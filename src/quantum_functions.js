@@ -2,8 +2,9 @@
 
 const factorialCache = new Map();
 const pochhammerCache = new Map();
-const laguerreCache = new Map(); // New cache for Laguerre polynomials
-const legendreCache = new Map(); // New cache for Legendre Polynomials
+const laguerreCache = new Map(); 
+const legendreCache = new Map(); 
+const sphericalHarmonicCache = new Map(); 
 
 // Bohr radius in meters (approximately 5.29 x 10^-11 m).
 // For convenience in calculations, we might consider using atomic units where a_0 = 1.
@@ -226,19 +227,17 @@ export function associatedLegendrePolynomial(l, m, x) {
     let val;
 
     if (m === l) {
-        // Base case: P_m^m(x) = (-1)^m * (2m-1)!! * (1-x^2)^(m/2)
-        // (2m-1)!! is double factorial = (2m-1) * (2m-3) * ... * 1
         let doubleFactorial = 1;
         for (let i = 2 * m - 1; i >= 1; i -= 2) {
             doubleFactorial *= i;
         }
-        val = Math.pow(-1, m) * doubleFactorial * Math.pow(1 - x * x, m / 2);
+        // ******************** CRITICAL CHANGE HERE ********************
+        // Remove Math.pow(-1, m) for consistency with real spherical harmonic formulas
+        val = doubleFactorial * Math.pow(1 - x * x, m / 2);
+        // **************************************************************
     } else if (m === l - 1) {
-        // Base case: P_{m+1}^m(x) = x * (2m+1) * P_m^m(x)
-        val = x * (2 * m + 1) * associatedLegendrePolynomial(m, m, x); // Recursive call to base case
+        val = x * (2 * m + 1) * associatedLegendrePolynomial(m, m, x);
     } else {
-        // Recurrence relation: (l-m)P_l^m(x) = x(2l-1)P_{l-1}^m(x) - (l+m-1)P_{l-2}^m(x)
-        // P_l^m(x) = [ x(2l-1)P_{l-1}^m(x) - (l+m-1)P_{l-2}^m(x) ] / (l-m)
         val = (x * (2 * l - 1) * associatedLegendrePolynomial(l - 1, m, x) -
                (l + m - 1) * associatedLegendrePolynomial(l - 2, m, x)) /
               (l - m);
@@ -246,8 +245,65 @@ export function associatedLegendrePolynomial(l, m, x) {
 
     legendreCache.set(cacheKey, val);
     return val;
+
 }
 
+/**
+ * Calculates the Real Spherical Harmonic Y_lm_l(theta, phi).
+ * This function handles the common real forms used for orbital visualization.
+ * Theta and phi are in radians.
+ * @param {number} l - The angular momentum quantum number (non-negative integer).
+ * @param {number} ml - The magnetic quantum number (integer, -l <= ml <= l).
+ * @param {number} theta - The polar angle in radians (0 to PI).
+ * @param {number} phi - The azimuthal angle in radians (0 to 2*PI).
+ * @returns {number} The value of the real spherical harmonic.
+ */
+export function realSphericalHarmonic(l, ml, theta, phi) {
+    // Validate quantum numbers and angles
+    if (l < 0 || !Number.isInteger(l)) {
+        throw new Error("Spherical Harmonic 'l' parameter must be a non-negative integer.");
+    }
+    if (!Number.isInteger(ml) || Math.abs(ml) > l) {
+        throw new Error("Spherical Harmonic 'ml' parameter must be an integer between -l and l (inclusive).");
+    }
+    if (theta < 0 || theta > Math.PI) {
+        throw new Error("Spherical Harmonic 'theta' parameter must be between 0 and PI radians.");
+    }
+    // No explicit check for phi range (0 to 2PI) as trigonometric functions handle periodicity,
+    // but typically phi is normalized to [0, 2PI) for consistent input.
+
+    const cacheKey = `${l},${ml},${theta},${phi}`;
+    if (sphericalHarmonicCache.has(cacheKey)) {
+        return sphericalHarmonicCache.get(cacheKey);
+    }
+
+    const abs_ml = Math.abs(ml);
+    const cosTheta = Math.cos(theta);
+
+    // Normalization factor, common to all forms
+    const normalizationFactor = Math.sqrt(
+        ((2 * l + 1) / (4 * Math.PI)) *
+        (factorial(l - abs_ml) / factorial(l + abs_ml))
+    );
+
+    // Associated Legendre Polynomial part
+    const legendrePart = associatedLegendrePolynomial(l, abs_ml, cosTheta);
+
+    let result;
+    if (ml === 0) {
+        // Y_l0 (real and complex forms are identical)
+        result = normalizationFactor * legendrePart;
+    } else if (ml > 0) {
+        // Real part (e.g., px, dxy)
+        result = normalizationFactor * legendrePart * Math.cos(ml * phi) * Math.sqrt(2);
+    } else { // ml < 0
+        // Imaginary part (e.g., py, dyz)
+        result = normalizationFactor * legendrePart * Math.sin(abs_ml * phi) * Math.sqrt(2);
+    }
+
+    sphericalHarmonicCache.set(cacheKey, result);
+    return result;
+}
 
 // Optional: function to clear all caches for testing purposes
 export const __clearAllCaches__ = () => {
@@ -255,4 +311,5 @@ export const __clearAllCaches__ = () => {
     pochhammerCache.clear();
     laguerreCache.clear();
     legendreCache.clear();
+    sphericalHarmonicCache.clear();
 };

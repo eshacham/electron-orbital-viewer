@@ -6,6 +6,7 @@ import {
     laguerrePolynomial,
     radialWaveFunction,
     associatedLegendrePolynomial,
+    realSphericalHarmonic,
     __clearAllCaches__ // Import the cache clearing function
 } from '../src/quantum_functions.js';
 
@@ -249,13 +250,13 @@ describe('Quantum Functions Module', () => {
         });
 
         it('should calculate P_1^1(x) correctly', () => {
-            // P_1^1(x) = -sqrt(1-x^2)
-            expect(associatedLegendrePolynomial(1, 1, 0)).toBeCloseTo(-1, EPSILON); // -sqrt(1-0) = -1
-            expect(associatedLegendrePolynomial(1, 1, 0.6)).toBeCloseTo(-Math.sqrt(1 - 0.6 * 0.6), EPSILON); // -0.8
-            expect(associatedLegendrePolynomial(1, 1, -0.8)).toBeCloseTo(-Math.sqrt(1 - (-0.8) * (-0.8)), EPSILON); // -0.6
+            // P_1^1(x) = sqrt(1-x^2)  <-- NOTE: Removed the leading negative sign from the comment and expectation
+            expect(associatedLegendrePolynomial(1, 1, 0)).toBeCloseTo(1, EPSILON); // sqrt(1-0) = 1
+            expect(associatedLegendrePolynomial(1, 1, 0.6)).toBeCloseTo(Math.sqrt(1 - 0.6 * 0.6), EPSILON); // 0.8
+            expect(associatedLegendrePolynomial(1, 1, -0.8)).toBeCloseTo(Math.sqrt(1 - (-0.8) * (-0.8)), EPSILON); // 0.6
             // Edge cases near boundaries
-            expect(associatedLegendrePolynomial(1, 1, 1)).toBeCloseTo(0, EPSILON); // -sqrt(1-1) = 0
-            expect(associatedLegendrePolynomial(1, 1, -1)).toBeCloseTo(0, EPSILON); // -sqrt(1-1) = 0
+            expect(associatedLegendrePolynomial(1, 1, 1)).toBeCloseTo(0, EPSILON);
+            expect(associatedLegendrePolynomial(1, 1, -1)).toBeCloseTo(0, EPSILON);
         });
 
         it('should calculate P_2^0(x) (Legendre P2) correctly', () => {
@@ -267,11 +268,11 @@ describe('Quantum Functions Module', () => {
         });
 
         it('should calculate P_2^1(x) correctly', () => {
-            // P_2^1(x) = -3x * sqrt(1-x^2)
+            // P_2^1(x) = 3x * sqrt(1-x^2) <-- NOTE: Removed the leading negative sign from the comment and expectation
             expect(associatedLegendrePolynomial(2, 1, 0)).toBeCloseTo(0, EPSILON);
             expect(associatedLegendrePolynomial(2, 1, 1)).toBeCloseTo(0, EPSILON);
             expect(associatedLegendrePolynomial(2, 1, -1)).toBeCloseTo(0, EPSILON);
-            expect(associatedLegendrePolynomial(2, 1, 0.5)).toBeCloseTo(-3 * 0.5 * Math.sqrt(1 - 0.25), EPSILON); // -1.5 * sqrt(0.75) = -1.299
+            expect(associatedLegendrePolynomial(2, 1, 0.5)).toBeCloseTo(3 * 0.5 * Math.sqrt(1 - 0.25), EPSILON); // 1.5 * sqrt(0.75) = 1.299
         });
 
         it('should calculate P_2^2(x) correctly', () => {
@@ -293,6 +294,96 @@ describe('Quantum Functions Module', () => {
         it('should throw an error for x out of range [-1, 1]', () => {
             expect(() => associatedLegendrePolynomial(1, 0, 1.1)).toThrow("Associated Legendre Polynomial 'x' parameter must be between -1 and 1 (inclusive).");
             expect(() => associatedLegendrePolynomial(1, 0, -1.1)).toThrow("Associated Legendre Polynomial 'x' parameter must be between -1 and 1 (inclusive).");
+        });
+    });
+
+    describe('realSphericalHarmonic function', () => {
+        const EPSILON = 1e-9;
+
+        // Test cases for known values of real spherical harmonics
+
+        it('should calculate Y_00 (s-orbital) correctly', () => {
+            // Y_00 = 1 / sqrt(4*PI) ~= 0.28209479177
+            const expected = 1 / Math.sqrt(4 * Math.PI);
+            expect(realSphericalHarmonic(0, 0, 0, 0)).toBeCloseTo(expected, EPSILON);
+            expect(realSphericalHarmonic(0, 0, Math.PI / 2, Math.PI)).toBeCloseTo(expected, EPSILON);
+            expect(realSphericalHarmonic(0, 0, Math.PI, 2 * Math.PI - 0.0001)).toBeCloseTo(expected, EPSILON);
+        });
+
+        it('should calculate Y_10 (p_z orbital) correctly', () => {
+            // Y_10 = sqrt(3 / (4*PI)) * cos(theta)
+            const factor = Math.sqrt(3 / (4 * Math.PI));
+            expect(realSphericalHarmonic(1, 0, 0, 0)).toBeCloseTo(factor * Math.cos(0), EPSILON); // theta=0, cos(0)=1
+            expect(realSphericalHarmonic(1, 0, Math.PI / 2, 0)).toBeCloseTo(factor * Math.cos(Math.PI / 2), EPSILON); // theta=PI/2, cos(PI/2)=0
+            expect(realSphericalHarmonic(1, 0, Math.PI, 0)).toBeCloseTo(factor * Math.cos(Math.PI), EPSILON); // theta=PI, cos(PI)=-1
+        });
+
+        it('should calculate Y_11 (p_x orbital) correctly', () => {
+            // Y_11 (real) = sqrt(3 / (4*PI)) * sin(theta) * cos(phi)
+            const factor = Math.sqrt(3 / (4 * Math.PI));
+            expect(realSphericalHarmonic(1, 1, Math.PI / 2, 0)).toBeCloseTo(factor * Math.sin(Math.PI / 2) * Math.cos(0), EPSILON); // theta=PI/2, phi=0 => 1 * 1 = 1
+            expect(realSphericalHarmonic(1, 1, Math.PI / 2, Math.PI / 2)).toBeCloseTo(factor * Math.sin(Math.PI / 2) * Math.cos(Math.PI / 2), EPSILON); // theta=PI/2, phi=PI/2 => 1 * 0 = 0
+            expect(realSphericalHarmonic(1, 1, 0, 0)).toBeCloseTo(factor * Math.sin(0) * Math.cos(0), EPSILON); // theta=0, sin(0)=0
+        });
+
+        it('should calculate Y_1-1 (p_y orbital) correctly', () => {
+            // Y_1-1 (real) = sqrt(3 / (4*PI)) * sin(theta) * sin(phi)
+            const factor = Math.sqrt(3 / (4 * Math.PI));
+            expect(realSphericalHarmonic(1, -1, Math.PI / 2, Math.PI / 2)).toBeCloseTo(factor * Math.sin(Math.PI / 2) * Math.sin(Math.PI / 2), EPSILON); // theta=PI/2, phi=PI/2 => 1 * 1 = 1
+            expect(realSphericalHarmonic(1, -1, Math.PI / 2, 0)).toBeCloseTo(factor * Math.sin(Math.PI / 2) * Math.sin(0), EPSILON); // theta=PI/2, phi=0 => 1 * 0 = 0
+            expect(realSphericalHarmonic(1, -1, 0, 0)).toBeCloseTo(factor * Math.sin(0) * Math.sin(0), EPSILON); // theta=0, sin(0)=0
+        });
+
+        // Test for d-orbitals (l=2)
+        it('should calculate Y_20 (d_z^2 orbital) correctly', () => {
+            // Y_20 = sqrt(5 / (16*PI)) * (3*cos^2(theta) - 1)
+            const factor = Math.sqrt(5 / (16 * Math.PI));
+            expect(realSphericalHarmonic(2, 0, 0, 0)).toBeCloseTo(factor * (3 * Math.cos(0) * Math.cos(0) - 1), EPSILON); // theta=0 => factor * (3*1-1) = 2*factor
+            expect(realSphericalHarmonic(2, 0, Math.PI / 2, 0)).toBeCloseTo(factor * (3 * Math.cos(Math.PI / 2) * Math.cos(Math.PI / 2) - 1), EPSILON); // theta=PI/2 => factor * (3*0-1) = -factor
+        });
+
+        it('should calculate Y_21 (d_xz orbital) correctly', () => {
+            // Y_21 (real) = sqrt(15 / (4*PI)) * sin(theta) * cos(theta) * cos(phi)
+            const factor = Math.sqrt(15 / (4 * Math.PI));
+            expect(realSphericalHarmonic(2, 1, Math.PI / 4, 0)).toBeCloseTo(factor * Math.sin(Math.PI / 4) * Math.cos(Math.PI / 4) * Math.cos(0), EPSILON);
+            expect(realSphericalHarmonic(2, 1, Math.PI / 2, Math.PI / 2)).toBeCloseTo(0, EPSILON); // cos(phi) term
+        });
+
+        it('should calculate Y_2-1 (d_yz orbital) correctly', () => {
+            // Y_2-1 (real) = sqrt(15 / (4*PI)) * sin(theta) * cos(theta) * sin(phi)
+            const factor = Math.sqrt(15 / (4 * Math.PI));
+            expect(realSphericalHarmonic(2, -1, Math.PI / 4, Math.PI / 4)).toBeCloseTo(factor * Math.sin(Math.PI / 4) * Math.cos(Math.PI / 4) * Math.sin(Math.PI / 4), EPSILON);
+            expect(realSphericalHarmonic(2, -1, Math.PI / 2, 0)).toBeCloseTo(0, EPSILON); // sin(phi) term
+        });
+
+        it('should calculate Y_22 (d_x^2-y^2 orbital) correctly', () => {
+            // Y_22 (real) = sqrt(15 / (16*PI)) * sin^2(theta) * cos(2*phi)
+            const factor = Math.sqrt(15 / (16 * Math.PI));
+            expect(realSphericalHarmonic(2, 2, Math.PI / 2, 0)).toBeCloseTo(factor * Math.pow(Math.sin(Math.PI / 2), 2) * Math.cos(0), EPSILON); // theta=PI/2, phi=0 => factor * 1 * 1 = factor
+            expect(realSphericalHarmonic(2, 2, Math.PI / 2, Math.PI / 4)).toBeCloseTo(0, EPSILON); // phi=PI/4 => cos(PI/2) = 0
+        });
+
+        it('should calculate Y_2-2 (d_xy orbital) correctly', () => {
+            // Y_2-2 (real) = sqrt(15 / (16*PI)) * sin^2(theta) * sin(2*phi)
+            const factor = Math.sqrt(15 / (16 * Math.PI));
+            expect(realSphericalHarmonic(2, -2, Math.PI / 2, Math.PI / 4)).toBeCloseTo(factor * Math.pow(Math.sin(Math.PI / 2), 2) * Math.sin(Math.PI / 2), EPSILON); // theta=PI/2, phi=PI/4 => factor * 1 * 1 = factor
+            expect(realSphericalHarmonic(2, -2, Math.PI / 2, 0)).toBeCloseTo(0, EPSILON); // phi=0 => sin(0) = 0
+        });
+
+        // Edge Cases / Invalid Inputs
+        it('should throw an error for negative l', () => {
+            expect(() => realSphericalHarmonic(-1, 0, 0, 0)).toThrow("Spherical Harmonic 'l' parameter must be a non-negative integer.");
+        });
+
+        it('should throw an error for ml out of range', () => {
+            expect(() => realSphericalHarmonic(1, 2, 0, 0)).toThrow("Spherical Harmonic 'ml' parameter must be an integer between -l and l (inclusive)."); // ml > l
+            expect(() => realSphericalHarmonic(1, -2, 0, 0)).toThrow("Spherical Harmonic 'ml' parameter must be an integer between -l and l (inclusive)."); // ml < -l
+            expect(() => realSphericalHarmonic(1, 0.5, 0, 0)).toThrow("Spherical Harmonic 'ml' parameter must be an integer between -l and l (inclusive)."); // ml not integer
+        });
+
+        it('should throw an error for theta out of range', () => {
+            expect(() => realSphericalHarmonic(0, 0, -0.1, 0)).toThrow("Spherical Harmonic 'theta' parameter must be between 0 and PI radians.");
+            expect(() => realSphericalHarmonic(0, 0, Math.PI + 0.1, 0)).toThrow("Spherical Harmonic 'theta' parameter must be between 0 and PI radians.");
         });
     });
 });
