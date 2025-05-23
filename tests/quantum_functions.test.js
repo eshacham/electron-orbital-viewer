@@ -5,6 +5,7 @@ import {
     binomialCoefficient,
     laguerrePolynomial,
     radialWaveFunction,
+    associatedLegendrePolynomial,
     __clearAllCaches__ // Import the cache clearing function
 } from '../src/quantum_functions.js';
 
@@ -214,6 +215,84 @@ describe('Quantum Functions Module', () => {
             expect(() => radialWaveFunction(1, 0, 1, 0)).toThrow("Nuclear charge (Z) must be a positive integer.");
             expect(() => radialWaveFunction(1, 0, 1, 1.5)).toThrow("Nuclear charge (Z) must be a positive integer.");
             expect(() => radialWaveFunction(1, 0, 1, -1)).toThrow("Nuclear charge (Z) must be a positive integer.");
+        });
+    });
+
+    describe('associatedLegendrePolynomial function', () => {
+        const EPSILON = 1e-9;
+
+        // Test cases for known values of P_l^m(x)
+        // General properties:
+        // P_l^m(x) = 0 if m > l
+        // P_l^0(1) = 1
+        // P_l^0(-1) = (-1)^l
+        // P_l^l(0) = (-1)^l (2l-1)!!
+        // P_l^0(0) = 0 if l is odd, (-1)^(l/2) * (l-1)!! / l!! if l is even
+
+        it('should return 0 when m > l', () => {
+            expect(associatedLegendrePolynomial(0, 1, 0.5)).toBeCloseTo(0, EPSILON);
+            expect(associatedLegendrePolynomial(1, 2, 0.5)).toBeCloseTo(0, EPSILON);
+            expect(associatedLegendrePolynomial(2, 3, 0.5)).toBeCloseTo(0, EPSILON);
+        });
+
+        it('should return 1 for P_0^0(x)', () => {
+            expect(associatedLegendrePolynomial(0, 0, 0)).toBeCloseTo(1, EPSILON);
+            expect(associatedLegendrePolynomial(0, 0, 0.5)).toBeCloseTo(1, EPSILON);
+            expect(associatedLegendrePolynomial(0, 0, -1)).toBeCloseTo(1, EPSILON);
+        });
+
+        it('should calculate P_1^0(x) (Legendre P1) correctly', () => {
+            // P_1^0(x) = x
+            expect(associatedLegendrePolynomial(1, 0, 0)).toBeCloseTo(0, EPSILON);
+            expect(associatedLegendrePolynomial(1, 0, 0.5)).toBeCloseTo(0.5, EPSILON);
+            expect(associatedLegendrePolynomial(1, 0, -1)).toBeCloseTo(-1, EPSILON);
+        });
+
+        it('should calculate P_1^1(x) correctly', () => {
+            // P_1^1(x) = -sqrt(1-x^2)
+            expect(associatedLegendrePolynomial(1, 1, 0)).toBeCloseTo(-1, EPSILON); // -sqrt(1-0) = -1
+            expect(associatedLegendrePolynomial(1, 1, 0.6)).toBeCloseTo(-Math.sqrt(1 - 0.6 * 0.6), EPSILON); // -0.8
+            expect(associatedLegendrePolynomial(1, 1, -0.8)).toBeCloseTo(-Math.sqrt(1 - (-0.8) * (-0.8)), EPSILON); // -0.6
+            // Edge cases near boundaries
+            expect(associatedLegendrePolynomial(1, 1, 1)).toBeCloseTo(0, EPSILON); // -sqrt(1-1) = 0
+            expect(associatedLegendrePolynomial(1, 1, -1)).toBeCloseTo(0, EPSILON); // -sqrt(1-1) = 0
+        });
+
+        it('should calculate P_2^0(x) (Legendre P2) correctly', () => {
+            // P_2^0(x) = 0.5 * (3x^2 - 1)
+            expect(associatedLegendrePolynomial(2, 0, 0)).toBeCloseTo(0.5 * (3 * 0 * 0 - 1), EPSILON); // -0.5
+            expect(associatedLegendrePolynomial(2, 0, 1)).toBeCloseTo(0.5 * (3 * 1 * 1 - 1), EPSILON); // 1
+            expect(associatedLegendrePolynomial(2, 0, -1)).toBeCloseTo(0.5 * (3 * 1 * 1 - 1), EPSILON); // 1
+            expect(associatedLegendrePolynomial(2, 0, 0.5)).toBeCloseTo(0.5 * (3 * 0.25 - 1), EPSILON); // -0.125
+        });
+
+        it('should calculate P_2^1(x) correctly', () => {
+            // P_2^1(x) = -3x * sqrt(1-x^2)
+            expect(associatedLegendrePolynomial(2, 1, 0)).toBeCloseTo(0, EPSILON);
+            expect(associatedLegendrePolynomial(2, 1, 1)).toBeCloseTo(0, EPSILON);
+            expect(associatedLegendrePolynomial(2, 1, -1)).toBeCloseTo(0, EPSILON);
+            expect(associatedLegendrePolynomial(2, 1, 0.5)).toBeCloseTo(-3 * 0.5 * Math.sqrt(1 - 0.25), EPSILON); // -1.5 * sqrt(0.75) = -1.299
+        });
+
+        it('should calculate P_2^2(x) correctly', () => {
+            // P_2^2(x) = 3 * (1-x^2)
+            expect(associatedLegendrePolynomial(2, 2, 0)).toBeCloseTo(3, EPSILON); // 3 * (1-0) = 3
+            expect(associatedLegendrePolynomial(2, 2, 1)).toBeCloseTo(0, EPSILON); // 3 * (1-1) = 0
+            expect(associatedLegendrePolynomial(2, 2, -1)).toBeCloseTo(0, EPSILON); // 3 * (1-1) = 0
+            expect(associatedLegendrePolynomial(2, 2, 0.5)).toBeCloseTo(3 * (1 - 0.25), EPSILON); // 3 * 0.75 = 2.25
+        });
+
+        it('should throw an error for negative l', () => {
+            expect(() => associatedLegendrePolynomial(-1, 0, 0)).toThrow('Associated Legendre Polynomial \'l\' parameter must be a non-negative integer.');
+        });
+
+        it('should throw an error for m < 0', () => {
+            expect(() => associatedLegendrePolynomial(1, -1, 0)).toThrow('Associated Legendre Polynomial \'m\' parameter must be a non-negative integer.');
+        });
+
+        it('should throw an error for x out of range [-1, 1]', () => {
+            expect(() => associatedLegendrePolynomial(1, 0, 1.1)).toThrow("Associated Legendre Polynomial 'x' parameter must be between -1 and 1 (inclusive).");
+            expect(() => associatedLegendrePolynomial(1, 0, -1.1)).toThrow("Associated Legendre Polynomial 'x' parameter must be between -1 and 1 (inclusive).");
         });
     });
 });

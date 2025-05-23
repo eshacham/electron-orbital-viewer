@@ -3,6 +3,7 @@
 const factorialCache = new Map();
 const pochhammerCache = new Map();
 const laguerreCache = new Map(); // New cache for Laguerre polynomials
+const legendreCache = new Map(); // New cache for Legendre Polynomials
 
 // Bohr radius in meters (approximately 5.29 x 10^-11 m).
 // For convenience in calculations, we might consider using atomic units where a_0 = 1.
@@ -35,7 +36,7 @@ const BOHR_RADIUS = 0.0529177210903; // nm or Angstroms depending on your desire
  * @param {number} n - The integer.
  * @returns {number} The factorial of n.
  */
-function factorial(n) {
+export function factorial(n) {
     if (n < 0) {
         throw new Error("Factorial is not defined for negative numbers.");
     }
@@ -62,7 +63,7 @@ function factorial(n) {
  * @param {number} n - The number of terms.
  * @returns {number} The Pochhammer symbol value.
  */
-function pochhammer(x, n) {
+export function pochhammer(x, n) {
     if (n < 0) {
         throw new Error("Pochhammer symbol is not defined for negative n.");
     }
@@ -89,7 +90,7 @@ function pochhammer(x, n) {
  * @param {number} K - The number of items to choose.
  * @returns {number} The binomial coefficient.
  */
-function binomialCoefficient(N, K) {
+export function binomialCoefficient(N, K) {
     if (K === 0) { // Explicitly handle K=0: C(N, 0) is always 1, even for negative N
         return 1;
     }
@@ -117,7 +118,7 @@ function binomialCoefficient(N, K) {
  * @param {number} x - The value at which to evaluate the polynomial.
  * @returns {number} The value of the generalized Laguerre polynomial.
  */
-function laguerrePolynomial(n, alpha, x) {
+export function laguerrePolynomial(n, alpha, x) {
     if (n < 0) {
         throw new Error("Laguerre polynomial degree (n) cannot be negative.");
     }
@@ -143,7 +144,6 @@ function laguerrePolynomial(n, alpha, x) {
     return sum;
 }
 
-
 /**
  * Calculates the radial wave function R_nl(r) for a hydrogen-like atom.
  * 'r' is expected to be in units of Bohr radii (atomic units).
@@ -153,7 +153,7 @@ function laguerrePolynomial(n, alpha, x) {
  * @param {number} Z - Nuclear charge (defaults to 1 for Hydrogen).
  * @returns {number} The value of the radial wave function.
  */
-function radialWaveFunction(n, l, r, Z = 1) {
+export function radialWaveFunction(n, l, r, Z = 1) {
     // Validate quantum numbers
     if (n < 1 || !Number.isInteger(n)) {
         throw new Error("Principal quantum number (n) must be a positive integer.");
@@ -195,12 +195,64 @@ function radialWaveFunction(n, l, r, Z = 1) {
     return normalizationFactor * rPowerTerm * expTerm * laguerreTerm;
 }
 
-// Export all relevant functions
-export { factorial, pochhammer, binomialCoefficient, laguerrePolynomial, radialWaveFunction };
+/**
+ * Calculates the Associated Legendre Polynomial P_l^m(x).
+ * Uses a recursive definition with memoization for efficiency.
+ * x = cos(theta), so -1 <= x <= 1.
+ * @param {number} l - The degree of the polynomial.
+ * @param {number} m - The order of the polynomial (abs value corresponds to |m_l|).
+ * @param {number} x - The value at which to evaluate the polynomial (cos(theta)).
+ * @returns {number} The value of P_l^m(x).
+ */
+export function associatedLegendrePolynomial(l, m, x) {
+    if (l < 0 || !Number.isInteger(l)) { // Validate l first
+        throw new Error("Associated Legendre Polynomial 'l' parameter must be a non-negative integer.");
+    }
+    if (m < 0 || !Number.isInteger(m)) { // Validate m is non-negative integer
+        throw new Error("Associated Legendre Polynomial 'm' parameter must be a non-negative integer.");
+    }
+    if (Math.abs(x) > 1 + 1e-9) {
+        throw new Error("Associated Legendre Polynomial 'x' parameter must be between -1 and 1 (inclusive).");
+    }
+    if (m > l) { // Then apply mathematical rule for m > l
+        return 0;
+    }
+
+    const cacheKey = `${l},${m},${x}`;
+    if (legendreCache.has(cacheKey)) {
+        return legendreCache.get(cacheKey);
+    }
+
+    let val;
+
+    if (m === l) {
+        // Base case: P_m^m(x) = (-1)^m * (2m-1)!! * (1-x^2)^(m/2)
+        // (2m-1)!! is double factorial = (2m-1) * (2m-3) * ... * 1
+        let doubleFactorial = 1;
+        for (let i = 2 * m - 1; i >= 1; i -= 2) {
+            doubleFactorial *= i;
+        }
+        val = Math.pow(-1, m) * doubleFactorial * Math.pow(1 - x * x, m / 2);
+    } else if (m === l - 1) {
+        // Base case: P_{m+1}^m(x) = x * (2m+1) * P_m^m(x)
+        val = x * (2 * m + 1) * associatedLegendrePolynomial(m, m, x); // Recursive call to base case
+    } else {
+        // Recurrence relation: (l-m)P_l^m(x) = x(2l-1)P_{l-1}^m(x) - (l+m-1)P_{l-2}^m(x)
+        // P_l^m(x) = [ x(2l-1)P_{l-1}^m(x) - (l+m-1)P_{l-2}^m(x) ] / (l-m)
+        val = (x * (2 * l - 1) * associatedLegendrePolynomial(l - 1, m, x) -
+               (l + m - 1) * associatedLegendrePolynomial(l - 2, m, x)) /
+              (l - m);
+    }
+
+    legendreCache.set(cacheKey, val);
+    return val;
+}
+
 
 // Optional: function to clear all caches for testing purposes
 export const __clearAllCaches__ = () => {
     factorialCache.clear();
     pochhammerCache.clear();
     laguerreCache.clear();
+    legendreCache.clear();
 };
