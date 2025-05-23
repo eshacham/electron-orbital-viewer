@@ -1,0 +1,16 @@
+{
+  "name": "electron-orbital-viewer",
+  "version": "1.0.0",
+  "description": "A web app to visualize electron orbitals.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
