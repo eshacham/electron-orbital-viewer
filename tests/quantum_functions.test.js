@@ -8,6 +8,7 @@ import {
     associatedLegendrePolynomial,
     realSphericalHarmonic,
     atomicOrbitalProbabilityDensity,
+    generateOrbitalData, 
     __clearAllCaches__ // Import the cache clearing function
 } from '../src/quantum_functions.js';
 
@@ -461,5 +462,70 @@ describe('Quantum Functions Module', () => {
         });
 
         // Other validation is covered by the underlying functions, no need to re-test.
+    });
+
+    describe('generateOrbitalData function', () => {
+        const EPSILON = 1e-9;
+        const Z = 1;
+
+        it('should generate the correct number of data points', () => {
+            const resolution = 10; // 11 steps for r, theta, 10 steps for phi
+            const rSteps = resolution + 1; // 0 to rMax
+            const thetaSteps = resolution + 1; // 0 to PI
+            const phiSteps = resolution; // 0 to 2PI (exclusive of 2PI)
+            const expectedPoints = rSteps * thetaSteps * phiSteps;
+
+            const data = generateOrbitalData(1, 0, 0, Z, resolution, 10);
+            expect(data.length).toBe(expectedPoints);
+        });
+
+        it('should return points with valid coordinates and positive density values (where expected)', () => {
+            const resolution = 5;
+            const rMax = 5;
+            const data = generateOrbitalData(1, 0, 0, Z, resolution, rMax); // 1s orbital
+
+            // Check a few points
+            const centerPoint = data.find(p => p.x === 0 && p.y === 0 && p.z === 0);
+            expect(centerPoint).toBeDefined();
+            expect(centerPoint.value).toBeCloseTo(1 / Math.PI, EPSILON); // Max density at origin for 1s
+
+            // Check coordinates are within bounds
+            data.forEach(point => {
+                const distance = Math.sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+                expect(distance).toBeLessThanOrEqual(rMax + EPSILON); // Allow for small floating point errors
+
+                // All densities should be non-negative
+                expect(point.value).toBeGreaterThanOrEqual(0);
+            });
+        });
+
+        it('should have zero density at known nodes (e.g., 2s radial node)', () => {
+            // For a 2s orbital, there's a radial node at r = 2a0.
+            // We'll generate data and check points near that r.
+            const resolution = 20;
+            const rMax = 5; // Ensure 2a0 is within rMax
+            const data = generateOrbitalData(2, 0, 0, Z, resolution, rMax); // 2s orbital
+
+            // Find points very close to r=2
+            const nodePoints = data.filter(p => {
+                const r = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+                return Math.abs(r - 2) < (rMax / resolution); // Check points within one radial step of the node
+            });
+
+            // At these node points, the density should be very close to zero
+            nodePoints.forEach(point => {
+                expect(point.value).toBeCloseTo(0, EPSILON);
+            });
+        });
+
+        it('should throw an error for invalid resolution', () => {
+            expect(() => generateOrbitalData(1, 0, 0, Z, 0, 10)).toThrow("Resolution must be a positive integer.");
+            expect(() => generateOrbitalData(1, 0, 0, Z, -5, 10)).toThrow("Resolution must be a positive integer.");
+        });
+
+        it('should throw an error for invalid rMax', () => {
+            expect(() => generateOrbitalData(1, 0, 0, Z, 50, 0)).toThrow("rMax must be a positive number.");
+            expect(() => generateOrbitalData(1, 0, 0, Z, 50, -5)).toThrow("rMax must be a positive number.");
+        });
     });
 });

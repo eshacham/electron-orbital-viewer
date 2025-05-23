@@ -343,6 +343,72 @@ export function atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z = 1) 
     return probabilityDensity;
 }
 
+/**
+ * Generates 3D data points for an atomic orbital's probability density.
+ * The data is generated on a spherical grid and returned as an array of objects,
+ * each containing Cartesian coordinates (x, y, z) and the probability density value.
+ *
+ * @param {number} n - Principal quantum number.
+ * @param {number} l - Azimuthal (angular momentum) quantum number.
+ * @param {number} ml - Magnetic quantum number.
+ * @param {number} Z - Nuclear charge (defaults to 1 for Hydrogen).
+ * @param {number} resolution - Number of steps along each axis for theta and phi.
+ * The radial steps will be adaptively chosen.
+ * @param {number} rMax - Maximum radial distance (in Bohr radii) to sample.
+ * @returns {Array<Object>} An array of objects, where each object has { x, y, z, value }.
+ */
+export function generateOrbitalData(n, l, ml, Z = 1, resolution = 50, rMax = 15) {
+    if (resolution <= 0) {
+        throw new Error("Resolution must be a positive integer.");
+    }
+    if (rMax <= 0) {
+        throw new Error("rMax must be a positive number.");
+    }
+
+    const dataPoints = [];
+    const rSteps = resolution; // Number of steps for radial distance
+    const thetaSteps = resolution; // Number of steps for theta
+    const phiSteps = resolution; // Number of steps for phi
+
+    // Calculate maximum probability density to normalize later (optional but good for visual scaling)
+    let maxDensity = 0;
+
+    // Iterate through the spherical coordinate grid
+    for (let i = 0; i <= rSteps; i++) {
+        const r = (i / rSteps) * rMax; // r from 0 to rMax
+
+        for (let j = 0; j <= thetaSteps; j++) {
+            // Theta from 0 to PI
+            const theta = (j / thetaSteps) * Math.PI;
+
+            for (let k = 0; k < phiSteps; k++) { // Note: phi goes from 0 up to, but not including, 2*PI
+                // Phi from 0 to 2*PI
+                const phi = (k / phiSteps) * (2 * Math.PI);
+
+                const density = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
+                maxDensity = Math.max(maxDensity, density);
+
+                // Convert spherical coordinates (r, theta, phi) to Cartesian (x, y, z)
+                // x = r * sin(theta) * cos(phi)
+                // y = r * sin(theta) * sin(phi)
+                // z = r * cos(theta)
+                const x = r * Math.sin(theta) * Math.cos(phi);
+                const y = r * Math.sin(theta) * Math.sin(phi);
+                const z = r * Math.cos(theta);
+
+                dataPoints.push({ x, y, z, value: density });
+            }
+        }
+    }
+
+    // Optional: Normalize densities if needed for visualization (e.g., values between 0 and 1)
+    // For now, we return raw density. Normalization can happen in the visualization layer.
+    // However, knowing maxDensity can be useful for determining isosurface levels.
+    // return { data: dataPoints, maxDensity }; // Could return object with data and max density
+
+    return dataPoints;
+}
+
 // Optional: function to clear all caches for testing purposes
 export const __clearAllCaches__ = () => {
     factorialCache.clear();
