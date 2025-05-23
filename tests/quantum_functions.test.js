@@ -7,6 +7,7 @@ import {
     radialWaveFunction,
     associatedLegendrePolynomial,
     realSphericalHarmonic,
+    atomicOrbitalProbabilityDensity,
     __clearAllCaches__ // Import the cache clearing function
 } from '../src/quantum_functions.js';
 
@@ -385,5 +386,80 @@ describe('Quantum Functions Module', () => {
             expect(() => realSphericalHarmonic(0, 0, -0.1, 0)).toThrow("Spherical Harmonic 'theta' parameter must be between 0 and PI radians.");
             expect(() => realSphericalHarmonic(0, 0, Math.PI + 0.1, 0)).toThrow("Spherical Harmonic 'theta' parameter must be between 0 and PI radians.");
         });
+    });
+
+    describe('atomicOrbitalProbabilityDensity function', () => {
+        const EPSILON = 1e-9;
+        const Z = 1; // Hydrogen atom for all tests
+
+        // Test for 1s orbital (n=1, l=0, ml=0)
+        it('should calculate 1s orbital probability density correctly at origin', () => {
+            // For 1s, R_10(r) is max at r=0. Y_00 is constant.
+            // At r=0, probability should be highest for 1s.
+            // R_10(0, Z=1) = 2 * (1/1)^(3/2) * e^0 * L_0^1(0) = 2
+            // Y_00 = 1 / sqrt(4*PI)
+            // Psi^2 = (2 * (1 / sqrt(4*PI)))^2 = 4 / (4*PI) = 1/PI
+            const expected = 1 / Math.PI;
+            // Note: r=0 can sometimes be tricky for radial functions due to r^l term.
+            // Our radialWaveFunction is designed to handle r=0 correctly.
+            // For 1s, the r^l term (r^0) is 1.
+            expect(atomicOrbitalProbabilityDensity(1, 0, 0, 0, 0, 0, Z)).toBeCloseTo(expected, EPSILON);
+        });
+
+        it('should calculate 1s orbital probability density correctly at a distance', () => {
+            // Test 1s at r = a0 (1 Bohr radius)
+            // R_10(r=1, Z=1) = 2 * (1/1)^(3/2) * exp(-1/1) * L_0^1(2*1*1/1) = 2 * exp(-1) * 1 = 2/e
+            // Y_00 = 1 / sqrt(4*PI)
+            // Psi^2 = ( (2/e) * (1 / sqrt(4*PI)) )^2 = (4 / e^2) / (4*PI) = 1 / (PI * e^2)
+            const expected = 1 / (Math.PI * Math.exp(2));
+            expect(atomicOrbitalProbabilityDensity(1, 0, 0, 1, Math.PI / 2, Math.PI / 2, Z)).toBeCloseTo(expected, EPSILON);
+        });
+
+        // Test for 2s orbital (n=2, l=0, ml=0) - check for node
+        it('should calculate 2s orbital probability density correctly at its radial node', () => {
+            // The 2s orbital has a radial node where r = 2a0 / Z. For Z=1, r=2.
+            // At a node, the wave function value (and thus probability density) should be 0.
+            expect(atomicOrbitalProbabilityDensity(2, 0, 0, 2, 0, 0, Z)).toBeCloseTo(0, EPSILON);
+        });
+
+        // Test for 2p_z orbital (n=2, l=1, ml=0) - check for angular node
+        it('should calculate 2p_z orbital probability density correctly at its angular node', () => {
+            // 2p_z has an angular node at theta = PI/2 (equatorial plane), because Y_10 ~ cos(theta)
+            expect(atomicOrbitalProbabilityDensity(2, 1, 0, 1, Math.PI / 2, 0, Z)).toBeCloseTo(0, EPSILON);
+        });
+
+        // Test for 2p_x orbital (n=2, l=1, ml=1) - check for angular node
+        it('should calculate 2p_x orbital probability density correctly at its angular node', () => {
+            // 2p_x has an angular node where cos(phi) = 0, e.g., phi = PI/2 or 3*PI/2
+            expect(atomicOrbitalProbabilityDensity(2, 1, 1, 1, Math.PI / 2, Math.PI / 2, Z)).toBeCloseTo(0, EPSILON);
+        });
+
+        // Test for 2p_y orbital (n=2, l=1, ml=-1) - check for angular node
+        it('should calculate 2p_y orbital probability density correctly at its angular node', () => {
+            // 2p_y has an angular node where sin(phi) = 0, e.g., phi = 0 or PI
+            expect(atomicOrbitalProbabilityDensity(2, 1, -1, 1, Math.PI / 2, 0, Z)).toBeCloseTo(0, EPSILON);
+        });
+
+        // General non-zero test for 2pz at a point
+        it('should calculate 2p_z orbital probability density correctly at a point', () => {
+            // n=2, l=1, ml=0, r=1, theta=0, phi=0
+            // R_21(r=1, Z=1) = (1/sqrt(3)) * (1/2)^(3/2) * (2*1)^1 * exp(-1) * L_0^3(2*1)
+            // L_0^3(2) = 1 (L_0^alpha(x) = 1)
+            // R_21(1, Z=1) = (1/sqrt(3)) * (1/2)^(3/2) * 2 * exp(-1) = (1/sqrt(3)) * (1/(2*sqrt(2))) * 2 * exp(-1)
+            //              = (1/sqrt(3)) * (1/sqrt(2)) * exp(-1) = 1/sqrt(6) * exp(-1)
+            // Y_10(theta=0, phi=0) = sqrt(3 / (4*PI)) * cos(0) = sqrt(3 / (4*PI))
+            // Psi^2 = (R * Y)^2 = ( (1/sqrt(6)) * exp(-1) * sqrt(3/(4*PI)) )^2
+            //                 = (1/6) * exp(-2) * (3/(4*PI)) = (1/2) * exp(-2) * (1/(4*PI)) = 1 / (8*PI*e^2)
+            const expected = 1 / (8 * Math.PI * Math.exp(2));
+            expect(atomicOrbitalProbabilityDensity(2, 1, 0, 1, 0, 0, Z)).toBeCloseTo(expected, EPSILON);
+        });
+
+
+        // Error handling for r < 0 (already handled by radialWaveFunction, but good to double check)
+        it('should throw an error if r is negative', () => {
+            expect(() => atomicOrbitalProbabilityDensity(1, 0, 0, -0.1, 0, 0, Z)).toThrow("Distance (r) cannot be negative for atomic orbital probability density.");
+        });
+
+        // Other validation is covered by the underlying functions, no need to re-test.
     });
 });

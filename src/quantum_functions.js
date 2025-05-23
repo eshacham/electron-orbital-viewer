@@ -5,6 +5,7 @@ const pochhammerCache = new Map();
 const laguerreCache = new Map(); 
 const legendreCache = new Map(); 
 const sphericalHarmonicCache = new Map(); 
+const atomicOrbitalCache = new Map();
 
 // Bohr radius in meters (approximately 5.29 x 10^-11 m).
 // For convenience in calculations, we might consider using atomic units where a_0 = 1.
@@ -305,6 +306,43 @@ export function realSphericalHarmonic(l, ml, theta, phi) {
     return result;
 }
 
+/**
+ * Calculates the probability density of finding an electron at a given point
+ * in space for a hydrogen-like atom (magnitude squared of the wave function).
+ * Psi(r, theta, phi)^2 = [R_nl(r) * Y_lm_l(theta, phi)]^2
+ * 'r' is expected to be in units of Bohr radii (atomic units).
+ * Theta and phi are in radians.
+ * @param {number} n - Principal quantum number.
+ * @param {number} l - Azimuthal (angular momentum) quantum number.
+ * @param {number} ml - Magnetic quantum number.
+ * @param {number} r - Distance from the nucleus in Bohr radii.
+ * @param {number} theta - Polar angle in radians (0 to PI).
+ * @param {number} phi - Azimuthal angle in radians (0 to 2*PI).
+ * @param {number} Z - Nuclear charge (defaults to 1 for Hydrogen).
+ * @returns {number} The probability density (magnitude squared of the wave function).
+ */
+export function atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z = 1) {
+    // Input validation is handled by the underlying functions.
+    // We only need to check for non-physical r here explicitly if it's not caught below.
+    if (r < 0) {
+        throw new Error("Distance (r) cannot be negative for atomic orbital probability density.");
+    }
+
+    const cacheKey = `${n},${l},${ml},${r},${theta},${phi},${Z}`;
+    if (atomicOrbitalCache.has(cacheKey)) {
+        return atomicOrbitalCache.get(cacheKey);
+    }
+
+    const radialPart = radialWaveFunction(n, l, r, Z);
+    const angularPart = realSphericalHarmonic(l, ml, theta, phi);
+
+    const waveFunctionValue = radialPart * angularPart;
+    const probabilityDensity = waveFunctionValue * waveFunctionValue; // Square the value
+
+    atomicOrbitalCache.set(cacheKey, probabilityDensity);
+    return probabilityDensity;
+}
+
 // Optional: function to clear all caches for testing purposes
 export const __clearAllCaches__ = () => {
     factorialCache.clear();
@@ -312,4 +350,5 @@ export const __clearAllCaches__ = () => {
     laguerreCache.clear();
     legendreCache.clear();
     sphericalHarmonicCache.clear();
+    atomicOrbitalCache.clear();
 };
