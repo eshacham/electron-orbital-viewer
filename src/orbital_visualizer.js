@@ -1,7 +1,7 @@
 // src/orbital_visualizer.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { getOrbitalPotentialFunction, atomicOrbitalProbabilityDensity } from './quantum_functions.js'; 
+import { getOrbitalPotentialFunction } from './quantum_functions.js'; 
 import MarchingCubesModule from 'marching-cubes-fast'
 
 // --- Scene Setup ---
@@ -9,8 +9,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050505);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-// ADJUSTED: Initial camera position for a better view of objects
-camera.position.z = 12; // Bring camera closer for better initial view
+camera.position.z = 12; // Initial camera position
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -28,24 +27,21 @@ scene.add(directionalLight);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-// ADDED: Set target to the center of the scene for proper rotation
 controls.target.set(0, 0, 0); 
-// ADDED: Adjust zoom limits for better control
 controls.minDistance = 0.1; // Allow very close zoom
 controls.maxDistance = 100; // Allow sufficient zoom out
 
 
 // --- UI Elements ---
-// Declare all UI element references at the top of this section
 const nSelect = document.getElementById('n-select');
 const lSelect = document.getElementById('l-select');
 const mlSelect = document.getElementById('ml-select');
 const zInput = document.getElementById('z-input');
-const resolutionInput = document.getElementById('resolution-input'); // This is now an <input type="number">
+const resolutionInput = document.getElementById('resolution-input');
 const rMaxInput = document.getElementById('rMax-input');
 const updateButton = document.getElementById('update-orbital');
 
-// NEW UI for Isosurface Level: Create and append dynamically
+// Dynamically create and append Iso-Level input
 const isoLevelInput = document.createElement('input');
 isoLevelInput.type = 'number';
 isoLevelInput.id = 'iso-level-input';
@@ -63,15 +59,60 @@ isoLevelGroup.appendChild(isoLevelInput);
 const controlsContainer = document.getElementById('controls');
 controlsContainer.insertBefore(isoLevelGroup, updateButton.parentNode);
 
-// --- Global Orbital Parameters (initialized from UI) ---
+
+// --- Global Orbital Parameters (initialized from UI or defaults) ---
 let currentN = parseInt(nSelect.value);
 let currentL = parseInt(lSelect.value);
 let currentMl = parseInt(mlSelect.value);
 let currentZ = parseInt(zInput.value);
-// Initial currentResolution should be a power of 2 for Marching Cubes
 let currentResolution = 64; // Default to a valid power of 2
 let currentRMax = parseFloat(rMaxInput.value);
 let isoSurfaceLevel = parseFloat(isoLevelInput.value);
+
+
+// --- Optimized Parameters Storage ---
+// YOU WILL FILL THIS OBJECT WITH YOUR OPTIMIZED VALUES
+// Example: "n_l": { rMax: value, isoLevel: value }
+const optimizedOrbitalParameters = {
+    // Initial suggested values - you will adjust these through experimentation!
+    "1_0": { rMax: 10, isoLevel: 0.001 },
+    "2_0": { rMax: 15, isoLevel: 0.0005 },
+    "2_1": { rMax: 15, isoLevel: 0.0005 },
+    "3_0": { rMax: 20, isoLevel: 0.0001 },
+    "3_1": { rMax: 20, isoLevel: 0.0001 },
+    "3_2": { rMax: 20, isoLevel: 0.0001 },
+    "4_0": { rMax: 25, isoLevel: 0.00005 },
+    "4_1": { rMax: 25, isoLevel: 0.00005 },
+    "4_2": { rMax: 25, isoLevel: 0.00005 },
+    "4_3": { rMax: 25, isoLevel: 0.00005 },
+    // Add more entries here as you find optimal rMax and isoLevel for other (n,l) combinations
+    // For example:
+    // "5_0": { rMax: 30, isoLevel: 0.00001 },
+    // "5_1": { rMax: 30, isoLevel: 0.00001 },
+    // ...
+};
+
+// --- Function to Load and Apply Optimized Parameters ---
+function loadOptimizedParameters() {
+    const key = `${currentN}_${currentL}`;
+    const params = optimizedOrbitalParameters[key];
+
+    if (params) {
+        currentRMax = params.rMax;
+        isoSurfaceLevel = params.isoLevel;
+        console.log(`Loaded optimized parameters for n=${currentN}, l=${currentL}: rMax=${currentRMax}, isoLevel=${isoSurfaceLevel}`);
+    } else {
+        // Fallback to default if no optimized parameters are found
+        currentRMax = parseFloat(rMaxInput.defaultValue || 15); // Use existing input default or 15
+        isoSurfaceLevel = parseFloat(isoLevelInput.defaultValue || 0.0005); // Use existing input default or 0.0005
+        console.warn(`No optimized parameters found for n=${currentN}, l=${currentL}. Using default values.`);
+    }
+
+    // Update UI inputs to reflect the loaded/default values
+    rMaxInput.value = currentRMax;
+    isoLevelInput.value = isoSurfaceLevel;
+}
+
 
 // --- Functions to Update UI Options ---
 
@@ -91,6 +132,7 @@ function updateLOptions() {
     }
     lSelect.value = currentL;
     updateMlOptions();
+    loadOptimizedParameters(); // Call after n and l are potentially updated
 }
 
 function updateMlOptions() {
@@ -109,18 +151,17 @@ function updateMlOptions() {
 }
 
 // --- Render Orbital ---
-let currentOrbitalMesh = null; // Variable to hold the current orbital mesh
-let currentOrbitalPoints = null; // Variable to hold the current orbital points
+let currentOrbitalMesh = null;
+let currentOrbitalPoints = null;
 
 function renderOrbital() {
-    // Clear previous orbital mesh
+    // Clear previous orbital mesh and points
     if (currentOrbitalMesh) {
-        scene.remove(currentOrbitalMesh); // Remove the old mesh directly from the scene
-        currentOrbitalMesh.geometry.dispose(); // Dispose geometry
-        currentOrbitalMesh.material.dispose(); // Dispose material
-        currentOrbitalMesh = null; // Clear reference
+        scene.remove(currentOrbitalMesh);
+        currentOrbitalMesh.geometry.dispose();
+        currentOrbitalMesh.material.dispose();
+        currentOrbitalMesh = null;
     }
-    // Clear previous orbital points
     if (currentOrbitalPoints) {
         scene.remove(currentOrbitalPoints);
         currentOrbitalPoints.geometry.dispose();
@@ -134,6 +175,7 @@ function renderOrbital() {
     const ml = currentMl;
     const Z = currentZ;
 
+    // Use currentRMax and isoSurfaceLevel that were potentially loaded
     const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoSurfaceLevel);
 
     const worldBounds = [
@@ -146,15 +188,12 @@ function renderOrbital() {
     console.log(`Visualization: Resolution=${currentResolution}, rMax=${currentRMax}, Iso-Level=${isoSurfaceLevel}`);
     console.log(`World Bounds:`, worldBounds);
 
-    // Validate resolution before calling Marching Cubes
-    // (Keeping check for informational purposes, but removing fallback as per user request)
     function isPowerOfTwo(value) {
         return (value & (value - 1)) === 0 && value > 0;
     }
 
     if (!isPowerOfTwo(currentResolution)) {
         console.error(`ERROR: Resolution (${currentResolution}) must be a power of two for Marching Cubes. Orbital might not render correctly or an error might occur.`);
-        // No automatic fallback here, user input is used directly.
     }
 
 
@@ -169,44 +208,38 @@ function renderOrbital() {
     console.log("First 5 cells (raw):", meshData.cells ? meshData.cells.slice(0, 5) : "N/A");
 
 
-    // Check if positions (vertices) were generated
     if (!meshData || !meshData.positions || meshData.positions.length === 0) {
         console.warn("Marching Cubes generated no positions (vertices). This means the isosurface level might not be found within the given parameters (rMax, resolution) or the orbital itself has very low density.");
         console.warn("Try adjusting Iso-Level (decrease it), rMax (increase it), or choose different quantum numbers.");
         return;
     }
 
-    // --- Detailed NaN/Infinity check and Flattening for meshData.positions ---
     const flatPositions = [];
-    let hasInvalidNumberInSource = false; // Flag for issues in meshData.positions source
+    let hasInvalidNumberInSource = false;
     for (let i = 0; i < meshData.positions.length; i++) {
-        const vertex = meshData.positions[i]; // Each element is an array [x, y, z]
+        const vertex = meshData.positions[i];
         if (!Array.isArray(vertex) || vertex.length !== 3) {
             console.error(`Unexpected vertex format at index ${i}. Expected [x,y,z] array. Found:`, vertex);
             hasInvalidNumberInSource = true;
             continue;
         }
         for (let j = 0; j < 3; j++) {
-            if (isNaN(vertex[j]) || !isFinite(vertex[j])) { // Check for NaN OR Infinity
+            if (isNaN(vertex[j]) || !isFinite(vertex[j])) {
                 console.error(`Invalid value (NaN or Infinity) found in meshData.positions[${i}][${j}]: ${vertex[j]}`);
                 hasInvalidNumberInSource = true;
             }
-            flatPositions.push(vertex[j]); // Flatten the array here
+            flatPositions.push(vertex[j]);
         }
     }
 
     if (hasInvalidNumberInSource) {
-        console.error("meshData.positions contains invalid numerical values (NaN or Infinity). This is likely the cause of the computeBoundingSphere error.");
-        return; // Stop rendering if data is bad
+        console.error("meshData.positions contains invalid numerical values (NaN or Infinity). This is likely the cause of a rendering error.");
+        return;
     }
 
-    console.log("flatPositions length:", flatPositions.length); // Log the length
-    // --- End NaN/Infinity check & Flattening ---
-
-    // --- Check if flatPositions length is a multiple of 3 ---
     if (flatPositions.length % 3 !== 0) {
         console.error(`ERROR: flatPositions length (${flatPositions.length}) is not a multiple of 3. This means vertex data is incomplete or corrupted!`);
-        return; // Prevent further errors
+        return;
     }
 
     const geometry = new THREE.BufferGeometry();
@@ -225,67 +258,52 @@ function renderOrbital() {
         if (typeof gx !== 'number' || typeof gy !== 'number' || typeof gz !== 'number' ||
             isNaN(gx) || isNaN(gy) || isNaN(gz) || !isFinite(gx) || !isFinite(gy) || !isFinite(gz)) {
             console.error(`Runtime ERROR: Invalid gx, gy, or gz found in scaling loop at index ${i}.`);
-            console.error(`gx: ${gx} (type: ${typeof gx}), gy: ${gy} (type: ${typeof gy}), gz: ${gz} (type: ${typeof gz})`);
         }
 
         scaledAndTranslatedPositions[i]     = gx * scaleFactor - currentRMax;
         scaledAndTranslatedPositions[i + 1] = gy * scaleFactor - currentRMax;
         scaledAndTranslatedPositions[i + 2] = gz * scaleFactor - currentRMax;
     }
-    console.log("scaledAndTranslatedPositions length:", scaledAndTranslatedPositions.length);
 
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(scaledAndTranslatedPositions, 3));
 
-    // --- CRITICAL FIX: Flatten meshData.cells before setting index ---
     const flatCells = [];
     for (let i = 0; i < meshData.cells.length; i++) {
         const triangle = meshData.cells[i];
         if (!Array.isArray(triangle) || triangle.length !== 3) {
             console.error(`Unexpected triangle format at index ${i}. Expected [idx1,idx2,idx3] array. Found:`, triangle);
-            // Handle error, maybe skip this triangle or break. For now, push invalid values.
-            flatCells.push(0, 0, 0); // Push dummy indices to prevent further errors
+            flatCells.push(0, 0, 0);
         } else {
             flatCells.push(triangle[0], triangle[1], triangle[2]);
         }
     }
-    console.log("flatCells length (after flattening):", flatCells.length);
     geometry.setIndex(new THREE.Uint32BufferAttribute(new Uint32Array(flatCells), 1));
-    // --- END CRITICAL FIX ---
-
 
     geometry.computeVertexNormals();
 
-
-    // --- Orbital Mesh Material (Transparent) ---
     const meshMaterial = new THREE.MeshStandardMaterial({
         color: 0x00aaff, // Blue color
         transparent: true,
         opacity: 0.5, // Semi-transparent
         side: THREE.DoubleSide,
-        depthWrite: false // Important for correct transparency rendering
+        depthWrite: false
     });
 
     const orbitalMesh = new THREE.Mesh(geometry, meshMaterial);
-    scene.add(orbitalMesh); // Add directly to the scene
-    currentOrbitalMesh = orbitalMesh; // Store reference to the new mesh
+    scene.add(orbitalMesh);
+    currentOrbitalMesh = orbitalMesh;
 
-
-    // --- Orbital Points Material ---
     const pointsMaterial = new THREE.PointsMaterial({
         color: 0x00ff00, // Green for points
-        size: 0.05, // Size of each point
-        sizeAttenuation: true // Points get smaller when farther away
+        size: 0.05,
+        sizeAttenuation: true
     });
 
     const orbitalPoints = new THREE.Points(geometry, pointsMaterial);
-    scene.add(orbitalPoints); // Add points to the scene
+    scene.add(orbitalPoints);
     currentOrbitalPoints = orbitalPoints;
 
-
-    // Debugging: Log orbital mesh properties right before adding
     console.log("Orbital Mesh created:", orbitalMesh);
-    console.log("Orbital Mesh Geometry:", orbitalMesh.geometry);
-    console.log("Orbital Mesh Material:", orbitalMesh.material);
     console.log("Orbital Points created:", orbitalPoints);
 }
 
@@ -293,12 +311,13 @@ function renderOrbital() {
 // --- Event Listeners ---
 nSelect.addEventListener('change', () => {
     currentN = parseInt(nSelect.value);
-    updateLOptions();
+    updateLOptions(); // This will now also call loadOptimizedParameters
 });
 
 lSelect.addEventListener('change', () => {
     currentL = parseInt(lSelect.value);
     updateMlOptions();
+    loadOptimizedParameters(); // Call to load parameters for the new (n,l)
 });
 
 mlSelect.addEventListener('change', () => {
@@ -313,14 +332,13 @@ zInput.addEventListener('change', () => {
     }
 });
 
-// Handling resolution input as a number field (no power of 2 enforcement in logic)
 resolutionInput.addEventListener('change', () => {
     let newResolution = parseInt(resolutionInput.value);
-    if (isNaN(newResolution) || newResolution < 20) { // Basic validation
-        newResolution = 64; // Default to a safe value
+    if (isNaN(newResolution) || newResolution < 20) {
+        newResolution = 64;
         resolutionInput.value = newResolution;
     }
-    currentResolution = newResolution; // Use value directly
+    currentResolution = newResolution;
 });
 
 rMaxInput.addEventListener('change', () => {
@@ -329,6 +347,7 @@ rMaxInput.addEventListener('change', () => {
         currentRMax = 15;
         rMaxInput.value = 15;
     }
+    // If the user manually changes rMax, this overwrites the loaded value for this session
 });
 
 isoLevelInput.addEventListener('change', () => {
@@ -337,6 +356,7 @@ isoLevelInput.addEventListener('change', () => {
         isoSurfaceLevel = 0.0005;
         isoLevelInput.value = 0.0005;
     }
+    // If the user manually changes isoLevel, this overwrites the loaded value for this session
 });
 
 
@@ -350,14 +370,15 @@ function animate() {
 }
 
 // --- Initialize ---
+// Set initial UI values to match current variables
 nSelect.value = currentN.toString();
-updateLOptions();
+updateLOptions(); // This will populate L and Ml options and load initial optimized parameters
 lSelect.value = currentL.toString();
 mlSelect.value = currentMl.toString();
 zInput.value = currentZ.toString();
-resolutionInput.value = currentResolution.toString(); // Ensure UI matches initial value
-rMaxInput.value = currentRMax.toString();
-isoLevelInput.value = isoSurfaceLevel.toString();
+resolutionInput.value = currentResolution.toString();
+rMaxInput.value = currentRMax.toString(); // Updated by loadOptimizedParameters initially
+isoLevelInput.value = isoSurfaceLevel.toString(); // Updated by loadOptimizedParameters initially
 
 // Initial render
 renderOrbital();
