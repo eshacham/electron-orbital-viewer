@@ -46,19 +46,19 @@ const nSelect = document.getElementById('n-select');
 const lSelect = document.getElementById('l-select');
 const mlSelect = document.getElementById('ml-select');
 const zInput = document.getElementById('z-input');
-const resolutionInput = document.getElementById('resolution-input');
+const resolutionInput = document.getElementById('resolution-input'); // This is a <select>
 const rMaxInput = document.getElementById('rMax-input');
-const updateButton = document.getElementById('update-orbital'); // This was declared later, causing the TDZ error
+const updateButton = document.getElementById('update-orbital');
 
 // NEW UI for Isosurface Level: Create and append dynamically
 const isoLevelInput = document.createElement('input');
 isoLevelInput.type = 'number';
 isoLevelInput.id = 'iso-level-input';
 isoLevelInput.value = '0.0005'; // Default starting value
-isoLevelInput.min = '0.0000001'; // Very small positive number
-isoLevelInput.step = '0.0001'; // Step for adjustment
-isoLevelInput.style.width = '80px'; // Adjust width if needed
-
+isoLevelInput.min = '0.0000001';
+isoLevelInput.max = '0.1';
+isoLevelInput.step = '0.00001';
+isoLevelInput.style.width = '80px';
 
 const isoLevelGroup = document.createElement('div');
 isoLevelGroup.className = 'control-group';
@@ -66,51 +66,44 @@ isoLevelGroup.innerHTML = '<label for="iso-level-input">Iso-Level:</label>';
 isoLevelGroup.appendChild(isoLevelInput);
 
 const controlsContainer = document.getElementById('controls');
-// Append the new isoLevelGroup to the end of the controls container
-controlsContainer.appendChild(isoLevelGroup);
-// Then, move the updateButton to be after the newly added isoLevelGroup
-controlsContainer.appendChild(updateButton); // Now updateButton is declared before this line
+controlsContainer.insertBefore(isoLevelGroup, updateButton.parentNode);
 
-
-// --- Global variables for orbital parameters ---
+// --- Global Orbital Parameters (initialized from UI) ---
 let currentN = parseInt(nSelect.value);
 let currentL = parseInt(lSelect.value);
 let currentMl = parseInt(mlSelect.value);
 let currentZ = parseInt(zInput.value);
-let currentResolution = parseInt(resolutionInput.value); // Will be 64 from HTML select
+let currentResolution = parseInt(resolutionInput.value);
 let currentRMax = parseFloat(rMaxInput.value);
 let isoSurfaceLevel = parseFloat(isoLevelInput.value);
 
-// --- Helper Functions ---
+// --- Functions to Update UI Options ---
 
-// Function to update L options based on N
 function updateLOptions() {
     const n = parseInt(nSelect.value);
     lSelect.innerHTML = '';
-    const orbitalTypes = ['s', 'p', 'd', 'f', 'g', 'h', 'i']; // Extend if n > 7
+    const orbitalTypes = ['s', 'p', 'd', 'f', 'g', 'h', 'i'];
     for (let l = 0; l < n; l++) {
         const option = document.createElement('option');
         option.value = l;
-        // Use an array lookup for orbital types
-        const orbitalChar = orbitalTypes[l] || `unknown(${l})`; // Fallback for higher l
+        const orbitalChar = orbitalTypes[l] || `orbital(${l})`;
         option.textContent = `l=${l} (${orbitalChar} orbital)`;
         lSelect.appendChild(option);
     }
     if (currentL >= n || isNaN(currentL)) {
-        currentL = 0;
+        currentL = n - 1;
     }
     lSelect.value = currentL;
     updateMlOptions();
 }
 
-// Function to update Ml options based on L
 function updateMlOptions() {
     const l = parseInt(lSelect.value);
     mlSelect.innerHTML = '';
     for (let ml = -l; ml <= l; ml++) {
         const option = document.createElement('option');
         option.value = ml;
-        option.textContent = ml;
+        option.textContent = `m_l=${ml}`;
         mlSelect.appendChild(option);
     }
     if (Math.abs(currentMl) > l || isNaN(currentMl)) {
@@ -224,7 +217,7 @@ function renderOrbital() {
     geometry.setIndex(new THREE.Uint32BufferAttribute(meshData.cells, 1));
 
 
-    // Calculate vertex colors
+    // Calculate vertex colors (still calculate, but won't be used by BasicMaterial below)
     const colors = new THREE.Float32BufferAttribute(new Float32Array(scaledAndTranslatedPositions.length), 3);
     const baseColor = new THREE.Color(0x00aaff);
     const highlightColor = new THREE.Color(0xaa00ff);
@@ -275,17 +268,22 @@ function renderOrbital() {
     geometry.setAttribute('color', colors);
     geometry.computeVertexNormals();
 
-    const material = new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.6,
-        roughness: 0.5,
-        metalness: 0.0,
+    // TEMPORARY: Use a basic material to rule out lighting/transparency issues
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x00aaff, // A fixed blue color
+        // vertexColors: true, // No need if not using vertex colors with BasicMaterial
+        // transparent: true, // Remove for now
+        opacity: 1.0, // Full opacity
         side: THREE.DoubleSide
     });
 
     const orbitalMesh = new THREE.Mesh(geometry, material);
     orbitalMeshGroup.add(orbitalMesh);
+
+    // Debugging: Log orbital mesh properties right before adding
+    console.log("Orbital Mesh created:", orbitalMesh);
+    console.log("Orbital Mesh Geometry:", orbitalMesh.geometry);
+    console.log("Orbital Mesh Material:", orbitalMesh.material);
 }
 
 
@@ -313,7 +311,6 @@ zInput.addEventListener('change', () => {
 });
 
 resolutionInput.addEventListener('change', () => {
-    // The HTML select enforces power-of-2 values, so no validation needed here.
     currentResolution = parseInt(resolutionInput.value);
 });
 
@@ -344,19 +341,20 @@ function animate() {
 }
 
 // --- Initialize ---
-nSelect.value = currentN;
-updateLOptions(); // Call to populate L and Ml options based on initial N
-lSelect.value = currentL;
-mlSelect.value = currentMl;
-
-// Ensure the HTML select reflects the initial currentResolution
-document.getElementById('resolution-input').value = currentResolution.toString(); // Set initial value for the dropdown
+nSelect.value = currentN.toString();
+updateLOptions();
+lSelect.value = currentL.toString();
+mlSelect.value = currentMl.toString();
+zInput.value = currentZ.toString();
+resolutionInput.value = currentResolution.toString();
+rMaxInput.value = currentRMax.toString();
+isoLevelInput.value = isoSurfaceLevel.toString();
 
 // Initial render
 renderOrbital();
 animate();
 
-// Handle window resize
+// --- Window Resize Handling ---
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
