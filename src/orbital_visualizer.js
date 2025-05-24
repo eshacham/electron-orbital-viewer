@@ -10,9 +10,7 @@ scene.background = new THREE.Color(0x050505);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 // ADJUSTED: Initial camera position for a better view of objects
-camera.position.z = 12; // Bring camera closer
-// camera.position.y = 5; // You can uncomment this if you want a slightly elevated view
-
+camera.position.z = 12; // Bring camera closer for better initial view
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -32,21 +30,9 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 // ADDED: Set target to the center of the scene for proper rotation
 controls.target.set(0, 0, 0); 
-// ADDED: Adjust zoom limits
-controls.minDistance = 0.5; // Allow much closer zoom
-controls.maxDistance = 100; // Allow further zoom if needed, or remove for infinity
-
-// --- TEST CUBE ADDED HERE ---
-const geometryTest = new THREE.BoxGeometry(2, 2, 2); // A 2x2x2 cube
-const materialTest = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Red color
-const cubeTest = new THREE.Mesh(geometryTest, materialTest);
-scene.add(cubeTest); // Add the cube to the scene
-// --- END TEST CUBE ---
-
-// --- Orbital Visualization Group ---
-// const orbitalMeshGroup = new THREE.Group();
-// scene.add(orbitalMeshGroup);
-
+// ADDED: Adjust zoom limits for better control
+controls.minDistance = 0.1; // Allow very close zoom
+controls.maxDistance = 100; // Allow sufficient zoom out
 
 
 // --- UI Elements ---
@@ -55,7 +41,7 @@ const nSelect = document.getElementById('n-select');
 const lSelect = document.getElementById('l-select');
 const mlSelect = document.getElementById('ml-select');
 const zInput = document.getElementById('z-input');
-const resolutionInput = document.getElementById('resolution-input'); // This is a <select>
+const resolutionInput = document.getElementById('resolution-input'); // This is now an <input type="number">
 const rMaxInput = document.getElementById('rMax-input');
 const updateButton = document.getElementById('update-orbital');
 
@@ -124,15 +110,24 @@ function updateMlOptions() {
 
 // --- Render Orbital ---
 let currentOrbitalMesh = null; // Variable to hold the current orbital mesh
+let currentOrbitalPoints = null; // Variable to hold the current orbital points
 
 function renderOrbital() {
-   // Clear previous orbital mesh
+    // Clear previous orbital mesh
     if (currentOrbitalMesh) {
         scene.remove(currentOrbitalMesh); // Remove the old mesh directly from the scene
         currentOrbitalMesh.geometry.dispose(); // Dispose geometry
         currentOrbitalMesh.material.dispose(); // Dispose material
         currentOrbitalMesh = null; // Clear reference
     }
+    // Clear previous orbital points
+    if (currentOrbitalPoints) {
+        scene.remove(currentOrbitalPoints);
+        currentOrbitalPoints.geometry.dispose();
+        currentOrbitalPoints.material.dispose();
+        currentOrbitalPoints = null;
+    }
+
 
     const n = currentN;
     const l = currentL;
@@ -151,6 +146,18 @@ function renderOrbital() {
     console.log(`Visualization: Resolution=${currentResolution}, rMax=${currentRMax}, Iso-Level=${isoSurfaceLevel}`);
     console.log(`World Bounds:`, worldBounds);
 
+    // Validate resolution before calling Marching Cubes
+    // (Keeping check for informational purposes, but removing fallback as per user request)
+    function isPowerOfTwo(value) {
+        return (value & (value - 1)) === 0 && value > 0;
+    }
+
+    if (!isPowerOfTwo(currentResolution)) {
+        console.error(`ERROR: Resolution (${currentResolution}) must be a power of two for Marching Cubes. Orbital might not render correctly or an error might occur.`);
+        // No automatic fallback here, user input is used directly.
+    }
+
+
     const meshData = MarchingCubesModule.marchingCubes(
         currentResolution,
         orbitalPotentialFunction,
@@ -165,7 +172,7 @@ function renderOrbital() {
     // Check if positions (vertices) were generated
     if (!meshData || !meshData.positions || meshData.positions.length === 0) {
         console.warn("Marching Cubes generated no positions (vertices). This means the isosurface level might not be found within the given parameters (rMax, resolution) or the orbital itself has very low density.");
-        console.warn("Try adjusting Iso-Level, rMax, or choose different quantum numbers. Also ensure your Marching Cubes library is correctly returning 'positions' and 'cells'.");
+        console.warn("Try adjusting Iso-Level (decrease it), rMax (increase it), or choose different quantum numbers.");
         return;
     }
 
@@ -206,18 +213,15 @@ function renderOrbital() {
 
     const scaledAndTranslatedPositions = new Float32Array(flatPositions.length);
 
-    // Scaling and Translation (remains the same, logic is correct for grid to world mapping)
     const modelExtent = currentRMax * 2;
     const gridDim = currentResolution;
     const scaleFactor = modelExtent / (gridDim - 1);
 
-    // CORRECTED: Iterate over flatPositions and extract individual components (numbers)
     for (let i = 0; i < flatPositions.length; i += 3) {
         const gx = flatPositions[i];
         const gy = flatPositions[i + 1];
         const gz = flatPositions[i + 2];
 
-        // Debug logs (re-added, though if this is correct, they won't trigger errors)
         if (typeof gx !== 'number' || typeof gy !== 'number' || typeof gz !== 'number' ||
             isNaN(gx) || isNaN(gy) || isNaN(gz) || !isFinite(gx) || !isFinite(gy) || !isFinite(gz)) {
             console.error(`Runtime ERROR: Invalid gx, gy, or gz found in scaling loop at index ${i}.`);
@@ -231,7 +235,7 @@ function renderOrbital() {
     console.log("scaledAndTranslatedPositions length:", scaledAndTranslatedPositions.length);
 
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(scaledAndTranslatedPositions, 3));
- 
+
     // --- CRITICAL FIX: Flatten meshData.cells before setting index ---
     const flatCells = [];
     for (let i = 0; i < meshData.cells.length; i++) {
@@ -249,79 +253,40 @@ function renderOrbital() {
     // --- END CRITICAL FIX ---
 
 
-    // Calculate vertex colors (still calculate, but won't be used by BasicMaterial below)
-    // const colors = new THREE.Float32BufferAttribute(new Float32Array(scaledAndTranslatedPositions.length), 3);
-    // const baseColor = new THREE.Color(0x00aaff);
-    // const highlightColor = new THREE.Color(0xaa00ff);
-    // let maxDensityAtVertices = 0;
-    // const tempVector = new THREE.Vector3();
-
-    // Iterate over the *flattened* and *scaled* positions for color calculation
-    // for (let i = 0; i < scaledAndTranslatedPositions.length; i += 3) {
-    //     tempVector.set(scaledAndTranslatedPositions[i], scaledAndTranslatedPositions[i + 1], scaledAndTranslatedPositions[i + 2]);
-    //     const r = tempVector.length();
-    //     const theta = Math.acos(Math.min(1, Math.max(-1, r === 0 ? 0 : tempVector.z / r)));
-    //     const phi = Math.atan2(tempVector.y, tempVector.x);
-
-    //     let densityAtVertex;
-    //     if (r === 0) {
-    //         densityAtVertex = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z);
-    //     } else {
-    //         densityAtVertex = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
-    //     }
-    //     maxDensityAtVertices = Math.max(maxDensityAtVertices, densityAtVertex);
-    // }
-
-    // const densityRangeForColor = maxDensityAtVertices - isoSurfaceLevel;
-
-    // for (let i = 0; i < scaledAndTranslatedPositions.length; i += 3) {
-    //     tempVector.set(scaledAndTranslatedPositions[i], scaledAndTranslatedPositions[i + 1], scaledAndTranslatedPositions[i + 2]);
-    //     const r = tempVector.length();
-    //     const theta = Math.acos(Math.min(1, Math.max(-1, r === 0 ? 0 : tempVector.z / r)));
-    //     const phi = Math.atan2(tempVector.y, tempVector.x);
-
-    //     let densityAtVertex;
-    //     if (r === 0) {
-    //         densityAtVertex = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z);
-    //     } else {
-    //         densityAtVertex = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
-    //     }
-
-    //     let normalizedColorDensity = 0;
-    //     if (densityRangeForColor > 0) {
-    //         normalizedColorDensity = Math.min(1, Math.max(0, (densityAtVertex - isoSurfaceLevel) / densityRangeForColor));
-    //     }
-
-    //     const interpolatedColor = new THREE.Color().copy(baseColor).lerp(highlightColor, normalizedColorDensity);
-
-    //     colors.setXYZ(i / 3, interpolatedColor.r, interpolatedColor.g, interpolatedColor.b);
-    // }
-
-    // geometry.setAttribute('color', colors);
     geometry.computeVertexNormals();
 
-    // TEMPORARY: Use a basic material to rule out lighting/transparency issues
-    const material = new THREE.MeshBasicMaterial({
-        color: 0x00aaff, // A fixed blue color
-        // vertexColors: true, // No need if not using vertex colors with BasicMaterial
-        // transparent: true, // Remove for now
-        opacity: 1.0, // Full opacity
-        side: THREE.DoubleSide
+
+    // --- Orbital Mesh Material (Transparent) ---
+    const meshMaterial = new THREE.MeshStandardMaterial({
+        color: 0x00aaff, // Blue color
+        transparent: true,
+        opacity: 0.5, // Semi-transparent
+        side: THREE.DoubleSide,
+        depthWrite: false // Important for correct transparency rendering
     });
 
-    const orbitalMesh = new THREE.Mesh(geometry, material);
+    const orbitalMesh = new THREE.Mesh(geometry, meshMaterial);
     scene.add(orbitalMesh); // Add directly to the scene
     currentOrbitalMesh = orbitalMesh; // Store reference to the new mesh
 
-    // OPTIONAL: Log object positions to verify centering
-    console.log("Cube position:", cubeTest.position);
-    console.log("Orbital mesh position:", orbitalMesh.position);
+
+    // --- Orbital Points Material ---
+    const pointsMaterial = new THREE.PointsMaterial({
+        color: 0x00ff00, // Green for points
+        size: 0.05, // Size of each point
+        sizeAttenuation: true // Points get smaller when farther away
+    });
+
+    const orbitalPoints = new THREE.Points(geometry, pointsMaterial);
+    scene.add(orbitalPoints); // Add points to the scene
+    currentOrbitalPoints = orbitalPoints;
 
 
     // Debugging: Log orbital mesh properties right before adding
     console.log("Orbital Mesh created:", orbitalMesh);
     console.log("Orbital Mesh Geometry:", orbitalMesh.geometry);
     console.log("Orbital Mesh Material:", orbitalMesh.material);
+    console.log("Orbital Points created:", orbitalPoints);
 }
 
 
@@ -348,8 +313,14 @@ zInput.addEventListener('change', () => {
     }
 });
 
+// Handling resolution input as a number field (no power of 2 enforcement in logic)
 resolutionInput.addEventListener('change', () => {
-    currentResolution = parseInt(resolutionInput.value);
+    let newResolution = parseInt(resolutionInput.value);
+    if (isNaN(newResolution) || newResolution < 20) { // Basic validation
+        newResolution = 64; // Default to a safe value
+        resolutionInput.value = newResolution;
+    }
+    currentResolution = newResolution; // Use value directly
 });
 
 rMaxInput.addEventListener('change', () => {
@@ -384,7 +355,7 @@ updateLOptions();
 lSelect.value = currentL.toString();
 mlSelect.value = currentMl.toString();
 zInput.value = currentZ.toString();
-resolutionInput.value = currentResolution.toString();
+resolutionInput.value = currentResolution.toString(); // Ensure UI matches initial value
 rMaxInput.value = currentRMax.toString();
 isoLevelInput.value = isoSurfaceLevel.toString();
 
