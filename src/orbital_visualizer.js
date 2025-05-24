@@ -1,8 +1,8 @@
 // src/orbital_visualizer.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { getOrbitalPotentialFunction, atomicOrbitalProbabilityDensity } from './quantum_functions.js'; 
-import MarchingCubesModule from 'marching-cubes-fast'
+import { getOrbitalPotentialFunction } from './quantum_functions.js';
+import MarchingCubesModule from 'marching-cubes-fast';
 
 // --- Scene Setup ---
 const scene = new THREE.Scene();
@@ -23,11 +23,15 @@ const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
 directionalLight.position.set(1, 1, 1).normalize();
 scene.add(directionalLight);
 
+// --- Global variable to hold the axes helper ---
+let currentAxesHelper = null;
+
+
 // --- Controls ---
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.target.set(0, 0, 0); 
+controls.target.set(0, 0, 0);
 controls.minDistance = 0.01; // Allow very close zoom
 controls.maxDistance = 100; // Allow sufficient zoom out
 
@@ -195,6 +199,18 @@ function renderOrbital() {
                 currentOrbitalPoints = null;
             }
 
+            // Remove existing axes helper if present
+            if (currentAxesHelper) {
+                scene.remove(currentAxesHelper);
+                currentAxesHelper.dispose(); // Dispose of geometry and material if they were created internally
+                currentAxesHelper = null;
+            }
+            // Add new axes helper, scaled by currentRMax
+            // Factor of 0.75 makes them visible and scaled appropriately for the orbital's extent (2 * rMax)
+            currentAxesHelper = new THREE.AxesHelper(currentRMax * 0.75);
+            scene.add(currentAxesHelper);
+
+
             const n = currentN;
             const l = currentL;
             const ml = currentMl;
@@ -235,7 +251,7 @@ function renderOrbital() {
                 resolve(); // Resolve the promise even on error
                 return;
             }
-            
+
 
             console.log("Marching Cubes Raw Result (meshData):", meshData);
             console.log("First 5 positions (raw):", meshData.positions ? meshData.positions.slice(0, 5) : "N/A");
@@ -353,9 +369,11 @@ function renderOrbital() {
             // --- CRITICAL FIX: Set controls target to the center of the orbital ---
             if (geometry.boundingSphere) {
                 controls.target.copy(geometry.boundingSphere.center);
+                currentAxesHelper.position.copy(geometry.boundingSphere.center);
                 console.log("Controls target updated to orbital center:", controls.target);
             } else {
                 controls.target.set(0, 0, 0); // Fallback
+                currentAxesHelper.position.set(0, 0, 0);
                 console.warn("Bounding sphere not computed, controls target set to origin.");
             }
             controls.update(); // Update controls after changing target
