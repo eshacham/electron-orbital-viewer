@@ -28,7 +28,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.target.set(0, 0, 0); 
-controls.minDistance = 0.1; // Allow very close zoom
+controls.minDistance = 0.01; // Allow very close zoom
 controls.maxDistance = 100; // Allow sufficient zoom out
 
 
@@ -41,7 +41,7 @@ const resolutionInput = document.getElementById('resolution-input');
 const rMaxInput = document.getElementById('rMax-input');
 const updateButton = document.getElementById('update-orbital');
 
-// Dynamically create and append Iso-Level input
+// Dynamically create and append Iso-Level input (as before)
 const isoLevelInput = document.createElement('input');
 isoLevelInput.type = 'number';
 isoLevelInput.id = 'iso-level-input';
@@ -59,6 +59,9 @@ isoLevelGroup.appendChild(isoLevelInput);
 const controlsContainer = document.getElementById('controls');
 controlsContainer.insertBefore(isoLevelGroup, updateButton.parentNode);
 
+// --- Loading Spinner Element ---
+const loadingSpinner = document.getElementById('loading-spinner');
+
 
 // --- Global Orbital Parameters (initialized from UI or defaults) ---
 let currentN = parseInt(nSelect.value);
@@ -70,26 +73,31 @@ let currentRMax = parseFloat(rMaxInput.value);
 let isoSurfaceLevel = parseFloat(isoLevelInput.value);
 
 
-// --- Optimized Parameters Storage ---
-// YOU WILL FILL THIS OBJECT WITH YOUR OPTIMIZED VALUES
-// Example: "n_l": { rMax: value, isoLevel: value }
+// --- Optimized Parameters Storage (with more predictions) ---
 const optimizedOrbitalParameters = {
-    // Initial suggested values - you will adjust these through experimentation!
-    "1_0": { rMax: 10, isoLevel: 0.001 },
-    "2_0": { rMax: 15, isoLevel: 0.0005 },
-    "2_1": { rMax: 15, isoLevel: 0.0005 },
-    "3_0": { rMax: 20, isoLevel: 0.0001 },
-    "3_1": { rMax: 20, isoLevel: 0.0001 },
-    "3_2": { rMax: 20, isoLevel: 0.0001 },
-    "4_0": { rMax: 25, isoLevel: 0.00005 },
-    "4_1": { rMax: 25, isoLevel: 0.00005 },
-    "4_2": { rMax: 25, isoLevel: 0.00005 },
-    "4_3": { rMax: 25, isoLevel: 0.00005 },
-    // Add more entries here as you find optimal rMax and isoLevel for other (n,l) combinations
-    // For example:
-    // "5_0": { rMax: 30, isoLevel: 0.00001 },
-    // "5_1": { rMax: 30, isoLevel: 0.00001 },
-    // ...
+    // These are predicted values - you will refine them through experimentation!
+    // Format: "n_l": { rMax: value, isoLevel: value }
+    "1_0": { rMax: 10, isoLevel: 0.001 },      // 1s
+    "2_0": { rMax: 15, isoLevel: 0.0005 },     // 2s
+    "2_1": { rMax: 15, isoLevel: 0.0005 },     // 2p
+    "3_0": { rMax: 20, isoLevel: 0.0001 },     // 3s
+    "3_1": { rMax: 20, isoLevel: 0.0001 },     // 3p
+    "3_2": { rMax: 20, isoLevel: 0.0001 },     // 3d
+    "4_0": { rMax: 25, isoLevel: 0.00005 },    // 4s
+    "4_1": { rMax: 25, isoLevel: 0.00005 },    // 4p
+    "4_2": { rMax: 25, isoLevel: 0.00005 },    // 4d
+    "4_3": { rMax: 25, isoLevel: 0.00005 },    // 4f
+    "5_0": { rMax: 30, isoLevel: 0.00001 },    // 5s
+    "5_1": { rMax: 30, isoLevel: 0.00001 },    // 5p
+    "5_2": { rMax: 30, isoLevel: 0.00001 },    // 5d
+    "5_3": { rMax: 30, isoLevel: 0.00001 },    // 5f
+    "5_4": { rMax: 30, isoLevel: 0.00001 },    // 5g
+    "6_0": { rMax: 35, isoLevel: 0.000005 },   // 6s
+    "6_1": { rMax: 35, isoLevel: 0.000005 },   // 6p
+    "6_2": { rMax: 35, isoLevel: 0.000005 },   // 6d
+    "6_3": { rMax: 35, isoLevel: 0.000005 },   // 6f
+    "6_4": { rMax: 35, isoLevel: 0.000005 },   // 6g
+    "6_5": { rMax: 35, isoLevel: 0.000005 },   // 6h
 };
 
 // --- Function to Load and Apply Optimized Parameters ---
@@ -103,8 +111,8 @@ function loadOptimizedParameters() {
         console.log(`Loaded optimized parameters for n=${currentN}, l=${currentL}: rMax=${currentRMax}, isoLevel=${isoSurfaceLevel}`);
     } else {
         // Fallback to default if no optimized parameters are found
-        currentRMax = parseFloat(rMaxInput.defaultValue || 15); // Use existing input default or 15
-        isoSurfaceLevel = parseFloat(isoLevelInput.defaultValue || 0.0005); // Use existing input default or 0.0005
+        currentRMax = parseFloat(rMaxInput.defaultValue || 15);
+        isoSurfaceLevel = parseFloat(isoLevelInput.defaultValue || 0.0005);
         console.warn(`No optimized parameters found for n=${currentN}, l=${currentL}. Using default values.`);
     }
 
@@ -155,6 +163,11 @@ let currentOrbitalMesh = null;
 let currentOrbitalPoints = null;
 
 function renderOrbital() {
+    // Show loading spinner
+    if (loadingSpinner) {
+        loadingSpinner.style.display = 'flex';
+    }
+
     // Clear previous orbital mesh and points
     if (currentOrbitalMesh) {
         scene.remove(currentOrbitalMesh);
@@ -175,7 +188,6 @@ function renderOrbital() {
     const ml = currentMl;
     const Z = currentZ;
 
-    // Use currentRMax and isoSurfaceLevel that were potentially loaded
     const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoSurfaceLevel);
 
     const worldBounds = [
@@ -211,6 +223,9 @@ function renderOrbital() {
     if (!meshData || !meshData.positions || meshData.positions.length === 0) {
         console.warn("Marching Cubes generated no positions (vertices). This means the isosurface level might not be found within the given parameters (rMax, resolution) or the orbital itself has very low density.");
         console.warn("Try adjusting Iso-Level (decrease it), rMax (increase it), or choose different quantum numbers.");
+        if (loadingSpinner) {
+            loadingSpinner.style.display = 'none'; // Hide spinner on error/no mesh
+        }
         return;
     }
 
@@ -234,11 +249,17 @@ function renderOrbital() {
 
     if (hasInvalidNumberInSource) {
         console.error("meshData.positions contains invalid numerical values (NaN or Infinity). This is likely the cause of a rendering error.");
+        if (loadingSpinner) {
+            loadingSpinner.style.display = 'none'; // Hide spinner on error
+        }
         return;
     }
 
     if (flatPositions.length % 3 !== 0) {
         console.error(`ERROR: flatPositions length (${flatPositions.length}) is not a multiple of 3. This means vertex data is incomplete or corrupted!`);
+        if (loadingSpinner) {
+            loadingSpinner.style.display = 'none'; // Hide spinner on error
+        }
         return;
     }
 
@@ -280,6 +301,7 @@ function renderOrbital() {
     geometry.setIndex(new THREE.Uint32BufferAttribute(new Uint32Array(flatCells), 1));
 
     geometry.computeVertexNormals();
+    geometry.computeBoundingSphere(); // Compute bounding sphere after positions and indices are set
 
     const meshMaterial = new THREE.MeshStandardMaterial({
         color: 0x00aaff, // Blue color
@@ -303,8 +325,23 @@ function renderOrbital() {
     scene.add(orbitalPoints);
     currentOrbitalPoints = orbitalPoints;
 
+    // --- CRITICAL FIX: Set controls target to the center of the orbital ---
+    if (geometry.boundingSphere) {
+        controls.target.copy(geometry.boundingSphere.center);
+        console.log("Controls target updated to orbital center:", controls.target);
+    } else {
+        controls.target.set(0, 0, 0); // Fallback
+        console.warn("Bounding sphere not computed, controls target set to origin.");
+    }
+    controls.update(); // Update controls after changing target
+
     console.log("Orbital Mesh created:", orbitalMesh);
     console.log("Orbital Points created:", orbitalPoints);
+
+    // Hide loading spinner
+    if (loadingSpinner) {
+        loadingSpinner.style.display = 'none';
+    }
 }
 
 
@@ -347,7 +384,6 @@ rMaxInput.addEventListener('change', () => {
         currentRMax = 15;
         rMaxInput.value = 15;
     }
-    // If the user manually changes rMax, this overwrites the loaded value for this session
 });
 
 isoLevelInput.addEventListener('change', () => {
@@ -356,7 +392,6 @@ isoLevelInput.addEventListener('change', () => {
         isoSurfaceLevel = 0.0005;
         isoLevelInput.value = 0.0005;
     }
-    // If the user manually changes isoLevel, this overwrites the loaded value for this session
 });
 
 
@@ -370,15 +405,14 @@ function animate() {
 }
 
 // --- Initialize ---
-// Set initial UI values to match current variables
 nSelect.value = currentN.toString();
 updateLOptions(); // This will populate L and Ml options and load initial optimized parameters
 lSelect.value = currentL.toString();
 mlSelect.value = currentMl.toString();
 zInput.value = currentZ.toString();
 resolutionInput.value = currentResolution.toString();
-rMaxInput.value = currentRMax.toString(); // Updated by loadOptimizedParameters initially
-isoLevelInput.value = isoSurfaceLevel.toString(); // Updated by loadOptimizedParameters initially
+// rMaxInput and isoLevelInput values are set by loadOptimizedParameters during updateLOptions() call
+// So, no need to set them here explicitly unless loadOptimizedParameters() fails.
 
 // Initial render
 renderOrbital();
