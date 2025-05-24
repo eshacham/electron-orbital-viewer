@@ -33,7 +33,7 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.target.set(0, 0, 0);
 controls.minDistance = 0.01; // Allow very close zoom
-controls.maxDistance = 100; // Allow sufficient zoom out
+// controls.maxDistance = 100; // Allow sufficient zoom out
 
 
 // --- UI Elements ---
