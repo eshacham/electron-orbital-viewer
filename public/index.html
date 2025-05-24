@@ -35,10 +35,10 @@
             min-width: 30px;
         }
         input[type="number"], select {
-            width: 60px;
             padding: 5px;
-            border: 1px solid #ccc;
             border-radius: 4px;
+            border: 1px solid #ccc;
+            width: 80px; /* Consistent width */
         }
         button {
             padding: 8px 15px;
@@ -47,7 +47,8 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 1em;
+            font-size: 16px;
+            align-self: flex-start; /* Align button to the left */
         }
         button:hover {
             background-color: #0056b3;
@@ -71,17 +72,17 @@
             </select>
         </div>
         <div class="control-group">
-            <label for="l-select">l:</label>
+            <label for="l-select">l (Angular Momentum Quantum):</label>
             <select id="l-select">
                 </select>
         </div>
         <div class="control-group">
-            <label for="ml-select">m_l:</label>
+            <label for="ml-select">m_l (Magnetic Quantum):</label>
             <select id="ml-select">
                 </select>
         </div>
         <div class="control-group">
-            <label for="z-input">Z:</label>
+            <label for="z-input">Z (Atomic Number):</label>
             <input type="number" id="z-input" value="1" min="1" step="1">
         </div>
         <div class="control-group">
@@ -94,18 +95,13 @@
             </select>
         </div>
         <div class="control-group">
-            <label for="rMax-input">rMax:</label>
+            <label for="rMax-input">rMax (Max Radius):</label>
             <input type="number" id="rMax-input" value="15" min="5" step="1">
         </div>
         <div class="control-group">
             <button id="update-orbital" type="button">Update Orbital</button>
         </div>
     </div>
-
-    ```
-
-After making these changes to your `index.html` file, save it and refresh your application. This should resolve both the layout inconsistency and the `NotFoundError`.
-
 
     <script type="module" src="/main.js"></script>
 </body>
