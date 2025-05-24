@@ -125,7 +125,11 @@
         </div>
         <div class="control-group">
             <label for="resolution-input">Resolution (Power of 2 Recommended):</label>
-            <input type="number" id="resolution-input" value="64" min="20" step="10">
+            <select id="resolution-input">
+                <option value="32">32</option>
+                <option value="64" selected>64</option>
+                <option value="128">128</option>
+            </select>
         </div>
         <div class="control-group">
             <label for="rMax-input">rMax (Max Radius):</label>
@@ -135,7 +139,8 @@
             <button id="update-orbital" type="button">Update Orbital</button>
         </div>
     </div>
-        <div id="loading-spinner">
+    
+    <div id="loading-spinner">
         <div class="spinner"></div>
         <p>Calculating orbital...</p>
     </div>
