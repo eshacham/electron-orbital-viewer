@@ -1,21 +1,22 @@
 // src/orbital_visualizer.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { generateOrbitalData } from './quantum_functions.js'; // Import our data generator
+import { getOrbitalPotentialFunction, atomicOrbitalProbabilityDensity } from './quantum_functions.js'; 
+import MarchingCubesModule from 'marching-cubes-fast'
 
 // --- Scene Setup ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050505); // Dark background
+scene.background = new THREE.Color(0x050505);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.z = 30; // Initial camera distance
+camera.position.z = 30;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.getElementById('canvas-container').appendChild(renderer.domElement);
 
 // --- Lights ---
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Soft white light
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -24,123 +25,267 @@ scene.add(directionalLight);
 
 // --- Controls ---
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; // For a smoother orbiting experience
+controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 
 // --- Orbital Visualization Group ---
-// This group will hold the orbital mesh, allowing us to easily clear and re-add.
-const orbitalGroup = new THREE.Group();
-scene.add(orbitalGroup);
+const orbitalMeshGroup = new THREE.Group();
+scene.add(orbitalMeshGroup);
 
-// --- Global variables for orbital parameters ---
-let currentN = 2;
-let currentL = 1;
-let currentMl = 0;
-let currentZ = 1;
-let currentResolution = 50;
-let currentRMax = 15;
+// --- TEST CUBE ADDED HERE ---
+const geometryTest = new THREE.BoxGeometry(2, 2, 2); // A 2x2x2 cube
+const materialTest = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Red color
+const cubeTest = new THREE.Mesh(geometryTest, materialTest);
+scene.add(cubeTest); // Add the cube to the scene
+// --- END TEST CUBE ---
+
 
 // --- UI Elements ---
+// Declare all UI element references at the top of this section
 const nSelect = document.getElementById('n-select');
 const lSelect = document.getElementById('l-select');
 const mlSelect = document.getElementById('ml-select');
 const zInput = document.getElementById('z-input');
 const resolutionInput = document.getElementById('resolution-input');
 const rMaxInput = document.getElementById('rMax-input');
-const updateButton = document.getElementById('update-orbital');
+const updateButton = document.getElementById('update-orbital'); // This was declared later, causing the TDZ error
+
+// NEW UI for Isosurface Level: Create and append dynamically
+const isoLevelInput = document.createElement('input');
+isoLevelInput.type = 'number';
+isoLevelInput.id = 'iso-level-input';
+isoLevelInput.value = '0.0005'; // Default starting value
+isoLevelInput.min = '0.0000001'; // Very small positive number
+isoLevelInput.step = '0.0001'; // Step for adjustment
+isoLevelInput.style.width = '80px'; // Adjust width if needed
+
+
+const isoLevelGroup = document.createElement('div');
+isoLevelGroup.className = 'control-group';
+isoLevelGroup.innerHTML = '<label for="iso-level-input">Iso-Level:</label>';
+isoLevelGroup.appendChild(isoLevelInput);
+
+const controlsContainer = document.getElementById('controls');
+// Append the new isoLevelGroup to the end of the controls container
+controlsContainer.appendChild(isoLevelGroup);
+// Then, move the updateButton to be after the newly added isoLevelGroup
+controlsContainer.appendChild(updateButton); // Now updateButton is declared before this line
+
+
+// --- Global variables for orbital parameters ---
+let currentN = parseInt(nSelect.value);
+let currentL = parseInt(lSelect.value);
+let currentMl = parseInt(mlSelect.value);
+let currentZ = parseInt(zInput.value);
+let currentResolution = parseInt(resolutionInput.value); // Will be 64 from HTML select
+let currentRMax = parseFloat(rMaxInput.value);
+let isoSurfaceLevel = parseFloat(isoLevelInput.value);
 
 // --- Helper Functions ---
 
 // Function to update L options based on N
 function updateLOptions() {
     const n = parseInt(nSelect.value);
-    lSelect.innerHTML = ''; // Clear existing options
+    lSelect.innerHTML = '';
+    const orbitalTypes = ['s', 'p', 'd', 'f', 'g', 'h', 'i']; // Extend if n > 7
     for (let l = 0; l < n; l++) {
         const option = document.createElement('option');
         option.value = l;
-        option.textContent = l;
+        // Use an array lookup for orbital types
+        const orbitalChar = orbitalTypes[l] || `unknown(${l})`; // Fallback for higher l
+        option.textContent = `l=${l} (${orbitalChar} orbital)`;
         lSelect.appendChild(option);
     }
-    // Set L to a valid default if currentL is out of range
-    if (currentL >= n) {
+    if (currentL >= n || isNaN(currentL)) {
         currentL = 0;
     }
     lSelect.value = currentL;
-    updateMlOptions(); // Update ml options as L changed
+    updateMlOptions();
 }
 
 // Function to update Ml options based on L
 function updateMlOptions() {
     const l = parseInt(lSelect.value);
-    mlSelect.innerHTML = ''; // Clear existing options
+    mlSelect.innerHTML = '';
     for (let ml = -l; ml <= l; ml++) {
         const option = document.createElement('option');
         option.value = ml;
         option.textContent = ml;
         mlSelect.appendChild(option);
     }
-    // Set Ml to a valid default if currentMl is out of range
-    if (Math.abs(currentMl) > l) {
+    if (Math.abs(currentMl) > l || isNaN(currentMl)) {
         currentMl = 0;
     }
     mlSelect.value = currentMl;
 }
 
-// Function to render the orbital
+// --- Render Orbital ---
 function renderOrbital() {
-    // Clear previous orbital
-    while (orbitalGroup.children.length > 0) {
-        const object = orbitalGroup.children[0];
-        if (object.geometry) object.geometry.dispose();
-        if (object.material) object.material.dispose();
-        orbitalGroup.remove(object);
+    // Clear previous orbital mesh
+    orbitalMeshGroup.clear();
+
+    const n = currentN;
+    const l = currentL;
+    const ml = currentMl;
+    const Z = currentZ;
+
+    const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoSurfaceLevel);
+
+    const worldBounds = [
+        [-currentRMax, -currentRMax, -currentRMax],
+        [currentRMax, currentRMax, currentRMax]
+    ];
+
+    console.log("--- Rendering Orbital ---");
+    console.log(`Parameters: n=${n}, l=${l}, ml=${ml}, Z=${Z}`);
+    console.log(`Visualization: Resolution=${currentResolution}, rMax=${currentRMax}, Iso-Level=${isoSurfaceLevel}`);
+    console.log(`World Bounds:`, worldBounds);
+
+    const meshData = MarchingCubesModule.marchingCubes(
+        currentResolution,
+        orbitalPotentialFunction,
+        worldBounds
+    );
+
+    console.log("Marching Cubes Raw Result (meshData):", meshData);
+    // Check if positions (vertices) were generated
+    if (!meshData || !meshData.positions || meshData.positions.length === 0) {
+        console.warn("Marching Cubes generated no positions (vertices). This means the isosurface level might not be found within the given parameters (rMax, resolution) or the orbital itself has very low density.");
+        console.warn("Try adjusting Iso-Level, rMax, or choose different quantum numbers. Also ensure your Marching Cubes library is correctly returning 'positions' and 'cells'.");
+        return;
     }
 
-    console.log(`Generating orbital for n=${currentN}, l=${currentL}, ml=${currentMl}, Z=${currentZ}, Resolution=${currentResolution}, rMax=${currentRMax}`);
-
-    const dataPoints = generateOrbitalData(currentN, currentL, currentMl, currentZ, currentResolution, currentRMax);
-
-    let maxDensity = 0;
-    dataPoints.forEach(p => maxDensity = Math.max(maxDensity, p.value));
-    const densityThreshold = maxDensity * 0.02; // Slightly higher threshold for a more defined surface
-
-    // Create a single geometry for all spheres
-    const orbitalGeometry = new THREE.BufferGeometry();
-    const positions = [];
-    const colors = [];
-
-    // Color gradient for the orbital
-    const colorA = new THREE.Color(0x007bff); // A vibrant blue
-    const colorB = new THREE.Color(0x00ff7f); // A vibrant green
-
-    const maxVal = maxDensity > 0 ? maxDensity : 1;
-
-    dataPoints.forEach(p => {
-        if (p.value >= densityThreshold) {
-            positions.push(p.x, p.y, p.z);
-            // Interpolate color based on normalized density
-            const normalizedDensity = p.value / maxVal;
-            const interpolatedColor = new THREE.Color().copy(colorA).lerp(colorB, normalizedDensity);
-            colors.push(interpolatedColor.r, interpolatedColor.g, interpolatedColor.b);
+    // --- Detailed NaN/Infinity check and Flattening for meshData.positions ---
+    const flatPositions = [];
+    let hasInvalidNumberInSource = false; // Flag for issues in meshData.positions source
+    for (let i = 0; i < meshData.positions.length; i++) {
+        const vertex = meshData.positions[i]; // Each element is an array [x, y, z]
+        if (!Array.isArray(vertex) || vertex.length !== 3) {
+            console.error(`Unexpected vertex format at index ${i}. Expected [x,y,z] array. Found:`, vertex);
+            hasInvalidNumberInSource = true;
+            continue;
         }
-    });
+        for (let j = 0; j < 3; j++) {
+            if (isNaN(vertex[j]) || !isFinite(vertex[j])) { // Check for NaN OR Infinity
+                console.error(`Invalid value (NaN or Infinity) found in meshData.positions[${i}][${j}]: ${vertex[j]}`);
+                hasInvalidNumberInSource = true;
+            }
+            flatPositions.push(vertex[j]); // Flatten the array here
+        }
+    }
 
-    orbitalGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    orbitalGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    if (hasInvalidNumberInSource) {
+        console.error("meshData.positions contains invalid numerical values (NaN or Infinity). This is likely the cause of the computeBoundingSphere error.");
+        return; // Stop rendering if data is bad
+    }
 
-    // Create a material for the individual spheres (or a combined point cloud of spheres)
-    // We'll use a single material and draw many instances if we want spheres.
-    // For simplicity, let's stick to a point cloud but make the points larger and more solid.
-    const material = new THREE.PointsMaterial({
-        size: currentRMax / currentResolution * 0.5, // Make point size relative to grid spacing
+    console.log("flatPositions length:", flatPositions.length); // Log the length
+    // --- End NaN/Infinity check & Flattening ---
+
+    // --- Check if flatPositions length is a multiple of 3 ---
+    if (flatPositions.length % 3 !== 0) {
+        console.error(`ERROR: flatPositions length (${flatPositions.length}) is not a multiple of 3. This means vertex data is incomplete or corrupted!`);
+        return; // Prevent further errors
+    }
+
+    const geometry = new THREE.BufferGeometry();
+
+    // CORRECTED: Initialize scaledAndTranslatedPositions with the correct length
+    // It needs to hold 3 components (x,y,z) for EACH vertex.
+    const scaledAndTranslatedPositions = new Float32Array(flatPositions.length);
+
+    // Scaling and Translation (remains the same, logic is correct for grid to world mapping)
+    const modelExtent = currentRMax * 2;
+    const gridDim = currentResolution;
+    const scaleFactor = modelExtent / (gridDim - 1);
+
+    // CORRECTED: Iterate over flatPositions and extract individual components (numbers)
+    for (let i = 0; i < flatPositions.length; i += 3) {
+        const gx = flatPositions[i];
+        const gy = flatPositions[i + 1];
+        const gz = flatPositions[i + 2];
+
+        // Debug logs (re-added, though if this is correct, they won't trigger errors)
+        if (typeof gx !== 'number' || typeof gy !== 'number' || typeof gz !== 'number' ||
+            isNaN(gx) || isNaN(gy) || isNaN(gz) || !isFinite(gx) || !isFinite(gy) || !isFinite(gz)) {
+            console.error(`Runtime ERROR: Invalid gx, gy, or gz found in scaling loop at index ${i}.`);
+            console.error(`gx: ${gx} (type: ${typeof gx}), gy: ${gy} (type: ${typeof gy}), gz: ${gz} (type: ${typeof gz})`);
+        }
+
+        scaledAndTranslatedPositions[i]     = gx * scaleFactor - currentRMax;
+        scaledAndTranslatedPositions[i + 1] = gy * scaleFactor - currentRMax;
+        scaledAndTranslatedPositions[i + 2] = gz * scaleFactor - currentRMax;
+    }
+    console.log("scaledAndTranslatedPositions length:", scaledAndTranslatedPositions.length);
+
+    // CORRECTED: Use scaledAndTranslatedPositions for the geometry's position attribute
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(scaledAndTranslatedPositions, 3));
+    // Set the index attribute from meshData.cells (these are already correct)
+    geometry.setIndex(new THREE.Uint32BufferAttribute(meshData.cells, 1));
+
+
+    // Calculate vertex colors
+    const colors = new THREE.Float32BufferAttribute(new Float32Array(scaledAndTranslatedPositions.length), 3);
+    const baseColor = new THREE.Color(0x00aaff);
+    const highlightColor = new THREE.Color(0xaa00ff);
+    let maxDensityAtVertices = 0;
+    const tempVector = new THREE.Vector3();
+
+    // Iterate over the *flattened* and *scaled* positions for color calculation
+    for (let i = 0; i < scaledAndTranslatedPositions.length; i += 3) {
+        tempVector.set(scaledAndTranslatedPositions[i], scaledAndTranslatedPositions[i + 1], scaledAndTranslatedPositions[i + 2]);
+        const r = tempVector.length();
+        const theta = Math.acos(Math.min(1, Math.max(-1, r === 0 ? 0 : tempVector.z / r)));
+        const phi = Math.atan2(tempVector.y, tempVector.x);
+
+        let densityAtVertex;
+        if (r === 0) {
+            densityAtVertex = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z);
+        } else {
+            densityAtVertex = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
+        }
+        maxDensityAtVertices = Math.max(maxDensityAtVertices, densityAtVertex);
+    }
+
+    const densityRangeForColor = maxDensityAtVertices - isoSurfaceLevel;
+
+    for (let i = 0; i < scaledAndTranslatedPositions.length; i += 3) {
+        tempVector.set(scaledAndTranslatedPositions[i], scaledAndTranslatedPositions[i + 1], scaledAndTranslatedPositions[i + 2]);
+        const r = tempVector.length();
+        const theta = Math.acos(Math.min(1, Math.max(-1, r === 0 ? 0 : tempVector.z / r)));
+        const phi = Math.atan2(tempVector.y, tempVector.x);
+
+        let densityAtVertex;
+        if (r === 0) {
+            densityAtVertex = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z);
+        } else {
+            densityAtVertex = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
+        }
+
+        let normalizedColorDensity = 0;
+        if (densityRangeForColor > 0) {
+            normalizedColorDensity = Math.min(1, Math.max(0, (densityAtVertex - isoSurfaceLevel) / densityRangeForColor));
+        }
+
+        const interpolatedColor = new THREE.Color().copy(baseColor).lerp(highlightColor, normalizedColorDensity);
+
+        colors.setXYZ(i / 3, interpolatedColor.r, interpolatedColor.g, interpolatedColor.b);
+    }
+
+    geometry.setAttribute('color', colors);
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshStandardMaterial({
         vertexColors: true,
         transparent: true,
-        opacity: 0.7,
-        blending: THREE.AdditiveBlending // Gives a nice glow effect
+        opacity: 0.6,
+        roughness: 0.5,
+        metalness: 0.0,
+        side: THREE.DoubleSide
     });
 
-    const orbitalPoints = new THREE.Points(orbitalGeometry, material);
-    orbitalGroup.add(orbitalPoints);
+    const orbitalMesh = new THREE.Mesh(geometry, material);
+    orbitalMeshGroup.add(orbitalMesh);
 }
 
 
@@ -161,18 +306,15 @@ mlSelect.addEventListener('change', () => {
 
 zInput.addEventListener('change', () => {
     currentZ = parseInt(zInput.value);
-    if (isNaN(currentZ) || currentZ < 1) { // Basic validation
+    if (isNaN(currentZ) || currentZ < 1) {
         currentZ = 1;
         zInput.value = 1;
     }
 });
 
 resolutionInput.addEventListener('change', () => {
+    // The HTML select enforces power-of-2 values, so no validation needed here.
     currentResolution = parseInt(resolutionInput.value);
-    if (isNaN(currentResolution) || currentResolution < 20) {
-        currentResolution = 50;
-        resolutionInput.value = 50;
-    }
 });
 
 rMaxInput.addEventListener('change', () => {
@@ -183,22 +325,32 @@ rMaxInput.addEventListener('change', () => {
     }
 });
 
+isoLevelInput.addEventListener('change', () => {
+    isoSurfaceLevel = parseFloat(isoLevelInput.value);
+    if (isNaN(isoSurfaceLevel) || isoSurfaceLevel < 0.0000001) {
+        isoSurfaceLevel = 0.0005;
+        isoLevelInput.value = 0.0005;
+    }
+});
+
+
 updateButton.addEventListener('click', renderOrbital);
 
 // --- Animation Loop ---
 function animate() {
     requestAnimationFrame(animate);
-    controls.update(); // Only required if controls.enableDamping or controls.autoRotate are set to true
+    controls.update();
     renderer.render(scene, camera);
 }
 
 // --- Initialize ---
-// Set initial UI values and populate dropdowns
 nSelect.value = currentN;
-updateLOptions(); // Populates L and Ml options based on initial N
+updateLOptions(); // Call to populate L and Ml options based on initial N
 lSelect.value = currentL;
-updateMlOptions(); // Ensures ml is set for currentL
 mlSelect.value = currentMl;
+
+// Ensure the HTML select reflects the initial currentResolution
+document.getElementById('resolution-input').value = currentResolution.toString(); // Set initial value for the dropdown
 
 // Initial render
 renderOrbital();

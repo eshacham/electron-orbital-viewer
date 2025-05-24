@@ -344,18 +344,22 @@ export function atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z = 1) 
 }
 
 /**
- * Generates 3D data points for an atomic orbital's probability density.
- * The data is generated on a spherical grid and returned as an array of objects,
- * each containing Cartesian coordinates (x, y, z) and the probability density value.
+ * Generates 3D volumetric data for an atomic orbital's probability density.
+ * The data is generated on a Cartesian grid and returned as a flat array representing a 3D grid.
  *
  * @param {number} n - Principal quantum number.
  * @param {number} l - Azimuthal (angular momentum) quantum number.
  * @param {number} ml - Magnetic quantum number.
  * @param {number} Z - Nuclear charge (defaults to 1 for Hydrogen).
- * @param {number} resolution - Number of steps along each axis for theta and phi.
- * The radial steps will be adaptively chosen.
- * @param {number} rMax - Maximum radial distance (in Bohr radii) to sample.
- * @returns {Array<Object>} An array of objects, where each object has { x, y, z, value }.
+ * @param {number} resolution - Number of steps along each Cartesian axis (e.g., if 50, grid is 50x50x50).
+ * @param {number} rMax - Maximum radial distance (in Bohr radii) to sample, defining the half-width of the cube.
+ * The cube will extend from -rMax to +rMax along each axis.
+ * @returns {{grid: Float32Array, dims: number[], maxDensity: number, minVal: number, maxVal: number}}
+ * An object containing:
+ * - grid: A flat Float32Array representing the 3D probability density grid.
+ * - dims: An array [resolution, resolution, resolution] indicating grid dimensions.
+ * - maxDensity: The maximum probability density found in the grid.
+ * - minVal, maxVal: The min and max coordinates of the sampled cube (e.g., -rMax, rMax).
  */
 export function generateOrbitalData(n, l, ml, Z = 1, resolution = 50, rMax = 15) {
     if (resolution <= 0) {
@@ -365,48 +369,86 @@ export function generateOrbitalData(n, l, ml, Z = 1, resolution = 50, rMax = 15)
         throw new Error("rMax must be a positive number.");
     }
 
-    const dataPoints = [];
-    const rSteps = resolution; // Number of steps for radial distance
-    const thetaSteps = resolution; // Number of steps for theta
-    const phiSteps = resolution; // Number of steps for phi
-
-    // Calculate maximum probability density to normalize later (optional but good for visual scaling)
+    const dims = [resolution, resolution, resolution];
+    const grid = new Float32Array(dims[0] * dims[1] * dims[2]);
     let maxDensity = 0;
 
-    // Iterate through the spherical coordinate grid
-    for (let i = 0; i <= rSteps; i++) {
-        const r = (i / rSteps) * rMax; // r from 0 to rMax
+    const step = (rMax * 2) / (resolution - 1); // Size of each step along an axis
+    const startCoord = -rMax; // Starting coordinate (e.g., -rMax)
 
-        for (let j = 0; j <= thetaSteps; j++) {
-            // Theta from 0 to PI
-            const theta = (j / thetaSteps) * Math.PI;
+    // Fill the 3D grid
+    for (let xIdx = 0; xIdx < dims[0]; xIdx++) {
+        const x = startCoord + xIdx * step;
+        for (let yIdx = 0; yIdx < dims[1]; yIdx++) {
+            const y = startCoord + yIdx * step;
+            for (let zIdx = 0; zIdx < dims[2]; zIdx++) {
+                const z = startCoord + zIdx * step;
 
-            for (let k = 0; k < phiSteps; k++) { // Note: phi goes from 0 up to, but not including, 2*PI
-                // Phi from 0 to 2*PI
-                const phi = (k / phiSteps) * (2 * Math.PI);
+                // Convert Cartesian (x, y, z) to Spherical (r, theta, phi)
+                const r = Math.sqrt(x * x + y * y + z * z);
+                // Clamp r to avoid issues with Math.acos(1.0000000000000001) or similar
+                const theta = Math.acos(Math.min(1, Math.max(-1, r === 0 ? 0 : z / r))); // acos(z/r), handle r=0 for safety
+                const phi = Math.atan2(y, x); // atan2(y, x)
 
-                const density = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
+                let density;
+                if (r === 0) {
+                     density = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z); // Use 0 for angles, as they don't matter at origin
+                } else {
+                    density = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
+                }
+
+
+                const index = xIdx * dims[1] * dims[2] + yIdx * dims[2] + zIdx;
+                grid[index] = density;
                 maxDensity = Math.max(maxDensity, density);
-
-                // Convert spherical coordinates (r, theta, phi) to Cartesian (x, y, z)
-                // x = r * sin(theta) * cos(phi)
-                // y = r * sin(theta) * sin(phi)
-                // z = r * cos(theta)
-                const x = r * Math.sin(theta) * Math.cos(phi);
-                const y = r * Math.sin(theta) * Math.sin(phi);
-                const z = r * Math.cos(theta);
-
-                dataPoints.push({ x, y, z, value: density });
             }
         }
     }
 
-    // Optional: Normalize densities if needed for visualization (e.g., values between 0 and 1)
-    // For now, we return raw density. Normalization can happen in the visualization layer.
-    // However, knowing maxDensity can be useful for determining isosurface levels.
-    // return { data: dataPoints, maxDensity }; // Could return object with data and max density
+    // THIS IS THE CRUCIAL PART THAT WAS LIKELY WRONG:
+    // It should return the object with grid, dims, etc.
+    return {
+        grid: grid,
+        dims: dims,
+        maxDensity: maxDensity,
+        minVal: startCoord,
+        maxVal: rMax
+    };
+}
 
-    return dataPoints;
+/**
+ * Returns a potential function (df) for marching-cubes-fast, which evaluates
+ * the atomic orbital probability density (adjusted for isosurface) at a given 3D world coordinate (x, y, z).
+ *
+ * @param {number} n The principal quantum number.
+ * @param {number} l The azimuthal quantum number.
+ * @param {number} ml The magnetic quantum number.
+ * @param {number} Z The atomic number.
+ * @param {number} isoLevel The isosurface level. The function will return (density - isoLevel).
+ * @returns {function(number, number, number): number} A function (df) that takes (x, y, z)
+ * and returns the orbital probability density minus the isoLevel at that point.
+ */
+export function getOrbitalPotentialFunction(n, l, ml, Z, isoLevel) { // Added isoLevel parameter
+    return (x, y, z) => {
+        const r = Math.sqrt(x * x + y * y + z * z);
+        const theta = Math.acos(Math.min(1, Math.max(-1, r === 0 ? 0 : z / r)));
+        const phi = Math.atan2(y, x);
+
+        let density;
+        if (r === 0) {
+             density = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z);
+        } else {
+            density = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
+        }
+
+        // --- CRITICAL CHANGE: Return (density - isoLevel) ---
+        // This effectively turns our density function into a signed distance-like function
+        // where the surface is where density - isoLevel = 0.
+        // The marching-cubes-fast library's filtering `Math.abs(dfc) < biasDist`
+        // will then look for points where `abs(density - isoLevel) < biasDist`.
+        // Since biasDist is hardcoded to 0 in the library, it will look for `density - isoLevel = 0`.
+        return density - isoLevel;
+    };
 }
 
 // Optional: function to clear all caches for testing purposes

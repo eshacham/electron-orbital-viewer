@@ -23,6 +23,8 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            max-height: 90vh; /* Prevent controls from overflowing if many options */
+            overflow-y: auto; /* Allow scrolling if content overflows */
         }
         .control-group {
             display: flex;
@@ -55,7 +57,7 @@
 <body>
     <div id="canvas-container"></div>
 
-    <div id="controls">
+<div id="controls">
         <h2>Orbital Parameters</h2>
         <div class="control-group">
             <label for="n-select">n:</label>
@@ -82,14 +84,26 @@
         </div>
         <div class="control-group">
             <label for="resolution-input">Resolution:</label>
-            <input type="number" id="resolution-input" value="50" min="20" step="10">
+            <select id="resolution-input">
+                <option value="32">32</option>
+                <option value="64" selected>64</option>
+                <option value="128">128</option>
+                <option value="256">256</option>
+            </select>
         </div>
         <div class="control-group">
             <label for="rMax-input">rMax:</label>
             <input type="number" id="rMax-input" value="15" min="5" step="1">
         </div>
-        <button id="update-orbital">Update Orbital</button>
+        <div class="control-group">
+            <button id="update-orbital" type="button">Update Orbital</button>
+        </div>
     </div>
+
+    ```
+
+After making these changes to your `index.html` file, save it and refresh your application. This should resolve both the layout inconsistency and the `NotFoundError`.
+
 
     <script type="module" src="/main.js"></script>
 </body>
