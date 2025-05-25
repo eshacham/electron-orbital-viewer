@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Controls from './components/Controls';
 import LoadingSpinner from './components/LoadingSpinner';
 import OrbitalViewer, { OrbitalParams } from './components/OrbitalViewer'; // Import OrbitalParams
@@ -25,7 +25,7 @@ function App() {
   const [rMax, setRMax] = useState<number>(defaultOptimized.rMax);
   const [isoLevel, setIsoLevel] = useState<number>(defaultOptimized.isoLevel);
 
-  const handleOrbitalParamsChange = (newParams: {
+    const handleOrbitalParamsChange = useCallback((newParams: {
     n: number;
     l: number;
     ml: number;
@@ -36,12 +36,13 @@ function App() {
   }) => {
     setIsLoading(true);
     // This will trigger the useEffect in OrbitalViewer
-    setCurrentOrbitalParams(newParams);
-  };
+     setCurrentOrbitalParams(newParams); 
+  }, []); // Dependencies: if this function used any state/props from App, list them here
 
-  const handleOrbitalRendered = () => {
+
+  const handleOrbitalRendered = useCallback(() => {
     setIsLoading(false);
-  };
+   }, []);
 
     // Effect to trigger initial orbital render on mount
   useEffect(() => {

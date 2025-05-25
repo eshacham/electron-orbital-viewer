@@ -91,7 +91,7 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     controls.dampingFactor = 0.05;
     controls.target.set(0, 0, 0);
     controls.minDistance = 0.1; // Adjusted min distance
-    controls.maxDistance = 100; // Added max distance
+    // controls.maxDistance = 100; // Added max distance
 
     visualizerContext = {
         scene,
