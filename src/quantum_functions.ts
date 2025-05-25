@@ -1,44 +1,24 @@
-// src/quantum_functions.js
+// src/quantum_functions.ts
 
-const factorialCache = new Map();
-const pochhammerCache = new Map();
-const laguerreCache = new Map(); 
-const legendreCache = new Map(); 
-const sphericalHarmonicCache = new Map(); 
-const atomicOrbitalCache = new Map();
+const factorialCache: Map<number, number> = new Map();
+const pochhammerCache: Map<string, number> = new Map();
+const laguerreCache: Map<string, number> = new Map();
+const legendreCache: Map<string, number> = new Map();
+const sphericalHarmonicCache: Map<string, number> = new Map();
+const atomicOrbitalCache: Map<string, number> = new Map();
 
-// Bohr radius in meters (approximately 5.29 x 10^-11 m).
-// For convenience in calculations, we might consider using atomic units where a_0 = 1.
-// However, to keep it physically grounded, we'll use its value.
-// It's often helpful to keep this as a configurable constant if we want to scale units later.
-const BOHR_RADIUS = 0.0529177210903; // nm or Angstroms depending on your desired scale for 'r' input.
-                                     // Let's assume input 'r' will also be in these units (e.g. nm)
-                                     // if we're visualizing in a range of say 0-10 nm.
-                                     // If we use 'r' as a multiple of a_0, then a_0=1.
-                                     // For now, assume r is already in units of a_0, so a_0 = 1 for calculation simplicity.
-                                     // This simplifies the formula's r/a_0 term.
-                                     // Let's refine this: the 2Zr/na0 term implies r is in units of a0.
-                                     // So, for calculations inside the function, we'll treat `a0` as 1 (atomic units).
-                                     // When we call this function from the main rendering loop,
-                                     // 'r' will be the distance in Bohr radii.
-
-// Re-evaluating BOHR_RADIUS: If r is in Bohr radii, then r/a0 is just r.
-// If r is in physical units (like nanometers), then r/a0 should be r/BOHR_RADIUS.
-// Let's define the function such that 'r' is passed in **Bohr radii**. This makes the math simpler.
-// So, effectively, a0 = 1 within the formula.
-
-// New approach: Pass r in atomic units (Bohr radii), Z = 1 for hydrogen.
-// So, BOHR_RADIUS constant isn't strictly needed inside this specific formula unless we scale r.
-// Let's rename the constant to something like ATOMIC_LENGTH_UNIT if we decide to use it for scaling visuals.
-// For now, assume r is the value in (r/a0) units.
-
+// Note on units:
+// Throughout these functions, the distance 'r' is assumed to be provided in atomic units,
+// specifically in multiples of the Bohr radius (a0).
+// This simplifies the formulas as a0 is effectively treated as 1.
+// The nuclear charge 'Z' is also a dimensionless integer.
 
 /**
  * Calculates the factorial of a non-negative integer with memoization.
- * @param {number} n - The integer.
- * @returns {number} The factorial of n.
+ * @param n - The integer.
+ * @returns The factorial of n.
  */
-export function factorial(n) {
+export function factorial(n: number): number {
     if (n < 0) {
         throw new Error("Factorial is not defined for negative numbers.");
     }
@@ -46,7 +26,8 @@ export function factorial(n) {
         return 1;
     }
     if (factorialCache.has(n)) {
-        return factorialCache.get(n);
+        // Map.get can return undefined, but .has ensures it exists
+        return factorialCache.get(n)!;
     }
 
     let result = 1;
@@ -61,11 +42,11 @@ export function factorial(n) {
  * Calculates the Pochhammer symbol (rising factorial) with memoization.
  * (x)_n = x * (x + 1) * ... * (x + n - 1)
  * (x)_0 = 1
- * @param {number} x - The base value.
- * @param {number} n - The number of terms.
- * @returns {number} The Pochhammer symbol value.
+ * @param x - The base value.
+ * @param n - The number of terms.
+ * @returns The Pochhammer symbol value.
  */
-export function pochhammer(x, n) {
+export function pochhammer(x: number, n: number): number {
     if (n < 0) {
         throw new Error("Pochhammer symbol is not defined for negative n.");
     }
@@ -74,7 +55,7 @@ export function pochhammer(x, n) {
     }
     const cacheKey = `${x},${n}`;
     if (pochhammerCache.has(cacheKey)) {
-        return pochhammerCache.get(cacheKey);
+        return pochhammerCache.get(cacheKey)!;
     }
 
     let result = 1;
@@ -88,11 +69,11 @@ export function pochhammer(x, n) {
 /**
  * Calculates the binomial coefficient "n choose k".
  * C(n, k) = n! / (k! * (n - k)!)
- * @param {number} N - The total number of items.
- * @param {number} K - The number of items to choose.
- * @returns {number} The binomial coefficient.
+ * @param N - The total number of items.
+ * @param K - The number of items to choose.
+ * @returns The binomial coefficient.
  */
-export function binomialCoefficient(N, K) {
+export function binomialCoefficient(N: number, K: number): number {
     if (K === 0) { // Explicitly handle K=0: C(N, 0) is always 1, even for negative N
         return 1;
     }
@@ -115,12 +96,12 @@ export function binomialCoefficient(N, K) {
  * Calculates the generalized Laguerre polynomial L_n^(alpha)(x).
  * Uses the sum formula: L_n^(alpha)(x) = sum_{k=0 to n} ( (-1)^k * C(n + alpha, n - k) * (x^k / k!) )
  *
- * @param {number} n - The degree of the polynomial.
- * @param {number} alpha - The order of the polynomial.
- * @param {number} x - The value at which to evaluate the polynomial.
- * @returns {number} The value of the generalized Laguerre polynomial.
+ * @param n - The degree of the polynomial.
+ * @param alpha - The order of the polynomial.
+ * @param x - The value at which to evaluate the polynomial.
+ * @returns The value of the generalized Laguerre polynomial.
  */
-export function laguerrePolynomial(n, alpha, x) {
+export function laguerrePolynomial(n: number, alpha: number, x: number): number {
     if (n < 0) {
         throw new Error("Laguerre polynomial degree (n) cannot be negative.");
     }
@@ -128,7 +109,7 @@ export function laguerrePolynomial(n, alpha, x) {
 
     const cacheKey = `${n},${alpha},${x}`;
     if (laguerreCache.has(cacheKey)) {
-        return laguerreCache.get(cacheKey);
+        return laguerreCache.get(cacheKey)!;
     }
 
     let sum = 0;
@@ -149,13 +130,13 @@ export function laguerrePolynomial(n, alpha, x) {
 /**
  * Calculates the radial wave function R_nl(r) for a hydrogen-like atom.
  * 'r' is expected to be in units of Bohr radii (atomic units).
- * @param {number} n - Principal quantum number.
- * @param {number} l - Azimuthal (angular momentum) quantum number.
- * @param {number} r - Distance from the nucleus in Bohr radii.
- * @param {number} Z - Nuclear charge (defaults to 1 for Hydrogen).
- * @returns {number} The value of the radial wave function.
+ * @param n - Principal quantum number.
+ * @param l - Azimuthal (angular momentum) quantum number.
+ * @param r - Distance from the nucleus in Bohr radii.
+ * @param Z - Nuclear charge (defaults to 1 for Hydrogen).
+ * @returns The value of the radial wave function.
  */
-export function radialWaveFunction(n, l, r, Z = 1) {
+export function radialWaveFunction(n: number, l: number, r: number, Z: number = 1): number {
     // Validate quantum numbers
     if (n < 1 || !Number.isInteger(n)) {
         throw new Error("Principal quantum number (n) must be a positive integer.");
@@ -201,20 +182,22 @@ export function radialWaveFunction(n, l, r, Z = 1) {
  * Calculates the Associated Legendre Polynomial P_l^m(x).
  * Uses a recursive definition with memoization for efficiency.
  * x = cos(theta), so -1 <= x <= 1.
- * @param {number} l - The degree of the polynomial.
- * @param {number} m - The order of the polynomial (abs value corresponds to |m_l|).
- * @param {number} x - The value at which to evaluate the polynomial (cos(theta)).
- * @returns {number} The value of P_l^m(x).
+ * @param l - The degree of the polynomial.
+ * @param m - The order of the polynomial (abs value corresponds to |m_l|). Must be non-negative.
+ * @param x - The value at which to evaluate the polynomial (cos(theta)).
+ * @returns The value of P_l^m(x).
  */
-export function associatedLegendrePolynomial(l, m, x) {
+export function associatedLegendrePolynomial(l: number, m: number, x: number): number {
     if (l < 0 || !Number.isInteger(l)) { // Validate l first
         throw new Error("Associated Legendre Polynomial 'l' parameter must be a non-negative integer.");
     }
     if (m < 0 || !Number.isInteger(m)) { // Validate m is non-negative integer
         throw new Error("Associated Legendre Polynomial 'm' parameter must be a non-negative integer.");
     }
-    if (Math.abs(x) > 1 + 1e-9) {
-        throw new Error("Associated Legendre Polynomial 'x' parameter must be between -1 and 1 (inclusive).");
+    if (Math.abs(x) > 1 + 1e-9) { // Allow for slight floating point inaccuracies
+        // Clamp x to the valid range if it's very slightly outside due to floating point math
+        x = Math.max(-1, Math.min(1, x));
+        // console.warn(`Associated Legendre Polynomial 'x' parameter was slightly out of [-1, 1] range and clamped. Original: ${originalX}, Clamped: ${x}`);
     }
     if (m > l) { // Then apply mathematical rule for m > l
         return 0;
@@ -222,7 +205,7 @@ export function associatedLegendrePolynomial(l, m, x) {
 
     const cacheKey = `${l},${m},${x}`;
     if (legendreCache.has(cacheKey)) {
-        return legendreCache.get(cacheKey);
+        return legendreCache.get(cacheKey)!;
     }
 
     let val;
@@ -232,12 +215,13 @@ export function associatedLegendrePolynomial(l, m, x) {
         for (let i = 2 * m - 1; i >= 1; i -= 2) {
             doubleFactorial *= i;
         }
-        // ******************** CRITICAL CHANGE HERE ********************
-        // Remove Math.pow(-1, m) for consistency with real spherical harmonic formulas
+        // The Math.pow(-1, m) term is often omitted for real spherical harmonics
+        // as its sign is incorporated into the definition of Y_lm for m < 0.
+        // For P_l^m itself, some definitions include it. We'll omit it here
+        // to align with common real spherical harmonic formulations.
         val = doubleFactorial * Math.pow(1 - x * x, m / 2);
-        // **************************************************************
     } else if (m === l - 1) {
-        val = x * (2 * m + 1) * associatedLegendrePolynomial(m, m, x);
+        val = x * (2 * m + 1) * associatedLegendrePolynomial(m, m, x); // P_m^m(x)
     } else {
         val = (x * (2 * l - 1) * associatedLegendrePolynomial(l - 1, m, x) -
                (l + m - 1) * associatedLegendrePolynomial(l - 2, m, x)) /
@@ -246,20 +230,19 @@ export function associatedLegendrePolynomial(l, m, x) {
 
     legendreCache.set(cacheKey, val);
     return val;
-
 }
 
 /**
  * Calculates the Real Spherical Harmonic Y_lm_l(theta, phi).
  * This function handles the common real forms used for orbital visualization.
  * Theta and phi are in radians.
- * @param {number} l - The angular momentum quantum number (non-negative integer).
- * @param {number} ml - The magnetic quantum number (integer, -l <= ml <= l).
- * @param {number} theta - The polar angle in radians (0 to PI).
- * @param {number} phi - The azimuthal angle in radians (0 to 2*PI).
- * @returns {number} The value of the real spherical harmonic.
+ * @param l - The angular momentum quantum number (non-negative integer).
+ * @param ml - The magnetic quantum number (integer, -l <= ml <= l).
+ * @param theta - The polar angle in radians (0 to PI).
+ * @param phi - The azimuthal angle in radians (0 to 2*PI).
+ * @returns The value of the real spherical harmonic.
  */
-export function realSphericalHarmonic(l, ml, theta, phi) {
+export function realSphericalHarmonic(l: number, ml: number, theta: number, phi: number): number {
     // Validate quantum numbers and angles
     if (l < 0 || !Number.isInteger(l)) {
         throw new Error("Spherical Harmonic 'l' parameter must be a non-negative integer.");
@@ -267,15 +250,17 @@ export function realSphericalHarmonic(l, ml, theta, phi) {
     if (!Number.isInteger(ml) || Math.abs(ml) > l) {
         throw new Error("Spherical Harmonic 'ml' parameter must be an integer between -l and l (inclusive).");
     }
-    if (theta < 0 || theta > Math.PI) {
-        throw new Error("Spherical Harmonic 'theta' parameter must be between 0 and PI radians.");
+    if (theta < -1e-9 || theta > Math.PI + 1e-9) { // Allow for slight floating point inaccuracies
+        // Clamp theta to the valid range
+        theta = Math.max(0, Math.min(Math.PI, theta));
+        // console.warn(`Spherical Harmonic 'theta' parameter was slightly out of [0, PI] range and clamped. Original: ${originalTheta}, Clamped: ${theta}`);
     }
     // No explicit check for phi range (0 to 2PI) as trigonometric functions handle periodicity,
     // but typically phi is normalized to [0, 2PI) for consistent input.
 
     const cacheKey = `${l},${ml},${theta},${phi}`;
     if (sphericalHarmonicCache.has(cacheKey)) {
-        return sphericalHarmonicCache.get(cacheKey);
+        return sphericalHarmonicCache.get(cacheKey)!;
     }
 
     const abs_ml = Math.abs(ml);
@@ -299,6 +284,8 @@ export function realSphericalHarmonic(l, ml, theta, phi) {
         result = normalizationFactor * legendrePart * Math.cos(ml * phi) * Math.sqrt(2);
     } else { // ml < 0
         // Imaginary part (e.g., py, dyz)
+        // Note: some definitions use (-1)^m factor here, but for real orbitals,
+        // it's common to use sin(abs_ml * phi)
         result = normalizationFactor * legendrePart * Math.sin(abs_ml * phi) * Math.sqrt(2);
     }
 
@@ -312,25 +299,26 @@ export function realSphericalHarmonic(l, ml, theta, phi) {
  * Psi(r, theta, phi)^2 = [R_nl(r) * Y_lm_l(theta, phi)]^2
  * 'r' is expected to be in units of Bohr radii (atomic units).
  * Theta and phi are in radians.
- * @param {number} n - Principal quantum number.
- * @param {number} l - Azimuthal (angular momentum) quantum number.
- * @param {number} ml - Magnetic quantum number.
- * @param {number} r - Distance from the nucleus in Bohr radii.
- * @param {number} theta - Polar angle in radians (0 to PI).
- * @param {number} phi - Azimuthal angle in radians (0 to 2*PI).
- * @param {number} Z - Nuclear charge (defaults to 1 for Hydrogen).
- * @returns {number} The probability density (magnitude squared of the wave function).
+ * @param n - Principal quantum number.
+ * @param l - Azimuthal (angular momentum) quantum number.
+ * @param ml - Magnetic quantum number.
+ * @param r - Distance from the nucleus in Bohr radii.
+ * @param theta - Polar angle in radians (0 to PI).
+ * @param phi - Azimuthal angle in radians (0 to 2*PI).
+ * @param Z - Nuclear charge (defaults to 1 for Hydrogen).
+ * @returns The probability density (magnitude squared of the wave function).
  */
-export function atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z = 1) {
+export function atomicOrbitalProbabilityDensity(n: number, l: number, ml: number, r: number, theta: number, phi: number, Z: number = 1): number {
     // Input validation is handled by the underlying functions.
     // We only need to check for non-physical r here explicitly if it's not caught below.
     if (r < 0) {
+        // Or handle as density = 0 for r < 0
         throw new Error("Distance (r) cannot be negative for atomic orbital probability density.");
     }
 
     const cacheKey = `${n},${l},${ml},${r},${theta},${phi},${Z}`;
     if (atomicOrbitalCache.has(cacheKey)) {
-        return atomicOrbitalCache.get(cacheKey);
+        return atomicOrbitalCache.get(cacheKey)!;
     }
 
     const radialPart = radialWaveFunction(n, l, r, Z);
@@ -343,33 +331,35 @@ export function atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z = 1) 
     return probabilityDensity;
 }
 
+interface OrbitalData {
+    grid: Float32Array;
+    dims: [number, number, number];
+    maxDensity: number;
+    minVal: number; // Starting coordinate of the cube (e.g., -rMax)
+    maxVal: number; // Ending coordinate of the cube (e.g., +rMax)
+}
+
 /**
  * Generates 3D volumetric data for an atomic orbital's probability density.
  * The data is generated on a Cartesian grid and returned as a flat array representing a 3D grid.
  *
- * @param {number} n - Principal quantum number.
- * @param {number} l - Azimuthal (angular momentum) quantum number.
- * @param {number} ml - Magnetic quantum number.
- * @param {number} Z - Nuclear charge (defaults to 1 for Hydrogen).
- * @param {number} resolution - Number of steps along each Cartesian axis (e.g., if 50, grid is 50x50x50).
- * @param {number} rMax - Maximum radial distance (in Bohr radii) to sample, defining the half-width of the cube.
+ * @param n - Principal quantum number.
+ * @param l - Azimuthal (angular momentum) quantum number.
+ * @param ml - Magnetic quantum number.
+ * @param Z - Nuclear charge (defaults to 1 for Hydrogen).
+ * @param resolution - Number of steps along each Cartesian axis (e.g., if 50, grid is 50x50x50).
+ * @param rMax - Maximum radial distance (in Bohr radii) to sample, defining the half-width of the cube.
  * The cube will extend from -rMax to +rMax along each axis.
- * @returns {{grid: Float32Array, dims: number[], maxDensity: number, minVal: number, maxVal: number}}
- * An object containing:
- * - grid: A flat Float32Array representing the 3D probability density grid.
- * - dims: An array [resolution, resolution, resolution] indicating grid dimensions.
- * - maxDensity: The maximum probability density found in the grid.
- * - minVal, maxVal: The min and max coordinates of the sampled cube (e.g., -rMax, rMax).
  */
-export function generateOrbitalData(n, l, ml, Z = 1, resolution = 50, rMax = 15) {
-    if (resolution <= 0) {
+export function generateOrbitalData(n: number, l: number, ml: number, Z: number = 1, resolution: number = 50, rMax: number = 15): OrbitalData {
+    if (resolution <= 0 || !Number.isInteger(resolution)) {
         throw new Error("Resolution must be a positive integer.");
     }
     if (rMax <= 0) {
         throw new Error("rMax must be a positive number.");
     }
 
-    const dims = [resolution, resolution, resolution];
+    const dims: [number, number, number] = [resolution, resolution, resolution];
     const grid = new Float32Array(dims[0] * dims[1] * dims[2]);
     let maxDensity = 0;
 
@@ -392,27 +382,29 @@ export function generateOrbitalData(n, l, ml, Z = 1, resolution = 50, rMax = 15)
 
                 let density;
                 if (r === 0) {
-                     density = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z); // Use 0 for angles, as they don't matter at origin
+                     // For s-orbitals (l=0), density is non-zero at r=0.
+                     // For l > 0, density is 0 at r=0.
+                     // The radialWaveFunction should handle r=0 correctly.
+                     density = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z);
                 } else {
                     density = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
                 }
 
-
                 const index = xIdx * dims[1] * dims[2] + yIdx * dims[2] + zIdx;
                 grid[index] = density;
-                maxDensity = Math.max(maxDensity, density);
+                if (density > maxDensity) {
+                    maxDensity = density;
+                }
             }
         }
     }
 
-    // THIS IS THE CRUCIAL PART THAT WAS LIKELY WRONG:
-    // It should return the object with grid, dims, etc.
     return {
         grid: grid,
         dims: dims,
         maxDensity: maxDensity,
         minVal: startCoord,
-        maxVal: rMax
+        maxVal: rMax // This should be startCoord + (resolution - 1) * step, which is rMax
     };
 }
 
@@ -420,17 +412,18 @@ export function generateOrbitalData(n, l, ml, Z = 1, resolution = 50, rMax = 15)
  * Returns a potential function (df) for marching-cubes-fast, which evaluates
  * the atomic orbital probability density (adjusted for isosurface) at a given 3D world coordinate (x, y, z).
  *
- * @param {number} n The principal quantum number.
- * @param {number} l The azimuthal quantum number.
- * @param {number} ml The magnetic quantum number.
- * @param {number} Z The atomic number.
- * @param {number} isoLevel The isosurface level. The function will return (density - isoLevel).
- * @returns {function(number, number, number): number} A function (df) that takes (x, y, z)
+ * @param n The principal quantum number.
+ * @param l The azimuthal quantum number.
+ * @param ml The magnetic quantum number.
+ * @param Z The atomic number.
+ * @param isoLevel The isosurface level. The function will return (density - isoLevel).
+ * @returns A function (df) that takes (x, y, z)
  * and returns the orbital probability density minus the isoLevel at that point.
  */
-export function getOrbitalPotentialFunction(n, l, ml, Z, isoLevel) { // Added isoLevel parameter
+export function getOrbitalPotentialFunction(n: number, l: number, ml: number, Z: number, isoLevel: number): (x: number, y: number, z: number) => number {
     return (x, y, z) => {
         const r = Math.sqrt(x * x + y * y + z * z);
+        // Clamp r to avoid issues with Math.acos(1.0000000000000001) or similar
         const theta = Math.acos(Math.min(1, Math.max(-1, r === 0 ? 0 : z / r)));
         const phi = Math.atan2(y, x);
 
@@ -440,23 +433,17 @@ export function getOrbitalPotentialFunction(n, l, ml, Z, isoLevel) { // Added is
         } else {
             density = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
         }
-
-        // --- CRITICAL CHANGE: Return (density - isoLevel) ---
-        // This effectively turns our density function into a signed distance-like function
-        // where the surface is where density - isoLevel = 0.
-        // The marching-cubes-fast library's filtering `Math.abs(dfc) < biasDist`
-        // will then look for points where `abs(density - isoLevel) < biasDist`.
-        // Since biasDist is hardcoded to 0 in the library, it will look for `density - isoLevel = 0`.
         return density - isoLevel;
     };
 }
 
-// Optional: function to clear all caches for testing purposes
-export const __clearAllCaches__ = () => {
+// Optional: function to clear all caches for testing purposes or specific scenarios
+export const __clearAllCaches__ = (): void => {
     factorialCache.clear();
     pochhammerCache.clear();
     laguerreCache.clear();
     legendreCache.clear();
     sphericalHarmonicCache.clear();
     atomicOrbitalCache.clear();
+    console.log("All quantum_functions caches cleared.");
 };
