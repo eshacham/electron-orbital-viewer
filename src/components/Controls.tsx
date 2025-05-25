@@ -7,7 +7,10 @@ import {
   MenuItem,
   TextField,
   Button,
-  SelectChangeEvent
+  SelectChangeEvent,
+  ToggleButton,
+  ToggleButtonGroup,
+  FormLabel, // To label the ToggleButtonGroup
 } from '@mui/material';
 
 // This interface should match the one in OrbitalViewer.tsx and App.tsx
@@ -114,7 +117,7 @@ const Controls: React.FC<ControlsProps> = ({
 
   return (
     <Box id="controls" sx={{ p: 2 }}> {/* sx prop allows for inline MUI styling */}
-      <FormControl fullWidth margin="normal" size="small">
+      <FormControl fullWidth margin="normal" size="small" >
         <InputLabel id="n-select-label">Principal (n)</InputLabel>
         <Select
           labelId="n-select-label"
@@ -163,9 +166,25 @@ const Controls: React.FC<ControlsProps> = ({
         label="Max Radius (rMax)"
         type="number"
         value={initialRMax}
-        onChange={(e) => onRMaxChange(parseFloat(e.target.value))}
-        inputProps={{ min: "1", step: "0.1" }}
-        InputLabelProps={{ shrink: true }} // Ensures label doesn't overlap with value
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          const value = e.target.value === '' ? 1 : parseFloat(e.target.value);
+          onRMaxChange(Math.max(1, Math.min(100, value))); // Min 1, Max 100 (example)
+        }}
+        slotProps={{ 
+          input: { 
+            inputProps: { min: "1", max: "100", step: "0.1" }   
+          }      
+        }}
+        InputLabelProps={{ shrink: true }}
+        sx={{
+          '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': {
+            WebkitAppearance: 'none',
+            margin: 0,
+          },
+          '& input[type=number]': {
+            MozAppearance: 'textfield',
+          },
+        }}
       />
 
       <TextField
@@ -176,9 +195,21 @@ const Controls: React.FC<ControlsProps> = ({
         label="Iso-Level"
         type="number"
         value={initialIsoLevel}
-        onChange={(e) => onIsoLevelChange(parseFloat(e.target.value))}
-        inputProps={{ min: "0.0000001", max: "0.1", step: "0.000001" }}
+        slotProps={{
+          input: {
+            inputProps: { min: "0.0000001", max: "0.1", step: "any" }
+          }
+        }}
         InputLabelProps={{ shrink: true }}
+        sx={{
+          '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': {
+            WebkitAppearance: 'none',
+            margin: 0,
+          },
+          '& input[type=number]': {
+            MozAppearance: 'textfield',
+          },
+        }}
       />
 
       <TextField
@@ -189,22 +220,47 @@ const Controls: React.FC<ControlsProps> = ({
         label="Atomic Number (Z)"
         type="number"
         value={initialZ}
-        onChange={(e) => onZChange(parseInt(e.target.value, 10))}
-        inputProps={{ min: "1", step: "1" }}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          const value = e.target.value === '' ? 1 : parseInt(e.target.value, 10);
+          onZChange(Math.max(1, Math.min(118, value))); // Min 1, Max 118
+        }}
+        slotProps={{ 
+          input: { 
+            inputProps: {
+              min: "1", max: "118", step: "1" }
+            }
+        }}
         InputLabelProps={{ shrink: true }}
+        sx={{
+          // Attempt to hide spinners
+          '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': {
+            WebkitAppearance: 'none',
+            margin: 0,
+          },
+          '& input[type=number]': {
+            MozAppearance: 'textfield',
+          },
+        }}
       />
 
-      <FormControl fullWidth margin="normal" size="small">
-        <InputLabel id="resolution-select-label">Resolution</InputLabel>
-        <Select
-          labelId="resolution-select-label"
-          id="resolution-select"
-          value={initialResolution.toString()}
-          label="Resolution"
-          onChange={(e: SelectChangeEvent<string>) => onResolutionChange(parseInt(e.target.value, 10))}
+      {/* Resolution ToggleButtonGroup */}
+      <FormControl component="fieldset" margin="normal" fullWidth>
+        <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Resolution</FormLabel> {/* Smaller label */}
+        <ToggleButtonGroup
+          value={initialResolution}
+          exclusive // Ensures only one button can be active
+          onChange={(event: React.MouseEvent<HTMLElement>, newValue: number | null) => {
+            if (newValue !== null) {
+              onResolutionChange(newValue);
+            }
+          }}
+          aria-label="text alignment"
+          size="small"
+          fullWidth
         >
-          {[32, 64, 128].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
-        </Select>
+          <ToggleButton value={32} aria-label="low resolution">Low</ToggleButton>
+          <ToggleButton value={64} aria-label="high resolution">High</ToggleButton>        
+        </ToggleButtonGroup>
       </FormControl>
 
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}> {/* Align button to the right */}

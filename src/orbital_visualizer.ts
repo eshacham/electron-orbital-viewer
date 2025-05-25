@@ -341,7 +341,7 @@ function addOrUpdateAxesHelper(context: VisualizerContext | null, scene: THREE.S
         context.currentAxesHelper.dispose();
         context.currentAxesHelper = null;
     }
-        context.currentAxesHelper = new THREE.AxesHelper(Math.max(1, rMax * 0.5));
+    context.currentAxesHelper = new THREE.AxesHelper(Math.max(1, rMax * 0.5));
     scene.add(context.currentAxesHelper);
 }
 

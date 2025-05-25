@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import Controls from './components/Controls';
-import LoadingSpinner from './components/LoadingSpinner';
+import CircularProgress from '@mui/material/CircularProgress';
 import OrbitalViewer, { OrbitalParams } from './components/OrbitalViewer'; // Import OrbitalParams
 import { getOptimizedParameters } from './orbital_visualizer'; // To get rMax and isoLevel suggestions
 
@@ -44,7 +44,7 @@ function App() {
   }) => {
     setIsLoading(true);
     // This will trigger the useEffect in OrbitalViewer
-     setCurrentOrbitalParams(newParams); 
+    setCurrentOrbitalParams(newParams); 
   }, []); // Dependencies: if this function used any state/props from App, list them here
 
 
@@ -60,7 +60,7 @@ function App() {
       l: defaultL,
       ml: 0, // Default ml
       Z: 1,  // Default Z
-      resolution: 64, // Default resolution
+      resolution: 32, // Default resolution
       rMax: defaultOptimized.rMax,
       isoLevel: defaultOptimized.isoLevel,
     });
@@ -88,7 +88,11 @@ function App() {
           onUpdateOrbital={handleOrbitalParamsChange} // This will pass all current states
           getOptimizedParams={getOptimizedParameters} // Pass this down
         />
-      <LoadingSpinner isVisible={isLoading} />
+      {isLoading && (
+      <div className="spinner-overlay">
+        <CircularProgress size={64} />
+      </div>
+)}
     </>
     </ThemeProvider>
   );
