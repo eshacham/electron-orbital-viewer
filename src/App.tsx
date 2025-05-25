@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Controls from './components/Controls';
 import LoadingSpinner from './components/LoadingSpinner';
+import OrbitalViewer from './components/OrbitalViewer';
 
 function App() {
   // State to control the visibility of the loading spinner
@@ -8,11 +9,9 @@ function App() {
   // For now, let's set it to false so it's hidden by default.
   const [isLoading, setIsLoading] = useState<boolean>(false);
   return (
-    <>
-      {/* The canvas will be rendered here by your existing logic later */}
-      {/* For now, this div acts as the container like in your original HTML */}
+    <>      
       <div id="canvas-container">
-        {/* In a later phase, your Three.js or other canvas rendering logic will target this or a child element. */}
+        <OrbitalViewer />
       </div>
       <Controls />
       <LoadingSpinner isVisible={isLoading} />
