@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-
+import {
+  Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+  Button,
+  SelectChangeEvent
+} from '@mui/material';
 
 // This interface should match the one in OrbitalViewer.tsx and App.tsx
 interface OrbitalParamsForUpdate {
@@ -50,7 +59,7 @@ const Controls: React.FC<ControlsProps> = ({
   useEffect(() => {
     const newLOptions = Array.from({ length: initialN }, (_, i) => i);
     setLOptions(newLOptions);
-// If current L is not valid for new N, reset L (and subsequently Ml)
+    // If current L is not valid for new N, reset L (and subsequently Ml)
     // Also, update rMax and isoLevel based on new N (and potentially new L)
     if (!newLOptions.includes(initialL)) {
       const newL = newLOptions[0] !== undefined ? newLOptions[0] : 0;
@@ -104,52 +113,111 @@ const Controls: React.FC<ControlsProps> = ({
   };
 
   return (
-    <div id="controls">
-      <div className="control-group">
-        <label htmlFor="n-select">n (Principal):</label>
-        <select id="n-select" value={initialN} onChange={(e) => onNChange(parseInt(e.target.value, 10))}>
-          {[1, 2, 3, 4, 5, 6].map(val => <option key={val} value={val}>{val}</option>)}
-        </select>
-      </div>
-      <div className="control-group">
-        <label htmlFor="l-select">l (Angular):</label>
-        <select id="l-select" value={initialL} onChange={(e) => onLChange(parseInt(e.target.value, 10))} disabled={lOptions.length === 0}>
-          {lOptions.map(val => <option key={val} value={val}>{val}</option>)}
-        </select>
-      </div>
-      <div className="control-group">
-        <label htmlFor="ml-select">m_l (Magnetic):</label>
-        <select id="ml-select" value={initialMl} onChange={(e) => onMlChange(parseInt(e.target.value, 10))} disabled={mlOptions.length === 0}>
-          {mlOptions.map(val => <option key={val} value={val}>{val}</option>)}
-        </select>
-      </div>
-      <div className="control-group">
-        <label htmlFor="z-input">Z (Atomic Number):</label>
-        <input type="number" id="z-input" value={initialZ} onChange={(e) => onZChange(parseInt(e.target.value, 10))} min="1" step="1" />
-      </div>
-      <div className="control-group">
-        <label htmlFor="resolution-input">Resolution:</label>
-        <select id="resolution-input" value={initialResolution} onChange={(e) => onResolutionChange(parseInt(e.target.value, 10))}>
-          {[32, 64, 128].map(val => <option key={val} value={val}>{val}</option>)}
-        </select>
-      </div>
-      <div className="control-group">
-        <label htmlFor="rMax-input">rMax (Max Radius):</label>
-        <input type="number" id="rMax-input" value={initialRMax} onChange={(e) => onRMaxChange(parseFloat(e.target.value))} min="1" step="0.1" />
-      </div>
-      <div className="control-group">
-        <label htmlFor="iso-level-input">Iso-Level:</label>
-        <input type="number" id="iso-level-input" value={initialIsoLevel} 
-          onChange={(e) => onIsoLevelChange(parseFloat(e.target.value))} 
-          min="0.0000001" max="0.1" step="0.00001" 
-          />
-      </div>
-      <div className="control-group">
-        <button id="update-orbital" type="button" onClick={handleUpdateOrbital}>
+    <Box id="controls" sx={{ p: 2 }}> {/* sx prop allows for inline MUI styling */}
+      <FormControl fullWidth margin="normal" size="small">
+        <InputLabel id="n-select-label">Principal (n)</InputLabel>
+        <Select
+          labelId="n-select-label"
+          id="n-select"
+          value={initialN.toString()} // Select value must be a string if items are strings
+          label="Principal (n)"
+          onChange={(e: SelectChangeEvent<string>) => onNChange(parseInt(e.target.value, 10))}
+        >
+          {[1, 2, 3, 4, 5, 6].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
+        </Select>
+      </FormControl>
+
+      <FormControl fullWidth margin="normal" size="small">
+        <InputLabel id="l-select-label">Angular (l)</InputLabel>
+        <Select
+          labelId="l-select-label"
+          id="l-select"
+          value={initialL.toString()}
+          label="Angular (l)"
+          onChange={(e: SelectChangeEvent<string>) => onLChange(parseInt(e.target.value, 10))}
+          disabled={lOptions.length === 0}
+        >
+          {lOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
+        </Select>
+      </FormControl>
+
+      <FormControl fullWidth margin="normal" size="small">
+        <InputLabel id="ml-select-label">Magnetic (m_l)</InputLabel>
+        <Select
+          labelId="ml-select-label"
+          id="ml-select"
+          value={initialMl.toString()}
+          label="Magnetic (m_l)"
+          onChange={(e: SelectChangeEvent<string>) => onMlChange(parseInt(e.target.value, 10))}
+          disabled={mlOptions.length === 0}
+        >
+          {mlOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
+        </Select>
+      </FormControl>
+
+      <TextField
+        fullWidth
+        margin="normal"
+        size="small"
+        id="rMax-input"
+        label="Max Radius (rMax)"
+        type="number"
+        value={initialRMax}
+        onChange={(e) => onRMaxChange(parseFloat(e.target.value))}
+        inputProps={{ min: "1", step: "0.1" }}
+        InputLabelProps={{ shrink: true }} // Ensures label doesn't overlap with value
+      />
+
+      <TextField
+        fullWidth
+        margin="normal"
+        size="small"
+        id="iso-level-input"
+        label="Iso-Level"
+        type="number"
+        value={initialIsoLevel}
+        onChange={(e) => onIsoLevelChange(parseFloat(e.target.value))}
+        inputProps={{ min: "0.0000001", max: "0.1", step: "0.000001" }}
+        InputLabelProps={{ shrink: true }}
+      />
+
+      <TextField
+        fullWidth
+        margin="normal"
+        size="small"
+        id="z-input"
+        label="Atomic Number (Z)"
+        type="number"
+        value={initialZ}
+        onChange={(e) => onZChange(parseInt(e.target.value, 10))}
+        inputProps={{ min: "1", step: "1" }}
+        InputLabelProps={{ shrink: true }}
+      />
+
+      <FormControl fullWidth margin="normal" size="small">
+        <InputLabel id="resolution-select-label">Resolution</InputLabel>
+        <Select
+          labelId="resolution-select-label"
+          id="resolution-select"
+          value={initialResolution.toString()}
+          label="Resolution"
+          onChange={(e: SelectChangeEvent<string>) => onResolutionChange(parseInt(e.target.value, 10))}
+        >
+          {[32, 64, 128].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
+        </Select>
+      </FormControl>
+
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}> {/* Align button to the right */}
+        <Button
+          id="update-orbital"
+          variant="contained"
+          color="primary"
+          onClick={handleUpdateOrbital}
+        >
           Update Orbital
-        </button>
-      </div>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   );
 };
 

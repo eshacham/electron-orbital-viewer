@@ -1,13 +1,13 @@
-
 /* public/style.css */
 html, body, #root {
   height: 100%;
   margin: 0;
-  font-family: sans-serif;
+  font-family: 'Roboto', sans-serif;
 }
 #root {
   display: flex; /* Use flexbox for layout if desired */
   flex-direction: column; /* Or 'row' depending on your layout */
+  position: relative; /* Make #root a positioning context for #controls */
 }
 /* This is the div from App.tsx */
 #canvas-container {
@@ -27,51 +27,75 @@ html, body, #root {
   display: block; /* Important for canvas to behave like a block element */
 }
 #controls {
-    padding: 10px;
-    background-color: #f0f0f0;
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    z-index: 100; /* Ensure controls are above canvas */
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-height: 90vh; /* Prevent controls from overflowing if many options */
-    overflow-y: auto; /* Allow scrolling if content overflows */
+  position: absolute; /* Position absolutely within #root */
+  top: 20px;          /* Distance from the top */
+  left: 20px;         /* Distance from the left */
+  width: fit-content; /* Constrain width to its content */
+  height: fit-content;/* Constrain height to its content */
+  padding: 15px; /* Added a bit more padding */
+  /* Make the background semi-transparent */
+  /* Adjust the alpha (last value) for more/less transparency */
+  /* e.g., 0.7 is 70% opaque, 0.5 is 50% opaque */
+  background-color: rgba(240, 240, 240, 0.85); /* Light grey with 85% opacity */
+  border-radius: 8px; /* Optional: add some rounded corners */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Optional: subtle shadow */
+  z-index: 10; /* Ensure it's above the canvas container if they overlap */
+  
+  /* Use flexbox to align children to the right */
+  display: flex;
+  flex-direction: column; /* Stack control groups vertically */
+  /* align-items: flex-end; */  /* Align items (control groups) to the right - commented out */
 }
 .control-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: '100px'
+  margin-bottom: 12px; /* Increased margin for better spacing */
+  display: flex; /* Allow label and input to align nicely */
+  align-items: center; /* Vertically align label and input */
+  justify-content: flex-end; /* Right-aligns the label and input within the group */
+  width: auto; /* Allow the group to shrink to its content if needed */
 }
-label {
-    min-width: 30px; /* Adjusted for longer labels */
+.control-group label {
+  margin-right: 10px; /* Space between label and input */
+  font-weight: 500; /* Slightly bolder labels */
 }
-input[type="number"], select {
-    padding: 5px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    width: 80px; /* Consistent width */
+
+/* Optional: Style inputs and selects for consistency */
+#controls select,
+#controls input[type="number"] {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
-button {
-    padding: 8px 15px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-    align-self: flex-start; /* Align button to the left */
+
+/* Set specific widths for numeric inputs to prevent them from being too long */
+#controls #z-input,
+#controls #rMax-input,
+#controls #iso-level-input {
+  width: 80px; /* Adjust as needed, includes space for steppers */
+}
+
+#controls select {
+  min-width: 100px; /* Give selects a bit more base width */
+}
+
+#controls button#update-orbital {
+  padding: 8px 15px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+#controls button#update-orbital:hover {
+  background-color: #2980b9;
 }
 button:hover {
     background-color: #0056b3;
 }
 
-/* --- LOADING SPINNER CSS --- */
+
 #loading-spinner {
   position: fixed;
   top: 50%;
@@ -102,4 +126,3 @@ button:hover {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
-/* --- END LOADING SPINNER CSS --- */
