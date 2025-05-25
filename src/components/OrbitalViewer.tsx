@@ -4,7 +4,7 @@ import {
     cleanupVisualizer,
     updateOrbitalInScene,
     handleResize as visualizerHandleResize,
-    // VisualizerContext // Not directly used here, but good to know it exists
+     // VisualizerContext is implicitly used by the functions
 } from '../orbital_visualizer';
 
 export interface OrbitalParams { // Renamed from OrbitalParameters in visualizer for consistency
@@ -25,42 +25,45 @@ interface OrbitalViewerProps {
 
 const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading, onOrbitalRendered }) => {
     const canvasHostRef = useRef<HTMLDivElement>(null);
-    const isInitialized = useRef(false);
+    // Store the visualizer context in a ref
+    const visualizerContextRef = useRef<any | null>(null); // Using 'any' for simplicity, ideally import VisualizerContext type
+
 
     // Initialize and cleanup
     useEffect(() => {
-        if (canvasHostRef.current && !isInitialized.current) {
+       if (canvasHostRef.current && !visualizerContextRef.current) {
             console.log('OrbitalViewer: Initializing visualizer.');
-            initVisualizer(canvasHostRef.current);
-            isInitialized.current = true;
+            visualizerContextRef.current = initVisualizer(canvasHostRef.current);
 
             // Initial resize handling
             const hostElement = canvasHostRef.current;
-            visualizerHandleResize(hostElement.clientWidth, hostElement.clientHeight);
+            if (visualizerContextRef.current) {
+                visualizerHandleResize(visualizerContextRef.current, hostElement.clientWidth, hostElement.clientHeight);
+            }
         }
 
         return () => {
-            if (isInitialized.current) {
+            if (visualizerContextRef.current) {
                 console.log('OrbitalViewer: Cleaning up visualizer.');
-                cleanupVisualizer();
-                isInitialized.current = false;
+                cleanupVisualizer(visualizerContextRef.current);
+                visualizerContextRef.current = null;
             }
         };
     }, []); // Empty dependency array: runs once on mount and cleanup on unmount
 
     // Handle orbital updates
     useEffect(() => {
-        if (isInitialized.current && orbitalParams) {
+        if (visualizerContextRef.current && orbitalParams) {
             console.log('OrbitalViewer: Updating orbital with params:', orbitalParams);
             // isLoading prop is managed by App.tsx, which should set it before calling this.
-            updateOrbitalInScene(orbitalParams, true /* showAxes */)
+            updateOrbitalInScene(visualizerContextRef.current, orbitalParams, true /* showAxes */)
                 .then(() => {
                     console.log('OrbitalViewer: Orbital update complete.');
                     onOrbitalRendered?.();
                 })
                 .catch(error => {
                     console.error('OrbitalViewer: Error updating orbital', error);
-                    onOrbitalRendered?.(); // Still call to potentially turn off loader
+                    onOrbitalRendered?.(); // Still call to potentially turn off loader_
                 });
         }
     }, [orbitalParams, onOrbitalRendered]); // Rerun when orbitalParams change
@@ -68,8 +71,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading,
     // Handle resize
     useEffect(() => {
         const handleResize = () => {
-            if (canvasHostRef.current && isInitialized.current) {
-                visualizerHandleResize(canvasHostRef.current.clientWidth, canvasHostRef.current.clientHeight);
+            if (canvasHostRef.current && visualizerContextRef.current) {
+                visualizerHandleResize(visualizerContextRef.current, canvasHostRef.current.clientWidth, canvasHostRef.current.clientHeight);
             }
         };
         window.addEventListener('resize', handleResize);

@@ -26,7 +26,7 @@ interface VisualizerContext {
   animationFrameId?: number;
 }
 
-let visualizerContext: VisualizerContext | null = null;
+// let visualizerContext: VisualizerContext | null = null;
 
 // --- Optimized Parameters Storage (with more predictions) ---
 const optimizedOrbitalParameters: Record<string, { rMax: number; isoLevel: number }> = {
@@ -93,7 +93,7 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     controls.minDistance = 0.1; // Adjusted min distance
     // controls.maxDistance = 100; // Added max distance
 
-    visualizerContext = {
+    const context: VisualizerContext = {
         scene,
         camera,
         renderer,
@@ -102,49 +102,51 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
         currentOrbitalPoints: null,
         currentAxesHelper: null,
     };
-
-    startAnimationLoop();
-    return visualizerContext;
+    
+    startAnimationLoop(context);
+    return context;
 }
 
-export function cleanupVisualizer() {
-    if (visualizerContext) {
-        if (visualizerContext.animationFrameId) {
-            cancelAnimationFrame(visualizerContext.animationFrameId);
-            visualizerContext.animationFrameId = undefined;
+
+export function cleanupVisualizer(context: VisualizerContext | null) {
+    if (context) {
+        if (context.animationFrameId) {
+            cancelAnimationFrame(context.animationFrameId);
+            context.animationFrameId = undefined;
         }
-        clearCurrentOrbital(visualizerContext.scene); // Ensure orbital is cleared
-        if (visualizerContext.currentAxesHelper) {
-            visualizerContext.scene.remove(visualizerContext.currentAxesHelper);
-            visualizerContext.currentAxesHelper.dispose();
-            visualizerContext.currentAxesHelper = null;
+        clearCurrentOrbital(context, context.scene); // Ensure orbital is cleared
+        if (context.currentAxesHelper) {
+            context.scene.remove(context.currentAxesHelper);
+            context.currentAxesHelper.dispose();
+            context.currentAxesHelper = null;
         }
-        if (visualizerContext.controls) {
-            visualizerContext.controls.dispose();
+        if (context.controls) {
+            context.controls.dispose();
         }
-        if (visualizerContext.renderer) {
-            visualizerContext.renderer.domElement.remove();
-            visualizerContext.renderer.dispose();
+        if (context.renderer) {
+            context.renderer.domElement.remove();
+            context.renderer.dispose();
         }
-        visualizerContext = null;
+        // The calling component will nullify its reference to the context
         console.log("Visualizer cleaned up.");
     }
 }
 
-export async function updateOrbitalInScene(params: OrbitalParameters, showAxes: boolean = true): Promise<void> {
-    if (!visualizerContext) {
+
+export async function updateOrbitalInScene(context: VisualizerContext | null, params: OrbitalParameters, showAxes: boolean = true): Promise<void> {
+    if (!context) {
         console.error("Visualizer not initialized.");
         return;
     }
-    const { scene, controls } = visualizerContext;
+    const { scene, controls } = context;
     const { n, l, ml, Z, resolution, rMax, isoLevel } = params;
 
     return new Promise(resolve => {
         setTimeout(() => { // Small delay to ensure spinner renders before heavy computation
-            clearCurrentOrbital(scene);
+            clearCurrentOrbital(context, scene);
 
             if (showAxes) {
-                addOrUpdateAxesHelper(scene, rMax);
+                addOrUpdateAxesHelper(context, scene, rMax);
             }
 
             const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoLevel);
@@ -257,13 +259,14 @@ export async function updateOrbitalInScene(params: OrbitalParameters, showAxes: 
                 metalness: 0.3,
                 roughness: 0.6,
                 side: THREE.DoubleSide, // Render both sides, useful for orbitals
-                // wireframe: true, // Uncomment for debugging geometry
+                transparent: true,     // Enable transparency
+                opacity: 0.75,         // Set opacity level (0.0 to 1.0)
+                wireframe: true, // Uncomment for debugging geometry
             });
 
             const orbitalMesh = new THREE.Mesh(geometry, meshMaterial);
-            if (!visualizerContext) return; // Guard
             scene.add(orbitalMesh);
-            visualizerContext.currentOrbitalMesh = orbitalMesh;
+            context.currentOrbitalMesh = orbitalMesh;
 
             // Optionally add points for debugging or different visual style
             // const pointsMaterial = new THREE.PointsMaterial({
@@ -271,9 +274,9 @@ export async function updateOrbitalInScene(params: OrbitalParameters, showAxes: 
             //     size: 0.1
             // });
             // const orbitalPoints = new THREE.Points(geometry, pointsMaterial);
-            // if (!visualizerContext) return; // Guard
+            // if (!context) return; // Guard
             // scene.add(orbitalPoints);
-            // visualizerContext.currentOrbitalPoints = orbitalPoints;
+            // context.currentOrbitalPoints = orbitalPoints;
 
             // --- CRITICAL FIX: Set controls target to the center of the orbital ---
             if (!geometry.boundingSphere) {
@@ -282,14 +285,14 @@ export async function updateOrbitalInScene(params: OrbitalParameters, showAxes: 
 
             if (geometry.boundingSphere) {
                 controls.target.copy(geometry.boundingSphere.center);
-                if (visualizerContext.currentAxesHelper) {
-                    visualizerContext.currentAxesHelper.position.copy(geometry.boundingSphere.center);
+                if (context.currentAxesHelper) {
+                    context.currentAxesHelper.position.copy(geometry.boundingSphere.center);
                 }
                 console.log("Controls target updated to orbital center:", controls.target);
             } else {
                 controls.target.set(0, 0, 0); // Fallback
-                if (visualizerContext.currentAxesHelper) {
-                    visualizerContext.currentAxesHelper.position.set(0, 0, 0);
+                if (context.currentAxesHelper) {
+                    context.currentAxesHelper.position.set(0, 0, 0);
                 }
                 console.warn("Bounding sphere could not be computed, controls target set to origin.");
 
@@ -306,60 +309,59 @@ export async function updateOrbitalInScene(params: OrbitalParameters, showAxes: 
     });
 }
 
-function clearCurrentOrbital(scene: THREE.Scene) {
-    if (!visualizerContext) return;
+function clearCurrentOrbital(context: VisualizerContext | null, scene: THREE.Scene) {
+    if (!context) return;
 
-    if (visualizerContext.currentOrbitalMesh) {
-        scene.remove(visualizerContext.currentOrbitalMesh);
-        visualizerContext.currentOrbitalMesh.geometry.dispose();
-        if (Array.isArray(visualizerContext.currentOrbitalMesh.material)) {
-            visualizerContext.currentOrbitalMesh.material.forEach(m => m.dispose());
+    if (context.currentOrbitalMesh) {
+        scene.remove(context.currentOrbitalMesh);
+        context.currentOrbitalMesh.geometry.dispose();
+        if (Array.isArray(context.currentOrbitalMesh.material)) {
+            context.currentOrbitalMesh.material.forEach(m => m.dispose());
         } else {
-            visualizerContext.currentOrbitalMesh.material.dispose();
+           context.currentOrbitalMesh.material.dispose();
         }
-        visualizerContext.currentOrbitalMesh = null;
+        context.currentOrbitalMesh = null;
     }
-    if (visualizerContext.currentOrbitalPoints) {
-        scene.remove(visualizerContext.currentOrbitalPoints);
-        visualizerContext.currentOrbitalPoints.geometry.dispose();
-        if (Array.isArray(visualizerContext.currentOrbitalPoints.material)) {
-            visualizerContext.currentOrbitalPoints.material.forEach(m => m.dispose());
+    if (context.currentOrbitalPoints) {
+        scene.remove(context.currentOrbitalPoints);
+        context.currentOrbitalPoints.geometry.dispose();
+        if (Array.isArray(context.currentOrbitalPoints.material)) {
+            context.currentOrbitalPoints.material.forEach(m => m.dispose());
         } else {
-            visualizerContext.currentOrbitalPoints.material.dispose();
+            context.currentOrbitalPoints.material.dispose();
         }
-        visualizerContext.currentOrbitalPoints = null;
+        context.currentOrbitalPoints = null;
     }
 }
 
-function addOrUpdateAxesHelper(scene: THREE.Scene, rMax: number) {
-    if (!visualizerContext) return;
+function addOrUpdateAxesHelper(context: VisualizerContext | null, scene: THREE.Scene, rMax: number) {
+    if (!context) return;
 
-    if (visualizerContext.currentAxesHelper) {
-        scene.remove(visualizerContext.currentAxesHelper);
-        visualizerContext.currentAxesHelper.dispose();
-        visualizerContext.currentAxesHelper = null;
+    if (context.currentAxesHelper) {
+        scene.remove(context.currentAxesHelper);
+        context.currentAxesHelper.dispose();
+        context.currentAxesHelper = null;
     }
-    // Scale axes helper to be a reasonable size relative to rMax
-    visualizerContext.currentAxesHelper = new THREE.AxesHelper(Math.max(1, rMax * 0.5));
-    scene.add(visualizerContext.currentAxesHelper);
+        context.currentAxesHelper = new THREE.AxesHelper(Math.max(1, rMax * 0.5));
+    scene.add(context.currentAxesHelper);
 }
 
-function startAnimationLoop() {
-    if (!visualizerContext) return;
-    const { renderer, scene, camera, controls } = visualizerContext;
-
+function startAnimationLoop(context: VisualizerContext | null) {
+    if (!context) return;
+    const { renderer, scene, camera, controls } = context;
+    
     function animateLoop() {
-        if (!visualizerContext) return; // Stop if cleaned up
-        visualizerContext.animationFrameId = requestAnimationFrame(animateLoop);
+        if (!context || !context.animationFrameId === undefined) return; // Stop if cleaned up or animationFrameId is intentionally undefined after cleanup
+        context.animationFrameId = requestAnimationFrame(animateLoop);
         controls.update(); // Only call if controls exist and are enabled
         renderer.render(scene, camera);
     }
     animateLoop();
 }
 
-export function handleResize(containerWidth: number, containerHeight: number) {
-    if (!visualizerContext) return;
-    const { camera, renderer } = visualizerContext;
+export function handleResize(context: VisualizerContext | null, containerWidth: number, containerHeight: number) {
+    if (!context) return;
+    const { camera, renderer } = context;
     if (containerHeight === 0) return; // Avoid division by zero
 
     camera.aspect = containerWidth / containerHeight;
