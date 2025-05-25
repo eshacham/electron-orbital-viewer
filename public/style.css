@@ -1,21 +1,43 @@
 
-body {
+/* public/style.css */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  font-family: sans-serif;
+}
+/* body {
     margin: 0;
     overflow: hidden;
     font-family: sans-serif;
     display: flex;
+} */
+#root {
+  display: flex; /* Use flexbox for layout if desired */
+  flex-direction: column; /* Or 'row' depending on your layout */
 }
+/* This is the div from App.tsx */
 #canvas-container {
-    flex-grow: 1; /* Takes up available space */
-    position: relative; /* For absolutely positioning the UI */
-    height: 100vh; /* Full viewport height */
+  flex-grow: 1; /* Allows it to take up available space in a flex container */
+  width: 100%;
+  /* For non-flex layout, you might need explicit height: */
+  /* height: calc(100vh - 100px); /* Example: full viewport height minus some space for controls */
+  min-height: 300px; /* Ensure it has at least some height */
+  background-color: #111; /* Temporary background to see its bounds */
+  position: relative; /* Good for positioning things inside it later if needed */
+}
+/* Ensure the host for the Three.js canvas also behaves correctly */
+#orbital-canvas-host {
+  width: 100%;
+  height: 100%;
+  display: block; /* Important for canvas to behave like a block element */
 }
 #controls {
+    padding: 10px;
+    background-color: #f0f0f0;
     position: absolute;
     top: 10px;
     left: 10px;
     background: rgba(255, 255, 255, 0.8);
-    padding: 15px;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     z-index: 100; /* Ensure controls are above canvas */
