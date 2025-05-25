@@ -139,8 +139,10 @@ const Controls: React.FC<ControlsProps> = ({
       </div>
       <div className="control-group">
         <label htmlFor="iso-level-input">Iso-Level:</label>
-        <input type="number" id="iso-level-input" value={initialIsoLevel} onChange={(e) => onIsoLevelChange(parseFloat(e.target.value))} min="0.0000001" max="0.1" step="0.00001" style={{width: '100px'}}/>
-
+        <input type="number" id="iso-level-input" value={initialIsoLevel} 
+          onChange={(e) => onIsoLevelChange(parseFloat(e.target.value))} 
+          min="0.0000001" max="0.1" step="0.00001" 
+          />
       </div>
       <div className="control-group">
         <button id="update-orbital" type="button" onClick={handleUpdateOrbital}>

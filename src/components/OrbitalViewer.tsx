@@ -81,7 +81,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading,
         };
     }, []); // Runs once on mount
 
-    return <div ref={canvasHostRef} id="orbital-canvas-host" style={{ width: '100%', height: '100%', position: 'relative' }} />;
+    return <div ref={canvasHostRef} id="orbital-canvas-host" />;
 };
 
 export default OrbitalViewer;

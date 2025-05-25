@@ -26,7 +26,6 @@ interface VisualizerContext {
   animationFrameId?: number;
 }
 
-// let visualizerContext: VisualizerContext | null = null;
 
 // --- Optimized Parameters Storage (with more predictions) ---
 const optimizedOrbitalParameters: Record<string, { rMax: number; isoLevel: number }> = {

@@ -5,12 +5,6 @@ html, body, #root {
   margin: 0;
   font-family: sans-serif;
 }
-/* body {
-    margin: 0;
-    overflow: hidden;
-    font-family: sans-serif;
-    display: flex;
-} */
 #root {
   display: flex; /* Use flexbox for layout if desired */
   flex-direction: column; /* Or 'row' depending on your layout */
@@ -29,6 +23,7 @@ html, body, #root {
 #orbital-canvas-host {
   width: 100%;
   height: 100%;
+  position: relative; /* Important for absolute positioning of canvas */
   display: block; /* Important for canvas to behave like a block element */
 }
 #controls {
@@ -51,6 +46,7 @@ html, body, #root {
     display: flex;
     align-items: center;
     gap: 10px;
+    width: '100px'
 }
 label {
     min-width: 30px; /* Adjusted for longer labels */
