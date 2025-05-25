@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": false, // Set to true if you want to allow JS files during transition
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler", // Or "node"
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx", // Important for React
+
+    /* Path Aliases (Optional, configure if needed) */
+    "baseUrl": ".",
+    "paths": {
+      // Example: "@/*": ["src/*"] // Adjust if your src is not at root relative to tsconfig
+      // If root is 'public' in vite.config, and src is sibling to public:
+      "@/*": ["../src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "public/**/*.ts", "public/**/*.tsx", "vite.config.ts"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
