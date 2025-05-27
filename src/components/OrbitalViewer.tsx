@@ -84,4 +84,4 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading,
     return <div ref={canvasHostRef} id="orbital-canvas-host" />;
 };
 
-export default OrbitalViewer;
+export default React.memo(OrbitalViewer);

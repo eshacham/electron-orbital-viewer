@@ -277,4 +277,4 @@ const Controls: React.FC<ControlsProps> = ({
   );
 };
 
-export default Controls;
+export default React.memo(Controls);
