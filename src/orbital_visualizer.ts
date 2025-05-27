@@ -29,7 +29,7 @@ interface VisualizerContext {
 
 // --- Optimized Parameters Storage (with more predictions) ---
 const optimizedOrbitalParameters: Record<string, { rMax: number; isoLevel: number }> = {
-    // Example: "n_l"
+    // Example: "n_0"
     "1_0": { rMax: 10, isoLevel: 0.001 },      // 1s
     "2_0": { rMax: 15, isoLevel: 0.0005 },     // 2s
     "2_1": { rMax: 15, isoLevel: 0.0005 },     // 2p
@@ -134,177 +134,186 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
 
 export async function updateOrbitalInScene(context: VisualizerContext | null, params: OrbitalParameters, showAxes: boolean = true): Promise<void> {
     if (!context) {
-        console.error("Visualizer not initialized.");
-        return;
+        throw new Error("Visualizer not initialized.");
     }
-    const { scene, controls } = context;
-    const { n, l, ml, Z, resolution, rMax, isoLevel } = params;
 
-    return new Promise(resolve => {
-        setTimeout(() => { // Small delay to ensure spinner renders before heavy computation
+    return new Promise((resolve, reject) => {
+        try {
+            // First clear the current orbital synchronously
+            const { scene, controls } = context;
             clearCurrentOrbital(context, scene);
-
+            
             if (showAxes) {
-                addOrUpdateAxesHelper(context, scene, rMax);
+                addOrUpdateAxesHelper(context, scene, params.rMax);
             }
 
-            const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoLevel);
+            // Increase initial delay to ensure loading state is visible
+            setTimeout(async () => {
+                try {
+                    const { n, l, ml, Z, resolution, rMax, isoLevel } = params;
+                    const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoLevel);
+                    
+                    const worldBounds: [[number, number, number], [number, number, number]] = [
+                        [-rMax, -rMax, -rMax],
+                        [rMax, rMax, rMax]
+                    ];
 
-            const worldBounds: [[number, number, number], [number, number, number]] = [
-                [-rMax, -rMax, -rMax],
-                [rMax, rMax, rMax]
-            ];
+                    console.log("--- Rendering Orbital ---");
+                    console.log(`Parameters: n=${n}, l=${l}, ml=${ml}, Z=${Z}`);
+                    console.log(`Visualization: Resolution=${resolution}, rMax=${rMax}, Iso-Level=${isoLevel}`);
+                    console.log(`World Bounds:`, worldBounds);
 
-            console.log("--- Rendering Orbital ---");
-            console.log(`Parameters: n=${n}, l=${l}, ml=${ml}, Z=${Z}`);
-            console.log(`Visualization: Resolution=${resolution}, rMax=${rMax}, Iso-Level=${isoLevel}`);
-            console.log(`World Bounds:`, worldBounds);
-
-            function isPowerOfTwo(value: number): boolean {
-                return (value & (value - 1)) === 0 && value > 0;
-            }
-
-            if (!isPowerOfTwo(resolution)) {
-                console.error(`ERROR: Resolution (${resolution}) must be a power of two for Marching Cubes. Orbital might not render correctly or an error might occur.`);
-                // Optionally, you could try to find the nearest power of two or default
-            }
-
-            let meshData: MarchingCubesMeshData | null = null;
-            try {
-                meshData = marchingCubes( // Use the direct import
-                    resolution,
-                    orbitalPotentialFunction,
-                    worldBounds
-                );
-            } catch (e) {
-                console.error("Error during Marching Cubes calculation:", e);
-                resolve(); // Resolve the promise even on error
-                return;
-            }
-
-            if (!meshData || !meshData.positions || meshData.positions.length === 0) {
-                console.warn("Marching Cubes generated no positions (vertices). This means the isosurface level might not be found within the given parameters (rMax, resolution) or the orbital itself has very low density.");
-                console.warn("Try adjusting Iso-Level (decrease it), rMax (increase it), or choose different quantum numbers.");
-                resolve(); // Resolve the promise
-                return;
-            }
-
-            // Check for invalid numbers in the source positions from marchingCubes
-            let hasInvalidNumberInSource = false;
-            if (meshData.positions) {
-                for (const pos of meshData.positions) {
-                    if (pos.some(val => typeof val !== 'number' || isNaN(val) || !isFinite(val))) {
-                        hasInvalidNumberInSource = true;
-                        break;
+                    function isPowerOfTwo(value: number): boolean {
+                        return (value & (value - 1)) === 0 && value > 0;
                     }
+
+                    if (!isPowerOfTwo(resolution)) {
+                        console.error(`ERROR: Resolution (${resolution}) must be a power of two for Marching Cubes. Orbital might not render correctly or an error might occur.`);
+                        // Optionally, you could try to find the nearest power of two or default
+                    }
+
+                    let meshData: MarchingCubesMeshData | null = null;
+                    try {
+                        meshData = marchingCubes( // Use the direct import
+                            resolution,
+                            orbitalPotentialFunction,
+                            worldBounds
+                        );
+                    } catch (e) {
+                        console.error("Error during Marching Cubes calculation:", e);
+                        resolve(); // Resolve the promise even on error
+                        return;
+                    }
+
+                    if (!meshData || !meshData.positions || meshData.positions.length === 0) {
+                        console.warn("Marching Cubes generated no positions (vertices). This means the isosurface level might not be found within the given parameters (rMax, resolution) or the orbital itself has very low density.");
+                        console.warn("Try adjusting Iso-Level (decrease it), rMax (increase it), or choose different quantum numbers.");
+                        resolve(); // Resolve the promise
+                        return;
+                    }
+
+                    // Check for invalid numbers in the source positions from marchingCubes
+                    let hasInvalidNumberInSource = false;
+                    if (meshData.positions) {
+                        for (const pos of meshData.positions) {
+                            if (pos.some(val => typeof val !== 'number' || isNaN(val) || !isFinite(val))) {
+                                hasInvalidNumberInSource = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (hasInvalidNumberInSource) {
+                        console.error("meshData.positions contains invalid numerical values (NaN or Infinity). This is likely the cause of a rendering error.");
+                        resolve(); // Resolve the promise
+                        return;
+                    }
+
+                    const flatPositions = meshData.positions.flat();
+
+                    if (flatPositions.length % 3 !== 0) {
+                        console.error(`ERROR: flatPositions length (${flatPositions.length}) is not a multiple of 3. This means vertex data is incomplete or corrupted!`);
+                        resolve(); // Resolve the promise
+                        return;
+                    }
+
+                    const scaledAndTranslatedPositions = new Float32Array(flatPositions.length);
+                    const modelExtent = rMax * 2;
+                    const gridDim = resolution; // This is the number of points along one edge of the cube
+                    const scaleFactor = modelExtent / (gridDim -1) ; // Scale from grid units to world units
+
+                    for (let i = 0; i < flatPositions.length; i += 3) {
+                        const gx = flatPositions[i];     // Grid x (0 to resolution-1)
+                        const gy = flatPositions[i + 1]; // Grid y (0 to resolution-1)
+                        const gz = flatPositions[i + 2]; // Grid z (0 to resolution-1)
+
+                        // Check for invalid numbers before scaling
+                        if (typeof gx !== 'number' || typeof gy !== 'number' || typeof gz !== 'number' ||
+                            isNaN(gx) || isNaN(gy) || isNaN(gz) || !isFinite(gx) || !isFinite(gy) || !isFinite(gz)) {
+                            console.error(`Runtime ERROR: Invalid gx, gy, or gz found in scaling loop at source index ${i/3}. Values: ${gx}, ${gy}, ${gz}`);
+                            // Set to origin or skip to prevent further errors
+                            scaledAndTranslatedPositions[i]     = 0;
+                            scaledAndTranslatedPositions[i + 1] = 0;
+                            scaledAndTranslatedPositions[i + 2] = 0;
+                            continue;
+                        }
+                        
+                        // Scale and translate from grid coordinates to world coordinates
+                        // The marching cubes output is typically in grid coordinates (0 to resolution-1)
+                        // We need to map this to our worldBounds (-rMax to +rMax)
+                        scaledAndTranslatedPositions[i]     = gx * scaleFactor - rMax;
+                        scaledAndTranslatedPositions[i + 1] = gy * scaleFactor - rMax;
+                        scaledAndTranslatedPositions[i + 2] = gz * scaleFactor - rMax;
+                    }
+                    
+                    const geometry = new THREE.BufferGeometry();
+                    geometry.setAttribute('position', new THREE.Float32BufferAttribute(scaledAndTranslatedPositions, 3));
+                    
+                    // Use meshData.cells for indexing if available and correct
+                    if (meshData.cells && meshData.cells.length > 0) {
+                        const indices = meshData.cells.flat();
+                        geometry.setIndex(indices);
+                    }
+                    geometry.computeVertexNormals(); // Important for lighting
+
+                    const meshMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x77ccff, // A light blue color
+                        metalness: 0.3,
+                        roughness: 0.6,
+                        side: THREE.DoubleSide, // Render both sides, useful for orbitals
+                        transparent: true,     // Enable transparency
+                        opacity: 0.75,         // Set opacity level (0.0 to 1.0)
+                        wireframe: true, // Uncomment for debugging geometry
+                    });
+
+                    const orbitalMesh = new THREE.Mesh(geometry, meshMaterial);
+                    scene.add(orbitalMesh);
+                    context.currentOrbitalMesh = orbitalMesh;
+
+                    // Optionally add points for debugging or different visual style
+                    // const pointsMaterial = new THREE.PointsMaterial({
+                    //     color: 0x00ff00, // Green for points
+                    //     size: 0.1
+                    // });
+                    // const orbitalPoints = new THREE.Points(geometry, pointsMaterial);
+                    // if (!context) return; // Guard
+                    // scene.add(orbitalPoints);
+                    // context.currentOrbitalPoints = orbitalPoints;
+
+                    // --- CRITICAL FIX: Set controls target to the center of the orbital ---
+                    if (!geometry.boundingSphere) {
+                        geometry.computeBoundingSphere(); // Ensure bounding sphere is computed
+                    }
+
+                    if (geometry.boundingSphere) {
+                        controls.target.copy(geometry.boundingSphere.center);
+                        if (context.currentAxesHelper) {
+                            context.currentAxesHelper.position.copy(geometry.boundingSphere.center);
+                        }
+                        console.log("Controls target updated to orbital center:", controls.target);
+                    } else {
+                        controls.target.set(0, 0, 0); // Fallback
+                        if (context.currentAxesHelper) {
+                            context.currentAxesHelper.position.set(0, 0, 0);
+                        }
+                        console.warn("Bounding sphere could not be computed, controls target set to origin.");
+
+                    }
+                    controls.update(); // Update controls after changing target
+
+                    console.log("Orbital rendered successfully.");
+
+                    // Add minimum loading time to ensure spinner is visible
+                    setTimeout(() => {
+                        resolve();
+                    }, 500); // Increased from 100ms to 500ms for better visibility
+                } catch (error) {
+                    reject(error);
                 }
-            }
-
-            if (hasInvalidNumberInSource) {
-                console.error("meshData.positions contains invalid numerical values (NaN or Infinity). This is likely the cause of a rendering error.");
-                resolve(); // Resolve the promise
-                return;
-            }
-
-            const flatPositions = meshData.positions.flat();
-
-            if (flatPositions.length % 3 !== 0) {
-                console.error(`ERROR: flatPositions length (${flatPositions.length}) is not a multiple of 3. This means vertex data is incomplete or corrupted!`);
-                resolve(); // Resolve the promise
-                return;
-            }
-
-            const scaledAndTranslatedPositions = new Float32Array(flatPositions.length);
-            const modelExtent = rMax * 2;
-            const gridDim = resolution; // This is the number of points along one edge of the cube
-            const scaleFactor = modelExtent / (gridDim -1) ; // Scale from grid units to world units
-
-            for (let i = 0; i < flatPositions.length; i += 3) {
-                const gx = flatPositions[i];     // Grid x (0 to resolution-1)
-                const gy = flatPositions[i + 1]; // Grid y (0 to resolution-1)
-                const gz = flatPositions[i + 2]; // Grid z (0 to resolution-1)
-
-                // Check for invalid numbers before scaling
-                if (typeof gx !== 'number' || typeof gy !== 'number' || typeof gz !== 'number' ||
-                    isNaN(gx) || isNaN(gy) || isNaN(gz) || !isFinite(gx) || !isFinite(gy) || !isFinite(gz)) {
-                    console.error(`Runtime ERROR: Invalid gx, gy, or gz found in scaling loop at source index ${i/3}. Values: ${gx}, ${gy}, ${gz}`);
-                    // Set to origin or skip to prevent further errors
-                    scaledAndTranslatedPositions[i]     = 0;
-                    scaledAndTranslatedPositions[i + 1] = 0;
-                    scaledAndTranslatedPositions[i + 2] = 0;
-                    continue;
-                }
-                
-                // Scale and translate from grid coordinates to world coordinates
-                // The marching cubes output is typically in grid coordinates (0 to resolution-1)
-                // We need to map this to our worldBounds (-rMax to +rMax)
-                scaledAndTranslatedPositions[i]     = gx * scaleFactor - rMax;
-                scaledAndTranslatedPositions[i + 1] = gy * scaleFactor - rMax;
-                scaledAndTranslatedPositions[i + 2] = gz * scaleFactor - rMax;
-            }
-            
-            const geometry = new THREE.BufferGeometry();
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(scaledAndTranslatedPositions, 3));
-            
-            // Use meshData.cells for indexing if available and correct
-            if (meshData.cells && meshData.cells.length > 0) {
-                const indices = meshData.cells.flat();
-                geometry.setIndex(indices);
-            }
-            geometry.computeVertexNormals(); // Important for lighting
-
-            const meshMaterial = new THREE.MeshStandardMaterial({
-                color: 0x77ccff, // A light blue color
-                metalness: 0.3,
-                roughness: 0.6,
-                side: THREE.DoubleSide, // Render both sides, useful for orbitals
-                transparent: true,     // Enable transparency
-                opacity: 0.75,         // Set opacity level (0.0 to 1.0)
-                wireframe: true, // Uncomment for debugging geometry
-            });
-
-            const orbitalMesh = new THREE.Mesh(geometry, meshMaterial);
-            scene.add(orbitalMesh);
-            context.currentOrbitalMesh = orbitalMesh;
-
-            // Optionally add points for debugging or different visual style
-            // const pointsMaterial = new THREE.PointsMaterial({
-            //     color: 0x00ff00, // Green for points
-            //     size: 0.1
-            // });
-            // const orbitalPoints = new THREE.Points(geometry, pointsMaterial);
-            // if (!context) return; // Guard
-            // scene.add(orbitalPoints);
-            // context.currentOrbitalPoints = orbitalPoints;
-
-            // --- CRITICAL FIX: Set controls target to the center of the orbital ---
-            if (!geometry.boundingSphere) {
-                geometry.computeBoundingSphere(); // Ensure bounding sphere is computed
-            }
-
-            if (geometry.boundingSphere) {
-                controls.target.copy(geometry.boundingSphere.center);
-                if (context.currentAxesHelper) {
-                    context.currentAxesHelper.position.copy(geometry.boundingSphere.center);
-                }
-                console.log("Controls target updated to orbital center:", controls.target);
-            } else {
-                controls.target.set(0, 0, 0); // Fallback
-                if (context.currentAxesHelper) {
-                    context.currentAxesHelper.position.set(0, 0, 0);
-                }
-                console.warn("Bounding sphere could not be computed, controls target set to origin.");
-
-            }
-            controls.update(); // Update controls after changing target
-
-            console.log("Orbital rendered successfully.");
-
-            // Hide loading spinner after a minimum delay
-            setTimeout(() => {
-                resolve(); // Resolve the promise
-            }, 100); // Shorter delay now that main work is done
-        }, 50); // Small initial delay to ensure spinner has time to render before main computation
+            }, 100); // Increased from 0 to 100ms to ensure loading state renders
+        } catch (error) {
+            reject(error);
+        }
     });
 }
 

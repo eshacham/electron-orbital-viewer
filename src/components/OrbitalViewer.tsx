@@ -53,19 +53,21 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading,
 
     // Handle orbital updates
     useEffect(() => {
-        if (visualizerContextRef.current && orbitalParams) {
-            console.log('OrbitalViewer: Updating orbital with params:', orbitalParams);
-            // isLoading prop is managed by App.tsx, which should set it before calling this.
-            updateOrbitalInScene(visualizerContextRef.current, orbitalParams, true /* showAxes */)
-                .then(() => {
+        const updateOrbital = async () => {
+            if (visualizerContextRef.current && orbitalParams) {
+                console.log('OrbitalViewer: Updating orbital with params:', orbitalParams);
+                try {
+                    await updateOrbitalInScene(visualizerContextRef.current, orbitalParams, true);
                     console.log('OrbitalViewer: Orbital update complete.');
                     onOrbitalRendered?.();
-                })
-                .catch(error => {
+                } catch (error) {
                     console.error('OrbitalViewer: Error updating orbital', error);
-                    onOrbitalRendered?.(); // Still call to potentially turn off loader_
-                });
-        }
+                    onOrbitalRendered?.(); // Still call to potentially turn off loader
+                }
+            }
+        };
+
+        updateOrbital();
     }, [orbitalParams, onOrbitalRendered]); // Rerun when orbitalParams change
 
     // Handle resize

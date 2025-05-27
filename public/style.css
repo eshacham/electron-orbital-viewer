@@ -96,11 +96,32 @@ button:hover {
 }
 .spinner-overlay {
   position: fixed;
-  top: 0; left: 0;
-  width: 100vw; height: 100vh;
+  top: 0; 
+  left: 0;
+  width: 100vw; 
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,0.5);
+  /* Darker semi-transparent background */
+  background: rgba(0, 0, 0, 0.7);
   z-index: 1300;
+}
+
+/* Add specific styles for the MUI CircularProgress */
+.spinner-overlay .MuiCircularProgress-root {
+  width: 80px !important;
+  height: 80px !important;
+  color: #fff !important;
+}
+
+/* Add a container for the spinner with a background */
+.spinner-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 50%;
+  padding: 20px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import Controls from './components/Controls';
 import CircularProgress from '@mui/material/CircularProgress';
 import OrbitalViewer, { OrbitalParams } from './components/OrbitalViewer'; // Import OrbitalParams
@@ -70,13 +70,20 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline /> {/* Applies baseline Material Design styles */}
       <>      
-        <div id="canvas-container">
+        <Box id="canvas-container">
           <OrbitalViewer
             orbitalParams={currentOrbitalParams}
             isLoading={isLoading}
             onOrbitalRendered={handleOrbitalRendered}
           />
-        </div>
+          {isLoading && (
+              <div className="spinner-overlay">
+                  <div className="spinner-container">
+                      <CircularProgress />
+                  </div>
+              </div>
+          )}
+        </Box>
         <Controls
           initialN={n} onNChange={setN}
           initialL={l} onLChange={setL}
@@ -88,12 +95,7 @@ function App() {
           onUpdateOrbital={handleOrbitalParamsChange} // This will pass all current states
           getOptimizedParams={getOptimizedParameters} // Pass this down
         />
-      {isLoading && (
-      <div className="spinner-overlay">
-        <CircularProgress size={64} />
-      </div>
-    )}
-    </>
+      </>
     </ThemeProvider>
   );
 }
