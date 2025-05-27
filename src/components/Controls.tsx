@@ -55,8 +55,8 @@ const Controls: React.FC<ControlsProps> = ({
   getOptimizedParams,
 }) => {
   // Local state for dropdown options, derived from props
-  const [lOptions, setLOptions] = useState<number[]>([]);
-  const [mlOptions, setMlOptions] = useState<number[]>([]);
+  const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
+  const [mlOptions, setMlOptions] = useState<number[]>([-2, -1, 0, 1, 2]);
 
   // Effect to update l options when n changes
   useEffect(() => {

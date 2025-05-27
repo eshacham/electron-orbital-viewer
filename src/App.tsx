@@ -92,7 +92,7 @@ function App() {
       <div className="spinner-overlay">
         <CircularProgress size={64} />
       </div>
-)}
+    )}
     </>
     </ThemeProvider>
   );
