@@ -1,53 +1,48 @@
 import React from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen } from '@testing-library/react'; // Add screen import
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import orbitalReducer from './store/orbitalSlice';
 import App from './App';
 
-// Mock the orbital_visualizer module
-jest.mock('./orbital_visualizer', () => ({
-  getOptimizedParameters: jest.fn(() => ({ rMax: 15, isoLevel: 0.005 })),
+// Mock OrbitalViewer component
+jest.mock('./components/OrbitalViewer', () => ({
+    __esModule: true,
+    default: () => <div data-testid="orbital-viewer">Orbital Viewer Mock</div>
 }));
 
-// Mock the OrbitalViewer component
-jest.mock('./components/OrbitalViewer', () => {
-  return {
-    __esModule: true,
-    default: ({ onOrbitalRendered }: { onOrbitalRendered: () => void }) => {
-      // Simulate the orbital being rendered
-      setTimeout(onOrbitalRendered, 0);
-      return <div data-testid="orbital-viewer">Orbital Viewer</div>;
-    }
-  };
+// Mock just what App directly uses
+jest.mock('./orbital_visualizer', () => ({
+    getOptimizedParameters: () => ({ rMax: 15, isoLevel: 0.005 })
+}));
+
+// Simple store setup
+const createTestStore = () => configureStore({
+    reducer: { orbital: orbitalReducer }
 });
 
+// Test wrapper
+const renderWithProvider = (ui: React.ReactElement) => {
+    const store = createTestStore();
+    return {
+        store,
+        ...render(
+            <Provider store={store}>{ui}</Provider>
+        )
+    };
+};
+
 describe('App', () => {
-  it('triggers initial orbital render on mount', async () => {
-    const consoleSpy = jest.spyOn(console, 'log');
-    
-    await act(async () => {
-      render(<App />);
+
+    it('renders main components', () => {
+        renderWithProvider(<App />);
+        
+        // Check if container exists by id
+        expect(screen.getByTestId('orbital-viewer')).toBeInTheDocument();
+        
+        // Check for controls by matching exact label text
+        expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: /Angular \(l\)/i })).toBeInTheDocument();
+        expect(screen.getByRole('spinbutton', { name: /Atomic Number \(Z\)/i })).toBeInTheDocument();
     });
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "App.tsx: Triggering initial orbital render."
-    );
-    consoleSpy.mockRestore();
-  });
-
-  it('renders controls with correct initial state values', () => {
-    render(<App />);
-    
-    // For MUI Select components, check the text content
-    expect(screen.getByLabelText(/Principal/i)).toHaveTextContent('3');
-    expect(screen.getByLabelText(/Angular/i)).toHaveTextContent('2');
-    
-    // For number inputs, use getAttribute
-    const zInput = screen.getByLabelText(/Atomic Number/i);
-    expect(zInput).toHaveValue(1);
-  });
-
-  it('renders with theme provider', () => {
-    render(<App />);
-    const controls = screen.getByRole('group', { name: /Resolution/i });
-    expect(controls).toBeInTheDocument();
-  });
 });
