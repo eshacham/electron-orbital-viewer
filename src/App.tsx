@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import Controls from './components/Controls';
-import CircularProgress from '@mui/material/CircularProgress';
 import OrbitalViewer, { OrbitalParams } from './components/OrbitalViewer'; // Import OrbitalParams
 import { getOptimizedParameters } from './orbital_visualizer'; // To get rMax and isoLevel suggestions
 
@@ -68,34 +67,28 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline /> {/* Applies baseline Material Design styles */}
-      <>      
-        <Box id="canvas-container">
-          <OrbitalViewer
-            orbitalParams={currentOrbitalParams}
-            isLoading={isLoading}
-            onOrbitalRendered={handleOrbitalRendered}
-          />
-          {isLoading && (
-              <div className="spinner-overlay">
-                  <div className="spinner-container">
-                      <CircularProgress />
-                  </div>
-              </div>
-          )}
-        </Box>
-        <Controls
-          initialN={n} onNChange={setN}
-          initialL={l} onLChange={setL}
-          initialMl={ml} onMlChange={setMl}
-          initialZ={Z} onZChange={setZ}
-          initialResolution={resolution} onResolutionChange={setResolution}
-          initialRMax={rMax} onRMaxChange={setRMax}
-          initialIsoLevel={isoLevel} onIsoLevelChange={setIsoLevel}
-          onUpdateOrbital={handleOrbitalParamsChange} // This will pass all current states
-          getOptimizedParams={getOptimizedParameters} // Pass this down
-        />
-      </>
+        <CssBaseline />
+        <>
+            <Box id="canvas-container">
+                <OrbitalViewer
+                    orbitalParams={currentOrbitalParams}
+                    isLoading={isLoading}
+                    onOrbitalRendered={handleOrbitalRendered}
+                />
+            </Box>
+            <Controls
+              initialN={n} onNChange={setN}
+              initialL={l} onLChange={setL}
+              initialMl={ml} onMlChange={setMl}
+              initialZ={Z} onZChange={setZ}
+              initialResolution={resolution} onResolutionChange={setResolution}
+              initialRMax={rMax} onRMaxChange={setRMax}
+              initialIsoLevel={isoLevel} onIsoLevelChange={setIsoLevel}
+              onUpdateOrbital={handleOrbitalParamsChange} // This will pass all current states
+              getOptimizedParams={getOptimizedParameters} // Pass this down
+              isLoading={isLoading}  // Add this prop
+            />
+        </>
     </ThemeProvider>
   );
 }

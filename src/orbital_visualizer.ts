@@ -21,9 +21,10 @@ interface VisualizerContext {
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
   currentOrbitalMesh: THREE.Mesh | null;
-  currentOrbitalPoints: THREE.Points | null;
+  currentOrbitalPoints: THREE.Mesh<THREE.BufferGeometry, THREE.Material> | null; // Change the type from Points to Mesh
   currentAxesHelper: THREE.AxesHelper | null;
   animationFrameId?: number;
+  currentOrbitalGroup: THREE.Group | null;
 }
 
 
@@ -100,6 +101,7 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
         currentOrbitalMesh: null,
         currentOrbitalPoints: null,
         currentAxesHelper: null,
+        currentOrbitalGroup: null,
     };
     
     startAnimationLoop(context);
@@ -133,213 +135,170 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
 
 
 export async function updateOrbitalInScene(context: VisualizerContext | null, params: OrbitalParameters, showAxes: boolean = true): Promise<void> {
-    if (!context) {
-        throw new Error("Visualizer not initialized.");
+    if (!context) return;
+
+    // Remove axes and clear orbital before starting calculation
+    if (context.currentAxesHelper) {
+        context.scene.remove(context.currentAxesHelper);
     }
+    clearCurrentOrbital(context, context.scene);
 
     return new Promise((resolve, reject) => {
-        try {
-            // First clear the current orbital synchronously
-            const { scene, controls } = context;
-            clearCurrentOrbital(context, scene);
-            
-            if (showAxes) {
-                addOrUpdateAxesHelper(context, scene, params.rMax);
-            }
+        const worker = new Worker(new URL('./workers/orbitalWorker.ts', import.meta.url), { 
+            type: 'module' 
+        });
 
-            // Increase initial delay to ensure loading state is visible
-            setTimeout(async () => {
+        worker.onmessage = (e) => {
+            if (e.data.type === 'success') {
                 try {
-                    const { n, l, ml, Z, resolution, rMax, isoLevel } = params;
-                    const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoLevel);
-                    
-                    const worldBounds: [[number, number, number], [number, number, number]] = [
-                        [-rMax, -rMax, -rMax],
-                        [rMax, rMax, rMax]
-                    ];
-
-                    console.log("--- Rendering Orbital ---");
-                    console.log(`Parameters: n=${n}, l=${l}, ml=${ml}, Z=${Z}`);
-                    console.log(`Visualization: Resolution=${resolution}, rMax=${rMax}, Iso-Level=${isoLevel}`);
-                    console.log(`World Bounds:`, worldBounds);
-
-                    function isPowerOfTwo(value: number): boolean {
-                        return (value & (value - 1)) === 0 && value > 0;
+                    const { meshData } = e.data;
+                    updateSceneWithMeshData(context, meshData, params);
+                    // Add axes back after mesh is updated
+                    if (showAxes) {
+                        addOrUpdateAxesHelper(context, context.scene, params.rMax);
                     }
-
-                    if (!isPowerOfTwo(resolution)) {
-                        console.error(`ERROR: Resolution (${resolution}) must be a power of two for Marching Cubes. Orbital might not render correctly or an error might occur.`);
-                        // Optionally, you could try to find the nearest power of two or default
-                    }
-
-                    let meshData: MarchingCubesMeshData | null = null;
-                    try {
-                        meshData = marchingCubes( // Use the direct import
-                            resolution,
-                            orbitalPotentialFunction,
-                            worldBounds
-                        );
-                    } catch (e) {
-                        console.error("Error during Marching Cubes calculation:", e);
-                        resolve(); // Resolve the promise even on error
-                        return;
-                    }
-
-                    if (!meshData || !meshData.positions || meshData.positions.length === 0) {
-                        console.warn("Marching Cubes generated no positions (vertices). This means the isosurface level might not be found within the given parameters (rMax, resolution) or the orbital itself has very low density.");
-                        console.warn("Try adjusting Iso-Level (decrease it), rMax (increase it), or choose different quantum numbers.");
-                        resolve(); // Resolve the promise
-                        return;
-                    }
-
-                    // Check for invalid numbers in the source positions from marchingCubes
-                    let hasInvalidNumberInSource = false;
-                    if (meshData.positions) {
-                        for (const pos of meshData.positions) {
-                            if (pos.some(val => typeof val !== 'number' || isNaN(val) || !isFinite(val))) {
-                                hasInvalidNumberInSource = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (hasInvalidNumberInSource) {
-                        console.error("meshData.positions contains invalid numerical values (NaN or Infinity). This is likely the cause of a rendering error.");
-                        resolve(); // Resolve the promise
-                        return;
-                    }
-
-                    const flatPositions = meshData.positions.flat();
-
-                    if (flatPositions.length % 3 !== 0) {
-                        console.error(`ERROR: flatPositions length (${flatPositions.length}) is not a multiple of 3. This means vertex data is incomplete or corrupted!`);
-                        resolve(); // Resolve the promise
-                        return;
-                    }
-
-                    const scaledAndTranslatedPositions = new Float32Array(flatPositions.length);
-                    const modelExtent = rMax * 2;
-                    const gridDim = resolution; // This is the number of points along one edge of the cube
-                    const scaleFactor = modelExtent / (gridDim -1) ; // Scale from grid units to world units
-
-                    for (let i = 0; i < flatPositions.length; i += 3) {
-                        const gx = flatPositions[i];     // Grid x (0 to resolution-1)
-                        const gy = flatPositions[i + 1]; // Grid y (0 to resolution-1)
-                        const gz = flatPositions[i + 2]; // Grid z (0 to resolution-1)
-
-                        // Check for invalid numbers before scaling
-                        if (typeof gx !== 'number' || typeof gy !== 'number' || typeof gz !== 'number' ||
-                            isNaN(gx) || isNaN(gy) || isNaN(gz) || !isFinite(gx) || !isFinite(gy) || !isFinite(gz)) {
-                            console.error(`Runtime ERROR: Invalid gx, gy, or gz found in scaling loop at source index ${i/3}. Values: ${gx}, ${gy}, ${gz}`);
-                            // Set to origin or skip to prevent further errors
-                            scaledAndTranslatedPositions[i]     = 0;
-                            scaledAndTranslatedPositions[i + 1] = 0;
-                            scaledAndTranslatedPositions[i + 2] = 0;
-                            continue;
-                        }
-                        
-                        // Scale and translate from grid coordinates to world coordinates
-                        // The marching cubes output is typically in grid coordinates (0 to resolution-1)
-                        // We need to map this to our worldBounds (-rMax to +rMax)
-                        scaledAndTranslatedPositions[i]     = gx * scaleFactor - rMax;
-                        scaledAndTranslatedPositions[i + 1] = gy * scaleFactor - rMax;
-                        scaledAndTranslatedPositions[i + 2] = gz * scaleFactor - rMax;
-                    }
-                    
-                    const geometry = new THREE.BufferGeometry();
-                    geometry.setAttribute('position', new THREE.Float32BufferAttribute(scaledAndTranslatedPositions, 3));
-                    
-                    // Use meshData.cells for indexing if available and correct
-                    if (meshData.cells && meshData.cells.length > 0) {
-                        const indices = meshData.cells.flat();
-                        geometry.setIndex(indices);
-                    }
-                    geometry.computeVertexNormals(); // Important for lighting
-
-                    const meshMaterial = new THREE.MeshStandardMaterial({
-                        color: 0x77ccff, // A light blue color
-                        metalness: 0.3,
-                        roughness: 0.6,
-                        side: THREE.DoubleSide, // Render both sides, useful for orbitals
-                        transparent: true,     // Enable transparency
-                        opacity: 0.75,         // Set opacity level (0.0 to 1.0)
-                        wireframe: true, // Uncomment for debugging geometry
-                    });
-
-                    const orbitalMesh = new THREE.Mesh(geometry, meshMaterial);
-                    scene.add(orbitalMesh);
-                    context.currentOrbitalMesh = orbitalMesh;
-
-                    // Optionally add points for debugging or different visual style
-                    // const pointsMaterial = new THREE.PointsMaterial({
-                    //     color: 0x00ff00, // Green for points
-                    //     size: 0.1
-                    // });
-                    // const orbitalPoints = new THREE.Points(geometry, pointsMaterial);
-                    // if (!context) return; // Guard
-                    // scene.add(orbitalPoints);
-                    // context.currentOrbitalPoints = orbitalPoints;
-
-                    // --- CRITICAL FIX: Set controls target to the center of the orbital ---
-                    if (!geometry.boundingSphere) {
-                        geometry.computeBoundingSphere(); // Ensure bounding sphere is computed
-                    }
-
-                    if (geometry.boundingSphere) {
-                        controls.target.copy(geometry.boundingSphere.center);
-                        if (context.currentAxesHelper) {
-                            context.currentAxesHelper.position.copy(geometry.boundingSphere.center);
-                        }
-                        console.log("Controls target updated to orbital center:", controls.target);
-                    } else {
-                        controls.target.set(0, 0, 0); // Fallback
-                        if (context.currentAxesHelper) {
-                            context.currentAxesHelper.position.set(0, 0, 0);
-                        }
-                        console.warn("Bounding sphere could not be computed, controls target set to origin.");
-
-                    }
-                    controls.update(); // Update controls after changing target
-
-                    console.log("Orbital rendered successfully.");
-
-                    // Add minimum loading time to ensure spinner is visible
-                    setTimeout(() => {
-                        resolve();
-                    }, 500); // Increased from 100ms to 500ms for better visibility
+                    resolve();
                 } catch (error) {
                     reject(error);
+                } finally {
+                    worker.terminate();
                 }
-            }, 100); // Increased from 0 to 100ms to ensure loading state renders
-        } catch (error) {
+            } else if (e.data.type === 'error') {
+                worker.terminate();
+                reject(new Error(e.data.error));
+            }
+        };
+
+        worker.onerror = (error) => {
+            worker.terminate();
             reject(error);
-        }
+        };
+
+        worker.postMessage({
+            type: 'calculate',
+            params
+        });
     });
 }
 
-function clearCurrentOrbital(context: VisualizerContext | null, scene: THREE.Scene) {
+interface MeshData {
+    positions: [number, number, number][];
+    cells: [number, number, number][];
+}
+
+function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData, params: OrbitalParameters) {
     if (!context) return;
 
+    console.log('Updating scene with new mesh data...', {
+        vertexCount: meshData.positions.length,
+        triangleCount: meshData.cells.length
+    });
+
+    // Clear existing orbital first
+    clearCurrentOrbital(context, context.scene);
+
+    const geometry = new THREE.BufferGeometry();
+    
+    // Convert array of triplets to flat array for THREE.js
+    const positions = new Float32Array(meshData.positions.flat());
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    
+    // Set indices for the triangles
+    geometry.setIndex(meshData.cells.flat());
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshStandardMaterial({
+        color: 0x77ccff, // A light blue color
+        metalness: 0.3,
+        roughness: 0.6,
+        side: THREE.DoubleSide, // Render both sides, useful for orbitals
+        transparent: true,     // Enable transparency
+        opacity: 0.75,         // Set opacity level (0.0 to 1.0)
+        wireframe: true, // Uncomment for debugging geometry
+    });
+
+    const wireframeMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.1
+    });
+
+    // Create both meshes
+    const mainMesh = new THREE.Mesh(geometry, material);
+    mainMesh.userData.isWireframe = false;
+
+    const wireframeMesh = new THREE.Mesh(geometry.clone(), wireframeMaterial);
+    wireframeMesh.userData.isWireframe = true;
+
+    // Create new group and add both meshes
+    const group = new THREE.Group();
+    group.add(mainMesh);
+    group.add(wireframeMesh);
+
+    // Clear any existing orbital first
+    if (context.currentOrbitalGroup) {
+        clearCurrentOrbital(context, context.scene);
+    }
+
+    // Add new group to scene and store reference
+    context.scene.add(group);
+    context.currentOrbitalGroup = group;
+    context.currentOrbitalMesh = null; // Clear old reference
+
+    // Force scene update
+    context.scene.updateMatrixWorld(true);
+}
+
+function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
+    if (!context) return;
+    
+    console.log('Clearing orbital...', {
+        hasGroup: !!context.currentOrbitalGroup,
+        childCount: context.currentOrbitalGroup?.children.length
+    });
+
+    // Remove current orbital group if it exists
+    if (context.currentOrbitalGroup) {
+        // Get all meshes from the group
+        context.currentOrbitalGroup.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+                if (child.geometry) {
+                    child.geometry.dispose();
+                }
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(mat => mat.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            }
+        });
+
+        // Remove from scene and clear reference
+        scene.remove(context.currentOrbitalGroup);
+        context.currentOrbitalGroup = null;
+    }
+
+    // Also clear old references if they exist
     if (context.currentOrbitalMesh) {
-        scene.remove(context.currentOrbitalMesh);
-        context.currentOrbitalMesh.geometry.dispose();
-        if (Array.isArray(context.currentOrbitalMesh.material)) {
-            context.currentOrbitalMesh.material.forEach(m => m.dispose());
-        } else {
-           context.currentOrbitalMesh.material.dispose();
+        if (context.currentOrbitalMesh.geometry) {
+            context.currentOrbitalMesh.geometry.dispose();
         }
+        if (context.currentOrbitalMesh.material) {
+            if (Array.isArray(context.currentOrbitalMesh.material)) {
+                context.currentOrbitalMesh.material.forEach(mat => mat.dispose());
+            } else {
+                context.currentOrbitalMesh.material.dispose();
+            }
+        }
+        scene.remove(context.currentOrbitalMesh);
         context.currentOrbitalMesh = null;
     }
-    if (context.currentOrbitalPoints) {
-        scene.remove(context.currentOrbitalPoints);
-        context.currentOrbitalPoints.geometry.dispose();
-        if (Array.isArray(context.currentOrbitalPoints.material)) {
-            context.currentOrbitalPoints.material.forEach(m => m.dispose());
-        } else {
-            context.currentOrbitalPoints.material.dispose();
-        }
-        context.currentOrbitalPoints = null;
-    }
+
+    // Ensure scene is marked for update
+    scene.updateMatrixWorld(true);
 }
 
 function addOrUpdateAxesHelper(context: VisualizerContext | null, scene: THREE.Scene, rMax: number) {

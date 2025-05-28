@@ -11,6 +11,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   FormLabel, // To label the ToggleButtonGroup
+  LinearProgress,
 } from '@mui/material';
 
 // This interface should match the one in OrbitalViewer.tsx and App.tsx
@@ -41,6 +42,7 @@ interface ControlsProps {
   onIsoLevelChange: (value: number) => void;
   onUpdateOrbital: (params: OrbitalParamsForUpdate) => void;
   getOptimizedParams: (n: number, l: number) => { rMax: number; isoLevel: number } | null;
+  isLoading: boolean;
 }
 
 const Controls: React.FC<ControlsProps> = ({
@@ -53,6 +55,7 @@ const Controls: React.FC<ControlsProps> = ({
   initialIsoLevel, onIsoLevelChange,
   onUpdateOrbital,
   getOptimizedParams,
+  isLoading,
 }) => {
   // Local state for dropdown options, derived from props
   const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
@@ -116,7 +119,29 @@ const Controls: React.FC<ControlsProps> = ({
   };
 
   return (
-    <Box id="controls" sx={{ p: 2 }}> {/* sx prop allows for inline MUI styling */}
+    <Box 
+      id="controls" 
+      sx={{ 
+        p: 2,
+        position: 'relative',
+      }}
+    >
+      {/* Add overlay when loading */}
+      {isLoading && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.5)',
+            zIndex: 1,
+            cursor: 'not-allowed',
+          }}
+        />
+      )}
+
       <FormControl fullWidth margin="normal" size="small" >
         <InputLabel id="n-select-label">Principal (n)</InputLabel>
         <Select
@@ -125,6 +150,7 @@ const Controls: React.FC<ControlsProps> = ({
           value={initialN.toString()} // Select value must be a string if items are strings
           label="Principal (n)"
           onChange={(e: SelectChangeEvent<string>) => onNChange(parseInt(e.target.value, 10))}
+          disabled={isLoading}
         >
           {[1, 2, 3, 4, 5, 6].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
         </Select>
@@ -138,7 +164,7 @@ const Controls: React.FC<ControlsProps> = ({
           value={initialL.toString()}
           label="Angular (l)"
           onChange={(e: SelectChangeEvent<string>) => onLChange(parseInt(e.target.value, 10))}
-          disabled={lOptions.length === 0}
+          disabled={lOptions.length === 0 || isLoading}
         >
           {lOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
         </Select>
@@ -152,7 +178,7 @@ const Controls: React.FC<ControlsProps> = ({
           value={initialMl.toString()}
           label="Magnetic (m_l)"
           onChange={(e: SelectChangeEvent<string>) => onMlChange(parseInt(e.target.value, 10))}
-          disabled={mlOptions.length === 0}
+          disabled={mlOptions.length === 0 || isLoading}
         >
           {mlOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
         </Select>
@@ -185,6 +211,7 @@ const Controls: React.FC<ControlsProps> = ({
             MozAppearance: 'textfield',
           },
         }}
+        disabled={isLoading}
       />
 
       <TextField
@@ -210,6 +237,7 @@ const Controls: React.FC<ControlsProps> = ({
             MozAppearance: 'textfield',
           },
         }}
+        disabled={isLoading}
       />
 
       <TextField
@@ -241,6 +269,7 @@ const Controls: React.FC<ControlsProps> = ({
             MozAppearance: 'textfield',
           },
         }}
+        disabled={isLoading}
       />
 
       {/* Resolution ToggleButtonGroup */}
@@ -258,8 +287,8 @@ const Controls: React.FC<ControlsProps> = ({
           size="small"
           fullWidth
         >
-          <ToggleButton value={32} aria-label="low resolution">Low</ToggleButton>
-          <ToggleButton value={64} aria-label="high resolution">High</ToggleButton>        
+          <ToggleButton value={32} aria-label="low resolution" disabled={isLoading}>Low</ToggleButton>
+          <ToggleButton value={64} aria-label="high resolution" disabled={isLoading}>High</ToggleButton>        
         </ToggleButtonGroup>
       </FormControl>
 
@@ -269,9 +298,26 @@ const Controls: React.FC<ControlsProps> = ({
           variant="contained"
           color="primary"
           onClick={handleUpdateOrbital}
+          disabled={isLoading}
         >
           Update Orbital
         </Button>
+      </Box>
+
+      {/* Progress bar */}
+      <Box sx={{ 
+          width: '100%',
+          mt: 2,
+          height: 4
+      }}>
+          {isLoading && (
+              <LinearProgress 
+                  variant="indeterminate"
+                  sx={{ 
+                      borderRadius: 1
+                  }} 
+              />
+          )}
       </Box>
     </Box>
   );
