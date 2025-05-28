@@ -1,96 +1,86 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import Controls from './components/Controls';
-import OrbitalViewer, { OrbitalParams } from './components/OrbitalViewer'; // Import OrbitalParams
-import { getOptimizedParameters } from './orbital_visualizer'; // To get rMax and isoLevel suggestions
+import OrbitalViewer, { OrbitalParams } from './components/OrbitalViewer';
+import { getOptimizedParameters } from './orbital_visualizer';
 
-// Define initial default parameters
 const defaultN = 3;
 const defaultL = 2;
 const defaultOptimized = getOptimizedParameters(defaultN, defaultL) || { rMax: 15, isoLevel: 0.005 };
 
-// Create a basic MUI theme
 const theme = createTheme({
   palette: {
-    primary: { main: '#1976d2' }, // Example primary color
-    secondary: { main: '#dc004e' }, // Example secondary color
+    primary: { main: '#1976d2' },
+    secondary: { main: '#dc004e' },
   },
 });
 
 function App() {
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [currentOrbitalParams, setCurrentOrbitalParams] = useState<OrbitalParams | null>(null);
+    const initialRenderRef = useRef(false);
 
-  // State for individual control values, to be passed to Controls.tsx
-  // These will be used to construct currentOrbitalParams when "Update Orbital" is clicked.
-  const [n, setN] = useState<number>(defaultN);
-  const [l, setL] = useState<number>(defaultL);
-  const [ml, setMl] = useState<number>(0);
-  const [Z, setZ] = useState<number>(1);
-  const [resolution, setResolution] = useState<number>(64);
-  // rMax and isoLevel will now also be part of the state managed by App
-  const [rMax, setRMax] = useState<number>(defaultOptimized.rMax);
-  const [isoLevel, setIsoLevel] = useState<number>(defaultOptimized.isoLevel);
+    const handleOrbitalParamsChange = useCallback((newParams: OrbitalParams) => {
+        console.log('App: Updating orbital params:', newParams);
+        setIsLoading(true);
+        setCurrentOrbitalParams(newParams);
+    }, []);
 
-    const handleOrbitalParamsChange = useCallback((newParams: {
-    n: number;
-    l: number;
-    ml: number;
-    Z: number;
-    resolution: number;
-    rMax: number;
-    isoLevel: number;
-  }) => {
-    setIsLoading(true);
-    // This will trigger the useEffect in OrbitalViewer
-    setCurrentOrbitalParams(newParams); 
-  }, []); // Dependencies: if this function used any state/props from App, list them here
+    const handleOrbitalRendered = useCallback(() => {
+        setIsLoading(false);
+    }, []);
 
+    // Initial render
+    useEffect(() => {
+        if (!initialRenderRef.current) {
+            console.log('App: Setting initial orbital parameters');
+            const initialParams = {
+                n: defaultN,
+                l: defaultL,
+                ml: 0,
+                Z: 1,
+                resolution: 32,
+                rMax: defaultOptimized.rMax,
+                isoLevel: defaultOptimized.isoLevel,
+            };
+            handleOrbitalParamsChange(initialParams);
+            initialRenderRef.current = true;
+        }
+    }, [handleOrbitalParamsChange]);
 
-  const handleOrbitalRendered = useCallback(() => {
-    setIsLoading(false);
-   }, []);
-
-    // Effect to trigger initial orbital render on mount
-  useEffect(() => {
-    console.log("App.tsx: Triggering initial orbital render.");
-    handleOrbitalParamsChange({
-      n: defaultN,
-      l: defaultL,
-      ml: 0, // Default ml
-      Z: 1,  // Default Z
-      resolution: 32, // Default resolution
-      rMax: defaultOptimized.rMax,
-      isoLevel: defaultOptimized.isoLevel,
-    });
-  }, []); // Empty dependency array ensures this runs only once on mount
-
-  return (
-    <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <>
-            <Box id="canvas-container">
+    return (
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <Box 
+                id="canvas-container" 
+                sx={{ 
+                    width: '100%', 
+                    height: '100vh',
+                    position: 'relative',
+                    backgroundColor: '#111',
+                    overflow: 'hidden'
+                }}
+            >
                 <OrbitalViewer
                     orbitalParams={currentOrbitalParams}
                     isLoading={isLoading}
                     onOrbitalRendered={handleOrbitalRendered}
                 />
+                <Controls
+                    initialN={defaultN} onNChange={() => {}}
+                    initialL={defaultL} onLChange={() => {}}
+                    initialMl={0} onMlChange={() => {}}
+                    initialZ={1} onZChange={() => {}}
+                    initialResolution={64} onResolutionChange={() => {}}
+                    initialRMax={defaultOptimized.rMax} onRMaxChange={() => {}}
+                    initialIsoLevel={defaultOptimized.isoLevel} onIsoLevelChange={() => {}}
+                    onUpdateOrbital={handleOrbitalParamsChange}
+                    getOptimizedParams={getOptimizedParameters}
+                    isLoading={isLoading}
+                />
             </Box>
-            <Controls
-              initialN={n} onNChange={setN}
-              initialL={l} onLChange={setL}
-              initialMl={ml} onMlChange={setMl}
-              initialZ={Z} onZChange={setZ}
-              initialResolution={resolution} onResolutionChange={setResolution}
-              initialRMax={rMax} onRMaxChange={setRMax}
-              initialIsoLevel={isoLevel} onIsoLevelChange={setIsoLevel}
-              onUpdateOrbital={handleOrbitalParamsChange} // This will pass all current states
-              getOptimizedParams={getOptimizedParameters} // Pass this down
-              isLoading={isLoading}  // Add this prop
-            />
-        </>
-    </ThemeProvider>
-  );
+        </ThemeProvider>
+    );
 }
 
 export default App;

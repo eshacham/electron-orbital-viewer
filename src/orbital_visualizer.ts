@@ -1,32 +1,49 @@
 // src/orbital_visualizer.ts
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-import { getOrbitalPotentialFunction } from './quantum_functions'; // .ts extension is usually not needed in imports
+import { getOrbitalPotentialFunction } from './quantum_functions';
 import { marchingCubes, MarchingCubesMeshData } from 'marching-cubes-fast';
 
-interface OrbitalParameters {
-  n: number;
-  l: number;
-  ml: number;
-  Z: number;
-  resolution: number;
-  rMax: number;
-  isoLevel: number;
+// Add MeshData interface since it's used but not defined
+interface MeshData {
+    positions: number[][];
+    cells: number[][];
 }
 
-interface VisualizerContext {
-  scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
-  renderer: THREE.WebGLRenderer;
-  controls: OrbitControls;
-  currentOrbitalMesh: THREE.Mesh | null;
-  currentOrbitalPoints: THREE.Mesh<THREE.BufferGeometry, THREE.Material> | null; // Change the type from Points to Mesh
-  currentAxesHelper: THREE.AxesHelper | null;
-  animationFrameId?: number;
-  currentOrbitalGroup: THREE.Group | null;
+// Add export to make it available to OrbitalViewer
+export interface OrbitalParameters {
+    n: number;
+    l: number;
+    ml: number;
+    Z: number;
+    resolution: number;
+    rMax: number;
+    isoLevel: number;
 }
 
+// Add export to make it available to OrbitalViewer
+export interface VisualizerContext {
+    scene: THREE.Scene;
+    camera: THREE.PerspectiveCamera;
+    renderer: THREE.WebGLRenderer;
+    controls: OrbitControls;
+    currentOrbitalGroup: THREE.Group | null;
+    currentAxesHelper: THREE.AxesHelper | null;
+    animationFrameId?: number;
+    isDisposed?: boolean;  // Add this flag
+}
+
+interface WorkerSuccessMessage {
+    type: 'success';
+    meshData: MeshData;
+}
+
+interface WorkerErrorMessage {
+    type: 'error';
+    message: string;
+}
+
+type WorkerMessage = WorkerSuccessMessage | WorkerErrorMessage;
 
 // --- Optimized Parameters Storage (with more predictions) ---
 const optimizedOrbitalParameters: Record<string, { rMax: number; isoLevel: number }> = {
@@ -98,10 +115,9 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
         camera,
         renderer,
         controls,
-        currentOrbitalMesh: null,
-        currentOrbitalPoints: null,
-        currentAxesHelper: null,
         currentOrbitalGroup: null,
+        currentAxesHelper: null,
+        isDisposed: false  // Initialize the flag
     };
     
     startAnimationLoop(context);
@@ -111,6 +127,7 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
 
 export function cleanupVisualizer(context: VisualizerContext | null) {
     if (context) {
+        context.isDisposed = true;  // Set flag first
         if (context.animationFrameId) {
             cancelAnimationFrame(context.animationFrameId);
             context.animationFrameId = undefined;
@@ -137,119 +154,57 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
 export async function updateOrbitalInScene(context: VisualizerContext | null, params: OrbitalParameters, showAxes: boolean = true): Promise<void> {
     if (!context) return;
 
-    // Remove axes and clear orbital before starting calculation
-    if (context.currentAxesHelper) {
-        context.scene.remove(context.currentAxesHelper);
-    }
-    clearCurrentOrbital(context, context.scene);
-
     return new Promise((resolve, reject) => {
+        console.log('Visualizer: Starting worker calculation');
+        
         const worker = new Worker(new URL('./workers/orbitalWorker.ts', import.meta.url), { 
             type: 'module' 
         });
 
-        worker.onmessage = (e) => {
-            if (e.data.type === 'success') {
-                try {
-                    const { meshData } = e.data;
-                    updateSceneWithMeshData(context, meshData, params);
-                    // Add axes back after mesh is updated
+        const { rMax, isoLevel } = getOptimizedParameters(params.n, params.l)!;
+
+        // Simple cleanup function
+        const cleanup = () => {
+            worker.terminate();
+        };
+
+        worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
+            try {
+                if (e.data.type === 'success') {
+                    console.log('Visualizer: Received mesh data from worker');
+                    updateSceneWithMeshData(context, e.data.meshData, params);
                     if (showAxes) {
-                        addOrUpdateAxesHelper(context, context.scene, params.rMax);
+                        addAxesHelper(context, rMax);
                     }
                     resolve();
-                } catch (error) {
-                    reject(error);
-                } finally {
-                    worker.terminate();
+                } else {
+                    console.error('Visualizer: Worker error:', e.data.message);
+                    reject(new Error(e.data.message));
                 }
-            } else if (e.data.type === 'error') {
-                worker.terminate();
-                reject(new Error(e.data.error));
+            } catch (error) {
+                console.error('Visualizer: Error processing mesh data:', error);
+                reject(error);
+            } finally {
+                cleanup();
             }
         };
 
         worker.onerror = (error) => {
-            worker.terminate();
+            console.error('Visualizer: Worker error:', error);
+            cleanup();
             reject(error);
         };
 
-        worker.postMessage({
+        // Send calculation request to worker
+        worker.postMessage({ 
             type: 'calculate',
-            params
+            params: { ...params, rMax, isoLevel }
         });
     });
 }
 
-interface MeshData {
-    positions: [number, number, number][];
-    cells: [number, number, number][];
-}
 
-function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData, params: OrbitalParameters) {
-    if (!context) return;
-
-    console.log('Updating scene with new mesh data...', {
-        vertexCount: meshData.positions.length,
-        triangleCount: meshData.cells.length
-    });
-
-    // Clear existing orbital first
-    clearCurrentOrbital(context, context.scene);
-
-    const geometry = new THREE.BufferGeometry();
-    
-    // Convert array of triplets to flat array for THREE.js
-    const positions = new Float32Array(meshData.positions.flat());
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    
-    // Set indices for the triangles
-    geometry.setIndex(meshData.cells.flat());
-    geometry.computeVertexNormals();
-
-    const material = new THREE.MeshStandardMaterial({
-        color: 0x77ccff, // A light blue color
-        metalness: 0.3,
-        roughness: 0.6,
-        side: THREE.DoubleSide, // Render both sides, useful for orbitals
-        transparent: true,     // Enable transparency
-        opacity: 0.75,         // Set opacity level (0.0 to 1.0)
-        wireframe: true, // Uncomment for debugging geometry
-    });
-
-    const wireframeMaterial = new THREE.MeshBasicMaterial({
-        color: 0x000000,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.1
-    });
-
-    // Create both meshes
-    const mainMesh = new THREE.Mesh(geometry, material);
-    mainMesh.userData.isWireframe = false;
-
-    const wireframeMesh = new THREE.Mesh(geometry.clone(), wireframeMaterial);
-    wireframeMesh.userData.isWireframe = true;
-
-    // Create new group and add both meshes
-    const group = new THREE.Group();
-    group.add(mainMesh);
-    group.add(wireframeMesh);
-
-    // Clear any existing orbital first
-    if (context.currentOrbitalGroup) {
-        clearCurrentOrbital(context, context.scene);
-    }
-
-    // Add new group to scene and store reference
-    context.scene.add(group);
-    context.currentOrbitalGroup = group;
-    context.currentOrbitalMesh = null; // Clear old reference
-
-    // Force scene update
-    context.scene.updateMatrixWorld(true);
-}
-
+// --- Helper Functions ---
 function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
     if (!context) return;
     
@@ -257,10 +212,9 @@ function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
         hasGroup: !!context.currentOrbitalGroup,
         childCount: context.currentOrbitalGroup?.children.length
     });
-
-    // Remove current orbital group if it exists
+    
     if (context.currentOrbitalGroup) {
-        // Get all meshes from the group
+        // Dispose of all children first
         context.currentOrbitalGroup.traverse((child) => {
             if (child instanceof THREE.Mesh) {
                 if (child.geometry) {
@@ -276,62 +230,116 @@ function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
             }
         });
 
-        // Remove from scene and clear reference
+        // Remove from scene
         scene.remove(context.currentOrbitalGroup);
         context.currentOrbitalGroup = null;
+        
+        // Force scene update
+        scene.updateMatrixWorld(true);
     }
-
-    // Also clear old references if they exist
-    if (context.currentOrbitalMesh) {
-        if (context.currentOrbitalMesh.geometry) {
-            context.currentOrbitalMesh.geometry.dispose();
-        }
-        if (context.currentOrbitalMesh.material) {
-            if (Array.isArray(context.currentOrbitalMesh.material)) {
-                context.currentOrbitalMesh.material.forEach(mat => mat.dispose());
-            } else {
-                context.currentOrbitalMesh.material.dispose();
-            }
-        }
-        scene.remove(context.currentOrbitalMesh);
-        context.currentOrbitalMesh = null;
-    }
-
-    // Ensure scene is marked for update
-    scene.updateMatrixWorld(true);
 }
 
-function addOrUpdateAxesHelper(context: VisualizerContext | null, scene: THREE.Scene, rMax: number) {
-    if (!context) return;
-
-    if (context.currentAxesHelper) {
-        scene.remove(context.currentAxesHelper);
-        context.currentAxesHelper.dispose();
-        context.currentAxesHelper = null;
-    }
-    context.currentAxesHelper = new THREE.AxesHelper(Math.max(1, rMax * 0.5));
-    scene.add(context.currentAxesHelper);
-}
-
-function startAnimationLoop(context: VisualizerContext | null) {
+function startAnimationLoop(context: VisualizerContext) {
     if (!context) return;
     const { renderer, scene, camera, controls } = context;
     
-    function animateLoop() {
-        if (!context || !context.animationFrameId === undefined) return; // Stop if cleaned up or animationFrameId is intentionally undefined after cleanup
-        context.animationFrameId = requestAnimationFrame(animateLoop);
-        controls.update(); // Only call if controls exist and are enabled
+    function animate() {
+        if (!context || context.isDisposed) {
+            return;
+        }
+        
+        controls.update();
         renderer.render(scene, camera);
+        context.animationFrameId = requestAnimationFrame(animate);
     }
-    animateLoop();
+    
+    // Start the animation
+    context.animationFrameId = requestAnimationFrame(animate);
 }
 
-export function handleResize(context: VisualizerContext | null, containerWidth: number, containerHeight: number) {
-    if (!context) return;
-    const { camera, renderer } = context;
-    if (containerHeight === 0) return; // Avoid division by zero
+// Modified updateSceneWithMeshData to include better error handling
+function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData, params: OrbitalParameters) {
+    if (!context || context.isDisposed) {
+        console.warn('Visualizer: Cannot update scene - context is disposed or null');
+        return;
+    }
 
-    camera.aspect = containerWidth / containerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(containerWidth, containerHeight);
+    try {
+        console.log('Visualizer: Creating mesh from data');
+        clearCurrentOrbital(context, context.scene);
+
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(meshData.positions.flat());
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex(meshData.cells.flat());
+        geometry.computeVertexNormals();
+
+        const material = new THREE.MeshPhongMaterial({
+            color: 0x1976d2,
+            shininess: 100,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.7,
+            depthWrite: true,
+        });
+
+        const wireframeMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.1
+        });
+
+        const mainMesh = new THREE.Mesh(geometry, material);
+        mainMesh.userData.isWireframe = false;
+
+        const wireframeMesh = new THREE.Mesh(geometry.clone(), wireframeMaterial);
+        wireframeMesh.userData.isWireframe = true;
+
+        const group = new THREE.Group();
+        group.add(mainMesh);
+        group.add(wireframeMesh);
+
+        context.scene.add(group);
+        context.currentOrbitalGroup = group;
+        console.log('Visualizer: Mesh created and added to scene');
+    } catch (error) {
+        console.error('Visualizer: Error creating mesh:', error);
+        throw error; // Propagate error to caller
+    }
+}
+
+function addAxesHelper(context: VisualizerContext, size: number) {
+    if (!context) return;
+    
+    // Remove existing axes if any
+    removeAxesHelper(context);
+    
+    // Create and add new axes
+    const axesHelper = new THREE.AxesHelper(size);
+    context.scene.add(axesHelper);
+    context.currentAxesHelper = axesHelper;
+}
+
+function removeAxesHelper(context: VisualizerContext) {
+    if (!context || !context.currentAxesHelper) return;
+    
+    context.scene.remove(context.currentAxesHelper);
+    context.currentAxesHelper.dispose();
+    context.currentAxesHelper = null;
+}
+
+export function handleResize(context: VisualizerContext, width: number, height: number) {
+    if (!context) return;
+    
+    const { camera, renderer } = context;
+    
+    // Update camera aspect ratio
+    if (camera instanceof THREE.PerspectiveCamera) {
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+    }
+    
+    // Update renderer size
+    renderer.setSize(width, height);
 }

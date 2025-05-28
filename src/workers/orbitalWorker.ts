@@ -1,6 +1,27 @@
 import { getOrbitalPotentialFunction } from '../quantum_functions';
 import { marchingCubes, MarchingCubesMeshData } from 'marching-cubes-fast';
 
+// Worker message types
+interface WorkerMessageData {
+    type: 'calculate';
+    params: OrbitalParameters;
+}
+
+interface WorkerSuccessResponse {
+    type: 'success';
+    meshData: {
+        positions: number[][];
+        cells: number[][];
+    };
+}
+
+interface WorkerErrorResponse {
+    type: 'error';
+    error: string;
+}
+
+type WorkerResponse = WorkerSuccessResponse | WorkerErrorResponse;
+
 interface OrbitalParameters {
   n: number;
   l: number;
@@ -11,34 +32,55 @@ interface OrbitalParameters {
   isoLevel: number;
 }
 
-self.onmessage = (e: MessageEvent<{ type: 'calculate', params: OrbitalParameters }>) => {
-  if (e.data.type === 'calculate') {
-    try {
-      const { n, l, ml, Z, resolution, rMax, isoLevel } = e.data.params;
-      const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoLevel);
-      
-      const meshData: MarchingCubesMeshData | null = marchingCubes(
-        resolution,
-        orbitalPotentialFunction,
-        [[-rMax, -rMax, -rMax], [rMax, rMax, rMax]]
-      );
+self.onmessage = (e: MessageEvent<WorkerMessageData>) => {
+    if (e.data.type === 'calculate') {
+        try {
+            console.log('Worker: Starting calculation', e.data.params);
+            const { n, l, ml, Z, resolution, rMax, isoLevel } = e.data.params;
+            
+            // Validate parameters
+            if (resolution <= 0 || rMax <= 0 || isoLevel <= 0) {
+                throw new Error('Invalid parameters: resolution, rMax, and isoLevel must be positive');
+            }
 
-      if (!meshData) {
-        throw new Error('Failed to generate mesh data');
-      }
+            const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoLevel);
+            
+            console.log('Worker: Running marching cubes algorithm');
+            const meshData: MarchingCubesMeshData | null = marchingCubes(
+                resolution,
+                orbitalPotentialFunction,
+                [[-rMax, -rMax, -rMax], [rMax, rMax, rMax]]
+            );
 
-      self.postMessage({ 
-        type: 'success', 
-        meshData: {
-          positions: meshData.positions,
-          cells: meshData.cells
+            if (!meshData) {
+                throw new Error('Failed to generate mesh data');
+            }
+
+            if (!meshData.positions.length || !meshData.cells.length) {
+                throw new Error('Generated mesh has no vertices or faces');
+            }
+
+            console.log('Worker: Calculation complete', {
+                vertexCount: meshData.positions.length,
+                triangleCount: meshData.cells.length
+            });
+
+            const response: WorkerSuccessResponse = {
+                type: 'success',
+                meshData: {
+                    positions: meshData.positions,
+                    cells: meshData.cells
+                }
+            };
+
+            self.postMessage(response);
+        } catch (error) {
+            console.error('Worker: Error during calculation:', error);
+            const response: WorkerErrorResponse = {
+                type: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+            self.postMessage(response);
         }
-      });
-    } catch (error) {
-      self.postMessage({ 
-        type: 'error', 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      });
     }
-  }
 };

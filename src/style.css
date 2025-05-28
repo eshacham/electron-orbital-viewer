@@ -21,10 +21,9 @@ html, body, #root {
 }
 /* Ensure the host for the Three.js canvas also behaves correctly */
 #orbital-canvas-host {
-  width: 100%;
-  height: 100%;
-  position: relative; /* Important for absolute positioning of canvas */
-  display: block; /* Important for canvas to behave like a block element */
+    width: 100%;
+    height: 100%;
+    position: relative;
 }
 #controls {
   position: absolute; /* Position absolutely within #root */

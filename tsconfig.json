@@ -18,11 +18,17 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      // "@/*": ["src/*"] // Or your specific alias
+      "@/*": ["src/*"],
+      "main": ["src/main.tsx"]
     }
-    // If you explicitly use "types", make sure "jest" is included or remove "types" to let TS auto-discover
-    // "types": ["jest", "node", "react", "react-dom"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "public/**/*.ts", "public/**/*.tsx", "vite.config.ts", "tests/**/*.ts"], // Ensure "tests/**/*.ts" is included
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "public/**/*.ts",
+    "public/**/*.tsx",
+    "vite.config.ts",
+    "tests/**/*.ts"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

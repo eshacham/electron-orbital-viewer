@@ -1,20 +1,22 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { setLoading } from './loadingSlice';
-import { setOrbitalParams } from './orbitalSlice';
+import { AppDispatch } from './index';
+// import { setLoading } from './loadingSlice';
 import { OrbitalParams } from '../components/OrbitalViewer';
 
-export const updateOrbitalParameters = createAsyncThunk(
+export const updateOrbitalParameters = createAsyncThunk<
+  OrbitalParams,
+  OrbitalParams,
+  { dispatch: AppDispatch }
+>(
   'orbital/updateParameters',
-  async (params: OrbitalParams, { dispatch }) => {
-    dispatch(setLoading(true));
-    dispatch(setOrbitalParams(params));
+  async (params) => {
     return params;
   }
 );
 
 export const orbitalRendered = createAsyncThunk(
   'orbital/rendered',
-  async (_, { dispatch }) => {
-    dispatch(setLoading(false));
+  async () => {
+    return;
   }
 );
