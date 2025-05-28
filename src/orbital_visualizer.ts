@@ -1,8 +1,5 @@
-// src/orbital_visualizer.ts
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { getOrbitalPotentialFunction } from './quantum_functions';
-import { marchingCubes, MarchingCubesMeshData } from 'marching-cubes-fast';
 
 // Add MeshData interface since it's used but not defined
 interface MeshData {
