@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
+import { 
+    ThemeProvider, 
+    createTheme, 
+    CssBaseline, 
+    Box, 
+    CircularProgress 
+} from '@mui/material';
 import Controls from './components/Controls';
 import OrbitalViewer, { OrbitalParams } from './components/OrbitalViewer';
 import { getOptimizedParameters } from './orbital_visualizer';
@@ -16,24 +22,37 @@ const theme = createTheme({
 });
 
 function App() {
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
     const [currentOrbitalParams, setCurrentOrbitalParams] = useState<OrbitalParams | null>(null);
-    const initialRenderRef = useRef(false);
+
+    // State for individual control values
+    const [n, setN] = useState<number>(defaultN);
+    const [l, setL] = useState<number>(defaultL);
+    const [ml, setMl] = useState<number>(0);
+    const [Z, setZ] = useState<number>(1);
+    const [resolution, setResolution] = useState<number>(64);
+    const [rMax, setRMax] = useState<number>(defaultOptimized.rMax);
+    const [isoLevel, setIsoLevel] = useState<number>(defaultOptimized.isoLevel);
+
+    // Track initialization
+    const isInitializedRef = useRef(false);
 
     const handleOrbitalParamsChange = useCallback((newParams: OrbitalParams) => {
-        console.log('App: Updating orbital params:', newParams);
+        console.log('App.tsx: Orbital params changing:', newParams);
         setIsLoading(true);
         setCurrentOrbitalParams(newParams);
     }, []);
 
     const handleOrbitalRendered = useCallback(() => {
+        console.log('App.tsx: Orbital rendered callback');
         setIsLoading(false);
     }, []);
 
-    // Initial render
+    // Single initialization effect
     useEffect(() => {
-        if (!initialRenderRef.current) {
-            console.log('App: Setting initial orbital parameters');
+        if (!isInitializedRef.current) {
+            isInitializedRef.current = true;
+            console.log("App.tsx: Triggering initial orbital render.");
             const initialParams = {
                 n: defaultN,
                 l: defaultL,
@@ -44,21 +63,19 @@ function App() {
                 isoLevel: defaultOptimized.isoLevel,
             };
             handleOrbitalParamsChange(initialParams);
-            initialRenderRef.current = true;
         }
-    }, [handleOrbitalParamsChange]);
+    }, []); // Empty dependency array to run only once
 
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <Box 
-                id="canvas-container" 
+                id="canvas-container"
                 sx={{ 
                     width: '100%', 
                     height: '100vh',
                     position: 'relative',
-                    backgroundColor: '#111',
-                    overflow: 'hidden'
+                    backgroundColor: '#111'
                 }}
             >
                 <OrbitalViewer
@@ -66,14 +83,28 @@ function App() {
                     isLoading={isLoading}
                     onOrbitalRendered={handleOrbitalRendered}
                 />
+                {isLoading && (
+                    <div className="spinner-overlay">
+                        <div className="spinner-container">
+                            <CircularProgress />
+                        </div>
+                    </div>
+                )}
                 <Controls
-                    initialN={defaultN} onNChange={() => {}}
-                    initialL={defaultL} onLChange={() => {}}
-                    initialMl={0} onMlChange={() => {}}
-                    initialZ={1} onZChange={() => {}}
-                    initialResolution={64} onResolutionChange={() => {}}
-                    initialRMax={defaultOptimized.rMax} onRMaxChange={() => {}}
-                    initialIsoLevel={defaultOptimized.isoLevel} onIsoLevelChange={() => {}}
+                    initialN={n}
+                    onNChange={setN}
+                    initialL={l}
+                    onLChange={setL}
+                    initialMl={ml}
+                    onMlChange={setMl}
+                    initialZ={Z}
+                    onZChange={setZ}
+                    initialResolution={resolution}
+                    onResolutionChange={setResolution}
+                    initialRMax={rMax}
+                    onRMaxChange={setRMax}
+                    initialIsoLevel={isoLevel}
+                    onIsoLevelChange={setIsoLevel}
                     onUpdateOrbital={handleOrbitalParamsChange}
                     getOptimizedParams={getOptimizedParameters}
                     isLoading={isLoading}

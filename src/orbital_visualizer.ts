@@ -274,13 +274,14 @@ function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData,
         geometry.setIndex(meshData.cells.flat());
         geometry.computeVertexNormals();
 
-        const material = new THREE.MeshPhongMaterial({
-            color: 0x1976d2,
-            shininess: 100,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.7,
-            depthWrite: true,
+        const material =  new THREE.MeshStandardMaterial({
+            color: 0x77ccff, // A light blue color
+            metalness: 0.3,
+            roughness: 0.6,
+            side: THREE.DoubleSide, // Render both sides, useful for orbitals
+            transparent: true,     // Enable transparency
+            opacity: 0.75,         // Set opacity level (0.0 to 1.0)
+            wireframe: true, // Uncomment for debugging geometry
         });
 
         const wireframeMaterial = new THREE.MeshBasicMaterial({

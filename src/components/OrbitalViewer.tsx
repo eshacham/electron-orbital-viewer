@@ -26,29 +26,12 @@ interface OrbitalViewerProps {
 const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading, onOrbitalRendered }) => {
     const canvasHostRef = useRef<HTMLDivElement>(null);
     const visualizerContextRef = useRef<VisualizerContext | null>(null);
-    const pendingUpdateRef = useRef<OrbitalParams | null>(null);
 
-    // Initialize visualizer
+    // Initialize visualizer - only once
     useEffect(() => {
-        if (canvasHostRef.current && !visualizerContextRef.current) {
+        if (canvasHostRef.current) {
             console.log('OrbitalViewer: Initializing visualizer');
             visualizerContextRef.current = initVisualizer(canvasHostRef.current);
-            
-            // Process any pending update after initialization
-            if (pendingUpdateRef.current) {
-                console.log('OrbitalViewer: Processing pending update after init');
-                updateOrbitalInScene(visualizerContextRef.current, pendingUpdateRef.current, true)
-                    .then(() => {
-                        console.log('OrbitalViewer: Pending update complete');
-                        onOrbitalRendered?.();
-                        pendingUpdateRef.current = null;
-                    })
-                    .catch(error => {
-                        console.error('OrbitalViewer: Error processing pending update', error);
-                        onOrbitalRendered?.();
-                        pendingUpdateRef.current = null;
-                    });
-            }
         }
 
         return () => {
@@ -56,23 +39,15 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading,
                 console.log('OrbitalViewer: Cleaning up visualizer');
                 cleanupVisualizer(visualizerContextRef.current);
                 visualizerContextRef.current = null;
-                pendingUpdateRef.current = null;
             }
         };
     }, []);
 
     // Handle orbital updates
     useEffect(() => {
-        if (!orbitalParams || isLoading) return;
+        if (!visualizerContextRef.current || !orbitalParams) return;
 
-        // Store update if visualizer isn't ready
-        if (!visualizerContextRef.current) {
-            console.log('OrbitalViewer: Storing update for after initialization');
-            pendingUpdateRef.current = orbitalParams;
-            return;
-        }
-
-        console.log('OrbitalViewer: Starting orbital update', orbitalParams);
+        console.log('OrbitalViewer: Updating orbital with params:', orbitalParams);
         updateOrbitalInScene(visualizerContextRef.current, orbitalParams, true)
             .then(() => {
                 console.log('OrbitalViewer: Orbital update complete');
@@ -82,7 +57,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading,
                 console.error('OrbitalViewer: Error updating orbital', error);
                 onOrbitalRendered?.();
             });
-    }, [orbitalParams, isLoading, onOrbitalRendered]);
+    }, [orbitalParams, onOrbitalRendered]);
 
     // Handle resize
     useEffect(() => {
