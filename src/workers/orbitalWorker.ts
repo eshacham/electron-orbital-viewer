@@ -1,10 +1,11 @@
+import { OrbitalParams } from '@/types/orbital';
 import { getOrbitalPotentialFunction } from '../quantum_functions';
 import { marchingCubes, MarchingCubesMeshData } from 'marching-cubes-fast';
 
 // Worker message types
 interface WorkerMessageData {
     type: 'calculate';
-    params: OrbitalParameters;
+    params: OrbitalParams;
 }
 
 interface WorkerSuccessResponse {
@@ -20,17 +21,6 @@ interface WorkerErrorResponse {
     error: string;
 }
 
-type WorkerResponse = WorkerSuccessResponse | WorkerErrorResponse;
-
-interface OrbitalParameters {
-  n: number;
-  l: number;
-  ml: number;
-  Z: number;
-  resolution: number;
-  rMax: number;
-  isoLevel: number;
-}
 
 self.onmessage = (e: MessageEvent<WorkerMessageData>) => {
     if (e.data.type === 'calculate') {

@@ -13,17 +13,7 @@ import {
   FormLabel, // To label the ToggleButtonGroup
   LinearProgress,
 } from '@mui/material';
-
-// This interface should match the one in OrbitalViewer.tsx and App.tsx
-interface OrbitalParamsForUpdate {
-  n: number;
-  l: number;
-  ml: number;
-  Z: number;
-  resolution: number;
-  rMax: number;
-  isoLevel: number;
-}
+import { OrbitalParams } from '@/types/orbital';
 
 interface ControlsProps {
   initialN: number;
@@ -40,7 +30,7 @@ interface ControlsProps {
   onRMaxChange: (value: number) => void;
   initialIsoLevel: number;
   onIsoLevelChange: (value: number) => void;
-  onUpdateOrbital: (params: OrbitalParamsForUpdate) => void;
+  onUpdateOrbital: (params: OrbitalParams) => void;
   getOptimizedParams: (n: number, l: number) => { rMax: number; isoLevel: number } | null;
   isLoading: boolean;
 }
@@ -105,7 +95,7 @@ const Controls: React.FC<ControlsProps> = ({
 
 
   const handleUpdateOrbital = () => {
-    const params: OrbitalParamsForUpdate = {
+    const params: OrbitalParams = {
       n: initialN,
       l: initialL,
       ml: initialMl,

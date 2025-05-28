@@ -26,7 +26,7 @@ const theme = createTheme({
 
 function App() {
     const dispatch = useAppDispatch();
-    const { isLoading, currentParams } = useAppSelector(state => state.orbital);
+    const { isLoading } = useAppSelector(state => state.orbital);
 
     // Keep individual control values as local state
     const [n, setN] = useState<number>(defaultN);
