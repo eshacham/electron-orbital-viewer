@@ -3,21 +3,27 @@ import { OrbitalParams } from '../components/OrbitalViewer';
 
 interface OrbitalState {
   currentParams: OrbitalParams | null;
+  isLoading: boolean;
 }
 
 const initialState: OrbitalState = {
-  currentParams: null
+  currentParams: null,
+  isLoading: false
 };
 
 const orbitalSlice = createSlice({
   name: 'orbital',
   initialState,
   reducers: {
-    setOrbitalParams: (state, action: PayloadAction<OrbitalParams>) => {
+    startOrbitalCalculation: (state, action: PayloadAction<OrbitalParams>) => {
+      state.isLoading = true;
       state.currentParams = action.payload;
+    },
+    finishOrbitalCalculation: (state) => {
+      state.isLoading = false;
     }
   }
 });
 
-export const { setOrbitalParams } = orbitalSlice.actions;
+export const { startOrbitalCalculation, finishOrbitalCalculation } = orbitalSlice.actions;
 export default orbitalSlice.reducer;

@@ -6,6 +6,8 @@ import {
     Box, 
     CircularProgress 
 } from '@mui/material';
+import { useAppDispatch, useAppSelector } from './store/hooks';
+import { startOrbitalCalculation, finishOrbitalCalculation } from './store/orbitalSlice';
 import Controls from './components/Controls';
 import OrbitalViewer, { OrbitalParams } from './components/OrbitalViewer';
 import { getOptimizedParameters } from './orbital_visualizer';
@@ -22,10 +24,10 @@ const theme = createTheme({
 });
 
 function App() {
-    const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [currentOrbitalParams, setCurrentOrbitalParams] = useState<OrbitalParams | null>(null);
+    const dispatch = useAppDispatch();
+    const { isLoading, currentParams } = useAppSelector(state => state.orbital);
 
-    // State for individual control values
+    // Keep individual control values as local state
     const [n, setN] = useState<number>(defaultN);
     const [l, setL] = useState<number>(defaultL);
     const [ml, setMl] = useState<number>(0);
@@ -34,21 +36,19 @@ function App() {
     const [rMax, setRMax] = useState<number>(defaultOptimized.rMax);
     const [isoLevel, setIsoLevel] = useState<number>(defaultOptimized.isoLevel);
 
-    // Track initialization
     const isInitializedRef = useRef(false);
 
     const handleOrbitalParamsChange = useCallback((newParams: OrbitalParams) => {
         console.log('App.tsx: Orbital params changing:', newParams);
-        setIsLoading(true);
-        setCurrentOrbitalParams(newParams);
-    }, []);
+        dispatch(startOrbitalCalculation(newParams));
+    }, [dispatch]);
 
     const handleOrbitalRendered = useCallback(() => {
         console.log('App.tsx: Orbital rendered callback');
-        setIsLoading(false);
-    }, []);
+        dispatch(finishOrbitalCalculation());
+    }, [dispatch]);
 
-    // Single initialization effect
+    // Initial render - only run once
     useEffect(() => {
         if (!isInitializedRef.current) {
             isInitializedRef.current = true;
@@ -64,7 +64,7 @@ function App() {
             };
             handleOrbitalParamsChange(initialParams);
         }
-    }, []); // Empty dependency array to run only once
+    }, [handleOrbitalParamsChange]);
 
     return (
         <ThemeProvider theme={theme}>
@@ -79,7 +79,7 @@ function App() {
                 }}
             >
                 <OrbitalViewer
-                    orbitalParams={currentOrbitalParams}
+                    orbitalParams={currentParams}
                     isLoading={isLoading}
                     onOrbitalRendered={handleOrbitalRendered}
                 />
