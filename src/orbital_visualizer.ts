@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OrbitalParams } from './types/orbital';
 
 // Add MeshData interface since it's used but not defined
 interface MeshData {
@@ -7,16 +8,6 @@ interface MeshData {
     cells: number[][];
 }
 
-// Add export to make it available to OrbitalViewer
-export interface OrbitalParameters {
-    n: number;
-    l: number;
-    ml: number;
-    Z: number;
-    resolution: number;
-    rMax: number;
-    isoLevel: number;
-}
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -148,7 +139,7 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
 }
 
 
-export async function updateOrbitalInScene(context: VisualizerContext | null, params: OrbitalParameters, showAxes: boolean = true): Promise<void> {
+export async function updateOrbitalInScene(context: VisualizerContext | null, params: OrbitalParams, showAxes: boolean = true): Promise<void> {
     if (!context) return;
 
     return new Promise((resolve, reject) => {
@@ -255,7 +246,7 @@ function startAnimationLoop(context: VisualizerContext) {
 }
 
 // Modified updateSceneWithMeshData to include better error handling
-function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData, params: OrbitalParameters) {
+function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData, params: OrbitalParams) {
     if (!context || context.isDisposed) {
         console.warn('Visualizer: Cannot update scene - context is disposed or null');
         return;

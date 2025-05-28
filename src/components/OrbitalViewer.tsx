@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { useAppSelector } from '../store/hooks';
 import {
     initVisualizer,
     cleanupVisualizer,
@@ -7,25 +8,15 @@ import {
     VisualizerContext
 } from '../orbital_visualizer';
 
-export interface OrbitalParams { // Renamed from OrbitalParameters in visualizer for consistency
-    n: number;
-    l: number;
-    ml: number;
-    Z: number;
-    resolution: number;
-    rMax: number;
-    isoLevel: number;
-}
 
 interface OrbitalViewerProps {
-    orbitalParams: OrbitalParams | null; // Can be null initially
-    isLoading: boolean; // To potentially show a message on the canvas itself (not implemented yet)
-    onOrbitalRendered?: () => void; // Callback for when rendering is complete
+    onOrbitalRendered?: () => void;
 }
 
-const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading, onOrbitalRendered }) => {
+const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered }) => {
     const canvasHostRef = useRef<HTMLDivElement>(null);
     const visualizerContextRef = useRef<VisualizerContext | null>(null);
+    const stateParams = useAppSelector(state => state.orbital.currentParams);
 
     // Initialize visualizer - only once
     useEffect(() => {
@@ -43,12 +34,13 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading,
         };
     }, []);
 
-    // Handle orbital updates
+    // Handle orbital updates - now using stateParams
     useEffect(() => {
-        if (!visualizerContextRef.current || !orbitalParams) return;
+        if (!visualizerContextRef.current || !stateParams) return;
 
-        console.log('OrbitalViewer: Updating orbital with params:', orbitalParams);
-        updateOrbitalInScene(visualizerContextRef.current, orbitalParams, true)
+        console.log('OrbitalViewer: Using state params:', stateParams);
+        
+        updateOrbitalInScene(visualizerContextRef.current, stateParams, true)
             .then(() => {
                 console.log('OrbitalViewer: Orbital update complete');
                 onOrbitalRendered?.();
@@ -57,7 +49,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ orbitalParams, isLoading,
                 console.error('OrbitalViewer: Error updating orbital', error);
                 onOrbitalRendered?.();
             });
-    }, [orbitalParams, onOrbitalRendered]);
+    }, [stateParams, onOrbitalRendered]); // Changed dependency to stateParams
 
     // Handle resize
     useEffect(() => {

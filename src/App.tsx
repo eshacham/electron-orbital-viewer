@@ -9,8 +9,9 @@ import {
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import { startOrbitalCalculation, finishOrbitalCalculation } from './store/orbitalSlice';
 import Controls from './components/Controls';
-import OrbitalViewer, { OrbitalParams } from './components/OrbitalViewer';
+import OrbitalViewer from './components/OrbitalViewer';
 import { getOptimizedParameters } from './orbital_visualizer';
+import { OrbitalParams } from './types/orbital';
 
 const defaultN = 3;
 const defaultL = 2;
@@ -79,8 +80,6 @@ function App() {
                 }}
             >
                 <OrbitalViewer
-                    orbitalParams={currentParams}
-                    isLoading={isLoading}
                     onOrbitalRendered={handleOrbitalRendered}
                 />
                 {isLoading && (

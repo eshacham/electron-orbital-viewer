@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { OrbitalParams } from '../components/OrbitalViewer';
+import { OrbitalParams } from '../types/orbital';
 
 interface OrbitalState {
   currentParams: OrbitalParams | null;
