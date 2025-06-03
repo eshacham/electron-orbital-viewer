@@ -1,11 +1,11 @@
-// src/quantum_functions.ts
+import { OrbitalDataPoint } from './types/orbital';
 
 const factorialCache: Map<number, number> = new Map();
 const pochhammerCache: Map<string, number> = new Map();
 const laguerreCache: Map<string, number> = new Map();
 const legendreCache: Map<string, number> = new Map();
 const sphericalHarmonicCache: Map<string, number> = new Map();
-const atomicOrbitalCache: Map<string, number> = new Map();
+const atomicOrbitalCache: Map<string, OrbitalDataPoint> = new Map();
 
 // Note on units:
 // Throughout these functions, the distance 'r' is assumed to be provided in atomic units,
@@ -308,11 +308,16 @@ export function realSphericalHarmonic(l: number, ml: number, theta: number, phi:
  * @param Z - Nuclear charge (defaults to 1 for Hydrogen).
  * @returns The probability density (magnitude squared of the wave function).
  */
-export function atomicOrbitalProbabilityDensity(n: number, l: number, ml: number, r: number, theta: number, phi: number, Z: number = 1): number {
-    // Input validation is handled by the underlying functions.
-    // We only need to check for non-physical r here explicitly if it's not caught below.
+export function atomicOrbitalProbabilityDensity(
+    n: number,
+    l: number,
+    ml: number,
+    r: number,
+    theta: number,
+    phi: number,
+    Z: number = 1
+): OrbitalDataPoint {
     if (r < 0) {
-        // Or handle as density = 0 for r < 0
         throw new Error("Distance (r) cannot be negative for atomic orbital probability density.");
     }
 
@@ -325,10 +330,11 @@ export function atomicOrbitalProbabilityDensity(n: number, l: number, ml: number
     const angularPart = realSphericalHarmonic(l, ml, theta, phi);
 
     const waveFunctionValue = radialPart * angularPart;
-    const probabilityDensity = waveFunctionValue * waveFunctionValue; // Square the value
+    const probabilityDensity = waveFunctionValue * waveFunctionValue;
 
-    atomicOrbitalCache.set(cacheKey, probabilityDensity);
-    return probabilityDensity;
+    const dataPoint: OrbitalDataPoint = { waveFunctionValue, probabilityDensity };
+    atomicOrbitalCache.set(cacheKey, dataPoint);
+    return dataPoint;
 }
 
 interface OrbitalData {
@@ -351,7 +357,14 @@ interface OrbitalData {
  * @param rMax - Maximum radial distance (in Bohr radii) to sample, defining the half-width of the cube.
  * The cube will extend from -rMax to +rMax along each axis.
  */
-export function generateOrbitalData(n: number, l: number, ml: number, Z: number = 1, resolution: number = 50, rMax: number = 15): OrbitalData {
+export function generateOrbitalData(
+    n: number,
+    l: number,
+    ml: number,
+    Z: number = 1,
+    resolution: number = 50,
+    rMax: number = 15
+): OrbitalData {
     if (resolution <= 0 || !Number.isInteger(resolution)) {
         throw new Error("Resolution must be a positive integer.");
     }
@@ -366,7 +379,9 @@ export function generateOrbitalData(n: number, l: number, ml: number, Z: number 
     const step = (rMax * 2) / (resolution - 1); // Size of each step along an axis
     const startCoord = -rMax; // Starting coordinate (e.g., -rMax)
 
-    // Fill the 3D grid
+    // Use getOrbitalPotentialFunction to calculate density values
+    const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, 0); // isoLevel is 0 for raw density
+
     for (let xIdx = 0; xIdx < dims[0]; xIdx++) {
         const x = startCoord + xIdx * step;
         for (let yIdx = 0; yIdx < dims[1]; yIdx++) {
@@ -374,26 +389,12 @@ export function generateOrbitalData(n: number, l: number, ml: number, Z: number 
             for (let zIdx = 0; zIdx < dims[2]; zIdx++) {
                 const z = startCoord + zIdx * step;
 
-                // Convert Cartesian (x, y, z) to Spherical (r, theta, phi)
-                const r = Math.sqrt(x * x + y * y + z * z);
-                // Clamp r to avoid issues with Math.acos(1.0000000000000001) or similar
-                const theta = Math.acos(Math.min(1, Math.max(-1, r === 0 ? 0 : z / r))); // acos(z/r), handle r=0 for safety
-                const phi = Math.atan2(y, x); // atan2(y, x)
-
-                let density;
-                if (r === 0) {
-                     // For s-orbitals (l=0), density is non-zero at r=0.
-                     // For l > 0, density is 0 at r=0.
-                     // The radialWaveFunction should handle r=0 correctly.
-                     density = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z);
-                } else {
-                    density = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
-                }
-
+                const { probabilityDensity } = orbitalPotentialFunction(x, y, z); // Extract density
                 const index = xIdx * dims[1] * dims[2] + yIdx * dims[2] + zIdx;
-                grid[index] = density;
-                if (density > maxDensity) {
-                    maxDensity = density;
+                grid[index] = probabilityDensity;
+
+                if (probabilityDensity > maxDensity) {
+                    maxDensity = probabilityDensity;
                 }
             }
         }
@@ -404,7 +405,7 @@ export function generateOrbitalData(n: number, l: number, ml: number, Z: number 
         dims: dims,
         maxDensity: maxDensity,
         minVal: startCoord,
-        maxVal: rMax // This should be startCoord + (resolution - 1) * step, which is rMax
+        maxVal: rMax
     };
 }
 
@@ -420,20 +421,29 @@ export function generateOrbitalData(n: number, l: number, ml: number, Z: number 
  * @returns A function (df) that takes (x, y, z)
  * and returns the orbital probability density minus the isoLevel at that point.
  */
-export function getOrbitalPotentialFunction(n: number, l: number, ml: number, Z: number, isoLevel: number): (x: number, y: number, z: number) => number {
+export function getOrbitalPotentialFunction(
+    n: number,
+    l: number,
+    ml: number,
+    Z: number,
+    isoLevel: number
+): (x: number, y: number, z: number) => OrbitalDataPoint {
     return (x, y, z) => {
         const r = Math.sqrt(x * x + y * y + z * z);
-        // Clamp r to avoid issues with Math.acos(1.0000000000000001) or similar
         const theta = Math.acos(Math.min(1, Math.max(-1, r === 0 ? 0 : z / r)));
         const phi = Math.atan2(y, x);
 
-        let density;
+        let dataPoint: OrbitalDataPoint;
         if (r === 0) {
-             density = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z);
+            dataPoint = atomicOrbitalProbabilityDensity(n, l, ml, 0, 0, 0, Z);
         } else {
-            density = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
+            dataPoint = atomicOrbitalProbabilityDensity(n, l, ml, r, theta, phi, Z);
         }
-        return density - isoLevel;
+
+        return {
+            waveFunctionValue: dataPoint.waveFunctionValue,
+            probabilityDensity: dataPoint.probabilityDensity - isoLevel
+        };
     };
 }
 

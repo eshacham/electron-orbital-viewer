@@ -27,18 +27,18 @@ self.onmessage = (e: MessageEvent<WorkerMessageData>) => {
         try {
             console.log('Worker: Starting calculation', e.data.params);
             const { n, l, ml, Z, resolution, rMax, isoLevel } = e.data.params;
-            
+
             // Validate parameters
             if (resolution <= 0 || rMax <= 0 || isoLevel <= 0) {
                 throw new Error('Invalid parameters: resolution, rMax, and isoLevel must be positive');
             }
 
             const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoLevel);
-            
+
             console.log('Worker: Running marching cubes algorithm');
             const meshData: MarchingCubesMeshData | null = marchingCubes(
                 resolution,
-                orbitalPotentialFunction,
+                (x, y, z) => orbitalPotentialFunction(x, y, z).probabilityDensity, // Extract probabilityDensity
                 [[-rMax, -rMax, -rMax], [rMax, rMax, rMax]]
             );
 
