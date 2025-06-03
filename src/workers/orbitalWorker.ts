@@ -1,4 +1,4 @@
-import { OrbitalParams } from '@/types/orbital';
+import { MeshData, OrbitalParams } from '@/types/orbital';
 import { getOrbitalPotentialFunction } from '../quantum_functions';
 import { marchingCubes, MarchingCubesMeshData } from 'marching-cubes-fast';
 
@@ -10,10 +10,7 @@ interface WorkerMessageData {
 
 interface WorkerSuccessResponse {
     type: 'success';
-    meshData: {
-        positions: number[][];
-        cells: number[][];
-    };
+    meshData: MeshData;
 }
 
 interface WorkerErrorResponse {
@@ -42,13 +39,15 @@ self.onmessage = (e: MessageEvent<WorkerMessageData>) => {
                 [[-rMax, -rMax, -rMax], [rMax, rMax, rMax]]
             );
 
-            if (!meshData) {
+            if (!meshData || !meshData.positions.length || !meshData.cells.length) {
                 throw new Error('Failed to generate mesh data');
             }
 
-            if (!meshData.positions.length || !meshData.cells.length) {
-                throw new Error('Generated mesh has no vertices or faces');
-            }
+            // Calculate ψ signs for each vertex
+            const psiSigns = meshData.positions.map(([x, y, z]) => {
+                const { waveFunctionValue } = orbitalPotentialFunction(x, y, z);
+                return waveFunctionValue >= 0 ? 1 : -1; // 1 for positive, -1 for negative
+            });
 
             console.log('Worker: Calculation complete', {
                 vertexCount: meshData.positions.length,
@@ -59,7 +58,8 @@ self.onmessage = (e: MessageEvent<WorkerMessageData>) => {
                 type: 'success',
                 meshData: {
                     positions: meshData.positions,
-                    cells: meshData.cells
+                    cells: meshData.cells,
+                    psiSigns // Include ψ signs in the response
                 }
             };
 

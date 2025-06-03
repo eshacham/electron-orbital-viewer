@@ -1,13 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { OrbitalParams } from './types/orbital';
-
-// Add MeshData interface since it's used but not defined
-interface MeshData {
-    positions: number[][];
-    cells: number[][];
-}
-
+import { MeshData, OrbitalParams } from './types/orbital';
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -253,48 +246,49 @@ function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData,
     }
 
     try {
-        console.log('Visualizer: Creating mesh from data');
         clearCurrentOrbital(context, context.scene);
 
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(meshData.positions.flat());
+        const colors = new Float32Array(meshData.positions.length * 3); // RGB for each vertex
+
+        // Assign colors based on ψ sign
+        meshData.psiSigns.forEach((sign, index) => {
+            const colorIndex = index * 3;
+            if (sign === 1) {
+                colors[colorIndex] = 1; // Red
+                colors[colorIndex + 1] = 0;
+                colors[colorIndex + 2] = 0;
+            } else {
+                colors[colorIndex] = 0; // Blue
+                colors[colorIndex + 1] = 0;
+                colors[colorIndex + 2] = 1;
+            }
+        });
+
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         geometry.setIndex(meshData.cells.flat());
         geometry.computeVertexNormals();
 
-        const material =  new THREE.MeshStandardMaterial({
-            color: 0x77ccff, // A light blue color
+        const material = new THREE.MeshStandardMaterial({
+            vertexColors: true, // Enable vertex colors
             metalness: 0.3,
             roughness: 0.6,
-            side: THREE.DoubleSide, // Render both sides, useful for orbitals
-            transparent: true,     // Enable transparency
-            opacity: 0.75,         // Set opacity level (0.0 to 1.0)
-            wireframe: true, // Uncomment for debugging geometry
-        });
-
-        const wireframeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
-            wireframe: true,
+            side: THREE.DoubleSide,
             transparent: true,
-            opacity: 0.1
+            opacity: 0.75
         });
 
-        const mainMesh = new THREE.Mesh(geometry, material);
-        mainMesh.userData.isWireframe = false;
-
-        const wireframeMesh = new THREE.Mesh(geometry.clone(), wireframeMaterial);
-        wireframeMesh.userData.isWireframe = true;
-
+        const mesh = new THREE.Mesh(geometry, material);
         const group = new THREE.Group();
-        group.add(mainMesh);
-        group.add(wireframeMesh);
+        group.add(mesh);
 
         context.scene.add(group);
         context.currentOrbitalGroup = group;
-        console.log('Visualizer: Mesh created and added to scene');
     } catch (error) {
         console.error('Visualizer: Error creating mesh:', error);
-        throw error; // Propagate error to caller
+        throw error;
     }
 }
 
