@@ -59,11 +59,13 @@ export function getOptimizedParameters(n: number, l: number): { rMax: number; is
     if (params) {
         return { ...params }; // Return a copy
     }
-    // Fallback if specific n_l not found
+    // Fallback if specific n_l combination is not found in the map
     if (n <= 2) return { rMax: 12, isoLevel: 0.005 };
     if (n === 3) return { rMax: 20, isoLevel: 0.001 };
-    if (n === 4) return { rMax: 30, isoLevel: 0.0005 };
-    return { rMax: 15, isoLevel: 0.0005 }; // Generic fallback
+    if (n === 4) return { rMax: 35, isoLevel: 0.000004 }; // Aligned with specific 4_x entries
+    if (n === 5) return { rMax: 50, isoLevel: 0.0000025 };// Aligned with specific 5_x entries
+    if (n === 6) return { rMax: 65, isoLevel: 0.000001 }; // Aligned with specific 6_x entries
+    return { rMax: 15 + (n - 1) * 10, isoLevel: 0.001 / Math.pow(n, 3) }; // Generic fallback for n > 6
 }
 
 export function initVisualizer(container: HTMLElement, initialCameraZ: number = 12): VisualizerContext {

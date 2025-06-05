@@ -295,7 +295,8 @@ const Controls: React.FC<ControlsProps> = ({
           fullWidth
         >
           <ToggleButton value={32} aria-label="low resolution" disabled={isLoading}>Low</ToggleButton>
-          <ToggleButton value={64} aria-label="high resolution" disabled={isLoading}>High</ToggleButton>        
+          <ToggleButton value={64} aria-label="Medium resolution" disabled={isLoading}>Medium</ToggleButton>
+          <ToggleButton value={128} aria-label="High resolution" disabled={isLoading}>High</ToggleButton>
         </ToggleButtonGroup>
       </FormControl>
 
