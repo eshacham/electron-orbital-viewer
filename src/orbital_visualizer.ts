@@ -272,12 +272,11 @@ function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData,
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshStandardMaterial({
-            vertexColors: true, // Enable vertex colors
-            metalness: 0.3,
-            roughness: 0.6,
+            vertexColors: true,     // Wireframe lines will use vertex colors
             side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.75
+            transparent: true,      // Can be true if you want transparent wireframe (e.g., for fading)
+            opacity: 1.0,           // Or lower if transparent wireframe is desired
+            wireframe: true
         });
 
         const mesh = new THREE.Mesh(geometry, material);
