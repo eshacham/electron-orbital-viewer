@@ -214,8 +214,8 @@ const Controls: React.FC<ControlsProps> = ({
         value={initialIsoLevel}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
           const valueStr = e.target.value;
-          const minIso = 0.0000001;
-          const maxIso = 0.1;
+          const minIso = 0.00000001;
+          const maxIso = 0.001;
 
           if (valueStr === '') {
             onIsoLevelChange(NaN); // Allow clearing, TextField will show empty
@@ -231,7 +231,7 @@ const Controls: React.FC<ControlsProps> = ({
         }}
         slotProps={{
           input: {
-            inputProps: { min: "0.0000001", max: "0.1", step: "any" }
+            inputProps: { min: "0.00000001", max: "0.001", step: "any" }
           }
         }}
         InputLabelProps={{ shrink: true }}

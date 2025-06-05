@@ -32,24 +32,24 @@ const optimizedOrbitalParameters: Record<string, { rMax: number; isoLevel: numbe
     "1_0": { rMax: 10, isoLevel: 0.001 },      // 1s
     "2_0": { rMax: 15, isoLevel: 0.0005 },     // 2s
     "2_1": { rMax: 15, isoLevel: 0.0005 },     // 2p
-    "3_0": { rMax: 20, isoLevel: 0.0001 },     // 3s
-    "3_1": { rMax: 20, isoLevel: 0.0001 },     // 3p
-    "3_2": { rMax: 20, isoLevel: 0.0001 },     // 3d
-    "4_0": { rMax: 25, isoLevel: 0.00005 },    // 4s
-    "4_1": { rMax: 25, isoLevel: 0.00005 },    // 4p
-    "4_2": { rMax: 25, isoLevel: 0.00005 },    // 4d
-    "4_3": { rMax: 25, isoLevel: 0.00005 },    // 4f
-    "5_0": { rMax: 30, isoLevel: 0.00001 },    // 5s
-    "5_1": { rMax: 30, isoLevel: 0.00001 },    // 5p
-    "5_2": { rMax: 30, isoLevel: 0.00001 },    // 5d
-    "5_3": { rMax: 30, isoLevel: 0.00001 },    // 5f
-    "5_4": { rMax: 30, isoLevel: 0.00001 },    // 5g
-    "6_0": { rMax: 35, isoLevel: 0.000005 },   // 6s
-    "6_1": { rMax: 35, isoLevel: 0.000005 },   // 6p
-    "6_2": { rMax: 35, isoLevel: 0.000005 },   // 6d
-    "6_3": { rMax: 35, isoLevel: 0.000005 },   // 6f
-    "6_4": { rMax: 35, isoLevel: 0.000005 },   // 6g
-    "6_5": { rMax: 35, isoLevel: 0.000005 },   // 6h
+    "3_0": { rMax: 20, isoLevel: 0.00001 },    // 3s
+    "3_1": { rMax: 20, isoLevel: 0.00001 },    // 3p
+    "3_2": { rMax: 20, isoLevel: 0.00001 },    // 3d
+    "4_0": { rMax: 35, isoLevel: 0.000004 },   // 4s
+    "4_1": { rMax: 35, isoLevel: 0.000004 },   // 4p
+    "4_2": { rMax: 35, isoLevel: 0.000004 },   // 4d
+    "4_3": { rMax: 35, isoLevel: 0.000004 },   // 4f
+    "5_0": { rMax: 50, isoLevel: 0.0000025 },  // 5s
+    "5_1": { rMax: 50, isoLevel: 0.0000025 },  // 5p
+    "5_2": { rMax: 50, isoLevel: 0.0000025 },  // 5d
+    "5_3": { rMax: 50, isoLevel: 0.0000025 },  // 5f
+    "5_4": { rMax: 50, isoLevel: 0.0000025 },  // 5g
+    "6_0": { rMax: 70, isoLevel: 0.000001 },   // 6s
+    "6_1": { rMax: 70, isoLevel: 0.000001 },   // 6p
+    "6_2": { rMax: 70, isoLevel: 0.000001 },   // 6d
+    "6_3": { rMax: 70, isoLevel: 0.000001 },   // 6f
+    "6_4": { rMax: 70, isoLevel: 0.000001 },   // 6g
+    "6_5": { rMax: 70, isoLevel: 0.000001 },   // 6h
 };
 
 
