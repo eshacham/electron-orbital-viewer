@@ -212,6 +212,23 @@ const Controls: React.FC<ControlsProps> = ({
         label="Iso-Level"
         type="number"
         value={initialIsoLevel}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          const valueStr = e.target.value;
+          const minIso = 0.0000001;
+          const maxIso = 0.1;
+
+          if (valueStr === '') {
+            onIsoLevelChange(NaN); // Allow clearing, TextField will show empty
+          } else {
+            let numValue = parseFloat(valueStr);
+            if (!isNaN(numValue)) {
+              // Clamp the value to the defined min/max
+              numValue = Math.max(minIso, Math.min(maxIso, numValue));
+              onIsoLevelChange(numValue);
+            }
+            // If numValue is NaN (e.g. "abc") and not empty, do nothing.
+          }
+        }}
         slotProps={{
           input: {
             inputProps: { min: "0.0000001", max: "0.1", step: "any" }

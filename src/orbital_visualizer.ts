@@ -142,21 +142,37 @@ export async function updateOrbitalInScene(context: VisualizerContext | null, pa
             type: 'module' 
         });
 
-        const { rMax, isoLevel } = getOptimizedParameters(params.n, params.l)!;
+        // Get optimized/default parameters to use as fallbacks
+        const optimizedDefaults = getOptimizedParameters(params.n, params.l)!;
+
+        let workerRMax = params.rMax;
+        if (isNaN(workerRMax) || workerRMax <= 0) {
+            workerRMax = optimizedDefaults.rMax;
+        }
+
+        let workerIsoLevel = params.isoLevel;
+        if (isNaN(workerIsoLevel)) {
+            workerIsoLevel = optimizedDefaults.isoLevel;
+        }
+
+        // Update or remove axes helper based on showAxes and the rMax to be used
+        if (showAxes) {
+            addAxesHelper(context, workerRMax);
+        } else {
+            removeAxesHelper(context); // Ensure axes are removed if showAxes is false
+        }
 
         // Simple cleanup function
         const cleanup = () => {
             worker.terminate();
         };
 
+
         worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
             try {
                 if (e.data.type === 'success') {
                     console.log('Visualizer: Received mesh data from worker');
                     updateSceneWithMeshData(context, e.data.meshData, params);
-                    if (showAxes) {
-                        addAxesHelper(context, rMax);
-                    }
                     resolve();
                 } else {
                     console.error('Visualizer: Worker error:', e.data.message);
@@ -179,7 +195,9 @@ export async function updateOrbitalInScene(context: VisualizerContext | null, pa
         // Send calculation request to worker
         worker.postMessage({ 
             type: 'calculate',
-            params: { ...params, rMax, isoLevel }
+            // Send original params for n, l, ml, Z, resolution
+            // but use the sanitized/defaulted rMax and isoLevel
+            params: { ...params, rMax: workerRMax, isoLevel: workerIsoLevel }
         });
     });
 }
