@@ -32,24 +32,48 @@ const optimizedOrbitalParameters: Record<string, { rMax: number; isoLevel: numbe
     "1_0": { rMax: 10, isoLevel: 0.001 },      // 1s
     "2_0": { rMax: 15, isoLevel: 0.0005 },     // 2s
     "2_1": { rMax: 15, isoLevel: 0.0005 },     // 2p
-    "3_0": { rMax: 20, isoLevel: 0.0001 },     // 3s
-    "3_1": { rMax: 20, isoLevel: 0.0001 },     // 3p
-    "3_2": { rMax: 20, isoLevel: 0.0001 },     // 3d
-    "4_0": { rMax: 25, isoLevel: 0.00005 },    // 4s
-    "4_1": { rMax: 25, isoLevel: 0.00005 },    // 4p
-    "4_2": { rMax: 25, isoLevel: 0.00005 },    // 4d
-    "4_3": { rMax: 25, isoLevel: 0.00005 },    // 4f
-    "5_0": { rMax: 30, isoLevel: 0.00001 },    // 5s
-    "5_1": { rMax: 30, isoLevel: 0.00001 },    // 5p
-    "5_2": { rMax: 30, isoLevel: 0.00001 },    // 5d
-    "5_3": { rMax: 30, isoLevel: 0.00001 },    // 5f
-    "5_4": { rMax: 30, isoLevel: 0.00001 },    // 5g
-    "6_0": { rMax: 35, isoLevel: 0.000005 },   // 6s
-    "6_1": { rMax: 35, isoLevel: 0.000005 },   // 6p
-    "6_2": { rMax: 35, isoLevel: 0.000005 },   // 6d
-    "6_3": { rMax: 35, isoLevel: 0.000005 },   // 6f
-    "6_4": { rMax: 35, isoLevel: 0.000005 },   // 6g
-    "6_5": { rMax: 35, isoLevel: 0.000005 },   // 6h
+    "3_0": { rMax: 20, isoLevel: 0.00001 },    // 3s
+    "3_1": { rMax: 20, isoLevel: 0.00001 },    // 3p
+    "3_2": { rMax: 20, isoLevel: 0.00001 },    // 3d
+    "4_0": { rMax: 35, isoLevel: 0.000004 },   // 4s
+    "4_1": { rMax: 35, isoLevel: 0.000004 },   // 4p
+    "4_2": { rMax: 35, isoLevel: 0.000004 },   // 4d
+    "4_3": { rMax: 35, isoLevel: 0.000004 },   // 4f
+    "5_0": { rMax: 50, isoLevel: 0.0000025 },  // 5s
+    "5_1": { rMax: 50, isoLevel: 0.0000025 },  // 5p
+    "5_2": { rMax: 50, isoLevel: 0.0000025 },  // 5d
+    "5_3": { rMax: 50, isoLevel: 0.0000025 },  // 5f
+    "5_4": { rMax: 50, isoLevel: 0.0000025 },  // 5g
+    "6_0": { rMax: 70, isoLevel: 0.000001 },   // 6s
+    "6_1": { rMax: 70, isoLevel: 0.000001 },   // 6p
+    "6_2": { rMax: 70, isoLevel: 0.000001 },   // 6d
+    "6_3": { rMax: 70, isoLevel: 0.000001 },   // 6f
+    "6_4": { rMax: 70, isoLevel: 0.000001 },   // 6g
+    "6_5": { rMax: 70, isoLevel: 0.000001 },   // 6h
+    "7_0": { rMax: 90, isoLevel: 0.0000007 },  // 
+    "7_1": { rMax: 90, isoLevel: 0.0000007 },  // 
+    "7_2": { rMax: 90, isoLevel: 0.0000007 },  //
+    "7_3": { rMax: 90, isoLevel: 0.0000007 },  //
+    "7_4": { rMax: 90, isoLevel: 0.0000007 },  //
+    "7_5": { rMax: 90, isoLevel: 0.0000007 },  //
+    "7_6": { rMax: 90, isoLevel: 0.0000007 },  //
+    "8_0": { rMax: 120, isoLevel: 0.0000001 }, // 
+    "8_1": { rMax: 140, isoLevel: 0.0000001 }, // 
+    "8_2": { rMax: 130, isoLevel: 0.0000001 }, //
+    "8_3": { rMax: 140, isoLevel: 0.0000001 }, //
+    "8_4": { rMax: 140, isoLevel: 0.0000001 }, //
+    "8_5": { rMax: 140, isoLevel: 0.0000001 }, //
+    "8_6": { rMax: 140, isoLevel: 0.0000001 }, //
+    "8_7": { rMax: 140, isoLevel: 0.0000001 }, //
+    "9_0": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_1": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_2": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_3": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_4": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_5": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_6": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_7": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_8": { rMax: 200, isoLevel: 0.00000001 }, //
 };
 
 
@@ -59,11 +83,9 @@ export function getOptimizedParameters(n: number, l: number): { rMax: number; is
     if (params) {
         return { ...params }; // Return a copy
     }
-    // Fallback if specific n_l not found
-    if (n <= 2) return { rMax: 12, isoLevel: 0.005 };
-    if (n === 3) return { rMax: 20, isoLevel: 0.001 };
-    if (n === 4) return { rMax: 30, isoLevel: 0.0005 };
-    return { rMax: 15, isoLevel: 0.0005 }; // Generic fallback
+    // Per your request, the fallback logic has been removed.
+    // The function now expects the key to be present in optimizedOrbitalParameters.
+    return null; // Explicitly return null if the key is not found.
 }
 
 export function initVisualizer(container: HTMLElement, initialCameraZ: number = 12): VisualizerContext {
@@ -142,21 +164,37 @@ export async function updateOrbitalInScene(context: VisualizerContext | null, pa
             type: 'module' 
         });
 
-        const { rMax, isoLevel } = getOptimizedParameters(params.n, params.l)!;
+        // Get optimized/default parameters to use as fallbacks
+        const optimizedDefaults = getOptimizedParameters(params.n, params.l)!;
+
+        let workerRMax = params.rMax;
+        if (isNaN(workerRMax) || workerRMax <= 0) {
+            workerRMax = optimizedDefaults.rMax;
+        }
+
+        let workerIsoLevel = params.isoLevel;
+        if (isNaN(workerIsoLevel)) {
+            workerIsoLevel = optimizedDefaults.isoLevel;
+        }
+
+        // Update or remove axes helper based on showAxes and the rMax to be used
+        if (showAxes) {
+            addAxesHelper(context, workerRMax);
+        } else {
+            removeAxesHelper(context); // Ensure axes are removed if showAxes is false
+        }
 
         // Simple cleanup function
         const cleanup = () => {
             worker.terminate();
         };
 
+
         worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
             try {
                 if (e.data.type === 'success') {
                     console.log('Visualizer: Received mesh data from worker');
                     updateSceneWithMeshData(context, e.data.meshData, params);
-                    if (showAxes) {
-                        addAxesHelper(context, rMax);
-                    }
                     resolve();
                 } else {
                     console.error('Visualizer: Worker error:', e.data.message);
@@ -179,7 +217,9 @@ export async function updateOrbitalInScene(context: VisualizerContext | null, pa
         // Send calculation request to worker
         worker.postMessage({ 
             type: 'calculate',
-            params: { ...params, rMax, isoLevel }
+            // Send original params for n, l, ml, Z, resolution
+            // but use the sanitized/defaulted rMax and isoLevel
+            params: { ...params, rMax: workerRMax, isoLevel: workerIsoLevel }
         });
     });
 }
@@ -272,12 +312,11 @@ function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData,
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshStandardMaterial({
-            vertexColors: true, // Enable vertex colors
-            metalness: 0.3,
-            roughness: 0.6,
+            vertexColors: true,     // Wireframe lines will use vertex colors
             side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.75
+            transparent: true,      // Can be true if you want transparent wireframe (e.g., for fading)
+            opacity: 1.0,           // Or lower if transparent wireframe is desired
+            wireframe: true
         });
 
         const mesh = new THREE.Mesh(geometry, material);
