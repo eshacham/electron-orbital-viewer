@@ -142,7 +142,7 @@ const Controls: React.FC<ControlsProps> = ({
           onChange={(e: SelectChangeEvent<string>) => onNChange(parseInt(e.target.value, 10))}
           disabled={isLoading}
         >
-          {[1, 2, 3, 4, 5, 6].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
         </Select>
       </FormControl>
 
@@ -184,11 +184,11 @@ const Controls: React.FC<ControlsProps> = ({
         value={initialRMax}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
           const value = e.target.value === '' ? 1 : parseFloat(e.target.value);
-          onRMaxChange(Math.max(1, Math.min(100, value))); // Min 1, Max 100 (example)
+          onRMaxChange(Math.max(1, Math.min(200, value))); // Min 1, Max 150 (example)
         }}
         slotProps={{ 
           input: { 
-            inputProps: { min: "1", max: "100", step: "0.1" }   
+            inputProps: { min: "20", max: "200", step: "1" }   
           }      
         }}
         InputLabelProps={{ shrink: true }}
@@ -214,7 +214,7 @@ const Controls: React.FC<ControlsProps> = ({
         value={initialIsoLevel}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
           const valueStr = e.target.value;
-          const minIso = 0.00000001;
+          const minIso = 0.000000001;
           const maxIso = 0.001;
 
           if (valueStr === '') {
@@ -231,7 +231,7 @@ const Controls: React.FC<ControlsProps> = ({
         }}
         slotProps={{
           input: {
-            inputProps: { min: "0.00000001", max: "0.001", step: "any" }
+            inputProps: { min: "0.000000001", max: "0.001", step: "any" }
           }
         }}
         InputLabelProps={{ shrink: true }}

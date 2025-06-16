@@ -50,6 +50,30 @@ const optimizedOrbitalParameters: Record<string, { rMax: number; isoLevel: numbe
     "6_3": { rMax: 70, isoLevel: 0.000001 },   // 6f
     "6_4": { rMax: 70, isoLevel: 0.000001 },   // 6g
     "6_5": { rMax: 70, isoLevel: 0.000001 },   // 6h
+    "7_0": { rMax: 90, isoLevel: 0.0000007 },  // 
+    "7_1": { rMax: 90, isoLevel: 0.0000007 },  // 
+    "7_2": { rMax: 90, isoLevel: 0.0000007 },  //
+    "7_3": { rMax: 90, isoLevel: 0.0000007 },  //
+    "7_4": { rMax: 90, isoLevel: 0.0000007 },  //
+    "7_5": { rMax: 90, isoLevel: 0.0000007 },  //
+    "7_6": { rMax: 90, isoLevel: 0.0000007 },  //
+    "8_0": { rMax: 120, isoLevel: 0.0000001 }, // 
+    "8_1": { rMax: 140, isoLevel: 0.0000001 }, // 
+    "8_2": { rMax: 130, isoLevel: 0.0000001 }, //
+    "8_3": { rMax: 140, isoLevel: 0.0000001 }, //
+    "8_4": { rMax: 140, isoLevel: 0.0000001 }, //
+    "8_5": { rMax: 140, isoLevel: 0.0000001 }, //
+    "8_6": { rMax: 140, isoLevel: 0.0000001 }, //
+    "8_7": { rMax: 140, isoLevel: 0.0000001 }, //
+    "9_0": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_1": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_2": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_3": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_4": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_5": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_6": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_7": { rMax: 200, isoLevel: 0.00000001 }, //
+    "9_8": { rMax: 200, isoLevel: 0.00000001 }, //
 };
 
 
@@ -59,13 +83,9 @@ export function getOptimizedParameters(n: number, l: number): { rMax: number; is
     if (params) {
         return { ...params }; // Return a copy
     }
-    // Fallback if specific n_l combination is not found in the map
-    if (n <= 2) return { rMax: 12, isoLevel: 0.005 };
-    if (n === 3) return { rMax: 20, isoLevel: 0.001 };
-    if (n === 4) return { rMax: 35, isoLevel: 0.000004 }; // Aligned with specific 4_x entries
-    if (n === 5) return { rMax: 50, isoLevel: 0.0000025 };// Aligned with specific 5_x entries
-    if (n === 6) return { rMax: 65, isoLevel: 0.000001 }; // Aligned with specific 6_x entries
-    return { rMax: 15 + (n - 1) * 10, isoLevel: 0.001 / Math.pow(n, 3) }; // Generic fallback for n > 6
+    // Per your request, the fallback logic has been removed.
+    // The function now expects the key to be present in optimizedOrbitalParameters.
+    return null; // Explicitly return null if the key is not found.
 }
 
 export function initVisualizer(container: HTMLElement, initialCameraZ: number = 12): VisualizerContext {
