@@ -4,3 +4,4 @@ dist/*
 
 .venv/
 cdk.out/
+__pycache__/
