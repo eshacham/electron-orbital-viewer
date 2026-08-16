@@ -14,10 +14,12 @@ import {
   FormHelperText,
   LinearProgress,
   Slider,
+  Typography,
 } from '@mui/material';
 import { OrbitalParams, RenderMode, ClipAxis, SurfaceStyle } from '@/types/orbital';
-import { computeSamplingRadius } from '../orbital_presets';
+import { computeSamplingRadius, ENCLOSED_FRACTIONS } from '../orbital_presets';
 import { ELEMENTS, elementLabel } from '../elements';
+import { orbitalName } from '../orbital_names';
 
 interface ControlsProps {
   initialN: number;
@@ -30,13 +32,15 @@ interface ControlsProps {
   onZChange: (value: number) => void;
   initialResolution: number;
   onResolutionChange: (value: number) => void;
-  initialIsoLevel: number;
-  onIsoLevelChange: (value: number) => void;
+  initialEnclosedFraction: number;
+  onEnclosedFractionChange: (value: number) => void;
+  /** The density contour the last render actually used, or null before one. */
+  isoLevel: number | null;
   onUpdateOrbital: (params: OrbitalParams) => void;
   onResetView: () => void;
   surfaceStyle: SurfaceStyle;
   onSurfaceStyleChange: (change: Partial<SurfaceStyle>) => void;
-  getIsoLevelFor: (n: number, l: number) => number | null;
+
   isBusy: boolean;
 }
 
@@ -49,73 +53,36 @@ const Controls: React.FC<ControlsProps> = ({
   initialMl, onMlChange,
   initialZ, onZChange,
   initialResolution, onResolutionChange,
-  initialIsoLevel, onIsoLevelChange,
+  initialEnclosedFraction, onEnclosedFractionChange,
+  isoLevel,
   onUpdateOrbital,
   onResetView,
   surfaceStyle,
   onSurfaceStyleChange,
-  getIsoLevelFor,
   isBusy,
 }) => {
   // Local state for dropdown options, derived from props
   const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
   const [mlOptions, setMlOptions] = useState<number[]>([-2, -1, 0, 1, 2]);
 
-  // What the iso-level box is showing while it is being edited. Clamping on
-  // every keystroke made the field impossible to type into: the leading "0" of
-  // "0.0002" is below the minimum, so it was rewritten to 1e-9 mid-entry.
-  const [isoText, setIsoText] = useState<string>(String(initialIsoLevel));
-  const [isoFocused, setIsoFocused] = useState(false);
-
-  useEffect(() => {
-    if (!isoFocused) setIsoText(String(initialIsoLevel));
-  }, [initialIsoLevel, isoFocused]);
-
-  const commitIsoLevel = () => {
-    setIsoFocused(false);
-    const parsed = parseFloat(isoText);
-    if (!Number.isFinite(parsed)) {
-      setIsoText(String(initialIsoLevel));   // reject junk, keep the last good value
-      return;
-    }
-    const clamped = Math.max(ISO_MIN, Math.min(ISO_MAX, parsed));
-    setIsoText(String(clamped));
-    onIsoLevelChange(clamped);
-  };
-
   // Effect to update l options when n changes
   useEffect(() => {
     const newLOptions = Array.from({ length: initialN }, (_, i) => i);
     setLOptions(newLOptions);
-    // If current L is not valid for new N, reset L (and subsequently Ml)
-    // Also, update rMax and isoLevel based on new N (and potentially new L)
+    // If current L is not valid for new N, reset it; ml follows from the l effect.
     if (!newLOptions.includes(initialL)) {
-      const newL = newLOptions[0] !== undefined ? newLOptions[0] : 0;
-      onLChange(newL); // This will trigger the l effect
-      // Ml will be reset by the effect hook for L
-      const isoLevel = getIsoLevelFor(initialN, newL);
-      if (isoLevel !== null) onIsoLevelChange(isoLevel);
-    } else {
-      // N changed, but L is still valid. Update the iso level for current N, L.
-      const isoLevel = getIsoLevelFor(initialN, initialL);
-      if (isoLevel !== null) onIsoLevelChange(isoLevel);
+      onLChange(newLOptions[0] !== undefined ? newLOptions[0] : 0);
     }
-  }, [initialN, getIsoLevelFor, onLChange, onIsoLevelChange]); // initialL is intentionally not here to avoid loops if L is reset
-
+  }, [initialN, onLChange]); // initialL is intentionally not here to avoid loops if L is reset
 
   // Effect to update ml options when l changes
   useEffect(() => {
     const newMlOptions = Array.from({ length: 2 * initialL + 1 }, (_, i) => i - initialL);
     setMlOptions(newMlOptions);
-    // Reset ml if the current ml is no longer valid
     if (!newMlOptions.includes(initialMl)) {
       onMlChange(newMlOptions[0] !== undefined ? newMlOptions[0] : 0);
     }
-    // When L changes, also update the iso level
-    const isoLevel = getIsoLevelFor(initialN, initialL);
-    if (isoLevel !== null) onIsoLevelChange(isoLevel);
-  }, [initialL, initialN, getIsoLevelFor, onMlChange, onIsoLevelChange]); // initialMl is intentionally not here
-
+  }, [initialL, onMlChange]); // initialMl is intentionally not here
 
   const handleUpdateOrbital = () => {
     const params: OrbitalParams = {
@@ -124,10 +91,9 @@ const Controls: React.FC<ControlsProps> = ({
       ml: initialMl,
       Z: initialZ,
       resolution: initialResolution,
-      // Derived, not chosen: the box that holds this orbital at this iso level.
-      // It depends on ml and Z as well as n and l, so it cannot be a preset.
-      rMax: computeSamplingRadius(initialN, initialL, initialMl, initialZ, initialIsoLevel),
-      isoLevel: initialIsoLevel,
+      // Derived, not chosen: the box that holds this orbital.
+      rMax: computeSamplingRadius(initialN, initialL, initialZ),
+      enclosedFraction: initialEnclosedFraction,
     };
     console.log("Update Orbital Clicked with params:", params);
       onUpdateOrbital(params);
@@ -141,6 +107,10 @@ const Controls: React.FC<ControlsProps> = ({
         position: 'relative',
       }}
     >
+      <Typography id="orbital-name" variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
+        {orbitalName(initialN, initialL, initialMl)}
+      </Typography>
+
       <FormControl fullWidth margin="normal" size="small" >
         <InputLabel id="n-select-label">Principal (n)</InputLabel>
         <Select
@@ -182,37 +152,30 @@ const Controls: React.FC<ControlsProps> = ({
         </Select>
       </FormControl>
 
-      <TextField
-        fullWidth
-        margin="normal"
-        size="small"
-        id="iso-level-input"
-        label="Iso-Level"
-        type="number"
-        value={isoText}
-        helperText={`${ISO_MIN} to ${ISO_MAX}`}
-        onFocus={() => setIsoFocused(true)}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIsoText(e.target.value)}
-        onBlur={commitIsoLevel}
-        onKeyDown={(e: React.KeyboardEvent) => {
-          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-        }}
-        slotProps={{
-          input: {
-            inputProps: { min: String(ISO_MIN), max: String(ISO_MAX), step: "any" }
-          }
-        }}
-        InputLabelProps={{ shrink: true }}
-        sx={{
-          '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': {
-            WebkitAppearance: 'none',
-            margin: 0,
-          },
-          '& input[type=number]': {
-            MozAppearance: 'textfield',
-          },
-        }}
-      />
+      {/* A raw density threshold is not comparable between orbitals; the share
+          of the electron enclosed is. The density that achieves it is derived
+          per orbital and reported back below. */}
+      <FormControl fullWidth margin="normal" size="small">
+        <InputLabel id="enclosed-select-label">Electron enclosed</InputLabel>
+        <Select
+          labelId="enclosed-select-label"
+          id="enclosed-select"
+          value={initialEnclosedFraction.toString()}
+          label="Electron enclosed"
+          onChange={(e: SelectChangeEvent<string>) => onEnclosedFractionChange(parseFloat(e.target.value))}
+        >
+          {ENCLOSED_FRACTIONS.map(fraction => (
+            <MenuItem key={fraction} value={fraction.toString()}>
+              {Math.round(fraction * 100)}%
+            </MenuItem>
+          ))}
+        </Select>
+        <FormHelperText>
+          {isoLevel === null
+            ? 'contour of constant |ψ|²'
+            : `|ψ|² = ${isoLevel.toExponential(2)}`}
+        </FormHelperText>
+      </FormControl>
 
       {/* The model is hydrogen-like: one electron bound to a charge-Z nucleus.
           The element names the nucleus; it is not a neutral atom's orbitals. */}

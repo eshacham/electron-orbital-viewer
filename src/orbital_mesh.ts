@@ -1,6 +1,7 @@
 import { DensityMap, MeshData, OrbitalParams } from './types/orbital';
 import { makeWaveFunctionEvaluator } from './quantum_functions';
 import { marchingCubes } from './marching_cubes';
+import { isoLevelForEnclosedFraction } from './radial_distribution';
 
 /**
  * Packs the sampled wave function into one byte per grid point.
@@ -43,19 +44,24 @@ export function encodeDensityMap(psi: Float32Array, isoLevel: number): Uint8Arra
 /**
  * Builds the isosurface mesh for an orbital.
  *
- * The field is |psi|^2 - isoLevel sampled on a regular grid over
- * [-rMax, rMax]^3. Each grid point is evaluated exactly once; the samples are
- * kept and handed back as a density map, so the cut-away face can be shaded
- * without evaluating the wave function a second time.
+ * psi is sampled once per point of a regular grid over [-rMax, rMax]^3. The
+ * contour to draw is then chosen from those samples: `enclosedFraction` says how
+ * much of the electron the surface should hold, and the density threshold that
+ * achieves it falls out of the sampled distribution. The samples are kept and
+ * handed back as a density map, so the cut-away face can be shaded without
+ * evaluating the wave function a second time.
  */
 export function generateOrbitalMesh(params: OrbitalParams): MeshData {
-    const { n, l, ml, Z, resolution, rMax, isoLevel } = params;
+    const { n, l, ml, Z, resolution, rMax, enclosedFraction } = params;
 
-    if (resolution <= 0 || rMax <= 0 || isoLevel <= 0) {
-        throw new Error('Invalid parameters: resolution, rMax, and isoLevel must be positive');
+    if (resolution <= 0 || rMax <= 0) {
+        throw new Error('Invalid parameters: resolution and rMax must be positive');
     }
     if (!Number.isInteger(resolution)) {
         throw new Error('Invalid parameters: resolution must be a whole number');
+    }
+    if (!(enclosedFraction > 0) || enclosedFraction >= 1) {
+        throw new Error('Invalid parameters: enclosedFraction must be between 0 and 1');
     }
 
     const evaluatePsi = makeWaveFunctionEvaluator(n, l, ml, Z);
@@ -65,9 +71,6 @@ export function generateOrbitalMesh(params: OrbitalParams): MeshData {
     const origin = -rMax;
 
     const samples = new Float32Array(side * side * side);
-    // Meshing needs float64: near the surface |psi|^2 and isoLevel are within a
-    // rounding error of each other, and their difference decides the sign.
-    const field = new Float64Array(side * side * side);
 
     let index = 0;
     for (let i = 0; i < side; i++) {
@@ -75,18 +78,27 @@ export function generateOrbitalMesh(params: OrbitalParams): MeshData {
         for (let j = 0; j < side; j++) {
             const y = origin + j * step;
             for (let k = 0; k < side; k++) {
-                const psi = evaluatePsi(x, y, origin + k * step);
-                samples[index] = psi;
-                field[index] = psi * psi - isoLevel;
-                index++;
+                samples[index++] = evaluatePsi(x, y, origin + k * step);
             }
         }
+    }
+
+    const isoLevel = isoLevelForEnclosedFraction(samples, enclosedFraction);
+    if (!(isoLevel > 0)) {
+        throw new Error('No isosurface for this orbital');
+    }
+
+    // Meshing needs float64: near the surface |psi|^2 and isoLevel are within a
+    // rounding error of each other, and their difference decides the sign.
+    const field = new Float64Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+        field[i] = samples[i] * samples[i] - isoLevel;
     }
 
     const mesh = marchingCubes(resolution, field, origin, step);
 
     if (!mesh.positions.length || !mesh.cells.length) {
-        throw new Error('No isosurface at this iso-level — try a smaller value');
+        throw new Error('No isosurface for this orbital');
     }
 
     // Sign of psi at the vertex itself. Taking it from the nearest grid sample
@@ -100,5 +112,5 @@ export function generateOrbitalMesh(params: OrbitalParams): MeshData {
         rMax,
     };
 
-    return { positions: mesh.positions, cells: mesh.cells, psiSigns, densityMap };
+    return { positions: mesh.positions, cells: mesh.cells, psiSigns, densityMap, isoLevel };
 }

@@ -17,8 +17,11 @@ actually is.
 - **Both phases of ψ**, so nodal surfaces are where the colours meet.
 - **A nucleus of charge Z** from hydrogen to oganesson. This is a *hydrogen-like*
   ion, not a neutral atom — see [Limitations](#limitations).
-- **The iso level**, the density contour the surface is drawn at. Lowering it
-  grows the surface outward; raising it shrinks it toward the densest core.
+- **How much of the electron the surface encloses** — 50 %, 75 %, 90 %, 95 % or
+  99 %. The density contour that achieves it is derived per orbital and reported
+  beneath the control, so "90 %" means the same thing for a 1s as for a 9f.
+- **The orbital's name** — `3d_z²`, `4f_xyz` — rather than leaving you to decode
+  three quantum numbers.
 
 And to look inside:
 
@@ -31,6 +34,9 @@ And to look inside:
 - **A scale bar in Bohr radii.** The camera frames every orbital to fill the
   view, so without this a carbon 3d looks exactly like a hydrogen 3d despite
   being six times smaller.
+- **The radial distribution**, P(r) = r²R(r)², plotted beside the view. Its peaks
+  are the shells — n − l of them, countable — and its zeros are the radial nodes,
+  which is what the concentric structure in a cut-open orbital actually is.
 
 ---
 
@@ -42,20 +48,26 @@ Everything that depends only on (n, l, mₗ, Z) — normalisation constants, the
 Laguerre coefficients — is computed once per orbital rather than per sample.
 
 **2. Sizing the box.** The sampling box has to contain the whole isosurface or
-the orbital comes out sliced flat against the wall. Since |ψ|² factors into a
-radial and an angular part, the outermost point of the surface is the largest r
-where R(r)² times the angular peak still reaches the iso level. That is computed
-per orbital, so the box tracks mₗ, Z and the iso level rather than being a fixed
-table.
+the orbital comes out sliced flat against the wall. It is sized from the radial
+distribution — the radius holding all but a ten-thousandth of the electron, which
+bounds the orbital in every direction and needs no contour to be chosen first.
+That ordering matters, because the contour is derived from the samples taken
+inside this box; sizing the box from the contour and the contour from the box
+would be circular.
 
 **3. Sampling.** ψ is evaluated once at every point of a regular grid over
 [−rMax, rMax]³ — 33³, 65³ or 129³ points for low, medium and high — inside a Web
 Worker, so the UI stays live.
 
-**4. Meshing.** Marching cubes over |ψ|² − isoLevel in float64, sharing vertices
+**4. Choosing the contour.** The requested share of the electron is turned into a
+density threshold by binning the samples by log density and walking down from the
+densest bin until the accumulated density reaches the target. Sorting two million
+samples would cost more than the render; binning is a single pass.
+
+**5. Meshing.** Marching cubes over |ψ|² − isoLevel in float64, sharing vertices
 between neighbouring cells. The result is an indexed, watertight mesh.
 
-**5. Rendering.** three.js. Vertex colours carry sign(ψ). The cut-away is a real
+**6. Rendering.** three.js. Vertex colours carry sign(ψ). The cut-away is a real
 clipping plane, capped with the usual stencil trick — back faces increment the
 stencil, front faces decrement it, and a quad is drawn wherever the count is
 non-zero. That quad reads the sampled wave function back out of a 3D texture, on
@@ -102,18 +114,15 @@ outside what this computes.
 high Z, where relativistic effects genuinely matter, the shapes shown are
 increasingly a fiction.
 
-**The iso level is a raw density, not a percentage.** It is a threshold on |ψ|²
-in atomic units, so surfaces at the same iso level for different orbitals do not
-enclose the same fraction of the electron. A "90 % of the electron is inside
-this surface" contour would be more meaningful and is not implemented.
-
-**Nothing is named.** The viewer shows the numbers you chose, not "3d_z²". You
-have to know what (3, 2, 0) looks like to notice when it looks wrong.
+**The enclosed fraction is of the sampled box.** The box holds all but a
+ten-thousandth of the electron, so "90 %" is 90 % to within that — not of an
+exact infinite integral. The threshold is also quantised by the grid it is
+derived from.
 
 **Resolution is finite.** The voxel is 2·rMax / resolution, so a wide box at a
 high n leaves the fine radial structure under-resolved, and marching cubes
-rounds off sharp features. The sampling radius is also capped, which a very low
-iso level on a high n can hit — in that case the surface will touch the box.
+rounds off sharp features. The sampling radius is also capped, which the widest
+orbitals could in principle hit — in that case the surface would touch the box.
 
 **One cut plane, axis-aligned.** No arbitrary orientation, no multiple planes.
 
@@ -126,7 +135,7 @@ iso level on a high n can hit — in that case the surface will touch the box.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 722 tests
+npm test           # 1065 tests
 npm run build      # production bundle into dist/
 ```
 
@@ -146,12 +155,14 @@ account. The Python side pins its own dependencies in `infra/requirements.txt`.
 | Path | What it is |
 | --- | --- |
 | `src/quantum_functions.ts` | The physics: radial functions, Legendre, real spherical harmonics, and a fast per-orbital evaluator |
-| `src/orbital_presets.ts` | Iso level per (n, l), and the derived sampling radius |
+| `src/orbital_presets.ts` | The enclosed-fraction options and the derived sampling radius |
 | `src/orbital_mesh.ts` | Samples the grid and produces the mesh plus the density map |
 | `src/marching_cubes.ts` | The isosurface algorithm |
 | `src/orbital_visualizer.ts` | three.js scene, camera framing, worker lifecycle |
 | `src/clip_caps.ts` | Stencil-capped cut faces and their density shader |
 | `src/orbital_material.ts` | Surface material: solid/wireframe, opacity, clipping |
+| `src/radial_distribution.ts` | P(r) = r²R(r)², the box-sizing radius, and the contour for a given enclosed fraction |
+| `src/orbital_names.ts` | Spectroscopic names for the real orbitals |
 | `src/scale_bar.ts` | Bohr-radius scale readout |
 | `src/components/` | React controls and the viewer host |
 | `src/workers/` | The off-thread calculation |

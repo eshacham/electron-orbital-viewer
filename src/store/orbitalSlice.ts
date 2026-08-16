@@ -9,6 +9,8 @@ interface OrbitalState {
   viewResetNonce: number;
   /** View-only: none of this re-runs the calculation. */
   surfaceStyle: SurfaceStyle;
+  /** The contour the last render settled on, derived from the enclosed fraction. */
+  isoLevel: number | null;
 }
 
 const initialState: OrbitalState = {
@@ -16,7 +18,8 @@ const initialState: OrbitalState = {
   isLoading: false,
   error: null,
   viewResetNonce: 0,
-  surfaceStyle: { ...defaultSurfaceStyle }
+  surfaceStyle: { ...defaultSurfaceStyle },
+  isoLevel: null
 };
 
 const orbitalSlice = createSlice({
@@ -28,9 +31,10 @@ const orbitalSlice = createSlice({
       state.error = null;
       state.currentParams = action.payload;
     },
-    finishOrbitalCalculation: (state) => {
+    finishOrbitalCalculation: (state, action: PayloadAction<{ isoLevel: number }>) => {
       state.isLoading = false;
       state.error = null;
+      state.isoLevel = action.payload.isoLevel;
     },
     failOrbitalCalculation: (state, action: PayloadAction<string>) => {
       state.isLoading = false;

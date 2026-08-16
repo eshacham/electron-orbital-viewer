@@ -14,7 +14,7 @@ import {
 
 
 interface OrbitalViewerProps {
-    onOrbitalRendered?: () => void;
+    onOrbitalRendered?: (isoLevel: number) => void;
     onOrbitalFailed?: (message: string) => void;
 }
 
@@ -52,9 +52,9 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             .then(outcome => {
                 // A superseded request's result was thrown away; the newer one
                 // still in flight is what will report completion.
-                if (outcome === 'superseded') return;
+                if (outcome.status === 'superseded') return;
                 console.log('OrbitalViewer: Orbital update complete');
-                onOrbitalRendered?.();
+                onOrbitalRendered?.(outcome.isoLevel);
             })
             .catch(error => {
                 console.error('OrbitalViewer: Error updating orbital', error);

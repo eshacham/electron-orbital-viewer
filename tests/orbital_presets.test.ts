@@ -1,7 +1,8 @@
 import {
-    getIsoLevel,
     computeSamplingRadius,
     MAX_SAMPLING_RADIUS,
+    DEFAULT_ENCLOSED_FRACTION,
+    ENCLOSED_FRACTIONS,
 } from '../src/orbital_presets';
 import { generateOrbitalMesh } from '../src/orbital_mesh';
 import { OrbitalParams } from '../src/types/orbital';
@@ -21,23 +22,25 @@ for (let n = 1; n <= MAX_N; n++) {
 const touchesBoxWall = (positions: number[][], rMax: number) =>
     positions.some(p => p.some(c => Math.abs(Math.abs(c) - rMax) < 1e-9));
 
-const meshFor = (n: number, l: number, ml: number, Z = 1, resolution = 32) => {
-    const isoLevel = getIsoLevel(n, l)!;
-    const rMax = computeSamplingRadius(n, l, ml, Z, isoLevel);
-    const params: OrbitalParams = { n, l, ml, Z, resolution, rMax, isoLevel };
+const meshFor = (
+    n: number, l: number, ml: number,
+    Z = 1, resolution = 32, enclosedFraction = DEFAULT_ENCLOSED_FRACTION
+) => {
+    const rMax = computeSamplingRadius(n, l, Z);
+    const params: OrbitalParams = { n, l, ml, Z, resolution, rMax, enclosedFraction };
     return { mesh: generateOrbitalMesh(params), rMax };
 };
 
 const extentOf = (positions: number[][]) =>
     Math.max(...positions.map(p => Math.hypot(p[0], p[1], p[2])));
 
-describe('iso levels', () => {
-    it('covers every (n, l) up to n=9', () => {
-        for (let n = 1; n <= MAX_N; n++) {
-            for (let l = 0; l < n; l++) {
-                expect(getIsoLevel(n, l)).toBeGreaterThan(0);
-            }
+describe('enclosed fraction options', () => {
+    it('offers only fractions strictly inside 0 and 1', () => {
+        for (const fraction of ENCLOSED_FRACTIONS) {
+            expect(fraction).toBeGreaterThan(0);
+            expect(fraction).toBeLessThan(1);
         }
+        expect(ENCLOSED_FRACTIONS).toContain(DEFAULT_ENCLOSED_FRACTION);
     });
 });
 
@@ -51,19 +54,22 @@ describe('computeSamplingRadius', () => {
         expect(touchesBoxWall(mesh.positions, rMax)).toBe(false);
     });
 
+    // ...including at the loosest contour offered, which reaches furthest out.
+    it.each(everyOrbital)('still encloses it at 99%% for %s', (_name, n, l, ml) => {
+        const { mesh, rMax } = meshFor(n, l, ml, 1, 32, 0.99);
+        expect(touchesBoxWall(mesh.positions, rMax)).toBe(false);
+    });
+
     // A box far larger than the orbital wastes resolution: the voxel is
     // 2 * rMax / resolution, so an oversized box blurs the radial shells.
     it.each(everyOrbital)('does not oversize the box for %s', (_name, n, l, ml) => {
         const { mesh, rMax } = meshFor(n, l, ml);
-        expect(rMax).toBeLessThan(extentOf(mesh.positions) * 1.6);
+        expect(rMax).toBeLessThan(extentOf(mesh.positions) * 4);
     });
 
-    // A table keyed on (n, l) cannot express this: a heavier nucleus pulls the
-    // orbital in as 1/Z, and a box sized for hydrogen leaves it a speck.
     it('shrinks with Z roughly as 1/Z', () => {
-        const iso = getIsoLevel(3, 2)!;
-        const hydrogen = computeSamplingRadius(3, 2, 0, 1, iso);
-        const helium = computeSamplingRadius(3, 2, 0, 2, iso);
+        const hydrogen = computeSamplingRadius(3, 2, 1);
+        const helium = computeSamplingRadius(3, 2, 2);
 
         expect(helium).toBeLessThan(hydrogen);
         expect(helium).toBeGreaterThan(hydrogen / 3);
@@ -73,30 +79,40 @@ describe('computeSamplingRadius', () => {
         for (const Z of [2, 6, 26]) {
             const { mesh, rMax } = meshFor(1, 0, 0, Z);
             expect(touchesBoxWall(mesh.positions, rMax)).toBe(false);
-            // ...and does not park a tiny orbital in an enormous box.
-            expect(rMax).toBeLessThan(extentOf(mesh.positions) * 1.6);
+            expect(rMax).toBeLessThan(extentOf(mesh.positions) * 4);
         }
     });
 
-    // The iso level decides how much of the tail is drawn, so the box has to
-    // follow it rather than being fixed per (n, l).
-    it('widens as the iso level drops', () => {
-        const tight = computeSamplingRadius(3, 2, 0, 1, 1e-4);
-        const loose = computeSamplingRadius(3, 2, 0, 1, 1e-8);
-        expect(loose).toBeGreaterThan(tight);
-    });
-
-    it('tracks ml, whose lobes reach different distances', () => {
-        const iso = getIsoLevel(7, 3)!;
-        const radii = [-3, -2, -1, 0, 1, 2, 3].map(ml => computeSamplingRadius(7, 3, ml, 1, iso));
-        expect(new Set(radii).size).toBeGreaterThan(1);
-    });
-
     it('never exceeds the point where a box stops resolving anything', () => {
-        for (const [, n, l, ml] of everyOrbital) {
-            const radius = computeSamplingRadius(n, l, ml, 1, getIsoLevel(n, l)!);
+        for (const [, n, l] of everyOrbital) {
+            const radius = computeSamplingRadius(n, l, 1);
             expect(radius).toBeGreaterThan(0);
             expect(radius).toBeLessThanOrEqual(MAX_SAMPLING_RADIUS);
+        }
+    });
+});
+
+describe('enclosed fraction drives the surface', () => {
+    it('grows the surface as more of the electron is asked for', () => {
+        const tight = meshFor(3, 2, 0, 1, 32, 0.5);
+        const loose = meshFor(3, 2, 0, 1, 32, 0.99);
+
+        // Same box, lower contour, so the surface reaches further out.
+        expect(loose.mesh.isoLevel).toBeLessThan(tight.mesh.isoLevel);
+        expect(extentOf(loose.mesh.positions)).toBeGreaterThan(extentOf(tight.mesh.positions));
+    });
+
+    it('reports the contour it settled on', () => {
+        const { mesh } = meshFor(2, 1, 0);
+        expect(mesh.isoLevel).toBeGreaterThan(0);
+    });
+
+    it('rejects a fraction outside 0 to 1', () => {
+        const rMax = computeSamplingRadius(2, 1, 1);
+        for (const enclosedFraction of [0, 1, 1.5, -0.2]) {
+            expect(() => generateOrbitalMesh({
+                n: 2, l: 1, ml: 0, Z: 1, resolution: 16, rMax, enclosedFraction,
+            })).toThrow(/enclosedFraction/);
         }
     });
 });

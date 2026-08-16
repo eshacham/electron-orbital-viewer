@@ -31,7 +31,14 @@ export interface OrbitalParams {
     Z: number;
     resolution: number;
     rMax: number;
-    isoLevel: number;
+    /**
+     * Which contour to draw, as the share of the electron it encloses.
+     *
+     * A raw density threshold says nothing about how much of the electron you
+     * are looking at, and the same number means different things for different
+     * orbitals. The density is derived from this per orbital instead.
+     */
+    enclosedFraction: number;
 }
 
 export type OrbitalDataPoint = {
@@ -63,4 +70,6 @@ export interface MeshData {
     cells: number[][];
     psiSigns: number[]; // Include ψ signs in the mesh data
     densityMap: DensityMap;
+    /** The density contour actually used, derived from `enclosedFraction`. */
+    isoLevel: number;
 }

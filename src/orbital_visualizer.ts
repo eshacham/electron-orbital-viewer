@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
-import { getIsoLevel, computeSamplingRadius } from './orbital_presets';
+import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius } from './orbital_presets';
 import { createOrbitalMaterial, applySurfaceStyle, updateClipPlane } from './orbital_material';
 import { createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCaps } from './clip_caps';
 import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
@@ -206,14 +206,16 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
  * Result of a render request. A request is superseded when a newer one starts
  * before it finishes: its mesh is discarded rather than drawn.
  */
-export type RenderOutcome = 'rendered' | 'superseded';
+export type RenderOutcome =
+    | { status: 'rendered'; isoLevel: number }
+    | { status: 'superseded' };
 
 export async function updateOrbitalInScene(
     context: VisualizerContext | null,
     params: OrbitalParams,
     showAxes: boolean = true
 ): Promise<RenderOutcome> {
-    if (!context) return 'superseded';
+    if (!context) return { status: 'superseded' };
 
     // Stop whatever is still running. Each request spawns its own worker, so
     // without this a slower earlier calculation could return after a faster
@@ -230,16 +232,14 @@ export async function updateOrbitalInScene(
         context.activeWorker = worker;
 
         // Fall back to the defaults if anything arrived unusable.
-        let workerIsoLevel = params.isoLevel;
-        if (isNaN(workerIsoLevel) || workerIsoLevel <= 0) {
-            workerIsoLevel = getIsoLevel(params.n, params.l) ?? 1e-5;
+        let workerFraction = params.enclosedFraction;
+        if (isNaN(workerFraction) || workerFraction <= 0 || workerFraction >= 1) {
+            workerFraction = DEFAULT_ENCLOSED_FRACTION;
         }
 
         let workerRMax = params.rMax;
         if (isNaN(workerRMax) || workerRMax <= 0) {
-            workerRMax = computeSamplingRadius(
-                params.n, params.l, params.ml, params.Z, workerIsoLevel
-            );
+            workerRMax = computeSamplingRadius(params.n, params.l, params.Z);
         }
 
         // Update or remove axes helper based on showAxes and the rMax to be used
@@ -276,14 +276,14 @@ export async function updateOrbitalInScene(
         worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
             if (superseded()) {
                 cleanup();
-                resolve('superseded');
+                resolve({ status: 'superseded' });
                 return;
             }
             try {
                 if (e.data.type === 'success') {
                     console.log('Visualizer: Received mesh data from worker');
                     updateSceneWithMeshData(context, e.data.meshData, params);
-                    resolve('rendered');
+                    resolve({ status: 'rendered', isoLevel: e.data.meshData.isoLevel });
                 } else {
                     console.error('Visualizer: Worker error:', e.data.message);
                     reject(new Error(e.data.message));
@@ -299,7 +299,7 @@ export async function updateOrbitalInScene(
         worker.onerror = (error) => {
             cleanup();
             if (superseded()) {
-                resolve('superseded');
+                resolve({ status: 'superseded' });
                 return;
             }
             console.error('Visualizer: Worker error:', error);
@@ -311,7 +311,7 @@ export async function updateOrbitalInScene(
             type: 'calculate',
             // Send original params for n, l, ml, Z, resolution
             // but use the sanitized/defaulted rMax and isoLevel
-            params: { ...params, rMax: workerRMax, isoLevel: workerIsoLevel }
+            params: { ...params, rMax: workerRMax, enclosedFraction: workerFraction }
         });
     });
 }

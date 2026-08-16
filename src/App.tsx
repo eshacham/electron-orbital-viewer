@@ -18,7 +18,8 @@ import {
 } from './store/orbitalSlice';
 import Controls from './components/Controls';
 import OrbitalViewer from './components/OrbitalViewer';
-import { getIsoLevel, computeSamplingRadius } from './orbital_presets';
+import RadialPlot from './components/RadialPlot';
+import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 
@@ -27,7 +28,7 @@ const BUSY_INDICATOR_DELAY_MS = 400;
 
 const defaultN = 3;
 const defaultL = 2;
-const defaultIsoLevel = getIsoLevel(defaultN, defaultL)!;
+
 
 const theme = createTheme({
   palette: {
@@ -38,7 +39,10 @@ const theme = createTheme({
 
 function App() {
     const dispatch = useAppDispatch();
-    const { isLoading, error, surfaceStyle } = useAppSelector(state => state.orbital);
+    const { isLoading, error, surfaceStyle, isoLevel } = useAppSelector(state => state.orbital);
+    // The plot describes what is on screen, so it follows the rendered orbital
+    // rather than the pending selection in the panel.
+    const renderedParams = useAppSelector(state => state.orbital.currentParams);
 
     // Keep individual control values as local state
     const [n, setN] = useState<number>(defaultN);
@@ -46,7 +50,7 @@ function App() {
     const [ml, setMl] = useState<number>(0);
     const [Z, setZ] = useState<number>(1);
     const [resolution, setResolution] = useState<number>(64);
-    const [isoLevel, setIsoLevel] = useState<number>(defaultIsoLevel);
+    const [enclosedFraction, setEnclosedFraction] = useState<number>(DEFAULT_ENCLOSED_FRACTION);
 
     const isInitializedRef = useRef(false);
 
@@ -55,9 +59,9 @@ function App() {
         dispatch(startOrbitalCalculation(newParams));
     }, [dispatch]);
 
-    const handleOrbitalRendered = useCallback(() => {
+    const handleOrbitalRendered = useCallback((isoLevel: number) => {
         console.log('App.tsx: Orbital rendered callback');
-        dispatch(finishOrbitalCalculation());
+        dispatch(finishOrbitalCalculation({ isoLevel }));
     }, [dispatch]);
 
     const handleOrbitalFailed = useCallback((message: string) => {
@@ -88,8 +92,8 @@ function App() {
                 ml: 0,
                 Z: 1,
                 resolution: 32,
-                rMax: computeSamplingRadius(defaultN, defaultL, 0, 1, defaultIsoLevel),
-                isoLevel: defaultIsoLevel,
+                rMax: computeSamplingRadius(defaultN, defaultL, 1),
+                enclosedFraction: DEFAULT_ENCLOSED_FRACTION,
             };
             handleOrbitalParamsChange(initialParams);
         }
@@ -123,15 +127,23 @@ function App() {
                     onZChange={setZ}
                     initialResolution={resolution}
                     onResolutionChange={setResolution}
-                    initialIsoLevel={isoLevel}
-                    onIsoLevelChange={setIsoLevel}
+                    initialEnclosedFraction={enclosedFraction}
+                    onEnclosedFractionChange={setEnclosedFraction}
+                    isoLevel={isoLevel}
                     onUpdateOrbital={handleOrbitalParamsChange}
                     onResetView={handleResetView}
                     surfaceStyle={surfaceStyle}
                     onSurfaceStyleChange={handleSurfaceStyleChange}
-                    getIsoLevelFor={getIsoLevel}
                     isBusy={showBusy}
                 />
+                {renderedParams && (
+                    <RadialPlot
+                        n={renderedParams.n}
+                        l={renderedParams.l}
+                        Z={renderedParams.Z}
+                        rMax={renderedParams.rMax}
+                    />
+                )}
                 <Snackbar
                     open={Boolean(error)}
                     onClose={() => dispatch(dismissOrbitalError())}

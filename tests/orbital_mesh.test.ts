@@ -1,5 +1,6 @@
 import { generateOrbitalMesh } from '../src/orbital_mesh';
 import { makeWaveFunctionEvaluator } from '../src/quantum_functions';
+import { computeSamplingRadius } from '../src/orbital_presets';
 import { MeshData, OrbitalParams } from '../src/types/orbital';
 
 /**
@@ -54,7 +55,7 @@ function topology(mesh: MeshData, rMax: number) {
 }
 
 const orbital = (over: Partial<OrbitalParams>): OrbitalParams => ({
-    n: 3, l: 2, ml: 0, Z: 1, resolution: 32, rMax: 20, isoLevel: 1e-5, ...over,
+    n: 3, l: 2, ml: 0, Z: 1, resolution: 32, rMax: 20, enclosedFraction: 0.9, ...over,
 });
 
 describe('generateOrbitalMesh', () => {
@@ -62,9 +63,9 @@ describe('generateOrbitalMesh', () => {
     const cases: Array<[string, OrbitalParams]> = [
         ['3d  (n=3 l=2 ml=0) @32', orbital({ resolution: 32 })],
         ['3d  (n=3 l=2 ml=0) @64', orbital({ resolution: 64 })],
-        ['7f  (n=7 l=3 ml=0) @64', orbital({ n: 7, l: 3, ml: 0, resolution: 64, rMax: 90, isoLevel: 7e-7 })],
-        ['9   (n=9 l=8 ml=8) @64', orbital({ n: 9, l: 8, ml: 8, resolution: 64, rMax: 200, isoLevel: 1e-8 })],
-        ['1s  (n=1 l=0 ml=0) @64', orbital({ n: 1, l: 0, ml: 0, resolution: 64, rMax: 10, isoLevel: 1e-3 })],
+        ['7f  (n=7 l=3 ml=0) @64', orbital({ n: 7, l: 3, ml: 0, resolution: 64, rMax: 90, enclosedFraction: 0.9 })],
+        ['9   (n=9 l=8 ml=8) @64', orbital({ n: 9, l: 8, ml: 8, resolution: 64, rMax: 200, enclosedFraction: 0.9 })],
+        ['1s  (n=1 l=0 ml=0) @64', orbital({ n: 1, l: 0, ml: 0, resolution: 64, rMax: 10, enclosedFraction: 0.9 })],
     ];
 
     it.each(cases)('produces a crack-free surface for %s', (_name, params) => {
@@ -79,7 +80,7 @@ describe('generateOrbitalMesh', () => {
 
     it('closes completely when the box is large enough to contain the orbital', () => {
         // 7f at the app's preset rMax=90 is truncated by the box; at 120 it fits.
-        const params = orbital({ n: 7, l: 3, ml: 0, resolution: 64, rMax: 120, isoLevel: 7e-7 });
+        const params = orbital({ n: 7, l: 3, ml: 0, resolution: 64, rMax: 120, enclosedFraction: 0.9 });
         const t = topology(generateOrbitalMesh(params), params.rMax);
 
         expect(t.cracks).toBe(0);
@@ -92,14 +93,26 @@ describe('generateOrbitalMesh', () => {
         expect(new Set(mesh.psiSigns)).toEqual(new Set([1, -1]));
     });
 
-    it('reports a usable error when no isosurface exists at the given level', () => {
-        expect(() => generateOrbitalMesh(orbital({ isoLevel: 1e-3 })))
-            .toThrow(/no isosurface/i);
+    // Asking for a contour by the share of the electron it encloses cannot fail
+    // the way a raw density could: there is always a threshold holding 90% of
+    // the field, whatever the orbital. The old "no isosurface at this iso-level"
+    // case is unreachable by construction now.
+    it('always finds a contour, whatever the orbital', () => {
+        for (const [n, l, ml] of [[1, 0, 0], [9, 8, 8], [7, 0, 0]] as number[][]) {
+            const mesh = generateOrbitalMesh(orbital({
+                n, l, ml, rMax: computeSamplingRadius(n, l, 1), resolution: 24,
+            }));
+            expect(mesh.isoLevel).toBeGreaterThan(0);
+            expect(mesh.cells.length).toBeGreaterThan(0);
+        }
     });
 
-    it('rejects non-positive parameters', () => {
+    it('rejects unusable parameters', () => {
         expect(() => generateOrbitalMesh(orbital({ rMax: 0 }))).toThrow(/must be positive/);
-        expect(() => generateOrbitalMesh(orbital({ isoLevel: 0 }))).toThrow(/must be positive/);
+        expect(() => generateOrbitalMesh(orbital({ resolution: 0 }))).toThrow(/must be positive/);
+        expect(() => generateOrbitalMesh(orbital({ resolution: 33.5 }))).toThrow(/whole number/);
+        expect(() => generateOrbitalMesh(orbital({ enclosedFraction: 0 }))).toThrow(/enclosedFraction/);
+        expect(() => generateOrbitalMesh(orbital({ enclosedFraction: 1 }))).toThrow(/enclosedFraction/);
     });
 });
 
@@ -107,9 +120,9 @@ describe('psi sign per vertex', () => {
     // The sign carried from the inside grid sample must match psi evaluated
     // directly at the vertex, which is what the colouring used to do.
     it.each([
-        ['2pz', { n: 2, l: 1, ml: 0, Z: 1, resolution: 32, rMax: 15, isoLevel: 5e-4 }],
-        ['3dz2', { n: 3, l: 2, ml: 0, Z: 1, resolution: 32, rMax: 20, isoLevel: 1e-5 }],
-        ['4f', { n: 4, l: 3, ml: 2, Z: 1, resolution: 32, rMax: 35, isoLevel: 4e-6 }],
+        ['2pz', { n: 2, l: 1, ml: 0, Z: 1, resolution: 32, rMax: 15, enclosedFraction: 0.9 }],
+        ['3dz2', { n: 3, l: 2, ml: 0, Z: 1, resolution: 32, rMax: 20, enclosedFraction: 0.9 }],
+        ['4f', { n: 4, l: 3, ml: 2, Z: 1, resolution: 32, rMax: 35, enclosedFraction: 0.9 }],
     ] as Array<[string, OrbitalParams]>)('agrees with psi at the vertex for %s', (_n, params) => {
         const mesh = generateOrbitalMesh(params);
         const psi = makeWaveFunctionEvaluator(params.n, params.l, params.ml, params.Z);
@@ -123,7 +136,7 @@ describe('psi sign per vertex', () => {
     });
 
     it('puts positive psi on +z for 2pz', () => {
-        const params: OrbitalParams = { n: 2, l: 1, ml: 0, Z: 1, resolution: 32, rMax: 15, isoLevel: 5e-4 };
+        const params: OrbitalParams = { n: 2, l: 1, ml: 0, Z: 1, resolution: 32, rMax: 15, enclosedFraction: 0.9 };
         const mesh = generateOrbitalMesh(params);
         const topmost = mesh.positions.reduce((best, p, i) =>
             p[2] > mesh.positions[best][2] ? i : best, 0);

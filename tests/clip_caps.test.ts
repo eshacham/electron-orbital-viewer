@@ -11,7 +11,7 @@ import { encodeDensityMap, generateOrbitalMesh } from '../src/orbital_mesh';
 import { DensityMap, OrbitalParams } from '../src/types/orbital';
 
 const params: OrbitalParams = {
-    n: 2, l: 1, ml: 0, Z: 1, resolution: 16, rMax: 15, isoLevel: 5e-4,
+    n: 2, l: 1, ml: 0, Z: 1, resolution: 16, rMax: 15, enclosedFraction: 0.9,
 };
 
 const build = () => {

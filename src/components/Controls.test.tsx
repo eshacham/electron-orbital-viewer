@@ -17,13 +17,13 @@ describe('Controls', () => {
         onZChange={() => {}}
         initialResolution={32}
         onResolutionChange={() => {}}
-        initialIsoLevel={0.005}
-        onIsoLevelChange={() => {}}
+        initialEnclosedFraction={0.9}
+        onEnclosedFractionChange={() => {}}
+        isoLevel={1e-5}
         onUpdateOrbital={() => {}}
         onResetView={() => {}}
         surfaceStyle={{ mode: 'solid', opacity: 1, clipAxis: 'none', clipPosition: 0 }}
         onSurfaceStyleChange={() => {}}
-        getIsoLevelFor={() => 0.005}
         isBusy={false}
       />
     );

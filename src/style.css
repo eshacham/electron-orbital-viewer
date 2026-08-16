@@ -132,3 +132,46 @@ button:hover {
 .scale-readout-label {
   font-variant-numeric: tabular-nums;
 }
+
+/* Radial distribution plot: where the electron is as a function of distance.
+   Stacked above the scale readout on the right, clear of the control panel —
+   the panel is tall enough to reach the bottom-left corner. */
+.radial-plot {
+  position: absolute;
+  right: 20px;
+  bottom: 84px;
+  z-index: 10;
+  padding: 8px 10px 6px;
+  border-radius: 8px;
+  background: rgba(8, 8, 10, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-family: 'Roboto', sans-serif;
+  pointer-events: none;
+}
+.radial-plot-title {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 2px;
+}
+.radial-plot-line {
+  fill: none;
+  stroke: #4da3ff;
+  stroke-width: 1.6;
+}
+.radial-plot-fill {
+  fill: rgba(77, 163, 255, 0.22);
+  stroke: none;
+}
+.radial-plot-axis {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 1;
+}
+.radial-plot-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+}
