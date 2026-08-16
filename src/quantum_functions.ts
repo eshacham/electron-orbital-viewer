@@ -1,11 +1,11 @@
 import { OrbitalDataPoint } from './types/orbital';
 
+// Only the integer-keyed caches are kept. The others were keyed by the raw
+// floating-point arguments, so on a sampled grid almost every lookup missed
+// while the map grew by one entry per sample: at 256^3 that threw
+// "RangeError: Map maximum size exceeded" and killed the render.
 const factorialCache: Map<number, number> = new Map();
 const pochhammerCache: Map<string, number> = new Map();
-const laguerreCache: Map<string, number> = new Map();
-const legendreCache: Map<string, number> = new Map();
-const sphericalHarmonicCache: Map<string, number> = new Map();
-const atomicOrbitalCache: Map<string, OrbitalDataPoint> = new Map();
 
 // Note on units:
 // Throughout these functions, the distance 'r' is assumed to be provided in atomic units,
@@ -107,11 +107,6 @@ export function laguerrePolynomial(n: number, alpha: number, x: number): number 
     }
     // No specific constraints on alpha or x beyond standard numbers for this formula.
 
-    const cacheKey = `${n},${alpha},${x}`;
-    if (laguerreCache.has(cacheKey)) {
-        return laguerreCache.get(cacheKey)!;
-    }
-
     let sum = 0;
     for (let k = 0; k <= n; k++) {
         // For n=0, k=0: C(alpha, 0)
@@ -123,7 +118,6 @@ export function laguerrePolynomial(n: number, alpha: number, x: number): number 
         sum += term;
     }
 
-    laguerreCache.set(cacheKey, sum);
     return sum;
 }
 
@@ -203,11 +197,6 @@ export function associatedLegendrePolynomial(l: number, m: number, x: number): n
         return 0;
     }
 
-    const cacheKey = `${l},${m},${x}`;
-    if (legendreCache.has(cacheKey)) {
-        return legendreCache.get(cacheKey)!;
-    }
-
     let val;
 
     if (m === l) {
@@ -228,7 +217,6 @@ export function associatedLegendrePolynomial(l: number, m: number, x: number): n
               (l - m);
     }
 
-    legendreCache.set(cacheKey, val);
     return val;
 }
 
@@ -258,11 +246,6 @@ export function realSphericalHarmonic(l: number, ml: number, theta: number, phi:
     // No explicit check for phi range (0 to 2PI) as trigonometric functions handle periodicity,
     // but typically phi is normalized to [0, 2PI) for consistent input.
 
-    const cacheKey = `${l},${ml},${theta},${phi}`;
-    if (sphericalHarmonicCache.has(cacheKey)) {
-        return sphericalHarmonicCache.get(cacheKey)!;
-    }
-
     const abs_ml = Math.abs(ml);
     const cosTheta = Math.cos(theta);
 
@@ -289,7 +272,6 @@ export function realSphericalHarmonic(l: number, ml: number, theta: number, phi:
         result = normalizationFactor * legendrePart * Math.sin(abs_ml * phi) * Math.sqrt(2);
     }
 
-    sphericalHarmonicCache.set(cacheKey, result);
     return result;
 }
 
@@ -321,20 +303,11 @@ export function atomicOrbitalProbabilityDensity(
         throw new Error("Distance (r) cannot be negative for atomic orbital probability density.");
     }
 
-    const cacheKey = `${n},${l},${ml},${r},${theta},${phi},${Z}`;
-    if (atomicOrbitalCache.has(cacheKey)) {
-        return atomicOrbitalCache.get(cacheKey)!;
-    }
-
     const radialPart = radialWaveFunction(n, l, r, Z);
     const angularPart = realSphericalHarmonic(l, ml, theta, phi);
 
     const waveFunctionValue = radialPart * angularPart;
-    const probabilityDensity = waveFunctionValue * waveFunctionValue;
-
-    const dataPoint: OrbitalDataPoint = { waveFunctionValue, probabilityDensity };
-    atomicOrbitalCache.set(cacheKey, dataPoint);
-    return dataPoint;
+    return { waveFunctionValue, probabilityDensity: waveFunctionValue * waveFunctionValue };
 }
 
 interface OrbitalData {
@@ -410,7 +383,7 @@ export function generateOrbitalData(
 }
 
 /**
- * Returns a potential function (df) for marching-cubes-fast, which evaluates
+ * Returns a potential function (df) for an isosurface mesher, which evaluates
  * the atomic orbital probability density (adjusted for isosurface) at a given 3D world coordinate (x, y, z).
  *
  * @param n The principal quantum number.
@@ -451,9 +424,101 @@ export function getOrbitalPotentialFunction(
 export const __clearAllCaches__ = (): void => {
     factorialCache.clear();
     pochhammerCache.clear();
-    laguerreCache.clear();
-    legendreCache.clear();
-    sphericalHarmonicCache.clear();
-    atomicOrbitalCache.clear();
-    console.log("All quantum_functions caches cleared.");
 };
+
+/**
+ * Builds a fast evaluator for one orbital: (x, y, z) -> psi.
+ *
+ * Same result as `atomicOrbitalProbabilityDensity`, but everything that depends
+ * only on (n, l, ml, Z) — normalisation constants and the Laguerre coefficients —
+ * is computed once here instead of at every sample point, and the Legendre
+ * polynomial uses a flat upward recurrence rather than a memoised recursive one.
+ * Sampling a 128^3 grid calls this a couple of million times, so the per-point
+ * work is what sets the render time.
+ */
+export function makeWaveFunctionEvaluator(
+    n: number,
+    l: number,
+    ml: number,
+    Z: number = 1
+): (x: number, y: number, z: number) => number {
+    if (n < 1 || !Number.isInteger(n)) {
+        throw new Error("Principal quantum number (n) must be a positive integer.");
+    }
+    if (l < 0 || l > n - 1 || !Number.isInteger(l)) {
+        throw new Error("Azimuthal quantum number (l) must be an integer between 0 and n-1.");
+    }
+    if (!Number.isInteger(ml) || Math.abs(ml) > l) {
+        throw new Error("Magnetic quantum number (ml) must be an integer between -l and l.");
+    }
+    if (Z < 1 || !Number.isInteger(Z)) {
+        throw new Error("Nuclear charge (Z) must be a positive integer.");
+    }
+
+    // --- radial part, R_nl(r) = radialNorm * rho^l * e^(-rho/2) * L(rho) ---
+    const radialNorm = Math.sqrt(
+        (Math.pow((2 * Z) / n, 3) * factorial(n - l - 1)) / (2 * n * factorial(n + l))
+    );
+    const rhoPerR = (2 * Z) / n;
+
+    // L_{n-l-1}^{2l+1}(rho) as plain coefficients, evaluated by Horner.
+    const degree = n - l - 1;
+    const alpha = 2 * l + 1;
+    const laguerreCoefficients = new Float64Array(degree + 1);
+    for (let k = 0; k <= degree; k++) {
+        laguerreCoefficients[k] =
+            Math.pow(-1, k) * binomialCoefficient(degree + alpha, degree - k) / factorial(k);
+    }
+
+    // --- angular part, real spherical harmonic ---
+    const absMl = Math.abs(ml);
+    const angularNorm =
+        Math.sqrt(
+            ((2 * l + 1) / (4 * Math.PI)) * (factorial(l - absMl) / factorial(l + absMl))
+        ) * (ml === 0 ? 1 : Math.SQRT2);
+
+    // (2m-1)!! for the P_m^m seed.
+    let doubleFactorial = 1;
+    for (let i = 2 * absMl - 1; i >= 1; i -= 2) doubleFactorial *= i;
+
+    return (x: number, y: number, z: number): number => {
+        const r = Math.sqrt(x * x + y * y + z * z);
+
+        const rho = rhoPerR * r;
+        let laguerre = laguerreCoefficients[degree];
+        for (let k = degree - 1; k >= 0; k--) {
+            laguerre = laguerre * rho + laguerreCoefficients[k];
+        }
+        const radial = radialNorm * Math.pow(rho, l) * Math.exp(-rho / 2) * laguerre;
+        if (radial === 0) return 0;
+
+        // cos(theta); the r === 0 case matches the reference, which passes theta = 0.
+        let cosTheta = r === 0 ? 1 : z / r;
+        if (cosTheta > 1) cosTheta = 1;
+        else if (cosTheta < -1) cosTheta = -1;
+
+        // P_l^m by upward recurrence, seeded at P_m^m. No Condon-Shortley phase,
+        // matching `associatedLegendrePolynomial`.
+        let legendre = doubleFactorial * Math.pow(1 - cosTheta * cosTheta, absMl / 2);
+        if (l > absMl) {
+            let previous = legendre;                              // P_{m}^{m}
+            legendre = cosTheta * (2 * absMl + 1) * previous;     // P_{m+1}^{m}
+            for (let degreeUp = absMl + 2; degreeUp <= l; degreeUp++) {
+                const next =
+                    (cosTheta * (2 * degreeUp - 1) * legendre -
+                        (degreeUp + absMl - 1) * previous) /
+                    (degreeUp - absMl);
+                previous = legendre;
+                legendre = next;
+            }
+        }
+
+        let azimuthal = 1;
+        if (ml !== 0) {
+            const phi = r === 0 ? 0 : Math.atan2(y, x);
+            azimuthal = ml > 0 ? Math.cos(ml * phi) : Math.sin(absMl * phi);
+        }
+
+        return radial * angularNorm * legendre * azimuthal;
+    };
+}

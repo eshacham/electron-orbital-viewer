@@ -17,12 +17,14 @@ describe('Controls', () => {
         onZChange={() => {}}
         initialResolution={32}
         onResolutionChange={() => {}}
-        initialRMax={15}
-        onRMaxChange={() => {}}
         initialIsoLevel={0.005}
         onIsoLevelChange={() => {}}
         onUpdateOrbital={() => {}}
-        getOptimizedParams={() => ({ rMax: 15, isoLevel: 0.005 })}
+        onResetView={() => {}}
+        surfaceStyle={{ mode: 'solid', opacity: 1, clipAxis: 'none', clipPosition: 0 }}
+        onSurfaceStyleChange={() => {}}
+        getIsoLevelFor={() => 0.005}
+        isBusy={false}
       />
     );
     // Example: check if N select is rendered

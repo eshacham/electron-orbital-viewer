@@ -43,6 +43,7 @@ describe('App', () => {
         // Check for controls by matching exact label text
         expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
         expect(screen.getByRole('combobox', { name: /Angular \(l\)/i })).toBeInTheDocument();
-        expect(screen.getByRole('spinbutton', { name: /Atomic Number \(Z\)/i })).toBeInTheDocument();
+        // Z is a list of elements now, not a free-text number.
+        expect(screen.getByRole('combobox', { name: /Nucleus \(Z\)/i })).toBeInTheDocument();
     });
 });

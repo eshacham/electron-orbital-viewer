@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { MeshData, OrbitalParams } from './types/orbital';
+import { MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
+import { getIsoLevel, computeSamplingRadius } from './orbital_presets';
+import { createOrbitalMaterial, applySurfaceStyle, updateClipPlane } from './orbital_material';
+import { createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCaps } from './clip_caps';
+import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -12,6 +16,18 @@ export interface VisualizerContext {
     currentAxesHelper: THREE.AxesHelper | null;
     animationFrameId?: number;
     isDisposed?: boolean;  // Add this flag
+    /** rMax the camera was last framed for, so we only re-frame when the scale changes. */
+    framedRMax?: number;
+    surfaceStyle: SurfaceStyle;
+    /** Single cut-away plane, shared by every orbital material. */
+    clipPlane: THREE.Plane;
+    clippingPlanes: THREE.Plane[];
+    /** Stencil-capped faces over the cut, rebuilt with each orbital. */
+    currentCaps: THREE.Group | null;
+    /** The calculation currently in flight, if any. */
+    activeWorker: Worker | null;
+    /** Increments per request, so a superseded result can be recognised. */
+    requestCounter: number;
 }
 
 interface WorkerSuccessMessage {
@@ -26,68 +42,6 @@ interface WorkerErrorMessage {
 
 type WorkerMessage = WorkerSuccessMessage | WorkerErrorMessage;
 
-// --- Optimized Parameters Storage (with more predictions) ---
-const optimizedOrbitalParameters: Record<string, { rMax: number; isoLevel: number }> = {
-    // Example: "n_0"
-    "1_0": { rMax: 10, isoLevel: 0.001 },      // 1s
-    "2_0": { rMax: 15, isoLevel: 0.0005 },     // 2s
-    "2_1": { rMax: 15, isoLevel: 0.0005 },     // 2p
-    "3_0": { rMax: 20, isoLevel: 0.00001 },    // 3s
-    "3_1": { rMax: 20, isoLevel: 0.00001 },    // 3p
-    "3_2": { rMax: 20, isoLevel: 0.00001 },    // 3d
-    "4_0": { rMax: 35, isoLevel: 0.000004 },   // 4s
-    "4_1": { rMax: 35, isoLevel: 0.000004 },   // 4p
-    "4_2": { rMax: 35, isoLevel: 0.000004 },   // 4d
-    "4_3": { rMax: 35, isoLevel: 0.000004 },   // 4f
-    "5_0": { rMax: 50, isoLevel: 0.0000025 },  // 5s
-    "5_1": { rMax: 50, isoLevel: 0.0000025 },  // 5p
-    "5_2": { rMax: 50, isoLevel: 0.0000025 },  // 5d
-    "5_3": { rMax: 50, isoLevel: 0.0000025 },  // 5f
-    "5_4": { rMax: 50, isoLevel: 0.0000025 },  // 5g
-    "6_0": { rMax: 70, isoLevel: 0.000001 },   // 6s
-    "6_1": { rMax: 70, isoLevel: 0.000001 },   // 6p
-    "6_2": { rMax: 70, isoLevel: 0.000001 },   // 6d
-    "6_3": { rMax: 70, isoLevel: 0.000001 },   // 6f
-    "6_4": { rMax: 70, isoLevel: 0.000001 },   // 6g
-    "6_5": { rMax: 70, isoLevel: 0.000001 },   // 6h
-    "7_0": { rMax: 90, isoLevel: 0.0000007 },  // 
-    "7_1": { rMax: 90, isoLevel: 0.0000007 },  // 
-    "7_2": { rMax: 90, isoLevel: 0.0000007 },  //
-    "7_3": { rMax: 90, isoLevel: 0.0000007 },  //
-    "7_4": { rMax: 90, isoLevel: 0.0000007 },  //
-    "7_5": { rMax: 90, isoLevel: 0.0000007 },  //
-    "7_6": { rMax: 90, isoLevel: 0.0000007 },  //
-    "8_0": { rMax: 120, isoLevel: 0.0000001 }, // 
-    "8_1": { rMax: 140, isoLevel: 0.0000001 }, // 
-    "8_2": { rMax: 130, isoLevel: 0.0000001 }, //
-    "8_3": { rMax: 140, isoLevel: 0.0000001 }, //
-    "8_4": { rMax: 140, isoLevel: 0.0000001 }, //
-    "8_5": { rMax: 140, isoLevel: 0.0000001 }, //
-    "8_6": { rMax: 140, isoLevel: 0.0000001 }, //
-    "8_7": { rMax: 140, isoLevel: 0.0000001 }, //
-    "9_0": { rMax: 200, isoLevel: 0.00000001 }, //
-    "9_1": { rMax: 200, isoLevel: 0.00000001 }, //
-    "9_2": { rMax: 200, isoLevel: 0.00000001 }, //
-    "9_3": { rMax: 200, isoLevel: 0.00000001 }, //
-    "9_4": { rMax: 200, isoLevel: 0.00000001 }, //
-    "9_5": { rMax: 200, isoLevel: 0.00000001 }, //
-    "9_6": { rMax: 200, isoLevel: 0.00000001 }, //
-    "9_7": { rMax: 200, isoLevel: 0.00000001 }, //
-    "9_8": { rMax: 200, isoLevel: 0.00000001 }, //
-};
-
-
-export function getOptimizedParameters(n: number, l: number): { rMax: number; isoLevel: number } | null {
-    const key = `${n}_${l}`;
-    const params = optimizedOrbitalParameters[key];
-    if (params) {
-        return { ...params }; // Return a copy
-    }
-    // Per your request, the fallback logic has been removed.
-    // The function now expects the key to be present in optimizedOrbitalParameters.
-    return null; // Explicitly return null if the key is not found.
-}
-
 export function initVisualizer(container: HTMLElement, initialCameraZ: number = 12): VisualizerContext {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050505);
@@ -95,8 +49,12 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.z = initialCameraZ;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // stencil defaults to false since three r163, and without the buffer every
+    // stencil test passes — which would draw the cut-away caps as full quads
+    // instead of only across the orbital's interior.
+    const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.localClippingEnabled = true;
     container.appendChild(renderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -105,6 +63,17 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(5, 5, 5).normalize(); // Adjusted light position
     scene.add(directionalLight);
+
+    // Orbitals get turned around freely, so light the other side too. Without
+    // this the solid surface goes black whenever it is viewed from behind.
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.35);
+    fillLight.position.set(-5, -3, -5).normalize();
+    scene.add(fillLight);
+
+    // Kept for the lifetime of the context so materials can hold a stable
+    // reference; "no cut" is expressed by moving it out of range, not by
+    // detaching it, which would force a shader recompile.
+    const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1e9);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -120,13 +89,90 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
         controls,
         currentOrbitalGroup: null,
         currentAxesHelper: null,
-        isDisposed: false  // Initialize the flag
+        isDisposed: false,  // Initialize the flag
+        surfaceStyle: { ...defaultSurfaceStyle },
+        clipPlane,
+        clippingPlanes: [clipPlane],
+        currentCaps: null,
+        activeWorker: null,
+        requestCounter: 0
     };
     
     startAnimationLoop(context);
     return context;
 }
 
+
+/**
+ * Pulls the camera back far enough to see a box of half-width rMax, keeping the
+ * direction it is currently looking from. Orbitals span 10 to 200 Bohr radii
+ * depending on n, so a fixed camera distance leaves the viewer inside the mesh
+ * for anything above n=3.
+ */
+export function frameOrbital(context: VisualizerContext | null, rMax: number) {
+    if (!context || context.isDisposed) return;
+
+    const { camera, controls } = context;
+    const halfFov = (camera.fov * Math.PI) / 180 / 2;
+    // Fit the sphere that encloses the sampling box, with a little margin.
+    const distance = (rMax * Math.sqrt(3) * 1.15) / Math.sin(halfFov);
+
+    const direction = camera.position.clone().sub(controls.target);
+    if (direction.lengthSq() === 0) direction.set(0, 0, 1);
+    direction.normalize();
+
+    controls.target.set(0, 0, 0);
+    camera.position.copy(direction.multiplyScalar(distance));
+    camera.near = Math.max(0.01, distance / 1000);
+    camera.far = distance * 10;
+    camera.updateProjectionMatrix();
+    controls.update();
+
+    context.framedRMax = rMax;
+}
+
+/**
+ * Puts the caps where the plane is, and shows them only when they mean
+ * something: there has to be a cut, and a solid surface for it to cut through.
+ */
+function refreshCaps(context: VisualizerContext) {
+    const { surfaceStyle, currentCaps } = context;
+    setCapsVisible(
+        currentCaps,
+        surfaceStyle.clipAxis !== 'none' && surfaceStyle.mode === 'solid'
+    );
+    setCapsOpacity(currentCaps, surfaceStyle.opacity);
+    positionCaps(currentCaps, context.clipPlane);
+}
+
+/** Restyles the orbital — mode, opacity, cut plane — without recalculating it. */
+export function setSurfaceStyle(context: VisualizerContext | null, style: SurfaceStyle) {
+    if (!context || context.isDisposed) return;
+    context.surfaceStyle = style;
+    applySurfaceStyle(context.currentOrbitalGroup, style);
+    updateClipPlane(
+        context.clipPlane,
+        style.clipAxis,
+        style.clipPosition,
+        context.framedRMax ?? 1
+    );
+    refreshCaps(context);
+}
+
+/** Scale bar for the current camera, or null if there is nothing to measure. */
+export function getScaleBar(
+    context: VisualizerContext | null,
+    canvasHeightPx: number,
+    maxPixels: number
+): ScaleBar | null {
+    if (!context || context.isDisposed) return null;
+
+    const { camera, controls } = context;
+    return computeScaleBar(
+        worldUnitsPerPixel(camera.position.distanceTo(controls.target), camera.fov, canvasHeightPx),
+        maxPixels
+    );
+}
 
 export function cleanupVisualizer(context: VisualizerContext | null) {
     if (context) {
@@ -135,6 +181,8 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
             cancelAnimationFrame(context.animationFrameId);
             context.animationFrameId = undefined;
         }
+        context.activeWorker?.terminate();   // do not leave a calculation running
+        context.activeWorker = null;
         clearCurrentOrbital(context, context.scene); // Ensure orbital is cleared
         if (context.currentAxesHelper) {
             context.scene.remove(context.currentAxesHelper);
@@ -154,27 +202,44 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
 }
 
 
-export async function updateOrbitalInScene(context: VisualizerContext | null, params: OrbitalParams, showAxes: boolean = true): Promise<void> {
-    if (!context) return;
+/**
+ * Result of a render request. A request is superseded when a newer one starts
+ * before it finishes: its mesh is discarded rather than drawn.
+ */
+export type RenderOutcome = 'rendered' | 'superseded';
+
+export async function updateOrbitalInScene(
+    context: VisualizerContext | null,
+    params: OrbitalParams,
+    showAxes: boolean = true
+): Promise<RenderOutcome> {
+    if (!context) return 'superseded';
+
+    // Stop whatever is still running. Each request spawns its own worker, so
+    // without this a slower earlier calculation could return after a faster
+    // later one and overwrite the orbital that was actually asked for.
+    context.activeWorker?.terminate();
+    const requestId = ++context.requestCounter;
 
     return new Promise((resolve, reject) => {
         console.log('Visualizer: Starting worker calculation');
-        
+
         const worker = new Worker(new URL('./workers/orbitalWorker.ts', import.meta.url), { 
             type: 'module' 
         });
+        context.activeWorker = worker;
 
-        // Get optimized/default parameters to use as fallbacks
-        const optimizedDefaults = getOptimizedParameters(params.n, params.l)!;
+        // Fall back to the defaults if anything arrived unusable.
+        let workerIsoLevel = params.isoLevel;
+        if (isNaN(workerIsoLevel) || workerIsoLevel <= 0) {
+            workerIsoLevel = getIsoLevel(params.n, params.l) ?? 1e-5;
+        }
 
         let workerRMax = params.rMax;
         if (isNaN(workerRMax) || workerRMax <= 0) {
-            workerRMax = optimizedDefaults.rMax;
-        }
-
-        let workerIsoLevel = params.isoLevel;
-        if (isNaN(workerIsoLevel)) {
-            workerIsoLevel = optimizedDefaults.isoLevel;
+            workerRMax = computeSamplingRadius(
+                params.n, params.l, params.ml, params.Z, workerIsoLevel
+            );
         }
 
         // Update or remove axes helper based on showAxes and the rMax to be used
@@ -184,18 +249,41 @@ export async function updateOrbitalInScene(context: VisualizerContext | null, pa
             removeAxesHelper(context); // Ensure axes are removed if showAxes is false
         }
 
-        // Simple cleanup function
+        // Re-frame only when the scale changes, so repeated updates at the same
+        // rMax leave the viewer's chosen angle and zoom alone.
+        if (context.framedRMax !== workerRMax) {
+            frameOrbital(context, workerRMax);
+        }
+        // The cut position is a fraction of rMax, so it has to be recomputed
+        // whenever the box changes size.
+        updateClipPlane(
+            context.clipPlane,
+            context.surfaceStyle.clipAxis,
+            context.surfaceStyle.clipPosition,
+            workerRMax
+        );
+        refreshCaps(context);
+
         const cleanup = () => {
             worker.terminate();
+            if (context.activeWorker === worker) context.activeWorker = null;
         };
+
+        /** True once a newer request has taken over. */
+        const superseded = () => requestId !== context.requestCounter;
 
 
         worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
+            if (superseded()) {
+                cleanup();
+                resolve('superseded');
+                return;
+            }
             try {
                 if (e.data.type === 'success') {
                     console.log('Visualizer: Received mesh data from worker');
                     updateSceneWithMeshData(context, e.data.meshData, params);
-                    resolve();
+                    resolve('rendered');
                 } else {
                     console.error('Visualizer: Worker error:', e.data.message);
                     reject(new Error(e.data.message));
@@ -209,8 +297,12 @@ export async function updateOrbitalInScene(context: VisualizerContext | null, pa
         };
 
         worker.onerror = (error) => {
-            console.error('Visualizer: Worker error:', error);
             cleanup();
+            if (superseded()) {
+                resolve('superseded');
+                return;
+            }
+            console.error('Visualizer: Worker error:', error);
             reject(error);
         };
 
@@ -252,8 +344,10 @@ function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
         });
 
         // Remove from scene
+        disposeCaps(context.currentCaps);
         scene.remove(context.currentOrbitalGroup);
         context.currentOrbitalGroup = null;
+        context.currentCaps = null;
         
         // Force scene update
         scene.updateMatrixWorld(true);
@@ -306,22 +400,28 @@ function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData,
             }
         });
 
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        const positionAttribute = new THREE.Float32BufferAttribute(positions, 3);
+        geometry.setAttribute('position', positionAttribute);
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         geometry.setIndex(meshData.cells.flat());
         geometry.computeVertexNormals();
 
-        const material = new THREE.MeshStandardMaterial({
-            vertexColors: true,     // Wireframe lines will use vertex colors
-            side: THREE.DoubleSide,
-            transparent: true,      // Can be true if you want transparent wireframe (e.g., for fading)
-            opacity: 1.0,           // Or lower if transparent wireframe is desired
-            wireframe: true
-        });
+        const material = createOrbitalMaterial(context.surfaceStyle, context.clippingPlanes);
 
         const mesh = new THREE.Mesh(geometry, material);
         const group = new THREE.Group();
         group.add(mesh);
+
+        // Solid faces over the cut, so a cross-section reads as cut material
+        // rather than the hollow inside of the far wall.
+        const caps = createClipCaps(geometry, {
+            plane: context.clipPlane,
+            densityMap: meshData.densityMap,
+            opacity: context.surfaceStyle.opacity
+        });
+        group.add(caps);
+        context.currentCaps = caps;
+        refreshCaps(context);
 
         context.scene.add(group);
         context.currentOrbitalGroup = group;

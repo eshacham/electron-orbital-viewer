@@ -1,21 +1,33 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-    ThemeProvider, 
-    createTheme, 
-    CssBaseline, 
-    Box, 
-    CircularProgress 
+import {
+    ThemeProvider,
+    createTheme,
+    CssBaseline,
+    Box,
+    Alert,
+    Snackbar
 } from '@mui/material';
 import { useAppDispatch, useAppSelector } from './store/hooks';
-import { startOrbitalCalculation, finishOrbitalCalculation } from './store/orbitalSlice';
+import {
+    startOrbitalCalculation,
+    finishOrbitalCalculation,
+    failOrbitalCalculation,
+    dismissOrbitalError,
+    resetView,
+    setSurfaceStyle
+} from './store/orbitalSlice';
 import Controls from './components/Controls';
 import OrbitalViewer from './components/OrbitalViewer';
-import { getOptimizedParameters } from './orbital_visualizer';
-import { OrbitalParams } from './types/orbital';
+import { getIsoLevel, computeSamplingRadius } from './orbital_presets';
+import { OrbitalParams, SurfaceStyle } from './types/orbital';
+import { useDelayedFlag } from './useDelayedFlag';
+
+/** How long a render has to take before the viewer is told it is working. */
+const BUSY_INDICATOR_DELAY_MS = 400;
 
 const defaultN = 3;
 const defaultL = 2;
-const defaultOptimized = getOptimizedParameters(defaultN, defaultL) || { rMax: 15, isoLevel: 0.005 };
+const defaultIsoLevel = getIsoLevel(defaultN, defaultL)!;
 
 const theme = createTheme({
   palette: {
@@ -26,7 +38,7 @@ const theme = createTheme({
 
 function App() {
     const dispatch = useAppDispatch();
-    const { isLoading } = useAppSelector(state => state.orbital);
+    const { isLoading, error, surfaceStyle } = useAppSelector(state => state.orbital);
 
     // Keep individual control values as local state
     const [n, setN] = useState<number>(defaultN);
@@ -34,8 +46,7 @@ function App() {
     const [ml, setMl] = useState<number>(0);
     const [Z, setZ] = useState<number>(1);
     const [resolution, setResolution] = useState<number>(64);
-    const [rMax, setRMax] = useState<number>(defaultOptimized.rMax);
-    const [isoLevel, setIsoLevel] = useState<number>(defaultOptimized.isoLevel);
+    const [isoLevel, setIsoLevel] = useState<number>(defaultIsoLevel);
 
     const isInitializedRef = useRef(false);
 
@@ -49,6 +60,23 @@ function App() {
         dispatch(finishOrbitalCalculation());
     }, [dispatch]);
 
+    const handleOrbitalFailed = useCallback((message: string) => {
+        console.warn('App.tsx: Orbital render failed:', message);
+        dispatch(failOrbitalCalculation(message));
+    }, [dispatch]);
+
+    const handleResetView = useCallback(() => {
+        dispatch(resetView());
+    }, [dispatch]);
+
+    const handleSurfaceStyleChange = useCallback((change: Partial<SurfaceStyle>) => {
+        dispatch(setSurfaceStyle(change));
+    }, [dispatch]);
+
+    // Only say anything if the calculation is actually taking a while; see
+    // useDelayedFlag for why.
+    const showBusy = useDelayedFlag(isLoading, BUSY_INDICATOR_DELAY_MS);
+
     // Initial render - only run once
     useEffect(() => {
         if (!isInitializedRef.current) {
@@ -60,8 +88,8 @@ function App() {
                 ml: 0,
                 Z: 1,
                 resolution: 32,
-                rMax: defaultOptimized.rMax,
-                isoLevel: defaultOptimized.isoLevel,
+                rMax: computeSamplingRadius(defaultN, defaultL, 0, 1, defaultIsoLevel),
+                isoLevel: defaultIsoLevel,
             };
             handleOrbitalParamsChange(initialParams);
         }
@@ -72,6 +100,7 @@ function App() {
             <CssBaseline />
             <Box 
                 id="canvas-container"
+                data-busy={isLoading ? 'true' : 'false'}
                 sx={{ 
                     width: '100%', 
                     height: '100vh',
@@ -81,14 +110,8 @@ function App() {
             >
                 <OrbitalViewer
                     onOrbitalRendered={handleOrbitalRendered}
+                    onOrbitalFailed={handleOrbitalFailed}
                 />
-                {isLoading && (
-                    <div className="spinner-overlay">
-                        <div className="spinner-container">
-                            <CircularProgress />
-                        </div>
-                    </div>
-                )}
                 <Controls
                     initialN={n}
                     onNChange={setN}
@@ -100,14 +123,28 @@ function App() {
                     onZChange={setZ}
                     initialResolution={resolution}
                     onResolutionChange={setResolution}
-                    initialRMax={rMax}
-                    onRMaxChange={setRMax}
                     initialIsoLevel={isoLevel}
                     onIsoLevelChange={setIsoLevel}
                     onUpdateOrbital={handleOrbitalParamsChange}
-                    getOptimizedParams={getOptimizedParameters}
-                    isLoading={isLoading}
+                    onResetView={handleResetView}
+                    surfaceStyle={surfaceStyle}
+                    onSurfaceStyleChange={handleSurfaceStyleChange}
+                    getIsoLevelFor={getIsoLevel}
+                    isBusy={showBusy}
                 />
+                <Snackbar
+                    open={Boolean(error)}
+                    onClose={() => dispatch(dismissOrbitalError())}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                >
+                    <Alert
+                        severity="warning"
+                        variant="filled"
+                        onClose={() => dispatch(dismissOrbitalError())}
+                    >
+                        {error}
+                    </Alert>
+                </Snackbar>
             </Box>
         </ThemeProvider>
     );

@@ -31,6 +31,9 @@ html, body, #root {
   left: 20px;         /* Distance from the left */
   width: fit-content; /* Constrain width to its content */
   height: fit-content;/* Constrain height to its content */
+  /* The panel is taller than a short viewport once every control is present. */
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   padding: 15px; /* Added a bit more padding */
   /* Make the background semi-transparent */
   /* Adjust the alpha (last value) for more/less transparency */
@@ -93,34 +96,39 @@ html, body, #root {
 button:hover {
     background-color: #0056b3;
 }
-.spinner-overlay {
-  position: fixed;
-  top: 0; 
-  left: 0;
-  width: 100vw; 
-  height: 100vh;
+/* Scale readout: a bar of known length in Bohr radii, bottom-right of the view.
+   The camera frames every orbital to fill the viewport, so this is the only
+   thing on screen that says how large the orbital actually is — which means it
+   has to be readable at a glance over both a black background and a lit
+   surface, not a hairline in the corner. */
+.scale-readout {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  /* Darker semi-transparent background */
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 1300;
+  gap: 6px;
+  padding: 10px 14px 8px;
+  border-radius: 8px;
+  background: rgba(8, 8, 10, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  pointer-events: none;
 }
-
-/* Add specific styles for the MUI CircularProgress */
-.spinner-overlay .MuiCircularProgress-root {
-  width: 80px !important;
-  height: 80px !important;
-  color: #fff !important;
+/* Ticked at both ends so the measured span is unambiguous. */
+.scale-readout-bar {
+  height: 9px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-top: none;
+  box-sizing: border-box;
 }
-
-/* Add a container for the spinner with a background */
-.spinner-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 50%;
-  padding: 20px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+.scale-readout-label {
+  font-variant-numeric: tabular-nums;
 }

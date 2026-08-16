@@ -27,8 +27,10 @@
     "src/**/*.tsx",
     "public/**/*.ts",
     "public/**/*.tsx",
-    "vite.config.ts",
     "tests/**/*.ts"
   ],
+  // vite.config.ts belongs to the referenced tsconfig.node.json. Listing it here
+  // too made tsc stop with TS6305 before checking anything else, which quietly
+  // turned `tsc --noEmit` into a no-op.
   "references": [{ "path": "./tsconfig.node.json" }]
 }

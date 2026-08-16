@@ -1,6 +1,6 @@
 import { MeshData, OrbitalParams } from '@/types/orbital';
-import { getOrbitalPotentialFunction } from '../quantum_functions';
-import { marchingCubes, MarchingCubesMeshData } from 'marching-cubes-fast';
+import { generateOrbitalMesh } from '../orbital_mesh';
+
 
 // Worker message types
 interface WorkerMessageData {
@@ -15,62 +15,40 @@ interface WorkerSuccessResponse {
 
 interface WorkerErrorResponse {
     type: 'error';
-    error: string;
+    message: string;
 }
 
+// The DOM lib types the global `self` as a Window, whose postMessage takes a
+// target origin rather than a transfer list. Pulling in the WebWorker lib
+// instead would collide with DOM, so describe just the surface used here.
+interface WorkerScope {
+    onmessage: ((event: MessageEvent<WorkerMessageData>) => void) | null;
+    postMessage(message: unknown, transfer?: Transferable[]): void;
+}
+const worker = self as unknown as WorkerScope;
 
-self.onmessage = (e: MessageEvent<WorkerMessageData>) => {
-    if (e.data.type === 'calculate') {
-        try {
-            console.log('Worker: Starting calculation', e.data.params);
-            const { n, l, ml, Z, resolution, rMax, isoLevel } = e.data.params;
+worker.onmessage = (e: MessageEvent<WorkerMessageData>) => {
+    if (e.data.type !== 'calculate') return;
 
-            // Validate parameters
-            if (resolution <= 0 || rMax <= 0 || isoLevel <= 0) {
-                throw new Error('Invalid parameters: resolution, rMax, and isoLevel must be positive');
-            }
+    try {
+        console.log('Worker: Starting calculation', e.data.params);
+        const meshData = generateOrbitalMesh(e.data.params);
 
-            const orbitalPotentialFunction = getOrbitalPotentialFunction(n, l, ml, Z, isoLevel);
+        console.log('Worker: Calculation complete', {
+            vertexCount: meshData.positions.length,
+            triangleCount: meshData.cells.length
+        });
 
-            console.log('Worker: Running marching cubes algorithm');
-            const meshData: MarchingCubesMeshData | null = marchingCubes(
-                resolution,
-                (x, y, z) => orbitalPotentialFunction(x, y, z).probabilityDensity, // Extract probabilityDensity
-                [[-rMax, -rMax, -rMax], [rMax, rMax, rMax]]
-            );
-
-            if (!meshData || !meshData.positions.length || !meshData.cells.length) {
-                throw new Error('Failed to generate mesh data');
-            }
-
-            // Calculate ψ signs for each vertex
-            const psiSigns = meshData.positions.map(([x, y, z]) => {
-                const { waveFunctionValue } = orbitalPotentialFunction(x, y, z);
-                return waveFunctionValue >= 0 ? 1 : -1; // 1 for positive, -1 for negative
-            });
-
-            console.log('Worker: Calculation complete', {
-                vertexCount: meshData.positions.length,
-                triangleCount: meshData.cells.length
-            });
-
-            const response: WorkerSuccessResponse = {
-                type: 'success',
-                meshData: {
-                    positions: meshData.positions,
-                    cells: meshData.cells,
-                    psiSigns // Include ψ signs in the response
-                }
-            };
-
-            self.postMessage(response);
-        } catch (error) {
-            console.error('Worker: Error during calculation:', error);
-            const response: WorkerErrorResponse = {
-                type: 'error',
-                error: error instanceof Error ? error.message : 'Unknown error'
-            };
-            self.postMessage(response);
-        }
+        const response: WorkerSuccessResponse = { type: 'success', meshData };
+        // The density map is the largest thing crossing the boundary; hand the
+        // buffer over rather than copying it.
+        worker.postMessage(response, [meshData.densityMap.data.buffer]);
+    } catch (error) {
+        console.error('Worker: Error during calculation:', error);
+        const response: WorkerErrorResponse = {
+            type: 'error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        };
+        worker.postMessage(response);
     }
 };
