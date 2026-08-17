@@ -54,6 +54,10 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     // instead of only across the orbital's interior.
     const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
+    // Without this the canvas backs at one device pixel per CSS pixel, which on
+    // a phone is a third of the screen's resolution. Capped at 2 so a 3x display
+    // does not pay for nine fragments per CSS pixel.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.localClippingEnabled = true;
     container.appendChild(renderer.domElement);
 

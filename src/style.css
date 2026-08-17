@@ -1,6 +1,9 @@
 /* public/style.css */
 html, body, #root {
   height: 100%;
+  /* iOS Safari counts the browser chrome in 100vh, which pushes the bottom of
+     the canvas under the toolbar. dvh tracks the visible area instead. */
+  height: 100dvh;
   margin: 0;
   font-family: 'Roboto', sans-serif;
 }
@@ -174,4 +177,107 @@ button:hover {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.7);
   font-variant-numeric: tabular-nums;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Phone layout.
+
+   At 393px wide the sidebar covered 73% of the screen, which left the orbital —
+   the entire point of the app — as a sliver behind it. Below the breakpoint the
+   panel becomes a sheet that is out of the way until asked for.
+   --------------------------------------------------------------------------- */
+
+.panel-toggle {
+  position: absolute !important;
+  top: 12px;
+  left: 12px;
+  z-index: 20;
+  width: 44px;   /* a comfortable touch target */
+  height: 44px;
+  border-radius: 10px !important;
+  background: rgba(8, 8, 10, 0.65) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+/* Phone layout: the panel flies out from the bottom as a horizontal strip.
+   Laying the controls in a row rather than a column keeps the strip short, so
+   the orbital, the radial plot and the scale all stay on screen while you work
+   the controls — which a full-height sheet or a side drawer both gave up. */
+@media (max-width: 760px), (max-height: 500px) {
+  #controls {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-width: none;
+    height: auto;
+    max-height: 44dvh;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+    transition: transform 0.22s ease-out;
+
+    /* One row, scrolled sideways when it runs past the screen. */
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 14px 14px !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  #controls.closed { transform: translateY(101%); }
+  #controls.open { transform: translateY(0); }
+
+  /* Each control keeps its own width instead of filling the row. */
+  #controls .MuiFormControl-root,
+  #controls .MuiBox-root {
+    flex: 0 0 auto;
+    width: auto;
+    margin-top: 8px;
+    margin-bottom: 0;
+  }
+  #controls .MuiFormControl-root { min-width: 132px; }
+  #controls #orbital-name {
+    flex: 0 0 auto;
+    align-self: center;
+    margin: 0 4px 0 0;
+    white-space: nowrap;
+  }
+  #controls .MuiSlider-root { width: 120px; }
+  #controls .MuiToggleButtonGroup-root { width: auto; }
+  #controls .MuiButton-root { white-space: nowrap; }
+
+  /* The strip is several screens wide, and Update is at the far end of it.
+     Pin the actions to the right edge so applying a change never means
+     scrolling back for the button. */
+  /* The wrapper stops being a box of its own so its two buttons become items of
+     the strip: Reset scrolls with everything else, and only Update is pinned.
+     Pinning both cost 270 of 393 pixels on a phone, which buried the controls. */
+  #controls .controls-actions {
+    display: contents;
+  }
+  #controls #reset-view {
+    flex: 0 0 auto;
+    align-self: center;
+    margin-top: 0;
+  }
+  #controls #update-orbital {
+    position: sticky;
+    right: -14px;          /* covers the panel's own right padding too */
+    z-index: 2;            /* paints over the controls scrolling beneath it */
+    flex: 0 0 auto;
+    align-self: center;
+    /* Carries the panel colour along with it so nothing shows through. */
+    box-shadow: -16px 0 12px 12px rgb(238, 238, 238);
+  }
+
+  /* Overlays move to the top so the strip has the bottom to itself. */
+  .radial-plot { right: 12px; top: 12px; bottom: auto; }
+  .scale-readout { left: 12px; top: 64px; right: auto; bottom: auto; padding: 6px 10px 5px; font-size: 12px; }
 }

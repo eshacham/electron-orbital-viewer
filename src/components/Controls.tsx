@@ -42,6 +42,10 @@ interface ControlsProps {
   onSurfaceStyleChange: (change: Partial<SurfaceStyle>) => void;
 
   isBusy: boolean;
+  /** Sheet is showing. Only meaningful on narrow screens. */
+  open?: boolean;
+  /** Phone-width layout. */
+  compact?: boolean;
 }
 
 const ISO_MIN = 0.000000001;
@@ -60,6 +64,8 @@ const Controls: React.FC<ControlsProps> = ({
   surfaceStyle,
   onSurfaceStyleChange,
   isBusy,
+  open = true,
+  compact = false,
 }) => {
   // Local state for dropdown options, derived from props
   const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
@@ -100,9 +106,10 @@ const Controls: React.FC<ControlsProps> = ({
   };
 
   return (
-    <Box 
-      id="controls" 
-      sx={{ 
+    <Box
+      id="controls"
+      className={[compact ? 'compact' : '', open ? 'open' : 'closed'].filter(Boolean).join(' ')}
+      sx={{
         p: 2,
         position: 'relative',
       }}
@@ -292,7 +299,7 @@ const Controls: React.FC<ControlsProps> = ({
         )}
       </FormControl>
 
-      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+      <Box className="controls-actions" sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', gap: 1 }}>
         <Button
           id="reset-view"
           variant="outlined"

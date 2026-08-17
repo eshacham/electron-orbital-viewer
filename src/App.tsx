@@ -5,7 +5,8 @@ import {
     CssBaseline,
     Box,
     Alert,
-    Snackbar
+    Snackbar,
+    IconButton
 } from '@mui/material';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import {
@@ -22,6 +23,7 @@ import RadialPlot from './components/RadialPlot';
 import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
+import { useMediaQuery, NARROW_VIEWPORT } from './useMediaQuery';
 
 /** How long a render has to take before the viewer is told it is working. */
 const BUSY_INDICATOR_DELAY_MS = 400;
@@ -77,6 +79,12 @@ function App() {
         dispatch(setSurfaceStyle(change));
     }, [dispatch]);
 
+    // On a phone the panel would cover most of the screen, so it starts out of
+    // the way and is opened deliberately. On a desktop it is just always there.
+    const isNarrow = useMediaQuery(NARROW_VIEWPORT);
+    const [panelOpen, setPanelOpen] = useState(true);
+    useEffect(() => { setPanelOpen(!isNarrow); }, [isNarrow]);
+
     // Only say anything if the calculation is actually taking a while; see
     // useDelayedFlag for why.
     const showBusy = useDelayedFlag(isLoading, BUSY_INDICATOR_DELAY_MS);
@@ -116,6 +124,16 @@ function App() {
                     onOrbitalRendered={handleOrbitalRendered}
                     onOrbitalFailed={handleOrbitalFailed}
                 />
+                {isNarrow && (
+                    <IconButton
+                        id="panel-toggle"
+                        className="panel-toggle"
+                        aria-label={panelOpen ? 'hide controls' : 'show controls'}
+                        onClick={() => setPanelOpen(open => !open)}
+                    >
+                        {panelOpen ? '✕' : '☰'}
+                    </IconButton>
+                )}
                 <Controls
                     initialN={n}
                     onNChange={setN}
@@ -135,6 +153,8 @@ function App() {
                     surfaceStyle={surfaceStyle}
                     onSurfaceStyleChange={handleSurfaceStyleChange}
                     isBusy={showBusy}
+                    open={panelOpen}
+                    compact={isNarrow}
                 />
                 {renderedParams && (
                     <RadialPlot
@@ -142,6 +162,7 @@ function App() {
                         l={renderedParams.l}
                         Z={renderedParams.Z}
                         rMax={renderedParams.rMax}
+                        compact={isNarrow}
                     />
                 )}
                 <Snackbar

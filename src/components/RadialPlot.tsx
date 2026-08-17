@@ -7,10 +7,10 @@ interface RadialPlotProps {
     Z: number;
     /** Half-width of the sampling box, which sets the horizontal range. */
     rMax: number;
+    /** Smaller layout for phone-width screens. */
+    compact?: boolean;
 }
 
-const WIDTH = 260;
-const HEIGHT = 96;
 const PADDING = { left: 6, right: 6, top: 8, bottom: 16 };
 
 /**
@@ -22,7 +22,10 @@ const PADDING = { left: 6, right: 6, top: 8, bottom: 16 };
  * cut a high-n orbital open — and it is the one view where "n − l shells" is
  * something you can count rather than take on faith.
  */
-const RadialPlot: React.FC<RadialPlotProps> = ({ n, l, Z, rMax }) => {
+const RadialPlot: React.FC<RadialPlotProps> = ({ n, l, Z, rMax, compact = false }) => {
+    const WIDTH = compact ? 150 : 260;
+    const HEIGHT = compact ? 62 : 96;
+
     const path = useMemo(() => {
         const profile = radialProfile(n, l, Z, rMax, 240);
         const peak = profile.reduce((max, p) => Math.max(max, p.probability), 0);
@@ -43,12 +46,12 @@ const RadialPlot: React.FC<RadialPlotProps> = ({ n, l, Z, rMax }) => {
             fill: `M ${PADDING.left},${baseline} L ${points.join(' L ')} L ${(WIDTH - PADDING.right).toFixed(2)},${baseline} Z`,
             baseline,
         };
-    }, [n, l, Z, rMax]);
+    }, [n, l, Z, rMax, WIDTH, HEIGHT]);
 
     if (!path) return null;
 
     return (
-        <div className="radial-plot" aria-label="radial distribution">
+        <div className={`radial-plot${compact ? ' compact' : ''}`} aria-label="radial distribution">
             <div className="radial-plot-title">
                 Radial distribution — r²R(r)²
             </div>
