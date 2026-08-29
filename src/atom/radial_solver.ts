@@ -168,6 +168,19 @@ function countNodesForBracketing(grid: RadialGrid, g: Float64Array, l: number, m
  * decaying solution, so it needs far fewer decay lengths to wash out
  * whatever error remains: the same case comes back accurate to 1e-9 once
  * this and the Phase A margin below are both in place.
+ *
+ * Stepped one grid point at a time with the same periodic rescale as
+ * integrateOutwardGuarded above, for the same reason: the classically
+ * forbidden region a deeply bound inner state must cross, integrating
+ * backward from a grid's outer edge to its own much smaller turning point,
+ * grows without bound in a grid sized for the atom's *outermost* shell
+ * (ruling R22 of the SCF task) rather than for this particular state — the
+ * whole point of solving every subshell on one shared grid. Discovered via
+ * the SCF loop itself: solving iron's 1s (turning point r ~ 0.08) on the
+ * grid its own 4s needs (rMax = 71) blew this integration to Infinity in a
+ * single unguarded call, where the same state solved on a grid sized only
+ * for n=1..3 (rMax <= 44) was fine — i.e. exactly the asymmetry this mirrors
+ * against the forward direction's existing guard.
  */
 function integrateInward(grid: RadialGrid, g: Float64Array, to: number): Float64Array {
     const y = new Float64Array(grid.size);
@@ -175,7 +188,12 @@ function integrateInward(grid: RadialGrid, g: Float64Array, to: number): Float64
     const kappa = Math.sqrt(Math.max(g[last], 0));
     y[last] = 1e-10;
     y[last - 1] = 1e-10 * Math.exp(kappa * grid.dx);
-    numerovBackward(g, grid.dx, y, last - 1, to);
+    for (let j = last - 1; j > to; j--) {
+        numerovBackward(g, grid.dx, y, j, j - 1);
+        if (Math.abs(y[j - 1]) > RESCALE_THRESHOLD) {
+            for (let k = j - 1; k <= last; k++) y[k] *= RESCALE_FACTOR;
+        }
+    }
     return y;
 }
 

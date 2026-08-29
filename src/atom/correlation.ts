@@ -71,10 +71,23 @@ function xFromDensity(rho: number): number {
  * confirmed by the rs -> infinity test below). A grid point at the tail of a
  * wide atomic grid can underflow to exactly rho = 0 in double precision, and
  * a single NaN there would poison every Simpson's-rule sum this feeds.
+ *
+ * The same failure mode also shows up one step earlier than exact zero:
+ * xFromDensity's 3/(4*pi*rho) is a mathematically enormous but finite number
+ * for rho anywhere in the denormalised range (rho below about 1e-308), and
+ * that quotient itself overflows to Infinity before cbrt/sqrt ever run,
+ * producing the same non-finite x with rho still nominally positive.
+ * Discovered running the SCF loop (Task 6) on the heaviest elements: their
+ * grids reach far enough into the classically forbidden tail that a
+ * subshell's density genuinely underflows into that range at some grid
+ * points, well before it reaches exact 0. Checking x itself, rather than
+ * only rho's sign, catches both cases with one guard.
  */
 export function correlationEnergyDensity(rho: number): number {
     if (!(rho > 0)) return 0;
-    return vwnEpsilonC(xFromDensity(rho));
+    const x = xFromDensity(rho);
+    if (!Number.isFinite(x)) return 0;
+    return vwnEpsilonC(x);
 }
 
 /**
@@ -88,6 +101,7 @@ export function correlationEnergyDensity(rho: number): number {
 export function correlationPotential(rho: number): number {
     if (!(rho > 0)) return 0;
     const x = xFromDensity(rho);
+    if (!Number.isFinite(x)) return 0;
     return vwnEpsilonC(x) - (x / 6) * vwnEpsilonCDerivative(x);
 }
 
