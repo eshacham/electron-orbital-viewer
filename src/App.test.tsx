@@ -93,6 +93,12 @@ function argonLikeProfile(): SerialisedAtomProfile {
         ],
         subshells: [
             {
+                n: 2, l: 0, electrons: 2, energy: -10.794,
+                curve: new Float64Array(9),
+                R: new Float64Array(9),
+                samplingRadius: 2.5,
+            },
+            {
                 n: 2, l: 1, electrons: 6, energy: -8.443,
                 curve: new Float64Array(9),
                 R: new Float64Array(9),
@@ -220,6 +226,27 @@ describe('App', () => {
         // "no n/l/ml at all" case of their own.
         fireEvent.click(screen.getByRole('button', { name: 'Hydrogen' }));
         expect(screen.queryByLabelText('subshells')).not.toBeInTheDocument();
+    });
+
+    // Spec bugfix: the radial plot used to keep showing every subshell of the
+    // parent shell (2s alongside 2p) all the way down to level 3, instead of
+    // narrowing to the one subshell actually selected -- D(r)/P(r) doesn't
+    // depend on mL at all, so once a subshell is picked (with or without an
+    // mL choice on top of it) there is exactly one curve to show.
+    it('narrows the radial plot to the selected subshell once one is picked, not the whole parent shell', () => {
+        const { container } = renderWithProvider(<App />, {
+            mode: 'atom',
+            Z: 18,
+            level: 'orbital',
+            selectedShell: 2,
+            selectedSubshell: { n: 2, l: 1 },
+            selectedOrbital: { n: 2, l: 1, ml: 0 },
+            profile: argonLikeProfile(),
+        });
+
+        const legendLabels = Array.from(container.querySelectorAll('.radial-plot-legend-item'))
+            .map(el => el.textContent);
+        expect(legendLabels).toEqual(['2p']);
     });
 
     // Ruling R17: a solver that did not converge must show up as an

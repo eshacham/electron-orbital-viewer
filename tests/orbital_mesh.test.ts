@@ -308,3 +308,56 @@ describe('hydrogen-like path: unaffected by atom-mode box sizing', () => {
         expect(mesh.psiSigns).toContain(-1);
     });
 });
+
+/**
+ * General regression guard, requested directly: for any orbital with l > 0,
+ * the angular factor changes sign across at least one nodal plane/cone, so
+ * `psiSigns` must contain both +1 and -1. A single-signed mesh for l > 0 is
+ * the signature of the angular part having silently gone missing or
+ * degenerated to a constant (effectively l = 0) -- a *different* failure
+ * mode than the box-sizing bugs above (which show up as an empty or
+ * near-empty mesh instead, not a wrongly-signed full one). l = 0 orbitals
+ * are deliberately excluded: 1s has no node at all and is legitimately
+ * single-signed everywhere, so asserting both signs there would be asserting
+ * something false rather than guarding a bug.
+ *
+ * Covers both the analytic hydrogen-like path (3d, 7f, the l=8 case already
+ * exercised above) and the numerical atom-mode path (argon's 2p, built from
+ * a real `solveAtom(18)` exactly as the level-3 UI does).
+ */
+describe('l > 0 orbitals are never single-signed (angular part must vary)', () => {
+    const l_gt_0_cases: Array<[string, OrbitalParams]> = [
+        ['3d (n=3 l=2 ml=0)', orbital({ resolution: 32 })],
+        ['7f (n=7 l=3 ml=0)', orbital({ n: 7, l: 3, ml: 0, resolution: 64, rMax: 90, enclosedFraction: 0.9 })],
+        ['l=8 (n=9 l=8 ml=8)', orbital({ n: 9, l: 8, ml: 8, resolution: 64, rMax: 200, enclosedFraction: 0.9 })],
+    ];
+
+    it.each(l_gt_0_cases)('%s has both phases present', (_name, params) => {
+        const mesh = generateOrbitalMesh(params);
+        expect(mesh.psiSigns).toContain(1);
+        expect(mesh.psiSigns).toContain(-1);
+    });
+
+    it('argon 2p (numerical R(r), l=1) has both phases present, evenly split', () => {
+        const atom = solveAtom(18);
+        const state = atom.states.find(s => s.n === 2 && s.l === 1)!;
+        const profile = buildAtomProfile(atom, 0.9);
+        const curve = profile.subshells.find(s => s.n === 2 && s.l === 1)!.curve.values;
+        const rMax = subshellSamplingRadius(atom.grid, curve);
+
+        const mesh = generateOrbitalMesh({
+            n: 2, l: 1, ml: 0, Z: 18, resolution: 64, rMax, enclosedFraction: 0.9,
+            radialSamples: { R: state.R, rMin: atom.grid.rMin, dx: atom.grid.dx, size: atom.grid.size },
+        });
+
+        expect(mesh.psiSigns).toContain(1);
+        expect(mesh.psiSigns).toContain(-1);
+        // p_z is antisymmetric under z -> -z, so the two lobes should be
+        // (near-)equal in vertex count, not merely both present.
+        const pos = mesh.psiSigns.filter(s => s === 1).length;
+        const neg = mesh.psiSigns.filter(s => s === -1).length;
+        expect(pos).toBeGreaterThan(0);
+        expect(neg).toBeGreaterThan(0);
+        expect(Math.abs(pos - neg) / (pos + neg)).toBeLessThan(0.05);
+    });
+});
