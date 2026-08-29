@@ -24,6 +24,76 @@ function radialOverrideFromSamples(
 }
 
 /**
+ * The density that anchors the top of the log-scale climb below (see
+ * `encodeDensityMap`), robust to a single isolated grid point outweighing
+ * every shell that is actually visible.
+ *
+ * An s orbital (l = 0) is nonzero at the nucleus, and for a high-n Rydberg
+ * state that single point can be two-plus orders of magnitude denser than
+ * any of the orbital's own shells -- a 7s samples 0.00093 at r = 0 against
+ * 0.0000039 at its next-highest shell, a 240x gap. That one grid point
+ * encloses essentially no volume, but taking the raw maximum as "the peak"
+ * still hands it the top of the ramp, and the log scale in encodeDensityMap
+ * only compresses the *span* of climb values -- it does nothing about where
+ * that span's own ceiling sits. With the nucleus pinned to climb = 1, every
+ * shell that actually has volume is squeezed into the bottom third of the
+ * ramp: the cut face reads as flat colour rather than the concentric shells
+ * described in the README's "tree rings" case (7s, cut away).
+ *
+ * The fix is to require the peak to be supported by more than a literal
+ * handful of samples. `MIN_SUPPORT_FRACTION` of the grid is a small share --
+ * for the default 65^3 grid that is already dozens of samples -- so an
+ * isolated point of arbitrary density cannot set the ceiling on its own, but
+ * a real shell (which spans a whole neighbourhood of grid points) still can.
+ * Below that many samples (any small input, in particular every existing
+ * test's tiny arrays) this returns the exact maximum, unchanged from before.
+ *
+ * Found via the log-density histogram already used by
+ * `isoLevelForEnclosedFraction` (radial_distribution.ts) rather than a sort,
+ * for the same reason that one avoids sorting millions of samples: one O(n)
+ * pass to bin, one to walk down from the top bin until enough samples are
+ * accounted for.
+ */
+const MIN_SUPPORT_FRACTION = 1e-4;
+
+function robustPeakDensity(psi: Float32Array): number {
+    let peak = 0;
+    for (let i = 0; i < psi.length; i++) {
+        const density = psi[i] * psi[i];
+        if (density > peak) peak = density;
+    }
+    if (!(peak > 0)) return peak;
+
+    const support = Math.max(1, Math.round(psi.length * MIN_SUPPORT_FRACTION));
+    if (support <= 1) return peak;
+
+    const BINS = 4096;
+    const DECADES = 12;
+    const logPeak = Math.log10(peak);
+    const counts = new Uint32Array(BINS);
+
+    for (let i = 0; i < psi.length; i++) {
+        const density = psi[i] * psi[i];
+        if (density <= 0) continue;
+        const depth = (logPeak - Math.log10(density)) / DECADES;   // 0 at the peak
+        if (depth >= 1) continue;   // fainter than the range covers; never the peak's neighbourhood
+        counts[Math.min(BINS - 1, Math.floor(depth * BINS))]++;
+    }
+
+    let seen = 0;
+    for (let bin = 0; bin < BINS; bin++) {
+        seen += counts[bin];
+        if (seen >= support) {
+            // Lower edge of this bin: everything denser than it is the peak's
+            // supported neighbourhood.
+            const depth = (bin + 1) / BINS;
+            return peak * Math.pow(10, -depth * DECADES);
+        }
+    }
+    return peak;
+}
+
+/**
  * Packs the sampled wave function into one byte per grid point.
  *
  * The cut-away face shades itself from this, so it has to carry both the phase
@@ -33,14 +103,12 @@ function radialOverrideFromSamples(
  *
  * That climb is measured on a log scale: between the iso level and the peak the
  * density spans several orders of magnitude, and a linear ramp would leave the
- * whole face flat except for a pinpoint at the nucleus.
+ * whole face flat except for a pinpoint at the nucleus. "The peak" itself comes
+ * from `robustPeakDensity` above rather than a plain maximum, for the same
+ * flat-face failure mode one order of compression further out.
  */
 export function encodeDensityMap(psi: Float32Array, isoLevel: number): Uint8Array {
-    let peak = 0;
-    for (let i = 0; i < psi.length; i++) {
-        const density = psi[i] * psi[i];
-        if (density > peak) peak = density;
-    }
+    const peak = robustPeakDensity(psi);
 
     const encoded = new Uint8Array(psi.length);
     const range = Math.log(peak / isoLevel);

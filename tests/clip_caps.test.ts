@@ -8,6 +8,7 @@ import {
     disposeCaps,
 } from '../src/clip_caps';
 import { encodeDensityMap, generateOrbitalMesh } from '../src/orbital_mesh';
+import { computeSamplingRadius } from '../src/orbital_presets';
 import { DensityMap, OrbitalParams } from '../src/types/orbital';
 
 const params: OrbitalParams = {
@@ -81,6 +82,50 @@ describe('encodeDensityMap', () => {
         expect(mesh.densityMap.data).toHaveLength(side * side * side);
         expect(mesh.densityMap.side).toBe(side);
         expect(mesh.densityMap.rMax).toBe(params.rMax);
+    });
+
+    // Regression test for the flat cut face reported for hydrogen-like 7s
+    // (README's "tree rings" case): an s orbital is nonzero at the nucleus,
+    // and a single grid point there can be two-plus orders of magnitude
+    // denser than any of the orbital's own shells. Using the raw maximum as
+    // the top of the log-scale ramp pins that one point to climb = 1 and
+    // squeezes every shell -- which is what a slice actually shows -- into
+    // an imperceptible sliver near the iso level.
+    it('does not let one isolated peak crush a real shell of samples towards the iso level', () => {
+        const n = 20000;
+        const psi = new Float32Array(n);
+        // A "shell": fifty samples sharing one amplitude, the way a real
+        // isosurface's belly is a whole neighbourhood of grid points at
+        // similar density, not a single one.
+        for (let i = 0; i < 50; i++) psi[i] = 0.01; // density 1e-4
+        // The nucleus: one sample, 10000x denser than the shell.
+        psi[100] = 1;
+        const iso = 1e-6;
+
+        const encoded = encodeDensityMap(psi, iso);
+        const climb = (byte: number) => (byte - 128) / 127;
+
+        // Before the fix this shell climbed only to ~0.33 (log(100)/log(1e6)),
+        // because the isolated spike alone set the range's ceiling.
+        expect(climb(encoded[0])).toBeGreaterThan(0.6);
+        // The spike is still real density and still saturates the ramp -- it
+        // is just no longer the sole reference point for where "peak" is.
+        expect(encoded[100]).toBe(255);
+    });
+
+    it('shades hydrogen-like 7s with visible shell structure, not a wash of near-iso colour (regression)', () => {
+        const rMax = computeSamplingRadius(7, 0, 1);
+        const mesh = generateOrbitalMesh({
+            n: 7, l: 0, ml: 0, Z: 1, resolution: 64, rMax, enclosedFraction: 0.9,
+        });
+
+        // Samples whose climb magnitude is at least 0.72 -- comfortably past
+        // where the unfixed peak (the nucleus alone) crushed everything
+        // outside itself. Before the fix only the single nucleus voxel
+        // reached this band; a real shell's own belly should too.
+        const highClimb = Array.from(mesh.densityMap.data)
+            .filter(byte => byte >= 220 || byte <= 36).length;
+        expect(highClimb).toBeGreaterThan(20);
     });
 });
 
