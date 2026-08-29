@@ -153,3 +153,39 @@ is true.
 - All three levels render, navigate in both directions, and survive the
   existing 1065-test suite unbroken.
 - Production build succeeds and the app is deployable by `./infra/deploy.sh`.
+
+---
+
+## Addendum: level-transition animation (approved 2026-08-29)
+
+The three levels currently cut between three static pictures, which makes them
+read as three separate objects rather than one decomposition of the same atom.
+An animated transition fixes that — but only if it animates the right thing.
+
+**The constraint.** Shells interpenetrate (spec §2). At the L-shell radius the
+K-shell density has not vanished; it has fallen off. The drill-down is a
+decomposition, not a spatial nesting. An animation that reads as *flying
+inward* therefore teaches something false, however good it looks. The
+transition must read as **isolating** — the other contributions fading out of
+the picture, not the camera diving through them.
+
+**Atom → shell.** Hold the camera still and fade the non-selected shells out of
+the cut-face radial curve first; only then ease the camera to the shell's own
+framing. Both levels render the same sphere-plus-shader, so this is an
+interpolation of one texture and one camera distance. The fade must lead and
+the camera must follow — if they run together it reads as a dive again.
+
+**Shell → orbital.** A genuine topology change: a sphere does not continuously
+deform into a p_z's two lobes, and marching-cubes output gives no vertex
+correspondence to morph along. Cross-fade instead, both geometries alive
+briefly with opacity animated. `orbital_material.ts` already supports opacity
+and already handles the depth-write behaviour translucency needs.
+
+**Reversibility.** Every transition must be symmetric — drilling out is the
+same animation reversed — and interruptible: changing selection mid-animation
+must not strand geometry in the scene or leave opacity part-way. The
+`requestCounter` supersession added in b25e274 is the mechanism that keeps
+that honest.
+
+**Respect prefers-reduced-motion.** Users who ask for reduced motion get the
+existing instant cut, not a shortened animation.
