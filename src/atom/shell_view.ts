@@ -71,6 +71,14 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
     uniform float rMax;
     uniform float opacity;
     uniform float highlightR;   // negative when nothing is highlighted
+    // World-space half-width of the highlight band, kept proportional to the
+    // camera's distance from the target (see setShellViewRingWidth) rather
+    // than a fraction of the sampling grid's rMax. rMax can be 20-100x the
+    // contour actually on screen for a heavy atom, and is completely
+    // unrelated to how far the camera has zoomed in -- sizing the band from
+    // it means zooming in on the sphere zooms in on the ring just as much,
+    // until it is wide enough to wash out the whole view.
+    uniform float ringWidth;
 
     varying vec3 vWorldPosition;
 
@@ -102,7 +110,7 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         // own |worldPosition| against highlightR is already geometrically
         // correct for a plot-selected radius: it traces the circle where the
         // sphere of radius r meets the cut plane, without any extra geometry.
-        if (highlightR > 0.0 && abs(r - highlightR) < rMax * 0.004) {
+        if (highlightR > 0.0 && abs(r - highlightR) < ringWidth) {
             color = vec3(0.30, 0.95, 1.00);
         }
 
@@ -198,6 +206,9 @@ export function createShellView(options: ShellViewOptions): THREE.Group {
             rMax: { value: rMax },
             opacity: { value: opacity },
             highlightR: { value: -1 },
+            // Placeholder until the first setShellViewRingWidth call from the
+            // render loop; only visible for a single frame at worst.
+            ringWidth: { value: rMax * 0.004 },
         },
         vertexShader: CAP_VERTEX_SHADER,
         fragmentShader: CAP_FRAGMENT_SHADER,
@@ -231,6 +242,26 @@ export function setShellViewHighlight(view: THREE.Object3D | null, r: number | n
         if (!(child instanceof THREE.Mesh) || !child.userData.isCap) return;
         const material = child.material as THREE.ShaderMaterial;
         material.uniforms.highlightR.value = r ?? -1;
+    });
+}
+
+/**
+ * Keeps the highlight ring a constant apparent thickness by sizing its
+ * world-space half-width from the camera's own distance to the target
+ * (spec bugfix -- see the `ringWidth` uniform's doc comment above). Called
+ * once per frame from the render loop rather than only on camera-move
+ * events: `OrbitControls` damping means the camera keeps moving for several
+ * frames after the user stops dragging, and this is cheap enough (one
+ * uniform write) that there is no reason to track "did the distance
+ * actually change" separately.
+ */
+export function setShellViewRingWidth(view: THREE.Object3D | null, worldHalfWidth: number): void {
+    if (!view) return;
+
+    view.traverse(child => {
+        if (!(child instanceof THREE.Mesh) || !child.userData.isCap) return;
+        const material = child.material as THREE.ShaderMaterial;
+        material.uniforms.ringWidth.value = worldHalfWidth;
     });
 }
 

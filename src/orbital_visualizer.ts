@@ -7,7 +7,7 @@ import { createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCa
 import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
 import { createOrbitalWorker } from './workers/createOrbitalWorker';
 import { createOrbitalControls } from './orbital_controls_factory';
-import { createShellView, setShellViewHighlight, disposeShellView, ShellViewOptions } from './atom/shell_view';
+import { createShellView, setShellViewHighlight, setShellViewRingWidth, disposeShellView, ShellViewOptions } from './atom/shell_view';
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -579,20 +579,39 @@ function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
     }
 }
 
+// Ring half-width, in on-screen pixels, regardless of zoom (spec bugfix --
+// see the `ringWidth` uniform in shell_view.ts). A handful of pixels reads as
+// a crisp line at any distance; a fraction of the sampling grid's rMax, the
+// old approach, does not, because rMax has no relationship to how far the
+// camera has zoomed in.
+const HIGHLIGHT_RING_HALF_WIDTH_PX = 2;
+
 function startAnimationLoop(context: VisualizerContext) {
     if (!context) return;
     const { renderer, scene, camera, controls } = context;
-    
+
     function animate() {
         if (!context || context.isDisposed) {
             return;
         }
-        
+
         controls.update();
+        // Damping keeps the camera moving for several frames after a drag
+        // ends, so this is recomputed every frame rather than only on
+        // explicit camera-move events.
+        if (context.isShellView) {
+            const canvasHeightPx = renderer.domElement.clientHeight;
+            const pxToWorld = worldUnitsPerPixel(
+                camera.position.distanceTo(controls.target),
+                camera.fov,
+                canvasHeightPx
+            );
+            setShellViewRingWidth(context.currentOrbitalGroup, pxToWorld * HIGHLIGHT_RING_HALF_WIDTH_PX);
+        }
         renderer.render(scene, camera);
         context.animationFrameId = requestAnimationFrame(animate);
     }
-    
+
     // Start the animation
     context.animationFrameId = requestAnimationFrame(animate);
 }

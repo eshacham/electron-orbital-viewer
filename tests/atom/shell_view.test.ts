@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { createShellView, setShellViewHighlight, disposeShellView, ShellViewOptions } from '../../src/atom/shell_view';
+import {
+    createShellView,
+    setShellViewHighlight,
+    setShellViewRingWidth,
+    disposeShellView,
+    ShellViewOptions,
+} from '../../src/atom/shell_view';
 
 /**
  * An already-computed shellEmphasis curve (see atom_profile.ts) on a tiny
@@ -127,6 +133,29 @@ describe('shell view', () => {
 
         setShellViewHighlight(view, null);
         expect(capMaterial(view).uniforms.highlightR.value).toBeLessThan(0);
+    });
+
+    // Regression test: the ring's width used to be a fraction of the sampling
+    // grid's rMax, which has no relationship to the camera's zoom. Zooming in
+    // made the (grid-relative) band cover more and more of the screen, since
+    // nothing about it tracked apparent size. It must instead be driven
+    // explicitly, in world units the caller derives from camera distance.
+    it('setShellViewRingWidth sets the ring uniform directly, independent of rMax', () => {
+        const view = createShellView(options());
+        const initial = capMaterial(view).uniforms.ringWidth.value;
+        expect(initial).toBeGreaterThan(0);
+
+        setShellViewRingWidth(view, 0.01);
+        expect(capMaterial(view).uniforms.ringWidth.value).toBe(0.01);
+
+        // A much larger value (as if the camera had zoomed far out) is taken
+        // as-is too -- there is no clamping back to a fraction of rMax.
+        setShellViewRingWidth(view, 5);
+        expect(capMaterial(view).uniforms.ringWidth.value).toBe(5);
+    });
+
+    it('setShellViewRingWidth tolerates a missing view', () => {
+        expect(() => setShellViewRingWidth(null, 0.01)).not.toThrow();
     });
 
     it('tolerates a missing view', () => {
