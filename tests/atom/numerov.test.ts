@@ -41,4 +41,33 @@ describe('numerov', () => {
         const y = Float64Array.from([0, 1, 2, 1, 0]);
         expect(countNodes(y, 0, 4)).toBe(0);
     });
+
+    // A spatially varying g, unlike the constant-g cases above: y'' = (x^2 - 1) y
+    // has the exact solution exp(-x^2/2). With a constant g every Numerov factor is
+    // the same number, so reading the wrong g index is undetectable; here it is not.
+    it('reproduces exp(-x^2/2) where g varies with position', () => {
+        const size = 1201;
+        const h = 0.005;
+        const x0 = -3;
+        const x = (j: number) => x0 + j * h;
+        const exact = (j: number) => Math.exp(-(x(j) * x(j)) / 2);
+
+        const g = new Float64Array(size);
+        for (let j = 0; j < size; j++) g[j] = x(j) * x(j) - 1;
+
+        const forward = new Float64Array(size);
+        forward[0] = exact(0);
+        forward[1] = exact(1);
+        numerovForward(g, h, forward, 1, size - 1);
+
+        const backward = new Float64Array(size);
+        backward[size - 1] = exact(size - 1);
+        backward[size - 2] = exact(size - 2);
+        numerovBackward(g, h, backward, size - 2, 0);
+
+        for (const j of [0, 200, 600, 900, size - 1]) {
+            expect(forward[j]).toBeCloseTo(exact(j), 9);
+            expect(backward[j]).toBeCloseTo(exact(j), 9);
+        }
+    });
 });
