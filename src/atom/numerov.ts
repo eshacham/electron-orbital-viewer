@@ -8,30 +8,40 @@
  *
  * Both directions mutate `y` in place and expect the two seed values adjacent
  * to `from` to be set already. `to` is inclusive.
+ *
+ * The eigenvalue solver bisects many times per state and the SCF loop calls it
+ * once per subshell per iteration, so this runs order 10^5 times over a run.
+ * Each call only ever touches [from, to], usually a fraction of the grid, so
+ * the factor f_j = 1 - h^2 g_j / 12 is rolled forward on the fly from g rather
+ * than precomputed over the whole array — nothing is allocated, and nothing
+ * outside the range actually integrated is ever touched.
  */
-
-function numerovFactors(g: Float64Array, h: number): Float64Array {
-    const twelfth = (h * h) / 12;
-    const f = new Float64Array(g.length);
-    for (let j = 0; j < g.length; j++) f[j] = 1 - twelfth * g[j];
-    return f;
-}
 
 export function numerovForward(
     g: Float64Array, h: number, y: Float64Array, from: number, to: number
 ): void {
-    const f = numerovFactors(g, h);
+    const twelfth = (h * h) / 12;
+    let fPrev = 1 - twelfth * g[from - 1];
+    let fCurr = 1 - twelfth * g[from];
     for (let j = from; j < to; j++) {
-        y[j + 1] = ((12 - 10 * f[j]) * y[j] - f[j - 1] * y[j - 1]) / f[j + 1];
+        const fNext = 1 - twelfth * g[j + 1];
+        y[j + 1] = ((12 - 10 * fCurr) * y[j] - fPrev * y[j - 1]) / fNext;
+        fPrev = fCurr;
+        fCurr = fNext;
     }
 }
 
 export function numerovBackward(
     g: Float64Array, h: number, y: Float64Array, from: number, to: number
 ): void {
-    const f = numerovFactors(g, h);
+    const twelfth = (h * h) / 12;
+    let fNext = 1 - twelfth * g[from + 1];
+    let fCurr = 1 - twelfth * g[from];
     for (let j = from; j > to; j--) {
-        y[j - 1] = ((12 - 10 * f[j]) * y[j] - f[j + 1] * y[j + 1]) / f[j - 1];
+        const fPrev = 1 - twelfth * g[j - 1];
+        y[j - 1] = ((12 - 10 * fCurr) * y[j] - fNext * y[j + 1]) / fPrev;
+        fNext = fCurr;
+        fCurr = fPrev;
     }
 }
 
