@@ -18,7 +18,16 @@ interface RadialPlotProps {
     n: number;
     l: number;
     Z: number;
-    /** Half-width of the sampling box, which sets the horizontal range. */
+    /**
+     * Right edge of the plotted domain. For the single-curve hydrogenic
+     * form this is also the sampling half-width handed to `radialProfile`
+     * below. For multi-curve (atom) mode this is **not** the sampling
+     * grid's rMax -- the caller (App.tsx) passes a range sized to the
+     * curves actually being shown (a little beyond their contour radius),
+     * since the grid extent is typically 3-100x larger than anything worth
+     * plotting and would crush every peak into the first few percent of
+     * the axis (spec bugfix).
+     */
     rMax: number;
     /** Smaller layout for phone-width screens. */
     compact?: boolean;
@@ -28,6 +37,16 @@ interface RadialPlotProps {
      * original single-curve behaviour unchanged.
      */
     curves?: RadialCurve[];
+    /**
+     * Horizontal axis mapping. 'sqrt' compresses the outer part of the
+     * range and expands the region near the origin -- used for the
+     * whole-atom level, where a heavy atom's inner-shell peaks can sit
+     * within a couple of percent of the range while the valence shell
+     * peak sits near the far edge (e.g. gold: 0.014 to 0.385 a0, a 27x
+     * span). Defaults to 'linear', which keeps the single-curve hydrogenic
+     * plot's behaviour unchanged.
+     */
+    scale?: 'linear' | 'sqrt';
     /**
      * Radii of the whole atom's resolved D(r) maxima, marked as decoration.
      * Ruling R26: these are a display annotation only, never a source of
@@ -84,7 +103,7 @@ function dominantCurveLabelAt(curves: RadialCurve[], r: number): string | null {
  */
 const RadialPlot: React.FC<RadialPlotProps> = ({
     n, l, Z, rMax, compact = false,
-    curves, peaks, hoverRadius = null, onHoverRadius,
+    curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear',
 }) => {
     const WIDTH = compact ? 150 : 260;
     const HEIGHT = compact ? 62 : 96;
@@ -94,6 +113,16 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
 
     const isMultiCurve = Boolean(curves && curves.length > 0);
 
+    // 'sqrt' expands the region near the origin relative to the tail, so
+    // peaks that would otherwise sit within a couple of percent of a
+    // linear axis (a heavy atom's inner shells) spread out into legible
+    // separation. Identity when scale is 'linear', so every caller that
+    // does not pass `scale` (the hydrogenic single-curve plot included)
+    // behaves exactly as before.
+    const toAxis = (r: number) => (scale === 'sqrt' ? Math.sqrt(Math.max(0, r)) : r);
+    const axisMax = toAxis(rMax) || 1;
+    const xForRadius = (r: number) => PADDING.left + (toAxis(r) / axisMax) * plotWidth;
+
     const path = useMemo(() => {
         if (isMultiCurve) return null;
 
@@ -102,7 +131,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
         if (!(peak > 0)) return null;
 
         const points = profile.map(point => {
-            const x = PADDING.left + (point.r / rMax) * plotWidth;
+            const x = xForRadius(point.r);
             const y = PADDING.top + plotHeight * (1 - point.probability / peak);
             return `${x.toFixed(2)},${y.toFixed(2)}`;
         });
@@ -111,7 +140,8 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
             line: `M ${points.join(' L ')}`,
             fill: `M ${PADDING.left},${baseline} L ${points.join(' L ')} L ${(WIDTH - PADDING.right).toFixed(2)},${baseline} Z`,
         };
-    }, [isMultiCurve, n, l, Z, rMax, WIDTH, plotWidth, plotHeight, baseline]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isMultiCurve, n, l, Z, rMax, scale, WIDTH, plotWidth, plotHeight, baseline]);
 
     // Multi-curve mode shares one vertical scale across every curve, rather
     // than each curve topping out at the plot's own height — shells differ
@@ -130,22 +160,22 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
 
         return curves.map(curve => {
             const points = curve.points.map(point => {
-                const x = PADDING.left + (point.r / rMax) * plotWidth;
+                const x = xForRadius(point.r);
                 const y = PADDING.top + plotHeight * (1 - point.value / globalMax);
                 return `${x.toFixed(2)},${y.toFixed(2)}`;
             });
             return { label: curve.label, color: curve.color, line: `M ${points.join(' L ')}` };
         });
-    }, [isMultiCurve, curves, rMax, plotWidth, plotHeight]);
-
-    const xForRadius = (r: number) => PADDING.left + (r / rMax) * plotWidth;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isMultiCurve, curves, rMax, scale, plotWidth, plotHeight]);
 
     const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
         if (!onHoverRadius) return;
         const rect = event.currentTarget.getBoundingClientRect();
-        const scale = rect.width > 0 ? WIDTH / rect.width : 1;
-        const xSvg = (event.clientX - rect.left) * scale;
-        const r = ((xSvg - PADDING.left) / plotWidth) * rMax;
+        const pixelScale = rect.width > 0 ? WIDTH / rect.width : 1;
+        const xSvg = (event.clientX - rect.left) * pixelScale;
+        const axisValue = ((xSvg - PADDING.left) / plotWidth) * axisMax;
+        const r = scale === 'sqrt' ? Math.max(0, axisValue) ** 2 : axisValue;
         onHoverRadius(Math.min(rMax, Math.max(0, r)));
     };
 
@@ -235,7 +265,13 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
             )}
             <div className="radial-plot-scale">
                 <span>0</span>
-                <span>{Math.round(rMax)} a₀</span>
+                {/* rMax is now a range fitted to the curves shown (spec
+                    bugfix), not the sampling grid's rMax, so it is often
+                    well under 10 a0 -- Math.round would otherwise collapse
+                    e.g. gold's 1.68 down to a misleading "2". The scale
+                    mode is called out explicitly since a non-linear axis
+                    is otherwise silently misleading. */}
+                <span>{rMax < 10 ? rMax.toFixed(2) : Math.round(rMax)} a₀{scale === 'sqrt' ? ' (√ scale)' : ''}</span>
             </div>
         </div>
     );

@@ -117,11 +117,15 @@ describe('visualizer dispatch: levels 1-2 render a shell view, not marching cube
         expect(context.scene.children.filter(c => c.userData.isCapAssembly)).toHaveLength(1);
     });
 
-    it('shares camera framing: frames the camera to the params rMax the first time, and does not reframe at the same scale', () => {
+    it('shares camera framing: frames the camera to the contour radius (not the grid rMax) the first time, and does not reframe at the same scale', () => {
         const context = buildContext();
 
         updateAtomViewInScene(context, atomShellParams());
-        expect(context.framedRMax).toBeCloseTo(atomShellParams().rMax);
+        // Framing tracks the contour radius, which actually bounds the
+        // visible sphere -- not the much larger sampling-grid rMax (spec
+        // bugfix: a heavy atom's grid rMax can be 100x its contour radius).
+        expect(context.framedRMax).toBeCloseTo(atomShellParams().contourRadius);
+        expect(context.clipExtent).toBeCloseTo(atomShellParams().rMax);
         const distanceAfterFirst = context.camera.position.length();
 
         // A second call at the same rMax must not move the camera again --

@@ -19,8 +19,25 @@ export interface VisualizerContext {
     currentAxesHelper: THREE.AxesHelper | null;
     animationFrameId?: number;
     isDisposed?: boolean;  // Add this flag
-    /** rMax the camera was last framed for, so we only re-frame when the scale changes. */
+    /**
+     * The radius the camera was last framed for, so we only re-frame when
+     * the scale changes. For a marching-cubes orbital this is the sampling
+     * box's rMax; for a levels-1/2 shell view it is the *contour* radius
+     * (spec bugfix), which is what actually bounds the visible object --
+     * not the sampling grid's rMax, which can be over 100x larger for a
+     * heavy atom (see clipExtent below for that quantity).
+     */
     framedRMax?: number;
+    /**
+     * The rMax used for the cut plane / discard radius, tracked separately
+     * from `framedRMax` above. The two coincide for a marching-cubes
+     * orbital (both are the sampling box's rMax), but a shell view's cut
+     * face and shader discard still need to span the full sampling grid
+     * even though the camera is framed tighter, on the contour radius --
+     * conflating the two would either clip the shell view's cut face short
+     * or zoom the camera out to the near-empty grid extent.
+     */
+    clipExtent?: number;
     surfaceStyle: SurfaceStyle;
     /** Single cut-away plane, shared by every orbital material. */
     clipPlane: THREE.Plane;
@@ -227,7 +244,7 @@ export function setSurfaceStyle(context: VisualizerContext | null, style: Surfac
         context.clipPlane,
         style.clipAxis,
         style.clipPosition,
-        context.framedRMax ?? 1
+        context.clipExtent ?? 1
     );
     refreshCaps(context);
 }
@@ -321,10 +338,14 @@ export async function updateOrbitalInScene(
         }
 
         // Re-frame only when the scale changes, so repeated updates at the same
-        // rMax leave the viewer's chosen angle and zoom alone.
+        // rMax leave the viewer's chosen angle and zoom alone. A
+        // marching-cubes orbital's visible extent *is* the sampling box, so
+        // camera framing and the clip extent are the same value here (unlike
+        // a shell view -- see updateAtomViewInScene).
         if (context.framedRMax !== workerRMax) {
             frameOrbital(context, workerRMax);
         }
+        context.clipExtent = workerRMax;
         // The cut position is a fraction of rMax, so it has to be recomputed
         // whenever the box changes size.
         updateClipPlane(
@@ -396,7 +417,15 @@ export interface AtomShellViewParams {
     rMin: number;
     dx: number;
     size: number;
-    /** Outer extent of the shared log grid; sizes the cut face, the discard radius, and the camera framing. */
+    /**
+     * Outer extent of the shared log grid; sizes the cut face and the
+     * shader's discard radius. **Not** the camera framing target -- the
+     * grid extent is chosen generously enough to hold the outermost
+     * occupied orbital's tail, so it is routinely 20-100x the radius that
+     * is actually visible (e.g. gold: rMax=140 vs a contour radius of
+     * 1.4). The camera frames on `contourRadius` instead (see
+     * updateAtomViewInScene).
+     */
     rMax: number;
 }
 
@@ -424,9 +453,19 @@ export function updateAtomViewInScene(
     // mark, unlike a marching-cubes orbital's lobes.
     removeAxesHelper(context);
 
-    if (context.framedRMax !== params.rMax) {
-        frameOrbital(context, params.rMax);
+    // Frame on the contour radius -- the radius that actually bounds the
+    // sphere drawn below -- not the sampling grid's rMax (spec bugfix: the
+    // grid is sized to comfortably hold the tail of the outermost orbital,
+    // which for a heavy atom leaves the visible contour a few pixels across
+    // in the middle of an otherwise empty viewport). This is also what
+    // makes drilling into a shell actually zoom in: each shell carries its
+    // own, smaller contour radius.
+    if (context.framedRMax !== params.contourRadius) {
+        frameOrbital(context, params.contourRadius);
     }
+    // The cut face and the shader's discard radius still need to span the
+    // full sampling grid, independently of how tight the camera is framed.
+    context.clipExtent = params.rMax;
     updateClipPlane(
         context.clipPlane,
         context.surfaceStyle.clipAxis,

@@ -236,7 +236,22 @@ function App() {
         () => atomProfile ? gridRadii(atomProfile.rMin, atomProfile.dx, atomProfile.size) : [],
         [atomProfile]
     );
-    const atomGridRMax = atomRGrid.length > 0 ? atomRGrid[atomRGrid.length - 1] : 1;
+    // The radial plot's horizontal range: sized to what is actually being
+    // shown, not the sampling grid's rMax (spec bugfix). The grid extent is
+    // chosen to comfortably hold the outermost orbital's tail -- for argon
+    // that is 44 a0 against shell peaks at 0.06/0.29/1.22, so a linear axis
+    // against the grid crushes every peak into the first few percent of the
+    // plot. 1.2x the contour radius keeps every peak visible with some tail
+    // included. Tracks the drill-down level, same as `atomCurves` below, so
+    // drilling into a shell zooms the plot in exactly as it zooms the 3D
+    // view in (see updateAtomViewInScene's camera-framing fix).
+    const atomPlotRange = useMemo(() => {
+        if (!atomProfile) return 1;
+        const radius = atomLevel === 'atom'
+            ? atomProfile.contourRadius
+            : (atomProfile.shells.find(s => s.n === atomSelectedShell)?.contourRadius ?? atomProfile.contourRadius);
+        return radius * 1.2;
+    }, [atomProfile, atomLevel, atomSelectedShell]);
 
     // Level 1: one curve per shell. Level 2/3: the selected shell's own
     // subshells, so the plot always answers "what am I looking at" rather
@@ -356,7 +371,8 @@ function App() {
                         n={1}
                         l={0}
                         Z={atomProfile.Z}
-                        rMax={atomGridRMax}
+                        rMax={atomPlotRange}
+                        scale={atomLevel === 'atom' ? 'sqrt' : 'linear'}
                         compact={isNarrow}
                         curves={atomCurves}
                         peaks={Array.from(atomProfile.shellPeaks)}
