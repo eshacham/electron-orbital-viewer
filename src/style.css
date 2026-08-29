@@ -179,6 +179,47 @@ button:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* Multi-curve (multi-electron atom) mode. The panel itself stays click-through
+   (see .radial-plot above) so it never blocks the 3D view underneath, but the
+   svg needs real pointer events here for hover-to-highlight to work. */
+.radial-plot.interactive svg {
+  pointer-events: auto;
+}
+.radial-plot-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.radial-plot-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.radial-plot-legend-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.radial-plot-peak {
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 1.4;
+}
+.radial-plot-hover-rule {
+  stroke: rgba(255, 255, 255, 0.8);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+.radial-plot-hover-readout {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
 
 /* ---------------------------------------------------------------------------
    Phone layout.
