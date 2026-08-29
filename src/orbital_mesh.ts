@@ -2,6 +2,26 @@ import { DensityMap, MeshData, OrbitalParams } from './types/orbital';
 import { makeWaveFunctionEvaluator } from './quantum_functions';
 import { marchingCubes } from './marching_cubes';
 import { isoLevelForEnclosedFraction } from './radial_distribution';
+import { RadialGrid, interpolateOnGrid } from './atom/radial_grid';
+
+/**
+ * Rebuilds the interpolating closure a converged SCF solution's R(r) was
+ * flattened into to cross the worker boundary (see `OrbitalParams.radialSamples`).
+ *
+ * `interpolateOnGrid` only reads `rMin`, `dx` and `size` off its grid
+ * argument, so a `RadialGrid`-shaped object is reconstructed here rather than
+ * duplicating its interpolation logic (`r` and `rMax` are unused and filled
+ * in only to satisfy the type); this is the one place `radialSamples` needs
+ * to be turned back into the `(r: number) => number` signature
+ * `makeWaveFunctionEvaluator` expects.
+ */
+function radialOverrideFromSamples(
+    samples: NonNullable<OrbitalParams['radialSamples']>
+): (r: number) => number {
+    const { R, rMin, dx, size } = samples;
+    const grid: RadialGrid = { r: new Float64Array(0), dx, size, rMin, rMax: rMin * Math.exp((size - 1) * dx) };
+    return (r: number) => interpolateOnGrid(grid, R, r);
+}
 
 /**
  * Packs the sampled wave function into one byte per grid point.
@@ -52,7 +72,7 @@ export function encodeDensityMap(psi: Float32Array, isoLevel: number): Uint8Arra
  * evaluating the wave function a second time.
  */
 export function generateOrbitalMesh(params: OrbitalParams): MeshData {
-    const { n, l, ml, Z, resolution, rMax, enclosedFraction } = params;
+    const { n, l, ml, Z, resolution, rMax, enclosedFraction, radialSamples } = params;
 
     if (resolution <= 0 || rMax <= 0) {
         throw new Error('Invalid parameters: resolution and rMax must be positive');
@@ -64,7 +84,10 @@ export function generateOrbitalMesh(params: OrbitalParams): MeshData {
         throw new Error('Invalid parameters: enclosedFraction must be between 0 and 1');
     }
 
-    const evaluatePsi = makeWaveFunctionEvaluator(n, l, ml, Z);
+    const evaluatePsi = makeWaveFunctionEvaluator(
+        n, l, ml, Z,
+        radialSamples ? radialOverrideFromSamples(radialSamples) : undefined
+    );
 
     const side = resolution + 1;
     const step = (2 * rMax) / resolution;

@@ -435,12 +435,23 @@ export const __clearAllCaches__ = (): void => {
  * polynomial uses a flat upward recurrence rather than a memoised recursive one.
  * Sampling a 128^3 grid calls this a couple of million times, so the per-point
  * work is what sets the render time.
+ *
+ * `radialOverride`, when supplied, replaces the analytic R_nl(r) with a
+ * numerical one (see `radialFunctionFor` in atom/atom_profile.ts) — the
+ * bridge from a converged SCF solution to this evaluator. The choice between
+ * the two is made once, here, before the closure below is returned: the
+ * inner loop calls whichever radial function was chosen through one
+ * indirection rather than testing `radialOverride` on every one of the
+ * couple of million points it runs for. Skipping the Laguerre coefficient
+ * setup below when an override is supplied is the same hoist applied to the
+ * one-off work instead of the per-point work.
  */
 export function makeWaveFunctionEvaluator(
     n: number,
     l: number,
     ml: number,
-    Z: number = 1
+    Z: number = 1,
+    radialOverride?: (r: number) => number
 ): (x: number, y: number, z: number) => number {
     if (n < 1 || !Number.isInteger(n)) {
         throw new Error("Principal quantum number (n) must be a positive integer.");
@@ -456,18 +467,33 @@ export function makeWaveFunctionEvaluator(
     }
 
     // --- radial part, R_nl(r) = radialNorm * rho^l * e^(-rho/2) * L(rho) ---
-    const radialNorm = Math.sqrt(
-        (Math.pow((2 * Z) / n, 3) * factorial(n - l - 1)) / (2 * n * factorial(n + l))
-    );
-    const rhoPerR = (2 * Z) / n;
+    // (or, with an override, whatever numerical function was supplied instead).
+    let radialAt: (r: number) => number;
+    if (radialOverride) {
+        radialAt = radialOverride;
+    } else {
+        const radialNorm = Math.sqrt(
+            (Math.pow((2 * Z) / n, 3) * factorial(n - l - 1)) / (2 * n * factorial(n + l))
+        );
+        const rhoPerR = (2 * Z) / n;
 
-    // L_{n-l-1}^{2l+1}(rho) as plain coefficients, evaluated by Horner.
-    const degree = n - l - 1;
-    const alpha = 2 * l + 1;
-    const laguerreCoefficients = new Float64Array(degree + 1);
-    for (let k = 0; k <= degree; k++) {
-        laguerreCoefficients[k] =
-            Math.pow(-1, k) * binomialCoefficient(degree + alpha, degree - k) / factorial(k);
+        // L_{n-l-1}^{2l+1}(rho) as plain coefficients, evaluated by Horner.
+        const degree = n - l - 1;
+        const alpha = 2 * l + 1;
+        const laguerreCoefficients = new Float64Array(degree + 1);
+        for (let k = 0; k <= degree; k++) {
+            laguerreCoefficients[k] =
+                Math.pow(-1, k) * binomialCoefficient(degree + alpha, degree - k) / factorial(k);
+        }
+
+        radialAt = (r: number): number => {
+            const rho = rhoPerR * r;
+            let laguerre = laguerreCoefficients[degree];
+            for (let k = degree - 1; k >= 0; k--) {
+                laguerre = laguerre * rho + laguerreCoefficients[k];
+            }
+            return radialNorm * Math.pow(rho, l) * Math.exp(-rho / 2) * laguerre;
+        };
     }
 
     // --- angular part, real spherical harmonic ---
@@ -484,12 +510,7 @@ export function makeWaveFunctionEvaluator(
     return (x: number, y: number, z: number): number => {
         const r = Math.sqrt(x * x + y * y + z * z);
 
-        const rho = rhoPerR * r;
-        let laguerre = laguerreCoefficients[degree];
-        for (let k = degree - 1; k >= 0; k--) {
-            laguerre = laguerre * rho + laguerreCoefficients[k];
-        }
-        const radial = radialNorm * Math.pow(rho, l) * Math.exp(-rho / 2) * laguerre;
+        const radial = radialAt(r);
         if (radial === 0) return 0;
 
         // cos(theta); the r === 0 case matches the reference, which passes theta = 0.

@@ -1,5 +1,5 @@
 import { generateOrbitalMesh } from '../src/orbital_mesh';
-import { makeWaveFunctionEvaluator } from '../src/quantum_functions';
+import { makeWaveFunctionEvaluator, radialWaveFunction } from '../src/quantum_functions';
 import { computeSamplingRadius } from '../src/orbital_presets';
 import { MeshData, OrbitalParams } from '../src/types/orbital';
 
@@ -141,5 +141,67 @@ describe('psi sign per vertex', () => {
         const topmost = mesh.positions.reduce((best, p, i) =>
             p[2] > mesh.positions[best][2] ? i : best, 0);
         expect(mesh.psiSigns[topmost]).toBe(1);
+    });
+});
+
+describe('radialSamples override', () => {
+    // Samples the exact analytic R_nl on a log grid, the same way a converged
+    // SCF solution's R(r) would arrive over the worker boundary, and checks
+    // that generateOrbitalMesh's worker-side interpolation reproduces the
+    // analytic surface closely rather than merely "producing some mesh".
+    function sampleAnalyticRadial(n: number, l: number, Z: number, rMin: number, rMaxSample: number, size: number) {
+        const dx = Math.log(rMaxSample / rMin) / (size - 1);
+        const R = new Float64Array(size);
+        for (let j = 0; j < size; j++) {
+            R[j] = radialWaveFunction(n, l, rMin * Math.exp(j * dx), Z);
+        }
+        return { R, rMin, dx, size };
+    }
+
+    it('actually uses radialSamples instead of silently falling back to the analytic radial factor', () => {
+        const params = orbital({ n: 3, l: 2, ml: 0, Z: 1, resolution: 32, rMax: 20, enclosedFraction: 0.9 });
+        const analyticMesh = generateOrbitalMesh(params);
+
+        // A radial factor with no nodes and a much faster decay than R_32 --
+        // nothing like the analytic curve. If radialSamples were silently
+        // ignored this mesh would come out identical to analyticMesh instead
+        // of having a markedly different iso level.
+        const rMin = 1e-4;
+        const rMaxSample = 60;
+        const size = 2001;
+        const dx = Math.log(rMaxSample / rMin) / (size - 1);
+        const R = new Float64Array(size);
+        for (let j = 0; j < size; j++) R[j] = Math.exp(-3 * rMin * Math.exp(j * dx));
+
+        const overriddenMesh = generateOrbitalMesh({ ...params, radialSamples: { R, rMin, dx, size } });
+
+        expect(overriddenMesh.cells.length).toBeGreaterThan(0);
+        expect(overriddenMesh.isoLevel).not.toBeCloseTo(analyticMesh.isoLevel, 6);
+    });
+
+    it('reproduces the analytic isosurface when fed a sampled version of the same radial function', () => {
+        const params = orbital({ n: 3, l: 2, ml: 0, Z: 1, resolution: 32, rMax: 20, enclosedFraction: 0.9 });
+        const radialSamples = sampleAnalyticRadial(3, 2, 1, 1e-4, 60, 2001);
+
+        const analyticMesh = generateOrbitalMesh(params);
+        const numericalMesh = generateOrbitalMesh({ ...params, radialSamples });
+
+        expect(numericalMesh.cells.length).toBeGreaterThan(0);
+        expect(numericalMesh.isoLevel).toBeCloseTo(analyticMesh.isoLevel, 3);
+        const vertexCountRatio = numericalMesh.positions.length / analyticMesh.positions.length;
+        expect(vertexCountRatio).toBeGreaterThan(0.95);
+        expect(vertexCountRatio).toBeLessThan(1.05);
+    });
+
+    it('produces a crack-free surface when the radial factor comes from samples', () => {
+        const params = orbital({ n: 3, l: 2, ml: 0, Z: 1, resolution: 32, rMax: 20, enclosedFraction: 0.9 });
+        const radialSamples = sampleAnalyticRadial(3, 2, 1, 1e-4, 60, 2001);
+
+        const mesh = generateOrbitalMesh({ ...params, radialSamples });
+        const t = topology(mesh, params.rMax);
+
+        expect(t.degenerate).toBe(0);
+        expect(t.nonManifoldEdges).toBe(0);
+        expect(t.cracks).toBe(0);
     });
 });

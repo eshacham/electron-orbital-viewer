@@ -60,4 +60,30 @@ describe('makeWaveFunctionEvaluator', () => {
             }
         }
     });
+
+    it('uses an injected radial function in place of the analytic one', () => {
+        const constantRadial = () => 2;
+        const evaluate = makeWaveFunctionEvaluator(2, 1, 0, 1, constantRadial);
+        const analytic = makeWaveFunctionEvaluator(2, 1, 0, 1);
+        // Same angular dependence, radial factor replaced by a constant.
+        const ratio = evaluate(0, 0, 3) / (2 * Math.SQRT1_2);
+        expect(Number.isFinite(ratio)).toBe(true);
+        expect(evaluate(0, 0, 3)).not.toBeCloseTo(analytic(0, 0, 3), 10);
+        // Angular node still in the right place: p_z vanishes in the xy plane.
+        expect(evaluate(3, 0, 0)).toBeCloseTo(0, 12);
+    });
+
+    it('is unchanged when no override is given', () => {
+        const evaluate = makeWaveFunctionEvaluator(3, 2, 1, 6);
+        for (const point of [[1, 2, 3], [0, 0, 1], [-2, 1, 0.5]] as Array<[number, number, number]>) {
+            const { waveFunctionValue } = atomicOrbitalProbabilityDensity(
+                3, 2, 1,
+                Math.hypot(...point),
+                Math.acos(point[2] / Math.hypot(...point)),
+                Math.atan2(point[1], point[0]),
+                6
+            );
+            expect(evaluate(...point)).toBeCloseTo(waveFunctionValue, 12);
+        }
+    });
 });

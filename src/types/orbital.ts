@@ -39,6 +39,19 @@ export interface OrbitalParams {
      * orbitals. The density is derived from this per orbital instead.
      */
     enclosedFraction: number;
+    /**
+     * Present when the radial factor comes from a converged SCF solution
+     * rather than the analytic hydrogen-like form.
+     *
+     * A closure cannot cross a worker boundary, so a solved subshell's R(r)
+     * is handed over as this sampled log-grid array plus its grid parameters
+     * instead; the receiving side (generateOrbitalMesh) rebuilds the
+     * interpolating closure itself. Presence of this field, rather than a
+     * separate flag, is what decides "numerical" vs "analytic" (ruling R4):
+     * a flag could disagree with the data it describes, and it could not
+     * carry what a worker needs regardless.
+     */
+    radialSamples?: { R: Float64Array; rMin: number; dx: number; size: number };
 }
 
 export type OrbitalDataPoint = {
