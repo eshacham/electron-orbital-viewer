@@ -1,0 +1,249 @@
+/**
+ * Atom profiles: the bridge from a converged `AtomSolution` to everything the
+ * UI draws.
+ *
+ * `solveAtom` hands back one radial state per occupied subshell and a single
+ * total D(r); the drill-down UI (whole atom -> shell -> subshell) needs those
+ * same electrons re-sliced three different ways, plus a handful of derived
+ * scalars (contour radii, shell peak positions) that would otherwise be
+ * recomputed ad hoc by every consumer. This module computes them once.
+ *
+ * Naming follows scf.ts: **`D(r)`** is the radial distribution
+ * (4*pi*r^2*rho(r), integrates to an electron count); `density` would mean
+ * rho(r) alone and is not used here — every curve in this module is a D(r).
+ */
+import { RadialGrid, cumulativeIntegral, interpolateOnGrid } from './radial_grid';
+import { RadialState } from './radial_solver';
+import { AtomSolution } from './scf';
+import { subshellLabel } from './configurations';
+
+export interface RadialCurve {
+    label: string;
+    /** D(r) sampled on the solution's grid. */
+    values: Float64Array;
+}
+
+export interface AtomProfile {
+    Z: number;
+    grid: RadialGrid;
+    total: RadialCurve;
+    shells: Array<{ n: number; electrons: number; curve: RadialCurve; contourRadius: number }>;
+    subshells: Array<{ n: number; l: number; electrons: number; energy: number; curve: RadialCurve }>;
+    /** Radius enclosing `fraction` of all electrons. */
+    contourRadius: number;
+    /** Peaks of the total D(r), one per resolved shell. */
+    shellPeaks: number[];
+}
+
+// Letters for the first seven principal shells, in the old X-ray notation
+// ("K shell", "L shell", ...) the brief's example label uses. Nothing in this
+// app reaches n > 7 (see configurations.ts), so the table need not go further.
+const PRINCIPAL_SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
+
+function shellName(n: number): string {
+    return `${PRINCIPAL_SHELL_LETTERS[n - 1] ?? `n=${n}`} shell`;
+}
+
+/**
+ * A single subshell's contribution to D(r): D_nl(r) = occ * u(r)^2.
+ *
+ * This mirrors buildD in scf.ts exactly (D itself is just the sum of these
+ * over every state), which is what makes "subshells sum to their shell" and
+ * "shells sum to the total" hold as identities rather than approximations.
+ */
+function subshellCurveOf(state: RadialState & { electrons: number }): Float64Array {
+    const values = new Float64Array(state.u.length);
+    for (let j = 0; j < values.length; j++) {
+        values[j] = state.electrons * state.u[j] * state.u[j];
+    }
+    return values;
+}
+
+/**
+ * The radius enclosing `fraction` of the electrons described by `curve`.
+ *
+ * cumulativeIntegral already folds in the r dt -> dr Jacobian (see
+ * radial_grid.ts), so cumulative[j] is directly the electron count enclosed
+ * within grid.r[j]; no extra r^2 or volume factor is needed since D(r) is
+ * itself already the per-dr electron density. The target radius is then
+ * found by walking outward and interpolating linearly in r between the
+ * bracketing grid points, rather than snapping to the nearest grid point,
+ * so contourRadius varies smoothly as `fraction` varies continuously.
+ */
+function radiusEnclosing(grid: RadialGrid, curve: Float64Array, fraction: number): number {
+    const cumulative = cumulativeIntegral(grid, curve);
+    const total = cumulative[grid.size - 1];
+    if (!(total > 0)) return grid.r[0];
+
+    const target = fraction * total;
+    for (let j = 1; j < grid.size; j++) {
+        if (cumulative[j] >= target) {
+            const span = cumulative[j] - cumulative[j - 1];
+            const t = span > 0 ? (target - cumulative[j - 1]) / span : 0;
+            return grid.r[j - 1] + t * (grid.r[j] - grid.r[j - 1]);
+        }
+    }
+    return grid.r[grid.size - 1];
+}
+
+// A peak only counts if it clears this fraction of the global maximum.
+// Shells differ in height by orders of magnitude (uranium's 1s peak is
+// ~1000x its 7s peak — see ruling R16), so the threshold must sit well below
+// the faintest real outer-shell peak while still rejecting the sub-ULP
+// wiggle that floating-point arithmetic leaves in D(r)'s exponentially
+// decaying tail. 1e-4 was checked empirically against solveAtom(10) (neon,
+// 2 peaks) and solveAtom(18) (argon, 3 peaks): both come out clean, and
+// solveAtom(92) (uranium)'s faintest resolved peak clears it by orders of
+// magnitude with room to spare.
+const SHELL_PEAK_RELATIVE_THRESHOLD = 1e-4;
+
+/**
+ * Local maxima of the total D(r), thresholded relative to the global
+ * maximum rather than by an absolute value (per the brief) so the same
+ * threshold works unchanged from hydrogen up to the heaviest atoms.
+ *
+ * Individual subshells within one principal shell (2s and 2p, say) overlap
+ * too heavily to show as separate maxima in the *summed* D(r) — that
+ * merging is real physics, not something this function needs to special-case
+ * — so "one peak per resolved shell" falls out of scanning the total curve
+ * directly.
+ */
+function findShellPeaks(grid: RadialGrid, D: Float64Array): number[] {
+    let globalMax = 0;
+    for (let j = 0; j < D.length; j++) {
+        if (D[j] > globalMax) globalMax = D[j];
+    }
+    if (!(globalMax > 0)) return [];
+
+    const threshold = SHELL_PEAK_RELATIVE_THRESHOLD * globalMax;
+    const peaks: number[] = [];
+    // D[j] >= D[j-1] (not >) takes the left edge of a flat top rather than
+    // reporting every point of a plateau as its own peak.
+    for (let j = 1; j < D.length - 1; j++) {
+        if (D[j] >= D[j - 1] && D[j] > D[j + 1] && D[j] > threshold) {
+            peaks.push(grid.r[j]);
+        }
+    }
+    return peaks;
+}
+
+/**
+ * Groups already-built subshell curves into shells (by principal quantum
+ * number n), summing their D(r) curves and electron counts.
+ *
+ * `atom.states` (and therefore `subshells`, built from it) is ordered by
+ * (n, l) per the AtomSolution contract, so consecutive subshells with equal n
+ * can simply be accumulated into the shell currently open — the same
+ * grouping trick shellsFor uses in configurations.ts, applied here to curves
+ * instead of subshell records.
+ */
+function groupIntoShells(
+    grid: RadialGrid,
+    subshells: AtomProfile['subshells'],
+    fraction: number
+): AtomProfile['shells'] {
+    const shells: AtomProfile['shells'] = [];
+    for (const subshell of subshells) {
+        let shell = shells[shells.length - 1];
+        if (!shell || shell.n !== subshell.n) {
+            shell = {
+                n: subshell.n,
+                electrons: 0,
+                curve: { label: shellName(subshell.n), values: new Float64Array(grid.size) },
+                contourRadius: 0,
+            };
+            shells.push(shell);
+        }
+        shell.electrons += subshell.electrons;
+        for (let j = 0; j < grid.size; j++) shell.curve.values[j] += subshell.curve.values[j];
+    }
+    for (const shell of shells) {
+        shell.contourRadius = radiusEnclosing(grid, shell.curve.values, fraction);
+    }
+    return shells;
+}
+
+/**
+ * Turns a converged AtomSolution into every curve and derived radius the UI
+ * needs: the whole-atom D(r), the per-shell and per-subshell D(r) (which sum
+ * back up to the total and to their shell respectively, by construction —
+ * see subshellCurveOf), a contour radius per shell and for the atom as a
+ * whole, and the resolved shell peak positions used by the drill-down UI.
+ */
+export function buildAtomProfile(atom: AtomSolution, fraction: number): AtomProfile {
+    const { grid, Z, states, D } = atom;
+
+    const subshells: AtomProfile['subshells'] = states.map(state => ({
+        n: state.n,
+        l: state.l,
+        electrons: state.electrons,
+        energy: state.energy,
+        curve: { label: subshellLabel(state.n, state.l), values: subshellCurveOf(state) },
+    }));
+
+    const shells = groupIntoShells(grid, subshells, fraction);
+
+    return {
+        Z,
+        grid,
+        total: { label: 'total', values: D },
+        shells,
+        subshells,
+        contourRadius: radiusEnclosing(grid, D, fraction),
+        shellPeaks: findShellPeaks(grid, D),
+    };
+}
+
+/**
+ * The bridge to level 3: an interpolating closure over a solved subshell's
+ * numerical R(r), with the same `(r: number) => number` signature as the
+ * analytic radial factor, so `makeWaveFunctionEvaluator` (Task 8) can take
+ * either one interchangeably as its radial override.
+ *
+ * Throws rather than returning a zero function for an unoccupied (n, l):
+ * there is no numerical R to interpolate for a subshell the SCF never
+ * solved, and silently returning zero would render as "orbital exists but
+ * is empty" instead of the caller's actual mistake.
+ */
+export function radialFunctionFor(atom: AtomSolution, n: number, l: number): (r: number) => number {
+    const state = atom.states.find(s => s.n === n && s.l === l);
+    if (!state) {
+        throw new Error(`(n=${n}, l=${l}) is not an occupied subshell of Z=${atom.Z}.`);
+    }
+    return (r: number) => interpolateOnGrid(atom.grid, state.R, r);
+}
+
+/**
+ * Resamples a log-grid array onto `samples` points evenly spaced in r over
+ * [0, rMax] (ruling R3).
+ *
+ * Every curve above lives on the SCF's logarithmic grid, which is the right
+ * representation for solving the equations but the wrong one for a fragment
+ * shader: Task 10 computes r = length(worldPosition) per-pixel and needs a
+ * direct index into a uniformly-spaced lookup table, not a log/exp round
+ * trip inside the shader. This is the one place that reshapes the data for
+ * that consumer.
+ *
+ * Deliberately does *not* normalise or quantise (ruling R16): a shell's D(r)
+ * peak can be three orders of magnitude below the atom's innermost peak, and
+ * either an 8-bit encoding or a linear normalisation here would flatten the
+ * outer shells to nothing before the shader — which will read this through a
+ * float texture and apply its own perceptual ramp — ever sees them.
+ */
+export function resampleUniform(
+    grid: RadialGrid,
+    values: Float64Array,
+    rMax: number,
+    samples: number
+): Float32Array {
+    if (!Number.isInteger(samples) || samples < 1) {
+        throw new Error('resampleUniform needs at least one sample.');
+    }
+
+    const out = new Float32Array(samples);
+    const step = samples > 1 ? rMax / (samples - 1) : 0;
+    for (let i = 0; i < samples; i++) {
+        out[i] = interpolateOnGrid(grid, values, i * step);
+    }
+    return out;
+}
