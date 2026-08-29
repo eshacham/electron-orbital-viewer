@@ -65,6 +65,7 @@ function hydrogenProfile(): SerialisedAtomProfile {
                 n: 1, l: 0, electrons: 1, energy: -0.5,
                 curve: new Float64Array([0, 1, 2, 3, 2, 1, 0.5, 0.2, 0.05]),
                 R: new Float64Array(9),
+                samplingRadius: 2,
             },
         ],
     };

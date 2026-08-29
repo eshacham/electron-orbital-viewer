@@ -1,5 +1,5 @@
 import { AtomSolution, solveAtom } from '../atom/scf';
-import { AtomProfile, buildAtomProfile, packRadialCurve } from '../atom/atom_profile';
+import { AtomProfile, buildAtomProfile, packRadialCurve, subshellSamplingRadius } from '../atom/atom_profile';
 
 /** One shell's contribution, flattened for the worker boundary. */
 export interface SerialisedShell {
@@ -27,6 +27,16 @@ export interface SerialisedSubshell {
      * from a solved atom without re-running the SCF loop client-side.
      */
     R: Float64Array;
+    /**
+     * How far out level 3's marching-cubes sampling box needs to reach to
+     * hold this subshell's whole orbital lobe (spec bugfix -- see
+     * `subshellSamplingRadius`'s doc comment). **Not** the same quantity as
+     * a shell's `contourRadius` above: this one is fixed at a generous
+     * 99.99% regardless of the user's chosen enclosed fraction, because the
+     * sampling box has to contain the isosurface no matter what fraction
+     * the surface itself is later asked to enclose.
+     */
+    samplingRadius: number;
 }
 
 /**
@@ -126,6 +136,7 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
             energy: subshell.energy,
             curve: subshell.curve.values,
             R: atom.states[i].R,
+            samplingRadius: subshellSamplingRadius(grid, subshell.curve.values),
         })),
     };
 }

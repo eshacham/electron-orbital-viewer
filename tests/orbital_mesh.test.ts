@@ -2,6 +2,8 @@ import { generateOrbitalMesh } from '../src/orbital_mesh';
 import { makeWaveFunctionEvaluator, radialWaveFunction } from '../src/quantum_functions';
 import { computeSamplingRadius } from '../src/orbital_presets';
 import { MeshData, OrbitalParams } from '../src/types/orbital';
+import { solveAtom, AtomSolution } from '../src/atom/scf';
+import { buildAtomProfile, subshellSamplingRadius } from '../src/atom/atom_profile';
 
 /**
  * Welds vertices that share a position and reports the topology of the result.
@@ -203,5 +205,73 @@ describe('radialSamples override', () => {
         expect(t.degenerate).toBe(0);
         expect(t.nonManifoldEdges).toBe(0);
         expect(t.cracks).toBe(0);
+    });
+});
+
+/**
+ * Regression guard for the level-3 (single-orbital) counterpart of the
+ * grid-vs-contour framing bug fixed in orbital_visualizer.ts and
+ * RadialPlot.tsx: the sampling box for one subshell's orbital lobes was
+ * being sized from the *whole atom's* shared log grid (rMax ~44 a0 for
+ * argon) instead of that subshell's own radial extent. Argon's 2p sits at
+ * about 1.3 a0 -- 35x smaller -- so at a normal resolution the orbital spans
+ * a couple of voxels out of a much wider box, and marching cubes finds
+ * essentially nothing: an empty viewport with only the axes helper, not an
+ * error, because a near-empty isosurface is not the same failure as an
+ * invalid parameter.
+ *
+ * This is real `solveAtom` output, not a synthetic radial function, because
+ * the bug is specifically about the *ratio* between a subshell's own extent
+ * and the atom's shared grid -- a property only a real converged solve has.
+ */
+describe('atom mode level 3: the box must be sized from the subshell, not the whole atom (spec bugfix)', () => {
+    let atom: AtomSolution;
+    let state: AtomSolution['states'][number];
+    let correctRMax: number;
+
+    beforeAll(() => {
+        atom = solveAtom(18); // argon
+        state = atom.states.find(s => s.n === 2 && s.l === 1)!; // 2p
+        const profile = buildAtomProfile(atom, 0.9);
+        const curve = profile.subshells.find(s => s.n === 2 && s.l === 1)!.curve.values;
+        correctRMax = subshellSamplingRadius(atom.grid, curve);
+    });
+
+    function paramsAt(rMax: number): OrbitalParams {
+        return {
+            n: 2, l: 1, ml: 0, Z: 18, resolution: 64, rMax, enclosedFraction: 0.9,
+            radialSamples: { R: state.R, rMin: atom.grid.rMin, dx: atom.grid.dx, size: atom.grid.size },
+        };
+    }
+
+    it("sizes argon 2p's own box far smaller than the atom's shared grid", () => {
+        const wholeAtomGridRMax = atom.grid.r[atom.grid.size - 1];
+        expect(correctRMax).toBeGreaterThan(0.5);
+        expect(correctRMax).toBeLessThan(5);
+        expect(wholeAtomGridRMax / correctRMax).toBeGreaterThan(10);
+    });
+
+    it('produces a real, non-empty mesh when the box is sized from the subshell', () => {
+        const mesh = generateOrbitalMesh(paramsAt(correctRMax));
+
+        expect(mesh.positions.length).toBeGreaterThan(0);
+        expect(mesh.cells.length).toBeGreaterThan(0);
+    });
+
+    it('reproduces the bug when sized from the whole atom instead: nothing left for marching cubes to find', () => {
+        const wholeAtomGridRMax = atom.grid.r[atom.grid.size - 1];
+        const correctMesh = generateOrbitalMesh(paramsAt(correctRMax));
+
+        // Either the box is so oversized that no isosurface is found at all
+        // (generateOrbitalMesh throws), or a handful of degenerate vertices
+        // survive -- either way, a tiny fraction of the correctly-sized
+        // mesh's vertex count is the signature of the regression this guards.
+        let vertexCount = 0;
+        try {
+            vertexCount = generateOrbitalMesh(paramsAt(wholeAtomGridRMax)).positions.length;
+        } catch {
+            vertexCount = 0;
+        }
+        expect(vertexCount).toBeLessThan(correctMesh.positions.length * 0.05);
     });
 });

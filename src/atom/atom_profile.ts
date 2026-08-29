@@ -84,7 +84,7 @@ function subshellCurveOf(state: RadialState & { electrons: number }): Float64Arr
  * bracketing grid points, rather than snapping to the nearest grid point,
  * so contourRadius varies smoothly as `fraction` varies continuously.
  */
-function radiusEnclosing(grid: RadialGrid, curve: Float64Array, fraction: number): number {
+export function radiusEnclosing(grid: RadialGrid, curve: Float64Array, fraction: number): number {
     const cumulative = cumulativeIntegral(grid, curve);
     const total = cumulative[grid.size - 1];
     if (!(total > 0)) return grid.r[0];
@@ -206,6 +206,36 @@ export function buildAtomProfile(atom: AtomSolution, fraction: number): AtomProf
         contourRadius: radiusEnclosing(grid, D, fraction),
         shellPeaks: findShellPeaks(grid, D),
     };
+}
+
+/**
+ * How far out level 3's marching-cubes sampling box needs to reach to hold
+ * one subshell's whole orbital lobe, regardless of what fraction the user
+ * later asks the *displayed* surface to enclose.
+ *
+ * Mirrors `computeSamplingRadius` (orbital_presets.ts, the hydrogen-like
+ * counterpart of this function) exactly: same 99.99% cutoff on the radial
+ * distribution, same 8% clearance so the surface never touches the wall.
+ * That function cannot be reused directly here, even though the reasoning
+ * is identical, because it assumes Z_eff = Z -- correct for a hydrogen-like
+ * ion, wrong in the opposite direction for a real, screened valence
+ * electron (spec bugfix: level 3 was previously sized from the *whole
+ * atom's* shared grid instead of the selected subshell's own extent, which
+ * for a tightly bound inner subshell -- argon's 2p, say -- left the orbital
+ * spanning a couple of voxels out of the grid's full width: too few for
+ * marching cubes to resolve, so the surface came out empty).
+ *
+ * Capped at the shared grid's own outer radius rather than at
+ * `MAX_SAMPLING_RADIUS`: that grid is already sized generously enough to
+ * hold every occupied subshell's tail (see radial_grid.ts), so this radius
+ * -- derived from a curve sampled on that very grid -- can never need to
+ * reach further than the grid itself does.
+ */
+export function subshellSamplingRadius(grid: RadialGrid, curve: Float64Array): number {
+    const radius = radiusEnclosing(grid, curve, 0.9999);
+    const gridRMax = grid.r[grid.size - 1];
+    if (!(radius > 0)) return gridRMax;
+    return Math.min(radius * 1.08, gridRMax);
 }
 
 /**

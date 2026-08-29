@@ -38,9 +38,9 @@ function neonLikeProfile(): SerialisedAtomProfile {
             { n: 2, electrons: 8, contourRadius: 2.5, curve: new Float64Array(5) },
         ],
         subshells: [
-            { n: 1, l: 0, electrons: 2, energy: -30, curve: new Float64Array(5), R: new Float64Array(5) },
-            { n: 2, l: 0, electrons: 2, energy: -1.3, curve: new Float64Array(5), R: new Float64Array(5) },
-            { n: 2, l: 1, electrons: 6, energy: -0.5, curve: new Float64Array(5), R: new Float64Array(5) },
+            { n: 1, l: 0, electrons: 2, energy: -30, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 0.5 },
+            { n: 2, l: 0, electrons: 2, energy: -1.3, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 2.5 },
+            { n: 2, l: 1, electrons: 6, energy: -0.5, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 2.5 },
         ],
     };
 }

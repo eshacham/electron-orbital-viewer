@@ -214,19 +214,23 @@ function App() {
         // always be found, but there is nothing sane to render if it is not.
         if (!subshell) return;
 
-        // The shared log grid's own outer radius -- generous by construction
-        // (see radial_grid.ts's RMAX_FOR_HIGHEST_N table) and, unlike
-        // computeSamplingRadius(n, l, Z), correct for a *screened* valence
-        // electron: computeSamplingRadius assumes Z_eff = Z, which for a
-        // heavy neutral atom's own nuclear charge would draw a box far too
-        // small to hold its actual (near-hydrogenic, Z_eff ~ 1) valence orbital.
-        const gridRMax = atomProfile.rMin * Math.exp(atomProfile.dx * (atomProfile.size - 1));
+        // This subshell's own sampling-box extent (spec bugfix): the whole
+        // atom's shared grid rMax is sized to hold the *outermost* occupied
+        // subshell's tail, which for a tightly bound inner one -- argon's
+        // 2p, say, at 35x smaller than the grid -- left the orbital spanning
+        // a couple of voxels out of a much wider box, too few for marching
+        // cubes to resolve anything. `samplingRadius` is computed per
+        // subshell for exactly this reason (see atomWorker.ts /
+        // subshellSamplingRadius). Still not computeSamplingRadius(n, l, Z):
+        // that assumes Z_eff = Z, wrong in the opposite direction for a
+        // screened valence electron.
+        const rMax = subshell.samplingRadius;
 
         dispatch(startOrbitalCalculation({
             n: selN, l: selL, ml: selMl,
             Z: atomProfile.Z,
             resolution,
-            rMax: gridRMax,
+            rMax,
             enclosedFraction,
             radialSamples: { R: subshell.R, rMin: atomProfile.rMin, dx: atomProfile.dx, size: atomProfile.size },
         }));
