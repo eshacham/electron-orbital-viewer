@@ -20,6 +20,7 @@ import {
     updateAtomViewInScene,
     radiusUnderPointer,
     setHoverRadius,
+    defaultCameraPosition,
 } from '../../src/orbital_visualizer';
 import { defaultSurfaceStyle, SurfaceStyle } from '../../src/types/orbital';
 
@@ -195,5 +196,33 @@ describe('setHoverRadius (radius -> highlight ring, the reverse direction)', () 
         const context = buildContext();
         expect(() => setHoverRadius(context, 1)).not.toThrow();
         expect(() => setHoverRadius(null, 1)).not.toThrow();
+    });
+});
+
+// Regression test: the default camera used to sit at (0, 0, initialCameraZ),
+// which looks straight down the z axis -- exactly the symmetry axis of every
+// m=0 orbital (2p_z, 3d_z^2, 4f_z^3, ...). Viewed from there the near lobe
+// hides the far one and the orbital reads as a featureless ball until the
+// viewer drags it. defaultCameraPosition must sit off every axis and every
+// pairwise symmetry plane so this holds for any m=0 orbital, not just one
+// aligned with a particular axis.
+describe('defaultCameraPosition (spec bugfix: no axis is viewed edge-on by default)', () => {
+    it('is not on the x, y or z axis', () => {
+        const p = defaultCameraPosition(12);
+        expect(p.x).not.toBe(0);
+        expect(p.y).not.toBe(0);
+        expect(p.z).not.toBe(0);
+    });
+
+    it('is not on the x=y, y=z or x=z symmetry plane', () => {
+        const p = defaultCameraPosition(12);
+        expect(p.x).not.toBeCloseTo(p.y);
+        expect(p.y).not.toBeCloseTo(p.z);
+        expect(p.x).not.toBeCloseTo(p.z);
+    });
+
+    it('sits at exactly the requested distance from the origin', () => {
+        expect(defaultCameraPosition(12).length()).toBeCloseTo(12);
+        expect(defaultCameraPosition(1).length()).toBeCloseTo(1);
     });
 });

@@ -76,12 +76,37 @@ interface WorkerErrorMessage {
 
 type WorkerMessage = WorkerSuccessMessage | WorkerErrorMessage;
 
+/**
+ * The default camera position, a three-quarter view rather than one straight
+ * down any single axis (spec bugfix): every m=0 orbital (2p_z, 3d_z^2,
+ * 4f_z^3, ...) is rotationally symmetric about z, so a camera sitting on the
+ * z axis looks straight down that symmetry axis and sees only a silhouette
+ * -- the near lobe hides the far one and the whole orbital reads as a
+ * featureless ball until the viewer drags it.
+ *
+ * The three components are deliberately unequal (not a plain (1,1,1)
+ * isometric view) so the camera is not exactly on any single axis or any
+ * x=y/y=z/x=z symmetry plane either, which would reintroduce the same
+ * edge-on problem for an orbital symmetric about a *different* axis or
+ * diagonal. `frameOrbital` only ever rescales this direction to fit whatever
+ * is on screen (see its own doc comment), so only the direction matters here
+ * -- `distance` sets the magnitude for the caller that wants an actual
+ * position rather than just this function's own return value.
+ *
+ * A free function, rather than inline in `initVisualizer`, purely so it can
+ * be unit-tested: `initVisualizer` itself constructs a real
+ * `THREE.WebGLRenderer`, which has no WebGL context under jsdom.
+ */
+export function defaultCameraPosition(distance: number): THREE.Vector3 {
+    return new THREE.Vector3(0.6, 0.45, 0.65).normalize().multiplyScalar(distance);
+}
+
 export function initVisualizer(container: HTMLElement, initialCameraZ: number = 12): VisualizerContext {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050505);
 
     const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
-    camera.position.z = initialCameraZ;
+    camera.position.copy(defaultCameraPosition(initialCameraZ));
 
     // stencil defaults to false since three r163, and without the buffer every
     // stencil test passes — which would draw the cut-away caps as full quads
