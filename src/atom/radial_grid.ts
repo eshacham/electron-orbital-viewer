@@ -23,6 +23,9 @@ export interface RadialGrid {
 export function makeRadialGrid(rMin: number, rMax: number, size: number): RadialGrid {
     if (!(rMin > 0) || !(rMax > rMin)) throw new Error('Radial grid needs 0 < rMin < rMax.');
     if (!Number.isInteger(size) || size < 3) throw new Error('Radial grid needs at least 3 points.');
+    if (size % 2 === 0) {
+        throw new Error('Radial grid needs an odd number of points, so Simpson\'s rule spans an even number of intervals.');
+    }
 
     const dx = Math.log(rMax / rMin) / (size - 1);
     const r = new Float64Array(size);

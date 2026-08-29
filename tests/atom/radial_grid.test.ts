@@ -67,4 +67,9 @@ describe('radial grid', () => {
     it('scales the inner cutoff with nuclear charge', () => {
         expect(gridForAtom(92).rMin).toBeLessThan(gridForAtom(1).rMin);
     });
+
+    it('rejects an even point count, which would break Simpson\'s rule', () => {
+        expect(() => makeRadialGrid(1e-4, 20, 1000)).toThrow();
+        expect(() => makeRadialGrid(1e-4, 20, 1001)).not.toThrow();
+    });
 });
