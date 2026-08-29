@@ -5,3 +5,8 @@ dist/*
 .venv/
 cdk.out/
 __pycache__/
+
+# SDD workspace and browser-automation output are scratch, not source
+.superpowers/
+.playwright-mcp/
+*.png
