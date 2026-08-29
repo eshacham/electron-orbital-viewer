@@ -90,6 +90,27 @@ describe('atom worker serialisation contract', () => {
         expect(profile.total.length).toBe(profile.size);
     });
 
+    // Task 20 regression: solveAtom(Z) is now actually reused across
+    // requests (the worker used to be created and terminated per request,
+    // which reset its module-scope cache every time -- see scf.ts's ruling
+    // R28). That makes `atom` here the *same* AtomSolution object a second,
+    // differently-fractioned request would also see. buildSerialisedAtomProfile
+    // must never hand out one of that shared object's own arrays directly:
+    // transferListFor puts every array in the transfer list, and
+    // postMessage's transfer *detaches* the buffer, so a second call reusing
+    // the same underlying buffer would throw DataCloneError trying to
+    // transfer an already-detached one (caught live: switching an
+    // already-solved element's enclosed fraction).
+    it('never serialises the solver\'s own R array by reference, so a second request cannot try to transfer an already-detached buffer', () => {
+        const secondProfile = buildSerialisedAtomProfile(atom, 0.5);
+
+        for (let i = 0; i < profile.subshells.length; i++) {
+            expect(profile.subshells[i].R.buffer).not.toBe(atom.states[i].R.buffer);
+            expect(secondProfile.subshells[i].R.buffer).not.toBe(atom.states[i].R.buffer);
+            expect(profile.subshells[i].R.buffer).not.toBe(secondProfile.subshells[i].R.buffer);
+        }
+    });
+
     it('carries the total D(r) on the shared log grid, raw and unnormalised (ruling R16, R25)', () => {
         // Ruling R25: no separate uniform-in-r resample any more -- `total`
         // (plus `rMin`/`dx`/`size` above) *is* the log-grid curve the shader

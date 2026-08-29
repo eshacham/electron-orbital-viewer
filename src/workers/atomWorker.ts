@@ -153,7 +153,21 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
             electrons: subshell.electrons,
             energy: subshell.energy,
             curve: subshell.curve.values,
-            R: atom.states[i].R,
+            // .slice() -- not the cached AtomSolution's own array -- because
+            // transferListFor below hands this buffer to postMessage's
+            // transfer list, which *detaches* it (Task 20: with solveAtom
+            // now actually reused across requests for the same Z, the same
+            // `atom.states[i].R` would otherwise be handed over, and
+            // therefore detached, on a later request too -- a second
+            // enclosedFraction for an already-solved element, say -- which
+            // throws a DataCloneError since a detached buffer can't be
+            // transferred again). Every other array here (`curve.values`,
+            // `shell.curve`, `shellPeaks`, ...) is already rebuilt fresh by
+            // buildAtomProfile/packRadialCurve on every call and needs no
+            // such copy; this is the one place a serialised profile still
+            // reached directly into the solver's own, potentially-reused
+            // state.
+            R: atom.states[i].R.slice(),
             samplingRadius: subshellSamplingRadius(grid, subshell.curve.values),
         })),
     };
@@ -172,16 +186,27 @@ interface WorkerMessageData {
     type: 'solve';
     Z: number;
     enclosedFraction: number;
+    /**
+     * Task 20: the worker is now reused across requests rather than
+     * created and terminated per call (see createAtomWorker.ts and
+     * useAtomSolver.ts), so terminate() can no longer be what stops a
+     * superseded reply from landing. Echoing this back on the response is
+     * what replaces it -- the caller drops any reply whose id no longer
+     * matches its latest dispatched request.
+     */
+    requestId: number;
 }
 
 interface WorkerSuccessResponse {
     type: 'success';
     profile: SerialisedAtomProfile;
+    requestId: number;
 }
 
 interface WorkerErrorResponse {
     type: 'error';
     message: string;
+    requestId: number;
 }
 
 // The DOM lib types the global `self` as a Window, whose postMessage takes a
@@ -196,8 +221,10 @@ const worker = self as unknown as WorkerScope;
 worker.onmessage = (e: MessageEvent<WorkerMessageData>) => {
     if (e.data.type !== 'solve') return;
 
+    const { requestId } = e.data;
+
     try {
-        console.log('Worker: Starting SCF solve', { Z: e.data.Z });
+        console.log('Worker: Starting SCF solve', { Z: e.data.Z, requestId });
         const atom = solveAtom(e.data.Z);
         const profile = buildSerialisedAtomProfile(atom, e.data.enclosedFraction);
 
@@ -208,13 +235,14 @@ worker.onmessage = (e: MessageEvent<WorkerMessageData>) => {
             subshellCount: profile.subshells.length,
         });
 
-        const response: WorkerSuccessResponse = { type: 'success', profile };
+        const response: WorkerSuccessResponse = { type: 'success', profile, requestId };
         worker.postMessage(response, transferListFor(profile));
     } catch (error) {
         console.error('Worker: Error during SCF solve:', error);
         const response: WorkerErrorResponse = {
             type: 'error',
-            message: error instanceof Error ? error.message : 'Unknown error'
+            message: error instanceof Error ? error.message : 'Unknown error',
+            requestId,
         };
         worker.postMessage(response);
     }

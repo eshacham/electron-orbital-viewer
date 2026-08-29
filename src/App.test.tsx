@@ -7,6 +7,7 @@ import atomReducer, { AtomState } from './store/atomSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
 import { computeSamplingRadius } from './orbital_presets';
+import { clearProfileCacheForTests } from './atom/profile_cache';
 import App from './App';
 
 // Mock OrbitalViewer component
@@ -151,7 +152,14 @@ const renderWithProvider = (ui: React.ReactElement, atomState?: Partial<AtomStat
 describe('App', () => {
     const originalMatchMedia = window.matchMedia;
     afterEach(() => { window.matchMedia = originalMatchMedia; });
-    beforeEach(() => { (createAtomWorker as jest.Mock).mockClear(); });
+    beforeEach(() => {
+        (createAtomWorker as jest.Mock).mockClear();
+        // Task 20's main-thread profile cache is module-level state (see
+        // profile_cache.ts), so without this a converged profile cached by
+        // one test could silently short-circuit a later test's own
+        // mount-time solve.
+        clearProfileCacheForTests();
+    });
 
     it('renders main components', () => {
         renderWithProvider(<App />);
@@ -263,9 +271,14 @@ describe('App', () => {
     it('shows an explicit error instead of a profile when the solve did not converge', () => {
         renderWithProvider(<App />);
         const worker = (createAtomWorker as jest.Mock).mock.results[0].value;
+        // Task 20: replies are now matched to their request by an echoed
+        // requestId (see useAtomSolver.ts) rather than by the worker's
+        // create-terminate lifecycle, so a hand-built reply has to carry
+        // whatever id the mount-time request actually posted.
+        const { requestId } = worker.postMessage.mock.calls[0][0];
 
         act(() => {
-            worker.onmessage({ data: { type: 'success', profile: { ...hydrogenProfile(), converged: false } } });
+            worker.onmessage({ data: { type: 'success', profile: { ...hydrogenProfile(), converged: false }, requestId } });
         });
 
         expect(screen.getByText(/did not converge/i)).toBeInTheDocument();
