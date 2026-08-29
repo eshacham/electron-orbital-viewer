@@ -206,6 +206,33 @@ describe('SCF cost (ruling R12)', () => {
     });
 });
 
+// Ruling R28: with no caching, drilling atom -> shell -> orbital -> back
+// would re-solve on every level change (34s for one heavy element instead
+// of 8.6s), even though an atom's LDA ground state is a pure function of Z
+// and can never go stale. Krypton is chosen because nothing earlier in this
+// file solves it, so the first call here is a genuine cold solve rather than
+// one already warmed by an earlier test.
+describe('solveAtom memoisation (ruling R28)', () => {
+    it('caches by Z: a second solve returns the identical object and is dramatically faster', () => {
+        const Z = 36;
+
+        const startFirst = performance.now();
+        const first = solveAtom(Z);
+        const elapsedFirst = performance.now() - startFirst;
+
+        const startSecond = performance.now();
+        const second = solveAtom(Z);
+        const elapsedSecond = performance.now() - startSecond;
+
+        expect(second).toBe(first);
+        // eslint-disable-next-line no-console
+        console.log(`memoisation timing: first=${elapsedFirst.toFixed(1)}ms second=${elapsedSecond.toFixed(3)}ms speedup=${(elapsedFirst / elapsedSecond).toFixed(0)}x`);
+        // At least 10x faster, not merely "faster" -- guards against the
+        // cache silently not being hit while tolerating ordinary timing noise.
+        expect(elapsedSecond).toBeLessThan(Math.max(elapsedFirst / 10, 1));
+    });
+});
+
 // Ruling R23: the hard gate that every neutral atom Z=1..118 converges
 // (ruling R17) is real and was checked, but it does not live in this suite.
 // At several seconds per heavy atom, a 1..118 loop is many minutes — fine

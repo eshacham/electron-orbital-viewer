@@ -1,9 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './orbitalSlice';
+import atomReducer from './atomSlice';
 
 export const store = configureStore({
   reducer: {
-    orbital: orbitalReducer
+    orbital: orbitalReducer,
+    atom: atomReducer
   }
 });
 

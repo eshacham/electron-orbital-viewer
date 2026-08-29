@@ -198,6 +198,16 @@ function solveOneElectronAtom(Z: number, grid: RadialGrid, configuration: Subshe
     };
 }
 
+// Ruling R28: an atom's LDA ground state is a pure function of Z alone (same
+// configuration, same gridForAtom sizing, same SCF loop every time), so this
+// cache can never go stale -- there is no invalidation to get wrong. Without
+// it, the drill-down UI (Task 11) would re-run the solve on every level
+// change; at ~8.6s for uranium, drilling atom -> shell -> orbital -> back
+// would cost four solves (~34s) for what is conceptually one. Module-level
+// rather than per-caller because `solveAtom(Z)` is meant to be cheap to call
+// repeatedly from anywhere (the worker, tests, the store) once warmed.
+const solveAtomCache = new Map<number, AtomSolution>();
+
 /**
  * Solves every occupied subshell of neutral atom Z self-consistently.
  *
@@ -212,10 +222,15 @@ function solveOneElectronAtom(Z: number, grid: RadialGrid, configuration: Subshe
  * it never needs to guess in advance which elements will need it.
  */
 export function solveAtom(Z: number): AtomSolution {
+    const cached = solveAtomCache.get(Z);
+    if (cached) return cached;
+
     const configuration = configurationFor(Z);
     const highestN = highestPrincipalQuantumNumber(configuration);
     const grid = gridForAtom(Z, highestN);
-    return solveAtomOnGrid(Z, grid);
+    const solution = solveAtomOnGrid(Z, grid);
+    solveAtomCache.set(Z, solution);
+    return solution;
 }
 
 /**
