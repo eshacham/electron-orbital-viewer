@@ -275,3 +275,36 @@ describe('atom mode level 3: the box must be sized from the subshell, not the wh
         expect(vertexCount).toBeLessThan(correctMesh.positions.length * 0.05);
     });
 });
+
+/**
+ * Regression guard for the hydrogen-like path's own box sizing: a second,
+ * unrelated bug surfaced while fixing the atom-mode one above. Both modes'
+ * marching-cubes render reads the same `orbital.currentParams` (App.tsx),
+ * and switching out of atom mode without resetting it left hydrogen-like
+ * mode rendering with whatever tiny rMax an atom-mode orbital (argon's 2p,
+ * ~1.7 a0) had last set, instead of its own computeSamplingRadius(n, l, Z).
+ * At that scale hydrogen's default 3d (rMax should be ~35 a0) samples only
+ * its innermost, near-featureless tail -- monotonic and one-signed -- which
+ * is exactly why the fix below (both phases present) is the cheap tell.
+ * The App.tsx-level fix (reset on the mode transition) has its own test in
+ * App.test.tsx; this one guards the hydrogen-like path itself never having
+ * been rerouted through the atom-mode sizing code in the first place.
+ */
+describe('hydrogen-like path: unaffected by atom-mode box sizing', () => {
+    it("computeSamplingRadius(3, 2, 1) is still around 35 a0", () => {
+        expect(computeSamplingRadius(3, 2, 1)).toBeGreaterThan(30);
+        expect(computeSamplingRadius(3, 2, 1)).toBeLessThan(40);
+    });
+
+    it('produces a non-empty mesh with both phases present at that box size', () => {
+        const rMax = computeSamplingRadius(3, 2, 1);
+        const mesh = generateOrbitalMesh(orbital({ n: 3, l: 2, ml: 0, Z: 1, resolution: 32, rMax }));
+
+        expect(mesh.positions.length).toBeGreaterThan(0);
+        // A p or d orbital's mesh containing only one sign is the signature
+        // of a box sized so small it only samples one lobe's near-origin
+        // tail (or none at all) -- the exact failure mode this guards.
+        expect(mesh.psiSigns).toContain(1);
+        expect(mesh.psiSigns).toContain(-1);
+    });
+});

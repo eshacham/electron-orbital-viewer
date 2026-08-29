@@ -198,6 +198,33 @@ function App() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Switching *out* of atom mode must show hydrogen-like mode's own
+    // current controls, never whatever atom mode's level 3 last dispatched
+    // into the shared orbital slice (spec bugfix). Both modes' marching-cubes
+    // renders read the same `orbital.currentParams`, and Controls.tsx's
+    // "Update Orbital" button is deliberately not auto-fired on every
+    // n/l/ml/Z edit -- but a mode switch has no such button to remind the
+    // user of, so without this, switching to hydrogen-like mode kept
+    // whatever tiny rMax an atom-mode orbital (e.g. argon's 2p, ~1.7 a0) had
+    // last set, instead of resetting to computeSamplingRadius(n, l, Z) for
+    // the panel's own current selection -- at that scale a hydrogen 3d's
+    // sampling box holds only its innermost, near-featureless tail, which is
+    // exactly why it rendered as a blob instead of a lobed shape.
+    useEffect(() => {
+        if (isAtomMode) return;
+        dispatch(startOrbitalCalculation({
+            n, l, ml, Z,
+            resolution,
+            rMax: computeSamplingRadius(n, l, Z),
+            enclosedFraction,
+        }));
+        // Only the mode transition itself should trigger this -- n/l/ml/Z/
+        // resolution/enclosedFraction changes while already in hydrogen-like
+        // mode still go through Controls.tsx's "Update Orbital" button,
+        // exactly as before.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAtomMode]);
+
     // Level 3 in atom mode: render the selected orbital through the same
     // marching-cubes pipeline as hydrogen-like mode, but with the SCF's own
     // numerical R(r) (OrbitalParams.radialSamples) in place of the analytic

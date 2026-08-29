@@ -6,6 +6,7 @@ import orbitalReducer from './store/orbitalSlice';
 import atomReducer, { AtomState } from './store/atomSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
+import { computeSamplingRadius } from './orbital_presets';
 import App from './App';
 
 // Mock OrbitalViewer component
@@ -66,6 +67,36 @@ function hydrogenProfile(): SerialisedAtomProfile {
                 curve: new Float64Array([0, 1, 2, 3, 2, 1, 0.5, 0.2, 0.05]),
                 R: new Float64Array(9),
                 samplingRadius: 2,
+            },
+        ],
+    };
+}
+
+/**
+ * A profile whose occupied 2p subshell carries a small `samplingRadius`
+ * (~1.7, in argon's actual range -- see atom_profile.ts's
+ * subshellSamplingRadius) -- structurally enough to drive App.tsx's level-3
+ * effect, which dispatches this straight into the shared `orbital` slice.
+ */
+function argonLikeProfile(): SerialisedAtomProfile {
+    return {
+        Z: 18,
+        converged: true,
+        rMin: 1e-3,
+        dx: 0.05,
+        size: 9,
+        total: new Float32Array([0, 1, 2, 3, 2, 1, 0.5, 0.2, 0.05]),
+        contourRadius: 2,
+        shellPeaks: new Float64Array([0.06, 0.29, 1.22]),
+        shells: [
+            { n: 2, electrons: 8, contourRadius: 0.5, curve: new Float64Array(9) },
+        ],
+        subshells: [
+            {
+                n: 2, l: 1, electrons: 6, energy: -8.443,
+                curve: new Float64Array(9),
+                R: new Float64Array(9),
+                samplingRadius: 1.7,
             },
         ],
     };
@@ -141,6 +172,38 @@ describe('App', () => {
         expect(screen.getByText('one electron, charge-Z nucleus')).toBeInTheDocument();
         // LevelNav is atom-mode only.
         expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).not.toBeInTheDocument();
+    });
+
+    // Spec bugfix / regression guard: both modes' marching-cubes path reads
+    // the same `orbital.currentParams`, and atom mode's level 3 dispatches
+    // into it with a tiny, subshell-specific rMax (~1.7 a0 for argon's 2p,
+    // per the fix in App.tsx / atom_profile.ts's subshellSamplingRadius).
+    // Switching to hydrogen-like mode without this fix left that leftover
+    // rMax in place -- at that scale a hydrogen 3d's sampling box holds only
+    // its innermost, near-featureless tail, rendering as a blob instead of
+    // the correct lobed shape. The fix must reset to
+    // computeSamplingRadius(n, l, Z) on the mode transition itself.
+    it('switching out of atom mode resets rMax to the hydrogen-like panel\'s own value, not whatever atom mode last set', () => {
+        const { store } = renderWithProvider(<App />, {
+            mode: 'atom',
+            Z: 18,
+            level: 'orbital',
+            selectedShell: 2,
+            selectedSubshell: { n: 2, l: 1 },
+            selectedOrbital: { n: 2, l: 1, ml: 0 },
+            profile: argonLikeProfile(),
+        });
+
+        // Confirm the level-3 effect actually ran and left the small
+        // atom-mode rMax in the shared slice, so the assertion below is
+        // proof the switch *changed* it rather than it having never been set.
+        expect(store.getState().orbital.currentParams?.rMax).toBeCloseTo(1.7);
+
+        fireEvent.click(screen.getByRole('button', { name: /hydrogen-like mode/i }));
+
+        // App.tsx's default hydrogen-like selection is n=3, l=2, Z=1 (the
+        // panel's own initial local state, untouched by atom mode).
+        expect(store.getState().orbital.currentParams?.rMax).toBeCloseTo(computeSamplingRadius(3, 2, 1));
     });
 
     it('drilling into a shell shows the SubshellPanel, and drilling back out hides it', () => {
