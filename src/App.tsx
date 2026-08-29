@@ -165,10 +165,19 @@ function App() {
     const showBusy = useDelayedFlag(isLoading, BUSY_INDICATOR_DELAY_MS);
     const showAtomBusy = useDelayedFlag(atomIsSolving, BUSY_INDICATOR_DELAY_MS);
 
-    // Initial render - only run once
+    // Initial render - only run once. Only seeds hydrogen-like mode's own
+    // default orbital when that is the mode actually on screen (spec
+    // bugfix): this used to fire unconditionally, which on a cold load into
+    // atom mode (the app's default) raced atom mode's own SCF solve and
+    // shell view -- both land in the same scene via orbital_visualizer.ts,
+    // and whichever finished second silently overwrote the other's mesh.
+    // Atom mode seeds its own initial view through useAtomSolver above; if
+    // the app ever starts in hydrogen-like mode instead, that case is
+    // covered here.
     useEffect(() => {
         if (!isInitializedRef.current) {
             isInitializedRef.current = true;
+            if (isAtomMode) return;
             console.log("App.tsx: Triggering initial orbital render.");
             const initialParams = {
                 n: defaultN,
@@ -181,6 +190,10 @@ function App() {
             };
             handleOrbitalParamsChange(initialParams);
         }
+        // Only the initial mount should ever run this -- isInitializedRef
+        // guards that -- so isAtomMode is deliberately read without being a
+        // dependency, exactly like the mode-switch effect below.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [handleOrbitalParamsChange]);
 
     // Levels 1-2's shell view only draws anything on its cut face (see

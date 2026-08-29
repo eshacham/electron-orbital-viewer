@@ -15,14 +15,16 @@ jest.mock('../../src/orbital_controls_factory', () => ({
     createOrbitalControls: jest.fn(),
 }));
 
+import { createOrbitalWorker } from '../../src/workers/createOrbitalWorker';
 import {
     VisualizerContext,
     updateAtomViewInScene,
+    updateOrbitalInScene,
     radiusUnderPointer,
     setHoverRadius,
     defaultCameraPosition,
 } from '../../src/orbital_visualizer';
-import { defaultSurfaceStyle, SurfaceStyle } from '../../src/types/orbital';
+import { defaultSurfaceStyle, SurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
 
 /**
  * Builds a VisualizerContext-shaped object without going through
@@ -78,6 +80,35 @@ function atomShellParams() {
 
 function pointerEventAt(clientX: number, clientY: number): PointerEvent {
     return { clientX, clientY } as PointerEvent;
+}
+
+function hydrogenLikeParams(): OrbitalParams {
+    return { n: 3, l: 2, ml: 0, Z: 1, resolution: 4, rMax: 20, enclosedFraction: 0.9 };
+}
+
+function fakeMeshData(): MeshData {
+    return {
+        positions: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
+        cells: [[0, 1, 2]],
+        psiSigns: [1, 1, 1],
+        densityMap: { data: new Uint8Array(1), side: 1, rMax: 20 },
+        isoLevel: 0.5,
+    };
+}
+
+/**
+ * A minimal stand-in for the real Worker updateOrbitalInScene creates via
+ * createOrbitalWorker (mocked at the top of this file). Lets a test hold the
+ * "calculation in flight" state open and fire its result at a chosen moment,
+ * which is exactly what reproducing the cold-load race below needs.
+ */
+function fakeWorker() {
+    return {
+        postMessage: jest.fn(),
+        terminate: jest.fn(),
+        onmessage: null as ((e: { data: unknown }) => void) | null,
+        onerror: null as ((e: unknown) => void) | null,
+    };
 }
 
 describe('visualizer dispatch: levels 1-2 render a shell view, not marching cubes', () => {
@@ -151,6 +182,67 @@ describe('visualizer dispatch: levels 1-2 render a shell view, not marching cube
         const cutContext = buildContext({ ...defaultSurfaceStyle, clipAxis: 'z', clipPosition: 0 });
         updateAtomViewInScene(cutContext, atomShellParams());
         expect(cutContext.currentOrbitalGroup!.visible).toBe(true);
+    });
+});
+
+// Regression test for the cold-load race (spec bugfix): App.tsx used to fire
+// hydrogen-like mode's default marching-cubes render unconditionally on
+// mount, which raced atom mode's own SCF solve and shell view -- both paths
+// land in the same scene, and whichever finished second silently overwrote
+// the other's mesh. The App.tsx fix stops the stray dispatch at the source;
+// this test guards the other half, at the level shared by both call sites --
+// updateAtomViewInScene must invalidate an in-flight marching-cubes worker
+// the same way a newer updateOrbitalInScene call already invalidates an
+// older one, so whichever request is actually newest wins regardless of
+// which kind it is.
+describe('shell view vs. marching cubes: only the newer request may own the scene', () => {
+    it('a shell view drawn while a marching-cubes worker is still in flight supersedes it -- the stale result is dropped, not drawn over the shell view', async () => {
+        const worker = fakeWorker();
+        (createOrbitalWorker as jest.Mock).mockReturnValue(worker);
+        const context = buildContext();
+
+        // The cold-load race: a marching-cubes request starts (e.g. the old
+        // unconditional hydrogen-like default)...
+        const pending = updateOrbitalInScene(context, hydrogenLikeParams());
+
+        // ...but atom mode's shell view lands before that worker responds.
+        updateAtomViewInScene(context, atomShellParams());
+        const shellViewGroup = context.currentOrbitalGroup;
+        expect(context.isShellView).toBe(true);
+        expect(context.scene.children).toContain(shellViewGroup);
+
+        // The stale marching-cubes worker now reports success, after the
+        // fact. Its terminate() has already been called by the shell view.
+        expect(worker.terminate).toHaveBeenCalled();
+        worker.onmessage!({ data: { type: 'success', meshData: fakeMeshData() } });
+        const outcome = await pending;
+
+        expect(outcome).toEqual({ status: 'superseded' });
+        // The shell view must still be exactly what is on screen -- nothing
+        // drew a stray orbital mesh over it, and nothing was left doubled up.
+        expect(context.currentOrbitalGroup).toBe(shellViewGroup);
+        expect(context.isShellView).toBe(true);
+        expect(context.scene.children).toEqual([shellViewGroup]);
+    });
+
+    it('the reverse direction still works: a marching-cubes result that lands after a newer request of its own kind still supersedes fine (no regression from the shared counter)', async () => {
+        const firstWorker = fakeWorker();
+        const secondWorker = fakeWorker();
+        (createOrbitalWorker as jest.Mock)
+            .mockReturnValueOnce(firstWorker)
+            .mockReturnValueOnce(secondWorker);
+        const context = buildContext();
+
+        const firstPending = updateOrbitalInScene(context, hydrogenLikeParams());
+        const secondPending = updateOrbitalInScene(context, { ...hydrogenLikeParams(), n: 2, l: 1 });
+
+        // The stale first worker reports after the second has already taken over.
+        firstWorker.onmessage!({ data: { type: 'success', meshData: fakeMeshData() } });
+        secondWorker.onmessage!({ data: { type: 'success', meshData: fakeMeshData() } });
+
+        expect(await firstPending).toEqual({ status: 'superseded' });
+        expect((await secondPending).status).toBe('rendered');
+        expect(context.isShellView).toBe(false);
     });
 });
 

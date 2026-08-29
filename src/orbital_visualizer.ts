@@ -509,6 +509,18 @@ export function updateAtomViewInScene(
 ): void {
     if (!context || context.isDisposed) return;
 
+    // A marching-cubes worker from updateOrbitalInScene may still be in
+    // flight (cold-load race, spec bugfix): the two paths land in the same
+    // scene, but only updateOrbitalInScene used to check requestCounter
+    // before drawing, so a stray worker result could arrive after this shell
+    // view and silently overwrite it. Terminating any active worker and
+    // bumping the shared counter here makes the two paths mutually
+    // exclusive -- whichever runs more recently wins, and the other's
+    // in-flight result is recognised as superseded when it lands.
+    context.activeWorker?.terminate();
+    context.activeWorker = null;
+    context.requestCounter++;
+
     clearCurrentOrbital(context, context.scene);
     context.isShellView = true;
     // Spherically symmetric: there is no preferred direction for the axes to
