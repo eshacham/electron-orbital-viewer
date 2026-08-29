@@ -322,3 +322,53 @@ button:hover {
   .radial-plot { right: 12px; top: 12px; bottom: auto; }
   .scale-readout { left: 12px; top: 64px; right: auto; bottom: auto; padding: 6px 10px 5px; font-size: 12px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Level navigation and subshell panel (multi-electron atom mode). Deliberately
+   un-positioned here -- these are the atom-mode counterparts of #controls,
+   and where they sit in the app shell is that assembly's decision, not
+   theirs. Only their own internal look lives here.
+   --------------------------------------------------------------------------- */
+.level-nav-breadcrumbs {
+  color: #fff;
+}
+.level-nav-configuration {
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
+}
+.level-nav-method {
+  opacity: 0.75;
+}
+.level-nav-shells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.level-nav-about {
+  margin-top: 6px;
+  opacity: 0.85;
+}
+
+.subshell-chip-row,
+.subshell-ml-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+.subshell-panel-legend {
+  opacity: 0.75;
+  margin-top: 4px;
+}
+.subshell-energy-diagram {
+  display: block;
+}
+.subshell-energy-rule {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 1.4;
+}
+.subshell-energy-rule.current {
+  stroke: #4da3ff;
+  stroke-width: 2;
+}
