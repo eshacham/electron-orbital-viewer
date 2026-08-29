@@ -145,6 +145,33 @@ const atomSlice = createSlice({
             }
         },
 
+        // Jumps straight to a level rather than stepping one at a time
+        // (levelUp above). Needed because LevelNav's breadcrumb segment for
+        // the whole atom carries no n/l/ml the way its shell/subshell/orbital
+        // segments do -- those already map onto drillToShell/drillToSubshell/
+        // drillToOrbital, which both validate occupancy *and* select the
+        // target, but "back to the whole atom" (or "back to the shell/orbital
+        // I already had selected") has nothing to validate against except
+        // what is already selected. Pure navigation like levelUp (ruling
+        // R28): never touches profile/isSolving/error.
+        goToLevel: (state, action: PayloadAction<ViewLevel>) => {
+            const target = action.payload;
+            if (target === 'atom') {
+                state.level = 'atom';
+                state.selectedShell = null;
+                state.selectedSubshell = null;
+                state.selectedOrbital = null;
+            } else if (target === 'shell') {
+                // Nothing to jump back to if a shell was never selected.
+                if (state.selectedShell === null) return;
+                state.level = 'shell';
+                state.selectedOrbital = null;
+            } else if (target === 'orbital') {
+                if (state.selectedOrbital === null) return;
+                state.level = 'orbital';
+            }
+        },
+
         setHoverRadius: (state, action: PayloadAction<number | null>) => {
             state.hoverRadius = action.payload;
         },
@@ -166,6 +193,7 @@ export const drillToShell = atomSlice.actions.drillToShell;
 export const drillToSubshell = (n: number, l: number) => atomSlice.actions.drillToSubshell({ n, l });
 export const drillToOrbital = (n: number, l: number, ml: number) => atomSlice.actions.drillToOrbital({ n, l, ml });
 export const levelUp = atomSlice.actions.levelUp;
+export const goToLevel = atomSlice.actions.goToLevel;
 export const setHoverRadius = atomSlice.actions.setHoverRadius;
 
 export default atomSlice.reducer;

@@ -1,12 +1,15 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { useAppSelector } from '../store/hooks';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { setHoverRadius as setAtomHoverRadius } from '../store/atomSlice';
 import { ScaleBar, formatScaleLabel } from '../scale_bar';
 import {
     initVisualizer,
     cleanupVisualizer,
     updateOrbitalInScene,
+    updateAtomViewInScene,
     frameOrbital,
     setSurfaceStyle,
+    setHoverRadius as setSceneHoverRadius,
     getScaleBar,
     handleResize as visualizerHandleResize,
     VisualizerContext
@@ -19,18 +22,35 @@ interface OrbitalViewerProps {
 }
 
 const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbitalFailed }) => {
+    const dispatch = useAppDispatch();
     const canvasHostRef = useRef<HTMLDivElement>(null);
     const visualizerContextRef = useRef<VisualizerContext | null>(null);
     const stateParams = useAppSelector(state => state.orbital.currentParams);
     const viewResetNonce = useAppSelector(state => state.orbital.viewResetNonce);
     const surfaceStyle = useAppSelector(state => state.orbital.surfaceStyle);
+    const atomMode = useAppSelector(state => state.atom.mode);
+    const atomLevel = useAppSelector(state => state.atom.level);
+    const atomProfile = useAppSelector(state => state.atom.profile);
+    const atomSelectedShell = useAppSelector(state => state.atom.selectedShell);
+    const atomHoverRadius = useAppSelector(state => state.atom.hoverRadius);
     const [scaleBar, setScaleBar] = useState<ScaleBar | null>(null);
+
+    // Levels 1-2 (whole atom / one shell) render a spherical shell view
+    // straight from the solved profile instead of the marching-cubes path
+    // below -- see orbital_visualizer.ts's updateAtomViewInScene.
+    const showShellView = atomMode === 'atom' && (atomLevel === 'atom' || atomLevel === 'shell') && atomProfile !== null;
 
     // Initialize visualizer - only once
     useEffect(() => {
         if (canvasHostRef.current) {
             console.log('OrbitalViewer: Initializing visualizer');
-            visualizerContextRef.current = initVisualizer(canvasHostRef.current);
+            const context = initVisualizer(canvasHostRef.current);
+            // Pointer -> radius (spec §6, the reverse of the plot's own
+            // onHoverRadius): both directions land on the same atomSlice
+            // action, so hovering the plot and hovering the cut face agree
+            // on a single shared radius with no extra plumbing.
+            context.onHoverRadius = (r) => dispatch(setAtomHoverRadius(r));
+            visualizerContextRef.current = context;
         }
 
         return () => {
@@ -40,11 +60,58 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 visualizerContextRef.current = null;
             }
         };
-    }, []);
+    }, [dispatch]);
 
-    // Handle orbital updates - now using stateParams
+    // Levels 1-2: build the shell view directly from the profile already in
+    // the store. No worker round trip and no sampling grid -- the density is
+    // spherically symmetric (see shell_view.ts), so there is nothing here
+    // that solveAtom has not already produced.
     useEffect(() => {
-        if (!visualizerContextRef.current || !stateParams) return;
+        const context = visualizerContextRef.current;
+        if (!context || !showShellView || !atomProfile) return;
+
+        // The shared log grid's outer radius: sizes the cut face, the
+        // discard radius, and the camera framing alike (see
+        // AtomShellViewParams). Available directly off the profile, so it
+        // needs no separate box-sizing pass the way the marching-cubes path
+        // needs computeSamplingRadius.
+        const gridRMax = atomProfile.rMin * Math.exp(atomProfile.dx * (atomProfile.size - 1));
+
+        if (atomLevel === 'atom') {
+            updateAtomViewInScene(context, {
+                contourRadius: atomProfile.contourRadius,
+                radialCurve: atomProfile.total,
+                rMin: atomProfile.rMin,
+                dx: atomProfile.dx,
+                size: atomProfile.size,
+                rMax: gridRMax,
+            });
+        } else {
+            const shell = atomProfile.shells.find(s => s.n === atomSelectedShell);
+            if (!shell) return;
+            updateAtomViewInScene(context, {
+                contourRadius: shell.contourRadius,
+                radialCurve: shell.curve,
+                rMin: atomProfile.rMin,
+                dx: atomProfile.dx,
+                size: atomProfile.size,
+                rMax: gridRMax,
+            });
+        }
+    }, [showShellView, atomLevel, atomProfile, atomSelectedShell]);
+
+    // Radial-plot hover -> the shell view's highlight ring (the other half
+    // of the pointer-to-radius link set up above).
+    useEffect(() => {
+        setSceneHoverRadius(visualizerContextRef.current, atomHoverRadius);
+    }, [atomHoverRadius]);
+
+    // Handle orbital updates - now using stateParams. Skipped while a shell
+    // view is showing: that path owns the scene instead (both call
+    // clearCurrentOrbital, so whichever runs leaves a clean handover either
+    // way when the level changes).
+    useEffect(() => {
+        if (!visualizerContextRef.current || !stateParams || showShellView) return;
 
         console.log('OrbitalViewer: Using state params:', stateParams);
 
@@ -64,7 +131,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                         : 'Could not render this orbital.'
                 );
             });
-    }, [stateParams, onOrbitalRendered, onOrbitalFailed]);
+    }, [stateParams, showShellView, onOrbitalRendered, onOrbitalFailed]);
 
     // Mode, opacity and the cut plane restyle the existing mesh; no recalculation.
     useEffect(() => {

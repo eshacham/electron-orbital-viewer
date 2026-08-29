@@ -39,6 +39,13 @@ export interface SerialisedSubshell {
 export interface SerialisedAtomProfile {
     Z: number;
     /**
+     * Whether the SCF loop actually converged (ruling R17). Every element in
+     * this app's range does, in practice, but the UI must still be able to
+     * tell the difference rather than silently drawing a converged-looking
+     * picture from an iteration limit's last, unconverged guess.
+     */
+    converged: boolean;
+    /**
      * The shared log grid every curve and R array below is sampled on:
      * r_j = rMin * e^(j*dx), j = 0..size-1. One set of parameters suffices
      * because `buildAtomProfile` samples every curve on `atom.grid`.
@@ -95,6 +102,7 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
 
     return {
         Z: atom.Z,
+        converged: atom.converged,
         rMin: grid.rMin,
         dx: grid.dx,
         size: grid.size,

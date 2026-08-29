@@ -28,6 +28,44 @@ html, body, #root {
     height: 100%;
     position: relative;
 }
+/* Stacks LevelNav above #controls (atom mode) on desktop. On a phone this
+   unwraps to display:contents below, so #controls keeps its own sheet
+   behaviour untouched and LevelNav gets an independent fixed position --
+   reachable even while the sheet is closed, which a wrapper that stayed a
+   real box could not offer without duplicating the sheet's own toggle. */
+.side-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 340px;
+  max-height: calc(100vh - 40px);
+}
+@media (min-width: 761px) and (min-height: 501px) {
+  .side-panel #controls {
+    position: static;
+    max-height: none;
+  }
+}
+.side-panel .level-nav {
+  background-color: rgba(240, 240, 240, 0.85);
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.atom-error {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  max-width: 360px;
+}
+
 #controls {
   position: absolute; /* Position absolutely within #root */
   top: 20px;          /* Distance from the top */
@@ -249,6 +287,24 @@ button:hover {
    the orbital, the radial plot and the scale all stay on screen while you work
    the controls — which a full-height sheet or a side drawer both gave up. */
 @media (max-width: 760px), (max-height: 500px) {
+  /* Unwrap: .side-panel stops being a box, so LevelNav and #controls go
+     back to being positioned independently against #canvas-container --
+     #controls keeps the sheet rules below untouched, and LevelNav (next
+     rule) gets its own fixed spot that the sheet's open/closed state
+     cannot cover. */
+  .side-panel {
+    display: contents;
+  }
+  .side-panel .level-nav {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 15;
+    max-height: 30dvh;
+    overflow-y: auto;
+  }
+
   #controls {
     top: auto;
     left: 0;

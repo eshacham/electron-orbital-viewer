@@ -20,8 +20,26 @@ import { OrbitalParams, RenderMode, ClipAxis, SurfaceStyle } from '@/types/orbit
 import { computeSamplingRadius, ENCLOSED_FRACTIONS } from '../orbital_presets';
 import { ELEMENTS, elementLabel } from '../elements';
 import { orbitalName } from '../orbital_names';
+import { ViewMode, ViewLevel } from '../store/atomSlice';
 
 interface ControlsProps {
+  /**
+   * Atom (default) drives the SCF for a neutral element and collapses n/l/ml
+   * into the LevelNav/SubshellPanel drill-down; hydrogen-like is the original
+   * one-electron-ion panel, unchanged. Optional (defaulting to hydrogen-like)
+   * purely so every pre-existing render of this component -- which predates
+   * atom mode and never passes it -- keeps behaving exactly as it did.
+   */
+  mode?: ViewMode;
+  onModeChange?: (mode: ViewMode) => void;
+  /** Which drill-down level is current, only so the enclosed-fraction helper text can stay honest (see below); irrelevant in hydrogen-like mode. */
+  atomLevel?: ViewLevel;
+  /** The element driving the SCF in atom mode -- kept apart from initialZ/onZChange, which remain the hydrogen-like nucleus charge untouched. */
+  atomZ?: number;
+  onAtomElementChange?: (Z: number) => void;
+  /** Slot for SubshellPanel at level 2; empty otherwise. Keeps this component ignorant of atomSlice/SubshellPanel specifics. */
+  children?: React.ReactNode;
+
   initialN: number;
   onNChange: (value: number) => void;
   initialL: number;
@@ -52,6 +70,12 @@ const ISO_MIN = 0.000000001;
 const ISO_MAX = 0.001;
 
 const Controls: React.FC<ControlsProps> = ({
+  mode = 'hydrogenic',
+  onModeChange,
+  atomLevel,
+  atomZ,
+  onAtomElementChange,
+  children,
   initialN, onNChange,
   initialL, onLChange,
   initialMl, onMlChange,
@@ -67,6 +91,7 @@ const Controls: React.FC<ControlsProps> = ({
   open = true,
   compact = false,
 }) => {
+  const isAtomMode = mode === 'atom';
   // Local state for dropdown options, derived from props
   const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
   const [mlOptions, setMlOptions] = useState<number[]>([-2, -1, 0, 1, 2]);
@@ -114,50 +139,76 @@ const Controls: React.FC<ControlsProps> = ({
         position: 'relative',
       }}
     >
-      <Typography id="orbital-name" variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
-        {orbitalName(initialN, initialL, initialMl)}
-      </Typography>
-
-      <FormControl fullWidth margin="normal" size="small" >
-        <InputLabel id="n-select-label">Principal (n)</InputLabel>
-        <Select
-          labelId="n-select-label"
-          id="n-select"
-          value={initialN.toString()} // Select value must be a string if items are strings
-          label="Principal (n)"
-          onChange={(e: SelectChangeEvent<string>) => onNChange(parseInt(e.target.value, 10))}
+      {/* Atom (a real neutral element, SCF-solved) vs hydrogen-like (the
+          original one-electron-ion panel, unchanged below). Always visible,
+          at every level, since it is how you get back out of atom mode's
+          drill-down entirely. */}
+      <FormControl component="fieldset" margin="normal" fullWidth>
+        <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Mode</FormLabel>
+        <ToggleButtonGroup
+          className="mode-toggle"
+          value={mode}
+          exclusive
+          onChange={(event: React.MouseEvent<HTMLElement>, newValue: ViewMode | null) => {
+            if (newValue !== null) onModeChange?.(newValue);
+          }}
+          aria-label="view mode"
+          size="small"
+          fullWidth
         >
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
-        </Select>
+          <ToggleButton value="atom" aria-label="atom mode">Atom</ToggleButton>
+          <ToggleButton value="hydrogenic" aria-label="hydrogen-like mode">Hydrogen-like</ToggleButton>
+        </ToggleButtonGroup>
       </FormControl>
 
-      <FormControl fullWidth margin="normal" size="small">
-        <InputLabel id="l-select-label">Angular (l)</InputLabel>
-        <Select
-          labelId="l-select-label"
-          id="l-select"
-          value={initialL.toString()}
-          label="Angular (l)"
-          onChange={(e: SelectChangeEvent<string>) => onLChange(parseInt(e.target.value, 10))}
-          disabled={lOptions.length === 0}
-        >
-          {lOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
-        </Select>
-      </FormControl>
+      {!isAtomMode && (
+        <>
+          <Typography id="orbital-name" variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
+            {orbitalName(initialN, initialL, initialMl)}
+          </Typography>
 
-      <FormControl fullWidth margin="normal" size="small">
-        <InputLabel id="ml-select-label">Magnetic (m_l)</InputLabel>
-        <Select
-          labelId="ml-select-label"
-          id="ml-select"
-          value={initialMl.toString()}
-          label="Magnetic (m_l)"
-          onChange={(e: SelectChangeEvent<string>) => onMlChange(parseInt(e.target.value, 10))}
-          disabled={mlOptions.length === 0}
-        >
-          {mlOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
-        </Select>
-      </FormControl>
+          <FormControl fullWidth margin="normal" size="small" >
+            <InputLabel id="n-select-label">Principal (n)</InputLabel>
+            <Select
+              labelId="n-select-label"
+              id="n-select"
+              value={initialN.toString()} // Select value must be a string if items are strings
+              label="Principal (n)"
+              onChange={(e: SelectChangeEvent<string>) => onNChange(parseInt(e.target.value, 10))}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth margin="normal" size="small">
+            <InputLabel id="l-select-label">Angular (l)</InputLabel>
+            <Select
+              labelId="l-select-label"
+              id="l-select"
+              value={initialL.toString()}
+              label="Angular (l)"
+              onChange={(e: SelectChangeEvent<string>) => onLChange(parseInt(e.target.value, 10))}
+              disabled={lOptions.length === 0}
+            >
+              {lOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth margin="normal" size="small">
+            <InputLabel id="ml-select-label">Magnetic (m_l)</InputLabel>
+            <Select
+              labelId="ml-select-label"
+              id="ml-select"
+              value={initialMl.toString()}
+              label="Magnetic (m_l)"
+              onChange={(e: SelectChangeEvent<string>) => onMlChange(parseInt(e.target.value, 10))}
+              disabled={mlOptions.length === 0}
+            >
+              {mlOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
+            </Select>
+          </FormControl>
+        </>
+      )}
 
       {/* A raw density threshold is not comparable between orbitals; the share
           of the electron enclosed is. The density that achieves it is derived
@@ -178,32 +229,67 @@ const Controls: React.FC<ControlsProps> = ({
           ))}
         </Select>
         <FormHelperText>
-          {isoLevel === null
-            ? 'contour of constant |ψ|²'
-            : `|ψ|² = ${isoLevel.toExponential(2)}`}
+          {/* Levels 1-2's contour encloses a share of the electron *count*,
+              not a |ψ|² threshold -- there is no isosurface for a
+              spherically symmetric shell view (see shell_view.ts), so the
+              marching-cubes wording below would be a claim this view never
+              makes. Level 3 in atom mode *does* go through marching cubes
+              (a numerical R(r) override), so it keeps the usual wording. */}
+          {isAtomMode && atomLevel !== 'orbital'
+            ? 'contour enclosing this fraction of the electron density'
+            : isoLevel === null
+              ? 'contour of constant |ψ|²'
+              : `|ψ|² = ${isoLevel.toExponential(2)}`}
         </FormHelperText>
       </FormControl>
 
-      {/* The model is hydrogen-like: one electron bound to a charge-Z nucleus.
-          The element names the nucleus; it is not a neutral atom's orbitals. */}
-      <FormControl fullWidth margin="normal" size="small">
-        <InputLabel id="z-select-label">Nucleus (Z)</InputLabel>
-        <Select
-          labelId="z-select-label"
-          id="z-select"
-          value={initialZ.toString()}
-          label="Nucleus (Z)"
-          onChange={(e: SelectChangeEvent<string>) => onZChange(parseInt(e.target.value, 10))}
-          MenuProps={{ slotProps: { paper: { sx: { maxHeight: 320 } } } }}
-        >
-          {ELEMENTS.map(element => (
-            <MenuItem key={element.atomicNumber} value={element.atomicNumber.toString()}>
-              {elementLabel(element.atomicNumber)}
-            </MenuItem>
-          ))}
-        </Select>
-        <FormHelperText>one electron, charge-Z nucleus</FormHelperText>
-      </FormControl>
+      {isAtomMode ? (
+        /* Atom mode: a real neutral element, SCF-solved -- the picker drives
+           solveAtom via atomSlice.setElement, not the hydrogen-like nucleus
+           charge below. */
+        <FormControl fullWidth margin="normal" size="small">
+          <InputLabel id="atom-z-select-label">Element</InputLabel>
+          <Select
+            labelId="atom-z-select-label"
+            id="atom-z-select"
+            value={(atomZ ?? 1).toString()}
+            label="Element"
+            onChange={(e: SelectChangeEvent<string>) => onAtomElementChange?.(parseInt(e.target.value, 10))}
+            MenuProps={{ slotProps: { paper: { sx: { maxHeight: 320 } } } }}
+          >
+            {ELEMENTS.map(element => (
+              <MenuItem key={element.atomicNumber} value={element.atomicNumber.toString()}>
+                {elementLabel(element.atomicNumber)}
+              </MenuItem>
+            ))}
+          </Select>
+          <FormHelperText>neutral atom, central-field SCF</FormHelperText>
+        </FormControl>
+      ) : (
+        /* The model is hydrogen-like: one electron bound to a charge-Z nucleus.
+           The element names the nucleus; it is not a neutral atom's orbitals. */
+        <FormControl fullWidth margin="normal" size="small">
+          <InputLabel id="z-select-label">Nucleus (Z)</InputLabel>
+          <Select
+            labelId="z-select-label"
+            id="z-select"
+            value={initialZ.toString()}
+            label="Nucleus (Z)"
+            onChange={(e: SelectChangeEvent<string>) => onZChange(parseInt(e.target.value, 10))}
+            MenuProps={{ slotProps: { paper: { sx: { maxHeight: 320 } } } }}
+          >
+            {ELEMENTS.map(element => (
+              <MenuItem key={element.atomicNumber} value={element.atomicNumber.toString()}>
+                {elementLabel(element.atomicNumber)}
+              </MenuItem>
+            ))}
+          </Select>
+          <FormHelperText>one electron, charge-Z nucleus</FormHelperText>
+        </FormControl>
+      )}
+
+      {/* SubshellPanel at level 2; empty at every other level (see App.tsx). */}
+      {isAtomMode && children}
 
       {/* Resolution ToggleButtonGroup */}
       <FormControl component="fieldset" margin="normal" fullWidth>
@@ -308,14 +394,20 @@ const Controls: React.FC<ControlsProps> = ({
         >
           Reset View
         </Button>
-        <Button
-          id="update-orbital"
-          variant="contained"
-          color="primary"
-          onClick={handleUpdateOrbital}
-        >
-          Update Orbital
-        </Button>
+        {/* Atom mode renders reactively as the drill-down changes (LevelNav/
+            SubshellPanel dispatch navigation directly); there is nothing
+            here to "update" the way a hydrogen-like n/l/ml choice needs an
+            explicit trigger. */}
+        {!isAtomMode && (
+          <Button
+            id="update-orbital"
+            variant="contained"
+            color="primary"
+            onClick={handleUpdateOrbital}
+          >
+            Update Orbital
+          </Button>
+        )}
       </Box>
 
       {/* Progress bar */}

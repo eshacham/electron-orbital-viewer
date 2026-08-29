@@ -9,6 +9,7 @@ import atomReducer, {
     drillToSubshell,
     drillToOrbital,
     levelUp,
+    goToLevel,
     setHoverRadius,
     AtomState,
 } from '../../src/store/atomSlice';
@@ -25,6 +26,7 @@ import { OrbitalParams } from '../../src/types/orbital';
 function neonLikeProfile(): SerialisedAtomProfile {
     return {
         Z: 10,
+        converged: true,
         rMin: 1e-4,
         dx: 0.01,
         size: 5,
@@ -267,6 +269,66 @@ describe('atomSlice', () => {
             store.dispatch(levelUp());
 
             expect(store.getState().atom.profile).toBe(profileBefore);
+        });
+    });
+
+    // LevelNav's breadcrumb for the whole atom carries no n/l/ml (unlike the
+    // shell/subshell/orbital crumbs, which map straight onto drillToShell/
+    // drillToSubshell/drillToOrbital), so there is no existing action that
+    // can jump straight back to the atom level from anywhere deeper. This is
+    // that action, generalised to jump to any of the three levels directly
+    // rather than one step at a time, clearing whatever is now below it.
+    describe('goToLevel', () => {
+        it('jumps straight to atom from the orbital level, clearing every selection', () => {
+            const store = buildStore();
+            store.dispatch(solveSucceeded(neonLikeProfile()));
+            store.dispatch(drillToOrbital(2, 1, 0));
+
+            store.dispatch(goToLevel('atom'));
+
+            const state = store.getState().atom;
+            expect(state.level).toBe('atom');
+            expect(state.selectedShell).toBeNull();
+            expect(state.selectedSubshell).toBeNull();
+            expect(state.selectedOrbital).toBeNull();
+        });
+
+        it('jumps back to shell from orbital, clearing only the orbital selection', () => {
+            const store = buildStore();
+            store.dispatch(solveSucceeded(neonLikeProfile()));
+            store.dispatch(drillToOrbital(2, 1, 0));
+
+            store.dispatch(goToLevel('shell'));
+
+            const state = store.getState().atom;
+            expect(state.level).toBe('shell');
+            expect(state.selectedShell).toBe(2);
+            expect(state.selectedSubshell).toEqual({ n: 2, l: 1 });
+            expect(state.selectedOrbital).toBeNull();
+        });
+
+        it('is rejected for shell/orbital when nothing is selected at that level yet', () => {
+            const store = buildStore();
+            store.dispatch(solveSucceeded(neonLikeProfile()));
+            const before = store.getState().atom;
+
+            store.dispatch(goToLevel('shell'));
+            expect(store.getState().atom).toEqual(before);
+
+            store.dispatch(goToLevel('orbital'));
+            expect(store.getState().atom).toEqual(before);
+        });
+
+        it('never triggers a solve (pure navigation, ruling R28)', () => {
+            const store = buildStore();
+            store.dispatch(solveSucceeded(neonLikeProfile()));
+            store.dispatch(drillToShell(2));
+            const profileBefore = store.getState().atom.profile;
+
+            store.dispatch(goToLevel('atom'));
+
+            expect(store.getState().atom.profile).toBe(profileBefore);
+            expect(store.getState().atom.isSolving).toBe(false);
         });
     });
 

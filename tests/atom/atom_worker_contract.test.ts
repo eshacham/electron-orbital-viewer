@@ -59,6 +59,15 @@ describe('atom worker serialisation contract', () => {
         expect(cloned.total).toBeInstanceOf(Float32Array);
     });
 
+    // Ruling R17: the UI must be able to tell a converged solution from one
+    // that is not, rather than drawing a confident wrong picture -- which
+    // means `converged` has to survive the worker boundary like everything
+    // else here.
+    it('carries the solver\'s converged flag', () => {
+        expect(profile.converged).toBe(atom.converged);
+        expect(profile.converged).toBe(true);
+    });
+
     it('carries the shell list, subshell list with energies, and contour radii', () => {
         expect(profile.Z).toBe(2);
         expect(profile.shells.length).toBeGreaterThan(0);
