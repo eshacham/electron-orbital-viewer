@@ -1,4 +1,4 @@
-import { gridForAtom, integrateOnGrid, interpolateOnGrid } from '../../src/atom/radial_grid';
+import { gridForAtom, makeRadialGrid, integrateOnGrid, interpolateOnGrid } from '../../src/atom/radial_grid';
 import { solveRadialState } from '../../src/atom/radial_solver';
 import { radialWaveFunction } from '../../src/quantum_functions';
 
@@ -16,7 +16,7 @@ describe('radial solver against the analytic hydrogen-like solution', () => {
     ];
 
     it.each(cases)('reproduces E = -Z^2/2n^2 for n=%i l=%i Z=%i', (n, l, Z) => {
-        const grid = gridForAtom(Z);
+        const grid = gridForAtom(Z, n);
         const state = solveRadialState(grid, n, l, coulomb(grid, Z));
         const exact = -(Z * Z) / (2 * n * n);
         expect(state.energy).toBeCloseTo(exact, 6);
@@ -24,7 +24,7 @@ describe('radial solver against the analytic hydrogen-like solution', () => {
     });
 
     it.each(cases)('reproduces R_nl(r) for n=%i l=%i Z=%i', (n, l, Z) => {
-        const grid = gridForAtom(Z);
+        const grid = gridForAtom(Z, n);
         const state = solveRadialState(grid, n, l, coulomb(grid, Z));
         // R spans about 1e-3 (Z=1, n=4) to about 130 (Z=26, n=1) across this case
         // list, so a fixed absolute tolerance (ruling R5) is meaningless: either
@@ -50,7 +50,7 @@ describe('radial solver against the analytic hydrogen-like solution', () => {
     });
 
     it('normalises u so that the integral of u^2 is 1', () => {
-        const grid = gridForAtom(1);
+        const grid = gridForAtom(1, 3);
         const state = solveRadialState(grid, 3, 1, coulomb(grid, 1));
         const uSquared = new Float64Array(grid.size);
         for (let j = 0; j < grid.size; j++) uSquared[j] = state.u[j] * state.u[j];
@@ -58,7 +58,7 @@ describe('radial solver against the analytic hydrogen-like solution', () => {
     });
 
     it('produces n - l - 1 radial nodes', () => {
-        const grid = gridForAtom(1);
+        const grid = gridForAtom(1, 4);
         for (const [n, l] of [[1, 0], [2, 0], [3, 0], [3, 1], [4, 1]] as Array<[number, number]>) {
             const state = solveRadialState(grid, n, l, coulomb(grid, 1));
             let nodes = 0;
@@ -77,7 +77,7 @@ describe('radial solver against the analytic hydrogen-like solution', () => {
     });
 
     it('takes R positive near the origin, matching the analytic convention', () => {
-        const grid = gridForAtom(1);
+        const grid = gridForAtom(1, 3);
         for (const [n, l] of [[1, 0], [2, 0], [2, 1], [3, 2]] as Array<[number, number]>) {
             const state = solveRadialState(grid, n, l, coulomb(grid, 1));
             const near = state.R.findIndex(value => Math.abs(value) > 1e-8);
@@ -89,5 +89,27 @@ describe('radial solver against the analytic hydrogen-like solution', () => {
         const grid = gridForAtom(1);
         expect(() => solveRadialState(grid, 1, 1, coulomb(grid, 1))).toThrow();
         expect(() => solveRadialState(grid, 0, 0, coulomb(grid, 1))).toThrow();
+    });
+});
+
+describe('grid extent (ruling R21)', () => {
+    // Regression tests for the defect the brief's own case list (n up to 4)
+    // could not see: gridForAtom's old Z-only extent formula silently
+    // truncated diffuse states. Hydrogen 6s and 7s were wrong by 20% and 41%
+    // before the fix; each of these must now reach the same order of accuracy
+    // as the brief's own n <= 4 cases once the grid is sized for its own n.
+    it.each([4, 5, 6, 7])('reproduces E = -1/2n^2 for hydrogen n=%i s once the grid is sized for it', (n) => {
+        const grid = gridForAtom(1, n);
+        const state = solveRadialState(grid, n, 0, coulomb(grid, 1));
+        const exact = -1 / (2 * n * n);
+        expect(Math.abs((state.energy - exact) / exact)).toBeLessThan(1e-5);
+    });
+
+    it('throws when the grid is too small for the requested state', () => {
+        // Hydrogen 7s needs rMax ~150 (gridForAtom(1, 7) gives 183); 40 is not
+        // remotely enough, so the containment guard must catch it rather than
+        // silently returning the ~41% wrong energy the unguarded solver did.
+        const grid = makeRadialGrid(1e-6, 40, 2001);
+        expect(() => solveRadialState(grid, 7, 0, coulomb(grid, 1))).toThrow(/n=7/);
     });
 });

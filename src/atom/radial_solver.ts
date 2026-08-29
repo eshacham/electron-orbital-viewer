@@ -7,7 +7,7 @@
  * solution already in quantum_functions.ts, so this is validated against that
  * rather than against itself.
  */
-import { RadialGrid, integrateOnGrid } from './radial_grid';
+import { RadialGrid, integrateOnGrid, cumulativeIntegral } from './radial_grid';
 import { numerovForward, numerovBackward, countNodes } from './numerov';
 
 export interface RadialState {
@@ -286,6 +286,36 @@ export function solveRadialState(
     for (let j = 0; j < grid.size; j++) uSquared[j] = u[j] * u[j];
     const norm = Math.sqrt(integrateOnGrid(grid, uSquared));
     if (!(norm > 0)) throw new Error(`Radial solver did not converge for n=${n}, l=${l}.`);
+
+    // Containment guard (ruling R21): a grid too small for the requested state
+    // does not fail loudly on its own — the hard-wall-like inward seed just
+    // forces the solution toward zero at whatever edge it is given, so a
+    // single point check at rMax (e.g. u(rMax)^2 against the peak) is not a
+    // reliable signal: measured directly for hydrogen 7s truncated at rMax=40,
+    // that ratio comes out *smaller* than for a correctly sized grid, because
+    // the boundary condition manufactures a small value there regardless of
+    // whether the true state has actually decayed by then. What does not lie
+    // is the norm itself: a state that does not fit is forced to pack an
+    // outsized share of its probability into the last sliver of the grid
+    // simply to be normalisable at all. Measured across gridForAtom(1, n) for
+    // n=1..7 and n=26,l=1/Z=26 etc., a correctly sized grid keeps under
+    // 5e-5 of the norm in the outermost 1% of grid points; truncating
+    // hydrogen 7s to rMax=40 (a third of the ~150 a0 it needs) pushes that
+    // figure to 0.15 — a three-thousand-fold jump, so 1e-2 leaves a wide,
+    // safe margin on both sides.
+    const cumulativeUSquared = cumulativeIntegral(grid, uSquared);
+    const totalUSquared = cumulativeUSquared[grid.size - 1];
+    const tailStart = Math.floor(grid.size * 0.99);
+    const tailFraction = totalUSquared > 0
+        ? (totalUSquared - cumulativeUSquared[tailStart]) / totalUSquared
+        : 1;
+    if (tailFraction > 1e-2) {
+        throw new Error(
+            `Radial grid (rMax=${grid.rMax}) is too small to hold n=${n}, l=${l}: ` +
+            `${(tailFraction * 100).toFixed(1)}% of the electron's probability lies ` +
+            `in the outermost 1% of the grid. Use a grid sized for this n.`
+        );
+    }
 
     // Sign convention: R > 0 as r -> 0, matching the analytic solution.
     const firstSignificant = u.findIndex(value => Math.abs(value) > 1e-12 * norm);

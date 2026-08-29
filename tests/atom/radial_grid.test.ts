@@ -18,18 +18,26 @@ describe('radial grid', () => {
     });
 
     it('integrates the hydrogen 1s radial distribution to 1', () => {
-        const grid = gridForAtom(1);
+        // A generic Simpson's-rule accuracy check, not a statement about any
+        // particular atom's occupation, so it asks makeRadialGrid directly for
+        // a domain wide enough that the 1s tail beyond it is negligible to
+        // machine precision (ruling R21 sized gridForAtom(1)'s own default to
+        // just past n=1's 99.99% radius, which is not wide enough for that:
+        // the true integral to r=9 alone is short of 1 by about 2.8e-6).
+        const grid = makeRadialGrid(1e-6, 65, 2001);
         const f = new Float64Array(grid.size);
         // D(r) = 4 r^2 exp(-2r) for 1s of hydrogen
         for (let j = 0; j < grid.size; j++) {
             const r = grid.r[j];
             f[j] = 4 * r * r * Math.exp(-2 * r);
         }
-        expect(integrateOnGrid(grid, f)).toBeCloseTo(1, 6);
+        expect(integrateOnGrid(grid, f)).toBeCloseTo(1, 8);
     });
 
     it('cumulative integral ends at the total', () => {
-        const grid = gridForAtom(1);
+        // Same reasoning as above: an explicit wide domain, not gridForAtom's
+        // atom-sized default.
+        const grid = makeRadialGrid(1e-6, 65, 2001);
         const f = new Float64Array(grid.size);
         for (let j = 0; j < grid.size; j++) {
             const r = grid.r[j];
@@ -71,5 +79,24 @@ describe('radial grid', () => {
     it('rejects an even point count, which would break Simpson\'s rule', () => {
         expect(() => makeRadialGrid(1e-4, 20, 1000)).toThrow();
         expect(() => makeRadialGrid(1e-4, 20, 1001)).not.toThrow();
+    });
+
+    it('sizes rMax from the highest occupied n of the atom\'s period (ruling R21)', () => {
+        // Period boundaries by highest occupied n: 1-2 -> 1, 3-10 -> 2, 11-18 -> 3,
+        // 19-36 -> 4, 37-54 -> 5, 55-86 -> 6, 87-118 -> 7. Values are the
+        // documented RMAX_FOR_HIGHEST_N margins in radial_grid.ts.
+        const expectedRMax: Array<[number, number]> = [
+            [1, 9], [6, 24], [20, 71], [47, 103], [87, 183], [118, 183],
+        ];
+        for (const [Z, rMax] of expectedRMax) {
+            expect(gridForAtom(Z).rMax).toBeGreaterThanOrEqual(rMax);
+        }
+    });
+
+    it('accepts an explicit highest-n override for states above an atom\'s own occupation', () => {
+        // Hydrogen only occupies n=1, but a caller solving its n=6 excited state
+        // needs a grid sized for n=6, not for hydrogen's default period.
+        expect(gridForAtom(1).rMax).toBeCloseTo(9, 6);
+        expect(gridForAtom(1, 6).rMax).toBeCloseTo(140, 6);
     });
 });
