@@ -61,4 +61,32 @@ describe('electron configurations', () => {
         const keys = chromium.map(s => s.n * 10 + s.l);
         expect(keys).toEqual([...keys].sort((a, b) => a - b));
     });
+
+    it('does not let a caller corrupt the cached configuration', () => {
+        const first = configurationFor(6);
+        first.push({ n: 99, l: 0, electrons: 1 });
+
+        const second = configurationFor(6);
+        expect(second).toHaveLength(3);
+        expect(second.some(s => s.n === 99)).toBe(false);
+    });
+
+    // Exact configurationLabel strings for six non-exception elements spanning
+    // the periods, chosen to catch a wrong-but-electron-balanced transcription
+    // that the totals/bounds/exceptions tests above would miss. Each expected
+    // string was derived independently from the same source used to build the
+    // table (the NIST-cited "Electron configurations of the elements" data
+    // page: https://en.wikipedia.org/wiki/Electron_configurations_of_the_elements_(data_page)),
+    // by expanding that source's own noble-gas-core notation and sorting by
+    // (n, l) by hand -- not read back from this module's own output.
+    it.each([
+        [14, '1s² 2s² 2p⁶ 3s² 3p²'],                                                     // Si: [Ne] 3s2 3p2
+        [33, '1s² 2s² 2p⁶ 3s² 3p⁶ 3d¹⁰ 4s² 4p³'],                                         // As: [Ar] 3d10 4s2 4p3
+        [50, '1s² 2s² 2p⁶ 3s² 3p⁶ 3d¹⁰ 4s² 4p⁶ 4d¹⁰ 5s² 5p²'],                            // Sn: [Kr] 4d10 5s2 5p2
+        [68, '1s² 2s² 2p⁶ 3s² 3p⁶ 3d¹⁰ 4s² 4p⁶ 4d¹⁰ 4f¹² 5s² 5p⁶ 6s²'],                    // Er: [Xe] 4f12 6s2
+        [82, '1s² 2s² 2p⁶ 3s² 3p⁶ 3d¹⁰ 4s² 4p⁶ 4d¹⁰ 4f¹⁴ 5s² 5p⁶ 5d¹⁰ 6s² 6p²'],           // Pb: [Xe] 4f14 5d10 6s2 6p2
+        [118, '1s² 2s² 2p⁶ 3s² 3p⁶ 3d¹⁰ 4s² 4p⁶ 4d¹⁰ 4f¹⁴ 5s² 5p⁶ 5d¹⁰ 5f¹⁴ 6s² 6p⁶ 6d¹⁰ 7s² 7p⁶'], // Og: [Rn] 5f14 6d10 7s2 7p6
+    ] as Array<[number, string]>)('knows the full configuration of Z=%i', (Z, expected) => {
+        expect(configurationLabel(Z)).toBe(expected);
+    });
 });

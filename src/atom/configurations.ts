@@ -112,12 +112,21 @@ function parseOwnSubshells(spec: string): SubshellOccupancy[] {
     });
 }
 
+/** Looks up a `[Xx]` core's already-built configuration, failing loudly on a typo rather than spreading `undefined`. */
+function resolveCore(symbol: string, configurations: SubshellOccupancy[][]): SubshellOccupancy[] {
+    const atomicNumber = NOBLE_GAS_CORE[symbol];
+    if (atomicNumber === undefined) {
+        throw new Error(`Unknown noble-gas core "[${symbol}]" in electron configuration table.`);
+    }
+    return configurations[atomicNumber - 1];
+}
+
 /** Parses the whole table once, resolving each `[core]` reference against the configurations already built for lower Z. */
 function buildConfigurations(): SubshellOccupancy[][] {
     const configurations: SubshellOccupancy[][] = [];
     for (const spec of RAW_CONFIGURATIONS) {
         const coreMatch = /^\[(\w+)\]\s*(.*)$/.exec(spec);
-        const core = coreMatch ? configurations[NOBLE_GAS_CORE[coreMatch[1]] - 1] : [];
+        const core = coreMatch ? resolveCore(coreMatch[1], configurations) : [];
         const own = parseOwnSubshells(coreMatch ? coreMatch[2] : spec);
         const combined = [...core, ...own];
         combined.sort((a, b) => (a.n - b.n) || (a.l - b.l));
@@ -128,14 +137,27 @@ function buildConfigurations(): SubshellOccupancy[][] {
 
 const CONFIGURATIONS: SubshellOccupancy[][] = buildConfigurations();
 
-/** The ground-state subshell occupancies for neutral atom Z, ordered by (n, l). */
+/**
+ * The ground-state subshell occupancies for neutral atom Z, ordered by (n, l).
+ *
+ * Returns a fresh array each call: CONFIGURATIONS is parsed once and reused
+ * for every Z, so handing back the cached array itself would let one caller's
+ * `.push`/`.sort`/etc. corrupt what every later caller sees.
+ */
 export function configurationFor(Z: number): SubshellOccupancy[] {
     const configuration = CONFIGURATIONS[Z - 1];
     if (!configuration) throw new Error(`No electron configuration for Z=${Z}; expected 1..${MAX_ATOMIC_NUMBER}.`);
-    return configuration;
+    return [...configuration];
 }
 
-/** The same occupancies grouped into shells, still ordered by n then l within each shell. */
+/**
+ * The same occupancies grouped into shells, still ordered by n then l within each shell.
+ *
+ * Clones each subshell (rather than reusing the objects `configurationFor`
+ * hands back) for the same reason `configurationFor` copies its array: a
+ * caller mutating `.electrons` on a returned subshell must not corrupt the
+ * cache for later callers.
+ */
 export function shellsFor(Z: number): ShellOccupancy[] {
     const shells: ShellOccupancy[] = [];
     for (const subshell of configurationFor(Z)) {
@@ -144,7 +166,7 @@ export function shellsFor(Z: number): ShellOccupancy[] {
             shell = { n: subshell.n, electrons: 0, subshells: [] };
             shells.push(shell);
         }
-        shell.subshells.push(subshell);
+        shell.subshells.push({ ...subshell });
         shell.electrons += subshell.electrons;
     }
     return shells;
