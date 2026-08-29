@@ -9,6 +9,8 @@ export interface SerialisedShell {
     contourRadius: number;
     /** D(r) for this shell, on the shared log grid (see SerialisedAtomProfile). */
     curve: Float64Array;
+    /** This shell's own curve divided by its running maximum (see `shellEmphasis`) -- what the level-2 cut face actually colours. */
+    emphasis: Float32Array;
 }
 
 /** One subshell's contribution, flattened for the worker boundary. */
@@ -82,6 +84,20 @@ export interface SerialisedAtomProfile {
      * regardless of magnitude, so it doesn't have that effect.
      */
     total: Float32Array;
+    /**
+     * `total` divided by a smoothed running maximum of itself (see
+     * `shellEmphasis` in atom_profile.ts). This, not `total`, is what the
+     * level-1 cut face colours: `total` alone spans about three orders of
+     * magnitude between a heavy atom's K shell and its valence, which
+     * crushes every shell peak against a single global scale (uranium's
+     * inner troughs sat 0.028 below their neighbouring peaks -- invisible).
+     * Dividing by a *local* running maximum instead means a shell peak
+     * approaches 1 regardless of its absolute height, and a trough between
+     * two peaks drops well below whichever neighbour is taller, at every
+     * radius. Already bounded to [0, 1] by construction, so unlike `total`
+     * there is no precision concern in shipping it as float32.
+     */
+    totalEmphasis: Float32Array;
     /** Radius enclosing the profile's requested fraction of all electrons. */
     contourRadius: number;
     /**
@@ -117,6 +133,7 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
         dx: grid.dx,
         size: grid.size,
         total: packRadialCurve(profile.total.values),
+        totalEmphasis: profile.totalEmphasis,
         contourRadius: profile.contourRadius,
         shellPeaks: Float64Array.from(profile.shellPeaks),
         shells: profile.shells.map(shell => ({
@@ -124,6 +141,7 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
             electrons: shell.electrons,
             contourRadius: shell.contourRadius,
             curve: shell.curve.values,
+            emphasis: shell.emphasis,
         })),
         // profile.subshells is built from atom.states in the same order
         // (atom_profile.ts's buildAtomProfile maps states.map(...) directly),
@@ -143,8 +161,8 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
 
 /** Every ArrayBuffer inside a payload, so it can be transferred rather than copied across the worker boundary. */
 function transferListFor(profile: SerialisedAtomProfile): Transferable[] {
-    const buffers: Transferable[] = [profile.total.buffer, profile.shellPeaks.buffer];
-    for (const shell of profile.shells) buffers.push(shell.curve.buffer);
+    const buffers: Transferable[] = [profile.total.buffer, profile.totalEmphasis.buffer, profile.shellPeaks.buffer];
+    for (const shell of profile.shells) buffers.push(shell.curve.buffer, shell.emphasis.buffer);
     for (const subshell of profile.subshells) buffers.push(subshell.curve.buffer, subshell.R.buffer);
     return buffers;
 }

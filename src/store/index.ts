@@ -12,8 +12,9 @@ export const store = configureStore({
   // arrays for RTK's serializableCheck would triple their memory and throw
   // away the point of using Float32Array/Float64Array in the first place.
   // Two paths carry them: `atom/solveSucceeded`'s payload (the whole
-  // SerialisedAtomProfile -- total, shells[].curve, subshells[].curve/R,
-  // shellPeaks, all under `atom.profile` once in state), and
+  // SerialisedAtomProfile -- total, totalEmphasis, shells[].curve/emphasis,
+  // subshells[].curve/R, shellPeaks, all under `atom.profile` once in
+  // state), and
   // `orbital/startOrbitalCalculation`'s payload when atom mode's level 3
   // hands the marching-cubes pipeline a subshell's numerical R(r) instead
   // of the analytic radial factor (`OrbitalParams.radialSamples.R`, landing

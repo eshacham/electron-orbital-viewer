@@ -1,6 +1,13 @@
 import { solveAtom, AtomSolution } from '../../src/atom/scf';
-import { integrateOnGrid, interpolateOnGrid } from '../../src/atom/radial_grid';
-import { AtomProfile, buildAtomProfile, radialFunctionFor, packRadialCurve } from '../../src/atom/atom_profile';
+import { integrateOnGrid, interpolateOnGrid, RadialGrid } from '../../src/atom/radial_grid';
+import {
+    AtomProfile,
+    buildAtomProfile,
+    radialFunctionFor,
+    packRadialCurve,
+    shellEmphasis,
+    SHELL_EMPHASIS_WINDOW,
+} from '../../src/atom/atom_profile';
 
 /**
  * solveAtom is expensive (neon ~1.2s, uranium ~8-9s), so each atom used here
@@ -102,6 +109,122 @@ describe('atom profile', () => {
             const ironProfile = buildAtomProfile(iron, 0.9);
             expect(ironProfile.shells.length).toBe(4);
             expect(ironProfile.shellPeaks.length).toBe(3);
+        });
+    });
+
+    describe('shellEmphasis', () => {
+        it('never exceeds 1, and reaches 1 exactly at a global maximum', () => {
+            const grid = { rMin: 1, dx: 1, size: 7 } as RadialGrid;
+            const D = new Float64Array([0, 1, 5, 10, 4, 1, 0]);
+            const e = shellEmphasis(grid, D, 3);
+            expect(e[3]).toBeCloseTo(1, 6);
+            for (const v of e) expect(v).toBeLessThanOrEqual(1);
+        });
+
+        it('gives a shallow trough between two comparably tall peaks a much lower ratio than either peak', () => {
+            // Two peaks of nearly equal height with a shallow (15%) dip
+            // between them -- the case that breaks a global normalisation
+            // (uranium's r=0.084 trough is exactly this shape; see the
+            // acceptance test below).
+            const grid = { rMin: 1, dx: 1, size: 9 } as RadialGrid;
+            const D = new Float64Array([0, 50, 100, 90, 85, 92, 100, 50, 0]);
+            const e = shellEmphasis(grid, D, 4);
+            expect(e[2]).toBeCloseTo(1, 6);
+            expect(e[6]).toBeCloseTo(1, 6);
+            // The trough sits at 85/100 = 0.85 of the taller neighbour --
+            // far from 1, even though 85 is not far from 100 in absolute
+            // terms. This is the property a fixed global scale cannot give:
+            // the ratio is local, not against one fixed reference.
+            expect(e[4]).toBeCloseTo(0.85, 6);
+        });
+
+        it('returns zero rather than dividing by zero where the curve is all zero', () => {
+            const grid = { rMin: 1, dx: 1, size: 5 } as RadialGrid;
+            const e = shellEmphasis(grid, new Float64Array(5), 2);
+            expect(Array.from(e)).toEqual([0, 0, 0, 0, 0]);
+        });
+    });
+
+    /**
+     * The acceptance test for the shell-ring fix (task: "Fix the atom
+     * cut-away so shell rings are actually visible"). Mirrors the shader's
+     * final ramp exactly (see shell_view.ts's fragment shader) so this
+     * measures precisely what ends up on screen, not just the intermediate
+     * emphasis ratio.
+     *
+     * Before this change the cut face read raw D(r) normalised against a
+     * single global peak and ramped with pow(d, 0.45) -- a *brightening*
+     * curve that compresses the top of the range, where every shell's peak
+     * already sits. Reproducing that old ramp against the same peak/trough
+     * pairs below gives contrasts of 0.148/0.058 (argon) and
+     * 0.028/0.056/0.049 (uranium) -- the 0.028 case (uranium, r=0.021) is
+     * the "0.028" figure this task's brief measured independently. All of
+     * those fail the 0.35 bar below; this test only exercises the new path,
+     * but that old-path arithmetic is why the bar is set where it is.
+     */
+    describe('shell rings are actually visible (acceptance test)', () => {
+        // Same lower edge the shader ramps with (smoothstep(0.9, 1.0, e)).
+        function ramp(e: number): number {
+            const t = Math.min(1, Math.max(0, (e - 0.9) / (1.0 - 0.9)));
+            return t * t * (3 - 2 * t);
+        }
+
+        function nearestIndex(grid: RadialGrid, r: number): number {
+            const t = Math.log(r / grid.rMin) / grid.dx;
+            return Math.max(0, Math.min(grid.size - 1, Math.round(t)));
+        }
+
+        function troughIndexBetween(D: Float64Array, i0: number, i1: number): number {
+            let minValue = Infinity;
+            let minIndex = i0;
+            for (let j = i0; j <= i1; j++) {
+                if (D[j] < minValue) {
+                    minValue = D[j];
+                    minIndex = j;
+                }
+            }
+            return minIndex;
+        }
+
+        it('keeps every peak-to-adjacent-trough shader-input contrast at or above 0.35, for argon and uranium', () => {
+            const MIN_CONTRAST = 0.35;
+            const cases: Array<{ label: string; grid: RadialGrid; D: Float64Array; emphasis: Float32Array; peaks: number[] }> = [
+                { label: 'Ar', grid: argon.grid, D: argonProfile.total.values, emphasis: argonProfile.totalEmphasis, peaks: argonProfile.shellPeaks },
+                { label: 'U', grid: uranium.grid, D: uraniumProfile.total.values, emphasis: uraniumProfile.totalEmphasis, peaks: uraniumProfile.shellPeaks },
+            ];
+
+            const table: string[] = [];
+            let worst = Infinity;
+
+            for (const { label, grid, D, emphasis, peaks } of cases) {
+                expect(peaks.length).toBeGreaterThanOrEqual(2);
+                const peakIndices = peaks.map(r => nearestIndex(grid, r));
+
+                for (let i = 0; i < peakIndices.length - 1; i++) {
+                    const p0 = peakIndices[i];
+                    const p1 = peakIndices[i + 1];
+                    const t = troughIndexBetween(D, p0, p1);
+
+                    const bPeak0 = ramp(emphasis[p0]);
+                    const bPeak1 = ramp(emphasis[p1]);
+                    const bTrough = ramp(emphasis[t]);
+                    const contrast = Math.min(bPeak0 - bTrough, bPeak1 - bTrough);
+                    worst = Math.min(worst, contrast);
+
+                    table.push(
+                        `${label} trough r=${grid.r[t].toFixed(3)}: peaks ${grid.r[p0].toFixed(3)}/${grid.r[p1].toFixed(3)} ` +
+                        `-> brightness ${bPeak0.toFixed(3)}/${bPeak1.toFixed(3)}, trough ${bTrough.toFixed(3)}, contrast ${contrast.toFixed(3)}`
+                    );
+                }
+            }
+
+            // eslint-disable-next-line no-console -- the before/after table this test exists to produce.
+            console.log(`shellEmphasis window=${SHELL_EMPHASIS_WINDOW}\n` + table.join('\n'));
+            for (const row of table) {
+                const contrast = Number(row.match(/contrast ([\d.]+)/)![1]);
+                expect(contrast).toBeGreaterThanOrEqual(MIN_CONTRAST);
+            }
+            expect(worst).toBeGreaterThanOrEqual(MIN_CONTRAST);
         });
     });
 

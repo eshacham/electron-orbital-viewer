@@ -67,7 +67,7 @@ function atomShellParams() {
     return {
         level: 'atom' as const,
         contourRadius: 4,
-        radialCurve: new Float64Array([1, 4, 10, 3, 0.5]),
+        shellEmphasis: new Float32Array([0.1, 0.4, 1.0, 0.3, 0.05]),
         rMin: 0.1,
         dx: 0.5,
         size: 5,

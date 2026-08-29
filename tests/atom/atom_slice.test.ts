@@ -31,11 +31,12 @@ function neonLikeProfile(): SerialisedAtomProfile {
         dx: 0.01,
         size: 5,
         total: new Float32Array([1, 2, 3, 2, 1]),
+        totalEmphasis: new Float32Array([0.5, 1, 1, 1, 0.5]),
         contourRadius: 3,
         shellPeaks: new Float64Array([0.5, 2]),
         shells: [
-            { n: 1, electrons: 2, contourRadius: 0.5, curve: new Float64Array(5) },
-            { n: 2, electrons: 8, contourRadius: 2.5, curve: new Float64Array(5) },
+            { n: 1, electrons: 2, contourRadius: 0.5, curve: new Float64Array(5), emphasis: new Float32Array(5) },
+            { n: 2, electrons: 8, contourRadius: 2.5, curve: new Float64Array(5), emphasis: new Float32Array(5) },
         ],
         subshells: [
             { n: 1, l: 0, electrons: 2, energy: -30, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 0.5 },

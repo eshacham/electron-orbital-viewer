@@ -78,20 +78,29 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         const gridRMax = atomProfile.rMin * Math.exp(atomProfile.dx * (atomProfile.size - 1));
 
         if (atomLevel === 'atom') {
+            // The outermost resolved shell peak, when the profile resolved
+            // any (ruling R26: display annotation only) -- lets the whole-
+            // atom view start framed on the shell structure itself rather
+            // than the much larger enclosed-fraction contour (spec bugfix;
+            // see framingRadiusFor in orbital_visualizer.ts).
+            const outermostFeatureR = atomProfile.shellPeaks.length > 0
+                ? atomProfile.shellPeaks[atomProfile.shellPeaks.length - 1]
+                : undefined;
             updateAtomViewInScene(context, {
                 contourRadius: atomProfile.contourRadius,
-                radialCurve: atomProfile.total,
+                shellEmphasis: atomProfile.totalEmphasis,
                 rMin: atomProfile.rMin,
                 dx: atomProfile.dx,
                 size: atomProfile.size,
                 rMax: gridRMax,
+                outermostFeatureR,
             });
         } else {
             const shell = atomProfile.shells.find(s => s.n === atomSelectedShell);
             if (!shell) return;
             updateAtomViewInScene(context, {
                 contourRadius: shell.contourRadius,
-                radialCurve: shell.curve,
+                shellEmphasis: shell.emphasis,
                 rMin: atomProfile.rMin,
                 dx: atomProfile.dx,
                 size: atomProfile.size,

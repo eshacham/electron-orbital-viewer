@@ -2,7 +2,9 @@ import * as THREE from 'three';
 
 /**
  * Levels 1 and 2 (whole atom, single shell): a spherical cut-away shaded by
- * the radial distribution D(r) = 4*pi*r^2*rho(r).
+ * the radial distribution D(r) = 4*pi*r^2*rho(r), scaled to local structure
+ * (see `shellEmphasis` in atom_profile.ts) so shells stay legible across the
+ * atom's full range rather than only the tallest one.
  *
  * Under the central-field approximation the density is spherically
  * symmetric, so unlike level 3's orbital lobes the isosurface here is just a
@@ -34,7 +36,7 @@ const CAP_VERTEX_SHADER = /* glsl */`
     }
 `;
 
-// Ruling R25: the radial curve ships on the SCF's own logarithmic grid
+// Ruling R25: the curve ships on the SCF's own logarithmic grid
 // (r_j = rMin * e^(j*dx)), not resampled onto a uniform-in-r table. A
 // uniform-in-r lookup sounds equivalent but silently flattens a heavy atom's
 // inner shells -- uranium's K shell retained under 40% of its true height
@@ -44,23 +46,29 @@ const CAP_VERTEX_SHADER = /* glsl */`
 // texture's built-in linear filtering between texels *is* correct log-space
 // interpolation, with no resampling step to get wrong.
 //
-// Ruling R16: the texture carries raw, unnormalised D(r) in a float
-// (RedFormat/FloatType) texture. A shell's peak can be three orders of
-// magnitude below the atom's innermost one; normalising or quantising to
-// 8 bits before upload would put every outer shell below one quantisation
-// step. Normalisation (against `peakD`) and the perceptual ramp both happen
-// here in the shader instead, working in display space per the same
-// reasoning as clip_caps.ts's cap shader (ramping in linear space and
-// converting afterwards flattens the gradient).
+// The texture carries `shellEmphasis` (atom_profile.ts) -- D(r) divided by a
+// smoothed running maximum of itself -- rather than raw D(r). Ruling R16
+// (raw D must not be normalised or quantised before upload) was about the
+// *global* range of D itself, which spans three orders of magnitude between
+// a heavy atom's K shell and its valence; dividing by a single global peak
+// -- which is what a naive normalisation, or the pow(d, k) perceptual ramp
+// this replaces, amounts to -- crushed every shell's peak against that one
+// scale (uranium's inner troughs sat 0.028 below their neighbouring peaks:
+// invisible). `shellEmphasis` sidesteps that entirely by comparing each
+// point only to its own neighbourhood, so it is already bounded to [0, 1]
+// by construction; R16's concern about losing precision to the global range
+// does not apply to a curve that no longer has one. The contrast-expanding
+// smoothstep below is what turns "denser than its neighbourhood" into a
+// crisp ring instead of a soft gradient -- tuned against the acceptance
+// test in atom_profile.test.ts, not chosen by eye.
 const CAP_FRAGMENT_SHADER = /* glsl */`
     precision highp float;
 
-    uniform sampler2D radialCurve;
+    uniform sampler2D shellEmphasis;
     uniform float rMin;
     uniform float dx;
     uniform float size;
     uniform float rMax;
-    uniform float peakD;
     uniform float opacity;
     uniform float highlightR;   // negative when nothing is highlighted
 
@@ -78,14 +86,17 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         t = clamp(t, 0.0, size - 1.0);
         float texCoord = (t + 0.5) / size;
 
-        float d = texture(radialCurve, vec2(texCoord, 0.5)).r / peakD;
+        float e = clamp(texture(shellEmphasis, vec2(texCoord, 0.5)).r, 0.0, 1.0);
 
-        // Shell rings: D(r) peaks are the shells. Perceptual ramp, warm at
-        // the peaks and near-black in the troughs between shells, tuned so
-        // the troughs stay visibly dark rather than crushing to true black.
+        // Shell rings: a shell peak sits at its own local maximum, so its
+        // emphasis approaches 1 regardless of the shell's absolute height;
+        // a trough between two peaks sits well below whichever neighbour is
+        // taller. smoothstep's lower edge is set high (0.9) so that ratio
+        // gap turns into a crisp bright ring against a dark background
+        // rather than a soft gradient -- see the module doc above.
         vec3 cold = vec3(0.02, 0.03, 0.10);
         vec3 warm = vec3(1.00, 0.85, 0.45);
-        vec3 color = mix(cold, warm, pow(clamp(d, 0.0, 1.0), 0.45));
+        vec3 color = mix(cold, warm, smoothstep(0.9, 1.0, e));
 
         // The ring the radial plot is pointing at. Comparing the cut face's
         // own |worldPosition| against highlightR is already geometrically
@@ -103,12 +114,14 @@ export interface ShellViewOptions {
     /** Sphere radius: the contour enclosing the profile's requested electron fraction. */
     contourRadius: number;
     /**
-     * D(r) for this view (the whole atom at level 1, one shell at level 2),
-     * raw and unnormalised, on the log grid described by rMin/dx/size below
-     * (ruling R25 -- supersedes the uniform-in-r `radialTexture` sketch in
-     * the original brief, which loses a heavy atom's inner-shell peak).
+     * `shellEmphasis(grid, D, ...)` for this view (the whole atom at level
+     * 1, one shell at level 2) -- D(r) already divided by a smoothed running
+     * maximum of itself, and so already bounded to [0, 1] -- on the log grid
+     * described by rMin/dx/size below (ruling R25 -- supersedes the
+     * uniform-in-r `radialTexture` sketch in the original brief, which loses
+     * a heavy atom's inner-shell peak).
      */
-    radialCurve: Float32Array;
+    shellEmphasis: Float32Array;
     /** The shared log grid's parameters: r_j = rMin * e^(j*dx), j = 0..size-1. */
     rMin: number;
     dx: number;
@@ -119,9 +132,9 @@ export interface ShellViewOptions {
     plane: THREE.Plane;
 }
 
-/** Wraps the raw log-grid curve in a float texture the cap shader can read. */
-function createRadialCurveTexture(radialCurve: Float32Array): THREE.DataTexture {
-    const texture = new THREE.DataTexture(radialCurve, radialCurve.length, 1);
+/** Wraps the log-grid emphasis curve in a float texture the cap shader can read. */
+function createShellEmphasisTexture(values: Float32Array): THREE.DataTexture {
+    const texture = new THREE.DataTexture(values, values.length, 1);
     texture.format = THREE.RedFormat;
     texture.type = THREE.FloatType;
     texture.minFilter = THREE.LinearFilter;
@@ -132,16 +145,6 @@ function createRadialCurveTexture(radialCurve: Float32Array): THREE.DataTexture 
     return texture;
 }
 
-function peakOf(values: Float32Array): number {
-    let peak = 0;
-    for (let i = 0; i < values.length; i++) {
-        if (values[i] > peak) peak = values[i];
-    }
-    // A curve that is all zero would otherwise divide by zero in the shader;
-    // 1 is an arbitrary safe fallback that never actually shows (d stays 0).
-    return peak > 0 ? peak : 1;
-}
-
 /**
  * Builds the stencil passes and the shaded cut face for one spherical shell
  * view. See the module doc above for why this is a sphere rather than a
@@ -149,7 +152,7 @@ function peakOf(values: Float32Array): number {
  * `clip_caps.ts` exactly.
  */
 export function createShellView(options: ShellViewOptions): THREE.Group {
-    const { contourRadius, radialCurve, rMin, dx, size, rMax, opacity, plane } = options;
+    const { contourRadius, shellEmphasis, rMin, dx, size, rMax, opacity, plane } = options;
 
     const view = new THREE.Group();
     view.userData.isCapAssembly = true;
@@ -188,12 +191,11 @@ export function createShellView(options: ShellViewOptions): THREE.Group {
     const capMaterial = new THREE.ShaderMaterial({
         glslVersion: THREE.GLSL3,
         uniforms: {
-            radialCurve: { value: createRadialCurveTexture(radialCurve) },
+            shellEmphasis: { value: createShellEmphasisTexture(shellEmphasis) },
             rMin: { value: rMin },
             dx: { value: dx },
             size: { value: size },
             rMax: { value: rMax },
-            peakD: { value: peakOf(radialCurve) },
             opacity: { value: opacity },
             highlightR: { value: -1 },
         },
@@ -232,13 +234,13 @@ export function setShellViewHighlight(view: THREE.Object3D | null, r: number | n
     });
 }
 
-/** Frees the radial curve texture; the geometry is shared and disposed with the mesh. */
+/** Frees the shell-emphasis texture; the geometry is shared and disposed with the mesh. */
 export function disposeShellView(view: THREE.Object3D | null): void {
     if (!view) return;
 
     view.traverse(child => {
         if (!(child instanceof THREE.Mesh) || !child.userData.isCap) return;
         const material = child.material as THREE.ShaderMaterial;
-        material.uniforms.radialCurve.value?.dispose();
+        material.uniforms.shellEmphasis.value?.dispose();
     });
 }

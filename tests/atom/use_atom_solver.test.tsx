@@ -35,6 +35,7 @@ function minimalProfile(overrides: Partial<SerialisedAtomProfile> = {}): Seriali
         dx: 0.01,
         size: 3,
         total: new Float32Array([1, 2, 1]),
+        totalEmphasis: new Float32Array([1, 1, 1]),
         contourRadius: 1,
         shellPeaks: new Float64Array([1]),
         shells: [],
@@ -165,7 +166,7 @@ describe('useAtomSolver', () => {
     it('does not start a new solve for pure navigation (drillToShell)', () => {
         const store = buildStore();
         store.dispatch({ type: 'atom/solveSucceeded', payload: minimalProfile({
-            shells: [{ n: 1, electrons: 2, contourRadius: 0.5, curve: new Float64Array(3) }],
+            shells: [{ n: 1, electrons: 2, contourRadius: 0.5, curve: new Float64Array(3), emphasis: new Float32Array(3) }],
         }) });
         const createWorker = jest.fn(fakeWorker);
 

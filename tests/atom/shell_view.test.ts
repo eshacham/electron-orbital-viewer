@@ -2,19 +2,20 @@ import * as THREE from 'three';
 import { createShellView, setShellViewHighlight, disposeShellView, ShellViewOptions } from '../../src/atom/shell_view';
 
 /**
- * D(r) on a tiny log grid: rMin = 0.1, dx = 0.5, size = 5, so
- * r_j = 0.1 * e^(0.5j) for j = 0..4. Peak is at j = 2 (arbitrary shape, just
- * needs a clear maximum so peakD is unambiguous).
+ * An already-computed shellEmphasis curve (see atom_profile.ts) on a tiny
+ * log grid: rMin = 0.1, dx = 0.5, size = 5, so r_j = 0.1 * e^(0.5j) for
+ * j = 0..4. Bounded to [0, 1] by construction -- the shader no longer
+ * normalises against a peak, it just ramps this ratio directly.
  */
 const RMIN = 0.1;
 const DX = 0.5;
 const SIZE = 5;
-const RADIAL_CURVE = new Float32Array([1, 4, 10, 3, 0.5]);
+const SHELL_EMPHASIS = new Float32Array([0.1, 0.4, 1.0, 0.3, 0.05]);
 const RMAX = RMIN * Math.exp(DX * (SIZE - 1));
 
 const options = (): ShellViewOptions => ({
     contourRadius: RMAX * 0.8,
-    radialCurve: RADIAL_CURVE,
+    shellEmphasis: SHELL_EMPHASIS,
     rMin: RMIN,
     dx: DX,
     size: SIZE,
@@ -94,26 +95,25 @@ describe('shell view', () => {
         expect(renderer.clearStencil).toHaveBeenCalled();
     });
 
-    it('carries a float RedFormat texture of the raw (unnormalised) log-grid curve, plus the log-grid parameters the shader needs', () => {
+    it('carries a float RedFormat texture of the shellEmphasis curve exactly as given, plus the log-grid parameters the shader needs', () => {
         const view = createShellView(options());
         const material = capMaterial(view);
 
-        const texture = material.uniforms.radialCurve.value as THREE.DataTexture;
+        const texture = material.uniforms.shellEmphasis.value as THREE.DataTexture;
         expect(texture).toBeInstanceOf(THREE.DataTexture);
         expect(texture.image.width).toBe(SIZE);
         expect(texture.image.height).toBe(1);
         expect(texture.format).toBe(THREE.RedFormat);
         expect(texture.type).toBe(THREE.FloatType);
-        // Raw values, not renormalised to [0, 1] before upload (ruling R16) --
-        // the shader does the peak-normalisation and perceptual ramp itself.
-        expect(Array.from(texture.image.data as Float32Array)).toEqual(Array.from(RADIAL_CURVE));
+        // Shipped as-is -- shellEmphasis is already bounded to [0, 1] by
+        // construction (atom_profile.ts), so unlike the old raw-D(r) texture
+        // there is no further normalisation for the shader to do.
+        expect(Array.from(texture.image.data as Float32Array)).toEqual(Array.from(SHELL_EMPHASIS));
 
         expect(material.uniforms.rMin.value).toBe(RMIN);
         expect(material.uniforms.dx.value).toBe(DX);
         expect(material.uniforms.size.value).toBe(SIZE);
         expect(material.uniforms.rMax.value).toBe(RMAX);
-        // The shader normalises D(r) against this before ramping (ruling R16).
-        expect(material.uniforms.peakD.value).toBeCloseTo(10);
         expect(material.uniforms.opacity.value).toBe(1);
         // Nothing highlighted yet.
         expect(material.uniforms.highlightR.value).toBeLessThan(0);
@@ -134,9 +134,9 @@ describe('shell view', () => {
         expect(() => disposeShellView(null)).not.toThrow();
     });
 
-    it('frees the radial curve texture on dispose', () => {
+    it('frees the shell-emphasis texture on dispose', () => {
         const view = createShellView(options());
-        const texture = capMaterial(view).uniforms.radialCurve.value as THREE.DataTexture;
+        const texture = capMaterial(view).uniforms.shellEmphasis.value as THREE.DataTexture;
         const disposed = jest.fn();
         texture.addEventListener('dispose', disposed);
 

@@ -195,7 +195,15 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
             aria-label="radial distribution"
         >
             <div className="radial-plot-title">
-                {isMultiCurve ? 'Radial distribution D(r) = 4πr²ρ(r)' : 'Radial distribution — r²R(r)²'}
+                {isMultiCurve
+                    // The 3D cut face this plot is linked to (hoverRadius/
+                    // onHoverRadius, see the module doc) colours the *same*
+                    // D(r) but scaled to local structure so shells stay
+                    // visible across the atom's full range, not this plot's
+                    // own curves -- called out here so that scaling is never
+                    // mistaken for the honest, unscaled D(r) plotted below.
+                    ? 'Radial distribution D(r) = 4πr²ρ(r) (cut face scaled to local shell structure)'
+                    : 'Radial distribution — r²R(r)²'}
             </div>
             <svg
                 width={WIDTH}

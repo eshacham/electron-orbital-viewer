@@ -412,8 +412,15 @@ export async function updateOrbitalInScene(
 export interface AtomShellViewParams {
     /** Radius enclosing this view's requested fraction of its electrons. */
     contourRadius: number;
-    /** D(r) for this view (the whole atom or one shell), on the log grid below. */
-    radialCurve: Float32Array | Float64Array;
+    /**
+     * `shellEmphasis(grid, D, ...)` for this view (the whole atom or one
+     * shell) -- D(r) already divided by a smoothed running maximum of
+     * itself, already bounded to [0, 1] -- on the log grid below. Always a
+     * Float32Array: unlike raw D(r) (which spans orders of magnitude and so
+     * genuinely needs float64 upstream), this is a bounded ratio computed
+     * once on the CPU (atom_profile.ts) and shipped as-is.
+     */
+    shellEmphasis: Float32Array;
     rMin: number;
     dx: number;
     size: number;
@@ -424,9 +431,39 @@ export interface AtomShellViewParams {
      * occupied orbital's tail, so it is routinely 20-100x the radius that
      * is actually visible (e.g. gold: rMax=140 vs a contour radius of
      * 1.4). The camera frames on `contourRadius` instead (see
-     * updateAtomViewInScene).
+     * updateAtomViewInScene) -- tighter still when `outermostFeatureR` is
+     * given.
      */
     rMax: number;
+    /**
+     * Radius of the outermost resolved shell peak, when known (level 1's
+     * whole-atom view only -- see `AtomProfile.shellPeaks`). Lets the camera
+     * start tighter than the enclosed-fraction contour for a heavy atom,
+     * where the fraction's tail vastly outsizes the shell structure itself
+     * (uranium: a 90%-enclosed contour of 1.58 a0 against an outermost
+     * resolved peak of just 0.30 a0 -- the structure is under 4% of the
+     * visible disc). Omit to frame on `contourRadius` exactly as before.
+     */
+    outermostFeatureR?: number;
+}
+
+/**
+ * How far out the camera frames a shell view by default.
+ *
+ * `contourRadius` bounds the sphere itself and must keep doing so exactly --
+ * this only chooses where the camera *starts*. Framing on the outermost
+ * resolved shell peak instead, with a margin for the ring's own width and a
+ * little breathing room beyond it, starts the camera close enough that the
+ * shell structure is what the viewer actually sees rather than a sliver in
+ * the middle of an empty disc. `Math.min` with `contourRadius` means this
+ * can only pull the default view in, never push it out past what the
+ * enclosed-fraction control already asked for -- scrolling back out still
+ * reaches the full contour, the control is untouched.
+ */
+const SHELL_VIEW_FRAMING_MARGIN = 2.5;
+function framingRadiusFor(contourRadius: number, outermostFeatureR: number | undefined): number {
+    if (!(outermostFeatureR !== undefined && outermostFeatureR > 0)) return contourRadius;
+    return Math.min(contourRadius, outermostFeatureR * SHELL_VIEW_FRAMING_MARGIN);
 }
 
 /**
@@ -457,11 +494,13 @@ export function updateAtomViewInScene(
     // sphere drawn below -- not the sampling grid's rMax (spec bugfix: the
     // grid is sized to comfortably hold the tail of the outermost orbital,
     // which for a heavy atom leaves the visible contour a few pixels across
-    // in the middle of an otherwise empty viewport). This is also what
-    // makes drilling into a shell actually zoom in: each shell carries its
-    // own, smaller contour radius.
-    if (context.framedRMax !== params.contourRadius) {
-        frameOrbital(context, params.contourRadius);
+    // in the middle of an otherwise empty viewport), and tighter still when
+    // `outermostFeatureR` narrows that further (see framingRadiusFor). This
+    // is also what makes drilling into a shell actually zoom in: each shell
+    // carries its own, smaller contour radius.
+    const framingRadius = framingRadiusFor(params.contourRadius, params.outermostFeatureR);
+    if (context.framedRMax !== framingRadius) {
+        frameOrbital(context, framingRadius);
     }
     // The cut face and the shader's discard radius still need to span the
     // full sampling grid, independently of how tight the camera is framed.
@@ -473,17 +512,9 @@ export function updateAtomViewInScene(
         params.rMax
     );
 
-    // The shader's DataTexture needs 32-bit floats regardless of which
-    // precision the curve arrived in (a whole-atom curve is already
-    // Float32Array off the wire; a single shell's curve is Float64Array --
-    // see SerialisedShell/SerialisedAtomProfile in atomWorker.ts).
-    const radialCurve = params.radialCurve instanceof Float32Array
-        ? params.radialCurve
-        : Float32Array.from(params.radialCurve);
-
     const view = createShellView({
         contourRadius: params.contourRadius,
-        radialCurve,
+        shellEmphasis: params.shellEmphasis,
         rMin: params.rMin,
         dx: params.dx,
         size: params.size,
