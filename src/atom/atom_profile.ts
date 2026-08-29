@@ -31,7 +31,21 @@ export interface AtomProfile {
     subshells: Array<{ n: number; l: number; electrons: number; energy: number; curve: RadialCurve }>;
     /** Radius enclosing `fraction` of all electrons. */
     contourRadius: number;
-    /** Peaks of the total D(r), one per resolved shell. */
+    /**
+     * Radii of the total D(r)'s resolved local maxima.
+     *
+     * **Display annotation only — ruling R26.** Shell and subshell identity
+     * is authoritative from the configuration (`shells`/`subshells` above,
+     * ultimately `shellsFor`/`atom.states`); `shellPeaks` must never drive
+     * navigation, and never be zipped positionally against `shells` or
+     * `subshells`. Neighbouring shells' D(r) genuinely merge into one
+     * maximum from around Z≈26 onward — real physics (shells overlap more
+     * as they compress inward with increasing Z), not a bug — so
+     * `shellPeaks.length` is *not* the shell count: e.g. iron (Z=26, 4
+     * occupied shells) resolves only 3 peaks, and heavier atoms merge
+     * further still. A consumer that assumes `shellPeaks.length ===
+     * shells.length` will misalign from iron onward.
+     */
     shellPeaks: number[];
 }
 
@@ -214,36 +228,39 @@ export function radialFunctionFor(atom: AtomSolution, n: number, l: number): (r:
 }
 
 /**
- * Resamples a log-grid array onto `samples` points evenly spaced in r over
- * [0, rMax] (ruling R3).
+ * Packs a log-grid curve into a `Float32Array` for the worker boundary /
+ * eventual texture upload (ruling R25, superseding the resampleUniform this
+ * replaces).
  *
- * Every curve above lives on the SCF's logarithmic grid, which is the right
- * representation for solving the equations but the wrong one for a fragment
- * shader: Task 10 computes r = length(worldPosition) per-pixel and needs a
- * direct index into a uniformly-spaced lookup table, not a log/exp round
- * trip inside the shader. This is the one place that reshapes the data for
- * that consumer.
+ * Every curve above already lives on the SCF's logarithmic grid — the right
+ * representation both for solving the equations *and*, it turns out, for a
+ * fragment shader: `r_j = rMin * e^(j*dx)` means a lookup is just
+ *
+ *   float t = log(r / rMin) / dx;
+ *   float texCoord = (t + 0.5) / float(size);
+ *
+ * exactly what `interpolateOnGrid` computes, on exactly the spacing the data
+ * already lives on. The previous approach resampled onto points evenly
+ * spaced in r instead, which sounds equivalent but is not: a heavy atom's
+ * K-shell peak sits inside the first fraction of a percent of the range (for
+ * uranium, r ≈ 0.012 against rMax = 183), so a uniform-in-r table needs
+ * thousands of samples to resolve it and silently flattens it at any
+ * texture size smaller than that (measured for uranium: 22% of the true
+ * peak height survived at 256 samples, 64% at 512, 86% at 2048). Shipping
+ * the log-grid values as-is and doing the lookup above in the shader is
+ * exact at every scale instead, with no resampling step to get wrong, so
+ * packing is nothing more than a float64 -> float32 narrowing cast.
  *
  * Deliberately does *not* normalise or quantise (ruling R16): a shell's D(r)
  * peak can be three orders of magnitude below the atom's innermost peak, and
  * either an 8-bit encoding or a linear normalisation here would flatten the
- * outer shells to nothing before the shader — which will read this through a
- * float texture and apply its own perceptual ramp — ever sees them.
+ * outer shells to nothing before the shader — which reads this through a
+ * float texture and applies its own perceptual ramp — ever sees them. A
+ * float32 narrowing keeps roughly 7 significant figures at every magnitude
+ * (unlike a fixed-point or normalised encoding, precision here doesn't
+ * depend on where a value sits in the dynamic range), which is far more than
+ * a perceptual ramp needs.
  */
-export function resampleUniform(
-    grid: RadialGrid,
-    values: Float64Array,
-    rMax: number,
-    samples: number
-): Float32Array {
-    if (!Number.isInteger(samples) || samples < 1) {
-        throw new Error('resampleUniform needs at least one sample.');
-    }
-
-    const out = new Float32Array(samples);
-    const step = samples > 1 ? rMax / (samples - 1) : 0;
-    for (let i = 0; i < samples; i++) {
-        out[i] = interpolateOnGrid(grid, values, i * step);
-    }
-    return out;
+export function packRadialCurve(values: Float64Array): Float32Array {
+    return Float32Array.from(values);
 }

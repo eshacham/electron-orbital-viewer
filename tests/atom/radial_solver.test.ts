@@ -113,3 +113,38 @@ describe('grid extent (ruling R21)', () => {
         expect(() => solveRadialState(grid, 7, 0, coulomb(grid, 1))).toThrow(/n=7/);
     });
 });
+
+describe('inward-integration rescale over a long classically-forbidden stretch (ruling R27)', () => {
+    // Regression test for the guard task 6 added to integrateInward
+    // (src/atom/radial_solver.ts) after it blew up to Infinity while running
+    // the SCF loop on iron: a deeply bound 1s (turning point r ~ 0.08),
+    // solved on a grid sized for iron's own outermost shell (4s, rMax = 71)
+    // rather than for 1s itself, has to integrate backward across a
+    // classically forbidden region far larger than 1s's own turning point
+    // requires. That combination previously overflowed before the periodic
+    // rescale-on-threshold guard was added to mirror the forward direction's
+    // existing one.
+    //
+    // Every default (non-ATOM_SLOW_TESTS) test elsewhere in this suite uses
+    // a grid sized for the state it actually solves, so none of them can
+    // exercise this path -- only running the real SCF loop on a heavy atom
+    // does, and that is gated behind ATOM_SLOW_TESTS. This reproduces the
+    // same oversized-grid geometry directly with a bare Coulomb potential
+    // (no SCF loop, no Hartree/exchange), so the guard has cheap, always-on
+    // coverage instead of a regression here silently passing every default
+    // `npx jest` run.
+    it('stays finite when a deeply bound state is solved on a grid sized for a much more diffuse one', () => {
+        const Z = 26; // iron's nuclear charge; not solving iron itself, just borrowing its numbers
+        const grid = makeRadialGrid(1e-6 / Z, 71, 2001); // rMax = 71: iron's own 4s extent, per gridForAtom(26, 4)
+        const state = solveRadialState(grid, 1, 0, coulomb(grid, Z));
+
+        expect(Number.isFinite(state.energy)).toBe(true);
+        for (const value of state.u) expect(Number.isFinite(value)).toBe(true);
+        for (const value of state.R) expect(Number.isFinite(value)).toBe(true);
+
+        // Finite is necessary but not sufficient -- confirm the guard didn't
+        // just avoid Infinity by also corrupting the answer.
+        const exact = -(Z * Z) / 2;
+        expect(Math.abs((state.energy - exact) / exact)).toBeLessThan(1e-4);
+    });
+});

@@ -1,13 +1,5 @@
 import { AtomSolution, solveAtom } from '../atom/scf';
-import { AtomProfile, buildAtomProfile, resampleUniform } from '../atom/atom_profile';
-
-/**
- * Number of points in the uniformly-resampled radial texture (ruling R3):
- * enough to resolve uranium's innermost peak (~0.02 a0 wide, against an
- * outer edge past 100 a0) without shipping an unreasonably large array
- * across the worker boundary for every solve.
- */
-const RESAMPLED_TEXTURE_SAMPLES = 512;
+import { AtomProfile, buildAtomProfile, packRadialCurve } from '../atom/atom_profile';
 
 /** One shell's contribution, flattened for the worker boundary. */
 export interface SerialisedShell {
@@ -54,25 +46,39 @@ export interface SerialisedAtomProfile {
     rMin: number;
     dx: number;
     size: number;
-    /** Whole-atom D(r) on the shared grid. */
-    total: Float64Array;
+    /**
+     * Whole-atom D(r) on the shared log grid above, packed to Float32
+     * (ruling R25 — supersedes the old uniform-in-r `resampled`/
+     * `resampledRMax` fields). The shader indexes this directly on the log
+     * spacing the data already lives on:
+     *
+     *   float t = log(r / rMin) / dx;
+     *   float texCoord = (t + 0.5) / float(size);
+     *
+     * which is exact at every scale — no resampling step to silently lose a
+     * heavy atom's inner shells the way a fixed-sample uniform-in-r table
+     * did (uranium's K shell retained only 22% of its true height at 256
+     * samples). Raw and unnormalised (ruling R16): a shell's peak can be
+     * three orders of magnitude below the innermost one, and normalising or
+     * quantising here would erase it before the shader's own perceptual
+     * ramp ever sees it — the float32 narrowing keeps ~7 significant figures
+     * regardless of magnitude, so it doesn't have that effect.
+     */
+    total: Float32Array;
     /** Radius enclosing the profile's requested fraction of all electrons. */
     contourRadius: number;
-    /** Radii of the total D(r)'s resolved local maxima, one per shell. */
+    /**
+     * Radii of the total D(r)'s resolved local maxima.
+     *
+     * Display annotation only (ruling R26): shell identity comes from
+     * `shells`/`subshells` above, not from this list. Neighbouring shells'
+     * D(r) genuinely merge into one maximum from around Z≈26 onward, so
+     * `shellPeaks.length` is not the shell count and must never be zipped
+     * positionally against `shells`.
+     */
     shellPeaks: Float64Array;
     shells: SerialisedShell[];
     subshells: SerialisedSubshell[];
-    /**
-     * The whole-atom D(r) resampled onto a uniform grid in r (ruling R3),
-     * for the shader to index directly instead of doing a log/exp round trip
-     * per pixel. Raw and unnormalised (ruling R16): a shell's peak can be
-     * three orders of magnitude below the innermost one, and normalising or
-     * quantising here would erase it before the shader's own perceptual
-     * ramp ever sees it.
-     */
-    resampled: Float32Array;
-    /** The half-open [0, resampledRMax) range `resampled` covers. */
-    resampledRMax: number;
 }
 
 /**
@@ -87,15 +93,12 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
     const profile: AtomProfile = buildAtomProfile(atom, enclosedFraction);
     const { grid } = atom;
 
-    const resampledRMax = grid.rMax;
-    const resampled = resampleUniform(grid, profile.total.values, resampledRMax, RESAMPLED_TEXTURE_SAMPLES);
-
     return {
         Z: atom.Z,
         rMin: grid.rMin,
         dx: grid.dx,
         size: grid.size,
-        total: profile.total.values,
+        total: packRadialCurve(profile.total.values),
         contourRadius: profile.contourRadius,
         shellPeaks: Float64Array.from(profile.shellPeaks),
         shells: profile.shells.map(shell => ({
@@ -116,14 +119,12 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
             curve: subshell.curve.values,
             R: atom.states[i].R,
         })),
-        resampled,
-        resampledRMax,
     };
 }
 
 /** Every ArrayBuffer inside a payload, so it can be transferred rather than copied across the worker boundary. */
 function transferListFor(profile: SerialisedAtomProfile): Transferable[] {
-    const buffers: Transferable[] = [profile.total.buffer, profile.shellPeaks.buffer, profile.resampled.buffer];
+    const buffers: Transferable[] = [profile.total.buffer, profile.shellPeaks.buffer];
     for (const shell of profile.shells) buffers.push(shell.curve.buffer);
     for (const subshell of profile.subshells) buffers.push(subshell.curve.buffer, subshell.R.buffer);
     return buffers;

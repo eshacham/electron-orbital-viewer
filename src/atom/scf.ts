@@ -236,6 +236,12 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid): AtomSolution {
         return solveOneElectronAtom(Z, grid, configuration);
     }
 
+    // Screened, not bare Coulomb (see screenedStartingPotential's doc
+    // comment above for the full reasoning): starting from a guess that is
+    // already closer to self-consistent gives the loop less charge-sloshing
+    // room, which matters most for exactly the near-degenerate transition-
+    // metal/lanthanide/actinide configurations the adaptive beta below also
+    // exists for.
     let potential = screenedStartingPotential(grid, Z);
     let beta = INITIAL_BETA;
     let previousDelta = Infinity;

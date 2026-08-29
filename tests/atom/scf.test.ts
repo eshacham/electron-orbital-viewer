@@ -153,6 +153,12 @@ describe('grid convergence (ruling R15)', () => {
         const base = solveAtomOnGrid(Z, baseGrid);
         const fine = solveAtomOnGrid(Z, fineGrid);
 
+        // Without this, two non-converged solves that happen to agree with
+        // each other would pass the checks below -- agreement between two
+        // wrong answers is not evidence the grid is fine enough.
+        expect(base.converged).toBe(true);
+        expect(fine.converged).toBe(true);
+
         const relativeEnergyDiff = Math.abs((fine.totalEnergy - base.totalEnergy) / base.totalEnergy);
         expect(relativeEnergyDiff).toBeLessThan(TOTAL_ENERGY_TOLERANCE);
 

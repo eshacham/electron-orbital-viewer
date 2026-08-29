@@ -1,6 +1,6 @@
 import { buildSerialisedAtomProfile, SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { solveAtom, AtomSolution } from '../../src/atom/scf';
-import { buildAtomProfile, resampleUniform } from '../../src/atom/atom_profile';
+import { buildAtomProfile, packRadialCurve } from '../../src/atom/atom_profile';
 
 /**
  * The worker cannot hand a class instance or a closure across the boundary,
@@ -56,7 +56,7 @@ describe('atom worker serialisation contract', () => {
         expect(cloned.total).not.toBe(profile.total);
         expect(cloned.subshells[0].R).not.toBe(profile.subshells[0].R);
         expect(cloned.subshells[0].R).toBeInstanceOf(Float64Array);
-        expect(cloned.resampled).toBeInstanceOf(Float32Array);
+        expect(cloned.total).toBeInstanceOf(Float32Array);
     });
 
     it('carries the shell list, subshell list with energies, and contour radii', () => {
@@ -81,18 +81,18 @@ describe('atom worker serialisation contract', () => {
         expect(profile.total.length).toBe(profile.size);
     });
 
-    it('carries a raw, unnormalised resampled radial texture (ruling R16)', () => {
-        expect(profile.resampled.length).toBeGreaterThan(1);
-        expect(profile.resampledRMax).toBeGreaterThan(0);
-
-        // R16: no normalisation or quantisation belongs here. Cross-check
-        // against resampleUniform called directly on the total D(r) curve --
-        // if the worker's payload builder scaled or clamped the values on
-        // the way out, this would no longer match.
+    it('carries the total D(r) on the shared log grid, raw and unnormalised (ruling R16, R25)', () => {
+        // Ruling R25: no separate uniform-in-r resample any more -- `total`
+        // (plus `rMin`/`dx`/`size` above) *is* the log-grid curve the shader
+        // looks up directly. Cross-check against packRadialCurve called
+        // directly on the total D(r) curve -- if the worker's payload
+        // builder scaled, quantised or resampled the values on the way out,
+        // this would no longer match.
+        expect(profile.total.length).toBe(profile.size);
         const total = buildAtomProfile(atom, 0.9).total.values;
-        const expected = resampleUniform(atom.grid, total, profile.resampledRMax, profile.resampled.length);
+        const expected = packRadialCurve(total);
         for (let i = 0; i < expected.length; i++) {
-            expect(profile.resampled[i]).toBeCloseTo(expected[i], 6);
+            expect(profile.total[i]).toBeCloseTo(expected[i], 6);
         }
     });
 });

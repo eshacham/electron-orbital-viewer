@@ -1,23 +1,32 @@
 import { solveAtom, AtomSolution } from '../../src/atom/scf';
 import { integrateOnGrid, interpolateOnGrid } from '../../src/atom/radial_grid';
-import { AtomProfile, buildAtomProfile, radialFunctionFor, resampleUniform } from '../../src/atom/atom_profile';
+import { AtomProfile, buildAtomProfile, radialFunctionFor, packRadialCurve } from '../../src/atom/atom_profile';
 
 /**
- * solveAtom is expensive (neon ~1.2s), so each atom used here is solved
- * exactly once in beforeAll and reused by every assertion below, per the
- * task brief's ruling against calling it inside a loop or per-test.
+ * solveAtom is expensive (neon ~1.2s, uranium ~8-9s), so each atom used here
+ * is solved exactly once in beforeAll and reused by every assertion below,
+ * per the task brief's ruling against calling it inside a loop or per-test.
+ *
+ * Uranium is included specifically for the log-grid packing tests below
+ * (finding 1 / ruling R25): its K-shell peak sits inside the first 0.007% of
+ * the grid's range, which is exactly the wide-dynamic-range case that a
+ * uniform-in-r resample loses and neon/argon alone cannot exercise.
  */
 describe('atom profile', () => {
     let neon: AtomSolution;
     let argon: AtomSolution;
+    let uranium: AtomSolution;
     let neonProfile: AtomProfile;
     let argonProfile: AtomProfile;
+    let uraniumProfile: AtomProfile;
 
     beforeAll(() => {
         neon = solveAtom(10);
         argon = solveAtom(18);
+        uranium = solveAtom(92);
         neonProfile = buildAtomProfile(neon, 0.9);
         argonProfile = buildAtomProfile(argon, 0.9);
+        uraniumProfile = buildAtomProfile(uranium, 0.9);
     });
 
     it("total curve integrates to Z", () => {
@@ -80,6 +89,22 @@ describe('atom profile', () => {
         }
     });
 
+    describe('shellPeaks undercounts once shells merge (ruling R26 — display annotation only)', () => {
+        // Iron has 4 occupied shells (K, L, M, N) but only 3 resolve as
+        // distinct maxima in the *summed* D(r) -- real physics (shells
+        // overlap more as they compress inward with growing Z), not a bug.
+        // Pinned directly so this merging is a recorded fact, not something
+        // a future change has to rediscover by surprise. This is also the
+        // regression case for R26: a consumer that assumed
+        // `shellPeaks.length === shells.length` would misalign here.
+        it('gives 3 peaks for iron\'s 4 occupied shells', () => {
+            const iron = solveAtom(26);
+            const ironProfile = buildAtomProfile(iron, 0.9);
+            expect(ironProfile.shells.length).toBe(4);
+            expect(ironProfile.shellPeaks.length).toBe(3);
+        });
+    });
+
     describe('radialFunctionFor', () => {
         it('reproduces state.R exactly at grid points', () => {
             const state = neon.states.find(s => s.n === 2 && s.l === 1)!;
@@ -107,42 +132,61 @@ describe('atom profile', () => {
         });
     });
 
-    describe('resampleUniform', () => {
-        it('returns exactly `samples` points', () => {
-            const out = resampleUniform(neon.grid, neonProfile.total.values, neon.grid.rMax, 257);
-            expect(out.length).toBe(257);
-            expect(out).toBeInstanceOf(Float32Array);
-        });
+    /**
+     * Mirrors the shader lookup from ruling R25 exactly: `t` is the position
+     * in log-grid index space, and linear interpolation between the two
+     * nearest texels reproduces `interpolateOnGrid`'s own log-space
+     * interpolation. This is what a `THREE.DataTexture` with linear
+     * filtering does in the actual shader; reproduced in plain JS here so
+     * the fidelity claim can be checked without a GL context.
+     */
+    function logSpaceLookup(packed: Float32Array, rMin: number, dx: number, r: number): number {
+        const t = Math.log(r / rMin) / dx;
+        const j = Math.max(0, Math.min(packed.length - 2, Math.floor(t)));
+        const frac = t - j;
+        return packed[j] * (1 - frac) + packed[j + 1] * frac;
+    }
 
-        it('preserves peak position and value to interpolation accuracy', () => {
-            const rMax = neon.grid.rMax;
-            const samples = 4001;
-            const resampled = resampleUniform(neon.grid, neonProfile.total.values, rMax, samples);
-
-            let peakIndex = 0;
-            for (let i = 1; i < resampled.length; i++) {
-                if (resampled[i] > resampled[peakIndex]) peakIndex = i;
+    describe('packRadialCurve and the log-space lookup (finding 1 / ruling R25)', () => {
+        it('packs to a Float32Array of the same length, no resampling', () => {
+            const packed = packRadialCurve(neonProfile.total.values);
+            expect(packed).toBeInstanceOf(Float32Array);
+            expect(packed.length).toBe(neonProfile.total.values.length);
+            for (const j of [0, 1, 500, 1000, neonProfile.total.values.length - 1]) {
+                expect(packed[j]).toBeCloseTo(neonProfile.total.values[j], 4);
             }
-            const rPeak = (rMax * peakIndex) / (samples - 1);
-            const expectedPeakR = neonProfile.shellPeaks[0];
-            const expectedPeakValue = interpolateOnGrid(neon.grid, neonProfile.total.values, expectedPeakR);
-
-            // Within one uniform sampling step of the true (log-grid) peak.
-            expect(Math.abs(rPeak - expectedPeakR)).toBeLessThan((2 * rMax) / samples);
-            // Float32 storage plus sampling-grid offset from the true peak:
-            // a loose relative tolerance, not an exact match.
-            expect(resampled[peakIndex]).toBeCloseTo(expectedPeakValue, 1);
         });
 
         it('does not normalise: raw magnitudes are preserved', () => {
-            const resampled = resampleUniform(neon.grid, neonProfile.total.values, neon.grid.rMax, 501);
+            const packed = packRadialCurve(neonProfile.total.values);
             const maxD = Math.max(...Array.from(neonProfile.total.values));
-            const maxResampled = Math.max(...Array.from(resampled));
-            // Interpolation can only ever sit at or below the true peak
-            // (piecewise-linear interpolation of a concave-down peak), and
-            // should come reasonably close to it on a fine sample grid.
-            expect(maxResampled).toBeLessThanOrEqual(maxD * 1.0001);
-            expect(maxResampled).toBeGreaterThan(maxD * 0.5);
+            const maxPacked = Math.max(...Array.from(packed));
+            // Float32 narrowing only, no resampling and no normalisation, so
+            // this should match to float32 precision rather than merely "in
+            // the right ballpark".
+            expect(maxPacked).toBeCloseTo(maxD, 1);
+        });
+
+        it("preserves uranium's K-shell peak to within 1% through the log-space lookup", () => {
+            // The regression this finding exists to catch: uranium's K-shell
+            // peak sits at r ~ 0.012 against rMax = 183 -- inside the first
+            // 0.007% of the range. The old `resampleUniform` (uniform-in-r)
+            // flattened that peak to 22% of its true height at 256 samples,
+            // 64% at 512, and needed ~4096 samples to recover it, because
+            // almost none of a uniform-in-r grid's points land anywhere near
+            // r = 0.012. Packing the log-grid values as-is and looking them
+            // up with the shader's own t = log(r/rMin)/dx formula needs no
+            // such resolution: the lookup lands on (or right next to) the
+            // same grid point the data was computed at, at any texture size,
+            // because the "texels" and the log grid are the same points.
+            const packed = packRadialCurve(uraniumProfile.total.values);
+            const { grid } = uranium;
+
+            const kShellPeakR = uraniumProfile.shellPeaks[0];
+            const truePeak = interpolateOnGrid(grid, uraniumProfile.total.values, kShellPeakR);
+            const lookedUp = logSpaceLookup(packed, grid.rMin, grid.dx, kShellPeakR);
+
+            expect(Math.abs(lookedUp - truePeak) / truePeak).toBeLessThan(0.01);
         });
     });
 });

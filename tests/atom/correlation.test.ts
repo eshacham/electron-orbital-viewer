@@ -68,6 +68,25 @@ describe('VWN5 correlation', () => {
         }
     });
 
+    it('returns 0, not NaN or Infinity, for a denormalised density (ruling R27)', () => {
+        // rho this small (denormalised: below ~1e-308) makes xFromDensity's
+        // 3/(4*pi*rho) overflow to Infinity before cbrt/sqrt ever run, with
+        // rho still nominally positive -- so the `rho > 0` guard above alone
+        // does not catch it, only the `Number.isFinite(x)` check does. This
+        // is a real code path: a heavy atom's grid reaches far enough into
+        // the classically forbidden tail that a subshell's density
+        // genuinely underflows into this range (see xFromDensity's doc
+        // comment, and task-6-report.md's "Two overflow guards" section).
+        // Pinned here as a cheap, always-on unit test so a regression to
+        // this guard trips in microseconds rather than needing a heavy-atom
+        // SCF solve (which is gated behind ATOM_SLOW_TESTS) to notice.
+        const rho = 5e-320;
+        expect(correlationEnergyDensity(rho)).toBe(0);
+        expect(correlationPotential(rho)).toBe(0);
+        expect(Number.isNaN(correlationEnergyDensity(rho))).toBe(false);
+        expect(Number.isNaN(correlationPotential(rho))).toBe(false);
+    });
+
     it('returns exactly 0 at rho = 0, rather than NaN from the rs -> infinity limit', () => {
         // rs = (3/(4*pi*rho))^(1/3) is literally Infinity at rho = 0, and the
         // VWN5 formula divides Infinity by Infinity there; a real atomic grid
