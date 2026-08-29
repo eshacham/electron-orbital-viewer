@@ -1,10 +1,13 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
 import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius } from './orbital_presets';
 import { createOrbitalMaterial, applySurfaceStyle, updateClipPlane } from './orbital_material';
 import { createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCaps } from './clip_caps';
 import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
+import { createOrbitalWorker } from './workers/createOrbitalWorker';
+import { createOrbitalControls } from './orbital_controls_factory';
+import { createShellView, setShellViewHighlight, disposeShellView, ShellViewOptions } from './atom/shell_view';
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -28,6 +31,20 @@ export interface VisualizerContext {
     activeWorker: Worker | null;
     /** Increments per request, so a superseded result can be recognised. */
     requestCounter: number;
+    /**
+     * True when `currentOrbitalGroup` is a levels-1/2 shell view rather than
+     * a marching-cubes orbital mesh. The two share a cap material with
+     * different uniforms (`radialCurve` vs `densityMap`), so this decides
+     * which disposal path and which highlight function apply to whatever is
+     * currently on screen (see clearCurrentOrbital and setHoverRadius below).
+     */
+    isShellView?: boolean;
+    /**
+     * Set by the owning component after `initVisualizer`; fed the radius
+     * under the pointer on every `pointermove` over the canvas (levels 1-2
+     * cross-view linkage, the reverse of `setHoverRadius`).
+     */
+    onHoverRadius?: (r: number | null) => void;
 }
 
 interface WorkerSuccessMessage {
@@ -79,7 +96,7 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     // detaching it, which would force a shader recompile.
     const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1e9);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
+    const controls = createOrbitalControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.target.set(0, 0, 0);
@@ -99,13 +116,65 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
         clippingPlanes: [clipPlane],
         currentCaps: null,
         activeWorker: null,
-        requestCounter: 0
+        requestCounter: 0,
+        isShellView: false
     };
-    
+
+    // Levels 1-2 cross-view linkage (spec §6): the plot reports a radius on
+    // hover, and this is the reverse direction, reading one back off the cut
+    // face under the pointer. Attached once, here, rather than per-render,
+    // since the canvas element itself never changes for the life of the
+    // context.
+    renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
+        context.onHoverRadius?.(radiusUnderPointer(context, event));
+    });
+    renderer.domElement.addEventListener('pointerleave', () => {
+        context.onHoverRadius?.(null);
+    });
+
     startAnimationLoop(context);
     return context;
 }
 
+// Reused across calls rather than allocated per pointermove: raycasting runs
+// on every pointer event, and per-frame allocation here would otherwise be
+// the one GC-pressure hot path in an app that is deliberately careful about
+// disposal everywhere else.
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const hit = new THREE.Vector3();
+
+/**
+ * The radius where the ray through the pointer meets the cut plane -- the
+ * cross-view link from the 3D view back to the radial plot (spec §6, the
+ * reverse of setHoverRadius below). Exported (rather than kept as a
+ * pointermove-only closure) so it can be tested directly: `initVisualizer`
+ * constructs a real WebGLRenderer, which has no WebGL context under jsdom,
+ * so nothing that requires it can be exercised in a test.
+ */
+export function radiusUnderPointer(context: VisualizerContext, event: PointerEvent): number | null {
+    const canvas = context.renderer.domElement;
+    const bounds = canvas.getBoundingClientRect();
+    pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+    pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, context.camera);
+    // Only meaningful when there is a cut face to read a radius off.
+    if (context.surfaceStyle.clipAxis === 'none') return null;
+    return raycaster.ray.intersectPlane(context.clipPlane, hit) ? hit.length() : null;
+}
+
+/**
+ * Drives the shell view's highlight ring from the radial plot's hovered
+ * radius -- the other direction of the link above. A no-op when the current
+ * view is a marching-cubes orbital rather than a shell view: that cap
+ * material carries no `highlightR` uniform at all, so reaching for it would
+ * throw rather than silently doing nothing.
+ */
+export function setHoverRadius(context: VisualizerContext | null, r: number | null): void {
+    if (!context || context.isDisposed) return;
+    if (!context.isShellView) return;
+    setShellViewHighlight(context.currentOrbitalGroup, r);
+}
 
 /**
  * Pulls the camera back far enough to see a box of half-width rMax, keeping the
@@ -230,9 +299,7 @@ export async function updateOrbitalInScene(
     return new Promise((resolve, reject) => {
         console.log('Visualizer: Starting worker calculation');
 
-        const worker = new Worker(new URL('./workers/orbitalWorker.ts', import.meta.url), { 
-            type: 'module' 
-        });
+        const worker = createOrbitalWorker();
         context.activeWorker = worker;
 
         // Fall back to the defaults if anything arrived unusable.
@@ -320,6 +387,83 @@ export async function updateOrbitalInScene(
     });
 }
 
+/** What updateAtomViewInScene needs to build one level-1/2 shell view. */
+export interface AtomShellViewParams {
+    /** Radius enclosing this view's requested fraction of its electrons. */
+    contourRadius: number;
+    /** D(r) for this view (the whole atom or one shell), on the log grid below. */
+    radialCurve: Float32Array | Float64Array;
+    rMin: number;
+    dx: number;
+    size: number;
+    /** Outer extent of the shared log grid; sizes the cut face, the discard radius, and the camera framing. */
+    rMax: number;
+}
+
+/**
+ * Renders levels 1-2 (whole atom / single shell): a spherical cut-away shaded
+ * by D(r), built directly from the profile already sitting in the store.
+ *
+ * This is the sibling of updateOrbitalInScene above, for the case where the
+ * density is spherically symmetric (see shell_view.ts's module doc): there is
+ * no worker round trip and no sampling grid, because nothing needs
+ * calculating that solveAtom has not already produced. It shares
+ * clearCurrentOrbital, the clip plane, camera framing and the caps lifecycle
+ * with the marching-cubes path, exactly as the marching-cubes path shares
+ * them with itself across renders.
+ */
+export function updateAtomViewInScene(
+    context: VisualizerContext | null,
+    params: AtomShellViewParams
+): void {
+    if (!context || context.isDisposed) return;
+
+    clearCurrentOrbital(context, context.scene);
+    context.isShellView = true;
+    // Spherically symmetric: there is no preferred direction for the axes to
+    // mark, unlike a marching-cubes orbital's lobes.
+    removeAxesHelper(context);
+
+    if (context.framedRMax !== params.rMax) {
+        frameOrbital(context, params.rMax);
+    }
+    updateClipPlane(
+        context.clipPlane,
+        context.surfaceStyle.clipAxis,
+        context.surfaceStyle.clipPosition,
+        params.rMax
+    );
+
+    // The shader's DataTexture needs 32-bit floats regardless of which
+    // precision the curve arrived in (a whole-atom curve is already
+    // Float32Array off the wire; a single shell's curve is Float64Array --
+    // see SerialisedShell/SerialisedAtomProfile in atomWorker.ts).
+    const radialCurve = params.radialCurve instanceof Float32Array
+        ? params.radialCurve
+        : Float32Array.from(params.radialCurve);
+
+    const view = createShellView({
+        contourRadius: params.contourRadius,
+        radialCurve,
+        rMin: params.rMin,
+        dx: params.dx,
+        size: params.size,
+        rMax: params.rMax,
+        opacity: context.surfaceStyle.opacity,
+        plane: context.clipPlane,
+    } satisfies ShellViewOptions);
+
+    context.scene.add(view);
+    // The shell view's own group *is* its caps -- there is no separate
+    // always-visible surface mesh the way a marching-cubes orbital has one,
+    // because the interesting content only exists on the cut face (see
+    // shell_view.ts). Setting both to the same group is what lets
+    // refreshCaps/setSurfaceStyle's positionCaps/setCapsVisible/setCapsOpacity
+    // calls work against it unchanged.
+    context.currentOrbitalGroup = view;
+    context.currentCaps = view;
+    refreshCaps(context);
+}
 
 // --- Helper Functions ---
 function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
@@ -347,8 +491,15 @@ function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
             }
         });
 
-        // Remove from scene
-        disposeCaps(context.currentCaps);
+        // Remove from scene. A shell view's cap material carries a
+        // `radialCurve` uniform rather than clip_caps.ts's `densityMap`, so
+        // it needs its own disposal path -- calling disposeCaps on it would
+        // reach for a uniform that does not exist.
+        if (context.isShellView) {
+            disposeShellView(context.currentOrbitalGroup);
+        } else {
+            disposeCaps(context.currentCaps);
+        }
         scene.remove(context.currentOrbitalGroup);
         context.currentOrbitalGroup = null;
         context.currentCaps = null;
@@ -385,6 +536,7 @@ function updateSceneWithMeshData(context: VisualizerContext, meshData: MeshData,
 
     try {
         clearCurrentOrbital(context, context.scene);
+        context.isShellView = false;
 
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(meshData.positions.flat());
