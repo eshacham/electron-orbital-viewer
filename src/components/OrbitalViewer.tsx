@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setHoverRadius as setAtomHoverRadius } from '../store/atomSlice';
 import { ScaleBar, formatScaleLabel } from '../scale_bar';
+import { useMediaQuery, PREFERS_REDUCED_MOTION } from '../useMediaQuery';
 import {
     initVisualizer,
     cleanupVisualizer,
@@ -35,10 +36,27 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     const atomHoverRadius = useAppSelector(state => state.atom.hoverRadius);
     const [scaleBar, setScaleBar] = useState<ScaleBar | null>(null);
 
+    // Level-transition spec addendum: a user who has asked their OS for
+    // reduced motion gets the existing instant cut, never a shortened
+    // version of the animation -- so this gates whether to animate at all,
+    // rather than shrinking any duration.
+    const prefersReducedMotion = useMediaQuery(PREFERS_REDUCED_MOTION);
+
     // Levels 1-2 (whole atom / one shell) render a spherical shell view
     // straight from the solved profile instead of the marching-cubes path
     // below -- see orbital_visualizer.ts's updateAtomViewInScene.
     const showShellView = atomMode === 'atom' && (atomLevel === 'atom' || atomLevel === 'shell') && atomProfile !== null;
+
+    // The atom<->shell fade only makes sense between two views of the *same*
+    // solved element -- a fresh element's own first shell view (or a mode
+    // switch back into atom mode) has nothing of the right shape to animate
+    // from, and the two elements' curves do not even share a grid (each
+    // atom gets its own log grid, see atom_profile.ts). Tracked by Z rather
+    // than by object identity: `atomProfile` is re-sliced (a new object)
+    // whenever `enclosedFraction` changes without the element changing, and
+    // that recomputed profile's curves/grid are perfectly valid to animate
+    // between.
+    const lastAnimatedProfileZRef = useRef<number | null>(null);
 
     // Initialize visualizer - only once
     useEffect(() => {
@@ -70,6 +88,11 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         const context = visualizerContextRef.current;
         if (!context || !showShellView || !atomProfile) return;
 
+        // Only animate between two views of the same solved element -- see
+        // lastAnimatedProfileZRef's own doc comment above.
+        const animate = lastAnimatedProfileZRef.current === atomProfile.Z && !prefersReducedMotion;
+        lastAnimatedProfileZRef.current = atomProfile.Z;
+
         // The shared log grid's outer radius: sizes the cut face, the
         // discard radius, and the camera framing alike (see
         // AtomShellViewParams). Available directly off the profile, so it
@@ -94,7 +117,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 size: atomProfile.size,
                 rMax: gridRMax,
                 outermostFeatureR,
-            });
+            }, { animate });
         } else {
             const shell = atomProfile.shells.find(s => s.n === atomSelectedShell);
             if (!shell) return;
@@ -105,9 +128,9 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 dx: atomProfile.dx,
                 size: atomProfile.size,
                 rMax: gridRMax,
-            });
+            }, { animate });
         }
-    }, [showShellView, atomLevel, atomProfile, atomSelectedShell]);
+    }, [showShellView, atomLevel, atomProfile, atomSelectedShell, prefersReducedMotion]);
 
     // Radial-plot hover -> the shell view's highlight ring (the other half
     // of the pointer-to-radius link set up above).
@@ -124,7 +147,14 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
 
         console.log('OrbitalViewer: Using state params:', stateParams);
 
-        updateOrbitalInScene(visualizerContextRef.current, stateParams, true)
+        // Cross-fade in from whatever shell view is currently showing, but
+        // only for atom mode's own level 3 -- hydrogen-like mode's orbitals
+        // have no drill-down levels to transition between (level-transition
+        // spec addendum is scoped to the three-level atom-mode drill-down).
+        // orbital_visualizer.ts still checks whether a shell view is
+        // actually showing before it cross-fades anything, so this is safe
+        // to pass whenever atom mode itself is active.
+        updateOrbitalInScene(visualizerContextRef.current, stateParams, true, { animate: atomMode === 'atom' && !prefersReducedMotion })
             .then(outcome => {
                 // A superseded request's result was thrown away; the newer one
                 // still in flight is what will report completion.
@@ -140,7 +170,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                         : 'Could not render this orbital.'
                 );
             });
-    }, [stateParams, showShellView, onOrbitalRendered, onOrbitalFailed]);
+    }, [stateParams, showShellView, atomMode, prefersReducedMotion, onOrbitalRendered, onOrbitalFailed]);
 
     // Mode, opacity and the cut plane restyle the existing mesh; no recalculation.
     useEffect(() => {

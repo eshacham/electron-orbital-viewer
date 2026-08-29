@@ -3,6 +3,10 @@ import {
     createShellView,
     setShellViewHighlight,
     setShellViewRingWidth,
+    setShellViewCurve,
+    getShellViewCurve,
+    setShellViewRadius,
+    getShellViewRadius,
     disposeShellView,
     ShellViewOptions,
 } from '../../src/atom/shell_view';
@@ -124,6 +128,62 @@ describe('shell view', () => {
         // Nothing highlighted yet.
         expect(material.uniforms.highlightR.value).toBeLessThan(0);
         expect(material.glslVersion).toBe(THREE.GLSL3);
+    });
+
+    // Regression test: the atom<->shell fade (level-transition spec addendum)
+    // mutates the texture's backing array in place every frame
+    // (setShellViewCurve), and the caller passes it a *direct reference* to
+    // a curve owned by the Redux store (AtomProfile.totalEmphasis /
+    // shell.emphasis) so it can be read again later, by the next view built
+    // and by the radial plot. If the texture aliased that array instead of
+    // copying it, animating one shell view would permanently corrupt the
+    // profile's own stored curve -- exactly the bug this guards against,
+    // caught live (see orbital_visualizer.ts / shell_view.ts's own doc
+    // comments) rather than by any pre-existing test, because no other test
+    // builds a view and then goes on to read the *input* array afterwards.
+    it('does not mutate the caller\'s shellEmphasis array when the displayed curve is later changed', () => {
+        const original = Float32Array.from(SHELL_EMPHASIS);
+        const view = createShellView(options());
+
+        setShellViewCurve(view, new Float32Array([0.9, 0.9, 0.9, 0.9, 0.9]));
+
+        expect(Array.from(SHELL_EMPHASIS)).toEqual(Array.from(original));
+    });
+
+    it('setShellViewCurve overwrites the displayed curve; getShellViewCurve reads back a copy of whatever is currently shown', () => {
+        const view = createShellView(options());
+        const next = new Float32Array([0.2, 0.3, 0.4, 0.5, 0.6]);
+
+        setShellViewCurve(view, next);
+
+        const read = getShellViewCurve(view);
+        expect(read).not.toBeNull();
+        expect(Array.from(read!)).toEqual(Array.from(next));
+
+        // A copy, not the live buffer -- mutating it must not affect the view.
+        read![0] = 999;
+        expect(Array.from(getShellViewCurve(view)!)).toEqual(Array.from(next));
+    });
+
+    it('getShellViewCurve tolerates a missing view', () => {
+        expect(getShellViewCurve(null)).toBeNull();
+    });
+
+    it('setShellViewRadius scales the stencil meshes relative to the geometry\'s own built radius; getShellViewRadius reads the result back', () => {
+        const view = createShellView(options());
+        const builtRadius = options().contourRadius;
+        expect(getShellViewRadius(view)).toBeCloseTo(builtRadius);
+
+        setShellViewRadius(view, builtRadius / 2);
+        expect(getShellViewRadius(view)).toBeCloseTo(builtRadius / 2);
+
+        setShellViewRadius(view, builtRadius * 3);
+        expect(getShellViewRadius(view)).toBeCloseTo(builtRadius * 3);
+    });
+
+    it('setShellViewRadius/getShellViewRadius tolerate a missing view', () => {
+        expect(() => setShellViewRadius(null, 1)).not.toThrow();
+        expect(getShellViewRadius(null)).toBeNull();
     });
 
     it('setShellViewHighlight updates the highlight uniform', () => {

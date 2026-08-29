@@ -29,26 +29,73 @@ export function createOrbitalMaterial(
 
 function applyStyleToMaterial(material: THREE.MeshStandardMaterial, style: SurfaceStyle) {
     const wireframe = style.mode === 'wireframe';
-    const opacity = Math.max(0, Math.min(1, style.opacity));
-    const translucent = opacity < 1;
 
-    // Changing `transparent` or `wireframe` swaps the shader program, so the
-    // material has to be told even though the values are plain assignments.
-    const needsRecompile =
-        material.wireframe !== wireframe || material.transparent !== translucent;
+    // Changing `wireframe` swaps the shader program, so the material has to
+    // be told even though the value is a plain assignment; setMaterialOpacity
+    // below does the equivalent check for `transparent`.
+    const needsRecompile = material.wireframe !== wireframe;
 
     material.wireframe = wireframe;
     // A wireframe wants flat, saturated lines rather than shading that dims half
     // of them; a solid surface wants the shading.
     material.roughness = wireframe ? 1 : 0.45;
+    setMaterialOpacity(material, Math.max(0, Math.min(1, style.opacity)));
+
+    if (needsRecompile) material.needsUpdate = true;
+}
+
+/**
+ * Sets a standard material's opacity, keeping `transparent` and `depthWrite`
+ * consistent with it. Factored out of `applyStyleToMaterial` so the
+ * level-transition animation (orbital_visualizer.ts's shell<->orbital
+ * cross-fade) can drive opacity every frame without dragging the
+ * wireframe/roughness half of that function along for the ride.
+ */
+export function setMaterialOpacity(material: THREE.MeshStandardMaterial, opacity: number): void {
+    const translucent = opacity < 1;
+    // Changing `transparent` swaps the shader program, so the material has
+    // to be told even though the value is a plain assignment.
+    const needsRecompile = material.transparent !== translucent;
+
     material.opacity = opacity;
     material.transparent = translucent;
     // Translucent shells overlap themselves constantly and there is no useful
     // draw order for them. Not writing depth gives an even x-ray blend instead
-    // of whichever shell happened to be drawn first winning.
+    // of whichever shell happened to be drawn first winning. Mid-fade this
+    // also applies to whichever of the two cross-fading groups is currently
+    // translucent, for exactly the same reason -- they overlap by design.
     material.depthWrite = !translucent;
 
     if (needsRecompile) material.needsUpdate = true;
+}
+
+/**
+ * Sets opacity across every material in a group, whatever kind of view it
+ * is -- a marching-cubes orbital's lit lobe (`MeshStandardMaterial`), or
+ * either kind of cap shader (`clip_caps.ts`'s density-map cap or
+ * `shell_view.ts`'s shellEmphasis cap, both of which carry a plain
+ * `uniforms.opacity` -- see shell_view.ts's own module doc on why the two
+ * are interchangeable here). This is what the shell<->orbital cross-fade
+ * (orbital_visualizer.ts) animates: two entirely different kinds of group,
+ * briefly alive together, faded by the same one call against each.
+ */
+export function setGroupOpacity(group: THREE.Object3D | null, opacity: number): void {
+    if (!group) return;
+
+    group.traverse(child => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        for (const material of materials) {
+            if (material instanceof THREE.MeshStandardMaterial) {
+                setMaterialOpacity(material, opacity);
+            } else if (material instanceof THREE.ShaderMaterial && material.uniforms.opacity) {
+                const translucent = opacity < 1;
+                if (material.transparent !== translucent) material.needsUpdate = true;
+                material.transparent = translucent;
+                material.uniforms.opacity.value = opacity;
+            }
+        }
+    });
 }
 
 /** Restyles an already-built orbital in place, without rebuilding it. */

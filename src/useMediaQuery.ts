@@ -35,3 +35,12 @@ export function useMediaQuery(query: string): boolean {
  * scrolling with no way to dismiss it.
  */
 export const NARROW_VIEWPORT = '(max-width: 760px), (max-height: 500px)';
+
+/**
+ * A user who has asked their OS for reduced motion gets the level-transition
+ * animation's instant cut, never a shortened version of the animation itself
+ * (level-transition spec addendum) -- so this is read once, at the point
+ * that decides whether to animate at all, rather than folded into any
+ * duration.
+ */
+export const PREFERS_REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

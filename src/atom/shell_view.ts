@@ -140,9 +140,24 @@ export interface ShellViewOptions {
     plane: THREE.Plane;
 }
 
-/** Wraps the log-grid emphasis curve in a float texture the cap shader can read. */
+/**
+ * Wraps the log-grid emphasis curve in a float texture the cap shader can
+ * read. Copies `values` rather than handing it to `DataTexture` directly:
+ * the atom<->shell fade (`setShellViewCurve`) mutates the texture's backing
+ * array in place every frame, and callers pass this a direct reference to
+ * data owned elsewhere -- `AtomProfile.totalEmphasis`/`shell.emphasis`,
+ * kept in the Redux store and read again by later views and by the radial
+ * plot. Without this copy, animating one shell view corrupts that shared
+ * array permanently: a bug caught live rather than by any test, because
+ * every existing test builds a single view and never goes on to read the
+ * profile's curve again afterwards -- see the level-transition task report
+ * for how this actually manifested (a later fade that should reveal three
+ * shells stayed stuck on one, because "the whole atom's curve" it was
+ * fading towards had already been overwritten with the previous fade's
+ * result).
+ */
 function createShellEmphasisTexture(values: Float32Array): THREE.DataTexture {
-    const texture = new THREE.DataTexture(values, values.length, 1);
+    const texture = new THREE.DataTexture(values.slice(), values.length, 1);
     texture.format = THREE.RedFormat;
     texture.type = THREE.FloatType;
     texture.minFilter = THREE.LinearFilter;
@@ -263,6 +278,85 @@ export function setShellViewRingWidth(view: THREE.Object3D | null, worldHalfWidt
         const material = child.material as THREE.ShaderMaterial;
         material.uniforms.ringWidth.value = worldHalfWidth;
     });
+}
+
+/**
+ * Overwrites the emphasis curve in place -- the atom<->shell fade (level-
+ * transition spec addendum) mutates one already-built view's texture every
+ * frame rather than rebuilding it, since both levels render the same sphere
+ * and shader (see the module doc above). A plain data upload, not a new
+ * `THREE.DataTexture`: rebuilding the texture object itself on every
+ * animation frame would work but is needless churn for what is otherwise a
+ * one-line `set` + a dirty flag.
+ */
+export function setShellViewCurve(view: THREE.Object3D | null, curve: Float32Array): void {
+    if (!view) return;
+
+    view.traverse(child => {
+        if (!(child instanceof THREE.Mesh) || !child.userData.isCap) return;
+        const material = child.material as THREE.ShaderMaterial;
+        const texture = material.uniforms.shellEmphasis.value as THREE.DataTexture;
+        const data = texture.image.data as Float32Array;
+        const length = Math.min(data.length, curve.length);
+        data.set(curve.subarray(0, length));
+        texture.needsUpdate = true;
+    });
+}
+
+/**
+ * Reads the currently-displayed curve back out, as a fresh copy -- lets an
+ * interrupted transition (orbital_visualizer.ts) read wherever the view
+ * actually is right now, mid-fade or settled, as the new "from" endpoint
+ * rather than either the stale original start or the target it never
+ * reached.
+ */
+export function getShellViewCurve(view: THREE.Object3D | null): Float32Array | null {
+    if (!view) return null;
+
+    let curve: Float32Array | null = null;
+    view.traverse(child => {
+        if (curve !== null || !(child instanceof THREE.Mesh) || !child.userData.isCap) return;
+        const material = child.material as THREE.ShaderMaterial;
+        const texture = material.uniforms.shellEmphasis.value as THREE.DataTexture;
+        curve = (texture.image.data as Float32Array).slice();
+    });
+    return curve;
+}
+
+/**
+ * Rescales the visible sphere without rebuilding its geometry -- the
+ * "camera follows" half of the atom<->shell fade (level-transition spec
+ * addendum): the contour radius genuinely differs between the whole atom and
+ * one shell (a shell's own enclosed-fraction contour is typically much
+ * smaller), and this is what lets that radius ease smoothly alongside the
+ * camera instead of popping. Scaling the stencil meshes is enough on its own
+ * -- the flat cap plane's shading comes from world position, independent of
+ * the sphere's size (see the module doc above), so it is never touched here.
+ * Scale is computed relative to `SphereGeometry.parameters.radius` (the
+ * radius the geometry was actually built at) rather than a separately
+ * tracked base value, so this stays correct however the view got here.
+ */
+export function setShellViewRadius(view: THREE.Object3D | null, radius: number): void {
+    if (!view) return;
+
+    view.traverse(child => {
+        if (!(child instanceof THREE.Mesh) || !child.userData.isCapStencil) return;
+        const baseRadius = (child.geometry as THREE.SphereGeometry).parameters.radius;
+        child.scale.setScalar(baseRadius > 0 ? radius / baseRadius : 1);
+    });
+}
+
+/** Reads the sphere's current effective radius back -- the radius counterpart of `getShellViewCurve`. */
+export function getShellViewRadius(view: THREE.Object3D | null): number | null {
+    if (!view) return null;
+
+    let radius: number | null = null;
+    view.traverse(child => {
+        if (radius !== null || !(child instanceof THREE.Mesh) || !child.userData.isCapStencil) return;
+        const baseRadius = (child.geometry as THREE.SphereGeometry).parameters.radius;
+        radius = baseRadius * child.scale.x;
+    });
+    return radius;
 }
 
 /** Frees the shell-emphasis texture; the geometry is shared and disposed with the mesh. */
