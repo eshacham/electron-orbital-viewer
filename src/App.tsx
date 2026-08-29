@@ -284,9 +284,11 @@ function App() {
         return radius * 1.2;
     }, [atomProfile, atomLevel, atomSelectedShell]);
 
-    // Level 1: one curve per shell. Level 2/3: the selected shell's own
-    // subshells, so the plot always answers "what am I looking at" rather
-    // than showing the whole atom regardless of how far the drill-down goes.
+    // The plot answers "what am I looking at", so it narrows as the drill-down
+    // does: every shell at the atom level, then the chosen shell's subshells
+    // side by side so 2s and 2p can be compared, then just the chosen subshell.
+    // Choosing an individual ml narrows it no further, because the radial
+    // distribution does not depend on ml.
     const atomCurves: RadialCurve[] = useMemo(() => {
         if (!atomProfile) return [];
         if (atomLevel === 'atom') {
@@ -296,14 +298,15 @@ function App() {
                 points: atomRGrid.map((r, j) => ({ r, value: shell.curve[j] })),
             }));
         }
-        return atomProfile.subshells
-            .filter(subshell => subshell.n === atomSelectedShell)
-            .map((subshell, i) => ({
-                label: subshellLabel(subshell.n, subshell.l),
-                color: CURVE_COLORS[i % CURVE_COLORS.length],
-                points: atomRGrid.map((r, j) => ({ r, value: subshell.curve[j] })),
-            }));
-    }, [atomProfile, atomLevel, atomSelectedShell, atomRGrid]);
+        const subshells = atomSelectedSubshell
+            ? atomProfile.subshells.filter(s => s.n === atomSelectedSubshell.n && s.l === atomSelectedSubshell.l)
+            : atomProfile.subshells.filter(s => s.n === atomSelectedShell);
+        return subshells.map((subshell, i) => ({
+            label: subshellLabel(subshell.n, subshell.l),
+            color: CURVE_COLORS[i % CURVE_COLORS.length],
+            points: atomRGrid.map((r, j) => ({ r, value: subshell.curve[j] })),
+        }));
+    }, [atomProfile, atomLevel, atomSelectedShell, atomSelectedSubshell, atomRGrid]);
 
     return (
         <ThemeProvider theme={theme}>
