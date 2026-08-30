@@ -73,6 +73,38 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
     const crumbs: Crumb[] = [
         { key: 'atom', label: elementName, target: { level: 'atom' } },
     ];
+
+    /**
+     * One step out, and what it is called — the inverse of whichever
+     * drill-down step got you here, so Back always undoes exactly the last
+     * thing you did:
+     *
+     *   an orbital  → its subshell, still isolated
+     *   an isolated subshell → the whole shell
+     *   a shell     → the whole atom
+     *
+     * Every step is expressible with the existing navigation targets, so
+     * this needs no reducer of its own: `drillToSubshell` clears the
+     * orbital, `drillToShell` clears the subshell.
+     *
+     * Reported from the running app: on a phone the breadcrumb below is the
+     * only way back, and its segments are small text links partly under the
+     * sheet toggle. Worse, the panel that carries the mL buttons unmounts at
+     * the orbital level, so the control you just used to get here disappears
+     * behind you. This is the affordance that fixes that; the breadcrumb
+     * stays for jumping more than one level at a time.
+     */
+    const parent: { label: string; target: NavigationTarget } | null =
+        selectedOrbital
+            ? {
+                label: subshellLabel(selectedOrbital.n, selectedOrbital.l),
+                target: { level: 'subshell', n: selectedOrbital.n, l: selectedOrbital.l },
+            }
+            : selectedSubshell
+                ? { label: shellName(selectedSubshell.n), target: { level: 'shell', n: selectedSubshell.n } }
+                : selectedShell !== null
+                    ? { label: elementName, target: { level: 'atom' } }
+                    : null;
     if (selectedShell !== null) {
         crumbs.push({ key: 'shell', label: shellName(selectedShell), target: { level: 'shell', n: selectedShell } });
     }
@@ -93,6 +125,15 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
 
     return (
         <Box className="level-nav" aria-label="level navigation">
+            {parent && (
+                <Button
+                    size="small"
+                    className="level-nav-back"
+                    onClick={() => onNavigate(parent.target)}
+                >
+                    ← Back to {parent.label}
+                </Button>
+            )}
             <Breadcrumbs aria-label="breadcrumb" className="level-nav-breadcrumbs">
                 {crumbs.map(crumb => (
                     <Link
@@ -148,9 +189,14 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
                 once a shell is open, the useful next move is getting back
                 out of it. */}
             <Typography variant="caption" className="level-nav-shell-hint" display="block">
-                {selectedShell === null
-                    ? 'Click a ring in the 3D view, or a shell above, to open it'
-                    : `${shellName(selectedShell)} only — click it again, or the ✕, for the whole atom`}
+                {selectedOrbital
+                    // At the orbital level the shell chips are context, not
+                    // the current subject -- saying "M shell only" here would
+                    // describe a view you are no longer looking at.
+                    ? `One orbital of ${subshellLabel(selectedOrbital.n, selectedOrbital.l)} — Back steps out one level at a time`
+                    : selectedShell === null
+                        ? 'Click a ring in the 3D view, or a shell above, to open it'
+                        : `${shellName(selectedShell)} only — click it again, or the ✕, for the whole atom`}
             </Typography>
 
             <Button

@@ -325,6 +325,16 @@ button:hover {
   .side-panel .level-nav .level-nav-breadcrumbs {
     padding-left: 44px;
   }
+  /* The Back control sits above the breadcrumb, so it is what has to clear
+     the sheet toggle here, and it gets a full touch target. */
+  .side-panel .level-nav .level-nav-back {
+    margin-left: 44px;
+    min-height: 40px;
+    font-size: 0.9rem !important;
+  }
+  .side-panel .level-nav .level-nav-back + .level-nav-breadcrumbs {
+    padding-left: 0;
+  }
   /* The panel is capped at 30dvh and scrolls, and with the valence line
      added it now clips "About this model" mid-word -- which reads as broken
      rather than as scrollable. The method one-liner is the line to give up:
@@ -494,6 +504,21 @@ button:hover {
   flex-wrap: wrap;
   gap: 6px;
   margin: 8px 0;
+}
+/* The primary way back out of a drill-down. Deliberately the largest
+   control in the panel: on a phone the breadcrumb's segments are small text
+   links, and this has to be hittable with a thumb. */
+.level-nav-back {
+  align-self: flex-start;
+  margin-bottom: 4px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  padding: 4px 10px !important;
+  min-height: 32px;
+}
+.subshell-ml-button.selected {
+  background: rgba(25, 118, 210, 0.14);
+  font-weight: 600;
 }
 .level-nav-shell-hint {
   opacity: 0.7;

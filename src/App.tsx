@@ -437,11 +437,20 @@ function App() {
                         open={panelOpen}
                         compact={isNarrow}
                     >
-                        {atomLevel === 'shell' && atomProfile && atomSelectedShell !== null && (
+                        {/* Shown at the orbital level too, not just the shell
+                            level (bug fix, reported from a phone): it used to
+                            unmount the moment you picked an orbital, so the mL
+                            buttons you had just used vanished and the only way
+                            back was a row of small breadcrumb links. Keeping it
+                            up means the parent subshell is still on screen, and
+                            switching to a sibling orbital is one tap rather
+                            than a round trip out and back in. */}
+                        {(atomLevel === 'shell' || atomLevel === 'orbital') && atomProfile && atomSelectedShell !== null && (
                             <SubshellPanel
                                 subshells={atomProfile.subshells}
                                 shellN={atomSelectedShell}
                                 selectedSubshell={atomSelectedSubshell}
+                                selectedOrbital={atomSelectedOrbital}
                                 onSelectSubshell={handleSelectSubshell}
                                 onSelectOrbital={handleSelectOrbital}
                             />

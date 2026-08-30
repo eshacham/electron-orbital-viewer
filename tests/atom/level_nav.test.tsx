@@ -128,6 +128,76 @@ describe('LevelNav', () => {
         });
     });
 
+    /**
+     * Reported from a phone: after picking an orbital there was no easy way
+     * back to the parent view. The breadcrumb was the only route, and its
+     * segments are small text links partly under the sheet toggle.
+     *
+     * Back undoes exactly the last drill-down step, so the ladder out
+     * mirrors the ladder in.
+     */
+    describe('stepping back out', () => {
+        const back = (container: HTMLElement) =>
+            container.querySelector<HTMLButtonElement>('.level-nav-back')!;
+
+        it('is not offered at the whole-atom level, where there is nowhere to go', () => {
+            const { container } = render(
+                <LevelNav Z={26} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+            );
+            expect(container.querySelector('.level-nav-back')).toBeNull();
+        });
+
+        it('from an orbital, goes back to its subshell rather than all the way out', () => {
+            const onNavigate = jest.fn();
+            const { container } = render(
+                <LevelNav
+                    Z={26}
+                    selectedShell={3}
+                    selectedSubshell={{ n: 3, l: 2 }}
+                    selectedOrbital={{ n: 3, l: 2, ml: 0 }}
+                    onNavigate={onNavigate}
+                />
+            );
+            expect(back(container).textContent).toMatch(/back to 3d/i);
+            fireEvent.click(back(container));
+            expect(onNavigate).toHaveBeenCalledWith({ level: 'subshell', n: 3, l: 2 } as NavigationTarget);
+        });
+
+        it('from an isolated subshell, goes back to the whole shell', () => {
+            const onNavigate = jest.fn();
+            const { container } = render(
+                <LevelNav Z={26} selectedShell={3} selectedSubshell={{ n: 3, l: 2 }} selectedOrbital={null} onNavigate={onNavigate} />
+            );
+            expect(back(container).textContent).toMatch(/back to M shell/i);
+            fireEvent.click(back(container));
+            expect(onNavigate).toHaveBeenCalledWith({ level: 'shell', n: 3 } as NavigationTarget);
+        });
+
+        it('from a shell, goes back to the whole atom, named', () => {
+            const onNavigate = jest.fn();
+            const { container } = render(
+                <LevelNav Z={26} selectedShell={3} selectedSubshell={null} selectedOrbital={null} onNavigate={onNavigate} />
+            );
+            expect(back(container).textContent).toMatch(/back to Iron/i);
+            fireEvent.click(back(container));
+            expect(onNavigate).toHaveBeenCalledWith({ level: 'atom' } as NavigationTarget);
+        });
+
+        it('does not describe the view as a shell once an orbital is selected', () => {
+            const { getByText, queryByText } = render(
+                <LevelNav
+                    Z={26}
+                    selectedShell={3}
+                    selectedSubshell={{ n: 3, l: 2 }}
+                    selectedOrbital={{ n: 3, l: 2, ml: 0 }}
+                    onNavigate={() => {}}
+                />
+            );
+            expect(getByText(/one orbital of 3d/i)).toBeInTheDocument();
+            expect(queryByText(/for the whole atom/i)).toBeNull();
+        });
+    });
+
     // Discoverability: the rings on the cut face are clickable now
     // (orbital_visualizer.ts's onPickRadius), and nothing about a ring says
     // so on its own.

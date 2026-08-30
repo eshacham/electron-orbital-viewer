@@ -27,7 +27,7 @@ vs −128.233481; Ar −525.945350 vs −525.946195), and argon's 2s/2p orbital
 energies read −10.794 / −8.443 Ha on screen against NIST's −10.794172 /
 −8.443439.
 
-~1415 tests, `npm run build` clean, `npx tsc --noEmit` clean. Deployed.
+~1423 tests, `npm run build` clean, `npx tsc --noEmit` clean. Deployed.
 
 ## Architecture of `src/atom/`
 
@@ -249,7 +249,7 @@ offset) and the new valence line made it total. They now sit below LevelNav's
 segment — which is the way back to the whole atom, so losing it to an overlap
 was worse than losing a label.
 
-### A later round of testing found five more
+### A later round of testing found six more
 
 Reported from the running app after the six items above shipped, and all
 fixed in `ec2d25c`.
@@ -280,6 +280,19 @@ fixed in `ec2d25c`.
 4. **A default view per element**, derived from each element's own profile
    rather than 118 hand-tuned presets. See the judgment calls below.
 5. **The resolution control is gone**; every marching-cubes render is 129³.
+
+6. **No easy way back from an orbital, on a phone.** The subshell panel
+   unmounted the instant you picked an orbital, so the mL buttons you had
+   just used disappeared and the breadcrumb — small text links, partly under
+   the sheet toggle — was the only route out. LevelNav now carries an
+   explicit **Back** control whenever there is somewhere to go, labelled with
+   where it goes, and it steps out one level at a time so the ladder out
+   mirrors the ladder in: an orbital → its subshell, still isolated → the
+   whole shell → the whole atom. Every step is expressible with the existing
+   navigation targets (`drillToSubshell` clears the orbital, `drillToShell`
+   clears the subshell), so no reducer changed. The subshell panel also stays
+   mounted at the orbital level now, with the current mL marked, which makes
+   a sibling orbital one tap instead of a round trip.
 
 Proof for (2) and (4) is a published contact sheet of the default view of
 all 118 elements, captured from the running app in one automated pass:

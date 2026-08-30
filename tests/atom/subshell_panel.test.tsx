@@ -139,4 +139,39 @@ describe('SubshellPanel', () => {
         const current = container.querySelectorAll('.subshell-energy-rule.current');
         expect(current).toHaveLength(2); // 2s and 2p belong to the selected shell.
     });
+
+    /**
+     * The panel stays mounted at the orbital level (bug fix, reported from a
+     * phone): unmounting it took the mL buttons away the instant one was
+     * used, leaving the breadcrumb as the only way back.
+     */
+    describe('at the orbital level', () => {
+        const renderAtOrbital = (ml: number) => render(
+            <SubshellPanel
+                subshells={neonLikeSubshells()}
+                shellN={2}
+                selectedSubshell={{ n: 2, l: 1 }}
+                selectedOrbital={{ n: 2, l: 1, ml }}
+                onSelectSubshell={() => {}}
+                onSelectOrbital={() => {}}
+            />
+        );
+
+        it('still offers the whole mL row, so a sibling orbital is one tap away', () => {
+            const { container } = renderAtOrbital(0);
+            expect(container.querySelectorAll('.subshell-ml-button')).toHaveLength(3);
+        });
+
+        it('marks which orbital is showing, and only that one', () => {
+            const { container } = renderAtOrbital(0);
+            const pressed = container.querySelectorAll('.subshell-ml-button[aria-pressed="true"]');
+            expect(pressed).toHaveLength(1);
+            expect(pressed[0].textContent).toMatch(/2p_z/i);
+        });
+
+        it('says what is on screen, not what was on screen a level ago', () => {
+            const { getByText } = renderAtOrbital(0);
+            expect(getByText(/showing one orbital of 2p/i)).toBeInTheDocument();
+        });
+    });
 });

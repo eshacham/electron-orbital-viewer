@@ -16,6 +16,12 @@ interface SubshellPanelProps {
     shellN: number;
     /** The subshell currently drilled into, if any — shows the mₗ row when set. */
     selectedSubshell: { n: number; l: number } | null;
+    /**
+     * The individual orbital currently being rendered (level 3), if any.
+     * The panel stays mounted at that level so the mL row does not vanish
+     * behind the user; this is what marks which of its buttons is current.
+     */
+    selectedOrbital?: { n: number; l: number; ml: number } | null;
     onSelectSubshell: (n: number, l: number) => void;
     onSelectOrbital: (n: number, l: number, ml: number) => void;
 }
@@ -48,7 +54,7 @@ function ruleY(energy: number, minEnergy: number, maxEnergy: number): number {
  * the label here is deliberately "orbital energy" throughout.
  */
 const SubshellPanel: React.FC<SubshellPanelProps> = ({
-    subshells, shellN, selectedSubshell, onSelectSubshell, onSelectOrbital,
+    subshells, shellN, selectedSubshell, selectedOrbital = null, onSelectSubshell, onSelectOrbital,
 }) => {
     const shellSubshells = subshells.filter(s => s.n === shellN);
 
@@ -116,9 +122,11 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                 honestly: the overlapping view is the default *because* the
                 overlap is real (spec §2). */}
             <Typography variant="caption" className="subshell-isolate-hint" display="block">
-                {selectedSubshell
-                    ? `Showing ${subshellLabel(selectedSubshell.n, selectedSubshell.l)} alone — click its chip again for the whole shell`
-                    : 'Click a subshell to show its orbitals on their own'}
+                {selectedOrbital
+                    ? `Showing one orbital of ${subshellLabel(selectedOrbital.n, selectedOrbital.l)} — pick another below, or Back for the whole subshell`
+                    : selectedSubshell
+                        ? `Showing ${subshellLabel(selectedSubshell.n, selectedSubshell.l)} alone — click its chip again for the whole shell`
+                        : 'Click a subshell to show its orbitals on their own'}
             </Typography>
 
             {activeSubshell && (
@@ -127,7 +135,17 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                         <Button
                             key={ml}
                             size="small"
-                            className="subshell-ml-button"
+                            className={`subshell-ml-button${
+                                selectedOrbital
+                                && selectedOrbital.n === activeSubshell.n
+                                && selectedOrbital.l === activeSubshell.l
+                                && selectedOrbital.ml === ml ? ' selected' : ''}`}
+                            aria-pressed={Boolean(
+                                selectedOrbital
+                                && selectedOrbital.n === activeSubshell.n
+                                && selectedOrbital.l === activeSubshell.l
+                                && selectedOrbital.ml === ml
+                            )}
                             onClick={() => onSelectOrbital(activeSubshell.n, activeSubshell.l, ml)}
                         >
                             {/* The legend for the isolated composition view
