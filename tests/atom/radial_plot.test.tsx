@@ -116,4 +116,36 @@ describe('RadialPlot', () => {
         expect(readout?.textContent).toMatch(/r = 1\.00 a₀/);
         expect(readout?.textContent).toMatch(/K shell/);
     });
+
+    // Regression test (task 22, bug 1): "when i hover over the 3d image or
+    // the 2d graph, the legend of the graph jumps, as the r formula is
+    // toggled". The readout used to be omitted from the DOM entirely
+    // whenever nothing was hovered, so the legend above it (and the scale
+    // readout below the whole panel) reflowed by its height on every hover
+    // in and out. The fix keeps its line present at all times; only the
+    // text inside changes.
+    it('keeps the hover-readout element present (reserving its height) even when nothing is hovered, so the legend never reflows', () => {
+        const { container, rerender } = render(
+            <RadialPlot n={2} l={1} Z={6} rMax={10} curves={twoCurves()} hoverRadius={null} onHoverRadius={() => {}} />
+        );
+        const readoutWhenIdle = container.querySelector('.radial-plot-hover-readout');
+        expect(readoutWhenIdle).not.toBeNull();
+
+        rerender(
+            <RadialPlot n={2} l={1} Z={6} rMax={10} curves={twoCurves()} hoverRadius={1} onHoverRadius={() => {}} />
+        );
+        expect(container.querySelector('.radial-plot-hover-readout')).not.toBeNull();
+
+        // Back to idle: the element -- and so its reserved line height --
+        // must still be there, not removed again.
+        rerender(
+            <RadialPlot n={2} l={1} Z={6} rMax={10} curves={twoCurves()} hoverRadius={null} onHoverRadius={() => {}} />
+        );
+        const readoutBackToIdle = container.querySelector('.radial-plot-hover-readout');
+        expect(readoutBackToIdle).not.toBeNull();
+        // Non-breaking space, not empty -- an empty text node collapses to
+        // zero height in a block element, which would silently reintroduce
+        // the same jump this test guards against.
+        expect(readoutBackToIdle?.textContent).toBe(' ');
+    });
 });

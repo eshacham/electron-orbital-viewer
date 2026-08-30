@@ -265,10 +265,18 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                     ))}
                 </div>
             )}
-            {showHover && (
+            {/* Always rendered (rather than only while hovering), reserving
+                its line's height at all times -- otherwise the legend above
+                it, and the scale readout below the whole panel, reflow by
+                that height on every hover in and out (bug fix, task 22 bug
+                1). A non-breaking space keeps the empty state's line box the
+                same height as the real readout's rather than collapsing to
+                nothing. */}
+            {isMultiCurve && (
                 <div className="radial-plot-hover-readout">
-                    {`r = ${(hoverRadius as number).toFixed(2)} a₀`}
-                    {hoverShellLabel ? ` — ${hoverShellLabel}` : ''}
+                    {showHover
+                        ? `r = ${(hoverRadius as number).toFixed(2)} a₀${hoverShellLabel ? ` — ${hoverShellLabel}` : ''}`
+                        : ' '}
                 </div>
             )}
             <div className="radial-plot-scale">
