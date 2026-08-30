@@ -409,6 +409,24 @@ button:hover {
 .level-nav-method {
   opacity: 0.75;
 }
+.level-nav-valence {
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.level-nav-valence-note {
+  opacity: 0.6;
+  font-size: 0.8em;
+}
+/* Core versus valence, matching the 3D view's own treatment: the valence
+   chip is lit and the core chips recede. The distinction is never carried
+   by opacity alone -- the valence chip also says "· valence". */
+.level-nav-shell-chip.core:not(.selected) {
+  opacity: 0.62;
+}
+.level-nav-shell-chip.valence:not(.selected) {
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  font-weight: 600;
+}
 .level-nav-shells {
   display: flex;
   flex-wrap: wrap;

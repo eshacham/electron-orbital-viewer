@@ -34,6 +34,8 @@ function neonLikeProfile(): SerialisedAtomProfile {
         total: new Float32Array([1, 2, 3, 2, 1]),
         totalEmphasis: new Float32Array([0.5, 1, 1, 1, 0.5]),
         contourRadius: 3,
+        valencePeakRadius: 2,
+        displayRadius: 3,
         shellPeaks: new Float64Array([0.5, 2]),
         shellIndexAtR: new Float32Array(5),
         shells: [

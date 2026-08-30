@@ -996,6 +996,15 @@ export interface AtomShellViewParams {
      */
     ringColorIndex?: Float32Array;
     /**
+     * Position of the outermost occupied shell in the same ascending-n list
+     * `ringColorIndex` indexes into (Addendum 2's core / valence
+     * distinction). Level 1 only, for the same reason as `ringColorIndex`:
+     * a single-shell view has no core to distinguish a valence shell from.
+     */
+    valenceIndex?: number;
+    /** The valence shell's own emphasis curve — see `ShellViewOptions.valenceEmphasis`. */
+    valenceEmphasis?: Float32Array;
+    /**
      * True for level 2's shell-composition view -- a shell view that will
      * have its own occupied orbitals attached inside it shortly after (see
      * OrbitalViewer.tsx). Sets `context.isCompositionView`, which is what
@@ -1149,6 +1158,8 @@ export function updateAtomViewInScene(
         opacity: backdropOpacityFor(context),
         plane: context.clipPlane,
         ringColorIndex: params.ringColorIndex,
+        valenceIndex: params.valenceIndex,
+        valenceEmphasis: params.valenceEmphasis,
     } satisfies ShellViewOptions);
 
     context.scene.add(view);

@@ -100,6 +100,17 @@ export interface SerialisedAtomProfile {
     totalEmphasis: Float32Array;
     /** Radius enclosing the profile's requested fraction of all electrons. */
     contourRadius: number;
+    /** Radius of the outermost occupied shell's own D(r) peak. */
+    valencePeakRadius: number;
+    /**
+     * How large to draw the whole atom: `contourRadius`, widened where
+     * needed so the valence shell's peak is inside the sphere with
+     * clearance. See `AtomProfile.displayRadius` for why the two are
+     * separate quantities -- "where is 90% of the charge" and "how big is
+     * this atom" have different answers, and the first one cut the valence
+     * shell off screen for most of the periodic table.
+     */
+    displayRadius: number;
     /**
      * Radii of the total D(r)'s resolved local maxima.
      *
@@ -144,6 +155,8 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
         total: packRadialCurve(profile.total.values),
         totalEmphasis: profile.totalEmphasis,
         contourRadius: profile.contourRadius,
+        valencePeakRadius: profile.valencePeakRadius,
+        displayRadius: profile.displayRadius,
         shellPeaks: Float64Array.from(profile.shellPeaks),
         shellIndexAtR: Float32Array.from(profile.shellIndexAtR),
         shells: profile.shells.map(shell => ({

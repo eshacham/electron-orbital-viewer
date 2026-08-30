@@ -45,6 +45,23 @@ export interface AtomProfile {
     subshells: Array<{ n: number; l: number; electrons: number; energy: number; curve: RadialCurve }>;
     /** Radius enclosing `fraction` of all electrons. */
     contourRadius: number;
+    /** Radius of the outermost occupied shell's own D(r) peak. */
+    valencePeakRadius: number;
+    /**
+     * How large to actually draw the whole atom: `contourRadius`, widened
+     * where necessary so the valence shell's peak sits inside the sphere
+     * with clearance.
+     *
+     * `contourRadius` stays exactly what it says it is — the radius
+     * enclosing `fraction` of the electrons — and every claim made about
+     * that number is still true of it. This is a separate, presentational
+     * quantity, because the two questions are different: "where is 90% of
+     * the charge" is dominated by the core, while "how big is this atom"
+     * is a question about its outermost shell. Answering the first when
+     * asked the second cut the valence shell off screen for most of the
+     * periodic table (see buildAtomProfile).
+     */
+    displayRadius: number;
     /**
      * Radii of the total D(r)'s resolved local maxima.
      *
@@ -296,6 +313,21 @@ function groupIntoShells(
 }
 
 /**
+ * Clearance beyond the valence shell's own D(r) peak that the whole-atom
+ * view's sphere must reach (see `displayRadius`). Enough to put the valence
+ * ring inside the sphere with room around it, rather than exactly on its
+ * rim.
+ */
+const VALENCE_CLEARANCE = 1.25;
+
+/** Radius at which a curve is largest — the shell's own peak. */
+function peakRadius(grid: RadialGrid, values: Float64Array): number {
+    let best = 0;
+    for (let j = 1; j < grid.size; j++) if (values[j] > values[best]) best = j;
+    return grid.r[best];
+}
+
+/**
  * Turns a converged AtomSolution into every curve and derived radius the UI
  * needs: the whole-atom D(r), the per-shell and per-subshell D(r) (which sum
  * back up to the total and to their shell respectively, by construction —
@@ -315,6 +347,21 @@ export function buildAtomProfile(atom: AtomSolution, fraction: number): AtomProf
 
     const shells = groupIntoShells(grid, subshells, fraction);
 
+    const contourRadius = radiusEnclosing(grid, D, fraction);
+    // The outermost shell's own peak. Needed separately from
+    // `contourRadius` because an enclosed-*count* contour is dominated by
+    // the compact core once there are many electrons: at the default 90%,
+    // 34 of the first 56 elements have their valence shell's peak outside
+    // it, sodium's by a factor of 1.67. The whole-atom sphere is drawn at
+    // the contour, and the cut face is stencilled to the sphere, so for
+    // most of the periodic table the valence shell was simply not on
+    // screen -- which makes "one lonely s electron outside a closed core"
+    // (Addendum 2 §3) impossible to show. Measured, not guessed; see the
+    // acceptance test in atom_profile.test.ts.
+    const valencePeakRadius = shells.length > 0
+        ? peakRadius(grid, shells[shells.length - 1].curve.values)
+        : contourRadius;
+
     return {
         Z,
         grid,
@@ -322,7 +369,9 @@ export function buildAtomProfile(atom: AtomSolution, fraction: number): AtomProf
         totalEmphasis: shellEmphasis(grid, D, SHELL_EMPHASIS_WINDOW),
         shells,
         subshells,
-        contourRadius: radiusEnclosing(grid, D, fraction),
+        contourRadius,
+        valencePeakRadius,
+        displayRadius: Math.max(contourRadius, valencePeakRadius * VALENCE_CLEARANCE),
         shellPeaks: findShellPeaks(grid, D),
         shellIndexAtR: dominantShellIndex(grid, shells),
     };

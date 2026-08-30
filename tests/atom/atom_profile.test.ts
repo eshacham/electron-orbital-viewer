@@ -6,6 +6,7 @@ import {
     radialFunctionFor,
     packRadialCurve,
     shellEmphasis,
+    radiusEnclosing,
     SHELL_EMPHASIS_WINDOW,
 } from '../../src/atom/atom_profile';
 
@@ -225,6 +226,64 @@ describe('atom profile', () => {
                 expect(contrast).toBeGreaterThanOrEqual(MIN_CONTRAST);
             }
             expect(worst).toBeGreaterThanOrEqual(MIN_CONTRAST);
+        });
+    });
+
+    /**
+     * Addendum 2 §3: "Li/Na/K all show one lonely s electron outside a
+     * closed core." They could not, until this. The whole-atom sphere is
+     * drawn at a radius and the cut face is stencilled to that sphere, so a
+     * shell outside it is not dim -- it is absent.
+     *
+     * Measured before the fix, at the default 90% enclosed fraction: 34 of
+     * the first 56 elements had their valence shell's own D(r) peak outside
+     * the contour, sodium's by a factor of 1.67, caesium's by 2.63. An
+     * enclosed-*count* contour is dominated by the compact core as soon as
+     * there are many electrons, which makes it the wrong answer to "how big
+     * is this atom" even though it is the right answer to the question it
+     * actually asks.
+     */
+    describe('the valence shell is inside the drawn sphere (acceptance test)', () => {
+        function valencePeakOf(profile: AtomProfile): number {
+            const valence = profile.shells[profile.shells.length - 1];
+            let best = 0;
+            for (let j = 1; j < profile.grid.size; j++) {
+                if (valence.curve.values[j] > valence.curve.values[best]) best = j;
+            }
+            return profile.grid.r[best];
+        }
+
+        it('reports the valence peak radius', () => {
+            for (const profile of [neonProfile, argonProfile, uraniumProfile]) {
+                expect(profile.valencePeakRadius).toBeCloseTo(valencePeakOf(profile), 10);
+            }
+        });
+
+        it('always draws the atom out past its valence shell, with clearance', () => {
+            for (const profile of [neonProfile, argonProfile, uraniumProfile]) {
+                expect(profile.displayRadius).toBeGreaterThan(profile.valencePeakRadius);
+            }
+        });
+
+        it('never draws it smaller than the enclosed-fraction contour, which still means exactly what it says', () => {
+            for (const profile of [neonProfile, argonProfile, uraniumProfile]) {
+                expect(profile.displayRadius).toBeGreaterThanOrEqual(profile.contourRadius);
+                // The contour itself is untouched: it is still the radius
+                // enclosing 90% of the electrons, and radiusEnclosing is
+                // still what computes it.
+                expect(profile.contourRadius).toBeCloseTo(
+                    radiusEnclosing(profile.grid, profile.total.values, 0.9), 10
+                );
+            }
+        });
+
+        // Sodium is the case the whole change exists for: one 3s electron
+        // sitting on the 2p tail, never a local maximum of the total, and
+        // 1.67x outside the 90% contour. It is also cheap to solve.
+        it('sodium: the lone 3s electron is on screen, where the 90% contour alone would have cut it off', () => {
+            const sodium = buildAtomProfile(solveAtom(11), 0.9);
+            expect(sodium.valencePeakRadius).toBeGreaterThan(sodium.contourRadius);
+            expect(sodium.displayRadius).toBeGreaterThan(sodium.valencePeakRadius);
         });
     });
 

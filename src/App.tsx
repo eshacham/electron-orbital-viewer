@@ -300,7 +300,12 @@ function App() {
     const atomPlotRange = useMemo(() => {
         if (!atomProfile) return 1;
         const radius = atomLevel === 'atom'
-            ? atomProfile.contourRadius
+            // displayRadius, matching the sphere actually drawn (see
+            // AtomProfile.displayRadius): the plot and the 3D view show the
+            // same object, so an axis that stopped short of the valence
+            // shell while the sphere reached past it would put a ring on
+            // screen with no curve under it.
+            ? atomProfile.displayRadius
             : (atomProfile.shells.find(s => s.n === atomSelectedShell)?.contourRadius ?? atomProfile.contourRadius);
         return radius * 1.2;
     }, [atomProfile, atomLevel, atomSelectedShell]);
@@ -313,8 +318,13 @@ function App() {
     const atomCurves: RadialCurve[] = useMemo(() => {
         if (!atomProfile) return [];
         if (atomLevel === 'atom') {
+            // The outermost shell is named as such here too (Addendum 2's
+            // core/valence distinction), so the plot and the lit ring in the
+            // 3D view are saying the same thing. `shells` is ascending n from
+            // the configuration, so the last entry is the valence shell.
+            const valenceIndex = atomProfile.shells.length - 1;
             return atomProfile.shells.map((shell, i) => ({
-                label: `n=${shell.n}`,
+                label: i === valenceIndex ? `n=${shell.n} valence` : `n=${shell.n}`,
                 color: CURVE_COLORS[i % CURVE_COLORS.length],
                 points: atomRGrid.map((r, j) => ({ r, value: shell.curve[j] })),
             }));

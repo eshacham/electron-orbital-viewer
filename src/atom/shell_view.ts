@@ -81,6 +81,24 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
     uniform sampler2D ringColorIndexMap;
     uniform float hueStrength;
     uniform vec3 palette[8];
+    // Core versus valence (Addendum 2, §3 of "what actually makes atoms
+    // look different"): which palette index belongs to the outermost
+    // occupied shell, and how hard to lean on the distinction. -1 (with
+    // valenceStrength 0) is the neutral setting every shell-level view and
+    // every pre-existing test uses, under which the mix below is the
+    // identity and core and valence rings shade exactly as before.
+    uniform int valenceIndex;
+    uniform float valenceStrength;
+    // The valence shell's *own* emphasis curve, on the same log grid.
+    // Needed because the total's emphasis does not resolve the valence
+    // shell for most of the periodic table: sodium's 3s is a shoulder on
+    // the 2p tail, never a local maximum of the total, so it drew no ring
+    // at all. Its own D_n(r) has an unambiguous peak, and that is what the
+    // ring is. Read only where the valence shell already dominates the
+    // total (paletteIndex == valenceIndex), so an inner lobe of a 3s -- a
+    // real local maximum of D_3s sitting inside the K shell -- cannot paint
+    // a spurious ring over the core.
+    uniform sampler2D valenceEmphasis;
     // World-space half-width of the highlight band, kept proportional to the
     // camera's distance from the target (see setShellViewRingWidth) rather
     // than a fraction of the sampling grid's rMax. rMax can be 20-100x the
@@ -91,6 +109,13 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
     uniform float ringWidth;
 
     varying vec3 vWorldPosition;
+
+    // How far a core shell's ring recedes, and how far the valence ring is
+    // lifted towards white, at full valenceStrength. Tuned so the core is
+    // plainly quieter without going dark enough to lose its own shell
+    // structure -- the rings still have to be countable, and clickable.
+    const float CORE_DIM = 0.55;
+    const float VALENCE_LIFT = 0.35;
 
     layout(location = 0) out vec4 fragColor;
 
@@ -105,6 +130,18 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         float texCoord = (t + 0.5) / size;
 
         float e = clamp(texture(shellEmphasis, vec2(texCoord, 0.5)).r, 0.0, 1.0);
+
+        // Which shell (by position, ascending n) dominates the total at this
+        // radius -- see dominantShellIndex in atom_profile.ts. The index is
+        // categorical, not a continuum, so it is sampled with NearestFilter
+        // (see createRingColorIndexTexture) rather than interpolated the way
+        // shellEmphasis's own texture is.
+        int paletteIndex = int(texture(ringColorIndexMap, vec2(texCoord, 0.5)).r + 0.5);
+        paletteIndex = clamp(paletteIndex, 0, 7);
+
+        if (valenceStrength > 0.0 && paletteIndex == valenceIndex) {
+            e = max(e, clamp(texture(valenceEmphasis, vec2(texCoord, 0.5)).r, 0.0, 1.0));
+        }
 
         // Shell rings: a shell peak sits at its own local maximum, so its
         // emphasis approaches 1 regardless of the shell's absolute height;
@@ -128,15 +165,25 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         // atom_profile.test.ts's acceptance test).
         vec3 cold = vec3(0.10, 0.12, 0.24);
         vec3 warm = vec3(1.00, 0.85, 0.45);
-        // Which shell (by position, ascending n) dominates the total at this
-        // radius -- see dominantShellIndex in atom_profile.ts. The index is
-        // categorical, not a continuum, so it is sampled with NearestFilter
-        // (see createRingColorIndexTexture) rather than interpolated the way
-        // shellEmphasis's own texture is.
-        int paletteIndex = int(texture(ringColorIndexMap, vec2(texCoord, 0.5)).r + 0.5);
-        paletteIndex = clamp(paletteIndex, 0, 7);
         vec3 peakColor = mix(warm, palette[paletteIndex], hueStrength);
-        vec3 color = mix(cold, peakColor, smoothstep(0.9, 1.0, e));
+
+        // An element's chemistry is almost entirely its outermost shell;
+        // everything inside is inert core, and every ring looking equally
+        // important hid the single most chemically meaningful fact about an
+        // atom. The core recedes and the valence ring is lifted towards
+        // white, which reads as "lit" without changing its hue -- the hue
+        // still has to say which n it is, and still has to match the radial
+        // plot's own curve for that shell.
+        //
+        // Applied to the ring's colour only, never to the emphasis e:
+        // the peak-to-
+        // trough emphasis ratio is what the >= 0.35 contrast acceptance
+        // test measures (atom_profile.test.ts), and it is untouched here.
+        vec3 recededCore = peakColor * mix(1.0, CORE_DIM, valenceStrength);
+        vec3 litValence = mix(peakColor, vec3(1.0), VALENCE_LIFT * valenceStrength);
+        vec3 shellColor = paletteIndex == valenceIndex ? litValence : recededCore;
+
+        vec3 color = mix(cold, shellColor, smoothstep(0.9, 1.0, e));
 
         // The ring the radial plot is pointing at. Comparing the cut face's
         // own |worldPosition| against highlightR is already geometrically
@@ -179,6 +226,22 @@ export interface ShellViewOptions {
      * exercise.
      */
     ringColorIndex?: Float32Array;
+    /**
+     * Palette index of the outermost occupied shell (Addendum 2's core /
+     * valence distinction), i.e. its position in the same ascending-n
+     * `shells` list `ringColorIndex` indexes into. Omit — as every
+     * shell-level view does, having only one shell to show — to shade every
+     * ring alike, exactly as before.
+     */
+    valenceIndex?: number;
+    /**
+     * The valence shell's own `shellEmphasis` curve, on the same log grid.
+     * Supplied alongside `valenceIndex` for the whole-atom view; without it
+     * the valence ring falls back to the total's own emphasis, which for
+     * most elements does not resolve the valence shell at all (see the
+     * `valenceEmphasis` uniform in the fragment shader).
+     */
+    valenceEmphasis?: Float32Array;
 }
 
 /** `CURVE_COLORS`, converted once to the [0,1] triples the shader's `palette` uniform array expects. */
@@ -239,7 +302,7 @@ function createRingColorIndexTexture(values: Float32Array): THREE.DataTexture {
  * `clip_caps.ts` exactly.
  */
 export function createShellView(options: ShellViewOptions): THREE.Group {
-    const { contourRadius, shellEmphasis, rMin, dx, size, rMax, opacity, plane, ringColorIndex } = options;
+    const { contourRadius, shellEmphasis, rMin, dx, size, rMax, opacity, plane, ringColorIndex, valenceIndex, valenceEmphasis } = options;
 
     const view = new THREE.Group();
     view.userData.isCapAssembly = true;
@@ -294,6 +357,11 @@ export function createShellView(options: ShellViewOptions): THREE.Group {
             ringColorIndexMap: { value: createRingColorIndexTexture(ringColorIndex ?? new Float32Array([0])) },
             hueStrength: { value: ringColorIndex ? 1 : 0 },
             palette: { value: PALETTE },
+            valenceIndex: { value: valenceIndex ?? -1 },
+            valenceStrength: { value: valenceIndex === undefined ? 0 : 1 },
+            // A 1-texel dummy when no valence curve was given; the guard on
+            // valenceStrength above means it is never sampled then.
+            valenceEmphasis: { value: createShellEmphasisTexture(valenceEmphasis ?? new Float32Array([0])) },
         },
         vertexShader: CAP_VERTEX_SHADER,
         fragmentShader: CAP_FRAGMENT_SHADER,
@@ -438,5 +506,6 @@ export function disposeShellView(view: THREE.Object3D | null): void {
         const material = child.material as THREE.ShaderMaterial;
         material.uniforms.shellEmphasis.value?.dispose();
         material.uniforms.ringColorIndexMap.value?.dispose();
+        material.uniforms.valenceEmphasis.value?.dispose();
     });
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Breadcrumbs, Link, Chip, Typography, Collapse, Button } from '@mui/material';
 import { elementFor } from '../elements';
-import { shellsFor, configurationLabel, subshellLabel } from '../atom/configurations';
+import { shellsFor, configurationLabel, subshellLabel, valenceShellFor, valenceConfigurationLabel } from '../atom/configurations';
 import { orbitalName } from '../orbital_names';
 
 /**
@@ -62,6 +62,13 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
     const element = elementFor(Z);
     const elementName = element ? element.name : `Z=${Z}`;
     const shells = shellsFor(Z);
+    // Addendum 2, "core versus valence". The outermost shell is where an
+    // element's chemistry almost entirely lives; everything inside is inert
+    // core. Showing the valence configuration on its own is what makes a
+    // group visible as a group -- Li/Na/K all read ns¹, F/Cl both ns²np⁵,
+    // Ne/Ar both ns²np⁶ -- without asserting any bonding model the app does
+    // not compute (see valenceShellFor).
+    const valenceN = valenceShellFor(Z);
 
     const crumbs: Crumb[] = [
         { key: 'atom', label: elementName, target: { level: 'atom' } },
@@ -104,6 +111,10 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
             <Typography variant="body2" className="level-nav-configuration">
                 {configurationLabel(Z)}
             </Typography>
+            <Typography variant="body2" className="level-nav-valence">
+                Valence: {valenceConfigurationLabel(Z)}
+                <span className="level-nav-valence-note"> · everything inside is core</span>
+            </Typography>
             <Typography variant="caption" className="level-nav-method" display="block">
                 {METHOD_STATEMENT}
             </Typography>
@@ -111,11 +122,12 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
             <Box className="level-nav-shells" role="group" aria-label="shells">
                 {shells.map(shell => {
                     const isSelected = selectedShell === shell.n;
+                    const isValence = shell.n === valenceN;
                     return (
                         <Chip
                             key={shell.n}
-                            className={`level-nav-shell-chip${isSelected ? ' selected' : ''}`}
-                            label={shellName(shell.n)}
+                            className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isValence ? ' valence' : ' core'}`}
+                            label={`${shellName(shell.n)}${isValence ? ' · valence' : ''}`}
                             color={isSelected ? 'primary' : 'default'}
                             // Addendum 2's "is there a way to unselect one?".
                             // Three ways now, because testing showed one

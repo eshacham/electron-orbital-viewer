@@ -133,11 +133,23 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             // atom view start framed on the shell structure itself rather
             // than the much larger enclosed-fraction contour (spec bugfix;
             // see framingRadiusFor in orbital_visualizer.ts).
-            const outermostFeatureR = atomProfile.shellPeaks.length > 0
-                ? atomProfile.shellPeaks[atomProfile.shellPeaks.length - 1]
-                : undefined;
+            // Whichever is further out: the last resolved peak of the
+            // total, or the valence shell's own peak. They differ for most
+            // of the periodic table -- the valence shell often does not
+            // resolve as a maximum of the total at all (sodium's 3s is a
+            // shoulder on the 2p tail, not a bump), and framing on the
+            // total's last peak alone left the valence ring outside the
+            // camera's starting view as well as outside the sphere.
+            const outermostFeatureR = Math.max(
+                atomProfile.shellPeaks.length > 0 ? atomProfile.shellPeaks[atomProfile.shellPeaks.length - 1] : 0,
+                atomProfile.valencePeakRadius
+            );
             updateAtomViewInScene(context, {
-                contourRadius: atomProfile.contourRadius,
+                // The whole atom is drawn at `displayRadius`, not at the
+                // enclosed-fraction contour: the cut face is stencilled to
+                // this sphere, so anything outside it is not merely dim, it
+                // is absent. See AtomProfile.displayRadius.
+                contourRadius: atomProfile.displayRadius,
                 shellEmphasis: atomProfile.totalEmphasis,
                 rMin: atomProfile.rMin,
                 dx: atomProfile.dx,
@@ -148,6 +160,19 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 // dominates the total D(r) there, using the same palette the
                 // radial plot colours its per-n curves with.
                 ringColorIndex: atomProfile.shellIndexAtR,
+                // Core versus valence: the outermost occupied shell is the
+                // last entry of `shells` (ascending n, from the
+                // configuration -- never from the resolved peaks, which
+                // merge from about Z = 26). Its ring is lit and the core's
+                // recede, which is the periodic table's logic rendered:
+                // Li/Na/K one lonely s electron outside a closed core,
+                // Ne/Ar sealed.
+                valenceIndex: atomProfile.shells.length - 1,
+                // ...and shade its ring from its own D_n(r), not only the
+                // total's: for most elements the valence shell never
+                // resolves as a maximum of the total, so without this it
+                // has a colour index and no ring to apply it to.
+                valenceEmphasis: atomProfile.shells[atomProfile.shells.length - 1]?.emphasis,
             }, { animate });
         } else {
             const shell = atomProfile.shells.find(s => s.n === atomSelectedShell);
@@ -279,7 +304,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 if (n !== null) dispatch(drillToShell(n));
             }
             : undefined;
-        context.pickableRadius = pickable ? atomProfile!.contourRadius : undefined;
+        context.pickableRadius = pickable ? atomProfile!.displayRadius : undefined;
 
         return () => {
             context.onPickRadius = undefined;

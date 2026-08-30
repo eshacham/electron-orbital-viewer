@@ -317,4 +317,86 @@ describe('shell view', () => {
             expect(disposed).toHaveBeenCalled();
         });
     });
+
+    // Addendum 2, "core versus valence": an element's chemistry is almost
+    // entirely its outermost shell, and every ring looking equally important
+    // hid that. The core recedes, the valence ring is lit.
+    describe('core versus valence', () => {
+        /** Pulls a `const float <name> = <value>;` literal out of GLSL source text. */
+        function extractConst(source: string, name: string): number {
+            const match = source.match(new RegExp(`const float ${name} = ([0-9.]+)`));
+            if (!match) throw new Error(`could not find "const float ${name}" in the shader source`);
+            return parseFloat(match[1]);
+        }
+
+        it('is off by default, so a single-shell view shades every ring exactly as before', () => {
+            const material = capMaterial(createShellView(options()));
+            expect(material.uniforms.valenceStrength.value).toBe(0);
+            expect(material.uniforms.valenceIndex.value).toBe(-1);
+        });
+
+        it('turns on, pointed at the given shell, when a valenceIndex is supplied', () => {
+            const material = capMaterial(createShellView({ ...options(), valenceIndex: 2 }));
+            expect(material.uniforms.valenceStrength.value).toBe(1);
+            expect(material.uniforms.valenceIndex.value).toBe(2);
+        });
+
+        it('accepts index 0 -- hydrogen has exactly one shell, and it is the valence shell', () => {
+            const material = capMaterial(createShellView({ ...options(), valenceIndex: 0 }));
+            expect(material.uniforms.valenceStrength.value).toBe(1);
+            expect(material.uniforms.valenceIndex.value).toBe(0);
+        });
+
+        it('recedes the core without darkening it towards the background, so its rings stay countable and clickable', () => {
+            const material = capMaterial(createShellView({ ...options(), valenceIndex: 1 }));
+            const coreDim = extractConst(material.fragmentShader, 'CORE_DIM');
+            // A dim that quiets the core rather than removing it. Below
+            // about a third they would start to compete with the cold floor
+            // the cut face already sits on.
+            expect(coreDim).toBeGreaterThan(0.4);
+            expect(coreDim).toBeLessThan(0.85);
+        });
+
+        it('lifts the valence ring towards white without washing its hue away -- the hue still says which n it is', () => {
+            const material = capMaterial(createShellView({ ...options(), valenceIndex: 1 }));
+            const lift = extractConst(material.fragmentShader, 'VALENCE_LIFT');
+            expect(lift).toBeGreaterThan(0.1);
+            expect(lift).toBeLessThan(0.6);
+        });
+
+        it('shades the valence ring from the valence shell\'s own curve when one is given', () => {
+            // The reason this exists: the total's emphasis does not resolve
+            // the valence shell for most of the periodic table -- sodium's
+            // 3s is a shoulder on the 2p tail, not a bump -- so the ring
+            // would have a colour index and nothing to paint it on.
+            const own = new Float32Array([0, 0, 0, 1, 0.5]);
+            const material = capMaterial(createShellView({ ...options(), valenceIndex: 1, valenceEmphasis: own }));
+            const texture = material.uniforms.valenceEmphasis.value as THREE.DataTexture;
+            expect(Array.from(texture.image.data as Float32Array)).toEqual(Array.from(own));
+            // Sampled only where the valence shell already dominates the
+            // total, so an inner lobe of a 3s cannot paint a ring over the
+            // core.
+            expect(material.fragmentShader).toContain('paletteIndex == valenceIndex');
+        });
+
+        it('frees the valence-emphasis texture on dispose', () => {
+            const view = createShellView({ ...options(), valenceIndex: 1, valenceEmphasis: new Float32Array(SIZE) });
+            const texture = capMaterial(view).uniforms.valenceEmphasis.value as THREE.DataTexture;
+            const disposed = jest.fn();
+            texture.addEventListener('dispose', disposed);
+
+            disposeShellView(view);
+            expect(disposed).toHaveBeenCalled();
+        });
+
+        it('touches the ring colour only, never the emphasis ramp the >= 0.35 contrast acceptance test measures', () => {
+            const source = capMaterial(createShellView({ ...options(), valenceIndex: 1 })).fragmentShader;
+            // `e` is the emphasis sample; the smoothstep over it is what
+            // turns "denser than its neighbourhood" into a ring. Both must
+            // be untouched by the core/valence mix, which applies to the
+            // colour being mixed *towards*.
+            expect(source).toContain('smoothstep(0.9, 1.0, e)');
+            expect(source).not.toMatch(/e\s*\*=\s*/);
+        });
+    });
 });

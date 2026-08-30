@@ -189,3 +189,40 @@ export function configurationLabel(Z: number): string {
         .map(subshell => `${subshellLabel(subshell.n, subshell.l)}${superscript(subshell.electrons)}`)
         .join(' ');
 }
+
+/**
+ * The outermost occupied shell — the valence shell (Addendum 2, "core
+ * versus valence").
+ *
+ * Highest occupied n, taken from the configuration and nothing else. Not
+ * from the resolved D(r) peaks (ruling R26: peaks merge from about Z = 26
+ * and there is no peak of its own for iron's N shell) and not from the
+ * energy ordering either: iron's 4s sits above its 3d in energy, and
+ * calling 3d the valence shell would put iron's chemistry in the M shell.
+ *
+ * "Valence shell" here means exactly the outermost principal shell, which
+ * is what makes Li/Na/K look alike and Ne/Ar look alike. It deliberately
+ * does not try to model which electrons are *chemically* active — for a
+ * transition metal that includes the (n−1)d, and the app has no business
+ * asserting a bonding model it does not compute.
+ */
+export function valenceShellFor(Z: number): number {
+    return configurationFor(Z).reduce((highest, subshell) => Math.max(highest, subshell.n), 0);
+}
+
+/** e.g. 17 -> "3s² 3p⁵" — the outermost shell alone, which is what a periodic-table group has in common. */
+export function valenceConfigurationLabel(Z: number): string {
+    const valenceN = valenceShellFor(Z);
+    return configurationFor(Z)
+        .filter(subshell => subshell.n === valenceN)
+        .map(subshell => `${subshellLabel(subshell.n, subshell.l)}${superscript(subshell.electrons)}`)
+        .join(' ');
+}
+
+/** How many electrons occupy the outermost shell. */
+export function valenceElectronsFor(Z: number): number {
+    const valenceN = valenceShellFor(Z);
+    return configurationFor(Z)
+        .filter(subshell => subshell.n === valenceN)
+        .reduce((total, subshell) => total + subshell.electrons, 0);
+}
