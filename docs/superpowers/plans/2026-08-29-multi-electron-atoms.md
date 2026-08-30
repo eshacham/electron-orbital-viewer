@@ -1,5 +1,16 @@
 # Multi-Electron Atoms — Three-Level Viewer Implementation Plan
 
+> **STATUS: all 16 tasks complete as of 2026-08-30.** This document is kept as
+> the record of how the engine was built and why each task was shaped the way it
+> was. It is **not** the current backlog — for present state, outstanding work
+> and the decisions taken since, see [docs/HANDOFF.md](../../HANDOFF.md) and the
+> addenda at the end of
+> [the spec](../specs/2026-08-29-multi-electron-atoms.md).
+>
+> Several tasks were amended during execution by controller rulings recorded in
+> the handoff; where this plan and the handoff disagree, **the handoff is
+> current**.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Extend the viewer from one-electron hydrogen-like orbitals to real neutral atoms, navigable at three levels — atom → shell → orbital — backed by a numerical self-consistent-field radial solver.
