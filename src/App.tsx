@@ -38,17 +38,13 @@ import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius } from './orbital_pres
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT } from './useMediaQuery';
+import { CURVE_COLORS } from './curve_colors';
 
 /** How long a render has to take before the viewer is told it is working. */
 const BUSY_INDICATOR_DELAY_MS = 400;
 
 const defaultN = 3;
 const defaultL = 2;
-
-// One colour per curve in the atom-mode radial plot (shells at level 1,
-// subshells at level 2). Cycles rather than growing without bound -- no
-// element needs more than a handful of shells/subshells shown at once.
-const CURVE_COLORS = ['#4da3ff', '#ff6b6b', '#ffd166', '#06d6a0', '#c77dff', '#f4a261', '#94d2bd', '#e76f51'];
 
 /** r_j = rMin * e^(j*dx), j = 0..size-1 -- the shared log grid every atom-profile curve is sampled on (see atomWorker.ts). */
 function gridRadii(rMin: number, dx: number, size: number): number[] {
@@ -337,6 +333,7 @@ function App() {
                 <OrbitalViewer
                     onOrbitalRendered={handleOrbitalRendered}
                     onOrbitalFailed={handleOrbitalFailed}
+                    enclosedFraction={enclosedFraction}
                 />
                 {isNarrow && (
                     <IconButton

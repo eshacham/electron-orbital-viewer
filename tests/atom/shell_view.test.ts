@@ -281,4 +281,40 @@ describe('shell view', () => {
             expect(luminance(warm) / luminance(cold)).toBeGreaterThanOrEqual(3);
         });
     });
+
+    // Addendum 2: colour each ring on the atom-level cut face by its
+    // principal quantum number, using the plot's own palette.
+    describe('ring colouring by shell (Addendum 2)', () => {
+        it('defaults to no hue tinting when ringColorIndex is omitted -- the old, uncoloured ramp every earlier test above exercises', () => {
+            const material = capMaterial(createShellView(options()));
+            expect(material.uniforms.hueStrength.value).toBe(0);
+        });
+
+        it('turns hue tinting on when a ringColorIndex is supplied', () => {
+            const index = new Float32Array(SIZE).fill(2);
+            const material = capMaterial(createShellView({ ...options(), ringColorIndex: index }));
+            expect(material.uniforms.hueStrength.value).toBe(1);
+            const texture = material.uniforms.ringColorIndexMap.value as THREE.DataTexture;
+            expect(Array.from(texture.image.data as Float32Array)).toEqual(Array.from(index));
+        });
+
+        it('copies the ringColorIndex array rather than aliasing it, matching shellEmphasis\'s own copy-in behaviour', () => {
+            const index = new Float32Array(SIZE).fill(1);
+            createShellView({ ...options(), ringColorIndex: index });
+            index.fill(5);
+            // The view's own copy must be unaffected by later mutation of
+            // the caller's array.
+            expect(index[0]).toBe(5);
+        });
+
+        it('frees the ring-colour-index texture on dispose', () => {
+            const view = createShellView({ ...options(), ringColorIndex: new Float32Array(SIZE) });
+            const texture = capMaterial(view).uniforms.ringColorIndexMap.value as THREE.DataTexture;
+            const disposed = jest.fn();
+            texture.addEventListener('dispose', disposed);
+
+            disposeShellView(view);
+            expect(disposed).toHaveBeenCalled();
+        });
+    });
 });

@@ -78,7 +78,13 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                 <span className="subshell-chip-content">
                                     <span className="subshell-chip-label">{subshellLabel(subshell.n, subshell.l)}</span>
                                     {' · '}
-                                    <span className="subshell-chip-occupancy">{subshell.electrons}e⁻</span>
+                                    {/* Addendum 2's explicit occupancy readout ("2p: 2 of 6") -- carbon's
+                                        2p2 and neon's 2p6 look identical as a bare electron count, but
+                                        "2 of 6" vs "6 of 6" says outright which one is full. Capacity is
+                                        2*(2l+1): two spins in each of the 2l+1 real orbitals. */}
+                                    <span className="subshell-chip-occupancy">
+                                        {subshell.electrons} of {2 * (2 * subshell.l + 1)} e⁻
+                                    </span>
                                     {' · '}
                                     <span className="subshell-chip-energy">
                                         {subshell.energy.toFixed(3)} Ha (orbital energy)

@@ -19,6 +19,13 @@ import {
     ShellViewOptions
 } from './atom/shell_view';
 import { lerp, clamp01, easeInOutCubic, interpolateCurves } from './atom/level_transition';
+import { OrbitalComponent } from './atom/shell_composition';
+import { LobeMeshData } from './workers/shellCompositionWorker';
+import {
+    createCompositionLobesGroup,
+    setCompositionLobesOpacity,
+    disposeCompositionLobes
+} from './atom/shell_composition_view';
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -67,6 +74,17 @@ export interface VisualizerContext {
      * currently on screen (see clearCurrentOrbital and setHoverRadius below).
      */
     isShellView?: boolean;
+    /**
+     * True when the current shell view is level 2's shell-composition view
+     * (Addendum 2) -- a shell view with its own occupied orbitals attached
+     * inside it (see OrbitalViewer.tsx / shell_composition_view.ts) -- as
+     * opposed to level 1's whole-atom shell view. Drives
+     * `backdropOpacityFor`: the composition's own outer sphere is forced
+     * translucent (a low opacity ceiling) so its lobes are visible inside
+     * it, regardless of the shared opacity slider (Addendum 2: "the shell
+     * sphere becomes translucent ... so its constituents are visible").
+     */
+    isCompositionView?: boolean;
     /**
      * Set by the owning component after `initVisualizer`; fed the radius
      * under the pointer on every `pointermove` over the canvas (levels 1-2
@@ -363,6 +381,25 @@ function shellViewClipAxis(context: VisualizerContext): ClipAxis {
 }
 
 /**
+ * Ceiling on the shell-composition view's own backdrop sphere opacity
+ * (Addendum 2: "the shell sphere becomes translucent ... so its
+ * constituents are visible"). Applied automatically, on top of whatever the
+ * shared opacity slider says, rather than requiring the user to lower it
+ * themselves before the lobes inside become visible at all -- the slider
+ * still works as a further multiplier (dragging it down still fades the
+ * backdrop further), it just cannot push the backdrop *above* this ceiling
+ * while a composition is showing.
+ */
+const SHELL_COMPOSITION_BACKDROP_OPACITY_CEILING = 0.3;
+
+/** The opacity a shell view's own backdrop sphere should render at right now -- see the ceiling's doc comment above. */
+function backdropOpacityFor(context: VisualizerContext): number {
+    return context.isCompositionView
+        ? Math.min(context.surfaceStyle.opacity, SHELL_COMPOSITION_BACKDROP_OPACITY_CEILING)
+        : context.surfaceStyle.opacity;
+}
+
+/**
  * Puts the caps where the plane is, and shows them only when they mean
  * something: there has to be a cut, and a solid surface for it to cut
  * through -- except for a shell view, which (per shellViewClipAxis's doc
@@ -375,7 +412,7 @@ function refreshCaps(context: VisualizerContext) {
         currentCaps,
         isShellView ? true : (surfaceStyle.clipAxis !== 'none' && surfaceStyle.mode === 'solid')
     );
-    setCapsOpacity(currentCaps, surfaceStyle.opacity);
+    setCapsOpacity(currentCaps, backdropOpacityFor(context));
     positionCaps(currentCaps, context.clipPlane);
 }
 
@@ -391,6 +428,10 @@ export function setSurfaceStyle(context: VisualizerContext | null, style: Surfac
         context.clipExtent ?? 1
     );
     refreshCaps(context);
+    // The composition lobes are not touched by applySurfaceStyle above (they
+    // are not part of the caps assembly) -- see shell_composition_view.ts's
+    // own opacity weighting by occupancy, which this preserves.
+    setCompositionLobesOpacity(findCompositionLobes(context.currentOrbitalGroup), style.opacity);
 }
 
 /** Scale bar for the current camera, or null if there is nothing to measure. */
@@ -883,6 +924,24 @@ export interface AtomShellViewParams {
      * visible disc). Omit to frame on `contourRadius` exactly as before.
      */
     outermostFeatureR?: number;
+    /**
+     * Per-grid-point palette index (Addendum 2's ring colouring) -- see
+     * `ShellViewOptions.ringColorIndex`. Only ever supplied for level 1's
+     * whole-atom view; a level-2 (single-shell) view omits it and keeps the
+     * plain cold/warm ramp, since that level's own colour signal is the
+     * composition's per-subshell lobe colours instead (see
+     * shell_composition_view.ts).
+     */
+    ringColorIndex?: Float32Array;
+    /**
+     * True for level 2's shell-composition view -- a shell view that will
+     * have its own occupied orbitals attached inside it shortly after (see
+     * OrbitalViewer.tsx). Sets `context.isCompositionView`, which is what
+     * makes the backdrop sphere render translucent automatically rather
+     * than at whatever the shared opacity slider happens to be (see
+     * `backdropOpacityFor`).
+     */
+    isComposition?: boolean;
 }
 
 /**
@@ -937,6 +996,13 @@ export function updateAtomViewInScene(
 ): void {
     if (!context || context.isDisposed) return;
 
+    // Set before anything below reads it (in particular beginShellFade's own
+    // refreshCaps call, and the non-animate path's createShellView call) --
+    // see backdropOpacityFor's doc comment for why the composition view's
+    // backdrop needs to know this regardless of which of the two branches
+    // below actually runs.
+    context.isCompositionView = Boolean(params.isComposition);
+
     // A marching-cubes worker from updateOrbitalInScene may still be in
     // flight (cold-load race, spec bugfix): the two paths land in the same
     // scene, but only updateOrbitalInScene used to check requestCounter
@@ -967,6 +1033,12 @@ export function updateAtomViewInScene(
     // existing view in place instead of rebuilding -- see beginShellFade.
     if (options.animate && context.isShellView && context.currentOrbitalGroup) {
         beginShellFade(context, params, framingRadius);
+        // The curve/radius/camera ease over the transition below, but the
+        // backdrop's translucency ceiling (isCompositionView, just set
+        // above) is not animated -- applied immediately so entering or
+        // leaving the composition view is never left showing an opaque
+        // backdrop mid-fade.
+        refreshCaps(context);
         return;
     }
 
@@ -1012,8 +1084,9 @@ export function updateAtomViewInScene(
         dx: params.dx,
         size: params.size,
         rMax: params.rMax,
-        opacity: context.surfaceStyle.opacity,
+        opacity: backdropOpacityFor(context),
         plane: context.clipPlane,
+        ringColorIndex: params.ringColorIndex,
     } satisfies ShellViewOptions);
 
     context.scene.add(view);
@@ -1038,6 +1111,67 @@ export function updateAtomViewInScene(
             outgoingIsShellView: false,
         };
     }
+}
+
+/**
+ * Finds the composition-lobes group currently attached to a shell view, if
+ * any -- `createCompositionLobesGroup`'s output is added as a direct child
+ * of the shell view group (see `attachShellCompositionLobes`), tagged with
+ * `isCompositionLobes` so it can be found and replaced independently of the
+ * shell view's own stencil/cap children.
+ */
+function findCompositionLobes(group: THREE.Object3D | null): THREE.Object3D | null {
+    if (!group) return null;
+    return group.children.find(child => child.userData.isCompositionLobes) ?? null;
+}
+
+/**
+ * Removes and disposes whatever composition lobes are currently attached to
+ * the shell view. Called before attaching a new shell's lobes (a different
+ * shell was selected, or the same shell's fraction/element changed) --
+ * necessary specifically because the atom<->shell fade (`beginShellFade`)
+ * mutates one already-built view *in place* rather than rebuilding it, so a
+ * previous shell's lobes would otherwise simply keep sitting inside the next
+ * shell's sphere alongside the new ones. Also exported for OrbitalViewer.tsx
+ * to call directly whenever the level-2 selection changes, before it even
+ * knows whether a cache hit or a fresh worker call will supply the
+ * replacement.
+ */
+export function clearShellCompositionLobes(context: VisualizerContext | null): void {
+    if (!context) return;
+    const existing = findCompositionLobes(context.currentOrbitalGroup);
+    if (!existing) return;
+    context.currentOrbitalGroup?.remove(existing);
+    disposeCompositionLobes(existing);
+}
+
+/**
+ * Attaches a shell's freshly-computed orbital lobes (Addendum 2) to the
+ * currently-showing shell view, once OrbitalViewer.tsx's batch worker call
+ * (or a cache hit) resolves.
+ *
+ * `guard` is `context.requestCounter` captured at the moment the fetch was
+ * kicked off; a mismatch means a newer request -- a different shell, a
+ * different element, drilling further in or out -- has already taken over
+ * the scene by the time this result comes back, so it is dropped rather than
+ * attached to whatever happens to be on screen now. The same supersession
+ * discipline `updateOrbitalInScene` already applies to a marching-cubes
+ * worker result, applied here to a second, independent async fetch that can
+ * land after the shell view itself has moved on.
+ */
+export function attachShellCompositionLobes(
+    context: VisualizerContext | null,
+    guard: number,
+    components: OrbitalComponent[],
+    meshes: LobeMeshData[]
+): void {
+    if (!context || context.isDisposed) return;
+    if (context.requestCounter !== guard) return;
+    if (!context.currentOrbitalGroup || !context.isShellView) return;
+
+    clearShellCompositionLobes(context);
+    const lobes = createCompositionLobesGroup(components, meshes, context.clippingPlanes, context.surfaceStyle.opacity);
+    context.currentOrbitalGroup.add(lobes);
 }
 
 // --- Helper Functions ---
@@ -1135,6 +1269,10 @@ function updateSceneWithMeshData(
             clearCurrentOrbital(context, context.scene);
         }
         context.isShellView = false;
+        // A stale `true` here (left over from a shell-composition view) would
+        // make refreshCaps cap *this* marching-cubes orbital's own cut face
+        // opacity at the composition ceiling too -- see backdropOpacityFor.
+        context.isCompositionView = false;
 
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(meshData.positions.flat());

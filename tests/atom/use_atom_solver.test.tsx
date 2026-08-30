@@ -52,6 +52,7 @@ function minimalProfile(overrides: Partial<SerialisedAtomProfile> = {}): Seriali
         totalEmphasis: new Float32Array([1, 1, 1]),
         contourRadius: 1,
         shellPeaks: new Float64Array([1]),
+        shellIndexAtR: new Float32Array(3),
         shells: [],
         subshells: [],
         ...overrides,

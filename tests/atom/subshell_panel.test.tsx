@@ -31,11 +31,32 @@ describe('SubshellPanel', () => {
         const text = container.textContent ?? '';
         expect(text).toMatch(/2s/);
         expect(text).toMatch(/2p/);
-        expect(text).toMatch(/2e⁻/); // 2s occupancy
-        expect(text).toMatch(/6e⁻/); // 2p occupancy
+        expect(text).toMatch(/2 of 2 e⁻/); // 2s occupancy: full, 2 of its own 2-electron capacity
+        expect(text).toMatch(/6 of 6 e⁻/); // 2p occupancy: full, 6 of its own 6-electron capacity
         expect(text).toMatch(/-1\.300 Ha/);
         expect(text).toMatch(/-0\.500 Ha/);
         expect(text).toMatch(/orbital energy/i);
+    });
+
+    // Addendum 2: "convey the partial filling ... an explicit '2 of 6'
+    // readout" -- carbon's 2p2 and neon's 2p6 must not read identically.
+    it('shows an open subshell\'s occupancy explicitly against its full capacity, not just a bare electron count', () => {
+        const carbonLike: SerialisedSubshell[] = [
+            { n: 2, l: 0, electrons: 2, energy: -1.0, curve: new Float64Array(4), R: new Float64Array(4), samplingRadius: 5 },
+            { n: 2, l: 1, electrons: 2, energy: -0.5, curve: new Float64Array(4), R: new Float64Array(4), samplingRadius: 6 },
+        ];
+        const { container } = render(
+            <SubshellPanel
+                subshells={carbonLike}
+                shellN={2}
+                selectedSubshell={null}
+                onSelectSubshell={() => {}}
+                onSelectOrbital={() => {}}
+            />
+        );
+        const text = container.textContent ?? '';
+        expect(text).toMatch(/2 of 6 e⁻/); // 2p2: two of its own six-electron capacity.
+        expect(text).toMatch(/2 of 2 e⁻/); // 2s2: full.
     });
 
     // Ruling R19: an SCF eigenvalue is not an ionisation energy, and the UI

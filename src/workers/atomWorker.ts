@@ -110,6 +110,15 @@ export interface SerialisedAtomProfile {
      * positionally against `shells`.
      */
     shellPeaks: Float64Array;
+    /**
+     * Which shell (by position in `shells`, ascending n) dominates the
+     * total D(r) at each grid point of the shared log grid above --
+     * Addendum 2's atom-level ring colouring. Packed as float rather than
+     * kept as the `Uint8Array` `buildAtomProfile` produces it as: the
+     * consumer (shell_view.ts's cap shader) reads it through the same
+     * float-texture machinery as every other curve here.
+     */
+    shellIndexAtR: Float32Array;
     shells: SerialisedShell[];
     subshells: SerialisedSubshell[];
 }
@@ -136,6 +145,7 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
         totalEmphasis: profile.totalEmphasis,
         contourRadius: profile.contourRadius,
         shellPeaks: Float64Array.from(profile.shellPeaks),
+        shellIndexAtR: Float32Array.from(profile.shellIndexAtR),
         shells: profile.shells.map(shell => ({
             n: shell.n,
             electrons: shell.electrons,
@@ -175,7 +185,12 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
 
 /** Every ArrayBuffer inside a payload, so it can be transferred rather than copied across the worker boundary. */
 function transferListFor(profile: SerialisedAtomProfile): Transferable[] {
-    const buffers: Transferable[] = [profile.total.buffer, profile.totalEmphasis.buffer, profile.shellPeaks.buffer];
+    const buffers: Transferable[] = [
+        profile.total.buffer,
+        profile.totalEmphasis.buffer,
+        profile.shellPeaks.buffer,
+        profile.shellIndexAtR.buffer,
+    ];
     for (const shell of profile.shells) buffers.push(shell.curve.buffer, shell.emphasis.buffer);
     for (const subshell of profile.subshells) buffers.push(subshell.curve.buffer, subshell.R.buffer);
     return buffers;

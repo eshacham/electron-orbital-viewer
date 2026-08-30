@@ -13,16 +13,41 @@ import {
     setHoverRadius as setSceneHoverRadius,
     getScaleBar,
     handleResize as visualizerHandleResize,
+    clearShellCompositionLobes,
+    attachShellCompositionLobes,
     VisualizerContext
 } from '../orbital_visualizer';
+import { shellComposition, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
+import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '../atom/shell_mesh_cache';
+import { createShellCompositionWorker } from '../workers/createShellCompositionWorker';
+import { LobeMeshData } from '../workers/shellCompositionWorker';
+import { OrbitalParams } from '../types/orbital';
 
+interface ShellCompositionSuccessMessage {
+    type: 'success';
+    meshes: LobeMeshData[];
+    requestId: number;
+}
+interface ShellCompositionErrorMessage {
+    type: 'error';
+    message: string;
+    requestId: number;
+}
+type ShellCompositionWorkerMessage = ShellCompositionSuccessMessage | ShellCompositionErrorMessage;
 
 interface OrbitalViewerProps {
     onOrbitalRendered?: (isoLevel: number) => void;
     onOrbitalFailed?: (message: string) => void;
+    /**
+     * Which contour to draw, shared with level 3's own orbitals (see
+     * App.tsx) -- reused here as-is for each composite lobe's own
+     * isosurface, so the same slider that controls a single drilled-into
+     * orbital's surface controls a shell-composition lobe's surface too.
+     */
+    enclosedFraction: number;
 }
 
-const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbitalFailed }) => {
+const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbitalFailed, enclosedFraction }) => {
     const dispatch = useAppDispatch();
     const canvasHostRef = useRef<HTMLDivElement>(null);
     const visualizerContextRef = useRef<VisualizerContext | null>(null);
@@ -117,6 +142,10 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 size: atomProfile.size,
                 rMax: gridRMax,
                 outermostFeatureR,
+                // Addendum 2: colour each ring by the shell (n) that
+                // dominates the total D(r) there, using the same palette the
+                // radial plot colours its per-n curves with.
+                ringColorIndex: atomProfile.shellIndexAtR,
             }, { animate });
         } else {
             const shell = atomProfile.shells.find(s => s.n === atomSelectedShell);
@@ -128,9 +157,93 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 dx: atomProfile.dx,
                 size: atomProfile.size,
                 rMax: gridRMax,
+                // This shell view will have its own occupied orbitals
+                // attached inside it shortly (see the composition effect
+                // below) -- see backdropOpacityFor's doc comment for why
+                // this needs to be known here rather than left implicit.
+                isComposition: true,
             }, { animate });
         }
     }, [showShellView, atomLevel, atomProfile, atomSelectedShell, prefersReducedMotion]);
+
+    // Level 2's shell-composition view (Addendum 2): once the shell view
+    // itself is showing, fetch that shell's own orbital lobes -- the actual
+    // isosurfaces of its occupied subshells, at their real relative scale --
+    // and attach them inside it. A second, independent effect rather than
+    // folded into the one above: this has its own async lifecycle (a batch
+    // marching-cubes worker call, or a cache hit), where the effect above is
+    // a synchronous read of the profile already in the store.
+    useEffect(() => {
+        const context = visualizerContextRef.current;
+        if (!context || atomMode !== 'atom' || atomLevel !== 'shell' || !atomProfile || atomSelectedShell === null) {
+            return;
+        }
+
+        const shellSubshells = atomProfile.subshells.filter(s => s.n === atomSelectedShell);
+        if (shellSubshells.length === 0) return;
+
+        // Ascending l, matching the order the radial plot colours a shell's
+        // subshells by (App.tsx's atomCurves) -- shellComposition's
+        // colorIndex is this array's position, so the two must agree.
+        const components = shellComposition(shellSubshells);
+        const cacheKey = shellMeshCacheKey(atomProfile.Z, atomSelectedShell, COMPOSITE_ORBITAL_RESOLUTION, enclosedFraction);
+
+        // A different shell's (or a stale fraction's) lobes must not linger
+        // while the new ones are being computed -- cleared synchronously,
+        // never left for whichever finishes first to sort out.
+        clearShellCompositionLobes(context);
+
+        // Captured now, checked when the result lands (cache hit or worker
+        // reply): a newer request -- a different shell, a different
+        // element, drilling further -- may already have taken over the
+        // scene by then (see attachShellCompositionLobes's doc comment).
+        const guard = context.requestCounter;
+
+        const cached = getCachedShellMeshes(cacheKey);
+        if (cached) {
+            attachShellCompositionLobes(context, guard, components, cached);
+            return;
+        }
+
+        // One OrbitalParams per mₗ orbital, in exactly shellComposition's
+        // own emission order, each carrying its own subshell's numerical
+        // R(r) and sampling box -- the same per-subshell sizing level 3
+        // uses (subshellSamplingRadius), just at a lower resolution (see
+        // COMPOSITE_ORBITAL_RESOLUTION).
+        const orbitalParams: OrbitalParams[] = [];
+        for (const subshell of shellSubshells) {
+            for (let ml = -subshell.l; ml <= subshell.l; ml++) {
+                orbitalParams.push({
+                    n: subshell.n, l: subshell.l, ml,
+                    Z: atomProfile.Z,
+                    resolution: COMPOSITE_ORBITAL_RESOLUTION,
+                    rMax: subshell.samplingRadius,
+                    enclosedFraction,
+                    radialSamples: { R: subshell.R, rMin: atomProfile.rMin, dx: atomProfile.dx, size: atomProfile.size },
+                });
+            }
+        }
+
+        const worker = createShellCompositionWorker();
+        worker.onmessage = (e: MessageEvent<ShellCompositionWorkerMessage>) => {
+            worker.terminate();
+            if (e.data.type === 'error') {
+                console.error('OrbitalViewer: shell composition worker error:', e.data.message);
+                return;
+            }
+            setCachedShellMeshes(cacheKey, e.data.meshes);
+            attachShellCompositionLobes(context, guard, components, e.data.meshes);
+        };
+        worker.onerror = (event) => {
+            console.error('OrbitalViewer: shell composition worker error:', event);
+            worker.terminate();
+        };
+        worker.postMessage({ type: 'calculate', orbitals: orbitalParams, requestId: 1 });
+
+        return () => {
+            worker.terminate();
+        };
+    }, [atomMode, atomLevel, atomProfile, atomSelectedShell, enclosedFraction]);
 
     // Radial-plot hover -> the shell view's highlight ring (the other half
     // of the pointer-to-radius link set up above).

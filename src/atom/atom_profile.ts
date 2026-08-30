@@ -61,6 +61,14 @@ export interface AtomProfile {
      * shells.length` will misalign from iron onward.
      */
     shellPeaks: number[];
+    /**
+     * Which shell (by position in `shells`, ascending n) dominates the
+     * total D(r) at each grid point — the atom-level cut face's ring colour
+     * (Addendum 2), display annotation only in the same sense as
+     * `shellPeaks`: it never drives navigation, only which palette entry
+     * (`curve_colors.ts`) a radius is tinted with.
+     */
+    shellIndexAtR: Uint8Array;
 }
 
 // Letters for the first seven principal shells, in the old X-ray notation
@@ -217,6 +225,38 @@ export function shellEmphasis(grid: RadialGrid, D: Float64Array, windowInDx: num
 }
 
 /**
+ * Which shell (by position in `shells`, ascending n — matching the plot's
+ * own per-n colour indexing, see App.tsx's atomCurves) has the largest
+ * D_n(r) at each grid point.
+ *
+ * Shells interpenetrate (spec §2), so this is not a hard boundary between
+ * them — it is which shell *dominates* the total at that radius, which is
+ * what actually determines the hue a viewer sees once the total's own
+ * peaks and troughs (`shellEmphasis`) set the luminance (Addendum 2's ring
+ * colouring). Near a shell's own peak the total is overwhelmingly that
+ * shell's contribution, so this lines up with the rings the emphasis ramp
+ * already draws.
+ */
+function dominantShellIndex(grid: RadialGrid, shells: Array<{ curve: RadialCurve }>): Uint8Array {
+    const result = new Uint8Array(grid.size);
+    if (shells.length === 0) return result;
+
+    for (let j = 0; j < grid.size; j++) {
+        let bestIndex = 0;
+        let bestValue = shells[0].curve.values[j];
+        for (let i = 1; i < shells.length; i++) {
+            const value = shells[i].curve.values[j];
+            if (value > bestValue) {
+                bestValue = value;
+                bestIndex = i;
+            }
+        }
+        result[j] = bestIndex;
+    }
+    return result;
+}
+
+/**
  * Groups already-built subshell curves into shells (by principal quantum
  * number n), summing their D(r) curves and electron counts.
  *
@@ -284,6 +324,7 @@ export function buildAtomProfile(atom: AtomSolution, fraction: number): AtomProf
         subshells,
         contourRadius: radiusEnclosing(grid, D, fraction),
         shellPeaks: findShellPeaks(grid, D),
+        shellIndexAtR: dominantShellIndex(grid, shells),
     };
 }
 

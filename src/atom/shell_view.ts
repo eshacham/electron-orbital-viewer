@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CURVE_COLORS, hexToRgb01 } from '../curve_colors';
 
 /**
  * Levels 1 and 2 (whole atom, single shell): a spherical cut-away shaded by
@@ -71,6 +72,15 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
     uniform float rMax;
     uniform float opacity;
     uniform float highlightR;   // negative when nothing is highlighted
+    // Addendum 2 ("the 2d graph has different colors f the n ... incorporate
+    // these colors somehow to the 3d view"): which curve-palette colour a
+    // given radius should read as, and how strongly to apply it. hueStrength
+    // is 0 for a view that was not given a ringColorIndex (createShellView's
+    // default, and every existing shell view before this change) -- the mix
+    // below then reduces to exactly the old warm literal, unchanged.
+    uniform sampler2D ringColorIndexMap;
+    uniform float hueStrength;
+    uniform vec3 palette[8];
     // World-space half-width of the highlight band, kept proportional to the
     // camera's distance from the target (see setShellViewRingWidth) rather
     // than a fraction of the sampling grid's rMax. rMax can be 20-100x the
@@ -118,7 +128,15 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         // atom_profile.test.ts's acceptance test).
         vec3 cold = vec3(0.10, 0.12, 0.24);
         vec3 warm = vec3(1.00, 0.85, 0.45);
-        vec3 color = mix(cold, warm, smoothstep(0.9, 1.0, e));
+        // Which shell (by position, ascending n) dominates the total at this
+        // radius -- see dominantShellIndex in atom_profile.ts. The index is
+        // categorical, not a continuum, so it is sampled with NearestFilter
+        // (see createRingColorIndexTexture) rather than interpolated the way
+        // shellEmphasis's own texture is.
+        int paletteIndex = int(texture(ringColorIndexMap, vec2(texCoord, 0.5)).r + 0.5);
+        paletteIndex = clamp(paletteIndex, 0, 7);
+        vec3 peakColor = mix(warm, palette[paletteIndex], hueStrength);
+        vec3 color = mix(cold, peakColor, smoothstep(0.9, 1.0, e));
 
         // The ring the radial plot is pointing at. Comparing the cut face's
         // own |worldPosition| against highlightR is already geometrically
@@ -152,7 +170,19 @@ export interface ShellViewOptions {
     rMax: number;
     opacity: number;
     plane: THREE.Plane;
+    /**
+     * Per-grid-point index into `CURVE_COLORS` (see `curve_colors.ts`),
+     * same log grid as `shellEmphasis`, choosing which palette colour a
+     * given radius reads as (Addendum 2's ring colouring). Omit for the
+     * plain, uncoloured cold/warm ramp -- this is what every shell-level
+     * (single-shell) view currently does, and what the pre-Addendum-2 tests
+     * exercise.
+     */
+    ringColorIndex?: Float32Array;
 }
+
+/** `CURVE_COLORS`, converted once to the [0,1] triples the shader's `palette` uniform array expects. */
+const PALETTE = CURVE_COLORS.map(hex => new THREE.Vector3(...hexToRgb01(hex)));
 
 /**
  * Wraps the log-grid emphasis curve in a float texture the cap shader can
@@ -183,13 +213,33 @@ function createShellEmphasisTexture(values: Float32Array): THREE.DataTexture {
 }
 
 /**
+ * Wraps a per-grid-point palette index in a texture the cap shader can read.
+ * NearestFilter, unlike `createShellEmphasisTexture`'s LinearFilter: the
+ * index is categorical (which shell owns this radius), and interpolating
+ * between e.g. index 1 and index 2 at the boundary between two shells would
+ * momentarily read back some third, unrelated fractional value instead of
+ * snapping cleanly from one shell's colour to the next.
+ */
+function createRingColorIndexTexture(values: Float32Array): THREE.DataTexture {
+    const texture = new THREE.DataTexture(values.slice(), values.length, 1);
+    texture.format = THREE.RedFormat;
+    texture.type = THREE.FloatType;
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    return texture;
+}
+
+/**
  * Builds the stencil passes and the shaded cut face for one spherical shell
  * view. See the module doc above for why this is a sphere rather than a
  * marching-cubes surface, and why the stencil technique matches
  * `clip_caps.ts` exactly.
  */
 export function createShellView(options: ShellViewOptions): THREE.Group {
-    const { contourRadius, shellEmphasis, rMin, dx, size, rMax, opacity, plane } = options;
+    const { contourRadius, shellEmphasis, rMin, dx, size, rMax, opacity, plane, ringColorIndex } = options;
 
     const view = new THREE.Group();
     view.userData.isCapAssembly = true;
@@ -238,6 +288,12 @@ export function createShellView(options: ShellViewOptions): THREE.Group {
             // Placeholder until the first setShellViewRingWidth call from the
             // render loop; only visible for a single frame at worst.
             ringWidth: { value: rMax * 0.004 },
+            // A 1-texel dummy when ringColorIndex is omitted -- hueStrength
+            // 0 means it is never sampled meaningfully either way (see the
+            // fragment shader), so its actual contents do not matter then.
+            ringColorIndexMap: { value: createRingColorIndexTexture(ringColorIndex ?? new Float32Array([0])) },
+            hueStrength: { value: ringColorIndex ? 1 : 0 },
+            palette: { value: PALETTE },
         },
         vertexShader: CAP_VERTEX_SHADER,
         fragmentShader: CAP_FRAGMENT_SHADER,
@@ -373,7 +429,7 @@ export function getShellViewRadius(view: THREE.Object3D | null): number | null {
     return radius;
 }
 
-/** Frees the shell-emphasis texture; the geometry is shared and disposed with the mesh. */
+/** Frees the shell-emphasis and ring-colour-index textures; the geometry is shared and disposed with the mesh. */
 export function disposeShellView(view: THREE.Object3D | null): void {
     if (!view) return;
 
@@ -381,5 +437,6 @@ export function disposeShellView(view: THREE.Object3D | null): void {
         if (!(child instanceof THREE.Mesh) || !child.userData.isCap) return;
         const material = child.material as THREE.ShaderMaterial;
         material.uniforms.shellEmphasis.value?.dispose();
+        material.uniforms.ringColorIndexMap.value?.dispose();
     });
 }

@@ -60,6 +60,7 @@ function hydrogenProfile(): SerialisedAtomProfile {
         totalEmphasis: new Float32Array([0, 0.3, 0.6, 1, 0.6, 0.3, 0.1, 0.05, 0.01]),
         contourRadius: 2,
         shellPeaks: new Float64Array([1.2]),
+        shellIndexAtR: new Float32Array(9),
         shells: [
             {
                 n: 1, electrons: 1, contourRadius: 2,
@@ -95,6 +96,7 @@ function argonLikeProfile(): SerialisedAtomProfile {
         totalEmphasis: new Float32Array([0, 0.3, 0.6, 1, 0.6, 0.3, 0.1, 0.05, 0.01]),
         contourRadius: 2,
         shellPeaks: new Float64Array([0.06, 0.29, 1.22]),
+        shellIndexAtR: new Float32Array(9),
         shells: [
             { n: 2, electrons: 8, contourRadius: 0.5, curve: new Float64Array(9), emphasis: new Float32Array(9) },
         ],
