@@ -262,3 +262,46 @@ the idealised textbook reference: pick n, l, mₗ, see the shape.
 Cost, recorded so it is a choice rather than an oversight: He⁺, Li²⁺ and the
 other one-electron ions are no longer reachable, and with them the direct
 demonstration that raising Z shrinks an orbital without changing its shape.
+
+### What actually makes atoms look different (expanded 2026-08-30)
+
+> "the point is to show how different the atoms are and what makes them so."
+
+The outer silhouette cannot vary — physics fixes it as a sphere (§2), and a 2p
+orbital has the same shape in carbon as in uranium, only scaled. Any rendering
+that made those look different would be invention. Everything below is real
+variation the app can show and currently does not.
+
+**1. Which orbital types are present.** This is the strongest visual signal and
+it falls straight out of the composition view. Crossing the table changes the
+*shapes* in a shell, not just their count:
+
+| element | shell contains | shapes rendered |
+| --- | --- | --- |
+| H | 1s¹ | one small sphere |
+| C | 2s² 2p² | sphere + 3 dumbbells, partly filled |
+| Ne | 2s² 2p⁶ | same shapes, fully filled |
+| Fe | + 3d⁶ | **5 cloverleaves** appear |
+| U | + 4f¹⁴ 5f³ | **7 f orbitals**, six to eight lobes each |
+
+The s→p→d→f progression is why the periodic table has blocks, and it makes a
+transition metal's shell genuinely unlike a noble gas's.
+
+**2. Occupancy.** Carbon 2p² against neon 2p⁶: identical rings in the atom
+view, completely different chemistry. Must be conveyed (see Addendum 2).
+
+**3. Core versus valence.** An element's chemistry is almost entirely its
+outermost shell; everything inside is inert core. All rings currently look
+equally important, which hides the single most chemically meaningful fact
+about an atom. Distinguishing the valence shell from the core makes group
+behaviour visible directly: Li/Na/K all show one lonely s electron outside a
+closed core, F/Cl both show one short of full, Ne/Ar both show sealed. That is
+the periodic table's logic rendered, for the cost of one visual distinction.
+
+**4. Relative size.** Atomic radius varies non-monotonically — contracting
+across a period, jumping at the start of each new one. The scale bar carries
+this but nothing draws attention to it.
+
+Priority order for implementation: composition with occupancy (1 and 2)
+first, since it subsumes the most; then core/valence (3); then size (4) only
+if it earns its place.
