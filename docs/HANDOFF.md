@@ -229,7 +229,18 @@ rewritten; full suite, `tsc` and `build` clean; end-to-end drive across 16
 elements spanning every block and every aufbau exception, at desktop and
 phone widths, with no console errors; deployed.
 
-One more live-only defect fixed on the way: **the radial plot and scale
+A separate phone pass afterwards (390x844 and 844x390, touch emulation, not
+just a resized desktop window) found four more layout defects, three of them
+hiding the level-2 drill-down entirely — see commit `ebb250e`. The short
+version: the subshell panel laid out as one 797px row inside a horizontally
+scrolling strip and never wrapped; the strip's retained scroll position put
+it off the left edge even after reordering it first; the compact plot's
+title stretched its panel to almost the full screen width; and landscape
+stacked three panels into 390px of height so the plot sat on the sheet.
+Short viewports now get their own rule, because there width is the plentiful
+dimension rather than the scarce one.
+
+One live-only defect fixed on the way to that: **the radial plot and scale
 readout were completely hidden behind LevelNav on a phone.** Both were pinned
 to the top, and LevelNav is wider, opaque and above them in z-order. It
 predates this session (the panel was already taller than the plot's 12 px
@@ -322,6 +333,13 @@ the list:
 - The valence shell was outside the drawn sphere for 34 of the first 56
   elements, with an acceptance test for ring contrast passing throughout
 - The radial plot was entirely hidden behind another panel on a phone
+- The level-2 subshell panel was off-screen on a phone in both directions at
+  once, and in landscape the plot sat on top of the controls sheet
+
+Corollary, learned the hard way this session: **checking one narrow width is
+not testing a phone.** The first pass resized to 420px and confirmed the
+selector swapped; the real defects only showed at a true 390x844 with touch,
+and again on rotation.
 
 The pattern: unit tests validated the functions and nothing validated the
 system. Drive the app.
