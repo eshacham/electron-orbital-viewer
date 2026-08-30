@@ -36,7 +36,7 @@ import RadialPlot, { RadialCurve } from './components/RadialPlot';
 import LevelNav, { NavigationTarget } from './components/LevelNav';
 import SubshellPanel from './components/SubshellPanel';
 import PeriodicTable from './components/PeriodicTable';
-import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, BASIC_ORBITALS_Z } from './orbital_presets';
+import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT } from './useMediaQuery';
@@ -83,7 +83,6 @@ function App() {
     const [n, setN] = useState<number>(defaultN);
     const [l, setL] = useState<number>(defaultL);
     const [ml, setMl] = useState<number>(0);
-    const [resolution, setResolution] = useState<number>(64);
     const [enclosedFraction, setEnclosedFraction] = useState<number>(DEFAULT_ENCLOSED_FRACTION);
 
     const isInitializedRef = useRef(false);
@@ -121,13 +120,23 @@ function App() {
         dispatch(setMode(newMode));
     }, [dispatch]);
 
+    // Picking an element gives you that element's best default view, derived
+    // from its own solved profile rather than hand-tuned per element: the
+    // camera back at the canonical angle and framed on this atom's own
+    // displayRadius, and the cut-away on, centred, which is what makes the
+    // shell rings visible at all (levels 1-2 draw nothing but their cut
+    // face). Everything else the user has set -- opacity, enclosed fraction
+    // -- is theirs and is left alone.
     const handleAtomElementChange = useCallback((newZ: number) => {
-        // Both dispatched together so React batches them into one render --
-        // setElement alone clears `profile` without setting `isSolving`,
-        // which otherwise leaves a one-frame "idle, no profile" gap before
-        // useAtomSolver's own effect gets to run (see its doc comment).
+        // setElement and solveStarted are dispatched together so React
+        // batches them into one render -- setElement alone clears `profile`
+        // without setting `isSolving`, which otherwise leaves a one-frame
+        // "idle, no profile" gap before useAtomSolver's own effect gets to
+        // run (see its doc comment).
         dispatch(setElement(newZ));
         dispatch(solveStarted());
+        dispatch(setSurfaceStyle({ clipAxis: 'z', clipPosition: 0 }));
+        dispatch(resetView());
     }, [dispatch]);
 
     const handleLevelNavigate = useCallback((target: NavigationTarget) => {
@@ -192,7 +201,7 @@ function App() {
                 l: defaultL,
                 ml: 0,
                 Z: BASIC_ORBITALS_Z,
-                resolution: 32,
+                resolution: ORBITAL_RESOLUTION,
                 rMax: computeSamplingRadius(defaultN, defaultL, BASIC_ORBITALS_Z),
                 enclosedFraction: DEFAULT_ENCLOSED_FRACTION,
             };
@@ -235,12 +244,12 @@ function App() {
         if (isAtomMode) return;
         dispatch(startOrbitalCalculation({
             n, l, ml, Z: BASIC_ORBITALS_Z,
-            resolution,
+            resolution: ORBITAL_RESOLUTION,
             rMax: computeSamplingRadius(n, l, BASIC_ORBITALS_Z),
             enclosedFraction,
         }));
         // Only the mode transition itself should trigger this -- n/l/ml/Z/
-        // resolution/enclosedFraction changes while already in hydrogen-like
+        // enclosedFraction changes while already in Basic Orbitals
         // mode still go through Controls.tsx's "Update Orbital" button,
         // exactly as before.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -277,12 +286,12 @@ function App() {
         dispatch(startOrbitalCalculation({
             n: selN, l: selL, ml: selMl,
             Z: atomProfile.Z,
-            resolution,
+            resolution: ORBITAL_RESOLUTION,
             rMax,
             enclosedFraction,
             radialSamples: { R: subshell.R, rMin: atomProfile.rMin, dx: atomProfile.dx, size: atomProfile.size },
         }));
-    }, [isAtomMode, atomLevel, atomSelectedOrbital, atomProfile, resolution, enclosedFraction, dispatch]);
+    }, [isAtomMode, atomLevel, atomSelectedOrbital, atomProfile, enclosedFraction, dispatch]);
 
     const atomRGrid = useMemo(
         () => atomProfile ? gridRadii(atomProfile.rMin, atomProfile.dx, atomProfile.size) : [],
@@ -307,7 +316,12 @@ function App() {
             // screen with no curve under it.
             ? atomProfile.displayRadius
             : (atomProfile.shells.find(s => s.n === atomSelectedShell)?.contourRadius ?? atomProfile.contourRadius);
-        return radius * 1.2;
+        // Exactly the drawn radius, with no headroom (bug fix, reported from
+        // the running app): the plot's curve used to run 20% past the edge
+        // of the sphere beside it, which reads as the sphere being larger
+        // and darker than it is -- "the line continues beyond the dark blue
+        // shell". The two views show the same object over the same range now.
+        return radius;
     }, [atomProfile, atomLevel, atomSelectedShell]);
 
     // The plot answers "what am I looking at", so it narrows as the drill-down
@@ -412,8 +426,6 @@ function App() {
                         onLChange={setL}
                         initialMl={ml}
                         onMlChange={setMl}
-                        initialResolution={resolution}
-                        onResolutionChange={setResolution}
                         initialEnclosedFraction={enclosedFraction}
                         onEnclosedFractionChange={setEnclosedFraction}
                         isoLevel={isoLevel}

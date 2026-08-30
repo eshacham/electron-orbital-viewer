@@ -60,6 +60,25 @@ export interface OrbitalComponent {
 export const COMPOSITE_ORBITAL_RESOLUTION = 32;
 
 /**
+ * The grid resolution for one orbital of a shell-composition view.
+ *
+ * Per subshell type rather than one number for all, because the cost and
+ * the need pull in opposite directions. A d or f subshell contributes five
+ * or seven meshes, and measures 97-99% of its true extent at the base
+ * resolution already (its lobes are compact relative to their box). An s
+ * subshell contributes exactly one mesh and is the case that needs more:
+ * a diffuse high-n s orbital has an enormous |ψ|² spike at the nucleus, and
+ * a coarse grid lets the handful of samples nearest it dominate the
+ * contour search, drawing the surface too small -- gadolinium's 6s reached
+ * 85% of its true extent at the base resolution and 98% at this one. One
+ * extra mesh at 65³ costs about 200 ms; the whole of uranium's N shell
+ * (4s 4p 4d 4f, sixteen meshes) stays under a second.
+ */
+export function compositeResolutionFor(l: number): number {
+    return l === 0 ? 64 : COMPOSITE_ORBITAL_RESOLUTION;
+}
+
+/**
  * Every mₗ orbital of every occupied subshell in one shell, in the same
  * order the subshells were given -- which must already be ascending l, the
  * same order `atomProfile.subshells` (filtered to one shell) is in, and the

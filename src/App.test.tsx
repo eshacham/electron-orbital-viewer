@@ -75,7 +75,7 @@ function hydrogenProfile(): SerialisedAtomProfile {
                 n: 1, l: 0, electrons: 1, energy: -0.5,
                 curve: new Float64Array([0, 1, 2, 3, 2, 1, 0.5, 0.2, 0.05]),
                 R: new Float64Array(9),
-                samplingRadius: 2,
+                samplingRadius: 2, compositeSamplingRadius: 2,
             },
         ],
     };
@@ -109,13 +109,13 @@ function argonLikeProfile(): SerialisedAtomProfile {
                 n: 2, l: 0, electrons: 2, energy: -10.794,
                 curve: new Float64Array(9),
                 R: new Float64Array(9),
-                samplingRadius: 2.5,
+                samplingRadius: 2.5, compositeSamplingRadius: 2.5,
             },
             {
                 n: 2, l: 1, electrons: 6, energy: -8.443,
                 curve: new Float64Array(9),
                 R: new Float64Array(9),
-                samplingRadius: 1.7,
+                samplingRadius: 1.7, compositeSamplingRadius: 1.7,
             },
         ],
     };
@@ -128,6 +128,7 @@ function argonLikeProfile(): SerialisedAtomProfile {
 const defaultAtomState: AtomState = {
     mode: 'atom',
     Z: 1,
+    solveNonce: 0,
     level: 'atom',
     selectedShell: null,
     selectedSubshell: null,

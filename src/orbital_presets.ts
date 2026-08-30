@@ -29,6 +29,25 @@ export const ENCLOSED_FRACTIONS = [0.5, 0.75, 0.9, 0.95, 0.99];
  * free parameter of `computeSamplingRadius` and of every quantum function
  * -- so restoring an ion picker later is a UI change only.
  */
+/**
+ * The marching-cubes grid every single-orbital render uses: 129³ samples.
+ *
+ * There is no longer a Resolution control. Low (33³) and Medium (65³) were
+ * offered for speed on hardware that no longer needs the concession -- the
+ * heaviest case measured, a 9s orbital, is under 0.6 s at this resolution,
+ * off the main thread -- and both of them cost accuracy that showed: a
+ * diffuse orbital's contour search is biased by the handful of samples
+ * nearest the nucleus, where |ψ|² is largest, so a coarse grid draws the
+ * surface too small (ruthenium's 5s came out at 3.6 a₀ against a true
+ * 5.2 a₀ at 33³). Fixing the grid at its finest removes both the control
+ * and the failure mode.
+ *
+ * The shell-composition view sizes its own, much smaller grids separately
+ * -- it renders up to sixteen orbitals at once (see
+ * `compositeResolutionFor` in atom/shell_composition.ts).
+ */
+export const ORBITAL_RESOLUTION = 128;
+
 export const BASIC_ORBITALS_Z = 1;
 
 export const MAX_SAMPLING_RADIUS = 400;

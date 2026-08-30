@@ -8,9 +8,9 @@ function neonLikeSubshells(): SerialisedSubshell[] {
     const curve = (): Float64Array => new Float64Array(4);
     const R = (): Float64Array => new Float64Array(4);
     return [
-        { n: 1, l: 0, electrons: 2, energy: -30.0, curve: curve(), R: R(), samplingRadius: 1 },
-        { n: 2, l: 0, electrons: 2, energy: -1.3, curve: curve(), R: R(), samplingRadius: 5 },
-        { n: 2, l: 1, electrons: 6, energy: -0.5, curve: curve(), R: R(), samplingRadius: 6 },
+        { n: 1, l: 0, electrons: 2, energy: -30.0, curve: curve(), R: R(), samplingRadius: 1, compositeSamplingRadius: 1 },
+        { n: 2, l: 0, electrons: 2, energy: -1.3, curve: curve(), R: R(), samplingRadius: 5, compositeSamplingRadius: 5 },
+        { n: 2, l: 1, electrons: 6, energy: -0.5, curve: curve(), R: R(), samplingRadius: 6, compositeSamplingRadius: 6 },
     ];
 }
 
@@ -42,8 +42,8 @@ describe('SubshellPanel', () => {
     // readout" -- carbon's 2p2 and neon's 2p6 must not read identically.
     it('shows an open subshell\'s occupancy explicitly against its full capacity, not just a bare electron count', () => {
         const carbonLike: SerialisedSubshell[] = [
-            { n: 2, l: 0, electrons: 2, energy: -1.0, curve: new Float64Array(4), R: new Float64Array(4), samplingRadius: 5 },
-            { n: 2, l: 1, electrons: 2, energy: -0.5, curve: new Float64Array(4), R: new Float64Array(4), samplingRadius: 6 },
+            { n: 2, l: 0, electrons: 2, energy: -1.0, curve: new Float64Array(4), R: new Float64Array(4), samplingRadius: 5, compositeSamplingRadius: 5 },
+            { n: 2, l: 1, electrons: 2, energy: -0.5, curve: new Float64Array(4), R: new Float64Array(4), samplingRadius: 6, compositeSamplingRadius: 6 },
         ];
         const { container } = render(
             <SubshellPanel

@@ -60,11 +60,18 @@ export interface AtomWorkerHandle {
  * element/fraction pick needs no worker interaction at all, and keeps
  * working even if the worker happens to be busy with an unrelated request.
  *
- * Keying the per-request effect on `[mode, Z, enclosedFraction]` is what
- * ensures only a genuine change to what should be solved re-requests
+ * Keying the per-request effect on `[mode, Z, enclosedFraction, solveNonce]`
+ * is what ensures only a genuine change to what should be solved re-requests
  * anything -- the pure navigation actions in atomSlice (drillToShell,
- * drillToSubshell, drillToOrbital, levelUp, goToLevel) never touch any of
- * those three, so none of them can retrigger this effect.
+ * drillToSubshell, drillToOrbital, levelUp, goToLevel) touch none of them,
+ * so none of them can retrigger this effect.
+ *
+ * `solveNonce` is there because the other three are not sufficient: it is
+ * bumped by every `setElement`, and `setElement` clears the profile
+ * unconditionally. Without it, re-picking the element already selected
+ * cleared the profile while leaving mode/Z/fraction unchanged, so this
+ * effect never re-ran and the app sat in "solving" forever with nothing on
+ * screen. Found live; the profile cache makes the repeat case immediate.
  *
  * Known issue this closes (see progress.md): `setElement` clears `profile`
  * without setting `isSolving`, which left a one-frame "idle, no profile"
@@ -82,6 +89,9 @@ export function useAtomSolver(
     const dispatch = useAppDispatch();
     const mode = useAppSelector(state => state.atom.mode);
     const Z = useAppSelector(state => state.atom.Z);
+    // Re-picking the element already selected must still produce a solve --
+    // `setElement` has cleared the profile by then. See AtomState.solveNonce.
+    const solveNonce = useAppSelector(state => state.atom.solveNonce);
 
     // One worker for this hook's whole lifetime, not one per request -- see
     // the doc comment above. Created lazily (on the first atom-mode
@@ -163,5 +173,5 @@ export function useAtomSolver(
         // intentionally-incomplete dependency array pattern Controls.tsx's
         // own n/l effects use.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mode, Z, enclosedFraction, dispatch]);
+    }, [mode, Z, enclosedFraction, solveNonce, dispatch]);
 }

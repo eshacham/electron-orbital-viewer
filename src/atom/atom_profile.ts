@@ -42,7 +42,15 @@ export interface AtomProfile {
         /** This shell's own curve divided by its running maximum -- the level-2 cut face's counterpart to `totalEmphasis`. */
         emphasis: Float32Array;
     }>;
-    subshells: Array<{ n: number; l: number; electrons: number; energy: number; curve: RadialCurve }>;
+    subshells: Array<{
+        n: number;
+        l: number;
+        electrons: number;
+        energy: number;
+        curve: RadialCurve;
+        /** Radius enclosing `fraction` of *this subshell's* own electrons. */
+        contourRadius: number;
+    }>;
     /** Radius enclosing `fraction` of all electrons. */
     contourRadius: number;
     /** Radius of the outermost occupied shell's own D(r) peak. */
@@ -337,13 +345,17 @@ function peakRadius(grid: RadialGrid, values: Float64Array): number {
 export function buildAtomProfile(atom: AtomSolution, fraction: number): AtomProfile {
     const { grid, Z, states, D } = atom;
 
-    const subshells: AtomProfile['subshells'] = states.map(state => ({
-        n: state.n,
-        l: state.l,
-        electrons: state.electrons,
-        energy: state.energy,
-        curve: { label: subshellLabel(state.n, state.l), values: subshellCurveOf(state) },
-    }));
+    const subshells: AtomProfile['subshells'] = states.map(state => {
+        const values = subshellCurveOf(state);
+        return {
+            n: state.n,
+            l: state.l,
+            electrons: state.electrons,
+            energy: state.energy,
+            curve: { label: subshellLabel(state.n, state.l), values },
+            contourRadius: radiusEnclosing(grid, values, fraction),
+        };
+    });
 
     const shells = groupIntoShells(grid, subshells, fraction);
 
@@ -375,6 +387,41 @@ export function buildAtomProfile(atom: AtomSolution, fraction: number): AtomProf
         shellPeaks: findShellPeaks(grid, D),
         shellIndexAtR: dominantShellIndex(grid, shells),
     };
+}
+
+/**
+ * Margin over a subshell's own enclosed-fraction radius that its
+ * shell-composition lobe's sampling box is given.
+ *
+ * Measured, not chosen: across s/p/d/f from carbon to uranium, the real
+ * isosurface never reaches beyond **1.19x** that radius (the extreme is a
+ * 4f, whose lobes stretch furthest along their axes relative to the
+ * spherically averaged D(r)). 1.45 clears that comfortably. See
+ * `compositeSamplingRadius` for why the 99.99% box cannot be used here.
+ */
+export const COMPOSITE_BOX_MARGIN = 1.45;
+
+/**
+ * The sampling box for one orbital of the **shell-composition view**.
+ *
+ * `subshellSamplingRadius` below is the right box for a single orbital
+ * rendered on its own: it is the 99.99% radius, so nothing can ever be
+ * clipped. But it runs 2.25-3.44x the radius actually drawn, and the
+ * composition view renders up to sixteen orbitals at once on a much coarser
+ * grid -- so most of that box is empty space bought with resolution. At
+ * ruthenium's 5s the voxel came out at 0.80 a0 and the lobe rendered as a
+ * 438-vertex faceted block reaching 3.57 a0 instead of a sphere at 5.23;
+ * gadolinium's 4f and every other d/f shell were coarse for the same
+ * reason. Sizing from the drawn contour instead cuts the voxel by 2-3x at
+ * the same cost: the same lobes come back with 2000-2900 vertices and reach
+ * 97-99% of their true extent.
+ *
+ * `Math.min` with the 99.99% radius keeps the guarantee that the box is
+ * never *larger* than the orbital's true extent, and covers the case where
+ * a subshell's contour is already close to it.
+ */
+export function compositeSamplingRadius(grid: RadialGrid, curve: Float64Array, contourRadius: number): number {
+    return Math.min(subshellSamplingRadius(grid, curve), contourRadius * COMPOSITE_BOX_MARGIN);
 }
 
 /**

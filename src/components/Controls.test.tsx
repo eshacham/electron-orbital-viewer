@@ -9,8 +9,6 @@ const baseProps = {
   onLChange: () => {},
   initialMl: 0,
   onMlChange: () => {},
-  initialResolution: 32,
-  onResolutionChange: () => {},
   initialEnclosedFraction: 0.9,
   onEnclosedFractionChange: () => {},
   isoLevel: 1e-5,
@@ -32,8 +30,6 @@ describe('Controls', () => {
         onLChange={() => {}}
         initialMl={0}
         onMlChange={() => {}}
-        initialResolution={32}
-        onResolutionChange={() => {}}
         initialEnclosedFraction={0.9}
         onEnclosedFractionChange={() => {}}
         isoLevel={1e-5}
@@ -81,7 +77,7 @@ describe('Controls', () => {
       const onUpdateOrbital = jest.fn();
       render(<Controls {...baseProps} initialN={4} initialL={3} initialMl={-2} onUpdateOrbital={onUpdateOrbital} />);
       fireEvent.click(screen.getByRole('button', { name: /update orbital/i }));
-      expect(onUpdateOrbital).toHaveBeenCalledWith(expect.objectContaining({ n: 4, l: 3, ml: -2, Z: 1 }));
+      expect(onUpdateOrbital).toHaveBeenCalledWith(expect.objectContaining({ n: 4, l: 3, ml: -2, Z: 1, resolution: 128 }));
     });
   });
 
@@ -136,16 +132,14 @@ describe('Controls', () => {
   // same marching-cubes pipeline hydrogen-like mode always uses -- so the
   // condition is level, not mode.
   describe('control visibility matrix (bug 6): Resolution, Surface and "no cut" only where they do something', () => {
-    it('Basic Orbitals mode (always a marching-cubes mesh): shows Resolution, Surface and "Off"', () => {
+    it('Basic Orbitals mode (always a marching-cubes mesh): shows Surface and "Off"', () => {
       render(<Controls {...baseProps} mode="hydrogenic" />);
-      expect(screen.getByRole('group', { name: /text alignment/i })).toBeInTheDocument();
       expect(screen.getByRole('group', { name: /surface style/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /no cut/i })).toBeInTheDocument();
     });
 
-    it('atom mode at the whole-atom level (a shell view): hides Resolution, Surface and "Off"', () => {
+    it('atom mode at the whole-atom level (a shell view): hides Surface and "Off"', () => {
       render(<Controls {...baseProps} mode="atom" atomLevel="atom" atomZ={6} onAtomElementChange={() => {}} />);
-      expect(screen.queryByRole('group', { name: /text alignment/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('group', { name: /surface style/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /no cut/i })).not.toBeInTheDocument();
       // The rest of "Cut away" (a real cut still changes the shell view's
@@ -155,18 +149,32 @@ describe('Controls', () => {
       expect(screen.getByRole('slider', { name: /surface opacity/i })).toBeInTheDocument();
     });
 
-    it('atom mode at the shell level (still a shell view): hides Resolution, Surface and "Off"', () => {
+    it('atom mode at the shell level (still a shell view): hides Surface and "Off"', () => {
       render(<Controls {...baseProps} mode="atom" atomLevel="shell" atomZ={6} onAtomElementChange={() => {}} />);
-      expect(screen.queryByRole('group', { name: /text alignment/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('group', { name: /surface style/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /no cut/i })).not.toBeInTheDocument();
     });
 
-    it('atom mode at the orbital level (level 3, a real marching-cubes mesh): shows Resolution, Surface and "Off" again', () => {
+    it('atom mode at the orbital level (level 3, a real marching-cubes mesh): shows Surface and "Off" again', () => {
       render(<Controls {...baseProps} mode="atom" atomLevel="orbital" atomZ={6} onAtomElementChange={() => {}} />);
-      expect(screen.getByRole('group', { name: /text alignment/i })).toBeInTheDocument();
       expect(screen.getByRole('group', { name: /surface style/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /no cut/i })).toBeInTheDocument();
+    });
+
+    // The Resolution control is gone entirely: every marching-cubes render
+    // is at ORBITAL_RESOLUTION now (see orbital_presets.ts).
+    it('offers no resolution control anywhere', () => {
+      for (const props of [
+        {},
+        { mode: 'atom' as const, atomLevel: 'atom' as const, atomZ: 6, onAtomElementChange: () => {} },
+        { mode: 'atom' as const, atomLevel: 'orbital' as const, atomZ: 6, onAtomElementChange: () => {} },
+      ]) {
+        const { unmount } = render(<Controls {...baseProps} {...props} />);
+        expect(screen.queryByRole('button', { name: /low resolution/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /medium resolution/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /high resolution/i })).not.toBeInTheDocument();
+        unmount();
+      }
     });
   });
 

@@ -17,7 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 import { OrbitalParams, RenderMode, ClipAxis, SurfaceStyle } from '@/types/orbital';
-import { computeSamplingRadius, ENCLOSED_FRACTIONS, BASIC_ORBITALS_Z } from '../orbital_presets';
+import { computeSamplingRadius, ENCLOSED_FRACTIONS, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION } from '../orbital_presets';
 import { ELEMENTS, elementLabel } from '../elements';
 import { orbitalName } from '../orbital_names';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
@@ -57,8 +57,6 @@ interface ControlsProps {
   onLChange: (value: number) => void;
   initialMl: number;
   onMlChange: (value: number) => void;
-  initialResolution: number;
-  onResolutionChange: (value: number) => void;
   initialEnclosedFraction: number;
   onEnclosedFractionChange: (value: number) => void;
   /** The density contour the last render actually used, or null before one. */
@@ -89,7 +87,6 @@ const Controls: React.FC<ControlsProps> = ({
   initialN, onNChange,
   initialL, onLChange,
   initialMl, onMlChange,
-  initialResolution, onResolutionChange,
   initialEnclosedFraction, onEnclosedFractionChange,
   isoLevel,
   onUpdateOrbital,
@@ -104,13 +101,14 @@ const Controls: React.FC<ControlsProps> = ({
   // Bug fix (task 22, bug 6): levels 1-2 in atom mode render a spherical
   // shell view straight from the shader (orbital_visualizer.ts's
   // updateAtomViewInScene / shell_view.ts) rather than a marching-cubes
-  // mesh -- there is no vertex count to raise or lower (Resolution), no
-  // separate solid-vs-wireframe surface to switch between (Surface), and
-  // no meaningful "uncut" state (Cut away's Off option: a shell view's cut
-  // face is its *only* visible content, see shellViewClipAxis's doc comment
-  // in orbital_visualizer.ts). All three genuinely matter again once level
-  // 3 hands the render back to the same marching-cubes pipeline hydrogen-
-  // like mode always uses -- so the condition is level, not mode.
+  // mesh -- there is no separate solid-vs-wireframe surface to switch
+  // between (Surface), and no meaningful "uncut" state (Cut away's Off
+  // option: a shell view's cut face is its *only* visible content, see
+  // shellViewClipAxis's doc comment in orbital_visualizer.ts). Both matter
+  // again once level 3 hands the render back to the same marching-cubes
+  // pipeline Basic Orbitals always uses -- so the condition is level, not
+  // mode. (Resolution used to be gated here too; there is no such control
+  // any more -- see ORBITAL_RESOLUTION.)
   const isMeshLevel = !isAtomMode || atomLevel === 'orbital';
   // Local state for dropdown options, derived from props
   const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
@@ -159,7 +157,7 @@ const Controls: React.FC<ControlsProps> = ({
       l: initialL,
       ml: initialMl,
       Z: BASIC_ORBITALS_Z,
-      resolution: initialResolution,
+      resolution: ORBITAL_RESOLUTION,
       // Derived, not chosen: the box that holds this orbital.
       rMax: computeSamplingRadius(initialN, initialL, BASIC_ORBITALS_Z),
       enclosedFraction: initialEnclosedFraction,
@@ -321,30 +319,6 @@ const Controls: React.FC<ControlsProps> = ({
 
       {/* SubshellPanel at level 2; empty at every other level (see App.tsx). */}
       {isAtomMode && children}
-
-      {/* Resolution: the marching-cubes vertex count -- meaningless for a
-          shell view's shader-only cut face (bug fix, task 22 bug 6). */}
-      {isMeshLevel && (
-        <FormControl component="fieldset" margin="normal" fullWidth>
-          <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Resolution</FormLabel> {/* Smaller label */}
-          <ToggleButtonGroup
-            value={initialResolution}
-            exclusive // Ensures only one button can be active
-            onChange={(event: React.MouseEvent<HTMLElement>, newValue: number | null) => {
-              if (newValue !== null) {
-                onResolutionChange(newValue);
-              }
-            }}
-            aria-label="text alignment"
-            size="small"
-            fullWidth
-          >
-            <ToggleButton value={32} aria-label="low resolution">Low</ToggleButton>
-            <ToggleButton value={64} aria-label="Medium resolution">Medium</ToggleButton>
-            <ToggleButton value={128} aria-label="High resolution">High</ToggleButton>
-          </ToggleButtonGroup>
-        </FormControl>
-      )}
 
       {/* Surface, opacity and cut-away are view-only: they restyle the existing
           mesh, so none of them re-runs the calculation. Surface (solid vs

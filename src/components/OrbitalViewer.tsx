@@ -17,7 +17,7 @@ import {
     attachShellCompositionLobes,
     VisualizerContext
 } from '../orbital_visualizer';
-import { shellComposition, isolateSubshell, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
+import { shellComposition, isolateSubshell, compositeResolutionFor, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
 import { shellAtRadius } from '../atom/shell_pick';
 import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '../atom/shell_mesh_cache';
 import { createShellCompositionWorker } from '../workers/createShellCompositionWorker';
@@ -259,8 +259,13 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             return {
                 n: component.n, l: component.l, ml: component.ml,
                 Z: atomProfile.Z,
-                resolution: COMPOSITE_ORBITAL_RESOLUTION,
-                rMax: subshell.samplingRadius,
+                // Per subshell type, and sized to what is actually drawn
+                // rather than to the 99.99% tail -- see
+                // compositeResolutionFor and compositeSamplingRadius. The
+                // pair of them is what turned ruthenium's 5s from a
+                // 438-vertex faceted block into a sphere.
+                resolution: compositeResolutionFor(component.l),
+                rMax: subshell.compositeSamplingRadius,
                 enclosedFraction,
                 radialSamples: { R: subshell.R, rMin: atomProfile.rMin, dx: atomProfile.dx, size: atomProfile.size },
             };
@@ -357,11 +362,14 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         setSurfaceStyle(visualizerContextRef.current, surfaceStyle);
     }, [surfaceStyle]);
 
-    // Re-frame the camera when the user asks for it
+    // Re-frame the camera when the user asks for it -- Reset View, and
+    // picking an element, which both mean "give me the standard view of
+    // this" and so restore the canonical viewing angle too, not just the
+    // distance (see frameOrbital's restoreDefaultDirection).
     useEffect(() => {
         if (viewResetNonce === 0) return;
         const rMax = visualizerContextRef.current?.framedRMax;
-        if (rMax) frameOrbital(visualizerContextRef.current, rMax);
+        if (rMax) frameOrbital(visualizerContextRef.current, rMax, true);
     }, [viewResetNonce]);
 
     // Keep the scale readout in step with the camera. OrbitControls fires on

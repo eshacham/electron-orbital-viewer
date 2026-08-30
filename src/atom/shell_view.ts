@@ -107,6 +107,10 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
     // it means zooming in on the sphere zooms in on the ring just as much,
     // until it is wide enough to wash out the whole view.
     uniform float ringWidth;
+    // The sphere's own radius, and how wide its rim is drawn -- see the rim
+    // block below. Zero disables it (a view that was not told its radius).
+    uniform float edgeRadius;
+    uniform float edgeWidth;
 
     varying vec3 vWorldPosition;
 
@@ -163,7 +167,7 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         // this trades on lives entirely in e and the smoothstep ramp above,
         // not in these two colours, so it is unaffected either way (see
         // atom_profile.test.ts's acceptance test).
-        vec3 cold = vec3(0.10, 0.12, 0.24);
+        vec3 cold = vec3(0.17, 0.20, 0.36);
         vec3 warm = vec3(1.00, 0.85, 0.45);
         vec3 peakColor = mix(warm, palette[paletteIndex], hueStrength);
 
@@ -184,6 +188,19 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         vec3 shellColor = paletteIndex == valenceIndex ? litValence : recededCore;
 
         vec3 color = mix(cold, shellColor, smoothstep(0.9, 1.0, e));
+
+        // The atom's own edge. Reported from the running app: "the bg color
+        // of the outer shell is too dark compared with the app's bg colour
+        // ... I think the outermost shell has the same colour as the app's
+        // bg". Lifting the cold floor (above) helps, but the real problem is
+        // that a disc fading into black has no edge at all -- the radial
+        // plot's curve visibly continued past where the sphere appeared to
+        // stop. A rim states the boundary outright, so "this is where the
+        // atom ends" is drawn rather than inferred.
+        if (edgeRadius > 0.0 && r > edgeRadius - edgeWidth && r <= edgeRadius) {
+            float t = (r - (edgeRadius - edgeWidth)) / max(edgeWidth, 1e-6);
+            color = mix(color, vec3(0.62, 0.70, 0.90), 0.35 + 0.45 * t);
+        }
 
         // The ring the radial plot is pointing at. Comparing the cut face's
         // own |worldPosition| against highlightR is already geometrically
@@ -243,6 +260,9 @@ export interface ShellViewOptions {
      */
     valenceEmphasis?: Float32Array;
 }
+
+/** How thick the sphere's rim is, as a fraction of its radius. Enough to read as an edge at any zoom without eating into the outermost ring. */
+const SHELL_EDGE_FRACTION = 0.035;
 
 /** `CURVE_COLORS`, converted once to the [0,1] triples the shader's `palette` uniform array expects. */
 const PALETTE = CURVE_COLORS.map(hex => new THREE.Vector3(...hexToRgb01(hex)));
@@ -351,6 +371,8 @@ export function createShellView(options: ShellViewOptions): THREE.Group {
             // Placeholder until the first setShellViewRingWidth call from the
             // render loop; only visible for a single frame at worst.
             ringWidth: { value: rMax * 0.004 },
+            edgeRadius: { value: contourRadius },
+            edgeWidth: { value: contourRadius * SHELL_EDGE_FRACTION },
             // A 1-texel dummy when ringColorIndex is omitted -- hueStrength
             // 0 means it is never sampled meaningfully either way (see the
             // fragment shader), so its actual contents do not matter then.
@@ -478,9 +500,20 @@ export function setShellViewRadius(view: THREE.Object3D | null, radius: number):
     if (!view) return;
 
     view.traverse(child => {
-        if (!(child instanceof THREE.Mesh) || !child.userData.isCapStencil) return;
-        const baseRadius = (child.geometry as THREE.SphereGeometry).parameters.radius;
-        child.scale.setScalar(baseRadius > 0 ? radius / baseRadius : 1);
+        if (!(child instanceof THREE.Mesh)) return;
+        if (child.userData.isCapStencil) {
+            const baseRadius = (child.geometry as THREE.SphereGeometry).parameters.radius;
+            child.scale.setScalar(baseRadius > 0 ? radius / baseRadius : 1);
+            return;
+        }
+        // The rim is drawn by the cap shader from world position, so unlike
+        // the cap's shading it does have to follow the sphere as the
+        // atom<->shell fade eases its radius (see the module doc).
+        if (child.userData.isCap) {
+            const material = child.material as THREE.ShaderMaterial;
+            material.uniforms.edgeRadius.value = radius;
+            material.uniforms.edgeWidth.value = radius * SHELL_EDGE_FRACTION;
+        }
     });
 }
 

@@ -43,9 +43,9 @@ function neonLikeProfile(): SerialisedAtomProfile {
             { n: 2, electrons: 8, contourRadius: 2.5, curve: new Float64Array(5), emphasis: new Float32Array(5) },
         ],
         subshells: [
-            { n: 1, l: 0, electrons: 2, energy: -30, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 0.5 },
-            { n: 2, l: 0, electrons: 2, energy: -1.3, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 2.5 },
-            { n: 2, l: 1, electrons: 6, energy: -0.5, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 2.5 },
+            { n: 1, l: 0, electrons: 2, energy: -30, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 0.5, compositeSamplingRadius: 0.5 },
+            { n: 2, l: 0, electrons: 2, energy: -1.3, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 2.5, compositeSamplingRadius: 2.5 },
+            { n: 2, l: 1, electrons: 6, energy: -0.5, curve: new Float64Array(5), R: new Float64Array(5), samplingRadius: 2.5, compositeSamplingRadius: 2.5 },
         ],
     };
 }
@@ -85,6 +85,37 @@ describe('atomSlice', () => {
             expect(state.selectedShell).toBeNull();
             expect(state.selectedSubshell).toBeNull();
             expect(state.selectedOrbital).toBeNull();
+        });
+    });
+
+    describe('solveNonce', () => {
+        it('advances on every setElement, including one that re-picks the current element', () => {
+            const store = buildStore();
+            const start = store.getState().atom.solveNonce;
+
+            store.dispatch(setElement(6));
+            const afterFirst = store.getState().atom.solveNonce;
+            expect(afterFirst).toBeGreaterThan(start);
+
+            // The case that hung: same Z, so nothing else in the solver's
+            // dependency list changes -- but the profile has been cleared.
+            store.dispatch(setElement(6));
+            expect(store.getState().atom.solveNonce).toBeGreaterThan(afterFirst);
+            expect(store.getState().atom.profile).toBeNull();
+        });
+
+        it('is untouched by pure navigation', () => {
+            const store = buildStore();
+            store.dispatch(solveSucceeded(neonLikeProfile()));
+            const nonce = store.getState().atom.solveNonce;
+
+            store.dispatch(drillToShell(2));
+            store.dispatch(drillToSubshell(2, 1));
+            store.dispatch(clearSubshell());
+            store.dispatch(levelUp());
+            store.dispatch(goToLevel('atom'));
+
+            expect(store.getState().atom.solveNonce).toBe(nonce);
         });
     });
 

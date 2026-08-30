@@ -34,6 +34,20 @@ export interface AtomState {
     error: string | null;
     /** Radius the pointer is currently over, shared by the plot and the cut face. */
     hoverRadius: number | null;
+    /**
+     * Bumped by every `setElement`, including one that picks the element
+     * already selected.
+     *
+     * Bug fix, found live: `setElement` clears `profile` unconditionally,
+     * but the effect that actually starts a solve is keyed on
+     * `[mode, Z, enclosedFraction]`. Re-picking the current element cleared
+     * the profile without changing any of those three, so the effect never
+     * re-ran and the app sat in "solving" forever with nothing on screen.
+     * This is the dependency that makes "solve what setElement just asked
+     * for" true regardless of whether Z changed; the profile cache makes
+     * the repeat case immediate.
+     */
+    solveNonce: number;
 }
 
 const initialState: AtomState = {
@@ -47,6 +61,7 @@ const initialState: AtomState = {
     isSolving: false,
     error: null,
     hoverRadius: null,
+    solveNonce: 0,
 };
 
 /** Whether the solved profile actually occupies shell n -- ruling R26: this reads `shells`, never `shellPeaks`, which is a display annotation only and does not line up 1:1 with real shells past Z≈26. */
@@ -72,6 +87,7 @@ const atomSlice = createSlice({
         // *not* pure navigation -- it is what starts a solve (ruling R28).
         setElement: (state, action: PayloadAction<number>) => {
             state.Z = action.payload;
+            state.solveNonce += 1;
             state.level = 'atom';
             state.selectedShell = null;
             state.selectedSubshell = null;

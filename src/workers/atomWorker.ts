@@ -1,5 +1,5 @@
 import { AtomSolution, solveAtom } from '../atom/scf';
-import { AtomProfile, buildAtomProfile, packRadialCurve, subshellSamplingRadius } from '../atom/atom_profile';
+import { AtomProfile, buildAtomProfile, packRadialCurve, subshellSamplingRadius, compositeSamplingRadius } from '../atom/atom_profile';
 
 /** One shell's contribution, flattened for the worker boundary. */
 export interface SerialisedShell {
@@ -39,6 +39,14 @@ export interface SerialisedSubshell {
      * the surface itself is later asked to enclose.
      */
     samplingRadius: number;
+    /**
+     * The sampling box for this subshell's orbitals in the **shell-
+     * composition view**, which renders up to sixteen of them at once on a
+     * much coarser grid than a single level-3 orbital gets. Sized from the
+     * contour actually drawn rather than the 99.99% tail -- see
+     * `compositeSamplingRadius` in atom_profile.ts for the measurements.
+     */
+    compositeSamplingRadius: number;
 }
 
 /**
@@ -192,6 +200,7 @@ export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction:
             // state.
             R: atom.states[i].R.slice(),
             samplingRadius: subshellSamplingRadius(grid, subshell.curve.values),
+            compositeSamplingRadius: compositeSamplingRadius(grid, subshell.curve.values, subshell.contourRadius),
         })),
     };
 }

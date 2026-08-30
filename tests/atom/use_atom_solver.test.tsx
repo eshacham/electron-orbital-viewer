@@ -51,6 +51,8 @@ function minimalProfile(overrides: Partial<SerialisedAtomProfile> = {}): Seriali
         total: new Float32Array([1, 2, 1]),
         totalEmphasis: new Float32Array([1, 1, 1]),
         contourRadius: 1,
+        valencePeakRadius: 0.8,
+        displayRadius: 1.2,
         shellPeaks: new Float64Array([1]),
         shellIndexAtR: new Float32Array(3),
         shells: [],
@@ -272,6 +274,68 @@ describe('useAtomSolver', () => {
     // every navigation, which is what "the cache has never had a hit in the
     // running app" looked like from here (an ~8.6s-for-uranium solve on
     // every trip back to atom mode).
+    /**
+     * Bug fix, found live. `setElement` clears `profile` unconditionally,
+     * but this hook's effect used to be keyed on `[mode, Z, fraction]`
+     * alone -- so re-picking the element already selected cleared the
+     * profile and then never re-ran, leaving the app in "solving" forever
+     * with nothing on screen. `solveNonce` is what closes that.
+     */
+    describe('re-selecting the element already selected', () => {
+        it('still produces a profile rather than hanging in a solving state', () => {
+            const store = buildStore();
+            const worker = fakeWorker();
+
+            const { rerender } = renderHook(
+                () => useAtomSolver(0.9, () => worker),
+                { wrapper: ({ children }) => <Provider store={store}>{children}</Provider> }
+            );
+            act(() => {
+                worker.onmessage!({
+                    data: { type: 'success', profile: minimalProfile({ Z: 1 }), requestId: lastRequestId(worker) },
+                } as MessageEvent);
+            });
+            expect(store.getState().atom.profile).not.toBeNull();
+
+            // Exactly what clicking the current element's own tile does.
+            // `setElement` clears the profile; the effect this dispatch now
+            // re-triggers puts one back within the same act() flush, which
+            // is the whole point -- before the fix nothing re-triggered it.
+            act(() => { store.dispatch(setElement(1)); });
+            rerender();
+
+            // Served from the profile cache, so no second worker round trip
+            // -- but a profile, and not stuck solving.
+            expect(store.getState().atom.profile).not.toBeNull();
+            expect(store.getState().atom.isSolving).toBe(false);
+        });
+
+        it('re-requests a solve when there is no cached profile to fall back on', () => {
+            const store = buildStore();
+            const worker = fakeWorker();
+
+            const { rerender } = renderHook(
+                () => useAtomSolver(0.9, () => worker),
+                { wrapper: ({ children }) => <Provider store={store}>{children}</Provider> }
+            );
+            expect(worker.postMessage).toHaveBeenCalledTimes(1);
+
+            // Never answered -- the element is re-picked while the first
+            // solve is still in flight, which is precisely the case that hung.
+            act(() => { store.dispatch(setElement(1)); });
+            rerender();
+            expect(worker.postMessage).toHaveBeenCalledTimes(2);
+
+            act(() => {
+                worker.onmessage!({
+                    data: { type: 'success', profile: minimalProfile({ Z: 1 }), requestId: lastRequestId(worker) },
+                } as MessageEvent);
+            });
+            expect(store.getState().atom.profile).not.toBeNull();
+            expect(store.getState().atom.isSolving).toBe(false);
+        });
+    });
+
     it('mode switch and re-selecting a previously solved element hit the cache: no extra solve requests', () => {
         const store = buildStore(); // starts at the default element, Z=1
         const worker = fakeWorker();

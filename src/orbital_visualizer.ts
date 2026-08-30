@@ -394,13 +394,28 @@ function fitDistance(camera: THREE.PerspectiveCamera, rMax: number): number {
  * depending on n, so a fixed camera distance leaves the viewer inside the mesh
  * for anything above n=3.
  */
-export function frameOrbital(context: VisualizerContext | null, rMax: number) {
+export function frameOrbital(
+    context: VisualizerContext | null,
+    rMax: number,
+    /**
+     * Also swing the camera back to the app's canonical viewing angle,
+     * rather than keeping wherever the user has orbited to.
+     *
+     * Off by default, because re-framing happens on every scale change and
+     * silently undoing someone's rotation each time would be maddening. On
+     * for the two places that mean "give me the standard view of this":
+     * Reset View, and picking a new element (see App.tsx).
+     */
+    restoreDefaultDirection = false
+) {
     if (!context || context.isDisposed) return;
 
     const { camera, controls } = context;
     const distance = fitDistance(camera, rMax);
 
-    const direction = camera.position.clone().sub(controls.target);
+    const direction = restoreDefaultDirection
+        ? defaultCameraPosition(1)
+        : camera.position.clone().sub(controls.target);
     if (direction.lengthSq() === 0) direction.set(0, 0, 1);
     direction.normalize();
 
