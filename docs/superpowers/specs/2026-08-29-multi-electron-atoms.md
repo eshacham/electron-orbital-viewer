@@ -189,3 +189,76 @@ that honest.
 
 **Respect prefers-reduced-motion.** Users who ask for reduced motion get the
 existing instant cut, not a shortened animation.
+
+---
+
+## Addendum 2: shell composition, shell colour, and mode rename (approved 2026-08-30)
+
+From user testing. Their words, which govern:
+
+> "the only thing that changes (on the 3d view) when moving betwen different
+> elements is the number of rings, their position and distance from others.
+> that's boring... i was expecting to be able to see how the (sub) shells are
+> constructed (composite) the orbitals."
+
+> "i expect the orbital lobes to show in the shell - not just the label."
+
+### Shell composition view (level 2)
+
+At the shell level, render the **actual isosurfaces of that shell's occupied
+orbitals, inside the shell, at true relative scale**. Not chips, not labels —
+the lobes themselves. The shell sphere becomes translucent so its constituents
+are visible within it.
+
+Carbon's L shell shows a 2s sphere plus the three 2p lobe-pairs, all at their
+real sizes, occupying the same space. That overlap is the teaching point: it is
+*why* the sum comes out spherical (Unsöld, spec §2), and it is the thing the
+current UI hides completely.
+
+**Occupancy is element-specific and must be visible.** Carbon's L shell is
+2s² 2p², neon's is 2s² 2p⁶ — same two rings in the atom view, entirely
+different chemistry. Under the spherically averaged central-field model an
+open subshell's electrons are spread equally over its mₗ states, so carbon's
+2p² is 2/3 of an electron in each of 2p_x, 2p_y, 2p_z. Render all three and
+convey the partial filling (opacity, or an explicit "2 of 6" readout, or
+both) rather than picking two arbitrary lobes to draw — picking would be a
+lie about which orbitals are occupied.
+
+This is the answer to "what else is element-specific": not the outer
+silhouette, which physics fixes as a sphere, but **what the shells are made
+of and how full they are**.
+
+### Shell colour in 3D (from the same testing round)
+
+> "the 2d graph has different colors f the n. why not incorporate these colors
+> somehow to the 3d view?"
+
+Colour each ring on the cut face by its principal quantum number, using the
+same palette the radial plot already uses for its per-n curves. The two views
+then read as one object, the shell chips become legible at a glance, and
+selecting a shell has an obvious visual consequence.
+
+Keep the ring contrast requirement: peak-to-trough ≥ 0.35 for Ar and U.
+Hue carries identity; luminance still has to carry structure.
+
+### Selection affordance
+
+> "what does clicking the k shell vs the l shell does to the view? is there a
+> way to unselect one?"
+
+Selection already isolates that shell, but the affordance is too weak to
+notice. Make the rings themselves clickable in the 3D view — the pointer→radius
+mapping needed for the hover linkage (spec §6) already computes everything
+required — and give the selected shell an explicit deselect, not only the
+breadcrumb.
+
+### Mode rename
+
+"Hydrogen-like" becomes **"Basic Orbitals"**, and its nucleus (Z) control is
+removed — atom mode covers every element now, so a second element control in
+the other mode was redundant and confusing. The mode is fixed at Z = 1 and is
+the idealised textbook reference: pick n, l, mₗ, see the shape.
+
+Cost, recorded so it is a choice rather than an oversight: He⁺, Li²⁺ and the
+other one-electron ions are no longer reachable, and with them the direct
+demonstration that raising Z shrinks an orbital without changing its shape.
