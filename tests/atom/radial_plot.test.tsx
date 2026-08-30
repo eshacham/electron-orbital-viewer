@@ -47,10 +47,17 @@ describe('RadialPlot', () => {
         const { container, getByText } = render(
             <RadialPlot n={2} l={1} Z={6} rMax={10} curves={twoCurves()} />
         );
-        const lines = container.querySelectorAll('.radial-plot-line');
+        const lines = container.querySelectorAll<SVGPathElement>('.radial-plot-line');
         expect(lines).toHaveLength(2);
-        expect(lines[0]).toHaveAttribute('stroke', '#ff0000');
-        expect(lines[1]).toHaveAttribute('stroke', '#00ff00');
+        // Asserted on the *computed* stroke, not a `stroke=` attribute (bug
+        // fix, found in the running app). `.radial-plot-line` in style.css
+        // sets `stroke: #4da3ff` for the single-curve plot, and a CSS
+        // declaration beats an SVG presentation attribute -- so the old
+        // assertion passed on an attribute the browser then ignored, and
+        // every curve drew blue while its legend swatch drew the real
+        // colour. Reading `style.stroke` is what the browser actually obeys.
+        expect(lines[0].style.stroke).toBe('#ff0000');
+        expect(lines[1].style.stroke).toBe('#00ff00');
         expect(getByText('K shell')).toBeInTheDocument();
         expect(getByText('L shell')).toBeInTheDocument();
         expect(getByText(/radial distribution d\(r\) = 4πr²ρ\(r\)/i)).toBeInTheDocument();

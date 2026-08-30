@@ -25,6 +25,7 @@ import {
     drillToShell,
     drillToSubshell,
     drillToOrbital,
+    clearSubshell,
     setHoverRadius as setAtomHoverRadius,
 } from './store/atomSlice';
 import { subshellLabel } from './atom/configurations';
@@ -138,9 +139,20 @@ function App() {
         }
     }, [dispatch]);
 
+    // Addendum 2's readability follow-up: a subshell chip is a toggle.
+    // Selecting one isolates its orbitals in the composition view (iron's
+    // five 3d cloverleaves are unreadable as an overlapping blob);
+    // clicking the selected one again clears the isolation and returns to
+    // the overlapping view, which stays the default because the overlap is
+    // the teaching point (spec §2). This is also the subshell-level half of
+    // the "is there a way to unselect one?" affordance.
     const handleSelectSubshell = useCallback((selN: number, selL: number) => {
+        if (atomSelectedSubshell && atomSelectedSubshell.n === selN && atomSelectedSubshell.l === selL) {
+            dispatch(clearSubshell());
+            return;
+        }
         dispatch(drillToSubshell(selN, selL));
-    }, [dispatch]);
+    }, [dispatch, atomSelectedSubshell]);
 
     const handleSelectOrbital = useCallback((selN: number, selL: number, selMl: number) => {
         dispatch(drillToOrbital(selN, selL, selMl));
@@ -307,12 +319,21 @@ function App() {
                 points: atomRGrid.map((r, j) => ({ r, value: shell.curve[j] })),
             }));
         }
+        // Colour by the subshell's position within its *shell*, computed
+        // before any filtering (bug fix, found live): isolating 3d used to
+        // recolour its curve to index 0's blue while the 3D lobes stayed
+        // gold, because the index came from the filtered array. The colour
+        // is an identity -- 3d is the shell's third subshell whether or not
+        // the other two are on screen -- so it must not depend on what else
+        // is being shown. shell_composition.ts's colorIndex is this same
+        // position, which is what keeps a lobe and its curve in agreement.
+        const shellSubshells = atomProfile.subshells.filter(s => s.n === atomSelectedShell);
         const subshells = atomSelectedSubshell
-            ? atomProfile.subshells.filter(s => s.n === atomSelectedSubshell.n && s.l === atomSelectedSubshell.l)
-            : atomProfile.subshells.filter(s => s.n === atomSelectedShell);
-        return subshells.map((subshell, i) => ({
+            ? shellSubshells.filter(s => s.l === atomSelectedSubshell.l)
+            : shellSubshells;
+        return subshells.map(subshell => ({
             label: subshellLabel(subshell.n, subshell.l),
-            color: CURVE_COLORS[i % CURVE_COLORS.length],
+            color: CURVE_COLORS[shellSubshells.indexOf(subshell) % CURVE_COLORS.length],
             points: atomRGrid.map((r, j) => ({ r, value: subshell.curve[j] })),
         }));
     }, [atomProfile, atomLevel, atomSelectedShell, atomSelectedSubshell, atomRGrid]);

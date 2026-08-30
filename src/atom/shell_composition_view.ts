@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitalComponent } from './shell_composition';
 import { LobeMeshData } from '../workers/shellCompositionWorker';
-import { CURVE_COLORS } from '../curve_colors';
+import { CURVE_COLORS, orbitalShade } from '../curve_colors';
 
 /**
  * Turns a shell's computed orbital lobes (Addendum 2) into a group of
@@ -47,7 +47,17 @@ export function createCompositionLobesGroup(
     components: OrbitalComponent[],
     meshes: LobeMeshData[],
     clippingPlanes: THREE.Plane[],
-    restingOpacity: number
+    restingOpacity: number,
+    /**
+     * True when the view has been isolated to a single subshell (Addendum
+     * 2's readability follow-up), in which case each of that subshell's
+     * orbitals gets its own shade of the subshell colour so five
+     * interpenetrating d cloverleaves can be counted instead of summing to
+     * one gold mass -- see `orbitalShade`. False for the default,
+     * overlapping whole-shell view, where one colour per subshell is
+     * exactly the distinction that matters.
+     */
+    distinguishOrbitals: boolean = false
 ): THREE.Group {
     const group = new THREE.Group();
     group.userData.isCompositionLobes = true;
@@ -65,8 +75,13 @@ export function createCompositionLobesGroup(
         geometry.setIndex(meshData.cells.flat());
         geometry.computeVertexNormals();
 
+        const baseColor = CURVE_COLORS[component.colorIndex % CURVE_COLORS.length];
         const material = new THREE.MeshStandardMaterial({
-            color: new THREE.Color(CURVE_COLORS[component.colorIndex % CURVE_COLORS.length]),
+            color: new THREE.Color(
+                distinguishOrbitals
+                    ? orbitalShade(baseColor, component.l + component.ml, 2 * component.l + 1)
+                    : baseColor
+            ),
             metalness: 0,
             roughness: 0.45,
             side: THREE.DoubleSide,

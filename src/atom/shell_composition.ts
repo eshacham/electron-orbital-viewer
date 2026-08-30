@@ -78,3 +78,23 @@ export function shellComposition(subshells: ShellCompositionSubshell[]): Orbital
     });
     return components;
 }
+
+/**
+ * The subset of a shell's orbital components belonging to one subshell --
+ * the composition view's isolation mode (Addendum 2's readability
+ * follow-up).
+ *
+ * Iron's five 3d orbitals overlapping read as one gold blob rather than five
+ * distinguishable cloverleaves. The overlap is physically honest and stays
+ * the default -- it is *why* the sum comes out spherical (spec §2) -- so
+ * isolation is a filter applied on top of the full composition, never a
+ * different composition: `colorIndex` is carried through unchanged from the
+ * full shell, so an isolated 3d keeps exactly the colour it had while
+ * overlapping, and matches its own curve in the radial plot.
+ *
+ * `l` of null means no isolation, i.e. the full shell.
+ */
+export function isolateSubshell(components: OrbitalComponent[], l: number | null): OrbitalComponent[] {
+    if (l === null) return components;
+    return components.filter(component => component.l === l);
+}

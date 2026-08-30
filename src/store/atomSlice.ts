@@ -121,6 +121,19 @@ const atomSlice = createSlice({
             state.selectedOrbital = null;
         },
 
+        // Addendum 2's "is there a way to unselect one?", at the subshell
+        // level: the inverse of drillToSubshell, staying at the shell level
+        // rather than stepping out of it (levelUp does that). Selecting a
+        // subshell isolates its orbitals in the composition view, so there
+        // has to be a way back to the overlapping view that is the default
+        // -- the overlap is the teaching point (spec §2), isolation is only
+        // how you read it. Pure navigation (ruling R28).
+        clearSubshell: (state) => {
+            if (state.level !== 'shell') return;
+            state.selectedSubshell = null;
+            state.selectedOrbital = null;
+        },
+
         drillToOrbital: (state, action: PayloadAction<{ n: number; l: number; ml: number }>) => {
             const { n, l, ml } = action.payload;
             if (!subshellIsOccupied(state.profile, n, l)) return;
@@ -192,6 +205,7 @@ export const drillToShell = atomSlice.actions.drillToShell;
 // `drillToSubshell(n, l)` / `drillToOrbital(n, l, ml)`.
 export const drillToSubshell = (n: number, l: number) => atomSlice.actions.drillToSubshell({ n, l });
 export const drillToOrbital = (n: number, l: number, ml: number) => atomSlice.actions.drillToOrbital({ n, l, ml });
+export const clearSubshell = atomSlice.actions.clearSubshell;
 export const levelUp = atomSlice.actions.levelUp;
 export const goToLevel = atomSlice.actions.goToLevel;
 export const setHoverRadius = atomSlice.actions.setHoverRadius;

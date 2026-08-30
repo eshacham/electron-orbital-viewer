@@ -1163,14 +1163,18 @@ export function attachShellCompositionLobes(
     context: VisualizerContext | null,
     guard: number,
     components: OrbitalComponent[],
-    meshes: LobeMeshData[]
+    meshes: LobeMeshData[],
+    /** True when `components` are one isolated subshell's orbitals rather than a whole shell's -- see createCompositionLobesGroup. */
+    distinguishOrbitals: boolean = false
 ): void {
     if (!context || context.isDisposed) return;
     if (context.requestCounter !== guard) return;
     if (!context.currentOrbitalGroup || !context.isShellView) return;
 
     clearShellCompositionLobes(context);
-    const lobes = createCompositionLobesGroup(components, meshes, context.clippingPlanes, context.surfaceStyle.opacity);
+    const lobes = createCompositionLobesGroup(
+        components, meshes, context.clippingPlanes, context.surfaceStyle.opacity, distinguishOrbitals
+    );
     context.currentOrbitalGroup.add(lobes);
 }
 

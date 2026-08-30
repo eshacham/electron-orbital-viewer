@@ -8,6 +8,7 @@ import atomReducer, {
     drillToShell,
     drillToSubshell,
     drillToOrbital,
+    clearSubshell,
     levelUp,
     goToLevel,
     setHoverRadius,
@@ -223,6 +224,50 @@ describe('atomSlice', () => {
             store.dispatch(drillToOrbital(2, 1, 2));   // l=1 only has ml in [-1, 1]
 
             expect(store.getState().atom).toEqual(before);
+        });
+    });
+
+    // Addendum 2's readability follow-up: selecting a subshell isolates its
+    // orbitals in the composition view, so there must be a way back to the
+    // overlapping view -- which stays the default, because the overlap is
+    // the teaching point (spec §2).
+    describe('clearSubshell', () => {
+        it('clears the subshell selection but stays on the shell level', () => {
+            const store = buildStore();
+            store.dispatch(solveSucceeded(neonLikeProfile()));
+            store.dispatch(drillToSubshell(2, 1));
+            store.dispatch(clearSubshell());
+
+            const state = store.getState().atom;
+            expect(state.level).toBe('shell');
+            expect(state.selectedShell).toBe(2);
+            expect(state.selectedSubshell).toBeNull();
+            expect(state.selectedOrbital).toBeNull();
+        });
+
+        it('is a no-op away from the shell level', () => {
+            const store = buildStore();
+            store.dispatch(solveSucceeded(neonLikeProfile()));
+            store.dispatch(drillToOrbital(2, 1, 0));
+            store.dispatch(clearSubshell());
+
+            const state = store.getState().atom;
+            expect(state.level).toBe('orbital');
+            expect(state.selectedSubshell).toEqual({ n: 2, l: 1 });
+            expect(state.selectedOrbital).toEqual({ n: 2, l: 1, ml: 0 });
+        });
+
+        it('never triggers a solve (pure navigation, ruling R28)', () => {
+            const store = buildStore();
+            const profile = neonLikeProfile();
+            store.dispatch(solveSucceeded(profile));
+            store.dispatch(drillToSubshell(2, 1));
+            store.dispatch(clearSubshell());
+
+            const state = store.getState().atom;
+            expect(state.profile).toBe(profile);
+            expect(state.isSolving).toBe(false);
+            expect(state.error).toBeNull();
         });
     });
 

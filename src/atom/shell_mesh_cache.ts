@@ -15,8 +15,22 @@ const MAX_ENTRIES = 24;
 
 const cache = new Map<string, LobeMeshData[]>();
 
-export function shellMeshCacheKey(Z: number, n: number, resolution: number, enclosedFraction: number): string {
-    return `${Z}:${n}:${resolution}:${enclosedFraction}`;
+/**
+ * `isolatedL` is the subshell the composition view is currently isolated to
+ * (Addendum 2's readability follow-up), or null for the full, overlapping
+ * shell. Part of the key because the cached value is the *list of meshes
+ * actually computed* -- isolating 3d computes five meshes, not nine, so an
+ * isolated entry and a full one are different values under the same
+ * (Z, n, resolution, fraction) and must not collide.
+ */
+export function shellMeshCacheKey(
+    Z: number,
+    n: number,
+    resolution: number,
+    enclosedFraction: number,
+    isolatedL: number | null = null
+): string {
+    return `${Z}:${n}:${resolution}:${enclosedFraction}:${isolatedL ?? 'all'}`;
 }
 
 /** Looks up a previously computed shell's lobe meshes, marking it most-recently-used on a hit. */

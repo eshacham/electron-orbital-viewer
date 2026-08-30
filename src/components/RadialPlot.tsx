@@ -224,7 +224,17 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                         key={curve.label}
                         d={curve.line}
                         className="radial-plot-line"
-                        stroke={curve.color}
+                        // `style`, not a `stroke=` attribute (bug fix, found
+                        // live rather than by any test): `.radial-plot-line`
+                        // in style.css sets `stroke: #4da3ff` for the
+                        // single-curve hydrogenic plot, and a CSS declaration
+                        // always beats an SVG presentation attribute -- so
+                        // every curve here drew blue while the legend swatch
+                        // beside it (an inline style, which does win) drew
+                        // the real colour. Addendum 2's whole point is that
+                        // the plot's per-n colours and the 3D view's agree;
+                        // they could not, because the plot was monochrome.
+                        style={{ stroke: curve.color }}
                         fill="none"
                     />
                 ))}

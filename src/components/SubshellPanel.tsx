@@ -3,6 +3,7 @@ import { Box, Chip, Typography, Button } from '@mui/material';
 import { SerialisedSubshell } from '../workers/atomWorker';
 import { subshellLabel } from '../atom/configurations';
 import { orbitalName } from '../orbital_names';
+import { CURVE_COLORS, orbitalShade } from '../curve_colors';
 
 interface SubshellPanelProps {
     /**
@@ -58,6 +59,12 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
     const activeSubshell = selectedSubshell && selectedSubshell.n === shellN
         ? shellSubshells.find(s => s.l === selectedSubshell.l) ?? null
         : null;
+    // The subshell's own curve colour: its position within the shell, which
+    // is exactly the index App.tsx's atomCurves and shell_composition.ts's
+    // colorIndex both use, so the chip, the curve and the 3D lobes agree.
+    const activeSubshellColor = activeSubshell
+        ? CURVE_COLORS[shellSubshells.indexOf(activeSubshell) % CURVE_COLORS.length]
+        : CURVE_COLORS[0];
 
     return (
         <Box className="subshell-panel" aria-label="subshells">
@@ -73,6 +80,12 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                             data-n={subshell.n}
                             data-l={subshell.l}
                             color={isSelected ? 'primary' : 'default'}
+                            // A toggle, not a one-way selection: pressed means
+                            // this subshell's orbitals are isolated in the 3D
+                            // composition view, and clicking it again returns to
+                            // the overlapping view (Addendum 2's readability
+                            // follow-up -- see App.tsx's handleSelectSubshell).
+                            aria-pressed={isSelected}
                             onClick={() => onSelectSubshell(subshell.n, subshell.l)}
                             label={
                                 <span className="subshell-chip-content">
@@ -96,6 +109,18 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                 })}
             </Box>
 
+            {/* Addendum 2's readability follow-up. Iron's five 3d orbitals
+                overlap into one gold blob; isolating a subshell is how you
+                read them apart. Said outright, because user testing showed
+                the affordance is not discoverable on its own -- and said
+                honestly: the overlapping view is the default *because* the
+                overlap is real (spec §2). */}
+            <Typography variant="caption" className="subshell-isolate-hint" display="block">
+                {selectedSubshell
+                    ? `Showing ${subshellLabel(selectedSubshell.n, selectedSubshell.l)} alone — click its chip again for the whole shell`
+                    : 'Click a subshell to show its orbitals on their own'}
+            </Typography>
+
             {activeSubshell && (
                 <Box className="subshell-ml-row" role="group" aria-label="magnetic quantum number">
                     {Array.from({ length: 2 * activeSubshell.l + 1 }, (_, i) => i - activeSubshell.l).map(ml => (
@@ -105,6 +130,20 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                             className="subshell-ml-button"
                             onClick={() => onSelectOrbital(activeSubshell.n, activeSubshell.l, ml)}
                         >
+                            {/* The legend for the isolated composition view
+                                (Addendum 2's readability follow-up): each of
+                                the subshell's orbitals is drawn in its own
+                                shade of the subshell colour in 3D, and this
+                                is where a shade gets its name. A swatch
+                                rather than coloured label text, which at
+                                these hues (a gold 3d_z² on a light panel)
+                                does not hold up as readable. Same arguments
+                                to orbitalShade as shell_composition_view.ts
+                                passes, so the two cannot drift apart. */}
+                            <span
+                                className="subshell-ml-swatch"
+                                style={{ background: orbitalShade(activeSubshellColor, activeSubshell.l + ml, 2 * activeSubshell.l + 1) }}
+                            />
                             {orbitalName(activeSubshell.n, activeSubshell.l, ml)}
                         </Button>
                     ))}

@@ -1,5 +1,5 @@
-import { shellComposition, ShellCompositionSubshell } from '../../src/atom/shell_composition';
-import { CURVE_COLORS } from '../../src/curve_colors';
+import { shellComposition, isolateSubshell, ShellCompositionSubshell } from '../../src/atom/shell_composition';
+import { CURVE_COLORS, orbitalShade } from '../../src/curve_colors';
 
 /**
  * Addendum 2's occupancy model: an open subshell spreads its electrons
@@ -87,6 +87,94 @@ describe('shellComposition', () => {
         const components = shellComposition(subshells);
         for (const c of components) {
             expect(CURVE_COLORS[c.colorIndex % CURVE_COLORS.length]).toBeDefined();
+        }
+    });
+});
+
+/**
+ * Addendum 2's readability follow-up: iron's five overlapping 3d orbitals
+ * read as one gold blob. Isolation is a filter over the full composition,
+ * never a different composition -- so colours (and therefore the link to
+ * the radial plot's curves) survive it unchanged.
+ */
+describe('isolateSubshell', () => {
+    /** Iron's M shell: 3s2 3p6 3d6 -- the case that motivated isolation. */
+    const ironM: ShellCompositionSubshell[] = [
+        { n: 3, l: 0, electrons: 2 },
+        { n: 3, l: 1, electrons: 6 },
+        { n: 3, l: 2, electrons: 6 },
+    ];
+
+    it('null leaves the full, overlapping shell -- the default view', () => {
+        const all = shellComposition(ironM);
+        expect(isolateSubshell(all, null)).toBe(all);
+        expect(all).toHaveLength(1 + 3 + 5);
+    });
+
+    it('keeps only the chosen subshell\'s orbitals', () => {
+        const isolated = isolateSubshell(shellComposition(ironM), 2);
+        expect(isolated).toHaveLength(5);
+        expect(isolated.every(c => c.l === 2)).toBe(true);
+        expect(isolated.map(c => c.ml).sort((a, b) => a - b)).toEqual([-2, -1, 0, 1, 2]);
+    });
+
+    it('carries colorIndex through unchanged, so an isolated subshell keeps the colour it had while overlapping', () => {
+        const all = shellComposition(ironM);
+        const isolated = isolateSubshell(all, 2);
+        const overlappingD = all.filter(c => c.l === 2);
+        expect(isolated.map(c => c.colorIndex)).toEqual(overlappingD.map(c => c.colorIndex));
+        // 3d is the third subshell of the M shell, so index 2 -- the same
+        // index App.tsx's atomCurves colours its curve with.
+        expect(new Set(isolated.map(c => c.colorIndex))).toEqual(new Set([2]));
+    });
+
+    it('preserves occupancy: iron\'s 3d6 is still 6/10 filled when isolated', () => {
+        const isolated = isolateSubshell(shellComposition(ironM), 2);
+        for (const c of isolated) {
+            expect(c.occupancyFraction).toBeCloseTo(0.6);
+        }
+    });
+
+    it('an unoccupied l yields nothing rather than throwing', () => {
+        expect(isolateSubshell(shellComposition(ironM), 3)).toEqual([]);
+    });
+});
+
+/**
+ * Addendum 2's readability follow-up, second half: isolating a subshell
+ * removes the other subshells, but five 3d cloverleaves in one colour still
+ * sum to one gold mass. Each member gets its own shade so they can be
+ * counted -- and stays close enough to the subshell's own curve colour that
+ * the link to the radial plot survives.
+ */
+describe('orbitalShade', () => {
+    it('leaves a one-member subshell (any s) on its plain curve colour', () => {
+        expect(orbitalShade('#ffd166', 0, 1)).toBe('#ffd166');
+    });
+
+    it('gives every member of a d subshell a distinct colour', () => {
+        const shades = [0, 1, 2, 3, 4].map(i => orbitalShade('#ffd166', i, 5));
+        expect(new Set(shades).size).toBe(5);
+    });
+
+    it('gives every member of an f subshell a distinct colour', () => {
+        const shades = Array.from({ length: 7 }, (_, i) => orbitalShade('#06d6a0', i, 7));
+        expect(new Set(shades).size).toBe(7);
+    });
+
+    it('keeps the middle member on the subshell\'s own hue, so the family still reads as one subshell', () => {
+        // The spread is centred, so the central mL of an odd-sized subshell
+        // is the base colour itself.
+        expect(orbitalShade('#ffd166', 2, 5)).toBe('#ffd166');
+    });
+
+    it('emits well-formed six-digit hex for every member of every subshell size', () => {
+        for (const base of CURVE_COLORS) {
+            for (const count of [1, 3, 5, 7]) {
+                for (let i = 0; i < count; i++) {
+                    expect(orbitalShade(base, i, count)).toMatch(/^#[0-9a-f]{6}$/);
+                }
+            }
         }
     });
 });

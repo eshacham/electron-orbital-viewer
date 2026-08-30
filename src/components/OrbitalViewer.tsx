@@ -17,7 +17,7 @@ import {
     attachShellCompositionLobes,
     VisualizerContext
 } from '../orbital_visualizer';
-import { shellComposition, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
+import { shellComposition, isolateSubshell, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
 import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '../atom/shell_mesh_cache';
 import { createShellCompositionWorker } from '../workers/createShellCompositionWorker';
 import { LobeMeshData } from '../workers/shellCompositionWorker';
@@ -58,6 +58,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     const atomLevel = useAppSelector(state => state.atom.level);
     const atomProfile = useAppSelector(state => state.atom.profile);
     const atomSelectedShell = useAppSelector(state => state.atom.selectedShell);
+    const atomSelectedSubshell = useAppSelector(state => state.atom.selectedSubshell);
     const atomHoverRadius = useAppSelector(state => state.atom.hoverRadius);
     const [scaleBar, setScaleBar] = useState<ScaleBar | null>(null);
 
@@ -182,11 +183,24 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         const shellSubshells = atomProfile.subshells.filter(s => s.n === atomSelectedShell);
         if (shellSubshells.length === 0) return;
 
+        // Addendum 2's readability follow-up: selecting a subshell isolates
+        // its orbitals here, so iron's five 3d cloverleaves can be read
+        // apart instead of summing to one gold blob. The overlapping view
+        // stays the default -- the overlap is the teaching point (spec §2)
+        // -- and clicking the selected chip again clears this back to it
+        // (App.tsx's handleSelectSubshell / atomSlice's clearSubshell).
+        const isolatedL = atomSelectedSubshell && atomSelectedSubshell.n === atomSelectedShell
+            ? atomSelectedSubshell.l
+            : null;
+
         // Ascending l, matching the order the radial plot colours a shell's
         // subshells by (App.tsx's atomCurves) -- shellComposition's
-        // colorIndex is this array's position, so the two must agree.
-        const components = shellComposition(shellSubshells);
-        const cacheKey = shellMeshCacheKey(atomProfile.Z, atomSelectedShell, COMPOSITE_ORBITAL_RESOLUTION, enclosedFraction);
+        // colorIndex is this array's position, so the two must agree. The
+        // isolation filter runs *after* that assignment, so an isolated
+        // subshell keeps the colour it had while overlapping.
+        const components = isolateSubshell(shellComposition(shellSubshells), isolatedL);
+        if (components.length === 0) return;
+        const cacheKey = shellMeshCacheKey(atomProfile.Z, atomSelectedShell, COMPOSITE_ORBITAL_RESOLUTION, enclosedFraction, isolatedL);
 
         // A different shell's (or a stale fraction's) lobes must not linger
         // while the new ones are being computed -- cleared synchronously,
@@ -201,7 +215,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
 
         const cached = getCachedShellMeshes(cacheKey);
         if (cached) {
-            attachShellCompositionLobes(context, guard, components, cached);
+            attachShellCompositionLobes(context, guard, components, cached, isolatedL !== null);
             return;
         }
 
@@ -210,19 +224,21 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         // R(r) and sampling box -- the same per-subshell sizing level 3
         // uses (subshellSamplingRadius), just at a lower resolution (see
         // COMPOSITE_ORBITAL_RESOLUTION).
-        const orbitalParams: OrbitalParams[] = [];
-        for (const subshell of shellSubshells) {
-            for (let ml = -subshell.l; ml <= subshell.l; ml++) {
-                orbitalParams.push({
-                    n: subshell.n, l: subshell.l, ml,
-                    Z: atomProfile.Z,
-                    resolution: COMPOSITE_ORBITAL_RESOLUTION,
-                    rMax: subshell.samplingRadius,
-                    enclosedFraction,
-                    radialSamples: { R: subshell.R, rMin: atomProfile.rMin, dx: atomProfile.dx, size: atomProfile.size },
-                });
-            }
-        }
+        // Driven off `components` rather than a second nested loop over the
+        // subshells, so the request list and the component list cannot
+        // diverge under isolation -- createCompositionLobesGroup pairs them
+        // strictly by index.
+        const orbitalParams: OrbitalParams[] = components.map(component => {
+            const subshell = shellSubshells.find(s => s.l === component.l)!;
+            return {
+                n: component.n, l: component.l, ml: component.ml,
+                Z: atomProfile.Z,
+                resolution: COMPOSITE_ORBITAL_RESOLUTION,
+                rMax: subshell.samplingRadius,
+                enclosedFraction,
+                radialSamples: { R: subshell.R, rMin: atomProfile.rMin, dx: atomProfile.dx, size: atomProfile.size },
+            };
+        });
 
         const worker = createShellCompositionWorker();
         worker.onmessage = (e: MessageEvent<ShellCompositionWorkerMessage>) => {
@@ -232,7 +248,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 return;
             }
             setCachedShellMeshes(cacheKey, e.data.meshes);
-            attachShellCompositionLobes(context, guard, components, e.data.meshes);
+            attachShellCompositionLobes(context, guard, components, e.data.meshes, isolatedL !== null);
         };
         worker.onerror = (event) => {
             console.error('OrbitalViewer: shell composition worker error:', event);
@@ -243,7 +259,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         return () => {
             worker.terminate();
         };
-    }, [atomMode, atomLevel, atomProfile, atomSelectedShell, enclosedFraction]);
+    }, [atomMode, atomLevel, atomProfile, atomSelectedShell, atomSelectedSubshell, enclosedFraction]);
 
     // Radial-plot hover -> the shell view's highlight ring (the other half
     // of the pointer-to-radius link set up above).
