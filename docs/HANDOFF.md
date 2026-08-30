@@ -120,10 +120,20 @@ the same `RadialState` interface. It would take gold's 6s from 27 % to under
    Surface matter only for a real marching-cubes mesh, i.e. hydrogen-like mode
    or atom level 3, so they are hidden at atom levels 1–2
 
-### In flight at time of writing
-- **Shell composition view** — render a shell's occupied orbitals *inside* it
-  at true scale, with occupancy visible, coloured to match the radial plot.
-  Spec: Addendum 2. This is the feature the user most wants.
+### Done, with a follow-up
+- **Shell composition view** (`81e7647`) — a shell's occupied orbitals render
+  inside it at true scale, coloured to match the radial plot, with occupancy
+  shown as "3d · 6 of 10 e⁻". Atom-level rings now colour by n. Timings at
+  resolution 32, off the main thread: C 4 meshes 112 ms, Fe 9 meshes 247 ms,
+  U 16 meshes 457 ms; cached per (Z, n, resolution, fraction).
+
+  **Follow-up needed:** with five d orbitals overlapping, iron's M shell reads
+  as a single gold blob rather than five distinguishable cloverleaves. The
+  overlap is physically honest — they do occupy the same space, which is the
+  teaching point — but it is hard to look at. Proposed fix: clicking a subshell
+  chip isolates that subshell's orbitals, keeping the overlapping view as the
+  default and isolation as the way to read it. Same mechanism would serve the
+  "explicit deselect" item below.
 
 ### Not started, in priority order
 - **Rename "Hydrogen-like" → "Basic Orbitals" and remove its Z control.**
