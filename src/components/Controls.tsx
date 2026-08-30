@@ -40,6 +40,14 @@ interface ControlsProps {
   /** The element driving the SCF in atom mode. Basic Orbitals mode has no element control of its own any more (Addendum 2's mode rename) -- it is fixed at BASIC_ORBITALS_Z. */
   atomZ?: number;
   onAtomElementChange?: (Z: number) => void;
+  /**
+   * Whether to show atom mode's element dropdown here. False once the
+   * periodic-table panel is on screen and owns element selection (Addendum
+   * 3) -- the dropdown is the narrow-screen fallback, since a periodic
+   * table does not survive a phone width. Defaults to true so every
+   * pre-existing render of this component keeps its picker.
+   */
+  showElementPicker?: boolean;
   /** Slot for SubshellPanel at level 2; empty otherwise. Keeps this component ignorant of atomSlice/SubshellPanel specifics. */
   children?: React.ReactNode;
 
@@ -76,6 +84,7 @@ const Controls: React.FC<ControlsProps> = ({
   atomLevel,
   atomZ,
   onAtomElementChange,
+  showElementPicker = true,
   children,
   initialN, onNChange,
   initialL, onLChange,
@@ -254,10 +263,11 @@ const Controls: React.FC<ControlsProps> = ({
         </FormHelperText>
       </FormControl>
 
-      {isAtomMode ? (
+      {isAtomMode ? (showElementPicker && (
         /* Atom mode: a real neutral element, SCF-solved -- the picker drives
-           solveAtom via atomSlice.setElement, not the hydrogen-like nucleus
-           charge below. */
+           solveAtom via atomSlice.setElement. Suppressed when the
+           periodic-table panel is showing, which is the same control in a
+           form that also says what the element *is*. */
         <FormControl fullWidth margin="normal" size="small">
           <InputLabel id="atom-z-select-label">Element</InputLabel>
           <Select
@@ -276,7 +286,7 @@ const Controls: React.FC<ControlsProps> = ({
           </Select>
           <FormHelperText>neutral atom, central-field SCF</FormHelperText>
         </FormControl>
-      ) : (
+      )) : (
         /* Addendum 2's mode rename: the element control is gone and Z is
            fixed at 1, so this mode is exactly one electron bound to one
            proton -- the case the Schrodinger equation solves exactly. Spec

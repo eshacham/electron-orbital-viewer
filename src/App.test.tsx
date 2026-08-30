@@ -170,8 +170,9 @@ describe('App', () => {
         expect(screen.getByTestId('orbital-viewer')).toBeInTheDocument();
 
         // Atom mode is the default: n/l/ml collapse into the drill-down, so
-        // the element picker (not Basic Orbitals' selects) is what shows.
-        expect(screen.getByRole('combobox', { name: /Element/i })).toBeInTheDocument();
+        // the element selector (not Basic Orbitals' selects) is what shows.
+        // On a desktop viewport that selector is the periodic table.
+        expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /atom mode/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /basic orbitals mode/i })).toBeInTheDocument();
     });
@@ -288,6 +289,46 @@ describe('App', () => {
 
         expect(screen.getByText(/did not converge/i)).toBeInTheDocument();
         expect(screen.queryByLabelText('subshells')).not.toBeInTheDocument();
+    });
+
+    // Addendum 3: the periodic table replaces the dropdown on desktop, and
+    // the dropdown remains the narrow-screen fallback. Exactly one of the
+    // two must be present, never both and never neither.
+    describe('element selector', () => {
+        it('uses the periodic table, not the dropdown, on a desktop viewport', () => {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+
+            expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
+            expect(container.querySelectorAll('.periodic-tile')).toHaveLength(118);
+            expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
+        });
+
+        it('falls back to the dropdown on a phone, where a table does not fit', () => {
+            installMatchMedia(true);
+            renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+
+            expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
+            expect(screen.getByRole('combobox', { name: /Element/i })).toBeInTheDocument();
+        });
+
+        it('is not shown at all in Basic Orbitals mode, which has no element', () => {
+            installMatchMedia(false);
+            renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+
+            expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
+        });
+
+        it('solves the element a tile selects', () => {
+            installMatchMedia(false);
+            const { container, store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+
+            fireEvent.click(container.querySelector('.periodic-tile[data-z="26"]')!);
+
+            expect(store.getState().atom.Z).toBe(26);
+            expect(store.getState().atom.isSolving).toBe(true);
+        });
     });
 
     it('keeps LevelNav reachable on a phone even while the controls sheet is closed', () => {

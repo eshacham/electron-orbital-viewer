@@ -35,6 +35,7 @@ import OrbitalViewer from './components/OrbitalViewer';
 import RadialPlot, { RadialCurve } from './components/RadialPlot';
 import LevelNav, { NavigationTarget } from './components/LevelNav';
 import SubshellPanel from './components/SubshellPanel';
+import PeriodicTable from './components/PeriodicTable';
 import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, BASIC_ORBITALS_Z } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
@@ -355,6 +356,14 @@ function App() {
                     onOrbitalFailed={handleOrbitalFailed}
                     enclosedFraction={enclosedFraction}
                 />
+                {/* Addendum 3: the element selector is a real periodic
+                    table, in its own panel across the top, on anything
+                    wider than a phone. A table does not survive a phone
+                    width, so below that the dropdown in Controls stays --
+                    the two are alternatives, never both at once. */}
+                {isAtomMode && !isNarrow && (
+                    <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} />
+                )}
                 {isNarrow && (
                     <IconButton
                         id="panel-toggle"
@@ -386,6 +395,7 @@ function App() {
                         atomLevel={atomLevel}
                         atomZ={atomZ}
                         onAtomElementChange={handleAtomElementChange}
+                        showElementPicker={isNarrow}
                         initialN={n}
                         onNChange={setN}
                         initialL={l}

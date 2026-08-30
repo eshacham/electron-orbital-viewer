@@ -460,3 +460,112 @@ button:hover {
   stroke: #4da3ff;
   stroke-width: 2;
 }
+
+/* ---------------------------------------------------------------------------
+   Periodic-table selector (Addendum 3). Its own panel across the top, clear
+   of the side panel on the left and the radial plot at the bottom right. It
+   is the element control on anything wider than a phone; the dropdown in
+   #controls takes over below that (see App.tsx's useMediaQuery).
+   --------------------------------------------------------------------------- */
+.periodic-table-panel {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 8px 12px 10px;
+  border-radius: 8px;
+  background: rgba(8, 8, 10, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-family: 'Roboto', sans-serif;
+  max-width: calc(100vw - 420px);
+}
+.periodic-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.periodic-table-current {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.periodic-table-grid {
+  display: grid;
+  grid-template-columns: repeat(18, 26px);
+  gap: 2px;
+  margin-top: 8px;
+}
+/* The detached rows sit under the main table, indented to start where group
+   3 would be -- the gap they were lifted out of. */
+.periodic-table-f-row {
+  margin-top: 2px;
+}
+.periodic-table-f-row:first-of-type {
+  margin-top: 8px;
+}
+.periodic-tile {
+  height: 26px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-family: inherit;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.periodic-tile-number {
+  font-size: 7px;
+  opacity: 0.65;
+}
+.periodic-tile-symbol {
+  font-size: 11px;
+  font-weight: 600;
+}
+/* Colour is carried by the border (set inline, per block) plus a tinted
+   face; the tint is applied here rather than inline so hover and selection
+   can override it without fighting an inline style's specificity. */
+.periodic-tile.block-s { background: rgba(91, 141, 217, 0.20); }
+.periodic-tile.block-p { background: rgba(217, 139, 74, 0.20); }
+.periodic-tile.block-d { background: rgba(74, 168, 138, 0.20); }
+.periodic-tile.block-f { background: rgba(157, 122, 212, 0.20); }
+.periodic-tile:hover { filter: brightness(1.45); }
+/* A group is a column, so selecting or hovering one member lights all of
+   them -- they share a valence configuration, which is what makes them a
+   group at all (Addendum 3). */
+.periodic-tile.in-column {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+.periodic-tile.selected {
+  box-shadow: 0 0 0 2px #fff;
+  filter: brightness(1.6);
+}
+.periodic-table-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+.periodic-table-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.periodic-table-legend-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+.periodic-table-legend-note {
+  opacity: 0.7;
+}
