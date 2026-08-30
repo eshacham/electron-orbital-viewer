@@ -6,11 +6,12 @@ Live: https://d3rhfcclqjt4tf.cloudfront.net
 
 Two modes. **Atom** solves the real, many-electron ground state of any
 neutral element from hydrogen to oganesson, from scratch, and lets you drill
-from the whole atom down to a single shell, subshell or orbital. **Hydrogen-like**
-is the original picture: pick a set of quantum numbers and any nuclear charge
-and it draws the exact one-electron surface, coloured by the sign of ψ — red
-where the wave function is positive, blue where it is negative. Either way,
-you can turn it, cut it open, and read off how big it actually is.
+from the whole atom down to a single shell, subshell or orbital — picking the
+element off a real periodic table. **Basic Orbitals** is the idealised
+picture: pick a set of quantum numbers and it draws the exact one-electron
+surface at Z = 1, coloured by the sign of ψ — red where the wave function is
+positive, blue where it is negative. Either way, you can turn it, cut it
+open, and read off how big it actually is.
 
 ---
 
@@ -26,31 +27,56 @@ you can turn it, cut it open, and read off how big it actually is.
   M, …), and within a shell its individual subshells (3s, 3p, 3d, …) down to
   a single orbital lobe. The whole-atom and single-shell levels render as a
   cut-away sphere shaded by the radial distribution; the orbital level hands
-  off to the same marching-cubes lobe used by hydrogen-like mode, built from
+  off to the same marching-cubes lobe used by Basic Orbitals mode, built from
   the atom's own numerically solved R_nl(r) rather than the analytic
   hydrogenic form.
 - **The radial distribution D(r) = 4πr²ρ(r)**, plotted with one curve per
   shell — or, once you've drilled into one, per subshell — so the atom's
   whole structure is visible in a single view: argon's three curves peak at
-  0.06, 0.29 and 1.22 a₀, its K, L and M shells.
+  0.06, 0.29 and 1.22 a₀, its K, L and M shells. Each curve's colour is the
+  colour of its ring on the 3D cut face, so the two views read as one object.
+- **What the shells are made of.** Drilling into a shell renders its occupied
+  orbitals *inside* it, at true relative scale, with how full each subshell
+  is spelled out ("3d · 6 of 10 e⁻"). Carbon's L shell is a 2s sphere and
+  three 2p dumbbells; iron's M shell adds five 3d cloverleaves; uranium's N
+  shell adds seven 4f orbitals. Clicking a subshell shows it on its own, each
+  of its orbitals in a distinct shade, because five interpenetrating
+  cloverleaves in one colour are a blob.
+- **Core versus valence.** The outermost shell's ring is lit and the core's
+  recede, and the valence configuration is named on its own — 3s¹ for sodium,
+  3s² 3p⁵ for chlorine, 3s² 3p⁶ for argon. This is the periodic table's logic
+  rendered rather than asserted: Li, Na and K all show one lonely s electron
+  outside a closed core; F and Cl both show one short of full.
+- **A periodic table for choosing the element**, coloured by block (s/p/d/f)
+  rather than by chemical family — the block names which subshell type its
+  row is filling, so a d-block tile predicts cloverleaves and an f-block tile
+  predicts seven-lobed shapes. Selecting or hovering an element lights its
+  whole column, because a group *is* a column: its members share a valence
+  configuration.
+- **Clickable rings.** The ring you can see is the thing you click to open
+  that shell; clicking the open shell again (or its ✕) returns to the whole
+  atom.
 - **Orbital energies**, in Hartree, next to each subshell — labelled
   explicitly as orbital energies, never ionisation energies, because they
   are not the same number (see [Limitations](#limitations)).
-- **A camera and a radial-plot axis framed to what's actually enclosed** —
-  the contour holding the requested share of the electron — not to the
-  sampling grid behind it, which is sized generously to hold the faintest
-  tail and would otherwise render argon 20x too small and gold 100x too
-  small: a few pixels in an empty view.
+- **A camera and a radial-plot axis framed to what the atom actually is** —
+  the contour holding the requested share of the electron, widened where
+  needed to reach the valence shell — not to the sampling grid behind it,
+  which is sized generously to hold the faintest tail and would otherwise
+  render argon 20x too small and gold 100x too small: a few pixels in an
+  empty view.
 - **A convergence guarantee.** Every neutral atom, Z = 1 to 118, reaches a
   converged self-consistent solution; the app never renders one that has not
   (see [How it works](#how-it-works)).
 
-### Hydrogen-like mode
+### Basic Orbitals mode
 
 - **Any orbital up to n = 9** — every (n, l, mₗ) combination, 285 in all.
 - **Both phases of ψ**, so nodal surfaces are where the colours meet.
-- **A nucleus of charge Z** from hydrogen to oganesson. This is a *hydrogen-like*
-  ion, not a neutral atom — atom mode above is what solves for the real thing.
+- **One electron, Z = 1** — the case the Schrödinger equation solves exactly,
+  and the idealised shape every multi-electron orbital is a distortion of.
+  There is no element control here: atom mode above covers every real
+  element.
 - **How much of the electron the surface encloses** — 50 %, 75 %, 90 %, 95 % or
   99 %. The density contour that achieves it is derived per orbital and reported
   beneath the control, so "90 %" means the same thing for a 1s as for a 9f.
@@ -76,11 +102,12 @@ you can turn it, cut it open, and read off how big it actually is.
 
 ## How it works
 
-### Rendering one orbital (hydrogen-like mode, and atom mode's orbital level)
+### Rendering one orbital (Basic Orbitals mode, and atom mode's orbital level)
 
-**1. The wave function.** ψ(r, θ, φ) = R_nl(r) · Y_lmₗ(θ, φ). In hydrogen-like
-mode R_nl is the exact analytic solution for one electron bound to a point
-nucleus of charge Z; everything that depends only on (n, l, mₗ, Z) —
+**1. The wave function.** ψ(r, θ, φ) = R_nl(r) · Y_lmₗ(θ, φ). In Basic
+Orbitals mode R_nl is the exact analytic solution for one electron bound to a
+point nucleus of charge Z (fixed at Z = 1); everything that depends only on
+(n, l, mₗ, Z) —
 normalisation constants, the Laguerre coefficients — is computed once per
 orbital rather than per sample. Atom mode's orbital level swaps in the same
 atom's own numerically solved R_nl(r) (see below) in place of the analytic
@@ -176,6 +203,17 @@ heavy atom's inner shells can sit within a couple of percent of the range
 even after that fix — gold's peaks span 0.014 to 0.385 a₀, a 27x range that
 a linear axis still crowds against the left edge.
 
+One further correction, at the whole-atom level only. The enclosed-fraction
+contour answers "where is 90% of the charge", and for a many-electron atom
+that is dominated by the compact core: at the default 90%, 34 of the first 56
+elements have their *valence* shell's peak outside it — sodium's by a factor
+of 1.67, caesium's by 2.63 — and since the cut face is stencilled to the
+sphere, the valence shell was not dim, it was off the picture. So the
+whole-atom sphere is drawn at whichever is larger, the contour or a little
+past the valence peak. The contour itself is untouched and still means
+exactly what it says; these are two different questions, and only the second
+one is "how big is this atom".
+
 ---
 
 ## Physics conventions
@@ -185,7 +223,7 @@ a linear axis still crowds against the left edge.
   Hartree (Ha), never eV.
 - **D(r) vs P(r).** Atom mode plots D(r) = 4πr²ρ(r), the radial electron
   density for a shell or subshell holding possibly several electrons.
-  Hydrogen-like mode plots P(r) = r²R(r)², the same idea for a single
+  Basic Orbitals mode plots P(r) = r²R(r)², the same idea for a single
   electron's own radial factor. They coincide for a one-electron subshell,
   which is why hydrogen looks identical in both modes.
 - **Central-field, spherically averaged.** The self-consistent field treats
@@ -265,6 +303,14 @@ spherically symmetric density (what the shell and subshell levels actually
 show); the individual lobe you get by drilling to level 3 is a real solution
 of the same equations, but not a privileged one.
 
+**A heavy atom's core compresses to a dot at the whole-atom level.** Once
+the view reaches out to the valence shell, the span it has to cover is real
+and enormous: uranium's K shell peaks inside 0.02 a₀ and its 7s near 4 a₀, a
+factor of 200 in one linear picture. The core rings are still there, still
+coloured and still countable in the radial plot (which uses a square-root
+axis for exactly this reason), but at the atom level they are small. Opening
+a shell — click its chip — reframes the camera onto it.
+
 **Shell peaks merge from about Z = 26 onward, so the visible ring count is
 not the shell count.** Neighbouring shells' D(r) genuinely overlap more as
 they compress inward with increasing nuclear charge — iron (Z = 26, four
@@ -273,14 +319,19 @@ distribution, and heavier atoms merge further still. This is real physics,
 not a rendering limitation, but it means counting rings is not a reliable way
 to count shells past the middle of the periodic table.
 
-### Hydrogen-like mode
+### Basic Orbitals mode
 
-**One electron.** The Schrödinger equation is solved exactly only for a single
-electron around a point nucleus, and that is what this draws. Choosing carbon
-gives you C⁵⁺ — a carbon nucleus with one electron — not carbon's actual
-orbitals; atom mode above is what solves for the real thing. There is no
-electron–electron repulsion, no screening, no correlation, and the energies
-are not the hydrogen-like ones at all.
+**One electron, and only hydrogen's.** The Schrödinger equation is solved
+exactly only for a single electron around a point nucleus, and that is what
+this draws — at Z = 1. There is no electron–electron repulsion, no screening
+and no correlation, so nothing here is an element other than hydrogen; atom
+mode above is what solves for real, many-electron atoms.
+
+The nuclear-charge control this mode used to carry is gone, and with it the
+one-electron ions (He⁺, Li²⁺, …) and the direct demonstration that raising Z
+shrinks an orbital without changing its shape. That was a deliberate trade
+for one element control in the app rather than two meaning different things;
+nothing in the solver is restricted, so it is a UI change only.
 
 **No hybrids, no molecules.** sp, sp² and sp³ hybrids and molecular orbitals —
 most of what an introductory chemistry course actually reasons with — are
@@ -293,7 +344,7 @@ increasingly a fiction.
 ### Both modes
 
 **The enclosed fraction, and level 3's box, are of the sampled grid.** The
-sampling box (hydrogen-like mode, and atom mode's orbital level) holds all but
+sampling box (Basic Orbitals mode, and atom mode's orbital level) holds all but
 a ten-thousandth of the electron, so "90 %" is 90 % to within that — not of an
 exact infinite integral. The threshold is also quantised by the grid it is
 derived from. Levels 1 and 2 in atom mode have no such caveat: the shell view
@@ -317,7 +368,7 @@ hit — in that case the surface would touch the box.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 1260+ tests
+npm test           # 1400+ tests
 npm run build      # production bundle into dist/
 ```
 
@@ -354,9 +405,13 @@ account. The Python side pins its own dependencies in `infra/requirements.txt`.
 | `src/atom/scf.ts` | The self-consistent field loop: nuclear charge in, converged ground-state atom out |
 | `src/atom/configurations.ts` | Ground-state electron configurations, Z = 1 to 118 |
 | `src/atom/atom_profile.ts` | Converged solution → per-shell/subshell D(r) curves, contour radii, shell peaks, and level-3's sampling radius |
-| `src/atom/shell_view.ts` | The spherical cut-away shading for levels 1-2 (whole atom / single shell) |
+| `src/atom/shell_view.ts` | The spherical cut-away shading for levels 1-2 (whole atom / single shell), including the ring colours and the core/valence distinction |
+| `src/atom/shell_composition.ts` | Which orbitals a shell is made of, how full each is, and the isolate-one-subshell filter |
+| `src/atom/shell_pick.ts` | Radius → shell, for clicking a ring on the cut face |
+| `src/periodic_table.ts` | Where each element sits in the 18-column table, and which block it belongs to |
+| `src/curve_colors.ts` | The one palette the radial plot, the rings and the orbital lobes all draw from |
 | `src/atom/useAtomSolver.ts` | React hook driving the atom worker and dispatching its result |
-| `src/store/` | Redux state: hydrogen-like params/surface style, and atom mode's drill-down level, profile and hover linkage |
+| `src/store/` | Redux state: Basic Orbitals params/surface style, and atom mode's drill-down level, profile and hover linkage |
 | `src/components/` | React controls and the viewer host, including atom mode's level navigation and subshell panel |
 | `src/workers/` | The off-thread calculation: marching cubes (`orbitalWorker.ts`) and the SCF solve (`atomWorker.ts`) |
 | `infra/` | CDK stack for S3 + CloudFront hosting |

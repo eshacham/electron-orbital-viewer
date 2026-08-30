@@ -318,6 +318,13 @@ button:hover {
     max-height: 30dvh;
     overflow-y: auto;
   }
+  /* The sheet toggle floats at top-left over this panel, and its 44px touch
+     target lands squarely on the breadcrumb's first segment -- which is the
+     way back to the whole atom, so losing it to an overlap is worse than
+     losing a label. Indent the one line it reaches. */
+  .side-panel .level-nav .level-nav-breadcrumbs {
+    padding-left: 44px;
+  }
 
   #controls {
     top: auto;
@@ -388,9 +395,13 @@ button:hover {
     box-shadow: -16px 0 12px 12px rgb(238, 238, 238);
   }
 
-  /* Overlays move to the top so the strip has the bottom to itself. */
-  .radial-plot { right: 12px; top: 12px; bottom: auto; }
-  .scale-readout { left: 12px; top: 64px; right: auto; bottom: auto; padding: 6px 10px 5px; font-size: 12px; }
+  /* Overlays move to the top so the strip has the bottom to itself --
+     but below LevelNav, which is also pinned to the top here and is both
+     wider and opaque. At `top: 12px` the plot sat entirely behind it and
+     was invisible on a phone (found by driving the app at 420px). LevelNav
+     is capped at 30dvh above, so clearing that always clears it. */
+  .radial-plot { right: 12px; top: calc(30dvh + 16px); bottom: auto; }
+  .scale-readout { left: 12px; top: calc(30dvh + 16px); right: auto; bottom: auto; padding: 6px 10px 5px; font-size: 12px; }
 }
 
 /* ---------------------------------------------------------------------------
