@@ -325,6 +325,14 @@ button:hover {
   .side-panel .level-nav .level-nav-breadcrumbs {
     padding-left: 44px;
   }
+  /* The panel is capped at 30dvh and scrolls, and with the valence line
+     added it now clips "About this model" mid-word -- which reads as broken
+     rather than as scrollable. The method one-liner is the line to give up:
+     spec §7 asks for the method to be stated "somewhere reachable", and the
+     About collapse right below states it in full. */
+  .side-panel .level-nav .level-nav-method {
+    display: none;
+  }
 
   #controls {
     top: auto;
@@ -402,6 +410,49 @@ button:hover {
      is capped at 30dvh above, so clearing that always clears it. */
   .radial-plot { right: 12px; top: calc(30dvh + 16px); bottom: auto; }
   .scale-readout { left: 12px; top: calc(30dvh + 16px); right: auto; bottom: auto; padding: 6px 10px 5px; font-size: 12px; }
+
+  /* The compact plot's SVG is 150px, but its title is a full sentence and
+     was stretching the panel to ~380px of a 390px screen -- covering the
+     atom it describes. Cap the panel to its content and let the title wrap
+     onto two or three lines instead. The title is not shortened: naming
+     D(r) = 4πr²ρ(r), and saying the cut face is scaled to local structure,
+     are both honesty requirements (spec §7), not decoration. */
+  .radial-plot.compact { max-width: 172px; }
+  .radial-plot.compact .radial-plot-title { font-size: 10px; line-height: 1.25; }
+
+  /* The subshell panel is the substance of level 2, and inside a
+     horizontally scrolling strip with no width of its own it laid out as
+     one 797px row on a 390px screen -- its chips off past the right edge
+     and its wrap never triggering. Give it a page's worth of the strip so
+     the chip rows wrap and read normally. */
+  #controls .subshell-panel {
+    flex: 0 0 auto;
+    width: min(76vw, 320px);
+    /* First in the strip. It only exists at level 2, and at level 2 it is
+       what you came for -- behind the mode toggle and the element picker it
+       started a full screen-width off the right edge. */
+    order: -1;
+  }
+  #controls .subshell-chip { max-width: 100%; }
+  #controls .subshell-chip .MuiChip-label { overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* ---------------------------------------------------------------------------
+   Short viewport (a phone in landscape, or a squat desktop window). The rule
+   block above is shared with narrow-and-tall, where the scarce dimension is
+   width and stacking LevelNav / plot / sheet vertically is right. Here the
+   scarce dimension is height: at 390px tall, LevelNav's 30dvh cap plus the
+   plot below it plus the sheet's 44dvh do not fit, and the plot ends up
+   sitting over the sheet. There is plenty of width instead, so LevelNav
+   stops spanning it and the plot goes back beside it at the top right.
+   Must follow the block above: same specificity, so source order decides.
+   --------------------------------------------------------------------------- */
+@media (max-height: 500px) {
+  .side-panel .level-nav {
+    right: auto;
+    max-width: min(52vw, 420px);
+  }
+  .radial-plot { top: 12px; }
 }
 
 /* ---------------------------------------------------------------------------

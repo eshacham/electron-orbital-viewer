@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   FormControl,
@@ -135,6 +135,24 @@ const Controls: React.FC<ControlsProps> = ({
     }
   }, [initialL, onMlChange]); // initialMl is intentionally not here
 
+  // On a phone #controls is one horizontally scrolling strip, and it keeps
+  // whatever scroll position it was left at. Drilling into a shell inserts
+  // the subshell panel at the head of that strip (style.css gives it
+  // `order: -1` -- at level 2 it is what you came for), but the strip is
+  // still scrolled to wherever picking the element left it, so the panel
+  // arrives off the left edge and looks like nothing happened. Bring it
+  // into view when it appears. Desktop stacks vertically and never scrolls
+  // sideways, so this is a no-op there.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const hasDrillDownPanel = isAtomMode && Boolean(children);
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip || !compact || !open || !hasDrillDownPanel) return;
+    const panel = strip.querySelector<HTMLElement>('.subshell-panel');
+    if (!panel) return;
+    strip.scrollTo({ left: panel.offsetLeft - strip.offsetLeft, behavior: 'smooth' });
+  }, [hasDrillDownPanel, compact, open]);
+
   const handleUpdateOrbital = () => {
     const params: OrbitalParams = {
       n: initialN,
@@ -153,6 +171,7 @@ const Controls: React.FC<ControlsProps> = ({
   return (
     <Box
       id="controls"
+      ref={stripRef}
       className={[compact ? 'compact' : '', open ? 'open' : 'closed'].filter(Boolean).join(' ')}
       sx={{
         p: 2,
