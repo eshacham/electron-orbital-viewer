@@ -169,7 +169,17 @@ describe('visualizer dispatch: levels 1-2 render a shell view, not marching cube
         expect(distanceAfterFirst).toBeGreaterThan(0);
     });
 
-    it('shares the caps lifecycle: the whole view is only visible with a cut, because its only content lives on the cut face', () => {
+    // Bug fix (task 22, bug 4): this used to assert the *opposite* --
+    // clipAxis: 'none' left the group invisible, on the reasoning quoted
+    // below. That reasoning is exactly backwards for a shell view: unlike a
+    // marching-cubes orbital, it has no always-visible surface to fall back
+    // on when "no cut" is selected, so 'none' left it rendering nothing at
+    // all, permanently, until the whole surfaceStyle was reset back to a
+    // real axis (see shellViewClipAxis's doc comment in
+    // orbital_visualizer.ts and the dedicated regression test below for the
+    // exact mechanism this reproduces live: switching through hydrogen-like
+    // mode with the cut off and back).
+    it('shares the caps lifecycle: the whole view is visible regardless of the shared cut/mode style, because its only content lives on the cut face', () => {
         const context = buildContext({ ...defaultSurfaceStyle, clipAxis: 'none' });
         updateAtomViewInScene(context, atomShellParams());
         // Unlike a marching-cubes orbital, a shell view has no always-visible
@@ -177,11 +187,44 @@ describe('visualizer dispatch: levels 1-2 render a shell view, not marching cube
         // currentCaps are the very same group (see updateAtomViewInScene),
         // so refreshCaps's visibility toggle covers the whole thing.
         expect(context.currentOrbitalGroup).toBe(context.currentCaps);
-        expect(context.currentOrbitalGroup!.visible).toBe(false);
+        expect(context.currentOrbitalGroup!.visible).toBe(true);
 
         const cutContext = buildContext({ ...defaultSurfaceStyle, clipAxis: 'z', clipPosition: 0 });
         updateAtomViewInScene(cutContext, atomShellParams());
         expect(cutContext.currentOrbitalGroup!.visible).toBe(true);
+
+        // Wireframe mode has the same "no separate surface" problem 'none'
+        // does -- refreshCaps used to hide the cap outside 'solid' mode too.
+        const wireframeContext = buildContext({ ...defaultSurfaceStyle, mode: 'wireframe' });
+        updateAtomViewInScene(wireframeContext, atomShellParams());
+        expect(wireframeContext.currentOrbitalGroup!.visible).toBe(true);
+    });
+
+    // The regression test for bug 4's actual mechanism, not just the
+    // symptom above: 'none' must not even reach the clip plane a shell view
+    // is built with, because the plane itself -- not just cap visibility --
+    // is what the stencil technique and the cap's cut-face quad both depend
+    // on (updateClipPlane pushes a 'none' plane 1e9 units away, which would
+    // leave the stencil buffer at zero everywhere no matter what
+    // setCapsVisible says). This is the exact path the live bug report
+    // traced back to: switching to hydrogen-like mode, turning the cut off
+    // there (an entirely reasonable thing to do, to see the whole lobe),
+    // and switching back to atom mode -- surfaceStyle is shared, global
+    // state untouched by the mode switch itself.
+    it('substitutes a real clip plane for a shell view even when the shared style says "no cut" -- not just a visibility patch over a broken plane', () => {
+        const context = buildContext({ ...defaultSurfaceStyle, clipAxis: 'none' });
+        updateAtomViewInScene(context, atomShellParams());
+
+        // The plane actually used to build the stencils/cut face must be a
+        // real, nearby one -- not the 1e9-away "no clip" constant a
+        // marching-cubes orbital would correctly get for the same style.
+        expect(Math.abs(context.clipPlane.constant)).toBeLessThan(atomShellParams().rMax * 10);
+        expect(context.currentOrbitalGroup!.visible).toBe(true);
+
+        // The substitution must not leak back into the shared style itself
+        // -- a later marching-cubes view (hydrogen-like mode, or level 3)
+        // still has to see the "no cut" the user actually chose.
+        expect(context.surfaceStyle.clipAxis).toBe('none');
     });
 });
 
@@ -316,5 +359,60 @@ describe('defaultCameraPosition (spec bugfix: no axis is viewed edge-on by defau
     it('sits at exactly the requested distance from the origin', () => {
         expect(defaultCameraPosition(12).length()).toBeCloseTo(12);
         expect(defaultCameraPosition(1).length()).toBeCloseTo(1);
+    });
+});
+
+/**
+ * End-to-end regression test for task 22's bug 4 ("after i played with the
+ * hydrogen-like views, the atom ones don't show anything ... to fix it, i
+ * have to reload the page"), reproducing the mechanism through the same two
+ * entry points OrbitalViewer.tsx actually calls, in the same order a real
+ * session hits them -- not just the isolated unit checks above.
+ *
+ * The mechanism: `surfaceStyle` (Cut away / Surface) is shared, global state
+ * -- switching between atom and hydrogen-like mode never resets it. Turning
+ * the cut off is a completely reasonable thing to do in hydrogen-like mode
+ * (to see the whole lobe rather than a cross-section), but a shell view (see
+ * shellViewClipAxis's doc comment in orbital_visualizer.ts) has no separate
+ * surface to fall back on when there is no cut -- its cut face *is* the
+ * whole visible object. Before the fix, the inherited 'none' left every
+ * subsequent atom-mode shell view invisible, with nothing left to dispatch
+ * that would ever correct it -- reproducing "have to reload the page": a
+ * fresh mount is the only thing that resets surfaceStyle back to a real
+ * axis (see App.tsx's own once-only nudge of the default to 'z').
+ */
+describe('bug 4 regression: a shell view survives an inherited "no cut" from hydrogen-like mode', () => {
+    it('stays visible after switching to hydrogen-like mode with the cut off, then back to atom mode', async () => {
+        const worker = fakeWorker();
+        (createOrbitalWorker as jest.Mock).mockReturnValue(worker);
+        const context = buildContext();
+
+        // Atom mode's first shell view, cut on (the app's own default nudge).
+        updateAtomViewInScene(context, atomShellParams());
+        expect(context.currentOrbitalGroup!.visible).toBe(true);
+
+        // Switch to hydrogen-like mode and turn the cut off -- exactly what
+        // "playing with the hydrogen-like views" naturally includes, and
+        // what OrbitalViewer.tsx's marching-cubes effect calls on every
+        // entry into hydrogen-like mode regardless of what changed.
+        context.surfaceStyle = { ...context.surfaceStyle, clipAxis: 'none' };
+        const pending = updateOrbitalInScene(context, hydrogenLikeParams());
+        worker.onmessage!({ data: { type: 'success', meshData: fakeMeshData() } });
+        await pending;
+        expect(context.isShellView).toBe(false);
+
+        // Switch back to atom mode -- surfaceStyle.clipAxis is still 'none',
+        // untouched by either mode switch. Before the fix this shell view
+        // rendered with an out-of-range clip plane and a hidden cap: visible
+        // for not even one real frame, since both were wrong from the
+        // moment this function returned.
+        updateAtomViewInScene(context, atomShellParams(), { animate: false });
+
+        expect(context.isShellView).toBe(true);
+        expect(context.currentOrbitalGroup!.visible).toBe(true);
+        expect(Math.abs(context.clipPlane.constant)).toBeLessThan(atomShellParams().rMax * 10);
+        // The fix must not silently "fix" the user's own choice elsewhere --
+        // only this shell view's own rendering substitutes a real axis.
+        expect(context.surfaceStyle.clipAxis).toBe('none');
     });
 });

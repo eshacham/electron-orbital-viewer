@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
+import { ClipAxis, MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
 import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius } from './orbital_presets';
 import { createOrbitalMaterial, applySurfaceStyle, updateClipPlane, setGroupOpacity } from './orbital_material';
 import { createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCaps } from './clip_caps';
@@ -335,14 +335,45 @@ export function frameOrbital(context: VisualizerContext | null, rMax: number) {
 }
 
 /**
+ * Bug fix (task 22, bug 4): a shell view (levels 1-2) has no separate
+ * always-visible surface the way a marching-cubes orbital does -- its cut
+ * face *is* the entire visible object (see shell_view.ts's module doc, and
+ * createShellView, where the sphere itself carries no colour of its own,
+ * only the cap's shader does). `clipAxis: 'none'` deliberately pushes the
+ * clip plane out of range (see updateClipPlane) so a marching-cubes orbital
+ * shows its full, uncut surface -- but a shell view has no such surface to
+ * fall back on, so the same setting instead left it rendering nothing at
+ * all: reproduced by switching to hydrogen-like mode, turning the cut off
+ * (a completely reasonable thing to do there, to see the whole lobe), and
+ * switching back to atom mode -- `surfaceStyle` is shared, global state, so
+ * the inherited 'none' silently broke every atom-mode shell view from then
+ * on, with no further render to ever correct it (matching the bug report's
+ * "have to reload the page to fix it": a fresh mount is the only thing that
+ * resets `surfaceStyle` back to a real axis). A shell view therefore
+ * substitutes a real axis rather than ever actually cutting nothing --
+ * arbitrarily 'z', since the sphere is spherically symmetric and every axis
+ * looks identical. `surfaceStyle` itself is left untouched by this
+ * substitution, so switching back to a marching-cubes view (hydrogen-like
+ * mode, or drilling to level 3) still sees whatever cut the user actually
+ * chose.
+ */
+const SHELL_VIEW_FALLBACK_AXIS: Exclude<ClipAxis, 'none'> = 'z';
+function shellViewClipAxis(context: VisualizerContext): ClipAxis {
+    return context.surfaceStyle.clipAxis === 'none' ? SHELL_VIEW_FALLBACK_AXIS : context.surfaceStyle.clipAxis;
+}
+
+/**
  * Puts the caps where the plane is, and shows them only when they mean
- * something: there has to be a cut, and a solid surface for it to cut through.
+ * something: there has to be a cut, and a solid surface for it to cut
+ * through -- except for a shell view, which (per shellViewClipAxis's doc
+ * comment above) always has a real cut and is never wireframe, so its cap
+ * is always shown regardless of the shared clip/mode style.
  */
 function refreshCaps(context: VisualizerContext) {
-    const { surfaceStyle, currentCaps } = context;
+    const { surfaceStyle, currentCaps, isShellView } = context;
     setCapsVisible(
         currentCaps,
-        surfaceStyle.clipAxis !== 'none' && surfaceStyle.mode === 'solid'
+        isShellView ? true : (surfaceStyle.clipAxis !== 'none' && surfaceStyle.mode === 'solid')
     );
     setCapsOpacity(currentCaps, surfaceStyle.opacity);
     positionCaps(currentCaps, context.clipPlane);
@@ -355,7 +386,7 @@ export function setSurfaceStyle(context: VisualizerContext | null, style: Surfac
     applySurfaceStyle(context.currentOrbitalGroup, style);
     updateClipPlane(
         context.clipPlane,
-        style.clipAxis,
+        context.isShellView ? shellViewClipAxis(context) : style.clipAxis,
         style.clipPosition,
         context.clipExtent ?? 1
     );
@@ -646,7 +677,9 @@ function beginShellFade(context: VisualizerContext, params: AtomShellViewParams,
     }
 
     context.clipExtent = params.rMax;
-    updateClipPlane(context.clipPlane, context.surfaceStyle.clipAxis, context.surfaceStyle.clipPosition, params.rMax);
+    // Always shell-to-shell here (the caller has already confirmed
+    // context.isShellView) -- see shellViewClipAxis's doc comment.
+    updateClipPlane(context.clipPlane, shellViewClipAxis(context), context.surfaceStyle.clipPosition, params.rMax);
 
     const fromCameraDistance = context.camera.position.distanceTo(context.controls.target);
     const toCameraDistance = fitDistance(context.camera, framingRadius);
@@ -962,10 +995,12 @@ export function updateAtomViewInScene(
     }
     // The cut face and the shader's discard radius still need to span the
     // full sampling grid, independently of how tight the camera is framed.
+    // shellViewClipAxis (not the raw surfaceStyle) is what keeps this view
+    // visible even when the shared style says "no cut" (bug 4 fix).
     context.clipExtent = params.rMax;
     updateClipPlane(
         context.clipPlane,
-        context.surfaceStyle.clipAxis,
+        shellViewClipAxis(context),
         context.surfaceStyle.clipPosition,
         params.rMax
     );
