@@ -102,7 +102,21 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         // taller. smoothstep's lower edge is set high (0.9) so that ratio
         // gap turns into a crisp bright ring against a dark background
         // rather than a soft gradient -- see the module doc above.
-        vec3 cold = vec3(0.02, 0.03, 0.10);
+        //
+        // Bug fix (task 22, bug 5): the old floor, vec3(0.02, 0.03, 0.10),
+        // sat almost exactly on the scene's own background colour (0x050505,
+        // ~0.02 in each channel -- see orbital_visualizer.ts's
+        // scene.background), so the disc's low-D(r) outer region was
+        // nearly indistinguishable from the void around it and the atom
+        // read as having no visible extent at all. This floor is roughly
+        // six times brighter (by perceptual luminance) than that
+        // background, which is enough to read as a distinct navy disc,
+        // while staying dark enough that warm (unchanged) still lands a
+        // clearly brighter ring on top of it: the peak-to-trough contrast
+        // this trades on lives entirely in e and the smoothstep ramp above,
+        // not in these two colours, so it is unaffected either way (see
+        // atom_profile.test.ts's acceptance test).
+        vec3 cold = vec3(0.10, 0.12, 0.24);
         vec3 warm = vec3(1.00, 0.85, 0.45);
         vec3 color = mix(cold, warm, smoothstep(0.9, 1.0, e));
 

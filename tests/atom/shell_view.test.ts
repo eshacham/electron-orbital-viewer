@@ -232,4 +232,53 @@ describe('shell view', () => {
         disposeShellView(view);
         expect(disposed).toHaveBeenCalled();
     });
+
+    // Regression test (task 22, bug 5): "the bg color of the most outer
+    // shell ... is too dark and is barely visible (compared to the dark bg
+    // of the whole viewer)". Reads the two colours straight out of the
+    // shipped fragment shader source (rather than a reimplementation of the
+    // ramp) so a future edit to either literal is caught here directly.
+    describe('cut-face colour', () => {
+        /** Pulls a `vec3 <name> = vec3(r, g, b);` literal out of GLSL source text. */
+        function extractVec3(source: string, name: string): [number, number, number] {
+            const match = source.match(new RegExp(`vec3 ${name} = vec3\\(([^)]+)\\)`));
+            if (!match) throw new Error(`could not find "vec3 ${name} = vec3(...)" in the shader source`);
+            const [r, g, b] = match[1].split(',').map(component => parseFloat(component.trim()));
+            return [r, g, b];
+        }
+
+        /** Standard perceptual (Rec. 709) luminance weights -- a straight RGB average would rate the old, blue-heavy floor brighter than it actually reads. */
+        function luminance([r, g, b]: [number, number, number]): number {
+            return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        }
+
+        it('lifts the cold floor well clear of the scene background, so the disc reads as a distinct object', () => {
+            const material = capMaterial(createShellView(options()));
+            const cold = extractVec3(material.fragmentShader, 'cold');
+
+            // orbital_visualizer.ts's scene.background is 0x050505 -- 5/255
+            // in every channel.
+            const background: [number, number, number] = [5 / 255, 5 / 255, 5 / 255];
+            const contrastRatio = luminance(cold) / luminance(background);
+
+            // The old floor, vec3(0.02, 0.03, 0.10), sat under 1.7x the
+            // background's own luminance -- close enough to read as "barely
+            // visible", per the bug report. This bar is comfortably above
+            // that without demanding a specific colour.
+            expect(contrastRatio).toBeGreaterThanOrEqual(3);
+        });
+
+        it('keeps the warm ring clearly brighter than the lifted cold floor, so rings stay crisp', () => {
+            const material = capMaterial(createShellView(options()));
+            const cold = extractVec3(material.fragmentShader, 'cold');
+            const warm = extractVec3(material.fragmentShader, 'warm');
+
+            // This is the "keep enough peak-to-trough contrast" half of the
+            // bug fix, expressed directly in colour space -- the acceptance
+            // test in atom_profile.test.ts covers the same requirement in
+            // ramp space (independent of these two literals) and is
+            // unaffected by this change either way.
+            expect(luminance(warm) / luminance(cold)).toBeGreaterThanOrEqual(3);
+        });
+    });
 });
