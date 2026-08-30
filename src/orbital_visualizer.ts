@@ -92,6 +92,27 @@ export interface VisualizerContext {
      */
     onHoverRadius?: (r: number | null) => void;
     /**
+     * Set by the owning component whenever a ring on the cut face is worth
+     * clicking (the whole-atom level, with a solved profile); fed the radius
+     * that was clicked. Left undefined at every other level, which also
+     * turns off the pointer cursor below — so the affordance only appears
+     * where it does something.
+     *
+     * Addendum 2's selection affordance: "is there a way to unselect one?"
+     * came from a user who could not tell that selecting a shell did
+     * anything, because the only way to select one was a chip in a side
+     * panel while the rings themselves — the obvious target — were inert.
+     */
+    onPickRadius?: (r: number) => void;
+    /**
+     * Outer radius within which `onPickRadius` is worth offering: the atom's
+     * contour. The cut face's own quad reaches all the way to the sampling
+     * grid's rMax, which for a heavy atom is tens of times larger than
+     * anything visible, so without this the pointer cursor would appear over
+     * a wide expanse of empty black.
+     */
+    pickableRadius?: number;
+    /**
      * The in-flight level-transition animation, if any (level-transition
      * spec addendum) -- either the atom<->shell curve/camera fade
      * (`ShellFadeTransition`) or the shell<->orbital cross-fade
@@ -196,6 +217,23 @@ export function defaultCameraPosition(distance: number): THREE.Vector3 {
     return new THREE.Vector3(0.6, 0.45, 0.65).normalize().multiplyScalar(distance);
 }
 
+/**
+ * How far a press may travel and still count as a click rather than a
+ * camera drag. A few pixels absorbs the wobble of a real mouse click and a
+ * touch tap without swallowing any deliberate orbit.
+ */
+const CLICK_DRAG_TOLERANCE_PX = 4;
+
+/** Whether a radius read off the cut face is one the current level offers to open — see `onPickRadius` / `pickableRadius`. */
+function isPickable(context: VisualizerContext, r: number | null): boolean {
+    return Boolean(
+        context.onPickRadius
+        && r !== null
+        && context.pickableRadius !== undefined
+        && r <= context.pickableRadius
+    );
+}
+
 export function initVisualizer(container: HTMLElement, initialCameraZ: number = 12): VisualizerContext {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050505);
@@ -264,10 +302,34 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     // since the canvas element itself never changes for the life of the
     // context.
     renderer.domElement.addEventListener('pointermove', (event: PointerEvent) => {
-        context.onHoverRadius?.(radiusUnderPointer(context, event));
+        const r = radiusUnderPointer(context, event);
+        context.onHoverRadius?.(r);
+        renderer.domElement.style.cursor = isPickable(context, r) ? 'pointer' : '';
     });
     renderer.domElement.addEventListener('pointerleave', () => {
         context.onHoverRadius?.(null);
+        renderer.domElement.style.cursor = '';
+    });
+
+    // Clicking a ring drills into that shell (Addendum 2's selection
+    // affordance). Split across pointerdown/pointerup rather than a plain
+    // `click` listener because the same canvas is OrbitControls' drag
+    // surface: releasing the button after orbiting the camera fires a click
+    // too, and navigating away from the view the user was just rotating is
+    // the worst possible response to that. A press that moved further than a
+    // few pixels was a drag, not a click.
+    let pressedAt: { x: number; y: number } | null = null;
+    renderer.domElement.addEventListener('pointerdown', (event: PointerEvent) => {
+        pressedAt = { x: event.clientX, y: event.clientY };
+    });
+    renderer.domElement.addEventListener('pointerup', (event: PointerEvent) => {
+        const start = pressedAt;
+        pressedAt = null;
+        if (!start || !context.onPickRadius) return;
+        if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_DRAG_TOLERANCE_PX) return;
+        const r = radiusUnderPointer(context, event);
+        if (!isPickable(context, r)) return;
+        context.onPickRadius(r as number);
     });
 
     startAnimationLoop(context);

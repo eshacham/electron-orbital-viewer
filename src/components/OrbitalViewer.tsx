@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { setHoverRadius as setAtomHoverRadius } from '../store/atomSlice';
+import { setHoverRadius as setAtomHoverRadius, drillToShell } from '../store/atomSlice';
 import { ScaleBar, formatScaleLabel } from '../scale_bar';
 import { useMediaQuery, PREFERS_REDUCED_MOTION } from '../useMediaQuery';
 import {
@@ -18,6 +18,7 @@ import {
     VisualizerContext
 } from '../orbital_visualizer';
 import { shellComposition, isolateSubshell, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
+import { shellAtRadius } from '../atom/shell_pick';
 import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '../atom/shell_mesh_cache';
 import { createShellCompositionWorker } from '../workers/createShellCompositionWorker';
 import { LobeMeshData } from '../workers/shellCompositionWorker';
@@ -260,6 +261,31 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             worker.terminate();
         };
     }, [atomMode, atomLevel, atomProfile, atomSelectedShell, atomSelectedSubshell, enclosedFraction]);
+
+    // Addendum 2's selection affordance: at the whole-atom level the rings on
+    // the cut face are clickable, and a click opens the shell that owns that
+    // radius. Only at that level -- a shell view is already one shell, and
+    // level 3 is a marching-cubes orbital with no rings at all -- so the
+    // callback is cleared everywhere else, which is also what turns the
+    // pointer cursor off (see isPickable in orbital_visualizer.ts).
+    useEffect(() => {
+        const context = visualizerContextRef.current;
+        if (!context) return;
+
+        const pickable = atomMode === 'atom' && atomLevel === 'atom' && atomProfile !== null;
+        context.onPickRadius = pickable
+            ? (r: number) => {
+                const n = shellAtRadius(atomProfile!, r);
+                if (n !== null) dispatch(drillToShell(n));
+            }
+            : undefined;
+        context.pickableRadius = pickable ? atomProfile!.contourRadius : undefined;
+
+        return () => {
+            context.onPickRadius = undefined;
+            context.pickableRadius = undefined;
+        };
+    }, [atomMode, atomLevel, atomProfile, dispatch]);
 
     // Radial-plot hover -> the shell view's highlight ring (the other half
     // of the pointer-to-radius link set up above).

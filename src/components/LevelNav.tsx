@@ -109,16 +109,37 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
             </Typography>
 
             <Box className="level-nav-shells" role="group" aria-label="shells">
-                {shells.map(shell => (
-                    <Chip
-                        key={shell.n}
-                        className="level-nav-shell-chip"
-                        label={shellName(shell.n)}
-                        color={selectedShell === shell.n ? 'primary' : 'default'}
-                        onClick={() => onNavigate({ level: 'shell', n: shell.n })}
-                    />
-                ))}
+                {shells.map(shell => {
+                    const isSelected = selectedShell === shell.n;
+                    return (
+                        <Chip
+                            key={shell.n}
+                            className={`level-nav-shell-chip${isSelected ? ' selected' : ''}`}
+                            label={shellName(shell.n)}
+                            color={isSelected ? 'primary' : 'default'}
+                            // Addendum 2's "is there a way to unselect one?".
+                            // Three ways now, because testing showed one
+                            // buried in a breadcrumb was not enough: the ✕ on
+                            // the selected chip, clicking that chip again,
+                            // and the breadcrumb that was already there.
+                            aria-pressed={isSelected}
+                            onDelete={isSelected ? () => onNavigate({ level: 'atom' }) : undefined}
+                            onClick={() => onNavigate(isSelected ? { level: 'atom' } : { level: 'shell', n: shell.n })}
+                        />
+                    );
+                })}
             </Box>
+
+            {/* Discoverability, not decoration: the rings are the obvious
+                thing to click and were inert until now, so the view has to
+                say that they are not. Phrased for the state you are in --
+                once a shell is open, the useful next move is getting back
+                out of it. */}
+            <Typography variant="caption" className="level-nav-shell-hint" display="block">
+                {selectedShell === null
+                    ? 'Click a ring in the 3D view, or a shell above, to open it'
+                    : `${shellName(selectedShell)} only — click it again, or the ✕, for the whole atom`}
+            </Typography>
 
             <Button
                 size="small"
