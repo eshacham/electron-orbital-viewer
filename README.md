@@ -360,3 +360,11 @@ account. The Python side pins its own dependencies in `infra/requirements.txt`.
 | `src/components/` | React controls and the viewer host, including atom mode's level navigation and subshell panel |
 | `src/workers/` | The off-thread calculation: marching cubes (`orbitalWorker.ts`) and the SCF solve (`atomWorker.ts`) |
 | `infra/` | CDK stack for S3 + CloudFront hosting |
+
+---
+
+## Continuing this work
+
+Design, decisions, backlog and process notes for the multi-electron atom work
+live in [docs/HANDOFF.md](docs/HANDOFF.md), with the full spec in
+[docs/superpowers/specs/](docs/superpowers/specs/).
