@@ -88,6 +88,10 @@ open, and read off how big it actually is.
 
 ### Both modes, to look inside
 
+- **A default view per element.** Picking an element gives you the standard
+  view of it, derived from its own solved profile: the camera back at the
+  canonical angle, framed on that atom's own extent, with the cut-away on and
+  centred. Opacity and enclosed fraction are yours and are left alone.
 - **Solid or wireframe.** Wireframe is see-through; solid is the only readable
   option at high resolution, where a wireframe becomes a wall of lines.
 - **Opacity**, so outer shells stop hiding inner ones.
@@ -127,8 +131,13 @@ comfortably holds the atom's outermost shell, and a box sized from the wrong
 one leaves nothing for marching cubes to find.
 
 **3. Sampling.** ψ is evaluated once at every point of a regular grid over
-[−rMax, rMax]³ — 33³, 65³ or 129³ points for low, medium and high — inside a Web
-Worker, so the UI stays live.
+[−rMax, rMax]³ — 129³ points — inside a Web Worker, so the UI stays live.
+There is no resolution control: the coarser grids that used to be offered
+cost accuracy as well as detail, because a diffuse orbital's contour search
+is biased by the handful of samples nearest the nucleus where |ψ|² is
+largest, and a coarse grid draws the surface too small. The shell-composition
+view sizes its own, much smaller grids separately, since it renders up to
+sixteen orbitals at once.
 
 **4. Choosing the contour.** The requested share of the electron is turned into a
 density threshold by binning the samples by log density and walking down from the
@@ -352,10 +361,10 @@ reads its contour straight off the SCF's own D(r), with no marching-cubes box
 in between.
 
 **Resolution is finite.** The voxel is 2·rMax / resolution, so a wide box at a
-high n (or, in atom mode, a diffuse valence orbital) leaves the fine radial
-structure under-resolved, and marching cubes rounds off sharp features. The
-sampling radius is also capped, which the widest orbitals could in principle
-hit — in that case the surface would touch the box.
+high n leaves the fine radial structure under-resolved, and marching cubes
+rounds off sharp features. The sampling radius is also capped, which the
+widest orbitals could in principle hit — in that case the surface would touch
+the box.
 
 **One cut plane, axis-aligned.** No arbitrary orientation, no multiple planes.
 

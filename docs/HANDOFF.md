@@ -27,7 +27,7 @@ vs −128.233481; Ar −525.945350 vs −525.946195), and argon's 2s/2p orbital
 energies read −10.794 / −8.443 Ha on screen against NIST's −10.794172 /
 −8.443439.
 
-~1405 tests, `npm run build` clean, `npx tsc --noEmit` clean. Deployed.
+~1415 tests, `npm run build` clean, `npx tsc --noEmit` clean. Deployed.
 
 ## Architecture of `src/atom/`
 
@@ -249,6 +249,45 @@ offset) and the new valence line made it total. They now sit below LevelNav's
 segment — which is the way back to the whole atom, so losing it to an overlap
 was worse than losing a label.
 
+### A later round of testing found five more
+
+Reported from the running app after the six items above shipped, and all
+fixed in `ec2d25c`.
+
+1. **The app could hang with nothing on screen.** Re-picking the element
+   already selected clears the profile (`setElement` always does) but changed
+   none of `[mode, Z, enclosedFraction]`, so the effect that starts a solve
+   never re-ran. `AtomState.solveNonce` is bumped by every `setElement` and is
+   part of that dependency list now. This is also what the empty hydrogen
+   legend in the previous round's sweep actually was — it was written off as
+   a timing artefact, wrongly.
+2. **"A sphere with a strange box inside."** The composition view sized each
+   lobe's box from the subshell's 99.99% radius. Right for a single orbital,
+   but 2.25–3.44x the radius actually drawn, and this view renders up to
+   sixteen lobes at once on a coarse grid — so most of the box was empty
+   space bought with resolution. Ruthenium's 5s came out as a 438-vertex
+   faceted block reaching 3.57 a₀ against a true 5.23. Boxes now come from
+   `compositeSamplingRadius`: the drawn contour with a 1.45x margin, measured
+   against the worst real isosurface reach (1.19x, a 4f) across s/p/d/f from
+   carbon to uranium. s subshells additionally render at 65³ — one mesh each,
+   and a diffuse high-n s has a |ψ|² spike at the nucleus that biases the
+   contour search on a coarse grid.
+3. **The outer shell read as the app background.** The cold floor is lifted
+   and the sphere draws its own rim — a disc fading into black has no edge to
+   see. The radial plot's axis also ran 20% past the sphere beside it, which
+   is what made the curve appear to continue into nothing; it ends exactly
+   where the sphere does now.
+4. **A default view per element**, derived from each element's own profile
+   rather than 118 hand-tuned presets. See the judgment calls below.
+5. **The resolution control is gone**; every marching-cubes render is 129³.
+
+Proof for (2) and (4) is a published contact sheet of the default view of
+all 118 elements, captured from the running app in one automated pass:
+<https://claude.ai/code/artifact/454adb20-98b7-466e-8451-731768eec58e>. It
+was produced by temporarily turning on `preserveDrawingBuffer` on the
+renderer and reading `canvas.toDataURL` per element; that flag is **not**
+committed — turn it back on if the sheet ever needs regenerating.
+
 ---
 
 ## Judgment calls made without asking
@@ -278,6 +317,16 @@ Recorded for review, per the session's standing authority.
    continues.
 8. **Left `ViewMode = 'hydrogenic'` as the stored value** after the rename. It
    names the model, not the label.
+9. **"A default view per element" is derived, not tabulated.** The ask was to
+   "set one up for each of the elements"; 118 hand-tuned presets would be
+   118 things to keep true as the renderer changes. Picking an element
+   instead restores the canonical camera angle, frames on that atom's own
+   `displayRadius`, and turns the cut on and centres it — which is the
+   element-specific part, since the framing radius comes from that element's
+   own solve. Opacity and enclosed fraction are left alone: the user set
+   those deliberately and they are not per-element.
+10. **Removing Low and Medium left nothing to choose, so the control went
+   too**, rather than leaving a one-option toggle.
 
 ---
 
@@ -333,6 +382,10 @@ the list:
 - The valence shell was outside the drawn sphere for 34 of the first 56
   elements, with an acceptance test for ring contrast passing throughout
 - The radial plot was entirely hidden behind another panel on a phone
+- Re-picking the current element hung the app in a permanent solving state,
+  with every solver test passing
+- Ruthenium's 5s rendered as a faceted block at a third of its size, with the
+  composition view's own tests green throughout
 - The level-2 subshell panel was off-screen on a phone in both directions at
   once, and in landscape the plot sat on top of the controls sheet
 
