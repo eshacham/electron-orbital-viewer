@@ -9,8 +9,6 @@ const baseProps = {
   onLChange: () => {},
   initialMl: 0,
   onMlChange: () => {},
-  initialZ: 1,
-  onZChange: () => {},
   initialResolution: 32,
   onResolutionChange: () => {},
   initialEnclosedFraction: 0.9,
@@ -34,8 +32,6 @@ describe('Controls', () => {
         onLChange={() => {}}
         initialMl={0}
         onMlChange={() => {}}
-        initialZ={1}
-        onZChange={() => {}}
         initialResolution={32}
         onResolutionChange={() => {}}
         initialEnclosedFraction={0.9}
@@ -57,12 +53,36 @@ describe('Controls', () => {
   });
 
   // Omitting `mode` entirely (as every pre-existing test here does) must
-  // still be the exact hydrogen-like panel that shipped before atom mode
-  // existed -- no regression to the one-electron-ion view.
-  it('defaults to hydrogen-like when mode is omitted', () => {
+  // still be the Basic Orbitals panel -- the n/l/mL selects and the explicit
+  // Update Orbital step, not atom mode's drill-down.
+  it('defaults to Basic Orbitals when mode is omitted', () => {
     render(<Controls {...baseProps} />);
-    expect(screen.getByRole('combobox', { name: /Nucleus \(Z\)/i })).toBeInTheDocument();
-    expect(screen.getByText('one electron, charge-Z nucleus')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /update orbital/i })).toBeInTheDocument();
+  });
+
+  // Addendum 2's mode rename: atom mode covers every real element now, so
+  // Basic Orbitals has no element control of its own and is fixed at Z = 1.
+  describe('Basic Orbitals mode', () => {
+    it('has no nucleus (Z) picker', () => {
+      render(<Controls {...baseProps} />);
+      expect(screen.queryByRole('combobox', { name: /Nucleus/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
+    });
+
+    // Spec §7: the one-electron framing must stay stated outright. It used
+    // to ride on the Z picker's helper text, which is gone.
+    it('still says outright that it is one electron at Z = 1', () => {
+      render(<Controls {...baseProps} />);
+      expect(screen.getByText(/one electron, Z = 1/i)).toBeInTheDocument();
+    });
+
+    it('renders at Z = 1 whatever n/l/mL are chosen', () => {
+      const onUpdateOrbital = jest.fn();
+      render(<Controls {...baseProps} initialN={4} initialL={3} initialMl={-2} onUpdateOrbital={onUpdateOrbital} />);
+      fireEvent.click(screen.getByRole('button', { name: /update orbital/i }));
+      expect(onUpdateOrbital).toHaveBeenCalledWith(expect.objectContaining({ n: 4, l: 3, ml: -2, Z: 1 }));
+    });
   });
 
   describe('atom mode', () => {
@@ -80,13 +100,11 @@ describe('Controls', () => {
       expect(screen.getByRole('button', { name: /reset view/i })).toBeInTheDocument();
     });
 
-    it('drives the element picker through onAtomElementChange, not onZChange', () => {
+    it('drives the element picker through onAtomElementChange', () => {
       const onAtomElementChange = jest.fn();
-      const onZChange = jest.fn();
       render(
         <Controls
           {...baseProps}
-          onZChange={onZChange}
           mode="atom"
           atomZ={6}
           onAtomElementChange={onAtomElementChange}
@@ -97,7 +115,6 @@ describe('Controls', () => {
       fireEvent.click(within(screen.getByRole('listbox')).getByText(/Oxygen/i));
 
       expect(onAtomElementChange).toHaveBeenCalledWith(8);
-      expect(onZChange).not.toHaveBeenCalled();
     });
 
     it('renders a slot for the drill-down panel (SubshellPanel at level 2)', () => {
@@ -119,7 +136,7 @@ describe('Controls', () => {
   // same marching-cubes pipeline hydrogen-like mode always uses -- so the
   // condition is level, not mode.
   describe('control visibility matrix (bug 6): Resolution, Surface and "no cut" only where they do something', () => {
-    it('hydrogen-like mode (always a marching-cubes mesh): shows Resolution, Surface and "Off"', () => {
+    it('Basic Orbitals mode (always a marching-cubes mesh): shows Resolution, Surface and "Off"', () => {
       render(<Controls {...baseProps} mode="hydrogenic" />);
       expect(screen.getByRole('group', { name: /text alignment/i })).toBeInTheDocument();
       expect(screen.getByRole('group', { name: /surface style/i })).toBeInTheDocument();
@@ -154,9 +171,12 @@ describe('Controls', () => {
   });
 
   describe('mode toggle', () => {
-    it('offers Atom and Hydrogen-like, and reports the choice via onModeChange', () => {
+    it('offers Atom and Basic Orbitals, and reports the choice via onModeChange', () => {
       const onModeChange = jest.fn();
       render(<Controls {...baseProps} mode="hydrogenic" onModeChange={onModeChange} atomZ={1} onAtomElementChange={() => {}} />);
+
+      expect(screen.getByRole('button', { name: /basic orbitals mode/i })).toHaveTextContent('Basic Orbitals');
+      expect(screen.queryByText(/hydrogen-like/i)).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
       expect(onModeChange).toHaveBeenCalledWith('atom');

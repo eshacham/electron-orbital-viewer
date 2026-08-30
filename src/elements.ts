@@ -1,11 +1,12 @@
 /**
  * Element symbols and names by atomic number.
  *
- * Z here sets the nuclear charge of a *hydrogen-like* atom — one electron bound
- * to a charge-Z nucleus. Picking carbon does not draw carbon's orbitals; it
- * draws C(5+), a single electron around a carbon nucleus, which is the only case
- * the Schrodinger equation solves exactly. The element name is a label for the
- * nucleus, not a claim about a neutral atom.
+ * Z here is a real, neutral element for atom mode's SCF solve — the whole
+ * table, 1 to 118. It used to double as the nuclear charge of Basic
+ * Orbitals mode's one-electron ion, where picking carbon drew C⁵⁺ rather
+ * than carbon; that control is gone (Addendum 2's mode rename) and Basic
+ * Orbitals is fixed at BASIC_ORBITALS_Z, so an element named here is now
+ * always the neutral atom it says it is.
  */
 export interface Element {
     atomicNumber: number;

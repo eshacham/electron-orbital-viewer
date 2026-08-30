@@ -35,7 +35,7 @@ import OrbitalViewer from './components/OrbitalViewer';
 import RadialPlot, { RadialCurve } from './components/RadialPlot';
 import LevelNav, { NavigationTarget } from './components/LevelNav';
 import SubshellPanel from './components/SubshellPanel';
-import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius } from './orbital_presets';
+import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, BASIC_ORBITALS_Z } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT } from './useMediaQuery';
@@ -82,7 +82,6 @@ function App() {
     const [n, setN] = useState<number>(defaultN);
     const [l, setL] = useState<number>(defaultL);
     const [ml, setMl] = useState<number>(0);
-    const [Z, setZ] = useState<number>(1);
     const [resolution, setResolution] = useState<number>(64);
     const [enclosedFraction, setEnclosedFraction] = useState<number>(DEFAULT_ENCLOSED_FRACTION);
 
@@ -191,9 +190,9 @@ function App() {
                 n: defaultN,
                 l: defaultL,
                 ml: 0,
-                Z: 1,
+                Z: BASIC_ORBITALS_Z,
                 resolution: 32,
-                rMax: computeSamplingRadius(defaultN, defaultL, 1),
+                rMax: computeSamplingRadius(defaultN, defaultL, BASIC_ORBITALS_Z),
                 enclosedFraction: DEFAULT_ENCLOSED_FRACTION,
             };
             handleOrbitalParamsChange(initialParams);
@@ -234,9 +233,9 @@ function App() {
     useEffect(() => {
         if (isAtomMode) return;
         dispatch(startOrbitalCalculation({
-            n, l, ml, Z,
+            n, l, ml, Z: BASIC_ORBITALS_Z,
             resolution,
-            rMax: computeSamplingRadius(n, l, Z),
+            rMax: computeSamplingRadius(n, l, BASIC_ORBITALS_Z),
             enclosedFraction,
         }));
         // Only the mode transition itself should trigger this -- n/l/ml/Z/
@@ -393,8 +392,6 @@ function App() {
                         onLChange={setL}
                         initialMl={ml}
                         onMlChange={setMl}
-                        initialZ={Z}
-                        onZChange={setZ}
                         initialResolution={resolution}
                         onResolutionChange={setResolution}
                         initialEnclosedFraction={enclosedFraction}

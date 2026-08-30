@@ -17,7 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 import { OrbitalParams, RenderMode, ClipAxis, SurfaceStyle } from '@/types/orbital';
-import { computeSamplingRadius, ENCLOSED_FRACTIONS } from '../orbital_presets';
+import { computeSamplingRadius, ENCLOSED_FRACTIONS, BASIC_ORBITALS_Z } from '../orbital_presets';
 import { ELEMENTS, elementLabel } from '../elements';
 import { orbitalName } from '../orbital_names';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
@@ -25,16 +25,19 @@ import { ViewMode, ViewLevel } from '../store/atomSlice';
 interface ControlsProps {
   /**
    * Atom (default) drives the SCF for a neutral element and collapses n/l/ml
-   * into the LevelNav/SubshellPanel drill-down; hydrogen-like is the original
-   * one-electron-ion panel, unchanged. Optional (defaulting to hydrogen-like)
-   * purely so every pre-existing render of this component -- which predates
-   * atom mode and never passes it -- keeps behaving exactly as it did.
+   * into the LevelNav/SubshellPanel drill-down; 'hydrogenic' is Basic
+   * Orbitals, the exact one-electron reference at Z = 1. Optional (defaulting
+   * to 'hydrogenic') purely so every pre-existing render of this component --
+   * which predates atom mode and never passes it -- keeps behaving as it did.
+   * The stored value stays 'hydrogenic': it names the *model* (a hydrogenic
+   * one-electron system), which the rename did not change, and it is
+   * persisted in no fewer than three places.
    */
   mode?: ViewMode;
   onModeChange?: (mode: ViewMode) => void;
-  /** Which drill-down level is current, only so the enclosed-fraction helper text can stay honest (see below); irrelevant in hydrogen-like mode. */
+  /** Which drill-down level is current, only so the enclosed-fraction helper text can stay honest (see below); irrelevant in Basic Orbitals mode. */
   atomLevel?: ViewLevel;
-  /** The element driving the SCF in atom mode -- kept apart from initialZ/onZChange, which remain the hydrogen-like nucleus charge untouched. */
+  /** The element driving the SCF in atom mode. Basic Orbitals mode has no element control of its own any more (Addendum 2's mode rename) -- it is fixed at BASIC_ORBITALS_Z. */
   atomZ?: number;
   onAtomElementChange?: (Z: number) => void;
   /** Slot for SubshellPanel at level 2; empty otherwise. Keeps this component ignorant of atomSlice/SubshellPanel specifics. */
@@ -46,8 +49,6 @@ interface ControlsProps {
   onLChange: (value: number) => void;
   initialMl: number;
   onMlChange: (value: number) => void;
-  initialZ: number;
-  onZChange: (value: number) => void;
   initialResolution: number;
   onResolutionChange: (value: number) => void;
   initialEnclosedFraction: number;
@@ -79,7 +80,6 @@ const Controls: React.FC<ControlsProps> = ({
   initialN, onNChange,
   initialL, onLChange,
   initialMl, onMlChange,
-  initialZ, onZChange,
   initialResolution, onResolutionChange,
   initialEnclosedFraction, onEnclosedFractionChange,
   isoLevel,
@@ -131,10 +131,10 @@ const Controls: React.FC<ControlsProps> = ({
       n: initialN,
       l: initialL,
       ml: initialMl,
-      Z: initialZ,
+      Z: BASIC_ORBITALS_Z,
       resolution: initialResolution,
       // Derived, not chosen: the box that holds this orbital.
-      rMax: computeSamplingRadius(initialN, initialL, initialZ),
+      rMax: computeSamplingRadius(initialN, initialL, BASIC_ORBITALS_Z),
       enclosedFraction: initialEnclosedFraction,
     };
     console.log("Update Orbital Clicked with params:", params);
@@ -150,9 +150,9 @@ const Controls: React.FC<ControlsProps> = ({
         position: 'relative',
       }}
     >
-      {/* Atom (a real neutral element, SCF-solved) vs hydrogen-like (the
-          original one-electron-ion panel, unchanged below). Always visible,
-          at every level, since it is how you get back out of atom mode's
+      {/* Atom (a real neutral element, SCF-solved) vs Basic Orbitals (the
+          exact one-electron reference at Z = 1, below). Always visible, at
+          every level, since it is how you get back out of atom mode's
           drill-down entirely. */}
       <FormControl component="fieldset" margin="normal" fullWidth>
         <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Mode</FormLabel>
@@ -168,7 +168,7 @@ const Controls: React.FC<ControlsProps> = ({
           fullWidth
         >
           <ToggleButton value="atom" aria-label="atom mode">Atom</ToggleButton>
-          <ToggleButton value="hydrogenic" aria-label="hydrogen-like mode">Hydrogen-like</ToggleButton>
+          <ToggleButton value="hydrogenic" aria-label="basic orbitals mode">Basic Orbitals</ToggleButton>
         </ToggleButtonGroup>
       </FormControl>
 
@@ -277,26 +277,17 @@ const Controls: React.FC<ControlsProps> = ({
           <FormHelperText>neutral atom, central-field SCF</FormHelperText>
         </FormControl>
       ) : (
-        /* The model is hydrogen-like: one electron bound to a charge-Z nucleus.
-           The element names the nucleus; it is not a neutral atom's orbitals. */
-        <FormControl fullWidth margin="normal" size="small">
-          <InputLabel id="z-select-label">Nucleus (Z)</InputLabel>
-          <Select
-            labelId="z-select-label"
-            id="z-select"
-            value={initialZ.toString()}
-            label="Nucleus (Z)"
-            onChange={(e: SelectChangeEvent<string>) => onZChange(parseInt(e.target.value, 10))}
-            MenuProps={{ slotProps: { paper: { sx: { maxHeight: 320 } } } }}
-          >
-            {ELEMENTS.map(element => (
-              <MenuItem key={element.atomicNumber} value={element.atomicNumber.toString()}>
-                {elementLabel(element.atomicNumber)}
-              </MenuItem>
-            ))}
-          </Select>
-          <FormHelperText>one electron, charge-Z nucleus</FormHelperText>
-        </FormControl>
+        /* Addendum 2's mode rename: the element control is gone and Z is
+           fixed at 1, so this mode is exactly one electron bound to one
+           proton -- the case the Schrodinger equation solves exactly. Spec
+           §7 still requires the one-electron framing to be stated outright,
+           which is what this line does now that there is no picker to carry
+           it. */
+        <FormHelperText className="basic-orbitals-note">
+          One electron, Z = 1 — the exact solution, and the idealised shape
+          every multi-electron orbital is a distortion of. Pick an element in
+          Atom mode for a real, many-electron atom.
+        </FormHelperText>
       )}
 
       {/* SubshellPanel at level 2; empty at every other level (see App.tsx). */}

@@ -170,10 +170,10 @@ describe('App', () => {
         expect(screen.getByTestId('orbital-viewer')).toBeInTheDocument();
 
         // Atom mode is the default: n/l/ml collapse into the drill-down, so
-        // the element picker (not the hydrogen-like selects) is what shows.
+        // the element picker (not Basic Orbitals' selects) is what shows.
         expect(screen.getByRole('combobox', { name: /Element/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /atom mode/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /hydrogen-like mode/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /basic orbitals mode/i })).toBeInTheDocument();
     });
 
     it('defaults to atom mode and shows LevelNav for the default element', () => {
@@ -183,15 +183,18 @@ describe('App', () => {
         expect(screen.getByText('Hydrogen')).toBeInTheDocument();
     });
 
-    it('switching to hydrogen-like mode restores the original one-electron-ion panel unchanged', () => {
+    it('switching to Basic Orbitals restores the n/l/mL panel, with no element control of its own', () => {
         renderWithProvider(<App />);
 
-        fireEvent.click(screen.getByRole('button', { name: /hydrogen-like mode/i }));
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
 
         expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
         expect(screen.getByRole('combobox', { name: /Angular \(l\)/i })).toBeInTheDocument();
-        expect(screen.getByRole('combobox', { name: /Nucleus \(Z\)/i })).toBeInTheDocument();
-        expect(screen.getByText('one electron, charge-Z nucleus')).toBeInTheDocument();
+        // Addendum 2's mode rename: no second element control, Z fixed at 1
+        // -- but the one-electron framing still stated outright (spec §7).
+        expect(screen.queryByRole('combobox', { name: /Nucleus/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
+        expect(screen.getByText(/one electron, Z = 1/i)).toBeInTheDocument();
         // LevelNav is atom-mode only.
         expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).not.toBeInTheDocument();
     });
@@ -200,12 +203,12 @@ describe('App', () => {
     // the same `orbital.currentParams`, and atom mode's level 3 dispatches
     // into it with a tiny, subshell-specific rMax (~1.7 a0 for argon's 2p,
     // per the fix in App.tsx / atom_profile.ts's subshellSamplingRadius).
-    // Switching to hydrogen-like mode without this fix left that leftover
+    // Switching to Basic Orbitals without this fix left that leftover
     // rMax in place -- at that scale a hydrogen 3d's sampling box holds only
     // its innermost, near-featureless tail, rendering as a blob instead of
     // the correct lobed shape. The fix must reset to
     // computeSamplingRadius(n, l, Z) on the mode transition itself.
-    it('switching out of atom mode resets rMax to the hydrogen-like panel\'s own value, not whatever atom mode last set', () => {
+    it('switching out of atom mode resets rMax to the Basic Orbitals panel\'s own value, not whatever atom mode last set', () => {
         const { store } = renderWithProvider(<App />, {
             mode: 'atom',
             Z: 18,
@@ -221,10 +224,10 @@ describe('App', () => {
         // proof the switch *changed* it rather than it having never been set.
         expect(store.getState().orbital.currentParams?.rMax).toBeCloseTo(1.7);
 
-        fireEvent.click(screen.getByRole('button', { name: /hydrogen-like mode/i }));
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
 
-        // App.tsx's default hydrogen-like selection is n=3, l=2, Z=1 (the
-        // panel's own initial local state, untouched by atom mode).
+        // App.tsx's default Basic Orbitals selection is n=3, l=2, and Z is
+        // now fixed at 1 for the whole mode (BASIC_ORBITALS_Z).
         expect(store.getState().orbital.currentParams?.rMax).toBeCloseTo(computeSamplingRadius(3, 2, 1));
     });
 

@@ -16,6 +16,21 @@ export const ENCLOSED_FRACTIONS = [0.5, 0.75, 0.9, 0.95, 0.99];
  * resolution, so at some point the box is so wide that nothing inside it is
  * resolved.
  */
+/**
+ * The nuclear charge Basic Orbitals mode always uses (Addendum 2's mode
+ * rename). The mode is the idealised textbook reference -- pick n, l, mₗ,
+ * see the shape -- and atom mode covers every real element now, so a second
+ * element control here was redundant and confusing.
+ *
+ * Cost, recorded so it stays a choice rather than an oversight: He⁺, Li²⁺
+ * and the other one-electron ions are no longer reachable, and with them
+ * the direct demonstration that raising Z shrinks an orbital without
+ * changing its shape. Nothing in the solver is restricted -- Z is still a
+ * free parameter of `computeSamplingRadius` and of every quantum function
+ * -- so restoring an ion picker later is a UI change only.
+ */
+export const BASIC_ORBITALS_Z = 1;
+
 export const MAX_SAMPLING_RADIUS = 400;
 
 function roundUpToTwoFigures(value: number): number {
