@@ -58,6 +58,20 @@ html, body, #root {
   max-height: 40vh;
   overflow-y: auto;
 }
+/* Bug fix (task 22, bug 2): the 40vh cap above applied unconditionally, so
+   on a normal desktop viewport the panel scrolled internally -- and clipped
+   its own "About this model" link -- well before it ran out of the room
+   #controls's own max-height:none (above) already assumes is there. Sized
+   to content here instead, same treatment as #controls; placed after the
+   base rule (equal selector specificity) so it wins when this query
+   matches. The 40vh scroll stays as the fallback for the short-viewport
+   case further down, where that room genuinely is not available. */
+@media (min-width: 761px) and (min-height: 501px) {
+  .side-panel .level-nav {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
 .atom-error {
   position: absolute;
   top: 20px;
