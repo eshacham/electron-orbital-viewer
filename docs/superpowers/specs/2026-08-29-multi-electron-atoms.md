@@ -305,3 +305,46 @@ this but nothing draws attention to it.
 Priority order for implementation: composition with occupancy (1 and 2)
 first, since it subsumes the most; then core/valence (3); then size (4) only
 if it earns its place.
+
+---
+
+## Addendum 3: periodic table selector (approved 2026-08-30)
+
+> "is there a good idea how to incorporate the elements table to the viewer?
+> maybe the element selector becomes a smarter component... as a separate
+> panel on the top with coloring indicating the family?"
+
+Replace the 118-item dropdown with a real periodic table as its own panel.
+
+**Colour by block (s/p/d/f), not by chemical family.** Two reasons, and the
+first is the binding one:
+
+1. **Block is derivable from what the engine already computes** — it is the
+   highest-l subshell being filled, available from `configurationFor(Z)`.
+   Chemical families (alkali metal, halogen, …) are an external taxonomy the
+   app does not calculate; colouring by them would be decoration bolted onto
+   physics rather than an expression of it. Consistent with §7: the app's
+   value is that what it shows, it computes.
+2. **It closes the loop with the composition view.** A d-block tile predicts
+   cloverleaf shapes in that element's shells; an f-block tile predicts the
+   seven f orbitals. The selector's colour becomes a legend for the 3D view.
+
+**Group highlighting.** On hover or selection, highlight the element's whole
+column. A group *is* a column precisely because its members share a valence
+configuration — Li/Na/K all ns¹, F/Cl/Br all ns²np⁵. Lighting the column while
+the composition view shows that valence shell makes "why does this belong to a
+family" visible rather than asserted, and answers the user's question directly.
+
+**Placement and layout.** Own panel, full width, above the viewer,
+collapsible. At ~28px tiles the standard 18-column layout is roughly 500x250
+including the lanthanide/actinide rows. It replaces the dropdown on desktop;
+the dropdown remains the narrow-screen fallback, since a periodic table does
+not survive a phone width (`useMediaQuery(NARROW_VIEWPORT)` already exists).
+
+Each tile shows atomic number and symbol; the selected element is marked; the
+lanthanides and actinides sit in their conventional detached rows rather than
+being crammed inline.
+
+**Sequencing:** after the shell-composition work of Addendum 2. Composition is
+the substance the user asked for; the table is the map that makes it
+navigable, and it is more useful once there is something varied to navigate to.
