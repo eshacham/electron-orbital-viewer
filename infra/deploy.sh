@@ -17,8 +17,15 @@ cd "$SCRIPT_DIR"
 # Clean up any existing virtual environment
 rm -rf .venv
 
-# Create a fresh virtual environment
-python -m venv .venv
+# Create a fresh virtual environment. `python3` with a `python` fallback:
+# macOS ships no bare `python`, and this script failed at exactly this line
+# on a stock machine with python3 and the CDK CLI both installed.
+PYTHON_BIN="$(command -v python3 || command -v python)"
+if [ -z "$PYTHON_BIN" ]; then
+  echo "No python3 (or python) on PATH; the CDK app needs one." >&2
+  exit 1
+fi
+"$PYTHON_BIN" -m venv .venv
 source .venv/bin/activate
 
 # Install CDK dependencies
