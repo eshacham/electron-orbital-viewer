@@ -92,6 +92,17 @@ const Controls: React.FC<ControlsProps> = ({
   compact = false,
 }) => {
   const isAtomMode = mode === 'atom';
+  // Bug fix (task 22, bug 6): levels 1-2 in atom mode render a spherical
+  // shell view straight from the shader (orbital_visualizer.ts's
+  // updateAtomViewInScene / shell_view.ts) rather than a marching-cubes
+  // mesh -- there is no vertex count to raise or lower (Resolution), no
+  // separate solid-vs-wireframe surface to switch between (Surface), and
+  // no meaningful "uncut" state (Cut away's Off option: a shell view's cut
+  // face is its *only* visible content, see shellViewClipAxis's doc comment
+  // in orbital_visualizer.ts). All three genuinely matter again once level
+  // 3 hands the render back to the same marching-cubes pipeline hydrogen-
+  // like mode always uses -- so the condition is level, not mode.
+  const isMeshLevel = !isAtomMode || atomLevel === 'orbital';
   // Local state for dropdown options, derived from props
   const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
   const [mlOptions, setMlOptions] = useState<number[]>([-2, -1, 0, 1, 2]);
@@ -291,47 +302,54 @@ const Controls: React.FC<ControlsProps> = ({
       {/* SubshellPanel at level 2; empty at every other level (see App.tsx). */}
       {isAtomMode && children}
 
-      {/* Resolution ToggleButtonGroup */}
-      <FormControl component="fieldset" margin="normal" fullWidth>
-        <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Resolution</FormLabel> {/* Smaller label */}
-        <ToggleButtonGroup
-          value={initialResolution}
-          exclusive // Ensures only one button can be active
-          onChange={(event: React.MouseEvent<HTMLElement>, newValue: number | null) => {
-            if (newValue !== null) {
-              onResolutionChange(newValue);
-            }
-          }}
-          aria-label="text alignment"
-          size="small"
-          fullWidth
-        >
-          <ToggleButton value={32} aria-label="low resolution">Low</ToggleButton>
-          <ToggleButton value={64} aria-label="Medium resolution">Medium</ToggleButton>
-          <ToggleButton value={128} aria-label="High resolution">High</ToggleButton>
-        </ToggleButtonGroup>
-      </FormControl>
+      {/* Resolution: the marching-cubes vertex count -- meaningless for a
+          shell view's shader-only cut face (bug fix, task 22 bug 6). */}
+      {isMeshLevel && (
+        <FormControl component="fieldset" margin="normal" fullWidth>
+          <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Resolution</FormLabel> {/* Smaller label */}
+          <ToggleButtonGroup
+            value={initialResolution}
+            exclusive // Ensures only one button can be active
+            onChange={(event: React.MouseEvent<HTMLElement>, newValue: number | null) => {
+              if (newValue !== null) {
+                onResolutionChange(newValue);
+              }
+            }}
+            aria-label="text alignment"
+            size="small"
+            fullWidth
+          >
+            <ToggleButton value={32} aria-label="low resolution">Low</ToggleButton>
+            <ToggleButton value={64} aria-label="Medium resolution">Medium</ToggleButton>
+            <ToggleButton value={128} aria-label="High resolution">High</ToggleButton>
+          </ToggleButtonGroup>
+        </FormControl>
+      )}
 
       {/* Surface, opacity and cut-away are view-only: they restyle the existing
-          mesh, so none of them re-runs the calculation. */}
-      <FormControl component="fieldset" margin="normal" fullWidth>
-        <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Surface</FormLabel>
-        <ToggleButtonGroup
-          value={surfaceStyle.mode}
-          exclusive
-          onChange={(event: React.MouseEvent<HTMLElement>, newValue: RenderMode | null) => {
-            if (newValue !== null) {
-              onSurfaceStyleChange({ mode: newValue });
-            }
-          }}
-          aria-label="surface style"
-          size="small"
-          fullWidth
-        >
-          <ToggleButton value="solid" aria-label="solid surface">Solid</ToggleButton>
-          <ToggleButton value="wireframe" aria-label="wireframe surface">Wireframe</ToggleButton>
-        </ToggleButtonGroup>
-      </FormControl>
+          mesh, so none of them re-runs the calculation. Surface (solid vs
+          wireframe) only has meaning for a marching-cubes mesh -- a shell
+          view's cap is always shown, solid (bug fix, task 22 bug 6). */}
+      {isMeshLevel && (
+        <FormControl component="fieldset" margin="normal" fullWidth>
+          <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Surface</FormLabel>
+          <ToggleButtonGroup
+            value={surfaceStyle.mode}
+            exclusive
+            onChange={(event: React.MouseEvent<HTMLElement>, newValue: RenderMode | null) => {
+              if (newValue !== null) {
+                onSurfaceStyleChange({ mode: newValue });
+              }
+            }}
+            aria-label="surface style"
+            size="small"
+            fullWidth
+          >
+            <ToggleButton value="solid" aria-label="solid surface">Solid</ToggleButton>
+            <ToggleButton value="wireframe" aria-label="wireframe surface">Wireframe</ToggleButton>
+          </ToggleButtonGroup>
+        </FormControl>
+      )}
 
       <FormControl component="fieldset" margin="normal" fullWidth>
         <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>
@@ -364,7 +382,11 @@ const Controls: React.FC<ControlsProps> = ({
           size="small"
           fullWidth
         >
-          <ToggleButton value="none" aria-label="no cut">Off</ToggleButton>
+          {/* A shell view has no separate surface to show when uncut -- its
+              cut face is the entire visible object (bug fix, task 22 bug 6;
+              see orbital_visualizer.ts's shellViewClipAxis) -- so "Off" is
+              only offered where it actually does something. */}
+          {isMeshLevel && <ToggleButton value="none" aria-label="no cut">Off</ToggleButton>}
           <ToggleButton value="x" aria-label="cut along x">X</ToggleButton>
           <ToggleButton value="y" aria-label="cut along y">Y</ToggleButton>
           <ToggleButton value="z" aria-label="cut along z">Z</ToggleButton>

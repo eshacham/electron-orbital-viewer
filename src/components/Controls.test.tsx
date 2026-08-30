@@ -110,6 +110,49 @@ describe('Controls', () => {
     });
   });
 
+  // Regression tests for task 22 bug 6: Resolution and Surface (solid vs
+  // wireframe) restyle or resize a marching-cubes mesh, which atom mode's
+  // levels 1-2 never build (see orbital_visualizer.ts's updateAtomViewInScene
+  // / shell_view.ts) -- so at those levels the two controls did nothing,
+  // and "Off" (no cut) left a shell view rendering nothing at all (bug 4).
+  // All three matter again at level 3, which hands rendering back to the
+  // same marching-cubes pipeline hydrogen-like mode always uses -- so the
+  // condition is level, not mode.
+  describe('control visibility matrix (bug 6): Resolution, Surface and "no cut" only where they do something', () => {
+    it('hydrogen-like mode (always a marching-cubes mesh): shows Resolution, Surface and "Off"', () => {
+      render(<Controls {...baseProps} mode="hydrogenic" />);
+      expect(screen.getByRole('group', { name: /text alignment/i })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: /surface style/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /no cut/i })).toBeInTheDocument();
+    });
+
+    it('atom mode at the whole-atom level (a shell view): hides Resolution, Surface and "Off"', () => {
+      render(<Controls {...baseProps} mode="atom" atomLevel="atom" atomZ={6} onAtomElementChange={() => {}} />);
+      expect(screen.queryByRole('group', { name: /text alignment/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: /surface style/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /no cut/i })).not.toBeInTheDocument();
+      // The rest of "Cut away" (a real cut still changes the shell view's
+      // cross-section) stays -- only the meaningless "Off" option is gone.
+      expect(screen.getByRole('button', { name: /cut along z/i })).toBeInTheDocument();
+      // Opacity fades the cap's own shader too, so it still does something.
+      expect(screen.getByRole('slider', { name: /surface opacity/i })).toBeInTheDocument();
+    });
+
+    it('atom mode at the shell level (still a shell view): hides Resolution, Surface and "Off"', () => {
+      render(<Controls {...baseProps} mode="atom" atomLevel="shell" atomZ={6} onAtomElementChange={() => {}} />);
+      expect(screen.queryByRole('group', { name: /text alignment/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: /surface style/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /no cut/i })).not.toBeInTheDocument();
+    });
+
+    it('atom mode at the orbital level (level 3, a real marching-cubes mesh): shows Resolution, Surface and "Off" again', () => {
+      render(<Controls {...baseProps} mode="atom" atomLevel="orbital" atomZ={6} onAtomElementChange={() => {}} />);
+      expect(screen.getByRole('group', { name: /text alignment/i })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: /surface style/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /no cut/i })).toBeInTheDocument();
+    });
+  });
+
   describe('mode toggle', () => {
     it('offers Atom and Hydrogen-like, and reports the choice via onModeChange', () => {
       const onModeChange = jest.fn();
