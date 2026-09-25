@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Button, Collapse, Typography } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Box, Button, Typography } from '@mui/material';
 import {
     MAIN_TABLE,
     F_BLOCK_ROWS,
@@ -15,6 +15,8 @@ interface PeriodicTableProps {
     /** The element currently being solved. */
     Z: number;
     onSelect: (Z: number) => void;
+    /** Closes the table; it is a pop-over opened from the element name in the navigation card. */
+    onClose: () => void;
 }
 
 const BLOCK_ORDER: Block[] = ['s', 'p', 'd', 'f'];
@@ -38,8 +40,7 @@ const BLOCK_ORDER: Block[] = ['s', 'p', 'd', 'f'];
  * while the composition view shows that valence shell is what makes "why
  * does this belong to a family" visible rather than asserted.
  */
-const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect }) => {
-    const [open, setOpen] = useState(true);
+const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect, onClose }) => {
     const [hovered, setHovered] = useState<number | null>(null);
 
     const selectedTile = tileOf(Z);
@@ -78,11 +79,10 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect }) => {
                 aria-label={`${tileElement?.name ?? tile.atomicNumber} (${tile.block}-block)`}
                 onClick={() => {
                     onSelect(tile.atomicNumber);
-                    // Folds to its header once a choice is made, like a
-                    // dropdown closing: open, the table covers the top third
-                    // of the view and the atom has to shrink to fit below it.
-                    // The header keeps the element and the way back in.
-                    setOpen(false);
+                    // Closes once a choice is made, like a dropdown: open, it
+                    // covers the view. The element name at the head of the
+                    // navigation card opens it again.
+                    onClose();
                 }}
                 onMouseEnter={() => setHovered(tile.atomicNumber)}
                 onMouseLeave={() => setHovered(current => (current === tile.atomicNumber ? null : current))}
@@ -95,8 +95,15 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect }) => {
         );
     };
 
+    // Escape closes it, as it would any pop-over.
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
     return (
-        <Box className="periodic-table-panel" aria-label="periodic table">
+        <Box className="periodic-table-panel" aria-label="periodic table" role="dialog">
             <Box className="periodic-table-header">
                 <Typography variant="body2" className="periodic-table-current">
                     {element ? `${element.atomicNumber} — ${element.symbol} (${element.name})` : `Z = ${Z}`}
@@ -105,14 +112,12 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect }) => {
                 <Button
                     size="small"
                     className="periodic-table-toggle"
-                    onClick={() => setOpen(value => !value)}
-                    aria-expanded={open}
+                    onClick={onClose}
                 >
-                    {open ? 'Hide table' : 'Change element'}
+                    Close
                 </Button>
             </Box>
 
-            <Collapse in={open}>
                 <div className="periodic-table-grid" role="group" aria-label="elements">
                     {MAIN_TABLE.map(renderTile)}
                 </div>
@@ -140,7 +145,6 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect }) => {
                         the subshell each row fills — and the shapes its shells contain
                     </span>
                 </div>
-            </Collapse>
         </Box>
     );
 };

@@ -38,6 +38,12 @@ interface LevelNavProps {
      * the fold, so the orbital buttons needed a scroll to find.
      */
     children?: React.ReactNode;
+    /**
+     * 'full' is the desktop card. A phone splits it: 'header' is the one line
+     * that stays on screen -- Back, the element, and where you are -- and
+     * 'body' is the rest, in the bottom sheet's Explore tab.
+     */
+    variant?: 'full' | 'header' | 'body';
 }
 
 // Old X-ray shell letters, matching atom_profile.ts's private shellName
@@ -71,6 +77,7 @@ interface Crumb {
  */
 const LevelNav: React.FC<LevelNavProps> = ({
     Z, selectedShell, selectedSubshell, selectedOrbital, onNavigate, onChangeElement, children,
+    variant = 'full',
 }) => {
     const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -138,9 +145,41 @@ const LevelNav: React.FC<LevelNavProps> = ({
         });
     }
 
+    if (variant === 'header') {
+        // Where you are, past the element the button already names.
+        const location = crumbs.slice(1).map(crumb => crumb.label).join(' · ');
+        return (
+            <Box className="level-nav level-nav-header" aria-label="level navigation">
+                {parent && (
+                    <Button
+                        size="small"
+                        className="level-nav-back"
+                        onClick={() => onNavigate(parent.target)}
+                        aria-label={`back to ${parent.label}`}
+                    >
+                        ←
+                    </Button>
+                )}
+                {onChangeElement && (
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        className="level-nav-change-element"
+                        onClick={onChangeElement}
+                        aria-label={`change element, currently ${elementName}`}
+                    >
+                        {element ? `${element.symbol} · ${element.name}` : elementName} ▾
+                    </Button>
+                )}
+                {location && <span className="level-nav-location">{location}</span>}
+            </Box>
+        );
+    }
+    const isBody = variant === 'body';
+
     return (
-        <Box className="level-nav" aria-label="level navigation">
-            {parent && (
+        <Box className={`level-nav${isBody ? ' level-nav-body' : ''}`} aria-label="level navigation">
+            {!isBody && parent && (
                 <Button
                     size="small"
                     className="level-nav-back"
@@ -149,7 +188,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     ← Back to {parent.label}
                 </Button>
             )}
-            {onChangeElement && (
+            {!isBody && onChangeElement && (
                 <Button
                     size="small"
                     variant="outlined"
@@ -161,8 +200,8 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 </Button>
             )}
             {/* At the whole-atom level the breadcrumb is only the element's
-                name, which the element button above already shows. */}
-            {(crumbs.length > 1 || !onChangeElement) && (
+                name, which the element button already shows. */}
+            {(crumbs.length > 1 || (!onChangeElement && !isBody)) && (
             <Breadcrumbs aria-label="breadcrumb" className="level-nav-breadcrumbs">
                 {crumbs.map(crumb => (
                     <Link

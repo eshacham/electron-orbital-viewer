@@ -7,7 +7,7 @@ const tilesIn = (container: HTMLElement, selector: string) =>
 
 describe('PeriodicTable', () => {
     it('renders every element as a tile carrying its number and symbol', () => {
-        const { container } = render(<PeriodicTable Z={1} onSelect={() => {}} />);
+        const { container } = render(<PeriodicTable Z={1} onSelect={() => {}} onClose={() => {}} />);
         const tiles = container.querySelectorAll('.periodic-tile');
         expect(tiles).toHaveLength(118);
 
@@ -17,7 +17,7 @@ describe('PeriodicTable', () => {
     });
 
     it('keeps the lanthanides and actinides in their own detached rows', () => {
-        const { getByRole } = render(<PeriodicTable Z={1} onSelect={() => {}} />);
+        const { getByRole } = render(<PeriodicTable Z={1} onSelect={() => {}} onClose={() => {}} />);
         const lanthanides = within(getByRole('group', { name: /lanthanides/i }));
         const actinides = within(getByRole('group', { name: /actinides/i }));
         expect(lanthanides.getByText('La')).toBeInTheDocument();
@@ -29,7 +29,7 @@ describe('PeriodicTable', () => {
     // Addendum 3: colour is block, not chemical family, because block is
     // what the engine computes with.
     it('colours by block, and says so in a legend', () => {
-        const { container, getByText } = render(<PeriodicTable Z={1} onSelect={() => {}} />);
+        const { container, getByText } = render(<PeriodicTable Z={1} onSelect={() => {}} onClose={() => {}} />);
         expect(container.querySelector('.periodic-tile[data-z="3"]')).toHaveAttribute('data-block', 's');
         expect(container.querySelector('.periodic-tile[data-z="9"]')).toHaveAttribute('data-block', 'p');
         expect(container.querySelector('.periodic-tile[data-z="26"]')).toHaveAttribute('data-block', 'd');
@@ -41,7 +41,7 @@ describe('PeriodicTable', () => {
 
     it('reports a clicked element and marks the current one', () => {
         const onSelect = jest.fn();
-        const { container } = render(<PeriodicTable Z={26} onSelect={onSelect} />);
+        const { container } = render(<PeriodicTable Z={26} onSelect={onSelect} onClose={() => {}} />);
 
         const selected = container.querySelectorAll('.periodic-tile.selected');
         expect(selected).toHaveLength(1);
@@ -56,13 +56,13 @@ describe('PeriodicTable', () => {
     // configuration" -- lighting the column is the point of the selector.
     describe('column highlighting', () => {
         it('lights the selected element\'s whole group', () => {
-            const { container } = render(<PeriodicTable Z={17} onSelect={() => {}} />);
+            const { container } = render(<PeriodicTable Z={17} onSelect={() => {}} onClose={() => {}} />);
             // The halogens: F, Cl, Br, I, At, Ts.
             expect(tilesIn(container, '.periodic-tile.in-column')).toEqual([9, 17, 35, 53, 85, 117]);
         });
 
         it('follows the pointer to another column, and back to the selection when it leaves', () => {
-            const { container } = render(<PeriodicTable Z={17} onSelect={() => {}} />);
+            const { container } = render(<PeriodicTable Z={17} onSelect={() => {}} onClose={() => {}} />);
             const lithium = container.querySelector('.periodic-tile[data-z="3"]')!;
 
             fireEvent.mouseEnter(lithium);
@@ -74,40 +74,38 @@ describe('PeriodicTable', () => {
         });
 
         it('pairs a lanthanide with the actinide below it, the rows having no groups of their own', () => {
-            const { container } = render(<PeriodicTable Z={58} onSelect={() => {}} />);
+            const { container } = render(<PeriodicTable Z={58} onSelect={() => {}} onClose={() => {}} />);
             expect(tilesIn(container, '.periodic-tile.in-column')).toEqual([58, 90]);
         });
 
         it('follows keyboard focus too, so the column is not a mouse-only affordance', () => {
-            const { container } = render(<PeriodicTable Z={17} onSelect={() => {}} />);
+            const { container } = render(<PeriodicTable Z={17} onSelect={() => {}} onClose={() => {}} />);
             fireEvent.focus(container.querySelector('.periodic-tile[data-z="3"]')!);
             expect(tilesIn(container, '.periodic-tile.in-column')).toEqual([1, 3, 11, 19, 37, 55, 87]);
         });
     });
 
-    it('collapses to its header, and comes back', () => {
-        const { container, getByRole } = render(<PeriodicTable Z={1} onSelect={() => {}} />);
-        const toggle = getByRole('button', { name: /hide table/i });
-        expect(toggle).toHaveAttribute('aria-expanded', 'true');
-
-        fireEvent.click(toggle);
-        expect(getByRole('button', { name: /change element/i })).toHaveAttribute('aria-expanded', 'false');
-        // Still says which element is current while collapsed.
-        expect(container.querySelector('.periodic-table-current')?.textContent).toMatch(/Hydrogen/);
+    // A pop-over: it closes on Close, on Escape, and once a choice is made,
+    // like a dropdown -- open, it covers the view.
+    it('closes on Close and on Escape', () => {
+        const onClose = jest.fn();
+        const { getByRole } = render(<PeriodicTable Z={1} onSelect={() => {}} onClose={onClose} />);
+        fireEvent.click(getByRole('button', { name: /close/i }));
+        fireEvent.keyDown(window, { key: 'Escape' });
+        expect(onClose).toHaveBeenCalledTimes(2);
     });
 
-    // Open, the table covers the top third of the view and the atom has to
-    // shrink below it; like a dropdown, it closes once a choice is made.
-    it('folds to its header once an element is picked', () => {
+    it('closes once an element is picked', () => {
         const onSelect = jest.fn();
-        const { container, getByRole } = render(<PeriodicTable Z={1} onSelect={onSelect} />);
+        const onClose = jest.fn();
+        const { container } = render(<PeriodicTable Z={1} onSelect={onSelect} onClose={onClose} />);
         fireEvent.click(container.querySelector('.periodic-tile[data-z="26"]')!);
         expect(onSelect).toHaveBeenCalledWith(26);
-        expect(getByRole('button', { name: /change element/i })).toHaveAttribute('aria-expanded', 'false');
+        expect(onClose).toHaveBeenCalled();
     });
 
     it('names the current element and its block in the header', () => {
-        const { container } = render(<PeriodicTable Z={92} onSelect={() => {}} />);
+        const { container } = render(<PeriodicTable Z={92} onSelect={() => {}} onClose={() => {}} />);
         expect(container.querySelector('.periodic-table-current')?.textContent)
             .toMatch(/92 — U \(Uranium\) · f-block/);
     });

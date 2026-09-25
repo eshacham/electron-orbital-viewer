@@ -186,8 +186,12 @@ describe('App', () => {
     it('defaults to atom mode and shows LevelNav for the default element', () => {
         renderWithProvider(<App />);
 
-        expect(screen.getByRole('navigation', { name: /breadcrumb/i })).toBeInTheDocument();
-        expect(screen.getByText('Hydrogen')).toBeInTheDocument();
+        // The element is the head of the card, and the way to change it --
+        // it reopens the periodic table.
+        fireEvent.click(screen.getByRole('button', { name: /close/i }));
+        expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /change element, currently Hydrogen/i }));
+        expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
     });
 
     it('switching to Basic Orbitals restores the n/l/mL panel, with no element control of its own', () => {
@@ -373,20 +377,39 @@ describe('App', () => {
         });
     });
 
-    it('keeps LevelNav reachable on a phone even while the controls sheet is closed', () => {
-        installMatchMedia(true); // narrow viewport: the sheet starts closed
-        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+    // A phone gets a one-line header (Back, the element, where you are) and a
+    // tabbed sheet -- Explore, View, Plot -- instead of the desktop columns.
+    describe('phone layout', () => {
+        it('keeps the element and the way back in a header that is always on screen', () => {
+            installMatchMedia(true);
+            renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
 
-        expect(screen.getByRole('button', { name: /show controls/i })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /change element, currently Hydrogen/i })).toBeInTheDocument();
+            // The sheet starts folded to its tabs: the atom gets the screen.
+            expect(screen.getByRole('tab', { name: 'Explore' })).toHaveAttribute('aria-selected', 'false');
+            expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
+        });
 
-        // LevelNav does not live inside #controls (see style.css's
-        // .side-panel unwrap on a narrow viewport), so it is unaffected by
-        // the sheet's own open/closed state.
-        // At the whole-atom level the element button is the card's head (a
-        // one-segment breadcrumb would only repeat it); drilled in, the
-        // breadcrumb is there for the way back out.
-        expect(screen.getByRole('button', { name: /change element, currently Hydrogen/i })).toBeInTheDocument();
-        fireEvent.click(screen.getByText(/K shell \(n=1\)/));
-        expect(screen.getByRole('navigation', { name: /breadcrumb/i })).toBeInTheDocument();
+        it('drills down from the Explore tab, and the header then offers the way back', () => {
+            installMatchMedia(true);
+            renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            fireEvent.click(screen.getByText(/K shell \(n=1\)/));
+
+            expect(screen.getByRole('button', { name: /back to Hydrogen/i })).toBeInTheDocument();
+            expect(screen.getByLabelText('subshells')).toBeInTheDocument();
+        });
+
+        it('puts the view settings on their own tab, and a second tap folds the sheet', () => {
+            installMatchMedia(true);
+            renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+
+            const view = screen.getByRole('tab', { name: 'View' });
+            fireEvent.click(view);
+            expect(screen.getByRole('button', { name: /atom mode/i })).toBeInTheDocument();
+            fireEvent.click(view);
+            expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
+        });
     });
 });

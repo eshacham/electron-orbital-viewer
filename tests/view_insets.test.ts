@@ -32,27 +32,26 @@ describe('measureViewInsets', () => {
         expect(measureViewInsets(root, false)).toEqual({ top: 70, right: 340, bottom: 0, left: 360 });
     });
 
-    it('on a phone held upright, counts the full-width navigation card as the top and the open sheet as the bottom', () => {
+    it('on a phone held upright, counts the header as the top and the sheet as the bottom', () => {
         const root = layout({ width: 390, height: 844 }, {
-            '.level-nav': { left: 8, right: 382, top: 8, bottom: 235, width: 374, height: 227 },
-            '#controls.open': { left: 0, right: 390, top: 540, bottom: 844, width: 390, height: 304 },
-            // Small corner overlays do not count.
-            '.scale-readout': { left: 12, right: 117, top: 270, bottom: 310, width: 105, height: 40 },
+            '.phone-header': { left: 8, right: 382, top: 8, bottom: 52, width: 374, height: 44 },
+            '.phone-sheet': { left: 0, right: 390, top: 500, bottom: 844, width: 390, height: 344 },
         });
-        expect(measureViewInsets(root, true)).toEqual({ top: 235, right: 0, bottom: 304, left: 0 });
+        expect(measureViewInsets(root, true)).toEqual({ top: 52, right: 0, bottom: 344, left: 0 });
     });
 
-    it('on a phone turned sideways, counts the navigation column as the left', () => {
+    it('on a phone turned sideways, counts the sheet docked down the right', () => {
         const root = layout({ width: 844, height: 390 }, {
-            '.level-nav': { left: 8, right: 428, top: 8, bottom: 125, width: 420, height: 117 },
+            '.phone-header': { left: 8, right: 440, top: 8, bottom: 52, width: 432, height: 44 },
+            '.phone-sheet': { left: 456, right: 844, top: 8, bottom: 390, width: 388, height: 382 },
         });
-        expect(measureViewInsets(root, true)).toEqual({ top: 0, right: 0, bottom: 0, left: 428 });
+        expect(measureViewInsets(root, true)).toEqual({ top: 52, right: 388, bottom: 0, left: 0 });
     });
 
-    it('ignores a closed sheet', () => {
+    it('counts only the tab bar of a folded sheet', () => {
         const root = layout({ width: 390, height: 844 }, {
-            '#controls.closed': { left: 0, right: 390, top: 844, bottom: 1150, width: 390, height: 306 },
+            '.phone-sheet': { left: 0, right: 390, top: 796, bottom: 844, width: 390, height: 48 },
         });
-        expect(measureViewInsets(root, true).bottom).toBe(0);
+        expect(measureViewInsets(root, true).bottom).toBe(48);
     });
 });

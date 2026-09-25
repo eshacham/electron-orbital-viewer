@@ -21,21 +21,18 @@ export function measureViewInsets(container: HTMLElement, narrow: boolean): View
     };
 
     if (narrow) {
-        // The navigation card spans the top of a phone held upright, and is
-        // a column down the left of one turned sideways. The scale readout
-        // and the folded plot are small corner overlays and do not count:
-        // shrinking the atom to clear them cost more than they cover.
-        const nav = rectOf('.level-nav') ?? rectOf('#panel-toggle');
-        if (nav) {
-            if (nav.width > bounds.width * 0.6) {
-                insets.top = Math.max(0, nav.bottom - bounds.top);
+        // The header across the top, and the tabbed sheet: along the bottom
+        // of a phone held upright, down the right of one turned sideways
+        // (only its tab bar, when folded).
+        const header = rectOf('.phone-header');
+        if (header) insets.top = Math.max(0, header.bottom - bounds.top);
+        const sheet = rectOf('.phone-sheet');
+        if (sheet) {
+            if (sheet.width > bounds.width * 0.6) {
+                insets.bottom = Math.max(0, bounds.bottom - sheet.top);
             } else {
-                insets.left = Math.max(0, nav.right - bounds.left);
+                insets.right = Math.max(0, bounds.right - sheet.left);
             }
-        }
-        const sheet = rectOf('#controls.open');
-        if (sheet && sheet.top < bounds.bottom) {
-            insets.bottom = Math.max(0, bounds.bottom - sheet.top);
         }
     } else {
         const table = rectOf('.periodic-table-panel');
@@ -96,7 +93,7 @@ export function useViewInsets(
             resizeObserver.disconnect();
             resizeObserver.observe(container);
             container
-                .querySelectorAll('.level-nav, .side-panel, .view-panel, .periodic-table-panel, .radial-plot, #controls')
+                .querySelectorAll('.phone-header, .phone-sheet, .side-panel, .view-panel, .periodic-table-panel')
                 .forEach(element => resizeObserver.observe(element));
         };
         const mutationObserver = new MutationObserver(() => {

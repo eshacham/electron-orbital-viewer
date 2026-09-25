@@ -8,6 +8,7 @@ html, body, #root {
   font-family: 'Roboto', sans-serif;
   /* Dark before React mounts too, so the first paint is not a white flash. */
   background-color: #050505;
+  overflow: hidden;
 }
 #root {
   display: flex; /* Use flexbox for layout if desired */
@@ -16,6 +17,11 @@ html, body, #root {
 }
 /* This is the div from App.tsx */
 #canvas-container {
+  /* A full-window app: nothing may scroll the page. The phone sheet used to
+     sit just below the screen and made it scrollable, and a tap inside the
+     sheet then scrolled the header and overlays away. Panels scroll inside
+     themselves instead. */
+  overflow: hidden;
   flex-grow: 1; /* Allows it to take up available space in a flex container */
   width: 100%;
   /* For non-flex layout, you might need explicit height: */
@@ -54,6 +60,18 @@ html, body, #root {
 .side-panel > * {
   flex-shrink: 0;
 }
+/* Folds the right-hand column to a bar on a medium-width window. */
+.view-panel-toggle {
+  align-self: flex-end;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(8, 8, 10, 0.72);
+  color: #fff;
+  font: 500 14px 'Roboto', sans-serif;
+  cursor: pointer;
+}
+
 /* The right-hand column on a desktop: view settings, then the radial plot. */
 .view-panel {
   position: absolute;
@@ -72,7 +90,7 @@ html, body, #root {
 .view-panel > * {
   flex-shrink: 0;
 }
-@media (min-width: 761px) and (min-height: 501px) {
+@media (min-width: 761px) and (min-height: 501px) and (orientation: landscape), (min-width: 1101px) and (min-height: 501px) {
   .view-panel #controls {
     position: static;
     max-height: none;
@@ -81,8 +99,16 @@ html, body, #root {
     width: 300px;
     box-sizing: border-box;
   }
+  /* Part of the right-hand column, the same width as the controls card
+     above it and flush to the same edge. */
   .view-panel .radial-plot {
     position: static;
+    width: 300px;
+    max-width: none !important;
+    box-sizing: border-box;
+  }
+  .view-panel .radial-plot.collapsed {
+    width: auto;
   }
 }
 .side-panel .level-nav {
@@ -101,7 +127,7 @@ html, body, #root {
    base rule (equal selector specificity) so it wins when this query
    matches. The 40vh scroll stays as the fallback for the short-viewport
    case further down, where that room genuinely is not available. */
-@media (min-width: 761px) and (min-height: 501px) {
+@media (min-width: 761px) and (min-height: 501px) and (orientation: landscape), (min-width: 1101px) and (min-height: 501px) {
   .side-panel .level-nav {
     max-height: none;
     overflow-y: visible;
@@ -407,175 +433,140 @@ html, body, #root {
 
 
 /* ---------------------------------------------------------------------------
-   Phone layout.
+   Phone layout: a one-line header across the top, and a tabbed sheet along
+   the bottom (down the right in landscape) -- see PhoneSheet.tsx. The atom
+   gets everything in between.
 
-   At 393px wide the sidebar covered 73% of the screen, which left the orbital —
-   the entire point of the app — as a sliver behind it. Below the breakpoint the
-   panel becomes a sheet that is out of the way until asked for.
+   It replaced a navigation card that took a third of the screen and scrolled
+   on its own, over a controls strip several screens wide that scrolled
+   sideways, with the drill-down split between the two.
    --------------------------------------------------------------------------- */
-
-.panel-toggle {
-  position: absolute !important;
-  top: 12px;
-  left: 12px;
-  z-index: 20;
-  width: 44px;   /* a comfortable touch target */
-  height: 44px;
-  border-radius: 10px !important;
-  background: rgba(8, 8, 10, 0.65) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  color: #fff !important;
-  font-size: 18px !important;
-  line-height: 1 !important;
-}
-
-/* Phone layout: the panel flies out from the bottom as a horizontal strip.
-   Laying the controls in a row rather than a column keeps the strip short, so
-   the orbital, the radial plot and the scale all stay on screen while you work
-   the controls — which a full-height sheet or a side drawer both gave up. */
-@media (max-width: 760px), (max-height: 500px) {
-  /* Unwrap: .side-panel stops being a box, so LevelNav and #controls go
-     back to being positioned independently against #canvas-container --
-     #controls keeps the sheet rules below untouched, and LevelNav (next
-     rule) gets its own fixed spot that the sheet's open/closed state
-     cannot cover. */
-  .side-panel,
-  .view-panel {
-    display: contents;
-  }
-  .side-panel .level-nav {
-    position: fixed;
+@media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
+  .phone-header {
+    position: absolute;
     top: 8px;
     left: 8px;
     right: 8px;
     z-index: 15;
-    max-height: 30dvh;
-    overflow-y: auto;
   }
-  /* The sheet toggle floats at top-left over this panel. A float the size
-     of the toggle makes the first lines wrap round it instead of running
-     underneath -- it used to cover the configuration line. */
-  .side-panel .level-nav::before {
-    content: '';
-    float: left;
-    width: 46px;
-    height: 44px;
+  .level-nav-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    border-radius: 10px;
+    background: rgba(240, 240, 240, 0.94);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
   }
-  .side-panel .level-nav .level-nav-back {
-    min-height: 40px;
-    font-size: 0.9rem !important;
+  .level-nav-header .level-nav-back {
+    min-width: 40px;
+    min-height: 36px;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 1.2rem !important;
+  }
+  .level-nav-header .level-nav-change-element {
+    margin: 0 !important;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+  .level-nav-location {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.72);
   }
 
-  #controls {
-    top: auto;
+  .phone-sheet {
+    position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    width: auto;
-    max-width: none;
-    height: auto;
-    max-height: 44dvh;
+    z-index: 14;
+    /* The tab bar is the last child but sits at the bottom, under the
+       thumb; the open tab's content grows upwards above it. */
+    display: flex;
+    flex-direction: column-reverse;
+    max-height: 55dvh;
+    background: rgba(240, 240, 240, 0.97);
     border-radius: 14px 14px 0 0;
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
-    transition: transform 0.22s ease-out;
-
-    /* One row, scrolled sideways when it runs past the screen. */
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 12px 14px 14px !important;
-    overflow-x: auto;
-    overflow-y: hidden;
+  }
+  .phone-sheet-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .phone-sheet.open .phone-sheet-tabs {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  .phone-sheet-tab {
+    flex: 1;
+    min-height: 48px;
+    border: none;
+    border-top: 3px solid transparent;
+    background: none;
+    color: rgba(0, 0, 0, 0.62);
+    font: 500 14px 'Roboto', sans-serif;
+    cursor: pointer;
+  }
+  .phone-sheet-tab[aria-selected="true"] {
+    color: #1976d2;
+    border-top-color: #1976d2;
+  }
+  .phone-sheet-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    padding: 10px 16px 12px;
   }
-  #controls.closed { transform: translateY(101%); }
-  #controls.open { transform: translateY(0); }
-
-  /* Each control keeps its own width instead of filling the row. */
-  #controls .MuiFormControl-root,
-  #controls .MuiBox-root {
-    flex: 0 0 auto;
+  /* The desktop cards' chrome does not belong inside the sheet. */
+  .phone-sheet-body #controls {
+    position: static;
     width: auto;
-    margin-top: 8px;
-    margin-bottom: 0;
+    max-height: none;
+    overflow: visible;
+    padding: 0 !important;
+    background: none;
+    box-shadow: none;
   }
-  #controls .MuiFormControl-root { min-width: 132px; }
-  #controls #orbital-name {
-    flex: 0 0 auto;
-    align-self: center;
-    margin: 0 4px 0 0;
-    white-space: nowrap;
+  .phone-sheet-body .level-nav-body {
+    padding: 0;
   }
-  #controls .MuiSlider-root { width: 120px; }
-  /* The cut section carries a sentence of help and a labelled slider; in
-     the sideways strip it needs a width of its own to wrap into, or the
-     sentence runs on one line several screens long. */
-  #controls .cut-controls { width: 250px; min-width: 250px; }
-  #controls .cut-controls .MuiSlider-root { width: auto; }
-  #controls .cut-controls .cut-help { white-space: normal; }
-  #controls .MuiToggleButtonGroup-root { width: auto; }
-  #controls .MuiButton-root { white-space: nowrap; }
-
-  /* The strip is several screens wide, and Update is at the far end of it.
-     Pin the actions to the right edge so applying a change never means
-     scrolling back for the button. */
-  /* The wrapper stops being a box of its own so its two buttons become items of
-     the strip: Reset scrolls with everything else, and only Update is pinned.
-     Pinning both cost 270 of 393 pixels on a phone, which buried the controls. */
-  #controls .controls-actions {
-    display: contents;
-  }
-  #controls #reset-view {
-    flex: 0 0 auto;
-    align-self: center;
-    margin-top: 0;
-  }
-  #controls #update-orbital {
-    position: sticky;
-    right: -14px;          /* covers the panel's own right padding too */
-    z-index: 2;            /* paints over the controls scrolling beneath it */
-    flex: 0 0 auto;
-    align-self: center;
-    /* Carries the panel colour along with it so nothing shows through. */
-    box-shadow: -16px 0 12px 12px rgb(238, 238, 238);
+  .phone-sheet-body .radial-plot {
+    position: static;
+    margin: 4px auto;
+    width: fit-content;
+    /* Opaque: its see-through dark card read as washed-out grey on the
+       light sheet. */
+    background: #111;
   }
 
-  /* Overlays move to the top so the strip has the bottom to itself --
-     but below LevelNav, which is also pinned to the top here and is both
-     wider and opaque. At `top: 12px` the plot sat entirely behind it and
-     was invisible on a phone (found by driving the app at 420px). LevelNav
-     is capped at 30dvh above, so clearing that always clears it. */
-  .radial-plot { right: 12px; top: calc(30dvh + 16px); bottom: auto; }
-  /* Beside the scale readout rather than at the bottom, where the open
-     controls sheet covered it. */
-  .phase-legend { top: calc(30dvh + 20px); bottom: auto; left: 50%; padding: 4px 8px; gap: 8px; font-size: 12px; }
-  .scale-readout { left: 12px; top: calc(30dvh + 16px); right: auto; bottom: auto; padding: 6px 10px 5px; font-size: 12px; }
-
-  /* The compact plot's SVG is 150px, but its title is a full sentence and
-     was stretching the panel to ~380px of a 390px screen -- covering the
-     atom it describes. Cap the panel to its content and let the title wrap
-     onto two or three lines instead. The title is not shortened: naming
-     D(r) = 4πr²ρ(r), and saying the cut face is scaled to local structure,
-     are both honesty requirements (spec §7), not decoration. */
-  .radial-plot.compact { max-width: 172px; }
-  .radial-plot.compact .radial-plot-title { font-size: 10px; line-height: 1.25; }
-
-  /* The subshell panel is the substance of level 2, and inside a
-     horizontally scrolling strip with no width of its own it laid out as
-     one 797px row on a 390px screen -- its chips off past the right edge
-     and its wrap never triggering. Give it a page's worth of the strip so
-     the chip rows wrap and read normally. */
-  #controls .subshell-panel {
-    flex: 0 0 auto;
-    width: min(76vw, 320px);
-    /* First in the strip. It only exists at level 2, and at level 2 it is
-       what you came for -- behind the mode toggle and the element picker it
-       started a full screen-width off the right edge. */
-    order: -1;
+  /* Small overlays sit just under the header. */
+  .scale-readout {
+    left: 12px;
+    top: 60px;
+    bottom: auto;
+    padding: 6px 10px 5px;
+    font-size: 12px;
   }
-  #controls .subshell-chip { max-width: 100%; }
-  #controls .subshell-chip .MuiChip-label { overflow: hidden; text-overflow: ellipsis; }
+  .phase-legend {
+    top: 62px;
+    bottom: auto;
+    left: auto;
+    right: 12px;
+    transform: none;
+    padding: 4px 8px;
+    gap: 8px;
+    font-size: 12px;
+  }
 }
 
 /* The element, as a button, at the head of the navigation card on a phone. */
@@ -624,24 +615,26 @@ html, body, #root {
 }
 
 /* ---------------------------------------------------------------------------
-   Short viewport (a phone in landscape, or a squat desktop window). The rule
-   block above is shared with narrow-and-tall, where the scarce dimension is
-   width and stacking LevelNav / plot / sheet vertically is right. Here the
-   scarce dimension is height: at 390px tall, LevelNav's 30dvh cap plus the
-   plot below it plus the sheet's 44dvh do not fit, and the plot ends up
-   sitting over the sheet. There is plenty of width instead, so LevelNav
-   stops spanning it and the plot goes back beside it at the top right.
-   Must follow the block above: same specificity, so source order decides.
+   A phone turned sideways: height is the scarce dimension, so the sheet docks
+   down the right instead of along the bottom, and the header only spans what
+   it needs. Must follow the block above: same specificity, so source order
+   decides.
    --------------------------------------------------------------------------- */
 @media (max-height: 500px) {
-  .side-panel .level-nav {
+  .phone-header {
     right: auto;
-    max-width: min(52vw, 420px);
+    max-width: calc(54vw - 16px);
   }
-  .radial-plot { top: 12px; }
-  /* The navigation card is a left column here, so the key goes under the
-     plot on the right instead of mid-screen, where the card would cover it. */
-  .phase-legend { top: 64px; left: auto; right: 12px; transform: none; }
+  .phone-sheet {
+    top: 8px;
+    left: auto;
+    width: min(46vw, 400px);
+    max-height: none;
+    border-radius: 14px 0 0 0;
+  }
+  .phone-sheet:not(.open) {
+    top: auto;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -777,14 +770,19 @@ html, body, #root {
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 10;
+  /* A pop-over now: above both side panels, which it used to open beneath
+     on anything narrower than about 1200 px. */
+  z-index: 25;
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
   padding: 8px 12px 10px;
   border-radius: 8px;
-  background: rgba(8, 8, 10, 0.72);
+  background: rgba(8, 8, 10, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: #fff;
   font-family: 'Roboto', sans-serif;
-  max-width: calc(100vw - 420px);
+  max-width: calc(100vw - 40px);
 }
 .periodic-table-header {
   display: flex;

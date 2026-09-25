@@ -6,7 +6,6 @@ import {
     Box,
     Alert,
     Snackbar,
-    IconButton,
     CircularProgress
 } from '@mui/material';
 import { useAppDispatch, useAppSelector } from './store/hooks';
@@ -35,6 +34,7 @@ import Controls from './components/Controls';
 import OrbitalViewer from './components/OrbitalViewer';
 import RadialPlot, { RadialCurve } from './components/RadialPlot';
 import LevelNav, { NavigationTarget } from './components/LevelNav';
+import PhoneSheet from './components/PhoneSheet';
 import SubshellPanel from './components/SubshellPanel';
 import PeriodicTable from './components/PeriodicTable';
 import ElementPickerDialog from './components/ElementPickerDialog';
@@ -43,8 +43,16 @@ import { orbitalName } from './orbital_names';
 import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
-import { useMediaQuery, NARROW_VIEWPORT } from './useMediaQuery';
+import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
+
+/**
+ * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
+ * less the plot card's own padding and border, so the two cards line up.
+ */
+const PLOT_WIDTH = 278;
+/** The plot's width in the phone sheet, which is at most 400 px across. */
+const PHONE_PLOT_WIDTH = 300;
 
 /** How long a render has to take before the viewer is told it is working. */
 const BUSY_INDICATOR_DELAY_MS = 400;
@@ -183,8 +191,23 @@ function App() {
     // On a phone the panel would cover most of the screen, so it starts out of
     // the way and is opened deliberately. On a desktop it is just always there.
     const isNarrow = useMediaQuery(NARROW_VIEWPORT);
-    const [panelOpen, setPanelOpen] = useState(true);
-    useEffect(() => { setPanelOpen(!isNarrow); }, [isNarrow]);
+    // The phone sheet's open tab, or null with the atom given the screen.
+    const [phoneTab, setPhoneTab] = useState<string | null>(null);
+    // Between a phone and a wide desktop the right-hand panel starts folded
+    // to a bar, so the atom keeps the width; it opens over the view on a tap.
+    const isMedium = useMediaQuery(MEDIUM_VIEWPORT) && !isNarrow;
+    // Folded by default at medium width, open otherwise; a tap overrides it
+    // until the window crosses the breakpoint again. Derived rather than
+    // synced in an effect, so the first render is already right.
+    const [viewPanelChoice, setViewPanelChoice] = useState<{ medium: boolean; open: boolean } | null>(null);
+    const viewPanelOpen = viewPanelChoice && viewPanelChoice.medium === isMedium ? viewPanelChoice.open : !isMedium;
+    const setViewPanelOpen = (update: (open: boolean) => boolean) =>
+        setViewPanelChoice({ medium: isMedium, open: update(viewPanelOpen) });
+    // Desktop element choice: the periodic table, as a pop-over opened from
+    // the element name. Open on arrival, so the first thing a visitor sees is
+    // what to pick; it closes once they do.
+    const [tableOpen, setTableOpen] = useState(true);
+    const closeTable = useCallback(() => setTableOpen(false), []);
 
     // Only say anything if the calculation is actually taking a while; see
     // useDelayedFlag for why.
@@ -439,6 +462,91 @@ function App() {
         )
         : null;
 
+    const levelNavProps = {
+        Z: atomZ,
+        selectedShell: atomSelectedShell,
+        selectedSubshell: atomSelectedSubshell,
+        selectedOrbital: atomSelectedOrbital,
+        onNavigate: handleLevelNavigate,
+        onChangeElement: isNarrow ? () => setElementPickerOpen(true) : () => setTableOpen(true),
+    };
+
+    const controls = (
+        <Controls
+            mode={atomMode}
+            onModeChange={handleModeChange}
+            atomLevel={atomLevel}
+            atomZ={atomZ}
+            onAtomElementChange={handleAtomElementChange}
+            showElementPicker={false}
+            initialN={n}
+            onNChange={setN}
+            initialL={l}
+            onLChange={setL}
+            initialMl={ml}
+            onMlChange={setMl}
+            initialEnclosedFraction={enclosedFraction}
+            onEnclosedFractionChange={setEnclosedFraction}
+            isoLevel={isoLevel}
+            onUpdateOrbital={handleOrbitalParamsChange}
+            onResetView={handleResetView}
+            surfaceStyle={surfaceStyle}
+            onSurfaceStyleChange={handleSurfaceStyleChange}
+            isBusy={isAtomMode ? showAtomBusy : showBusy}
+        />
+    );
+
+    const renderRadialPlot = (width: number, collapsible: boolean) => {
+        if (!isAtomMode) {
+            return renderedParams && (
+                <RadialPlot
+                    n={renderedParams.n}
+                    l={renderedParams.l}
+                    Z={renderedParams.Z}
+                    rMax={renderedParams.rMax}
+                    width={width}
+                    collapsible={collapsible}
+                />
+            );
+        }
+        return atomProfile && (
+            <RadialPlot
+                // n/l are unused in multi-curve mode (see RadialPlot); Z is
+                // real, since the hover readout's shell label logic has no
+                // other use for it here.
+                n={1}
+                l={0}
+                Z={atomProfile.Z}
+                rMax={atomPlotRange}
+                scale={atomLevel === 'atom' ? 'sqrt' : 'linear'}
+                width={width}
+                collapsible={collapsible}
+                curves={atomCurves}
+                peaks={Array.from(atomProfile.shellPeaks)}
+                cutFaceNote={atomLevel !== 'orbital'}
+                hoverRadius={atomHoverRadius}
+                onHoverRadius={handleAtomHoverRadius}
+            />
+        );
+    };
+
+    // The phone sheet's tabs, one job each. Basic Orbitals has no drill-down,
+    // so its orbital choice and view settings share one tab.
+    const phoneTabs = isAtomMode
+        ? [
+            {
+                key: 'explore',
+                label: 'Explore',
+                content: <LevelNav {...levelNavProps} variant="body">{subshellPanel}</LevelNav>,
+            },
+            { key: 'view', label: 'View', content: controls },
+            { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
+        ]
+        : [
+            { key: 'view', label: 'Orbital & view', content: controls },
+            { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
+        ];
+
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
@@ -475,105 +583,54 @@ function App() {
                     </div>
                 )}
                 {/* Addendum 3: the element selector is a real periodic
-                    table, in its own panel across the top, on anything
-                    wider than a phone. A table does not survive a phone
-                    width, so below that the dropdown in Controls stays --
-                    the two are alternatives, never both at once. */}
-                {isAtomMode && !isNarrow && (
-                    <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} />
-                )}
-                {isNarrow && (
-                    <IconButton
-                        id="panel-toggle"
-                        className="panel-toggle"
-                        aria-label={panelOpen ? 'hide controls' : 'show controls'}
-                        onClick={() => setPanelOpen(open => !open)}
-                    >
-                        {panelOpen ? '✕' : '☰'}
-                    </IconButton>
+                    table on anything wider than a phone, as a pop-over over
+                    the view. A table does not survive a phone width, so
+                    below that a searchable list stands in for it -- the two
+                    are alternatives, never both at once. */}
+                {isAtomMode && !isNarrow && tableOpen && (
+                    <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} onClose={closeTable} />
                 )}
                 {/* Desktop: navigation down the left (.side-panel), view
-                    settings and the plot down the right (.view-panel). The
-                    two used to share the left column, and once the drill-down
-                    was in it one or the other was always below the fold. On
-                    a phone both unwrap (display:contents in style.css), so
-                    LevelNav gets its own fixed position, independent of the
-                    controls sheet -- a phone user who drills in and closes
-                    the sheet still has a way back out. */}
-                <Box className="side-panel">
-                    {isAtomMode && (
-                        <LevelNav
-                            Z={atomZ}
-                            selectedShell={atomSelectedShell}
-                            selectedSubshell={atomSelectedSubshell}
-                            selectedOrbital={atomSelectedOrbital}
-                            onNavigate={handleLevelNavigate}
-                            onChangeElement={isNarrow ? () => setElementPickerOpen(true) : undefined}
-                        >
-                            {!isNarrow && subshellPanel}
-                        </LevelNav>
-                    )}
-                </Box>
-                <Box className="view-panel">
-                    <Controls
-                        mode={atomMode}
-                        onModeChange={handleModeChange}
-                        atomLevel={atomLevel}
-                        atomZ={atomZ}
-                        onAtomElementChange={handleAtomElementChange}
-                        showElementPicker={false}
-                        initialN={n}
-                        onNChange={setN}
-                        initialL={l}
-                        onLChange={setL}
-                        initialMl={ml}
-                        onMlChange={setMl}
-                        initialEnclosedFraction={enclosedFraction}
-                        onEnclosedFractionChange={setEnclosedFraction}
-                        isoLevel={isoLevel}
-                        onUpdateOrbital={handleOrbitalParamsChange}
-                        onResetView={handleResetView}
-                        surfaceStyle={surfaceStyle}
-                        onSurfaceStyleChange={handleSurfaceStyleChange}
-                        isBusy={isAtomMode ? showAtomBusy : showBusy}
-                        open={panelOpen}
-                        compact={isNarrow}
-                    >
-                        {/* Shown at the orbital level too, not just the shell
-                            level (bug fix, reported from a phone): it used to
-                            unmount the moment you picked an orbital, so the mL
-                            buttons you had just used vanished. On a desktop
-                            it is in the navigation card instead. */}
-                        {isNarrow && subshellPanel}
-                    </Controls>
-                {!isAtomMode && renderedParams && (
-                    <RadialPlot
-                        n={renderedParams.n}
-                        l={renderedParams.l}
-                        Z={renderedParams.Z}
-                        rMax={renderedParams.rMax}
-                        compact={isNarrow}
-                    />
+                    settings and the plot down the right (.view-panel). A
+                    phone gets a one-line header and a tabbed bottom sheet
+                    instead (PhoneSheet): the two columns do not fit, and the
+                    single sideways-scrolling strip that stood in for them
+                    split navigation across two places and hid most of
+                    itself off screen. */}
+                {isNarrow ? (
+                    <>
+                        {isAtomMode && (
+                            <div className="phone-header">
+                                <LevelNav {...levelNavProps} variant="header" />
+                            </div>
+                        )}
+                        <PhoneSheet tabs={phoneTabs} active={phoneTab} onChange={setPhoneTab} />
+                    </>
+                ) : (
+                    <>
+                        <Box className="side-panel">
+                            {isAtomMode && (
+                                <LevelNav {...levelNavProps}>
+                                    {subshellPanel}
+                                </LevelNav>
+                            )}
+                        </Box>
+                        <Box className={`view-panel${viewPanelOpen ? '' : ' folded'}`}>
+                            {isMedium && (
+                                <button
+                                    type="button"
+                                    className="view-panel-toggle"
+                                    aria-expanded={viewPanelOpen}
+                                    onClick={() => setViewPanelOpen(open => !open)}
+                                >
+                                    View settings {viewPanelOpen ? '▾' : '▸'}
+                                </button>
+                            )}
+                            {viewPanelOpen && controls}
+                            {renderRadialPlot(PLOT_WIDTH, isMedium)}
+                        </Box>
+                    </>
                 )}
-                {isAtomMode && atomProfile && (
-                    <RadialPlot
-                        // n/l are unused in multi-curve mode (see RadialPlot);
-                        // Z is real, since the hover readout's shell label
-                        // logic has no other use for it here.
-                        n={1}
-                        l={0}
-                        Z={atomProfile.Z}
-                        rMax={atomPlotRange}
-                        scale={atomLevel === 'atom' ? 'sqrt' : 'linear'}
-                        compact={isNarrow}
-                        curves={atomCurves}
-                        peaks={Array.from(atomProfile.shellPeaks)}
-                        cutFaceNote={atomLevel !== 'orbital'}
-                        hoverRadius={atomHoverRadius}
-                        onHoverRadius={handleAtomHoverRadius}
-                    />
-                )}
-                </Box>
                 {isAtomMode && isNarrow && (
                     <ElementPickerDialog
                         open={elementPickerOpen}

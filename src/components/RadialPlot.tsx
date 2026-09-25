@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { radialProfile } from '../radial_distribution';
 
 /**
@@ -65,6 +65,10 @@ interface RadialPlotProps {
      * exists. At the orbital level there is none.
      */
     cutFaceNote?: boolean;
+    /** Drawing width in px; defaults to 150 compact, 260 otherwise. */
+    width?: number;
+    /** Starts folded to its title, as on a phone, where room is short. */
+    collapsible?: boolean;
 }
 
 /** Axis label for a radius: two decimals below 10 a₀, where rounding would mislead. */
@@ -116,11 +120,14 @@ function dominantCurveLabelAt(curves: RadialCurve[], r: number): string | null {
 const RadialPlot: React.FC<RadialPlotProps> = ({
     n, l, Z, rMax, compact = false,
     curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear', cutFaceNote = false,
+    width, collapsible = false,
 }) => {
-    // On a phone the plot sits over the atom, so it starts folded to its
-    // title and opens on a tap.
-    const [expanded, setExpanded] = useState(!compact);
-    const WIDTH = compact ? 150 : 260;
+    // On a phone, or a window too narrow for both side panels, the plot sits
+    // over the atom, so it starts folded to its title and opens on a tap.
+    const foldable = compact || collapsible;
+    const [expanded, setExpanded] = useState(!foldable);
+    useEffect(() => { setExpanded(!foldable); }, [foldable]);
+    const WIDTH = width ?? (compact ? 150 : 260);
     const HEIGHT = compact ? 62 : 96;
     const plotWidth = WIDTH - PADDING.left - PADDING.right;
     const plotHeight = HEIGHT - PADDING.top - PADDING.bottom;
@@ -209,9 +216,9 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
     const midRadius = scale === 'sqrt' ? rMax / 4 : rMax / 2;
     const title = isMultiCurve ? 'Radial distribution D(r) = 4πr²ρ(r)' : 'Radial distribution — r²R(r)²';
 
-    if (compact && !expanded) {
+    if (foldable && !expanded) {
         return (
-            <div className="radial-plot compact collapsed" aria-label="radial distribution">
+            <div className={`radial-plot collapsed${compact ? ' compact' : ''}`} aria-label="radial distribution">
                 <button
                     type="button"
                     className="radial-plot-toggle"
@@ -233,7 +240,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
             style={{ maxWidth: WIDTH + 22 }}
         >
             <div className="radial-plot-title">
-                {compact ? (
+                {foldable ? (
                     <button
                         type="button"
                         className="radial-plot-toggle"
