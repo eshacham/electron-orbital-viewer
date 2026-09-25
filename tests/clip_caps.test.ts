@@ -243,3 +243,24 @@ describe('clip caps', () => {
         expect(() => disposeCaps(null)).not.toThrow();
     });
 });
+
+// See the matching shell-view test: a cloned stencil material holds a copy
+// of the cut plane, so the cap painted where the cut used to be.
+describe('clip cap stencil', () => {
+    it('clips with the live cut plane, not a copy of it', () => {
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+        const caps = createClipCaps(new THREE.BufferGeometry(), {
+            plane,
+            densityMap: generateOrbitalMesh(params).densityMap,
+            opacity: 1,
+        });
+        const stencils: THREE.Material[] = [];
+        caps.traverse(child => {
+            if (child instanceof THREE.Mesh && child.userData.isCapStencil) stencils.push(child.material as THREE.Material);
+        });
+        expect(stencils).toHaveLength(2);
+        for (const material of stencils) {
+            expect(material.clippingPlanes?.[0]).toBe(plane);
+        }
+    });
+});

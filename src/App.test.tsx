@@ -264,7 +264,8 @@ describe('App', () => {
 
         act(() => { store.dispatch(drillToShell(1)); });
         act(() => { store.dispatch(drillToOrbital(1, 0, 0)); });
-        expect(store.getState().orbital.surfaceStyle.clipAxis).toBe('none');
+        // Off, and centred for when an axis is picked here.
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'none', clipPosition: 0 });
 
         act(() => { store.dispatch(drillToShell(1)); });
         expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'y', clipPosition: 0.3 });

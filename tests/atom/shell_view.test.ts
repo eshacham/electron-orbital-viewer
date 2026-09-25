@@ -45,6 +45,25 @@ const capMaterial = (view: THREE.Object3D): THREE.ShaderMaterial => {
 };
 
 describe('shell view', () => {
+    // The stencil passes decide where the cut face may paint. three's
+    // Material.clone() deep-copies clippingPlanes, so a cloned stencil
+    // material kept the plane as it was when the view was built: changing
+    // the cut axis or depth moved the face but not the region it painted
+    // in, and X, Y and Z all looked like the same rings tilted.
+    it('clips its stencil passes with the live cut plane, not a copy of it', () => {
+        const opts = options();
+        const view = createShellView(opts);
+        const stencils: THREE.Material[] = [];
+        view.traverse(child => {
+            if (child instanceof THREE.Mesh && child.userData.isCapStencil) stencils.push(child.material as THREE.Material);
+        });
+        expect(stencils).toHaveLength(2);
+        for (const material of stencils) {
+            expect(material.clippingPlanes?.[0]).toBe(opts.plane);
+        }
+    });
+
+
     it('is a sphere at the contour radius, not a sampled grid', () => {
         const view = createShellView(options());
         const stencils: THREE.Mesh[] = [];

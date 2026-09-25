@@ -274,7 +274,9 @@ function App() {
         wasOrbitalViewRef.current = isOrbitalView;
         if (isOrbitalView && !wasOrbitalView) {
             shellViewCutRef.current = { clipAxis: surfaceStyle.clipAxis, clipPosition: surfaceStyle.clipPosition };
-            dispatch(setSurfaceStyle({ clipAxis: 'none' }));
+            // Centred too, so picking an axis here starts at the nucleus
+            // rather than at whatever depth the shell view was left at.
+            dispatch(setSurfaceStyle({ clipAxis: 'none', clipPosition: 0 }));
         } else if (!isOrbitalView && wasOrbitalView) {
             const saved = shellViewCutRef.current;
             dispatch(setSurfaceStyle(saved && saved.clipAxis !== 'none'

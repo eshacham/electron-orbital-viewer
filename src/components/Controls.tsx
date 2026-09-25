@@ -76,6 +76,22 @@ interface ControlsProps {
 const ISO_MIN = 0.000000001;
 const ISO_MAX = 0.001;
 
+/** The cut-depth slider's landmarks: the edge, the nucleus, the far edge. */
+const CUT_DEPTH_MARKS = [
+  { value: 0, label: 'none' },
+  { value: 50, label: 'centre' },
+  { value: 100, label: 'all' },
+];
+
+/** What a cut at this clipPosition leaves, in words, for the slider's label. */
+export function cutDepthLabel(clipPosition: number): string {
+  const depth = Math.round((1 - clipPosition) * 50);
+  if (depth <= 0) return 'nothing removed';
+  if (depth >= 100) return 'everything removed';
+  if (depth === 50) return '50% — through the nucleus';
+  return `${depth}% — ${depth < 50 ? 'short of' : 'past'} the nucleus`;
+}
+
 const Controls: React.FC<ControlsProps> = ({
   mode = 'hydrogenic',
   onModeChange,
@@ -362,7 +378,14 @@ const Controls: React.FC<ControlsProps> = ({
         />
       </FormControl>
 
-      <FormControl component="fieldset" margin="normal" fullWidth>
+      {/* The cut: a plane across the chosen axis, removing the + side of
+          it. Depth is how far in the plane has come, from the edge of what
+          is drawn (nothing removed) through the nucleus (half) to the far
+          edge (everything) -- the whole travel spans the drawn object (see
+          clipExtent in orbital_visualizer.ts). Stored as clipPosition, the
+          plane's offset as a fraction of that radius: +1 at depth 0, 0 at
+          50 %, -1 at 100 %. */}
+      <FormControl component="fieldset" margin="normal" fullWidth className="cut-controls">
         <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Cut away</FormLabel>
         <ToggleButtonGroup
           value={surfaceStyle.clipAxis}
@@ -385,19 +408,37 @@ const Controls: React.FC<ControlsProps> = ({
           <ToggleButton value="y" aria-label="cut along y">Y</ToggleButton>
           <ToggleButton value="z" aria-label="cut along z">Z</ToggleButton>
         </ToggleButtonGroup>
+        <FormHelperText className="cut-help" sx={{ mx: 0 }}>
+          {surfaceStyle.clipAxis === 'none'
+            ? 'Pick an axis to slice the orbital open.'
+            : isMeshLevel
+              ? `Removes the part on the +${surfaceStyle.clipAxis} side of a plane perpendicular to the ${surfaceStyle.clipAxis} axis.`
+              : `Slices off the +${surfaceStyle.clipAxis} side to show the shells inside. The atom is round, so X, Y and Z give the same rings, facing a different way.`}
+        </FormHelperText>
         {surfaceStyle.clipAxis !== 'none' && (
-          <Slider
-            id="clip-slider"
-            aria-label="cut position"
-            value={surfaceStyle.clipPosition}
-            min={-1}
-            max={1}
-            step={0.02}
-            size="small"
-            sx={{ mt: 1 }}
-            onChange={(event: Event, value: number | number[]) =>
-              onSurfaceStyleChange({ clipPosition: Array.isArray(value) ? value[0] : value })}
-          />
+          <>
+            <FormLabel sx={{ mt: 1.5, fontSize: '0.75rem' }} id="cut-depth-label">
+              Depth: {cutDepthLabel(surfaceStyle.clipPosition)}
+            </FormLabel>
+            <Slider
+              id="clip-slider"
+              aria-labelledby="cut-depth-label"
+              value={Math.round((1 - surfaceStyle.clipPosition) * 50)}
+              min={0}
+              max={100}
+              step={1}
+              size="small"
+              marks={CUT_DEPTH_MARKS}
+              // The label above already says the value, in words.
+              valueLabelDisplay="off"
+              // Room either side for the end marks' labels.
+              sx={{ mx: '18px', width: 'auto' }}
+              onChange={(event: Event, value: number | number[]) => {
+                const depth = Array.isArray(value) ? value[0] : value;
+                onSurfaceStyleChange({ clipPosition: 1 - depth / 50 });
+              }}
+            />
+          </>
         )}
       </FormControl>
 

@@ -128,6 +128,12 @@ export function createClipCaps(
     frontFaces.stencilZFail = THREE.DecrementWrapStencilOp;
     frontFaces.stencilZPass = THREE.DecrementWrapStencilOp;
     stencilBase.dispose();
+    // clone() deep-copies clippingPlanes, which froze the stencil passes at
+    // the cut as it was when this was built: changing the axis or depth then
+    // moved the cut face but not the region it paints in. Share the live
+    // plane instead, as the cut face itself does.
+    backFaces.clippingPlanes = [plane];
+    frontFaces.clippingPlanes = [plane];
 
     for (const material of [backFaces, frontFaces]) {
         const mesh = new THREE.Mesh(geometry, material);

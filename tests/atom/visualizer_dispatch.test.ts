@@ -26,6 +26,10 @@ import {
 } from '../../src/orbital_visualizer';
 import { defaultSurfaceStyle, SurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
 
+/** What is in the scene apart from the axes, which are a helper, not a view. */
+const sceneContent = (context: { scene: THREE.Scene }) =>
+    context.scene.children.filter(child => !child.userData.isAxes);
+
 /**
  * Builds a VisualizerContext-shaped object without going through
  * initVisualizer, which constructs a real THREE.WebGLRenderer and cannot run
@@ -132,7 +136,7 @@ describe('visualizer dispatch: levels 1-2 render a shell view, not marching cube
         for (const stencil of stencils) {
             expect(stencil.geometry).toBeInstanceOf(THREE.SphereGeometry);
         }
-        expect(context.scene.children).toContain(context.currentOrbitalGroup);
+        expect(sceneContent(context)).toContain(context.currentOrbitalGroup);
     });
 
     it('shares clearCurrentOrbital/caps lifecycle: a second call disposes the first group and leaves exactly one in the scene', () => {
@@ -144,9 +148,9 @@ describe('visualizer dispatch: levels 1-2 render a shell view, not marching cube
         updateAtomViewInScene(context, { ...atomShellParams(), contourRadius: 2 });
 
         expect(context.currentOrbitalGroup).not.toBe(firstGroup);
-        expect(context.scene.children).not.toContain(firstGroup);
-        expect(context.scene.children).toContain(context.currentOrbitalGroup);
-        expect(context.scene.children.filter(c => c.userData.isCapAssembly)).toHaveLength(1);
+        expect(sceneContent(context)).not.toContain(firstGroup);
+        expect(sceneContent(context)).toContain(context.currentOrbitalGroup);
+        expect(sceneContent(context).filter(c => c.userData.isCapAssembly)).toHaveLength(1);
     });
 
     it('shares camera framing: frames the camera to the contour radius (not the grid rMax) the first time, and does not reframe at the same scale', () => {
@@ -157,7 +161,9 @@ describe('visualizer dispatch: levels 1-2 render a shell view, not marching cube
         // visible sphere -- not the much larger sampling-grid rMax (spec
         // bugfix: a heavy atom's grid rMax can be 100x its contour radius).
         expect(context.framedRMax).toBeCloseTo(atomShellParams().contourRadius);
-        expect(context.clipExtent).toBeCloseTo(atomShellParams().rMax);
+        // The cut is scaled to the sphere drawn, not the grid, so the depth
+        // slider's travel spans the atom rather than mostly empty space.
+        expect(context.clipExtent).toBeCloseTo(atomShellParams().contourRadius);
         const distanceAfterFirst = context.camera.position.length();
 
         // A second call at the same rMax must not move the camera again --
@@ -252,7 +258,7 @@ describe('shell view vs. marching cubes: only the newer request may own the scen
         updateAtomViewInScene(context, atomShellParams());
         const shellViewGroup = context.currentOrbitalGroup;
         expect(context.isShellView).toBe(true);
-        expect(context.scene.children).toContain(shellViewGroup);
+        expect(sceneContent(context)).toContain(shellViewGroup);
 
         // The stale marching-cubes worker now reports success, after the
         // fact. Its terminate() has already been called by the shell view.
@@ -265,7 +271,7 @@ describe('shell view vs. marching cubes: only the newer request may own the scen
         // drew a stray orbital mesh over it, and nothing was left doubled up.
         expect(context.currentOrbitalGroup).toBe(shellViewGroup);
         expect(context.isShellView).toBe(true);
-        expect(context.scene.children).toEqual([shellViewGroup]);
+        expect(sceneContent(context)).toEqual([shellViewGroup]);
     });
 
     it('the reverse direction still works: a marching-cubes result that lands after a newer request of its own kind still supersedes fine (no regression from the shared counter)', async () => {

@@ -63,13 +63,14 @@ export interface VisualizerContext {
     /** fitFactorFor() as of the last framing, so a change of insets can rescale the distance by the ratio. */
     fitFactor?: number;
     /**
-     * The rMax used for the cut plane / discard radius, tracked separately
-     * from `framedRMax` above. The two coincide for a marching-cubes
-     * orbital (both are the sampling box's rMax), but a shell view's cut
-     * face and shader discard still need to span the full sampling grid
-     * even though the camera is framed tighter, on the contour radius --
-     * conflating the two would either clip the shell view's cut face short
-     * or zoom the camera out to the near-empty grid extent.
+     * The radius the cut position is a fraction of: the object actually
+     * drawn -- a shell view's sphere, or an orbital's furthest vertex --
+     * so the slider's whole travel runs from "nothing cut" to "all cut".
+     *
+     * It used to be the sampling grid, which for a shell view is many times
+     * the drawn sphere (gold: 140 a₀ against 1.4). All but a sliver of the
+     * slider then did nothing, or put the plane outside the atom and
+     * removed it entirely.
      */
     clipExtent?: number;
     surfaceStyle: SurfaceStyle;
@@ -884,10 +885,11 @@ function beginShellFade(context: VisualizerContext, params: AtomShellViewParams,
         return;
     }
 
-    context.clipExtent = params.rMax;
+    context.clipExtent = params.contourRadius;
+    addAxesHelper(context, params.contourRadius * AXES_LENGTH_FACTOR);
     // Always shell-to-shell here (the caller has already confirmed
     // context.isShellView) -- see shellViewClipAxis's doc comment.
-    updateClipPlane(context.clipPlane, shellViewClipAxis(context), context.surfaceStyle.clipPosition, params.rMax);
+    updateClipPlane(context.clipPlane, shellViewClipAxis(context), context.surfaceStyle.clipPosition, params.contourRadius);
 
     const fromCameraDistance = context.camera.position.distanceTo(context.controls.target);
     const toCameraDistance = fitDistance(context, framingRadius);
@@ -973,9 +975,8 @@ export async function updateOrbitalInScene(
         // contour -- that left diffuse orbitals small in the middle of the
         // frame.
         const reframe = context.framedBox !== workerRMax;
+        // The box until the mesh lands; then the surface itself (below).
         context.clipExtent = workerRMax;
-        // The cut position is a fraction of rMax, so it has to be recomputed
-        // whenever the box changes size.
         updateClipPlane(
             context.clipPlane,
             context.surfaceStyle.clipAxis,
@@ -1015,6 +1016,16 @@ export async function updateOrbitalInScene(
                     const crossFadeFromShellView = Boolean(options.animate) && context.isShellView && context.currentOrbitalGroup !== null;
                     updateSceneWithMeshData(context, e.data.meshData, params, crossFadeFromShellView);
                     const surfaceRadius = meshRadius(e.data.meshData) || workerRMax;
+                    // The cut position is a fraction of the surface drawn,
+                    // so the slider spans exactly the orbital (see clipExtent).
+                    context.clipExtent = surfaceRadius;
+                    updateClipPlane(
+                        context.clipPlane,
+                        context.surfaceStyle.clipAxis,
+                        context.surfaceStyle.clipPosition,
+                        surfaceRadius
+                    );
+                    refreshCaps(context);
                     if (reframe) {
                         // frameOrbital fits a box of this half-width, i.e. a
                         // sphere √3 larger. The surface is the sphere, with
@@ -1241,23 +1252,24 @@ export function updateAtomViewInScene(
 
     context.isShellView = true;
     context.framedBox = undefined;
-    // Spherically symmetric: there is no preferred direction for the axes to
-    // mark, unlike a marching-cubes orbital's lobes.
-    removeAxesHelper(context);
+    // The atom has no preferred direction, but the cut does: without the
+    // axes, choosing X, Y or Z only tilted the same rings, and there was
+    // nothing on screen to say which way the plane ran.
+    addAxesHelper(context, params.contourRadius * AXES_LENGTH_FACTOR);
 
     if (context.framedRMax !== framingRadius) {
         frameOrbital(context, framingRadius);
     }
-    // The cut face and the shader's discard radius still need to span the
-    // full sampling grid, independently of how tight the camera is framed.
-    // shellViewClipAxis (not the raw surfaceStyle) is what keeps this view
-    // visible even when the shared style says "no cut" (bug 4 fix).
-    context.clipExtent = params.rMax;
+    // The cut position is a fraction of the sphere actually drawn (see
+    // clipExtent). shellViewClipAxis (not the raw surfaceStyle) is what
+    // keeps this view visible even when the shared style says "no cut"
+    // (bug 4 fix).
+    context.clipExtent = params.contourRadius;
     updateClipPlane(
         context.clipPlane,
         shellViewClipAxis(context),
         context.surfaceStyle.clipPosition,
-        params.rMax
+        params.contourRadius
     );
 
     const view = createShellView({
@@ -1575,6 +1587,7 @@ function addAxesHelper(context: VisualizerContext, size: number) {
     // The lines alone said nothing about which was which; each gets its
     // letter just past its end.
     const group = new THREE.Group();
+    group.userData.isAxes = true;
     group.add(new THREE.AxesHelper(size));
     for (const label of AXIS_LABELS) {
         const sprite = createAxisLabel(label.text, label.color);

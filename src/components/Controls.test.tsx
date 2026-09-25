@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import Controls from './Controls';
+import Controls, { cutDepthLabel } from './Controls';
 
 const baseProps = {
   initialN: 3,
@@ -189,5 +189,42 @@ describe('Controls', () => {
       fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
       expect(onModeChange).toHaveBeenCalledWith('atom');
     });
+  });
+});
+
+// The cut's position used to be a bare -1..1 slider with no labels; it is a
+// depth now, from nothing removed through the nucleus to everything.
+describe('cut depth', () => {
+  it('describes the depth in words', () => {
+    expect(cutDepthLabel(1)).toBe('nothing removed');
+    expect(cutDepthLabel(0)).toBe('50% — through the nucleus');
+    expect(cutDepthLabel(0.5)).toBe('25% — short of the nucleus');
+    expect(cutDepthLabel(-0.5)).toBe('75% — past the nucleus');
+    expect(cutDepthLabel(-1)).toBe('everything removed');
+  });
+
+  it('shows the depth, with the edge, the centre and the far edge marked', () => {
+    render(<Controls {...baseProps} surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'x', clipPosition: 0 }} />);
+    expect(screen.getByText(/Depth: 50% — through the nucleus/)).toBeInTheDocument();
+    for (const mark of ['none', 'centre', 'all']) expect(screen.getByText(mark)).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /depth/i })).toHaveValue('50');
+  });
+
+  it('maps a depth back to the plane position the renderer uses', () => {
+    const onSurfaceStyleChange = jest.fn();
+    render(
+      <Controls
+        {...baseProps}
+        surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'x', clipPosition: 0 }}
+        onSurfaceStyleChange={onSurfaceStyleChange}
+      />
+    );
+    fireEvent.change(screen.getByRole('slider', { name: /depth/i }), { target: { value: '75' } });
+    expect(onSurfaceStyleChange).toHaveBeenCalledWith({ clipPosition: -0.5 });
+  });
+
+  it('says which side a cut removes', () => {
+    render(<Controls {...baseProps} surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
+    expect(screen.getByText(/\+y side/)).toBeInTheDocument();
   });
 });

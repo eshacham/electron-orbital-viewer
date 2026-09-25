@@ -19,6 +19,10 @@ import {
 } from '../../src/orbital_visualizer';
 import { defaultSurfaceStyle, SurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
 
+/** What is in the scene apart from the axes, which are a helper, not a view. */
+const sceneContent = (context: { scene: THREE.Scene }) =>
+    context.scene.children.filter(child => !child.userData.isAxes);
+
 /**
  * A VisualizerContext-shaped object built without initVisualizer, which
  * constructs a real THREE.WebGLRenderer and cannot run under jsdom (see
@@ -121,8 +125,8 @@ describe('prefers-reduced-motion bypasses the animation entirely', () => {
         // and no transition left running.
         expect(context.currentOrbitalGroup).not.toBe(first);
         expect(context.transition).toBeNull();
-        expect(context.scene.children).not.toContain(first);
-        expect(context.scene.children).toEqual([context.currentOrbitalGroup]);
+        expect(sceneContent(context)).not.toContain(first);
+        expect(sceneContent(context)).toEqual([context.currentOrbitalGroup]);
     });
 
     it('omitting the animate option entirely behaves the same way (the pre-existing default)', () => {
@@ -156,7 +160,7 @@ describe('atom<->shell fade: interrupting mid-flight', () => {
 
         // Still exactly one group in the scene throughout -- a shell-fade
         // never has a second, orphaned group the way a cross-fade does.
-        expect(context.scene.children).toEqual([view]);
+        expect(sceneContent(context)).toEqual([view]);
         expect(context.currentOrbitalGroup).toBe(view);
         // The interrupted first fade was settled (not left frozen mid-fade)
         // before the new one began.
@@ -186,8 +190,8 @@ describe('shell<->orbital cross-fade: interrupting mid-flight leaves exactly one
         expect(context.transition?.kind).toBe('cross-fade');
         const shellViewGroup = context.currentOrbitalGroup!;
         expect(shellViewGroup).not.toBe(orbitalGroup);
-        expect(context.scene.children).toHaveLength(2);
-        expect(context.scene.children).toEqual(expect.arrayContaining([orbitalGroup, shellViewGroup]));
+        expect(sceneContent(context)).toHaveLength(2);
+        expect(sceneContent(context)).toEqual(expect.arrayContaining([orbitalGroup, shellViewGroup]));
         // Faded in from zero -- not yet at the resting opacity.
         expect(shellViewOpacity(shellViewGroup)).toBe(0);
 
@@ -205,9 +209,9 @@ describe('shell<->orbital cross-fade: interrupting mid-flight leaves exactly one
         // also hold the new orbital request's axes helper, added
         // synchronously ahead of its own not-yet-resolved worker -- that is
         // unrelated to the cross-fade this is testing.)
-        const capAssemblies = context.scene.children.filter(child => child.userData.isCapAssembly);
+        const capAssemblies = sceneContent(context).filter(child => child.userData.isCapAssembly);
         expect(capAssemblies).toEqual([shellViewGroup]);
-        expect(context.scene.children).not.toContain(orbitalGroup);
+        expect(sceneContent(context)).not.toContain(orbitalGroup);
         // Opacity restored to its resting value, not left at the
         // part-way-through-the-fade value it had a moment ago.
         expect(shellViewOpacity(shellViewGroup)).toBeCloseTo(restingOpacity);
