@@ -148,9 +148,6 @@ html, body, #root {
 #controls button#update-orbital:hover {
   background-color: #2980b9;
 }
-button:hover {
-    background-color: #0056b3;
-}
 /* Scale readout: a bar of known length in Bohr radii, bottom-right of the view.
    The camera frames every orbital to fill the viewport, so this is the only
    thing on screen that says how large the orbital actually is — which means it
@@ -335,15 +332,6 @@ button:hover {
   .side-panel .level-nav .level-nav-back + .level-nav-breadcrumbs {
     padding-left: 0;
   }
-  /* The panel is capped at 30dvh and scrolls, and with the valence line
-     added it now clips "About this model" mid-word -- which reads as broken
-     rather than as scrollable. The method one-liner is the line to give up:
-     spec §7 asks for the method to be stated "somewhere reachable", and the
-     About collapse right below states it in full. */
-  .side-panel .level-nav .level-nav-method {
-    display: none;
-  }
-
   #controls {
     top: auto;
     left: 0;
@@ -492,12 +480,20 @@ button:hover {
 /* Core versus valence, matching the 3D view's own treatment: the valence
    chip is lit and the core chips recede. The distinction is never carried
    by opacity alone -- the valence chip also says "· valence". */
-.level-nav-shell-chip.core:not(.selected) {
-  opacity: 0.62;
+.level-nav-shell-chip:not(.selected) {
+  background: rgba(255, 255, 255, 0.7) !important;
 }
-.level-nav-shell-chip.valence:not(.selected) {
-  border: 1px solid rgba(0, 0, 0, 0.45);
-  font-weight: 600;
+/* Valence is carried by the label ("· valence") and a dot, never by an
+   outline or fill -- those are what selection looks like. */
+.level-nav-shell-chip.valence .MuiChip-label::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #f4b400;
+  vertical-align: 1px;
 }
 .level-nav-shells {
   display: flex;
@@ -515,6 +511,9 @@ button:hover {
   text-transform: none !important;
   padding: 4px 10px !important;
   min-height: 32px;
+}
+.subshell-ml-button {
+  text-transform: none !important;
 }
 .subshell-ml-button.selected {
   background: rgba(25, 118, 210, 0.14);
@@ -557,13 +556,19 @@ button:hover {
 .subshell-energy-diagram {
   display: block;
 }
+/* The panel is light, so the other shells' rules are dark and faint and
+   this shell's are drawn thick in their own curve colours (set inline). */
 .subshell-energy-rule {
-  stroke: rgba(255, 255, 255, 0.35);
-  stroke-width: 1.4;
+  stroke: rgba(0, 0, 0, 0.28);
+  stroke-width: 1.2;
 }
 .subshell-energy-rule.current {
-  stroke: #4da3ff;
-  stroke-width: 2;
+  stroke-width: 3;
+}
+.subshell-energy-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: rgba(0, 0, 0, 0.8);
 }
 
 /* ---------------------------------------------------------------------------

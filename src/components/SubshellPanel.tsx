@@ -26,21 +26,30 @@ interface SubshellPanelProps {
     onSelectOrbital: (n: number, l: number, ml: number) => void;
 }
 
-const DIAGRAM_WIDTH = 120;
-const DIAGRAM_HEIGHT = 80;
+const DIAGRAM_WIDTH = 220;
+const DIAGRAM_HEIGHT = 96;
 const DIAGRAM_PADDING = 6;
+/** Room on the right of the rules for the current shell's subshell labels. */
+const DIAGRAM_LABEL_WIDTH = 34;
 
 /**
  * Vertical position for an energy rule: least-bound (least negative) states
  * near the top, most tightly bound (most negative) near the bottom, which is
- * the usual convention for an energy-level diagram. Falls back to the
- * middle when every subshell happens to share one energy (a single-subshell
- * atom), so the divide-by-zero case never has to be a special case above.
+ * the usual convention for an energy-level diagram.
+ *
+ * On a log scale of the binding energy |E|, because the whole atom spans
+ * orders of magnitude: uranium's 1s sits near -3600 Ha and its 7s near
+ * -0.1, so a linear axis crushed every level from n = 3 outwards into one
+ * line at the top. Falls back to the middle when every subshell shares one
+ * energy (a single-subshell atom).
  */
 function ruleY(energy: number, minEnergy: number, maxEnergy: number): number {
-    const range = maxEnergy - minEnergy;
-    const t = range > 0 ? (energy - minEnergy) / range : 0.5;
-    return DIAGRAM_PADDING + (1 - t) * (DIAGRAM_HEIGHT - 2 * DIAGRAM_PADDING);
+    const logOf = (e: number) => Math.log10(Math.max(Math.abs(e), 1e-6));
+    const top = logOf(maxEnergy);      // least bound: smallest |E|
+    const bottom = logOf(minEnergy);   // most bound: largest |E|
+    const range = bottom - top;
+    const t = range > 0 ? (logOf(energy) - top) / range : 0.5;
+    return DIAGRAM_PADDING + t * (DIAGRAM_HEIGHT - 2 * DIAGRAM_PADDING);
 }
 
 /**
@@ -168,8 +177,11 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                 </Box>
             )}
 
+            {/* The whole atom's orbital energies, with this shell's subshells
+                picked out in their own colours and named. It used to be
+                captioned "Radial distribution D(r)", which it is not. */}
             <Typography variant="caption" className="subshell-panel-legend" display="block">
-                Radial distribution D(r) = 4πr²ρ(r)
+                Orbital energies, whole atom (log |E|)
             </Typography>
 
             <svg
@@ -179,16 +191,36 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                 role="img"
                 aria-label="orbital energy diagram"
             >
-                {subshells.map(subshell => (
-                    <line
-                        key={`${subshell.n}-${subshell.l}`}
-                        className={`subshell-energy-rule${subshell.n === shellN ? ' current' : ''}`}
-                        x1={DIAGRAM_PADDING}
-                        x2={DIAGRAM_WIDTH - DIAGRAM_PADDING}
-                        y1={ruleY(subshell.energy, minEnergy, maxEnergy)}
-                        y2={ruleY(subshell.energy, minEnergy, maxEnergy)}
-                    />
-                ))}
+                {subshells.map(subshell => {
+                    const isCurrent = subshell.n === shellN;
+                    const y = ruleY(subshell.energy, minEnergy, maxEnergy);
+                    const color = isCurrent
+                        ? CURVE_COLORS[shellSubshells.indexOf(subshell) % CURVE_COLORS.length]
+                        : undefined;
+                    return (
+                        <g key={`${subshell.n}-${subshell.l}`}>
+                            <line
+                                className={`subshell-energy-rule${isCurrent ? ' current' : ''}`}
+                                x1={DIAGRAM_PADDING}
+                                x2={DIAGRAM_WIDTH - DIAGRAM_PADDING - DIAGRAM_LABEL_WIDTH}
+                                y1={y}
+                                y2={y}
+                                // style, not stroke=: a CSS stroke beats the attribute.
+                                style={color ? { stroke: color } : undefined}
+                            />
+                            {isCurrent && (
+                                <text
+                                    className="subshell-energy-label"
+                                    x={DIAGRAM_WIDTH - DIAGRAM_LABEL_WIDTH}
+                                    y={y}
+                                    dominantBaseline="middle"
+                                >
+                                    {subshellLabel(subshell.n, subshell.l)}
+                                </text>
+                            )}
+                        </g>
+                    );
+                })}
             </svg>
         </Box>
     );

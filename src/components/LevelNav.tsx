@@ -25,6 +25,19 @@ interface LevelNavProps {
     selectedSubshell: { n: number; l: number } | null;
     selectedOrbital: { n: number; l: number; ml: number } | null;
     onNavigate: (target: NavigationTarget) => void;
+    /**
+     * Opens an element picker. Given on a phone, where the periodic table
+     * does not fit and the element is otherwise only reachable by opening
+     * the controls sheet and scrolling it sideways; the element name then
+     * becomes the button.
+     */
+    onChangeElement?: () => void;
+    /**
+     * The drill-down's next step (SubshellPanel) on a desktop. It belongs
+     * with the navigation it continues; below the view controls it sat under
+     * the fold, so the orbital buttons needed a scroll to find.
+     */
+    children?: React.ReactNode;
 }
 
 // Old X-ray shell letters, matching atom_profile.ts's private shellName
@@ -56,7 +69,9 @@ interface Crumb {
  * shells but only 3 resolved peaks), so a picker built from peaks would
  * quietly lose a real, selectable shell for every transition metal onward.
  */
-const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell, selectedOrbital, onNavigate }) => {
+const LevelNav: React.FC<LevelNavProps> = ({
+    Z, selectedShell, selectedSubshell, selectedOrbital, onNavigate, onChangeElement, children,
+}) => {
     const [aboutOpen, setAboutOpen] = useState(false);
 
     const element = elementFor(Z);
@@ -134,6 +149,17 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
                     ← Back to {parent.label}
                 </Button>
             )}
+            {onChangeElement && (
+                <Button
+                    size="small"
+                    variant="outlined"
+                    className="level-nav-change-element"
+                    onClick={onChangeElement}
+                    aria-label={`change element, currently ${elementName}`}
+                >
+                    {element ? `${element.symbol} · ${element.name}` : elementName} ▾
+                </Button>
+            )}
             <Breadcrumbs aria-label="breadcrumb" className="level-nav-breadcrumbs">
                 {crumbs.map(crumb => (
                     <Link
@@ -154,10 +180,10 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
             </Typography>
             <Typography variant="body2" className="level-nav-valence">
                 Valence: {valenceConfigurationLabel(Z)}
-                <span className="level-nav-valence-note"> · everything inside is core</span>
-            </Typography>
-            <Typography variant="caption" className="level-nav-method" display="block">
-                {METHOD_STATEMENT}
+                {/* Hydrogen and helium have one shell and so no core at all. */}
+                {shells.length > 1 && (
+                    <span className="level-nav-valence-note"> · everything inside is core</span>
+                )}
             </Typography>
 
             <Box className="level-nav-shells" role="group" aria-label="shells">
@@ -199,6 +225,8 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
                         : `${shellName(selectedShell)} only — click it again, or the ✕, for the whole atom`}
             </Typography>
 
+            {children}
+
             <Button
                 size="small"
                 className="level-nav-about-toggle"
@@ -208,6 +236,13 @@ const LevelNav: React.FC<LevelNavProps> = ({ Z, selectedShell, selectedSubshell,
                 About this model
             </Button>
             <Collapse in={aboutOpen}>
+                {/* The one-line method statement lives here with the rest of
+                    the model's framing rather than on the card face, which
+                    it made tall enough to push the controls below it under
+                    the fold. */}
+                <Typography variant="caption" className="level-nav-method" display="block">
+                    {METHOD_STATEMENT}
+                </Typography>
                 <Typography variant="body2" className="level-nav-about">
                     This is a central-field model: each electron moves in the
                     spherically averaged potential of the nucleus and every

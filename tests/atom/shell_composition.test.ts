@@ -168,6 +168,26 @@ describe('orbitalShade', () => {
         expect(orbitalShade('#ffd166', 2, 5)).toBe('#ffd166');
     });
 
+    it('spreads an f subshell\'s seven members far enough apart in hue to tell apart', () => {
+        // A 96-degree spread used to leave 16 degrees between neighbours,
+        // and uranium's isolated 4f read as three or four colours, not seven.
+        const hueOf = (hex: string) => {
+            const v = parseInt(hex.slice(1), 16);
+            const [r, g, b] = [(v >> 16) & 255, (v >> 8) & 255, v & 255].map(c => c / 255);
+            const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+            if (d === 0) return 0;
+            const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+            return ((h * 60) % 360 + 360) % 360;
+        };
+        const hues = Array.from({ length: 7 }, (_, i) => hueOf(orbitalShade('#06d6a0', i, 7)));
+        for (let i = 0; i < hues.length; i++) {
+            for (let j = i + 1; j < hues.length; j++) {
+                const gap = Math.abs(hues[i] - hues[j]);
+                expect(Math.min(gap, 360 - gap)).toBeGreaterThan(40);
+            }
+        }
+    });
+
     it('emits well-formed six-digit hex for every member of every subshell size', () => {
         for (const base of CURVE_COLORS) {
             for (const count of [1, 3, 5, 7]) {

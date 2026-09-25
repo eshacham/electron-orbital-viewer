@@ -3,6 +3,29 @@ import { render, fireEvent, within } from '@testing-library/react';
 import LevelNav, { NavigationTarget } from '../../src/components/LevelNav';
 
 describe('LevelNav', () => {
+    it('does not claim a core for a one-shell atom', () => {
+        const render1 = (Z: number) => render(
+            <LevelNav Z={Z} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+        );
+        expect(render1(1).container.textContent).not.toMatch(/inside is core/);
+        expect(render1(2).container.textContent).not.toMatch(/inside is core/);
+        expect(render1(3).container.textContent).toMatch(/inside is core/);
+    });
+
+    it('offers an element button only when given somewhere to send it', () => {
+        const onChangeElement = jest.fn();
+        const { getByRole, rerender, queryByRole } = render(
+            <LevelNav Z={26} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+        );
+        expect(queryByRole('button', { name: /change element/i })).toBeNull();
+        rerender(
+            <LevelNav Z={26} selectedShell={null} selectedSubshell={null} selectedOrbital={null}
+                onNavigate={() => {}} onChangeElement={onChangeElement} />
+        );
+        fireEvent.click(getByRole('button', { name: /change element, currently Iron/i }));
+        expect(onChangeElement).toHaveBeenCalled();
+    });
+
     it('shows the element name, configuration label and method statement', () => {
         const { getByText } = render(
             <LevelNav

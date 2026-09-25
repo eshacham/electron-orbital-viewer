@@ -74,8 +74,8 @@ describe('SubshellPanel', () => {
         expect(container.textContent ?? '').not.toMatch(/ionisation|ionization/i);
     });
 
-    it('reads the radial-distribution legend as D(r) = 4πr²ρ(r), never "density"', () => {
-        const { getByText } = render(
+    it('titles the energy diagram as orbital energies, not as the radial distribution it is not', () => {
+        const { getByText, container } = render(
             <SubshellPanel
                 subshells={neonLikeSubshells()}
                 shellN={2}
@@ -84,7 +84,8 @@ describe('SubshellPanel', () => {
                 onSelectOrbital={() => {}}
             />
         );
-        expect(getByText(/radial distribution d\(r\) = 4πr²ρ\(r\)/i)).toBeInTheDocument();
+        expect(getByText(/orbital energies/i)).toBeInTheDocument();
+        expect(container.textContent ?? '').not.toMatch(/radial distribution/i);
     });
 
     it('drills to a subshell when its chip is clicked', () => {
@@ -121,6 +122,20 @@ describe('SubshellPanel', () => {
 
         fireEvent.click(getByRole('button', { name: '2p_x' }));
         expect(onSelectOrbital).toHaveBeenCalledWith(2, 1, 1);
+    });
+
+    it('names the current shell\'s energy rules, and only those', () => {
+        const { container } = render(
+            <SubshellPanel
+                subshells={neonLikeSubshells()}
+                shellN={2}
+                selectedSubshell={null}
+                onSelectSubshell={() => {}}
+                onSelectOrbital={() => {}}
+            />
+        );
+        const labels = Array.from(container.querySelectorAll('.subshell-energy-label')).map(l => l.textContent);
+        expect(labels).toEqual(['2s', '2p']);
     });
 
     it('draws one energy rule per subshell in the whole atom, with the current shell highlighted', () => {
