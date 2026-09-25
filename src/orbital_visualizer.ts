@@ -73,6 +73,12 @@ export interface VisualizerContext {
      * removed it entirely.
      */
     clipExtent?: number;
+    /**
+     * A shell view's own sphere radius. The lobes attached to a shell view
+     * reach past it, so while they are shown clipExtent is the larger of the
+     * two; this is what it falls back to when they go.
+     */
+    shellViewRadius?: number;
     surfaceStyle: SurfaceStyle;
     /** Single cut-away plane, shared by every orbital material. */
     clipPlane: THREE.Plane;
@@ -553,6 +559,19 @@ function shellViewClipAxis(context: VisualizerContext): ClipAxis {
 }
 
 /**
+ * The whole-atom view draws nothing but its slice, so a slice at the very
+ * edge (depth 0 % or 100 %) is a point and the atom vanished. Keep it inside.
+ * A shell's composition view has lobes to show at any depth, so it is not
+ * held back.
+ */
+const SHELL_VIEW_MAX_OFFSET = 0.9;
+function shellViewClipPosition(context: VisualizerContext): number {
+    const position = context.surfaceStyle.clipPosition;
+    if (context.isCompositionView) return position;
+    return Math.max(-SHELL_VIEW_MAX_OFFSET, Math.min(SHELL_VIEW_MAX_OFFSET, position));
+}
+
+/**
  * Ceiling on the shell-composition view's own backdrop sphere opacity
  * (Addendum 2: "the shell sphere becomes translucent ... so its
  * constituents are visible"). Applied automatically, on top of whatever the
@@ -596,7 +615,7 @@ export function setSurfaceStyle(context: VisualizerContext | null, style: Surfac
     updateClipPlane(
         context.clipPlane,
         context.isShellView ? shellViewClipAxis(context) : style.clipAxis,
-        style.clipPosition,
+        context.isShellView ? shellViewClipPosition(context) : style.clipPosition,
         context.clipExtent ?? 1
     );
     refreshCaps(context);
@@ -886,10 +905,11 @@ function beginShellFade(context: VisualizerContext, params: AtomShellViewParams,
     }
 
     context.clipExtent = params.contourRadius;
+    context.shellViewRadius = params.contourRadius;
     addAxesHelper(context, params.contourRadius * AXES_LENGTH_FACTOR);
     // Always shell-to-shell here (the caller has already confirmed
     // context.isShellView) -- see shellViewClipAxis's doc comment.
-    updateClipPlane(context.clipPlane, shellViewClipAxis(context), context.surfaceStyle.clipPosition, params.contourRadius);
+    updateClipPlane(context.clipPlane, shellViewClipAxis(context), shellViewClipPosition(context), params.contourRadius);
 
     const fromCameraDistance = context.camera.position.distanceTo(context.controls.target);
     const toCameraDistance = fitDistance(context, framingRadius);
@@ -1265,10 +1285,11 @@ export function updateAtomViewInScene(
     // keeps this view visible even when the shared style says "no cut"
     // (bug 4 fix).
     context.clipExtent = params.contourRadius;
+    context.shellViewRadius = params.contourRadius;
     updateClipPlane(
         context.clipPlane,
         shellViewClipAxis(context),
-        context.surfaceStyle.clipPosition,
+        shellViewClipPosition(context),
         params.contourRadius
     );
 
@@ -1340,6 +1361,29 @@ export function clearShellCompositionLobes(context: VisualizerContext | null): v
     if (!existing) return;
     context.currentOrbitalGroup?.remove(existing);
     disposeCompositionLobes(existing);
+    if (context.shellViewRadius !== undefined) setShellCutExtent(context, context.shellViewRadius);
+}
+
+/**
+ * Re-scales a shell view's cut to `extent`: the depth slider's travel has
+ * to span everything drawn, so "nothing removed" really removes nothing.
+ */
+function setShellCutExtent(context: VisualizerContext, extent: number): void {
+    context.clipExtent = extent;
+    updateClipPlane(context.clipPlane, shellViewClipAxis(context), shellViewClipPosition(context), extent);
+    refreshCaps(context);
+}
+
+/** Distance from the origin to the furthest vertex of any lobe. */
+function lobeReach(meshes: LobeMeshData[]): number {
+    let max = 0;
+    for (const mesh of meshes) {
+        for (const [x, y, z] of mesh.positions) {
+            const r = x * x + y * y + z * z;
+            if (r > max) max = r;
+        }
+    }
+    return Math.sqrt(max);
 }
 
 /**
@@ -1373,6 +1417,12 @@ export function attachShellCompositionLobes(
         components, meshes, context.clippingPlanes, context.surfaceStyle.opacity, distinguishOrbitals
     );
     context.currentOrbitalGroup.add(lobes);
+    // The lobes reach past the shell's sphere (a 4f by about 1.2x), and the
+    // cut was scaled to the sphere alone: at "nothing removed" the plane sat
+    // inside the lobes and cut a hole in them. Cover the lobes too.
+    const reach = lobeReach(meshes);
+    const base = context.shellViewRadius ?? context.clipExtent ?? 0;
+    if (reach > base) setShellCutExtent(context, reach);
 }
 
 // --- Helper Functions ---

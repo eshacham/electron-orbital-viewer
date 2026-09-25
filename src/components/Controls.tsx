@@ -82,6 +82,12 @@ const CUT_DEPTH_MARKS = [
   { value: 50, label: 'centre' },
   { value: 100, label: 'all' },
 ];
+/** The whole-atom view's slider stops short of both edges, where the slice vanishes. */
+const SLICE_DEPTH_MARKS = [
+  { value: 5, label: 'edge' },
+  { value: 50, label: 'centre' },
+  { value: 95, label: 'edge' },
+];
 
 /** What a cut at this clipPosition leaves, in words, for the slider's label. */
 export function cutDepthLabel(clipPosition: number): string {
@@ -126,6 +132,8 @@ const Controls: React.FC<ControlsProps> = ({
   // mode. (Resolution used to be gated here too; there is no such control
   // any more -- see ORBITAL_RESOLUTION.)
   const isMeshLevel = !isAtomMode || atomLevel === 'orbital';
+  // The whole-atom view draws only its slice: no lobes, no surface.
+  const isSliceOnlyView = isAtomMode && atomLevel === 'atom';
   // Local state for dropdown options, derived from props
   const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
   const [mlOptions, setMlOptions] = useState<number[]>([-2, -1, 0, 1, 2]);
@@ -424,11 +432,13 @@ const Controls: React.FC<ControlsProps> = ({
               id="clip-slider"
               aria-labelledby="cut-depth-label"
               value={Math.round((1 - surfaceStyle.clipPosition) * 50)}
-              min={0}
-              max={100}
+              // The whole atom is only its slice; at the very edge the slice
+              // is a point and the atom vanishes (see shellViewClipPosition).
+              min={isSliceOnlyView ? 5 : 0}
+              max={isSliceOnlyView ? 95 : 100}
               step={1}
               size="small"
-              marks={CUT_DEPTH_MARKS}
+              marks={isSliceOnlyView ? SLICE_DEPTH_MARKS : CUT_DEPTH_MARKS}
               // The label above already says the value, in words.
               valueLabelDisplay="off"
               // Room either side for the end marks' labels.

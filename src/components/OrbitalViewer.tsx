@@ -214,7 +214,13 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // a synchronous read of the profile already in the store.
     useEffect(() => {
         const context = visualizerContextRef.current;
-        if (!context || atomMode !== 'atom' || atomLevel !== 'shell' || !atomProfile || atomSelectedShell === null) {
+        if (!context) return;
+        if (atomMode !== 'atom' || atomLevel !== 'shell' || !atomProfile || atomSelectedShell === null) {
+            // Stepping back to the whole atom animates by reshaping the shell
+            // view in place, so its lobes -- children of that view -- rode
+            // along into the atom level and sat inside it. Nothing else here
+            // owns them, so take them off on the way out.
+            clearShellCompositionLobes(context);
             return;
         }
 

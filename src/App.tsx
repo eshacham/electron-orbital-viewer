@@ -61,6 +61,11 @@ const theme = createTheme({
   palette: {
     primary: { main: '#1976d2' },
     secondary: { main: '#dc004e' },
+    // CssBaseline paints <body> in this. MUI's default is white, which
+    // showed as a white frame round the dark view wherever the app's own
+    // container did not reach -- a window resized larger, or a phone's
+    // overscroll. The scene's own colour, so there is no seam either.
+    background: { default: '#050505' },
   },
 });
 

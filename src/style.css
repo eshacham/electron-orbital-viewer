@@ -6,6 +6,8 @@ html, body, #root {
   height: 100dvh;
   margin: 0;
   font-family: 'Roboto', sans-serif;
+  /* Dark before React mounts too, so the first paint is not a white flash. */
+  background-color: #050505;
 }
 #root {
   display: flex; /* Use flexbox for layout if desired */

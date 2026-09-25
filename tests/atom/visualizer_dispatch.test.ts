@@ -23,7 +23,10 @@ import {
     radiusUnderPointer,
     setHoverRadius,
     defaultCameraPosition,
+    attachShellCompositionLobes,
+    clearShellCompositionLobes,
 } from '../../src/orbital_visualizer';
+import { shellComposition } from '../../src/atom/shell_composition';
 import { defaultSurfaceStyle, SurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
 
 /** What is in the scene apart from the axes, which are a helper, not a view. */
@@ -420,5 +423,37 @@ describe('bug 4 regression: a shell view survives an inherited "no cut" from hyd
         // The fix must not silently "fix" the user's own choice elsewhere --
         // only this shell view's own rendering substitutes a real axis.
         expect(context.surfaceStyle.clipAxis).toBe('none');
+    });
+});
+
+// Reported: Lawrencium's P shell, cut along y, depth dragged away from
+// "none" and back -- a hole in the 6p lobes. The cut was scaled to the
+// shell's sphere, but a shell's lobes reach past it, so "nothing removed"
+// still sliced them. The extent has to cover everything drawn.
+describe('the cut covers a shell view\'s lobes, not just its sphere', () => {
+    const lobesReaching = (r: number) => [{ positions: [[r, 0, 0], [0, r, 0], [0, 0, r]], cells: [[0, 1, 2]] }];
+
+    it('widens the cut extent to the furthest lobe, and narrows it again when they go', () => {
+        const context = buildContext({ ...defaultSurfaceStyle, clipAxis: 'y', clipPosition: 1 });
+        // Lobes belong to a shell's composition view.
+        const params = { ...atomShellParams(), level: 'shell' as const, isComposition: true };
+        updateAtomViewInScene(context, params);
+        expect(context.clipExtent).toBeCloseTo(params.contourRadius);
+
+        const components = shellComposition([{ n: 2, l: 0, electrons: 2 }]);
+        attachShellCompositionLobes(context, context.requestCounter, components, lobesReaching(params.contourRadius * 1.3));
+        expect(context.clipExtent).toBeCloseTo(params.contourRadius * 1.3);
+        // At depth 0 the plane sits past every lobe, so nothing is cut.
+        expect(context.clipPlane.constant).toBeCloseTo(params.contourRadius * 1.3);
+
+        clearShellCompositionLobes(context);
+        expect(context.clipExtent).toBeCloseTo(params.contourRadius);
+    });
+
+    it('keeps the whole-atom slice inside the atom, where it is all there is to see', () => {
+        const context = buildContext({ ...defaultSurfaceStyle, clipAxis: 'x', clipPosition: 1 });
+        const params = atomShellParams();
+        updateAtomViewInScene(context, params);
+        expect(context.clipPlane.constant).toBeCloseTo(params.contourRadius * 0.9);
     });
 });

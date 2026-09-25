@@ -227,4 +227,21 @@ describe('cut depth', () => {
     render(<Controls {...baseProps} surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
     expect(screen.getByText(/\+y side/)).toBeInTheDocument();
   });
+
+  // The whole-atom view is nothing but its slice; at depth 0 or 100 % the
+  // slice is a point and the atom vanished.
+  it('keeps the whole-atom slice inside the atom', () => {
+    render(
+      <Controls
+        {...baseProps}
+        mode="atom"
+        atomLevel="atom"
+        surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'x', clipPosition: 0 }}
+      />
+    );
+    const slider = screen.getByRole('slider', { name: /depth/i });
+    expect(slider).toHaveAttribute('min', '5');
+    expect(slider).toHaveAttribute('max', '95');
+    expect(screen.getAllByText('edge')).toHaveLength(2);
+  });
 });
