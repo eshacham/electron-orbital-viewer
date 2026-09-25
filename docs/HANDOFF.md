@@ -303,6 +303,28 @@ committed — turn it back on if the sheet ever needs regenerating.
 
 ---
 
+## UX review round (2026-09-25)
+
+Found by driving the app at 1440x900 and 390x844/844x390 with touch; all
+fixed and checked live. The layout decisions worth knowing:
+
+- **The cut is a shell-view thing.** Entering any orbital view (atom level 3,
+  or Basic Orbitals) clears it; stepping back to a shell view restores the
+  cut it had. The inherited half-cut used to hide half of every orbital.
+- **z is up** (`camera.up`, set before OrbitControls reads it), so the
+  default shell cut is now X (`SHELL_VIEW_CUT_AXIS`), the face turned most
+  squarely to the default camera.
+- **Panels are measured, and the camera avoids them.** `useViewInsets`
+  measures what the panels cover; `setViewInsets` shifts the projection
+  centre with `setViewOffset` and scales the fit distance, keeping the
+  user's zoom in proportion. Desktop: navigation left, view settings and
+  plot right. The periodic table folds after a pick.
+- **Level 3 frames on the drawn surface**, not the sampling box, once the
+  mesh lands; re-framing is still keyed on the box so switching mₗ keeps
+  the zoom.
+- **Phone element choice** is a full-screen searchable list opened from the
+  element name; the dropdown in the sideways strip is gone.
+
 ## Judgment calls made without asking
 
 Recorded for review, per the session's standing authority.
@@ -361,12 +383,6 @@ Recorded for review, per the session's standing authority.
 - The cross-fade renders the scene twice for ~350 ms.
 - A busy SCF worker queues behind an abandoned slow solve. Correctness is
   preserved by request id; latency in that narrow case is not.
-- With `clipAxis` inherited as `'none'` at atom levels 1–2, no cut-away button
-  shows pressed and the position slider stays hidden until X/Y/Z is clicked.
-  The view renders correctly regardless.
-- Level 3 frames the camera on the sampling box (the 99.99 % radius), not on
-  the visible contour, so a diffuse orbital sits smallish in frame. Shared
-  with Basic Orbitals mode and unchanged from before.
 
 ---
 
