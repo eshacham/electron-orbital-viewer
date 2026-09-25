@@ -1,8 +1,9 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setHoverRadius as setAtomHoverRadius, drillToShell } from '../store/atomSlice';
 import { ScaleBar, formatScaleLabel } from '../scale_bar';
-import { useMediaQuery, PREFERS_REDUCED_MOTION } from '../useMediaQuery';
+import { useMediaQuery, PREFERS_REDUCED_MOTION, NARROW_VIEWPORT } from '../useMediaQuery';
+import { useViewInsets } from '../useViewInsets';
 import {
     initVisualizer,
     cleanupVisualizer,
@@ -13,6 +14,8 @@ import {
     setHoverRadius as setSceneHoverRadius,
     getScaleBar,
     handleResize as visualizerHandleResize,
+    setViewInsets,
+    ViewInsets,
     clearShellCompositionLobes,
     attachShellCompositionLobes,
     VisualizerContext
@@ -106,6 +109,15 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             }
         };
     }, [dispatch]);
+
+    // Centre the scene in the part of the canvas no panel covers (see
+    // useViewInsets). The panels are siblings of the canvas host inside
+    // #canvas-container, so that is what gets measured.
+    const isNarrow = useMediaQuery(NARROW_VIEWPORT);
+    const handleInsets = useCallback((insets: ViewInsets) => {
+        setViewInsets(visualizerContextRef.current, insets);
+    }, []);
+    useViewInsets(canvasHostRef, isNarrow, handleInsets);
 
     // Levels 1-2: build the shell view directly from the profile already in
     // the store. No worker round trip and no sampling grid -- the density is

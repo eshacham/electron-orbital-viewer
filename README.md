@@ -40,8 +40,8 @@ open, and read off how big it actually is.
   is spelled out ("3d · 6 of 10 e⁻"). Carbon's L shell is a 2s sphere and
   three 2p dumbbells; iron's M shell adds five 3d cloverleaves; uranium's N
   shell adds seven 4f orbitals. Clicking a subshell shows it on its own, each
-  of its orbitals in a distinct shade, because five interpenetrating
-  cloverleaves in one colour are a blob.
+  of its orbitals in its own colour, spread evenly round the colour wheel,
+  because five interpenetrating cloverleaves in one colour are a blob.
 - **Core versus valence.** The outermost shell's ring is lit and the core's
   recede, and the valence configuration is named on its own — 3s¹ for sodium,
   3s² 3p⁵ for chlorine, 3s² 3p⁶ for argon. This is the periodic table's logic
@@ -52,13 +52,17 @@ open, and read off how big it actually is.
   row is filling, so a d-block tile predicts cloverleaves and an f-block tile
   predicts seven-lobed shapes. Selecting or hovering an element lights its
   whole column, because a group *is* a column: its members share a valence
-  configuration.
+  configuration. It folds to a header once you pick, so the atom gets the
+  view. On a phone, where a table does not fit, the element's name at the
+  head of the navigation card opens a searchable list instead.
 - **Clickable rings.** The ring you can see is the thing you click to open
   that shell; clicking the open shell again (or its ✕) returns to the whole
   atom.
 - **Orbital energies**, in Hartree, next to each subshell — labelled
   explicitly as orbital energies, never ionisation energies, because they
-  are not the same number (see [Limitations](#limitations)).
+  are not the same number (see [Limitations](#limitations)) — and as a
+  level diagram of the whole atom on a log |E| scale, with the open shell's
+  subshells named.
 - **A camera and a radial-plot axis framed to what the atom actually is** —
   the contour holding the requested share of the electron, widened where
   needed to reach the valence shell — not to the sampling grid behind it,
@@ -97,7 +101,17 @@ open, and read off how big it actually is.
 - **Opacity**, so outer shells stop hiding inner ones.
 - **A cut-away plane** along X, Y or Z, positioned with a slider. The cut face is
   capped and shaded by the density it passes through, so a slice through a 7s
-  reads like tree rings rather than a hollow shell.
+  reads like tree rings rather than a hollow shell. The shell views need a cut
+  (it is all they draw); an orbital is shown whole when you open it, and the
+  shell view's cut comes back when you step out.
+- **z up**, the chemistry convention, so 2p_z, 3d_z² and 4f_z³ stand
+  upright. The axes are labelled, and orbital surfaces carry a key for the
+  sign of ψ.
+- **Panels that stay off the atom.** Navigation runs down the left, view
+  settings and the radial plot down the right, and the scene is centred and
+  fitted in whatever the panels leave uncovered — on a phone too, where it
+  moves up when the controls sheet opens. While a new element solves or an
+  orbital is meshed, the old picture dims and says what it is waiting for.
 - **A scale bar in Bohr radii.** The camera frames every view to fill the
   screen, so without this a carbon 3d looks exactly like a hydrogen 3d despite
   being six times smaller.

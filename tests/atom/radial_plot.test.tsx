@@ -155,4 +155,25 @@ describe('RadialPlot', () => {
         // the same jump this test guards against.
         expect(readoutBackToIdle?.textContent).toBe(' ');
     });
+
+    it('names the cut-face scaling only where there is a cut face', () => {
+        const { container, rerender } = render(<RadialPlot n={1} l={0} Z={18} rMax={5} curves={twoCurves()} cutFaceNote />);
+        expect(container.textContent).toMatch(/cut face shading is scaled/);
+        rerender(<RadialPlot n={1} l={0} Z={18} rMax={5} curves={twoCurves()} cutFaceNote={false} />);
+        expect(container.textContent).not.toMatch(/cut face/);
+    });
+
+    it('labels the middle of the axis, a quarter of the range on a √ scale', () => {
+        const { container, rerender } = render(<RadialPlot n={1} l={0} Z={18} rMax={4} curves={twoCurves()} />);
+        expect(container.querySelector('.radial-plot-scale-mid')?.textContent).toBe('2.00');
+        rerender(<RadialPlot n={1} l={0} Z={18} rMax={4} curves={twoCurves()} scale="sqrt" />);
+        expect(container.querySelector('.radial-plot-scale-mid')?.textContent).toBe('1.00');
+    });
+
+    it('starts folded on a phone, where it would cover the atom, and opens on a tap', () => {
+        const { container, getByRole } = render(<RadialPlot n={1} l={0} Z={18} rMax={5} curves={twoCurves()} compact />);
+        expect(container.querySelector('svg')).toBeNull();
+        fireEvent.click(getByRole('button', { name: /D\(r\) plot/ }));
+        expect(container.querySelector('svg')).not.toBeNull();
+    });
 });

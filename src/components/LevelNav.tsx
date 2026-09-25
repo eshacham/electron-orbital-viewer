@@ -160,6 +160,9 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     {element ? `${element.symbol} · ${element.name}` : elementName} ▾
                 </Button>
             )}
+            {/* At the whole-atom level the breadcrumb is only the element's
+                name, which the element button above already shows. */}
+            {(crumbs.length > 1 || !onChangeElement) && (
             <Breadcrumbs aria-label="breadcrumb" className="level-nav-breadcrumbs">
                 {crumbs.map(crumb => (
                     <Link
@@ -174,6 +177,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     </Link>
                 ))}
             </Breadcrumbs>
+            )}
 
             <Typography variant="body2" className="level-nav-configuration">
                 {configurationLabel(Z)}

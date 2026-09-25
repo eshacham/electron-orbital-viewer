@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ClipAxis, MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
-import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius } from './orbital_presets';
+import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { createOrbitalMaterial, applySurfaceStyle, updateClipPlane, setGroupOpacity } from './orbital_material';
 import { createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCaps } from './clip_caps';
 import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
@@ -34,7 +34,8 @@ export interface VisualizerContext {
     renderer: THREE.WebGLRenderer;
     controls: OrbitControls;
     currentOrbitalGroup: THREE.Group | null;
-    currentAxesHelper: THREE.AxesHelper | null;
+    /** The axes and their x/y/z labels, as one group. */
+    currentAxesHelper: THREE.Object3D | null;
     animationFrameId?: number;
     isDisposed?: boolean;  // Add this flag
     /**
@@ -46,6 +47,21 @@ export interface VisualizerContext {
      * heavy atom (see clipExtent below for that quantity).
      */
     framedRMax?: number;
+    /**
+     * The sampling box a marching-cubes orbital was last framed for. Its
+     * camera is framed on the surface actually drawn, which is only known
+     * once the mesh lands, but the decision to re-frame at all stays keyed
+     * on the box: switching mₗ within one subshell keeps the user's zoom.
+     */
+    framedBox?: number;
+    /**
+     * CSS pixels of the canvas covered by panels, per edge. The camera
+     * centres the scene in what is left and fits it to that area, so the
+     * periodic table or the phone's navigation card do not sit on the atom.
+     */
+    viewInsets?: ViewInsets;
+    /** fitFactorFor() as of the last framing, so a change of insets can rescale the distance by the ratio. */
+    fitFactor?: number;
     /**
      * The rMax used for the cut plane / discard radius, tracked separately
      * from `framedRMax` above. The two coincide for a marching-cubes
@@ -214,7 +230,9 @@ type WorkerMessage = WorkerSuccessMessage | WorkerErrorMessage;
  * `THREE.WebGLRenderer`, which has no WebGL context under jsdom.
  */
 export function defaultCameraPosition(distance: number): THREE.Vector3 {
-    return new THREE.Vector3(0.6, 0.45, 0.65).normalize().multiplyScalar(distance);
+    // z is up (see initVisualizer): mostly in front along +x, a little to
+    // the side along +y, and about 26 degrees above the xy plane.
+    return new THREE.Vector3(0.75, 0.42, 0.5).normalize().multiplyScalar(distance);
 }
 
 /**
@@ -239,6 +257,10 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     scene.background = new THREE.Color(0x050505);
 
     const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+    // z up, the chemistry convention, so 2p_z, 3d_z² and 4f_z³ stand upright
+    // instead of pointing at the viewer. Must be set before OrbitControls is
+    // created: it reads `up` once, in its constructor.
+    camera.up.set(0, 0, 1);
     camera.position.copy(defaultCameraPosition(initialCameraZ));
 
     // stencil defaults to false since three r163, and without the buffer every
@@ -383,9 +405,81 @@ export function setHoverRadius(context: VisualizerContext | null, r: number | nu
  * target distance up front, without moving the camera itself until the
  * animation actually gets there.
  */
-function fitDistance(camera: THREE.PerspectiveCamera, rMax: number): number {
-    const halfFov = (camera.fov * Math.PI) / 180 / 2;
-    return (rMax * Math.sqrt(3) * 1.15) / Math.sin(halfFov);
+function fitDistance(context: VisualizerContext, rMax: number): number {
+    const halfFov = (context.camera.fov * Math.PI) / 180 / 2;
+    return (rMax * Math.sqrt(3) * 1.15) / Math.sin(halfFov) * fitFactorFor(context);
+}
+
+export interface ViewInsets {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+}
+
+/** Canvas size in CSS pixels, falling back to 1x1 before layout. */
+function canvasSize(context: VisualizerContext): { width: number; height: number } {
+    const element = context.renderer.domElement;
+    return { width: element.clientWidth || 1, height: element.clientHeight || 1 };
+}
+
+/**
+ * How much further back the camera has to sit for a fitted object to fit
+ * the uncovered part of the canvas rather than all of it. The fit is
+ * computed against the full height, and a pixel measures the same world
+ * distance across as it does up and down, so the narrower of the free
+ * width and height decides.
+ */
+function fitFactorFor(context: VisualizerContext): number {
+    const insets = context.viewInsets;
+    if (!insets) return 1;
+    const { width, height } = canvasSize(context);
+    const freeWidth = Math.max(width - insets.left - insets.right, width * 0.25);
+    const freeHeight = Math.max(height - insets.top - insets.bottom, height * 0.25);
+    return Math.max(1, height / freeHeight, height / freeWidth);
+}
+
+/** Moves the projection centre to the middle of the uncovered area. */
+function applyViewOffset(context: VisualizerContext): void {
+    const { camera } = context;
+    const insets = context.viewInsets;
+    const { width, height } = canvasSize(context);
+    const dx = insets ? (insets.left - insets.right) / 2 : 0;
+    const dy = insets ? (insets.top - insets.bottom) / 2 : 0;
+    if (dx === 0 && dy === 0) {
+        camera.clearViewOffset();
+    } else {
+        camera.setViewOffset(width, height, -dx, -dy, width, height);
+    }
+    camera.updateProjectionMatrix();
+}
+
+/**
+ * Tells the visualizer which parts of the canvas are covered by panels.
+ *
+ * The scene is re-centred in the free area at once, and the camera distance
+ * scales by the ratio of the old and new fit factors, so whatever zoom the
+ * user had chosen is kept in proportion rather than reset.
+ */
+export function setViewInsets(context: VisualizerContext | null, insets: ViewInsets): void {
+    if (!context || context.isDisposed) return;
+    const previous = context.viewInsets;
+    if (previous && previous.top === insets.top && previous.right === insets.right
+        && previous.bottom === insets.bottom && previous.left === insets.left) return;
+
+    const oldFactor = context.fitFactor ?? fitFactorFor(context);
+    context.viewInsets = insets;
+    const newFactor = fitFactorFor(context);
+    context.fitFactor = newFactor;
+
+    if (context.framedRMax !== undefined && !context.transition && oldFactor > 0) {
+        const { camera, controls } = context;
+        const offset = camera.position.clone().sub(controls.target).multiplyScalar(newFactor / oldFactor);
+        camera.position.copy(controls.target).add(offset);
+        camera.far = Math.max(camera.far, offset.length() * 10);
+        controls.update();
+    }
+    applyViewOffset(context);
 }
 
 /**
@@ -411,7 +505,8 @@ export function frameOrbital(
     if (!context || context.isDisposed) return;
 
     const { camera, controls } = context;
-    const distance = fitDistance(camera, rMax);
+    const distance = fitDistance(context, rMax);
+    context.fitFactor = fitFactorFor(context);
 
     const direction = restoreDefaultDirection
         ? defaultCameraPosition(1)
@@ -446,13 +541,12 @@ export function frameOrbital(
  * "have to reload the page to fix it": a fresh mount is the only thing that
  * resets `surfaceStyle` back to a real axis). A shell view therefore
  * substitutes a real axis rather than ever actually cutting nothing --
- * arbitrarily 'z', since the sphere is spherically symmetric and every axis
- * looks identical. `surfaceStyle` itself is left untouched by this
+ * SHELL_VIEW_CUT_AXIS, the face turned most squarely to the default camera. `surfaceStyle` itself is left untouched by this
  * substitution, so switching back to a marching-cubes view (hydrogen-like
  * mode, or drilling to level 3) still sees whatever cut the user actually
  * chose.
  */
-const SHELL_VIEW_FALLBACK_AXIS: Exclude<ClipAxis, 'none'> = 'z';
+const SHELL_VIEW_FALLBACK_AXIS: Exclude<ClipAxis, 'none'> = SHELL_VIEW_CUT_AXIS;
 function shellViewClipAxis(context: VisualizerContext): ClipAxis {
     return context.surfaceStyle.clipAxis === 'none' ? SHELL_VIEW_FALLBACK_AXIS : context.surfaceStyle.clipAxis;
 }
@@ -536,11 +630,7 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
         context.activeWorker?.terminate();   // do not leave a calculation running
         context.activeWorker = null;
         clearCurrentOrbital(context, context.scene); // Ensure orbital is cleared
-        if (context.currentAxesHelper) {
-            context.scene.remove(context.currentAxesHelper);
-            context.currentAxesHelper.dispose();
-            context.currentAxesHelper = null;
-        }
+        removeAxesHelper(context);
         if (context.controls) {
             context.controls.dispose();
         }
@@ -800,7 +890,7 @@ function beginShellFade(context: VisualizerContext, params: AtomShellViewParams,
     updateClipPlane(context.clipPlane, shellViewClipAxis(context), context.surfaceStyle.clipPosition, params.rMax);
 
     const fromCameraDistance = context.camera.position.distanceTo(context.controls.target);
-    const toCameraDistance = fitDistance(context.camera, framingRadius);
+    const toCameraDistance = fitDistance(context, framingRadius);
     const drillingOut = toCameraDistance > fromCameraDistance;
 
     context.transition = {
@@ -875,21 +965,14 @@ export async function updateOrbitalInScene(
             workerRMax = computeSamplingRadius(params.n, params.l, params.Z);
         }
 
-        // Update or remove axes helper based on showAxes and the rMax to be used
-        if (showAxes) {
-            addAxesHelper(context, workerRMax);
-        } else {
-            removeAxesHelper(context); // Ensure axes are removed if showAxes is false
-        }
-
-        // Re-frame only when the scale changes, so repeated updates at the same
-        // rMax leave the viewer's chosen angle and zoom alone. A
-        // marching-cubes orbital's visible extent *is* the sampling box, so
-        // camera framing and the clip extent are the same value here (unlike
-        // a shell view -- see updateAtomViewInScene).
-        if (context.framedRMax !== workerRMax) {
-            frameOrbital(context, workerRMax);
-        }
+        // Re-frame only when the scale changes, so repeated updates at the
+        // same rMax (another mₗ of the same subshell) leave the viewer's
+        // chosen angle and zoom alone. The framing itself waits for the mesh:
+        // it is fitted to the surface drawn, not to the sampling box, which
+        // holds 99.99 % of the electron and is often twice the size of a 90 %
+        // contour -- that left diffuse orbitals small in the middle of the
+        // frame.
+        const reframe = context.framedBox !== workerRMax;
         context.clipExtent = workerRMax;
         // The cut position is a fraction of rMax, so it has to be recomputed
         // whenever the box changes size.
@@ -931,6 +1014,19 @@ export async function updateOrbitalInScene(
                     // needs to fade from.
                     const crossFadeFromShellView = Boolean(options.animate) && context.isShellView && context.currentOrbitalGroup !== null;
                     updateSceneWithMeshData(context, e.data.meshData, params, crossFadeFromShellView);
+                    const surfaceRadius = meshRadius(e.data.meshData) || workerRMax;
+                    if (reframe) {
+                        // frameOrbital fits a box of this half-width, i.e. a
+                        // sphere √3 larger. The surface is the sphere, with
+                        // room round it for the axes and their labels.
+                        frameOrbital(context, (surfaceRadius * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3));
+                        context.framedBox = workerRMax;
+                    }
+                    if (showAxes) {
+                        addAxesHelper(context, surfaceRadius * AXES_LENGTH_FACTOR);
+                    } else {
+                        removeAxesHelper(context);
+                    }
                     resolve({ status: 'rendered', isoLevel: e.data.meshData.isoLevel });
                 } else {
                     console.error('Visualizer: Worker error:', e.data.message);
@@ -1144,6 +1240,7 @@ export function updateAtomViewInScene(
     }
 
     context.isShellView = true;
+    context.framedBox = undefined;
     // Spherically symmetric: there is no preferred direction for the axes to
     // mark, unlike a marching-cubes orbital's lobes.
     removeAxesHelper(context);
@@ -1427,23 +1524,82 @@ function updateSceneWithMeshData(
     }
 }
 
+/** Framing radius for a marching-cubes orbital, as a multiple of its furthest vertex. */
+const ORBITAL_FRAMING_MARGIN = 1.3;
+/** Axis length as a multiple of the furthest vertex: just past the lobes, labels inside the frame. */
+const AXES_LENGTH_FACTOR = 1.15;
+
+/** Distance from the nucleus to the furthest vertex of a mesh. */
+function meshRadius(meshData: MeshData): number {
+    let max = 0;
+    for (const [x, y, z] of meshData.positions) {
+        const r = x * x + y * y + z * z;
+        if (r > max) max = r;
+    }
+    return Math.sqrt(max);
+}
+
+/** Label colours, matching the far end of each AxesHelper line. */
+const AXIS_LABELS: Array<{ text: string; color: string; direction: [number, number, number] }> = [
+    { text: 'x', color: '#ff9f40', direction: [1, 0, 0] },
+    { text: 'y', color: '#a0ff40', direction: [0, 1, 0] },
+    { text: 'z', color: '#40a8ff', direction: [0, 0, 1] },
+];
+
+/** A camera-facing letter, or null where there is no 2D canvas (jsdom). */
+function createAxisLabel(text: string, color: string): THREE.Sprite | null {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const context2d = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
+    if (!context2d) return null;
+    context2d.font = 'italic 600 44px Roboto, sans-serif';
+    context2d.textAlign = 'center';
+    context2d.textBaseline = 'middle';
+    context2d.fillStyle = color;
+    context2d.fillText(text, 32, 34);
+    const material = new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(canvas),
+        depthTest: false,
+        transparent: true,
+    });
+    return new THREE.Sprite(material);
+}
+
 function addAxesHelper(context: VisualizerContext, size: number) {
     if (!context) return;
-    
+
     // Remove existing axes if any
     removeAxesHelper(context);
-    
-    // Create and add new axes
-    const axesHelper = new THREE.AxesHelper(size);
-    context.scene.add(axesHelper);
-    context.currentAxesHelper = axesHelper;
+
+    // The lines alone said nothing about which was which; each gets its
+    // letter just past its end.
+    const group = new THREE.Group();
+    group.add(new THREE.AxesHelper(size));
+    for (const label of AXIS_LABELS) {
+        const sprite = createAxisLabel(label.text, label.color);
+        if (!sprite) continue;
+        const [x, y, z] = label.direction;
+        sprite.position.set(x, y, z).multiplyScalar(size * 1.08);
+        sprite.scale.setScalar(size * 0.12);
+        group.add(sprite);
+    }
+    context.scene.add(group);
+    context.currentAxesHelper = group;
 }
 
 function removeAxesHelper(context: VisualizerContext) {
     if (!context || !context.currentAxesHelper) return;
-    
+
     context.scene.remove(context.currentAxesHelper);
-    context.currentAxesHelper.dispose();
+    context.currentAxesHelper.traverse(object => {
+        if (object instanceof THREE.AxesHelper) {
+            object.dispose();
+        } else if (object instanceof THREE.Sprite) {
+            object.material.map?.dispose();
+            object.material.dispose();
+        }
+    });
     context.currentAxesHelper = null;
 }
 
@@ -1460,4 +1616,6 @@ export function handleResize(context: VisualizerContext, width: number, height: 
     
     // Update renderer size
     renderer.setSize(width, height);
+    // The view offset is expressed in canvas pixels, so it has to follow.
+    applyViewOffset(context);
 }

@@ -3,7 +3,8 @@ import { render, screen, fireEvent, act } from '@testing-library/react'; // Add 
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
-import atomReducer, { AtomState } from './store/atomSlice';
+import atomReducer, { AtomState, drillToOrbital, drillToShell } from './store/atomSlice';
+import { setSurfaceStyle } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
 import { computeSamplingRadius } from './orbital_presets';
@@ -253,6 +254,34 @@ describe('App', () => {
         expect(screen.queryByLabelText('subshells')).not.toBeInTheDocument();
     });
 
+    // A shell view is nothing but its cut face, but an orbital is a closed
+    // surface: the inherited half-cut hid half of 4f_z³. Entering an orbital
+    // clears the cut; stepping back out restores the shell view's own.
+    it('clears the cut on entering an orbital and restores it on the way back out', () => {
+        installMatchMedia(false);
+        const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        act(() => { store.dispatch(setSurfaceStyle({ clipAxis: 'y', clipPosition: 0.3 })); });
+
+        act(() => { store.dispatch(drillToShell(1)); });
+        act(() => { store.dispatch(drillToOrbital(1, 0, 0)); });
+        expect(store.getState().orbital.surfaceStyle.clipAxis).toBe('none');
+
+        act(() => { store.dispatch(drillToShell(1)); });
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'y', clipPosition: 0.3 });
+    });
+
+    it('does not carry the atom view\'s cut into Basic Orbitals, and brings it back on return', () => {
+        installMatchMedia(false);
+        const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        act(() => { store.dispatch(setSurfaceStyle({ clipAxis: 'z', clipPosition: -0.2 })); });
+
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        expect(store.getState().orbital.surfaceStyle.clipAxis).toBe('none');
+
+        fireEvent.click(screen.getByRole('button', { name: /^atom mode/i }));
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'z', clipPosition: -0.2 });
+    });
+
     // Spec bugfix: the radial plot used to keep showing every subshell of the
     // parent shell (2s alongside 2p) all the way down to level 3, instead of
     // narrowing to the one subshell actually selected -- D(r)/P(r) doesn't
@@ -309,12 +338,19 @@ describe('App', () => {
             expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
         });
 
-        it('falls back to the dropdown on a phone, where a table does not fit', () => {
+        it('opens a searchable list from the element name on a phone, where a table does not fit', () => {
             installMatchMedia(true);
-            renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+            const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
 
             expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
-            expect(screen.getByRole('combobox', { name: /Element/i })).toBeInTheDocument();
+            // Not buried in the sideways-scrolling controls strip any more.
+            expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole('button', { name: /change element, currently Hydrogen/i }));
+            fireEvent.change(screen.getByLabelText('filter elements'), { target: { value: 'iron' } });
+            fireEvent.click(screen.getByRole('button', { name: /Iron/ }));
+
+            expect(store.getState().atom.Z).toBe(26);
         });
 
         it('is not shown at all in Basic Orbitals mode, which has no element', () => {
@@ -345,7 +381,11 @@ describe('App', () => {
         // LevelNav does not live inside #controls (see style.css's
         // .side-panel unwrap on a narrow viewport), so it is unaffected by
         // the sheet's own open/closed state.
+        // At the whole-atom level the element button is the card's head (a
+        // one-segment breadcrumb would only repeat it); drilled in, the
+        // breadcrumb is there for the way back out.
+        expect(screen.getByRole('button', { name: /change element, currently Hydrogen/i })).toBeInTheDocument();
+        fireEvent.click(screen.getByText(/K shell \(n=1\)/));
         expect(screen.getByRole('navigation', { name: /breadcrumb/i })).toBeInTheDocument();
-        expect(screen.getByText('Hydrogen')).toBeInTheDocument();
     });
 });

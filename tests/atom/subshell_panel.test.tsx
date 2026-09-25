@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
-import SubshellPanel from '../../src/components/SubshellPanel';
+import SubshellPanel, { spreadLabels } from '../../src/components/SubshellPanel';
 import { SerialisedSubshell } from '../../src/workers/atomWorker';
 
 /** A neon-shaped list of subshells: 1s (n=1), 2s and 2p (n=2). */
@@ -188,5 +188,22 @@ describe('SubshellPanel', () => {
             const { getByText } = renderAtOrbital(0);
             expect(getByText(/showing one orbital of 2p/i)).toBeInTheDocument();
         });
+    });
+});
+
+describe('spreadLabels', () => {
+    it('pushes labels that would overlap apart, keeping their order', () => {
+        expect(spreadLabels([50, 51, 52], 11, 0, 100)).toEqual([50, 61, 72]);
+    });
+
+    it('slides a run that would leave the bottom back up', () => {
+        const ys = spreadLabels([95, 96, 97], 11, 0, 100);
+        expect(ys[2]).toBeLessThanOrEqual(100);
+        expect(ys[1]).toBeLessThanOrEqual(ys[2] - 11);
+        expect(ys[0]).toBeLessThanOrEqual(ys[1] - 11);
+    });
+
+    it('leaves well-separated labels where they are', () => {
+        expect(spreadLabels([10, 60], 11, 0, 100)).toEqual([10, 60]);
     });
 });

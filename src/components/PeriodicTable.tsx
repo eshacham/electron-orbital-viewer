@@ -76,7 +76,14 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect }) => {
                 data-block={tile.block}
                 aria-pressed={isSelected}
                 aria-label={`${tileElement?.name ?? tile.atomicNumber} (${tile.block}-block)`}
-                onClick={() => onSelect(tile.atomicNumber)}
+                onClick={() => {
+                    onSelect(tile.atomicNumber);
+                    // Folds to its header once a choice is made, like a
+                    // dropdown closing: open, the table covers the top third
+                    // of the view and the atom has to shrink to fit below it.
+                    // The header keeps the element and the way back in.
+                    setOpen(false);
+                }}
                 onMouseEnter={() => setHovered(tile.atomicNumber)}
                 onMouseLeave={() => setHovered(current => (current === tile.atomicNumber ? null : current))}
                 onFocus={() => setHovered(tile.atomicNumber)}
@@ -101,7 +108,7 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect }) => {
                     onClick={() => setOpen(value => !value)}
                     aria-expanded={open}
                 >
-                    {open ? 'Hide table' : 'Periodic table'}
+                    {open ? 'Hide table' : 'Change element'}
                 </Button>
             </Box>
 

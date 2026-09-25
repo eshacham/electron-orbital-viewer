@@ -50,6 +50,15 @@ export const ORBITAL_RESOLUTION = 128;
 
 export const BASIC_ORBITALS_Z = 1;
 
+/**
+ * The axis levels 1-2 cut the atom along by default. The camera is z-up (the
+ * chemistry convention: 2p_z, 3d_z² and 4f_z³ stand upright) and looks in
+ * mostly along +x, so the x cut is the face turned most squarely towards it.
+ * A z cut would be a horizontal face seen from 26 degrees above, squashed to
+ * a thin ellipse.
+ */
+export const SHELL_VIEW_CUT_AXIS = 'x' as const;
+
 export const MAX_SAMPLING_RADIUS = 400;
 
 function roundUpToTwoFigures(value: number): number {

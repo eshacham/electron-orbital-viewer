@@ -91,9 +91,19 @@ describe('PeriodicTable', () => {
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
         fireEvent.click(toggle);
-        expect(getByRole('button', { name: /periodic table/i })).toHaveAttribute('aria-expanded', 'false');
+        expect(getByRole('button', { name: /change element/i })).toHaveAttribute('aria-expanded', 'false');
         // Still says which element is current while collapsed.
         expect(container.querySelector('.periodic-table-current')?.textContent).toMatch(/Hydrogen/);
+    });
+
+    // Open, the table covers the top third of the view and the atom has to
+    // shrink below it; like a dropdown, it closes once a choice is made.
+    it('folds to its header once an element is picked', () => {
+        const onSelect = jest.fn();
+        const { container, getByRole } = render(<PeriodicTable Z={1} onSelect={onSelect} />);
+        fireEvent.click(container.querySelector('.periodic-tile[data-z="26"]')!);
+        expect(onSelect).toHaveBeenCalledWith(26);
+        expect(getByRole('button', { name: /change element/i })).toHaveAttribute('aria-expanded', 'false');
     });
 
     it('names the current element and its block in the header', () => {

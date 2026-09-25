@@ -6,7 +6,8 @@ import {
     Box,
     Alert,
     Snackbar,
-    IconButton
+    IconButton,
+    CircularProgress
 } from '@mui/material';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import {
@@ -36,7 +37,10 @@ import RadialPlot, { RadialCurve } from './components/RadialPlot';
 import LevelNav, { NavigationTarget } from './components/LevelNav';
 import SubshellPanel from './components/SubshellPanel';
 import PeriodicTable from './components/PeriodicTable';
-import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION } from './orbital_presets';
+import ElementPickerDialog from './components/ElementPickerDialog';
+import { elementFor } from './elements';
+import { orbitalName } from './orbital_names';
+import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT } from './useMediaQuery';
@@ -135,7 +139,7 @@ function App() {
         // run (see its doc comment).
         dispatch(setElement(newZ));
         dispatch(solveStarted());
-        dispatch(setSurfaceStyle({ clipAxis: 'z', clipPosition: 0 }));
+        dispatch(setSurfaceStyle({ clipAxis: SHELL_VIEW_CUT_AXIS, clipPosition: 0 }));
         dispatch(resetView());
     }, [dispatch]);
 
@@ -223,7 +227,7 @@ function App() {
     // who deliberately turns the cut back off keeps their choice.
     useEffect(() => {
         if (isAtomMode && surfaceStyle.clipAxis === 'none') {
-            dispatch(setSurfaceStyle({ clipAxis: 'z' }));
+            dispatch(setSurfaceStyle({ clipAxis: SHELL_VIEW_CUT_AXIS }));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -254,6 +258,32 @@ function App() {
         // exactly as before.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAtomMode]);
+
+    // The cut belongs to the shell views. Levels 1-2 draw nothing but their
+    // cut face, so they need one; an orbital -- atom mode's level 3, or any
+    // Basic Orbitals render -- is a closed surface, and the inherited
+    // half-cut hid half of it: 4f_z³ arrived as a single lobe, with the Off
+    // button at the bottom of a scrolled panel. Moving into an orbital view
+    // clears the cut, and moving back to a shell view restores whatever it
+    // had. A cut chosen while looking at an orbital is left alone.
+    const isOrbitalView = !isAtomMode || atomLevel === 'orbital';
+    const shellViewCutRef = useRef<Pick<SurfaceStyle, 'clipAxis' | 'clipPosition'> | null>(null);
+    const wasOrbitalViewRef = useRef(isOrbitalView);
+    useEffect(() => {
+        const wasOrbitalView = wasOrbitalViewRef.current;
+        wasOrbitalViewRef.current = isOrbitalView;
+        if (isOrbitalView && !wasOrbitalView) {
+            shellViewCutRef.current = { clipAxis: surfaceStyle.clipAxis, clipPosition: surfaceStyle.clipPosition };
+            dispatch(setSurfaceStyle({ clipAxis: 'none' }));
+        } else if (!isOrbitalView && wasOrbitalView) {
+            const saved = shellViewCutRef.current;
+            dispatch(setSurfaceStyle(saved && saved.clipAxis !== 'none'
+                ? saved
+                : { clipAxis: SHELL_VIEW_CUT_AXIS, clipPosition: 0 }));
+        }
+        // surfaceStyle is read, not watched: only the change of view matters.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOrbitalView, dispatch]);
 
     // Level 3 in atom mode: render the selected orbital through the same
     // marching-cubes pipeline as hydrogen-like mode, but with the SCF's own
@@ -362,11 +392,52 @@ function App() {
         }));
     }, [atomProfile, atomLevel, atomSelectedShell, atomSelectedSubshell, atomRGrid]);
 
+    // Phone: the element is chosen from a full-screen list opened from the
+    // element name, since the periodic table does not fit.
+    const [elementPickerOpen, setElementPickerOpen] = useState(false);
+
+    // What the canvas is waiting for, if anything. The panels switch to the
+    // new element or orbital at once while the old picture stays up until
+    // the new one is ready, and the only sign of that used to be a 4 px bar
+    // at the bottom of the controls -- often scrolled out of view. The
+    // canvas now dims and says what it is working on.
+    const atomOrbitalBusy = isAtomMode && atomLevel === 'orbital' && showBusy;
+    const canvasBusyLabel = isAtomMode
+        ? (showAtomBusy
+            ? `Solving ${elementFor(atomZ)?.name ?? `Z = ${atomZ}`}…`
+            : atomOrbitalBusy && atomSelectedOrbital
+                ? `Computing ${orbitalName(atomSelectedOrbital.n, atomSelectedOrbital.l, atomSelectedOrbital.ml)}…`
+                : null)
+        : (showBusy && renderedParams
+            ? `Computing ${orbitalName(renderedParams.n, renderedParams.l, renderedParams.ml)}…`
+            : null);
+
+    // A marching-cubes surface is coloured by the sign of ψ, unlike the shell
+    // views, which colour by shell or subshell. Say so where it applies.
+    const showPhaseLegend = !isAtomMode || atomLevel === 'orbital';
+
+    // The drill-down's next step. On a desktop it lives in the navigation
+    // card it continues, where the orbital buttons are in view; on a phone
+    // it stays in the controls strip, which is laid out for it.
+    const subshellPanel = (atomLevel === 'shell' || atomLevel === 'orbital') && atomProfile && atomSelectedShell !== null
+        ? (
+            <SubshellPanel
+                subshells={atomProfile.subshells}
+                shellN={atomSelectedShell}
+                selectedSubshell={atomSelectedSubshell}
+                selectedOrbital={atomSelectedOrbital}
+                onSelectSubshell={handleSelectSubshell}
+                onSelectOrbital={handleSelectOrbital}
+            />
+        )
+        : null;
+
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <Box
                 id="canvas-container"
+                className={canvasBusyLabel ? 'busy' : undefined}
                 data-busy={isLoading ? 'true' : 'false'}
                 sx={{
                     width: '100%',
@@ -380,6 +451,22 @@ function App() {
                     onOrbitalFailed={handleOrbitalFailed}
                     enclosedFraction={enclosedFraction}
                 />
+                {canvasBusyLabel && (
+                    <div className="canvas-busy" role="status" aria-live="polite">
+                        <CircularProgress size={22} thickness={5} color="inherit" />
+                        <span>{canvasBusyLabel}</span>
+                    </div>
+                )}
+                {showPhaseLegend && (
+                    <div className="phase-legend" aria-label="surface colour key">
+                        <span className="phase-legend-item">
+                            <span className="phase-legend-swatch positive" />ψ &gt; 0
+                        </span>
+                        <span className="phase-legend-item">
+                            <span className="phase-legend-swatch negative" />ψ &lt; 0
+                        </span>
+                    </div>
+                )}
                 {/* Addendum 3: the element selector is a real periodic
                     table, in its own panel across the top, on anything
                     wider than a phone. A table does not survive a phone
@@ -398,8 +485,11 @@ function App() {
                         {panelOpen ? '✕' : '☰'}
                     </IconButton>
                 )}
-                {/* .side-panel stacks LevelNav above Controls on desktop; on a
-                    phone it unwraps (display:contents in style.css) so
+                {/* Desktop: navigation down the left (.side-panel), view
+                    settings and the plot down the right (.view-panel). The
+                    two used to share the left column, and once the drill-down
+                    was in it one or the other was always below the fold. On
+                    a phone both unwrap (display:contents in style.css), so
                     LevelNav gets its own fixed position, independent of the
                     controls sheet -- a phone user who drills in and closes
                     the sheet still has a way back out. */}
@@ -411,15 +501,20 @@ function App() {
                             selectedSubshell={atomSelectedSubshell}
                             selectedOrbital={atomSelectedOrbital}
                             onNavigate={handleLevelNavigate}
-                        />
+                            onChangeElement={isNarrow ? () => setElementPickerOpen(true) : undefined}
+                        >
+                            {!isNarrow && subshellPanel}
+                        </LevelNav>
                     )}
+                </Box>
+                <Box className="view-panel">
                     <Controls
                         mode={atomMode}
                         onModeChange={handleModeChange}
                         atomLevel={atomLevel}
                         atomZ={atomZ}
                         onAtomElementChange={handleAtomElementChange}
-                        showElementPicker={isNarrow}
+                        showElementPicker={false}
                         initialN={n}
                         onNChange={setN}
                         initialL={l}
@@ -440,23 +535,10 @@ function App() {
                         {/* Shown at the orbital level too, not just the shell
                             level (bug fix, reported from a phone): it used to
                             unmount the moment you picked an orbital, so the mL
-                            buttons you had just used vanished and the only way
-                            back was a row of small breadcrumb links. Keeping it
-                            up means the parent subshell is still on screen, and
-                            switching to a sibling orbital is one tap rather
-                            than a round trip out and back in. */}
-                        {(atomLevel === 'shell' || atomLevel === 'orbital') && atomProfile && atomSelectedShell !== null && (
-                            <SubshellPanel
-                                subshells={atomProfile.subshells}
-                                shellN={atomSelectedShell}
-                                selectedSubshell={atomSelectedSubshell}
-                                selectedOrbital={atomSelectedOrbital}
-                                onSelectSubshell={handleSelectSubshell}
-                                onSelectOrbital={handleSelectOrbital}
-                            />
-                        )}
+                            buttons you had just used vanished. On a desktop
+                            it is in the navigation card instead. */}
+                        {isNarrow && subshellPanel}
                     </Controls>
-                </Box>
                 {!isAtomMode && renderedParams && (
                     <RadialPlot
                         n={renderedParams.n}
@@ -479,8 +561,18 @@ function App() {
                         compact={isNarrow}
                         curves={atomCurves}
                         peaks={Array.from(atomProfile.shellPeaks)}
+                        cutFaceNote={atomLevel !== 'orbital'}
                         hoverRadius={atomHoverRadius}
                         onHoverRadius={handleAtomHoverRadius}
+                    />
+                )}
+                </Box>
+                {isAtomMode && isNarrow && (
+                    <ElementPickerDialog
+                        open={elementPickerOpen}
+                        Z={atomZ}
+                        onSelect={handleAtomElementChange}
+                        onClose={() => setElementPickerOpen(false)}
                     />
                 )}
                 {/* Ruling R17: a solver that did not converge must show up as

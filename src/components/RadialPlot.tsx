@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { radialProfile } from '../radial_distribution';
 
 /**
@@ -58,6 +58,18 @@ interface RadialPlotProps {
     hoverRadius?: number | null;
     /** Reports the radius under the pointer, or null when it leaves the plot. */
     onHoverRadius?: (r: number | null) => void;
+    /**
+     * The 3D view beside the plot has a cut face shaded from these curves
+     * (atom levels 1-2), scaled to local shell structure rather than
+     * plotted honestly -- which has to be said, but only where a cut face
+     * exists. At the orbital level there is none.
+     */
+    cutFaceNote?: boolean;
+}
+
+/** Axis label for a radius: two decimals below 10 a₀, where rounding would mislead. */
+function formatRadius(r: number): string {
+    return r < 10 ? r.toFixed(2) : String(Math.round(r));
 }
 
 const PADDING = { left: 6, right: 6, top: 8, bottom: 16 };
@@ -103,8 +115,11 @@ function dominantCurveLabelAt(curves: RadialCurve[], r: number): string | null {
  */
 const RadialPlot: React.FC<RadialPlotProps> = ({
     n, l, Z, rMax, compact = false,
-    curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear',
+    curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear', cutFaceNote = false,
 }) => {
+    // On a phone the plot sits over the atom, so it starts folded to its
+    // title and opens on a tap.
+    const [expanded, setExpanded] = useState(!compact);
     const WIDTH = compact ? 150 : 260;
     const HEIGHT = compact ? 62 : 96;
     const plotWidth = WIDTH - PADDING.left - PADDING.right;
@@ -189,22 +204,53 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
 
     if (!isMultiCurve && !path) return null;
 
+    // The middle of the axis, labelled: 0 and the maximum alone left the
+    // scale unreadable, and on a √ axis the midpoint is a quarter of rMax.
+    const midRadius = scale === 'sqrt' ? rMax / 4 : rMax / 2;
+    const title = isMultiCurve ? 'Radial distribution D(r) = 4πr²ρ(r)' : 'Radial distribution — r²R(r)²';
+
+    if (compact && !expanded) {
+        return (
+            <div className="radial-plot compact collapsed" aria-label="radial distribution">
+                <button
+                    type="button"
+                    className="radial-plot-toggle"
+                    aria-expanded={false}
+                    onClick={() => setExpanded(true)}
+                >
+                    D(r) plot ▸
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div
             className={`radial-plot${compact ? ' compact' : ''}${isMultiCurve ? ' interactive' : ''}`}
             aria-label="radial distribution"
+            // As wide as the plot, so a long title wraps rather than
+            // stretching the panel past the curves.
+            style={{ maxWidth: WIDTH + 22 }}
         >
             <div className="radial-plot-title">
-                {isMultiCurve
-                    // The 3D cut face this plot is linked to (hoverRadius/
-                    // onHoverRadius, see the module doc) colours the *same*
-                    // D(r) but scaled to local structure so shells stay
-                    // visible across the atom's full range, not this plot's
-                    // own curves -- called out here so that scaling is never
-                    // mistaken for the honest, unscaled D(r) plotted below.
-                    ? 'Radial distribution D(r) = 4πr²ρ(r) (cut face scaled to local shell structure)'
-                    : 'Radial distribution — r²R(r)²'}
+                {compact ? (
+                    <button
+                        type="button"
+                        className="radial-plot-toggle"
+                        aria-expanded
+                        onClick={() => setExpanded(false)}
+                    >
+                        {title} ▾
+                    </button>
+                ) : title}
             </div>
+            {/* The 3D cut face this plot is linked to colours the *same* D(r)
+                but scaled to local structure so shells stay visible across
+                the atom's full range -- said so that scaling is never
+                mistaken for the honest, unscaled D(r) plotted below. */}
+            {isMultiCurve && cutFaceNote && (
+                <div className="radial-plot-note">cut face shading is scaled to local shell structure</div>
+            )}
             <svg
                 width={WIDTH}
                 height={HEIGHT}
@@ -264,6 +310,13 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                     y2={baseline}
                     className="radial-plot-axis"
                 />
+                <line
+                    x1={xForRadius(midRadius)}
+                    x2={xForRadius(midRadius)}
+                    y1={baseline}
+                    y2={baseline + 4}
+                    className="radial-plot-axis"
+                />
             </svg>
             {isMultiCurve && (
                 <div className="radial-plot-legend">
@@ -273,6 +326,13 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                             {curve.label}
                         </span>
                     ))}
+                    {/* The short ticks on the baseline were unexplained. */}
+                    {(peaks ?? []).length > 0 && (
+                        <span className="radial-plot-legend-key">
+                            <span className="radial-plot-legend-peak" />
+                            peaks of the total
+                        </span>
+                    )}
                 </div>
             )}
             {/* Always rendered (rather than only while hovering), reserving
@@ -289,15 +349,21 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                         : ' '}
                 </div>
             )}
-            <div className="radial-plot-scale">
+            <div className="radial-plot-scale" style={{ width: WIDTH }}>
                 <span>0</span>
+                <span
+                    className="radial-plot-scale-mid"
+                    style={{ left: xForRadius(midRadius) }}
+                >
+                    {formatRadius(midRadius)}
+                </span>
                 {/* rMax is now a range fitted to the curves shown (spec
                     bugfix), not the sampling grid's rMax, so it is often
                     well under 10 a0 -- Math.round would otherwise collapse
                     e.g. gold's 1.68 down to a misleading "2". The scale
                     mode is called out explicitly since a non-linear axis
                     is otherwise silently misleading. */}
-                <span>{rMax < 10 ? rMax.toFixed(2) : Math.round(rMax)} a₀{scale === 'sqrt' ? ' (√ scale)' : ''}</span>
+                <span>{formatRadius(rMax)} a₀{scale === 'sqrt' ? ' (√ scale)' : ''}</span>
             </div>
         </div>
     );

@@ -43,11 +43,44 @@ html, body, #root {
   gap: 12px;
   max-width: 340px;
   max-height: calc(100vh - 40px);
+  /* One scroll for the whole column. With the drill-down in the navigation
+     card, letting #controls scroll on its own gave two scrollbars and hid
+     the view controls in a short inner box. */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.side-panel > * {
+  flex-shrink: 0;
+}
+/* The right-hand column on a desktop: view settings, then the radial plot. */
+.view-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  max-width: 340px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.view-panel > * {
+  flex-shrink: 0;
 }
 @media (min-width: 761px) and (min-height: 501px) {
-  .side-panel #controls {
+  .view-panel #controls {
     position: static;
     max-height: none;
+    overflow: visible;
+    /* A fixed width, so the card does not change size with the level. */
+    width: 300px;
+    box-sizing: border-box;
+  }
+  .view-panel .radial-plot {
+    position: static;
   }
 }
 .side-panel .level-nav {
@@ -74,8 +107,9 @@ html, body, #root {
 }
 .atom-error {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
   max-width: 360px;
 }
@@ -155,7 +189,9 @@ html, body, #root {
    surface, not a hairline in the corner. */
 .scale-readout {
   position: absolute;
-  right: 20px;
+  /* Bottom-left of the uncovered area (set by useViewInsets): the corners
+     belong to the panels on either side. */
+  left: calc(var(--free-left, 0px) + 20px);
   bottom: 20px;
   z-index: 10;
   display: flex;
@@ -221,6 +257,7 @@ html, body, #root {
   stroke-width: 1;
 }
 .radial-plot-scale {
+  position: relative;
   display: flex;
   justify-content: space-between;
   font-size: 11px;
@@ -242,7 +279,8 @@ html, body, #root {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.85);
 }
-.radial-plot-legend-item {
+.radial-plot-legend-item,
+.radial-plot-legend-key {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -253,6 +291,102 @@ html, body, #root {
   height: 8px;
   border-radius: 50%;
 }
+.radial-plot-scale-mid {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+}
+.radial-plot-note {
+  font-size: 10px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 2px;
+}
+.radial-plot-legend-peak {
+  display: inline-block;
+  width: 1.5px;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.6);
+}
+/* Phone: the plot folds to its title, which is a button, so the panel's
+   own click-through has to make an exception for it. */
+.radial-plot-toggle {
+  pointer-events: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.radial-plot.collapsed {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.radial-plot.collapsed .radial-plot-toggle {
+  min-height: 28px;
+}
+
+/* The canvas is waiting on a solve or a mesh: the old picture dims and the
+   view says what it is doing. */
+#orbital-canvas-host {
+  transition: opacity 160ms ease;
+}
+#canvas-container.busy #orbital-canvas-host {
+  opacity: 0.35;
+}
+.canvas-busy {
+  position: absolute;
+  /* The middle of the uncovered area, which is where the atom is (set by
+     useViewInsets), not the middle of the canvas. */
+  left: var(--free-center-x, 50%);
+  top: var(--free-center-y, 50%);
+  transform: translate(-50%, -50%);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(8, 8, 10, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* Sign of ψ on a marching-cubes surface: the vertex colours are pure red
+   and pure blue (orbital_visualizer.ts). */
+.phase-legend {
+  position: absolute;
+  left: var(--free-center-x, 50%);
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 14px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(8, 8, 10, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 13px;
+  pointer-events: none;
+}
+.phase-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.phase-legend-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+.phase-legend-swatch.positive { background: #e02020; }
+.phase-legend-swatch.negative { background: #2040ff; }
+
 .radial-plot-peak {
   stroke: rgba(255, 255, 255, 0.6);
   stroke-width: 1.4;
@@ -303,7 +437,8 @@ html, body, #root {
      #controls keeps the sheet rules below untouched, and LevelNav (next
      rule) gets its own fixed spot that the sheet's open/closed state
      cannot cover. */
-  .side-panel {
+  .side-panel,
+  .view-panel {
     display: contents;
   }
   .side-panel .level-nav {
@@ -315,23 +450,20 @@ html, body, #root {
     max-height: 30dvh;
     overflow-y: auto;
   }
-  /* The sheet toggle floats at top-left over this panel, and its 44px touch
-     target lands squarely on the breadcrumb's first segment -- which is the
-     way back to the whole atom, so losing it to an overlap is worse than
-     losing a label. Indent the one line it reaches. */
-  .side-panel .level-nav .level-nav-breadcrumbs {
-    padding-left: 44px;
+  /* The sheet toggle floats at top-left over this panel. A float the size
+     of the toggle makes the first lines wrap round it instead of running
+     underneath -- it used to cover the configuration line. */
+  .side-panel .level-nav::before {
+    content: '';
+    float: left;
+    width: 46px;
+    height: 44px;
   }
-  /* The Back control sits above the breadcrumb, so it is what has to clear
-     the sheet toggle here, and it gets a full touch target. */
   .side-panel .level-nav .level-nav-back {
-    margin-left: 44px;
     min-height: 40px;
     font-size: 0.9rem !important;
   }
-  .side-panel .level-nav .level-nav-back + .level-nav-breadcrumbs {
-    padding-left: 0;
-  }
+
   #controls {
     top: auto;
     left: 0;
@@ -407,6 +539,9 @@ html, body, #root {
      was invisible on a phone (found by driving the app at 420px). LevelNav
      is capped at 30dvh above, so clearing that always clears it. */
   .radial-plot { right: 12px; top: calc(30dvh + 16px); bottom: auto; }
+  /* Beside the scale readout rather than at the bottom, where the open
+     controls sheet covered it. */
+  .phase-legend { top: calc(30dvh + 20px); bottom: auto; left: 50%; padding: 4px 8px; gap: 8px; font-size: 12px; }
   .scale-readout { left: 12px; top: calc(30dvh + 16px); right: auto; bottom: auto; padding: 6px 10px 5px; font-size: 12px; }
 
   /* The compact plot's SVG is 150px, but its title is a full sentence and
@@ -435,6 +570,51 @@ html, body, #root {
   #controls .subshell-chip .MuiChip-label { overflow: hidden; text-overflow: ellipsis; }
 }
 
+/* The element, as a button, at the head of the navigation card on a phone. */
+.level-nav-change-element {
+  text-transform: none !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+  margin: 0 8px 4px 0 !important;
+}
+.element-picker-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.element-picker-content {
+  padding-top: 12px !important;
+}
+.element-picker-item {
+  gap: 10px;
+  min-height: 44px;
+}
+.element-picker-number {
+  width: 28px;
+  text-align: right;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.element-picker-symbol {
+  width: 28px;
+  font-weight: 700;
+}
+.element-picker-name {
+  flex: 1;
+}
+.element-picker-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.element-picker-block-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
 /* ---------------------------------------------------------------------------
    Short viewport (a phone in landscape, or a squat desktop window). The rule
    block above is shared with narrow-and-tall, where the scarce dimension is
@@ -451,6 +631,9 @@ html, body, #root {
     max-width: min(52vw, 420px);
   }
   .radial-plot { top: 12px; }
+  /* The navigation card is a left column here, so the key goes under the
+     plot on the right instead of mid-screen, where the card would cover it. */
+  .phase-legend { top: 64px; left: auto; right: 12px; transform: none; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -564,6 +747,10 @@ html, body, #root {
 }
 .subshell-energy-rule.current {
   stroke-width: 3;
+}
+.subshell-energy-leader {
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 0.8;
 }
 .subshell-energy-label {
   font-size: 11px;

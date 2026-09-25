@@ -30,7 +30,33 @@ const DIAGRAM_WIDTH = 220;
 const DIAGRAM_HEIGHT = 96;
 const DIAGRAM_PADDING = 6;
 /** Room on the right of the rules for the current shell's subshell labels. */
-const DIAGRAM_LABEL_WIDTH = 34;
+const DIAGRAM_LABEL_WIDTH = 44;
+/** Closest two labels may sit, in px, before they are pushed apart. */
+const LABEL_SPACING = 11;
+
+/**
+ * Label positions for rules at `ys`, pushed apart so none overlap: a shell's
+ * subshells can sit within a pixel or two of each other (uranium's 4s-4f),
+ * and their labels printed on top of one another. Order is preserved.
+ */
+export function spreadLabels(ys: number[], spacing: number, min: number, max: number): number[] {
+    const order = ys.map((y, i) => ({ y, i })).sort((a, b) => a.y - b.y);
+    const placed = order.map(entry => entry.y);
+    for (let k = 1; k < placed.length; k++) {
+        placed[k] = Math.max(placed[k], placed[k - 1] + spacing);
+    }
+    // Anything pushed off the bottom slides the whole run back up.
+    const overflow = placed.length > 0 ? placed[placed.length - 1] - max : 0;
+    if (overflow > 0) {
+        for (let k = placed.length - 1; k >= 0; k--) {
+            placed[k] = Math.max(min, placed[k] - overflow);
+            if (k > 0 && placed[k - 1] > placed[k] - spacing) placed[k - 1] = placed[k] - spacing;
+        }
+    }
+    const result = new Array<number>(ys.length);
+    order.forEach((entry, k) => { result[entry.i] = placed[k]; });
+    return result;
+}
 
 /**
  * Vertical position for an energy rule: least-bound (least negative) states
@@ -191,6 +217,37 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                 role="img"
                 aria-label="orbital energy diagram"
             >
+                {(() => {
+                    const labelYs = spreadLabels(
+                        shellSubshells.map(sub => ruleY(sub.energy, minEnergy, maxEnergy)),
+                        LABEL_SPACING,
+                        LABEL_SPACING / 2,
+                        DIAGRAM_HEIGHT - LABEL_SPACING / 2
+                    );
+                    return shellSubshells.map((sub, i) => {
+                        const y = ruleY(sub.energy, minEnergy, maxEnergy);
+                        const lineEnd = DIAGRAM_WIDTH - DIAGRAM_PADDING - DIAGRAM_LABEL_WIDTH;
+                        return (
+                            <g key={`label-${sub.n}-${sub.l}`}>
+                                <line
+                                    className="subshell-energy-leader"
+                                    x1={lineEnd}
+                                    y1={y}
+                                    x2={lineEnd + 10}
+                                    y2={labelYs[i]}
+                                />
+                                <text
+                                    className="subshell-energy-label"
+                                    x={lineEnd + 13}
+                                    y={labelYs[i]}
+                                    dominantBaseline="middle"
+                                >
+                                    {subshellLabel(sub.n, sub.l)}
+                                </text>
+                            </g>
+                        );
+                    });
+                })()}
                 {subshells.map(subshell => {
                     const isCurrent = subshell.n === shellN;
                     const y = ruleY(subshell.energy, minEnergy, maxEnergy);
@@ -208,16 +265,6 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                 // style, not stroke=: a CSS stroke beats the attribute.
                                 style={color ? { stroke: color } : undefined}
                             />
-                            {isCurrent && (
-                                <text
-                                    className="subshell-energy-label"
-                                    x={DIAGRAM_WIDTH - DIAGRAM_LABEL_WIDTH}
-                                    y={y}
-                                    dominantBaseline="middle"
-                                >
-                                    {subshellLabel(subshell.n, subshell.l)}
-                                </text>
-                            )}
                         </g>
                     );
                 })}
