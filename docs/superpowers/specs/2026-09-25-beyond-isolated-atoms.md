@@ -127,14 +127,16 @@ so nothing existing changes behaviour. For `quantity: 'density'` the field is
 
 ### 4.2 Molecule data format (Phases 5–6)
 
-Produced offline by `tools/molecules/` (Python, PySCF), consumed by the app:
+Produced offline by `tools/molecules/` (Python, PySCF), published to S3
+(§4.5) and served at `/molecules/<version>/` (paths below are relative to
+that):
 
 ```
-public/molecules/index.json           — list: id, name, formula, category, tags
-public/molecules/<id>/meta.json       — see below
-public/molecules/<id>/density.bin.gz  — Float32 ρ on the grid in meta.grid
-public/molecules/<id>/esp.bin.gz      — Float32 electrostatic potential, coarser grid
-public/molecules/<id>/basis.json      — Gaussian basis + MO coefficients (molden-equivalent)
+index.json           — list: id, name, formula, category, tags
+<id>/meta.json       — see below
+<id>/density.bin.gz  — Float32 ρ on the grid in meta.grid
+<id>/esp.bin.gz      — Float32 electrostatic potential, coarser grid
+<id>/basis.json      — Gaussian basis + MO coefficients (molden-equivalent)
 ```
 
 `meta.json`:
@@ -198,6 +200,41 @@ export const VALIDATION: ValidationRow[];
 writes them), never typed by hand. `tests/validation/references.test.ts`
 fails if any row is outside its tolerance; the Methods page (Phase 7)
 renders the same rows.
+
+### 4.5 Where the generated data lives (decided 2026-09-26)
+
+Generated molecule data is **not committed to git and not built into the
+app**. Git would keep every regenerated set (~70 MB each) in the public
+repo's history for good; the app bucket's deployment prunes anything not in
+`dist/`.
+
+- **Generate** into `tools/molecules/out/<version>/` (gitignored).
+  `<version>` is `v1`, `v2` …, one constant in `tools/molecules/version.py`
+  and `src/molecules/data_version.ts` (`MOLECULE_DATA_VERSION`), with a test
+  that they agree.
+- **Publish** with `tools/molecules/publish.py <version>` to the stack's
+  private, versioned data bucket (`MoleculeDataBucketName` output; exists
+  since 2026-09-26) under `molecules/<version>/`, served by the existing
+  CloudFront distribution at `/molecules/*`. A published version is
+  immutable: the script refuses to overwrite one, sets
+  `Cache-Control: public, max-age=31536000, immutable`, and verifies every
+  file through CloudFront after upload.
+- **Commit only what makes the data reproducible and testable:** the
+  generator and its pinned requirements; `tools/molecules/manifest/<version>.json`
+  (every file's path, bytes, SHA-256, and the PySCF version and git commit
+  that produced it); small validation summaries under
+  `src/validation/generated/`; and small test fixtures under
+  `tests/fixtures/molecules/` (reduced grids, well under 1 MB in total).
+- **The app** reads `/molecules/${MOLECULE_DATA_VERSION}/…`. The dev server
+  serves `tools/molecules/out/` when present and otherwise proxies
+  `/molecules` to CloudFront. A missing file answers 403 (the bucket allows
+  no listing), never the app's `index.html`; the loader treats any non-OK
+  response as a `MoleculeLoadError`.
+- **Order of operations:** publish a data version before deploying app code
+  that references it; `infra/deploy.sh` checks
+  `/molecules/<version>/index.json` answers 200 before deploying.
+- **Archive** each data version on Zenodo with its own DOI (owner action),
+  so research that uses a figure can cite the exact data.
 
 ## 5. Phases
 

@@ -10,6 +10,36 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-25-beyond-isolated-atoms.md` (§3, §4.1, §4.2 binding; §5 Phase 6 is the requirement).
 
+## Amendment 2026-09-26 — generated data lives in S3 (spec §4.5)
+
+**Read this before Task 1.** Generated molecule data is published to S3 as immutable versions, not committed to git or copied into the app build. Phase 5's amendment (its Task 5A) creates the tooling this phase uses: `tools/molecules/version.py` (`DATA_VERSION`, `OUT_ROOT`), `src/molecules/data_version.ts` (`MOLECULE_DATA_VERSION`), `tools/molecules/publish.py`, the committed manifest `tools/molecules/manifest/<version>.json`, the dev server's local-first/proxy setup and the deploy check. Physics, file formats and the app in this plan stand; these parts change:
+
+| Where in this plan | Was | Now |
+|---|---|---|
+| Global Constraints, "Size" | every `public/molecules/<id>/` ≤ 3,000,000 bytes | every `tools/molecules/out/<DATA_VERSION>/<id>/` ≤ 3,000,000 bytes — pytest on the output, and Phase 5's manifest test (`tests/molecules/data_version.test.ts`), whose limit this phase tightens from 3,145,728 to 3,000,000 |
+| Dependencies, `public/molecules/index.json` | a committed file | `/molecules/<DATA_VERSION>/index.json`, published |
+| **Task 1 Step 5** ("copy `public/molecules` into `dist/`") | a `closeBundle` copy plugin | **delete** — nothing ships in the build |
+| `library.py` output (Task 6 onward) | `public/molecules/<id>/`, merging `public/molecules/index.json` | `version.OUT_ROOT/<id>/`, merging `version.OUT_ROOT/index.json` |
+| **Task 7** generated files and commit | 25 molecule folders committed (~50 MB) | not committed; commit `tools/molecules/manifest/v2.json`, `tools/molecules/geometries/*.xyz`, `src/validation/molecule_rows.json` and the tests |
+| Task 7 Step 6, `tests/molecules/size_budget.test.ts` (reads `public/molecules`) | reads the directory | **delete**; the manifest test covers it |
+| `MOLECULES_BASE_URL` in `library_types.ts` | `'/molecules'` | import Phase 5's, which is `` `/molecules/${MOLECULE_DATA_VERSION}` `` (see the reconciliation note under Global Constraints) |
+| HANDOFF entry "committed data size (~50 MB in git)" | in git | "data version v2 in S3 (≈ 70 MB with the diatomics); manifest in git" |
+
+### A new data version for the library
+
+Published versions are immutable (spec §4.5), so this phase does **not** add to Phase 5's `v1`. In Task 7, before generating:
+
+1. Set `DATA_VERSION = "v2"` in `tools/molecules/version.py` and `MOLECULE_DATA_VERSION = 'v2'` in `src/molecules/data_version.ts` (Phase 5's test fails until both agree).
+2. Copy Phase 5's output into the new version unchanged: `cp -R tools/molecules/out/v1/. tools/molecules/out/v2/` (regenerate with `python tools/molecules/generate.py` only if `out/v1` is not on this machine; the manifest's SHA-256s then show whether anything changed).
+3. Generate the library into `out/v2`, which merges its entries into `out/v2/index.json`.
+4. `python tools/molecules/publish.py v2 --dry-run`, then `python tools/molecules/publish.py v2`. Expected: `published N files as v2`, with `manifest/v2.json` written.
+5. Check that the v1 and v2 entries for each diatomic have identical `sha256` values: `python - <<'PY'` with `json.load` on both manifests, comparing entries whose path starts with a Phase 5 id. Report any difference as a finding, not a failure to hide.
+6. Deploy the app only after step 4. `infra/deploy.sh` refuses otherwise.
+
+**Owner action after publishing:** archive `out/v2/` with `manifest/v2.json` on Zenodo as a new dataset version (spec §4.5).
+
+---
+
 ## Global Constraints
 
 - **Every number states its method** (§3.1): each length, angle, dipole, orbital energy and ESP value on screen carries its source in a caption (`meta.geometrySource`, `meta.method.density`).
