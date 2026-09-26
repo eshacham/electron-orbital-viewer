@@ -961,6 +961,72 @@ export interface UpdateOrbitalOptions {
     animate?: boolean;
 }
 
+/**
+ * Sizes the clip plane and caps to the sampling box before a request's
+ * mesh(es) land, and reports whether the camera needs to re-frame once they
+ * do. Shared by updateOrbitalInScene (one marching-cubes mesh) and
+ * updateFieldInScene (one or several field meshes, boxed by the largest
+ * source's own rMax) -- both key this off the *sampling box*, not the
+ * surface, because the surface is not known until the worker replies (see
+ * frameToSurface below).
+ *
+ * Re-frame only when the scale changes, so repeated updates at the same box
+ * (another mₗ of the same subshell, or another member of the same Basic
+ * Orbitals combination) leave the viewer's chosen angle and zoom alone.
+ */
+function prepareBoxFraming(context: VisualizerContext, boxRMax: number): boolean {
+    const reframe = context.framedBox !== boxRMax;
+    // The box until the mesh lands; then the surface itself (see frameToSurface).
+    context.clipExtent = boxRMax;
+    updateClipPlane(
+        context.clipPlane,
+        context.surfaceStyle.clipAxis,
+        context.surfaceStyle.clipPosition,
+        boxRMax
+    );
+    refreshCaps(context);
+    return reframe;
+}
+
+/**
+ * Re-keys the clip plane, caps, camera framing and axes onto the surface
+ * actually drawn, once it is known -- the counterpart of prepareBoxFraming
+ * above, called once the worker's mesh(es) land. The framing itself waits
+ * for the mesh: it is fitted to the surface drawn, not to the sampling box,
+ * which holds 99.99 % of the electron and is often twice the size of a 90 %
+ * contour -- that left diffuse orbitals small in the middle of the frame.
+ */
+function frameToSurface(
+    context: VisualizerContext,
+    surfaceRadius: number,
+    boxRMax: number,
+    reframe: boolean,
+    showAxes: boolean
+): void {
+    // The cut position is a fraction of the surface drawn, so the slider
+    // spans exactly the orbital (see clipExtent).
+    context.clipExtent = surfaceRadius;
+    updateClipPlane(
+        context.clipPlane,
+        context.surfaceStyle.clipAxis,
+        context.surfaceStyle.clipPosition,
+        surfaceRadius
+    );
+    refreshCaps(context);
+    if (reframe) {
+        // frameOrbital fits a box of this half-width, i.e. a sphere √3
+        // larger. The surface is the sphere, with room round it for the
+        // axes and their labels.
+        frameOrbital(context, (surfaceRadius * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3));
+        context.framedBox = boxRMax;
+    }
+    if (showAxes) {
+        addAxesHelper(context, surfaceRadius * AXES_LENGTH_FACTOR);
+    } else {
+        removeAxesHelper(context);
+    }
+}
+
 export async function updateOrbitalInScene(
     context: VisualizerContext | null,
     params: OrbitalParams,
@@ -996,23 +1062,7 @@ export async function updateOrbitalInScene(
             workerRMax = computeSamplingRadius(params.n, params.l, params.Z);
         }
 
-        // Re-frame only when the scale changes, so repeated updates at the
-        // same rMax (another mₗ of the same subshell) leave the viewer's
-        // chosen angle and zoom alone. The framing itself waits for the mesh:
-        // it is fitted to the surface drawn, not to the sampling box, which
-        // holds 99.99 % of the electron and is often twice the size of a 90 %
-        // contour -- that left diffuse orbitals small in the middle of the
-        // frame.
-        const reframe = context.framedBox !== workerRMax;
-        // The box until the mesh lands; then the surface itself (below).
-        context.clipExtent = workerRMax;
-        updateClipPlane(
-            context.clipPlane,
-            context.surfaceStyle.clipAxis,
-            context.surfaceStyle.clipPosition,
-            workerRMax
-        );
-        refreshCaps(context);
+        const reframe = prepareBoxFraming(context, workerRMax);
 
         const cleanup = () => {
             worker.terminate();
@@ -1045,28 +1095,7 @@ export async function updateOrbitalInScene(
                     const crossFadeFromShellView = Boolean(options.animate) && context.isShellView && context.currentOrbitalGroup !== null;
                     updateSceneWithMeshData(context, e.data.meshData, crossFadeFromShellView);
                     const surfaceRadius = meshRadius(e.data.meshData) || workerRMax;
-                    // The cut position is a fraction of the surface drawn,
-                    // so the slider spans exactly the orbital (see clipExtent).
-                    context.clipExtent = surfaceRadius;
-                    updateClipPlane(
-                        context.clipPlane,
-                        context.surfaceStyle.clipAxis,
-                        context.surfaceStyle.clipPosition,
-                        surfaceRadius
-                    );
-                    refreshCaps(context);
-                    if (reframe) {
-                        // frameOrbital fits a box of this half-width, i.e. a
-                        // sphere √3 larger. The surface is the sphere, with
-                        // room round it for the axes and their labels.
-                        frameOrbital(context, (surfaceRadius * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3));
-                        context.framedBox = workerRMax;
-                    }
-                    if (showAxes) {
-                        addAxesHelper(context, surfaceRadius * AXES_LENGTH_FACTOR);
-                    } else {
-                        removeAxesHelper(context);
-                    }
+                    frameToSurface(context, surfaceRadius, workerRMax, reframe, showAxes);
                     resolve({ status: 'rendered', isoLevel: e.data.meshData.isoLevel });
                 } else {
                     console.error('Visualizer: Worker error:', e.data.message);
@@ -1102,6 +1131,7 @@ export async function updateOrbitalInScene(
 
 /** Replaces whatever is on screen with an overlay of several field meshes. */
 function showFieldOverlay(context: VisualizerContext, meshes: MeshData[], colors: string[]): void {
+    if (!context || context.isDisposed) return;
     clearCurrentOrbital(context, context.scene);
     context.isShellView = false;
     context.isCompositionView = false;
@@ -1135,10 +1165,7 @@ export async function updateFieldInScene(
         const worker = createOrbitalWorker();
         context.activeWorker = worker;
 
-        const reframe = context.framedBox !== boxRMax;
-        context.clipExtent = boxRMax;
-        updateClipPlane(context.clipPlane, context.surfaceStyle.clipAxis, context.surfaceStyle.clipPosition, boxRMax);
-        refreshCaps(context);
+        const reframe = prepareBoxFraming(context, boxRMax);
 
         const cleanup = () => {
             worker.terminate();
@@ -1147,7 +1174,14 @@ export async function updateFieldInScene(
         const superseded = () => requestId !== context.requestCounter;
 
         worker.onmessage = (e: MessageEvent<FieldWorkerMessage>) => {
-            if (superseded()) {
+            // A disposed context is treated the same as a superseded request:
+            // cleanupVisualizer terminates the worker but does not bump
+            // requestCounter, so a reply already in flight when disposal
+            // happens can still arrive here with superseded() false. Without
+            // this check the multi-source path would build a new group and
+            // attach it to a scene/renderer that is already gone, and never
+            // dispose it.
+            if (superseded() || context.isDisposed) {
                 cleanup();
                 resolve({ status: 'superseded' });
                 return;
@@ -1161,15 +1195,7 @@ export async function updateFieldInScene(
                         showFieldOverlay(context, meshes, request.colors);
                     }
                     const surfaceRadius = Math.max(...meshes.map(meshRadius)) || boxRMax;
-                    context.clipExtent = surfaceRadius;
-                    updateClipPlane(context.clipPlane, context.surfaceStyle.clipAxis, context.surfaceStyle.clipPosition, surfaceRadius);
-                    refreshCaps(context);
-                    if (reframe) {
-                        frameOrbital(context, (surfaceRadius * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3));
-                        context.framedBox = boxRMax;
-                    }
-                    if (showAxes) addAxesHelper(context, surfaceRadius * AXES_LENGTH_FACTOR);
-                    else removeAxesHelper(context);
+                    frameToSurface(context, surfaceRadius, boxRMax, reframe, showAxes);
                     console.log(`Visualizer: ${request.label} drawn in ${Math.round(performance.now() - startedAt)} ms`);
                     resolve({ status: 'rendered', isoLevel: meshes[0].isoLevel });
                 } else {
@@ -1189,6 +1215,7 @@ export async function updateFieldInScene(
                 resolve({ status: 'superseded' });
                 return;
             }
+            console.error('Visualizer: Worker error:', error);
             reject(error);
         };
 

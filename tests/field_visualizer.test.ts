@@ -122,6 +122,23 @@ describe('updateFieldInScene', () => {
         await expect(pending).rejects.toThrow(/refused/);
     });
 
+    it('drops a fieldsSuccess reply that arrives after the context was disposed, without building an overlay', async () => {
+        const worker = fakeWorker();
+        (createOrbitalWorker as jest.Mock).mockReturnValue(worker);
+        const context = buildContext();
+        const pending = updateFieldInScene(context, overlay);
+        // cleanupVisualizer terminates the worker but never bumps
+        // requestCounter, so a reply already posted before it runs can still
+        // reach onmessage with superseded() false -- isDisposed is the only
+        // signal left to catch it.
+        context.isDisposed = true;
+        worker.onmessage!({ data: { type: 'fieldsSuccess', meshes: [fakeMesh(0), fakeMesh(5)] } });
+
+        expect(await pending).toEqual({ status: 'superseded' });
+        expect(context.currentOrbitalGroup).toBeNull();
+        expect(context.scene.children).toHaveLength(0);
+    });
+
     // Review Focus 5.
     it('restyles the overlay without recomputing', async () => {
         const worker = fakeWorker();
