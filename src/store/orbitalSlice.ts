@@ -88,6 +88,11 @@ const orbitalSlice = createSlice({
     },
     resetView: (state) => {
       state.viewResetNonce += 1;
+      // Reset View (and picking an element, which dispatches this too)
+      // swings the camera back to the canonical direction -- the store must
+      // say so, or it goes on reporting a stale angle for a screen that has
+      // already gone back to canonical.
+      state.cameraAngles = null;
     },
     setSurfaceStyle: (state, action: PayloadAction<Partial<SurfaceStyle>>) => {
       state.surfaceStyle = { ...state.surfaceStyle, ...action.payload };

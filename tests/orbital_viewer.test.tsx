@@ -7,7 +7,11 @@ jest.mock('../src/workers/createShellCompositionWorker', () => ({ createShellCom
 jest.mock('../src/orbital_visualizer', () => ({
     initVisualizer: jest.fn(() => ({
         requestCounter: 0,
-        controls: { addEventListener: jest.fn(), removeEventListener: jest.fn() },
+        controls: { addEventListener: jest.fn(), removeEventListener: jest.fn(), update: jest.fn(), target: {} },
+        // A truthy framedRMax and a camera stand-in: enough for the reset and
+        // restore-camera effects (below) to actually run their mocked calls.
+        framedRMax: 5,
+        camera: {},
     })),
     cleanupVisualizer: jest.fn(),
     updateOrbitalInScene: jest.fn(() => new Promise(() => {})),
@@ -24,13 +28,23 @@ jest.mock('../src/orbital_visualizer', () => ({
     clearShellCompositionLobes: jest.fn(),
     attachShellCompositionLobes: jest.fn(),
 }));
+// Only applyCameraAngles is mocked (as a spy to record call order); the rest
+// of the module -- isCanonicalAngles etc., which orbitalSlice's own reducers
+// use for real -- stays the genuine implementation.
+jest.mock('../src/camera_angles', () => ({
+    ...jest.requireActual('../src/camera_angles'),
+    applyCameraAngles: jest.fn(),
+}));
 
 import OrbitalViewer from '../src/components/OrbitalViewer';
-import orbitalReducer, { startFieldCalculation, startOrbitalCalculation, clearPicture } from '../src/store/orbitalSlice';
+import orbitalReducer, {
+    startFieldCalculation, startOrbitalCalculation, clearPicture, resetView, restoreCamera,
+} from '../src/store/orbitalSlice';
 import atomReducer, { setMode } from '../src/store/atomSlice';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
-import { updateFieldInScene, cancelPendingRender, clearScene } from '../src/orbital_visualizer';
+import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital } from '../src/orbital_visualizer';
+import { applyCameraAngles } from '../src/camera_angles';
 
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
 
@@ -70,5 +84,27 @@ describe('OrbitalViewer with nothing requested', () => {
         act(() => { store.dispatch(startOrbitalCalculation(basicOrbitalParams(2, 1, 0, 0.9))); });
         expect(clearScene).not.toHaveBeenCalled();
         expect(cancelPendingRender).not.toHaveBeenCalled();
+    });
+});
+
+// Review finding: Task 5's URL decoder batches resetView with
+// restoreCamera(angles) into one store commit (the same way picking an
+// element batches setElement with resetView today). Effects run in
+// declaration order, so whichever of frameOrbital/applyCameraAngles is
+// wired to run second is the one that wins the screen -- this pins that the
+// restore wins, not the reset.
+describe('OrbitalViewer: reset and restore in the same commit', () => {
+    it('applies the restored camera angle after the reset effect runs, not before', () => {
+        const store = renderViewer();
+        const order: string[] = [];
+        (frameOrbital as jest.Mock).mockImplementation(() => { order.push('frameOrbital'); });
+        (applyCameraAngles as jest.Mock).mockImplementation(() => { order.push('applyCameraAngles'); });
+
+        act(() => {
+            store.dispatch(resetView());
+            store.dispatch(restoreCamera({ azimuth: 70, elevation: -15 }));
+        });
+
+        expect(order).toEqual(['frameOrbital', 'applyCameraAngles']);
     });
 });

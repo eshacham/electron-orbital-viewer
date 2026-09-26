@@ -2,7 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import reducer, {
     startOrbitalCalculation, startFieldCalculation, finishOrbitalCalculation, clearPicture,
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, selectShownBasicOrbital,
-    DEFAULT_BASIC_SELECTION, cameraMoved, restoreCamera,
+    DEFAULT_BASIC_SELECTION, cameraMoved, restoreCamera, resetView,
 } from '../src/store/orbitalSlice';
 import orbitalReducer from '../src/store/orbitalSlice';
 import { setMode } from '../src/store/atomSlice';
@@ -122,5 +122,27 @@ describe('orbitalSlice: camera', () => {
         expect(store.getState().orbital).toMatchObject({ cameraAngles: { azimuth: 45, elevation: 20 }, cameraRestoreNonce: 1 });
         store.dispatch(restoreCamera(null));
         expect(store.getState().orbital).toMatchObject({ cameraAngles: null, cameraRestoreNonce: 2 });
+    });
+
+    // Review finding: Reset View (and picking an element, which dispatches
+    // it) swings the camera back to the canonical direction. The store must
+    // say so too, or it goes on reporting a stale non-canonical angle while
+    // the screen sits at canonical.
+    it('clears the camera angle on a view reset', () => {
+        const store = makeStore();
+        store.dispatch(cameraMoved({ azimuth: 120, elevation: -10 }));
+        store.dispatch(resetView());
+        expect(store.getState().orbital.cameraAngles).toBeNull();
+    });
+
+    // A restored link's resetView + restoreCamera land in the same commit
+    // (Task 5's URL decoder). Whichever the effects apply last must be the
+    // restored angle, not the reset -- this pins the reducer side of that;
+    // OrbitalViewer's effect order is pinned separately.
+    it('leaves the restored angle in place when resetView precedes restoreCamera', () => {
+        const store = makeStore();
+        store.dispatch(resetView());
+        store.dispatch(restoreCamera({ azimuth: 70, elevation: -15 }));
+        expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 70, elevation: -15 });
     });
 });

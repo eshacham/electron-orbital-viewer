@@ -140,20 +140,6 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         };
     }, [dispatch]);
 
-    // A restored link turns the camera. frameOrbital keeps the direction it
-    // finds, so this survives the framing that follows when the mesh lands.
-    const cameraRestoreNonce = useAppSelector(state => state.orbital.cameraRestoreNonce);
-    const restoredCameraAngles = useAppSelector(state => state.orbital.cameraAngles);
-    useEffect(() => {
-        const context = visualizerContextRef.current;
-        if (!context || cameraRestoreNonce === 0) return;
-        applyCameraAngles(context.camera, context.controls.target, restoredCameraAngles);
-        context.controls.update();
-        // Only a restore moves the camera; the user's own moves also change
-        // cameraAngles and must not.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cameraRestoreNonce]);
-
     // Centre the scene in the part of the canvas no panel covers (see
     // useViewInsets). The panels are siblings of the canvas host inside
     // #canvas-container, so that is what gets measured.
@@ -463,6 +449,24 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         const rMax = visualizerContextRef.current?.framedRMax;
         if (rMax) frameOrbital(visualizerContextRef.current, rMax, true);
     }, [viewResetNonce]);
+
+    // A restored link turns the camera. frameOrbital keeps the direction it
+    // finds, so this survives the framing that follows when the mesh lands.
+    // Declared after the reset effect above: a restored link's resetView and
+    // restoreCamera land in the same store commit (Task 5's URL decoder), so
+    // effects fire in declaration order -- this must run second, or the
+    // reset effect's canonical direction would overwrite the restored one.
+    const cameraRestoreNonce = useAppSelector(state => state.orbital.cameraRestoreNonce);
+    const restoredCameraAngles = useAppSelector(state => state.orbital.cameraAngles);
+    useEffect(() => {
+        const context = visualizerContextRef.current;
+        if (!context || cameraRestoreNonce === 0) return;
+        applyCameraAngles(context.camera, context.controls.target, restoredCameraAngles);
+        context.controls.update();
+        // Only a restore moves the camera; the user's own moves also change
+        // cameraAngles and must not.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cameraRestoreNonce]);
 
     // Keep the scale readout in step with the camera. OrbitControls fires on
     // every damped frame, so only re-render when the drawn bar actually changes.
