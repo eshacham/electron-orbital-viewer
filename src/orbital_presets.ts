@@ -94,6 +94,8 @@ export function computeSamplingRadius(n: number, l: number, Z: number): number {
     return Math.min(roundUpToTwoFigures(radius * 1.08), MAX_SAMPLING_RADIUS);
 }
 
+const combinationRadiusCache = new Map<number, number>();
+
 /**
  * The box for a combination of shell n's orbitals: the widest of their own
  * boxes, so no member is truncated. 21 a₀ for n = 2 (the 2s sets it), 7.6 a₀
@@ -101,8 +103,14 @@ export function computeSamplingRadius(n: number, l: number, Z: number): number {
  * never from a formula of its own (docs/HANDOFF.md).
  */
 export function combinationSamplingRadius(n: number): number {
+    // Pure in n, and asked for by every hybrid and Stark source App builds
+    // on each render (the legend, the radial plot) -- each miss is two
+    // radius searches of a few ms each, so it is worked out once per n.
+    const cached = combinationRadiusCache.get(n);
+    if (cached !== undefined) return cached;
     let radius = 0;
     for (let l = 0; l < n; l++) radius = Math.max(radius, computeSamplingRadius(n, l, BASIC_ORBITALS_Z));
+    combinationRadiusCache.set(n, radius);
     return radius;
 }
 

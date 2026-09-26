@@ -459,7 +459,11 @@ function App() {
 
     // A marching-cubes surface is coloured by the sign of ψ, unlike the shell
     // views, which colour by shell or subshell. Say so where it applies.
-    const combinationLegend = !isAtomMode && renderedField ? overlayLegend(combination) : null;
+    // Both build the combination's sources (and the plot samples three radial
+    // curves), so they follow the selection rather than every render.
+    const selectionLegend = useMemo(() => overlayLegend(combination), [combination]);
+    const selectionPlot = useMemo(() => combinationCurves(combination), [combination]);
+    const combinationLegend = !isAtomMode && renderedField ? selectionLegend : null;
     const showPhaseLegend = (!isAtomMode || atomLevel === 'orbital') && !combinationLegend;
 
     // The drill-down's next step. On a desktop it lives in the navigation
@@ -518,7 +522,7 @@ function App() {
         if (!isAtomMode) {
             // A combination's plot is its ingredients and the result (see
             // combinationCurves): the weighted sum is its exact radial distribution.
-            const combinationPlot = renderedField ? combinationCurves(combination) : null;
+            const combinationPlot = renderedField ? selectionPlot : null;
             if (combinationPlot) {
                 return (
                     <RadialPlot

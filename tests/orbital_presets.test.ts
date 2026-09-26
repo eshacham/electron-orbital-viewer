@@ -116,3 +116,26 @@ describe('enclosed fraction drives the surface', () => {
         }
     });
 });
+
+// Final review: every hybrid and Stark source asks for this box, and App's
+// legend and radial plot build those sources on every render -- two
+// radiusContaining searches (~3 ms each) per source, per render. It depends
+// on n alone, so it is worked out once per n.
+describe('combinationSamplingRadius', () => {
+    it('is worked out once per n', () => {
+        jest.isolateModules(() => {
+            const actual = jest.requireActual('../src/radial_distribution');
+            const radiusContaining = jest.fn(actual.radiusContaining);
+            jest.doMock('../src/radial_distribution', () => ({ ...actual, radiusContaining }));
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const presets = require('../src/orbital_presets') as typeof import('../src/orbital_presets');
+
+            const first = presets.combinationSamplingRadius(2);
+            const callsForOne = radiusContaining.mock.calls.length;
+            expect(callsForOne).toBe(2);
+            for (let i = 0; i < 5; i++) expect(presets.combinationSamplingRadius(2)).toBe(first);
+            expect(radiusContaining).toHaveBeenCalledTimes(callsForOne);
+            expect(first).toBe(presets.computeSamplingRadius(2, 0, presets.BASIC_ORBITALS_Z));
+        });
+    });
+});
