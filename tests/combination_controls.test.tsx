@@ -76,6 +76,15 @@ describe('CombinationControls', () => {
         expect(screen.getByRole('slider', { name: /field f/i })).toHaveAttribute('max', '0.0039');
     });
 
+    // Final review: the validity statement belongs on the field view at both
+    // levels; only the 0.05 a.u. refusal is n = 1's alone.
+    it('states the validity at n = 2 too, without n = 1\'s refusal threshold', () => {
+        renderWith(fieldAt(2, 0.002));
+        const caption = screen.getByText(/F ≪ 1 a\.u\.; ionisation by tunnelling is ignored/);
+        expect(caption).toHaveTextContent(/not bound/);
+        expect(caption).not.toHaveTextContent(/0\.05 a\.u\./);
+    });
+
     it('brings the field down into range when switching to n = 2', () => {
         const onChange = renderWith(fieldAt(1, 0.03));
         fireEvent.click(screen.getByRole('button', { name: /first excited level/i }));

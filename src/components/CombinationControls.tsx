@@ -16,10 +16,12 @@ import {
 
 export const HYBRID_CAPTION =
   "A basis choice for one atom — hybrids describe bonding directions, not a free atom's ground state.";
+/** Both levels' validity statement; the refusal threshold that follows it is each level's own. */
+const FIELD_VALIDITY = 'Valid for F ≪ 1 a.u.; ionisation by tunnelling is ignored.';
 export const FIELD_CAPTION =
-  'Valid for F ≪ 1 a.u.; ionisation by tunnelling is ignored. Fields above 0.05 a.u. are refused (the n = 1 electron goes over the barrier at 0.0625 a.u.).';
+  `${FIELD_VALIDITY} Fields above 0.05 a.u. are refused (the n = 1 electron goes over the barrier at 0.0625 a.u.).`;
 const N2_FIELD_CAPTION =
-  `Above ${N2_MAX_FIELD_AU} a.u. an n = 2 electron is not bound: the field lowers the barrier below its energy (F = E²/4, E = −1/8 Ha), so stronger fields are refused here. First-order (degenerate) perturbation theory: the field picks these two combinations out of the four n = 2 states. They are the sp hybrid shapes, and they do not change with F; only their energies do.`;
+  `${FIELD_VALIDITY} Above ${N2_MAX_FIELD_AU} a.u. an n = 2 electron is not bound: the field lowers the barrier below its energy (F = E²/4, E = −1/8 Ha), so stronger fields are refused here. First-order (degenerate) perturbation theory: the field picks these two combinations out of the four n = 2 states. They are the sp hybrid shapes, and they do not change with F; only their energies do.`;
 
 type Choice = 'none' | HybridKind | 'field';
 
