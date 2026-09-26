@@ -1,5 +1,6 @@
 import { radiusContaining } from './radial_distribution';
 import { HydrogenicRecipe } from './field_source';
+import { OrbitalParams } from './types/orbital';
 
 /**
  * The share of the electron the surface encloses by default.
@@ -103,4 +104,22 @@ export function combinationSamplingRadius(n: number): number {
     let radius = 0;
     for (let l = 0; l < n; l++) radius = Math.max(radius, computeSamplingRadius(n, l, BASIC_ORBITALS_Z));
     return radius;
+}
+
+/**
+ * Grid for an overlay of several combinations at once (all four sp³
+ * hybrids): each member is a full mesh, and the composition view already
+ * trades resolution for count the same way (compositeResolutionFor). 96³
+ * keeps an sp³ overlay inside the 1.5 s budget (spec §3.7).
+ */
+export const OVERLAY_RESOLUTION = 96;
+
+/** The Basic Orbitals render of one orbital. */
+export function basicOrbitalParams(n: number, l: number, ml: number, enclosedFraction: number): OrbitalParams {
+    return {
+        n, l, ml, Z: BASIC_ORBITALS_Z,
+        resolution: ORBITAL_RESOLUTION,
+        rMax: computeSamplingRadius(n, l, BASIC_ORBITALS_Z),
+        enclosedFraction,
+    };
 }
