@@ -26,6 +26,8 @@ import {
     setCompositionLobesOpacity,
     disposeCompositionLobes
 } from './atom/shell_composition_view';
+import { FieldRenderRequest } from './field_source';
+import { createFieldOverlayGroup } from './field_overlay_view';
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -214,6 +216,13 @@ interface WorkerErrorMessage {
 }
 
 type WorkerMessage = WorkerSuccessMessage | WorkerErrorMessage;
+
+interface WorkerFieldsSuccessMessage {
+    type: 'fieldsSuccess';
+    meshes: MeshData[];
+}
+
+type FieldWorkerMessage = WorkerFieldsSuccessMessage | WorkerErrorMessage;
 
 /**
  * The default camera position, a three-quarter view rather than one straight
@@ -1034,7 +1043,7 @@ export async function updateOrbitalInScene(
                     // whichever view is *still* showing right now that this
                     // needs to fade from.
                     const crossFadeFromShellView = Boolean(options.animate) && context.isShellView && context.currentOrbitalGroup !== null;
-                    updateSceneWithMeshData(context, e.data.meshData, params, crossFadeFromShellView);
+                    updateSceneWithMeshData(context, e.data.meshData, crossFadeFromShellView);
                     const surfaceRadius = meshRadius(e.data.meshData) || workerRMax;
                     // The cut position is a fraction of the surface drawn,
                     // so the slider spans exactly the orbital (see clipExtent).
@@ -1088,6 +1097,102 @@ export async function updateOrbitalInScene(
             // but use the sanitized/defaulted rMax and isoLevel
             params: { ...params, rMax: workerRMax, enclosedFraction: workerFraction }
         });
+    });
+}
+
+/** Replaces whatever is on screen with an overlay of several field meshes. */
+function showFieldOverlay(context: VisualizerContext, meshes: MeshData[], colors: string[]): void {
+    clearCurrentOrbital(context, context.scene);
+    context.isShellView = false;
+    context.isCompositionView = false;
+    const group = createFieldOverlayGroup(meshes, colors, context.surfaceStyle, context.clippingPlanes);
+    context.scene.add(group);
+    context.currentOrbitalGroup = group;
+    context.currentCaps = null;
+}
+
+/**
+ * Draws a Basic Orbitals combination (spec §5 Phase 1): one source exactly as
+ * an orbital (phase colours, capped cut face), several as a merged overlay.
+ * The same worker, request counter and framing discipline as
+ * updateOrbitalInScene -- only the newest request may own the scene.
+ */
+export async function updateFieldInScene(
+    context: VisualizerContext | null,
+    request: FieldRenderRequest,
+    showAxes: boolean = true
+): Promise<RenderOutcome> {
+    if (!context) return { status: 'superseded' };
+
+    context.activeWorker?.terminate();
+    const requestId = ++context.requestCounter;
+    cancelTransition(context);
+    const startedAt = performance.now();
+
+    const boxRMax = Math.max(...request.sources.map(source => source.rMax));
+
+    return new Promise((resolve, reject) => {
+        const worker = createOrbitalWorker();
+        context.activeWorker = worker;
+
+        const reframe = context.framedBox !== boxRMax;
+        context.clipExtent = boxRMax;
+        updateClipPlane(context.clipPlane, context.surfaceStyle.clipAxis, context.surfaceStyle.clipPosition, boxRMax);
+        refreshCaps(context);
+
+        const cleanup = () => {
+            worker.terminate();
+            if (context.activeWorker === worker) context.activeWorker = null;
+        };
+        const superseded = () => requestId !== context.requestCounter;
+
+        worker.onmessage = (e: MessageEvent<FieldWorkerMessage>) => {
+            if (superseded()) {
+                cleanup();
+                resolve({ status: 'superseded' });
+                return;
+            }
+            try {
+                if (e.data.type === 'fieldsSuccess') {
+                    const meshes = e.data.meshes;
+                    if (meshes.length === 1) {
+                        updateSceneWithMeshData(context, meshes[0]);
+                    } else {
+                        showFieldOverlay(context, meshes, request.colors);
+                    }
+                    const surfaceRadius = Math.max(...meshes.map(meshRadius)) || boxRMax;
+                    context.clipExtent = surfaceRadius;
+                    updateClipPlane(context.clipPlane, context.surfaceStyle.clipAxis, context.surfaceStyle.clipPosition, surfaceRadius);
+                    refreshCaps(context);
+                    if (reframe) {
+                        frameOrbital(context, (surfaceRadius * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3));
+                        context.framedBox = boxRMax;
+                    }
+                    if (showAxes) addAxesHelper(context, surfaceRadius * AXES_LENGTH_FACTOR);
+                    else removeAxesHelper(context);
+                    console.log(`Visualizer: ${request.label} drawn in ${Math.round(performance.now() - startedAt)} ms`);
+                    resolve({ status: 'rendered', isoLevel: meshes[0].isoLevel });
+                } else {
+                    reject(new Error(e.data.message));
+                }
+            } catch (error) {
+                console.error('Visualizer: Error drawing field meshes:', error);
+                reject(error);
+            } finally {
+                cleanup();
+            }
+        };
+
+        worker.onerror = (error) => {
+            cleanup();
+            if (superseded()) {
+                resolve({ status: 'superseded' });
+                return;
+            }
+            reject(error);
+        };
+
+        worker.postMessage({ type: 'calculateFields', request });
     });
 }
 
@@ -1499,7 +1604,6 @@ function startAnimationLoop(context: VisualizerContext) {
 function updateSceneWithMeshData(
     context: VisualizerContext,
     meshData: MeshData,
-    params: OrbitalParams,
     crossFadeFromShellView: boolean = false
 ) {
     if (!context || context.isDisposed) {
