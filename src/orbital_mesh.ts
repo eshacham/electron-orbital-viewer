@@ -3,8 +3,9 @@ import { marchingCubes } from './marching_cubes';
 import { isoLevelForEnclosedFraction } from './radial_distribution';
 import {
     AnalyticFieldSource, FieldEvaluator, FieldSource, GridFieldSource,
-    hydrogenicSource, makeFieldEvaluator,
+    hydrogenicSource, makeFieldEvaluator, FieldRenderRequest,
 } from './field_source';
+import { makeWaveFunctionEvaluator } from './quantum_functions';
 
 /**
  * The density that anchors the top of the log-scale climb below (see
@@ -263,4 +264,50 @@ export function generateFieldMesh(source: FieldSource, resolution: number, enclo
 /** One orbital's isosurface; unchanged behaviour, now a field source like any other. */
 export function generateOrbitalMesh(params: OrbitalParams): MeshData {
     return generateFieldMesh(hydrogenicSource(params), params.resolution, params.enclosedFraction);
+}
+
+/**
+ * Every mesh of one render, in order. An overlay of hybrids is four
+ * combinations of the same four orbitals, so each distinct hydrogenic term is
+ * sampled once and every member is formed from those samples: evaluating each
+ * combination point by point costs four times the exponentials, which put an
+ * sp³ overlay at ~2.5 s against the 1.5 s budget (spec §3.7). Anything that is
+ * not a plain analytic combination -- an SCF radial function, a polarised 1s
+ * -- is drawn by generateFieldMesh as usual.
+ */
+export function generateFieldMeshes(request: FieldRenderRequest): MeshData[] {
+    const { sources, resolution, enclosedFraction } = request;
+    if (sources.length === 0) throw new Error('Nothing to draw: the request has no field sources');
+    const basis = new Map<string, Float32Array>();
+
+    return sources.map(source => {
+        const recipe = source.recipe;
+        if (recipe.type !== 'combination' || recipe.terms.some(term => term.orbital.radialSamples)) {
+            return generateFieldMesh(source, resolution, enclosedFraction);
+        }
+        checkBox(resolution, source.rMax);
+        checkFraction(enclosedFraction);
+        // Built first: it validates the terms, and it colours the vertices.
+        const evaluate = makeFieldEvaluator(recipe);
+
+        const combined = new Float64Array((resolution + 1) ** 3);
+        for (const term of recipe.terms) {
+            const { n, l, ml, Z } = term.orbital;
+            const key = `${source.rMax}|${n},${l},${ml},${Z}`;
+            let values = basis.get(key);
+            if (!values) {
+                values = sampleEvaluator(makeWaveFunctionEvaluator(n, l, ml, Z), source.rMax, resolution).samples;
+                basis.set(key, values);
+            }
+            for (let i = 0; i < combined.length; i++) combined[i] += term.coefficient * values[i];
+        }
+
+        const field: SampledField = {
+            samples: Float32Array.from(combined),
+            side: resolution + 1,
+            step: (2 * source.rMax) / resolution,
+            origin: -source.rMax,
+        };
+        return meshFromSamples(field, enclosedFraction, evaluate);
+    });
 }
