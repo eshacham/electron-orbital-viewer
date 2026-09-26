@@ -38,6 +38,8 @@ export const N2_MAX_FIELD_AU = Math.floor(overTheBarrierField(1 / 8) * 1e4) / 1e
 
 export function starkFieldProblem(field: number): string | null {
     if (Number.isFinite(field) && field >= 0 && field <= N2_MAX_FIELD_AU) return null;
+    // Only a real, positive field can free the electron; anything else is simply out of range.
+    if (!(field > 0) || !Number.isFinite(field)) return `A field of ${field} a.u. is refused at n = 2: the field must be between 0 and ${N2_MAX_FIELD_AU} a.u.`;
     return `A field of ${field} a.u. is refused at n = 2: an n = 2 electron is not bound above about ${N2_MAX_FIELD_AU} a.u. (the field lowers the barrier below its energy, F = E²/4 with E = −1/8 Ha).`;
 }
 

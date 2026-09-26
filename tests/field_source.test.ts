@@ -52,6 +52,17 @@ describe('makeFieldEvaluator', () => {
         expect(() => makeFieldEvaluator({ type: 'polarized1s', field })).toThrow(/refused/);
     });
 
+    // Final review: a negative or non-finite field (reachable once Phase 2
+    // decodes URLs) is not "too strong"; saying it ionises the atom is wrong.
+    it.each([-0.001, Number.NaN, Number.POSITIVE_INFINITY])('says a field of %p a.u. is out of range, not that it ionises', field => {
+        expect(fieldProblem(field)).toMatch(/must be between 0 and 0\.05 a\.u\./);
+        expect(fieldProblem(field)).not.toMatch(/ionise/);
+    });
+
+    it('keeps the ionisation reason for a field that is too strong', () => {
+        expect(fieldProblem(0.2)).toMatch(/stronger fields ionise the atom/);
+    });
+
     it('accepts the whole slider range', () => {
         expect(fieldProblem(0)).toBeNull();
         expect(fieldProblem(MAX_FIELD_AU)).toBeNull();

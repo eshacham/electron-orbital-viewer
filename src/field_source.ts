@@ -91,6 +91,8 @@ export const MAX_FIELD_AU = 0.05;
 /** Why a field cannot be drawn, or null if it can. */
 export function fieldProblem(field: number): string | null {
     if (Number.isFinite(field) && field >= 0 && field <= MAX_FIELD_AU) return null;
+    // Only a real, positive field can be too strong; anything else is simply out of range.
+    if (!(field > 0) || !Number.isFinite(field)) return `A field of ${field} a.u. is refused: the field must be between 0 and ${MAX_FIELD_AU} a.u.`;
     return `A field of ${field} a.u. is refused: first-order perturbation theory is drawn only from 0 to ${MAX_FIELD_AU} a.u., and stronger fields ionise the atom.`;
 }
 

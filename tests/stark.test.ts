@@ -82,7 +82,13 @@ describe('n = 2 Stark states', () => {
         expect(N2_MAX_FIELD_AU).toBeLessThanOrEqual(1 / 256);
         expect(starkFieldProblem(N2_MAX_FIELD_AU)).toBeNull();
         expect(starkFieldProblem(0.01)).toMatch(/not bound/);
-        expect(starkFieldProblem(-1)).toMatch(/not bound/);
+    });
+
+    // Final review: a negative or non-finite field is out of range, not strong
+    // enough to free the electron.
+    it.each([-1, Number.NaN, Number.NEGATIVE_INFINITY])('says a field of %p a.u. is out of range at n = 2, not unbound', field => {
+        expect(starkFieldProblem(field)).toMatch(/refused at n = 2: the field must be between 0 and 0\.0039 a\.u\./);
+        expect(starkFieldProblem(field)).not.toMatch(/not bound/);
     });
 });
 
