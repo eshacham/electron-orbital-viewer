@@ -17,7 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 import { OrbitalParams, RenderMode, ClipAxis, SurfaceStyle } from '@/types/orbital';
-import { computeSamplingRadius, ENCLOSED_FRACTIONS, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION } from '../orbital_presets';
+import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../orbital_presets';
 import { ELEMENTS, elementLabel } from '../elements';
 import { orbitalName } from '../orbital_names';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
@@ -186,16 +186,7 @@ const Controls: React.FC<ControlsProps> = ({
   }, [hasDrillDownPanel, compact, open]);
 
   const handleUpdateOrbital = () => {
-    const params: OrbitalParams = {
-      n: initialN,
-      l: initialL,
-      ml: initialMl,
-      Z: BASIC_ORBITALS_Z,
-      resolution: ORBITAL_RESOLUTION,
-      // Derived, not chosen: the box that holds this orbital.
-      rMax: computeSamplingRadius(initialN, initialL, BASIC_ORBITALS_Z),
-      enclosedFraction: initialEnclosedFraction,
-    };
+    const params: OrbitalParams = basicOrbitalParams(initialN, initialL, initialMl, initialEnclosedFraction);
     console.log("Update Orbital Clicked with params:", params);
       onUpdateOrbital(params);
   };

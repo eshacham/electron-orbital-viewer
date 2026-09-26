@@ -16,7 +16,10 @@ import {
     dismissOrbitalError,
     resetView,
     setSurfaceStyle,
-    clearPicture
+    clearPicture,
+    setBasicSelection,
+    setEnclosedFraction,
+    setCombination
 } from './store/orbitalSlice';
 import {
     setMode,
@@ -42,8 +45,8 @@ import PeriodicTable from './components/PeriodicTable';
 import ElementPickerDialog from './components/ElementPickerDialog';
 import { elementFor } from './elements';
 import { orbitalName } from './orbital_names';
-import { CombinationSelection, NO_COMBINATION, fieldRequestFor, combinationCurves, overlayLegend, samePicture } from './combinations';
-import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
+import { CombinationSelection, fieldRequestFor, combinationCurves, overlayLegend, samePicture } from './combinations';
+import { basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT } from './useMediaQuery';
@@ -59,9 +62,6 @@ const PHONE_PLOT_WIDTH = 300;
 
 /** How long a render has to take before the viewer is told it is working. */
 const BUSY_INDICATOR_DELAY_MS = 400;
-
-const defaultN = 3;
-const defaultL = 2;
 
 /** r_j = rMin * e^(j*dx), j = 0..size-1 -- the shared log grid every atom-profile curve is sampled on (see atomWorker.ts). */
 function gridRadii(rMin: number, dx: number, size: number): number[] {
@@ -89,19 +89,22 @@ function App() {
     const atomHoverRadius = useAppSelector(state => state.atom.hoverRadius);
     const isAtomMode = atomMode === 'atom';
 
-    // Keep individual control values as local state
-    const [n, setN] = useState<number>(defaultN);
-    const [l, setL] = useState<number>(defaultL);
-    const [ml, setMl] = useState<number>(0);
-    const [enclosedFraction, setEnclosedFraction] = useState<number>(DEFAULT_ENCLOSED_FRACTION);
-
-    // Basic Orbitals' combination (hybrids, a field). Local like n/l/mₗ, but
-    // reactive: each choice is complete, so it renders without an Update step.
-    const [combination, setCombination] = useState<CombinationSelection>(NO_COMBINATION);
+    // Basic Orbitals' view state -- n/l/mₗ, the enclosed fraction, and Phase
+    // 1's combination -- lives in the store, not in App: a shared link's URL
+    // decoder can only dispatch, and cannot reach into a component's local
+    // state to restore it.
+    const { n, l, ml } = useAppSelector(state => state.orbital.basicSelection);
+    const enclosedFraction = useAppSelector(state => state.orbital.enclosedFraction);
+    const combination = useAppSelector(state => state.orbital.combination);
+    const basicRenderNonce = useAppSelector(state => state.orbital.basicRenderNonce);
+    // Stable, because Controls' n/l effects list these callbacks as dependencies.
+    const setN = useCallback((value: number) => dispatch(setBasicSelection({ n: value })), [dispatch]);
+    const setL = useCallback((value: number) => dispatch(setBasicSelection({ l: value })), [dispatch]);
+    const setMl = useCallback((value: number) => dispatch(setBasicSelection({ ml: value })), [dispatch]);
+    const handleEnclosedFractionChange = useCallback((value: number) => dispatch(setEnclosedFraction(value)), [dispatch]);
+    const handleCombinationChange = useCallback((value: CombinationSelection) => dispatch(setCombination(value)), [dispatch]);
     const renderedField = useAppSelector(state => state.orbital.currentField);
     const renderFailed = useAppSelector(state => state.orbital.renderFailed);
-
-    const isInitializedRef = useRef(false);
 
     // Ruling R28: the only thing that starts a solve is a Z change (or an
     // enclosedFraction change, which re-slices an already-memoised solution
@@ -213,37 +216,6 @@ function App() {
     const showBusy = useDelayedFlag(isLoading, BUSY_INDICATOR_DELAY_MS);
     const showAtomBusy = useDelayedFlag(atomIsSolving, BUSY_INDICATOR_DELAY_MS);
 
-    // Initial render - only run once. Only seeds hydrogen-like mode's own
-    // default orbital when that is the mode actually on screen (spec
-    // bugfix): this used to fire unconditionally, which on a cold load into
-    // atom mode (the app's default) raced atom mode's own SCF solve and
-    // shell view -- both land in the same scene via orbital_visualizer.ts,
-    // and whichever finished second silently overwrote the other's mesh.
-    // Atom mode seeds its own initial view through useAtomSolver above; if
-    // the app ever starts in hydrogen-like mode instead, that case is
-    // covered here.
-    useEffect(() => {
-        if (!isInitializedRef.current) {
-            isInitializedRef.current = true;
-            if (isAtomMode) return;
-            console.log("App.tsx: Triggering initial orbital render.");
-            const initialParams = {
-                n: defaultN,
-                l: defaultL,
-                ml: 0,
-                Z: BASIC_ORBITALS_Z,
-                resolution: ORBITAL_RESOLUTION,
-                rMax: computeSamplingRadius(defaultN, defaultL, BASIC_ORBITALS_Z),
-                enclosedFraction: DEFAULT_ENCLOSED_FRACTION,
-            };
-            handleOrbitalParamsChange(initialParams);
-        }
-        // Only the initial mount should ever run this -- isInitializedRef
-        // guards that -- so isAtomMode is deliberately read without being a
-        // dependency, exactly like the mode-switch effect below.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [handleOrbitalParamsChange]);
-
     // Levels 1-2's shell view only draws anything on its cut face (see
     // shell_view.ts / updateAtomViewInScene) -- with the shared surface
     // style's out-of-the-box default of no cut, the very first thing atom
@@ -259,29 +231,17 @@ function App() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Switching *out* of atom mode must show hydrogen-like mode's own
-    // current controls, never whatever atom mode's level 3 last dispatched
-    // into the shared orbital slice (spec bugfix). Both modes' marching-cubes
-    // renders read the same `orbital.currentParams`, and Controls.tsx's
-    // "Update Orbital" button is deliberately not auto-fired on every
-    // n/l/ml/Z edit -- but a mode switch has no such button to remind the
-    // user of, so without this, switching to hydrogen-like mode kept
-    // whatever tiny rMax an atom-mode orbital (e.g. argon's 2p, ~1.7 a0) had
-    // last set, instead of resetting to computeSamplingRadius(n, l, Z) for
-    // the panel's own current selection -- at that scale a hydrogen 3d's
-    // sampling box holds only its innermost, near-featureless tail, which is
-    // exactly why it rendered as a blob instead of a lobed shape.
+    // Basic Orbitals draws its plain orbital here and nowhere else: on the
+    // switch into the mode (setMode bumps the nonce) and when a restored link
+    // asks (requestBasicRender). One effect, run after every dispatch of the
+    // batch has landed, so a link's selection and combination are both in
+    // place before anything is drawn. A combination draws through Phase 1's
+    // own effect below instead.
     useEffect(() => {
-        if (isAtomMode || combination.kind !== 'none') return;
+        if (basicRenderNonce === 0 || isAtomMode || combination.kind !== 'none') return;
         dispatch(startOrbitalCalculation(basicOrbitalParams(n, l, ml, enclosedFraction)));
-        // Only the mode transition itself should trigger this -- n/l/ml/Z/
-        // enclosedFraction changes while already in Basic Orbitals
-        // mode still go through Controls.tsx's "Update Orbital" button,
-        // exactly as before. combination is read, not watched, like the
-        // rest; the effect below redraws a combination on the same mode
-        // change.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAtomMode]);
+    }, [basicRenderNonce]);
 
     // A combination draws as soon as it is chosen, and again when the
     // enclosed fraction changes. Going back to None redraws the n/l/mₗ still in
@@ -519,9 +479,9 @@ function App() {
             initialMl={ml}
             onMlChange={setMl}
             initialEnclosedFraction={enclosedFraction}
-            onEnclosedFractionChange={setEnclosedFraction}
+            onEnclosedFractionChange={handleEnclosedFractionChange}
             combination={combination}
-            onCombinationChange={setCombination}
+            onCombinationChange={handleCombinationChange}
             isoLevel={isoLevel}
             onUpdateOrbital={handleOrbitalParamsChange}
             onResetView={handleResetView}

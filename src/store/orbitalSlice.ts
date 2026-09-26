@@ -2,6 +2,12 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from '../types/orbital';
 import { FieldRenderRequest } from '../field_source';
 import { setMode } from './atomSlice';
+import { BASIC_ORBITALS_Z, DEFAULT_ENCLOSED_FRACTION } from '../orbital_presets';
+import { CombinationSelection, NO_COMBINATION } from '../combinations';
+import type { RootState } from './index';
+
+export interface BasicSelection { n: number; l: number; ml: number; }
+export const DEFAULT_BASIC_SELECTION: BasicSelection = { n: 3, l: 2, ml: 0 };
 
 interface OrbitalState {
   currentParams: OrbitalParams | null;
@@ -24,6 +30,14 @@ interface OrbitalState {
   surfaceStyle: SurfaceStyle;
   /** The contour the last render settled on, derived from the enclosed fraction. */
   isoLevel: number | null;
+  /** Basic Orbitals' panel choice. In the store, not App, because a shared link restores it. */
+  basicSelection: BasicSelection;
+  /** The contour's enclosed share, for both modes. */
+  enclosedFraction: number;
+  /** Phase 1's combination picker. */
+  combination: CombinationSelection;
+  /** Bumped to ask App for a Basic Orbitals render once every pending dispatch has landed. */
+  basicRenderNonce: number;
 }
 
 const initialState: OrbitalState = {
@@ -34,7 +48,11 @@ const initialState: OrbitalState = {
   renderFailed: false,
   viewResetNonce: 0,
   surfaceStyle: { ...defaultSurfaceStyle },
-  isoLevel: null
+  isoLevel: null,
+  basicSelection: { ...DEFAULT_BASIC_SELECTION },
+  enclosedFraction: DEFAULT_ENCLOSED_FRACTION,
+  combination: NO_COMBINATION,
+  basicRenderNonce: 0
 };
 
 const orbitalSlice = createSlice({
@@ -86,14 +104,29 @@ const orbitalSlice = createSlice({
       state.error = null;
       state.renderFailed = false;
       state.isoLevel = null;
+    },
+    setBasicSelection: (state, action: PayloadAction<Partial<BasicSelection>>) => {
+      state.basicSelection = { ...state.basicSelection, ...action.payload };
+    },
+    setEnclosedFraction: (state, action: PayloadAction<number>) => {
+      state.enclosedFraction = action.payload;
+    },
+    setCombination: (state, action: PayloadAction<CombinationSelection>) => {
+      state.combination = action.payload;
+    },
+    requestBasicRender: (state) => {
+      state.basicRenderNonce += 1;
     }
   },
   // Combinations belong to Basic Orbitals. Leaving for atom mode drops the
   // request, so no effect can redraw a hybrid over an atom, and the viewer
-  // stops the worker still computing one (OrbitalViewer); coming back
-  // re-requests it from App's own selection.
+  // stops the worker still computing one (OrbitalViewer); coming back bumps
+  // basicRenderNonce, so App re-renders whatever the store's own selection
+  // and combination currently hold -- the selection now lives here, not in
+  // App's local state, so there is nothing left for App to "re-request" from.
   extraReducers: builder => {
     builder.addCase(setMode, (state, action) => {
+      if (action.payload === 'hydrogenic') state.basicRenderNonce += 1;
       if (action.payload !== 'atom' || !state.currentField) return;
       state.currentField = null;
       state.isLoading = false;
@@ -109,6 +142,25 @@ export const {
   resetView,
   setSurfaceStyle,
   startFieldCalculation,
-  clearPicture
+  clearPicture,
+  setBasicSelection,
+  setEnclosedFraction,
+  setCombination,
+  requestBasicRender
 } = orbitalSlice.actions;
+
+/**
+ * The Basic Orbitals orbital a link or a caption should name: the one drawn,
+ * which can differ from the panel until Update Orbital is pressed. An orbital
+ * with a numerical radial factor, or another Z, is atom mode's level 3 and
+ * does not count.
+ */
+export function selectShownBasicOrbital(state: RootState): BasicSelection {
+  const drawn = state.orbital.currentParams;
+  if (drawn && !drawn.radialSamples && drawn.Z === BASIC_ORBITALS_Z) {
+    return { n: drawn.n, l: drawn.l, ml: drawn.ml };
+  }
+  return state.orbital.basicSelection;
+}
+
 export default orbitalSlice.reducer;

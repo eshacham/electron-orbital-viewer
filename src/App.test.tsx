@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
 import atomReducer, { AtomState, drillToOrbital, drillToShell } from './store/atomSlice';
-import { setSurfaceStyle } from './store/orbitalSlice';
+import { setSurfaceStyle, setBasicSelection } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
 import { computeSamplingRadius } from './orbital_presets';
@@ -466,5 +466,12 @@ describe('App', () => {
                 .toEqual(['hybrid:sp2:0', 'hybrid:sp2:1', 'hybrid:sp2:2']);
             expect(store.getState().orbital.currentParams).toBeNull();
         });
+    });
+
+    it('switching to Basic Orbitals draws the selection held in the store', () => {
+        const { store } = renderWithProvider(<App />);
+        act(() => { store.dispatch(setBasicSelection({ n: 2, l: 1, ml: 1 })); });
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
     });
 });
