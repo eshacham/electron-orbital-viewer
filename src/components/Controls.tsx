@@ -21,6 +21,8 @@ import { computeSamplingRadius, ENCLOSED_FRACTIONS, BASIC_ORBITALS_Z, ORBITAL_RE
 import { ELEMENTS, elementLabel } from '../elements';
 import { orbitalName } from '../orbital_names';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
+import CombinationControls from './CombinationControls';
+import { CombinationSelection, NO_COMBINATION, combinationTitle } from '../combinations';
 
 interface ControlsProps {
   /**
@@ -57,6 +59,9 @@ interface ControlsProps {
   onLChange: (value: number) => void;
   initialMl: number;
   onMlChange: (value: number) => void;
+  /** Basic Orbitals' hybrid / electric-field choice (spec §5 Phase 1). Defaults to none, which is exactly the old panel. */
+  combination?: CombinationSelection;
+  onCombinationChange?: (selection: CombinationSelection) => void;
   initialEnclosedFraction: number;
   onEnclosedFractionChange: (value: number) => void;
   /** The density contour the last render actually used, or null before one. */
@@ -109,6 +114,7 @@ const Controls: React.FC<ControlsProps> = ({
   initialN, onNChange,
   initialL, onLChange,
   initialMl, onMlChange,
+  combination = NO_COMBINATION, onCombinationChange,
   initialEnclosedFraction, onEnclosedFractionChange,
   isoLevel,
   onUpdateOrbital,
@@ -134,6 +140,10 @@ const Controls: React.FC<ControlsProps> = ({
   const isMeshLevel = !isAtomMode || atomLevel === 'orbital';
   // The whole-atom view draws only its slice: no lobes, no surface.
   const isSliceOnlyView = isAtomMode && atomLevel === 'atom';
+  // A combination (hybrid set or field) replaces the single n/l/mₗ orbital
+  // entirely -- the selects stay visible but frozen, so the way back to a
+  // single orbital is obvious rather than a control that vanished.
+  const combinationActive = combination.kind !== 'none';
   // Local state for dropdown options, derived from props
   const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
   const [mlOptions, setMlOptions] = useState<number[]>([-2, -1, 0, 1, 2]);
@@ -225,7 +235,7 @@ const Controls: React.FC<ControlsProps> = ({
       {!isAtomMode && (
         <>
           <Typography id="orbital-name" variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
-            {orbitalName(initialN, initialL, initialMl)}
+            {combinationActive ? combinationTitle(combination) : orbitalName(initialN, initialL, initialMl)}
           </Typography>
 
           <FormControl fullWidth margin="normal" size="small" >
@@ -236,6 +246,7 @@ const Controls: React.FC<ControlsProps> = ({
               value={initialN.toString()} // Select value must be a string if items are strings
               label="Principal (n)"
               onChange={(e: SelectChangeEvent<string>) => onNChange(parseInt(e.target.value, 10))}
+              disabled={combinationActive}
             >
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
             </Select>
@@ -249,7 +260,7 @@ const Controls: React.FC<ControlsProps> = ({
               value={initialL.toString()}
               label="Angular (l)"
               onChange={(e: SelectChangeEvent<string>) => onLChange(parseInt(e.target.value, 10))}
-              disabled={lOptions.length === 0}
+              disabled={combinationActive || lOptions.length === 0}
             >
               {lOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
             </Select>
@@ -263,11 +274,15 @@ const Controls: React.FC<ControlsProps> = ({
               value={initialMl.toString()}
               label="Magnetic (m_l)"
               onChange={(e: SelectChangeEvent<string>) => onMlChange(parseInt(e.target.value, 10))}
-              disabled={mlOptions.length === 0}
+              disabled={combinationActive || mlOptions.length === 0}
             >
               {mlOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
             </Select>
           </FormControl>
+
+          {/* Next to n/l/mₗ (spec §5 Phase 1). While a combination is drawn the
+              three selects stay in view, disabled, so the way back is obvious. */}
+          <CombinationControls selection={combination} onChange={selection => onCombinationChange?.(selection)} />
         </>
       )}
 
@@ -465,7 +480,7 @@ const Controls: React.FC<ControlsProps> = ({
             SubshellPanel dispatch navigation directly); there is nothing
             here to "update" the way a hydrogen-like n/l/ml choice needs an
             explicit trigger. */}
-        {!isAtomMode && (
+        {!isAtomMode && !combinationActive && (
           <Button
             id="update-orbital"
             variant="contained"

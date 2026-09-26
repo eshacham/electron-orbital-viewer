@@ -245,3 +245,28 @@ describe('cut depth', () => {
     expect(screen.getAllByText('edge')).toHaveLength(2);
   });
 });
+
+describe('Combination picker', () => {
+  it('sits with n/l/mL in Basic Orbitals, and not in atom mode', () => {
+    const { unmount } = render(<Controls {...baseProps} />);
+    expect(screen.getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
+    unmount();
+    render(<Controls {...baseProps} mode="atom" atomLevel="atom" />);
+    expect(screen.queryByRole('combobox', { name: /combination/i })).not.toBeInTheDocument();
+  });
+
+  it('disables n/l/mL and hides Update Orbital while a combination is drawn', () => {
+    render(<Controls {...baseProps} combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} />);
+    expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('button', { name: /update orbital/i })).not.toBeInTheDocument();
+    expect(screen.getByText('sp³ hybrids — all 4')).toBeInTheDocument();
+  });
+
+  it('reports the choice', () => {
+    const onCombinationChange = jest.fn();
+    render(<Controls {...baseProps} onCombinationChange={onCombinationChange} />);
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('sp'));
+    expect(onCombinationChange).toHaveBeenCalledWith({ kind: 'hybrid', hybrid: 'sp', member: 'all' });
+  });
+});
