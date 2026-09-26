@@ -54,6 +54,33 @@ class InfraStack(Stack):
             ]
         )
         
+        # Generated molecule data (spec 4.2): density grids, orbital bases and
+        # scans produced offline by tools/molecules/. It lives in its own
+        # bucket rather than in git -- a regenerated data set would otherwise
+        # add tens of MB to the public repo's history for good -- and rather
+        # than in the app bucket, whose deployment below prunes everything
+        # that is not in dist/.
+        #
+        # Private and versioned, read only through CloudFront (Origin Access
+        # Control). Each data release goes under its own prefix
+        # (molecules/v1/, v2/ ...) so a published link never changes meaning;
+        # tools/molecules/publish.py uploads it. Retained on stack deletion:
+        # regenerating it takes hours of quantum-chemistry compute.
+        data_bucket = s3.Bucket(
+            self, "MoleculeDataBucket",
+            versioned=True,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            removal_policy=RemovalPolicy.RETAIN,
+        )
+        distribution.add_behavior(
+            "molecules/*",
+            origins.S3BucketOrigin.with_origin_access_control(data_bucket),
+            viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        )
+
         # Deploy the website to S3 - using the production build from Vite
         # Vite automatically minifies code in production builds
         s3deploy.BucketDeployment(
@@ -67,3 +94,5 @@ class InfraStack(Stack):
         # Output the CloudFront URL
         CfnOutput(self, "CloudFrontURL", value=f"https://{distribution.distribution_domain_name}")
         CfnOutput(self, "BucketURL", value=website_bucket.bucket_website_url)
+        # tools/molecules/publish.py reads this to know where to upload.
+        CfnOutput(self, "MoleculeDataBucketName", value=data_bucket.bucket_name)
