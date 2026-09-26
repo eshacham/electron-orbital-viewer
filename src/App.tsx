@@ -99,6 +99,7 @@ function App() {
     // reactive: each choice is complete, so it renders without an Update step.
     const [combination, setCombination] = useState<CombinationSelection>(NO_COMBINATION);
     const renderedField = useAppSelector(state => state.orbital.currentField);
+    const renderFailed = useAppSelector(state => state.orbital.renderFailed);
 
     const isInitializedRef = useRef(false);
 
@@ -303,7 +304,7 @@ function App() {
             dispatch(clearPicture());
             return;
         }
-        if (renderedField && !error && samePicture(renderedField, request)) return;
+        if (renderedField && !renderFailed && samePicture(renderedField, request)) return;
         dispatch(startFieldCalculation(request));
         // n/l/mₗ are read for the None case only; changing them while a
         // combination is drawn must not replace it. renderedField is read,

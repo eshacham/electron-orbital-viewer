@@ -29,7 +29,7 @@ jest.mock('../src/components/CombinationControls', () => {
 });
 
 import App from '../src/App';
-import orbitalReducer from '../src/store/orbitalSlice';
+import orbitalReducer, { failOrbitalCalculation, dismissOrbitalError } from '../src/store/orbitalSlice';
 import atomReducer from '../src/store/atomSlice';
 
 function renderBasicOrbitals() {
@@ -91,6 +91,20 @@ describe('App: the n = 2 field slider', () => {
         select(field(2, 0.002));
         expect(store.getState().orbital.currentField).toBe(drawn);
         expect(screen.getByText(/ΔE = −3F = −0\.0060 Ha/)).toBeInTheDocument();
+    });
+
+    it('sends the same picture again after a failed render, even once the message is dismissed', () => {
+        const store = renderBasicOrbitals();
+        select(field(2, 0.001));
+        const failed = store.getState().orbital.currentField;
+        store.dispatch(failOrbitalCalculation('worker crashed'));
+        store.dispatch(dismissOrbitalError());
+
+        select(field(2, 0.002));
+        const retried = store.getState().orbital.currentField;
+        expect(retried).not.toBe(failed);
+        expect(retried?.sources.map(s => s.id)).toEqual(['stark:n2:lower']);
+        expect(store.getState().orbital.isLoading).toBe(true);
     });
 
     it('still redraws when the states or the enclosed fraction change', () => {

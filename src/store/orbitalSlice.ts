@@ -13,6 +13,11 @@ interface OrbitalState {
   currentField: FieldRenderRequest | null;
   isLoading: boolean;
   error: string | null;
+  /**
+   * The last render failed. Outlives `error`, which the user can dismiss, so
+   * the same request can still be sent again after the message is gone.
+   */
+  renderFailed: boolean;
   /** Bumped to ask the viewer to re-frame the camera. */
   viewResetNonce: number;
   /** View-only: none of this re-runs the calculation. */
@@ -26,6 +31,7 @@ const initialState: OrbitalState = {
   currentField: null,
   isLoading: false,
   error: null,
+  renderFailed: false,
   viewResetNonce: 0,
   surfaceStyle: { ...defaultSurfaceStyle },
   isoLevel: null
@@ -38,6 +44,7 @@ const orbitalSlice = createSlice({
     startOrbitalCalculation: (state, action: PayloadAction<OrbitalParams>) => {
       state.isLoading = true;
       state.error = null;
+      state.renderFailed = false;
       state.currentParams = action.payload;
       state.currentField = null;
     },
@@ -49,6 +56,7 @@ const orbitalSlice = createSlice({
     failOrbitalCalculation: (state, action: PayloadAction<string>) => {
       state.isLoading = false;
       state.error = action.payload;
+      state.renderFailed = true;
     },
     dismissOrbitalError: (state) => {
       state.error = null;
@@ -62,6 +70,7 @@ const orbitalSlice = createSlice({
     startFieldCalculation: (state, action: PayloadAction<FieldRenderRequest>) => {
       state.isLoading = true;
       state.error = null;
+      state.renderFailed = false;
       state.currentField = action.payload;
       state.currentParams = null;
     },
@@ -75,6 +84,7 @@ const orbitalSlice = createSlice({
       state.currentParams = null;
       state.isLoading = false;
       state.error = null;
+      state.renderFailed = false;
       state.isoLevel = null;
     }
   },
