@@ -1,4 +1,4 @@
-import reducer, { startOrbitalCalculation, startFieldCalculation } from '../src/store/orbitalSlice';
+import reducer, { startOrbitalCalculation, startFieldCalculation, finishOrbitalCalculation, clearPicture } from '../src/store/orbitalSlice';
 import { setMode } from '../src/store/atomSlice';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
@@ -30,5 +30,22 @@ describe('orbitalSlice field requests', () => {
         state = reducer(state, setMode('atom'));
         expect(state.currentField).toBeNull();
         expect(state.isLoading).toBe(false);
+    });
+
+    // Final review: a selection with a problem (a field above the bound limit,
+    // reachable once Phase 2 decodes URLs) must not leave the previous
+    // picture standing under the new selection's title (spec §3.5).
+    it('asks for nothing at all when a selection is refused', () => {
+        let state = reducer(undefined, startFieldCalculation(request));
+        state = reducer(state, finishOrbitalCalculation({ isoLevel: 1e-3 }));
+        state = reducer(state, clearPicture());
+        expect(state.currentField).toBeNull();
+        expect(state.currentParams).toBeNull();
+        expect(state.isLoading).toBe(false);
+        expect(state.isoLevel).toBeNull();
+
+        state = reducer(state, startOrbitalCalculation(basicOrbitalParams(3, 2, 0, 0.9)));
+        state = reducer(state, clearPicture());
+        expect(state.currentParams).toBeNull();
     });
 });

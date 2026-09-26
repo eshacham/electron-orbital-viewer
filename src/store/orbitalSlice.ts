@@ -64,10 +64,23 @@ const orbitalSlice = createSlice({
       state.error = null;
       state.currentField = action.payload;
       state.currentParams = null;
+    },
+    /**
+     * A combination that cannot be drawn (selectionProblem): ask for nothing,
+     * so the viewer takes the last picture down rather than leave it under
+     * the new selection's title (spec §3.5). The reason is shown by the picker.
+     */
+    clearPicture: (state) => {
+      state.currentField = null;
+      state.currentParams = null;
+      state.isLoading = false;
+      state.error = null;
+      state.isoLevel = null;
     }
   },
   // Combinations belong to Basic Orbitals. Leaving for atom mode drops the
-  // request, so no effect can redraw a hybrid over an atom; coming back
+  // request, so no effect can redraw a hybrid over an atom, and the viewer
+  // stops the worker still computing one (OrbitalViewer); coming back
   // re-requests it from App's own selection.
   extraReducers: builder => {
     builder.addCase(setMode, (state, action) => {
@@ -85,6 +98,7 @@ export const {
   dismissOrbitalError,
   resetView,
   setSurfaceStyle,
-  startFieldCalculation
+  startFieldCalculation,
+  clearPicture
 } = orbitalSlice.actions;
 export default orbitalSlice.reducer;

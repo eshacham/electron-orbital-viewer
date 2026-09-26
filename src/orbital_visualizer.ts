@@ -1223,6 +1223,35 @@ export async function updateFieldInScene(
     });
 }
 
+/**
+ * Stops the render still in flight, if any, and makes its result a no-op when
+ * it lands: nothing asks for it any more (a combination dropped on the way to
+ * atom mode). The scene itself is left as it is.
+ */
+export function cancelPendingRender(context: VisualizerContext | null): void {
+    if (!context || !context.activeWorker) return;
+    context.activeWorker.terminate();
+    context.activeWorker = null;
+    context.requestCounter++;
+}
+
+/**
+ * Leaves the scene empty: whatever is drawn comes down, and whatever is still
+ * computing never lands. For a selection that is refused rather than drawn
+ * (spec §3.5) -- the last picture must not stay up under its title.
+ */
+export function clearScene(context: VisualizerContext | null): void {
+    if (!context || context.isDisposed) return;
+    context.activeWorker?.terminate();
+    context.activeWorker = null;
+    context.requestCounter++;
+    cancelTransition(context);
+    clearCurrentOrbital(context, context.scene);
+    context.isShellView = false;
+    context.isCompositionView = false;
+    removeAxesHelper(context);
+}
+
 /** What updateAtomViewInScene needs to build one level-1/2 shell view. */
 export interface AtomShellViewParams {
     /** Radius enclosing this view's requested fraction of its electrons. */

@@ -15,7 +15,8 @@ import {
     failOrbitalCalculation,
     dismissOrbitalError,
     resetView,
-    setSurfaceStyle
+    setSurfaceStyle,
+    clearPicture
 } from './store/orbitalSlice';
 import {
     setMode,
@@ -284,6 +285,8 @@ function App() {
     // A combination draws as soon as it is chosen, and again when the
     // enclosed fraction changes. Going back to None redraws the n/l/mₗ still in
     // the panel: the canvas was showing the combination, not that orbital.
+    // A selection that cannot be drawn clears the canvas rather than leave the
+    // last picture under its title (spec §3.5); the picker says why.
     const previousCombinationRef = useRef(combination);
     useEffect(() => {
         const previous = previousCombinationRef.current;
@@ -294,7 +297,11 @@ function App() {
             return;
         }
         const request = fieldRequestFor(combination, enclosedFraction);
-        if (request) dispatch(startFieldCalculation(request));
+        if (!request) {
+            dispatch(clearPicture());
+            return;
+        }
+        dispatch(startFieldCalculation(request));
         // n/l/mₗ are read for the None case only; changing them while a
         // combination is drawn must not replace it.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -464,7 +471,8 @@ function App() {
     const selectionLegend = useMemo(() => overlayLegend(combination), [combination]);
     const selectionPlot = useMemo(() => combinationCurves(combination), [combination]);
     const combinationLegend = !isAtomMode && renderedField ? selectionLegend : null;
-    const showPhaseLegend = (!isAtomMode || atomLevel === 'orbital') && !combinationLegend;
+    // Not over an empty canvas: a refused combination draws nothing.
+    const showPhaseLegend = (isAtomMode ? atomLevel === 'orbital' : Boolean(renderedParams || renderedField)) && !combinationLegend;
 
     // The drill-down's next step. On a desktop it lives in the navigation
     // card it continues, where the orbital buttons are in view; on a phone

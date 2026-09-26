@@ -4,7 +4,7 @@ jest.mock('../src/workers/createOrbitalWorker', () => ({ createOrbitalWorker: je
 jest.mock('../src/orbital_controls_factory', () => ({ createOrbitalControls: jest.fn() }));
 
 import { createOrbitalWorker } from '../src/workers/createOrbitalWorker';
-import { VisualizerContext, updateFieldInScene, setSurfaceStyle } from '../src/orbital_visualizer';
+import { VisualizerContext, updateFieldInScene, setSurfaceStyle, cancelPendingRender, clearScene } from '../src/orbital_visualizer';
 import { overlayVertexColors, NEGATIVE_PHASE_SHADE } from '../src/field_overlay_view';
 import { defaultSurfaceStyle, MeshData } from '../src/types/orbital';
 import { FieldRenderRequest } from '../src/field_source';
@@ -155,5 +155,59 @@ describe('updateFieldInScene', () => {
         expect(material.opacity).toBeCloseTo(0.4, 12);
         expect(context.clipPlane.normal.toArray()).toEqual([-1, 0, 0]);
         expect(createOrbitalWorker).not.toHaveBeenCalled();
+    });
+});
+
+// Final review: nothing asked for any more -- a refused selection, or a
+// combination dropped on the way to atom mode -- must stop the worker and
+// make its late result a no-op, and in Basic Orbitals take the picture down.
+describe('cancelPendingRender and clearScene', () => {
+    it('stops a field worker in flight, so its result never lands', async () => {
+        const worker = fakeWorker();
+        (createOrbitalWorker as jest.Mock).mockReturnValue(worker);
+        const context = buildContext();
+        const pending = updateFieldInScene(context, overlay);
+
+        cancelPendingRender(context);
+        expect(worker.terminate).toHaveBeenCalled();
+        expect(context.activeWorker).toBeNull();
+
+        worker.onmessage!({ data: { type: 'fieldsSuccess', meshes: [fakeMesh(0), fakeMesh(5)] } });
+        expect(await pending).toEqual({ status: 'superseded' });
+        expect(context.currentOrbitalGroup).toBeNull();
+    });
+
+    it('leaves the scene alone when nothing is in flight', async () => {
+        const worker = fakeWorker();
+        (createOrbitalWorker as jest.Mock).mockReturnValue(worker);
+        const context = buildContext();
+        const pending = updateFieldInScene(context, single);
+        worker.onmessage!({ data: { type: 'fieldsSuccess', meshes: [fakeMesh(0)] } });
+        await pending;
+        const counter = context.requestCounter;
+
+        cancelPendingRender(context);
+        expect(context.requestCounter).toBe(counter);
+        expect(context.currentOrbitalGroup).not.toBeNull();
+    });
+
+    it('clearScene takes down what is drawn and anything still coming', async () => {
+        const first = fakeWorker();
+        const second = fakeWorker();
+        (createOrbitalWorker as jest.Mock).mockReturnValueOnce(first).mockReturnValueOnce(second);
+        const context = buildContext();
+        const drawn = updateFieldInScene(context, single);
+        first.onmessage!({ data: { type: 'fieldsSuccess', meshes: [fakeMesh(0)] } });
+        await drawn;
+        expect(context.scene.children.length).toBeGreaterThan(0);
+        const pending = updateFieldInScene(context, overlay);
+
+        clearScene(context);
+        expect(context.currentOrbitalGroup).toBeNull();
+        expect(context.currentAxesHelper).toBeNull();
+        expect(context.scene.children).toHaveLength(0);
+        second.onmessage!({ data: { type: 'fieldsSuccess', meshes: [fakeMesh(0), fakeMesh(5)] } });
+        expect(await pending).toEqual({ status: 'superseded' });
+        expect(context.scene.children).toHaveLength(0);
     });
 });

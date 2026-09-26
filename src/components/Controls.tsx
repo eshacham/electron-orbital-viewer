@@ -22,7 +22,7 @@ import { ELEMENTS, elementLabel } from '../elements';
 import { orbitalName } from '../orbital_names';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
 import CombinationControls from './CombinationControls';
-import { CombinationSelection, NO_COMBINATION, combinationTitle } from '../combinations';
+import { CombinationSelection, NO_COMBINATION, combinationTitle, selectionProblem } from '../combinations';
 
 interface ControlsProps {
   /**
@@ -235,7 +235,9 @@ const Controls: React.FC<ControlsProps> = ({
       {!isAtomMode && (
         <>
           <Typography id="orbital-name" variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
-            {combinationActive ? combinationTitle(combination) : orbitalName(initialN, initialL, initialMl)}
+            {combinationActive
+              ? `${combinationTitle(combination)}${selectionProblem(combination) ? ' — not drawn' : ''}`
+              : orbitalName(initialN, initialL, initialMl)}
           </Typography>
 
           <FormControl fullWidth margin="normal" size="small" >

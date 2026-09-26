@@ -10,6 +10,8 @@ import {
     updateOrbitalInScene,
     updateFieldInScene,
     updateAtomViewInScene,
+    cancelPendingRender,
+    clearScene,
     frameOrbital,
     setSurfaceStyle,
     setHoverRadius as setSceneHoverRadius,
@@ -120,6 +122,20 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         setViewInsets(visualizerContextRef.current, insets);
     }, []);
     useViewInsets(canvasHostRef, isNarrow, handleInsets);
+
+    // Nothing asked for: a refused combination (orbitalSlice's clearPicture),
+    // or one dropped on the way to atom mode. Either way a worker may still
+    // be computing it, and must not land. In Basic Orbitals the last picture
+    // comes down too -- the panel now describes something that is not drawn
+    // (spec §3.5); atom mode's own views replace it. Declared ahead of the
+    // shell-view effects so that, in the same commit, they run after this and
+    // their requests are the newest.
+    useEffect(() => {
+        const context = visualizerContextRef.current;
+        if (!context || stateParams || fieldRequest) return;
+        if (atomMode === 'atom') cancelPendingRender(context);
+        else clearScene(context);
+    }, [stateParams, fieldRequest, atomMode]);
 
     // Levels 1-2: build the shell view directly from the profile already in
     // the store. No worker round trip and no sampling grid -- the density is
