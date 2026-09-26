@@ -364,8 +364,9 @@ polarised 1s and the n = 2 Stark states). Decisions worth knowing:
 - **The n = 2 field slider is capped at 0.0039 a.u.**, the field at which the
   classical over-the-barrier limit (F = E²/4, E = −1/8 Ha for n = 2) frees
   the electron — above it there is no bound state left to perturb. The spec
-  did not state this number; it was derived and added under spec §3.5. (The
-  n = 1 cap, 0.05 a.u., was already in the spec.)
+  states it (F = 1/256 ≈ 0.0039 a.u., §5 Phase 1, corrected 2026-09-25 from
+  the Phase 1 plan's 0.05 a.u., which is safe for n = 1 only); the view
+  refuses stronger fields rather than drawing them (§3.5).
 - **α is validated at F = 0.01 a.u., not 0.05.** The polarised-1s recipe is
   ψ₁ₛ + (first-order correction), and normalising that sum costs accuracy as
   F grows: 0.05 % at F = 0.01 versus 1.4 % at F = 0.05 — nearly 30× worse —
