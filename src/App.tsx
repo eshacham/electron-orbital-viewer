@@ -10,6 +10,7 @@ import {
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import {
     startOrbitalCalculation,
+    startFieldCalculation,
     finishOrbitalCalculation,
     failOrbitalCalculation,
     dismissOrbitalError,
@@ -40,7 +41,8 @@ import PeriodicTable from './components/PeriodicTable';
 import ElementPickerDialog from './components/ElementPickerDialog';
 import { elementFor } from './elements';
 import { orbitalName } from './orbital_names';
-import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
+import { CombinationSelection, NO_COMBINATION, fieldRequestFor, combinationCurves, overlayLegend } from './combinations';
+import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT } from './useMediaQuery';
@@ -91,6 +93,11 @@ function App() {
     const [l, setL] = useState<number>(defaultL);
     const [ml, setMl] = useState<number>(0);
     const [enclosedFraction, setEnclosedFraction] = useState<number>(DEFAULT_ENCLOSED_FRACTION);
+
+    // Basic Orbitals' combination (hybrids, a field). Local like n/l/mₗ, but
+    // reactive: each choice is complete, so it renders without an Update step.
+    const [combination, setCombination] = useState<CombinationSelection>(NO_COMBINATION);
+    const renderedField = useAppSelector(state => state.orbital.currentField);
 
     const isInitializedRef = useRef(false);
 
@@ -263,19 +270,35 @@ function App() {
     // sampling box holds only its innermost, near-featureless tail, which is
     // exactly why it rendered as a blob instead of a lobed shape.
     useEffect(() => {
-        if (isAtomMode) return;
-        dispatch(startOrbitalCalculation({
-            n, l, ml, Z: BASIC_ORBITALS_Z,
-            resolution: ORBITAL_RESOLUTION,
-            rMax: computeSamplingRadius(n, l, BASIC_ORBITALS_Z),
-            enclosedFraction,
-        }));
+        if (isAtomMode || combination.kind !== 'none') return;
+        dispatch(startOrbitalCalculation(basicOrbitalParams(n, l, ml, enclosedFraction)));
         // Only the mode transition itself should trigger this -- n/l/ml/Z/
         // enclosedFraction changes while already in Basic Orbitals
         // mode still go through Controls.tsx's "Update Orbital" button,
-        // exactly as before.
+        // exactly as before. combination is read, not watched, like the
+        // rest; the effect below redraws a combination on the same mode
+        // change.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAtomMode]);
+
+    // A combination draws as soon as it is chosen, and again when the
+    // enclosed fraction changes. Going back to None redraws the n/l/mₗ still in
+    // the panel: the canvas was showing the combination, not that orbital.
+    const previousCombinationRef = useRef(combination);
+    useEffect(() => {
+        const previous = previousCombinationRef.current;
+        previousCombinationRef.current = combination;
+        if (isAtomMode) return;
+        if (combination.kind === 'none') {
+            if (previous.kind !== 'none') dispatch(startOrbitalCalculation(basicOrbitalParams(n, l, ml, enclosedFraction)));
+            return;
+        }
+        const request = fieldRequestFor(combination, enclosedFraction);
+        if (request) dispatch(startFieldCalculation(request));
+        // n/l/mₗ are read for the None case only; changing them while a
+        // combination is drawn must not replace it.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAtomMode, combination, enclosedFraction, dispatch]);
 
     // The cut belongs to the shell views. Levels 1-2 draw nothing but their
     // cut face, so they need one; an orbital -- atom mode's level 3, or any
@@ -428,13 +451,16 @@ function App() {
             : atomOrbitalBusy && atomSelectedOrbital
                 ? `Computing ${orbitalName(atomSelectedOrbital.n, atomSelectedOrbital.l, atomSelectedOrbital.ml)}…`
                 : null)
-        : (showBusy && renderedParams
-            ? `Computing ${orbitalName(renderedParams.n, renderedParams.l, renderedParams.ml)}…`
+        : (showBusy
+            ? (renderedField
+                ? `Computing ${renderedField.label}…`
+                : renderedParams ? `Computing ${orbitalName(renderedParams.n, renderedParams.l, renderedParams.ml)}…` : null)
             : null);
 
     // A marching-cubes surface is coloured by the sign of ψ, unlike the shell
     // views, which colour by shell or subshell. Say so where it applies.
-    const showPhaseLegend = !isAtomMode || atomLevel === 'orbital';
+    const combinationLegend = !isAtomMode && renderedField ? overlayLegend(combination) : null;
+    const showPhaseLegend = (!isAtomMode || atomLevel === 'orbital') && !combinationLegend;
 
     // The drill-down's next step. On a desktop it lives in the navigation
     // card it continues, where the orbital buttons are in view; on a phone
@@ -477,6 +503,8 @@ function App() {
             onMlChange={setMl}
             initialEnclosedFraction={enclosedFraction}
             onEnclosedFractionChange={setEnclosedFraction}
+            combination={combination}
+            onCombinationChange={setCombination}
             isoLevel={isoLevel}
             onUpdateOrbital={handleOrbitalParamsChange}
             onResetView={handleResetView}
@@ -488,6 +516,22 @@ function App() {
 
     const renderRadialPlot = (width: number, collapsible: boolean) => {
         if (!isAtomMode) {
+            // A combination's plot is its ingredients and the result (see
+            // combinationCurves): the weighted sum is its exact radial distribution.
+            const combinationPlot = renderedField ? combinationCurves(combination) : null;
+            if (combinationPlot) {
+                return (
+                    <RadialPlot
+                        n={2}
+                        l={0}
+                        Z={BASIC_ORBITALS_Z}
+                        rMax={combinationPlot.rMax}
+                        width={width}
+                        collapsible={collapsible}
+                        curves={combinationPlot.curves}
+                    />
+                );
+            }
             return renderedParams && (
                 <RadialPlot
                     n={renderedParams.n}
@@ -570,6 +614,16 @@ function App() {
                         <span className="phase-legend-item">
                             <span className="phase-legend-swatch negative" />ψ &lt; 0
                         </span>
+                    </div>
+                )}
+                {combinationLegend && (
+                    <div className="phase-legend" aria-label="combination colour key">
+                        {combinationLegend.map(item => (
+                            <span key={item.label} className="phase-legend-item">
+                                <span className="phase-legend-swatch" style={{ background: item.color }} />{item.label}
+                            </span>
+                        ))}
+                        <span className="phase-legend-item">darker: ψ &lt; 0</span>
                     </div>
                 )}
                 {/* Addendum 3: the element selector is a real periodic

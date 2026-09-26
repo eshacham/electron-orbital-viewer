@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react'; // Add screen import
+import { render, screen, fireEvent, act, within } from '@testing-library/react'; // Add screen import
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
@@ -410,6 +410,61 @@ describe('App', () => {
             expect(screen.getByRole('button', { name: /atom mode/i })).toBeInTheDocument();
             fireEvent.click(view);
             expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
+        });
+    });
+
+    describe('Basic Orbitals combinations', () => {
+        const chooseCombination = (option: string | RegExp) => {
+            fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
+            fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
+        };
+
+        beforeEach(() => installMatchMedia(false));
+
+        it('draws a chosen combination at once, with its key and its radial components', () => {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            chooseCombination('sp³');
+
+            expect(store.getState().orbital.currentField?.sources.map(s => s.id))
+                .toEqual(['hybrid:sp3:0', 'hybrid:sp3:1', 'hybrid:sp3:2', 'hybrid:sp3:3']);
+            expect(store.getState().orbital.currentParams).toBeNull();
+            expect(screen.getByLabelText('combination colour key')).toHaveTextContent('h₁');
+            expect(screen.queryByLabelText('surface colour key')).not.toBeInTheDocument();
+            expect(screen.getByText('each hybrid: ¼·2s + ¾·2p')).toBeInTheDocument();
+        });
+
+        it('redraws when the enclosed fraction changes, with no Update step', () => {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            chooseCombination('Electric field');
+            fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
+            fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
+            expect(store.getState().orbital.currentField?.enclosedFraction).toBe(0.75);
+            expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'polarized1s', field: 0.03 });
+        });
+
+        // Review Focus 1.
+        it('None redraws the orbital in the panel', () => {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            chooseCombination('sp');
+            chooseCombination(/None/);
+            expect(store.getState().orbital.currentField).toBeNull();
+            expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 2, ml: 0, Z: 1 });
+        });
+
+        // Review Focus 2.
+        it('a combination survives a round trip through atom mode, and is not drawn there', () => {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            chooseCombination('sp²');
+            fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
+            expect(store.getState().orbital.currentField).toBeNull();
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            expect(store.getState().orbital.currentField?.sources.map(s => s.id))
+                .toEqual(['hybrid:sp2:0', 'hybrid:sp2:1', 'hybrid:sp2:2']);
+            expect(store.getState().orbital.currentParams).toBeNull();
         });
     });
 });

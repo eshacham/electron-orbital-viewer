@@ -634,6 +634,14 @@ html, body, #root {
   .phone-sheet:not(.open) {
     top: auto;
   }
+  /* The narrow rule above anchors the key to the viewport's right edge
+     (right: 12px), which is where the sheet docks here too (bug found live,
+     Task 11 §6.6: a Basic Orbitals or Stark key sat directly under the open
+     sheet). Pull it in by the sheet's own width so it stays over the free
+     canvas, matching how .phone-header's max-width makes the same room. */
+  .phase-legend {
+    right: calc(46vw + 12px);
+  }
 }
 
 /* ---------------------------------------------------------------------------

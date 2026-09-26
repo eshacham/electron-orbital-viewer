@@ -8,6 +8,7 @@ import {
     initVisualizer,
     cleanupVisualizer,
     updateOrbitalInScene,
+    updateFieldInScene,
     updateAtomViewInScene,
     frameOrbital,
     setSurfaceStyle,
@@ -56,6 +57,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     const canvasHostRef = useRef<HTMLDivElement>(null);
     const visualizerContextRef = useRef<VisualizerContext | null>(null);
     const stateParams = useAppSelector(state => state.orbital.currentParams);
+    const fieldRequest = useAppSelector(state => state.orbital.currentField);
     const viewResetNonce = useAppSelector(state => state.orbital.viewResetNonce);
     const surfaceStyle = useAppSelector(state => state.orbital.surfaceStyle);
     const atomMode = useAppSelector(state => state.atom.mode);
@@ -375,6 +377,22 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             });
     }, [stateParams, showShellView, atomMode, prefersReducedMotion, onOrbitalRendered, onOrbitalFailed]);
 
+    // Basic Orbitals combinations (spec §5 Phase 1). Exactly one of
+    // `stateParams` and `fieldRequest` is set (orbitalSlice), so the two
+    // effects never both draw; either way the newest request owns the scene.
+    useEffect(() => {
+        if (!visualizerContextRef.current || !fieldRequest || atomMode === 'atom' || showShellView) return;
+        updateFieldInScene(visualizerContextRef.current, fieldRequest)
+            .then(outcome => {
+                if (outcome.status === 'superseded') return;
+                onOrbitalRendered?.(outcome.isoLevel);
+            })
+            .catch(error => {
+                console.error('OrbitalViewer: Error drawing combination', error);
+                onOrbitalFailed?.(error instanceof Error && error.message ? error.message : 'Could not draw this combination.');
+            });
+    }, [fieldRequest, atomMode, showShellView, onOrbitalRendered, onOrbitalFailed]);
+
     // Mode, opacity and the cut plane restyle the existing mesh; no recalculation.
     useEffect(() => {
         setSurfaceStyle(visualizerContextRef.current, surfaceStyle);
@@ -421,7 +439,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             context.controls.removeEventListener('change', update);
             window.removeEventListener('resize', update);
         };
-    }, [stateParams]);
+    }, [stateParams, fieldRequest]);
 
     // Handle resize
     useEffect(() => {
