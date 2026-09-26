@@ -89,6 +89,12 @@ open, and read off how big it actually is.
 - **The radial distribution**, P(r) = r²R(r)², plotted beside the view. Its peaks
   are the shells — n − l of them, countable — and its zeros are the radial nodes,
   which is what the concentric structure in a cut-open orbital actually is.
+- **Combinations** — sp, sp² and sp³ hybrids of hydrogen's 2s and 2p (one at a
+  time in phase colours, or all at once, one colour each), and hydrogen in an
+  electric field: the 1s polarised to first order (μ = αF, α = 9/2 a₀³) with
+  the field in a.u. and V/m, and the n = 2 Stark states (2s ± 2p_z)/√2 with
+  their ±3F shifts. The radial plot shows what went in: 2s, 2p and their
+  weighted sum, which is the combination's exact radial distribution.
 
 ### Both modes, to look inside
 
@@ -356,9 +362,14 @@ shrinks an orbital without changing its shape. That was a deliberate trade
 for one element control in the app rather than two meaning different things;
 nothing in the solver is restricted, so it is a UI change only.
 
-**No hybrids, no molecules.** sp, sp² and sp³ hybrids and molecular orbitals —
-most of what an introductory chemistry course actually reasons with — are
-outside what this computes.
+**Hybrids are a basis choice, not a state.** They describe bonding
+directions; a free hydrogen or carbon atom is not in one. The 2s enters with
+a minus sign, because hydrogen's 2s is negative beyond its node at 2 a₀ where
+95 % of it lies, and this is the sign that points each large lobe along its
+axis. **The field view is first-order perturbation theory:** valid for
+F ≪ 1 a.u., tunnelling ignored, refused above 0.05 a.u. (n = 1) and above
+0.0039 a.u. (n = 2, where the electron would no longer be bound). **No
+molecules yet** — that is Phase 5 onward.
 
 **Non-relativistic, spinless.** No fine structure, no spin–orbit coupling. For
 high Z, where relativistic effects genuinely matter, the shapes shown are
@@ -420,6 +431,13 @@ account. The Python side pins its own dependencies in `infra/requirements.txt`.
 | `src/radial_distribution.ts` | P(r) = r²R(r)², the box-sizing radius, and the contour for a given enclosed fraction |
 | `src/orbital_names.ts` | Spectroscopic names for the real orbitals |
 | `src/scale_bar.ts` | Bohr-radius scale readout |
+| `src/field_source.ts` | The Combination picker's field types: the analytic/sampled source union, `FieldRenderRequest`, the evaluator, and the field-refusal message |
+| `src/field_integrals.ts` | Grid quadrature on a sampled field: overlap and ⟨z⟩ integrals, and the positive-lobe centroid and share |
+| `src/hybrids.ts` | sp, sp² and sp³ hybrid directions, recipes and sources for hydrogen's n = 2 shell, and their measured lobe axes |
+| `src/stark.ts` | Hydrogen in a uniform field: the polarised 1s, the n = 2 Stark states, and α and ⟨2s\|z\|2p_z⟩ measured from the drawn grid |
+| `src/combinations.ts` | The Combination picker's selection type, field requests, titles, radial curves and overlay legend |
+| `src/field_overlay_view.ts` | Several field sources merged into one mesh, each member its own colour, no cut-face caps |
+| `src/validation/` | The `VALIDATION` table behind the Methods page: every quantitative claim beside its reference value, `app` computed by the same function its physics test calls |
 | `src/atom/radial_grid.ts` | The shared logarithmic radial grid every atomic calculation runs on |
 | `src/atom/numerov.ts` | Numerov integration of the radial Schrödinger equation |
 | `src/atom/radial_solver.ts` | Shooting-method bound-state solver for one (n, l) subshell |

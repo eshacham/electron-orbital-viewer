@@ -325,6 +325,63 @@ fixed and checked live. The layout decisions worth knowing:
 - **Phone element choice** is a full-screen searchable list opened from the
   element name; the dropdown in the sideways strip is gone.
 
+## Phase 1 — hybrids and the Stark effect (2026-09-25)
+
+Basic Orbitals mode gained a Combination picker: sp/sp²/sp³ hybrids of
+hydrogen's n = 2 shell, and hydrogen in a uniform electric field (the
+polarised 1s and the n = 2 Stark states). Decisions worth knowing:
+
+- **The 2s enters every hybrid with a minus sign**,
+  `hᵢ = −(1/√(k+1)) ψ₂ₛ + √(k/(k+1)) (dᵢ·p)`. Hydrogen's R₂₀ is positive only
+  inside its node at 2 a₀; 95 % of the 2s density lies beyond it, where it is
+  negative. With +ψ₂ₛ each hybrid's large lobe would point opposite its own
+  label — the sign is what makes the lobe and the direction agree.
+- **A lobe's axis is the density-weighted centroid of its positive half**,
+  Σ_{ψ>0} rψ² / Σ_{ψ>0} ψ², not the grid's argmax of |ψ|². An argmax snaps to
+  one voxel; at the render grid's 0.33 a₀ spacing and a peak 3–4 a₀ out, that
+  is up to ~5° of error — ten times the sp³ angle tolerance. The centroid
+  uses the whole drawn lobe instead. Measured on the actual render grid: sp
+  and sp³'s centroids land on the exact textbook angles (180°, 109.47122°,
+  matching to 7 significant figures — the cube's own symmetries map those
+  two sets onto themselves), and sp² — whose 120° rotation is not a cube
+  symmetry, so it shows the real grid error — still lands within 0.00006° of
+  120°, far inside the ±0.5° budget.
+- **Overlays are one merged mesh, with no cut-face caps.** The stencil-cap
+  trick assumes a single capped object on screen (the same call
+  `shell_composition_view.ts` makes for composition lobes); a cut through an
+  overlay opens the lobes' insides rather than shading a cross-section.
+  Overlays render at 96³ (`OVERLAY_RESOLUTION`) rather than the single-source
+  129³, and share each basis orbital's samples across members of the same
+  overlay (an sp³ overlay is four hybrids built from the same four terms, so
+  each term is only evaluated once). Measured live at 1440×900: sp³ all four
+  drawn in 533 ms, sp² in 465 ms, sp in 280 ms, a single sp³ hybrid (h₁) in
+  545 ms — all comfortably under the 1500 ms desktop budget. At phone width
+  (390×844) sp³-all measured 505 ms. That figure is unthrottled: the
+  Playwright MCP tooling used for the phone pass had no CPU-throttling or
+  touch-pointer emulation hook, so the spec's 4× throttled, touch-driven
+  budget (4 s) was not literally exercised — 505 ms unthrottled leaves ample
+  headroom under it, but a genuinely throttled measurement is still owed.
+- **The n = 2 field slider is capped at 0.0039 a.u.**, the field at which the
+  classical over-the-barrier limit (F = E²/4, E = −1/8 Ha for n = 2) frees
+  the electron — above it there is no bound state left to perturb. The spec
+  did not state this number; it was derived and added under spec §3.5. (The
+  n = 1 cap, 0.05 a.u., was already in the spec.)
+- **α is validated at F = 0.01 a.u., not 0.05.** The polarised-1s recipe is
+  ψ₁ₛ + (first-order correction), and normalising that sum costs accuracy as
+  F grows: 0.05 % at F = 0.01 versus 1.4 % at F = 0.05 — nearly 30× worse —
+  so the validation row measures at the smaller field, where the first-order
+  approximation is closest to exact. Measured there: α ≈ 4.4959 a₀³ against
+  the exact 4.5 (≈0.09 % error), and ⟨2s|z|2p_z⟩ ≈ −2.99998 a₀ against the
+  exact −3 (≈0.0007 % error) — both from quadrature on the same 129³ grid the
+  app draws.
+- **`src/validation/references.ts` computes every phase-1 row at import
+  time** (grid quadrature over several combinations, about a second). That is
+  fine for tests and fine for now, but Phase 7's Methods page must lazy-load
+  this module rather than pulling it into the app's entry bundle. Later
+  phases should append rows the same way this phase did: `app` comes from
+  calling the function the phase's own physics test calls, never a
+  hand-typed number, so the table and the tests cannot drift apart.
+
 ## Judgment calls made without asking
 
 Recorded for review, per the session's standing authority.
