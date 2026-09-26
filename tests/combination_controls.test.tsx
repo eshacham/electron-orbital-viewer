@@ -88,4 +88,13 @@ describe('CombinationControls', () => {
             renderWith(selection);
             expect(screen.getByRole('alert')).toHaveTextContent(message);
         });
+
+    // Fix round 1: an out-of-range hybrid member (reachable once Phase 2's
+    // URL state feeds selections in) used to suppress the mesh silently --
+    // the Alert only rendered inside the 'field' branch. It must show for
+    // any selection kind.
+    it('says why an out-of-range hybrid member is not drawn', () => {
+        renderWith({ kind: 'hybrid', hybrid: 'sp', member: 5 });
+        expect(screen.getByRole('alert')).toHaveTextContent(/there is no hybrid 6/);
+    });
 });

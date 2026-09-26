@@ -183,18 +183,31 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
                 <ToggleButton value="upper" aria-label="upper Stark state">Upper</ToggleButton>
                 <ToggleButton value="both" aria-label="both Stark states">Both</ToggleButton>
               </ToggleButtonGroup>
-              <Typography variant="body2" className="combination-readout">
-                (2s + 2p_z)/√2: ΔE = −3F = {signed(starkShiftHartree('lower', draftField), 4)} Ha ({signed(starkShiftHartree('lower', draftField) * EV_PER_HARTREE, 2)} eV)
-              </Typography>
-              <Typography variant="body2" className="combination-readout">
-                (2s − 2p_z)/√2: ΔE = +3F = {signed(starkShiftHartree('upper', draftField), 4)} Ha ({signed(starkShiftHartree('upper', draftField) * EV_PER_HARTREE, 2)} eV)
-              </Typography>
+              {(() => {
+                const lowerShift = starkShiftHartree('lower', draftField);
+                const upperShift = starkShiftHartree('upper', draftField);
+                return (
+                  <>
+                    <Typography variant="body2" className="combination-readout">
+                      (2s + 2p_z)/√2: ΔE = −3F = {signed(lowerShift, 4)} Ha ({signed(lowerShift * EV_PER_HARTREE, 2)} eV)
+                    </Typography>
+                    <Typography variant="body2" className="combination-readout">
+                      (2s − 2p_z)/√2: ΔE = +3F = {signed(upperShift, 4)} Ha ({signed(upperShift * EV_PER_HARTREE, 2)} eV)
+                    </Typography>
+                  </>
+                );
+              })()}
               <FormHelperText className="combination-caption" sx={{ mx: 0 }}>{N2_FIELD_CAPTION}</FormHelperText>
             </>
           )}
-          {problem && <Alert severity="error" sx={{ mt: 1 }}>{problem}</Alert>}
         </FormControl>
       )}
+
+      {/* Any selection can fail (an out-of-range hybrid member, a field
+          outside the drawn range) -- shown here, once, regardless of which
+          kind of selection it is, so a failure is never silently swallowed
+          into an empty view (see selectionProblem's doc comment). */}
+      {problem && <Alert severity="error" sx={{ mt: 1 }}>{problem}</Alert>}
     </>
   );
 };
