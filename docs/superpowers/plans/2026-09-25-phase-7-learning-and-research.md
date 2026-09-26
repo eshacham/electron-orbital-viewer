@@ -3239,6 +3239,8 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 ### Task 16: Accessibility — keyboard navigation audit, contrast, reduced motion
 
+> **Contrast part already done (2026-09-26, ahead of this phase):** `src/a11y/contrast.ts`, `src/theme.ts` (`appTheme`, primary `#1565c0`), `tests/a11y/contrast.test.ts`, `tests/a11y/panel_contrast.test.ts` (its `rule()` anchored to a line start, since `.view-panel .radial-plot {` otherwise matches `.radial-plot {`) and every CSS change listed in Step 3 are on `main`. When executing this task, skip those; add only the `.embed-open-full` row to `PAIRS` once Task 13 creates it, and do the keyboard, focus-ring and reduced-motion parts.
+
 **Keyboard audit findings** (from reading the components). The periodic table puts 118 tiles in the tab order, with no arrow keys and no focus moved into it when it opens. The phone tab bar has no arrow keys. Custom buttons (`.periodic-tile`, `.phone-sheet-tab`, `.view-panel-toggle`, the canvas host) have no visible focus style. MUI controls already handle their own keyboard and focus.
 
 **Contrast findings** (WCAG AA 4.5:1, computed while writing this plan over the worst backdrops a translucent panel can sit on, near-black #050505 and a white-hot lobe #ffffff):

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     ThemeProvider,
-    createTheme,
     CssBaseline,
     Box,
     Alert,
@@ -31,6 +30,7 @@ import {
 import { subshellLabel } from './atom/configurations';
 import { useAtomSolver } from './atom/useAtomSolver';
 import Controls from './components/Controls';
+import { appTheme } from './theme';
 import OrbitalViewer from './components/OrbitalViewer';
 import RadialPlot, { RadialCurve } from './components/RadialPlot';
 import LevelNav, { NavigationTarget } from './components/LevelNav';
@@ -65,17 +65,7 @@ function gridRadii(rMin: number, dx: number, size: number): number[] {
     return Array.from({ length: size }, (_, j) => rMin * Math.exp(j * dx));
 }
 
-const theme = createTheme({
-  palette: {
-    primary: { main: '#1976d2' },
-    secondary: { main: '#dc004e' },
-    // CssBaseline paints <body> in this. MUI's default is white, which
-    // showed as a white frame round the dark view wherever the app's own
-    // container did not reach -- a window resized larger, or a phone's
-    // overscroll. The scene's own colour, so there is no seam either.
-    background: { default: '#050505' },
-  },
-});
+// The theme lives in theme.ts so its contrast is testable.
 
 function App() {
     const dispatch = useAppDispatch();
@@ -548,7 +538,7 @@ function App() {
         ];
 
     return (
-        <ThemeProvider theme={theme}>
+        <ThemeProvider theme={appTheme}>
             <CssBaseline />
             <Box
                 id="canvas-container"
