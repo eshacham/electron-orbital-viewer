@@ -64,6 +64,10 @@ interface CombinationControlsProps {
  * slider commits on release: each commit is a fresh worker render, and
  * dragging would otherwise start one per pixel.
  */
+// MUI capitalises toggle buttons, which turns the quantum number n = 2 into
+// "N = 2" and the hybrid h₁ into "H₁". These labels are symbols; keep their case.
+const KEEP_CASE = { '& .MuiToggleButton-root': { textTransform: 'none' } } as const;
+
 const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, onChange }) => {
   const committedField = selection.kind === 'field' ? selection.field : DEFAULT_FIELD_AU;
   const [draftField, setDraftField] = useState(committedField);
@@ -96,6 +100,7 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
         <FormControl component="fieldset" margin="normal" fullWidth>
           <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Show</FormLabel>
           <ToggleButtonGroup
+            sx={KEEP_CASE}
             value={selection.member === 'all' ? 'all' : String(selection.member)}
             exclusive
             size="small"
@@ -121,6 +126,7 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
         <FormControl component="fieldset" margin="normal" fullWidth>
           <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Level</FormLabel>
           <ToggleButtonGroup
+            sx={KEEP_CASE}
             value={String(selection.level)}
             exclusive
             size="small"
@@ -176,7 +182,7 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
                 size="small"
                 fullWidth
                 aria-label="Stark state"
-                sx={{ mt: 1 }}
+                sx={{ ...KEEP_CASE, mt: 1 }}
                 onChange={(event: React.MouseEvent<HTMLElement>, value: StarkChoice | null) => {
                   if (value !== null) onChange({ ...selection, stark: value });
                 }}
