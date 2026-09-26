@@ -4,6 +4,7 @@ import { FieldRenderRequest } from '../field_source';
 import { setMode } from './atomSlice';
 import { BASIC_ORBITALS_Z, DEFAULT_ENCLOSED_FRACTION } from '../orbital_presets';
 import { CombinationSelection, NO_COMBINATION } from '../combinations';
+import { CameraAngles, isCanonicalAngles } from '../camera_angles';
 import type { RootState } from './index';
 
 export interface BasicSelection { n: number; l: number; ml: number; }
@@ -38,6 +39,10 @@ interface OrbitalState {
   combination: CombinationSelection;
   /** Bumped to ask App for a Basic Orbitals render once every pending dispatch has landed. */
   basicRenderNonce: number;
+  /** The camera's direction, off the canonical view. Null at the canonical view, so an untouched view's link carries no cam key. */
+  cameraAngles: CameraAngles | null;
+  /** Bumped to ask the viewer to turn the camera to `cameraAngles` (a restored link). */
+  cameraRestoreNonce: number;
 }
 
 const initialState: OrbitalState = {
@@ -52,7 +57,9 @@ const initialState: OrbitalState = {
   basicSelection: { ...DEFAULT_BASIC_SELECTION },
   enclosedFraction: DEFAULT_ENCLOSED_FRACTION,
   combination: NO_COMBINATION,
-  basicRenderNonce: 0
+  basicRenderNonce: 0,
+  cameraAngles: null,
+  cameraRestoreNonce: 0
 };
 
 const orbitalSlice = createSlice({
@@ -116,7 +123,22 @@ const orbitalSlice = createSlice({
     },
     requestBasicRender: (state) => {
       state.basicRenderNonce += 1;
-    }
+    },
+    // The viewer reports the camera once it settles. Stored as null at the
+    // canonical view, so an untouched view's link carries no cam key.
+    cameraMoved: (state, action: PayloadAction<CameraAngles>) => {
+      const next = isCanonicalAngles(action.payload) ? null : action.payload;
+      const current = state.cameraAngles;
+      const same = next === null
+        ? current === null
+        : current !== null && current.azimuth === next.azimuth && current.elevation === next.elevation;
+      if (!same) state.cameraAngles = next;
+    },
+    // A restored link: the nonce is what the viewer watches.
+    restoreCamera: (state, action: PayloadAction<CameraAngles | null>) => {
+      state.cameraAngles = action.payload && !isCanonicalAngles(action.payload) ? action.payload : null;
+      state.cameraRestoreNonce += 1;
+    },
   },
   // Combinations belong to Basic Orbitals. Leaving for atom mode drops the
   // request, so no effect can redraw a hybrid over an atom, and the viewer
@@ -146,7 +168,9 @@ export const {
   setBasicSelection,
   setEnclosedFraction,
   setCombination,
-  requestBasicRender
+  requestBasicRender,
+  cameraMoved,
+  restoreCamera
 } = orbitalSlice.actions;
 
 /**

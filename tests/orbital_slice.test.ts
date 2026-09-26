@@ -2,13 +2,14 @@ import { configureStore } from '@reduxjs/toolkit';
 import reducer, {
     startOrbitalCalculation, startFieldCalculation, finishOrbitalCalculation, clearPicture,
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, selectShownBasicOrbital,
-    DEFAULT_BASIC_SELECTION,
+    DEFAULT_BASIC_SELECTION, cameraMoved, restoreCamera,
 } from '../src/store/orbitalSlice';
 import orbitalReducer from '../src/store/orbitalSlice';
 import { setMode } from '../src/store/atomSlice';
 import atomReducer from '../src/store/atomSlice';
 import { fieldRequestFor, NO_COMBINATION } from '../src/combinations';
 import { basicOrbitalParams, DEFAULT_ENCLOSED_FRACTION } from '../src/orbital_presets';
+import { CANONICAL_CAMERA_ANGLES } from '../src/camera_angles';
 
 const makeStore = () => configureStore({ reducer: { orbital: orbitalReducer, atom: atomReducer } });
 
@@ -103,5 +104,23 @@ describe('orbitalSlice: Basic Orbitals view state', () => {
             radialSamples: { R: new Float64Array(3), rMin: 1e-3, dx: 0.1, size: 3 },
         }));
         expect(selectShownBasicOrbital(store.getState())).toEqual(DEFAULT_BASIC_SELECTION);
+    });
+});
+
+describe('orbitalSlice: camera', () => {
+    it('records a settled camera and forgets it at the canonical view', () => {
+        const store = makeStore();
+        store.dispatch(cameraMoved({ azimuth: 120, elevation: -10 }));
+        expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 120, elevation: -10 });
+        store.dispatch(cameraMoved(CANONICAL_CAMERA_ANGLES));
+        expect(store.getState().orbital.cameraAngles).toBeNull();
+    });
+
+    it('bumps the restore nonce so the viewer turns the camera', () => {
+        const store = makeStore();
+        store.dispatch(restoreCamera({ azimuth: 45, elevation: 20 }));
+        expect(store.getState().orbital).toMatchObject({ cameraAngles: { azimuth: 45, elevation: 20 }, cameraRestoreNonce: 1 });
+        store.dispatch(restoreCamera(null));
+        expect(store.getState().orbital).toMatchObject({ cameraAngles: null, cameraRestoreNonce: 2 });
     });
 });

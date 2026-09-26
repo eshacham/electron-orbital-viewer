@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setHoverRadius as setAtomHoverRadius, drillToShell } from '../store/atomSlice';
+import { cameraMoved } from '../store/orbitalSlice';
+import { applyCameraAngles, cameraAnglesOf } from '../camera_angles';
 import { ScaleBar, formatScaleLabel } from '../scale_bar';
 import { useMediaQuery, PREFERS_REDUCED_MOTION, NARROW_VIEWPORT } from '../useMediaQuery';
 import { useViewInsets } from '../useViewInsets';
@@ -41,6 +43,9 @@ interface ShellCompositionErrorMessage {
     requestId: number;
 }
 type ShellCompositionWorkerMessage = ShellCompositionSuccessMessage | ShellCompositionErrorMessage;
+
+/** How long the camera must sit still before its direction is reported to the store -- OrbitControls fires on every damped frame while it eases to a stop. */
+const CAMERA_SETTLE_MS = 300;
 
 interface OrbitalViewerProps {
     onOrbitalRendered?: (isoLevel: number) => void;
@@ -113,6 +118,41 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             }
         };
     }, [dispatch]);
+
+    // The camera's direction, into the store once it settles (OrbitControls
+    // fires every damped frame), so a shared link can carry it.
+    useEffect(() => {
+        const context = visualizerContextRef.current;
+        if (!context) return;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const settle = () => {
+            timer = null;
+            dispatch(cameraMoved(cameraAnglesOf(context.camera, context.controls.target)));
+        };
+        const onChange = () => {
+            if (timer !== null) clearTimeout(timer);
+            timer = setTimeout(settle, CAMERA_SETTLE_MS);
+        };
+        context.controls.addEventListener('change', onChange);
+        return () => {
+            context.controls.removeEventListener('change', onChange);
+            if (timer !== null) clearTimeout(timer);
+        };
+    }, [dispatch]);
+
+    // A restored link turns the camera. frameOrbital keeps the direction it
+    // finds, so this survives the framing that follows when the mesh lands.
+    const cameraRestoreNonce = useAppSelector(state => state.orbital.cameraRestoreNonce);
+    const restoredCameraAngles = useAppSelector(state => state.orbital.cameraAngles);
+    useEffect(() => {
+        const context = visualizerContextRef.current;
+        if (!context || cameraRestoreNonce === 0) return;
+        applyCameraAngles(context.camera, context.controls.target, restoredCameraAngles);
+        context.controls.update();
+        // Only a restore moves the camera; the user's own moves also change
+        // cameraAngles and must not.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cameraRestoreNonce]);
 
     // Centre the scene in the part of the canvas no panel covers (see
     // useViewInsets). The panels are siblings of the canvas host inside

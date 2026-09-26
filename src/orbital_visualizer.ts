@@ -28,6 +28,7 @@ import {
 } from './atom/shell_composition_view';
 import { FieldRenderRequest } from './field_source';
 import { createFieldOverlayGroup } from './field_overlay_view';
+import { CANONICAL_CAMERA_DIRECTION } from './camera_angles';
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -247,8 +248,8 @@ type FieldWorkerMessage = WorkerFieldsSuccessMessage | WorkerErrorMessage;
  */
 export function defaultCameraPosition(distance: number): THREE.Vector3 {
     // z is up (see initVisualizer): mostly in front along +x, a little to
-    // the side along +y, and about 26 degrees above the xy plane.
-    return new THREE.Vector3(0.75, 0.42, 0.5).normalize().multiplyScalar(distance);
+    // the side along +y, and about 30 degrees above the xy plane.
+    return new THREE.Vector3(...CANONICAL_CAMERA_DIRECTION).normalize().multiplyScalar(distance);
 }
 
 /**
