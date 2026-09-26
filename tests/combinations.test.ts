@@ -1,6 +1,6 @@
 import {
     NO_COMBINATION, OVERLAY_COLORS, fieldRequestFor, combinationTitle, combinationCurves, overlayLegend,
-    selectionProblem, CombinationSelection,
+    selectionProblem, samePicture, CombinationSelection,
 } from '../src/combinations';
 import { ORBITAL_RESOLUTION, OVERLAY_RESOLUTION, combinationSamplingRadius, basicOrbitalParams, computeSamplingRadius } from '../src/orbital_presets';
 import { CURVE_COLORS } from '../src/curve_colors';
@@ -46,6 +46,28 @@ describe('fieldRequestFor', () => {
     ])('refuses %s, with a reason', (_name, selection) => {
         expect(fieldRequestFor(selection, 0.9)).toBeNull();
         expect(selectionProblem(selection)).toMatch(/refused|no hybrid/);
+    });
+});
+
+// Final review: at n = 2 the Stark shapes do not depend on F, so a new F on
+// the slider is the same picture and must not be recomputed.
+describe('samePicture', () => {
+    const request = (selection: CombinationSelection, fraction = 0.9) => fieldRequestFor(selection, fraction)!;
+
+    it('treats a new n = 2 field as the same picture', () => {
+        expect(samePicture(request(field(2, 0.001)), request(field(2, 0.003)))).toBe(true);
+    });
+
+    it.each([
+        ['another Stark choice', field(2, 0.001, 'both'), 0.9],
+        ['another enclosed fraction', field(2, 0.001), 0.75],
+        ['another level', field(1, 0.001), 0.9],
+    ] as const)('tells %s apart', (_name, other, fraction) => {
+        expect(samePicture(request(field(2, 0.001)), request(other, fraction))).toBe(false);
+    });
+
+    it('tells a new n = 1 field apart: that shape does depend on F', () => {
+        expect(samePicture(request(field(1, 0.01)), request(field(1, 0.02)))).toBe(false);
     });
 });
 

@@ -89,6 +89,18 @@ export function fieldRequestFor(selection: CombinationSelection, enclosedFractio
     };
 }
 
+/**
+ * Whether two requests draw the same meshes: the same sources, by id, at the
+ * same enclosed fraction. A new field at n = 2 is one -- the Stark shapes do
+ * not depend on F, only their energies do -- so the slider need not recompute.
+ */
+export function samePicture(a: FieldRenderRequest, b: FieldRenderRequest): boolean {
+    return a.enclosedFraction === b.enclosedFraction
+        && a.resolution === b.resolution
+        && a.sources.length === b.sources.length
+        && a.sources.every((source, i) => source.id === b.sources[i].id);
+}
+
 /** The colour key for an overlay; null when a single source is drawn in phase colours. */
 export function overlayLegend(selection: CombinationSelection): Array<{ label: string; color: string }> | null {
     const sources = fieldSourcesFor(selection);

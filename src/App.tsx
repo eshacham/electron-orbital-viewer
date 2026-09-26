@@ -42,7 +42,7 @@ import PeriodicTable from './components/PeriodicTable';
 import ElementPickerDialog from './components/ElementPickerDialog';
 import { elementFor } from './elements';
 import { orbitalName } from './orbital_names';
-import { CombinationSelection, NO_COMBINATION, fieldRequestFor, combinationCurves, overlayLegend } from './combinations';
+import { CombinationSelection, NO_COMBINATION, fieldRequestFor, combinationCurves, overlayLegend, samePicture } from './combinations';
 import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
@@ -286,7 +286,9 @@ function App() {
     // enclosed fraction changes. Going back to None redraws the n/l/mₗ still in
     // the panel: the canvas was showing the combination, not that orbital.
     // A selection that cannot be drawn clears the canvas rather than leave the
-    // last picture under its title (spec §3.5); the picker says why.
+    // last picture under its title (spec §3.5); the picker says why. A request
+    // for the picture already drawn or in flight -- a new F at n = 2, where
+    // only the energies change -- is not sent again, unless it failed.
     const previousCombinationRef = useRef(combination);
     useEffect(() => {
         const previous = previousCombinationRef.current;
@@ -301,9 +303,11 @@ function App() {
             dispatch(clearPicture());
             return;
         }
+        if (renderedField && !error && samePicture(renderedField, request)) return;
         dispatch(startFieldCalculation(request));
         // n/l/mₗ are read for the None case only; changing them while a
-        // combination is drawn must not replace it.
+        // combination is drawn must not replace it. renderedField is read,
+        // not watched: only a new selection asks for a picture.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAtomMode, combination, enclosedFraction, dispatch]);
 

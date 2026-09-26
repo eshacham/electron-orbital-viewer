@@ -77,3 +77,30 @@ describe('App: a refused combination', () => {
         expect(document.getElementById('orbital-name')).not.toHaveTextContent(/not drawn/);
     });
 });
+
+describe('App: the n = 2 field slider', () => {
+    // Final review: at n = 2 the drawn shapes do not depend on F, so a new
+    // F must not recompute them -- only the energies change.
+    it('does not re-request an identical picture, while the energies follow F', () => {
+        const store = renderBasicOrbitals();
+        select(field(2, 0.001));
+        const drawn = store.getState().orbital.currentField;
+        expect(drawn?.sources.map(s => s.id)).toEqual(['stark:n2:lower']);
+        expect(screen.getByText(/ΔE = −3F = −0\.0030 Ha/)).toBeInTheDocument();
+
+        select(field(2, 0.002));
+        expect(store.getState().orbital.currentField).toBe(drawn);
+        expect(screen.getByText(/ΔE = −3F = −0\.0060 Ha/)).toBeInTheDocument();
+    });
+
+    it('still redraws when the states or the enclosed fraction change', () => {
+        const store = renderBasicOrbitals();
+        select(field(2, 0.001));
+        select(field(2, 0.002, 'both'));
+        expect(store.getState().orbital.currentField?.sources.map(s => s.id)).toEqual(['stark:n2:lower', 'stark:n2:upper']);
+
+        fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
+        fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
+        expect(store.getState().orbital.currentField?.enclosedFraction).toBe(0.75);
+    });
+});
