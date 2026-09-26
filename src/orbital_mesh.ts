@@ -1,27 +1,10 @@
 import { DensityMap, MeshData, OrbitalParams } from './types/orbital';
-import { makeWaveFunctionEvaluator } from './quantum_functions';
 import { marchingCubes } from './marching_cubes';
 import { isoLevelForEnclosedFraction } from './radial_distribution';
-import { RadialGrid, interpolateOnGrid } from './atom/radial_grid';
-
-/**
- * Rebuilds the interpolating closure a converged SCF solution's R(r) was
- * flattened into to cross the worker boundary (see `OrbitalParams.radialSamples`).
- *
- * `interpolateOnGrid` only reads `rMin`, `dx` and `size` off its grid
- * argument, so a `RadialGrid`-shaped object is reconstructed here rather than
- * duplicating its interpolation logic (`r` and `rMax` are unused and filled
- * in only to satisfy the type); this is the one place `radialSamples` needs
- * to be turned back into the `(r: number) => number` signature
- * `makeWaveFunctionEvaluator` expects.
- */
-function radialOverrideFromSamples(
-    samples: NonNullable<OrbitalParams['radialSamples']>
-): (r: number) => number {
-    const { R, rMin, dx, size } = samples;
-    const grid: RadialGrid = { r: new Float64Array(0), dx, size, rMin, rMax: rMin * Math.exp((size - 1) * dx) };
-    return (r: number) => interpolateOnGrid(grid, R, r);
-}
+import {
+    AnalyticFieldSource, FieldEvaluator, FieldSource, GridFieldSource,
+    hydrogenicSource, makeFieldEvaluator,
+} from './field_source';
 
 /**
  * The density that anchors the top of the log-scale climb below (see
@@ -129,51 +112,67 @@ export function encodeDensityMap(psi: Float32Array, isoLevel: number): Uint8Arra
     return encoded;
 }
 
-/**
- * Builds the isosurface mesh for an orbital.
- *
- * psi is sampled once per point of a regular grid over [-rMax, rMax]^3. The
- * contour to draw is then chosen from those samples: `enclosedFraction` says how
- * much of the electron the surface should hold, and the density threshold that
- * achieves it falls out of the sampled distribution. The samples are kept and
- * handed back as a density map, so the cut-away face can be shaded without
- * evaluating the wave function a second time.
- */
-export function generateOrbitalMesh(params: OrbitalParams): MeshData {
-    const { n, l, ml, Z, resolution, rMax, enclosedFraction, radialSamples } = params;
+/** ψ sampled on a regular cube, z-fastest: index = (i * side + j) * side + k. */
+export interface SampledField {
+    samples: Float32Array;
+    side: number;
+    step: number;
+    /** World coordinate of grid point 0 on every axis. */
+    origin: number;
+}
 
+function checkBox(resolution: number, rMax: number): void {
     if (resolution <= 0 || rMax <= 0) {
         throw new Error('Invalid parameters: resolution and rMax must be positive');
     }
     if (!Number.isInteger(resolution)) {
         throw new Error('Invalid parameters: resolution must be a whole number');
     }
+}
+
+function checkFraction(enclosedFraction: number): void {
     if (!(enclosedFraction > 0) || enclosedFraction >= 1) {
         throw new Error('Invalid parameters: enclosedFraction must be between 0 and 1');
     }
+}
 
-    const evaluatePsi = makeWaveFunctionEvaluator(
-        n, l, ml, Z,
-        radialSamples ? radialOverrideFromSamples(radialSamples) : undefined
-    );
-
+export function sampleEvaluator(evaluate: FieldEvaluator, rMax: number, resolution: number): SampledField {
     const side = resolution + 1;
     const step = (2 * rMax) / resolution;
     const origin = -rMax;
-
     const samples = new Float32Array(side * side * side);
-
     let index = 0;
     for (let i = 0; i < side; i++) {
         const x = origin + i * step;
         for (let j = 0; j < side; j++) {
             const y = origin + j * step;
             for (let k = 0; k < side; k++) {
-                samples[index++] = evaluatePsi(x, y, origin + k * step);
+                samples[index++] = evaluate(x, y, origin + k * step);
             }
         }
     }
+    return { samples, side, step, origin };
+}
 
+export function sampleFieldSource(source: AnalyticFieldSource, resolution: number): SampledField {
+    checkBox(resolution, source.rMax);
+    return sampleEvaluator(makeFieldEvaluator(source.recipe), source.rMax, resolution);
+}
+
+/**
+ * The contour and its mesh, from samples already taken.
+ *
+ * The contour to draw is chosen from the samples: `enclosedFraction` says how
+ * much of the electron the surface should hold, and the density threshold that
+ * achieves it falls out of the sampled distribution. The samples are handed
+ * back as a density map, so the cut-away face is shaded without evaluating
+ * the field a second time. `signAt` colours each vertex by the sign of ψ at
+ * the vertex itself: taken from the nearest sample instead, vertices across a
+ * nodal surface from that sample would be miscoloured, exactly where the two
+ * phases meet.
+ */
+export function meshFromSamples(field: SampledField, enclosedFraction: number, signAt: FieldEvaluator): MeshData {
+    const { samples, side, step, origin } = field;
     const isoLevel = isoLevelForEnclosedFraction(samples, enclosedFraction);
     if (!(isoLevel > 0)) {
         throw new Error('No isosurface for this orbital');
@@ -181,27 +180,87 @@ export function generateOrbitalMesh(params: OrbitalParams): MeshData {
 
     // Meshing needs float64: near the surface |psi|^2 and isoLevel are within a
     // rounding error of each other, and their difference decides the sign.
-    const field = new Float64Array(samples.length);
+    const values = new Float64Array(samples.length);
     for (let i = 0; i < samples.length; i++) {
-        field[i] = samples[i] * samples[i] - isoLevel;
+        values[i] = samples[i] * samples[i] - isoLevel;
     }
 
-    const mesh = marchingCubes(resolution, field, origin, step);
-
+    const mesh = marchingCubes(side - 1, values, origin, step);
     if (!mesh.positions.length || !mesh.cells.length) {
         throw new Error('No isosurface for this orbital');
     }
 
-    // Sign of psi at the vertex itself. Taking it from the nearest grid sample
-    // instead would miscolour vertices that sit across a nodal surface from
-    // that sample, which is exactly where the two phases meet.
-    const psiSigns = mesh.positions.map(([x, y, z]) => (evaluatePsi(x, y, z) >= 0 ? 1 : -1));
-
-    const densityMap: DensityMap = {
-        data: encodeDensityMap(samples, isoLevel),
-        side,
-        rMax,
-    };
-
+    const psiSigns = mesh.positions.map(([x, y, z]) => (signAt(x, y, z) >= 0 ? 1 : -1));
+    const densityMap: DensityMap = { data: encodeDensityMap(samples, isoLevel), side, rMax: -origin };
     return { positions: mesh.positions, cells: mesh.cells, psiSigns, densityMap, isoLevel };
+}
+
+const GRID_SHAPE_MESSAGE =
+    'Grid field sources must be a centred cube: the same number of points on every axis, origin at minus half the width';
+
+/**
+ * A grid source as samples the mesher understands. A density grid is carried
+ * as √ρ so the enclosed-fraction search, which squares its input, sees ρ
+ * itself; its vertices are all "positive", there being no phase to show.
+ */
+function gridAsSampledField(source: GridFieldSource, resolution: number): SampledField {
+    const [side, ny, nz] = source.shape;
+    if (ny !== side || nz !== side || side < 2 || !(source.spacing > 0)) throw new Error(GRID_SHAPE_MESSAGE);
+    const halfWidth = ((side - 1) * source.spacing) / 2;
+    if (source.origin.some(o => Math.abs(o + halfWidth) > 1e-6 * halfWidth)) throw new Error(GRID_SHAPE_MESSAGE);
+    if (source.values.length !== side ** 3) {
+        throw new Error(`Grid field source ${source.id}: expected ${side ** 3} values, got ${source.values.length}`);
+    }
+    if (resolution !== side - 1) {
+        throw new Error(`Invalid parameters: resolution must be ${side - 1} for grid ${source.id} (its own shape)`);
+    }
+    const samples = source.quantity === 'density'
+        ? Float32Array.from(source.values, v => Math.sqrt(Math.max(0, v)))
+        : source.values;
+    return { samples, side, step: source.spacing, origin: -halfWidth };
+}
+
+/** Trilinear interpolation of a sampled field, clamped to the box. */
+function interpolateSample(field: SampledField, x: number, y: number, z: number): number {
+    const { samples, side, step, origin } = field;
+    const cell = (c: number): [number, number] => {
+        const t = (c - origin) / step;
+        const i = Math.min(side - 2, Math.max(0, Math.floor(t)));
+        return [i, Math.min(1, Math.max(0, t - i))];
+    };
+    const [i, fx] = cell(x);
+    const [j, fy] = cell(y);
+    const [k, fz] = cell(z);
+    const at = (a: number, b: number, c: number) => samples[((i + a) * side + (j + b)) * side + (k + c)];
+    const lerp = (p: number, q: number, t: number) => p + (q - p) * t;
+    return lerp(
+        lerp(lerp(at(0, 0, 0), at(0, 0, 1), fz), lerp(at(0, 1, 0), at(0, 1, 1), fz), fy),
+        lerp(lerp(at(1, 0, 0), at(1, 0, 1), fz), lerp(at(1, 1, 0), at(1, 1, 1), fz), fy),
+        fx
+    );
+}
+
+/**
+ * The isosurface of any field source (spec §4.1). An analytic source is
+ * sampled once per point of a (resolution + 1)³ grid over its box; a grid
+ * source is meshed on its own grid.
+ */
+export function generateFieldMesh(source: FieldSource, resolution: number, enclosedFraction: number): MeshData {
+    if (source.kind === 'grid') {
+        const field = gridAsSampledField(source, resolution);
+        checkFraction(enclosedFraction);
+        const signAt: FieldEvaluator = source.quantity === 'density'
+            ? () => 1
+            : (x, y, z) => interpolateSample(field, x, y, z);
+        return meshFromSamples(field, enclosedFraction, signAt);
+    }
+    checkBox(resolution, source.rMax);
+    checkFraction(enclosedFraction);
+    const evaluate = makeFieldEvaluator(source.recipe);
+    return meshFromSamples(sampleEvaluator(evaluate, source.rMax, resolution), enclosedFraction, evaluate);
+}
+
+/** One orbital's isosurface; unchanged behaviour, now a field source like any other. */
+export function generateOrbitalMesh(params: OrbitalParams): MeshData {
+    return generateFieldMesh(hydrogenicSource(params), params.resolution, params.enclosedFraction);
 }
