@@ -1,7 +1,7 @@
-import { AnalyticFieldSource, CombinationRecipe, HydrogenicRecipe, fieldProblem } from './field_source';
+import { AnalyticFieldSource, CombinationRecipe, fieldProblem } from './field_source';
 import { sampleFieldSource } from './orbital_mesh';
 import { overlapIntegral, zMatrixElement } from './field_integrals';
-import { BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, combinationSamplingRadius } from './orbital_presets';
+import { ORBITAL_RESOLUTION, combinationSamplingRadius, n2Recipe } from './orbital_presets';
 
 /**
  * Hydrogen in a uniform field F along +z, H′ = +F z (atomic units): the field
@@ -47,14 +47,12 @@ export function polarized1sSource(field: number): AnalyticFieldSource {
     return { kind: 'analytic', id: `polarized1s:F${field}`, recipe: { type: 'polarized1s', field }, rMax: combinationSamplingRadius(1) };
 }
 
-const n2 = (l: number, ml: number): HydrogenicRecipe => ({ type: 'hydrogenic', n: 2, l, ml, Z: BASIC_ORBITALS_Z });
-
 /** lower = (2s + 2p_z)/√2, shifted by −3F; upper = (2s − 2p_z)/√2, by +3F. */
 export function starkStateRecipe(state: StarkState): CombinationRecipe {
     const pSign = state === 'lower' ? 1 : -1;
     return { type: 'combination', terms: [
-        { coefficient: Math.SQRT1_2, orbital: n2(0, 0) },
-        { coefficient: pSign * Math.SQRT1_2, orbital: n2(1, 0) },
+        { coefficient: Math.SQRT1_2, orbital: n2Recipe(0, 0) },
+        { coefficient: pSign * Math.SQRT1_2, orbital: n2Recipe(1, 0) },
     ] };
 }
 
@@ -86,8 +84,8 @@ export function polarizabilityFromDrawnPsi(field: number = VALIDATION_FIELD_AU, 
 /** ⟨2s|z|2p_z⟩ on the render grid; −3 a₀ exactly. */
 export function transitionDipole2s2pz(resolution: number = ORBITAL_RESOLUTION): number {
     const rMax = combinationSamplingRadius(2);
-    const s = sampleFieldSource({ kind: 'analytic', id: 'hydrogenic:2,0,0,Z1', recipe: n2(0, 0), rMax }, resolution);
-    const pz = sampleFieldSource({ kind: 'analytic', id: 'hydrogenic:2,1,0,Z1', recipe: n2(1, 0), rMax }, resolution);
+    const s = sampleFieldSource({ kind: 'analytic', id: 'hydrogenic:2,0,0,Z1', recipe: n2Recipe(0, 0), rMax }, resolution);
+    const pz = sampleFieldSource({ kind: 'analytic', id: 'hydrogenic:2,1,0,Z1', recipe: n2Recipe(1, 0), rMax }, resolution);
     return zMatrixElement(s, pz);
 }
 

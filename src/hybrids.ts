@@ -1,7 +1,7 @@
-import { AnalyticFieldSource, CombinationRecipe, HydrogenicRecipe } from './field_source';
+import { AnalyticFieldSource, CombinationRecipe } from './field_source';
 import { sampleFieldSource } from './orbital_mesh';
 import { positiveLobeCentroid, angleBetweenDegrees } from './field_integrals';
-import { BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, combinationSamplingRadius } from './orbital_presets';
+import { ORBITAL_RESOLUTION, combinationSamplingRadius, n2Recipe } from './orbital_presets';
 
 /**
  * sp, sp² and sp³ hybrids of hydrogen's n = 2 shell:
@@ -32,8 +32,6 @@ export function hybridCount(kind: HybridKind): number {
     return HYBRID_DIRECTIONS[kind].length;
 }
 
-const n2 = (l: number, ml: number): HydrogenicRecipe => ({ type: 'hydrogenic', n: 2, l, ml, Z: BASIC_ORBITALS_Z });
-
 /** In makeWaveFunctionEvaluator's real harmonics mₗ = +1 is p_x, −1 is p_y, 0 is p_z. */
 export function hybridRecipe(kind: HybridKind, index: number): CombinationRecipe {
     const directions = HYBRID_DIRECTIONS[kind];
@@ -45,10 +43,10 @@ export function hybridRecipe(kind: HybridKind, index: number): CombinationRecipe
     const p = Math.sqrt(k / (k + 1));
     const [dx, dy, dz] = directions[index];
     const terms = [
-        { coefficient: -s, orbital: n2(0, 0) },
-        { coefficient: p * dx, orbital: n2(1, 1) },
-        { coefficient: p * dy, orbital: n2(1, -1) },
-        { coefficient: p * dz, orbital: n2(1, 0) },
+        { coefficient: -s, orbital: n2Recipe(0, 0) },
+        { coefficient: p * dx, orbital: n2Recipe(1, 1) },
+        { coefficient: p * dy, orbital: n2Recipe(1, -1) },
+        { coefficient: p * dz, orbital: n2Recipe(1, 0) },
     ].filter(term => term.coefficient !== 0);
     return { type: 'combination', terms };
 }

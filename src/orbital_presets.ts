@@ -1,4 +1,5 @@
 import { radiusContaining } from './radial_distribution';
+import { HydrogenicRecipe } from './field_source';
 
 /**
  * The share of the electron the surface encloses by default.
@@ -49,6 +50,11 @@ export const ENCLOSED_FRACTIONS = [0.5, 0.75, 0.9, 0.95, 0.99];
 export const ORBITAL_RESOLUTION = 128;
 
 export const BASIC_ORBITALS_Z = 1;
+
+/** A shell-2 hydrogenic recipe at Basic Orbitals' Z = 1: shared so hybrids and Stark states build identical terms. */
+export function n2Recipe(l: number, ml: number): HydrogenicRecipe {
+    return { type: 'hydrogenic', n: 2, l, ml, Z: BASIC_ORBITALS_Z };
+}
 
 /**
  * The axis levels 1-2 cut the atom along by default. The camera is z-up (the
