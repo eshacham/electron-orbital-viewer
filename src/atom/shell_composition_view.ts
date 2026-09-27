@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { OrbitalComponent } from './shell_composition';
 import { LobeMeshData } from '../workers/shellCompositionWorker';
 import { CURVE_COLORS, orbitalShade } from '../curve_colors';
+import { orbitalName } from '../orbital_names';
+import { markExportSurface } from '../export/surfaces';
 
 /**
  * Turns a shell's computed orbital lobes (Addendum 2) into a group of
@@ -92,6 +94,7 @@ export function createCompositionLobesGroup(
         });
 
         const mesh = new THREE.Mesh(geometry, material);
+        markExportSurface(mesh, orbitalName(component.n, component.l, component.ml));
         // Read back by setCompositionLobesOpacity below whenever the shared
         // opacity slider changes, so each lobe keeps its own occupancy
         // weighting instead of every lobe snapping to the same raw value.

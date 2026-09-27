@@ -86,4 +86,15 @@ describe('ShareExportBar: Export', () => {
             jest.useRealTimers();
         }
     });
+
+    it('asks for a print size before exporting STL', async () => {
+        const onExport = jest.fn().mockResolvedValue(undefined);
+        render(<ShareExportBar onShare={share} onExport={onExport} availability={allAvailable()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /3D print/i }));
+        fireEvent.mouseDown(screen.getByRole('combobox', { name: /longest side/i }));
+        fireEvent.click(screen.getByRole('option', { name: '80 mm' }));
+        fireEvent.click(screen.getByRole('button', { name: /export stl/i }));
+        await waitFor(() => expect(onExport).toHaveBeenCalledWith('stl', { longestSideMm: 80 }));
+    });
 });

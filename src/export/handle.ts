@@ -1,4 +1,5 @@
 import type { CombinationLegendItem } from './png';
+import type { ExportSurface } from './surfaces';
 
 /** What the export code may ask of the 3D view. OrbitalViewer fills it. */
 export interface PngOverlayInput {
@@ -10,4 +11,6 @@ export interface PngOverlayInput {
 
 export interface ViewerExportHandle {
     capturePng(overlays: PngOverlayInput | null): Promise<Blob>;
+    /** The surfaces drawn now, whole (the cut is a view setting), in world-space bohr. */
+    collectSurfaces(): ExportSurface[];
 }

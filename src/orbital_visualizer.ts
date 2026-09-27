@@ -28,6 +28,7 @@ import {
 } from './atom/shell_composition_view';
 import { FieldRenderRequest } from './field_source';
 import { createFieldOverlayGroup } from './field_overlay_view';
+import { markExportSurface } from './export/surfaces';
 import { CANONICAL_CAMERA_DIRECTION } from './camera_angles';
 
 // Add export to make it available to OrbitalViewer
@@ -1722,6 +1723,7 @@ function updateSceneWithMeshData(
         const material = createOrbitalMaterial(context.surfaceStyle, context.clippingPlanes);
 
         const mesh = new THREE.Mesh(geometry, material);
+        markExportSurface(mesh, 'surface');
         const group = new THREE.Group();
         group.add(mesh);
 

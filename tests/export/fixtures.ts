@@ -2,6 +2,7 @@ import { createAppStore, RootState } from '../../src/store';
 import { setElement, solveSucceeded } from '../../src/store/atomSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { ExportContext } from '../../src/export/run_export';
+import type { ExportSurface } from '../../src/export/surfaces';
 
 /** A store with production's middleware config (see createAppStore), so a typed-array payload does not print serializableCheck's console.error. */
 export const makeStore = () => createAppStore();
@@ -53,3 +54,13 @@ export async function readText(blob: Blob): Promise<string> {
  * `csvCurves` when they need to exercise the CSV encoder itself.
  */
 export const baseContext = (state: RootState): ExportContext => ({ state, shareUrl: 'http://x/#mode=atom&Z=10', csvCurves: [] });
+
+/** A closed octahedron of half-width 1 bohr, wound outward. */
+export function octahedron(name = 'octa'): ExportSurface {
+    return {
+        name,
+        positions: new Float32Array([1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1]),
+        indices: new Uint32Array([0, 2, 4, 2, 1, 4, 1, 3, 4, 3, 0, 4, 2, 0, 5, 1, 2, 5, 3, 1, 5, 0, 3, 5]),
+        colors: new Float32Array(18).fill(1),
+    };
+}

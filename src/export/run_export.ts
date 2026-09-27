@@ -4,8 +4,9 @@ import { CsvCurve, radialCurvesToCsv } from './csv';
 import { exportFileStem, methodStatement, viewDescription } from './caption';
 import { CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
+import { encodeStl } from './stl';
 
-export type ExportKind = 'png' | 'png-plain' | 'csv';
+export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl';
 
 export interface ExportItem { kind: ExportKind; label: string; detail: string; }
 
@@ -14,6 +15,7 @@ export const EXPORT_ITEMS: ExportItem[] = [
     { kind: 'png', label: 'Image (PNG, 2×)', detail: 'with caption, scale bar and colour key' },
     { kind: 'png-plain', label: 'Image (PNG, 2×), view only', detail: 'no overlays' },
     { kind: 'csv', label: 'Radial curves (CSV)', detail: 'the plotted curves, every sample' },
+    { kind: 'stl', label: '3D print (STL)', detail: 'watertight, in millimetres' },
 ];
 
 export interface ExportOptions { longestSideMm?: number; }
@@ -76,9 +78,22 @@ function pngReason(state: RootState): string | null {
     return drawnReason(state) ?? (state.orbital.isLoading || state.atom.isSolving ? PICTURE_BUSY_REASON : null);
 }
 
+export const WHOLE_ATOM_GEOMETRY_REASON = 'The whole-atom view is a shaded cut face, not a surface. Open a shell or an orbital to export geometry.';
+
+/**
+ * STL (and glTF after it) take the surfaces in the scene, so they refuse
+ * exactly when a PNG would -- nothing drawn, or a new picture still on its
+ * way while the old one's meshes are still up -- and also at the whole-atom
+ * level, whose picture is a shaded cut face with no surface behind it.
+ */
+function geometryReason(state: RootState): string | null {
+    if (state.atom.mode === 'atom' && state.atom.level === 'atom') return WHOLE_ATOM_GEOMETRY_REASON;
+    return pngReason(state);
+}
+
 export function exportAvailability(state: RootState): ExportAvailability {
     const png = pngReason(state);
-    return { png, 'png-plain': png, csv: drawnReason(state) };
+    return { png, 'png-plain': png, csv: drawnReason(state), stl: geometryReason(state) };
 }
 
 function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
@@ -124,6 +139,11 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             // caption (—, ², ½) correctly instead of mangling them.
             const blob = new Blob(['﻿', csvFor(context)], { type: 'text/csv;charset=utf-8' });
             return { blob, filename: `${stem}.csv` };
+        }
+        case 'stl': {
+            if (!context.handle) throw new Error('The 3D view is not ready yet.');
+            const stl = encodeStl(context.handle.collectSurfaces(), context.longestSideMm ?? 50);
+            return { blob: new Blob([stl], { type: 'model/stl' }), filename: `${stem}.stl` };
         }
     }
 }

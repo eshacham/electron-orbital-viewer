@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, ListItemText, Menu, MenuItem, Snackbar, TextField } from '@mui/material';
+import {
+    Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, InputLabel,
+    ListItemText, Menu, MenuItem, Select, Snackbar, TextField,
+} from '@mui/material';
 import { EXPORT_ITEMS, ExportAvailability, ExportKind, ExportOptions } from '../export/run_export';
+
+/** The longest side of a print, offered as a choice (a desk model to a display piece). */
+const PRINT_SIZES_MM = [30, 50, 80, 120];
 
 export type ShareOutcome = { kind: 'copied' } | { kind: 'manual'; url: string };
 
@@ -31,6 +37,8 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
     };
     const [manualUrl, setManualUrl] = useState<string | null>(null);
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+    const [stlOpen, setStlOpen] = useState(false);
+    const [printSize, setPrintSize] = useState(50);
 
     const handleShare = async () => {
         const outcome = await onShare();
@@ -49,7 +57,16 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
             showNotice(error instanceof Error ? error.message : 'The export failed.');
         }
     };
-    const handleItem = (kind: ExportKind) => { void runKind(kind); };
+    const handleItem = (kind: ExportKind) => {
+        // STL needs a size first: millimetres are what a slicer reads, and
+        // the file carries no other scale.
+        if (kind === 'stl') {
+            setMenuAnchor(null);
+            setStlOpen(true);
+        } else {
+            void runKind(kind);
+        }
+    };
 
     return (
         <Box className="share-export-bar" sx={{ mt: 1.5, display: 'flex', gap: 1 }}>
@@ -78,6 +95,33 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
                     </Menu>
                 </>
             )}
+            <Dialog open={stlOpen} onClose={() => setStlOpen(false)}>
+                <DialogTitle>Export for 3D printing</DialogTitle>
+                <DialogContent>
+                    <FormControl fullWidth margin="dense" size="small">
+                        <InputLabel id="print-size-label">Longest side</InputLabel>
+                        <Select
+                            labelId="print-size-label"
+                            id="print-size"
+                            label="Longest side"
+                            value={String(printSize)}
+                            onChange={event => setPrintSize(Number(event.target.value))}
+                        >
+                            {PRINT_SIZES_MM.map(mm => <MenuItem key={mm} value={String(mm)}>{mm} mm</MenuItem>)}
+                        </Select>
+                        <FormHelperText>
+                            Binary STL in millimetres; the scale (mm per a₀) is in the file header. The whole
+                            surface is exported: the cut is a view setting, and a cut surface would not print.
+                        </FormHelperText>
+                    </FormControl>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setStlOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={() => { setStlOpen(false); void runKind('stl', { longestSideMm: printSize }); }}>
+                        Export STL
+                    </Button>
+                </DialogActions>
+            </Dialog>
             <Dialog open={manualUrl !== null} onClose={() => setManualUrl(null)} fullWidth>
                 <DialogTitle>Copy this link</DialogTitle>
                 <DialogContent>

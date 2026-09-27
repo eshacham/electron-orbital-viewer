@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MeshData, SurfaceStyle } from './types/orbital';
 import { createOrbitalMaterial } from './orbital_material';
+import { ExportMember, markExportSurface } from './export/surfaces';
 
 /**
  * Several field sources at once (all four sp³ hybrids, both Stark states) as
@@ -42,12 +43,14 @@ export function createFieldOverlayGroup(
 ): THREE.Group {
     const positions: number[] = [];
     const indices: number[] = [];
+    const members: ExportMember[] = [];
     let offset = 0;
-    for (const mesh of meshes) {
+    meshes.forEach((mesh, i) => {
+        members.push({ name: `overlay member ${i + 1}`, start: indices.length, count: mesh.cells.length * 3 });
         for (const [x, y, z] of mesh.positions) positions.push(x, y, z);
         for (const [a, b, c] of mesh.cells) indices.push(a + offset, b + offset, c + offset);
         offset += mesh.positions.length;
-    }
+    });
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -57,6 +60,12 @@ export function createFieldOverlayGroup(
 
     const group = new THREE.Group();
     group.userData.isFieldOverlay = true;
-    group.add(new THREE.Mesh(geometry, createOrbitalMaterial(style, clippingPlanes)));
+    const mesh = new THREE.Mesh(geometry, createOrbitalMaterial(style, clippingPlanes));
+    // Ruling C4: each member exported as its own solid. On the symmetric grid
+    // mirror-image members meet at identical vertices, so welded as one mesh
+    // their shared edges would belong to four triangles and fail the
+    // manifold check -- no overlay would ever print.
+    markExportSurface(mesh, 'overlay', members);
+    group.add(mesh);
     return group;
 }

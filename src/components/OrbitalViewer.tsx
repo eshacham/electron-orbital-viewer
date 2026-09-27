@@ -28,6 +28,7 @@ import {
 } from '../orbital_visualizer';
 import { captureViewPng, freeAreaCrop } from '../export/png';
 import { ViewerExportHandle } from '../export/handle';
+import { collectExportSurfaces } from '../export/surfaces';
 import { shellComposition, isolateSubshell, compositeResolutionFor, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
 import { shellAtRadius } from '../atom/shell_pick';
 import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '../atom/shell_mesh_cache';
@@ -130,6 +131,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                             },
                         );
                     },
+                    collectSurfaces: () => collectExportSurfaces(context.currentOrbitalGroup),
                 };
             }
         }
