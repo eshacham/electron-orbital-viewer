@@ -12,6 +12,8 @@ import atomReducer, {
     levelUp,
     goToLevel,
     setHoverRadius,
+    requestAtomView,
+    PendingAtomView,
     AtomState,
 } from '../../src/store/atomSlice';
 import orbitalReducer, { startOrbitalCalculation } from '../../src/store/orbitalSlice';
@@ -461,5 +463,41 @@ describe('atomSlice', () => {
         const store = buildStore();
         const state: AtomState = store.getState().atom;
         expect(state).toBeDefined();
+    });
+});
+
+describe('a requested view lands with the solve', () => {
+    const landOnNeon = (view: PendingAtomView) => {
+        const store = buildStore();
+        store.dispatch(setElement(10));
+        store.dispatch(requestAtomView(view));
+        store.dispatch(solveSucceeded(neonLikeProfile()));
+        return store.getState().atom;
+    };
+    const orbital = (n: number, l: number, ml: number): PendingAtomView =>
+        ({ level: 'orbital', shell: n, subshell: { n, l }, orbital: { n, l, ml } });
+
+    it('opens the requested orbital once the profile arrives', () => {
+        const atom = landOnNeon(orbital(2, 1, -1));
+        expect(atom).toMatchObject({ level: 'orbital', selectedShell: 2, selectedSubshell: { n: 2, l: 1 }, selectedOrbital: { n: 2, l: 1, ml: -1 }, pendingView: null });
+    });
+
+    it('stops at the subshell when mₗ is out of range', () => {
+        expect(landOnNeon(orbital(2, 1, 2))).toMatchObject({ level: 'shell', selectedSubshell: { n: 2, l: 1 }, selectedOrbital: null });
+    });
+
+    // Review Focus 2: neon has no n = 3 shell.
+    it('falls back to the whole atom for a shell the element does not have', () => {
+        expect(landOnNeon(orbital(3, 2, 0))).toMatchObject({ level: 'atom', selectedShell: null, pendingView: null });
+    });
+
+    it('is cancelled by picking another element, and not re-applied by a later solve', () => {
+        const store = buildStore();
+        store.dispatch(setElement(10));
+        store.dispatch(requestAtomView(orbital(2, 1, 0)));
+        store.dispatch(setElement(10));
+        expect(store.getState().atom.pendingView).toBeNull();
+        store.dispatch(solveSucceeded(neonLikeProfile()));
+        expect(store.getState().atom.level).toBe('atom');
     });
 });

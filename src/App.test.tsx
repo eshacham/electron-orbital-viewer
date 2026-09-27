@@ -137,6 +137,7 @@ const defaultAtomState: AtomState = {
     profile: null,
     isSolving: false,
     error: null,
+    pendingView: null,
     hoverRadius: null,
 };
 

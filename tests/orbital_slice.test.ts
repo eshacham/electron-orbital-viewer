@@ -3,6 +3,7 @@ import reducer, {
     startOrbitalCalculation, startFieldCalculation, finishOrbitalCalculation, clearPicture,
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, selectShownBasicOrbital,
     DEFAULT_BASIC_SELECTION, cameraMoved, restoreCamera, resetView,
+    requestCut, clearPendingCut,
 } from '../src/store/orbitalSlice';
 import orbitalReducer from '../src/store/orbitalSlice';
 import { setMode } from '../src/store/atomSlice';
@@ -144,5 +145,16 @@ describe('orbitalSlice: camera', () => {
         store.dispatch(resetView());
         store.dispatch(restoreCamera({ azimuth: 70, elevation: -15 }));
         expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 70, elevation: -15 });
+    });
+});
+
+describe('orbitalSlice: a restored cut', () => {
+    it('is applied at once and remembered until cleared', () => {
+        const store = makeStore();
+        store.dispatch(requestCut({ clipAxis: 'y', clipPosition: 0.5 }));
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'y', clipPosition: 0.5 });
+        expect(store.getState().orbital.pendingCut).toEqual({ clipAxis: 'y', clipPosition: 0.5 });
+        store.dispatch(clearPendingCut());
+        expect(store.getState().orbital.pendingCut).toBeNull();
     });
 });

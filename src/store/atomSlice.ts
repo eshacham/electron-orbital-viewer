@@ -22,6 +22,18 @@ import { SerialisedAtomProfile } from '../workers/atomWorker';
 export type ViewMode = 'atom' | 'hydrogenic';
 export type ViewLevel = 'atom' | 'shell' | 'orbital';
 
+/**
+ * A view asked for before it can be shown: a shared link names a shell or
+ * an orbital, but occupancy is only known once the SCF lands. Applied by
+ * solveSucceeded, as deep as the profile allows.
+ */
+export interface PendingAtomView {
+    level: ViewLevel;
+    shell: number | null;
+    subshell: { n: number; l: number } | null;
+    orbital: { n: number; l: number; ml: number } | null;
+}
+
 export interface AtomState {
     mode: ViewMode;
     Z: number;
@@ -32,6 +44,8 @@ export interface AtomState {
     profile: SerialisedAtomProfile | null;
     isSolving: boolean;
     error: string | null;
+    /** A view named by a shared link, applied by solveSucceeded once the profile lands. */
+    pendingView: PendingAtomView | null;
     /** Radius the pointer is currently over, shared by the plot and the cut face. */
     hoverRadius: number | null;
     /**
@@ -60,6 +74,7 @@ const initialState: AtomState = {
     profile: null,
     isSolving: false,
     error: null,
+    pendingView: null,
     hoverRadius: null,
     solveNonce: 0,
 };
@@ -72,6 +87,29 @@ function shellIsOccupied(profile: SerialisedAtomProfile | null, n: number): bool
 /** Whether the solved profile actually occupies subshell (n, l) -- same reasoning as shellIsOccupied, against `subshells` rather than any peak list. */
 function subshellIsOccupied(profile: SerialisedAtomProfile | null, n: number, l: number): boolean {
     return profile !== null && profile.subshells.some(subshell => subshell.n === n && subshell.l === l);
+}
+
+/** Opens a pending view to the deepest level the solved profile actually has. */
+function applyPendingView(state: AtomState): void {
+    const view = state.pendingView;
+    const profile = state.profile;
+    if (!view || !profile || profile.Z !== state.Z) return;
+    state.pendingView = null;
+    state.level = 'atom';
+    state.selectedShell = null;
+    state.selectedSubshell = null;
+    state.selectedOrbital = null;
+    if (view.level === 'atom' || view.shell === null || !shellIsOccupied(profile, view.shell)) return;
+    state.level = 'shell';
+    state.selectedShell = view.shell;
+    const subshell = view.subshell;
+    if (!subshell || subshell.n !== view.shell || !subshellIsOccupied(profile, subshell.n, subshell.l)) return;
+    state.selectedSubshell = { n: subshell.n, l: subshell.l };
+    const orbital = view.orbital;
+    if (view.level !== 'orbital' || !orbital || orbital.n !== subshell.n || orbital.l !== subshell.l
+        || orbital.ml < -subshell.l || orbital.ml > subshell.l) return;
+    state.level = 'orbital';
+    state.selectedOrbital = { n: orbital.n, l: orbital.l, ml: orbital.ml };
 }
 
 const atomSlice = createSlice({
@@ -94,6 +132,7 @@ const atomSlice = createSlice({
             state.selectedOrbital = null;
             state.profile = null;
             state.error = null;
+            state.pendingView = null;
         },
 
         solveStarted: (state) => {
@@ -105,6 +144,13 @@ const atomSlice = createSlice({
             state.profile = action.payload;
             state.isSolving = false;
             state.error = null;
+            applyPendingView(state);
+        },
+
+        // A shared link's view, held until solveSucceeded can tell how deep
+        // the solved profile actually goes.
+        requestAtomView: (state, action: PayloadAction<PendingAtomView>) => {
+            state.pendingView = action.payload;
         },
 
         solveFailed: (state, action: PayloadAction<string>) => {
@@ -212,6 +258,7 @@ export const {
     setElement,
     solveStarted,
     solveFailed,
+    requestAtomView,
 } = atomSlice.actions;
 
 export const solveSucceeded = atomSlice.actions.solveSucceeded;
