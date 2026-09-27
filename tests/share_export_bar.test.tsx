@@ -97,4 +97,19 @@ describe('ShareExportBar: Export', () => {
         fireEvent.click(screen.getByRole('button', { name: /export stl/i }));
         await waitFor(() => expect(onExport).toHaveBeenCalledWith('stl', { longestSideMm: 80 }));
     });
+
+    // Ruling T10-I1: several solids are each watertight, the file as a whole is not.
+    it('says when the print holds several overlapping solids, and not when it holds one', () => {
+        const { unmount } = render(<ShareExportBar onShare={share} onExport={jest.fn()} availability={allAvailable()} stlSolids={() => 4} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+        expect(screen.getByRole('menuitem', { name: /3D print/i })).toHaveTextContent('each solid watertight, in millimetres');
+        fireEvent.click(screen.getByRole('menuitem', { name: /3D print/i }));
+        expect(screen.getByText('4 overlapping solids, each watertight; your slicer merges them into one.')).toBeInTheDocument();
+        unmount();
+
+        render(<ShareExportBar onShare={share} onExport={jest.fn()} availability={allAvailable()} stlSolids={() => 1} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /3D print/i }));
+        expect(screen.getByRole('dialog')).not.toHaveTextContent(/overlapping solids/);
+    });
 });

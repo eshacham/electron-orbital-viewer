@@ -13,4 +13,6 @@ export interface ViewerExportHandle {
     capturePng(overlays: PngOverlayInput | null): Promise<Blob>;
     /** The surfaces drawn now, whole (the cut is a view setting), in world-space bohr. */
     collectSurfaces(): ExportSurface[];
+    /** How many surfaces collectSurfaces would return, without copying them: the STL dialog says when a file holds several solids. */
+    surfaceCount(): number;
 }

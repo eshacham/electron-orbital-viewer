@@ -15,6 +15,8 @@ interface ShareExportBarProps {
     /** The menu shows only when this is given (Task 8: not every caller exports yet). */
     onExport?: (kind: ExportKind, options: ExportOptions) => Promise<void>;
     availability?: ExportAvailability;
+    /** How many separate solids an STL would hold right now (the viewer's surfaces), read as the print dialog opens. */
+    stlSolids?: () => number;
 }
 
 /**
@@ -22,7 +24,7 @@ interface ShareExportBarProps {
  * the right-hand panel on a desktop and in the View tab on a phone: no new
  * panel over the canvas (spec §3.8).
  */
-const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, availability }) => {
+const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, availability, stlSolids }) => {
     const [notice, setNotice] = useState<string | null>(null);
     // Fix round 1 (M6): MUI's Snackbar starts its auto-hide timer once, when
     // `open` first turns true, and does not notice a later change to
@@ -39,6 +41,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const [stlOpen, setStlOpen] = useState(false);
     const [printSize, setPrintSize] = useState(50);
+    const [solidCount, setSolidCount] = useState(0);
 
     const handleShare = async () => {
         const outcome = await onShare();
@@ -62,6 +65,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
         // the file carries no other scale.
         if (kind === 'stl') {
             setMenuAnchor(null);
+            setSolidCount(stlSolids?.() ?? 0);
             setStlOpen(true);
         } else {
             void runKind(kind);
@@ -113,6 +117,13 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
                             Binary STL in millimetres; the scale (mm per a₀) is in the file header. The whole
                             surface is exported: the cut is a view setting, and a cut surface would not print.
                         </FormHelperText>
+                        {/* Ruling T10-I1: each solid passes the manifold check on its own, but where
+                            they meet the file as a whole does not -- say so rather than call it watertight. */}
+                        {solidCount > 1 && (
+                            <FormHelperText>
+                                {solidCount} overlapping solids, each watertight; your slicer merges them into one.
+                            </FormHelperText>
+                        )}
                     </FormControl>
                 </DialogContent>
                 <DialogActions>

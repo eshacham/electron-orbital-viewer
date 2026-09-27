@@ -82,6 +82,18 @@ export function collectExportSurfaces(root: THREE.Object3D | null): ExportSurfac
     return surfaces;
 }
 
+/** How many surfaces collectExportSurfaces would return, counted without copying any geometry. */
+export function countExportSurfaces(root: THREE.Object3D | null): number {
+    let count = 0;
+    root?.traverse(object => {
+        if (!(object instanceof THREE.Mesh) || typeof object.userData.exportName !== 'string') return;
+        const position = (object.geometry as THREE.BufferGeometry).getAttribute('position');
+        if (!position || position.count === 0) return;
+        count += (object.userData.exportMembers as ExportMember[] | undefined)?.length ?? 1;
+    });
+    return count;
+}
+
 export interface SurfaceBounds { min: [number, number, number]; max: [number, number, number]; longestSide: number; }
 
 export function surfaceBounds(surfaces: ExportSurface[]): SurfaceBounds {

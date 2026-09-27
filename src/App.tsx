@@ -540,10 +540,11 @@ function App() {
         });
         downloadBlob(result.blob, result.filename);
     }, [store, csvCurvesNow, showPhaseLegend, combinationLegend]);
+    const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
     const shareExportBar = useMemo(
-        () => <ShareExportBar onShare={handleShare} onExport={handleExport} availability={availability} />,
-        [handleShare, handleExport, availability]
+        () => <ShareExportBar onShare={handleShare} onExport={handleExport} availability={availability} stlSolids={stlSolids} />,
+        [handleShare, handleExport, availability, stlSolids]
     );
 
     const controls = (

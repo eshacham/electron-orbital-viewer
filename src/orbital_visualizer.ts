@@ -1132,12 +1132,12 @@ export async function updateOrbitalInScene(
 }
 
 /** Replaces whatever is on screen with an overlay of several field meshes. */
-function showFieldOverlay(context: VisualizerContext, meshes: MeshData[], colors: string[]): void {
+function showFieldOverlay(context: VisualizerContext, meshes: MeshData[], colors: string[], labels: string[]): void {
     if (!context || context.isDisposed) return;
     clearCurrentOrbital(context, context.scene);
     context.isShellView = false;
     context.isCompositionView = false;
-    const group = createFieldOverlayGroup(meshes, colors, context.surfaceStyle, context.clippingPlanes);
+    const group = createFieldOverlayGroup(meshes, colors, labels, context.surfaceStyle, context.clippingPlanes);
     context.scene.add(group);
     context.currentOrbitalGroup = group;
     context.currentCaps = null;
@@ -1194,7 +1194,7 @@ export async function updateFieldInScene(
                     if (meshes.length === 1) {
                         updateSceneWithMeshData(context, meshes[0]);
                     } else {
-                        showFieldOverlay(context, meshes, request.colors);
+                        showFieldOverlay(context, meshes, request.colors, request.memberLabels);
                     }
                     const surfaceRadius = Math.max(...meshes.map(meshRadius)) || boxRMax;
                     frameToSurface(context, surfaceRadius, boxRMax, reframe, showAxes);

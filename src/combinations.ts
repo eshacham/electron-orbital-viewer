@@ -83,6 +83,7 @@ export function fieldRequestFor(selection: CombinationSelection, enclosedFractio
     return {
         sources,
         colors: sources.map((_, i) => OVERLAY_COLORS[i % OVERLAY_COLORS.length]),
+        memberLabels: overlayLegend(selection)?.map(item => item.label) ?? [combinationTitle(selection)],
         resolution: sources.length > 1 ? OVERLAY_RESOLUTION : ORBITAL_RESOLUTION,
         enclosedFraction,
         label: combinationTitle(selection),

@@ -15,7 +15,7 @@ export const EXPORT_ITEMS: ExportItem[] = [
     { kind: 'png', label: 'Image (PNG, 2×)', detail: 'with caption, scale bar and colour key' },
     { kind: 'png-plain', label: 'Image (PNG, 2×), view only', detail: 'no overlays' },
     { kind: 'csv', label: 'Radial curves (CSV)', detail: 'the plotted curves, every sample' },
-    { kind: 'stl', label: '3D print (STL)', detail: 'watertight, in millimetres' },
+    { kind: 'stl', label: '3D print (STL)', detail: 'each solid watertight, in millimetres' },
 ];
 
 export interface ExportOptions { longestSideMm?: number; }
@@ -45,6 +45,8 @@ export type ExportAvailability = Record<ExportKind, string | null>;
  */
 export const WAITING_FOR_ATOM_REASON = 'Waiting for the atom to finish solving.';
 export const NOTHING_DRAWN_REASON = 'Nothing is drawn yet.';
+/** Before OrbitalViewer has mounted and filled the export handle. */
+export const VIEW_NOT_READY_REASON = 'The 3D view is not ready yet.';
 /**
  * I3: `drawnReason` alone says whether *something* is on screen, not
  * whether it is the *current* something -- `startOrbitalCalculation` /
@@ -121,7 +123,7 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
     switch (kind) {
         case 'png':
         case 'png-plain': {
-            if (!context.handle) throw new Error('The 3D view is not ready yet.');
+            if (!context.handle) throw new Error(VIEW_NOT_READY_REASON);
             const overlays = kind === 'png'
                 ? {
                     caption: [viewDescription(context.state), methodStatement(context.state)],
@@ -141,7 +143,7 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             return { blob, filename: `${stem}.csv` };
         }
         case 'stl': {
-            if (!context.handle) throw new Error('The 3D view is not ready yet.');
+            if (!context.handle) throw new Error(VIEW_NOT_READY_REASON);
             const stl = encodeStl(context.handle.collectSurfaces(), context.longestSideMm ?? 50);
             return { blob: new Blob([stl], { type: 'model/stl' }), filename: `${stem}.stl` };
         }

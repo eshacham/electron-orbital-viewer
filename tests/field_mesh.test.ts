@@ -76,14 +76,14 @@ const spHybrid = (sign: 1 | -1): AnalyticFieldSource => ({
 
 describe('generateFieldMeshes', () => {
     it('draws a combination as generateFieldMesh does, from shared basis samples', () => {
-        const [batched] = generateFieldMeshes({ sources: [spHybrid(1)], colors: ['#ffffff'], resolution: 32, enclosedFraction: 0.9, label: 'test' });
+        const [batched] = generateFieldMeshes({ sources: [spHybrid(1)], colors: ['#ffffff'], memberLabels: ['a'], resolution: 32, enclosedFraction: 0.9, label: 'test' });
         const direct = generateFieldMesh(spHybrid(1), 32, 0.9);
         expect(Math.abs(batched.isoLevel - direct.isoLevel) / direct.isoLevel).toBeLessThan(1e-4);
         expect(Math.abs(batched.positions.length - direct.positions.length)).toBeLessThanOrEqual(direct.positions.length * 0.01);
     });
 
     it('returns one mesh per source, in order', () => {
-        const meshes = generateFieldMeshes({ sources: [spHybrid(1), spHybrid(-1)], colors: ['#ffffff', '#000000'], resolution: 32, enclosedFraction: 0.9, label: 'test' });
+        const meshes = generateFieldMeshes({ sources: [spHybrid(1), spHybrid(-1)], colors: ['#ffffff', '#000000'], memberLabels: ['a', 'b'], resolution: 32, enclosedFraction: 0.9, label: 'test' });
         const meanPositiveZ = (index: number) => {
             const zs = meshes[index].positions.filter((_, v) => meshes[index].psiSigns[v] === 1).map(([, , z]) => z);
             return zs.reduce((a, b) => a + b, 0) / zs.length;
@@ -96,12 +96,12 @@ describe('generateFieldMeshes', () => {
     it('passes anything that is not a plain combination straight to generateFieldMesh', () => {
         const oneS = hydrogenicSource({ n: 1, l: 0, ml: 0, Z: 1, resolution: 24, rMax: 7.6, enclosedFraction: 0.9 });
         const polarised: AnalyticFieldSource = { kind: 'analytic', id: 'p', rMax: 7.6, recipe: { type: 'polarized1s', field: 0.03 } };
-        const meshes = generateFieldMeshes({ sources: [oneS, polarised], colors: ['#fff', '#fff'], resolution: 24, enclosedFraction: 0.9, label: 'test' });
+        const meshes = generateFieldMeshes({ sources: [oneS, polarised], colors: ['#fff', '#fff'], memberLabels: ['a', 'b'], resolution: 24, enclosedFraction: 0.9, label: 'test' });
         expect(meshes[0]).toEqual(generateFieldMesh(oneS, 24, 0.9));
         expect(meshes[1]).toEqual(generateFieldMesh(polarised, 24, 0.9));
     });
 
     it('refuses an empty request', () => {
-        expect(() => generateFieldMeshes({ sources: [], colors: [], resolution: 24, enclosedFraction: 0.9, label: 'x' })).toThrow(/no field sources/);
+        expect(() => generateFieldMeshes({ sources: [], colors: [], memberLabels: [], resolution: 24, enclosedFraction: 0.9, label: 'x' })).toThrow(/no field sources/);
     });
 });

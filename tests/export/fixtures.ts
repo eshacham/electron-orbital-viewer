@@ -3,6 +3,7 @@ import { setElement, solveSucceeded } from '../../src/store/atomSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { ExportContext } from '../../src/export/run_export';
 import type { ExportSurface } from '../../src/export/surfaces';
+import type { ViewerExportHandle } from '../../src/export/handle';
 
 /** A store with production's middleware config (see createAppStore), so a typed-array payload does not print serializableCheck's console.error. */
 export const makeStore = () => createAppStore();
@@ -63,4 +64,9 @@ export function octahedron(name = 'octa'): ExportSurface {
         indices: new Uint32Array([0, 2, 4, 2, 1, 4, 1, 3, 4, 3, 0, 4, 2, 0, 5, 1, 2, 5, 3, 1, 5, 0, 3, 5]),
         colors: new Float32Array(18).fill(1),
     };
+}
+
+/** A stand-in for OrbitalViewer's export handle: holds nothing unless told to. */
+export function exportHandle(overrides: Partial<ViewerExportHandle> = {}): ViewerExportHandle {
+    return { capturePng: jest.fn(), collectSurfaces: () => [], surfaceCount: () => 0, ...overrides };
 }

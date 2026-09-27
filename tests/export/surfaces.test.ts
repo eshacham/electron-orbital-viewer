@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { collectExportSurfaces, markExportSurface, surfaceBounds } from '../../src/export/surfaces';
+import { collectExportSurfaces, countExportSurfaces, markExportSurface, surfaceBounds } from '../../src/export/surfaces';
 import { isWatertight, meshTopology } from '../../src/export/mesh_topology';
 import { createFieldOverlayGroup } from '../../src/field_overlay_view';
 import { createCompositionLobesGroup } from '../../src/atom/shell_composition_view';
@@ -80,7 +80,7 @@ describe('collectExportSurfaces', () => {
 describe('an sp³ overlay, exported', () => {
     const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
     const meshes = generateFieldMeshes(request);
-    const group = createFieldOverlayGroup(meshes, request.colors, defaultSurfaceStyle, []);
+    const group = createFieldOverlayGroup(meshes, request.colors, request.memberLabels, defaultSurfaceStyle, []);
     const surfaces = collectExportSurfaces(group);
 
     it('would not pass as one mesh: the members meet at shared vertices', () => {
@@ -90,8 +90,10 @@ describe('an sp³ overlay, exported', () => {
         expect(meshTopology(positions, indices).nonManifoldEdges).toBeGreaterThan(0);
     });
 
-    it('is one surface per member, holding exactly that member\'s triangles', () => {
+    it('is one surface per member, holding exactly that member\'s triangles, named as the colour key names it', () => {
         expect(surfaces).toHaveLength(4);
+        expect(countExportSurfaces(group)).toBe(4);
+        expect(surfaces.map(s => s.name)).toEqual(['h₁', 'h₂', 'h₃', 'h₄']);
         surfaces.forEach((surface, i) => {
             expect(surface.indices.length).toBe(meshes[i].cells.length * 3);
             expect(surface.positions.length).toBe(meshes[i].positions.length * 3);
@@ -107,5 +109,32 @@ describe('an sp³ overlay, exported', () => {
     it('prints, every member\'s triangles in one STL', () => {
         const triangles = meshes.reduce((sum, mesh) => sum + mesh.cells.length, 0);
         expect(new DataView(encodeStl(surfaces, 50)).getUint32(80, true)).toBe(triangles);
+    });
+
+    // Ruling T10-I1: the file as a whole, read the way a slicer reads it (a
+    // vertex is its exact bits). Where members meet, an edge is used by four
+    // triangles; it must still be two each way, so merging the solids leaves
+    // no hole and no fold -- the dialog's "your slicer merges them" holds.
+    it('as a whole file, uses every edge twice, or 2k times split evenly each way', () => {
+        const buffer = encodeStl(surfaces, 50);
+        const words = new DataView(buffer);
+        const count = words.getUint32(80, true);
+        const vertexKey = (offset: number) => [0, 4, 8].map(d => words.getUint32(offset + d, true)).join(',');
+        const edges = new Map<string, { forward: number; backward: number }>();
+        for (let t = 0; t < count; t++) {
+            const base = 84 + 50 * t + 12;
+            const corners = [vertexKey(base), vertexKey(base + 12), vertexKey(base + 24)];
+            for (let e = 0; e < 3; e++) {
+                const [from, to] = [corners[e], corners[(e + 1) % 3]];
+                const key = from < to ? `${from}|${to}` : `${to}|${from}`;
+                const entry = edges.get(key) ?? { forward: 0, backward: 0 };
+                if (from < to) entry.forward++; else entry.backward++;
+                edges.set(key, entry);
+            }
+        }
+        const uses = [...edges.values()];
+        expect(uses.filter(({ forward, backward }) => forward !== backward || forward === 0)).toEqual([]);
+        // The members do meet: without this the test would not be exercising the multi-body case.
+        expect(uses.some(({ forward }) => forward > 1)).toBe(true);
     });
 });

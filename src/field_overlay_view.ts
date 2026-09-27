@@ -38,6 +38,8 @@ export function overlayVertexColors(meshes: MeshData[], colors: string[]): Float
 export function createFieldOverlayGroup(
     meshes: MeshData[],
     colors: string[],
+    /** The colour key's name for each member (overlayLegend), which the exported solids carry too. */
+    labels: string[],
     style: SurfaceStyle,
     clippingPlanes: THREE.Plane[]
 ): THREE.Group {
@@ -46,7 +48,7 @@ export function createFieldOverlayGroup(
     const members: ExportMember[] = [];
     let offset = 0;
     meshes.forEach((mesh, i) => {
-        members.push({ name: `overlay member ${i + 1}`, start: indices.length, count: mesh.cells.length * 3 });
+        members.push({ name: labels[i] ?? `overlay member ${i + 1}`, start: indices.length, count: mesh.cells.length * 3 });
         for (const [x, y, z] of mesh.positions) positions.push(x, y, z);
         for (const [a, b, c] of mesh.cells) indices.push(a + offset, b + offset, c + offset);
         offset += mesh.positions.length;

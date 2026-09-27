@@ -76,6 +76,8 @@ export type FieldEvaluator = (x: number, y: number, z: number) => number;
 export interface FieldRenderRequest {
     sources: AnalyticFieldSource[];
     colors: string[];
+    /** What the colour key calls each source (`memberLabels[i]` for `sources[i]`); an exported overlay names its solids with them. */
+    memberLabels: string[];
     resolution: number;
     enclosedFraction: number;
     label: string;

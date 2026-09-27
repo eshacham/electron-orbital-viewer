@@ -34,6 +34,12 @@ describe('fieldRequestFor', () => {
         expect(request.sources[0]).toMatchObject({ recipe: { type: 'polarized1s', field: 0.03 }, rMax: combinationSamplingRadius(1) });
     });
 
+    it('names each member as the colour key does, so an exported solid carries the same name', () => {
+        expect(fieldRequestFor(sp3All, 0.9)!.memberLabels).toEqual(overlayLegend(sp3All)!.map(item => item.label));
+        const both = field(2, 0.002, 'both');
+        expect(fieldRequestFor(both, 0.9)!.memberLabels).toEqual(overlayLegend(both)!.map(item => item.label));
+    });
+
     it('draws both n = 2 Stark states together', () => {
         expect(fieldRequestFor(field(2, 0.002, 'both'), 0.9)!.sources.map(s => s.id)).toEqual(['stark:n2:lower', 'stark:n2:upper']);
     });

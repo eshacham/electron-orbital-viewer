@@ -1,14 +1,14 @@
-import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON } from '../../src/export/run_export';
+import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON } from '../../src/export/run_export';
 import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted } from '../../src/store/atomSlice';
 import { setCombination } from '../../src/store/orbitalSlice';
 import { selectionProblem } from '../../src/combinations';
 import { NOTHING_TO_EXPORT_REASON } from '../../src/export/surfaces';
-import { makeStore, neonStore, readText, baseContext, octahedron } from './fixtures';
+import { makeStore, neonStore, readText, baseContext, octahedron, exportHandle } from './fixtures';
 
 describe('runExport: PNG', () => {
     it('asks the viewer for an image, with the caption and method, or without overlays', async () => {
         const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
-        const context = { ...baseContext(neonStore().getState()), handle: { capturePng, collectSurfaces: () => [] }, phaseLegend: false };
+        const context = { ...baseContext(neonStore().getState()), handle: exportHandle({ capturePng }), phaseLegend: false };
         expect((await runExport('png', context)).filename).toBe('orbital-viewer_Ne_atom.png');
         expect(capturePng).toHaveBeenLastCalledWith({ caption: ['Neon (Ne, Z = 10), whole atom, 90% contour', expect.stringMatching(/^central-field SCF/)], phaseLegend: false });
         expect((await runExport('png-plain', context)).filename).toBe('orbital-viewer_Ne_atom_view.png');
@@ -16,7 +16,7 @@ describe('runExport: PNG', () => {
     });
 
     it('says so when the 3D view is not ready', async () => {
-        await expect(runExport('png', baseContext(neonStore().getState()))).rejects.toThrow('The 3D view is not ready yet.');
+        await expect(runExport('png', baseContext(neonStore().getState()))).rejects.toThrow(VIEW_NOT_READY_REASON);
     });
 
     // Ruling C5: App shows a combination colour key instead of the plain
@@ -28,7 +28,7 @@ describe('runExport: PNG', () => {
         const combinationLegend = [{ label: 'h₁', color: '#20c020' }, { label: 'h₂', color: '#c02020' }];
         const context = {
             ...baseContext(neonStore().getState()),
-            handle: { capturePng, collectSurfaces: () => [] },
+            handle: exportHandle({ capturePng }),
             phaseLegend: false,
             combinationLegend,
         };
@@ -38,7 +38,7 @@ describe('runExport: PNG', () => {
 
     it('never asks for a combination key when App has none (plain ψ key, or nothing overlaid)', async () => {
         const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
-        const context = { ...baseContext(neonStore().getState()), handle: { capturePng, collectSurfaces: () => [] }, phaseLegend: true };
+        const context = { ...baseContext(neonStore().getState()), handle: exportHandle({ capturePng }), phaseLegend: true };
         await runExport('png', context);
         expect(capturePng).toHaveBeenLastCalledWith({ caption: expect.any(Array), phaseLegend: true });
     });
@@ -51,7 +51,7 @@ describe('runExport: PNG', () => {
     describe('refuses like CSV, and also while busy (ruling I3)', () => {
         it('refuses before the atom has solved, same reason as CSV', async () => {
             const capturePng = jest.fn();
-            const context = { ...baseContext(makeStore().getState()), handle: { capturePng, collectSurfaces: () => [] }, phaseLegend: false };
+            const context = { ...baseContext(makeStore().getState()), handle: exportHandle({ capturePng }), phaseLegend: false };
             expect(exportAvailability(makeStore().getState()).png).toBe(WAITING_FOR_ATOM_REASON);
             await expect(runExport('png', context)).rejects.toThrow(WAITING_FOR_ATOM_REASON);
             expect(capturePng).not.toHaveBeenCalled();
@@ -63,7 +63,7 @@ describe('runExport: PNG', () => {
             const combination = { kind: 'field' as const, level: 2 as const, field: 0.01, stark: 'lower' as const };
             store.dispatch(setCombination(combination));
             const capturePng = jest.fn();
-            const context = { ...baseContext(store.getState()), handle: { capturePng, collectSurfaces: () => [] }, phaseLegend: false };
+            const context = { ...baseContext(store.getState()), handle: exportHandle({ capturePng }), phaseLegend: false };
             const reason = selectionProblem(combination)!;
             expect(exportAvailability(store.getState()).png).toBe(reason);
             await expect(runExport('png', context)).rejects.toThrow(reason);
@@ -78,7 +78,7 @@ describe('runExport: PNG', () => {
             expect(exportAvailability(store.getState()).png).toBe(PICTURE_BUSY_REASON);
             expect(exportAvailability(store.getState())['png-plain']).toBe(PICTURE_BUSY_REASON);
             const capturePng = jest.fn();
-            const context = { ...baseContext(store.getState()), handle: { capturePng, collectSurfaces: () => [] }, phaseLegend: false };
+            const context = { ...baseContext(store.getState()), handle: exportHandle({ capturePng }), phaseLegend: false };
             await expect(runExport('png', context)).rejects.toThrow(PICTURE_BUSY_REASON);
             await expect(runExport('png-plain', context)).rejects.toThrow(PICTURE_BUSY_REASON);
             expect(capturePng).not.toHaveBeenCalled();
@@ -160,7 +160,7 @@ describe('runExport: STL', () => {
     it('prints what the viewer holds, at the chosen size', async () => {
         const store = neonStore();
         store.dispatch(drillToShell(2));
-        const handle = { capturePng: jest.fn(), collectSurfaces: () => [octahedron()] };
+        const handle = exportHandle({ collectSurfaces: () => [octahedron()] });
         const result = await runExport('stl', { ...baseContext(store.getState()), handle, longestSideMm: 80 });
         expect(result.filename).toBe('orbital-viewer_Ne_shell_n2.stl');
         expect(result.blob.size).toBe(84 + 50 * 8);
@@ -171,7 +171,7 @@ describe('runExport: STL', () => {
         expect(exportAvailability(neonStore().getState()).stl).toMatch(/whole-atom view is a shaded cut face/);
         const store = neonStore();
         store.dispatch(drillToShell(2));
-        const handle = { capturePng: jest.fn(), collectSurfaces: () => [] };
+        const handle = exportHandle();
         await expect(runExport('stl', { ...baseContext(store.getState()), handle, longestSideMm: 50 })).rejects.toThrow(/Nothing to export yet/);
         // Ruling R1: one wording, shared with glTF.
         await expect(runExport('stl', { ...baseContext(store.getState()), handle, longestSideMm: 50 })).rejects.toThrow(NOTHING_TO_EXPORT_REASON);
@@ -190,6 +190,6 @@ describe('runExport: STL', () => {
     it('says so when the 3D view is not ready', async () => {
         const store = neonStore();
         store.dispatch(drillToShell(2));
-        await expect(runExport('stl', { ...baseContext(store.getState()), longestSideMm: 50 })).rejects.toThrow('The 3D view is not ready yet.');
+        await expect(runExport('stl', { ...baseContext(store.getState()), longestSideMm: 50 })).rejects.toThrow(VIEW_NOT_READY_REASON);
     });
 });
