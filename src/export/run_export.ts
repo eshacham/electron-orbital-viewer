@@ -53,9 +53,18 @@ function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
     const quantity = state.atom.mode === 'atom'
         ? 'D(r) = 4*pi*r^2*rho(r), electrons per bohr (the radial distribution, not the density)'
         : 'P(r) = r^2*R(r)^2, probability per bohr';
-    return radialCurvesToCsv(csvCurves, [
+    const comments = [
         viewDescription(state), `quantity: ${quantity}`, `method: ${methodStatement(state)}`, 'r in bohr (a0)', `view: ${shareUrl}`,
-    ]);
+    ];
+    // Fix round 1 (M5): at the orbital level the curve on screen is still
+    // the whole subshell's D(r) (RadialPlot draws one curve per subshell,
+    // not per orbital -- see App.tsx's atomCurves) -- worth saying, since a
+    // file named after one m_l could otherwise read as if it were specific
+    // to that orbital.
+    if (state.atom.mode === 'atom' && state.atom.level === 'orbital') {
+        comments.push('note: D(r) is the subshell\'s, independent of m_l -- every orbital in this subshell shares the same curve');
+    }
+    return radialCurvesToCsv(csvCurves, comments);
 }
 
 export async function runExport(kind: ExportKind, context: ExportContext): Promise<ExportResult> {
@@ -63,7 +72,13 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
     if (reason) throw new Error(reason);
     const stem = exportFileStem(context.state);
     switch (kind) {
-        case 'csv':
-            return { blob: new Blob([csvFor(context)], { type: 'text/csv' }), filename: `${stem}.csv` };
+        case 'csv': {
+            // Fix round 1 (M3): a UTF-8 BOM, and charset said in the MIME
+            // type, so Excel -- which otherwise guesses the system codepage
+            // -- reads the em dashes, superscripts and fractions in a
+            // caption (—, ², ½) correctly instead of mangling them.
+            const blob = new Blob(['﻿', csvFor(context)], { type: 'text/csv;charset=utf-8' });
+            return { blob, filename: `${stem}.csv` };
+        }
     }
 }

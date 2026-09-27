@@ -4,6 +4,8 @@ import { orbitalName } from '../orbital_names';
 import { subshellLabel } from '../atom/configurations';
 import { selectShownBasicOrbital } from '../store/orbitalSlice';
 import { combinationTitle } from '../combinations';
+import { MAX_FIELD_AU } from '../field_source';
+import { N2_MAX_FIELD_AU } from '../stark';
 
 /** Spec §3.1: every exported number says how it was computed. */
 export const ATOM_METHOD = 'central-field SCF, LDA exchange + VWN5 correlation, non-relativistic, spherically averaged';
@@ -16,9 +18,15 @@ export function methodStatement(state: RootState): string {
         return `${BASIC_METHOD}; hybrids are linear combinations of these, a basis choice rather than a state of the free atom (qualitative)`;
     }
     if (combination.kind === 'field') {
+        // Fix round 1 (I1): the n = 1 case is genuinely valid across the whole
+        // "F << 1 a.u." regime the app ever draws (MAX_FIELD_AU = 0.05), but
+        // n = 2's window is far narrower -- the app refuses a field above
+        // N2_MAX_FIELD_AU, the over-the-barrier field for E = -1/8 Ha, long
+        // before F approaches 1 a.u. -- so that one names its own cap rather
+        // than borrowing the "<< 1" phrasing, which overstates it ~250x.
         return combination.level === 1
-            ? 'hydrogen 1s polarised by first-order perturbation theory (Dalgarno-Lewis); valid for F << 1 a.u., tunnelling ignored'
-            : 'hydrogen n = 2 Stark states (2s +/- 2p_z)/sqrt 2, first-order degenerate perturbation theory; valid for F << 1 a.u.';
+            ? `hydrogen 1s polarised by first-order perturbation theory (Dalgarno-Lewis); valid for F << 1 a.u., tunnelling ignored; drawn only up to F = ${MAX_FIELD_AU} a.u.`
+            : `hydrogen n = 2 Stark states (2s +/- 2p_z)/sqrt 2, first-order degenerate perturbation theory; valid for F well below the n = 2 over-the-barrier field, 1/256 a.u. (≈ ${N2_MAX_FIELD_AU}); tunnelling ignored`;
     }
     return BASIC_METHOD;
 }

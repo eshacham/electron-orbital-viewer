@@ -36,8 +36,14 @@ export function readBlob(blob: Blob): Promise<ArrayBuffer> {
     });
 }
 
+/**
+ * Fix round 1 (M3): decoded as UTF-8, not byte-per-character -- the export
+ * now carries a UTF-8 BOM and non-ASCII captions (—, ², ½). TextDecoder
+ * strips a leading BOM by default, so callers see the text exactly as a
+ * spreadsheet would after opening the file.
+ */
 export async function readText(blob: Blob): Promise<string> {
-    return Array.from(new Uint8Array(await readBlob(blob)), c => String.fromCharCode(c)).join('');
+    return new TextDecoder('utf-8').decode(await readBlob(blob));
 }
 
 /**

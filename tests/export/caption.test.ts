@@ -1,6 +1,8 @@
 import { drillToShell, drillToSubshell, drillToOrbital, setMode } from '../../src/store/atomSlice';
 import { setCombination } from '../../src/store/orbitalSlice';
 import { viewDescription, exportFileStem, methodStatement, ATOM_METHOD, BASIC_METHOD } from '../../src/export/caption';
+import { MAX_FIELD_AU } from '../../src/field_source';
+import { N2_MAX_FIELD_AU } from '../../src/stark';
 import { makeStore, neonStore } from './fixtures';
 
 describe('export captions', () => {
@@ -29,5 +31,24 @@ describe('export captions', () => {
         store.dispatch(setCombination({ kind: 'field', level: 1, field: 0.03, stark: 'lower' }));
         expect(methodStatement(store.getState())).toMatch(/first-order perturbation theory/);
         expect(exportFileStem(store.getState())).toBe('orbital-viewer_H_field1');
+    });
+
+    // Fix round 1, I1: n = 2's Stark states are refused far below "F << 1
+    // a.u." (see N2_MAX_FIELD_AU, the over-the-barrier field for E = -1/8
+    // Ha), so its caption must not claim n = 1's much wider range.
+    it('states each field level\'s own valid range and says tunnelling is ignored', () => {
+        const store = makeStore();
+        store.dispatch(setMode('hydrogenic'));
+        store.dispatch(setCombination({ kind: 'field', level: 1, field: 0.03, stark: 'lower' }));
+        const level1 = methodStatement(store.getState());
+        expect(level1).toContain('tunnelling ignored');
+        expect(level1).toContain(`up to F = ${MAX_FIELD_AU} a.u.`);
+        expect(level1).toContain('F << 1 a.u.');
+
+        store.dispatch(setCombination({ kind: 'field', level: 2, field: 0.001, stark: 'lower' }));
+        const level2 = methodStatement(store.getState());
+        expect(level2).toContain('tunnelling ignored');
+        expect(level2).toContain(`${N2_MAX_FIELD_AU}`);
+        expect(level2).not.toContain('F << 1 a.u.');
     });
 });

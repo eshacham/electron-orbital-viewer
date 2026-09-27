@@ -18,24 +18,35 @@ interface ShareExportBarProps {
  */
 const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, availability }) => {
     const [notice, setNotice] = useState<string | null>(null);
+    // Fix round 1 (M6): MUI's Snackbar starts its auto-hide timer once, when
+    // `open` first turns true, and does not notice a later change to
+    // `message` while it stays open -- so "Preparing export…" replaced by an
+    // error a moment before the original 4s ran out would vanish almost at
+    // once. Keying the Snackbar on this (bumped on every new notice, success
+    // or failure alike) remounts it, which restarts the timer.
+    const [noticeId, setNoticeId] = useState(0);
+    const showNotice = (message: string) => {
+        setNotice(message);
+        setNoticeId(id => id + 1);
+    };
     const [manualUrl, setManualUrl] = useState<string | null>(null);
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
     const handleShare = async () => {
         const outcome = await onShare();
-        if (outcome.kind === 'copied') setNotice('Link copied — it opens this exact view.');
+        if (outcome.kind === 'copied') showNotice('Link copied — it opens this exact view.');
         else setManualUrl(outcome.url);
     };
 
     const runKind = async (kind: ExportKind, options: ExportOptions = {}) => {
         if (!onExport) return;
         setMenuAnchor(null);
-        setNotice('Preparing export…');
+        showNotice('Preparing export…');
         try {
             await onExport(kind, options);
             setNotice(null);
         } catch (error) {
-            setNotice(error instanceof Error ? error.message : 'The export failed.');
+            showNotice(error instanceof Error ? error.message : 'The export failed.');
         }
     };
     const handleItem = (kind: ExportKind) => { void runKind(kind); };
@@ -50,6 +61,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
                         variant="outlined"
                         aria-haspopup="menu"
                         aria-controls={menuAnchor ? 'export-menu' : undefined}
+                        aria-expanded={menuAnchor !== null}
                         onClick={event => setMenuAnchor(event.currentTarget)}
                     >
                         Export
@@ -83,6 +95,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
                 </DialogActions>
             </Dialog>
             <Snackbar
+                key={noticeId}
                 open={notice !== null}
                 autoHideDuration={4000}
                 onClose={() => setNotice(null)}

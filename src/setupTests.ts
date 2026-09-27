@@ -32,6 +32,19 @@ if (typeof globalThis.structuredClone === 'undefined') {
     globalThis.structuredClone = clone as typeof structuredClone;
 }
 
+// jsdom's test global does not carry over Node's TextDecoder/TextEncoder
+// either (used to decode an exported CSV Blob back to text, matching what a
+// spreadsheet does when it reads the file's declared UTF-8 charset). Node's
+// own implementation is realm-agnostic here -- it works on plain bytes, not
+// jsdom-realm typed arrays -- so, unlike structuredClone above, borrowing it
+// directly is safe.
+if (typeof globalThis.TextDecoder === 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { TextDecoder, TextEncoder } = require('util');
+    globalThis.TextDecoder = TextDecoder;
+    globalThis.TextEncoder = TextEncoder;
+}
+
 // jsdom does not implement matchMedia, which the responsive layout reads to
 // decide between the sidebar and the phone sheet. Report desktop width.
 if (!window.matchMedia) {

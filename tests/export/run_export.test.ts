@@ -1,4 +1,7 @@
-import { runExport, exportAvailability } from '../../src/export/run_export';
+import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON } from '../../src/export/run_export';
+import { setMode, drillToShell, drillToSubshell, drillToOrbital } from '../../src/store/atomSlice';
+import { setCombination } from '../../src/store/orbitalSlice';
+import { selectionProblem } from '../../src/combinations';
 import { makeStore, neonStore, readText, baseContext } from './fixtures';
 
 describe('runExport: CSV', () => {
@@ -16,7 +19,57 @@ describe('runExport: CSV', () => {
 
     it('refuses, with the reason, before the atom is solved', async () => {
         const state = makeStore().getState();
-        expect(exportAvailability(state).csv).toBe('Waiting for the atom to finish solving.');
+        expect(exportAvailability(state).csv).toBe(WAITING_FOR_ATOM_REASON);
         await expect(runExport('csv', baseContext(state))).rejects.toThrow('Waiting for the atom to finish solving.');
+    });
+
+    // Fix round 1, M3: Excel reads the file's codepage from the BOM plus
+    // the MIME type's charset; without them a caption's em dash or
+    // superscript arrives mangled.
+    it('writes a UTF-8 BOM and states the charset, so non-ASCII captions round-trip', async () => {
+        const context = {
+            ...baseContext(neonStore().getState()),
+            csvCurves: [{ label: 'd_z² — ½', points: [{ r: 0.1, value: 1 }] }],
+        };
+        const result = await runExport('csv', context);
+        expect(result.blob.type).toBe('text/csv;charset=utf-8');
+        const text = await readText(result.blob);
+        // TextDecoder strips the BOM by default; what is left must not have
+        // been corrupted by writing it as one byte per character.
+        expect(text.charCodeAt(0)).not.toBe(0xfeff);
+        expect(text).toContain('d_z² — ½');
+    });
+
+    // Fix round 1, M4.
+    describe('exportAvailability', () => {
+        it('gives a refused combination its own reason (ruling C10), not the generic "nothing drawn"', () => {
+            const store = makeStore();
+            store.dispatch(setMode('hydrogenic'));
+            const combination = { kind: 'field' as const, level: 2 as const, field: 0.01, stark: 'lower' as const };
+            store.dispatch(setCombination(combination));
+            const reason = exportAvailability(store.getState()).csv;
+            expect(reason).toBe(selectionProblem(combination));
+            expect(reason).not.toBe(NOTHING_DRAWN_REASON);
+        });
+
+        it('says nothing is drawn yet for Basic Orbitals with no render requested', () => {
+            const store = makeStore();
+            store.dispatch(setMode('hydrogenic'));
+            expect(exportAvailability(store.getState()).csv).toBe(NOTHING_DRAWN_REASON);
+        });
+    });
+
+    // Fix round 1, M5: the orbital level's curve is still the whole
+    // subshell's D(r) (RadialPlot draws one curve per subshell, not per
+    // m_l), which the file should say so it is not read as specific to the
+    // one orbital named in its filename.
+    it('notes that an orbital-level curve is its subshell\'s, independent of m_l', async () => {
+        const store = neonStore();
+        store.dispatch(drillToShell(2));
+        store.dispatch(drillToSubshell(2, 1));
+        store.dispatch(drillToOrbital(2, 1, 1));
+        const context = { ...baseContext(store.getState()), csvCurves: [{ label: '2p', points: [{ r: 0.1, value: 1 }] }] };
+        const text = await readText((await runExport('csv', context)).blob);
+        expect(text).toContain('# note: D(r) is the subshell\'s, independent of m_l');
     });
 });
