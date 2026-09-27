@@ -62,6 +62,8 @@ import { exportAvailability, runExport, ExportKind, ExportOptions } from './expo
 import { CsvCurve } from './export/csv';
 import { downloadBlob } from './export/download';
 import { ViewerExportHandle } from './export/handle';
+import { CubeWorkerHandle } from './export/cube_request';
+import { createExportWorker } from './workers/createExportWorker';
 
 /**
  * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
@@ -536,6 +538,9 @@ function App() {
         const result = await runExport(kind, {
             state, shareUrl: shareUrlFor(encodeStateOf(state)), csvCurves: csvCurvesNow(),
             handle: exportHandleRef.current, phaseLegend: showPhaseLegend, combinationLegend,
+            // A DOM Worker's onmessage is typed with `this`; this states that
+            // it satisfies CubeWorkerHandle's structural shape, which does not care.
+            createCubeWorker: createExportWorker as unknown as () => CubeWorkerHandle,
             ...options,
         });
         downloadBlob(result.blob, result.filename);

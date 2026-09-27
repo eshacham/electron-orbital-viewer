@@ -12,6 +12,8 @@ jest.mock('../src/orbital_visualizer', () => ({}));
 jest.mock('../src/workers/createAtomWorker', () => ({
     createAtomWorker: jest.fn(() => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null })),
 }));
+// Ruling C1: App imports createExportWorker (import.meta.url), unparseable by ts-jest.
+jest.mock('../src/workers/createExportWorker', () => ({ createExportWorker: jest.fn() }));
 // The picker's controls cannot reach a refused selection (the slider is
 // clamped); Phase 2's URL state will. This stands in for it: any selection
 // can be typed in, and the real picker still renders beside it, Alert and all.

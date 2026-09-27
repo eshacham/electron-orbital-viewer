@@ -1,13 +1,17 @@
 import type { RootState } from '../store';
 import { selectionProblem } from '../combinations';
+import { hydrogenicSource } from '../field_source';
+import { ORBITAL_RESOLUTION } from '../orbital_presets';
+import { subshellLabel } from '../atom/configurations';
 import { CsvCurve, radialCurvesToCsv } from './csv';
-import { exportFileStem, methodStatement, viewDescription } from './caption';
+import { exportFileStem, ATOM_METHOD, methodStatement, viewDescription } from './caption';
 import { CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
 import { encodeGlb } from './gltf';
+import { CubeJob, CubeWorkerHandle, requestCube } from './cube_request';
 
-export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb';
+export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb' | 'cube';
 
 export interface ExportItem { kind: ExportKind; label: string; detail: string; }
 
@@ -18,6 +22,7 @@ export const EXPORT_ITEMS: ExportItem[] = [
     { kind: 'csv', label: 'Radial curves (CSV)', detail: 'the plotted curves, every sample' },
     { kind: 'glb', label: '3D model (glTF .glb)', detail: 'colours kept — slides and AR' },
     { kind: 'stl', label: '3D print (STL)', detail: 'each solid watertight, in millimetres' },
+    { kind: 'cube', label: 'Field grid (Gaussian cube)', detail: 'the sampled ψ or ρ, in bohr — for VMD, VESTA, Avogadro' },
 ];
 
 export interface ExportOptions { longestSideMm?: number; }
@@ -33,6 +38,8 @@ export interface ExportContext extends ExportOptions {
     phaseLegend?: boolean;
     /** Ruling C5: App's combination colour key, when one is on screen instead. */
     combinationLegend?: CombinationLegendItem[] | null;
+    /** Builds the cube worker; absent before App has wired it up (structurally, see App.tsx). */
+    createCubeWorker?: () => CubeWorkerHandle;
 }
 
 export interface ExportResult { blob: Blob; filename: string; }
@@ -95,10 +102,71 @@ function geometryReason(state: RootState): string | null {
     return pngReason(state);
 }
 
+/** Review Focus 4: an overlay of several members in one picture cannot become one grid. */
+export const CUBE_OVERLAY_REASON = 'An overlay is several fields in one picture; pick one member to export its grid.';
+/** The surface being sampled -- atom levels 1-2's radial curve is always ready once solved, so only the field/orbital path needs a busy reason. */
+export const CUBE_BUSY_REASON = 'The surface is still being computed.';
+
+/**
+ * Ruling R1: cubeJobFor reuses viewDescription's shell/subshell labels
+ * rather than re-deriving them; Review Focus 4: a multi-member overlay
+ * (hybrids "All", Stark "Both") and anything not yet drawn/busy give a
+ * stated reason, reusing drawnReason's own wording and reason constants
+ * where the situation matches it exactly.
+ */
+export function cubeReason(state: RootState): string | null {
+    if (state.atom.mode === 'atom' && state.atom.level !== 'orbital') {
+        if (!state.atom.profile) return WAITING_FOR_ATOM_REASON;
+        // A re-solve (a new element) can leave the old profile in place while it runs.
+        return state.atom.isSolving ? CUBE_BUSY_REASON : null;
+    }
+    const reason = drawnReason(state);
+    if (reason) return reason;
+    const { currentField, isLoading } = state.orbital;
+    if (isLoading) return CUBE_BUSY_REASON;
+    if (currentField && currentField.sources.length !== 1) return CUBE_OVERLAY_REASON;
+    return null;
+}
+
+/**
+ * What the view shows, as a cube job: the drawn ψ (a field source, resampled
+ * exactly as it was drawn), or ρ(r) = D(r)/(4πr²) of what the cut face shows
+ * at atom levels 1-2 (design decisions, "the cube file is resampled on
+ * demand").
+ */
+export function cubeJobFor(state: RootState): CubeJob {
+    const title = `electron-orbital-viewer: ${viewDescription(state)}`;
+    const atom = state.atom;
+    if (atom.mode === 'atom' && atom.level !== 'orbital' && atom.profile) {
+        const profile = atom.profile;
+        const sub = atom.selectedSubshell;
+        const subshell = atom.level === 'shell' && sub ? profile.subshells.find(s => s.n === sub.n && s.l === sub.l) : undefined;
+        const shell = atom.level === 'shell' ? profile.shells.find(s => s.n === atom.selectedShell) : undefined;
+        const what = subshell ? `${subshellLabel(subshell.n, subshell.l)} subshell` : shell ? `n = ${shell.n} shell` : 'total';
+        return {
+            type: 'radialCube',
+            curve: { D: subshell?.curve ?? shell?.curve ?? profile.total, rMin: profile.rMin, dx: profile.dx, size: profile.size },
+            resolution: ORBITAL_RESOLUTION,
+            atoms: [{ Z: profile.Z, position: [0, 0, 0] }],
+            title,
+            // Carry from Task 12: features finer than the grid spacing (a heavy atom's 1s) are not resolved.
+            description: `rho(r) = D(r)/(4 pi r^2), ${what} electron density, electrons/bohr^3, box enclosing 99.9%, finer features (e.g. a heavy atom's 1s) not resolved; ${ATOM_METHOD}; lengths in bohr`,
+        };
+    }
+    const { currentParams, currentField } = state.orbital;
+    const source = currentField ? currentField.sources[0] : hydrogenicSource(currentParams!);
+    const resolution = currentField ? currentField.resolution : currentParams!.resolution;
+    const Z = currentParams?.Z ?? 1;
+    return {
+        type: 'fieldCube', source, resolution, atoms: [{ Z, position: [0, 0, 0] }], title,
+        description: `psi(x,y,z), real, bohr^-3/2, on the grid as drawn; ${methodStatement(state)}; lengths in bohr`,
+    };
+}
+
 export function exportAvailability(state: RootState): ExportAvailability {
     const png = pngReason(state);
     const geometry = geometryReason(state);
-    return { png, 'png-plain': png, csv: drawnReason(state), stl: geometry, glb: geometry };
+    return { png, 'png-plain': png, csv: drawnReason(state), stl: geometry, glb: geometry, cube: cubeReason(state) };
 }
 
 function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
@@ -155,6 +223,10 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             const description = `${viewDescription(context.state)}; ${methodStatement(context.state)}`;
             const buffer = await encodeGlb(context.handle.collectSurfaces(), description);
             return { blob: new Blob([buffer], { type: 'model/gltf-binary' }), filename: `${stem}.glb` };
+        }
+        case 'cube': {
+            if (!context.createCubeWorker) throw new Error('The cube worker is not available.');
+            return { blob: await requestCube(cubeJobFor(context.state), context.createCubeWorker), filename: `${stem}.cube` };
         }
     }
 }

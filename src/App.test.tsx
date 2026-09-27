@@ -41,6 +41,12 @@ jest.mock('./workers/createAtomWorker', () => ({
     })),
 }));
 
+// Ruling C1: App now imports createExportWorker (import.meta.url), which
+// this project's ts-jest cannot parse -- see createAtomWorker's mock above
+// for the same reason. Nothing here drives it; the cube export path is
+// covered directly in tests/export/cube_request.test.ts and run_export.test.ts.
+jest.mock('./workers/createExportWorker', () => ({ createExportWorker: jest.fn() }));
+
 /** A matchMedia stand-in reporting a fixed narrow/wide state (see tests/useMediaQuery.test.tsx for the original). */
 function installMatchMedia(matches: boolean) {
     (window as unknown as { matchMedia: unknown }).matchMedia = (media: string) => ({

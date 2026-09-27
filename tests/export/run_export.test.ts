@@ -198,6 +198,15 @@ describe('runExport: STL', () => {
     });
 });
 
+describe('runExport: cube', () => {
+    it('asks the worker for the cube and names it .cube', async () => {
+        const worker = { onmessage: null as ((e: MessageEvent) => void) | null, onerror: null, terminate: jest.fn(),
+            postMessage(request: { requestId: number }) { setTimeout(() => worker.onmessage?.({ data: { type: 'success', blob: new Blob(['c']), requestId: request.requestId } } as MessageEvent)); } };
+        const result = await runExport('cube', { ...baseContext(neonStore().getState()), createCubeWorker: () => worker });
+        expect(result.filename).toBe('orbital-viewer_Ne_atom.cube');
+    });
+});
+
 describe('runExport: glTF', () => {
     it('writes a .glb of what the viewer holds, and not at the whole-atom level', async () => {
         const store = neonStore();
