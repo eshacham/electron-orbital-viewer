@@ -23,14 +23,14 @@ describe('Gaussian cube', () => {
         expect(formatCubeValue(-0.5)).toBe(' -5.00000E-01');
         expect(formatCubeValue(0)).toBe('  0.00000E+00');
         expect(formatCubeValue(1e-120)).toBe('  0.00000E+00');
-        expect(formatCubeValue(Number.NaN)).toBe('  0.00000E+00');
     });
 
     it('writes the header in bohr and the values x-slowest, six to a line', () => {
         const cube = parseCube(encodeCube(tiny, [{ Z: 26, position: [0, 0, 0] }], 'Iron 3d_z²', 'ψ, bohr^-3/2').join(''));
         expect(cube.comments).toEqual(['Iron 3d_z2', 'psi, bohr^-3/2']);
-        expect(cube.natoms).toBe(1);   // positive: bohr
+        expect(cube.natoms).toBe(1);   // a negative atom count would mean an MO-index line follows; not used here
         expect(cube.origin).toEqual([-1, -2, -3]);
+        // Positive voxel counts: bohr (negative would mean Ångström).
         expect(cube.axes).toEqual([[2, 0.5, 0, 0], [3, 0, 0.5, 0], [7, 0, 0, 0.5]]);
         expect(cube.atoms).toEqual([[26, 26, 0, 0, 0]]);
         expect(cube.values).toHaveLength(42);
@@ -72,5 +72,41 @@ describe('Gaussian cube', () => {
 
     it('keeps comment lines to printable ASCII on one line', () => {
         expect(asciiLine('ρ(r) − 4f_z³\nnext')).toBe('rho(r) - 4f_z3 next');
+    });
+
+    it('refuses a grid whose values do not match its shape', () => {
+        const bad: CubeGrid = { ...tiny, values: Float32Array.from({ length: 41 }, () => 0) };
+        expect(() => encodeCube(bad, [], 'x', 'y')).toThrow();
+    });
+
+    it('refuses a non-finite value instead of silently writing it as zero, naming the index', () => {
+        const bad: CubeGrid = { ...tiny, values: Float32Array.from(tiny.values) };
+        bad.values[5] = Number.NaN;
+        expect(() => encodeCube(bad, [], 'x', 'y')).toThrow(/index 5/);
+    });
+
+    it('refuses a non-finite origin', () => {
+        const bad: CubeGrid = { ...tiny, origin: [Number.NaN, -2, -3] };
+        expect(() => encodeCube(bad, [], 'x', 'y')).toThrow();
+    });
+
+    it('refuses non-positive or non-finite spacing', () => {
+        expect(() => encodeCube({ ...tiny, spacing: 0 }, [], 'x', 'y')).toThrow();
+        expect(() => encodeCube({ ...tiny, spacing: -0.5 }, [], 'x', 'y')).toThrow();
+        expect(() => encodeCube({ ...tiny, spacing: Number.POSITIVE_INFINITY }, [], 'x', 'y')).toThrow();
+    });
+
+    it('refuses a radial curve whose enclosed total is not finite and positive', () => {
+        const size = 11, rMin = 1e-4, dx = 0.5;
+        const allZero = { D: new Float64Array(size), rMin, dx, size };
+        expect(() => radiusEnclosing(allZero, 0.999)).toThrow();
+        const allNaN = { D: Float64Array.from({ length: size }, () => Number.NaN), rMin, dx, size };
+        expect(() => radiusEnclosing(allNaN, 0.999)).toThrow();
+    });
+
+    it('refuses a radial curve whose D array length does not match size', () => {
+        const mismatched = { D: new Float64Array(5), rMin: 1e-4, dx: 0.5, size: 10 };
+        expect(() => radiusEnclosing(mismatched, 0.999)).toThrow();
+        expect(() => radialDensityCubeGrid(mismatched, 8)).toThrow();
     });
 });

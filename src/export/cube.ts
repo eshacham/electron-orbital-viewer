@@ -7,9 +7,13 @@ export interface CubeGrid { shape: [number, number, number]; origin: [number, nu
 export interface CubeAtom { Z: number; position: [number, number, number]; }
 export interface RadialCurveOnGrid { D: ArrayLike<number>; rMin: number; dx: number; size: number; }
 
-/** Fortran E13.5, which every cube reader accepts. Below 1e-99 is written as 0 to keep the exponent two digits. */
+/**
+ * Fortran E13.5, which every cube reader accepts. Underflow below 1e-99 is
+ * written as 0 to keep the exponent two digits; encodeCube rejects
+ * non-finite values outright rather than letting this clamp them to zero.
+ */
 export function formatCubeValue(value: number): string {
-    const v = Number.isFinite(value) && Math.abs(value) >= 1e-99 ? value : 0;
+    const v = Math.abs(value) >= 1e-99 ? value : 0;
     const [mantissa, exponent] = v.toExponential(5).split('e');
     const e = Number(exponent);
     return `${mantissa}E${e < 0 ? '-' : '+'}${String(Math.abs(e)).padStart(2, '0')}`.padStart(13);
@@ -28,6 +32,8 @@ const count = (v: number) => String(v).padStart(5);
 export function encodeCube(grid: CubeGrid, atoms: CubeAtom[], title: string, description: string): string[] {
     const [n1, n2, n3] = grid.shape;
     if (grid.values.length !== n1 * n2 * n3) throw new Error('Cube grid: the values do not match its shape.');
+    if (!grid.origin.every(Number.isFinite)) throw new Error('Cube grid: origin must be finite.');
+    if (!(Number.isFinite(grid.spacing) && grid.spacing > 0)) throw new Error('Cube grid: spacing must be a positive, finite number.');
     const s = grid.spacing;
     const chunks = [
         `${asciiLine(title)}\n${asciiLine(description)}\n`,
@@ -41,7 +47,10 @@ export function encodeCube(grid: CubeGrid, atoms: CubeAtom[], title: string, des
         for (let j = 0; j < n2; j++) {
             let line = '';
             for (let k = 0; k < n3; k++) {
-                line += formatCubeValue(grid.values[index++]);
+                const value = grid.values[index];
+                if (!Number.isFinite(value)) throw new Error(`Cube grid: value at index ${index} is not finite.`);
+                line += formatCubeValue(value);
+                index++;
                 if (k % 6 === 5 || k === n3 - 1) { rows.push(line); line = ''; }
             }
         }
@@ -58,29 +67,35 @@ export function fieldCubeGrid(source: AnalyticFieldSource, resolution: number): 
 
 /** Built directly: the profile's own grid, whatever its point count. */
 function gridOf(curve: RadialCurveOnGrid): RadialGrid {
+    if (curve.D.length !== curve.size) throw new Error('Radial curve: D.length must equal size.');
     const r = Float64Array.from({ length: curve.size }, (_, j) => curve.rMin * Math.exp(j * curve.dx));
     return { r, dx: curve.dx, size: curve.size, rMin: curve.rMin, rMax: r[curve.size - 1] };
 }
 
 export const RADIAL_CUBE_FRACTION = 0.999;
 
-export function radiusEnclosing(curve: RadialCurveOnGrid, fraction: number): number {
-    const grid = gridOf(curve);
-    const running = cumulativeIntegral(grid, Float64Array.from(curve.D));
+/** Shared by radiusEnclosing and radialDensityCubeGrid, so a caller that needs both builds the grid and D array only once. */
+function enclosingRadiusOnGrid(grid: RadialGrid, D: Float64Array, fraction: number): number {
+    const running = cumulativeIntegral(grid, D);
     const total = running[grid.size - 1];
+    if (!(Number.isFinite(total) && total > 0)) throw new Error('Radial distribution: the enclosed total is not finite and positive.');
     for (let j = 0; j < grid.size; j++) if (running[j] >= fraction * total) return grid.r[j];
     return grid.rMax;
 }
 
+export function radiusEnclosing(curve: RadialCurveOnGrid, fraction: number): number {
+    return enclosingRadiusOnGrid(gridOf(curve), Float64Array.from(curve.D), fraction);
+}
+
 /**
  * ρ(r) = D(r)/(4πr²) of a spherically averaged atom, on a cube enclosing
- * 99.9 % of it. Features finer than the spacing (a heavy atom's 1s) are not
- * resolved by any uniform grid; the description line says so.
+ * `RADIAL_CUBE_FRACTION` of it. Features finer than the spacing (a heavy
+ * atom's 1s) are not resolved by any uniform grid.
  */
 export function radialDensityCubeGrid(curve: RadialCurveOnGrid, resolution: number): CubeGrid {
     const grid = gridOf(curve);
     const D = Float64Array.from(curve.D);
-    const halfWidth = radiusEnclosing(curve, RADIAL_CUBE_FRACTION);
+    const halfWidth = enclosingRadiusOnGrid(grid, D, RADIAL_CUBE_FRACTION);
     const side = resolution + 1;
     const step = (2 * halfWidth) / resolution;
     const values = new Float32Array(side * side * side);
