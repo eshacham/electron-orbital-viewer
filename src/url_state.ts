@@ -117,10 +117,16 @@ export function parseIntInRange(value: string | null, min: number, max: number):
     return n >= min && n <= max ? n : null;
 }
 
+// A decimal literal only -- like parseIntInRange's regex, but with an optional
+// fraction and exponent. Number() also accepts hex ('0x1') and padded
+// whitespace (' 5'); a hand-edited link with either must be ignored like any
+// other malformed key, not parsed as a number nobody wrote (ruling T5/M3).
+const DECIMAL_LITERAL = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
+
 export function parseNumberInRange(value: string | null, min: number, max: number): number | null {
-    if (value === null || value.trim() === '') return null;
+    if (value === null || !DECIMAL_LITERAL.test(value)) return null;
     const n = Number(value);
-    return Number.isFinite(n) && n >= min && n <= max ? n : null;
+    return n >= min && n <= max ? n : null;
 }
 
 const round2 = (value: number) => Math.round(value * 100) / 100 + 0;

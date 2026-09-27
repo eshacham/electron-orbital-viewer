@@ -1,19 +1,23 @@
-import { configureStore } from '@reduxjs/toolkit';
-import orbitalReducer, {
+import {
     setEnclosedFraction, setBasicSelection, setSurfaceStyle, setCombination, cameraMoved,
     startOrbitalCalculation, selectShownBasicOrbital,
 } from '../src/store/orbitalSlice';
-import atomReducer, { setMode, setElement, solveSucceeded, drillToShell, drillToSubshell, drillToOrbital } from '../src/store/atomSlice';
+import { setMode, setElement, solveSucceeded, drillToShell, drillToSubshell, drillToOrbital } from '../src/store/atomSlice';
 import {
     registerUrlKeys, resetUrlKeysForTests, encodeStateOf, applyStateTo, encodeState, applyState,
-    bindUrlStateStore, hasSharedView, urlModeOf, ANY_MODE, registerBuiltInUrlKeys,
+    bindUrlStateStore, hasSharedView, urlModeOf, ANY_MODE, registerBuiltInUrlKeys, parseNumberInRange,
 } from '../src/url_state';
 import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../src/orbital_presets';
 import { CombinationSelection, selectionProblem, fieldRequestFor } from '../src/combinations';
+import { createAppStore } from '../src/store';
 import type { RootState } from '../src/store';
 import type { SerialisedAtomProfile } from '../src/workers/atomWorker';
 
-const makeStore = () => configureStore({ reducer: { orbital: orbitalReducer, atom: atomReducer } });
+// Production's serializableCheck exceptions (ruling R16), not a bare
+// configureStore: a plain store prints a console.error for every
+// solveSucceeded/startOrbitalCalculation dispatched below (their payloads
+// carry typed arrays by design) -- output must stay pristine (ruling T5/I1).
+const makeStore = createAppStore;
 const noop = () => {};
 
 describe('url_state registry', () => {
@@ -286,5 +290,65 @@ describe('built-in URL keys', () => {
         applyStateTo('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&cut=none', store.dispatch);
         expect(store.getState().atom.level).toBe('atom');
         expect(encodeStateOf(store.getState())).toMatch(/^mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=none&/);
+    });
+
+    // Ruling T5/M1: setSurfaceStyle (the Depth slider) runs the moment the
+    // user touches it, which can be before the linked view's solve lands.
+    // encodeViewKeys must keep reporting the *link's* cut until then --
+    // removing the `pendingCut ??` in encodeViewKeys would report the user's
+    // unrelated mid-solve change instead.
+    it('keeps a pending link\'s cut in the URL over a surface-style change made before the solve lands', () => {
+        const store = makeStore();
+        applyStateTo('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&cut=x:0.25', store.dispatch);
+        expect(store.getState().orbital.pendingCut).toEqual({ clipAxis: 'x', clipPosition: 0.5 });
+        // A user action, unrelated to the link, arriving before solveSucceeded.
+        store.dispatch(setSurfaceStyle({ clipAxis: 'y', clipPosition: 0.5 }));
+        expect(encodeStateOf(store.getState())).toMatch(/cut=x:0\.25/);
+    });
+
+    // Ruling T5/M2: no cam key means the canonical view (as decodeViewKeys'
+    // own comment says), so a link must turn a moved camera back, not leave
+    // whatever direction this tab already happened to be looking from.
+    it('a link without a cam key resets a moved camera to canonical', () => {
+        const store = makeStore();
+        store.dispatch(cameraMoved({ azimuth: 100, elevation: 10 }));
+        expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 100, elevation: 10 });
+        const nonceBefore = store.getState().orbital.cameraRestoreNonce;
+        applyStateTo('#frac=0.5', store.dispatch);
+        expect(store.getState().orbital.cameraAngles).toBeNull();
+        expect(store.getState().orbital.cameraRestoreNonce).toBe(nonceBefore + 1);
+    });
+
+    // Ruling T5/M3: Number() also accepts hex ('0x1') and padded whitespace
+    // (' 5'); a link is a decimal literal or nothing.
+    it('parseNumberInRange requires a decimal literal, not whatever Number() would parse', () => {
+        expect(parseNumberInRange('0x1', 0, 100)).toBeNull();
+        expect(parseNumberInRange(' 5', 0, 100)).toBeNull();
+        expect(parseNumberInRange('5 ', 0, 100)).toBeNull();
+        expect(parseNumberInRange('1e2', 0, 200)).toBe(100);
+        expect(parseNumberInRange('-0.5', -1, 1)).toBe(-0.5);
+    });
+
+    it('ignores a hex F or op as malformed, defaulting like any other bad key', () => {
+        const store = makeStore();
+        applyStateTo('#mode=basic&combo=field&level=1&F=0x1&op=0x1', store.dispatch);
+        expect(store.getState().orbital.combination).toEqual({ kind: 'field', level: 1, field: 0.03, stark: 'lower' });
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+    });
+
+    // Ruling T5/M4: encodeViewKeys always writes frac, cut, op and surf
+    // (never omits them at their defaults) -- only cam is conditionally
+    // omitted at canonical, and its decoder already resets on absence (test
+    // above). So a link missing op/surf, like the spec's own shorthand §4.3
+    // example, leaves a non-default tab's opacity and render mode alone;
+    // frac and cut, which that link does carry, still apply.
+    it('a link missing an always-written key leaves that tab setting alone', () => {
+        const store = makeStore();
+        store.dispatch(setSurfaceStyle({ opacity: 0.5, mode: 'wireframe' }));
+        applyStateTo('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&cut=x:0.5&frac=0.9', store.dispatch);
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({
+            opacity: 0.5, mode: 'wireframe', clipAxis: 'x', clipPosition: 0,
+        });
+        expect(store.getState().orbital.enclosedFraction).toBe(0.9);
     });
 });
