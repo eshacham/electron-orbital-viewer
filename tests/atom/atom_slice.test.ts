@@ -500,4 +500,17 @@ describe('a requested view lands with the solve', () => {
         store.dispatch(solveSucceeded(neonLikeProfile()));
         expect(store.getState().atom.level).toBe('atom');
     });
+
+    // Review finding: a failed solve left pendingView set, so a later
+    // successful solve for the same Z (e.g. useAtomSolver retrying after an
+    // enclosed-fraction change) would silently jump to the old link's view.
+    it('is cancelled by a failed solve, and not re-applied by a later success', () => {
+        const store = buildStore();
+        store.dispatch(setElement(10));
+        store.dispatch(requestAtomView(orbital(2, 1, 0)));
+        store.dispatch(solveFailed('did not converge'));
+        expect(store.getState().atom.pendingView).toBeNull();
+        store.dispatch(solveSucceeded(neonLikeProfile()));
+        expect(store.getState().atom.level).toBe('atom');
+    });
 });

@@ -156,6 +156,11 @@ const atomSlice = createSlice({
         solveFailed: (state, action: PayloadAction<string>) => {
             state.isSolving = false;
             state.error = action.payload;
+            // A failed solve leaves no profile to apply the link against, and
+            // this Z's solve may be retried later (e.g. useAtomSolver re-runs
+            // on an enclosed-fraction change) -- without this, a later
+            // success would silently jump to a view nobody just asked for.
+            state.pendingView = null;
         },
 
         // Pure navigation (ruling R28): reads the existing profile, never
