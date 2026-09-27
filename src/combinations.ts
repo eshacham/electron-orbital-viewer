@@ -3,7 +3,7 @@ import { AnalyticFieldSource, FieldRenderRequest, fieldProblem } from './field_s
 import { HybridKind, HYBRID_NAMES, hybridCount, hybridSource } from './hybrids';
 import { StarkState, polarized1sSource, starkFieldProblem, starkStateSource } from './stark';
 import { ORBITAL_RESOLUTION, OVERLAY_RESOLUTION, BASIC_ORBITALS_Z, combinationSamplingRadius } from './orbital_presets';
-import { radialProfile } from './radial_distribution';
+import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
 import { CURVE_COLORS } from './curve_colors';
 
 /** What Basic Orbitals' Combination picker has chosen. */
@@ -125,7 +125,7 @@ const WEIGHT_LABEL: Record<number, string> = { 1: '½·2s + ½·2p', 2: '⅓·2s
 export function combinationCurves(selection: CombinationSelection): { curves: RadialCurve[]; rMax: number } | null {
     if (selection.kind === 'none' || selectionProblem(selection)) return null;
     const curveOf = (n: number, l: number, rMax: number) =>
-        radialProfile(n, l, BASIC_ORBITALS_Z, rMax, 240).map(point => ({ r: point.r, value: point.probability }));
+        radialProfile(n, l, BASIC_ORBITALS_Z, rMax, PLOT_SAMPLE_COUNT).map(point => ({ r: point.r, value: point.probability }));
 
     if (selection.kind === 'field' && selection.level === 1) {
         const rMax = combinationSamplingRadius(1);

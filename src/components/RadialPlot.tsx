@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { radialProfile } from '../radial_distribution';
+import { radialProfile, PLOT_SAMPLE_COUNT } from '../radial_distribution';
 
 /**
  * One curve to draw in multi-curve mode: a shell's or subshell's D(r),
@@ -148,7 +148,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
     const path = useMemo(() => {
         if (isMultiCurve) return null;
 
-        const profile = radialProfile(n, l, Z, rMax, 240);
+        const profile = radialProfile(n, l, Z, rMax, PLOT_SAMPLE_COUNT);
         const peak = profile.reduce((max, p) => Math.max(max, p.probability), 0);
         if (!(peak > 0)) return null;
 

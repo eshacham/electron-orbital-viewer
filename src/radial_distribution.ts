@@ -16,13 +16,21 @@ export interface RadialPoint {
     probability: number;
 }
 
+/**
+ * How densely the plot samples a curve, for anything that draws one
+ * (RadialPlot's single- and multi-curve modes, combinationCurves). The CSV
+ * export (ruling C6) reuses this same constant rather than its own sample
+ * count, so an exported number is the same number that was plotted.
+ */
+export const PLOT_SAMPLE_COUNT = 240;
+
 /** Samples P(r) over [0, rMax] for plotting. */
 export function radialProfile(
     n: number,
     l: number,
     Z: number,
     rMax: number,
-    samples: number = 240
+    samples: number = PLOT_SAMPLE_COUNT
 ): RadialPoint[] {
     const points: RadialPoint[] = [];
     for (let i = 0; i <= samples; i++) {

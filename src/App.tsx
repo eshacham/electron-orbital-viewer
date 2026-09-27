@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { shallowEqual } from 'react-redux';
 import {
     ThemeProvider,
     CssBaseline,
@@ -56,6 +57,10 @@ import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT } from './useMediaQuery
 import { CURVE_COLORS } from './curve_colors';
 import { useUrlStateSync } from './useUrlStateSync';
 import { hasSharedView, encodeStateOf } from './url_state';
+import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
+import { exportAvailability, runExport, ExportKind, ExportOptions } from './export/run_export';
+import { CsvCurve } from './export/csv';
+import { downloadBlob } from './export/download';
 
 /**
  * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
@@ -157,8 +162,6 @@ function App() {
         const url = shareUrlFor(encodeStateOf(store.getState()));
         return (await copyText(url)) ? { kind: 'copied' } : { kind: 'manual', url };
     }, [store]);
-    // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
-    const shareExportBar = useMemo(() => <ShareExportBar onShare={handleShare} />, [handleShare]);
 
     const handleSurfaceStyleChange = useCallback((change: Partial<SurfaceStyle>) => {
         dispatch(setSurfaceStyle(change));
@@ -509,6 +512,28 @@ function App() {
         onNavigate: handleLevelNavigate,
         onChangeElement: isNarrow ? () => setElementPickerOpen(true) : () => setTableOpen(true),
     };
+
+    const availability = useAppSelector(exportAvailability, shallowEqual);
+    // What the plot shows, at the moment of export -- the same curves
+    // already computed for the radial plot (atomCurves, selectionPlot), not
+    // a fresh sample: ruling C6, an exported number equals the plotted one.
+    const csvCurvesNow = useCallback((): CsvCurve[] => {
+        if (isAtomMode) return atomCurves;
+        if (renderedField) return selectionPlot?.curves ?? [];
+        if (!renderedParams) return [];
+        const { n: pn, l: pl, Z: pZ, rMax } = renderedParams;
+        return [{ label: 'P(r)', points: radialProfile(pn, pl, pZ, rMax, PLOT_SAMPLE_COUNT).map(p => ({ r: p.r, value: p.probability })) }];
+    }, [isAtomMode, atomCurves, renderedField, selectionPlot, renderedParams]);
+    const handleExport = useCallback(async (kind: ExportKind, options: ExportOptions) => {
+        const state = store.getState();
+        const result = await runExport(kind, { state, shareUrl: shareUrlFor(encodeStateOf(state)), csvCurves: csvCurvesNow(), ...options });
+        downloadBlob(result.blob, result.filename);
+    }, [store, csvCurvesNow]);
+    // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
+    const shareExportBar = useMemo(
+        () => <ShareExportBar onShare={handleShare} onExport={handleExport} availability={availability} />,
+        [handleShare, handleExport, availability]
+    );
 
     const controls = (
         <Controls
