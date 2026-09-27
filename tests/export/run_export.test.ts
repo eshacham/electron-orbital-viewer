@@ -1,3 +1,7 @@
+// GLTFExporter ships only as an ES module, which this project's ts-jest cannot
+// load (see orbital_controls_factory.ts), so the factory is mocked.
+jest.mock('../../src/export/gltf_exporter_factory', () => ({ exportGlb: jest.fn(async () => new ArrayBuffer(12)) }));
+
 import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON } from '../../src/export/run_export';
 import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted } from '../../src/store/atomSlice';
 import { setCombination } from '../../src/store/orbitalSlice';
@@ -191,5 +195,17 @@ describe('runExport: STL', () => {
         const store = neonStore();
         store.dispatch(drillToShell(2));
         await expect(runExport('stl', { ...baseContext(store.getState()), longestSideMm: 50 })).rejects.toThrow(VIEW_NOT_READY_REASON);
+    });
+});
+
+describe('runExport: glTF', () => {
+    it('writes a .glb of what the viewer holds, and not at the whole-atom level', async () => {
+        const store = neonStore();
+        expect(exportAvailability(store.getState()).glb).toMatch(/whole-atom view/);
+        store.dispatch(drillToShell(2));
+        const handle = exportHandle({ collectSurfaces: () => [octahedron()] });
+        const result = await runExport('glb', { ...baseContext(store.getState()), handle });
+        expect(result.filename).toBe('orbital-viewer_Ne_shell_n2.glb');
+        expect(result.blob.type).toBe('model/gltf-binary');
     });
 });

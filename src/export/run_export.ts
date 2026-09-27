@@ -5,8 +5,9 @@ import { exportFileStem, methodStatement, viewDescription } from './caption';
 import { CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
+import { encodeGlb } from './gltf';
 
-export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl';
+export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb';
 
 export interface ExportItem { kind: ExportKind; label: string; detail: string; }
 
@@ -15,6 +16,7 @@ export const EXPORT_ITEMS: ExportItem[] = [
     { kind: 'png', label: 'Image (PNG, 2×)', detail: 'with caption, scale bar and colour key' },
     { kind: 'png-plain', label: 'Image (PNG, 2×), view only', detail: 'no overlays' },
     { kind: 'csv', label: 'Radial curves (CSV)', detail: 'the plotted curves, every sample' },
+    { kind: 'glb', label: '3D model (glTF .glb)', detail: 'colours kept — slides and AR' },
     { kind: 'stl', label: '3D print (STL)', detail: 'each solid watertight, in millimetres' },
 ];
 
@@ -83,10 +85,10 @@ function pngReason(state: RootState): string | null {
 export const WHOLE_ATOM_GEOMETRY_REASON = 'The whole-atom view is a shaded cut face, not a surface. Open a shell or an orbital to export geometry.';
 
 /**
- * STL (and glTF after it) take the surfaces in the scene, so they refuse
- * exactly when a PNG would -- nothing drawn, or a new picture still on its
- * way while the old one's meshes are still up -- and also at the whole-atom
- * level, whose picture is a shaded cut face with no surface behind it.
+ * STL and glTF take the surfaces in the scene, so they refuse exactly when a
+ * PNG would -- nothing drawn, or a new picture still on its way while the
+ * old one's meshes are still up -- and also at the whole-atom level, whose
+ * picture is a shaded cut face with no surface behind it.
  */
 function geometryReason(state: RootState): string | null {
     if (state.atom.mode === 'atom' && state.atom.level === 'atom') return WHOLE_ATOM_GEOMETRY_REASON;
@@ -95,7 +97,8 @@ function geometryReason(state: RootState): string | null {
 
 export function exportAvailability(state: RootState): ExportAvailability {
     const png = pngReason(state);
-    return { png, 'png-plain': png, csv: drawnReason(state), stl: geometryReason(state) };
+    const geometry = geometryReason(state);
+    return { png, 'png-plain': png, csv: drawnReason(state), stl: geometry, glb: geometry };
 }
 
 function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
@@ -146,6 +149,12 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             if (!context.handle) throw new Error(VIEW_NOT_READY_REASON);
             const stl = encodeStl(context.handle.collectSurfaces(), context.longestSideMm ?? 50);
             return { blob: new Blob([stl], { type: 'model/stl' }), filename: `${stem}.stl` };
+        }
+        case 'glb': {
+            if (!context.handle) throw new Error(VIEW_NOT_READY_REASON);
+            const description = `${viewDescription(context.state)}; ${methodStatement(context.state)}`;
+            const buffer = await encodeGlb(context.handle.collectSurfaces(), description);
+            return { blob: new Blob([buffer], { type: 'model/gltf-binary' }), filename: `${stem}.glb` };
         }
     }
 }
