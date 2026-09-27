@@ -4,12 +4,13 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
 import { SERIALIZABLE_CHECK } from './store';
-import atomReducer, { AtomState, drillToOrbital, drillToShell } from './store/atomSlice';
+import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded } from './store/atomSlice';
 import { setSurfaceStyle, setBasicSelection } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
 import { computeSamplingRadius } from './orbital_presets';
 import { clearProfileCacheForTests } from './atom/profile_cache';
+import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from './url_state';
 import App from './App';
 
 // Mock OrbitalViewer component
@@ -476,5 +477,73 @@ describe('App', () => {
         act(() => { store.dispatch(setBasicSelection({ n: 2, l: 1, ml: 1 })); });
         fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
+    });
+});
+
+describe('App: opening a shared link', () => {
+    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); clearProfileCacheForTests(); });
+    // The hook writes the hash, and jsdom keeps it between tests: clean up so
+    // later tests still open with the periodic table.
+    afterEach(() => { resetUrlKeysForTests(); window.history.replaceState(null, '', '/'); });
+
+    const openLink = (hash: string) => {
+        window.history.replaceState(null, '', `/${hash}`);
+        const store = createTestStore();
+        applyStateTo(hash, store.dispatch);
+        render(<Provider store={store}><App /></Provider>);
+        act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+        return store;
+    };
+
+    it('lands on the linked orbital with no cut, once the solve arrives', () => {
+        const store = openLink('#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&frac=0.9&cut=none&op=1&surf=solid');
+        expect(store.getState().atom).toMatchObject({ level: 'orbital', selectedOrbital: { n: 2, l: 1, ml: 0 } });
+        expect(store.getState().orbital.surfaceStyle.clipAxis).toBe('none');
+        expect(store.getState().orbital.pendingCut).toBeNull();
+    });
+
+    it('keeps a linked cut at the orbital level, where entering it would clear the cut', () => {
+        const store = openLink('#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&cut=y:0.25');
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'y', clipPosition: 0.5 });
+    });
+
+    it('opens without the periodic table over a shared view', () => {
+        openLink('#mode=atom&Z=18&level=atom');
+        expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
+    });
+
+    // Ruling C2 / spec §3.5 + Review Focus 1: a link naming a refused
+    // combination (sp has two hybrids; member 5 does not exist) must not
+    // draw the last picture under the wrong title -- the canvas clears and
+    // the panel says so.
+    it('clears the canvas for a refused combination named by the link, and says it is not drawn', () => {
+        const store = openLink('#mode=basic&combo=sp&member=5');
+        expect(store.getState().orbital.currentField).toBeNull();
+        expect(store.getState().orbital.currentParams).toBeNull();
+        expect(document.getElementById('orbital-name')).toHaveTextContent(/not drawn/);
+    });
+
+    // Carry to Task 6 (progress.md): a user cut change made while a link's
+    // pendingCut is still waiting on the solve must clear pendingCut, or
+    // the link's stale cut would land on top of the user's own choice once
+    // the profile arrives.
+    it("a user cut change made while a link's cut is still pending clears it, so the link cannot later overwrite the user's choice", () => {
+        const hash = '#mode=atom&Z=18&level=atom&cut=y:0.25';
+        window.history.replaceState(null, '', `/${hash}`);
+        const store = createTestStore();
+        applyStateTo(hash, store.dispatch);
+        render(<Provider store={store}><App /></Provider>);
+
+        // Mid-solve: the link's cut has already been applied and is waiting
+        // to be re-applied once the profile confirms the view.
+        expect(store.getState().orbital.pendingCut).toEqual({ clipAxis: 'y', clipPosition: 0.5 });
+
+        fireEvent.click(screen.getByRole('button', { name: 'cut along x' }));
+        expect(store.getState().orbital.pendingCut).toBeNull();
+
+        act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+
+        // The user's own cut survives; the link's y-axis cut is not reasserted.
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'x' });
     });
 });

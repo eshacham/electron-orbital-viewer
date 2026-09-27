@@ -19,7 +19,8 @@ import {
     clearPicture,
     setBasicSelection,
     setEnclosedFraction,
-    setCombination
+    setCombination,
+    clearPendingCut
 } from './store/orbitalSlice';
 import {
     setMode,
@@ -51,6 +52,8 @@ import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
+import { useUrlStateSync } from './useUrlStateSync';
+import { hasSharedView } from './url_state';
 
 /**
  * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
@@ -111,6 +114,7 @@ function App() {
     // cheaply). Every navigation dispatch below reads the profile this
     // produces; none of them can retrigger it.
     useAtomSolver(enclosedFraction);
+    useUrlStateSync();
 
     const handleOrbitalParamsChange = useCallback((newParams: OrbitalParams) => {
         console.log('App.tsx: Orbital params changing:', newParams);
@@ -133,6 +137,11 @@ function App() {
 
     const handleSurfaceStyleChange = useCallback((change: Partial<SurfaceStyle>) => {
         dispatch(setSurfaceStyle(change));
+        // A user-driven cut change while a link's cut is still waiting on the
+        // solve (pendingCut) must win: without this, the link's stale cut
+        // would land back on top of it once the profile arrives (progress.md,
+        // "carry to Task 6").
+        if ('clipAxis' in change || 'clipPosition' in change) dispatch(clearPendingCut());
     }, [dispatch]);
 
     const handleModeChange = useCallback((newMode: 'atom' | 'hydrogenic') => {
@@ -155,6 +164,7 @@ function App() {
         dispatch(setElement(newZ));
         dispatch(solveStarted());
         dispatch(setSurfaceStyle({ clipAxis: SHELL_VIEW_CUT_AXIS, clipPosition: 0 }));
+        dispatch(clearPendingCut());
         dispatch(resetView());
     }, [dispatch]);
 
@@ -208,7 +218,7 @@ function App() {
     // Desktop element choice: the periodic table, as a pop-over opened from
     // the element name. Open on arrival, so the first thing a visitor sees is
     // what to pick; it closes once they do.
-    const [tableOpen, setTableOpen] = useState(true);
+    const [tableOpen, setTableOpen] = useState(() => !hasSharedView(window.location.hash));
     const closeTable = useCallback(() => setTableOpen(false), []);
 
     // Only say anything if the calculation is actually taking a while; see
@@ -299,6 +309,17 @@ function App() {
         // surfaceStyle is read, not watched: only the change of view matters.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOrbitalView, dispatch]);
+
+    // A shared link's cut, re-applied once the linked view is on screen. It
+    // has to come after the effect above: entering the linked orbital clears
+    // the cut, and in the same commit this puts the link's back.
+    const pendingCut = useAppSelector(state => state.orbital.pendingCut);
+    const atomPendingView = useAppSelector(state => state.atom.pendingView);
+    useEffect(() => {
+        if (!pendingCut || atomPendingView) return;
+        dispatch(setSurfaceStyle(pendingCut));
+        dispatch(clearPendingCut());
+    }, [pendingCut, atomPendingView, isOrbitalView, dispatch]);
 
     // Level 3 in atom mode: render the selected orbital through the same
     // marching-cubes pipeline as hydrogen-like mode, but with the SCF's own
