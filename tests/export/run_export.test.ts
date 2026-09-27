@@ -4,6 +4,45 @@ import { setCombination } from '../../src/store/orbitalSlice';
 import { selectionProblem } from '../../src/combinations';
 import { makeStore, neonStore, readText, baseContext } from './fixtures';
 
+describe('runExport: PNG', () => {
+    it('asks the viewer for an image, with the caption and method, or without overlays', async () => {
+        const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+        const context = { ...baseContext(neonStore().getState()), handle: { capturePng, collectSurfaces: () => [] }, phaseLegend: false };
+        expect((await runExport('png', context)).filename).toBe('orbital-viewer_Ne_atom.png');
+        expect(capturePng).toHaveBeenLastCalledWith({ caption: ['Neon (Ne, Z = 10), whole atom, 90% contour', expect.stringMatching(/^central-field SCF/)], phaseLegend: false });
+        expect((await runExport('png-plain', context)).filename).toBe('orbital-viewer_Ne_atom_view.png');
+        expect(capturePng).toHaveBeenLastCalledWith(null);
+    });
+
+    it('says so when the 3D view is not ready', async () => {
+        await expect(runExport('png', baseContext(neonStore().getState()))).rejects.toThrow('The 3D view is not ready yet.');
+    });
+
+    // Ruling C5: App shows a combination colour key instead of the plain
+    // ψ-sign key when more than one source is overlaid (its
+    // combinationLegend); the PNG must carry the same key, so it describes
+    // what it shows rather than only ever naming ψ's sign.
+    it('carries the combination colour key through to the capture, when App has one on screen (ruling C5)', async () => {
+        const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+        const combinationLegend = [{ label: 'h₁', color: '#20c020' }, { label: 'h₂', color: '#c02020' }];
+        const context = {
+            ...baseContext(neonStore().getState()),
+            handle: { capturePng },
+            phaseLegend: false,
+            combinationLegend,
+        };
+        await runExport('png', context);
+        expect(capturePng).toHaveBeenLastCalledWith(expect.objectContaining({ combinationLegend }));
+    });
+
+    it('never asks for a combination key when App has none (plain ψ key, or nothing overlaid)', async () => {
+        const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+        const context = { ...baseContext(neonStore().getState()), handle: { capturePng }, phaseLegend: true };
+        await runExport('png', context);
+        expect(capturePng).toHaveBeenLastCalledWith({ caption: expect.any(Array), phaseLegend: true });
+    });
+});
+
 describe('runExport: CSV', () => {
     it('writes the plotted curves with what they are and how they were computed', async () => {
         const context = { ...baseContext(neonStore().getState()), csvCurves: [{ label: 'n=1', points: [{ r: 0.1, value: 1 }, { r: 0.2, value: 2 }] }] };

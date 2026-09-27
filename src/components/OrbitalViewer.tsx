@@ -23,8 +23,11 @@ import {
     ViewInsets,
     clearShellCompositionLobes,
     attachShellCompositionLobes,
-    VisualizerContext
+    VisualizerContext,
+    renderFrame
 } from '../orbital_visualizer';
+import { captureViewPng, freeAreaCrop } from '../export/png';
+import { ViewerExportHandle } from '../export/handle';
 import { shellComposition, isolateSubshell, compositeResolutionFor, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
 import { shellAtRadius } from '../atom/shell_pick';
 import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '../atom/shell_mesh_cache';
@@ -57,9 +60,11 @@ interface OrbitalViewerProps {
      * orbital's surface controls a shell-composition lobe's surface too.
      */
     enclosedFraction: number;
+    /** Task 9: lets App ask this view for a PNG capture without the view reaching back into App. */
+    exportHandleRef?: React.MutableRefObject<ViewerExportHandle | null>;
 }
 
-const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbitalFailed, enclosedFraction }) => {
+const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbitalFailed, enclosedFraction, exportHandleRef }) => {
     const dispatch = useAppDispatch();
     const canvasHostRef = useRef<HTMLDivElement>(null);
     const visualizerContextRef = useRef<VisualizerContext | null>(null);
@@ -108,6 +113,25 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             // on a single shared radius with no extra plumbing.
             context.onHoverRadius = (r) => dispatch(setAtomHoverRadius(r));
             visualizerContextRef.current = context;
+
+            if (exportHandleRef) {
+                exportHandleRef.current = {
+                    capturePng: (overlays) => {
+                        const host = canvasHostRef.current!;
+                        const width = host.clientWidth;
+                        const height = host.clientHeight;
+                        return captureViewPng(
+                            { renderer: context.renderer, render: () => renderFrame(context) },
+                            freeAreaCrop(width, height, context.viewInsets),
+                            overlays && {
+                                ...overlays,
+                                // The same bar the readout shows (see the scale effect below).
+                                scaleBar: getScaleBar(context, height, Math.max(80, Math.min(240, width * 0.22))),
+                            },
+                        );
+                    },
+                };
+            }
         }
 
         return () => {
@@ -116,8 +140,9 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 cleanupVisualizer(visualizerContextRef.current);
                 visualizerContextRef.current = null;
             }
+            if (exportHandleRef) exportHandleRef.current = null;
         };
-    }, [dispatch]);
+    }, [dispatch, exportHandleRef]);
 
     // The camera's direction, into the store once it settles (OrbitControls
     // fires every damped frame), so a shared link can carry it.

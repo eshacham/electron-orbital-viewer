@@ -61,6 +61,7 @@ import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
 import { exportAvailability, runExport, ExportKind, ExportOptions } from './export/run_export';
 import { CsvCurve } from './export/csv';
 import { downloadBlob } from './export/download';
+import { ViewerExportHandle } from './export/handle';
 
 /**
  * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
@@ -162,6 +163,12 @@ function App() {
         const url = shareUrlFor(encodeStateOf(store.getState()));
         return (await copyText(url)) ? { kind: 'copied' } : { kind: 'manual', url };
     }, [store]);
+
+    // Task 9: the 3D view's own PNG capture, reached through a ref rather
+    // than lifted state -- OrbitalViewer owns the renderer, and re-rendering
+    // App on every camera settle just to keep a handle in sync would be
+    // pointless churn.
+    const exportHandleRef = useRef<ViewerExportHandle | null>(null);
 
     const handleSurfaceStyleChange = useCallback((change: Partial<SurfaceStyle>) => {
         dispatch(setSurfaceStyle(change));
@@ -526,9 +533,13 @@ function App() {
     }, [isAtomMode, atomCurves, renderedField, selectionPlot, renderedParams]);
     const handleExport = useCallback(async (kind: ExportKind, options: ExportOptions) => {
         const state = store.getState();
-        const result = await runExport(kind, { state, shareUrl: shareUrlFor(encodeStateOf(state)), csvCurves: csvCurvesNow(), ...options });
+        const result = await runExport(kind, {
+            state, shareUrl: shareUrlFor(encodeStateOf(state)), csvCurves: csvCurvesNow(),
+            handle: exportHandleRef.current, phaseLegend: showPhaseLegend, combinationLegend,
+            ...options,
+        });
         downloadBlob(result.blob, result.filename);
-    }, [store, csvCurvesNow]);
+    }, [store, csvCurvesNow, showPhaseLegend, combinationLegend]);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
     const shareExportBar = useMemo(
         () => <ShareExportBar onShare={handleShare} onExport={handleExport} availability={availability} />,
@@ -648,6 +659,7 @@ function App() {
                     onOrbitalRendered={handleOrbitalRendered}
                     onOrbitalFailed={handleOrbitalFailed}
                     enclosedFraction={enclosedFraction}
+                    exportHandleRef={exportHandleRef}
                 />
                 {canvasBusyLabel && (
                     <div className="canvas-busy" role="status" aria-live="polite">

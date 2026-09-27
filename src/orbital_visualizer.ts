@@ -1618,38 +1618,47 @@ function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
 // camera has zoomed in.
 const HIGHLIGHT_RING_HALF_WIDTH_PX = 2;
 
+/**
+ * One frame: the ring width a shell view needs at this zoom, then the
+ * render (two passes mid cross-fade). Extracted so an export capture can
+ * call exactly this -- not a copy of it -- to draw the frame it reads back.
+ */
+export function renderFrame(context: VisualizerContext): void {
+    const { renderer, scene, camera, controls } = context;
+    // Damping keeps the camera moving for several frames after a drag
+    // ends, so this is recomputed every frame rather than only on
+    // explicit camera-move events.
+    if (context.isShellView) {
+        const canvasHeightPx = renderer.domElement.clientHeight;
+        const pxToWorld = worldUnitsPerPixel(
+            camera.position.distanceTo(controls.target),
+            camera.fov,
+            canvasHeightPx
+        );
+        setShellViewRingWidth(context.currentOrbitalGroup, pxToWorld * HIGHLIGHT_RING_HALF_WIDTH_PX);
+    }
+    if (context.transition?.kind === 'cross-fade') {
+        renderCrossFade(context, context.transition);
+    } else {
+        renderer.render(scene, camera);
+    }
+}
+
 function startAnimationLoop(context: VisualizerContext) {
     if (!context) return;
-    const { renderer, scene, camera, controls } = context;
 
     function animate(timestamp: number) {
         if (!context || context.isDisposed) {
             return;
         }
 
-        controls.update();
+        context.controls.update();
         // Advances the level-transition animation, if one is running --
         // before the ring-width/render steps below, so both see this
         // frame's already-updated curve/radius/opacity/camera rather than
         // last frame's.
         if (context.transition) tickTransition(context, timestamp);
-        // Damping keeps the camera moving for several frames after a drag
-        // ends, so this is recomputed every frame rather than only on
-        // explicit camera-move events.
-        if (context.isShellView) {
-            const canvasHeightPx = renderer.domElement.clientHeight;
-            const pxToWorld = worldUnitsPerPixel(
-                camera.position.distanceTo(controls.target),
-                camera.fov,
-                canvasHeightPx
-            );
-            setShellViewRingWidth(context.currentOrbitalGroup, pxToWorld * HIGHLIGHT_RING_HALF_WIDTH_PX);
-        }
-        if (context.transition?.kind === 'cross-fade') {
-            renderCrossFade(context, context.transition);
-        } else {
-            renderer.render(scene, camera);
-        }
+        renderFrame(context);
         context.animationFrameId = requestAnimationFrame(animate);
     }
 

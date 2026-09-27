@@ -2,13 +2,17 @@ import type { RootState } from '../store';
 import { selectionProblem } from '../combinations';
 import { CsvCurve, radialCurvesToCsv } from './csv';
 import { exportFileStem, methodStatement, viewDescription } from './caption';
+import { CombinationLegendItem } from './png';
+import { ViewerExportHandle } from './handle';
 
-export type ExportKind = 'csv';
+export type ExportKind = 'png' | 'png-plain' | 'csv';
 
 export interface ExportItem { kind: ExportKind; label: string; detail: string; }
 
 /** Menu order. Each later format adds its entry here. */
 export const EXPORT_ITEMS: ExportItem[] = [
+    { kind: 'png', label: 'Image (PNG, 2×)', detail: 'with caption, scale bar and colour key' },
+    { kind: 'png-plain', label: 'Image (PNG, 2×), view only', detail: 'no overlays' },
     { kind: 'csv', label: 'Radial curves (CSV)', detail: 'the plotted curves, every sample' },
 ];
 
@@ -19,6 +23,12 @@ export interface ExportContext extends ExportOptions {
     /** Written into files, so a file says which view it came from. */
     shareUrl: string;
     csvCurves: CsvCurve[];
+    /** The 3D view's capture handle, set once OrbitalViewer has mounted. */
+    handle?: ViewerExportHandle | null;
+    /** Whether the on-screen ψ-sign key is showing (App.tsx's showPhaseLegend). */
+    phaseLegend?: boolean;
+    /** Ruling C5: App's combination colour key, when one is on screen instead. */
+    combinationLegend?: CombinationLegendItem[] | null;
 }
 
 export interface ExportResult { blob: Blob; filename: string; }
@@ -46,7 +56,11 @@ function drawnReason(state: RootState): string | null {
 }
 
 export function exportAvailability(state: RootState): ExportAvailability {
-    return { csv: drawnReason(state) };
+    // PNG captures whatever the canvas shows, even nothing in particular --
+    // unlike CSV it needs no data of its own, so state alone never refuses
+    // it. Readiness instead depends on the 3D view's capture handle, which
+    // is not part of the store; runExport checks that at call time.
+    return { png: null, 'png-plain': null, csv: drawnReason(state) };
 }
 
 function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
@@ -72,6 +86,19 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
     if (reason) throw new Error(reason);
     const stem = exportFileStem(context.state);
     switch (kind) {
+        case 'png':
+        case 'png-plain': {
+            if (!context.handle) throw new Error('The 3D view is not ready yet.');
+            const overlays = kind === 'png'
+                ? {
+                    caption: [viewDescription(context.state), methodStatement(context.state)],
+                    phaseLegend: Boolean(context.phaseLegend),
+                    // Ruling C5: describe the combination key too, when App has one on screen.
+                    combinationLegend: context.combinationLegend,
+                }
+                : null;
+            return { blob: await context.handle.capturePng(overlays), filename: kind === 'png' ? `${stem}.png` : `${stem}_view.png` };
+        }
         case 'csv': {
             // Fix round 1 (M3): a UTF-8 BOM, and charset said in the MIME
             // type, so Excel -- which otherwise guesses the system codepage
