@@ -616,3 +616,59 @@ describe('App: opening a shared link', () => {
         expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'x' });
     });
 });
+
+describe('App: Share', () => {
+    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); clearProfileCacheForTests(); });
+    afterEach(() => {
+        resetUrlKeysForTests();
+        window.history.replaceState(null, '', '/');
+        Reflect.deleteProperty(navigator, 'clipboard');
+    });
+
+    // Review Focus 3: handleShare reads store.getState() at the moment of the
+    // click and hands it to encodeStateOf, which prefers atom.pendingView --
+    // so a link copied mid-solve names the orbital that was asked for, not
+    // the transient whole-atom view still on screen while that solve runs
+    // (see url_state.ts's encodeAtomKeys, pinned directly in Task 5's
+    // url_state.test.ts; this test pins the App wiring that reaches it).
+    it('copies the requested view, not the transient whole-atom view, while the linked atom is still solving', async () => {
+        const writeText = jest.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+        const hash = '#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0';
+        window.history.replaceState(null, '', `/${hash}`);
+        const store = createTestStore();
+        applyStateTo(hash, store.dispatch);
+        render(<Provider store={store}><App /></Provider>);
+
+        // Mid-solve: the whole atom is what is actually on screen...
+        expect(store.getState().atom).toMatchObject({ level: 'atom', isSolving: true });
+        // ...but the link asked for the orbital, held here until the solve lands.
+        expect(store.getState().atom.pendingView).toMatchObject({ level: 'orbital', shell: 2, subshell: { n: 2, l: 1 }, orbital: { n: 2, l: 1, ml: 0 } });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+        await waitFor(() => expect(writeText).toHaveBeenCalled());
+        const url = writeText.mock.calls[0][0] as string;
+        expect(url).toMatch(/#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&/);
+        expect(await screen.findByText(/link copied/i)).toBeInTheDocument();
+    });
+
+    // Review Focus 5, at the App level (ShareExportBar's own unit test in
+    // tests/share_export_bar.test.tsx pins the dialog itself): a page served
+    // without clipboard permission -- plain http, or an iframe that was
+    // refused it -- must still let the link be copied by hand.
+    it('shows the link in a dialog when the clipboard API is absent and execCommand refuses', async () => {
+        Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+        const originalExecCommand = document.execCommand;
+        document.execCommand = jest.fn().mockReturnValue(false);
+
+        renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+        const linkField = await screen.findByRole('textbox', { name: /link to this view/i });
+        expect((linkField as HTMLInputElement).value).toMatch(/^https?:\/\/.*#mode=atom&Z=1&level=atom&/);
+
+        document.execCommand = originalExecCommand;
+    });
+});

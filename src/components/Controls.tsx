@@ -76,6 +76,9 @@ interface ControlsProps {
   open?: boolean;
   /** Phone-width layout. */
   compact?: boolean;
+
+  /** Share and Export (ShareExportBar), under Reset View. */
+  actions?: React.ReactNode;
 }
 
 const ISO_MIN = 0.000000001;
@@ -124,6 +127,7 @@ const Controls: React.FC<ControlsProps> = ({
   isBusy,
   open = true,
   compact = false,
+  actions,
 }) => {
   const isAtomMode = mode === 'atom';
   // Bug fix (task 22, bug 6): levels 1-2 in atom mode render a spherical
@@ -484,6 +488,8 @@ const Controls: React.FC<ControlsProps> = ({
           </Button>
         )}
       </Box>
+
+      {actions}
 
       {/* Progress bar */}
       <Box sx={{ 

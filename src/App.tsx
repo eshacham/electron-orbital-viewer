@@ -7,7 +7,7 @@ import {
     Snackbar,
     CircularProgress
 } from '@mui/material';
-import { useAppDispatch, useAppSelector } from './store/hooks';
+import { useAppDispatch, useAppSelector, useAppStore } from './store/hooks';
 import {
     startOrbitalCalculation,
     startFieldCalculation,
@@ -36,6 +36,8 @@ import {
 import { subshellLabel } from './atom/configurations';
 import { useAtomSolver } from './atom/useAtomSolver';
 import Controls from './components/Controls';
+import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
+import { shareUrlFor, copyText } from './share';
 import { appTheme } from './theme';
 import OrbitalViewer from './components/OrbitalViewer';
 import RadialPlot, { RadialCurve } from './components/RadialPlot';
@@ -53,7 +55,7 @@ import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
 import { useUrlStateSync } from './useUrlStateSync';
-import { hasSharedView } from './url_state';
+import { hasSharedView, encodeStateOf } from './url_state';
 
 /**
  * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
@@ -144,6 +146,19 @@ function App() {
     const handleResetView = useCallback(() => {
         dispatch(resetView());
     }, [dispatch]);
+
+    // Share copies a link built from the state at the moment of the click
+    // (store.getState(), not a selector) -- mid-solve, encodeStateOf reads
+    // atom.pendingView rather than the transient whole-atom view still on
+    // screen, so the link carries the view that was actually asked for
+    // (Review Focus 3).
+    const store = useAppStore();
+    const handleShare = useCallback(async (): Promise<ShareOutcome> => {
+        const url = shareUrlFor(encodeStateOf(store.getState()));
+        return (await copyText(url)) ? { kind: 'copied' } : { kind: 'manual', url };
+    }, [store]);
+    // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
+    const shareExportBar = useMemo(() => <ShareExportBar onShare={handleShare} />, [handleShare]);
 
     const handleSurfaceStyleChange = useCallback((change: Partial<SurfaceStyle>) => {
         dispatch(setSurfaceStyle(change));
@@ -519,6 +534,7 @@ function App() {
             surfaceStyle={surfaceStyle}
             onSurfaceStyleChange={handleSurfaceStyleChange}
             isBusy={isAtomMode ? showAtomBusy : showBusy}
+            actions={shareExportBar}
         />
     );
 
