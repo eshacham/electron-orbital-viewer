@@ -3,7 +3,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setHoverRadius as setAtomHoverRadius, drillToShell } from '../store/atomSlice';
 import { cameraMoved } from '../store/orbitalSlice';
 import { applyCameraAngles, cameraAnglesOf } from '../camera_angles';
-import { ScaleBar, formatScaleLabel } from '../scale_bar';
+import { ScaleBar, formatScaleLabel, scaleBarMaxPx } from '../scale_bar';
 import { useMediaQuery, PREFERS_REDUCED_MOTION, NARROW_VIEWPORT } from '../useMediaQuery';
 import { useViewInsets } from '../useViewInsets';
 import {
@@ -126,7 +126,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                             overlays && {
                                 ...overlays,
                                 // The same bar the readout shows (see the scale effect below).
-                                scaleBar: getScaleBar(context, height, Math.max(80, Math.min(240, width * 0.22))),
+                                scaleBar: getScaleBar(context, height, scaleBarMaxPx(width)),
                             },
                         );
                     },
@@ -504,7 +504,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             const next = getScaleBar(
                 context,
                 host.clientHeight,
-                Math.max(80, Math.min(240, host.clientWidth * 0.22))
+                scaleBarMaxPx(host.clientWidth)
             );
             setScaleBar(current => {
                 if (current === next) return current;

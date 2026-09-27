@@ -43,6 +43,15 @@ export type ExportAvailability = Record<ExportKind, string | null>;
  */
 export const WAITING_FOR_ATOM_REASON = 'Waiting for the atom to finish solving.';
 export const NOTHING_DRAWN_REASON = 'Nothing is drawn yet.';
+/**
+ * I3: `drawnReason` alone says whether *something* is on screen, not
+ * whether it is the *current* something -- `startOrbitalCalculation` /
+ * `startFieldCalculation` / `solveStarted` all set the new request into the
+ * store at once, before the worker (or the SCF solve) actually finishes, so
+ * a caption built from state can already name the new view while the
+ * canvas is still showing the old one underneath it.
+ */
+export const PICTURE_BUSY_REASON = 'Wait for the picture to finish computing.';
 
 function drawnReason(state: RootState): string | null {
     if (state.atom.mode === 'atom') return state.atom.profile ? null : WAITING_FOR_ATOM_REASON;
@@ -55,12 +64,21 @@ function drawnReason(state: RootState): string | null {
     return state.orbital.currentParams || state.orbital.currentField ? null : NOTHING_DRAWN_REASON;
 }
 
+/**
+ * I3: CSV's curves are read fresh off the store at click time (App's
+ * csvCurvesNow), so a mid-flight request only ever produces up-to-date
+ * numbers or (via `drawnReason`) a refusal -- there is no stale-picture
+ * risk for it to guard against. A PNG instead photographs whatever the
+ * canvas currently shows, which lags the store during a fresh
+ * computation, so it additionally refuses while one is in flight.
+ */
+function pngReason(state: RootState): string | null {
+    return drawnReason(state) ?? (state.orbital.isLoading || state.atom.isSolving ? PICTURE_BUSY_REASON : null);
+}
+
 export function exportAvailability(state: RootState): ExportAvailability {
-    // PNG captures whatever the canvas shows, even nothing in particular --
-    // unlike CSV it needs no data of its own, so state alone never refuses
-    // it. Readiness instead depends on the 3D view's capture handle, which
-    // is not part of the store; runExport checks that at call time.
-    return { png: null, 'png-plain': null, csv: drawnReason(state) };
+    const png = pngReason(state);
+    return { png, 'png-plain': png, csv: drawnReason(state) };
 }
 
 function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {

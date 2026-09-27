@@ -50,6 +50,16 @@ export function computeScaleBar(worldPerPixel: number, maxPixels: number): Scale
     return { lengthBohr, pixels: lengthBohr / worldPerPixel };
 }
 
+/**
+ * The bar's maximum on-screen length: a fraction of the canvas width,
+ * clamped so it still reads on a phone and does not sprawl across a wide
+ * desktop. Shared (M5) by the live readout (OrbitalViewer's scale effect)
+ * and the PNG export, which draws the very same bar at export scale.
+ */
+export function scaleBarMaxPx(width: number): number {
+    return Math.max(80, Math.min(240, width * 0.22));
+}
+
 /** e.g. "20 a₀", or "0.5 a₀" — trimmed so round numbers stay round. */
 export function formatScaleLabel(lengthBohr: number): string {
     const text = lengthBohr >= 1

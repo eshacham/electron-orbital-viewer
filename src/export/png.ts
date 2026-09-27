@@ -13,20 +13,25 @@ export function exportPixelRatio(currentRatio: number, cssWidth: number, cssHeig
 export interface CropRect { x: number; y: number; width: number; height: number; }
 
 /**
- * The part of the canvas no panel covers. The view offset centres the atom
- * there, so the image is the atom, not the black under the panels. Mirrors
- * fitFactorFor's rule: below a quarter of the canvas the fit used all of it.
+ * The part of the canvas the view was actually fitted and centred to, so
+ * the PNG matches what is on screen rather than guessing at it. Mirrors
+ * `fitFactorFor`'s own floor -- each axis is clamped to at least a quarter
+ * of the canvas, not just "use the whole canvas" once a panel eats more
+ * than that -- and `applyViewOffset`'s own centring, on the free area's
+ * true centre rather than the canvas centre, clamped so the window never
+ * runs off the canvas when that centre sits close to an edge.
  */
 export function freeAreaCrop(width: number, height: number, insets?: ViewInsets): CropRect {
     if (!insets) return { x: 0, y: 0, width, height };
-    const freeWidth = width - insets.left - insets.right;
-    const freeHeight = height - insets.top - insets.bottom;
-    const useX = freeWidth >= width * 0.25;
-    const useY = freeHeight >= height * 0.25;
-    return {
-        x: useX ? insets.left : 0, y: useY ? insets.top : 0,
-        width: useX ? freeWidth : width, height: useY ? freeHeight : height,
+    const axis = (size: number, start: number, end: number) => {
+        const free = size - start - end;
+        const span = Math.min(size, Math.max(free, size * 0.25));
+        const centre = start + free / 2;
+        return { pos: Math.max(0, Math.min(centre - span / 2, size - span)), span };
     };
+    const x = axis(width, insets.left, insets.right);
+    const y = axis(height, insets.top, insets.bottom);
+    return { x: x.pos, y: y.pos, width: x.span, height: y.span };
 }
 
 /**
@@ -91,16 +96,46 @@ function drawLegendRow(
     }
 }
 
+/**
+ * Splits `text` into lines no wider than `maxWidth`, breaking on spaces.
+ * The caption is prose (a method statement can run past 1000 px at 13 CSS
+ * px), so drawing it as one `fillText` per string silently clips it --
+ * the DOM version wraps for free; the canvas version has to do it itself.
+ * A single word wider than `maxWidth` is kept whole rather than split.
+ */
+function wrapText(painter: OverlayPainter, text: string, maxWidth: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let current = '';
+    for (const word of words) {
+        const candidate = current ? `${current} ${word}` : word;
+        if (current && painter.measureText(candidate).width > maxWidth) {
+            lines.push(current);
+            current = word;
+        } else {
+            current = candidate;
+        }
+    }
+    lines.push(current);
+    return lines;
+}
+
 /** The on-screen overlays, redrawn at export scale (they are DOM, not canvas). */
 export function drawOverlays(painter: OverlayPainter, width: number, height: number, scale: number, spec: OverlaySpec): void {
     const pad = 14 * scale;
     const line = 18 * scale;
     painter.font = `${13 * scale}px Roboto, sans-serif`;
     painter.textBaseline = 'top';
+    // I1: each caption entry may itself be several words too many for the
+    // frame (a method statement especially, on a phone-width export) -- wrap
+    // it to what is left of the width after both side margins, and let the
+    // band grow to fit however many lines that becomes.
+    const maxTextWidth = width - 2 * pad;
+    const wrappedLines = spec.caption.flatMap(text => wrapText(painter, text, maxTextWidth));
     painter.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    painter.fillRect(0, 0, width, spec.caption.length * line + 2 * pad - (line - 13 * scale));
+    painter.fillRect(0, 0, width, wrappedLines.length * line + 2 * pad - (line - 13 * scale));
     painter.fillStyle = '#ffffff';
-    spec.caption.forEach((text, i) => painter.fillText(text, pad, pad + i * line));
+    wrappedLines.forEach((text, i) => painter.fillText(text, pad, pad + i * line));
 
     painter.textBaseline = 'bottom';
     if (spec.scaleBar) {
@@ -127,6 +162,8 @@ export function drawOverlays(painter: OverlayPainter, width: number, height: num
 export interface CaptureRenderer {
     getPixelRatio(): number;
     setPixelRatio(ratio: number): void;
+    /** The real WebGLRenderingContext/WebGL2RenderingContext already has this; only the shape is declared here. */
+    getContext(): { isContextLost(): boolean };
     readonly domElement: HTMLCanvasElement;
 }
 export interface CaptureTarget { renderer: CaptureRenderer; render(): void; }
@@ -145,9 +182,11 @@ function canvasToBlob(canvas: ExportCanvas): Promise<Blob> {
 
 /**
  * Renders one frame at the export ratio and copies it out in the same task,
- * before the browser composites and clears the drawing buffer; so there is
- * no preserveDrawingBuffer and no per-frame cost. The ratio is restored and
- * the frame re-rendered at once, so the screen never shows a cleared canvas.
+ * before the browser composites and clears the drawing buffer -- so the
+ * renderer never needs the option that would keep a copy of every frame
+ * around just for this, and this costs nothing on the frames that are not
+ * exports. The ratio is restored and the frame re-rendered at once, so the
+ * screen never shows a cleared canvas.
  */
 export async function captureViewPng(
     target: CaptureTarget, crop: CropRect, overlays: OverlaySpec | null,
@@ -163,6 +202,13 @@ export async function captureViewPng(
     try {
         renderer.setPixelRatio(ratio);
         target.render();
+        // I2: a lost WebGL context makes three's render() a silent no-op --
+        // without this check, drawImage would happily copy the canvas's
+        // leftover (or fully transparent) pixels into what looks like a
+        // normal PNG, with nothing to say the capture never actually happened.
+        if (renderer.getContext().isContextLost()) {
+            throw new Error('The graphics context was lost; the image could not be captured.');
+        }
         painter.drawImage(element, crop.x * ratio, crop.y * ratio, crop.width * ratio, crop.height * ratio, 0, 0, out.width, out.height);
     } finally {
         renderer.setPixelRatio(previous);

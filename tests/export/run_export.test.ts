@@ -1,5 +1,5 @@
-import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON } from '../../src/export/run_export';
-import { setMode, drillToShell, drillToSubshell, drillToOrbital } from '../../src/store/atomSlice';
+import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON } from '../../src/export/run_export';
+import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted } from '../../src/store/atomSlice';
 import { setCombination } from '../../src/store/orbitalSlice';
 import { selectionProblem } from '../../src/combinations';
 import { makeStore, neonStore, readText, baseContext } from './fixtures';
@@ -40,6 +40,48 @@ describe('runExport: PNG', () => {
         const context = { ...baseContext(neonStore().getState()), handle: { capturePng }, phaseLegend: true };
         await runExport('png', context);
         expect(capturePng).toHaveBeenLastCalledWith({ caption: expect.any(Array), phaseLegend: true });
+    });
+
+    // I3: a PNG photographs whatever the canvas currently shows, unlike CSV
+    // (whose curves are read fresh off the store at click time) -- so it
+    // must refuse in every case CSV refuses (drawnReason), and also while a
+    // fresh computation is in flight, when the canvas still shows the old
+    // picture under a caption that already names the new one.
+    describe('refuses like CSV, and also while busy (ruling I3)', () => {
+        it('refuses before the atom has solved, same reason as CSV', async () => {
+            const capturePng = jest.fn();
+            const context = { ...baseContext(makeStore().getState()), handle: { capturePng }, phaseLegend: false };
+            expect(exportAvailability(makeStore().getState()).png).toBe(WAITING_FOR_ATOM_REASON);
+            await expect(runExport('png', context)).rejects.toThrow(WAITING_FOR_ATOM_REASON);
+            expect(capturePng).not.toHaveBeenCalled();
+        });
+
+        it('refuses with a refused combination\'s own reason, same as CSV', async () => {
+            const store = makeStore();
+            store.dispatch(setMode('hydrogenic'));
+            const combination = { kind: 'field' as const, level: 2 as const, field: 0.01, stark: 'lower' as const };
+            store.dispatch(setCombination(combination));
+            const capturePng = jest.fn();
+            const context = { ...baseContext(store.getState()), handle: { capturePng }, phaseLegend: false };
+            const reason = selectionProblem(combination)!;
+            expect(exportAvailability(store.getState()).png).toBe(reason);
+            await expect(runExport('png', context)).rejects.toThrow(reason);
+            expect(capturePng).not.toHaveBeenCalled();
+        });
+
+        it('refuses while a fresh solve is in flight, even though the old profile is still what is drawn', async () => {
+            const store = neonStore();
+            store.dispatch(solveStarted()); // e.g. re-solving a new element -- Neon's profile is still on screen
+            // CSV is unaffected: its curves are read fresh at click time, and the (stale) profile is still there to read.
+            expect(exportAvailability(store.getState()).csv).toBeNull();
+            expect(exportAvailability(store.getState()).png).toBe(PICTURE_BUSY_REASON);
+            expect(exportAvailability(store.getState())['png-plain']).toBe(PICTURE_BUSY_REASON);
+            const capturePng = jest.fn();
+            const context = { ...baseContext(store.getState()), handle: { capturePng }, phaseLegend: false };
+            await expect(runExport('png', context)).rejects.toThrow(PICTURE_BUSY_REASON);
+            await expect(runExport('png-plain', context)).rejects.toThrow(PICTURE_BUSY_REASON);
+            expect(capturePng).not.toHaveBeenCalled();
+        });
     });
 });
 
