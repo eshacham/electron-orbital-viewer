@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
+import { createAppStore } from '../src/store';
 
 jest.mock('../src/workers/createShellCompositionWorker', () => ({ createShellCompositionWorker: jest.fn() }));
 jest.mock('../src/orbital_visualizer', () => ({
@@ -37,10 +37,10 @@ jest.mock('../src/camera_angles', () => ({
 }));
 
 import OrbitalViewer from '../src/components/OrbitalViewer';
-import orbitalReducer, {
+import {
     startFieldCalculation, startOrbitalCalculation, clearPicture, resetView, restoreCamera,
 } from '../src/store/orbitalSlice';
-import atomReducer, { setMode } from '../src/store/atomSlice';
+import { setMode } from '../src/store/atomSlice';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
 import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital } from '../src/orbital_visualizer';
@@ -49,7 +49,7 @@ import { applyCameraAngles } from '../src/camera_angles';
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
 
 function renderViewer() {
-    const store = configureStore({ reducer: { orbital: orbitalReducer, atom: atomReducer } });
+    const store = createAppStore();
     act(() => { store.dispatch(setMode('hydrogenic')); });
     render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
     jest.clearAllMocks();

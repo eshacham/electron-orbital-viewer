@@ -3,6 +3,7 @@ import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
+import { SERIALIZABLE_CHECK } from './store';
 import atomReducer, { AtomState, drillToOrbital, drillToShell } from './store/atomSlice';
 import { setSurfaceStyle, setBasicSelection } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
@@ -144,6 +145,7 @@ const defaultAtomState: AtomState = {
 // Simple store setup
 const createTestStore = (atomState?: Partial<AtomState>) => configureStore({
     reducer: { orbital: orbitalReducer, atom: atomReducer },
+    middleware: getDefaultMiddleware => getDefaultMiddleware({ serializableCheck: SERIALIZABLE_CHECK }),
     preloadedState: atomState ? { atom: { ...defaultAtomState, ...atomState } } : undefined,
 });
 

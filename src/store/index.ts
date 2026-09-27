@@ -9,6 +9,12 @@ import atomReducer from './atomSlice';
  * instead of a bare `configureStore` that prints ruling R16's console.error
  * on every `solveSucceeded`/`startOrbitalCalculation` it dispatches.
  */
+/** Exported for tests that build their own store (e.g. with preloaded state). */
+export const SERIALIZABLE_CHECK = {
+  ignoredActions: ['atom/solveSucceeded', 'orbital/startOrbitalCalculation'],
+  ignoredPaths: [/^atom\.profile/, /^orbital\.currentParams\.radialSamples/],
+};
+
 export function createAppStore() {
   return configureStore({
     reducer: {
@@ -29,13 +35,7 @@ export function createAppStore() {
     // in state under `orbital.currentParams.radialSamples`). Both the actions
     // and the resulting state paths are told to the check as intentional
     // exceptions rather than "fixed" into something slower.
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({
-        serializableCheck: {
-          ignoredActions: ['atom/solveSucceeded', 'orbital/startOrbitalCalculation'],
-          ignoredPaths: [/^atom\.profile/, /^orbital\.currentParams\.radialSamples/],
-        },
-      }),
+    middleware: getDefaultMiddleware => getDefaultMiddleware({ serializableCheck: SERIALIZABLE_CHECK }),
   });
 }
 

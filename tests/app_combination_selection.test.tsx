@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
+import { createAppStore } from '../src/store';
 import type { CombinationSelection } from '../src/combinations';
 
 jest.mock('../src/components/OrbitalViewer', () => ({
@@ -29,11 +29,10 @@ jest.mock('../src/components/CombinationControls', () => {
 });
 
 import App from '../src/App';
-import orbitalReducer, { failOrbitalCalculation, dismissOrbitalError } from '../src/store/orbitalSlice';
-import atomReducer from '../src/store/atomSlice';
+import { failOrbitalCalculation, dismissOrbitalError } from '../src/store/orbitalSlice';
 
 function renderBasicOrbitals() {
-    const store = configureStore({ reducer: { orbital: orbitalReducer, atom: atomReducer } });
+    const store = createAppStore();
     render(<Provider store={store}><App /></Provider>);
     fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
     return store;

@@ -1,8 +1,8 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
-import atomReducer, { setElement, setMode, drillToShell } from '../../src/store/atomSlice';
+import { createAppStore } from '../../src/store';
+import { setElement, setMode, drillToShell } from '../../src/store/atomSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { clearProfileCacheForTests } from '../../src/atom/profile_cache';
 
@@ -62,7 +62,7 @@ function minimalProfile(overrides: Partial<SerialisedAtomProfile> = {}): Seriali
 }
 
 function buildStore() {
-    return configureStore({ reducer: { atom: atomReducer } });
+    return createAppStore();
 }
 
 describe('useAtomSolver', () => {

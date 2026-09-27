@@ -1,18 +1,16 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { createAppStore } from '../src/store';
 import reducer, {
     startOrbitalCalculation, startFieldCalculation, finishOrbitalCalculation, clearPicture,
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, selectShownBasicOrbital,
     DEFAULT_BASIC_SELECTION, cameraMoved, restoreCamera, resetView,
     requestCut, clearPendingCut,
 } from '../src/store/orbitalSlice';
-import orbitalReducer from '../src/store/orbitalSlice';
 import { setMode } from '../src/store/atomSlice';
-import atomReducer from '../src/store/atomSlice';
 import { fieldRequestFor, NO_COMBINATION } from '../src/combinations';
 import { basicOrbitalParams, DEFAULT_ENCLOSED_FRACTION } from '../src/orbital_presets';
 import { CANONICAL_CAMERA_ANGLES } from '../src/camera_angles';
 
-const makeStore = () => configureStore({ reducer: { orbital: orbitalReducer, atom: atomReducer } });
+const makeStore = () => createAppStore();
 
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
 

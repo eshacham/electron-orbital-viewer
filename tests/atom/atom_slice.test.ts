@@ -1,5 +1,5 @@
-import { configureStore } from '@reduxjs/toolkit';
-import atomReducer, {
+import { createAppStore } from '../../src/store';
+import {
     setMode,
     setElement,
     solveStarted,
@@ -16,7 +16,7 @@ import atomReducer, {
     PendingAtomView,
     AtomState,
 } from '../../src/store/atomSlice';
-import orbitalReducer, { startOrbitalCalculation } from '../../src/store/orbitalSlice';
+import { startOrbitalCalculation } from '../../src/store/orbitalSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { OrbitalParams } from '../../src/types/orbital';
 
@@ -52,9 +52,7 @@ function neonLikeProfile(): SerialisedAtomProfile {
     };
 }
 
-const buildStore = () => configureStore({
-    reducer: { atom: atomReducer, orbital: orbitalReducer },
-});
+const buildStore = () => createAppStore();
 
 describe('atomSlice', () => {
     it('starts on the atom level with nothing selected and no profile', () => {
