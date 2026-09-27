@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, act, within } from '@testing-library/react'; // Add screen import
+import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react'; // Add screen import
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
@@ -8,7 +8,7 @@ import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded } 
 import { setSurfaceStyle, setBasicSelection } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
-import { computeSamplingRadius } from './orbital_presets';
+import { computeSamplingRadius, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { clearProfileCacheForTests } from './atom/profile_cache';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from './url_state';
 import App from './App';
@@ -515,12 +515,81 @@ describe('App: opening a shared link', () => {
     // Ruling C2 / spec §3.5 + Review Focus 1: a link naming a refused
     // combination (sp has two hybrids; member 5 does not exist) must not
     // draw the last picture under the wrong title -- the canvas clears and
-    // the panel says so.
-    it('clears the canvas for a refused combination named by the link, and says it is not drawn', () => {
-        const store = openLink('#mode=basic&combo=sp&member=5');
+    // the panel says so. A real picture is put up first (fix round 1, I2),
+    // so the assertions below prove the canvas was actually cleared by the
+    // refused link, rather than having started empty. Applied through the
+    // real hashchange path (a pasted link into an already-open tab), not
+    // applyStateTo directly, since that is what the App is wired to for a
+    // link that arrives after the app is already running.
+    it('clears the canvas for a refused combination named by a pasted link, and says it is not drawn', async () => {
+        const store = openLink('#mode=basic&n=2&l=1&ml=0');
+        expect(store.getState().orbital.currentParams).not.toBeNull();
+
+        // jsdom fires 'hashchange' asynchronously, not within the assignment;
+        // currentParams is non-null beforehand, so waiting on it becoming
+        // null (rather than currentField, already null) actually observes
+        // the transition instead of passing immediately.
+        act(() => { window.location.hash = '#mode=basic&combo=sp&member=5'; });
+        await waitFor(() => expect(store.getState().orbital.currentParams).toBeNull());
+
         expect(store.getState().orbital.currentField).toBeNull();
-        expect(store.getState().orbital.currentParams).toBeNull();
         expect(document.getElementById('orbital-name')).toHaveTextContent(/not drawn/);
+    });
+
+    // Fix round 1, I1: switching mode while a link's atom is still solving
+    // used to let the link's cut land later, on the *other* mode's view --
+    // the reapply effect only watches pendingCut/atomPendingView, not which
+    // mode is on screen by the time the solve lands.
+    it("switching mode while a link's atom is still solving does not let the link's cut land on the other mode's view", () => {
+        const hash = '#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&cut=y:0.25';
+        window.history.replaceState(null, '', `/${hash}`);
+        const store = createTestStore();
+        applyStateTo(hash, store.dispatch);
+        render(<Provider store={store}><App /></Provider>);
+
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        // The solve for the abandoned atom link still lands and still clears
+        // atom.pendingView -- that must not resurrect the link's cut here.
+        act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+
+        expect(store.getState().orbital.surfaceStyle.clipAxis).toBe('none');
+        expect(store.getState().orbital.pendingCut).toBeNull();
+    });
+
+    // Fix round 1, M1: picking another element while a link's atom is still
+    // solving must drop the link's cut too -- otherwise it would land on the
+    // newly picked element's shell view once the (unrelated) solve for the
+    // link's own element eventually lands.
+    it("picking another element mid-solve clears a link's still-pending cut, so it does not land on the new element", () => {
+        const hash = '#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&cut=y:0.25';
+        window.history.replaceState(null, '', `/${hash}`);
+        const store = createTestStore();
+        applyStateTo(hash, store.dispatch);
+        const { container } = render(<Provider store={store}><App /></Provider>);
+
+        expect(store.getState().orbital.pendingCut).toEqual({ clipAxis: 'y', clipPosition: 0.5 });
+
+        fireEvent.click(screen.getByRole('button', { name: /change element, currently/i }));
+        fireEvent.click(container.querySelector('.periodic-tile[data-z="26"]')!);
+
+        expect(store.getState().orbital.pendingCut).toBeNull();
+        // The new element's own default shell-view cut, not the old link's.
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: SHELL_VIEW_CUT_AXIS, clipPosition: 0 });
+    });
+
+    // Fix round 1, M2: a link pasted into an address bar that already has
+    // the app open must not stay hidden behind a pop-over left open from
+    // before.
+    it("closes the periodic table pop-over when a pasted link's hash is applied", async () => {
+        const store = createTestStore();
+        render(<Provider store={store}><App /></Provider>);
+        expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
+
+        // jsdom fires 'hashchange' asynchronously, not within the assignment.
+        act(() => { window.location.hash = '#mode=atom&Z=18&level=atom'; });
+        await waitFor(() => expect(store.getState().atom.Z).toBe(18));
+
+        expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
     });
 
     // Carry to Task 6 (progress.md): a user cut change made while a link's

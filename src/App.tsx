@@ -114,7 +114,17 @@ function App() {
     // cheaply). Every navigation dispatch below reads the profile this
     // produces; none of them can retrigger it.
     useAtomSolver(enclosedFraction);
-    useUrlStateSync();
+
+    // Desktop element choice: the periodic table, as a pop-over opened from
+    // the element name. Open on arrival, so the first thing a visitor sees is
+    // what to pick; it closes once they do. Declared here, ahead of
+    // useUrlStateSync below, so a pasted link's hashchange can close it too
+    // (fix round 1, M2) -- a pop-over left open would otherwise hide the
+    // very link that was just followed.
+    const [tableOpen, setTableOpen] = useState(() => !hasSharedView(window.location.hash));
+    const closeTable = useCallback(() => setTableOpen(false), []);
+
+    useUrlStateSync(window, undefined, closeTable);
 
     const handleOrbitalParamsChange = useCallback((newParams: OrbitalParams) => {
         console.log('App.tsx: Orbital params changing:', newParams);
@@ -146,6 +156,11 @@ function App() {
 
     const handleModeChange = useCallback((newMode: 'atom' | 'hydrogenic') => {
         dispatch(setMode(newMode));
+        // A link's cut, still waiting on an atom-mode solve that has not
+        // finished yet, must not land on the other mode's view once that
+        // solve does finish (fix round 1, I1): the pendingCut re-apply
+        // effect below does not know which mode it is re-applying into.
+        dispatch(clearPendingCut());
     }, [dispatch]);
 
     // Picking an element gives you that element's best default view, derived
@@ -215,11 +230,6 @@ function App() {
     const viewPanelOpen = viewPanelChoice && viewPanelChoice.medium === isMedium ? viewPanelChoice.open : !isMedium;
     const setViewPanelOpen = (update: (open: boolean) => boolean) =>
         setViewPanelChoice({ medium: isMedium, open: update(viewPanelOpen) });
-    // Desktop element choice: the periodic table, as a pop-over opened from
-    // the element name. Open on arrival, so the first thing a visitor sees is
-    // what to pick; it closes once they do.
-    const [tableOpen, setTableOpen] = useState(() => !hasSharedView(window.location.hash));
-    const closeTable = useCallback(() => setTableOpen(false), []);
 
     // Only say anything if the calculation is actually taking a while; see
     // useDelayedFlag for why.
