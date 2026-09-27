@@ -1,5 +1,15 @@
 import type { RootState, AppDispatch } from './store';
-import type { ViewMode } from './store/atomSlice';
+import { setMode, setElement, solveStarted, requestAtomView, PendingAtomView, ViewMode } from './store/atomSlice';
+import {
+    setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, requestCut, restoreCamera,
+    setSurfaceStyle, selectShownBasicOrbital, BasicSelection, CutSetting,
+} from './store/orbitalSlice';
+import { ENCLOSED_FRACTIONS } from './orbital_presets';
+import { MIN_ATOMIC_NUMBER, MAX_ATOMIC_NUMBER } from './elements';
+import { CombinationSelection, NO_COMBINATION, DEFAULT_FIELD_AU } from './combinations';
+import { HybridKind } from './hybrids';
+import { CameraAngles } from './camera_angles';
+import { ClipAxis } from './types/orbital';
 
 /**
  * The URL hash is the view (spec §4.3). This module owns reading and writing
@@ -99,4 +109,169 @@ export function encodeState(): string {
 
 export function applyState(hash: string): void {
     applyStateTo(hash, requireStore().dispatch);
+}
+
+export function parseIntInRange(value: string | null, min: number, max: number): number | null {
+    if (value === null || !/^-?\d+$/.test(value)) return null;
+    const n = Number(value);
+    return n >= min && n <= max ? n : null;
+}
+
+export function parseNumberInRange(value: string | null, min: number, max: number): number | null {
+    if (value === null || value.trim() === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) && n >= min && n <= max ? n : null;
+}
+
+const round2 = (value: number) => Math.round(value * 100) / 100 + 0;
+
+/** Depth as the Depth slider shows it: 0 nothing removed, 0.5 through the nucleus, 1 everything. */
+export function formatCut(cut: CutSetting): string {
+    return cut.clipAxis === 'none' ? 'none' : `${cut.clipAxis}:${round2((1 - cut.clipPosition) / 2)}`;
+}
+
+export function parseCut(value: string | null): CutSetting | null {
+    if (value === 'none') return { clipAxis: 'none', clipPosition: 0 };
+    const match = value ? /^([xyz]):(.+)$/.exec(value) : null;
+    const depth = match ? parseNumberInRange(match[2], 0, 1) : null;
+    if (!match || depth === null) return null;
+    return { clipAxis: match[1] as ClipAxis, clipPosition: round2(1 - 2 * depth) };
+}
+
+export function parseCamera(value: string | null): CameraAngles | null {
+    const match = value ? /^(-?\d+),(-?\d+)$/.exec(value) : null;
+    const azimuth = match ? parseIntInRange(match[1], -179, 180) : null;
+    const elevation = match ? parseIntInRange(match[2], -89, 89) : null;
+    return azimuth === null || elevation === null ? null : { azimuth, elevation };
+}
+
+function encodeViewKeys(state: RootState): Record<string, string> {
+    const { surfaceStyle, enclosedFraction, pendingCut, cameraAngles } = state.orbital;
+    const keys: Record<string, string> = {
+        frac: String(enclosedFraction),
+        // A cut still waiting for its view is the one the link asked for.
+        cut: formatCut(pendingCut ?? surfaceStyle),
+        op: String(round2(surfaceStyle.opacity)),
+        surf: surfaceStyle.mode === 'wireframe' ? 'wire' : 'solid',
+    };
+    if (cameraAngles) keys.cam = `${cameraAngles.azimuth},${cameraAngles.elevation}`;
+    return keys;
+}
+
+function decodeViewKeys(params: URLSearchParams, dispatch: AppDispatch): void {
+    const fraction = parseNumberInRange(params.get('frac'), 0, 1);
+    if (fraction !== null && ENCLOSED_FRACTIONS.includes(fraction)) dispatch(setEnclosedFraction(fraction));
+    const opacity = parseNumberInRange(params.get('op'), 0.05, 1);
+    if (opacity !== null) dispatch(setSurfaceStyle({ opacity: round2(opacity) }));
+    const surface = params.get('surf');
+    if (surface === 'solid' || surface === 'wire') dispatch(setSurfaceStyle({ mode: surface === 'wire' ? 'wireframe' : 'solid' }));
+    const cut = parseCut(params.get('cut'));
+    if (cut) dispatch(requestCut(cut));
+    // No cam key means the canonical view, so a link always sets the camera.
+    dispatch(restoreCamera(parseCamera(params.get('cam'))));
+}
+
+export function parseAtomView(params: URLSearchParams): PendingAtomView {
+    const whole: PendingAtomView = { level: 'atom', shell: null, subshell: null, orbital: null };
+    const level = params.get('level');
+    if (level !== 'shell' && level !== 'orbital') return whole;
+    const n = parseIntInRange(params.get('n'), 1, 7);
+    if (n === null) return whole;
+    const shell: PendingAtomView = { level: 'shell', shell: n, subshell: null, orbital: null };
+    const l = parseIntInRange(params.get('l'), 0, Math.min(3, n - 1));
+    if (l === null) return shell;
+    const subshell: PendingAtomView = { ...shell, subshell: { n, l } };
+    if (level !== 'orbital') return subshell;
+    const ml = parseIntInRange(params.get('ml'), -l, l);
+    return ml === null ? subshell : { level: 'orbital', shell: n, subshell: { n, l }, orbital: { n, l, ml } };
+}
+
+function encodeAtomKeys(state: RootState): Record<string, string> {
+    const atom = state.atom;
+    // Mid-solve, the link is the view that was asked for, not the whole atom shown meanwhile.
+    const view: PendingAtomView = atom.pendingView
+        ?? { level: atom.level, shell: atom.selectedShell, subshell: atom.selectedSubshell, orbital: atom.selectedOrbital };
+    const keys: Record<string, string> = { Z: String(atom.Z), level: view.level };
+    if (view.level !== 'atom' && view.shell !== null) {
+        keys.n = String(view.shell);
+        if (view.subshell) keys.l = String(view.subshell.l);
+        if (view.level === 'orbital' && view.orbital) keys.ml = String(view.orbital.ml);
+    }
+    return keys;
+}
+
+function decodeAtomKeys(params: URLSearchParams, dispatch: AppDispatch): void {
+    dispatch(setMode('atom'));
+    const Z = parseIntInRange(params.get('Z'), MIN_ATOMIC_NUMBER, MAX_ATOMIC_NUMBER);
+    // Without an element there is no solve to land a level on.
+    if (Z === null) return;
+    dispatch(setElement(Z));
+    dispatch(solveStarted());
+    dispatch(requestAtomView(parseAtomView(params)));
+}
+
+export function parseBasicSelection(params: URLSearchParams): BasicSelection | null {
+    const n = parseIntInRange(params.get('n'), 1, 9);
+    const l = n === null ? null : parseIntInRange(params.get('l'), 0, n - 1);
+    const ml = l === null ? null : parseIntInRange(params.get('ml'), -l, l);
+    return n === null || l === null || ml === null ? null : { n, l, ml };
+}
+
+/**
+ * Phase 1's combination, with the key names Phase 7's lessons use. Values
+ * are never clamped: an out-of-range F or member decodes as given, so the
+ * selection lands in Phase 1's refused state (selectionProblem says why and
+ * nothing is drawn) instead of silently showing a different field.
+ */
+export function parseCombination(params: URLSearchParams): CombinationSelection {
+    const combo = params.get('combo');
+    if (combo === 'sp' || combo === 'sp2' || combo === 'sp3') {
+        const member = params.get('member');
+        const index = parseIntInRange(member, 0, Number.MAX_SAFE_INTEGER);
+        return { kind: 'hybrid', hybrid: combo as HybridKind, member: index ?? 'all' };
+    }
+    if (combo === 'field') {
+        const level = params.get('level') === '2' ? 2 : 1;
+        const strength = parseNumberInRange(params.get('F'), -Number.MAX_VALUE, Number.MAX_VALUE);
+        const stark = params.get('stark');
+        return {
+            kind: 'field', level, field: strength ?? DEFAULT_FIELD_AU,
+            stark: stark === 'upper' || stark === 'both' ? stark : 'lower',
+        };
+    }
+    return NO_COMBINATION;
+}
+
+export function formatCombination(selection: CombinationSelection): Record<string, string> {
+    if (selection.kind === 'hybrid') {
+        return { combo: selection.hybrid, member: String(selection.member) };
+    }
+    if (selection.kind === 'field') {
+        return {
+            combo: 'field', level: String(selection.level),
+            F: String(Number(selection.field.toPrecision(6))), stark: selection.stark,
+        };
+    }
+    return { combo: 'none' };
+}
+
+function encodeBasicKeys(state: RootState): Record<string, string> {
+    const shown = selectShownBasicOrbital(state);
+    return { n: String(shown.n), l: String(shown.l), ml: String(shown.ml), ...formatCombination(state.orbital.combination) };
+}
+
+function decodeBasicKeys(params: URLSearchParams, dispatch: AppDispatch): void {
+    dispatch(setMode('hydrogenic'));
+    const selection = parseBasicSelection(params);
+    if (selection) dispatch(setBasicSelection(selection));
+    dispatch(setCombination(parseCombination(params)));
+    // App draws once every decoder has dispatched (see basicRenderNonce).
+    dispatch(requestBasicRender());
+}
+
+/** Registers the keys this app has today. main.tsx calls it once, before applyState. */
+export function registerBuiltInUrlKeys(): void {
+    registerUrlKeys(ANY_MODE, encodeViewKeys, decodeViewKeys);
+    registerUrlKeys('atom', encodeAtomKeys, decodeAtomKeys);
+    registerUrlKeys('basic', encodeBasicKeys, decodeBasicKeys);
 }
