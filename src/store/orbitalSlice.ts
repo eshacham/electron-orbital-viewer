@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { ClipAxis, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from '../types/orbital';
 import { FieldRenderRequest } from '../field_source';
-import { setMode } from './atomSlice';
+import { setMode, solveUnbound } from './atomSlice';
 import { BASIC_ORBITALS_Z, DEFAULT_ENCLOSED_FRACTION } from '../orbital_presets';
 import { CombinationSelection, NO_COMBINATION } from '../combinations';
 import { CameraAngles, isCanonicalAngles } from '../camera_angles';
@@ -213,6 +213,12 @@ const orbitalSlice = createSlice({
       if (action.payload !== 'atom' || !state.currentField) return;
       state.currentField = null;
       state.isLoading = false;
+    });
+    // A link's cut waits for the linked view to be on screen; an anion LDA
+    // cannot bind never draws one, so the cut must not be left waiting for
+    // whatever species is picked next (atomSlice drops its pendingView too).
+    builder.addCase(solveUnbound, (state) => {
+      state.pendingCut = null;
     });
   }
 });

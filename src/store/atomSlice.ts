@@ -257,12 +257,16 @@ const atomSlice = createSlice({
         },
 
         // Spec §3.5: an anion whose extra electron LDA cannot bind is shown
-        // as such and not drawn -- no profile, and not an error either.
+        // as such and not drawn -- no profile, and not an error either. Like
+        // solveFailed it drops a link's pending view: there is no picture for
+        // it to land on, and neither the Share link nor the next species
+        // should inherit it (orbitalSlice drops the link's cut the same way).
         solveUnbound: (state, action: PayloadAction<string>) => {
             state.isSolving = false;
             state.profile = null;
             state.error = null;
             state.unbound = action.payload;
+            state.pendingView = null;
         },
 
         energiesStarted: (state, action: PayloadAction<string>) => {

@@ -552,7 +552,7 @@ describe('species in the store', () => {
         const store = buildStore();
         store.dispatch(setElement(17));
         store.dispatch(setCharge(-1));
-        store.dispatch(solveUnbound('LDA does not bind this anion: its 3p electron has no bound state (eigenvalue ≥ 0).'));
+        store.dispatch(solveUnbound('LDA does not bind this anion: its 3p electron is not bound by 10⁻⁴ Ha or more.'));
         expect(store.getState().atom.unbound).toMatch(/does not bind/);
         const nonce = store.getState().atom.solveNonce;
         store.dispatch(setCharge(0));
@@ -569,6 +569,17 @@ describe('species in the store', () => {
         store.dispatch(solveUnbound('LDA does not bind this anion: …'));
         const atom = store.getState().atom;
         expect([atom.isSolving, atom.profile, atom.error, atom.unbound]).toEqual([false, null, null, 'LDA does not bind this anion: …']);
+    });
+
+    // Like solveFailed: a picture that never drew leaves no profile for a
+    // link's view to land on, and a later species must not inherit it.
+    it('solveUnbound cancels a pending link view', () => {
+        const store = buildStore();
+        store.dispatch(setElement(17));
+        store.dispatch(setCharge(-1));
+        store.dispatch(requestAtomView({ level: 'shell', shell: 3, subshell: null, orbital: null }));
+        store.dispatch(solveUnbound('LDA does not bind this anion: its 3p electron is not bound by 10⁻⁴ Ha or more.'));
+        expect(store.getState().atom.pendingView).toBeNull();
     });
 
     it('setExcitation accepts only an offered promotion and is cleared by a charge change', () => {

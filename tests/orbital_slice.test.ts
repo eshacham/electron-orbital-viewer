@@ -6,7 +6,7 @@ import reducer, {
     requestCut, clearPendingCut, startCompositionBuild, endCompositionBuild, failCompositionBuild, setLevelTransition,
     dismissOrbitalError,
 } from '../src/store/orbitalSlice';
-import { setMode } from '../src/store/atomSlice';
+import { setMode, solveUnbound } from '../src/store/atomSlice';
 import { fieldRequestFor, NO_COMBINATION } from '../src/combinations';
 import { basicOrbitalParams, DEFAULT_ENCLOSED_FRACTION } from '../src/orbital_presets';
 import { CANONICAL_CAMERA_ANGLES } from '../src/camera_angles';
@@ -155,6 +155,14 @@ describe('orbitalSlice: a restored cut', () => {
         expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'y', clipPosition: 0.5 });
         expect(store.getState().orbital.pendingCut).toEqual({ clipAxis: 'y', clipPosition: 0.5 });
         store.dispatch(clearPendingCut());
+        expect(store.getState().orbital.pendingCut).toBeNull();
+    });
+
+    // An anion LDA cannot bind never draws the linked view the cut waits for.
+    it('is dropped when the solve reports an unbound anion', () => {
+        const store = makeStore();
+        store.dispatch(requestCut({ clipAxis: 'y', clipPosition: 0.5 }));
+        store.dispatch(solveUnbound('LDA does not bind this anion: its 3p electron is not bound by 10⁻⁴ Ha or more.'));
         expect(store.getState().orbital.pendingCut).toBeNull();
     });
 });

@@ -2,14 +2,18 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createAppStore } from '../../src/store';
-import { setElement, setCharge, solveStarted, solveSucceeded, solveUnbound } from '../../src/store/atomSlice';
+import { setElement, setCharge, setMode, solveStarted, solveSucceeded, solveUnbound } from '../../src/store/atomSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
+import { clearEnergiesCacheForTests, getCachedEnergies, setCachedEnergies } from '../../src/atom/energies_cache';
 
 // See use_atom_solver.test.tsx: createAtomWorker.ts holds `import.meta.url`,
 // which this CommonJS ts-jest setup cannot parse; every test injects a fake.
 jest.mock('../../src/workers/createAtomWorker', () => ({ createAtomWorker: jest.fn() }));
 import { useDeltaScfEnergies } from '../../src/atom/useDeltaScfEnergies';
 import { AtomWorkerHandle } from '../../src/atom/useAtomSolver';
+
+// energies_cache.ts is module-level state; see use_atom_solver.test.tsx's profile cache note.
+beforeEach(() => { clearEnergiesCacheForTests(); });
 
 type FakeWorker = AtomWorkerHandle & { postMessage: jest.Mock; terminate: jest.Mock };
 const fake = (): FakeWorker => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null });
@@ -33,6 +37,8 @@ function mount(store: ReturnType<typeof createAppStore>) {
     });
     return { workers, ...view };
 }
+
+const sodium = { valueEv: 5.37, fromLabel: 'Na', toLabel: 'Na⁺' };
 
 const requestIdOf = (worker: FakeWorker) => (worker.postMessage.mock.calls[0][0] as { requestId: number }).requestId;
 
@@ -60,6 +66,67 @@ describe('useDeltaScfEnergies', () => {
         });
         expect(store.getState().atom.energies).toMatchObject({ status: 'done', speciesKey: '11+1', ionisation: null });
         expect(workers[1].terminate).toHaveBeenCalled();
+        // Landing as done re-runs the effect; it must not ask again.
+        expect(workers).toHaveLength(2);
+    });
+
+    it('keeps energies already done across a mode switch away and back', () => {
+        const store = createAppStore();
+        store.dispatch(setElement(11));
+        const { workers } = mount(store);
+        act(() => { store.dispatch(solveSucceeded(pictureOf(11, '11'))); });
+        act(() => {
+            workers[0].onmessage!({ data: { type: 'energies', speciesKey: '11', ionisation: sodium, excitation: null, requestId: requestIdOf(workers[0]) } } as MessageEvent);
+        });
+        // Not the cache that keeps them: the store's own 'done' does.
+        clearEnergiesCacheForTests();
+        act(() => { store.dispatch(setMode('hydrogenic')); });
+        act(() => { store.dispatch(setMode('atom')); });
+        expect(workers).toHaveLength(1);
+        expect(store.getState().atom.energies).toMatchObject({ status: 'done', speciesKey: '11', ionisation: sodium });
+    });
+
+    it('serves a species computed earlier from the cache: Na -> Na⁺ -> Na asks no worker the second time', () => {
+        const store = createAppStore();
+        store.dispatch(setElement(11));
+        const { workers } = mount(store);
+        act(() => { store.dispatch(solveSucceeded(pictureOf(11, '11'))); });
+        act(() => {
+            workers[0].onmessage!({ data: { type: 'energies', speciesKey: '11', ionisation: sodium, excitation: null, requestId: requestIdOf(workers[0]) } } as MessageEvent);
+        });
+        expect(getCachedEnergies('11')).toEqual({ ionisation: sodium, excitation: null });
+
+        act(() => { store.dispatch(setCharge(1)); });
+        act(() => { store.dispatch(solveSucceeded(pictureOf(11, '11+1'))); });
+        expect(workers).toHaveLength(2);
+
+        act(() => { store.dispatch(setCharge(0)); });
+        act(() => { store.dispatch(solveSucceeded(pictureOf(11, '11'))); });
+        expect(workers).toHaveLength(2);
+        expect(store.getState().atom.energies).toMatchObject({ status: 'done', speciesKey: '11', ionisation: sodium });
+    });
+
+    it('a cache hit lands under the selected species key with no worker at all', () => {
+        const excited = { valueEv: 2.185, fromLabel: 'Na 3s', toLabel: 'Na 3p' };
+        setCachedEnergies('11:3s>3p', { ionisation: null, excitation: excited });
+        const store = createAppStore();
+        store.dispatch(setElement(11));
+        store.dispatch({ type: 'atom/setExcitation', payload: { from: { n: 3, l: 0 }, to: { n: 3, l: 1 } } });
+        const { workers } = mount(store);
+        act(() => { store.dispatch(solveSucceeded(pictureOf(11, '11:3s>3p'))); });
+        expect(workers).toHaveLength(0);
+        expect(store.getState().atom.energies).toEqual({ speciesKey: '11:3s>3p', status: 'done', ionisation: null, excitation: excited, message: null });
+    });
+
+    it('does not cache a failure', () => {
+        const store = createAppStore();
+        store.dispatch(setElement(11));
+        const { workers } = mount(store);
+        act(() => { store.dispatch(solveSucceeded(pictureOf(11, '11'))); });
+        act(() => {
+            workers[0].onmessage!({ data: { type: 'error', message: 'did not converge', requestId: requestIdOf(workers[0]) } } as MessageEvent);
+        });
+        expect(getCachedEnergies('11')).toBeUndefined();
     });
 
     it('does not restart for a re-solve of the same species (an enclosed-fraction change)', () => {

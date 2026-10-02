@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { energiesStarted, energiesSucceeded, energiesFailed, pictureLanded } from '../store/atomSlice';
+import { energiesStarted, energiesSucceeded, energiesFailed, pictureLanded, selectSpeciesEnergies } from '../store/atomSlice';
 import { createAtomWorker } from '../workers/createAtomWorker';
 import { AtomWorkerHandle, AtomWorkerMessage } from './useAtomSolver';
 import { speciesKey } from './species';
+import { getCachedEnergies, setCachedEnergies } from './energies_cache';
 
 const FAILED = 'The ΔSCF calculation failed.';
 
@@ -26,6 +27,10 @@ const FAILED = 'The ΔSCF calculation failed.';
  * enclosed fraction: a fraction change re-solves the picture but leaves the
  * profile in place until the new one replaces it, so the landed flag stays
  * true and the energies (which do not depend on the fraction) carry on.
+ *
+ * A species computed earlier this session is served from energies_cache.ts
+ * without a worker at all: the terminated worker took delta_scf's own
+ * memoisation with it, and Na -> Na⁺ -> Na should not cost the ΔSCF twice.
  */
 export function useDeltaScfEnergies(createWorker: () => AtomWorkerHandle = createAtomWorker): void {
     const dispatch = useAppDispatch();
@@ -36,13 +41,18 @@ export function useDeltaScfEnergies(createWorker: () => AtomWorkerHandle = creat
     const landed = useAppSelector(state => pictureLanded(state.atom));
     // A mode switch away and back re-runs the effect below; energies already
     // in hand for this species are kept rather than recomputed.
-    const done = useAppSelector(state => state.atom.energies.status === 'done'
-        && state.atom.energies.speciesKey === speciesKey({ Z: state.atom.Z, charge: state.atom.charge, excitation: state.atom.excitation }));
+    const done = useAppSelector(state => selectSpeciesEnergies(state)?.status === 'done');
     const nextRequestId = useRef(0);
 
     useEffect(() => {
         if (mode !== 'atom' || !landed || done) return;
         const key = speciesKey({ Z, charge, excitation });
+        const cached = getCachedEnergies(key);
+        if (cached) {
+            // Lands as done, which re-runs this effect and stops at `done`.
+            dispatch(energiesSucceeded({ speciesKey: key, ...cached }));
+            return;
+        }
         const requestId = ++nextRequestId.current;
         dispatch(energiesStarted(key));
         const worker = createWorker();
@@ -50,6 +60,7 @@ export function useDeltaScfEnergies(createWorker: () => AtomWorkerHandle = creat
             const data = event.data;
             if (data.requestId !== requestId) return;
             if (data.type === 'energies') {
+                setCachedEnergies(data.speciesKey, { ionisation: data.ionisation, excitation: data.excitation });
                 dispatch(energiesSucceeded({ speciesKey: data.speciesKey, ionisation: data.ionisation, excitation: data.excitation }));
             } else {
                 // The worker reports every throw from delta_scf -- an
