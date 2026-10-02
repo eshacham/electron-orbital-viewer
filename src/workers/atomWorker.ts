@@ -1,6 +1,6 @@
 import { AtomSolution, solveAtom, solveSpecies } from '../atom/scf';
 import { UnboundAnionError } from '../atom/scf_shared';
-import { AtomSpecies, Excitation, isNeutralGround, speciesKey } from '../atom/species';
+import { AtomSpecies, Excitation, isNeutralGround, speciesConfiguration, speciesKey } from '../atom/species';
 import { EnergyReading, excitationEnergy, ionisationEnergy } from '../atom/delta_scf';
 import { AtomProfile, buildAtomProfile, packRadialCurve, subshellSamplingRadius, compositeSamplingRadius } from '../atom/atom_profile';
 
@@ -233,6 +233,32 @@ export function buildSerialisedAtomProfile(
     };
 }
 
+// Keyed on `${Z}:${enclosedFraction}` -- an ion's reference ring is always
+// the *neutral* atom's radii, so this is deliberately independent of charge
+// and excitation. Without it, every ion or excited-atom request would rerun
+// buildAtomProfile on the neutral solution from scratch even though
+// solveAtom(Z) itself is already memoised; the SCF part was never the
+// expense here, but there is no reason to repeat even the cheap part on
+// every request for the same (Z, fraction) pair.
+const referenceRadiiCache = new Map<string, ReferenceRadii>();
+
+/**
+ * The neutral ground state's radii for the reference ring. Phase 4: when
+ * `relativity` becomes a solve option (Global Constraints), this neutral
+ * reference solve must be passed the same `relativity` as the ion's own
+ * solve -- comparing a relativistic ion against a non-relativistic neutral
+ * reference would silently compare two different methods.
+ */
+function referenceRadiiFor(Z: number, enclosedFraction: number): ReferenceRadii {
+    const key = `${Z}:${enclosedFraction}`;
+    const hit = referenceRadiiCache.get(key);
+    if (hit) return hit;
+    const neutral = buildAtomProfile(solveAtom(Z), enclosedFraction);
+    const radii: ReferenceRadii = { displayRadius: neutral.displayRadius, contourRadius: neutral.contourRadius };
+    referenceRadiiCache.set(key, radii);
+    return radii;
+}
+
 /** Every ArrayBuffer inside a payload, so it can be transferred rather than copied across the worker boundary. */
 function transferListFor(profile: SerialisedAtomProfile): Transferable[] {
     const buffers: Transferable[] = [
@@ -253,6 +279,13 @@ function transferListFor(profile: SerialisedAtomProfile): Transferable[] {
  * only ever named a `Z` still type-checks. `'energies'` is a separate
  * request so a slow ΔSCF energies solve (useDeltaScfEnergies' own worker,
  * Task 9) never queues in front of a picture solve on this one.
+ *
+ * `requestId` on both this and `AtomWorkerResponse` below: Task 20 made the
+ * worker long-lived (reused across requests rather than created and
+ * terminated per call), which means `terminate()` can no longer be what
+ * stops a superseded reply from landing. Echoing the id back is what
+ * replaces it -- a caller drops any reply whose id no longer matches its
+ * latest dispatched request.
  */
 export type AtomWorkerRequest =
     | { type: 'solve'; Z: number; charge?: number; excitation?: Excitation | null; enclosedFraction: number; requestId: number }
@@ -281,16 +314,20 @@ export function handleAtomWorkerRequest(data: AtomWorkerRequest): { response: At
     const species: AtomSpecies = { Z: data.Z, charge: data.charge ?? 0, excitation: data.excitation ?? null };
     try {
         if (data.type === 'energies') {
+            // ionisationEnergy/excitationEnergy only ever look *past* this
+            // species (the next ion up, or its own un-excited ground state),
+            // so neither one validates a charge or excitation this element
+            // doesn't itself offer -- speciesConfiguration does, throwing the
+            // same "not offered" error solveSpecies would for the 'solve'
+            // path, caught below like any other throw from this branch.
+            speciesConfiguration(species);
             return {
                 response: { type: 'energies', speciesKey: speciesKey(species), ionisation: ionisationEnergy(species), excitation: excitationEnergy(species), requestId },
                 transfer: [],
             };
         }
         const atom = solveSpecies(species);
-        const reference = isNeutralGround(species) ? null : (() => {
-            const neutral = buildAtomProfile(solveAtom(species.Z), data.enclosedFraction);
-            return { displayRadius: neutral.displayRadius, contourRadius: neutral.contourRadius };
-        })();
+        const reference = isNeutralGround(species) ? null : referenceRadiiFor(species.Z, data.enclosedFraction);
         const profile = buildSerialisedAtomProfile(atom, data.enclosedFraction, { speciesKey: speciesKey(species), reference });
         return { response: { type: 'success', profile, requestId }, transfer: transferListFor(profile) };
     } catch (error) {

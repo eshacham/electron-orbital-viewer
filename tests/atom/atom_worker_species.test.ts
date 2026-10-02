@@ -25,7 +25,7 @@ describe('atom worker, species protocol', () => {
 
     it('answers an unbound anion with an explicit unbound reply, not a profile', () => {
         const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 17, charge: -1, excitation: null, enclosedFraction: 0.9, requestId: 3 });
-        expect(response).toEqual({ type: 'unbound', message: expect.stringMatching(/^LDA does not bind this anion/), requestId: 3 });
+        expect(response).toEqual({ type: 'unbound', message: expect.stringMatching(/^LDA does not bind this anion: its 3p electron/), requestId: 3 });
     });
 
     it('computes ΔSCF energies on request', () => {
@@ -40,4 +40,19 @@ describe('atom worker, species protocol', () => {
         const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 11, charge: 2, excitation: null, enclosedFraction: 0.9, requestId: 5 });
         expect(response).toEqual({ type: 'error', message: expect.stringMatching(/not offered/), requestId: 5 });
     });
+
+    // Same disallowed-charge guard as the 'solve' test above, but through the
+    // 'energies' branch's own catch -- both branches share one try/catch in
+    // handleAtomWorkerRequest, but only a passing test on each pins that down.
+    it('reports a disallowed species on the energies path as an error too', () => {
+        const { response } = handleAtomWorkerRequest({ type: 'energies', Z: 11, charge: 2, excitation: null, requestId: 6 });
+        expect(response).toEqual({ type: 'error', message: expect.stringMatching(/not offered/), requestId: 6 });
+    });
+
+    // Not tested here: an anion's energies request (e.g. Cl-, Z=17 charge=-1)
+    // also reaches UnboundAnionError, via solvePolarised rather than
+    // assertStatesBound's restricted-LDA path -- confirmed by hand to reply
+    // 'unbound' with the same "its 3p electron" message, but the
+    // spin-polarised SCF it requires takes several seconds, too slow for the
+    // default suite's budget.
 });

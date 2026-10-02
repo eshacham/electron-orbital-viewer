@@ -18,11 +18,13 @@
  */
 import { SerialisedAtomProfile } from '../workers/atomWorker';
 
-// 118 elements times the app's 5 enclosed-fraction presets (orbital_presets.
-// ts's ENCLOSED_FRACTIONS) is 590 possible entries; a real session touches a
-// tiny fraction of that combination space at a time (a handful of elements,
-// switching between a couple of fractions), so 20 is generous headroom
-// without letting the cache grow unbounded across a long session.
+// Ions and excitations widen the key space well past "118 elements times 5
+// enclosed-fraction presets" (orbital_presets.ts's ENCLOSED_FRACTIONS), since
+// a species key can now also carry a charge or an excitation -- but a real
+// session still only ever touches a handful of species at a time (switching
+// an element's charge/excitation/fraction a few times, not sweeping the
+// whole offered range), so 20 remains generous headroom without letting the
+// cache grow unbounded across a long session.
 const MAX_ENTRIES = 20;
 
 const cache = new Map<string, SerialisedAtomProfile>();
