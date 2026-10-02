@@ -34,6 +34,9 @@ jest.mock('../src/orbital_visualizer', () => ({
 jest.mock('../src/camera_angles', () => ({
     ...jest.requireActual('../src/camera_angles'),
     applyCameraAngles: jest.fn(),
+    // The mocked context's camera is a bare stand-in, so the angle it
+    // reports is fixed here.
+    cameraAnglesOf: jest.fn(() => ({ azimuth: 40, elevation: 20 })),
 }));
 
 import OrbitalViewer from '../src/components/OrbitalViewer';
@@ -49,7 +52,7 @@ import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
 import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital } from '../src/orbital_visualizer';
-import { applyCameraAngles } from '../src/camera_angles';
+import { applyCameraAngles, cameraAnglesOf } from '../src/camera_angles';
 
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
 
@@ -201,5 +204,43 @@ describe('OrbitalViewer: level transitions in the store', () => {
         expect(store.getState().orbital.levelTransition).toBe(true);
         view.unmount();
         expect(store.getState().orbital.levelTransition).toBe(false);
+    });
+});
+
+// Task 2's deferred minor (final review T2): OrbitalControls fires 'change'
+// on every damped frame while the camera eases to a stop; the store must
+// hear the direction once, after it has settled, not once per frame.
+describe('OrbitalViewer: reporting the camera', () => {
+    it('reports the direction once, 300 ms after the last change', () => {
+        jest.useFakeTimers();
+        try {
+            const store = createAppStore();
+            render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+            const context = (initVisualizer as jest.Mock).mock.results.at(-1)!.value as VisualizerContext;
+            const listeners = (context.controls.addEventListener as jest.Mock).mock.calls
+                .filter(([type]) => type === 'change')
+                .map(([, listener]) => listener as () => void);
+            const change = () => listeners.forEach(listener => listener());
+            (cameraAnglesOf as jest.Mock).mockClear();
+
+            // A drag, then damping: a change every frame for a while.
+            for (let frame = 0; frame < 20; frame++) {
+                act(() => { change(); jest.advanceTimersByTime(16); });
+            }
+            act(() => { change(); });
+            expect(cameraAnglesOf).not.toHaveBeenCalled();
+            expect(store.getState().orbital.cameraAngles).toBeNull();
+
+            act(() => { jest.advanceTimersByTime(299); });
+            expect(cameraAnglesOf).not.toHaveBeenCalled();
+            act(() => { jest.advanceTimersByTime(1); });
+            expect(cameraAnglesOf).toHaveBeenCalledTimes(1);
+            expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 40, elevation: 20 });
+
+            act(() => { jest.advanceTimersByTime(1000); });
+            expect(cameraAnglesOf).toHaveBeenCalledTimes(1);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 });
