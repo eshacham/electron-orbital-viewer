@@ -579,17 +579,28 @@ describe('App', () => {
         // A folded phone sheet has no card on screen, so the canvas note is
         // the only place the reason is said: a status there, still not a
         // second alert.
-        it('on a phone with the sheet folded, the canvas note is what says why nothing is drawn', () => {
+        // A folded phone sheet has no card on screen, so the canvas note is
+        // the only place the reason is said. It is announced through a
+        // status region that was already mounted (fix round 1, M4): a live
+        // region inserted together with its text is not reliably read.
+        it('on a phone with the sheet folded, fills an already-mounted status region with the reason', () => {
             installMatchMedia(true);
             const { container } = renderWithProvider(<App />, { Z: 17, charge: -1 });
+            const live = container.querySelector('.canvas-unbound-live')!;
+            expect(live).toHaveAttribute('role', 'status');
+            expect(live).toBeEmptyDOMElement();
+
             replyUnbound();
+            expect(container.querySelector('.canvas-unbound-live')).toBe(live);
             expect(screen.queryAllByRole('alert')).toHaveLength(0);
-            const note = container.querySelector('.canvas-unbound')!;
-            expect(note).toHaveAttribute('role', 'status');
-            expect(note).not.toHaveAttribute('aria-hidden');
-            expect(note).toHaveTextContent('LDA does not bind this anion');
+            expect(live).toHaveTextContent('LDA does not bind this anion');
+
+            // Explore open: the card's alert speaks, the region empties, and
+            // the note over the canvas is for the eye only.
             fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
             expect(screen.getAllByRole('alert')).toHaveLength(1);
+            expect(live).toBeEmptyDOMElement();
+            expect(container.querySelector('.canvas-unbound')).toHaveAttribute('aria-hidden', 'true');
         });
 
         it('says which species it is solving', () => {

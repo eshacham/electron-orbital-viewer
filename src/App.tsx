@@ -746,17 +746,19 @@ function App() {
                 )}
                 {/* Spec §3.5: an anion LDA cannot bind draws nothing, and
                     the empty canvas says why. The card's alert
-                    (SpeciesControls) is the one announced; this repeats it
-                    for the eye, hidden from assistive technology while that
-                    alert is on screen so it is never heard twice. A folded
-                    phone sheet has no card, so there it is a status. */}
-                {isAtomMode && atomUnbound && (
-                    <div
-                        className="canvas-unbound"
-                        {...(isNarrow && phoneTab !== 'explore' ? { role: 'status' } : { 'aria-hidden': true })}
-                    >
-                        {atomUnbound}
+                    (SpeciesControls) is the one announced; while it is on
+                    screen this note is for the eye only, so the reason is
+                    never heard twice. A folded phone sheet has no card, so
+                    there the note goes into a status region that is always
+                    mounted in atom mode -- a live region inserted together
+                    with its text is not reliably announced. */}
+                {isAtomMode && isNarrow && (
+                    <div className="canvas-unbound-live" role="status">
+                        {atomUnbound && phoneTab !== 'explore' && <div className="canvas-unbound">{atomUnbound}</div>}
                     </div>
+                )}
+                {isAtomMode && atomUnbound && !(isNarrow && phoneTab !== 'explore') && (
+                    <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
                 )}
                 {showPhaseLegend && (
                     <div className="phase-legend" aria-label="surface colour key">
