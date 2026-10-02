@@ -235,6 +235,7 @@ export function valenceShellOf(configuration: SubshellOccupancy[]): number {
     return configuration.reduce((highest, subshell) => Math.max(highest, subshell.n), 0);
 }
 
+/** The neutral atom's valence shell; see valenceShellOf for what counts as valence. */
 export function valenceShellFor(Z: number): number {
     return valenceShellOf(configurationFor(Z));
 }
