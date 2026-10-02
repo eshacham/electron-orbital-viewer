@@ -65,6 +65,11 @@ const EnergyLine: React.FC<{ label: string; reading: EnergyReading | null; statu
  * that describe them and the size comparison against the neutral atom.
  * Presentational: every change goes out through a callback.
  */
+// MUI's ButtonBase removes the browser's focus outline and relies on the
+// ripple to show keyboard focus; with the ripple off, these buttons need
+// their own ring or a keyboard user cannot see where focus is.
+const FOCUS_RING = { '&.Mui-focusVisible': { outline: '2px solid #1565c0', outlineOffset: '2px' } } as const;
+
 const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChange, onExcitationChange, energies, radii, unbound }) => {
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const decreaseRef = useRef<HTMLButtonElement>(null);
@@ -128,12 +133,12 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
         <Box className="species-controls" role="group" aria-label="ion and excitation">
             <Box className="species-charge-row">
                 <Typography variant="body2" component="span">Charge</Typography>
-                <Button ref={decreaseRef} size="small" disableRipple aria-label="decrease charge" disabled={species.charge <= charges[0]}
+                <Button ref={decreaseRef} size="small" disableRipple sx={FOCUS_RING} aria-label="decrease charge" disabled={species.charge <= charges[0]}
                     onClick={handleDecrease}>−</Button>
                 <span className="species-charge-value" aria-label="charge" role="status">
                     {species.charge === 0 ? `${neutralSymbol} (neutral)` : speciesSymbol({ ...species, excitation: null })}
                 </span>
-                <Button ref={increaseRef} size="small" disableRipple aria-label="increase charge" disabled={species.charge >= charges[charges.length - 1]}
+                <Button ref={increaseRef} size="small" disableRipple sx={FOCUS_RING} aria-label="increase charge" disabled={species.charge >= charges[charges.length - 1]}
                     onClick={handleIncrease}>+</Button>
             </Box>
 
