@@ -32,6 +32,26 @@ describe('ShareExportBar: Export', () => {
         expect(item).toHaveTextContent('Waiting for the atom to finish solving.');
     });
 
+    // Final review M5: an unavailable item's reason is only heard if the item
+    // can be reached -- MUI skips disabled items in keyboard navigation unless
+    // the list says otherwise.
+    it('lets the keyboard reach an unavailable item, so its reason is read out, without running it', () => {
+        const onExport = jest.fn();
+        const availability = { ...allAvailable(), png: 'Wait for the picture to finish computing.', 'png-plain': 'Wait for the picture to finish computing.' };
+        render(<ShareExportBar onShare={share} onExport={onExport} availability={availability} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+        const csv = screen.getByRole('menuitem', { name: /radial curves/i });
+        expect(csv).toHaveFocus();
+        fireEvent.keyDown(csv, { key: 'ArrowUp' });
+        const plain = screen.getByRole('menuitem', { name: /view only/i });
+        expect(plain).toHaveFocus();
+        expect(plain).toHaveAttribute('aria-disabled', 'true');
+        expect(plain).toHaveAccessibleName(expect.stringContaining('Wait for the picture to finish computing.'));
+        fireEvent.keyDown(plain, { key: 'Enter' });
+        fireEvent.click(plain);
+        expect(onExport).not.toHaveBeenCalled();
+    });
+
     it('runs the chosen export and shows why one failed', async () => {
         const onExport = jest.fn().mockRejectedValue(new Error('Nothing is drawn yet.'));
         render(<ShareExportBar onShare={share} onExport={onExport} availability={allAvailable()} />);

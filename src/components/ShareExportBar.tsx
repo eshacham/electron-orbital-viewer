@@ -96,11 +96,26 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
                     >
                         Export
                     </Button>
-                    <Menu id="export-menu" anchorEl={menuAnchor} open={menuAnchor !== null} onClose={() => setMenuAnchor(null)}>
+                    {/* Final review M5: an unavailable item stays reachable by
+                        arrow key, so a keyboard or screen-reader user hears its
+                        reason (the secondary text) rather than having it
+                        skipped. It is still disabled: Enter does nothing. */}
+                    <Menu
+                        id="export-menu"
+                        anchorEl={menuAnchor}
+                        open={menuAnchor !== null}
+                        onClose={() => setMenuAnchor(null)}
+                        slotProps={{ list: { disabledItemsFocusable: true } }}
+                    >
                         {EXPORT_ITEMS.map(item => {
                             const reason = availability?.[item.kind] ?? null;
+                            const unavailable = reason !== null || exporting;
                             return (
-                                <MenuItem key={item.kind} disabled={reason !== null || exporting} onClick={() => handleItem(item.kind)}>
+                                <MenuItem
+                                    key={item.kind}
+                                    disabled={unavailable}
+                                    onClick={() => { if (!unavailable) handleItem(item.kind); }}
+                                >
                                     <ListItemText primary={item.label} secondary={reason ?? item.detail} />
                                 </MenuItem>
                             );
