@@ -16,7 +16,7 @@ export const MAX_ITERATIONS = 200;
 // near the origin or meaningless at large r.
 export const CONVERGENCE_TOLERANCE = 1e-6;
 export const INITIAL_BETA = 0.3;
-// Floor for the adaptive mixing in solveAtomOnGrid below: small enough that
+// Floor for the adaptive mixing in scf.ts's solveAtomOnGrid: small enough that
 // even the most charge-sloshing-prone configurations (near-degenerate 4s/3d,
 // 4f/5d) settle, without ever fully stalling the loop.
 export const MIN_BETA = 0.02;
@@ -98,7 +98,7 @@ export class UnboundAnionError extends Error {
     readonly n: number;
     readonly l: number;
     constructor(n: number, l: number) {
-        super(`LDA does not bind this anion: its ${subshellLabel(n, l)} electron has no bound state (eigenvalue ≥ 0).`);
+        super(`LDA does not bind this anion: its ${subshellLabel(n, l)} electron is not bound by 10⁻⁴ Ha or more.`);
         this.name = 'UnboundAnionError';
         this.n = n;
         this.l = l;

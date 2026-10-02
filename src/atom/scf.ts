@@ -228,9 +228,9 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions
     const isAnion = electrons > Z;
 
     // Screened, not bare Coulomb (see screenedStartingPotential's doc
-    // comment above for the full reasoning): starting from a guess that is
-    // already closer to self-consistent gives the loop less charge-sloshing
-    // room, which matters most for exactly the near-degenerate transition-
+    // comment in scf_shared.ts for the full reasoning): starting from a
+    // guess that is already closer to self-consistent gives the loop less
+    // charge-sloshing room, which matters most for exactly the near-degenerate transition-
     // metal/lanthanide/actinide configurations the adaptive beta below also
     // exists for.
     let potential = screenedStartingPotential(grid, Z);

@@ -159,4 +159,11 @@ describe('hasBoundState', () => {
         const repulsive = attractive.map(v => -v);
         expect(hasBoundState(grid, 1, 0, repulsive)).toBe(false);
     });
+
+    it('draws the line at `below`: hydrogen 2p (E = -0.125) is bound below -0.124 but not below -0.126', () => {
+        const grid = gridForAtom(1, 4);
+        const attractive = coulomb(grid, 1);
+        expect(hasBoundState(grid, 2, 1, attractive, -0.124)).toBe(true);
+        expect(hasBoundState(grid, 2, 1, attractive, -0.126)).toBe(false);
+    });
 });

@@ -6,7 +6,7 @@ import { neutralGround, AtomSpecies } from '../../src/atom/species';
 import { configurationLabelOf } from '../../src/atom/configurations';
 
 jest.setTimeout(120000);
-// Fe2+, Br/Br- and I/I- add ~45 s; gated like scf.test.ts.
+// Fe2+, Br/Br- and I/I- add ~20 s; gated like scf.test.ts.
 const SLOW = process.env.ATOM_SLOW_TESTS === '1';
 const itSlow = SLOW ? it : it.skip;
 
@@ -29,7 +29,7 @@ describe('solveSpecies', () => {
         expect(sodiumIon.states.reduce((sum, s) => sum + s.electrons, 0)).toBe(10);
         const neutral = radii(neutralGround(11));
         const cation = radii(ion(11, 1));
-        expect(cation.contour).toBeLessThan(neutral.contour);     // measured 1.284 < 1.944
+        expect(cation.contour).toBeLessThan(neutral.contour);     // measured 1.275 < 1.939
         expect(cation.display).toBeLessThan(neutral.display);
     });
 
@@ -50,11 +50,12 @@ describe('solveSpecies', () => {
     });
 
     it('reports H- and Cl- as unbound in LDA instead of returning a picture', () => {
-        for (const [Z, n, l] of [[1, 1, 0], [17, 3, 1]] as const) {
+        for (const [Z, n, l, label] of [[1, 1, 0, '1s'], [17, 3, 1, '3p']] as const) {
             let caught: unknown;
             try { solveSpecies(ion(Z, -1)); } catch (error) { caught = error; }
             expect(caught).toBeInstanceOf(UnboundAnionError);
             expect((caught as UnboundAnionError).message).toMatch(/^LDA does not bind this anion/);
+            expect((caught as UnboundAnionError).message).toContain(`its ${label} electron`);
             expect([(caught as UnboundAnionError).n, (caught as UnboundAnionError).l]).toEqual([n, l]);
         }
     });
@@ -73,7 +74,7 @@ describe('solveSpecies', () => {
         for (const Z of [35, 53]) {
             const neutral = radii(neutralGround(Z));
             const anion = radii(ion(Z, -1));
-            expect(anion.contour).toBeGreaterThan(neutral.contour);   // measured Br 2.088 > 1.874, I 2.014 > 1.820
+            expect(anion.contour).toBeGreaterThan(neutral.contour);   // measured Br 1.858 < Br- 2.073, I 1.804 < I- 1.997
             expect(anion.display).toBeGreaterThan(neutral.display);
         }
     });
