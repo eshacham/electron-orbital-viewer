@@ -37,6 +37,24 @@ describe('exportAvailability and runExport: a render that failed', () => {
     });
 });
 
+describe('exportAvailability: a failed orbital render in atom mode', () => {
+    // Re-review of M3: atom mode's level 3 renders through the same orbital
+    // request, so its failure must refuse too -- but only at that level.
+    it('refuses at the orbital level, and not once back at a shell view', () => {
+        const store = neonStore();
+        store.dispatch(drillToShell(2));
+        store.dispatch(drillToSubshell(2, 1));
+        store.dispatch(drillToOrbital(2, 1, 0));
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(2, 1, 0, 0.9)));
+        store.dispatch(failOrbitalCalculation('worker crashed'));
+        expect(exportAvailability(store.getState()).png).toBe(RENDER_FAILED_REASON);
+        expect(exportAvailability(store.getState()).cube).toBe(RENDER_FAILED_REASON);
+
+        store.dispatch(drillToShell(2));
+        expect(exportAvailability(store.getState()).png).toBeNull();
+    });
+});
+
 describe('runExport: PNG', () => {
     it('asks the viewer for an image, with the caption and method, or without overlays', async () => {
         const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));

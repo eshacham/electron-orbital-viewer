@@ -69,7 +69,14 @@ export const PICTURE_BUSY_REASON = 'Wait for the picture to finish computing.';
 export const RENDER_FAILED_REASON = 'The last picture failed to compute; nothing to export.';
 
 function drawnReason(state: RootState): string | null {
-    if (state.atom.mode === 'atom') return state.atom.profile ? null : WAITING_FOR_ATOM_REASON;
+    if (state.atom.mode === 'atom') {
+        if (!state.atom.profile) return WAITING_FOR_ATOM_REASON;
+        // Atom mode's level 3 renders through the same orbital request as
+        // Basic Orbitals, so a failed one leaves nothing on screen either.
+        // The shell levels draw from the profile; a stale flag from an
+        // orbital left behind must not refuse them.
+        return state.atom.level === 'orbital' && state.orbital.renderFailed ? RENDER_FAILED_REASON : null;
+    }
     // Ruling C10: a combination Phase 1 refuses (selectionProblem) says why
     // it refused, not the generic "nothing is drawn" -- the picker already
     // knows the reason, and the export menu should say the same thing.
