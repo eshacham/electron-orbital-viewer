@@ -248,7 +248,7 @@ describe('OrbitalViewer: reporting the camera', () => {
 
 /** Ne⁺ as the worker would serialise it: its own species key, and the neutral's radii for the ring. */
 function neonIonProfile() {
-    return { ...neonProfile(), speciesKey: '10+1', displayRadius: 1.6, reference: { displayRadius: 2, contourRadius: 2.1 } };
+    return { ...neonProfile(), speciesKey: '10+1', displayRadius: 1.6, reference: { displayRadius: 2, contourRadius: 2.1, framingRadius: 1.7 } };
 }
 
 // Phase 3 Task 12: an ion's whole-atom view carries the neutral atom's edge
@@ -269,7 +269,9 @@ describe('OrbitalViewer: ions', () => {
     it('rings the neutral atom\'s drawn radius at the whole-atom level, and frames on it', () => {
         const store = ionStore();
         render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
-        expect(updateAtomViewInScene).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ contourRadius: 1.6, framingFloor: 2 }), expect.anything());
+        // Floored at the neutral's own framing radius (1.7), not its drawn
+        // radius (2): the camera stays where the neutral atom's view put it.
+        expect(updateAtomViewInScene).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ contourRadius: 1.6, framingFloor: 1.7 }), expect.anything());
         expect(setReferenceRing).toHaveBeenLastCalledWith(expect.anything(), 2);
 
         (createShellCompositionWorker as jest.Mock).mockReturnValue(fakeCompositionWorker());

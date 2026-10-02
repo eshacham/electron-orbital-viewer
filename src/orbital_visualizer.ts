@@ -30,6 +30,7 @@ import { FieldRenderRequest } from './field_source';
 import { createFieldOverlayGroup } from './field_overlay_view';
 import { markExportSurface } from './export/surfaces';
 import { CANONICAL_CAMERA_DIRECTION } from './camera_angles';
+import { framingRadiusFor } from './atom/framing';
 import {
     createReferenceRing,
     positionReferenceRing,
@@ -1361,28 +1362,11 @@ export interface AtomShellViewParams {
      * `backdropOpacityFor`).
      */
     isComposition?: boolean;
-    /** Frame on at least this radius -- the reference ring's, so the neutral's edge is on screen. */
+    /** Frame on at least this radius -- the neutral atom's own framing radius, so a charge step leaves the camera where it is (ReferenceRadii.framingRadius). */
     framingFloor?: number;
 }
 
-/**
- * How far out the camera frames a shell view by default.
- *
- * `contourRadius` bounds the sphere itself and must keep doing so exactly --
- * this only chooses where the camera *starts*. Framing on the outermost
- * resolved shell peak instead, with a margin for the ring's own width and a
- * little breathing room beyond it, starts the camera close enough that the
- * shell structure is what the viewer actually sees rather than a sliver in
- * the middle of an empty disc. `Math.min` with `contourRadius` means this
- * can only pull the default view in, never push it out past what the
- * enclosed-fraction control already asked for -- scrolling back out still
- * reaches the full contour, the control is untouched.
- */
-const SHELL_VIEW_FRAMING_MARGIN = 2.5;
-function framingRadiusFor(contourRadius: number, outermostFeatureR: number | undefined): number {
-    if (!(outermostFeatureR !== undefined && outermostFeatureR > 0)) return contourRadius;
-    return Math.min(contourRadius, outermostFeatureR * SHELL_VIEW_FRAMING_MARGIN);
-}
+// framingRadiusFor lives in atom/framing.ts, shared with the atom worker.
 
 /**
  * Renders levels 1-2 (whole atom / single shell): a spherical cut-away shaded

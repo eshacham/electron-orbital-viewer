@@ -1,5 +1,6 @@
 import { handleAtomWorkerRequest } from '../../src/workers/atomWorker';
 import { NIST_FIRST_IONISATION_EV } from '../../src/atom/ionisation_references';
+import { wholeAtomFramingRadius } from '../../src/atom/framing';
 
 jest.setTimeout(120000);
 
@@ -14,6 +15,16 @@ describe('atom worker, species protocol', () => {
         expect(response.profile.subshells.reduce((sum, s) => sum + s.electrons, 0)).toBe(10);
         expect(response.profile.reference!.displayRadius).toBeGreaterThan(response.profile.displayRadius);
         expect(transfer).toContain(response.profile.total.buffer);
+    });
+
+    // Ruling C12's fallback: the ion is framed on the neutral's own framing
+    // radius, not its drawn radius, so a charge step leaves the camera put.
+    it('carries the neutral atom\'s own framing radius in the reference', () => {
+        const ion = handleAtomWorkerRequest({ type: 'solve', Z: 2, charge: 1, excitation: null, enclosedFraction: 0.9, requestId: 1 }).response;
+        const neutral = handleAtomWorkerRequest({ type: 'solve', Z: 2, enclosedFraction: 0.9, requestId: 2 }).response;
+        if (ion.type !== 'success' || neutral.type !== 'success') throw new Error('He or He+ did not solve');
+        expect(ion.profile.reference!.framingRadius).toBe(wholeAtomFramingRadius(neutral.profile));
+        expect(ion.profile.reference!.framingRadius).toBeLessThan(ion.profile.reference!.displayRadius);
     });
 
     it('carries no reference for a neutral ground state, and keeps its key as String(Z)', () => {

@@ -183,7 +183,7 @@ describe('SpeciesControls', () => {
     });
 
     it('compares the drawn radius with the neutral atom\'s, naming the dashed ring', () => {
-        renderControls({ species: { Z: 11, charge: 1, excitation: null }, radii: { displayRadius: 1.6, reference: { displayRadius: 3.2, contourRadius: 1.94 } } });
+        renderControls({ species: { Z: 11, charge: 1, excitation: null }, radii: { displayRadius: 1.6, reference: { displayRadius: 3.2, contourRadius: 1.94, framingRadius: 3.2 } } });
         const compare = screen.getByLabelText('size compared with the neutral atom');
         expect(compare).toHaveTextContent('dashed ring: neutral Na, drawn radius 3.20 a₀');
         expect(compare).toHaveTextContent('Na⁺ 1.60 a₀ (−50 %)');
@@ -192,7 +192,7 @@ describe('SpeciesControls', () => {
     // M11: a rounded 0 % reads as a typo ("−0 %"); say plainly that the
     // sizes are indistinguishable instead.
     it('says sizes are indistinguishable rather than showing a signed near-zero', () => {
-        renderControls({ species: { Z: 11, charge: 1, excitation: null }, radii: { displayRadius: 1.999, reference: { displayRadius: 2.0, contourRadius: 1.2 } } });
+        renderControls({ species: { Z: 11, charge: 1, excitation: null }, radii: { displayRadius: 1.999, reference: { displayRadius: 2.0, contourRadius: 1.2, framingRadius: 2.0 } } });
         const compare = screen.getByLabelText('size compared with the neutral atom');
         expect(compare).toHaveTextContent('≈ same size');
         expect(compare).not.toHaveTextContent('−0 %');

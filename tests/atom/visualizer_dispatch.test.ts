@@ -26,8 +26,9 @@ import {
     attachShellCompositionLobes,
     clearShellCompositionLobes,
     setReferenceRing,
-    clearAtomView,
+    clearScene,
 } from '../../src/orbital_visualizer';
+import { wholeAtomFramingRadius } from '../../src/atom/framing';
 import { shellComposition } from '../../src/atom/shell_composition';
 import { defaultSurfaceStyle, SurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
 
@@ -478,11 +479,24 @@ describe('reference ring and framing floor', () => {
         expect(context.framedRMax).toBeCloseTo(1.94, 12);
     });
 
-    it('clearAtomView leaves nothing drawn', () => {
+    // He-like numbers: He is drawn at 1.764 a₀ but framed at 2.5 x its
+    // 0.5716 a₀ peak = 1.429 a₀; He⁺ is smaller still. A floor at the
+    // neutral's own framing radius lands He⁺ on exactly He's framing.
+    it('an ion floored at the neutral\'s framing radius is framed exactly as the neutral was', () => {
+        const context = buildContext();
+        const he = { displayRadius: 1.764, shellPeaks: [0.5716], valencePeakRadius: 0.5716 };
+        updateAtomViewInScene(context, { ...atomShellParams(), contourRadius: he.displayRadius, outermostFeatureR: 0.5716 });
+        const neutralFraming = context.framedRMax;
+        expect(neutralFraming).toBeCloseTo(1.429, 12);
+        updateAtomViewInScene(context, { ...atomShellParams(), contourRadius: 0.9, outermostFeatureR: 0.29, framingFloor: wholeAtomFramingRadius(he) });
+        expect(context.framedRMax).toBe(neutralFraming);
+    });
+
+    it('clearScene leaves nothing drawn, the reference ring included', () => {
         const context = buildContext();
         updateAtomViewInScene(context, atomShellParams());
         setReferenceRing(context, 2);
-        clearAtomView(context);
+        clearScene(context);
         expect(sceneContent(context)).toHaveLength(0);
         expect(context.currentOrbitalGroup).toBeNull();
     });

@@ -3,6 +3,7 @@ import { UnboundAnionError } from '../atom/scf_shared';
 import { AtomSpecies, Excitation, isNeutralGround, speciesConfiguration, speciesKey } from '../atom/species';
 import { EnergyReading, excitationEnergy, ionisationEnergy } from '../atom/delta_scf';
 import { AtomProfile, buildAtomProfile, packRadialCurve, subshellSamplingRadius, compositeSamplingRadius } from '../atom/atom_profile';
+import { wholeAtomFramingRadius } from '../atom/framing';
 
 /** One shell's contribution, flattened for the worker boundary. */
 export interface SerialisedShell {
@@ -53,7 +54,14 @@ export interface SerialisedSubshell {
 }
 
 /** The neutral ground state's radii, carried alongside an ion or excited atom's profile for the reference ring. */
-export interface ReferenceRadii { displayRadius: number; contourRadius: number }
+/**
+ * `framingRadius` is where the neutral atom's own whole-atom view frames the
+ * camera (atom/framing.ts). The ion is framed on at least that, so stepping
+ * Na -> Na⁺ -> Na or He -> He⁺ -> He leaves the camera where it is (ruling
+ * C12): the neutral's drawn radius would not do, because a neutral is often
+ * framed inside its own sphere (He: 1.43 a₀ against 1.76).
+ */
+export interface ReferenceRadii { displayRadius: number; contourRadius: number; framingRadius: number }
 
 /**
  * Everything the UI needs from one converged `AtomSolution`, flattened to
@@ -254,7 +262,11 @@ function referenceRadiiFor(Z: number, enclosedFraction: number): ReferenceRadii 
     const hit = referenceRadiiCache.get(key);
     if (hit) return hit;
     const neutral = buildAtomProfile(solveAtom(Z), enclosedFraction);
-    const radii: ReferenceRadii = { displayRadius: neutral.displayRadius, contourRadius: neutral.contourRadius };
+    const radii: ReferenceRadii = {
+        displayRadius: neutral.displayRadius,
+        contourRadius: neutral.contourRadius,
+        framingRadius: wholeAtomFramingRadius(neutral),
+    };
     referenceRadiiCache.set(key, radii);
     return radii;
 }

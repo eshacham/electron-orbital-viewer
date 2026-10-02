@@ -34,6 +34,7 @@ import { ViewerExportHandle } from '../export/handle';
 import { collectExportSurfaces, countExportSurfaces } from '../export/surfaces';
 import { shellComposition, isolateSubshell, compositeResolutionFor, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
 import { shellAtRadius } from '../atom/shell_pick';
+import { outermostFeatureRadius } from '../atom/framing';
 import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '../atom/shell_mesh_cache';
 import { createShellCompositionWorker } from '../workers/createShellCompositionWorker';
 import { LobeMeshData } from '../workers/shellCompositionWorker';
@@ -228,18 +229,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             // any (ruling R26: display annotation only) -- lets the whole-
             // atom view start framed on the shell structure itself rather
             // than the much larger enclosed-fraction contour (spec bugfix;
-            // see framingRadiusFor in orbital_visualizer.ts).
-            // Whichever is further out: the last resolved peak of the
-            // total, or the valence shell's own peak. They differ for most
-            // of the periodic table -- the valence shell often does not
-            // resolve as a maximum of the total at all (sodium's 3s is a
-            // shoulder on the 2p tail, not a bump), and framing on the
-            // total's last peak alone left the valence ring outside the
-            // camera's starting view as well as outside the sphere.
-            const outermostFeatureR = Math.max(
-                atomProfile.shellPeaks.length > 0 ? atomProfile.shellPeaks[atomProfile.shellPeaks.length - 1] : 0,
-                atomProfile.valencePeakRadius
-            );
+            // see atom/framing.ts, which also says why the valence peak).
+            const outermostFeatureR = outermostFeatureRadius(atomProfile.shellPeaks, atomProfile.valencePeakRadius);
             updateAtomViewInScene(context, {
                 // The whole atom is drawn at `displayRadius`, not at the
                 // enclosed-fraction contour: the cut face is stencilled to
@@ -269,11 +260,12 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 // resolves as a maximum of the total, so without this it
                 // has a colour index and no ring to apply it to.
                 valenceEmphasis: atomProfile.shells[atomProfile.shells.length - 1]?.emphasis,
-                // An ion or excited atom is framed on at least the neutral
-                // atom's drawn radius, so the reference ring is on screen
-                // and stepping Na -> Na⁺ -> Na leaves the camera where it is
-                // (ruling C12). Undefined for a neutral ground state.
-                framingFloor: atomProfile.reference?.displayRadius,
+                // An ion or excited atom is framed on at least where the
+                // neutral atom's own view was framed, so stepping Na -> Na⁺
+                // -> Na leaves the camera where it is (ruling C12; see
+                // ReferenceRadii.framingRadius). Undefined for a neutral
+                // ground state.
+                framingFloor: atomProfile.reference?.framingRadius,
             }, { animate });
         } else {
             const shell = atomProfile.shells.find(s => s.n === atomSelectedShell);
