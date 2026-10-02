@@ -195,7 +195,7 @@ const orbitalSlice = createSlice({
     failCompositionBuild: (state, action: PayloadAction<string>) => {
       state.compositionBusy = false;
       state.compositionFailed = true;
-      state.error = `Could not compute this shell's orbital lobes: ${action.payload}`;
+      state.error = `Could not compute this shell's orbital lobes: ${action.payload}. Go back a level and reopen the shell to try again.`;
     },
     setLevelTransition: (state, action: PayloadAction<boolean>) => {
       state.levelTransition = action.payload;
