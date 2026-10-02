@@ -15,6 +15,14 @@ import {
     requestAtomView,
     PendingAtomView,
     AtomState,
+    setCharge,
+    setExcitation,
+    solveUnbound,
+    energiesStarted,
+    energiesSucceeded,
+    energiesFailed,
+    speciesOf,
+    selectSpeciesEnergies,
 } from '../../src/store/atomSlice';
 import { startOrbitalCalculation } from '../../src/store/orbitalSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
@@ -510,5 +518,163 @@ describe('a requested view lands with the solve', () => {
         expect(store.getState().atom.pendingView).toBeNull();
         store.dispatch(solveSucceeded(neonLikeProfile()));
         expect(store.getState().atom.level).toBe('atom');
+    });
+});
+
+describe('species in the store', () => {
+    const na3p = { from: { n: 3, l: 0 }, to: { n: 3, l: 1 } };
+
+    /** Na⁺ is neon-shaped: 1s² 2s² 2p⁶, no M shell (Review Focus 5). */
+    const sodiumIonProfile = (): SerialisedAtomProfile => ({ ...neonLikeProfile(), Z: 11, charge: 1, speciesKey: '11+1' });
+
+    it('starts neutral and in the ground state', () => {
+        const atom = buildStore().getState().atom;
+        expect([atom.charge, atom.excitation, atom.unbound]).toEqual([0, null, null]);
+        expect(atom.energies).toEqual({ speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null });
+    });
+
+    it('setCharge accepts only an offered charge, resets the view and starts a solve', () => {
+        const store = buildStore();
+        store.dispatch(setElement(11));
+        store.dispatch(solveSucceeded(neonLikeProfile()));
+        store.dispatch(drillToShell(2));
+        const nonce = store.getState().atom.solveNonce;
+        store.dispatch(setCharge(2));                        // Na2+ is not offered
+        expect(store.getState().atom.charge).toBe(0);
+        expect(store.getState().atom.solveNonce).toBe(nonce);
+        store.dispatch(setCharge(1));
+        const atom = store.getState().atom;
+        expect([atom.charge, atom.level, atom.selectedShell, atom.profile]).toEqual([1, 'atom', null, null]);
+        expect(atom.solveNonce).toBe(nonce + 1);
+    });
+
+    it('setCharge clears an unbound report and bumps the nonce, even to the same charge', () => {
+        const store = buildStore();
+        store.dispatch(setElement(17));
+        store.dispatch(setCharge(-1));
+        store.dispatch(solveUnbound('LDA does not bind this anion: its 3p electron has no bound state (eigenvalue ≥ 0).'));
+        expect(store.getState().atom.unbound).toMatch(/does not bind/);
+        const nonce = store.getState().atom.solveNonce;
+        store.dispatch(setCharge(0));
+        expect(store.getState().atom.unbound).toBeNull();
+        store.dispatch(setCharge(0));
+        expect(store.getState().atom.solveNonce).toBe(nonce + 2);
+    });
+
+    it('solveUnbound ends the solve with no profile and no error', () => {
+        const store = buildStore();
+        store.dispatch(setElement(17));
+        store.dispatch(setCharge(-1));
+        store.dispatch(solveStarted());
+        store.dispatch(solveUnbound('LDA does not bind this anion: …'));
+        const atom = store.getState().atom;
+        expect([atom.isSolving, atom.profile, atom.error, atom.unbound]).toEqual([false, null, null, 'LDA does not bind this anion: …']);
+    });
+
+    it('setExcitation accepts only an offered promotion and is cleared by a charge change', () => {
+        const store = buildStore();
+        store.dispatch(setElement(11));
+        store.dispatch(setExcitation({ from: { n: 2, l: 1 }, to: { n: 3, l: 1 } }));
+        expect(store.getState().atom.excitation).toBeNull();
+        store.dispatch(setExcitation(na3p));
+        expect(store.getState().atom.excitation).toEqual(na3p);
+        store.dispatch(setCharge(1));
+        expect(store.getState().atom.excitation).toBeNull();
+    });
+
+    it('setExcitation starts a solve, and null returns to the ground state', () => {
+        const store = buildStore();
+        store.dispatch(setElement(11));
+        const nonce = store.getState().atom.solveNonce;
+        store.dispatch(setExcitation(na3p));
+        expect(store.getState().atom.solveNonce).toBe(nonce + 1);
+        store.dispatch(setExcitation(null));
+        expect(speciesOf(store.getState().atom)).toEqual({ Z: 11, charge: 0, excitation: null });
+        expect(store.getState().atom.solveNonce).toBe(nonce + 2);
+    });
+
+    // Review Focus 1: Fe²⁺ carried onto sodium would be a species that does not exist.
+    it('setElement returns to the neutral ground state', () => {
+        const store = buildStore();
+        store.dispatch(setElement(26));
+        store.dispatch(setCharge(2));
+        store.dispatch(setElement(11));
+        expect(speciesOf(store.getState().atom)).toEqual({ Z: 11, charge: 0, excitation: null });
+    });
+
+    // Review Focus 3: stepping Na -> Na⁺ -> Na quickly.
+    it('drops an energies reply for a species no longer selected', () => {
+        const store = buildStore();
+        store.dispatch(setElement(11));
+        store.dispatch(energiesStarted('11'));
+        store.dispatch(energiesSucceeded({ speciesKey: '11+1', ionisation: { valueEv: 47, fromLabel: 'Na⁺', toLabel: 'Na²⁺' }, excitation: null }));
+        expect(store.getState().atom.energies.status).toBe('computing');
+        store.dispatch(energiesSucceeded({ speciesKey: '11', ionisation: { valueEv: 5.37, fromLabel: 'Na', toLabel: 'Na⁺' }, excitation: null }));
+        expect(store.getState().atom.energies).toMatchObject({ status: 'done', ionisation: { valueEv: 5.37 } });
+    });
+
+    it('drops an energies failure for a species no longer selected, and records one for the current species', () => {
+        const store = buildStore();
+        store.dispatch(setElement(11));
+        store.dispatch(energiesStarted('11'));
+        store.dispatch(energiesFailed({ speciesKey: '11+1', message: 'stale' }));
+        expect(store.getState().atom.energies.status).toBe('computing');
+        store.dispatch(energiesFailed({ speciesKey: '11', message: 'did not converge' }));
+        expect(store.getState().atom.energies).toMatchObject({ speciesKey: '11', status: 'failed', message: 'did not converge' });
+    });
+
+    // Ruling C5: the shared reset clears energies, and a reader only ever sees the selected species' energies.
+    it('a species change clears energies, and selectSpeciesEnergies shows only the selected species', () => {
+        const store = buildStore();
+        store.dispatch(setElement(11));
+        store.dispatch(energiesStarted('11'));
+        store.dispatch(energiesSucceeded({ speciesKey: '11', ionisation: { valueEv: 5.37, fromLabel: 'Na', toLabel: 'Na⁺' }, excitation: null }));
+        expect(selectSpeciesEnergies(store.getState())).toMatchObject({ status: 'done', speciesKey: '11' });
+
+        store.dispatch(setCharge(1));
+        expect(store.getState().atom.energies).toMatchObject({ speciesKey: null, status: 'idle', ionisation: null });
+        // Started for a species that has since been left: present in the store, never shown.
+        store.dispatch(energiesStarted('11'));
+        expect(selectSpeciesEnergies(store.getState())).toBeNull();
+    });
+
+    // Ruling C1: a link's view is cancelled by any species change.
+    it('setCharge and setExcitation cancel a pending link view', () => {
+        const store = buildStore();
+        store.dispatch(setElement(11));
+        store.dispatch(requestAtomView({ level: 'shell', shell: 2, subshell: null, orbital: null }));
+        store.dispatch(setCharge(1));
+        expect(store.getState().atom.pendingView).toBeNull();
+
+        store.dispatch(setCharge(0));
+        store.dispatch(requestAtomView({ level: 'shell', shell: 2, subshell: null, orbital: null }));
+        store.dispatch(setExcitation(na3p));
+        expect(store.getState().atom.pendingView).toBeNull();
+    });
+
+    // Ruling C1: a link's view never lands on the wrong species.
+    it('a pending view lands only on a profile of the selected species', () => {
+        const store = buildStore();
+        store.dispatch(setElement(11));
+        store.dispatch(setCharge(1));
+        store.dispatch(requestAtomView({ level: 'shell', shell: 2, subshell: null, orbital: null }));
+        // A neutral sodium profile (key '11') is not Na⁺'s.
+        store.dispatch(solveSucceeded({ ...neonLikeProfile(), Z: 11, speciesKey: '11' }));
+        expect(store.getState().atom).toMatchObject({ level: 'atom', pendingView: { shell: 2 } });
+
+        store.dispatch(solveSucceeded(sodiumIonProfile()));
+        expect(store.getState().atom).toMatchObject({ level: 'shell', selectedShell: 2, pendingView: null });
+    });
+
+    // Review Focus 5, ruling C10: Na⁺ has no M shell, though neutral sodium does.
+    it('drillToShell refuses a shell the ion does not occupy', () => {
+        const store = buildStore();
+        store.dispatch(setElement(11));
+        store.dispatch(setCharge(1));
+        store.dispatch(solveSucceeded(sodiumIonProfile()));
+        store.dispatch(drillToShell(3));
+        expect(store.getState().atom.level).toBe('atom');
+        store.dispatch(drillToShell(2));
+        expect(store.getState().atom).toMatchObject({ level: 'shell', selectedShell: 2 });
     });
 });

@@ -144,6 +144,10 @@ function argonLikeProfile(): SerialisedAtomProfile {
 const defaultAtomState: AtomState = {
     mode: 'atom',
     Z: 1,
+    charge: 0,
+    excitation: null,
+    unbound: null,
+    energies: { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null },
     solveNonce: 0,
     level: 'atom',
     selectedShell: null,

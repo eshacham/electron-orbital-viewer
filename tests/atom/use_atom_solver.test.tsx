@@ -2,9 +2,9 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createAppStore } from '../../src/store';
-import { setElement, setMode, drillToShell } from '../../src/store/atomSlice';
+import { setElement, setMode, drillToShell, setCharge } from '../../src/store/atomSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
-import { clearProfileCacheForTests } from '../../src/atom/profile_cache';
+import { clearProfileCacheForTests, getCachedProfile, setCachedProfile } from '../../src/atom/profile_cache';
 
 // useAtomSolver's default worker factory imports createAtomWorker.ts, which
 // contains `import.meta.url` -- unparseable by this project's Babel-less
@@ -91,7 +91,7 @@ describe('useAtomSolver', () => {
         expect(store.getState().atom.isSolving).toBe(true);
         expect(createWorker).toHaveBeenCalledTimes(1);
         expect(worker.postMessage).toHaveBeenCalledWith({
-            type: 'solve', Z: 1, enclosedFraction: 0.9, requestId: expect.any(Number),
+            type: 'solve', Z: 1, charge: 0, excitation: null, enclosedFraction: 0.9, requestId: expect.any(Number),
         });
     });
 
@@ -183,7 +183,7 @@ describe('useAtomSolver', () => {
         expect(worker.terminate).not.toHaveBeenCalled();
         expect(createWorker).toHaveBeenCalledTimes(1);
         expect(worker.postMessage).toHaveBeenLastCalledWith({
-            type: 'solve', Z: 6, enclosedFraction: 0.9, requestId: expect.any(Number),
+            type: 'solve', Z: 6, charge: 0, excitation: null, enclosedFraction: 0.9, requestId: expect.any(Number),
         });
     });
 
@@ -262,7 +262,7 @@ describe('useAtomSolver', () => {
 
         expect(createWorker).toHaveBeenCalledTimes(1);
         expect(worker.postMessage).toHaveBeenLastCalledWith({
-            type: 'solve', Z: 1, enclosedFraction: 0.5, requestId: expect.any(Number),
+            type: 'solve', Z: 1, charge: 0, excitation: null, enclosedFraction: 0.5, requestId: expect.any(Number),
         });
     });
 
@@ -379,5 +379,68 @@ describe('useAtomSolver', () => {
         expect(worker.postMessage).toHaveBeenCalledTimes(2); // still unchanged
         expect(store.getState().atom.profile).toEqual(minimalProfile({ Z: 1 }));
         expect(store.getState().atom.isSolving).toBe(false);
+    });
+});
+
+describe('useAtomSolver with species', () => {
+    it('posts the charge, and keys the cache by species', () => {
+        const store = buildStore();
+        const worker = fakeWorker();
+        store.dispatch(setElement(11));
+        setCachedProfile('11', 0.9, minimalProfile({ Z: 11 }));
+        renderHook(() => useAtomSolver(0.9, () => worker), {
+            wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+        });
+        expect(worker.postMessage).not.toHaveBeenCalled();         // neutral Na was cached
+        act(() => { store.dispatch(setCharge(1)); });
+        expect(worker.postMessage).toHaveBeenLastCalledWith({
+            type: 'solve', Z: 11, charge: 1, excitation: null, enclosedFraction: 0.9, requestId: expect.any(Number),
+        });
+
+        const ion = minimalProfile({ Z: 11, charge: 1, speciesKey: '11+1' });
+        act(() => {
+            worker.onmessage!({ data: { type: 'success', profile: ion, requestId: lastRequestId(worker) } } as MessageEvent);
+        });
+        expect(getCachedProfile('11+1', 0.9)).toBe(ion);
+        expect(getCachedProfile('11', 0.9)).toEqual(minimalProfile({ Z: 11 }));
+    });
+
+    it('turns an unbound reply into the unbound state, not a profile or an error', () => {
+        const store = buildStore();
+        const worker = fakeWorker();
+        store.dispatch(setElement(17));
+        store.dispatch(setCharge(-1));
+        renderHook(() => useAtomSolver(0.9, () => worker), {
+            wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+        });
+        act(() => {
+            worker.onmessage!({ data: { type: 'unbound', message: 'LDA does not bind this anion: …', requestId: lastRequestId(worker) } } as MessageEvent);
+        });
+        const atom = store.getState().atom;
+        expect([atom.unbound, atom.profile, atom.error, atom.isSolving]).toEqual(['LDA does not bind this anion: …', null, null, false]);
+        expect(getCachedProfile('17-1', 0.9)).toBeUndefined();
+    });
+
+    // Review Focus 2: Cl⁻ -> Cl must draw chlorine again, with no stale alert.
+    it('going back from an unbound anion solves the neutral atom again', () => {
+        const store = buildStore();
+        const worker = fakeWorker();
+        store.dispatch(setElement(17));
+        store.dispatch(setCharge(-1));
+        renderHook(() => useAtomSolver(0.9, () => worker), {
+            wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+        });
+        act(() => {
+            worker.onmessage!({ data: { type: 'unbound', message: 'LDA does not bind this anion: …', requestId: lastRequestId(worker) } } as MessageEvent);
+        });
+        act(() => { store.dispatch(setCharge(0)); });
+        expect(worker.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'solve', Z: 17, charge: 0 }));
+        expect(store.getState().atom).toMatchObject({ unbound: null, isSolving: true });
+
+        const chlorine = minimalProfile({ Z: 17 });
+        act(() => {
+            worker.onmessage!({ data: { type: 'success', profile: chlorine, requestId: lastRequestId(worker) } } as MessageEvent);
+        });
+        expect(store.getState().atom).toMatchObject({ unbound: null, isSolving: false, profile: chlorine });
     });
 });

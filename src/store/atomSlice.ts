@@ -1,5 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { SerialisedAtomProfile } from '../workers/atomWorker';
+import { AtomSpecies, Excitation, isValidExcitation, speciesKey } from '../atom/species';
+import { allowedCharges } from '../atom/ion_configurations';
+import type { EnergyReading } from '../atom/delta_scf';
 
 /**
  * State for the three-level multi-electron drill-down (whole atom -> shell
@@ -14,9 +17,11 @@ import { SerialisedAtomProfile } from '../workers/atomWorker';
  * than `solveAtom`'s own memoisation by Z. So `drillToShell`, `drillToSubshell`,
  * `drillToOrbital` and `levelUp` are pure, synchronous navigation over the
  * `profile` this slice already holds -- none of them dispatch a solve, and
- * none of them clear or refetch `profile`. Only `setElement` starts one
- * (elsewhere, in the effect that owns the worker -- this slice only records
- * the request via `solveStarted`/`solveSucceeded`/`solveFailed`).
+ * none of them clear or refetch `profile`. Only a species change --
+ * `setElement`, `setCharge`, `setExcitation` -- starts one (elsewhere, in the
+ * effect that owns the worker -- this slice only records the request via
+ * `solveStarted`/`solveSucceeded`/`solveFailed`/`solveUnbound`), plus the
+ * enclosed fraction, which is not state here at all.
  */
 
 export type ViewMode = 'atom' | 'hydrogenic';
@@ -34,9 +39,35 @@ export interface PendingAtomView {
     orbital: { n: number; l: number; ml: number } | null;
 }
 
+/**
+ * ΔSCF results for `speciesKey` only. Computed in a second worker after the
+ * picture lands (useDeltaScfEnergies); a reader must check `speciesKey`
+ * against the selected species -- `selectSpeciesEnergies` does -- because a
+ * reply can be in flight across a species change.
+ */
+export interface EnergiesState {
+    speciesKey: string | null;
+    status: 'idle' | 'computing' | 'done' | 'failed';
+    ionisation: EnergyReading | null;
+    excitation: EnergyReading | null;
+    message: string | null;
+}
+
 export interface AtomState {
     mode: ViewMode;
     Z: number;
+    /** What to solve alongside Z: always one `allowedCharges(Z)` offers; 0 after every setElement. */
+    charge: number;
+    /** What to solve alongside Z: one promoted electron `isValidExcitation` accepts, or the ground state. */
+    excitation: Excitation | null;
+    /**
+     * The worker's "LDA does not bind this anion…" message (spec §3.5: shown,
+     * not drawn). Set instead of `profile` and instead of `error`: an
+     * explained physical outcome, not a failure of the solver.
+     */
+    unbound: string | null;
+    /** ΔSCF results for `energies.speciesKey` only -- see EnergiesState. */
+    energies: EnergiesState;
     level: ViewLevel;
     selectedShell: number | null;
     selectedSubshell: { n: number; l: number } | null;
@@ -49,8 +80,9 @@ export interface AtomState {
     /** Radius the pointer is currently over, shared by the plot and the cut face. */
     hoverRadius: number | null;
     /**
-     * Bumped by every `setElement`, including one that picks the element
-     * already selected.
+     * Bumped by every species change (`setElement`, `setCharge`,
+     * `setExcitation`), including one that picks the species already
+     * selected -- e.g. Cl⁻ reported unbound, then Cl⁻ picked again.
      *
      * Bug fix, found live: `setElement` clears `profile` unconditionally,
      * but the effect that actually starts a solve is keyed on
@@ -64,9 +96,15 @@ export interface AtomState {
     solveNonce: number;
 }
 
+const NO_ENERGIES: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
+
 const initialState: AtomState = {
     mode: 'atom',
     Z: 1,
+    charge: 0,
+    excitation: null,
+    unbound: null,
+    energies: NO_ENERGIES,
     level: 'atom',
     selectedShell: null,
     selectedSubshell: null,
@@ -89,11 +127,63 @@ function subshellIsOccupied(profile: SerialisedAtomProfile | null, n: number, l:
     return profile !== null && profile.subshells.some(subshell => subshell.n === n && subshell.l === l);
 }
 
-/** Opens a pending view to the deepest level the solved profile actually has. */
+export function speciesOf(state: Pick<AtomState, 'Z' | 'charge' | 'excitation'>): AtomSpecies {
+    return { Z: state.Z, charge: state.charge, excitation: state.excitation };
+}
+
+/**
+ * The species a profile was solved for. Hand-built fixtures (and anything
+ * serialised before ions existed) carry no `speciesKey`; they can only have
+ * been a neutral ground state, whose key is String(Z).
+ */
+function profileSpeciesKey(profile: SerialisedAtomProfile): string {
+    return profile.speciesKey ?? String(profile.Z);
+}
+
+/** Whether the profile on screen is the selected species' own picture, not one left over from before a species change. */
+export function pictureLanded(state: AtomState): boolean {
+    return state.profile !== null && profileSpeciesKey(state.profile) === speciesKey(speciesOf(state));
+}
+
+/**
+ * The selected species' energies, or null when what the store holds belongs
+ * to some other species (ruling C5: Na⁺'s ionisation energy must never be
+ * shown under Na, however quickly the charge is stepped).
+ */
+export function selectSpeciesEnergies(state: { atom: AtomState }): EnergiesState | null {
+    const { energies } = state.atom;
+    return energies.speciesKey === speciesKey(speciesOf(state.atom)) ? energies : null;
+}
+
+/**
+ * What every species change does: the reset setElement always did, plus the
+ * unbound report and the energies, which both describe the old species.
+ * Clears pendingView too (ruling C1): a shared link's view names shells of
+ * the species it was decoded with, and is re-requested after the species
+ * actions when a link is restored.
+ */
+function resetForNewSpecies(state: AtomState): void {
+    state.solveNonce += 1;
+    state.level = 'atom';
+    state.selectedShell = null;
+    state.selectedSubshell = null;
+    state.selectedOrbital = null;
+    state.profile = null;
+    state.error = null;
+    state.unbound = null;
+    state.pendingView = null;
+    state.energies = NO_ENERGIES;
+}
+
+/**
+ * Opens a pending view to the deepest level the solved profile actually
+ * has -- and only on the selected species' own profile (ruling C1): Na⁺ and
+ * Na share a Z but not an M shell.
+ */
 function applyPendingView(state: AtomState): void {
     const view = state.pendingView;
-    const profile = state.profile;
-    if (!view || !profile || profile.Z !== state.Z) return;
+    if (!view || !pictureLanded(state)) return;
+    const profile = state.profile!;
     state.pendingView = null;
     state.level = 'atom';
     state.selectedShell = null;
@@ -121,30 +211,77 @@ const atomSlice = createSlice({
         },
 
         // A new element invalidates every existing selection and the old
-        // profile (it describes the wrong Z); this is the one action that is
-        // *not* pure navigation -- it is what starts a solve (ruling R28).
+        // profile (it describes the wrong Z); with setCharge/setExcitation
+        // below, the actions that are *not* pure navigation -- they are what
+        // start a solve (ruling R28). Always the neutral ground state (Review
+        // Focus 1): Fe²⁺ carried onto sodium would be a species that does
+        // not exist, and the element's own offered charges differ anyway.
         setElement: (state, action: PayloadAction<number>) => {
             state.Z = action.payload;
-            state.solveNonce += 1;
-            state.level = 'atom';
-            state.selectedShell = null;
-            state.selectedSubshell = null;
-            state.selectedOrbital = null;
-            state.profile = null;
-            state.error = null;
-            state.pendingView = null;
+            state.charge = 0;
+            state.excitation = null;
+            resetForNewSpecies(state);
+        },
+
+        // An unoffered charge is ignored rather than clamped: every caller
+        // (the stepper, a URL) offers only allowedCharges, so anything else is
+        // a stale or hand-edited request, and solving it would throw in the
+        // worker. The excitation is cleared because which promotions exist
+        // depends on the charge (Na 3s -> 3p has no Na⁺ counterpart).
+        setCharge: (state, action: PayloadAction<number>) => {
+            if (!allowedCharges(state.Z).includes(action.payload)) return;
+            state.charge = action.payload;
+            state.excitation = null;
+            resetForNewSpecies(state);
+        },
+
+        setExcitation: (state, action: PayloadAction<Excitation | null>) => {
+            const excitation = action.payload;
+            if (excitation && !isValidExcitation(state.Z, state.charge, excitation)) return;
+            state.excitation = excitation;
+            resetForNewSpecies(state);
         },
 
         solveStarted: (state) => {
             state.isSolving = true;
             state.error = null;
+            state.unbound = null;
         },
 
         solveSucceeded: (state, action: PayloadAction<SerialisedAtomProfile>) => {
             state.profile = action.payload;
             state.isSolving = false;
             state.error = null;
+            state.unbound = null;
             applyPendingView(state);
+        },
+
+        // Spec §3.5: an anion whose extra electron LDA cannot bind is shown
+        // as such and not drawn -- no profile, and not an error either.
+        solveUnbound: (state, action: PayloadAction<string>) => {
+            state.isSolving = false;
+            state.profile = null;
+            state.error = null;
+            state.unbound = action.payload;
+        },
+
+        energiesStarted: (state, action: PayloadAction<string>) => {
+            state.energies = { speciesKey: action.payload, status: 'computing', ionisation: null, excitation: null, message: null };
+        },
+
+        // Both results are dropped unless they are for the species selected
+        // now (Review Focus 3): the energies worker is terminated on a
+        // species change, but a reply already posted can still arrive.
+        energiesSucceeded: (state, action: PayloadAction<{ speciesKey: string; ionisation: EnergyReading | null; excitation: EnergyReading | null }>) => {
+            const { speciesKey: key, ionisation, excitation } = action.payload;
+            if (key !== speciesKey(speciesOf(state))) return;
+            state.energies = { speciesKey: key, status: 'done', ionisation, excitation, message: null };
+        },
+
+        energiesFailed: (state, action: PayloadAction<{ speciesKey: string; message: string }>) => {
+            const { speciesKey: key, message } = action.payload;
+            if (key !== speciesKey(speciesOf(state))) return;
+            state.energies = { speciesKey: key, status: 'failed', ionisation: null, excitation: null, message };
         },
 
         // A shared link's view, held until solveSucceeded can tell how deep
@@ -264,6 +401,12 @@ export const {
     solveStarted,
     solveFailed,
     requestAtomView,
+    setCharge,
+    setExcitation,
+    solveUnbound,
+    energiesStarted,
+    energiesSucceeded,
+    energiesFailed,
 } = atomSlice.actions;
 
 export const solveSucceeded = atomSlice.actions.solveSucceeded;

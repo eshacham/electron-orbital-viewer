@@ -1,22 +1,18 @@
 import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { solveStarted, solveSucceeded, solveFailed } from '../store/atomSlice';
+import { solveStarted, solveSucceeded, solveFailed, solveUnbound } from '../store/atomSlice';
 import { createAtomWorker } from '../workers/createAtomWorker';
-import { SerialisedAtomProfile } from '../workers/atomWorker';
+import type { AtomWorkerResponse } from '../workers/atomWorker';
 import { getCachedProfile, setCachedProfile } from './profile_cache';
+import { speciesKey } from './species';
 
-interface AtomWorkerSuccessMessage {
-    type: 'success';
-    profile: SerialisedAtomProfile;
-    /** Echoed back from the request that produced it -- see requestId below. */
-    requestId: number;
-}
-interface AtomWorkerErrorMessage {
-    type: 'error';
-    message: string;
-    requestId: number;
-}
-type AtomWorkerMessage = AtomWorkerSuccessMessage | AtomWorkerErrorMessage;
+/**
+ * Every reply atomWorker.ts can post, `requestId` echoed from the request
+ * that produced it (see requestId below). One type for both workers: this
+ * hook's picture worker and useDeltaScfEnergies' energies worker run the
+ * same module.
+ */
+export type AtomWorkerMessage = AtomWorkerResponse;
 
 /**
  * The surface useAtomSolver actually needs from a worker. Real callers get a
@@ -60,14 +56,16 @@ export interface AtomWorkerHandle {
  * element/fraction pick needs no worker interaction at all, and keeps
  * working even if the worker happens to be busy with an unrelated request.
  *
- * Keying the per-request effect on `[mode, Z, enclosedFraction, solveNonce]`
- * is what ensures only a genuine change to what should be solved re-requests
- * anything -- the pure navigation actions in atomSlice (drillToShell,
- * drillToSubshell, drillToOrbital, levelUp, goToLevel) touch none of them,
- * so none of them can retrigger this effect.
+ * Keying the per-request effect on the species (Z, charge, excitation), the
+ * fraction and solveNonce is what ensures only a genuine change to what
+ * should be solved re-requests anything -- the pure navigation actions in
+ * atomSlice (drillToShell, drillToSubshell, drillToOrbital, levelUp,
+ * goToLevel) touch none of them, so none of them can retrigger this effect.
+ * Both caches are keyed the same way, by `speciesKey` -- a neutral ground
+ * state's key is String(Z), exactly what they were keyed by before ions.
  *
- * `solveNonce` is there because the other three are not sufficient: it is
- * bumped by every `setElement`, and `setElement` clears the profile
+ * `solveNonce` is there because the others are not sufficient: it is
+ * bumped by every species change, and each one clears the profile
  * unconditionally. Without it, re-picking the element already selected
  * cleared the profile while leaving mode/Z/fraction unchanged, so this
  * effect never re-ran and the app sat in "solving" forever with nothing on
@@ -89,6 +87,8 @@ export function useAtomSolver(
     const dispatch = useAppDispatch();
     const mode = useAppSelector(state => state.atom.mode);
     const Z = useAppSelector(state => state.atom.Z);
+    const charge = useAppSelector(state => state.atom.charge);
+    const excitation = useAppSelector(state => state.atom.excitation);
     // Re-picking the element already selected must still produce a solve --
     // `setElement` has cleared the profile by then. See AtomState.solveNonce.
     const solveNonce = useAppSelector(state => state.atom.solveNonce);
@@ -119,15 +119,14 @@ export function useAtomSolver(
         if (mode !== 'atom') return;
 
         const requestId = ++latestRequestId.current;
+        const key = speciesKey({ Z, charge, excitation });
 
         // Layer 2 of the fix: a solved profile is a pure function of
-        // (Z, enclosedFraction), so a hit here needs no worker round trip
-        // at all -- this is what makes a mode switch away and back, or
+        // (species, enclosedFraction), so a hit here needs no worker round
+        // trip at all -- this is what makes a mode switch away and back, or
         // re-picking the same element, immediate rather than another
         // multi-second solve.
-        // String(Z) is a neutral species' key (Task 8's C9 ruling) -- a stopgap
-        // until Task 9 rewires this hook to post/cache a full species.
-        const cached = getCachedProfile(String(Z), enclosedFraction);
+        const cached = getCachedProfile(key, enclosedFraction);
         if (cached) {
             dispatch(solveSucceeded(cached));
             return;
@@ -143,17 +142,28 @@ export function useAtomSolver(
             // let a slower earlier solve land after a faster later one.
             if (event.data.requestId !== requestId) return;
 
+            // Spec §3.5: an anion LDA cannot bind has no profile to read, and
+            // is reported as itself rather than as a solve error. Never
+            // cached: nothing was solved, and re-picking it is cheap -- the
+            // SCF gives up within a few iterations.
+            if (event.data.type === 'unbound') {
+                dispatch(solveUnbound(event.data.message));
+                return;
+            }
             if (event.data.type === 'error') {
                 dispatch(solveFailed(event.data.message));
                 return;
             }
+            // 'energies' replies belong to useDeltaScfEnergies' own worker;
+            // this one is never asked for them.
+            if (event.data.type !== 'success') return;
             const { profile } = event.data;
             // Ruling R17: never render an atom the solver did not converge
             // for. This should never fire -- every element in range
             // converges -- but silently drawing a wrong picture instead of
             // reporting it would be worse than the ruling it violates.
             if (profile.converged) {
-                setCachedProfile(String(Z), enclosedFraction, profile);
+                setCachedProfile(key, enclosedFraction, profile);
                 dispatch(solveSucceeded(profile));
             } else {
                 dispatch(solveFailed(`The SCF calculation for Z=${Z} did not converge.`));
@@ -163,7 +173,7 @@ export function useAtomSolver(
             dispatch(solveFailed(event.message || `Could not solve Z=${Z}.`));
         };
 
-        worker.postMessage({ type: 'solve', Z, enclosedFraction, requestId });
+        worker.postMessage({ type: 'solve', Z, charge, excitation, enclosedFraction, requestId });
 
         // No worker cleanup here any more -- the worker is shared across
         // requests (see workerRef's effect above), and the requestId check
@@ -175,5 +185,5 @@ export function useAtomSolver(
         // intentionally-incomplete dependency array pattern Controls.tsx's
         // own n/l effects use.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mode, Z, enclosedFraction, solveNonce, dispatch]);
+    }, [mode, Z, charge, excitation, enclosedFraction, solveNonce, dispatch]);
 }
