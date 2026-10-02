@@ -139,7 +139,7 @@ describe('SpeciesControls', () => {
         });
         const line = screen.getByText(/Ionisation energy/).closest('.species-energy')!;
         expect(line).not.toHaveTextContent('47.3');
-        expect(line).toHaveTextContent('—');
+        expect(line).toHaveTextContent('waiting for the picture…');
     });
 
     it('shows the excitation energy\'s own method label', () => {
@@ -150,6 +150,24 @@ describe('SpeciesControls', () => {
         const line = screen.getByText(/Excitation energy/).closest('.species-energy')!;
         expect(line).toHaveTextContent('2.19 eV');
         expect(line).toHaveTextContent('ΔSCF, LDA');
+    });
+
+    // Fix round 1, M3: "—" means "not defined" (Na⁺ has no ionisation the
+    // neon core allows); before the ΔSCF has even started -- it waits for
+    // the picture (ruling C15) -- the line must not claim that.
+    it('says it is waiting for the picture before the ΔSCF starts', () => {
+        renderControls();
+        expect(screen.getByText(/Ionisation energy/).closest('.species-energy')).toHaveTextContent('Ionisation energy (Na → Na⁺): waiting for the picture…');
+    });
+
+    it('shows "—" only once the ΔSCF has said there is no value', () => {
+        renderControls({
+            species: { Z: 11, charge: 1, excitation: null },
+            energies: { speciesKey: '11+1', status: 'done', ionisation: null, excitation: null, message: null },
+        });
+        const line = screen.getByText(/Ionisation energy/).closest('.species-energy')!;
+        expect(line).toHaveTextContent('—');
+        expect(line).not.toHaveTextContent('waiting');
     });
 
     it('says it is computing while the ΔSCF runs', () => {

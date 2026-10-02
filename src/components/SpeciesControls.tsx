@@ -49,12 +49,24 @@ function ionisationQualifier(species: AtomSpecies, reading: EnergyReading | null
     return `${speciesSymbol(species)} → ${toLabel}`;
 }
 
+/**
+ * What the value slot says. "—" is reserved for an answer the ΔSCF gave --
+ * no such energy (Na⁺'s next electron would break the neon core) -- never
+ * for one not asked yet: the energies wait for the species' picture (ruling
+ * C15), and until then the line says so.
+ */
+function energyValueText(reading: EnergyReading | null, status: EnergiesState['status']): string {
+    if (status === 'idle') return 'waiting for the picture…';
+    if (status === 'computing') return 'computing…';
+    return reading ? `${reading.valueEv.toFixed(2)} eV` : '—';
+}
+
 /** "5.37 eV  ΔSCF, LDA", the method one hover away (spec §3.1). */
 const EnergyLine: React.FC<{ label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number }> =
     ({ label, reading, status, measuredEv }) => (
         <Typography variant="body2" className="species-energy">
             {label}:{' '}
-            {status === 'computing' ? 'computing…' : reading ? `${reading.valueEv.toFixed(2)} eV` : '—'}
+            {energyValueText(reading, status)}
             {' '}<span className="species-method" title={DELTA_SCF_METHOD}>{DELTA_SCF_LABEL}</span>
             {measuredEv !== undefined && reading && <span className="species-measured"> · measured {measuredEv.toFixed(3)} eV (NIST)</span>}
         </Typography>
