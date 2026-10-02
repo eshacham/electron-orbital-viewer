@@ -138,6 +138,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                     },
                     collectSurfaces: () => collectExportSurfaces(context.currentOrbitalGroup),
                     surfaceCount: () => countExportSurfaces(context.currentOrbitalGroup),
+                    cameraAngles: () => cameraAnglesOf(context.camera, context.controls.target),
                 };
             }
         }

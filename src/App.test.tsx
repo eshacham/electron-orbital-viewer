@@ -11,12 +11,19 @@ import { createAtomWorker } from './workers/createAtomWorker';
 import { computeSamplingRadius, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { clearProfileCacheForTests } from './atom/profile_cache';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from './url_state';
+import type { ViewerExportHandle } from './export/handle';
 import App from './App';
 
-// Mock OrbitalViewer component
+// Mock OrbitalViewer component. A test that needs the 3D view's export
+// handle sets mockViewerHandle; the mock hands it to App the way the real
+// viewer fills exportHandleRef on mount.
+let mockViewerHandle: ViewerExportHandle | null = null;
 jest.mock('./components/OrbitalViewer', () => ({
     __esModule: true,
-    default: () => <div data-testid="orbital-viewer">Orbital Viewer Mock</div>
+    default: ({ exportHandleRef }: { exportHandleRef?: { current: ViewerExportHandle | null } }) => {
+        if (exportHandleRef) exportHandleRef.current = mockViewerHandle;
+        return <div data-testid="orbital-viewer">Orbital Viewer Mock</div>;
+    }
 }));
 
 // Mock just what App directly uses
@@ -658,6 +665,27 @@ describe('App: Share', () => {
         const url = writeText.mock.calls[0][0] as string;
         expect(url).toMatch(/#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&/);
         expect(await screen.findByText(/link copied/i)).toBeInTheDocument();
+    });
+
+    // Final review M4: the store hears the camera only once it has sat still
+    // for 300 ms, so Share asks the view for its angle at the click instead.
+    it('copies the camera angle on screen now, not the one last settled into the store', async () => {
+        const writeText = jest.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+        mockViewerHandle = {
+            capturePng: jest.fn(), collectSurfaces: () => [], surfaceCount: () => 0,
+            cameraAngles: () => ({ azimuth: 40, elevation: 20 }),
+        };
+        try {
+            const { store } = renderWithProvider(<App />);
+            expect(store.getState().orbital.cameraAngles).toBeNull();
+            fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+            await waitFor(() => expect(writeText).toHaveBeenCalled());
+            expect(writeText.mock.calls[0][0]).toMatch(/&cam=40,20$/);
+            expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 40, elevation: 20 });
+        } finally {
+            mockViewerHandle = null;
+        }
     });
 
     // Review Focus 5, at the App level (ShareExportBar's own unit test in

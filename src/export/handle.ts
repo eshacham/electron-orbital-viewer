@@ -1,5 +1,6 @@
 import type { CombinationLegendItem } from './png';
 import type { ExportSurface } from './surfaces';
+import type { CameraAngles } from '../camera_angles';
 
 /** What the export code may ask of the 3D view. OrbitalViewer fills it. */
 export interface PngOverlayInput {
@@ -15,4 +16,10 @@ export interface ViewerExportHandle {
     collectSurfaces(): ExportSurface[];
     /** How many surfaces collectSurfaces would return, without copying them: the STL dialog says when a file holds several solids. */
     surfaceCount(): number;
+    /**
+     * The camera's direction now. The store's cameraAngles trails it by the
+     * settle delay (OrbitalViewer reports a move once the camera has sat
+     * still), so a link made at the click asks here instead (final review M4).
+     */
+    cameraAngles(): CameraAngles;
 }

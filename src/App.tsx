@@ -21,7 +21,8 @@ import {
     setBasicSelection,
     setEnclosedFraction,
     setCombination,
-    clearPendingCut
+    clearPendingCut,
+    cameraMoved
 } from './store/orbitalSlice';
 import {
     setMode,
@@ -155,22 +156,29 @@ function App() {
         dispatch(resetView());
     }, [dispatch]);
 
-    // Share copies a link built from the state at the moment of the click
-    // (store.getState(), not a selector) -- mid-solve, encodeStateOf reads
-    // atom.pendingView rather than the transient whole-atom view still on
-    // screen, so the link carries the view that was actually asked for
-    // (Review Focus 3).
-    const store = useAppStore();
-    const handleShare = useCallback(async (): Promise<ShareOutcome> => {
-        const url = shareUrlFor(encodeStateOf(store.getState()));
-        return (await copyText(url)) ? { kind: 'copied' } : { kind: 'manual', url };
-    }, [store]);
-
     // Task 9: the 3D view's own PNG capture, reached through a ref rather
     // than lifted state -- OrbitalViewer owns the renderer, and re-rendering
     // App on every camera settle just to keep a handle in sync would be
     // pointless churn.
     const exportHandleRef = useRef<ViewerExportHandle | null>(null);
+
+    // Share copies a link built from the state at the moment of the click
+    // (store.getState(), not a selector) -- mid-solve, encodeStateOf reads
+    // atom.pendingView rather than the transient whole-atom view still on
+    // screen, so the link carries the view that was actually asked for
+    // (Review Focus 3). The camera is read off the view itself first (final
+    // review M4): the store hears of a move only once the camera has settled,
+    // so a click straight after a drag would otherwise copy the old angle.
+    const store = useAppStore();
+    const stateNow = useCallback(() => {
+        const angles = exportHandleRef.current?.cameraAngles();
+        if (angles) store.dispatch(cameraMoved(angles));
+        return store.getState();
+    }, [store]);
+    const handleShare = useCallback(async (): Promise<ShareOutcome> => {
+        const url = shareUrlFor(encodeStateOf(stateNow()));
+        return (await copyText(url)) ? { kind: 'copied' } : { kind: 'manual', url };
+    }, [stateNow]);
 
     const handleSurfaceStyleChange = useCallback((change: Partial<SurfaceStyle>) => {
         dispatch(setSurfaceStyle(change));
@@ -534,7 +542,8 @@ function App() {
         return [{ label: 'P(r)', points: radialProfile(pn, pl, pZ, rMax, PLOT_SAMPLE_COUNT).map(p => ({ r: p.r, value: p.probability })) }];
     }, [isAtomMode, atomCurves, renderedField, selectionPlot, renderedParams]);
     const handleExport = useCallback(async (kind: ExportKind, options: ExportOptions) => {
-        const state = store.getState();
+        // The file's "view:" link names the angle on screen, as Share's does.
+        const state = stateNow();
         const result = await runExport(kind, {
             state, shareUrl: shareUrlFor(encodeStateOf(state)), csvCurves: csvCurvesNow(),
             handle: exportHandleRef.current, phaseLegend: showPhaseLegend, combinationLegend,
@@ -544,7 +553,7 @@ function App() {
             ...options,
         });
         downloadBlob(result.blob, result.filename);
-    }, [store, csvCurvesNow, showPhaseLegend, combinationLegend]);
+    }, [stateNow, csvCurvesNow, showPhaseLegend, combinationLegend]);
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
     const shareExportBar = useMemo(

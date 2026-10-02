@@ -4,6 +4,7 @@ import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { ExportContext } from '../../src/export/run_export';
 import type { ExportSurface } from '../../src/export/surfaces';
 import type { ViewerExportHandle } from '../../src/export/handle';
+import { CANONICAL_CAMERA_ANGLES } from '../../src/camera_angles';
 
 /** A store with production's middleware config (see createAppStore), so a typed-array payload does not print serializableCheck's console.error. */
 export const makeStore = () => createAppStore();
@@ -68,5 +69,5 @@ export function octahedron(name = 'octa'): ExportSurface {
 
 /** A stand-in for OrbitalViewer's export handle: holds nothing unless told to. */
 export function exportHandle(overrides: Partial<ViewerExportHandle> = {}): ViewerExportHandle {
-    return { capturePng: jest.fn(), collectSurfaces: () => [], surfaceCount: () => 0, ...overrides };
+    return { capturePng: jest.fn(), collectSurfaces: () => [], surfaceCount: () => 0, cameraAngles: () => CANONICAL_CAMERA_ANGLES, ...overrides };
 }
