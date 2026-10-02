@@ -679,11 +679,7 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
         context.activeWorker = null;
         clearCurrentOrbital(context, context.scene); // Ensure orbital is cleared
         removeAxesHelper(context);
-        if (context.referenceRing) {
-            context.scene.remove(context.referenceRing);
-            disposeReferenceRing(context.referenceRing);
-            context.referenceRing = null;
-        }
+        removeReferenceRing(context);
         if (context.controls) {
             context.controls.dispose();
         }
@@ -1582,11 +1578,7 @@ export function clearShellCompositionLobes(context: VisualizerContext | null): v
 /** Shows the neutral atom's edge at `radius`, or removes it with null. One ring at most. */
 export function setReferenceRing(context: VisualizerContext | null, radius: number | null): void {
     if (!context || context.isDisposed) return;
-    if (context.referenceRing) {
-        context.scene.remove(context.referenceRing);
-        disposeReferenceRing(context.referenceRing);
-        context.referenceRing = null;
-    }
+    removeReferenceRing(context);
     if (radius === null || !(radius > 0)) return;
     const ring = createReferenceRing(radius);
     positionReferenceRing(ring, context.clipPlane);
@@ -1890,6 +1882,14 @@ function addAxesHelper(context: VisualizerContext, size: number) {
     }
     context.scene.add(group);
     context.currentAxesHelper = group;
+}
+
+/** Takes the reference ring out of the scene and frees its GPU resources. */
+function removeReferenceRing(context: VisualizerContext) {
+    if (!context.referenceRing) return;
+    context.scene.remove(context.referenceRing);
+    disposeReferenceRing(context.referenceRing);
+    context.referenceRing = null;
 }
 
 function removeAxesHelper(context: VisualizerContext) {
