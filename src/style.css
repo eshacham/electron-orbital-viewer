@@ -86,6 +86,11 @@ html, body, #root {
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   overflow-x: hidden;
+  /* The gutter is kept whether or not the panel scrolls: otherwise a plot
+     legend wrapping to a second line (four shells: Fe, Br) toggles a
+     scrollbar, the panel widens, and the view's insets -- and so the
+     camera's fit -- shift by a couple of per cent between two species. */
+  scrollbar-gutter: stable;
 }
 .view-panel > * {
   flex-shrink: 0;
