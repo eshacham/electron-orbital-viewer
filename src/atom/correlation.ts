@@ -18,11 +18,47 @@ const A = 0.0310907;
 const X0 = -0.10498;
 const B = 3.72744;
 const C = 12.9352;
-const Q = Math.sqrt(4 * C - B * B);
 
-/** X(x) = x^2 + b*x + c, the quadratic VWN5 factors throughout. */
-function bigX(x: number): number {
-    return x * x + B * x + C;
+/**
+ * One parameter set of the VWN5 form G(x; A, x0, b, c) below. The
+ * restricted functional uses the paramagnetic set alone; the spin-polarised
+ * one (spinCorrelation, Phase 3) adds VWN's (Vosko, Wilk and Nusair 1980,
+ * fit 5) ferromagnetic set and spin stiffness alpha_c, the same form with
+ * their own constants.
+ */
+export interface VwnParameters { A: number; x0: number; b: number; c: number }
+export const PARAMAGNETIC: VwnParameters = { A, x0: X0, b: B, c: C };
+export const FERROMAGNETIC: VwnParameters = { A: 0.01554535, x0: -0.325, b: 7.06042, c: 18.0578 };
+export const SPIN_STIFFNESS: VwnParameters = { A: -1 / (6 * Math.PI * Math.PI), x0: -0.0047584, b: 1.13107, c: 13.0045 };
+
+/** G(x; A, x0, b, c), x = sqrt(rs), factored throughout by the quadratic X(x) = x^2 + b*x + c. */
+export function vwnG(x: number, p: VwnParameters): number {
+    const X = x * x + p.b * x + p.c;
+    const X0Value = p.x0 * p.x0 + p.b * p.x0 + p.c;
+    const Q = Math.sqrt(4 * p.c - p.b * p.b);
+    const atanTerm = Math.atan(Q / (2 * x + p.b));
+    return p.A * (
+        Math.log((x * x) / X)
+        + ((2 * p.b) / Q) * atanTerm
+        - ((p.b * p.x0) / X0Value) * (
+            Math.log(((x - p.x0) * (x - p.x0)) / X)
+            + ((2 * (p.b + 2 * p.x0)) / Q) * atanTerm
+        )
+    );
+}
+
+/**
+ * dG/dx, using the simplified form from vwn5-verified.md: the naive
+ * derivative's 4b/((2x+b)^2+Q^2) term collapses via the identity
+ * (2x+b)^2+Q^2 = 4*X(x), verified exactly there.
+ */
+function vwnGDerivative(x: number, p: VwnParameters): number {
+    const X = x * x + p.b * x + p.c;
+    const X0Value = p.x0 * p.x0 + p.b * p.x0 + p.c;
+    return p.A * (
+        2 / x - (2 * x + p.b) / X - p.b / X
+        - ((p.b * p.x0) / X0Value) * (2 / (x - p.x0) - (2 * x + p.b) / X - (p.b + 2 * p.x0) / X)
+    );
 }
 
 /**
@@ -30,31 +66,12 @@ function bigX(x: number): number {
  * values and, at rs=1 and rs=2, against published Ceperley-Alder values.
  */
 export function vwnEpsilonC(x: number): number {
-    const X = bigX(x);
-    const X0Value = bigX(X0);
-    const atanTerm = Math.atan(Q / (2 * x + B));
-    return A * (
-        Math.log((x * x) / X)
-        + ((2 * B) / Q) * atanTerm
-        - ((B * X0) / X0Value) * (
-            Math.log(((x - X0) * (x - X0)) / X)
-            + ((2 * (B + 2 * X0)) / Q) * atanTerm
-        )
-    );
+    return vwnG(x, PARAMAGNETIC);
 }
 
-/**
- * d(eps_c)/dx, using the simplified form from vwn5-verified.md: the naive
- * derivative's 4b/((2x+b)^2+Q^2) term collapses via the identity
- * (2x+b)^2+Q^2 = 4*X(x), verified exactly there.
- */
+/** d(eps_c)/dx. */
 export function vwnEpsilonCDerivative(x: number): number {
-    const X = bigX(x);
-    const X0Value = bigX(X0);
-    return A * (
-        2 / x - (2 * x + B) / X - B / X
-        - ((B * X0) / X0Value) * (2 / (x - X0) - (2 * x + B) / X - (B + 2 * X0) / X)
-    );
+    return vwnGDerivative(x, PARAMAGNETIC);
 }
 
 /** rs = (3/(4*pi*rho))^(1/3), the Wigner-Seitz radius for a given density. */
@@ -119,45 +136,11 @@ export function correlationEnergy(grid: RadialGrid, D: Float64Array, density: Fl
  * oxygen's ΔSCF ionisation energy 22 % high. Pictures keep the restricted,
  * NIST-validated functional above.
  *
- * The three parameter sets are VWN's (Vosko, Wilk and Nusair 1980, fit 5):
- * paramagnetic and ferromagnetic correlation energies and the spin
- * stiffness alpha_c, each the same G(x; A, x0, b, c) form as eps_c above.
- * The paramagnetic set reuses the constants above rather than restating
- * them, so at zeta = 0 this reproduces the restricted functional exactly.
- * The ferromagnetic and stiffness sets are verified end to end by the LSD
- * total energies matching NIST SRD 141's LSD column (Task 5).
+ * eps_P is vwnEpsilonC itself (the same G and parameter set), so at
+ * zeta = 0 this reproduces the restricted functional bit for bit. The
+ * ferromagnetic and stiffness sets are verified end to end by the LSD total
+ * energies matching NIST SRD 141's LSD column (Task 5).
  */
-interface VwnParameters { A: number; x0: number; b: number; c: number }
-const PARAMAGNETIC: VwnParameters = { A, x0: X0, b: B, c: C };
-const FERROMAGNETIC: VwnParameters = { A: 0.01554535, x0: -0.325, b: 7.06042, c: 18.0578 };
-const SPIN_STIFFNESS: VwnParameters = { A: -1 / (6 * Math.PI * Math.PI), x0: -0.0047584, b: 1.13107, c: 13.0045 };
-
-/** G(x; A, x0, b, c): vwnEpsilonC with the parameter set passed in. */
-function vwnG(x: number, p: VwnParameters): number {
-    const X = x * x + p.b * x + p.c;
-    const X0Value = p.x0 * p.x0 + p.b * p.x0 + p.c;
-    const Qp = Math.sqrt(4 * p.c - p.b * p.b);
-    const atanTerm = Math.atan(Qp / (2 * x + p.b));
-    return p.A * (
-        Math.log((x * x) / X)
-        + ((2 * p.b) / Qp) * atanTerm
-        - ((p.b * p.x0) / X0Value) * (
-            Math.log(((x - p.x0) * (x - p.x0)) / X)
-            + ((2 * (p.b + 2 * p.x0)) / Qp) * atanTerm
-        )
-    );
-}
-
-/** dG/dx, vwnEpsilonCDerivative with the parameter set passed in. */
-function vwnGDerivative(x: number, p: VwnParameters): number {
-    const X = x * x + p.b * x + p.c;
-    const X0Value = p.x0 * p.x0 + p.b * p.x0 + p.c;
-    return p.A * (
-        2 / x - (2 * x + p.b) / X - p.b / X
-        - ((p.b * p.x0) / X0Value) * (2 / (x - p.x0) - (2 * x + p.b) / X - (p.b + 2 * p.x0) / X)
-    );
-}
-
 /** f(zeta) = [(1+zeta)^(4/3) + (1-zeta)^(4/3) - 2] / (2^(4/3) - 2), 0 unpolarised, 1 fully polarised. */
 const F_DENOMINATOR = Math.pow(2, 4 / 3) - 2;
 const F_SECOND_DERIVATIVE_AT_0 = 8 / (9 * F_DENOMINATOR);

@@ -97,4 +97,24 @@ describe('VWN5 correlation', () => {
         expect(correlationEnergyDensity(-1)).toBe(0);
         expect(correlationPotential(-1)).toBe(0);
     });
+
+    it('returns exactly the values pinned before vwnEpsilonC delegated to vwnG', () => {
+        // Captured with === from the self-contained vwnEpsilonC that predates
+        // the spin-polarised functional, so routing the restricted path
+        // through the shared G(x; A, x0, b, c) provably changes no picture.
+        const PINNED: ReadonlyArray<[number, number, number]> = [
+            [1e-8, -0.0012347421836510445, -0.0016139651588105892],
+            [1e-6, -0.004776617504447308, -0.006099907725695201],
+            [1e-4, -0.015313336369862542, -0.018769557995406805],
+            [1e-2, -0.03764519026217142, -0.043872656447393646],
+            [0.3, -0.06181075674335299, -0.06970249333275723],
+            [1, -0.07159261230679066, -0.07993838317598562],
+            [30, -0.1017004786161465, -0.11097990228453106],
+            [1e3, -0.13530412095922578, -0.1451354718634849],
+        ];
+        for (const [rho, eps, v] of PINNED) {
+            expect(correlationEnergyDensity(rho)).toBe(eps);
+            expect(correlationPotential(rho)).toBe(v);
+        }
+    });
 });
