@@ -40,4 +40,12 @@ describe('spin-polarised SCF', () => {
     it('reports an unbound anion the same way the restricted solver does', () => {
         expect(() => solvePolarised(17, ionConfigurationFor(17, -1))).toThrow(UnboundAnionError);
     });
+
+    it('names the open subshell when an open-shell anion is unbound (O-, 2p up 3 / down 2)', () => {
+        let thrown: unknown;
+        try { solvePolarised(8, ionConfigurationFor(8, -1)); } catch (error) { thrown = error; }
+        expect(thrown).toBeInstanceOf(UnboundAnionError);
+        expect(thrown).toMatchObject({ n: 2, l: 1 });
+        expect((thrown as Error).message).toMatch(/^LDA does not bind this anion: its 2p electron/);
+    });
 });

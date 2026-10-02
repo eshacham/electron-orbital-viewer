@@ -138,6 +138,27 @@ describe('NIST LDA benchmark', () => {
 });
 
 /**
+ * The restricted loop's mixing moved into scf_shared.ts (nextBeta,
+ * linearMix) so the spin-polarised loop shares it. These totals were
+ * captured from the code before that move and are compared with ===: the
+ * pictures must not change by a single bit. He, Ne and Ar are already
+ * solved (and memoised) by the benchmark above, so they cost nothing; Fe,
+ * the case adaptive damping exists for, costs ~3 s and runs with the slow set.
+ */
+describe('restricted totals pinned before the mixing moved to scf_shared', () => {
+    it.each([
+        [2, -2.8348293873176917],
+        [10, -128.23325013137895],
+        [18, -525.94534967016239],
+    ])('Z=%i is bit-identical', (Z, total) => {
+        expect(solveAtom(Z).totalEnergy).toBe(total);
+    });
+    itSlow('Z=26 (Fe) is bit-identical', () => {
+        expect(solveAtom(26).totalEnergy).toBe(-1261.0909736684721);
+    });
+});
+
+/**
  * Ruling R15: validate gridForAtom's point count by measurement rather than
  * assuming 2001 points is enough. Doubling it and re-solving isolates grid
  * discretisation error from every other source of error this engine has —

@@ -18,8 +18,8 @@ import { SubshellOccupancy } from './configurations';
 import { hartreePotential, hartreeEnergy, densityFromD, spinExchangePotential, spinExchangeEnergyDensity } from './hartree';
 import { spinCorrelation } from './correlation';
 import {
-    ANION_BINDING_THRESHOLD, UnboundAnionError, assertStatesBound, buildD, highestPrincipalQuantumNumber, maxWeightedDelta,
-    screenedStartingPotential, totalElectronsOf, CONVERGENCE_TOLERANCE, INITIAL_BETA, MAX_ITERATIONS, MIN_BETA,
+    ANION_BINDING_THRESHOLD, UnboundAnionError, assertStatesBound, buildD, highestPrincipalQuantumNumber, linearMix,
+    maxWeightedDelta, nextBeta, screenedStartingPotential, totalElectronsOf, CONVERGENCE_TOLERANCE, INITIAL_BETA, MAX_ITERATIONS,
 } from './scf_shared';
 
 export interface SpinOccupancy { n: number; l: number; up: number; down: number }
@@ -28,10 +28,11 @@ export interface PolarisedSolution {
     Z: number;
     charge: number;
     /**
-     * Total energy (Ha). Only an energy when `converged` is true: an
-     * unconverged loop's total is whatever the last iterate happened to
-     * give, so callers must refuse it (delta_scf.ts throws) rather than
-     * show it.
+     * Total energy (Ha). NaN when `converged` is false: an unconverged
+     * loop's total is whatever the last iterate happened to give, so it is
+     * never returned as a number -- a caller that forgets to check
+     * `converged` gets NaN through every difference it takes, not a
+     * plausible wrong energy. delta_scf.ts refuses it outright (throws).
      */
     totalEnergy: number;
     converged: boolean;
@@ -90,7 +91,8 @@ function polarisedPotentials(grid: RadialGrid, Z: number, DUp: Float64Array, DDo
  * by both channels so neither runs ahead of the density it is built from.
  *
  * Returns converged: false rather than throwing when MAX_ITERATIONS runs
- * out, as solveAtomOnGrid does; see PolarisedSolution.totalEnergy. Throws
+ * out, as solveAtomOnGrid does, but with a NaN total (see
+ * PolarisedSolution.totalEnergy). Throws
  * UnboundAnionError when an anion's electron has no bound state in its
  * channel, exactly as the restricted solver does.
  */
@@ -113,7 +115,7 @@ export function solvePolarisedOnGrid(Z: number, grid: RadialGrid, configuration:
     // the occupations within the first iteration, so nothing is gained by
     // guessing it.
     let vUp = screenedStartingPotential(grid, Z);
-    let vDown = vUp.slice();
+    let vDown: Float64Array = vUp.slice();
     let beta = INITIAL_BETA;
     let previousDelta = Infinity;
     let upStates: Channel = [];
@@ -130,22 +132,20 @@ export function solvePolarisedOnGrid(Z: number, grid: RadialGrid, configuration:
         const next = polarisedPotentials(grid, Z, buildD(grid, upStates), buildD(grid, downStates));
         const delta = Math.max(maxWeightedDelta(grid, vUp, next.up), maxWeightedDelta(grid, vDown, next.down));
         if (delta < CONVERGENCE_TOLERANCE) { converged = true; vUp = next.up; vDown = next.down; break; }
-        if (delta > previousDelta) beta = Math.max(beta * 0.5, MIN_BETA);
+        beta = nextBeta(delta, previousDelta, beta);
         previousDelta = delta;
-        const mixedUp = new Float64Array(grid.size);
-        const mixedDown = new Float64Array(grid.size);
-        for (let j = 0; j < grid.size; j++) {
-            mixedUp[j] = (1 - beta) * vUp[j] + beta * next.up[j];
-            mixedDown[j] = (1 - beta) * vDown[j] + beta * next.down[j];
-        }
-        vUp = mixedUp;
-        vDown = mixedDown;
+        vUp = linearMix(vUp, next.up, beta);
+        vDown = linearMix(vDown, next.down, beta);
     }
 
     const all = [...upStates, ...downStates];
     const highest = all.reduce((top, s) => (s.energy > top.energy ? s : top), all[0]);
+    if (!converged) {
+        // The for loop leaves its counter one past the cap when it runs out.
+        return { Z, charge, totalEnergy: NaN, converged: false, iterations: MAX_ITERATIONS, highestEigenvalue: highest.energy };
+    }
     // Bound, but by less than the grid can represent: the same verdict (see ANION_BINDING_THRESHOLD).
-    if (isAnion && converged && highest.energy >= -ANION_BINDING_THRESHOLD) throw new UnboundAnionError(highest.n, highest.l);
+    if (isAnion && highest.energy >= -ANION_BINDING_THRESHOLD) throw new UnboundAnionError(highest.n, highest.l);
 
     // E = sum(occ eps) - E_H - integral(sum_s D_s V_xc,s) + E_x + E_c: scf.ts's
     // bookkeeping (ruling R8) per spin. Exchange is a sum over the two

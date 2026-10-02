@@ -27,7 +27,8 @@ import {
     MAX_ITERATIONS,
     CONVERGENCE_TOLERANCE,
     INITIAL_BETA,
-    MIN_BETA,
+    nextBeta,
+    linearMix,
     ANION_BINDING_THRESHOLD,
     UnboundAnionError,
     assertStatesBound,
@@ -266,21 +267,12 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions
             break;
         }
 
-        // Adaptive damping: growth in the residual signals oscillation
-        // (charge sloshing between near-degenerate subshells), and halving
-        // beta is the standard, self-correcting response to it. Convergence
-        // that is merely slowing down, not growing, is left alone — halving
-        // beta on every step would make the well-behaved majority of
-        // elements needlessly slower.
-        if (delta > previousDelta) beta = Math.max(beta * 0.5, MIN_BETA);
+        beta = nextBeta(delta, previousDelta, beta);
         previousDelta = delta;
-
-        const mixed = new Float64Array(grid.size);
-        for (let j = 0; j < grid.size; j++) {
-            mixed[j] = (1 - beta) * potential[j] + beta * newPotential[j];
-        }
-        potential = mixed;
+        potential = linearMix(potential, newPotential, beta);
     }
+    // The for loop leaves its counter one past the cap when it runs out.
+    if (!converged) iterations = MAX_ITERATIONS;
 
     // A converged anion can still hold its outermost electron by less than
     // the grid can represent (see ANION_BINDING_THRESHOLD); that is the same

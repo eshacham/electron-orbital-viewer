@@ -16,7 +16,7 @@ export const MAX_ITERATIONS = 200;
 // near the origin or meaningless at large r.
 export const CONVERGENCE_TOLERANCE = 1e-6;
 export const INITIAL_BETA = 0.3;
-// Floor for the adaptive mixing in scf.ts's solveAtomOnGrid: small enough that
+// Floor for nextBeta's adaptive mixing: small enough that
 // even the most charge-sloshing-prone configurations (near-degenerate 4s/3d,
 // 4f/5d) settle, without ever fully stalling the loop.
 export const MIN_BETA = 0.02;
@@ -83,6 +83,24 @@ export function maxWeightedDelta(grid: RadialGrid, previous: Float64Array, next:
         if (delta > maxDelta) maxDelta = delta;
     }
     return maxDelta;
+}
+
+/**
+ * Adaptive damping (ruling R17): growth in the residual signals oscillation
+ * (charge sloshing between near-degenerate subshells), and halving beta is
+ * the standard, self-correcting response to it. Convergence that is merely
+ * slowing down, not growing, is left alone -- halving beta on every step
+ * would make the well-behaved majority of elements needlessly slower.
+ */
+export function nextBeta(delta: number, previousDelta: number, beta: number): number {
+    return delta > previousDelta ? Math.max(beta * 0.5, MIN_BETA) : beta;
+}
+
+/** V <- (1 - beta) V_old + beta V_new, the loop's linear mixing. */
+export function linearMix(previous: Float64Array, next: Float64Array, beta: number): Float64Array {
+    const mixed = new Float64Array(previous.length);
+    for (let j = 0; j < previous.length; j++) mixed[j] = (1 - beta) * previous[j] + beta * next[j];
+    return mixed;
 }
 
 /** An anion's electron bound by less than this (Ha) counts as unbound: its ~70 a0 decay length does not fit the grid. */
