@@ -245,6 +245,8 @@ describe('built-in URL keys', () => {
             ['#mode=basic&combo=field&level=1&F=0.08', { kind: 'field', level: 1, field: 0.08, stark: 'lower' }],
             ['#mode=basic&combo=field&level=2&F=0.01&stark=upper', { kind: 'field', level: 2, field: 0.01, stark: 'upper' }],
             ['#mode=basic&combo=sp&member=5', { kind: 'hybrid', hybrid: 'sp', member: 5 }],
+            // Final review M8: a well-formed negative integer is out of range, not malformed.
+            ['#mode=basic&combo=sp3&member=-1', { kind: 'hybrid', hybrid: 'sp3', member: -1 }],
         ];
         for (const [hash, expected] of refused) {
             const store = makeStore();
@@ -263,6 +265,9 @@ describe('built-in URL keys', () => {
             ['#mode=atom&Z=26&level=orbital&n=3&l=2&ml=5', s => expect(s.atom.pendingView).toMatchObject({ level: 'shell', subshell: { n: 3, l: 2 }, orbital: null })],
             ['#mode=basic&n=2&l=2&ml=0', s => expect(s.orbital.basicSelection).toEqual({ n: 3, l: 2, ml: 0 })],
             ['#mode=basic&combo=sp4&member=1', s => expect(s.orbital.combination).toEqual({ kind: 'none' })],
+            // A member that is not an integer at all is malformed: ignored, so the default (all) applies.
+            ['#mode=basic&combo=sp&member=abc', s => expect(s.orbital.combination).toEqual({ kind: 'hybrid', hybrid: 'sp', member: 'all' })],
+            ['#mode=basic&combo=sp2&member=1.5', s => expect(s.orbital.combination).toEqual({ kind: 'hybrid', hybrid: 'sp2', member: 'all' })],
             ['#mode=basic&combo=field&level=3&F=abc&stark=sideways', s => expect(s.orbital.combination).toEqual({ kind: 'field', level: 1, field: 0.03, stark: 'lower' })],
             ['#frac=0.42&op=7&surf=glass&cut=w:0.5&cam=400,0&bogus=1', s => {
                 expect(s.orbital.enclosedFraction).toBe(0.9);

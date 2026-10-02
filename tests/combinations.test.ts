@@ -53,6 +53,15 @@ describe('fieldRequestFor', () => {
         expect(fieldRequestFor(selection, 0.9)).toBeNull();
         expect(selectionProblem(selection)).toMatch(/refused|no hybrid/);
     });
+
+    // Final review M8: a hand-edited link can carry member=-1; the refusal
+    // must read as a numbering mistake, not name a "hybrid 0" or "hybrid -1".
+    it('refuses a negative hybrid member, saying how the hybrids are numbered', () => {
+        const selection: CombinationSelection = { kind: 'hybrid', hybrid: 'sp3', member: -1 };
+        expect(fieldRequestFor(selection, 0.9)).toBeNull();
+        expect(selectionProblem(selection)).toBe('sp³ has 4 hybrids, numbered 1 to 4; there is no hybrid 0.');
+        expect(combinationTitle({ kind: 'hybrid', hybrid: 'sp3', member: -3 })).toBe('sp³ hybrid h₋₂');
+    });
 });
 
 // Final review: at n = 2 the Stark shapes do not depend on F, so a new F on

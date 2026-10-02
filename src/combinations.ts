@@ -28,9 +28,9 @@ export const OVERLAY_COLORS: string[] = [CURVE_COLORS[2], CURVE_COLORS[3], CURVE
 
 const SUBSCRIPTS = '₀₁₂₃₄₅₆₇₈₉';
 
-/** "h₁" for member 0. */
+/** "h₁" for member 0. A link's out-of-range negative member still gets a readable title beside its refusal. */
 export function hybridMemberLabel(index: number): string {
-    return `h${String(index + 1).split('').map(d => SUBSCRIPTS[Number(d)]).join('')}`;
+    return `h${String(index + 1).split('').map(d => (d === '-' ? '₋' : SUBSCRIPTS[Number(d)])).join('')}`;
 }
 
 const STARK_LABEL: Record<StarkState, string> = { lower: '(2s + 2p_z)/√2', upper: '(2s − 2p_z)/√2' };
@@ -44,7 +44,7 @@ export function selectionProblem(selection: CombinationSelection): string | null
         const count = hybridCount(selection.hybrid);
         const member = selection.member;
         if (!Number.isInteger(member) || member < 0 || member >= count) {
-            return `${HYBRID_NAMES[selection.hybrid]} has ${count} hybrids; there is no hybrid ${member + 1}.`;
+            return `${HYBRID_NAMES[selection.hybrid]} has ${count} hybrids, numbered 1 to ${count}; there is no hybrid ${member + 1}.`;
         }
     }
     return null;

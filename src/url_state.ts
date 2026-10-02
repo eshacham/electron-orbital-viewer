@@ -228,13 +228,17 @@ export function parseBasicSelection(params: URLSearchParams): BasicSelection | n
  * Phase 1's combination, with the key names Phase 7's lessons use. Values
  * are never clamped: an out-of-range F or member decodes as given, so the
  * selection lands in Phase 1's refused state (selectionProblem says why and
- * nothing is drawn) instead of silently showing a different field.
+ * nothing is drawn) instead of silently showing a different field. "Out of
+ * range" means a well-formed number -- a negative member included, which is
+ * an integer as much as 5 is. A value that is not a number of the right kind
+ * at all (member=abc, member=1.5) is malformed, and is ignored like any other
+ * malformed key: the default applies (every member, F = 0.03 a.u.).
  */
 export function parseCombination(params: URLSearchParams): CombinationSelection {
     const combo = params.get('combo');
     if (combo === 'sp' || combo === 'sp2' || combo === 'sp3') {
         const member = params.get('member');
-        const index = parseIntInRange(member, 0, Number.MAX_SAFE_INTEGER);
+        const index = parseIntInRange(member, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
         return { kind: 'hybrid', hybrid: combo as HybridKind, member: index ?? 'all' };
     }
     if (combo === 'field') {
