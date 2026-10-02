@@ -124,6 +124,94 @@ open, and read off how big it actually is.
 
 ---
 
+## Share and export
+
+**The address bar is always the link.** Every change — element, level,
+camera, cut, opacity, combination — rewrites the URL hash (debounced, via
+`replaceState`, so a slider drag is not a hundred Back-button stops), so
+there is no separate "generate link" step: the **Share** button next to Reset
+View just copies what is already there. If the clipboard is refused (plain
+http, an iframe without permission) it shows the link in a dialog to copy by
+hand instead. Opening a link applies what it can and ignores the rest —
+a hand-edited or truncated key never throws, it just falls back to the
+deepest valid part of the view — and closes the periodic-table pop-over so
+the view it just restored is visible.
+
+The spec's own example — iron, the 3d_z² orbital, cut through the nucleus
+along x, at a 90% contour:
+
+```
+#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&cut=x:0.5&frac=0.9
+```
+
+| Key | Meaning |
+| --- | --- |
+| `mode` | `atom` or `basic` |
+| `frac` | enclosed fraction, 0–1 |
+| `cut` | `none`, or `<x\|y\|z>:<depth>` — depth 0–1 as the Depth slider shows it (0 nothing removed, 0.5 through the nucleus, 1 everything) |
+| `op` | opacity, 0.05–1 |
+| `surf` | `solid` or `wire` |
+| `cam` | `<azimuth>,<elevation>`, whole degrees; left out at the canonical view, and a link with no `cam` key resets a moved camera to canonical rather than leaving it where it was |
+| `Z`, `level` (`atom`\|`shell`\|`orbital`), `n`, `l`, `ml` | atom mode's element and drill-down |
+| `n`, `l`, `ml` | Basic Orbitals' quantum numbers |
+| `combo` (`sp`\|`sp2`\|`sp3`\|`field`\|`none`), `member` (a hybrid's index, or `all`), `level` (a field's: 1 or 2), `F` (field strength, a.u.), `stark` (`lower`\|`upper`\|`both`) | the Combination picker |
+
+`frac`, `cut`, `op` and `surf` are always written, even at their defaults, so
+a link reproduces the sender's picture in any tab rather than whatever that
+tab's settings happened to be. Number keys (`frac`, `op`, `cam`, `F`) accept
+decimal literals only — hex, leading `+`, or stray whitespace are ignored
+like any other malformed key, not parsed as a number nobody wrote.
+
+**Export**, beside Share, offers:
+
+- **Image (PNG, 2×)**, with or without the caption/scale-bar/key overlay —
+  twice the on-screen resolution, capped at 4096 px on the long side,
+  cropped to the area the side panels leave free. The caption states the
+  view and its method, word-wrapped to the image width; the key is either
+  the plain ψ-sign key or, when a combination is on screen, its own colour
+  key. Refuses while the picture is still computing, while the atom is
+  solving, or if the WebGL context is lost mid-capture.
+- **Radial curves (CSV)** — UTF-8 with a BOM, LF line endings, `#`-prefixed
+  comment lines (what the view is, the quantity plotted, the method, and the
+  share link for this exact view), one column per curve against a shared
+  `r` (bohr). Basic Orbitals and the Combination picker sample 240 points —
+  the same count the plot itself draws; atom mode's curves are the SCF's own
+  grid samples.
+- **3D model (glTF, `.glb`)** — binary, colours kept, scaled so the model is
+  20 cm across (a convenient AR/tabletop size); the scale back to bohr
+  (`metresPerBohr`) is recorded in the root node's `extras`.
+- **3D print (STL)** — binary, in millimetres, at a chosen longest-side size;
+  the scale is recorded in the file's own header. Refused unless every
+  surface is watertight (every edge shared by exactly two triangles,
+  consistently oriented) — a half-open contour from a low enclosed fraction
+  is the usual cause, and the message suggests lowering it. A shell's lobes
+  or a hybrid overlay's members export as that many separate solids, each
+  individually watertight; where a file holds more than one, the dialog
+  says so ("N overlapping solids, each watertight; your slicer merges them
+  into one") rather than calling the whole file watertight.
+- **Field grid (Gaussian cube)**, lengths in bohr throughout. For an orbital
+  or a single-member field it is ψ itself (real, bohr⁻³ᐟ²), sampled on
+  exactly the grid that was drawn. For atom mode's whole-atom or shell
+  levels — no 3D field to sample — it is ρ(r) = D(r)/(4πr²) in
+  electrons/bohr³, on a box enclosing 99.9% of the shown curve, with a note
+  that features finer than the grid spacing (a heavy atom's 1s) are not
+  resolved. A multi-member overlay (a hybrid's "All", Stark's "Both") is
+  refused — it is several fields in one picture, not one grid. Built in a
+  Web Worker.
+
+Every export states its method (the same wording the caption, CSV and cube
+headers all use), and refuses with a stated reason rather than writing an
+empty, partial or non-watertight file: when nothing is drawn, the picture is
+still computing, the atom is still solving, a combination is refused (its
+own message), or the last render failed.
+
+**Not exported:** the cut (geometry export takes the whole surface — a cut
+is a view setting, and a cut surface would not print or display correctly),
+and the camera's distance (the URL carries only its direction — see the
+Design decisions in [docs/HANDOFF.md](docs/HANDOFF.md) for why).
+
+---
+
 ## How it works
 
 ### Rendering one orbital (Basic Orbitals mode, and atom mode's orbital level)
@@ -393,7 +481,12 @@ the box.
 
 **One cut plane, axis-aligned.** No arbitrary orientation, no multiple planes.
 
-**No export.** No image, mesh or state saving; no shareable links.
+**Export is the picture, not a saved session.** PNG, CSV, glTF, STL and
+Gaussian-cube export what is on screen (see
+[Share and export](#share-and-export)); there is no scene file, undo
+history or bookmarked-session format beyond the URL. Geometry export always
+takes the whole surface — the cut is a view setting and does not travel into
+it — and the URL's camera key carries direction only, never distance.
 
 ---
 
@@ -402,7 +495,7 @@ the box.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 1400+ tests
+npm test           # 1700+ tests
 npm run build      # production bundle into dist/
 ```
 
@@ -454,7 +547,11 @@ account. The Python side pins its own dependencies in `infra/requirements.txt`.
 | `src/atom/useAtomSolver.ts` | React hook driving the atom worker and dispatching its result |
 | `src/store/` | Redux state: Basic Orbitals params/surface style, and atom mode's drill-down level, profile and hover linkage |
 | `src/components/` | React controls and the viewer host, including atom mode's level navigation and subshell panel |
-| `src/workers/` | The off-thread calculation: marching cubes (`orbitalWorker.ts`) and the SCF solve (`atomWorker.ts`) |
+| `src/workers/` | The off-thread calculation: marching cubes (`orbitalWorker.ts`), the SCF solve (`atomWorker.ts`), and building a cube file (`exportWorker.ts`) |
+| `src/url_state.ts` | The URL hash as the view: `encodeState`/`applyState`, the mode-keyed key-group registry (`registerUrlKeys`), and the shared/atom/basic key codecs |
+| `src/share.ts` | The share link and its clipboard copy, with the pre-Clipboard-API fallback |
+| `src/export/` | Each export format's encoder (`png.ts`, `csv.ts`, `stl.ts`, `gltf.ts`, `cube.ts`), the availability/refusal logic and dispatch (`run_export.ts`), and the surface collection and manifold check they share (`surfaces.ts`, `mesh_topology.ts`) |
+| `src/components/ShareExportBar.tsx` | The Share and Export controls: the export menu, the STL print-size dialog, and the manual-copy dialog |
 | `infra/` | CDK stack for S3 + CloudFront hosting |
 
 ---

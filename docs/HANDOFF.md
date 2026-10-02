@@ -108,6 +108,46 @@ These cost real effort to arrive at; do not undo them without reading why.
   electron is 4s and it is unambiguously d-block). The test asserts the
   relationship in the direction that does hold — every d-block element has an
   occupied d subshell, and so on.
+- **The URL carries camera direction but never distance.** Azimuth and
+  elevation mean the same on any screen; distance does not, because the app
+  fits the camera to the viewport and to the panels it measures
+  (`useViewInsets`, `fitFactorFor`), which differ between a phone and a
+  desktop — a stored distance would frame the atom wrongly on the other
+  device. `frameOrbital` already keeps the current direction when it refits,
+  so a direction set before the mesh lands survives framing.
+- **PNG capture renders and reads the canvas back in the same JavaScript
+  task, with no `preserveDrawingBuffer`.** That flag forces a buffer copy on
+  every frame for the life of the page just to serve an occasional export;
+  instead the capture raises the pixel ratio, renders once, copies the
+  canvas out while the drawing buffer is still valid (before the browser
+  composites), restores the ratio and renders again, so the screen is never
+  left showing a cleared frame.
+- **The cube file is re-sampled on demand, in a worker, rather than kept
+  from the render that drew it.** The mesh worker returns only the 8-bit
+  density map; holding the float field from every render for the rare case
+  someone exports it would cost ~8.6 MB per render. Sampling is
+  deterministic, so the export worker (`sampleFieldSource`, Phase 1's
+  function) reproduces exactly the grid that was drawn.
+- **Geometry exports always take the whole surface, never the cut.** A cut
+  is a view setting; a cut surface is open and would not print or display
+  as a solid. STL is refused outright unless every surface passes a
+  manifold check first.
+- **Basic Orbitals' selection, fraction and combination all live in the
+  store, and a URL decoder never renders directly — it dispatches and calls
+  `requestBasicRender()`.** A decoder cannot see what state the others on
+  the same link have already set, and several decoders can run for one
+  link (Phase 1's combination keys, and any a later mode adds), so `App`
+  renders exactly once, after every dispatch from the link has landed, from
+  whatever the store then says — never from what any one decoder saw.
+- **A link's view waits in `atom.pendingView`, its cut in
+  `orbital.pendingCut`, until the thing it depends on is ready.** `App`
+  clears the cut whenever it enters an orbital view, so a link's cut has to
+  be re-applied once the view it belongs to has actually landed — the
+  pending slot is what survives the gap between "the link was decoded" and
+  "the level/profile it names exists". The same shape covers Share pressed
+  mid-solve: the link encodes `atom.pendingView` in preference to the
+  transient whole-atom view still on screen, so it carries the view that
+  was actually asked for.
 
 ## Known limits of the model — quantified, and stated in the README
 
@@ -383,6 +423,118 @@ polarised 1s and the n = 2 Stark states). Decisions worth knowing:
   calling the function the phase's own physics test calls, never a
   hand-typed number, so the table and the tests cannot drift apart.
 
+## Phase 2 — share and export (2026-09-25)
+
+The view is always in the URL (`src/url_state.ts`), and both modes can
+export the picture (`src/export/`). The README's
+[Share and export](README.md#share-and-export) section is the user-facing
+description of keys and formats; this section is what differs from the
+phase plan, or isn't visible from reading one file.
+
+### URL state
+
+- **One registry, keyed by mode, read in a fixed order.** `registerUrlKeys`
+  appends an `{ encoder, decoder }` pair under a mode name or the shared
+  `ANY_MODE` group. Encoding writes `mode`, then that mode's groups, then any
+  shared key not already written; decoding always runs the shared group
+  first, then the named mode's groups, in registration order. See "Process
+  notes" below for how a later phase adds to it.
+- **A decoder never throws past the link.** `applyStateTo` wraps every
+  decoder call and logs rather than rethrows, so a hand-edited or truncated
+  key (`Z=abc`, `cut=w:2`, `mode=molecule`) loses only what it could not use,
+  not the rest of the link.
+- **Numbers are decimal literals, not whatever `Number()` accepts.**
+  `parseNumberInRange` requires `DECIMAL_LITERAL` to match first — `Number()`
+  on its own also accepts `'0x1'` and padded whitespace, which would decode a
+  key as a number nobody actually wrote into the link.
+- **A link's cut waits in `orbital.pendingCut`**, applied once
+  `atom.pendingView` is null (the view it belongs to has landed), **and is
+  cleared by any user cut change, element pick, or mode switch that happens
+  before that point** (`App.tsx`'s `handleSurfaceStyleChange`,
+  `handleAtomElementChange`, `handleModeChange`) — otherwise a stale link cut
+  could land on top of a cut the user set while the solve it was waiting on
+  was still running.
+- **A link with no `cam` key resets a moved camera to the canonical angle**
+  (`decodeViewKeys` always dispatches `restoreCamera`, passing `null` when
+  the key is absent) — the alternative, leaving whatever the camera already
+  showed, would mean a link only sometimes reproduces the sender's view,
+  depending on what the receiving tab happened to be looking at already.
+- **`frac`, `cut`, `op` and `surf` are always written, even at their
+  defaults** — unlike `cam`, which is left out exactly at the canonical
+  angle. The asymmetry is deliberate: a missing view key must decode to the
+  same default the encoder would have written, so a link reproduces the
+  sender's picture in *any* tab; `cam`'s "missing means canonical" rule
+  gives the same guarantee more cheaply, since the canonical angle is also
+  the only value worth omitting.
+- **A pasted or typed link that names a recognised mode closes the
+  periodic-table pop-over** (`useUrlStateSync`'s `onApplyHash`, wired from
+  `App.tsx` to `closeTable`) — otherwise the view the link just restored
+  could load directly behind it.
+
+### Export, by format — as built, not as planned
+
+- **Every export's availability comes from one function per kind**
+  (`drawnReason`, `pngReason`, `geometryReason`, `cubeReason` in
+  `run_export.ts`), each layering the next case on the last: nothing drawn →
+  waiting for the atom → the picture still computing → a refused combination
+  (its own message, ruling C10) → the last render failed → (STL/glTF only)
+  the whole-atom level has no surface → (cube only) an overlay has more than
+  one member. The export menu shows whichever of these is true as the
+  item's disabled reason, read fresh every time the menu opens.
+- **PNG** draws the combination's own colour key instead of the plain
+  ψ-sign key when one is on screen (ruling C5) — the two are mutually
+  exclusive in the app itself. The caption is wrapped to the image width
+  (a method statement can run past 1000 px at 13 CSS px) and a lost WebGL
+  context fails the capture outright rather than silently copying out
+  whatever pixels happen to be left in the buffer.
+- **CSV** is UTF-8 with a leading BOM and LF line endings — Excel otherwise
+  guesses the system codepage and mangles the em dashes, superscripts and
+  fractions (—, ², ½) a caption can contain. Basic Orbitals and the
+  Combination picker sample at `PLOT_SAMPLE_COUNT` (240, `src/
+  radial_distribution.ts`) — the same constant the on-screen plot uses, so
+  the exported numbers are the plotted ones, not a re-sample. A non-finite
+  value refuses the whole export by name and radius rather than writing an
+  empty cell. The n = 2 Stark method line states its own validity window
+  (well below the over-the-barrier field, 1/256 a.u. ≈ 0.0039 a.u.) rather
+  than the generic "F ≪ 1 a.u." phrasing the n = 1 case uses, which would
+  overstate it roughly 250×; it also states that tunnelling is ignored.
+- **STL** refuses unless every surface in the scene is individually
+  watertight (ruling T10-I1). A shell's lobes and an overlay's members are
+  exported as that many separate solids — welding them into one mesh would
+  make every shared vertex belong to four triangles instead of two, and no
+  multi-lobe file would ever pass the check. Where a file holds more than
+  one solid, the print dialog states it plainly: "N overlapping solids,
+  each watertight; your slicer merges them into one" — not "watertight",
+  because the file as a whole was never checked as one shape. **Follow-up,
+  not built:** export the union's outer shell instead — marching cubes over
+  max_i f_i (the pointwise maximum of the member densities) rather than each
+  member separately, in a worker — so a strict external checker (trimesh,
+  Netfabb) that inspects the whole file as one body does not warn on an
+  overlay or shell-lobe STL. The per-member export above is correct and
+  slices fine; this would additionally satisfy tools stricter than a slicer.
+- **Cube** is ψ (real, bohr⁻³ᐟ²) exactly as drawn, for a single-source field
+  or an orbital, re-sampled by the same `sampleFieldSource` the mesh worker
+  used. For atom levels 1–2 (no 3D field) it is ρ(r) = D(r)/(4πr²) in
+  electrons/bohr³ on a box enclosing 99.9% of the shown curve, carrying
+  forward Task 12's note that features finer than the grid spacing (a heavy
+  atom's 1s) are not resolved by any uniform grid. A multi-member overlay is
+  refused (`CUBE_OVERLAY_REASON`) rather than exported as one of its
+  members or as a sum. `cube_request.ts` is deliberately narrow — it and
+  `cube.ts` are the *only* modules `exportWorker.ts` imports (ruling C8), so
+  the worker never pulls in three.js or Redux; building a request out of
+  live state (`cubeJobFor`, which needs `RootState` and `caption.ts`) stays
+  on the main thread, in `run_export.ts`.
+- **Known gap, not fixed this phase:** the shell-lobe composition worker
+  (`shell_composition_view.ts`'s mesh build) has no busy flag in the store,
+  unlike the orbital/field pipeline's `isLoading`. So while a shell's lobes
+  are still being composed, the PNG and STL/glTF menu items read as
+  available when they should not: STL and glTF still refuse at the moment
+  of the click (`collectSurfaces` has nothing yet, or only the previous
+  level's meshes), but a PNG can succeed and silently capture the previous
+  frame instead of the one being built. Fixing it properly needs a busy flag
+  threaded through that worker the way `orbital.isLoading` already is for
+  the single-orbital path.
+
 ## Judgment calls made without asking
 
 Recorded for review, per the session's standing authority.
@@ -433,6 +585,11 @@ Recorded for review, per the session's standing authority.
   the previously selected element would be cheap and would finally make the
   contraction-across-a-period, jump-at-a-new-one pattern visible.
 - **Scalar-relativistic v2** (see "Known limits").
+- **STL's union outer shell** (Phase 2 follow-up) — marching cubes on
+  max_i f_i across a shell's lobes or an overlay's members, in a worker, as
+  an additional export alongside the current per-member one, so a strict
+  external manifold checker (trimesh, Netfabb) inspecting the file as one
+  body does not warn on it. See "Phase 2 — share and export" above.
 
 ### Known, accepted, not scheduled
 - `prefers-reduced-motion` for the level transitions is verified at unit
@@ -441,6 +598,11 @@ Recorded for review, per the session's standing authority.
 - The cross-fade renders the scene twice for ~350 ms.
 - A busy SCF worker queues behind an abandoned slow solve. Correctness is
   preserved by request id; latency in that narrow case is not.
+- **The shell-lobe composition worker has no busy flag** (Phase 2), so the
+  PNG and STL/glTF export items stay enabled while a shell's lobes are still
+  being composed. STL and glTF still refuse at the moment of the click; a
+  PNG taken in that window can succeed and silently capture the previous
+  frame. See "Phase 2 — share and export" above.
 
 ---
 
@@ -454,6 +616,25 @@ with expected durations so a multi-minute foreground wait reads as normal.
 
 **Expensive SCF sweeps are gated behind `ATOM_SLOW_TESTS=1`.** The default
 suite is ~57 s; the full set is ~2 min. Do not un-gate them.
+
+**A test that needs a real store builds one with `createAppStore()` (or
+reuses its `SERIALIZABLE_CHECK`), never a bare `configureStore`.**
+(`src/store/index.ts`.) A plain `configureStore` is missing production's
+serializable-check exceptions for the typed arrays an atom profile and a
+numerically-sourced orbital's `radialSamples` carry by design, so it prints
+a console.error for every `solveSucceeded` or `startOrbitalCalculation` a
+test dispatches — real noise that was masking real warnings until Phase 2
+swept the suite to zero. Keep it at zero.
+
+**Adding a URL key for a later phase/mode:** call `registerUrlKeys(mode,
+encoder, decoder)` for a brand-new mode (`src/url_state.ts`), or fold a new
+key into an existing encoder/decoder pair (`encodeViewKeys`/`decodeViewKeys`
+for a key every mode should carry, `encodeAtomKeys`/`decodeAtomKeys` or
+`encodeBasicKeys`/`decodeBasicKeys` for a mode-specific one). Either way, add
+a case to `tests/url_state.test.ts`'s round-trip property test (the `Shape`
+union and `randomView`'s `it.each`) so the new key is swept by the same
+seeded-PRNG property every existing key is, rather than only unit-tested in
+isolation.
 
 **Verify in the live app, not only in tests.** Every serious defect in this
 project was invisible to a green suite, and this session added four more to
