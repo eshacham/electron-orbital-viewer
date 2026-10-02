@@ -147,7 +147,7 @@ along x, at a 90% contour:
 | Key | Meaning |
 | --- | --- |
 | `mode` | `atom` or `basic` |
-| `frac` | enclosed fraction, 0–1 |
+| `frac` | enclosed fraction — one of the presets 0.5, 0.75, 0.9, 0.95, 0.99; any other value is ignored |
 | `cut` | `none`, or `<x\|y\|z>:<depth>` — depth 0–1 as the Depth slider shows it (0 nothing removed, 0.5 through the nucleus, 1 everything) |
 | `op` | opacity, 0.05–1 |
 | `surf` | `solid` or `wire` |
@@ -188,7 +188,9 @@ like any other malformed key, not parsed as a number nobody wrote.
   or a hybrid overlay's members export as that many separate solids, each
   individually watertight; where a file holds more than one, the dialog
   says so ("N overlapping solids, each watertight; your slicer merges them
-  into one") rather than calling the whole file watertight.
+  into one") rather than calling the whole file watertight. glTF and STL
+  are not offered at atom mode's whole-atom level, which is a shaded cut
+  face rather than a surface; open a shell or an orbital first.
 - **Field grid (Gaussian cube)**, lengths in bohr throughout. For an orbital
   or a single-member field it is ψ itself (real, bohr⁻³ᐟ²), sampled on
   exactly the grid that was drawn. For atom mode's whole-atom or shell
