@@ -287,7 +287,21 @@ describe('OrbitalViewer: ions', () => {
         });
         render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
         expect((updateAtomViewInScene as jest.Mock).mock.calls.at(-1)![1].framingFloor).toBeUndefined();
+        expect(setReferenceRing).toHaveBeenCalled();
         expect((setReferenceRing as jest.Mock).mock.calls.every(([, radius]) => radius === null)).toBe(true);
+    });
+
+    it('takes the ring down on a switch to Basic Orbitals, and on picking another element', () => {
+        const store = ionStore();
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        expect(setReferenceRing).toHaveBeenLastCalledWith(expect.anything(), 2);
+        act(() => { store.dispatch(setMode('hydrogenic')); });
+        expect(setReferenceRing).toHaveBeenLastCalledWith(expect.anything(), null);
+
+        act(() => { store.dispatch(setMode('atom')); });
+        expect(setReferenceRing).toHaveBeenLastCalledWith(expect.anything(), 2);
+        act(() => { store.dispatch(setElement(11)); });
+        expect(setReferenceRing).toHaveBeenLastCalledWith(expect.anything(), null);
     });
 
     // Na and Na⁺ share a Z but not a grid: the in-place reshaping fade

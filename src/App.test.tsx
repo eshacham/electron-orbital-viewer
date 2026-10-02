@@ -544,6 +544,24 @@ describe('App', () => {
             expect(store.getState().orbital.viewResetNonce).toBe(resetNonce);
         });
 
+        // The same pairing for an excitation (fix round 1, M5).
+        it('an excitation is solving at once, drops a waiting link cut, and leaves the camera alone', () => {
+            installMatchMedia(false);
+            const { store } = renderWithProvider(<App />, { Z: 11 });
+            act(() => {
+                store.dispatch(requestAtomView({ level: 'shell', shell: 3, subshell: null, orbital: null }));
+                store.dispatch(requestCut({ clipAxis: 'x', clipPosition: 0.5 }));
+                store.dispatch(setSurfaceStyle({ clipPosition: 0.2 }));
+            });
+            const resetNonce = store.getState().orbital.viewResetNonce;
+            fireEvent.click(screen.getByRole('button', { name: /Excite/ }));
+            fireEvent.click(screen.getByRole('menuitem', { name: '3s → 3p' }));
+            expect(store.getState().atom).toMatchObject({ excitation: { from: { n: 3, l: 0 }, to: { n: 3, l: 1 } }, isSolving: true });
+            expect(store.getState().orbital.pendingCut).toBeNull();
+            expect(store.getState().orbital.surfaceStyle.clipPosition).toBe(0.2);
+            expect(store.getState().orbital.viewResetNonce).toBe(resetNonce);
+        });
+
         it('shows "LDA does not bind this anion" instead of a picture', () => {
             installMatchMedia(false);
             renderWithProvider(<App />, { Z: 17, charge: -1 });
