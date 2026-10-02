@@ -1,0 +1,422 @@
+{
+  "generator": "tests/atom/delta_scf_nist.test.ts with ATOM_SLOW_TESTS=1 WRITE_VALIDATION=1",
+  "generatedOn": "2026-10-02",
+  "entries": [
+    {
+      "kind": "ionisation",
+      "Z": 1,
+      "charge": 0,
+      "system": "H",
+      "app": 13.605693122994,
+      "reference": 13.598434599702
+    },
+    {
+      "kind": "ionisation",
+      "Z": 2,
+      "charge": 0,
+      "system": "He",
+      "app": 22.716864907803213,
+      "reference": 24.587389011
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 2,
+      "charge": 0,
+      "system": "He",
+      "app": -2.8348293873176913,
+      "reference": -2.834836
+    },
+    {
+      "kind": "ionisation",
+      "Z": 3,
+      "charge": 0,
+      "system": "Li",
+      "app": 5.473223316965569,
+      "reference": 5.391714996
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 3,
+      "charge": 0,
+      "system": "Li",
+      "app": -7.343942962444486,
+      "reference": -7.343957
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 3,
+      "charge": 1,
+      "system": "Li⁺",
+      "app": -7.142805715430011,
+      "reference": -7.142818
+    },
+    {
+      "kind": "ionisation",
+      "Z": 4,
+      "charge": 0,
+      "system": "Be",
+      "app": 9.02586362924535,
+      "reference": 9.322699
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 4,
+      "charge": 0,
+      "system": "Be",
+      "app": -14.447186814672538,
+      "reference": -14.447209
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 4,
+      "charge": 1,
+      "system": "Be⁺",
+      "app": -14.115492444247874,
+      "reference": -14.115512
+    },
+    {
+      "kind": "ionisation",
+      "Z": 5,
+      "charge": 0,
+      "system": "B",
+      "app": 8.580680615717045,
+      "reference": 8.298019
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 5,
+      "charge": 0,
+      "system": "B",
+      "app": -24.353577856020618,
+      "reference": -24.353614
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 5,
+      "charge": 1,
+      "system": "B⁺",
+      "app": -24.038243659587234,
+      "reference": -24.038275
+    },
+    {
+      "kind": "ionisation",
+      "Z": 6,
+      "charge": 0,
+      "system": "C",
+      "app": 11.771954624420701,
+      "reference": 11.260288
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 6,
+      "charge": 0,
+      "system": "C",
+      "app": -37.46997531838074,
+      "reference": -37.470031
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 6,
+      "charge": 1,
+      "system": "C⁺",
+      "app": -37.03736396525071,
+      "reference": -37.037413
+    },
+    {
+      "kind": "ionisation",
+      "Z": 7,
+      "charge": 0,
+      "system": "N",
+      "app": 15.003857148169644,
+      "reference": 14.53413
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 7,
+      "charge": 0,
+      "system": "N",
+      "app": -54.13671547968692,
+      "reference": -54.136799
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 7,
+      "charge": 1,
+      "system": "N⁺",
+      "app": -53.58533389947133,
+      "reference": -53.585407
+    },
+    {
+      "kind": "ionisation",
+      "Z": 8,
+      "charge": 0,
+      "system": "O",
+      "app": 13.896159391709837,
+      "reference": 13.618055
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 8,
+      "charge": 0,
+      "system": "O",
+      "app": -74.52728834881195,
+      "reference": -74.52741
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 8,
+      "charge": 1,
+      "system": "O⁺",
+      "app": -74.01661391032175,
+      "reference": -74.016721
+    },
+    {
+      "kind": "ionisation",
+      "Z": 9,
+      "charge": 0,
+      "system": "F",
+      "app": 18.061494989891,
+      "reference": 17.42282
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 9,
+      "charge": 0,
+      "system": "F",
+      "app": -99.11402211763787,
+      "reference": -99.114192
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 9,
+      "charge": 1,
+      "system": "F⁺",
+      "app": -98.45027441928039,
+      "reference": -98.450427
+    },
+    {
+      "kind": "ionisation",
+      "Z": 10,
+      "charge": 0,
+      "system": "Ne",
+      "app": 22.186714257895037,
+      "reference": 21.564541
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 10,
+      "charge": 0,
+      "system": "Ne",
+      "app": -128.23325013137892,
+      "reference": -128.233481
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 10,
+      "charge": 1,
+      "system": "Ne⁺",
+      "app": -127.41790342109634,
+      "reference": -127.418114
+    },
+    {
+      "kind": "ionisation",
+      "Z": 11,
+      "charge": 0,
+      "system": "Na",
+      "app": 5.367949454648934,
+      "reference": 5.13907696
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 11,
+      "charge": 0,
+      "system": "Na",
+      "app": -161.44732464258195,
+      "reference": -161.447625
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 11,
+      "charge": 1,
+      "system": "Na⁺",
+      "app": -161.25005613865042,
+      "reference": -161.25034
+    },
+    {
+      "kind": "ionisation",
+      "Z": 12,
+      "charge": 0,
+      "system": "Mg",
+      "app": 7.72079807318844,
+      "reference": 7.646236
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 12,
+      "charge": 0,
+      "system": "Mg",
+      "app": -199.13904890444007,
+      "reference": -199.139406
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 12,
+      "charge": 1,
+      "system": "Mg⁺",
+      "app": -198.8553148085953,
+      "reference": -198.855669
+    },
+    {
+      "kind": "ionisation",
+      "Z": 13,
+      "charge": 0,
+      "system": "Al",
+      "app": 6.001643101426105,
+      "reference": 5.985769
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 13,
+      "charge": 0,
+      "system": "Al",
+      "app": -241.32073726948704,
+      "reference": -241.321156
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 13,
+      "charge": 1,
+      "system": "Al⁺",
+      "app": -241.10018095356943,
+      "reference": -241.100595
+    },
+    {
+      "kind": "ionisation",
+      "Z": 14,
+      "charge": 0,
+      "system": "Si",
+      "app": 8.276738857845915,
+      "reference": 8.15168
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 14,
+      "charge": 0,
+      "system": "Si",
+      "app": -288.2224589804574,
+      "reference": -288.222945
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 14,
+      "charge": 1,
+      "system": "Si⁺",
+      "app": -287.9182944376067,
+      "reference": -287.918773
+    },
+    {
+      "kind": "ionisation",
+      "Z": 15,
+      "charge": 0,
+      "system": "P",
+      "app": 10.539835605539102,
+      "reference": 10.486686
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 15,
+      "charge": 0,
+      "system": "P",
+      "app": -340.00523348982733,
+      "reference": -340.005794
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 15,
+      "charge": 1,
+      "system": "P⁺",
+      "app": -339.61790167548094,
+      "reference": -339.618451
+    },
+    {
+      "kind": "ionisation",
+      "Z": 16,
+      "charge": 0,
+      "system": "S",
+      "app": 10.541506269677,
+      "reference": 10.3600167
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 16,
+      "charge": 0,
+      "system": "S",
+      "app": -396.7433024038155,
+      "reference": -396.743948
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 16,
+      "charge": 1,
+      "system": "S⁺",
+      "app": -396.35590919369446,
+      "reference": -396.35654
+    },
+    {
+      "kind": "ionisation",
+      "Z": 17,
+      "charge": 0,
+      "system": "Cl",
+      "app": 13.248734534598565,
+      "reference": 12.967633
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 17,
+      "charge": 0,
+      "system": "Cl",
+      "app": -458.6707230364736,
+      "reference": -458.671463
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 17,
+      "charge": 1,
+      "system": "Cl⁺",
+      "app": -458.1838410226419,
+      "reference": -458.184562
+    },
+    {
+      "kind": "ionisation",
+      "Z": 18,
+      "charge": 0,
+      "system": "Ar",
+      "app": 15.93854508838401,
+      "reference": 15.7596119
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 18,
+      "charge": 0,
+      "system": "Ar",
+      "app": -525.9453496701632,
+      "reference": -525.946195
+    },
+    {
+      "kind": "lsdTotal",
+      "Z": 18,
+      "charge": 1,
+      "system": "Ar⁺",
+      "app": -525.359618941699,
+      "reference": -525.360439
+    },
+    {
+      "kind": "excitation",
+      "Z": 11,
+      "charge": 0,
+      "system": "Na",
+      "app": 2.18455657651563,
+      "reference": 2.104
+    }
+  ]
+}

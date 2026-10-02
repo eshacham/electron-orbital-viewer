@@ -12,6 +12,7 @@
  * from tests and from a lazily loaded page, never from the app's entry.
  */
 import { PHASE_1_ROWS } from './phase1';
+import { ION_VALIDATION_ROWS } from './ion_rows';
 
 export interface ValidationRow {
     phase: number;
@@ -36,7 +37,7 @@ const PHASE_0_ROWS: ValidationRow[] = [
     { phase: 0, quantity: '2p eigenvalue', system: 'Ar', app: -8.443, reference: -8.443439, unit: 'Ha', tolerancePercent: 0.02, referenceSource: NIST_LDA, method: ATOM_METHOD },
 ];
 
-export const VALIDATION: ValidationRow[] = [...PHASE_0_ROWS, ...PHASE_1_ROWS];
+export const VALIDATION: ValidationRow[] = [...PHASE_0_ROWS, ...PHASE_1_ROWS, ...ION_VALIDATION_ROWS];
 
 export function relativeErrorPercent(row: ValidationRow): number {
     return (Math.abs(row.app - row.reference) / Math.abs(row.reference)) * 100;
