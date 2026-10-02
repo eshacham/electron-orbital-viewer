@@ -347,3 +347,19 @@ export function solveRadialState(
 
     return { n, l, energy, u, R };
 }
+
+/**
+ * Whether `potential` holds a bound (n, l) state below `below` Hartree --
+ * the oscillation theorem again: the outward regular solution at that
+ * energy has exactly as many nodes as there are eigenvalues beneath it, so
+ * more than n - l - 1 nodes means the (n, l) state lies below. Used by the
+ * SCF's anion guard, where the extra electron's state can leave the bound
+ * spectrum mid-iteration and solveRadialState (which only searches E < 0)
+ * would otherwise return a nonsense state rather than fail.
+ */
+export function hasBoundState(
+    grid: RadialGrid, n: number, l: number, potential: Float64Array, below: number = -1e-4
+): boolean {
+    const g = buildG(grid, l, potential, below);
+    return countNodesForBracketing(grid, g, l, matchIndex(g)) > n - l - 1;
+}

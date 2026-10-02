@@ -1,5 +1,5 @@
 import { gridForAtom, makeRadialGrid, integrateOnGrid, interpolateOnGrid } from '../../src/atom/radial_grid';
-import { solveRadialState } from '../../src/atom/radial_solver';
+import { solveRadialState, hasBoundState } from '../../src/atom/radial_solver';
 import { radialWaveFunction } from '../../src/quantum_functions';
 
 /** V(r) = -Z/r on the grid: the one potential with an exact answer. */
@@ -146,5 +146,17 @@ describe('inward-integration rescale over a long classically-forbidden stretch (
         // just avoid Infinity by also corrupting the answer.
         const exact = -(Z * Z) / 2;
         expect(Math.abs((state.energy - exact) / exact)).toBeLessThan(1e-4);
+    });
+});
+
+describe('hasBoundState', () => {
+    it('finds hydrogen 1s, 2p and 4f in -1/r, and nothing in a repulsive +1/r', () => {
+        const grid = gridForAtom(1, 4);
+        const attractive = coulomb(grid, 1);
+        expect(hasBoundState(grid, 1, 0, attractive)).toBe(true);
+        expect(hasBoundState(grid, 2, 1, attractive)).toBe(true);
+        expect(hasBoundState(grid, 4, 3, attractive)).toBe(true);
+        const repulsive = attractive.map(v => -v);
+        expect(hasBoundState(grid, 1, 0, repulsive)).toBe(false);
     });
 });

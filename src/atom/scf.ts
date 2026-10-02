@@ -22,9 +22,29 @@ import {
     hartreeEnergy,
 } from './hartree';
 import { correlationPotential, correlationEnergy } from './correlation';
+import { AtomSpecies, neutralGround, speciesConfiguration, speciesKey } from './species';
+import {
+    MAX_ITERATIONS,
+    CONVERGENCE_TOLERANCE,
+    INITIAL_BETA,
+    MIN_BETA,
+    ANION_BINDING_THRESHOLD,
+    UnboundAnionError,
+    assertStatesBound,
+    highestPrincipalQuantumNumber,
+    totalElectronsOf,
+    bareCoulombPotential,
+    screenedStartingPotential,
+    buildD,
+    maxWeightedDelta,
+} from './scf_shared';
 
 export interface AtomSolution {
     Z: number;
+    /** Z minus the electron count: 0 for a neutral atom, +1 for Na+, -1 for Br-. */
+    charge: number;
+    /** The occupancies actually solved, sorted by (n, l) -- an ion's or an excited atom's own. */
+    configuration: SubshellOccupancy[];
     grid: RadialGrid;
     /** One entry per occupied subshell, ordered by (n, l). */
     states: Array<RadialState & { electrons: number }>;
@@ -37,62 +57,14 @@ export interface AtomSolution {
     converged: boolean;
 }
 
-const MAX_ITERATIONS = 200;
-// Ruling: "max|delta-V * r| < 1e-6" — measured in r*V (a Hartree-like unit
-// that stays finite as r -> infinity) rather than in V itself, since V ~ 1/r
-// far out would make a fixed absolute tolerance on V either impossibly tight
-// near the origin or meaningless at large r.
-const CONVERGENCE_TOLERANCE = 1e-6;
-const INITIAL_BETA = 0.3;
-// Floor for the adaptive mixing in solveAtomOnGrid below: small enough that
-// even the most charge-sloshing-prone configurations (near-degenerate 4s/3d,
-// 4f/5d) settle, without ever fully stalling the loop.
-const MIN_BETA = 0.02;
-
-/** The largest principal quantum number occupied by this configuration — what gridForAtom (ruling R22) needs to size the grid correctly. */
-function highestPrincipalQuantumNumber(configuration: SubshellOccupancy[]): number {
-    return configuration.reduce((max, subshell) => Math.max(max, subshell.n), 1);
-}
-
-function totalElectronsOf(configuration: SubshellOccupancy[]): number {
-    return configuration.reduce((sum, subshell) => sum + subshell.electrons, 0);
-}
-
-/** V = -Z/r, the bare nuclear attraction and the loop's starting guess. */
-function bareCoulombPotential(grid: RadialGrid, Z: number): Float64Array {
-    const v = new Float64Array(grid.size);
-    for (let j = 0; j < grid.size; j++) v[j] = -Z / grid.r[j];
-    return v;
-}
-
 /**
- * A screened starting potential, used in place of the bare Coulomb guess for
- * the SCF loop (not for the one-electron bypass, which has no loop to seed).
- *
- * The bare potential's first iteration puts the full, unscreened nuclear
- * charge in front of every electron at once, which is furthest from
- * self-consistency for exactly the atoms most prone to charge sloshing
- * between near-degenerate subshells (the 3d/4s and 4f/5d transition rows).
- * This is not a Thomas-Fermi solve — it is a cheap, qualitatively-right
- * stand-in: the effective charge decays from Z at the nucleus towards 1 at
- * large r (an outer electron sees the other Z-1 electrons screening the
- * nucleus down to a net charge of 1), with a length scale of order an atomic
- * radius (~Z^(-1/3), the same scaling Thomas-Fermi theory gives) so the
- * transition happens roughly where the outermost, screening electrons
- * actually sit. It only has to be closer to self-consistent than the bare
- * nucleus, which any monotonic screening curve of the right scale achieves;
- * the loop's own iteration determines the converged potential regardless of
- * where it started, provided it converges.
+ * Options for one SCF solve. An object rather than more positional
+ * parameters so later physics layers on without another signature change:
+ * Phase 4 adds `relativity` and `startingPotential` here.
  */
-function screenedStartingPotential(grid: RadialGrid, Z: number): Float64Array {
-    const screeningLength = 0.8853 * Math.pow(Z, -1 / 3);
-    const v = new Float64Array(grid.size);
-    for (let j = 0; j < grid.size; j++) {
-        const r = grid.r[j];
-        const zEff = 1 + (Z - 1) * Math.exp(-r / screeningLength);
-        v[j] = -zEff / r;
-    }
-    return v;
+export interface ScfOptions {
+    /** Defaults to the neutral ground state, configurationFor(Z). */
+    configuration?: SubshellOccupancy[];
 }
 
 /**
@@ -112,24 +84,6 @@ function meanFieldPotential(grid: RadialGrid, Z: number, D: Float64Array): Float
         v[j] = -Z / grid.r[j] + vHartree[j] + vExchange[j] + correlationPotential(density[j]);
     }
     return v;
-}
-
-function buildD(grid: RadialGrid, states: Array<RadialState & { electrons: number }>): Float64Array {
-    const D = new Float64Array(grid.size);
-    for (const state of states) {
-        for (let j = 0; j < grid.size; j++) D[j] += state.electrons * state.u[j] * state.u[j];
-    }
-    return D;
-}
-
-/** max|delta-V * r|, the convergence measure the brief specifies. */
-function maxWeightedDelta(grid: RadialGrid, previous: Float64Array, next: Float64Array): number {
-    let maxDelta = 0;
-    for (let j = 0; j < grid.size; j++) {
-        const delta = Math.abs((next[j] - previous[j]) * grid.r[j]);
-        if (delta > maxDelta) maxDelta = delta;
-    }
-    return maxDelta;
 }
 
 /**
@@ -178,7 +132,8 @@ function totalEnergyOf(
  * exactly.
  */
 function solveOneElectronAtom(Z: number, grid: RadialGrid, configuration: SubshellOccupancy[]): AtomSolution {
-    const subshell = configuration[0];
+    // Its own subshell, not 1s: an excited hydrogen (1s -> 2p) is reachable now.
+    const subshell = configuration.find(s => s.electrons > 0)!;
     const potential = bareCoulombPotential(grid, Z);
     const state = solveRadialState(grid, subshell.n, subshell.l, potential);
     const states = [{ ...state, electrons: subshell.electrons }];
@@ -187,29 +142,36 @@ function solveOneElectronAtom(Z: number, grid: RadialGrid, configuration: Subshe
 
     return {
         Z,
+        charge: Z - 1,
+        configuration,
         grid,
         states,
         D,
         density,
         potential,
-        totalEnergy: -(Z * Z) / 2,
+        // Exact: E = -Z^2 / (2 n^2) for any l.
+        totalEnergy: -(Z * Z) / (2 * subshell.n * subshell.n),
         iterations: 1,
         converged: true,
     };
 }
 
-// Ruling R28: an atom's LDA ground state is a pure function of Z alone (same
-// configuration, same gridForAtom sizing, same SCF loop every time), so this
-// cache can never go stale -- there is no invalidation to get wrong. Without
-// it, the drill-down UI (Task 11) would re-run the solve on every level
-// change; at ~8.6s for uranium, drilling atom -> shell -> orbital -> back
-// would cost four solves (~34s) for what is conceptually one. Module-level
-// rather than per-caller because `solveAtom(Z)` is meant to be cheap to call
-// repeatedly from anywhere (the worker, tests, the store) once warmed.
-const solveAtomCache = new Map<number, AtomSolution>();
+// Ruling R28, generalised from Z to species: a species' LDA solution is a
+// pure function of its key (same configuration, same gridForAtom sizing,
+// same SCF loop every time), so this cache can never go stale -- there is
+// no invalidation to get wrong. Without it, the drill-down UI would re-run
+// the solve on every level change; at ~8.6s for uranium, drilling atom ->
+// shell -> orbital -> back would cost four solves (~34s) for what is
+// conceptually one. Module-level rather than per-caller because solving is
+// meant to be cheap to call repeatedly from anywhere (the worker, tests, the
+// store) once warmed. A neutral ground state's key is String(Z) and
+// solveAtom goes through here, so solveAtom(Z) keeps returning one memoised
+// object exactly as before.
+const solveSpeciesCache = new Map<string, AtomSolution>();
 
 /**
- * Solves every occupied subshell of neutral atom Z self-consistently.
+ * Solves every occupied subshell of a species -- an element, a charge and
+ * at most one promoted electron -- self-consistently, once per species.
  *
  * Mixing is linear (V <- (1-beta)*V_old + beta*V_new) but beta is adaptive,
  * not fixed at the brief's 0.3 (ruling R17): plain fixed-beta linear mixing
@@ -221,35 +183,49 @@ const solveAtomCache = new Map<number, AtomSolution>();
  * oscillation directly, and is a strictly local, self-correcting response —
  * it never needs to guess in advance which elements will need it.
  */
-export function solveAtom(Z: number): AtomSolution {
-    const cached = solveAtomCache.get(Z);
+export function solveSpecies(species: AtomSpecies): AtomSolution {
+    const key = speciesKey(species);
+    const cached = solveSpeciesCache.get(key);
     if (cached) return cached;
 
-    const configuration = configurationFor(Z);
+    const configuration = speciesConfiguration(species);
     const highestN = highestPrincipalQuantumNumber(configuration);
-    const grid = gridForAtom(Z, highestN);
-    const solution = solveAtomOnGrid(Z, grid);
-    solveAtomCache.set(Z, solution);
+    const grid = gridForAtom(species.Z, highestN);
+    const solution = solveAtomOnGrid(species.Z, grid, { configuration });
+    solveSpeciesCache.set(key, solution);
     return solution;
 }
 
-/**
- * The same solve, but on a caller-supplied grid rather than one sized by
- * gridForAtom.
- *
- * Not for production use — solveAtom's own grid choice is what ruling R22
- * requires, and every real caller should go through it. This exists so the
- * grid-convergence acceptance test (ruling R15) can solve the same atom a
- * second time on an independently-sized grid and compare, which is the only
- * way to measure whether gridForAtom's point count is actually fine enough
- * rather than merely assumed to be.
- */
-export function solveAtomOnGrid(Z: number, grid: RadialGrid): AtomSolution {
-    const configuration = configurationFor(Z);
+/** Neutral ground state of Z (unchanged behaviour; see solveSpecies). */
+export function solveAtom(Z: number): AtomSolution {
+    return solveSpecies(neutralGround(Z));
+}
 
-    if (totalElectronsOf(configuration) === 1) {
-        return solveOneElectronAtom(Z, grid, configuration);
-    }
+/**
+ * The solve itself, on a caller-supplied grid rather than one sized by
+ * gridForAtom, for `options.configuration` (the neutral ground state when
+ * omitted).
+ *
+ * Not for production use directly — solveSpecies's own grid choice is what
+ * ruling R22 requires, and every real caller should go through it (or
+ * solveAtom). This is exported so the grid-convergence acceptance test
+ * (ruling R15) can solve the same atom a second time on an
+ * independently-sized grid and compare, which is the only way to measure
+ * whether gridForAtom's point count is actually fine enough rather than
+ * merely assumed to be.
+ *
+ * Throws UnboundAnionError when an anion's electron has no bound state
+ * (spec §3.5): the verdict is reported, never drawn around.
+ */
+export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions = {}): AtomSolution {
+    const configuration = (options.configuration ?? configurationFor(Z)).filter(s => s.electrons > 0);
+    const electrons = totalElectronsOf(configuration);
+    if (electrons === 0) throw new Error(`Z=${Z} with no electrons has nothing to solve.`);
+    if (electrons === 1) return solveOneElectronAtom(Z, grid, configuration);
+
+    // Only an anion can lose its outermost bound state (see UnboundAnionError);
+    // neutral atoms and cations run exactly the loop they always have.
+    const isAnion = electrons > Z;
 
     // Screened, not bare Coulomb (see screenedStartingPotential's doc
     // comment above for the full reasoning): starting from a guess that is
@@ -271,6 +247,10 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid): AtomSolution {
     let iterations = 0;
 
     for (iterations = 1; iterations <= MAX_ITERATIONS; iterations++) {
+        // Before the solve, not after: solveRadialState searches only E < 0
+        // and would hand back a state for an (n, l) the potential no longer
+        // binds -- the nonsense (H- at -379 Ha) this guard exists to stop.
+        if (isAnion) assertStatesBound(grid, configuration, potential);
         states = configuration.map(subshell => ({
             ...solveRadialState(grid, subshell.n, subshell.l, potential),
             electrons: subshell.electrons,
@@ -302,8 +282,16 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid): AtomSolution {
         potential = mixed;
     }
 
+    // A converged anion can still hold its outermost electron by less than
+    // the grid can represent (see ANION_BINDING_THRESHOLD); that is the same
+    // verdict as unbound.
+    if (isAnion && converged) {
+        const highest = states.reduce((top, s) => (s.energy > top.energy ? s : top), states[0]);
+        if (highest.energy >= -ANION_BINDING_THRESHOLD) throw new UnboundAnionError(highest.n, highest.l);
+    }
+
     const density = densityFromD(grid, D);
     const totalEnergy = totalEnergyOf(grid, states, D, density);
 
-    return { Z, grid, states, D, density, potential, totalEnergy, iterations, converged };
+    return { Z, charge: Z - electrons, configuration, grid, states, D, density, potential, totalEnergy, iterations, converged };
 }
