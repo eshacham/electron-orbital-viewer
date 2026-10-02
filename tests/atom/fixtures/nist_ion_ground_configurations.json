@@ -1,0 +1,2137 @@
+{
+ "source": "NIST Atomic Spectra Database, Ionization Energies Data, \"Ground Shells\" column (Kramida, Ralchenko, Reader and NIST ASD Team)",
+ "url": "https://physics.nist.gov/PhysRefData/ASD/ionEnergy.html",
+ "retrieved": "2026-10-02",
+ "entries": [
+  {
+   "Z": 1,
+   "charge": 0,
+   "groundShells": "1s"
+  },
+  {
+   "Z": 2,
+   "charge": 0,
+   "groundShells": "1s2"
+  },
+  {
+   "Z": 2,
+   "charge": 1,
+   "groundShells": "1s"
+  },
+  {
+   "Z": 3,
+   "charge": 0,
+   "groundShells": "1s2.2s"
+  },
+  {
+   "Z": 3,
+   "charge": 1,
+   "groundShells": "1s2"
+  },
+  {
+   "Z": 3,
+   "charge": 2,
+   "groundShells": "1s"
+  },
+  {
+   "Z": 4,
+   "charge": 0,
+   "groundShells": "1s2.2s2"
+  },
+  {
+   "Z": 4,
+   "charge": 1,
+   "groundShells": "1s2.2s"
+  },
+  {
+   "Z": 4,
+   "charge": 2,
+   "groundShells": "1s2"
+  },
+  {
+   "Z": 4,
+   "charge": 3,
+   "groundShells": "1s"
+  },
+  {
+   "Z": 5,
+   "charge": 0,
+   "groundShells": "1s2.2s2.2p"
+  },
+  {
+   "Z": 5,
+   "charge": 1,
+   "groundShells": "1s2.2s2"
+  },
+  {
+   "Z": 5,
+   "charge": 2,
+   "groundShells": "1s2.2s"
+  },
+  {
+   "Z": 5,
+   "charge": 3,
+   "groundShells": "1s2"
+  },
+  {
+   "Z": 6,
+   "charge": 0,
+   "groundShells": "1s2.2s2.2p2"
+  },
+  {
+   "Z": 6,
+   "charge": 1,
+   "groundShells": "1s2.2s2.2p"
+  },
+  {
+   "Z": 6,
+   "charge": 2,
+   "groundShells": "1s2.2s2"
+  },
+  {
+   "Z": 6,
+   "charge": 3,
+   "groundShells": "1s2.2s"
+  },
+  {
+   "Z": 7,
+   "charge": 0,
+   "groundShells": "1s2.2s2.2p3"
+  },
+  {
+   "Z": 7,
+   "charge": 1,
+   "groundShells": "1s2.2s2.2p2"
+  },
+  {
+   "Z": 7,
+   "charge": 2,
+   "groundShells": "1s2.2s2.2p"
+  },
+  {
+   "Z": 7,
+   "charge": 3,
+   "groundShells": "1s2.2s2"
+  },
+  {
+   "Z": 8,
+   "charge": 0,
+   "groundShells": "1s2.2s2.2p4"
+  },
+  {
+   "Z": 8,
+   "charge": 1,
+   "groundShells": "1s2.2s2.2p3"
+  },
+  {
+   "Z": 8,
+   "charge": 2,
+   "groundShells": "1s2.2s2.2p2"
+  },
+  {
+   "Z": 8,
+   "charge": 3,
+   "groundShells": "1s2.2s2.2p"
+  },
+  {
+   "Z": 9,
+   "charge": 0,
+   "groundShells": "1s2.2s2.2p5"
+  },
+  {
+   "Z": 9,
+   "charge": 1,
+   "groundShells": "1s2.2s2.2p4"
+  },
+  {
+   "Z": 9,
+   "charge": 2,
+   "groundShells": "1s2.2s2.2p3"
+  },
+  {
+   "Z": 9,
+   "charge": 3,
+   "groundShells": "1s2.2s2.2p2"
+  },
+  {
+   "Z": 10,
+   "charge": 0,
+   "groundShells": "1s2.2s2.2p6"
+  },
+  {
+   "Z": 10,
+   "charge": 1,
+   "groundShells": "1s2.2s2.2p5"
+  },
+  {
+   "Z": 10,
+   "charge": 2,
+   "groundShells": "1s2.2s2.2p4"
+  },
+  {
+   "Z": 10,
+   "charge": 3,
+   "groundShells": "1s2.2s2.2p3"
+  },
+  {
+   "Z": 11,
+   "charge": 0,
+   "groundShells": "[Ne].3s"
+  },
+  {
+   "Z": 11,
+   "charge": 1,
+   "groundShells": "1s2.2s2.2p6"
+  },
+  {
+   "Z": 11,
+   "charge": 2,
+   "groundShells": "1s2.2s2.2p5"
+  },
+  {
+   "Z": 11,
+   "charge": 3,
+   "groundShells": "1s2.2s2.2p4"
+  },
+  {
+   "Z": 12,
+   "charge": 0,
+   "groundShells": "[Ne].3s2"
+  },
+  {
+   "Z": 12,
+   "charge": 1,
+   "groundShells": "[Ne].3s"
+  },
+  {
+   "Z": 12,
+   "charge": 2,
+   "groundShells": "1s2.2s2.2p6"
+  },
+  {
+   "Z": 12,
+   "charge": 3,
+   "groundShells": "1s2.2s2.2p5"
+  },
+  {
+   "Z": 13,
+   "charge": 0,
+   "groundShells": "[Ne].3s2.3p"
+  },
+  {
+   "Z": 13,
+   "charge": 1,
+   "groundShells": "[Ne].3s2"
+  },
+  {
+   "Z": 13,
+   "charge": 2,
+   "groundShells": "[Ne].3s"
+  },
+  {
+   "Z": 13,
+   "charge": 3,
+   "groundShells": "1s2.2s2.2p6"
+  },
+  {
+   "Z": 14,
+   "charge": 0,
+   "groundShells": "[Ne].3s2.3p2"
+  },
+  {
+   "Z": 14,
+   "charge": 1,
+   "groundShells": "[Ne].3s2.3p"
+  },
+  {
+   "Z": 14,
+   "charge": 2,
+   "groundShells": "[Ne].3s2"
+  },
+  {
+   "Z": 14,
+   "charge": 3,
+   "groundShells": "[Ne].3s"
+  },
+  {
+   "Z": 15,
+   "charge": 0,
+   "groundShells": "[Ne].3s2.3p3"
+  },
+  {
+   "Z": 15,
+   "charge": 1,
+   "groundShells": "[Ne].3s2.3p2"
+  },
+  {
+   "Z": 15,
+   "charge": 2,
+   "groundShells": "[Ne].3s2.3p"
+  },
+  {
+   "Z": 15,
+   "charge": 3,
+   "groundShells": "[Ne].3s2"
+  },
+  {
+   "Z": 16,
+   "charge": 0,
+   "groundShells": "[Ne].3s2.3p4"
+  },
+  {
+   "Z": 16,
+   "charge": 1,
+   "groundShells": "[Ne].3s2.3p3"
+  },
+  {
+   "Z": 16,
+   "charge": 2,
+   "groundShells": "[Ne].3s2.3p2"
+  },
+  {
+   "Z": 16,
+   "charge": 3,
+   "groundShells": "[Ne].3s2.3p"
+  },
+  {
+   "Z": 17,
+   "charge": 0,
+   "groundShells": "[Ne].3s2.3p5"
+  },
+  {
+   "Z": 17,
+   "charge": 1,
+   "groundShells": "[Ne].3s2.3p4"
+  },
+  {
+   "Z": 17,
+   "charge": 2,
+   "groundShells": "[Ne].3s2.3p3"
+  },
+  {
+   "Z": 17,
+   "charge": 3,
+   "groundShells": "[Ne].3s2.3p2"
+  },
+  {
+   "Z": 18,
+   "charge": 0,
+   "groundShells": "[Ne].3s2.3p6"
+  },
+  {
+   "Z": 18,
+   "charge": 1,
+   "groundShells": "[Ne].3s2.3p5"
+  },
+  {
+   "Z": 18,
+   "charge": 2,
+   "groundShells": "[Ne].3s2.3p4"
+  },
+  {
+   "Z": 18,
+   "charge": 3,
+   "groundShells": "[Ne].3s2.3p3"
+  },
+  {
+   "Z": 19,
+   "charge": 0,
+   "groundShells": "[Ar].4s"
+  },
+  {
+   "Z": 19,
+   "charge": 1,
+   "groundShells": "[Ne].3s2.3p6"
+  },
+  {
+   "Z": 19,
+   "charge": 2,
+   "groundShells": "[Ne].3s2.3p5"
+  },
+  {
+   "Z": 19,
+   "charge": 3,
+   "groundShells": "[Ne].3s2.3p4"
+  },
+  {
+   "Z": 20,
+   "charge": 0,
+   "groundShells": "[Ar].4s2"
+  },
+  {
+   "Z": 20,
+   "charge": 1,
+   "groundShells": "[Ar].4s"
+  },
+  {
+   "Z": 20,
+   "charge": 2,
+   "groundShells": "[Ne].3s2.3p6"
+  },
+  {
+   "Z": 20,
+   "charge": 3,
+   "groundShells": "[Ne].3s2.3p5"
+  },
+  {
+   "Z": 21,
+   "charge": 0,
+   "groundShells": "[Ar].3d.4s2"
+  },
+  {
+   "Z": 21,
+   "charge": 1,
+   "groundShells": "[Ar].3d.4s"
+  },
+  {
+   "Z": 21,
+   "charge": 2,
+   "groundShells": "[Ar].3d"
+  },
+  {
+   "Z": 21,
+   "charge": 3,
+   "groundShells": "[Ne].3s2.3p6"
+  },
+  {
+   "Z": 22,
+   "charge": 0,
+   "groundShells": "[Ar].3d2.4s2"
+  },
+  {
+   "Z": 22,
+   "charge": 1,
+   "groundShells": "[Ar].3d2.4s"
+  },
+  {
+   "Z": 22,
+   "charge": 2,
+   "groundShells": "[Ar].3d2"
+  },
+  {
+   "Z": 22,
+   "charge": 3,
+   "groundShells": "[Ar].3d"
+  },
+  {
+   "Z": 23,
+   "charge": 0,
+   "groundShells": "[Ar].3d3.4s2"
+  },
+  {
+   "Z": 23,
+   "charge": 1,
+   "groundShells": "[Ar].3d4"
+  },
+  {
+   "Z": 23,
+   "charge": 2,
+   "groundShells": "[Ar].3d3"
+  },
+  {
+   "Z": 23,
+   "charge": 3,
+   "groundShells": "[Ar].3d2"
+  },
+  {
+   "Z": 24,
+   "charge": 0,
+   "groundShells": "[Ar].3d5.4s"
+  },
+  {
+   "Z": 24,
+   "charge": 1,
+   "groundShells": "[Ar].3d5"
+  },
+  {
+   "Z": 24,
+   "charge": 2,
+   "groundShells": "[Ar].3d4"
+  },
+  {
+   "Z": 24,
+   "charge": 3,
+   "groundShells": "[Ar].3d3"
+  },
+  {
+   "Z": 25,
+   "charge": 0,
+   "groundShells": "[Ar].3d5.4s2"
+  },
+  {
+   "Z": 25,
+   "charge": 1,
+   "groundShells": "[Ar].3d5.4s"
+  },
+  {
+   "Z": 25,
+   "charge": 2,
+   "groundShells": "[Ar].3d5"
+  },
+  {
+   "Z": 25,
+   "charge": 3,
+   "groundShells": "[Ar].3d4"
+  },
+  {
+   "Z": 26,
+   "charge": 0,
+   "groundShells": "[Ar].3d6.4s2"
+  },
+  {
+   "Z": 26,
+   "charge": 1,
+   "groundShells": "[Ar].3d6.4s"
+  },
+  {
+   "Z": 26,
+   "charge": 2,
+   "groundShells": "[Ar].3d6"
+  },
+  {
+   "Z": 26,
+   "charge": 3,
+   "groundShells": "[Ar].3d5"
+  },
+  {
+   "Z": 27,
+   "charge": 0,
+   "groundShells": "[Ar].3d7.4s2"
+  },
+  {
+   "Z": 27,
+   "charge": 1,
+   "groundShells": "[Ar].3d8"
+  },
+  {
+   "Z": 27,
+   "charge": 2,
+   "groundShells": "[Ar].3d7"
+  },
+  {
+   "Z": 27,
+   "charge": 3,
+   "groundShells": "[Ar].3d6"
+  },
+  {
+   "Z": 28,
+   "charge": 0,
+   "groundShells": "[Ar].3d8.4s2"
+  },
+  {
+   "Z": 28,
+   "charge": 1,
+   "groundShells": "[Ar].3d9"
+  },
+  {
+   "Z": 28,
+   "charge": 2,
+   "groundShells": "[Ar].3d8"
+  },
+  {
+   "Z": 28,
+   "charge": 3,
+   "groundShells": "[Ar].3d7"
+  },
+  {
+   "Z": 29,
+   "charge": 0,
+   "groundShells": "[Ar].3d10.4s"
+  },
+  {
+   "Z": 29,
+   "charge": 1,
+   "groundShells": "[Ar].3d10"
+  },
+  {
+   "Z": 29,
+   "charge": 2,
+   "groundShells": "[Ar].3d9"
+  },
+  {
+   "Z": 29,
+   "charge": 3,
+   "groundShells": "[Ar].3d8"
+  },
+  {
+   "Z": 30,
+   "charge": 0,
+   "groundShells": "[Ar].3d10.4s2"
+  },
+  {
+   "Z": 30,
+   "charge": 1,
+   "groundShells": "[Ar].3d10.4s"
+  },
+  {
+   "Z": 30,
+   "charge": 2,
+   "groundShells": "[Ar].3d10"
+  },
+  {
+   "Z": 30,
+   "charge": 3,
+   "groundShells": "[Ar].3d9"
+  },
+  {
+   "Z": 31,
+   "charge": 0,
+   "groundShells": "[Ar].3d10.4s2.4p"
+  },
+  {
+   "Z": 31,
+   "charge": 1,
+   "groundShells": "[Ar].3d10.4s2"
+  },
+  {
+   "Z": 31,
+   "charge": 2,
+   "groundShells": "[Ar].3d10.4s"
+  },
+  {
+   "Z": 31,
+   "charge": 3,
+   "groundShells": "[Ar].3d10"
+  },
+  {
+   "Z": 32,
+   "charge": 0,
+   "groundShells": "[Ar].3d10.4s2.4p2"
+  },
+  {
+   "Z": 32,
+   "charge": 1,
+   "groundShells": "[Ar].3d10.4s2.4p"
+  },
+  {
+   "Z": 32,
+   "charge": 2,
+   "groundShells": "[Ar].3d10.4s2"
+  },
+  {
+   "Z": 32,
+   "charge": 3,
+   "groundShells": "[Ar].3d10.4s"
+  },
+  {
+   "Z": 33,
+   "charge": 0,
+   "groundShells": "[Ar].3d10.4s2.4p3"
+  },
+  {
+   "Z": 33,
+   "charge": 1,
+   "groundShells": "[Ar].3d10.4s2.4p2"
+  },
+  {
+   "Z": 33,
+   "charge": 2,
+   "groundShells": "[Ar].3d10.4s2.4p"
+  },
+  {
+   "Z": 33,
+   "charge": 3,
+   "groundShells": "[Ar].3d10.4s2"
+  },
+  {
+   "Z": 34,
+   "charge": 0,
+   "groundShells": "[Ar].3d10.4s2.4p4"
+  },
+  {
+   "Z": 34,
+   "charge": 1,
+   "groundShells": "[Ar].3d10.4s2.4p3"
+  },
+  {
+   "Z": 34,
+   "charge": 2,
+   "groundShells": "[Ar].3d10.4s2.4p2"
+  },
+  {
+   "Z": 34,
+   "charge": 3,
+   "groundShells": "[Ar].3d10.4s2.4p"
+  },
+  {
+   "Z": 35,
+   "charge": 0,
+   "groundShells": "[Ar].3d10.4s2.4p5"
+  },
+  {
+   "Z": 35,
+   "charge": 1,
+   "groundShells": "[Ar].3d10.4s2.4p4"
+  },
+  {
+   "Z": 35,
+   "charge": 2,
+   "groundShells": "[Ar].3d10.4s2.4p3"
+  },
+  {
+   "Z": 35,
+   "charge": 3,
+   "groundShells": "[Ar].3d10.4s2.4p2"
+  },
+  {
+   "Z": 36,
+   "charge": 0,
+   "groundShells": "[Ar].3d10.4s2.4p6"
+  },
+  {
+   "Z": 36,
+   "charge": 1,
+   "groundShells": "[Ar].3d10.4s2.4p5"
+  },
+  {
+   "Z": 36,
+   "charge": 2,
+   "groundShells": "[Ar].3d10.4s2.4p4"
+  },
+  {
+   "Z": 36,
+   "charge": 3,
+   "groundShells": "[Ar].3d10.4s2.4p3"
+  },
+  {
+   "Z": 37,
+   "charge": 0,
+   "groundShells": "[Kr].5s"
+  },
+  {
+   "Z": 37,
+   "charge": 1,
+   "groundShells": "[Ar].3d10.4s2.4p6"
+  },
+  {
+   "Z": 37,
+   "charge": 2,
+   "groundShells": "[Ar].3d10.4s2.4p5"
+  },
+  {
+   "Z": 37,
+   "charge": 3,
+   "groundShells": "[Ar].3d10.4s2.4p4"
+  },
+  {
+   "Z": 38,
+   "charge": 0,
+   "groundShells": "[Kr].5s2"
+  },
+  {
+   "Z": 38,
+   "charge": 1,
+   "groundShells": "[Kr].5s"
+  },
+  {
+   "Z": 38,
+   "charge": 2,
+   "groundShells": "[Ar].3d10.4s2.4p6"
+  },
+  {
+   "Z": 38,
+   "charge": 3,
+   "groundShells": "[Ar].3d10.4s2.4p5"
+  },
+  {
+   "Z": 39,
+   "charge": 0,
+   "groundShells": "[Kr].4d.5s2"
+  },
+  {
+   "Z": 39,
+   "charge": 1,
+   "groundShells": "[Kr].5s2"
+  },
+  {
+   "Z": 39,
+   "charge": 2,
+   "groundShells": "[Kr].4d"
+  },
+  {
+   "Z": 39,
+   "charge": 3,
+   "groundShells": "[Ar].3d10.4s2.4p6"
+  },
+  {
+   "Z": 40,
+   "charge": 0,
+   "groundShells": "[Kr].4d2.5s2"
+  },
+  {
+   "Z": 40,
+   "charge": 1,
+   "groundShells": "[Kr].4d2.5s"
+  },
+  {
+   "Z": 40,
+   "charge": 2,
+   "groundShells": "[Kr].4d2"
+  },
+  {
+   "Z": 40,
+   "charge": 3,
+   "groundShells": "[Kr].4d"
+  },
+  {
+   "Z": 41,
+   "charge": 0,
+   "groundShells": "[Kr].4d4.5s"
+  },
+  {
+   "Z": 41,
+   "charge": 1,
+   "groundShells": "[Kr].4d4"
+  },
+  {
+   "Z": 41,
+   "charge": 2,
+   "groundShells": "[Kr].4d3"
+  },
+  {
+   "Z": 41,
+   "charge": 3,
+   "groundShells": "[Kr].4d2"
+  },
+  {
+   "Z": 42,
+   "charge": 0,
+   "groundShells": "[Kr].4d5.5s"
+  },
+  {
+   "Z": 42,
+   "charge": 1,
+   "groundShells": "[Kr].4d5"
+  },
+  {
+   "Z": 42,
+   "charge": 2,
+   "groundShells": "[Kr].4d4"
+  },
+  {
+   "Z": 42,
+   "charge": 3,
+   "groundShells": "[Kr].4d3"
+  },
+  {
+   "Z": 43,
+   "charge": 0,
+   "groundShells": "[Kr].4d5.5s2"
+  },
+  {
+   "Z": 43,
+   "charge": 1,
+   "groundShells": "[Kr].4d5.5s"
+  },
+  {
+   "Z": 43,
+   "charge": 2,
+   "groundShells": "[Kr].4d5"
+  },
+  {
+   "Z": 43,
+   "charge": 3,
+   "groundShells": "[Kr].4d4"
+  },
+  {
+   "Z": 44,
+   "charge": 0,
+   "groundShells": "[Kr].4d7.5s"
+  },
+  {
+   "Z": 44,
+   "charge": 1,
+   "groundShells": "[Kr].4d7"
+  },
+  {
+   "Z": 44,
+   "charge": 2,
+   "groundShells": "[Kr].4d6"
+  },
+  {
+   "Z": 44,
+   "charge": 3,
+   "groundShells": "[Kr].4d5"
+  },
+  {
+   "Z": 45,
+   "charge": 0,
+   "groundShells": "[Kr].4d8.5s"
+  },
+  {
+   "Z": 45,
+   "charge": 1,
+   "groundShells": "[Kr].4d8"
+  },
+  {
+   "Z": 45,
+   "charge": 2,
+   "groundShells": "[Kr].4d7"
+  },
+  {
+   "Z": 45,
+   "charge": 3,
+   "groundShells": "[Kr].4d6"
+  },
+  {
+   "Z": 46,
+   "charge": 0,
+   "groundShells": "[Kr].4d10"
+  },
+  {
+   "Z": 46,
+   "charge": 1,
+   "groundShells": "[Kr].4d9"
+  },
+  {
+   "Z": 46,
+   "charge": 2,
+   "groundShells": "[Kr].4d8"
+  },
+  {
+   "Z": 46,
+   "charge": 3,
+   "groundShells": "[Kr].4d7"
+  },
+  {
+   "Z": 47,
+   "charge": 0,
+   "groundShells": "[Kr].4d10.5s"
+  },
+  {
+   "Z": 47,
+   "charge": 1,
+   "groundShells": "[Kr].4d10"
+  },
+  {
+   "Z": 47,
+   "charge": 2,
+   "groundShells": "[Kr].4d9"
+  },
+  {
+   "Z": 47,
+   "charge": 3,
+   "groundShells": "[Kr].4d8"
+  },
+  {
+   "Z": 48,
+   "charge": 0,
+   "groundShells": "[Kr].4d10.5s2"
+  },
+  {
+   "Z": 48,
+   "charge": 1,
+   "groundShells": "[Kr].4d10.5s"
+  },
+  {
+   "Z": 48,
+   "charge": 2,
+   "groundShells": "[Kr].4d10"
+  },
+  {
+   "Z": 48,
+   "charge": 3,
+   "groundShells": "[Kr].4d9"
+  },
+  {
+   "Z": 49,
+   "charge": 0,
+   "groundShells": "[Cd].5p"
+  },
+  {
+   "Z": 49,
+   "charge": 1,
+   "groundShells": "[Kr].4d10.5s2"
+  },
+  {
+   "Z": 49,
+   "charge": 2,
+   "groundShells": "[Kr].4d10.5s"
+  },
+  {
+   "Z": 49,
+   "charge": 3,
+   "groundShells": "[Kr].4d10"
+  },
+  {
+   "Z": 50,
+   "charge": 0,
+   "groundShells": "[Cd].5p2"
+  },
+  {
+   "Z": 50,
+   "charge": 1,
+   "groundShells": "[Cd].5p"
+  },
+  {
+   "Z": 50,
+   "charge": 2,
+   "groundShells": "[Kr].4d10.5s2"
+  },
+  {
+   "Z": 50,
+   "charge": 3,
+   "groundShells": "[Kr].4d10.5s"
+  },
+  {
+   "Z": 51,
+   "charge": 0,
+   "groundShells": "[Cd].5p3"
+  },
+  {
+   "Z": 51,
+   "charge": 1,
+   "groundShells": "[Cd].5p2"
+  },
+  {
+   "Z": 51,
+   "charge": 2,
+   "groundShells": "[Cd].5p"
+  },
+  {
+   "Z": 51,
+   "charge": 3,
+   "groundShells": "[Kr].4d10.5s2"
+  },
+  {
+   "Z": 52,
+   "charge": 0,
+   "groundShells": "[Cd].5p4"
+  },
+  {
+   "Z": 52,
+   "charge": 1,
+   "groundShells": "[Cd].5p3"
+  },
+  {
+   "Z": 52,
+   "charge": 2,
+   "groundShells": "[Cd].5p2"
+  },
+  {
+   "Z": 52,
+   "charge": 3,
+   "groundShells": "[Cd].5p"
+  },
+  {
+   "Z": 53,
+   "charge": 0,
+   "groundShells": "[Cd].5p5"
+  },
+  {
+   "Z": 53,
+   "charge": 1,
+   "groundShells": "[Cd].5p4"
+  },
+  {
+   "Z": 53,
+   "charge": 2,
+   "groundShells": "[Cd].5p3"
+  },
+  {
+   "Z": 53,
+   "charge": 3,
+   "groundShells": "[Cd].5p2"
+  },
+  {
+   "Z": 54,
+   "charge": 0,
+   "groundShells": "[Cd].5p6"
+  },
+  {
+   "Z": 54,
+   "charge": 1,
+   "groundShells": "[Cd].5p5"
+  },
+  {
+   "Z": 54,
+   "charge": 2,
+   "groundShells": "[Cd].5p4"
+  },
+  {
+   "Z": 54,
+   "charge": 3,
+   "groundShells": "[Cd].5p3"
+  },
+  {
+   "Z": 55,
+   "charge": 0,
+   "groundShells": "[Xe].6s"
+  },
+  {
+   "Z": 55,
+   "charge": 1,
+   "groundShells": "[Cd].5p6"
+  },
+  {
+   "Z": 55,
+   "charge": 2,
+   "groundShells": "[Cd].5p5"
+  },
+  {
+   "Z": 55,
+   "charge": 3,
+   "groundShells": "[Cd].5p4"
+  },
+  {
+   "Z": 56,
+   "charge": 0,
+   "groundShells": "[Xe].6s2"
+  },
+  {
+   "Z": 56,
+   "charge": 1,
+   "groundShells": "[Xe].6s"
+  },
+  {
+   "Z": 56,
+   "charge": 2,
+   "groundShells": "[Cd].5p6"
+  },
+  {
+   "Z": 56,
+   "charge": 3,
+   "groundShells": "[Cd].5p5"
+  },
+  {
+   "Z": 57,
+   "charge": 0,
+   "groundShells": "[Xe].5d.6s2"
+  },
+  {
+   "Z": 57,
+   "charge": 1,
+   "groundShells": "[Xe].5d2"
+  },
+  {
+   "Z": 57,
+   "charge": 2,
+   "groundShells": "[Xe].5d"
+  },
+  {
+   "Z": 57,
+   "charge": 3,
+   "groundShells": "[Cd].5p6"
+  },
+  {
+   "Z": 58,
+   "charge": 0,
+   "groundShells": "[Xe].4f.5d.6s2"
+  },
+  {
+   "Z": 58,
+   "charge": 1,
+   "groundShells": "[Xe].4f.5d2"
+  },
+  {
+   "Z": 58,
+   "charge": 2,
+   "groundShells": "[Xe].4f2"
+  },
+  {
+   "Z": 58,
+   "charge": 3,
+   "groundShells": "[Xe].4f"
+  },
+  {
+   "Z": 59,
+   "charge": 0,
+   "groundShells": "[Xe].4f3.6s2"
+  },
+  {
+   "Z": 59,
+   "charge": 1,
+   "groundShells": "[Xe].4f3.6s"
+  },
+  {
+   "Z": 59,
+   "charge": 2,
+   "groundShells": "[Xe].4f3"
+  },
+  {
+   "Z": 59,
+   "charge": 3,
+   "groundShells": "[Xe].4f2"
+  },
+  {
+   "Z": 60,
+   "charge": 0,
+   "groundShells": "[Xe].4f4.6s2"
+  },
+  {
+   "Z": 60,
+   "charge": 1,
+   "groundShells": "[Xe].4f4.6s"
+  },
+  {
+   "Z": 60,
+   "charge": 2,
+   "groundShells": "[Xe].4f4"
+  },
+  {
+   "Z": 60,
+   "charge": 3,
+   "groundShells": "[Xe].4f3"
+  },
+  {
+   "Z": 61,
+   "charge": 0,
+   "groundShells": "[Xe].4f5.6s2"
+  },
+  {
+   "Z": 61,
+   "charge": 1,
+   "groundShells": "[Xe].4f5.6s"
+  },
+  {
+   "Z": 61,
+   "charge": 2,
+   "groundShells": "[Xe].4f5"
+  },
+  {
+   "Z": 61,
+   "charge": 3,
+   "groundShells": "[Xe].4f4"
+  },
+  {
+   "Z": 62,
+   "charge": 0,
+   "groundShells": "[Xe].4f6.6s2"
+  },
+  {
+   "Z": 62,
+   "charge": 1,
+   "groundShells": "[Xe].4f6.6s"
+  },
+  {
+   "Z": 62,
+   "charge": 2,
+   "groundShells": "[Xe].4f6"
+  },
+  {
+   "Z": 62,
+   "charge": 3,
+   "groundShells": "[Xe].4f5"
+  },
+  {
+   "Z": 63,
+   "charge": 0,
+   "groundShells": "[Xe].4f7.6s2"
+  },
+  {
+   "Z": 63,
+   "charge": 1,
+   "groundShells": "[Xe].4f7.6s"
+  },
+  {
+   "Z": 63,
+   "charge": 2,
+   "groundShells": "[Xe].4f7"
+  },
+  {
+   "Z": 63,
+   "charge": 3,
+   "groundShells": "[Xe].4f6"
+  },
+  {
+   "Z": 64,
+   "charge": 0,
+   "groundShells": "[Xe].4f7.5d.6s2"
+  },
+  {
+   "Z": 64,
+   "charge": 1,
+   "groundShells": "[Xe].4f7.5d.6s"
+  },
+  {
+   "Z": 64,
+   "charge": 2,
+   "groundShells": "[Xe].4f7.5d"
+  },
+  {
+   "Z": 64,
+   "charge": 3,
+   "groundShells": "[Xe].4f7"
+  },
+  {
+   "Z": 65,
+   "charge": 0,
+   "groundShells": "[Xe].4f9.6s2"
+  },
+  {
+   "Z": 65,
+   "charge": 1,
+   "groundShells": "[Xe].4f9.6s"
+  },
+  {
+   "Z": 65,
+   "charge": 2,
+   "groundShells": "[Xe].4f9"
+  },
+  {
+   "Z": 65,
+   "charge": 3,
+   "groundShells": "[Xe].4f8"
+  },
+  {
+   "Z": 66,
+   "charge": 0,
+   "groundShells": "[Xe].4f10.6s2"
+  },
+  {
+   "Z": 66,
+   "charge": 1,
+   "groundShells": "[Xe].4f10.6s"
+  },
+  {
+   "Z": 66,
+   "charge": 2,
+   "groundShells": "[Xe].4f10"
+  },
+  {
+   "Z": 66,
+   "charge": 3,
+   "groundShells": "[Xe].4f9"
+  },
+  {
+   "Z": 67,
+   "charge": 0,
+   "groundShells": "[Xe].4f11.6s2"
+  },
+  {
+   "Z": 67,
+   "charge": 1,
+   "groundShells": "[Xe].4f11.6s"
+  },
+  {
+   "Z": 67,
+   "charge": 2,
+   "groundShells": "[Xe].4f11"
+  },
+  {
+   "Z": 67,
+   "charge": 3,
+   "groundShells": "[Xe].4f10"
+  },
+  {
+   "Z": 68,
+   "charge": 0,
+   "groundShells": "[Xe].4f12.6s2"
+  },
+  {
+   "Z": 68,
+   "charge": 1,
+   "groundShells": "[Xe].4f12.6s"
+  },
+  {
+   "Z": 68,
+   "charge": 2,
+   "groundShells": "[Xe].4f12"
+  },
+  {
+   "Z": 68,
+   "charge": 3,
+   "groundShells": "[Xe].4f11"
+  },
+  {
+   "Z": 69,
+   "charge": 0,
+   "groundShells": "[Xe].4f13.6s2"
+  },
+  {
+   "Z": 69,
+   "charge": 1,
+   "groundShells": "[Xe].4f13.6s"
+  },
+  {
+   "Z": 69,
+   "charge": 2,
+   "groundShells": "[Xe].4f13"
+  },
+  {
+   "Z": 69,
+   "charge": 3,
+   "groundShells": "[Xe].4f12"
+  },
+  {
+   "Z": 70,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.6s2"
+  },
+  {
+   "Z": 70,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.6s"
+  },
+  {
+   "Z": 70,
+   "charge": 2,
+   "groundShells": "[Xe].4f14"
+  },
+  {
+   "Z": 70,
+   "charge": 3,
+   "groundShells": "[Xe].4f13"
+  },
+  {
+   "Z": 71,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d.6s2"
+  },
+  {
+   "Z": 71,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.6s2"
+  },
+  {
+   "Z": 71,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.6s"
+  },
+  {
+   "Z": 71,
+   "charge": 3,
+   "groundShells": "[Xe].4f14"
+  },
+  {
+   "Z": 72,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d2.6s2"
+  },
+  {
+   "Z": 72,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d.6s2"
+  },
+  {
+   "Z": 72,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d2"
+  },
+  {
+   "Z": 72,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d"
+  },
+  {
+   "Z": 73,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d3.6s2"
+  },
+  {
+   "Z": 73,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d3.6s"
+  },
+  {
+   "Z": 73,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d3"
+  },
+  {
+   "Z": 73,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d2"
+  },
+  {
+   "Z": 74,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d4.6s2"
+  },
+  {
+   "Z": 74,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d4.6s"
+  },
+  {
+   "Z": 74,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d4"
+  },
+  {
+   "Z": 74,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d3"
+  },
+  {
+   "Z": 75,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d5.6s2"
+  },
+  {
+   "Z": 75,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d5.6s"
+  },
+  {
+   "Z": 75,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d5"
+  },
+  {
+   "Z": 75,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d4"
+  },
+  {
+   "Z": 76,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d6.6s2"
+  },
+  {
+   "Z": 76,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d6.6s"
+  },
+  {
+   "Z": 76,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d6"
+  },
+  {
+   "Z": 76,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d5"
+  },
+  {
+   "Z": 77,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d7.6s2"
+  },
+  {
+   "Z": 77,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d7.6s"
+  },
+  {
+   "Z": 77,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d7"
+  },
+  {
+   "Z": 77,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d6"
+  },
+  {
+   "Z": 78,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d9.6s"
+  },
+  {
+   "Z": 78,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d9"
+  },
+  {
+   "Z": 78,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d8"
+  },
+  {
+   "Z": 78,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d7"
+  },
+  {
+   "Z": 79,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d10.6s"
+  },
+  {
+   "Z": 79,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d10"
+  },
+  {
+   "Z": 79,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d9"
+  },
+  {
+   "Z": 79,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d8"
+  },
+  {
+   "Z": 80,
+   "charge": 0,
+   "groundShells": "[Xe].4f14.5d10.6s2"
+  },
+  {
+   "Z": 80,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d10.6s"
+  },
+  {
+   "Z": 80,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d10"
+  },
+  {
+   "Z": 80,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d9"
+  },
+  {
+   "Z": 81,
+   "charge": 0,
+   "groundShells": "[Hg].6p"
+  },
+  {
+   "Z": 81,
+   "charge": 1,
+   "groundShells": "[Xe].4f14.5d10.6s2"
+  },
+  {
+   "Z": 81,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d10.6s"
+  },
+  {
+   "Z": 81,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d10"
+  },
+  {
+   "Z": 82,
+   "charge": 0,
+   "groundShells": "[Hg].6p2"
+  },
+  {
+   "Z": 82,
+   "charge": 1,
+   "groundShells": "[Hg].6p"
+  },
+  {
+   "Z": 82,
+   "charge": 2,
+   "groundShells": "[Xe].4f14.5d10.6s2"
+  },
+  {
+   "Z": 82,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d10.6s"
+  },
+  {
+   "Z": 83,
+   "charge": 0,
+   "groundShells": "[Hg].6p3"
+  },
+  {
+   "Z": 83,
+   "charge": 1,
+   "groundShells": "[Hg].6p2"
+  },
+  {
+   "Z": 83,
+   "charge": 2,
+   "groundShells": "[Hg].6p"
+  },
+  {
+   "Z": 83,
+   "charge": 3,
+   "groundShells": "[Xe].4f14.5d10.6s2"
+  },
+  {
+   "Z": 84,
+   "charge": 0,
+   "groundShells": "[Hg].6p4"
+  },
+  {
+   "Z": 84,
+   "charge": 1,
+   "groundShells": "[Hg].6p3"
+  },
+  {
+   "Z": 84,
+   "charge": 2,
+   "groundShells": "[Hg].6p2"
+  },
+  {
+   "Z": 84,
+   "charge": 3,
+   "groundShells": "[Hg].6p"
+  },
+  {
+   "Z": 85,
+   "charge": 0,
+   "groundShells": "[Hg].6p5"
+  },
+  {
+   "Z": 85,
+   "charge": 1,
+   "groundShells": "[Hg].6p4"
+  },
+  {
+   "Z": 85,
+   "charge": 2,
+   "groundShells": "[Hg].6p3"
+  },
+  {
+   "Z": 85,
+   "charge": 3,
+   "groundShells": "[Hg].6p2"
+  },
+  {
+   "Z": 86,
+   "charge": 0,
+   "groundShells": "[Hg].6p6"
+  },
+  {
+   "Z": 86,
+   "charge": 1,
+   "groundShells": "[Hg].6p5"
+  },
+  {
+   "Z": 86,
+   "charge": 2,
+   "groundShells": "[Hg].6p4"
+  },
+  {
+   "Z": 86,
+   "charge": 3,
+   "groundShells": "[Hg].6p3"
+  },
+  {
+   "Z": 87,
+   "charge": 0,
+   "groundShells": "[Rn].7s"
+  },
+  {
+   "Z": 87,
+   "charge": 1,
+   "groundShells": "[Hg].6p6"
+  },
+  {
+   "Z": 87,
+   "charge": 2,
+   "groundShells": "[Hg].6p5"
+  },
+  {
+   "Z": 87,
+   "charge": 3,
+   "groundShells": "[Hg].6p4"
+  },
+  {
+   "Z": 88,
+   "charge": 0,
+   "groundShells": "[Rn].7s2"
+  },
+  {
+   "Z": 88,
+   "charge": 1,
+   "groundShells": "[Rn].7s"
+  },
+  {
+   "Z": 88,
+   "charge": 2,
+   "groundShells": "[Hg].6p6"
+  },
+  {
+   "Z": 88,
+   "charge": 3,
+   "groundShells": "[Hg].6p5"
+  },
+  {
+   "Z": 89,
+   "charge": 0,
+   "groundShells": "[Rn].6d.7s2"
+  },
+  {
+   "Z": 89,
+   "charge": 1,
+   "groundShells": "[Rn].7s2"
+  },
+  {
+   "Z": 89,
+   "charge": 2,
+   "groundShells": "[Rn].7s"
+  },
+  {
+   "Z": 89,
+   "charge": 3,
+   "groundShells": "[Hg].6p6"
+  },
+  {
+   "Z": 90,
+   "charge": 0,
+   "groundShells": "[Rn].6d2.7s2"
+  },
+  {
+   "Z": 90,
+   "charge": 1,
+   "groundShells": "[Rn].6d.7s2"
+  },
+  {
+   "Z": 90,
+   "charge": 2,
+   "groundShells": "[Rn].5f.6d"
+  },
+  {
+   "Z": 90,
+   "charge": 3,
+   "groundShells": "[Rn].5f"
+  },
+  {
+   "Z": 91,
+   "charge": 0,
+   "groundShells": "[Rn].5f2.6d.7s2"
+  },
+  {
+   "Z": 91,
+   "charge": 1,
+   "groundShells": "[Rn].5f2.7s2"
+  },
+  {
+   "Z": 91,
+   "charge": 2,
+   "groundShells": "[Rn].5f2.6d"
+  },
+  {
+   "Z": 91,
+   "charge": 3,
+   "groundShells": "[Rn].5f2"
+  },
+  {
+   "Z": 92,
+   "charge": 0,
+   "groundShells": "[Rn].5f3.6d.7s2"
+  },
+  {
+   "Z": 92,
+   "charge": 1,
+   "groundShells": "[Rn].5f3.7s2"
+  },
+  {
+   "Z": 92,
+   "charge": 2,
+   "groundShells": "[Rn].5f4"
+  },
+  {
+   "Z": 92,
+   "charge": 3,
+   "groundShells": "[Rn].5f3"
+  },
+  {
+   "Z": 93,
+   "charge": 0,
+   "groundShells": "[Rn].5f4.6d.7s2"
+  },
+  {
+   "Z": 93,
+   "charge": 1,
+   "groundShells": "[Rn].5f4.6d.7s"
+  },
+  {
+   "Z": 93,
+   "charge": 2,
+   "groundShells": "[Rn].5f5"
+  },
+  {
+   "Z": 93,
+   "charge": 3,
+   "groundShells": "[Rn].5f4"
+  },
+  {
+   "Z": 94,
+   "charge": 0,
+   "groundShells": "[Rn].5f6.7s2"
+  },
+  {
+   "Z": 94,
+   "charge": 1,
+   "groundShells": "[Rn].5f6.7s"
+  },
+  {
+   "Z": 94,
+   "charge": 2,
+   "groundShells": "[Rn].5f6"
+  },
+  {
+   "Z": 94,
+   "charge": 3,
+   "groundShells": "[Rn].5f5"
+  },
+  {
+   "Z": 95,
+   "charge": 0,
+   "groundShells": "[Rn].5f7.7s2"
+  },
+  {
+   "Z": 95,
+   "charge": 1,
+   "groundShells": "[Rn].5f7.7s"
+  },
+  {
+   "Z": 95,
+   "charge": 2,
+   "groundShells": "[Rn].5f7"
+  },
+  {
+   "Z": 95,
+   "charge": 3,
+   "groundShells": "[Rn].5f6"
+  },
+  {
+   "Z": 96,
+   "charge": 0,
+   "groundShells": "[Rn].5f7.6d.7s2"
+  },
+  {
+   "Z": 96,
+   "charge": 1,
+   "groundShells": "[Rn].5f7.7s2"
+  },
+  {
+   "Z": 96,
+   "charge": 2,
+   "groundShells": "[Rn].5f8"
+  },
+  {
+   "Z": 96,
+   "charge": 3,
+   "groundShells": "[Rn].5f7"
+  },
+  {
+   "Z": 97,
+   "charge": 0,
+   "groundShells": "[Rn].5f9.7s2"
+  },
+  {
+   "Z": 97,
+   "charge": 1,
+   "groundShells": "[Rn].5f9.7s"
+  },
+  {
+   "Z": 97,
+   "charge": 2,
+   "groundShells": "[Rn].5f9"
+  },
+  {
+   "Z": 97,
+   "charge": 3,
+   "groundShells": "[Rn].5f8"
+  },
+  {
+   "Z": 98,
+   "charge": 0,
+   "groundShells": "[Rn].5f10.7s2"
+  },
+  {
+   "Z": 98,
+   "charge": 1,
+   "groundShells": "[Rn].5f10.7s"
+  },
+  {
+   "Z": 98,
+   "charge": 2,
+   "groundShells": "[Rn].5f10"
+  },
+  {
+   "Z": 98,
+   "charge": 3,
+   "groundShells": "[Rn].5f9"
+  },
+  {
+   "Z": 99,
+   "charge": 0,
+   "groundShells": "[Rn].5f11.7s2"
+  },
+  {
+   "Z": 99,
+   "charge": 1,
+   "groundShells": "[Rn].5f11.7s"
+  },
+  {
+   "Z": 99,
+   "charge": 2,
+   "groundShells": "[Rn].5f11"
+  },
+  {
+   "Z": 99,
+   "charge": 3,
+   "groundShells": "[Rn].5f10"
+  },
+  {
+   "Z": 100,
+   "charge": 0,
+   "groundShells": "[Rn].5f12.7s2"
+  },
+  {
+   "Z": 100,
+   "charge": 1,
+   "groundShells": "[Rn].5f12.7s"
+  },
+  {
+   "Z": 100,
+   "charge": 2,
+   "groundShells": "[Rn].5f12"
+  },
+  {
+   "Z": 100,
+   "charge": 3,
+   "groundShells": "[Rn].5f11"
+  },
+  {
+   "Z": 101,
+   "charge": 0,
+   "groundShells": "[Rn].5f13.7s2"
+  },
+  {
+   "Z": 101,
+   "charge": 1,
+   "groundShells": "[Rn].5f13.7s"
+  },
+  {
+   "Z": 101,
+   "charge": 2,
+   "groundShells": "[Rn].5f13"
+  },
+  {
+   "Z": 101,
+   "charge": 3,
+   "groundShells": "[Rn].5f12"
+  },
+  {
+   "Z": 102,
+   "charge": 0,
+   "groundShells": "[Rn].5f14.7s2"
+  },
+  {
+   "Z": 102,
+   "charge": 1,
+   "groundShells": "[Rn].5f14.7s"
+  },
+  {
+   "Z": 102,
+   "charge": 2,
+   "groundShells": "[Rn].5f14"
+  },
+  {
+   "Z": 102,
+   "charge": 3,
+   "groundShells": "[Rn].5f13"
+  },
+  {
+   "Z": 103,
+   "charge": 0,
+   "groundShells": "[Rn].5f14.7s2.7p"
+  },
+  {
+   "Z": 103,
+   "charge": 1,
+   "groundShells": "[Rn].5f14.7s2"
+  },
+  {
+   "Z": 103,
+   "charge": 2,
+   "groundShells": "[Rn].5f14.7s"
+  },
+  {
+   "Z": 103,
+   "charge": 3,
+   "groundShells": "[Rn].5f14"
+  },
+  {
+   "Z": 104,
+   "charge": 0,
+   "groundShells": "[Rn].5f14.6d2.7s2"
+  },
+  {
+   "Z": 104,
+   "charge": 1,
+   "groundShells": "[Rn].5f14.6d.7s2"
+  },
+  {
+   "Z": 104,
+   "charge": 2,
+   "groundShells": "[Rn].5f14.7s2"
+  },
+  {
+   "Z": 104,
+   "charge": 3,
+   "groundShells": "[Rn].5f14.7s"
+  },
+  {
+   "Z": 105,
+   "charge": 0,
+   "groundShells": "[Rn].5f14.6d3.7s2"
+  },
+  {
+   "Z": 105,
+   "charge": 1,
+   "groundShells": "[Rn].5f14.6d2.7s2"
+  },
+  {
+   "Z": 105,
+   "charge": 2,
+   "groundShells": "[Rn].5f14.6d2.7s"
+  },
+  {
+   "Z": 105,
+   "charge": 3,
+   "groundShells": "[Rn].5f14.6d2"
+  },
+  {
+   "Z": 106,
+   "charge": 0,
+   "groundShells": "[Rn].5f14.6d4.7s2"
+  },
+  {
+   "Z": 106,
+   "charge": 1,
+   "groundShells": "[Rn].5f14.6d3.7s2"
+  },
+  {
+   "Z": 106,
+   "charge": 2,
+   "groundShells": "[Rn].5f14.6d3.7s"
+  },
+  {
+   "Z": 106,
+   "charge": 3,
+   "groundShells": "[Rn].5f14.6d3"
+  },
+  {
+   "Z": 107,
+   "charge": 0,
+   "groundShells": "[Rn].5f14.6d5.7s2"
+  },
+  {
+   "Z": 107,
+   "charge": 1,
+   "groundShells": "[Rn].5f14.6d4.7s2"
+  },
+  {
+   "Z": 107,
+   "charge": 2,
+   "groundShells": "[Rn].5f14.6d4.7s"
+  },
+  {
+   "Z": 107,
+   "charge": 3,
+   "groundShells": "[Rn].5f14.6d4"
+  },
+  {
+   "Z": 108,
+   "charge": 0,
+   "groundShells": "[Rn].5f14.6d6.7s2"
+  },
+  {
+   "Z": 108,
+   "charge": 1,
+   "groundShells": "[Rn].5f14.6d5.7s2"
+  },
+  {
+   "Z": 108,
+   "charge": 2,
+   "groundShells": "[Rn].5f14.6d5.7s"
+  },
+  {
+   "Z": 108,
+   "charge": 3,
+   "groundShells": "[Rn].5f14.6d4.7s"
+  }
+ ]
+}

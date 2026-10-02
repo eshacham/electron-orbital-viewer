@@ -138,6 +138,19 @@ function buildConfigurations(): SubshellOccupancy[][] {
 const CONFIGURATIONS: SubshellOccupancy[][] = buildConfigurations();
 
 /**
+ * Parses one configuration in this file's own notation -- '[Ar] 3d6',
+ * '1s2 2s1', '[Xe]' -- into occupancies sorted by (n, l). The ion table
+ * (ion_configurations.ts) is written in the same notation as
+ * RAW_CONFIGURATIONS, so it resolves cores against the same neutral table.
+ */
+export function parseConfiguration(spec: string): SubshellOccupancy[] {
+    const coreMatch = /^\[(\w+)\]\s*(.*)$/.exec(spec.trim());
+    const core = coreMatch ? resolveCore(coreMatch[1], CONFIGURATIONS).map(s => ({ ...s })) : [];
+    const own = parseOwnSubshells(coreMatch ? coreMatch[2] : spec);
+    return [...core, ...own].sort((a, b) => (a.n - b.n) || (a.l - b.l));
+}
+
+/**
  * The ground-state subshell occupancies for neutral atom Z, ordered by (n, l).
  *
  * Returns a fresh array each call: CONFIGURATIONS is parsed once and reused
