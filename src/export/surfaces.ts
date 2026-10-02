@@ -108,3 +108,20 @@ export function surfaceBounds(surfaces: ExportSurface[]): SurfaceBounds {
     }
     return { min, max, longestSide: Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]) };
 }
+
+/**
+ * Why these surfaces cannot be scaled to a physical size, or null. Both
+ * geometry exports divide a target size by the longest side, so a
+ * non-finite vertex or a surface collapsed to one point would write NaN or
+ * Infinity into the file's scale. `verb` and `target` fit the wording to the
+ * format ("printed", "a print").
+ */
+export function surfaceScaleProblem(surfaces: ExportSurface[], verb: string, target: string): string | null {
+    for (const { name, positions } of surfaces) {
+        if (!positions.every(Number.isFinite)) return `${name} has coordinates that are not finite numbers, so it cannot be ${verb}.`;
+    }
+    if (!(surfaceBounds(surfaces).longestSide > 0)) {
+        return `The surface has no size: every vertex is at one point, so there is nothing to scale to ${target}.`;
+    }
+    return null;
+}

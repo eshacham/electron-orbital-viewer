@@ -1,4 +1,4 @@
-import { ExportSurface, NOTHING_TO_EXPORT_REASON, surfaceBounds } from './surfaces';
+import { ExportSurface, NOTHING_TO_EXPORT_REASON, surfaceBounds, surfaceScaleProblem } from './surfaces';
 import { analyseMesh, isWatertight, TopologyReport } from './mesh_topology';
 
 export class StlExportError extends Error {}
@@ -26,15 +26,9 @@ function topologyProblem(report: TopologyReport): string {
 export function encodeStl(surfaces: ExportSurface[], longestSideMm: number): ArrayBuffer {
     if (surfaces.length === 0) throw new StlExportError(NOTHING_TO_EXPORT_REASON);
     if (!(longestSideMm > 0) || !Number.isFinite(longestSideMm)) throw new StlExportError('Pick a print size.');
-    for (const { name, positions } of surfaces) {
-        if (!positions.every(Number.isFinite)) {
-            throw new StlExportError(`${name} has coordinates that are not finite numbers, so it cannot be printed.`);
-        }
-    }
+    const problem = surfaceScaleProblem(surfaces, 'printed', 'a print');
+    if (problem) throw new StlExportError(problem);
     const { longestSide } = surfaceBounds(surfaces);
-    if (!(longestSide > 0)) {
-        throw new StlExportError('The surface has no size: every vertex is at one point, so there is nothing to scale to a print.');
-    }
     const mmPerBohr = longestSideMm / longestSide;
 
     // Checked and written from the same welded mesh (analyseMesh), so the

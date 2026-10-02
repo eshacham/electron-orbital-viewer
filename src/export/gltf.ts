@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ExportSurface, NOTHING_TO_EXPORT_REASON, surfaceBounds } from './surfaces';
+import { ExportSurface, NOTHING_TO_EXPORT_REASON, surfaceBounds, surfaceScaleProblem } from './surfaces';
 import { exportGlb } from './gltf_exporter_factory';
 
 /** Tabletop size for AR, and irrelevant to slides, which rescale anyway. */
@@ -12,6 +12,12 @@ export const GLTF_LONGEST_SIDE_METRES = 0.2;
  * extras record by how much.
  */
 export function buildGltfScene(surfaces: ExportSurface[], description: string): THREE.Scene {
+    // STL's guards (shared wording): the root's scale and its metresPerBohr
+    // extra are 0.2 m over the longest side, so a NaN vertex or a surface
+    // with no size would write NaN or Infinity into the file.
+    if (surfaces.length === 0) throw new Error(NOTHING_TO_EXPORT_REASON);
+    const problem = surfaceScaleProblem(surfaces, 'made into a model', 'a model');
+    if (problem) throw new Error(problem);
     const scene = new THREE.Scene();
     const metresPerBohr = GLTF_LONGEST_SIDE_METRES / surfaceBounds(surfaces).longestSide;
     const root = new THREE.Group();
@@ -36,9 +42,9 @@ export function buildGltfScene(surfaces: ExportSurface[], description: string): 
 /**
  * Binary glTF of the surfaces, scaled to a 20 cm model with metresPerBohr in
  * the root node's extras (ruling: spec's AR/slides design decision). Refuses
- * with the same wording STL uses (ruling R1) when the viewer holds nothing.
+ * with the same wording STL uses (ruling R1) when the viewer holds nothing,
+ * or nothing that can be scaled (see buildGltfScene).
  */
 export async function encodeGlb(surfaces: ExportSurface[], description: string): Promise<ArrayBuffer> {
-    if (surfaces.length === 0) throw new Error(NOTHING_TO_EXPORT_REASON);
     return exportGlb(buildGltfScene(surfaces, description));
 }

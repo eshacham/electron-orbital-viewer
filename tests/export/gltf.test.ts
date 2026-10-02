@@ -25,4 +25,16 @@ describe('glTF export', () => {
         expect(exportGlb).toHaveBeenCalledTimes(1);
         await expect(encodeGlb([], 'x')).rejects.toThrow(/Nothing to export yet/);
     });
+
+    // Final review M7: the scale is 0.2 m over the longest side, so a
+    // non-finite vertex or a zero-size surface would write NaN or Infinity
+    // into the root's scale and extras -- refused with STL's reasons instead.
+    it('refuses a surface with coordinates that are not numbers, or with no size', async () => {
+        const broken = octahedron('nan');
+        broken.positions[4] = NaN;
+        expect(() => buildGltfScene([broken], 'x')).toThrow('nan has coordinates that are not finite numbers, so it cannot be made into a model.');
+        const point = { ...octahedron('point'), positions: new Float32Array(18) };
+        expect(() => buildGltfScene([point], 'x')).toThrow('The surface has no size: every vertex is at one point, so there is nothing to scale to a model.');
+        await expect(encodeGlb([point], 'x')).rejects.toThrow(/no size/);
+    });
 });
