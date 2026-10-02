@@ -53,6 +53,19 @@ describe('exportAvailability: a failed orbital render in atom mode', () => {
         store.dispatch(drillToShell(2));
         expect(exportAvailability(store.getState()).png).toBeNull();
     });
+
+    // Final review M6: the plot at the orbital level is the subshell's D(r)
+    // from the solved profile, which a failed 3D render does not touch.
+    it('still offers CSV at the orbital level, whose curves come from the solved profile', async () => {
+        const store = neonStore();
+        store.dispatch(drillToOrbital(2, 1, 0));
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(2, 1, 0, 0.9)));
+        store.dispatch(failOrbitalCalculation('worker crashed'));
+        expect(exportAvailability(store.getState()).csv).toBeNull();
+        const csvCurves = [{ label: '2p', points: [{ r: 1, value: 0.5 }] }];
+        const result = await runExport('csv', { ...baseContext(store.getState()), csvCurves });
+        expect(await readText(result.blob)).toContain('0.5');
+    });
 });
 
 describe('runExport: PNG', () => {

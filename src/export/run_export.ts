@@ -181,10 +181,22 @@ export function cubeJobFor(state: RootState): CubeJob {
     };
 }
 
+/**
+ * Atom mode's curves come from the solved profile at every level -- at the
+ * orbital level too, where the plot is the subshell's D(r) -- so a failed 3D
+ * render there leaves them intact, and only a missing profile refuses them.
+ * Basic Orbitals plots the orbital or combination drawn, so it refuses
+ * exactly when nothing is.
+ */
+function csvReason(state: RootState): string | null {
+    if (state.atom.mode === 'atom') return state.atom.profile ? null : WAITING_FOR_ATOM_REASON;
+    return drawnReason(state);
+}
+
 export function exportAvailability(state: RootState): ExportAvailability {
     const png = pngReason(state);
     const geometry = geometryReason(state);
-    return { png, 'png-plain': png, csv: drawnReason(state), stl: geometry, glb: geometry, cube: cubeReason(state) };
+    return { png, 'png-plain': png, csv: csvReason(state), stl: geometry, glb: geometry, cube: cubeReason(state) };
 }
 
 function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
