@@ -60,16 +60,16 @@ const EnergyLine: React.FC<{ label: string; reading: EnergyReading | null; statu
         </Typography>
     );
 
-/**
- * Charge and excitation for atom mode (spec §5 Phase 3), with the energies
- * that describe them and the size comparison against the neutral atom.
- * Presentational: every change goes out through a callback.
- */
 // MUI's ButtonBase removes the browser's focus outline and relies on the
 // ripple to show keyboard focus; with the ripple off, these buttons need
 // their own ring or a keyboard user cannot see where focus is.
 const FOCUS_RING = { '&.Mui-focusVisible': { outline: '2px solid #1565c0', outlineOffset: '2px' } } as const;
 
+/**
+ * Charge and excitation for atom mode (spec §5 Phase 3), with the energies
+ * that describe them and the size comparison against the neutral atom.
+ * Presentational: every change goes out through a callback.
+ */
 const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChange, onExcitationChange, energies, radii, unbound }) => {
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const decreaseRef = useRef<HTMLButtonElement>(null);
