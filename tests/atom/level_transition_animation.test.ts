@@ -16,6 +16,7 @@ import {
     VisualizerContext,
     updateAtomViewInScene,
     updateOrbitalInScene,
+    reportTransitionState,
 } from '../../src/orbital_visualizer';
 import { defaultSurfaceStyle, SurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
 
@@ -222,5 +223,30 @@ describe('shell<->orbital cross-fade: interrupting mid-flight leaves exactly one
         // does not leave a dangling promise/worker behind.
         secondOrbitalWorker.onmessage!({ data: { type: 'success', meshData: fakeMeshData() } });
         await secondRender;
+    });
+});
+
+// Final review M9: the export menu waits while a transition runs, so the
+// visualizer tells its owner when one starts and when it ends -- once each,
+// not on every frame.
+describe('reportTransitionState', () => {
+    it('reports a transition starting and ending once each', () => {
+        const context = buildContext();
+        const onTransitionChange = jest.fn();
+        context.onTransitionChange = onTransitionChange;
+
+        updateAtomViewInScene(context, shellParamsFor(1), { animate: true });
+        reportTransitionState(context);
+        expect(onTransitionChange).not.toHaveBeenCalled();
+
+        updateAtomViewInScene(context, shellParamsFor(2), { animate: true });
+        reportTransitionState(context);
+        reportTransitionState(context);
+        expect(onTransitionChange.mock.calls).toEqual([[true]]);
+
+        // An instant rebuild settles the fade first.
+        updateAtomViewInScene(context, shellParamsFor(3), { animate: false });
+        reportTransitionState(context);
+        expect(onTransitionChange.mock.calls).toEqual([[true], [false]]);
     });
 });

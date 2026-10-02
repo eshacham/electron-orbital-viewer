@@ -68,6 +68,9 @@ export const PICTURE_BUSY_REASON = 'Wait for the picture to finish computing.';
 
 export const RENDER_FAILED_REASON = 'The last picture failed to compute; nothing to export.';
 
+/** Final review I2: a shell view whose lobes failed is not the picture its caption names. */
+export const COMPOSITION_FAILED_REASON = 'This shell\'s orbital lobes failed to compute, so the picture is incomplete.';
+
 function drawnReason(state: RootState): string | null {
     if (state.atom.mode === 'atom') {
         if (!state.atom.profile) return WAITING_FOR_ATOM_REASON;
@@ -101,7 +104,17 @@ function drawnReason(state: RootState): string | null {
  * computation, so it additionally refuses while one is in flight.
  */
 function pngReason(state: RootState): string | null {
-    return drawnReason(state) ?? (state.orbital.isLoading || state.atom.isSolving ? PICTURE_BUSY_REASON : null);
+    const drawn = drawnReason(state);
+    if (drawn) return drawn;
+    const { orbital, atom } = state;
+    // Final review I2: the shell's lobes are built after the shell view is
+    // up, with no orbital request in flight -- OrbitalViewer reports the
+    // build itself. Only at the shell level: a stale flag must not refuse
+    // another level, which has no lobes to have lost.
+    if (atom.mode === 'atom' && atom.level === 'shell' && orbital.compositionFailed) return COMPOSITION_FAILED_REASON;
+    // M9: a level transition is two pictures blending, neither of them the one named.
+    const busy = orbital.isLoading || atom.isSolving || orbital.compositionBusy || orbital.levelTransition;
+    return busy ? PICTURE_BUSY_REASON : null;
 }
 
 export const WHOLE_ATOM_GEOMETRY_REASON = 'The whole-atom view is a shaded cut face, not a surface. Open a shell or an orbital to export geometry.';

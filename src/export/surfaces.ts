@@ -5,8 +5,9 @@ export interface ExportSurface { name: string; positions: Float32Array; indices:
 
 /**
  * Ruling R1: the one wording STL and glTF give when the viewer holds no
- * surface -- the shell's lobes still coming back from their worker, most
- * often, since that fetch has no busy flag in the store to refuse on sooner.
+ * surface. The menu normally refuses sooner (a render or the shell's lobes
+ * still computing has its own flag in the store); this is the last check, on
+ * what the scene actually holds at the moment of export.
  */
 export const NOTHING_TO_EXPORT_REASON = 'Nothing to export yet — the surface is still being computed.';
 

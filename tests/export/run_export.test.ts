@@ -2,9 +2,12 @@
 // load (see orbital_controls_factory.ts), so the factory is mocked.
 jest.mock('../../src/export/gltf_exporter_factory', () => ({ exportGlb: jest.fn(async () => new ArrayBuffer(12)) }));
 
-import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON } from '../../src/export/run_export';
-import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted } from '../../src/store/atomSlice';
-import { setCombination, startOrbitalCalculation, failOrbitalCalculation } from '../../src/store/orbitalSlice';
+import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON, COMPOSITION_FAILED_REASON } from '../../src/export/run_export';
+import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted, levelUp } from '../../src/store/atomSlice';
+import {
+    setCombination, startOrbitalCalculation, failOrbitalCalculation, startCompositionBuild, endCompositionBuild, failCompositionBuild,
+    setLevelTransition,
+} from '../../src/store/orbitalSlice';
 import { basicOrbitalParams } from '../../src/orbital_presets';
 import { selectionProblem } from '../../src/combinations';
 import { NOTHING_TO_EXPORT_REASON } from '../../src/export/surfaces';
@@ -65,6 +68,49 @@ describe('exportAvailability: a failed orbital render in atom mode', () => {
         const csvCurves = [{ label: '2p', points: [{ r: 1, value: 0.5 }] }];
         const result = await runExport('csv', { ...baseContext(store.getState()), csvCurves });
         expect(await readText(result.blob)).toContain('0.5');
+    });
+});
+
+// Final review I2/M9: a shell's lobes are built after the shell view is
+// up (OrbitalViewer clears the old ones at once), and a level transition
+// animates between two pictures -- either way the canvas is not yet the
+// picture the caption names.
+describe('exportAvailability: the shell\'s lobes and level transitions', () => {
+    it('waits while the lobes are computing: images and geometry, not CSV or the radial cube', () => {
+        const store = neonStore();
+        store.dispatch(drillToShell(2));
+        store.dispatch(startCompositionBuild());
+        const busy = exportAvailability(store.getState());
+        expect([busy.png, busy['png-plain'], busy.stl, busy.glb]).toEqual(Array(4).fill(PICTURE_BUSY_REASON));
+        expect(busy.csv).toBeNull();
+        expect(busy.cube).toBeNull();
+        store.dispatch(endCompositionBuild());
+        expect(exportAvailability(store.getState()).png).toBeNull();
+    });
+
+    it('waits while a level transition is running', async () => {
+        const store = neonStore();
+        store.dispatch(drillToShell(2));
+        store.dispatch(setLevelTransition(true));
+        expect(exportAvailability(store.getState()).png).toBe(PICTURE_BUSY_REASON);
+        expect(exportAvailability(store.getState()).glb).toBe(PICTURE_BUSY_REASON);
+        await expect(runExport('png', { ...baseContext(store.getState()), handle: exportHandle() })).rejects.toThrow(PICTURE_BUSY_REASON);
+        store.dispatch(setLevelTransition(false));
+        expect(exportAvailability(store.getState()).png).toBeNull();
+    });
+
+    it('refuses, with the reason, a shell whose lobes failed, rather than export it without them', async () => {
+        const store = neonStore();
+        store.dispatch(drillToShell(2));
+        store.dispatch(startCompositionBuild());
+        store.dispatch(failCompositionBuild('worker crashed'));
+        const failed = exportAvailability(store.getState());
+        expect([failed.png, failed['png-plain'], failed.stl, failed.glb]).toEqual(Array(4).fill(COMPOSITION_FAILED_REASON));
+        expect(failed.csv).toBeNull();
+        await expect(runExport('stl', { ...baseContext(store.getState()), handle: exportHandle() })).rejects.toThrow(COMPOSITION_FAILED_REASON);
+        // The whole atom has no lobes to have lost.
+        store.dispatch(levelUp());
+        expect(exportAvailability(store.getState()).png).toBeNull();
     });
 });
 

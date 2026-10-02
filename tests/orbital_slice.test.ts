@@ -3,7 +3,8 @@ import reducer, {
     startOrbitalCalculation, startFieldCalculation, finishOrbitalCalculation, clearPicture,
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, selectShownBasicOrbital,
     DEFAULT_BASIC_SELECTION, cameraMoved, restoreCamera, resetView,
-    requestCut, clearPendingCut,
+    requestCut, clearPendingCut, startCompositionBuild, endCompositionBuild, failCompositionBuild, setLevelTransition,
+    dismissOrbitalError,
 } from '../src/store/orbitalSlice';
 import { setMode } from '../src/store/atomSlice';
 import { fieldRequestFor, NO_COMBINATION } from '../src/combinations';
@@ -154,5 +155,36 @@ describe('orbitalSlice: a restored cut', () => {
         expect(store.getState().orbital.pendingCut).toEqual({ clipAxis: 'y', clipPosition: 0.5 });
         store.dispatch(clearPendingCut());
         expect(store.getState().orbital.pendingCut).toBeNull();
+    });
+});
+
+// Final review I2/M9: the shell's lobes and the level-transition animation
+// change the picture with no orbital request in flight, so the store needs
+// to hear about them for the export menu to wait.
+describe('orbitalSlice: the shell-lobe build and level transitions', () => {
+    it('marks a lobe build busy until it ends, and clears an earlier failure when a new one starts', () => {
+        let state = reducer(undefined, startCompositionBuild());
+        expect(state).toMatchObject({ compositionBusy: true, compositionFailed: false });
+        state = reducer(state, endCompositionBuild());
+        expect(state).toMatchObject({ compositionBusy: false, compositionFailed: false });
+        state = reducer(reducer(state, startCompositionBuild()), failCompositionBuild('worker crashed'));
+        expect(state).toMatchObject({ compositionBusy: false, compositionFailed: true });
+        state = reducer(state, startCompositionBuild());
+        expect(state.compositionFailed).toBe(false);
+    });
+
+    it('shows a failed lobe build through the app\'s error message, which outlives dismissing it', () => {
+        let state = reducer(undefined, failCompositionBuild('worker crashed'));
+        expect(state.error).toMatch(/orbital lobes.*worker crashed/);
+        state = reducer(state, dismissOrbitalError());
+        expect(state.error).toBeNull();
+        expect(state.compositionFailed).toBe(true);
+        expect(reducer(state, endCompositionBuild()).compositionFailed).toBe(false);
+    });
+
+    it('records whether a level transition is running', () => {
+        const state = reducer(undefined, setLevelTransition(true));
+        expect(state.levelTransition).toBe(true);
+        expect(reducer(state, setLevelTransition(false)).levelTransition).toBe(false);
     });
 });

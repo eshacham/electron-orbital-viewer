@@ -51,6 +51,19 @@ interface OrbitalState {
    * is on screen -- entering an orbital view clears the cut (App).
    */
   pendingCut: CutSetting | null;
+  /**
+   * Level 2's orbital lobes are being built (OrbitalViewer's composition
+   * worker). The shell view is already up and the old lobes are already
+   * gone, so until this clears the canvas shows the shell without them.
+   */
+  compositionBusy: boolean;
+  /**
+   * The last lobe build failed, so the shell view stands without its lobes.
+   * Outlives `error`, which the user can dismiss, like `renderFailed`.
+   */
+  compositionFailed: boolean;
+  /** A level-transition animation is running (the visualizer reports it): the picture is between two views. */
+  levelTransition: boolean;
 }
 
 const initialState: OrbitalState = {
@@ -69,6 +82,9 @@ const initialState: OrbitalState = {
   cameraAngles: null,
   cameraRestoreNonce: 0,
   pendingCut: null,
+  compositionBusy: false,
+  compositionFailed: false,
+  levelTransition: false,
 };
 
 const orbitalSlice = createSlice({
@@ -162,6 +178,28 @@ const orbitalSlice = createSlice({
     clearPendingCut: (state) => {
       state.pendingCut = null;
     },
+    // The viewer's shell-lobe build: posted, and then answered, superseded
+    // or abandoned. Ending clears a failure too -- whatever replaces the
+    // build (another one, a cache hit, another level) is no longer the
+    // shell that lost its lobes.
+    startCompositionBuild: (state) => {
+      state.compositionBusy = true;
+      state.compositionFailed = false;
+    },
+    endCompositionBuild: (state) => {
+      state.compositionBusy = false;
+      state.compositionFailed = false;
+    },
+    // Shown through the same message as a failed render (App's Snackbar):
+    // failures are shown, not hidden.
+    failCompositionBuild: (state, action: PayloadAction<string>) => {
+      state.compositionBusy = false;
+      state.compositionFailed = true;
+      state.error = `Could not compute this shell's orbital lobes: ${action.payload}`;
+    },
+    setLevelTransition: (state, action: PayloadAction<boolean>) => {
+      state.levelTransition = action.payload;
+    },
   },
   // Combinations belong to Basic Orbitals. Leaving for atom mode drops the
   // request, so no effect can redraw a hybrid over an atom, and the viewer
@@ -195,7 +233,11 @@ export const {
   cameraMoved,
   restoreCamera,
   requestCut,
-  clearPendingCut
+  clearPendingCut,
+  startCompositionBuild,
+  endCompositionBuild,
+  failCompositionBuild,
+  setLevelTransition
 } = orbitalSlice.actions;
 
 /**

@@ -40,13 +40,24 @@ import OrbitalViewer from '../src/components/OrbitalViewer';
 import {
     startFieldCalculation, startOrbitalCalculation, clearPicture, resetView, restoreCamera,
 } from '../src/store/orbitalSlice';
-import { setMode } from '../src/store/atomSlice';
+import { setMode, setElement, solveSucceeded, drillToShell, goToLevel } from '../src/store/atomSlice';
+import { createShellCompositionWorker } from '../src/workers/createShellCompositionWorker';
+import { clearShellMeshCacheForTests } from '../src/atom/shell_mesh_cache';
+import { neonProfile } from './export/fixtures';
+import { initVisualizer, attachShellCompositionLobes } from '../src/orbital_visualizer';
+import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
 import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital } from '../src/orbital_visualizer';
 import { applyCameraAngles } from '../src/camera_angles';
 
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
+
+// The viewer logs its own lifecycle (initialising, cleaning up) as a
+// debugging aid; muted here so the run stays readable. Warnings and errors
+// still print.
+beforeEach(() => { jest.spyOn(console, 'log').mockImplementation(() => {}); });
+afterEach(() => { (console.log as jest.Mock).mockRestore(); });
 
 function renderViewer() {
     const store = createAppStore();
@@ -106,5 +117,89 @@ describe('OrbitalViewer: reset and restore in the same commit', () => {
         });
 
         expect(order).toEqual(['frameOrbital', 'applyCameraAngles']);
+    });
+});
+
+/** Stands in for the composition worker: records what was posted, replies when told to. */
+function fakeCompositionWorker() {
+    return {
+        postMessage: jest.fn(),
+        terminate: jest.fn(),
+        onmessage: null as ((e: { data: unknown }) => void) | null,
+        onerror: null as ((e: unknown) => void) | null,
+    };
+}
+
+/** Neon solved and opened at its n = 2 shell, so the viewer builds that shell's lobes. */
+function renderNeonShell() {
+    clearShellMeshCacheForTests();
+    const worker = fakeCompositionWorker();
+    (createShellCompositionWorker as jest.Mock).mockReturnValue(worker);
+    const store = createAppStore();
+    act(() => {
+        store.dispatch(setElement(10));
+        store.dispatch(solveSucceeded(neonProfile()));
+    });
+    const view = render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+    act(() => { store.dispatch(drillToShell(2)); });
+    return { store, worker, view };
+}
+
+// Final review I2: the lobes arrive after the shell view, with no orbital
+// request in flight, so the viewer reports the build for export to wait on.
+describe('OrbitalViewer: the shell-lobe build in the store', () => {
+    it('is busy from the moment the build is posted until the lobes land', () => {
+        const { store, worker } = renderNeonShell();
+        expect(worker.postMessage).toHaveBeenCalledTimes(1);
+        expect(store.getState().orbital.compositionBusy).toBe(true);
+        act(() => { worker.onmessage!({ data: { type: 'success', meshes: [], requestId: 1 } }); });
+        expect(attachShellCompositionLobes).toHaveBeenCalledTimes(1);
+        expect(store.getState().orbital).toMatchObject({ compositionBusy: false, compositionFailed: false });
+    });
+
+    it('shows a failed build as the app\'s error and records it, without the console', () => {
+        const { store, worker } = renderNeonShell();
+        const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            act(() => { worker.onmessage!({ data: { type: 'error', message: 'out of memory', requestId: 1 } }); });
+            expect(consoleError).not.toHaveBeenCalled();
+        } finally {
+            consoleError.mockRestore();
+        }
+        expect(store.getState().orbital).toMatchObject({ compositionBusy: false, compositionFailed: true });
+        expect(store.getState().orbital.error).toMatch(/out of memory/);
+    });
+
+    it('treats a worker that dies outright as a failure too', () => {
+        const { store, worker } = renderNeonShell();
+        act(() => { worker.onerror!(new Event('error')); });
+        expect(store.getState().orbital.compositionFailed).toBe(true);
+        expect(store.getState().orbital.error).toBeTruthy();
+    });
+
+    it('is no longer busy once the build is abandoned: another level, or the viewer gone', () => {
+        const { store, worker, view } = renderNeonShell();
+        act(() => { store.dispatch(goToLevel('atom')); });
+        expect(worker.terminate).toHaveBeenCalled();
+        expect(store.getState().orbital.compositionBusy).toBe(false);
+
+        act(() => { store.dispatch(drillToShell(2)); });
+        expect(store.getState().orbital.compositionBusy).toBe(true);
+        view.unmount();
+        expect(store.getState().orbital.compositionBusy).toBe(false);
+    });
+});
+
+// Final review M9: the visualizer reports a running level transition; the
+// viewer passes it to the store, and drops it when it goes away.
+describe('OrbitalViewer: level transitions in the store', () => {
+    it('records a transition the visualizer reports, and clears it on unmount', () => {
+        const store = createAppStore();
+        const view = render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        const context = (initVisualizer as jest.Mock).mock.results.at(-1)!.value as VisualizerContext;
+        act(() => { context.onTransitionChange!(true); });
+        expect(store.getState().orbital.levelTransition).toBe(true);
+        view.unmount();
+        expect(store.getState().orbital.levelTransition).toBe(false);
     });
 });

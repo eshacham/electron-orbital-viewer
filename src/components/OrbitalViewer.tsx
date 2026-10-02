@@ -1,7 +1,9 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setHoverRadius as setAtomHoverRadius, drillToShell } from '../store/atomSlice';
-import { cameraMoved } from '../store/orbitalSlice';
+import {
+    cameraMoved, startCompositionBuild, endCompositionBuild, failCompositionBuild, setLevelTransition,
+} from '../store/orbitalSlice';
 import { applyCameraAngles, cameraAnglesOf } from '../camera_angles';
 import { ScaleBar, formatScaleLabel, scaleBarMaxPx } from '../scale_bar';
 import { useMediaQuery, PREFERS_REDUCED_MOTION, NARROW_VIEWPORT } from '../useMediaQuery';
@@ -113,6 +115,9 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             // action, so hovering the plot and hovering the cut face agree
             // on a single shared radius with no extra plumbing.
             context.onHoverRadius = (r) => dispatch(setAtomHoverRadius(r));
+            // M9: a level transition blends two pictures, so the export
+            // menu waits for it (run_export's pngReason).
+            context.onTransitionChange = (active) => dispatch(setLevelTransition(active));
             visualizerContextRef.current = context;
 
             if (exportHandleRef) {
@@ -144,6 +149,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 visualizerContextRef.current = null;
             }
             if (exportHandleRef) exportHandleRef.current = null;
+            // No animation loop is left to report the end of one in flight.
+            dispatch(setLevelTransition(false));
         };
     }, [dispatch, exportHandleRef]);
 
@@ -284,6 +291,12 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // folded into the one above: this has its own async lifecycle (a batch
     // marching-cubes worker call, or a cache hit), where the effect above is
     // a synchronous read of the profile already in the store.
+    //
+    // Final review I2: the store hears about the build (compositionBusy from
+    // the post to the reply, compositionFailed if it fails), because until
+    // the lobes land the canvas shows the shell without them and no orbital
+    // request is in flight to say so. Every way out of a build -- a reply, a
+    // newer run of this effect, another level, unmount -- ends it.
     useEffect(() => {
         const context = visualizerContextRef.current;
         if (!context) return;
@@ -293,11 +306,15 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             // along into the atom level and sat inside it. Nothing else here
             // owns them, so take them off on the way out.
             clearShellCompositionLobes(context);
+            dispatch(endCompositionBuild());
             return;
         }
 
         const shellSubshells = atomProfile.subshells.filter(s => s.n === atomSelectedShell);
-        if (shellSubshells.length === 0) return;
+        if (shellSubshells.length === 0) {
+            dispatch(endCompositionBuild());
+            return;
+        }
 
         // Addendum 2's readability follow-up: selecting a subshell isolates
         // its orbitals here, so iron's five 3d cloverleaves can be read
@@ -315,7 +332,10 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         // isolation filter runs *after* that assignment, so an isolated
         // subshell keeps the colour it had while overlapping.
         const components = isolateSubshell(shellComposition(shellSubshells), isolatedL);
-        if (components.length === 0) return;
+        if (components.length === 0) {
+            dispatch(endCompositionBuild());
+            return;
+        }
         const cacheKey = shellMeshCacheKey(atomProfile.Z, atomSelectedShell, COMPOSITE_ORBITAL_RESOLUTION, enclosedFraction, isolatedL);
 
         // A different shell's (or a stale fraction's) lobes must not linger
@@ -332,6 +352,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         const cached = getCachedShellMeshes(cacheKey);
         if (cached) {
             attachShellCompositionLobes(context, guard, components, cached, isolatedL !== null);
+            dispatch(endCompositionBuild());
             return;
         }
 
@@ -365,22 +386,27 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         worker.onmessage = (e: MessageEvent<ShellCompositionWorkerMessage>) => {
             worker.terminate();
             if (e.data.type === 'error') {
-                console.error('OrbitalViewer: shell composition worker error:', e.data.message);
+                // Shown, not hidden: the app's error message, and export
+                // refuses the lobeless shell (run_export's pngReason).
+                dispatch(failCompositionBuild(e.data.message));
                 return;
             }
             setCachedShellMeshes(cacheKey, e.data.meshes);
             attachShellCompositionLobes(context, guard, components, e.data.meshes, isolatedL !== null);
+            dispatch(endCompositionBuild());
         };
         worker.onerror = (event) => {
-            console.error('OrbitalViewer: shell composition worker error:', event);
             worker.terminate();
+            dispatch(failCompositionBuild(event instanceof ErrorEvent && event.message ? event.message : 'the worker stopped'));
         };
+        dispatch(startCompositionBuild());
         worker.postMessage({ type: 'calculate', orbitals: orbitalParams, requestId: 1 });
 
         return () => {
             worker.terminate();
+            dispatch(endCompositionBuild());
         };
-    }, [atomMode, atomLevel, atomProfile, atomSelectedShell, atomSelectedSubshell, enclosedFraction]);
+    }, [atomMode, atomLevel, atomProfile, atomSelectedShell, atomSelectedSubshell, enclosedFraction, dispatch]);
 
     // Addendum 2's selection affordance: at the whole-atom level the rings on
     // the cut face are clickable, and a click opens the shell that owns that

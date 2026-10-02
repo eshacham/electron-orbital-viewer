@@ -153,6 +153,14 @@ export interface VisualizerContext {
      * applied to the animation state too.
      */
     transition?: LevelTransition | null;
+    /**
+     * Set by the owning component: told when a level transition starts and
+     * when it ends (see `reportTransitionState`), so the store can say the
+     * picture is mid-change -- an export waits for it.
+     */
+    onTransitionChange?: (active: boolean) => void;
+    /** What `onTransitionChange` was last told, so it hears each change once rather than every frame. */
+    reportedTransition?: boolean;
 }
 
 /**
@@ -818,6 +826,19 @@ function tickCrossFade(context: VisualizerContext, transition: CrossFadeTransiti
         setGroupOpacity(context.currentOrbitalGroup, resting);
         context.transition = null;
     }
+}
+
+/**
+ * Tells `onTransitionChange` whether a transition is running, when that has
+ * changed since it was last told. Run once per frame by the animation loop
+ * rather than at each of the places a transition is begun or settled, so no
+ * new one can be missed; the cost is that the news lands up to a frame late.
+ */
+export function reportTransitionState(context: VisualizerContext): void {
+    const active = Boolean(context.transition);
+    if (active === Boolean(context.reportedTransition)) return;
+    context.reportedTransition = active;
+    context.onTransitionChange?.(active);
 }
 
 /** Ticks whichever kind of transition is running -- dispatches to the two functions above. */
@@ -1659,6 +1680,7 @@ function startAnimationLoop(context: VisualizerContext) {
         // frame's already-updated curve/radius/opacity/camera rather than
         // last frame's.
         if (context.transition) tickTransition(context, timestamp);
+        reportTransitionState(context);
         renderFrame(context);
         context.animationFrameId = requestAnimationFrame(animate);
     }
