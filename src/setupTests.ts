@@ -59,3 +59,10 @@ if (!window.matchMedia) {
         dispatchEvent: () => false,
     }) as unknown as MediaQueryList;
 }
+
+// jsdom's canvas has no drawing context without the optional `canvas`
+// package: getContext returns null, but prints a "Not implemented" error
+// first. The visualizer already handles null (its text labels are skipped),
+// so answer null quietly -- the same behaviour, without the noise. Tests that
+// need a context supply their own stand-in canvas.
+HTMLCanvasElement.prototype.getContext = (() => null) as HTMLCanvasElement['getContext'];
