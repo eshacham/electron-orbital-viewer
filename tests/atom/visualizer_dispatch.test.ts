@@ -25,6 +25,8 @@ import {
     defaultCameraPosition,
     attachShellCompositionLobes,
     clearShellCompositionLobes,
+    setReferenceRing,
+    clearAtomView,
 } from '../../src/orbital_visualizer';
 import { shellComposition } from '../../src/atom/shell_composition';
 import { defaultSurfaceStyle, SurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
@@ -455,5 +457,33 @@ describe('the cut covers a shell view\'s lobes, not just its sphere', () => {
         const params = atomShellParams();
         updateAtomViewInScene(context, params);
         expect(context.clipPlane.constant).toBeCloseTo(params.contourRadius * 0.9);
+    });
+});
+
+describe('reference ring and framing floor', () => {
+    it('adds one ring to the scene, replaces it, and removes it with null', () => {
+        const context = buildContext();
+        setReferenceRing(context, 2);
+        setReferenceRing(context, 3);
+        const rings = context.scene.children.filter(child => child.userData.isReferenceRing);
+        expect(rings).toHaveLength(1);
+        expect(((rings[0] as THREE.Mesh).material as THREE.ShaderMaterial).uniforms.radius.value).toBe(3);
+        setReferenceRing(context, null);
+        expect(context.scene.children.some(child => child.userData.isReferenceRing)).toBe(false);
+    });
+
+    it('frames on at least the framing floor, so the ring is on screen', () => {
+        const context = buildContext();
+        updateAtomViewInScene(context, { ...atomShellParams(), contourRadius: 1.3, framingFloor: 1.94 });
+        expect(context.framedRMax).toBeCloseTo(1.94, 12);
+    });
+
+    it('clearAtomView leaves nothing drawn', () => {
+        const context = buildContext();
+        updateAtomViewInScene(context, atomShellParams());
+        setReferenceRing(context, 2);
+        clearAtomView(context);
+        expect(sceneContent(context)).toHaveLength(0);
+        expect(context.currentOrbitalGroup).toBeNull();
     });
 });

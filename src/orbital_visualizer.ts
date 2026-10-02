@@ -30,6 +30,12 @@ import { FieldRenderRequest } from './field_source';
 import { createFieldOverlayGroup } from './field_overlay_view';
 import { markExportSurface } from './export/surfaces';
 import { CANONICAL_CAMERA_DIRECTION } from './camera_angles';
+import {
+    createReferenceRing,
+    positionReferenceRing,
+    setReferenceRingWidth,
+    disposeReferenceRing
+} from './atom/reference_ring';
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -112,6 +118,8 @@ export interface VisualizerContext {
      * sphere becomes translucent ... so its constituents are visible").
      */
     isCompositionView?: boolean;
+    /** The neutral atom's edge while an ion or excited atom is shown (reference_ring.ts). */
+    referenceRing?: THREE.Mesh | null;
     /**
      * Set by the owning component after `initVisualizer`; fed the radius
      * under the pointer on every `pointermove` over the canvas (levels 1-2
@@ -624,6 +632,7 @@ function refreshCaps(context: VisualizerContext) {
     );
     setCapsOpacity(currentCaps, backdropOpacityFor(context));
     positionCaps(currentCaps, context.clipPlane);
+    positionReferenceRing(context.referenceRing ?? null, context.clipPlane);
 }
 
 /** Restyles the orbital — mode, opacity, cut plane — without recalculating it. */
@@ -670,6 +679,11 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
         context.activeWorker = null;
         clearCurrentOrbital(context, context.scene); // Ensure orbital is cleared
         removeAxesHelper(context);
+        if (context.referenceRing) {
+            context.scene.remove(context.referenceRing);
+            disposeReferenceRing(context.referenceRing);
+            context.referenceRing = null;
+        }
         if (context.controls) {
             context.controls.dispose();
         }
@@ -1272,7 +1286,19 @@ export function clearScene(context: VisualizerContext | null): void {
     clearCurrentOrbital(context, context.scene);
     context.isShellView = false;
     context.isCompositionView = false;
+    setReferenceRing(context, null);
     removeAxesHelper(context);
+}
+
+/**
+ * Empties the atom view -- for an anion LDA does not bind (spec §3.5): the
+ * previous species' picture must not stay up under a message saying there
+ * is nothing to draw. Just `clearScene` under its own name: the atom view
+ * and the combination view both end up wanting exactly this teardown, and
+ * the ring removal above belongs in one place, not two.
+ */
+export function clearAtomView(context: VisualizerContext | null): void {
+    clearScene(context);
 }
 
 /** What updateAtomViewInScene needs to build one level-1/2 shell view. */
@@ -1339,6 +1365,8 @@ export interface AtomShellViewParams {
      * `backdropOpacityFor`).
      */
     isComposition?: boolean;
+    /** Frame on at least this radius -- the reference ring's, so the neutral's edge is on screen. */
+    framingFloor?: number;
 }
 
 /**
@@ -1423,7 +1451,10 @@ export function updateAtomViewInScene(
     // `outermostFeatureR` narrows that further (see framingRadiusFor). This
     // is also what makes drilling into a shell actually zoom in: each shell
     // carries its own, smaller contour radius.
-    const framingRadius = framingRadiusFor(params.contourRadius, params.outermostFeatureR);
+    const framingRadius = Math.max(
+        framingRadiusFor(params.contourRadius, params.outermostFeatureR),
+        params.framingFloor ?? 0
+    );
 
     // The atom<->shell fade: both the current and the new view are shell
     // views (of the whole atom or of one shell each), so this mutates the
@@ -1548,6 +1579,21 @@ export function clearShellCompositionLobes(context: VisualizerContext | null): v
     if (context.shellViewRadius !== undefined) setShellCutExtent(context, context.shellViewRadius);
 }
 
+/** Shows the neutral atom's edge at `radius`, or removes it with null. One ring at most. */
+export function setReferenceRing(context: VisualizerContext | null, radius: number | null): void {
+    if (!context || context.isDisposed) return;
+    if (context.referenceRing) {
+        context.scene.remove(context.referenceRing);
+        disposeReferenceRing(context.referenceRing);
+        context.referenceRing = null;
+    }
+    if (radius === null || !(radius > 0)) return;
+    const ring = createReferenceRing(radius);
+    positionReferenceRing(ring, context.clipPlane);
+    context.scene.add(ring);
+    context.referenceRing = ring;
+}
+
 /**
  * Re-scales a shell view's cut to `extent`: the depth slider's travel has
  * to span everything drawn, so "nothing removed" really removes nothing.
@@ -1658,6 +1704,7 @@ export function renderFrame(context: VisualizerContext): void {
             canvasHeightPx
         );
         setShellViewRingWidth(context.currentOrbitalGroup, pxToWorld * HIGHLIGHT_RING_HALF_WIDTH_PX);
+        setReferenceRingWidth(context.referenceRing ?? null, pxToWorld * HIGHLIGHT_RING_HALF_WIDTH_PX);
     }
     if (context.transition?.kind === 'cross-fade') {
         renderCrossFade(context, context.transition);
