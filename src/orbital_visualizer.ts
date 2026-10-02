@@ -1272,7 +1272,9 @@ export function cancelPendingRender(context: VisualizerContext | null): void {
 /**
  * Leaves the scene empty: whatever is drawn comes down, and whatever is still
  * computing never lands. For a selection that is refused rather than drawn
- * (spec §3.5) -- the last picture must not stay up under its title.
+ * (spec §3.5) -- a combination that cannot be drawn, or an anion LDA does
+ * not bind -- the last picture, an ion's reference ring with it, must not
+ * stay up under its title.
  */
 export function clearScene(context: VisualizerContext | null): void {
     if (!context || context.isDisposed) return;
@@ -1285,17 +1287,6 @@ export function clearScene(context: VisualizerContext | null): void {
     context.isCompositionView = false;
     setReferenceRing(context, null);
     removeAxesHelper(context);
-}
-
-/**
- * Empties the atom view -- for an anion LDA does not bind (spec §3.5): the
- * previous species' picture must not stay up under a message saying there
- * is nothing to draw. Just `clearScene` under its own name: the atom view
- * and the combination view both end up wanting exactly this teardown, and
- * the ring removal above belongs in one place, not two.
- */
-export function clearAtomView(context: VisualizerContext | null): void {
-    clearScene(context);
 }
 
 /** What updateAtomViewInScene needs to build one level-1/2 shell view. */

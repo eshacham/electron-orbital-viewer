@@ -75,7 +75,7 @@ Measured while writing the plan with a prototype of exactly the solvers below, a
 | `src/atom/useAtomSolver.ts` | Modify | Posts species, handles `'unbound'`, caches by species |
 | `src/atom/useDeltaScfEnergies.ts` | Create | Cancellable energies worker |
 | `src/atom/reference_ring.ts` | Create | Dashed ring on the cut plane at the neutral's drawn radius |
-| `src/orbital_visualizer.ts` | Modify | `setReferenceRing`, `clearAtomView`, `framingFloor` |
+| `src/orbital_visualizer.ts` | Modify | `setReferenceRing`, `framingFloor` (the unbound view reuses Phase 2's `clearScene`, ruling C7) |
 | `src/components/SpeciesControls.tsx` | Create | Charge stepper, Excite menu, energies, compare line |
 | `src/components/LevelNav.tsx` | Modify | `configuration`, `speciesSymbol`, `speciesTitle`, `speciesControls` props; about text |
 | `src/components/OrbitalViewer.tsx`, `src/App.tsx`, `src/style.css` | Modify | Wiring, unbound alert, ring, busy label |
