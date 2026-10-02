@@ -1,10 +1,10 @@
 /**
  * Front-of-worker cache for a shell's composite orbital meshes (Addendum 2),
  * mirroring `profile_cache.ts`'s reasoning exactly: a shell's marching-cubes
- * lobes are a pure function of (Z, n, resolution, enclosedFraction) -- same
- * SCF solution, same subshells, same per-orbital sampling box and contour --
- * so a hit here can never go stale, and re-entering a shell already visited
- * this session needs no worker round trip at all.
+ * lobes are a pure function of (species, n, resolution, enclosedFraction) --
+ * same SCF solution, same subshells, same per-orbital sampling box and
+ * contour -- so a hit here can never go stale, and re-entering a shell
+ * already visited this session needs no worker round trip at all.
  */
 import { LobeMeshData } from '../workers/shellCompositionWorker';
 
@@ -21,16 +21,16 @@ const cache = new Map<string, LobeMeshData[]>();
  * shell. Part of the key because the cached value is the *list of meshes
  * actually computed* -- isolating 3d computes five meshes, not nine, so an
  * isolated entry and a full one are different values under the same
- * (Z, n, resolution, fraction) and must not collide.
+ * (species, n, resolution, fraction) and must not collide.
  */
 export function shellMeshCacheKey(
-    Z: number,
+    species: string | number,
     n: number,
     resolution: number,
     enclosedFraction: number,
     isolatedL: number | null = null
 ): string {
-    return `${Z}:${n}:${resolution}:${enclosedFraction}:${isolatedL ?? 'all'}`;
+    return `${species}:${n}:${resolution}:${enclosedFraction}:${isolatedL ?? 'all'}`;
 }
 
 /** Looks up a previously computed shell's lobe meshes, marking it most-recently-used on a hit. */

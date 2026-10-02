@@ -1,4 +1,7 @@
-import { AtomSolution, solveAtom } from '../atom/scf';
+import { AtomSolution, solveAtom, solveSpecies } from '../atom/scf';
+import { UnboundAnionError } from '../atom/scf_shared';
+import { AtomSpecies, Excitation, isNeutralGround, speciesKey } from '../atom/species';
+import { EnergyReading, excitationEnergy, ionisationEnergy } from '../atom/delta_scf';
 import { AtomProfile, buildAtomProfile, packRadialCurve, subshellSamplingRadius, compositeSamplingRadius } from '../atom/atom_profile';
 
 /** One shell's contribution, flattened for the worker boundary. */
@@ -49,6 +52,9 @@ export interface SerialisedSubshell {
     compositeSamplingRadius: number;
 }
 
+/** The neutral ground state's radii, carried alongside an ion or excited atom's profile for the reference ring. */
+export interface ReferenceRadii { displayRadius: number; contourRadius: number }
+
 /**
  * Everything the UI needs from one converged `AtomSolution`, flattened to
  * plain numbers, plain arrays/objects and typed arrays so it can cross a
@@ -65,6 +71,16 @@ export interface SerialisedAtomProfile {
      * picture from an iteration limit's last, unconverged guess.
      */
     converged: boolean;
+    /** Z minus the electron count. Optional only so older hand-built test fixtures still type-check. */
+    charge?: number;
+    /** speciesKey of what was solved ('11', '11+1', '11:3s>3p'); what the caches and the animation guard key on. */
+    speciesKey?: string;
+    /**
+     * The neutral ground state's radii, for the reference ring (spec: "a
+     * compare strip shows the neutral atom's contour ring"). Null for a
+     * neutral ground state, which is its own reference.
+     */
+    reference?: ReferenceRadii | null;
     /**
      * The shared log grid every curve and R array below is sampled on:
      * r_j = rMin * e^(j*dx), j = 0..size-1. One set of parameters suffices
@@ -149,14 +165,26 @@ export interface SerialisedAtomProfile {
  * so the serialisation contract can be tested directly, without going
  * through `self`/`postMessage` at all -- see the module doc on WorkerScope
  * below for why the DOM worker surface itself is not exercised in tests.
+ *
+ * `extras` is optional so existing callers (and hand-built test fixtures)
+ * that only ever solved a neutral atom still type-check unchanged;
+ * `speciesKey` defaults to `String(atom.Z)`, which is exactly a neutral
+ * ground state's own key.
  */
-export function buildSerialisedAtomProfile(atom: AtomSolution, enclosedFraction: number): SerialisedAtomProfile {
+export function buildSerialisedAtomProfile(
+    atom: AtomSolution,
+    enclosedFraction: number,
+    extras: { speciesKey?: string; reference?: ReferenceRadii | null } = {}
+): SerialisedAtomProfile {
     const profile: AtomProfile = buildAtomProfile(atom, enclosedFraction);
     const { grid } = atom;
 
     return {
         Z: atom.Z,
         converged: atom.converged,
+        charge: atom.charge,
+        speciesKey: extras.speciesKey ?? String(atom.Z),
+        reference: extras.reference ?? null,
         rMin: grid.rMin,
         dx: grid.dx,
         size: grid.size,
@@ -219,68 +247,69 @@ function transferListFor(profile: SerialisedAtomProfile): Transferable[] {
 }
 
 // Worker message types
-interface WorkerMessageData {
-    type: 'solve';
-    Z: number;
-    enclosedFraction: number;
-    /**
-     * Task 20: the worker is now reused across requests rather than
-     * created and terminated per call (see createAtomWorker.ts and
-     * useAtomSolver.ts), so terminate() can no longer be what stops a
-     * superseded reply from landing. Echoing this back on the response is
-     * what replaces it -- the caller drops any reply whose id no longer
-     * matches its latest dispatched request.
-     */
-    requestId: number;
-}
+/**
+ * `'solve'` carries a species -- `charge`/`excitation` default to a neutral
+ * ground state so every existing caller (and hand-built test fixture) that
+ * only ever named a `Z` still type-checks. `'energies'` is a separate
+ * request so a slow ΔSCF energies solve (useDeltaScfEnergies' own worker,
+ * Task 9) never queues in front of a picture solve on this one.
+ */
+export type AtomWorkerRequest =
+    | { type: 'solve'; Z: number; charge?: number; excitation?: Excitation | null; enclosedFraction: number; requestId: number }
+    | { type: 'energies'; Z: number; charge: number; excitation: Excitation | null; requestId: number };
 
-interface WorkerSuccessResponse {
-    type: 'success';
-    profile: SerialisedAtomProfile;
-    requestId: number;
-}
+/**
+ * `'unbound'` is a distinct reply from `'error'` (spec §3.5): an anion LDA
+ * cannot bind is an expected, explained outcome, not a failure to show
+ * alongside a genuine solve error.
+ */
+export type AtomWorkerResponse =
+    | { type: 'success'; profile: SerialisedAtomProfile; requestId: number }
+    | { type: 'unbound'; message: string; requestId: number }
+    | { type: 'error'; message: string; requestId: number }
+    | { type: 'energies'; speciesKey: string; ionisation: EnergyReading | null; excitation: EnergyReading | null; requestId: number };
 
-interface WorkerErrorResponse {
-    type: 'error';
-    message: string;
-    requestId: number;
+/**
+ * One request in, one response out -- exported so the protocol is tested
+ * without a Worker (see the module note on WorkerScope). The same module
+ * serves two worker instances: useAtomSolver's (pictures) and
+ * useDeltaScfEnergies' (energies), so a slow ΔSCF never queues in front of
+ * a picture.
+ */
+export function handleAtomWorkerRequest(data: AtomWorkerRequest): { response: AtomWorkerResponse; transfer: Transferable[] } {
+    const { requestId } = data;
+    const species: AtomSpecies = { Z: data.Z, charge: data.charge ?? 0, excitation: data.excitation ?? null };
+    try {
+        if (data.type === 'energies') {
+            return {
+                response: { type: 'energies', speciesKey: speciesKey(species), ionisation: ionisationEnergy(species), excitation: excitationEnergy(species), requestId },
+                transfer: [],
+            };
+        }
+        const atom = solveSpecies(species);
+        const reference = isNeutralGround(species) ? null : (() => {
+            const neutral = buildAtomProfile(solveAtom(species.Z), data.enclosedFraction);
+            return { displayRadius: neutral.displayRadius, contourRadius: neutral.contourRadius };
+        })();
+        const profile = buildSerialisedAtomProfile(atom, data.enclosedFraction, { speciesKey: speciesKey(species), reference });
+        return { response: { type: 'success', profile, requestId }, transfer: transferListFor(profile) };
+    } catch (error) {
+        if (error instanceof UnboundAnionError) return { response: { type: 'unbound', message: error.message, requestId }, transfer: [] };
+        return { response: { type: 'error', message: error instanceof Error ? error.message : 'Unknown error', requestId }, transfer: [] };
+    }
 }
 
 // The DOM lib types the global `self` as a Window, whose postMessage takes a
 // target origin rather than a transfer list. Pulling in the WebWorker lib
 // instead would collide with DOM, so describe just the surface used here.
 interface WorkerScope {
-    onmessage: ((event: MessageEvent<WorkerMessageData>) => void) | null;
+    onmessage: ((event: MessageEvent<AtomWorkerRequest>) => void) | null;
     postMessage(message: unknown, transfer?: Transferable[]): void;
 }
 const worker = self as unknown as WorkerScope;
 
-worker.onmessage = (e: MessageEvent<WorkerMessageData>) => {
-    if (e.data.type !== 'solve') return;
-
-    const { requestId } = e.data;
-
-    try {
-        console.log('Worker: Starting SCF solve', { Z: e.data.Z, requestId });
-        const atom = solveAtom(e.data.Z);
-        const profile = buildSerialisedAtomProfile(atom, e.data.enclosedFraction);
-
-        console.log('Worker: Solve complete', {
-            Z: profile.Z,
-            iterations: atom.iterations,
-            converged: atom.converged,
-            subshellCount: profile.subshells.length,
-        });
-
-        const response: WorkerSuccessResponse = { type: 'success', profile, requestId };
-        worker.postMessage(response, transferListFor(profile));
-    } catch (error) {
-        console.error('Worker: Error during SCF solve:', error);
-        const response: WorkerErrorResponse = {
-            type: 'error',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            requestId,
-        };
-        worker.postMessage(response);
-    }
+worker.onmessage = (e: MessageEvent<AtomWorkerRequest>) => {
+    if (e.data.type !== 'solve' && e.data.type !== 'energies') return;
+    const { response, transfer } = handleAtomWorkerRequest(e.data);
+    worker.postMessage(response, transfer);
 };

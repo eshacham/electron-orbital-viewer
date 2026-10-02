@@ -33,4 +33,9 @@ describe('shellMeshCacheKey', () => {
     it('defaults to the full shell when no isolation is given', () => {
         expect(shellMeshCacheKey(26, 3, 32, 0.9)).toBe(shellMeshCacheKey(26, 3, 32, 0.9, null));
     });
+
+    it('keys by species, and a neutral atom\'s key is unchanged', () => {
+        expect(shellMeshCacheKey('26', 3, 32, 0.9)).toBe(shellMeshCacheKey(26, 3, 32, 0.9));
+        expect(shellMeshCacheKey('11+1', 2, 32, 0.9)).not.toBe(shellMeshCacheKey(11, 2, 32, 0.9));
+    });
 });

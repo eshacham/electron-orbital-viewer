@@ -125,7 +125,9 @@ export function useAtomSolver(
         // at all -- this is what makes a mode switch away and back, or
         // re-picking the same element, immediate rather than another
         // multi-second solve.
-        const cached = getCachedProfile(Z, enclosedFraction);
+        // String(Z) is a neutral species' key (Task 8's C9 ruling) -- a stopgap
+        // until Task 9 rewires this hook to post/cache a full species.
+        const cached = getCachedProfile(String(Z), enclosedFraction);
         if (cached) {
             dispatch(solveSucceeded(cached));
             return;
@@ -151,7 +153,7 @@ export function useAtomSolver(
             // converges -- but silently drawing a wrong picture instead of
             // reporting it would be worse than the ruling it violates.
             if (profile.converged) {
-                setCachedProfile(Z, enclosedFraction, profile);
+                setCachedProfile(String(Z), enclosedFraction, profile);
                 dispatch(solveSucceeded(profile));
             } else {
                 dispatch(solveFailed(`The SCF calculation for Z=${Z} did not converge.`));

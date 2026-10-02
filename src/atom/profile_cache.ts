@@ -8,12 +8,13 @@
  * fresh worker per request, wiping the worker's module scope (and its
  * cache) every time.
  *
- * This cache sits in front of the worker entirely. An atom's LDA ground
- * state is a pure function of Z, and the profile built from it a pure
- * function of (Z, enclosedFraction) -- same configuration, same grid, same
- * SCF loop, same fraction-to-contour slice every time -- so a hit here can
- * never go stale; there is no invalidation to get wrong, only a size bound
- * so a long session cannot grow this without limit.
+ * This cache sits in front of the worker entirely. A species' LDA ground
+ * state is a pure function of (Z, charge, excitation) -- its speciesKey --
+ * and the profile built from it a pure function of (species, enclosedFraction)
+ * -- same configuration, same grid, same SCF loop, same fraction-to-contour
+ * slice every time -- so a hit here can never go stale; there is no
+ * invalidation to get wrong, only a size bound so a long session cannot grow
+ * this without limit.
  */
 import { SerialisedAtomProfile } from '../workers/atomWorker';
 
@@ -26,13 +27,13 @@ const MAX_ENTRIES = 20;
 
 const cache = new Map<string, SerialisedAtomProfile>();
 
-function keyFor(Z: number, enclosedFraction: number): string {
-    return `${Z}:${enclosedFraction}`;
+function keyFor(species: string, enclosedFraction: number): string {
+    return `${species}:${enclosedFraction}`;
 }
 
 /** Looks up a previously solved profile, marking it most-recently-used on a hit. */
-export function getCachedProfile(Z: number, enclosedFraction: number): SerialisedAtomProfile | undefined {
-    const key = keyFor(Z, enclosedFraction);
+export function getCachedProfile(species: string, enclosedFraction: number): SerialisedAtomProfile | undefined {
+    const key = keyFor(species, enclosedFraction);
     const hit = cache.get(key);
     if (hit !== undefined) {
         // Map iterates in insertion order, so re-inserting on a hit is what
@@ -44,8 +45,8 @@ export function getCachedProfile(Z: number, enclosedFraction: number): Serialise
 }
 
 /** Records a solved profile, evicting the least-recently-used entry if this pushes the cache over its bound. */
-export function setCachedProfile(Z: number, enclosedFraction: number, profile: SerialisedAtomProfile): void {
-    const key = keyFor(Z, enclosedFraction);
+export function setCachedProfile(species: string, enclosedFraction: number, profile: SerialisedAtomProfile): void {
+    const key = keyFor(species, enclosedFraction);
     cache.delete(key);
     cache.set(key, profile);
     if (cache.size > MAX_ENTRIES) {
