@@ -669,10 +669,14 @@ html, body, #root {
 .species-charge-row, .species-excite-row { display: flex; align-items: center; gap: 4px; }
 .species-charge-row .MuiButton-root { min-width: 32px; }
 .species-charge-value { min-width: 84px; text-align: center; font-weight: 600; }
-.species-method { font-size: 0.75rem; color: #9fb3d9; border-bottom: 1px dotted #9fb3d9; cursor: help; }
-.species-measured { color: #b0b0b0; }
-.species-compare { color: #c8ccd6; }
-.species-compare-swatch { display: inline-block; width: 18px; height: 0; border-top: 2px dashed #d9dde8; vertical-align: middle; margin-right: 6px; }
+/* I1: these three sit on the same light, translucent card as the rest of
+   LevelNav (panel_contrast.test.ts pins all three against that background),
+   so they need dark-on-light colours, not the dark-on-dark ones a card
+   floating over the black 3D view might suggest. */
+.species-method { font-size: 0.75rem; color: #1f4e9a; border-bottom: 1px dotted #1f4e9a; cursor: help; }
+.species-measured { color: rgba(0, 0, 0, 0.62); }
+.species-compare { color: rgba(0, 0, 0, 0.7); }
+.species-compare-swatch { display: inline-block; width: 18px; height: 0; border-top: 2px dashed rgba(0, 0, 0, 0.6); vertical-align: middle; margin-right: 6px; }
 .level-nav-valence {
   margin-top: 2px;
   font-variant-numeric: tabular-nums;

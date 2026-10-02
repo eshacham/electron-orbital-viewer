@@ -87,8 +87,10 @@ interface Crumb {
  * Breadcrumb + shell picker + honest-framing note for the multi-electron
  * drill-down (whole atom -> shell -> subshell -> orbital).
  *
- * The shell picker below is built from `shellsFor(Z)` — the ground-state
- * configuration — and never from `shellPeaks`. Ruling R26: neighbouring
+ * The shell picker below is built from the species configuration --
+ * `shellsOf(configuration ?? configurationFor(Z))`, an ion's or an excited
+ * atom's own occupancies when one is given, the neutral ground state's
+ * otherwise -- and never from `shellPeaks`. Ruling R26: neighbouring
  * shells' D(r) genuinely merge into one resolved maximum well before the
  * shells themselves stop being distinct occupied levels (iron has 4 occupied
  * shells but only 3 resolved peaks), so a picker built from peaks would
@@ -102,6 +104,11 @@ const LevelNav: React.FC<LevelNavProps> = ({
 
     const element = elementFor(Z);
     const elementName = element ? element.name : `Z=${Z}`;
+    // M10: the element button's accessible name names the species, not just
+    // the element -- "change element, currently Na⁺ · Sodium" rather than
+    // a plain "currently Sodium" that drops the very thing distinguishing
+    // this view from the neutral atom's.
+    const changeElementLabel = `change element, currently ${speciesSymbol ? `${speciesSymbol} · ${elementName}` : elementName}`;
     // Everything below is built from the species' own occupancies, not the
     // neutral ground state's (Global Constraints, Review Focus 5): Na⁺ has
     // no M shell, Na(3s→4s) has no n=3 shell, and both must say so.
@@ -190,7 +197,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                         variant="outlined"
                         className="level-nav-change-element"
                         onClick={onChangeElement}
-                        aria-label={`change element, currently ${elementName}`}
+                        aria-label={changeElementLabel}
                     >
                         {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
                     </Button>
@@ -222,7 +229,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     variant="outlined"
                     className="level-nav-change-element"
                     onClick={onChangeElement}
-                    aria-label={`change element, currently ${elementName}`}
+                    aria-label={changeElementLabel}
                 >
                     {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
                 </Button>
@@ -329,7 +336,10 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     electron moved; ionisation and excitation energies are
                     ΔSCF differences of total energies from the
                     spin-polarised form of the same LDA, never orbital
-                    eigenvalues. The individual s/p/d/f
+                    eigenvalues. The picture on screen is drawn from a
+                    simpler, spin-restricted form of that LDA, and in it
+                    most anions -- Cl⁻ included -- have no bound state for
+                    their extra electron at all. The individual s/p/d/f
                     lobes you can select below are a basis choice, not
                     separate physical objects: a partially filled subshell's
                     electrons are smeared uniformly over all of it, not

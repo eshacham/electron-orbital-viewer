@@ -34,6 +34,11 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     { selector: '.level-nav-valence-note', declared: 'opacity: 0.75', fg: 'rgba(0, 0, 0, 0.6525)', bg: LIGHT_96 },
     { selector: '.level-nav-shell-hint', declared: 'opacity: 0.7', fg: 'rgba(0, 0, 0, 0.609)', bg: LIGHT_96 },
     { selector: '.phone-sheet-tab[aria-selected="true"]', declared: 'color: #1565c0', fg: '#1565c0', bg: 'rgba(240, 240, 240, 0.97)' },
+    // SpeciesControls (Task 11 fix round, I1): sits on the same light card as
+    // the rest of LevelNav, so it needs the same dark-on-light treatment.
+    { selector: '.species-method', declared: 'color: #1f4e9a', fg: '#1f4e9a', bg: LIGHT_96 },
+    { selector: '.species-measured', declared: 'color: rgba(0, 0, 0, 0.62)', fg: 'rgba(0, 0, 0, 0.62)', bg: LIGHT_96 },
+    { selector: '.species-compare', declared: 'color: rgba(0, 0, 0, 0.7)', fg: 'rgba(0, 0, 0, 0.7)', bg: LIGHT_96 },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {

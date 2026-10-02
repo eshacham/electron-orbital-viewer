@@ -20,6 +20,12 @@ describe('ΔSCF energies', () => {
         expect(DELTA_SCF_LABEL).toBe('ΔSCF, LDA');
         expect(DELTA_SCF_METHOD).toMatch(/difference of two self-consistent total energies/);
         expect(DELTA_SCF_METHOD).toMatch(/spin-polarised/);
+        // M5: the tooltip states both halves of the method split -- these
+        // energies are spin-polarised (just asserted above), but the picture
+        // on screen is a different, spin-restricted solve of the same LDA.
+        // A reader who only ever hovers an energy must still be told the
+        // picture is not what produced the number next to it.
+        expect(DELTA_SCF_METHOD).toMatch(/spin-restricted/);
     });
 
     it('is exact for hydrogen and He+ (one-electron bypass)', () => {

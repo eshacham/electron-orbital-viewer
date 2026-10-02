@@ -265,6 +265,16 @@ describe('LevelNav', () => {
         // longer contains.
         expect(about.textContent).toMatch(/isolated atoms and their ions/i);
         expect(about.textContent).toMatch(/basis choice/i);
+        // M5: an ion/excitation energy's own tooltip says it is never an
+        // orbital eigenvalue and that these energies are spin-polarised;
+        // the about text says the same, plus which solve draws the picture.
+        expect(about.textContent).toMatch(/never orbital eigenvalues/i);
+        expect(about.textContent).toMatch(/spin-polarised/i);
+        // M5: the picture itself is the simpler, spin-restricted LDA, and
+        // most anions -- Cl⁻ included -- are not bound in it (Fact 3; Global
+        // Constraints' "Cl⁻ reported as unbound").
+        expect(about.textContent).toMatch(/spin-restricted/i);
+        expect(about.textContent).toMatch(/Cl⁻/);
     });
 });
 
@@ -278,7 +288,23 @@ describe('LevelNav for a species', () => {
         expect(getByText('1s² 2s² 2p⁶')).toBeInTheDocument();
         const shells = within(getByRole('group', { name: 'shells' })).getAllByRole('button').map(b => b.textContent);
         expect(shells.some(label => /M shell/.test(label ?? ''))).toBe(false);
-        expect(getByRole('button', { name: /change element/i })).toHaveTextContent('Na⁺ · Sodium');
+        // M10: the accessible name carries the species too, not only the
+        // element -- "Na⁺ · Sodium", not a bare "Sodium" that would read
+        // identically for the neutral atom and every one of its ions.
+        const changeElement = getByRole('button', { name: /change element, currently Na⁺ · Sodium/i });
+        expect(changeElement).toHaveTextContent('Na⁺ · Sodium');
+    });
+
+    // Review Focus 5 extends past ions: an excited atom can lose a shell
+    // entirely too, when its one promoted electron was that shell's last.
+    it('an excited atom with an emptied shell has no chip for it either (Na 3s → 4s)', () => {
+        const configuration = speciesConfiguration({ Z: 11, charge: 0, excitation: { from: { n: 3, l: 0 }, to: { n: 4, l: 0 } } });
+        const { getByRole } = render(
+            <LevelNav Z={11} configuration={configuration} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+        );
+        const shells = within(getByRole('group', { name: 'shells' })).getAllByRole('button').map(b => b.textContent);
+        expect(shells.some(label => /M shell/.test(label ?? ''))).toBe(false);
+        expect(shells.some(label => /N shell/.test(label ?? ''))).toBe(true);
     });
 
     it('renders species controls directly under the element button', () => {
