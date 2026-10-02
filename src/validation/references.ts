@@ -6,10 +6,12 @@
  *
  * Phase 0 rows are the atom-mode engine's recorded agreement with NIST
  * (docs/HANDOFF.md); tests/atom/scf.test.ts is what pins those values, with
- * the same tolerances (0.001 % total energy, 0.02 % eigenvalues). Rows from
- * phase 1 on compute `app` by calling the very functions their physics tests
- * call, at import -- about a second of grid quadrature -- so import this only
- * from tests and from a lazily loaded page, never from the app's entry.
+ * the same tolerances (0.001 % total energy, 0.02 % eigenvalues). Phase 1's
+ * rows compute `app` by calling the very functions their physics tests call,
+ * at import -- about a second of grid quadrature -- so import this only from
+ * tests and from a lazily loaded page, never from the app's entry. Phase 3's
+ * rows are dozens of SCF solves, too slow for import: a slow test writes them
+ * to ion_results.json, and a staleness check re-solves them (ion_rows.ts).
  */
 import { PHASE_1_ROWS } from './phase1';
 import { ION_VALIDATION_ROWS } from './ion_rows';
