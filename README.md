@@ -158,7 +158,10 @@ along x, at a 90% contour:
 
 `frac`, `cut`, `op` and `surf` are always written, even at their defaults, so
 a link reproduces the sender's picture in any tab rather than whatever that
-tab's settings happened to be. Number keys (`frac`, `op`, `cam`, `F`) accept
+tab's settings happened to be; a hand-written link that leaves one out keeps
+the opening tab's own setting for it (only a missing `cam` resets). `frac` is
+the contour drawn: in Basic Orbitals a new fraction counts once Update Orbital
+has drawn it. Number keys (`frac`, `op`, `cam`, `F`) accept
 decimal literals only — hex, leading `+`, or stray whitespace are ignored
 like any other malformed key, not parsed as a number nobody wrote.
 
@@ -169,8 +172,9 @@ like any other malformed key, not parsed as a number nobody wrote.
   cropped to the area the side panels leave free. The caption states the
   view and its method, word-wrapped to the image width; the key is either
   the plain ψ-sign key or, when a combination is on screen, its own colour
-  key. Refuses while the picture is still computing, while the atom is
-  solving, or if the WebGL context is lost mid-capture.
+  key. Refuses while the picture is still computing (a shell's lobes and a
+  level transition included), while the atom is solving, if a shell's lobes
+  failed to compute, or if the WebGL context is lost mid-capture.
 - **Radial curves (CSV)** — UTF-8 with a BOM, LF line endings, `#`-prefixed
   comment lines (what the view is, the quantity plotted, the method, and the
   share link for this exact view), one column per curve against a shared

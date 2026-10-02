@@ -461,11 +461,28 @@ phase plan, or isn't visible from reading one file.
   depending on what the receiving tab happened to be looking at already.
 - **`frac`, `cut`, `op` and `surf` are always written, even at their
   defaults** — unlike `cam`, which is left out exactly at the canonical
-  angle. The asymmetry is deliberate: a missing view key must decode to the
-  same default the encoder would have written, so a link reproduces the
-  sender's picture in *any* tab; `cam`'s "missing means canonical" rule
-  gives the same guarantee more cheaply, since the canonical angle is also
-  the only value worth omitting.
+  angle. So every link the app makes carries all five settings it shows, and
+  reproduces the sender's picture in any tab. Decoding is not symmetric
+  with that: a link *missing* `frac`, `cut`, `op` or `surf` (hand-written,
+  or the spec's own shorthand §4.3 example) leaves the opening tab's value
+  for that key alone (`decodeViewKeys` dispatches only what it can parse);
+  only a missing `cam` resets, to the canonical angle, because "no `cam`"
+  is what the encoder writes for canonical.
+- **`frac` is the contour drawn, not the panel's** (`selectShownEnclosedFraction`
+  in `orbitalSlice.ts`). Basic Orbitals applies a new enclosed fraction only
+  on Update Orbital, like its n/l/mₗ, so until then a link and every caption
+  state the drawn orbital's own fraction. Combinations and atom mode redraw
+  as the fraction changes, so there the store's value is already the drawn
+  one.
+- **For Phase 4:** a link without `rel` must decode as relativistic
+  corrections *off* — every Phase 2 link predates the key, and must go on
+  reproducing the picture it showed when it was made. Treat absence as
+  "off", not as "the tab's current setting" and not as a new default.
+- **For Phase 7:** lesson links should write the full view-key set — `frac`,
+  `cut`, `op`, `surf`, and `cam` unless the canonical angle is meant —
+  because a missing `frac`/`cut`/`op`/`surf` inherits whatever the reader's
+  tab already had, so a terse lesson link would open a different picture in
+  different tabs.
 - **A pasted or typed link that names a recognised mode closes the
   periodic-table pop-over** (`useUrlStateSync`'s `onApplyHash`, wired from
   `App.tsx` to `closeTable`) — otherwise the view the link just restored
@@ -474,13 +491,31 @@ phase plan, or isn't visible from reading one file.
 ### Export, by format — as built, not as planned
 
 - **Every export's availability comes from one function per kind**
-  (`drawnReason`, `pngReason`, `geometryReason`, `cubeReason` in
-  `run_export.ts`), each layering the next case on the last: nothing drawn →
-  waiting for the atom → the picture still computing → a refused combination
-  (its own message, ruling C10) → the last render failed → (STL/glTF only)
-  the whole-atom level has no surface → (cube only) an overlay has more than
-  one member. The export menu shows whichever of these is true as the
-  item's disabled reason, read fresh every time the menu opens.
+  (`run_export.ts`), and the first reason that applies is the one shown.
+  `drawnReason` is the base: in atom mode, waiting for the atom (no profile
+  yet), then — at the orbital level only — the last render failed; in Basic
+  Orbitals, a refused combination (its own message, ruling C10), then the
+  last render failed, then nothing drawn yet. On top of it:
+  - `pngReason` (both PNGs): `drawnReason`, then — at a shell — its lobes
+    failed to compute (`COMPOSITION_FAILED_REASON`), then the picture still
+    computing (`PICTURE_BUSY_REASON`: an orbital or combination render in
+    flight, the atom solving, a shell's lobes being built, or a level
+    transition running).
+  - `geometryReason` (STL, glTF): the whole-atom level first (it has no
+    surface, `WHOLE_ATOM_GEOMETRY_REASON`), then `pngReason`.
+  - `csvReason`: atom mode needs only the profile (its curves are the SCF's,
+    at every level — a failed 3D render does not touch them); Basic Orbitals
+    uses `drawnReason`.
+  - `cubeReason`: atom levels 1–2 need only the profile; otherwise
+    `drawnReason`, then the surface still computing (`CUBE_BUSY_REASON`),
+    then an overlay of several members (`CUBE_OVERLAY_REASON`).
+
+  The export menu shows the reason as the item's secondary text; unavailable
+  items stay reachable by arrow key so a screen reader reads it. At the
+  click, `runExport` checks again, then the 3D view must be mounted
+  (`VIEW_NOT_READY_REASON`), then each encoder applies its own checks on what
+  the scene actually holds (nothing to export, a non-finite or zero-size
+  surface, STL's manifold check).
 - **PNG** draws the combination's own colour key instead of the plain
   ψ-sign key when one is on screen (ruling C5) — the two are mutually
   exclusive in the app itself. The caption is wrapped to the image width
@@ -524,16 +559,16 @@ phase plan, or isn't visible from reading one file.
   the worker never pulls in three.js or Redux; building a request out of
   live state (`cubeJobFor`, which needs `RootState` and `caption.ts`) stays
   on the main thread, in `run_export.ts`.
-- **Known gap, not fixed this phase:** the shell-lobe composition worker
-  (`shell_composition_view.ts`'s mesh build) has no busy flag in the store,
-  unlike the orbital/field pipeline's `isLoading`. So while a shell's lobes
-  are still being composed, the PNG and STL/glTF menu items read as
-  available when they should not: STL and glTF still refuse at the moment
-  of the click (`collectSurfaces` has nothing yet, or only the previous
-  level's meshes), but a PNG can succeed and silently capture the previous
-  frame instead of the one being built. Fixing it properly needs a busy flag
-  threaded through that worker the way `orbital.isLoading` already is for
-  the single-orbital path.
+- **A shell's lobes and a level transition change the picture with no
+  render request in flight**, so each reports itself to the store.
+  `OrbitalViewer`'s composition effect sets `orbital.compositionBusy` when
+  it posts a lobe build and clears it on the reply, on a newer run of the
+  effect, on leaving the shell level and on unmount; a failed build sets
+  `compositionFailed` and the app's error message (the same Snackbar as a
+  failed render) instead of only logging. The visualizer's animation loop
+  reports a running transition through `onTransitionChange`
+  (`reportTransitionState`, once per change, up to a frame late) into
+  `orbital.levelTransition`. PNG, STL and glTF wait on all three.
 
 ## Judgment calls made without asking
 
@@ -598,11 +633,6 @@ Recorded for review, per the session's standing authority.
 - The cross-fade renders the scene twice for ~350 ms.
 - A busy SCF worker queues behind an abandoned slow solve. Correctness is
   preserved by request id; latency in that narrow case is not.
-- **The shell-lobe composition worker has no busy flag** (Phase 2), so the
-  PNG and STL/glTF export items stay enabled while a shell's lobes are still
-  being composed. STL and glTF still refuse at the moment of the click; a
-  PNG taken in that window can succeed and silently capture the previous
-  frame. See "Phase 2 — share and export" above.
 
 ---
 
