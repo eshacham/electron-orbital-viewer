@@ -661,6 +661,18 @@ html, body, #root {
 .level-nav-method {
   opacity: 0.75;
 }
+/* SpeciesControls: charge stepper, Excite menu, ΔSCF energies, size compare
+   (spec §5 Phase 3). Lives in LevelNav's own stylesheet section because it
+   is laid out directly under the element button (ruling C13), not as a
+   panel of its own. */
+.species-controls { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 8px; }
+.species-charge-row, .species-excite-row { display: flex; align-items: center; gap: 4px; }
+.species-charge-row .MuiButton-root { min-width: 32px; }
+.species-charge-value { min-width: 84px; text-align: center; font-weight: 600; }
+.species-method { font-size: 0.75rem; color: #9fb3d9; border-bottom: 1px dotted #9fb3d9; cursor: help; }
+.species-measured { color: #b0b0b0; }
+.species-compare { color: #c8ccd6; }
+.species-compare-swatch { display: inline-block; width: 18px; height: 0; border-top: 2px dashed #d9dde8; vertical-align: middle; margin-right: 6px; }
 .level-nav-valence {
   margin-top: 2px;
   font-variant-numeric: tabular-nums;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, fireEvent, within } from '@testing-library/react';
 import LevelNav, { NavigationTarget } from '../../src/components/LevelNav';
+import { speciesConfiguration } from '../../src/atom/species';
 
 describe('LevelNav', () => {
     it('does not claim a core for a one-shell atom', () => {
@@ -257,7 +258,45 @@ describe('LevelNav', () => {
         expect(about.textContent).toMatch(/LDA/);
         expect(about.textContent).toMatch(/VWN/);
         expect(about.textContent).toMatch(/non-relativistic/i);
-        expect(about.textContent).toMatch(/neutral/i);
+        // Task 11 rewrites the "neutral, isolated atoms only" sentence to
+        // "isolated atoms and their ions" (spec §5 Phase 3: the model now
+        // covers ions and excited atoms too) -- this pins the replacement
+        // wording rather than the word "neutral", which this sentence no
+        // longer contains.
+        expect(about.textContent).toMatch(/isolated atoms and their ions/i);
         expect(about.textContent).toMatch(/basis choice/i);
+    });
+});
+
+describe('LevelNav for a species', () => {
+    it('LevelNav builds its shells from the species configuration', () => {
+        const configuration = speciesConfiguration({ Z: 11, charge: 1, excitation: null });
+        const { getByText, getByRole } = render(
+            <LevelNav Z={11} configuration={configuration} speciesTitle="Sodium ion Na⁺" speciesSymbol="Na⁺"
+                selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} onChangeElement={() => {}} />
+        );
+        expect(getByText('1s² 2s² 2p⁶')).toBeInTheDocument();
+        const shells = within(getByRole('group', { name: 'shells' })).getAllByRole('button').map(b => b.textContent);
+        expect(shells.some(label => /M shell/.test(label ?? ''))).toBe(false);
+        expect(getByRole('button', { name: /change element/i })).toHaveTextContent('Na⁺ · Sodium');
+    });
+
+    it('renders species controls directly under the element button', () => {
+        const { container } = render(
+            <LevelNav Z={11} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}}
+                onChangeElement={() => {}} speciesControls={<div className="probe">controls</div>} />
+        );
+        const probe = container.querySelector('.probe')!;
+        const button = container.querySelector('.level-nav-change-element')!;
+        expect(button.compareDocumentPosition(probe) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(container.querySelector('.level-nav-configuration')!.compareDocumentPosition(probe) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    });
+
+    it('no longer claims to describe neutral atoms only', () => {
+        const { container } = render(
+            <LevelNav Z={6} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+        );
+        expect(container.textContent).not.toMatch(/no ions/);
+        expect(container.textContent).toMatch(/isolated atoms and their ions/);
     });
 });

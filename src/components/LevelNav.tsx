@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Breadcrumbs, Link, Chip, Typography, Collapse, Button } from '@mui/material';
 import { elementFor } from '../elements';
-import { shellsFor, configurationLabel, subshellLabel, valenceShellFor, valenceConfigurationLabel } from '../atom/configurations';
+import { SubshellOccupancy, configurationFor, shellsOf, configurationLabelOf, subshellLabel, valenceShellOf, valenceConfigurationLabelOf } from '../atom/configurations';
 import { orbitalName } from '../orbital_names';
 
 /**
@@ -44,6 +44,25 @@ interface LevelNavProps {
      * 'body' is the rest, in the bottom sheet's Explore tab.
      */
     variant?: 'full' | 'header' | 'body';
+    /**
+     * The species' own occupancies -- an ion's or an excited atom's --
+     * rather than the neutral ground state's (Global Constraints: "shell
+     * chips, configuration line and valence line come from the species
+     * configuration, never from detected peaks"). Defaults to
+     * `configurationFor(Z)` so every existing neutral-atom caller is
+     * unaffected.
+     */
+    configuration?: SubshellOccupancy[];
+    /** The element button's text when the species is not the neutral atom, e.g. 'Na⁺'. */
+    speciesSymbol?: string;
+    /** The breadcrumb root label for the species, e.g. 'Sodium ion Na⁺'. Defaults to the element's name. */
+    speciesTitle?: string;
+    /**
+     * The Charge/Excite card (layout contract §3.8: directly under the
+     * element button, left `.side-panel` on desktop, first block of the
+     * phone Explore tab -- no floating panel of its own).
+     */
+    speciesControls?: React.ReactNode;
 }
 
 // Old X-ray shell letters, matching atom_profile.ts's private shellName
@@ -77,23 +96,28 @@ interface Crumb {
  */
 const LevelNav: React.FC<LevelNavProps> = ({
     Z, selectedShell, selectedSubshell, selectedOrbital, onNavigate, onChangeElement, children,
-    variant = 'full',
+    variant = 'full', configuration, speciesSymbol, speciesTitle, speciesControls,
 }) => {
     const [aboutOpen, setAboutOpen] = useState(false);
 
     const element = elementFor(Z);
     const elementName = element ? element.name : `Z=${Z}`;
-    const shells = shellsFor(Z);
+    // Everything below is built from the species' own occupancies, not the
+    // neutral ground state's (Global Constraints, Review Focus 5): Na⁺ has
+    // no M shell, Na(3s→4s) has no n=3 shell, and both must say so.
+    const speciesConfiguration = configuration ?? configurationFor(Z);
+    const rootLabel = speciesTitle ?? elementName;
+    const shells = shellsOf(speciesConfiguration);
     // Addendum 2, "core versus valence". The outermost shell is where an
     // element's chemistry almost entirely lives; everything inside is inert
     // core. Showing the valence configuration on its own is what makes a
     // group visible as a group -- Li/Na/K all read ns¹, F/Cl both ns²np⁵,
     // Ne/Ar both ns²np⁶ -- without asserting any bonding model the app does
-    // not compute (see valenceShellFor).
-    const valenceN = valenceShellFor(Z);
+    // not compute (see valenceShellOf).
+    const valenceN = valenceShellOf(speciesConfiguration);
 
     const crumbs: Crumb[] = [
-        { key: 'atom', label: elementName, target: { level: 'atom' } },
+        { key: 'atom', label: rootLabel, target: { level: 'atom' } },
     ];
 
     /**
@@ -125,7 +149,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
             : selectedSubshell
                 ? { label: shellName(selectedSubshell.n), target: { level: 'shell', n: selectedSubshell.n } }
                 : selectedShell !== null
-                    ? { label: elementName, target: { level: 'atom' } }
+                    ? { label: rootLabel, target: { level: 'atom' } }
                     : null;
     if (selectedShell !== null) {
         crumbs.push({ key: 'shell', label: shellName(selectedShell), target: { level: 'shell', n: selectedShell } });
@@ -168,7 +192,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                         onClick={onChangeElement}
                         aria-label={`change element, currently ${elementName}`}
                     >
-                        {element ? `${element.symbol} · ${element.name}` : elementName} ▾
+                        {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
                     </Button>
                 )}
                 {location && <span className="level-nav-location">{location}</span>}
@@ -179,6 +203,10 @@ const LevelNav: React.FC<LevelNavProps> = ({
 
     return (
         <Box className={`level-nav${isBody ? ' level-nav-body' : ''}`} aria-label="level navigation">
+            {/* Ruling C13: the Charge/Excite card sits directly under the
+                element button on a desktop, and as the first thing in a
+                phone's Explore tab -- never a floating panel of its own. */}
+            {isBody && speciesControls}
             {!isBody && parent && (
                 <Button
                     size="small"
@@ -196,9 +224,10 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     onClick={onChangeElement}
                     aria-label={`change element, currently ${elementName}`}
                 >
-                    {element ? `${element.symbol} · ${element.name}` : elementName} ▾
+                    {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
                 </Button>
             )}
+            {!isBody && speciesControls}
             {/* At the whole-atom level the breadcrumb is only the element's
                 name, which the element button already shows. */}
             {(crumbs.length > 1 || (!onChangeElement && !isBody)) && (
@@ -219,10 +248,10 @@ const LevelNav: React.FC<LevelNavProps> = ({
             )}
 
             <Typography variant="body2" className="level-nav-configuration">
-                {configurationLabel(Z)}
+                {configurationLabelOf(speciesConfiguration)}
             </Typography>
             <Typography variant="body2" className="level-nav-valence">
-                Valence: {valenceConfigurationLabel(Z)}
+                Valence: {valenceConfigurationLabelOf(speciesConfiguration)}
                 {/* Hydrogen and helium have one shell and so no core at all. */}
                 {shells.length > 1 && (
                     <span className="level-nav-valence-note"> · everything inside is core</span>
@@ -294,8 +323,13 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     determinants. Exchange and correlation come from the
                     local density approximation (LDA) with the VWN
                     correlation functional. It is non-relativistic and
-                    describes neutral, isolated atoms only — no ions, no
-                    molecules, no spin-orbit coupling. The individual s/p/d/f
+                    describes isolated atoms and their ions — no molecules,
+                    no spin-orbit coupling. An ion or an excited atom uses
+                    the same model with its own electron count or one
+                    electron moved; ionisation and excitation energies are
+                    ΔSCF differences of total energies from the
+                    spin-polarised form of the same LDA, never orbital
+                    eigenvalues. The individual s/p/d/f
                     lobes you can select below are a basis choice, not
                     separate physical objects: a partially filled subshell's
                     electrons are smeared uniformly over all of it, not
