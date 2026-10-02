@@ -2,7 +2,7 @@ import type { RootState } from '../store';
 import { elementFor } from '../elements';
 import { orbitalName } from '../orbital_names';
 import { subshellLabel } from '../atom/configurations';
-import { selectShownBasicOrbital } from '../store/orbitalSlice';
+import { selectShownBasicOrbital, selectShownEnclosedFraction } from '../store/orbitalSlice';
 import { combinationTitle } from '../combinations';
 import { MAX_FIELD_AU } from '../field_source';
 import { N2_MAX_FIELD_AU } from '../stark';
@@ -37,7 +37,7 @@ export function shellLabel(n: number): string {
 }
 
 export function viewDescription(state: RootState): string {
-    const percent = `${Math.round(state.orbital.enclosedFraction * 100)}% contour`;
+    const percent = `${Math.round(selectShownEnclosedFraction(state) * 100)}% contour`;
     if (state.atom.mode !== 'atom') {
         const combination = state.orbital.combination;
         if (combination.kind !== 'none') return `Hydrogen, ${combinationTitle(combination)}, ${percent}`;

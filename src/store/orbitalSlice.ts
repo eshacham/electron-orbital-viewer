@@ -205,11 +205,27 @@ export const {
  * does not count.
  */
 export function selectShownBasicOrbital(state: RootState): BasicSelection {
+  const drawn = drawnBasicOrbital(state);
+  return drawn ? { n: drawn.n, l: drawn.l, ml: drawn.ml } : state.orbital.basicSelection;
+}
+
+/** Basic Orbitals' own plain orbital on screen, if that is what is drawn (see selectShownBasicOrbital). */
+function drawnBasicOrbital(state: RootState): OrbitalParams | null {
   const drawn = state.orbital.currentParams;
-  if (drawn && !drawn.radialSamples && drawn.Z === BASIC_ORBITALS_Z) {
-    return { n: drawn.n, l: drawn.l, ml: drawn.ml };
-  }
-  return state.orbital.basicSelection;
+  return drawn && !drawn.radialSamples && drawn.Z === BASIC_ORBITALS_Z ? drawn : null;
+}
+
+/**
+ * The enclosed fraction a link or a caption should state: the contour on
+ * screen. A plain Basic Orbitals orbital takes a new fraction only on Update
+ * Orbital, like its n/l/mₗ, so until then the drawn one is what counts. A
+ * combination redraws as the fraction changes (App), and so do atom mode's
+ * views (the solver re-slices, level 3 re-requests), so there the panel's
+ * value is already the one drawn.
+ */
+export function selectShownEnclosedFraction(state: RootState): number {
+  const drawn = state.atom.mode !== 'atom' && state.orbital.combination.kind === 'none' ? drawnBasicOrbital(state) : null;
+  return drawn ? drawn.enclosedFraction : state.orbital.enclosedFraction;
 }
 
 export default orbitalSlice.reducer;

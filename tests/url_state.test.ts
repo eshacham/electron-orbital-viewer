@@ -1,6 +1,6 @@
 import {
     setEnclosedFraction, setBasicSelection, setSurfaceStyle, setCombination, cameraMoved,
-    startOrbitalCalculation, selectShownBasicOrbital,
+    startOrbitalCalculation, selectShownBasicOrbital, selectShownEnclosedFraction,
 } from '../src/store/orbitalSlice';
 import { setMode, setElement, solveSucceeded, drillToShell, drillToSubshell, drillToOrbital } from '../src/store/atomSlice';
 import {
@@ -181,7 +181,8 @@ function viewOf(state: RootState) {
             ? { Z: atom.Z, level: atom.level, shell: atom.selectedShell, subshell: atom.selectedSubshell, orbital: atom.selectedOrbital }
             : null,
         basic: atom.mode === 'hydrogenic' ? { orbital: selectShownBasicOrbital(state), combination: orbital.combination } : null,
-        frac: orbital.enclosedFraction,
+        // The contour on screen (final review I1), which a link must reproduce.
+        frac: selectShownEnclosedFraction(state),
         opacity: round2(style.opacity),
         surface: style.mode,
         clipAxis: style.clipAxis,
@@ -334,6 +335,31 @@ describe('built-in URL keys', () => {
         applyStateTo('#mode=basic&combo=field&level=1&F=0x1&op=0x1', store.dispatch);
         expect(store.getState().orbital.combination).toEqual({ kind: 'field', level: 1, field: 0.03, stark: 'lower' });
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+    });
+
+    // Final review I1: Basic Orbitals applies a new fraction only on Update
+    // Orbital, so a link copied before then must carry the drawn contour --
+    // the panel's would open a different picture.
+    it('writes the drawn fraction in Basic Orbitals until Update applies the panel\'s', () => {
+        const store = makeStore();
+        store.dispatch(setMode('hydrogenic'));
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(3, 2, 0, 0.9)));
+        store.dispatch(setEnclosedFraction(0.5));
+        expect(encodeStateOf(store.getState())).toMatch(/&frac=0\.9&/);
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(3, 2, 0, 0.5)));
+        expect(encodeStateOf(store.getState())).toMatch(/&frac=0\.5&/);
+    });
+
+    it('writes the panel\'s fraction for a combination and in atom mode, which redraw as it changes', () => {
+        const store = makeStore();
+        store.dispatch(setMode('hydrogenic'));
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(3, 2, 0, 0.9)));
+        store.dispatch(setCombination({ kind: 'hybrid', hybrid: 'sp', member: 0 }));
+        store.dispatch(setEnclosedFraction(0.75));
+        expect(encodeStateOf(store.getState())).toMatch(/&frac=0\.75&/);
+        store.dispatch(setMode('atom'));
+        store.dispatch(setEnclosedFraction(0.95));
+        expect(encodeStateOf(store.getState())).toMatch(/&frac=0\.95&/);
     });
 
     // Ruling T5/M4: encodeViewKeys always writes frac, cut, op and surf

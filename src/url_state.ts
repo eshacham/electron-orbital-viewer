@@ -2,7 +2,7 @@ import type { RootState, AppDispatch } from './store';
 import { setMode, setElement, solveStarted, requestAtomView, PendingAtomView, ViewMode } from './store/atomSlice';
 import {
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, requestCut, restoreCamera,
-    setSurfaceStyle, selectShownBasicOrbital, BasicSelection, CutSetting,
+    setSurfaceStyle, selectShownBasicOrbital, selectShownEnclosedFraction, BasicSelection, CutSetting,
 } from './store/orbitalSlice';
 import { ENCLOSED_FRACTIONS } from './orbital_presets';
 import { MIN_ATOMIC_NUMBER, MAX_ATOMIC_NUMBER } from './elements';
@@ -152,9 +152,10 @@ export function parseCamera(value: string | null): CameraAngles | null {
 }
 
 function encodeViewKeys(state: RootState): Record<string, string> {
-    const { surfaceStyle, enclosedFraction, pendingCut, cameraAngles } = state.orbital;
+    const { surfaceStyle, pendingCut, cameraAngles } = state.orbital;
     const keys: Record<string, string> = {
-        frac: String(enclosedFraction),
+        // The contour drawn, which in Basic Orbitals can lag the panel until Update Orbital.
+        frac: String(selectShownEnclosedFraction(state)),
         // A cut still waiting for its view is the one the link asked for.
         cut: formatCut(pendingCut ?? surfaceStyle),
         op: String(round2(surfaceStyle.opacity)),

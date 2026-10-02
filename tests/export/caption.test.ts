@@ -1,5 +1,6 @@
 import { drillToShell, drillToSubshell, drillToOrbital, setMode } from '../../src/store/atomSlice';
-import { setCombination } from '../../src/store/orbitalSlice';
+import { setCombination, setEnclosedFraction, startOrbitalCalculation } from '../../src/store/orbitalSlice';
+import { basicOrbitalParams } from '../../src/orbital_presets';
 import { viewDescription, exportFileStem, methodStatement, ATOM_METHOD, BASIC_METHOD } from '../../src/export/caption';
 import { MAX_FIELD_AU } from '../../src/field_source';
 import { N2_MAX_FIELD_AU } from '../../src/stark';
@@ -50,5 +51,23 @@ describe('export captions', () => {
         expect(level2).toContain('tunnelling ignored');
         expect(level2).toContain(`${N2_MAX_FIELD_AU}`);
         expect(level2).not.toContain('F << 1 a.u.');
+    });
+
+    // Final review I1: in Basic Orbitals the fraction only takes effect on
+    // Update Orbital, so until then the caption names the drawn contour, not
+    // the panel's. Combinations redraw as the fraction changes, so they
+    // follow the panel at once.
+    it('names the contour drawn, not one the panel has not applied yet', () => {
+        const store = makeStore();
+        store.dispatch(setMode('hydrogenic'));
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(3, 2, 0, 0.9)));
+        store.dispatch(setEnclosedFraction(0.5));
+        expect(viewDescription(store.getState())).toBe('Hydrogen 3d_z², 90% contour');
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(3, 2, 0, 0.5)));
+        expect(viewDescription(store.getState())).toBe('Hydrogen 3d_z², 50% contour');
+
+        store.dispatch(setCombination({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }));
+        store.dispatch(setEnclosedFraction(0.75));
+        expect(viewDescription(store.getState())).toMatch(/, 75% contour$/);
     });
 });
