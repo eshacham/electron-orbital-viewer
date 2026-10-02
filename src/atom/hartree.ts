@@ -94,3 +94,24 @@ export function hartreeEnergy(grid: RadialGrid, D: Float64Array, vHartree: Float
     for (let j = 0; j < grid.size; j++) integrand[j] = D[j] * vHartree[j];
     return 0.5 * integrateOnGrid(grid, integrand);
 }
+
+const SPIN_EXCHANGE_COEFFICIENT = Math.pow(6 / Math.PI, 1 / 3);
+
+/**
+ * Exchange for one spin channel, for the spin-polarised ΔSCF energies.
+ * Exchange only couples like spins, so E_x[up, down] = (E_x[2 up] + E_x[2 down]) / 2
+ * exactly, which gives V_x,s = -(6 rho_s / pi)^(1/3): the unpolarised
+ * formula at twice that channel's density.
+ */
+export function spinExchangePotential(densitySigma: Float64Array): Float64Array {
+    const v = new Float64Array(densitySigma.length);
+    for (let j = 0; j < densitySigma.length; j++) v[j] = -SPIN_EXCHANGE_COEFFICIENT * Math.cbrt(Math.max(densitySigma[j], 0));
+    return v;
+}
+
+/** Exchange energy per electron of that spin channel, -(3/4)(6 rho_s / pi)^(1/3). */
+export function spinExchangeEnergyDensity(densitySigma: Float64Array): Float64Array {
+    const eps = new Float64Array(densitySigma.length);
+    for (let j = 0; j < densitySigma.length; j++) eps[j] = -0.75 * SPIN_EXCHANGE_COEFFICIENT * Math.cbrt(Math.max(densitySigma[j], 0));
+    return eps;
+}

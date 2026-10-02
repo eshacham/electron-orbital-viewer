@@ -111,3 +111,88 @@ export function correlationEnergy(grid: RadialGrid, D: Float64Array, density: Fl
     for (let j = 0; j < grid.size; j++) integrand[j] = D[j] * correlationEnergyDensity(density[j]);
     return integrateOnGrid(grid, integrand);
 }
+
+/**
+ * VWN5 with spin polarisation, for the ΔSCF energies only (Phase 3).
+ * Restricted LDA misses the exchange-correlation energy of unpaired spins,
+ * which differs between an atom and its ion (O has two, O+ three) and put
+ * oxygen's ΔSCF ionisation energy 22 % high. Pictures keep the restricted,
+ * NIST-validated functional above.
+ *
+ * The three parameter sets are VWN's (Vosko, Wilk and Nusair 1980, fit 5):
+ * paramagnetic and ferromagnetic correlation energies and the spin
+ * stiffness alpha_c, each the same G(x; A, x0, b, c) form as eps_c above.
+ * The paramagnetic set reuses the constants above rather than restating
+ * them, so at zeta = 0 this reproduces the restricted functional exactly.
+ * The ferromagnetic and stiffness sets are verified end to end by the LSD
+ * total energies matching NIST SRD 141's LSD column (Task 5).
+ */
+interface VwnParameters { A: number; x0: number; b: number; c: number }
+const PARAMAGNETIC: VwnParameters = { A, x0: X0, b: B, c: C };
+const FERROMAGNETIC: VwnParameters = { A: 0.01554535, x0: -0.325, b: 7.06042, c: 18.0578 };
+const SPIN_STIFFNESS: VwnParameters = { A: -1 / (6 * Math.PI * Math.PI), x0: -0.0047584, b: 1.13107, c: 13.0045 };
+
+/** G(x; A, x0, b, c): vwnEpsilonC with the parameter set passed in. */
+function vwnG(x: number, p: VwnParameters): number {
+    const X = x * x + p.b * x + p.c;
+    const X0Value = p.x0 * p.x0 + p.b * p.x0 + p.c;
+    const Qp = Math.sqrt(4 * p.c - p.b * p.b);
+    const atanTerm = Math.atan(Qp / (2 * x + p.b));
+    return p.A * (
+        Math.log((x * x) / X)
+        + ((2 * p.b) / Qp) * atanTerm
+        - ((p.b * p.x0) / X0Value) * (
+            Math.log(((x - p.x0) * (x - p.x0)) / X)
+            + ((2 * (p.b + 2 * p.x0)) / Qp) * atanTerm
+        )
+    );
+}
+
+/** dG/dx, vwnEpsilonCDerivative with the parameter set passed in. */
+function vwnGDerivative(x: number, p: VwnParameters): number {
+    const X = x * x + p.b * x + p.c;
+    const X0Value = p.x0 * p.x0 + p.b * p.x0 + p.c;
+    return p.A * (
+        2 / x - (2 * x + p.b) / X - p.b / X
+        - ((p.b * p.x0) / X0Value) * (2 / (x - p.x0) - (2 * x + p.b) / X - (p.b + 2 * p.x0) / X)
+    );
+}
+
+/** f(zeta) = [(1+zeta)^(4/3) + (1-zeta)^(4/3) - 2] / (2^(4/3) - 2), 0 unpolarised, 1 fully polarised. */
+const F_DENOMINATOR = Math.pow(2, 4 / 3) - 2;
+const F_SECOND_DERIVATIVE_AT_0 = 8 / (9 * F_DENOMINATOR);
+const spinF = (z: number) => (Math.pow(1 + z, 4 / 3) + Math.pow(1 - z, 4 / 3) - 2) / F_DENOMINATOR;
+const spinFDerivative = (z: number) => (4 / 3) * (Math.cbrt(1 + z) - Math.cbrt(1 - z)) / F_DENOMINATOR;
+
+/** Correlation energy per electron (Ha) and the potential each spin channel feels. */
+export interface SpinCorrelation { epsilon: number; vUp: number; vDown: number }
+
+/**
+ * eps_c(rs, zeta) = eps_P + alpha_c f/f''(0) (1 - zeta^4) + (eps_F - eps_P) f zeta^4,
+ * with V_s = eps_c - (x/6) d(eps_c)/dx + (s - zeta) d(eps_c)/d(zeta), s = +1 up, -1 down:
+ * the x/6 is correlationPotential's chain rule, and the zeta term is how
+ * moving density from one spin to the other shifts zeta at fixed total
+ * density. Zero and underflowing density short-circuit to zero for the same
+ * reason as correlationEnergyDensity.
+ */
+export function spinCorrelation(rhoUp: number, rhoDown: number): SpinCorrelation {
+    const up = Math.max(rhoUp, 0);
+    const down = Math.max(rhoDown, 0);
+    const rho = up + down;
+    if (!(rho > 0)) return { epsilon: 0, vUp: 0, vDown: 0 };
+    const x = xFromDensity(rho);
+    if (!Number.isFinite(x)) return { epsilon: 0, vUp: 0, vDown: 0 };
+    const zeta = Math.max(-1, Math.min(1, (up - down) / rho));
+
+    const eP = vwnG(x, PARAMAGNETIC), dP = vwnGDerivative(x, PARAMAGNETIC);
+    const eF = vwnG(x, FERROMAGNETIC), dF = vwnGDerivative(x, FERROMAGNETIC);
+    const a = vwnG(x, SPIN_STIFFNESS), dA = vwnGDerivative(x, SPIN_STIFFNESS);
+    const f = spinF(zeta), fPrime = spinFDerivative(zeta);
+    const z3 = zeta * zeta * zeta, z4 = z3 * zeta;
+
+    const epsilon = eP + a * (f / F_SECOND_DERIVATIVE_AT_0) * (1 - z4) + (eF - eP) * f * z4;
+    const dEpsDx = dP + dA * (f / F_SECOND_DERIVATIVE_AT_0) * (1 - z4) + (dF - dP) * f * z4;
+    const dEpsDz = (a / F_SECOND_DERIVATIVE_AT_0) * (fPrime * (1 - z4) - 4 * z3 * f) + (eF - eP) * (fPrime * z4 + 4 * z3 * f);
+    const common = epsilon - (x / 6) * dEpsDx;
+    return { epsilon, vUp: common + (1 - zeta) * dEpsDz, vDown: common - (1 + zeta) * dEpsDz };
+}
