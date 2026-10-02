@@ -164,16 +164,18 @@ export function configurationFor(Z: number): SubshellOccupancy[] {
 }
 
 /**
- * The same occupancies grouped into shells, still ordered by n then l within each shell.
+ * The same grouping into shells, for any configuration — an ion's or an
+ * excited atom's, not just a neutral ground state's. `shellsFor` below is
+ * now the Z = 1..118 special case of this.
  *
- * Clones each subshell (rather than reusing the objects `configurationFor`
- * hands back) for the same reason `configurationFor` copies its array: a
- * caller mutating `.electrons` on a returned subshell must not corrupt the
- * cache for later callers.
+ * Clones each subshell (rather than reusing the objects the caller passed
+ * in) for the same reason `configurationFor` copies its array: a caller
+ * mutating `.electrons` on a returned subshell must not corrupt whatever
+ * the input configuration came from.
  */
-export function shellsFor(Z: number): ShellOccupancy[] {
+export function shellsOf(configuration: SubshellOccupancy[]): ShellOccupancy[] {
     const shells: ShellOccupancy[] = [];
-    for (const subshell of configurationFor(Z)) {
+    for (const subshell of configuration) {
         let shell = shells[shells.length - 1];
         if (!shell || shell.n !== subshell.n) {
             shell = { n: subshell.n, electrons: 0, subshells: [] };
@@ -183,6 +185,11 @@ export function shellsFor(Z: number): ShellOccupancy[] {
         shell.electrons += subshell.electrons;
     }
     return shells;
+}
+
+/** The same occupancies grouped into shells, still ordered by n then l within each shell. */
+export function shellsFor(Z: number): ShellOccupancy[] {
+    return shellsOf(configurationFor(Z));
 }
 
 const SUPERSCRIPT_DIGITS = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
@@ -196,11 +203,16 @@ export function subshellLabel(n: number, l: number): string {
     return `${n}${shellLetter(l)}`;
 }
 
-/** e.g. 6 -> "1s² 2s² 2p²". */
-export function configurationLabel(Z: number): string {
-    return configurationFor(Z)
+/** Renders any configuration — an ion's or an excited atom's included. `configurationLabel` below is the neutral-atom case. */
+export function configurationLabelOf(configuration: SubshellOccupancy[]): string {
+    return configuration
         .map(subshell => `${subshellLabel(subshell.n, subshell.l)}${superscript(subshell.electrons)}`)
         .join(' ');
+}
+
+/** e.g. 6 -> "1s² 2s² 2p²". */
+export function configurationLabel(Z: number): string {
+    return configurationLabelOf(configurationFor(Z));
 }
 
 /**
@@ -219,17 +231,23 @@ export function configurationLabel(Z: number): string {
  * transition metal that includes the (n−1)d, and the app has no business
  * asserting a bonding model it does not compute.
  */
+export function valenceShellOf(configuration: SubshellOccupancy[]): number {
+    return configuration.reduce((highest, subshell) => Math.max(highest, subshell.n), 0);
+}
+
 export function valenceShellFor(Z: number): number {
-    return configurationFor(Z).reduce((highest, subshell) => Math.max(highest, subshell.n), 0);
+    return valenceShellOf(configurationFor(Z));
+}
+
+/** The outermost shell alone, for any configuration — what `valenceConfigurationLabel` below reports for a neutral atom. */
+export function valenceConfigurationLabelOf(configuration: SubshellOccupancy[]): string {
+    const valenceN = valenceShellOf(configuration);
+    return configurationLabelOf(configuration.filter(subshell => subshell.n === valenceN));
 }
 
 /** e.g. 17 -> "3s² 3p⁵" — the outermost shell alone, which is what a periodic-table group has in common. */
 export function valenceConfigurationLabel(Z: number): string {
-    const valenceN = valenceShellFor(Z);
-    return configurationFor(Z)
-        .filter(subshell => subshell.n === valenceN)
-        .map(subshell => `${subshellLabel(subshell.n, subshell.l)}${superscript(subshell.electrons)}`)
-        .join(' ');
+    return valenceConfigurationLabelOf(configurationFor(Z));
 }
 
 /** How many electrons occupy the outermost shell. */
