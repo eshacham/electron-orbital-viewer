@@ -598,7 +598,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             {/* The renderer's canvas is appended here directly, so this element
                 is left without React children of its own. */}
             <div ref={canvasHostRef} id="orbital-canvas-host" />
-            {scaleBar && (
+            {/* A scale over an empty canvas (an unbound anion) measures nothing. */}
+            {scaleBar && !(atomMode === 'atom' && atomUnbound) && (
                 <div className="scale-readout" aria-label="scale">
                     <div className="scale-readout-bar" style={{ width: `${scaleBar.pixels}px` }} />
                     <span className="scale-readout-label">{formatScaleLabel(scaleBar.lengthBohr)}</span>

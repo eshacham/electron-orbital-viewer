@@ -325,4 +325,26 @@ describe('LevelNav for a species', () => {
         expect(container.textContent).not.toMatch(/no ions/);
         expect(container.textContent).toMatch(/isolated atoms and their ions/);
     });
+
+    // Fix round 1, M1: an anion LDA does not bind has a configuration but
+    // no picture, so there is no shell to open -- the chips say so instead
+    // of looking clickable and doing nothing.
+    it('shows the shells as unavailable while nothing is drawn, keeping the configuration', () => {
+        const onNavigate = jest.fn();
+        const configuration = speciesConfiguration({ Z: 17, charge: -1, excitation: null });
+        const { getByRole, container } = render(
+            <LevelNav Z={17} configuration={configuration} speciesSymbol="Cl⁻" selectedShell={null} selectedSubshell={null}
+                selectedOrbital={null} onNavigate={onNavigate} shellsUnavailable />
+        );
+        const chips = within(getByRole('group', { name: 'shells' })).getAllByRole('button');
+        expect(chips).toHaveLength(3);
+        for (const chip of chips) {
+            expect(chip).toHaveAttribute('aria-disabled', 'true');
+            fireEvent.click(chip);
+        }
+        expect(onNavigate).not.toHaveBeenCalled();
+        expect(container.querySelector('.level-nav-configuration')).toHaveTextContent('1s² 2s² 2p⁶ 3s² 3p⁶');
+        expect(container.querySelector('.level-nav-valence')).toHaveTextContent('3s² 3p⁶');
+        expect(container.querySelector('.level-nav-shell-hint')).toHaveTextContent(/nothing is drawn/i);
+    });
 });

@@ -556,6 +556,16 @@ describe('App', () => {
             expect(screen.queryByLabelText('subshells')).not.toBeInTheDocument();
         });
 
+        it('shows an unbound anion\'s shells as unavailable, with its configuration still named', () => {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, { Z: 17, charge: -1 });
+            replyUnbound();
+            const chips = container.querySelectorAll('.side-panel .level-nav-shell-chip');
+            expect(chips).toHaveLength(3);
+            chips.forEach(chip => expect(chip).toHaveAttribute('aria-disabled', 'true'));
+            expect(container.querySelector('.side-panel .level-nav-configuration')).toHaveTextContent('3p⁶');
+        });
+
         // One alert, not two: the card's own (SpeciesControls) is announced;
         // the note over the empty canvas only says it again for the eye.
         it('announces an unbound anion once, with the note over the canvas hidden from assistive technology', () => {

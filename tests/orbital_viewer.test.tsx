@@ -53,7 +53,7 @@ import { initVisualizer, attachShellCompositionLobes } from '../src/orbital_visu
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
-import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital, updateAtomViewInScene, setReferenceRing } from '../src/orbital_visualizer';
+import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital, updateAtomViewInScene, setReferenceRing, getScaleBar } from '../src/orbital_visualizer';
 import { applyCameraAngles, cameraAnglesOf } from '../src/camera_angles';
 
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
@@ -315,6 +315,26 @@ describe('OrbitalViewer: ions', () => {
         act(() => { store.dispatch(drillToShell(2)); });
         expect(worker.postMessage).toHaveBeenCalledTimes(1);
         expect(attachShellCompositionLobes).not.toHaveBeenCalled();
+    });
+
+    // Fix round 1, M1: a scale bar over an empty canvas measures nothing.
+    it('hides the scale bar while an anion is unbound, and brings it back with a picture', () => {
+        (getScaleBar as jest.Mock).mockReturnValue({ lengthBohr: 2, pixels: 100 });
+        try {
+            const store = createAppStore();
+            act(() => {
+                store.dispatch(setElement(17));
+                store.dispatch(solveSucceeded({ ...neonProfile(), Z: 17 }));
+            });
+            const { container } = render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+            expect(container.querySelector('.scale-readout')).not.toBeNull();
+            act(() => { store.dispatch(solveUnbound('LDA does not bind this anion: its 3p electron is not bound.')); });
+            expect(container.querySelector('.scale-readout')).toBeNull();
+            act(() => { store.dispatch(setElement(17)); store.dispatch(solveSucceeded({ ...neonProfile(), Z: 17 })); });
+            expect(container.querySelector('.scale-readout')).not.toBeNull();
+        } finally {
+            (getScaleBar as jest.Mock).mockReturnValue(null);
+        }
     });
 
     // Spec §3.5: not even the previous species' picture stays up.

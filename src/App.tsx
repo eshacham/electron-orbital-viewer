@@ -584,6 +584,7 @@ function App() {
         speciesSymbol: isNeutralGround(species) ? undefined : speciesSymbol(species),
         speciesTitle: speciesTitle(species),
         speciesControls,
+        shellsUnavailable: atomUnbound !== null,
         selectedShell: atomSelectedShell,
         selectedSubshell: atomSelectedSubshell,
         selectedOrbital: atomSelectedOrbital,

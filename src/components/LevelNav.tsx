@@ -63,6 +63,13 @@ interface LevelNavProps {
      * phone Explore tab -- no floating panel of its own).
      */
     speciesControls?: React.ReactNode;
+    /**
+     * Nothing is drawn for this species -- an anion LDA does not bind (spec
+     * §3.5) -- so there is no shell to open. The configuration and valence
+     * lines still name the species; the chips are shown disabled rather
+     * than inviting a click that can do nothing.
+     */
+    shellsUnavailable?: boolean;
 }
 
 // Old X-ray shell letters, matching atom_profile.ts's private shellName
@@ -98,7 +105,7 @@ interface Crumb {
  */
 const LevelNav: React.FC<LevelNavProps> = ({
     Z, selectedShell, selectedSubshell, selectedOrbital, onNavigate, onChangeElement, children,
-    variant = 'full', configuration, speciesSymbol, speciesTitle, speciesControls,
+    variant = 'full', configuration, speciesSymbol, speciesTitle, speciesControls, shellsUnavailable = false,
 }) => {
     const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -275,6 +282,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                             className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isValence ? ' valence' : ' core'}`}
                             label={`${shellName(shell.n)}${isValence ? ' · valence' : ''}`}
                             color={isSelected ? 'primary' : 'default'}
+                            disabled={shellsUnavailable}
                             // Addendum 2's "is there a way to unselect one?".
                             // Three ways now, because testing showed one
                             // buried in a breadcrumb was not enough: the ✕ on
@@ -282,7 +290,13 @@ const LevelNav: React.FC<LevelNavProps> = ({
                             // and the breadcrumb that was already there.
                             aria-pressed={isSelected}
                             onDelete={isSelected ? () => onNavigate({ level: 'atom' }) : undefined}
-                            onClick={() => onNavigate(isSelected ? { level: 'atom' } : { level: 'shell', n: shell.n })}
+                            // Still a (disabled) button while unavailable, so it is
+                            // announced as one; the guard is what actually refuses
+                            // the click, since a disabled Chip only stops pointers.
+                            onClick={() => {
+                                if (shellsUnavailable) return;
+                                onNavigate(isSelected ? { level: 'atom' } : { level: 'shell', n: shell.n });
+                            }}
                         />
                     );
                 })}
@@ -294,14 +308,17 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 once a shell is open, the useful next move is getting back
                 out of it. */}
             <Typography variant="caption" className="level-nav-shell-hint" display="block">
-                {selectedOrbital
-                    // At the orbital level the shell chips are context, not
-                    // the current subject -- saying "M shell only" here would
-                    // describe a view you are no longer looking at.
-                    ? `One orbital of ${subshellLabel(selectedOrbital.n, selectedOrbital.l)} — Back steps out one level at a time`
-                    : selectedShell === null
-                        ? 'Click a ring in the 3D view, or a shell above, to open it'
-                        : `${shellName(selectedShell)} only — click it again, or the ✕, for the whole atom`}
+                {shellsUnavailable
+                    ? 'Nothing is drawn for this species, so there is no shell to open'
+                    : selectedOrbital
+                        // At the orbital level the shell chips are context,
+                        // not the current subject -- saying "M shell only"
+                        // here would describe a view you are no longer
+                        // looking at.
+                        ? `One orbital of ${subshellLabel(selectedOrbital.n, selectedOrbital.l)} — Back steps out one level at a time`
+                        : selectedShell === null
+                            ? 'Click a ring in the 3D view, or a shell above, to open it'
+                            : `${shellName(selectedShell)} only — click it again, or the ✕, for the whole atom`}
             </Typography>
 
             {children}
