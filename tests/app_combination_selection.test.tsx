@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createAppStore } from '../src/store';
 import type { CombinationSelection } from '../src/combinations';
@@ -98,8 +98,12 @@ describe('App: the n = 2 field slider', () => {
         const store = renderBasicOrbitals();
         select(field(2, 0.001));
         const failed = store.getState().orbital.currentField;
-        store.dispatch(failOrbitalCalculation('worker crashed'));
-        store.dispatch(dismissOrbitalError());
+        // Wrapped in act(): App now subscribes to exportAvailability (Task
+        // 13's cube export), so these direct dispatches re-render it outside
+        // Testing Library's own event handling, which act() would otherwise
+        // not know to wait for.
+        act(() => { store.dispatch(failOrbitalCalculation('worker crashed')); });
+        act(() => { store.dispatch(dismissOrbitalError()); });
 
         select(field(2, 0.002));
         const retried = store.getState().orbital.currentField;

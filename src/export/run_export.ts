@@ -1,10 +1,10 @@
 import type { RootState } from '../store';
 import { selectionProblem } from '../combinations';
 import { hydrogenicSource } from '../field_source';
-import { ORBITAL_RESOLUTION } from '../orbital_presets';
+import { ORBITAL_RESOLUTION, BASIC_ORBITALS_Z } from '../orbital_presets';
 import { subshellLabel } from '../atom/configurations';
 import { CsvCurve, radialCurvesToCsv } from './csv';
-import { exportFileStem, ATOM_METHOD, methodStatement, viewDescription } from './caption';
+import { exportFileStem, ATOM_METHOD, methodStatement, shellLabel, viewDescription } from './caption';
 import { CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
@@ -66,6 +66,8 @@ export const VIEW_NOT_READY_REASON = 'The 3D view is not ready yet.';
  */
 export const PICTURE_BUSY_REASON = 'Wait for the picture to finish computing.';
 
+export const RENDER_FAILED_REASON = 'The last picture failed to compute; nothing to export.';
+
 function drawnReason(state: RootState): string | null {
     if (state.atom.mode === 'atom') return state.atom.profile ? null : WAITING_FOR_ATOM_REASON;
     // Ruling C10: a combination Phase 1 refuses (selectionProblem) says why
@@ -74,6 +76,12 @@ function drawnReason(state: RootState): string | null {
     const combination = state.orbital.combination;
     const problem = combination.kind !== 'none' ? selectionProblem(combination) : null;
     if (problem) return problem;
+    // M3: startOrbitalCalculation/startFieldCalculation set currentParams/
+    // currentField before the render finishes, and failOrbitalCalculation
+    // does not clear them back out -- so a request that failed still reads
+    // as "drawn" by the check below unless this catches it first. There is
+    // nothing on screen for a failed request to have left behind.
+    if (state.orbital.renderFailed) return RENDER_FAILED_REASON;
     return state.orbital.currentParams || state.orbital.currentField ? null : NOTHING_DRAWN_REASON;
 }
 
@@ -116,9 +124,10 @@ export const CUBE_BUSY_REASON = 'The surface is still being computed.';
  */
 export function cubeReason(state: RootState): string | null {
     if (state.atom.mode === 'atom' && state.atom.level !== 'orbital') {
-        if (!state.atom.profile) return WAITING_FOR_ATOM_REASON;
-        // A re-solve (a new element) can leave the old profile in place while it runs.
-        return state.atom.isSolving ? CUBE_BUSY_REASON : null;
+        // setElement nulls the profile unconditionally (see atomSlice), so
+        // isSolving is never true here with a profile still in place --
+        // "no profile yet" is the only way to be waiting at these levels.
+        return state.atom.profile ? null : WAITING_FOR_ATOM_REASON;
     }
     const reason = drawnReason(state);
     if (reason) return reason;
@@ -142,7 +151,7 @@ export function cubeJobFor(state: RootState): CubeJob {
         const sub = atom.selectedSubshell;
         const subshell = atom.level === 'shell' && sub ? profile.subshells.find(s => s.n === sub.n && s.l === sub.l) : undefined;
         const shell = atom.level === 'shell' ? profile.shells.find(s => s.n === atom.selectedShell) : undefined;
-        const what = subshell ? `${subshellLabel(subshell.n, subshell.l)} subshell` : shell ? `n = ${shell.n} shell` : 'total';
+        const what = subshell ? `${subshellLabel(subshell.n, subshell.l)} subshell` : shell ? shellLabel(shell.n) : 'total';
         return {
             type: 'radialCube',
             curve: { D: subshell?.curve ?? shell?.curve ?? profile.total, rMin: profile.rMin, dx: profile.dx, size: profile.size },
@@ -156,7 +165,9 @@ export function cubeJobFor(state: RootState): CubeJob {
     const { currentParams, currentField } = state.orbital;
     const source = currentField ? currentField.sources[0] : hydrogenicSource(currentParams!);
     const resolution = currentField ? currentField.resolution : currentParams!.resolution;
-    const Z = currentParams?.Z ?? 1;
+    // currentParams carries the real Z (a solved profile's, at atom mode's
+    // level 3); a combination's sources are always hydrogen's own.
+    const Z = currentParams?.Z ?? BASIC_ORBITALS_Z;
     return {
         type: 'fieldCube', source, resolution, atoms: [{ Z, position: [0, 0, 0] }], title,
         description: `psi(x,y,z), real, bohr^-3/2, on the grid as drawn; ${methodStatement(state)}; lengths in bohr`,

@@ -2,12 +2,40 @@
 // load (see orbital_controls_factory.ts), so the factory is mocked.
 jest.mock('../../src/export/gltf_exporter_factory', () => ({ exportGlb: jest.fn(async () => new ArrayBuffer(12)) }));
 
-import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON } from '../../src/export/run_export';
+import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON } from '../../src/export/run_export';
 import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted } from '../../src/store/atomSlice';
-import { setCombination } from '../../src/store/orbitalSlice';
+import { setCombination, startOrbitalCalculation, failOrbitalCalculation } from '../../src/store/orbitalSlice';
+import { basicOrbitalParams } from '../../src/orbital_presets';
 import { selectionProblem } from '../../src/combinations';
 import { NOTHING_TO_EXPORT_REASON } from '../../src/export/surfaces';
 import { makeStore, neonStore, readText, baseContext, octahedron, exportHandle } from './fixtures';
+
+// Fix round 1, M3: startOrbitalCalculation sets currentParams before the
+// render finishes, and failOrbitalCalculation does not clear it back out --
+// so without this check, every export kind read a failed request as "drawn"
+// and would have tried (and for PNG/STL/glTF, mostly succeeded, misleadingly)
+// to export the picture that failed to appear.
+describe('exportAvailability and runExport: a render that failed', () => {
+    it('refuses every kind with a stated reason, even though currentParams is still set from the failed request', async () => {
+        const store = makeStore();
+        store.dispatch(setMode('hydrogenic'));
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(2, 1, 0, 0.9)));
+        store.dispatch(failOrbitalCalculation('worker crashed'));
+        const state = store.getState();
+        expect(state.orbital.currentParams).not.toBeNull();
+        expect(state.orbital.renderFailed).toBe(true);
+
+        const availability = exportAvailability(state);
+        expect(availability.csv).toBe(RENDER_FAILED_REASON);
+        expect(availability.png).toBe(RENDER_FAILED_REASON);
+        expect(availability['png-plain']).toBe(RENDER_FAILED_REASON);
+        expect(availability.stl).toBe(RENDER_FAILED_REASON);
+        expect(availability.glb).toBe(RENDER_FAILED_REASON);
+        expect(availability.cube).toBe(RENDER_FAILED_REASON);
+
+        await expect(runExport('csv', baseContext(state))).rejects.toThrow(RENDER_FAILED_REASON);
+    });
+});
 
 describe('runExport: PNG', () => {
     it('asks the viewer for an image, with the caption and method, or without overlays', async () => {
@@ -200,7 +228,7 @@ describe('runExport: STL', () => {
 
 describe('runExport: cube', () => {
     it('asks the worker for the cube and names it .cube', async () => {
-        const worker = { onmessage: null as ((e: MessageEvent) => void) | null, onerror: null, terminate: jest.fn(),
+        const worker = { onmessage: null as ((e: MessageEvent) => void) | null, onerror: null, onmessageerror: null, terminate: jest.fn(),
             postMessage(request: { requestId: number }) { setTimeout(() => worker.onmessage?.({ data: { type: 'success', blob: new Blob(['c']), requestId: request.requestId } } as MessageEvent)); } };
         const result = await runExport('cube', { ...baseContext(neonStore().getState()), createCubeWorker: () => worker });
         expect(result.filename).toBe('orbital-viewer_Ne_atom.cube');

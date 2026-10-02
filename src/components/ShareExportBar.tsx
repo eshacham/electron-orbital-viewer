@@ -42,6 +42,11 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
     const [stlOpen, setStlOpen] = useState(false);
     const [printSize, setPrintSize] = useState(50);
     const [solidCount, setSolidCount] = useState(0);
+    // M6: a build in flight -- "Preparing export…" must not time itself out
+    // while it is still true (a cube can take longer than the usual 4s
+    // notice window), and the Export control is disabled meanwhile so a
+    // second click cannot start a second build on top of the first.
+    const [exporting, setExporting] = useState(false);
 
     const handleShare = async () => {
         const outcome = await onShare();
@@ -50,14 +55,17 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
     };
 
     const runKind = async (kind: ExportKind, options: ExportOptions = {}) => {
-        if (!onExport) return;
+        if (!onExport || exporting) return;
         setMenuAnchor(null);
+        setExporting(true);
         showNotice('Preparing export…');
         try {
             await onExport(kind, options);
             setNotice(null);
         } catch (error) {
             showNotice(error instanceof Error ? error.message : 'The export failed.');
+        } finally {
+            setExporting(false);
         }
     };
     const handleItem = (kind: ExportKind) => {
@@ -83,6 +91,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
                         aria-haspopup="menu"
                         aria-controls={menuAnchor ? 'export-menu' : undefined}
                         aria-expanded={menuAnchor !== null}
+                        disabled={exporting}
                         onClick={event => setMenuAnchor(event.currentTarget)}
                     >
                         Export
@@ -91,7 +100,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
                         {EXPORT_ITEMS.map(item => {
                             const reason = availability?.[item.kind] ?? null;
                             return (
-                                <MenuItem key={item.kind} disabled={reason !== null} onClick={() => handleItem(item.kind)}>
+                                <MenuItem key={item.kind} disabled={reason !== null || exporting} onClick={() => handleItem(item.kind)}>
                                     <ListItemText primary={item.label} secondary={reason ?? item.detail} />
                                 </MenuItem>
                             );
@@ -128,7 +137,11 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setStlOpen(false)}>Cancel</Button>
-                    <Button variant="contained" onClick={() => { setStlOpen(false); void runKind('stl', { longestSideMm: printSize }); }}>
+                    <Button
+                        variant="contained"
+                        disabled={exporting}
+                        onClick={() => { setStlOpen(false); void runKind('stl', { longestSideMm: printSize }); }}
+                    >
                         Export STL
                     </Button>
                 </DialogActions>
@@ -152,7 +165,11 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
             <Snackbar
                 key={noticeId}
                 open={notice !== null}
-                autoHideDuration={4000}
+                // M6: undefined while a build is in flight -- MUI takes that
+                // as "no auto-hide" -- so a cube that takes longer than 4s
+                // does not lose its "Preparing export…" notice out from
+                // under it while it is still building.
+                autoHideDuration={exporting ? undefined : 4000}
                 onClose={() => setNotice(null)}
                 message={notice}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}

@@ -87,6 +87,47 @@ describe('ShareExportBar: Export', () => {
         }
     });
 
+    // Fix round 1, M6: a cube can take longer to build than the notice's
+    // usual 4s window, and a second click on Export while one build is
+    // already running would start a second, overlapping one.
+    it('keeps "Preparing export…" open past 4s while a build is in flight, and disables Export meanwhile', async () => {
+        jest.useFakeTimers();
+        try {
+            let resolveExport: () => void = () => {};
+            const onExport = jest.fn(() => new Promise<void>(resolve => { resolveExport = resolve; }));
+            render(<ShareExportBar onShare={share} onExport={onExport} availability={allAvailable()} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+            fireEvent.click(screen.getByRole('menuitem', { name: /field grid/i }));
+            expect(screen.getByText('Preparing export…')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
+
+            // Long past the usual 4s auto-hide window -- still building, still shown.
+            act(() => { jest.advanceTimersByTime(10000); });
+            expect(screen.getByText('Preparing export…')).toBeInTheDocument();
+
+            await act(async () => { resolveExport(); });
+            expect(screen.queryByText('Preparing export…')).not.toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Export' })).not.toBeDisabled();
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it('does not let a second click start a second build while one is already running', async () => {
+        let resolveExport: () => void = () => {};
+        const onExport = jest.fn(() => new Promise<void>(resolve => { resolveExport = resolve; }));
+        render(<ShareExportBar onShare={share} onExport={onExport} availability={allAvailable()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: /field grid/i }));
+
+        // The Export button is disabled now, so this click reaches nothing.
+        fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+        await act(async () => { resolveExport(); });
+        expect(onExport).toHaveBeenCalledTimes(1);
+    });
+
     it('asks for a print size before exporting STL', async () => {
         const onExport = jest.fn().mockResolvedValue(undefined);
         render(<ShareExportBar onShare={share} onExport={onExport} availability={allAvailable()} />);

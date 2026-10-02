@@ -31,9 +31,14 @@ export interface CubeWorkerHandle {
     terminate(): void;
     onmessage: ((event: MessageEvent<CubeResponse>) => void) | null;
     onerror: ((event: ErrorEvent) => void) | null;
+    /** Fires instead of onmessage when the worker's reply cannot be deserialised. */
+    onmessageerror: ((event: MessageEvent) => void) | null;
 }
 
 let nextRequestId = 0;
+
+/** Fallback wording shared by every way a cube job can fail without its own message. */
+const CUBE_WORKER_FAILED_REASON = 'The cube file could not be built.';
 
 /** One worker per file: a cube is rare, and the worker's memory goes with it. */
 export function requestCube(job: CubeJob, createWorker: () => CubeWorkerHandle): Promise<Blob> {
@@ -47,8 +52,22 @@ export function requestCube(job: CubeJob, createWorker: () => CubeWorkerHandle):
         };
         worker.onerror = event => {
             worker.terminate();
-            reject(new Error(event.message || 'The cube file could not be built.'));
+            reject(new Error(event.message || CUBE_WORKER_FAILED_REASON));
         };
-        worker.postMessage({ ...job, requestId } as CubeRequest);
+        // A reply the worker posted but this side cannot deserialise (e.g. a
+        // corrupted transfer) -- fires instead of onmessage, never alongside it.
+        worker.onmessageerror = () => {
+            worker.terminate();
+            reject(new Error('The cube reply could not be read.'));
+        };
+        try {
+            worker.postMessage({ ...job, requestId } as CubeRequest);
+        } catch (error) {
+            // A message the worker boundary refuses outright (e.g.
+            // DataCloneError on a non-cloneable job) never reaches onerror --
+            // postMessage throws synchronously instead.
+            worker.terminate();
+            reject(error instanceof Error ? error : new Error(CUBE_WORKER_FAILED_REASON));
+        }
     });
 }

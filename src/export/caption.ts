@@ -31,6 +31,11 @@ export function methodStatement(state: RootState): string {
     return BASIC_METHOD;
 }
 
+/** "n = 2 shell" -- shared by viewDescription and cubeJobFor's own labelling of a shell's radial curve. */
+export function shellLabel(n: number): string {
+    return `n = ${n} shell`;
+}
+
 export function viewDescription(state: RootState): string {
     const percent = `${Math.round(state.orbital.enclosedFraction * 100)}% contour`;
     if (state.atom.mode !== 'atom') {
@@ -46,7 +51,7 @@ export function viewDescription(state: RootState): string {
         return `${name}, ${orbitalName(selectedOrbital.n, selectedOrbital.l, selectedOrbital.ml)}, ${percent}`;
     }
     if (level === 'shell' && selectedSubshell) return `${name}, ${subshellLabel(selectedSubshell.n, selectedSubshell.l)} subshell, ${percent}`;
-    if (level === 'shell' && selectedShell !== null) return `${name}, n = ${selectedShell} shell, ${percent}`;
+    if (level === 'shell' && selectedShell !== null) return `${name}, ${shellLabel(selectedShell)}, ${percent}`;
     return `${name}, whole atom, ${percent}`;
 }
 
