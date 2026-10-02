@@ -135,10 +135,11 @@ describe('orbitalSlice: camera', () => {
         expect(store.getState().orbital.cameraAngles).toBeNull();
     });
 
-    // A restored link's resetView + restoreCamera land in the same commit
-    // (Task 5's URL decoder). Whichever the effects apply last must be the
-    // restored angle, not the reset -- this pins the reducer side of that;
-    // OrbitalViewer's effect order is pinned separately.
+    // An element pick's resetView and a link's restoreCamera can land in the
+    // same commit (no URL decoder dispatches resetView itself). Whichever the
+    // effects apply last must be the restored angle, not the reset -- this
+    // pins the reducer side of that; OrbitalViewer's effect order is pinned
+    // separately.
     it('leaves the restored angle in place when resetView precedes restoreCamera', () => {
         const store = makeStore();
         store.dispatch(resetView());

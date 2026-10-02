@@ -507,10 +507,13 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
 
     // A restored link turns the camera. frameOrbital keeps the direction it
     // finds, so this survives the framing that follows when the mesh lands.
-    // Declared after the reset effect above: a restored link's resetView and
-    // restoreCamera land in the same store commit (Task 5's URL decoder), so
-    // effects fire in declaration order -- this must run second, or the
-    // reset effect's canonical direction would overwrite the restored one.
+    // Declared after the reset effect above. No URL decoder dispatches
+    // resetView, but picking an element does (App's handleAtomElementChange),
+    // and if a link's restoreCamera lands before React has committed that
+    // pick, both nonces change in one commit and the two effects run in
+    // declaration order. This one runs second, so the link's angle -- the
+    // more specific request -- is not overwritten by the reset's canonical
+    // direction.
     const cameraRestoreNonce = useAppSelector(state => state.orbital.cameraRestoreNonce);
     const restoredCameraAngles = useAppSelector(state => state.orbital.cameraAngles);
     useEffect(() => {

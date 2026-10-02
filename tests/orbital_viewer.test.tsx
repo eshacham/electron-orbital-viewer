@@ -101,12 +101,11 @@ describe('OrbitalViewer with nothing requested', () => {
     });
 });
 
-// Review finding: Task 5's URL decoder batches resetView with
-// restoreCamera(angles) into one store commit (the same way picking an
-// element batches setElement with resetView today). Effects run in
-// declaration order, so whichever of frameOrbital/applyCameraAngles is
-// wired to run second is the one that wins the screen -- this pins that the
-// restore wins, not the reset.
+// Review finding: picking an element dispatches resetView, and a link's
+// restoreCamera can land in the same React commit (no URL decoder
+// dispatches resetView itself). Effects run in declaration order, so
+// whichever of frameOrbital/applyCameraAngles is wired to run second is the
+// one that wins the screen -- this pins that the restore wins, not the reset.
 describe('OrbitalViewer: reset and restore in the same commit', () => {
     it('applies the restored camera angle after the reset effect runs, not before', () => {
         const store = renderViewer();
