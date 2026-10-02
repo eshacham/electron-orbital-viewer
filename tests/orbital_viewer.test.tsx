@@ -27,6 +27,7 @@ jest.mock('../src/orbital_visualizer', () => ({
     setViewInsets: jest.fn(),
     clearShellCompositionLobes: jest.fn(),
     attachShellCompositionLobes: jest.fn(),
+    setReferenceRing: jest.fn(),
 }));
 // Only applyCameraAngles is mocked (as a spy to record call order); the rest
 // of the module -- isCanonicalAngles etc., which orbitalSlice's own reducers
@@ -43,15 +44,16 @@ import OrbitalViewer from '../src/components/OrbitalViewer';
 import {
     startFieldCalculation, startOrbitalCalculation, clearPicture, resetView, restoreCamera,
 } from '../src/store/orbitalSlice';
-import { setMode, setElement, solveSucceeded, drillToShell, goToLevel } from '../src/store/atomSlice';
+import { setMode, setElement, setCharge, solveSucceeded, solveUnbound, drillToShell, goToLevel } from '../src/store/atomSlice';
 import { createShellCompositionWorker } from '../src/workers/createShellCompositionWorker';
-import { clearShellMeshCacheForTests } from '../src/atom/shell_mesh_cache';
+import { clearShellMeshCacheForTests, setCachedShellMeshes, shellMeshCacheKey } from '../src/atom/shell_mesh_cache';
+import { COMPOSITE_ORBITAL_RESOLUTION } from '../src/atom/shell_composition';
 import { neonProfile } from './export/fixtures';
 import { initVisualizer, attachShellCompositionLobes } from '../src/orbital_visualizer';
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
-import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital } from '../src/orbital_visualizer';
+import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital, updateAtomViewInScene, setReferenceRing } from '../src/orbital_visualizer';
 import { applyCameraAngles, cameraAnglesOf } from '../src/camera_angles';
 
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
@@ -241,5 +243,88 @@ describe('OrbitalViewer: reporting the camera', () => {
         } finally {
             jest.useRealTimers();
         }
+    });
+});
+
+/** Ne⁺ as the worker would serialise it: its own species key, and the neutral's radii for the ring. */
+function neonIonProfile() {
+    return { ...neonProfile(), speciesKey: '10+1', displayRadius: 1.6, reference: { displayRadius: 2, contourRadius: 2.1 } };
+}
+
+// Phase 3 Task 12: an ion's whole-atom view carries the neutral atom's edge
+// as a dashed ring, and the camera is framed to keep that edge on screen.
+describe('OrbitalViewer: ions', () => {
+    beforeEach(() => { clearShellMeshCacheForTests(); jest.clearAllMocks(); });
+
+    const ionStore = () => {
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(10));
+            store.dispatch(setCharge(1));
+            store.dispatch(solveSucceeded(neonIonProfile()));
+        });
+        return store;
+    };
+
+    it('rings the neutral atom\'s drawn radius at the whole-atom level, and frames on it', () => {
+        const store = ionStore();
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        expect(updateAtomViewInScene).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ contourRadius: 1.6, framingFloor: 2 }), expect.anything());
+        expect(setReferenceRing).toHaveBeenLastCalledWith(expect.anything(), 2);
+
+        (createShellCompositionWorker as jest.Mock).mockReturnValue(fakeCompositionWorker());
+        act(() => { store.dispatch(drillToShell(2)); });
+        expect(setReferenceRing).toHaveBeenLastCalledWith(expect.anything(), null);
+    });
+
+    it('draws no ring for a neutral atom, which is its own reference', () => {
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(10));
+            store.dispatch(solveSucceeded(neonProfile()));
+        });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        expect((updateAtomViewInScene as jest.Mock).mock.calls.at(-1)![1].framingFloor).toBeUndefined();
+        expect((setReferenceRing as jest.Mock).mock.calls.every(([, radius]) => radius === null)).toBe(true);
+    });
+
+    // Na and Na⁺ share a Z but not a grid: the in-place reshaping fade
+    // would morph one curve into another sampled somewhere else.
+    it('does not fade between a neutral atom and its ion', () => {
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(10));
+            store.dispatch(solveSucceeded(neonProfile()));
+        });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        act(() => {
+            store.dispatch(setCharge(1));
+            store.dispatch(solveSucceeded(neonIonProfile()));
+        });
+        expect(updateAtomViewInScene).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ contourRadius: 1.6 }), { animate: false });
+    });
+
+    it('builds an ion\'s shell lobes for the ion, not from the neutral atom\'s cached ones', () => {
+        setCachedShellMeshes(shellMeshCacheKey(10, 2, COMPOSITE_ORBITAL_RESOLUTION, 0.9, null), []);
+        const worker = fakeCompositionWorker();
+        (createShellCompositionWorker as jest.Mock).mockReturnValue(worker);
+        const store = ionStore();
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        act(() => { store.dispatch(drillToShell(2)); });
+        expect(worker.postMessage).toHaveBeenCalledTimes(1);
+        expect(attachShellCompositionLobes).not.toHaveBeenCalled();
+    });
+
+    // Spec §3.5: not even the previous species' picture stays up.
+    it('empties the view for an anion LDA does not bind', () => {
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(10));
+            store.dispatch(solveSucceeded(neonProfile()));
+        });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        expect(clearScene).not.toHaveBeenCalled();
+        act(() => { store.dispatch(solveUnbound('LDA does not bind this anion: its 2p electron is not bound.')); });
+        expect(clearScene).toHaveBeenCalledTimes(1);
     });
 });

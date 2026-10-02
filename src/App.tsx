@@ -34,9 +34,16 @@ import {
     drillToOrbital,
     clearSubshell,
     setHoverRadius as setAtomHoverRadius,
+    setCharge,
+    setExcitation,
+    speciesOf,
 } from './store/atomSlice';
 import { subshellLabel } from './atom/configurations';
 import { useAtomSolver } from './atom/useAtomSolver';
+import { useDeltaScfEnergies } from './atom/useDeltaScfEnergies';
+import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidExcitation, isNeutralGround } from './atom/species';
+import { allowedCharges } from './atom/ion_configurations';
+import SpeciesControls from './components/SpeciesControls';
 import Controls from './components/Controls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
@@ -48,7 +55,6 @@ import PhoneSheet from './components/PhoneSheet';
 import SubshellPanel from './components/SubshellPanel';
 import PeriodicTable from './components/PeriodicTable';
 import ElementPickerDialog from './components/ElementPickerDialog';
-import { elementFor } from './elements';
 import { orbitalName } from './orbital_names';
 import { CombinationSelection, fieldRequestFor, combinationCurves, overlayLegend, samePicture } from './combinations';
 import { basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
@@ -101,6 +107,14 @@ function App() {
     const atomIsSolving = useAppSelector(state => state.atom.isSolving);
     const atomError = useAppSelector(state => state.atom.error);
     const atomHoverRadius = useAppSelector(state => state.atom.hoverRadius);
+    const atomCharge = useAppSelector(state => state.atom.charge);
+    const atomExcitation = useAppSelector(state => state.atom.excitation);
+    const atomUnbound = useAppSelector(state => state.atom.unbound);
+    const atomEnergies = useAppSelector(state => state.atom.energies);
+    const species = useMemo(
+        () => speciesOf({ Z: atomZ, charge: atomCharge, excitation: atomExcitation }),
+        [atomZ, atomCharge, atomExcitation]
+    );
     const isAtomMode = atomMode === 'atom';
 
     // Basic Orbitals' view state -- n/l/mₗ, the enclosed fraction, and Phase
@@ -120,11 +134,15 @@ function App() {
     const renderedField = useAppSelector(state => state.orbital.currentField);
     const renderFailed = useAppSelector(state => state.orbital.renderFailed);
 
-    // Ruling R28: the only thing that starts a solve is a Z change (or an
-    // enclosedFraction change, which re-slices an already-memoised solution
-    // cheaply). Every navigation dispatch below reads the profile this
-    // produces; none of them can retrigger it.
+    // Ruling R28: the only thing that starts a solve is a species change --
+    // the element, its charge or its excitation (or an enclosedFraction
+    // change, which re-slices an already-memoised solution cheaply). Every
+    // navigation dispatch below reads the profile this produces; none of
+    // them can retrigger it.
     useAtomSolver(enclosedFraction);
+    // After the solver, so the picture's worker is always the first one
+    // created. The energies wait for that picture anyway (ruling C15).
+    useDeltaScfEnergies();
 
     // Desktop element choice: the periodic table, as a pop-over opened from
     // the element name. Open on arrival, so the first thing a visitor sees is
@@ -217,6 +235,27 @@ function App() {
         dispatch(clearPendingCut());
         dispatch(resetView());
     }, [dispatch]);
+
+    // A charge or an excitation is the same element seen differently, so --
+    // unlike picking an element -- the camera stays where it is: Na⁺ visibly
+    // shrinking against an unchanged scale bar is the point (the framing
+    // floor at the neutral's radius keeps the view from re-zooming onto it).
+    // Otherwise the same pairing as handleAtomElementChange: solveStarted in
+    // the same batch, so there is no idle, no-profile frame, and a link's
+    // cut still waiting on the old species does not land on the new one.
+    const handleChargeChange = useCallback((charge: number) => {
+        if (!allowedCharges(atomZ).includes(charge)) return;
+        dispatch(setCharge(charge));
+        dispatch(solveStarted());
+        dispatch(clearPendingCut());
+    }, [dispatch, atomZ]);
+
+    const handleExcitationChange = useCallback((excitation: Excitation | null) => {
+        if (excitation && !isValidExcitation(atomZ, atomCharge, excitation)) return;
+        dispatch(setExcitation(excitation));
+        dispatch(solveStarted());
+        dispatch(clearPendingCut());
+    }, [dispatch, atomZ, atomCharge]);
 
     const handleLevelNavigate = useCallback((target: NavigationTarget) => {
         switch (target.level) {
@@ -485,7 +524,7 @@ function App() {
     const atomOrbitalBusy = isAtomMode && atomLevel === 'orbital' && showBusy;
     const canvasBusyLabel = isAtomMode
         ? (showAtomBusy
-            ? `Solving ${elementFor(atomZ)?.name ?? `Z = ${atomZ}`}…`
+            ? `Solving ${speciesTitle(species)}…`
             : atomOrbitalBusy && atomSelectedOrbital
                 ? `Computing ${orbitalName(atomSelectedOrbital.n, atomSelectedOrbital.l, atomSelectedOrbital.ml)}…`
                 : null)
@@ -521,8 +560,30 @@ function App() {
         )
         : null;
 
+    // One element for both layouts: LevelNav places it under the element
+    // button on a desktop and at the top of the phone's Explore tab, and the
+    // phone header's LevelNav leaves it out (layout contract, §3.8). The
+    // energies go in unfiltered: SpeciesControls makes the species-key check
+    // itself (ruling C5).
+    const speciesControls = (
+        <SpeciesControls
+            species={species}
+            onChargeChange={handleChargeChange}
+            onExcitationChange={handleExcitationChange}
+            energies={atomEnergies}
+            radii={atomProfile ? { displayRadius: atomProfile.displayRadius, reference: atomProfile.reference ?? null } : null}
+            unbound={atomUnbound}
+        />
+    );
+
     const levelNavProps = {
         Z: atomZ,
+        configuration: speciesConfiguration(species),
+        // Named only when it is not the plain element: a neutral atom's
+        // button keeps exactly the name it always had ("currently Sodium").
+        speciesSymbol: isNeutralGround(species) ? undefined : speciesSymbol(species),
+        speciesTitle: speciesTitle(species),
+        speciesControls,
         selectedShell: atomSelectedShell,
         selectedSubshell: atomSelectedSubshell,
         selectedOrbital: atomSelectedOrbital,
@@ -680,6 +741,20 @@ function App() {
                     <div className="canvas-busy" role="status" aria-live="polite">
                         <CircularProgress size={22} thickness={5} color="inherit" />
                         <span>{canvasBusyLabel}</span>
+                    </div>
+                )}
+                {/* Spec §3.5: an anion LDA cannot bind draws nothing, and
+                    the empty canvas says why. The card's alert
+                    (SpeciesControls) is the one announced; this repeats it
+                    for the eye, hidden from assistive technology while that
+                    alert is on screen so it is never heard twice. A folded
+                    phone sheet has no card, so there it is a status. */}
+                {isAtomMode && atomUnbound && (
+                    <div
+                        className="canvas-unbound"
+                        {...(isNarrow && phoneTab !== 'explore' ? { role: 'status' } : { 'aria-hidden': true })}
+                    >
+                        {atomUnbound}
                     </div>
                 )}
                 {showPhaseLegend && (

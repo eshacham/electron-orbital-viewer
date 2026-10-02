@@ -4,8 +4,8 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
 import { SERIALIZABLE_CHECK } from './store';
-import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded } from './store/atomSlice';
-import { setSurfaceStyle, setBasicSelection } from './store/orbitalSlice';
+import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView } from './store/atomSlice';
+import { setSurfaceStyle, setBasicSelection, requestCut } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
 import { computeSamplingRadius, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
@@ -486,6 +486,145 @@ describe('App', () => {
             expect(store.getState().orbital.currentField?.sources.map(s => s.id))
                 .toEqual(['hybrid:sp2:0', 'hybrid:sp2:1', 'hybrid:sp2:2']);
             expect(store.getState().orbital.currentParams).toBeNull();
+        });
+    });
+
+    describe('ions and excited states', () => {
+        /** The solver's first post, answered with a one-shell profile for `speciesKey`. */
+        const landPicture = (speciesKey: string, Z: number) => {
+            const solver = (createAtomWorker as jest.Mock).mock.results[0].value;
+            const { requestId } = solver.postMessage.mock.calls[0][0];
+            act(() => {
+                solver.onmessage({ data: { type: 'success', profile: { ...hydrogenProfile(), Z, speciesKey }, requestId } });
+            });
+        };
+
+        /** The solver's first post, answered as an anion LDA does not bind. */
+        const replyUnbound = () => {
+            const solver = (createAtomWorker as jest.Mock).mock.results[0].value;
+            const { requestId } = solver.postMessage.mock.calls[0][0];
+            act(() => {
+                solver.onmessage({ data: { type: 'unbound', message: 'LDA does not bind this anion: its 3p electron is not bound.', requestId } });
+            });
+        };
+
+        it('puts the charge controls in the navigation card on a desktop', () => {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, { Z: 11 });
+            expect(container.querySelector('.side-panel .species-controls')).not.toBeNull();
+            expect(container.querySelector('.view-panel .species-controls')).toBeNull();
+        });
+
+        it('stepping the charge starts a solve for the ion', () => {
+            installMatchMedia(false);
+            renderWithProvider(<App />, { Z: 11 });
+            const solver = (createAtomWorker as jest.Mock).mock.results[0].value;
+            fireEvent.click(screen.getByRole('button', { name: 'increase charge' }));
+            expect(solver.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'solve', Z: 11, charge: 1 }));
+        });
+
+        // Carry from Tasks 9/11: like picking an element, a species change is
+        // solving from the very render it happens in, and a link's cut still
+        // waiting on the old species does not land on the new one. Unlike
+        // picking an element, the camera stays put -- that is what lets Na⁺
+        // visibly shrink against the scale bar.
+        it('a charge step is solving at once, drops a waiting link cut, and leaves the camera alone', () => {
+            installMatchMedia(false);
+            const { store } = renderWithProvider(<App />, { Z: 11 });
+            act(() => {
+                store.dispatch(requestAtomView({ level: 'shell', shell: 3, subshell: null, orbital: null }));
+                store.dispatch(requestCut({ clipAxis: 'x', clipPosition: 0.5 }));
+                store.dispatch(setSurfaceStyle({ clipPosition: 0.2 }));
+            });
+            const resetNonce = store.getState().orbital.viewResetNonce;
+            fireEvent.click(screen.getByRole('button', { name: 'increase charge' }));
+            expect(store.getState().atom).toMatchObject({ charge: 1, isSolving: true });
+            expect(store.getState().orbital.pendingCut).toBeNull();
+            expect(store.getState().orbital.surfaceStyle.clipPosition).toBe(0.2);
+            expect(store.getState().orbital.viewResetNonce).toBe(resetNonce);
+        });
+
+        it('shows "LDA does not bind this anion" instead of a picture', () => {
+            installMatchMedia(false);
+            renderWithProvider(<App />, { Z: 17, charge: -1 });
+            const solver = (createAtomWorker as jest.Mock).mock.results[0].value;
+            const { requestId } = solver.postMessage.mock.calls[0][0];
+            act(() => {
+                solver.onmessage({ data: { type: 'unbound', message: 'LDA does not bind this anion: its 3p electron has no bound state (eigenvalue ≥ 0).', requestId } });
+            });
+            expect(screen.getAllByText(/LDA does not bind this anion/).length).toBeGreaterThan(0);
+            expect(screen.queryByLabelText('subshells')).not.toBeInTheDocument();
+        });
+
+        // One alert, not two: the card's own (SpeciesControls) is announced;
+        // the note over the empty canvas only says it again for the eye.
+        it('announces an unbound anion once, with the note over the canvas hidden from assistive technology', () => {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, { Z: 17, charge: -1 });
+            replyUnbound();
+            expect(screen.getAllByRole('alert')).toHaveLength(1);
+            expect(container.querySelector('.canvas-unbound')).toHaveAttribute('aria-hidden', 'true');
+        });
+
+        // A folded phone sheet has no card on screen, so the canvas note is
+        // the only place the reason is said: a status there, still not a
+        // second alert.
+        it('on a phone with the sheet folded, the canvas note is what says why nothing is drawn', () => {
+            installMatchMedia(true);
+            const { container } = renderWithProvider(<App />, { Z: 17, charge: -1 });
+            replyUnbound();
+            expect(screen.queryAllByRole('alert')).toHaveLength(0);
+            const note = container.querySelector('.canvas-unbound')!;
+            expect(note).toHaveAttribute('role', 'status');
+            expect(note).not.toHaveAttribute('aria-hidden');
+            expect(note).toHaveTextContent('LDA does not bind this anion');
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            expect(screen.getAllByRole('alert')).toHaveLength(1);
+        });
+
+        it('says which species it is solving', () => {
+            installMatchMedia(false);
+            jest.useFakeTimers();
+            try {
+                renderWithProvider(<App />, { Z: 11, charge: 1, isSolving: true });
+                act(() => { jest.advanceTimersByTime(500); });
+                expect(screen.getByText('Solving Sodium ion Na⁺…')).toBeInTheDocument();
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        // Ruling C15: the energies wait for the picture, in a second worker.
+        it('asks for the ΔSCF energies once the ion\'s picture has landed', () => {
+            installMatchMedia(false);
+            renderWithProvider(<App />, { Z: 11, charge: 1 });
+            expect(createAtomWorker).toHaveBeenCalledTimes(1);
+            landPicture('11+1', 11);
+            const energies = (createAtomWorker as jest.Mock).mock.results[1].value;
+            expect(energies.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'energies', Z: 11, charge: 1 }));
+            const { requestId } = energies.postMessage.mock.calls[0][0];
+            act(() => {
+                energies.onmessage({ data: { type: 'energies', speciesKey: '11+1', ionisation: { valueEv: 47.1, fromLabel: 'Na⁺', toLabel: 'Na²⁺' }, excitation: null, requestId } });
+            });
+            expect(screen.getByText(/47\.10 eV/)).toBeInTheDocument();
+        });
+
+        it('names the ion in the phone header and puts the controls in the Explore tab', () => {
+            installMatchMedia(true);
+            renderWithProvider(<App />, { Z: 11, charge: 1 });
+            expect(screen.getByRole('button', { name: /change element/i })).toHaveTextContent('Na⁺ · Sodium');
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            expect(screen.getByLabelText('ion and excitation')).toBeInTheDocument();
+        });
+
+        it('the Explore tab opens on the charge controls, above the configuration', () => {
+            installMatchMedia(true);
+            renderWithProvider(<App />, { Z: 11 });
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            const panel = screen.getByRole('tabpanel');
+            const controls = panel.querySelector('.species-controls')!;
+            const configuration = panel.querySelector('.level-nav-configuration')!;
+            expect(controls.compareDocumentPosition(configuration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         });
     });
 

@@ -25,6 +25,7 @@ import {
     ViewInsets,
     clearShellCompositionLobes,
     attachShellCompositionLobes,
+    setReferenceRing,
     VisualizerContext,
     renderFrame
 } from '../orbital_visualizer';
@@ -81,6 +82,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     const atomSelectedShell = useAppSelector(state => state.atom.selectedShell);
     const atomSelectedSubshell = useAppSelector(state => state.atom.selectedSubshell);
     const atomHoverRadius = useAppSelector(state => state.atom.hoverRadius);
+    const atomUnbound = useAppSelector(state => state.atom.unbound);
     const [scaleBar, setScaleBar] = useState<ScaleBar | null>(null);
 
     // Level-transition spec addendum: a user who has asked their OS for
@@ -95,15 +97,15 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     const showShellView = atomMode === 'atom' && (atomLevel === 'atom' || atomLevel === 'shell') && atomProfile !== null;
 
     // The atom<->shell fade only makes sense between two views of the *same*
-    // solved element -- a fresh element's own first shell view (or a mode
+    // solved species -- a fresh species' own first shell view (or a mode
     // switch back into atom mode) has nothing of the right shape to animate
-    // from, and the two elements' curves do not even share a grid (each
-    // atom gets its own log grid, see atom_profile.ts). Tracked by Z rather
-    // than by object identity: `atomProfile` is re-sliced (a new object)
-    // whenever `enclosedFraction` changes without the element changing, and
-    // that recomputed profile's curves/grid are perfectly valid to animate
-    // between.
-    const lastAnimatedProfileZRef = useRef<number | null>(null);
+    // from, and two species' curves do not even share a grid (each solve
+    // gets its own log grid, see atom_profile.ts -- Na and Na⁺ included).
+    // Tracked by species, not object identity: `atomProfile` is re-sliced (a
+    // new object) whenever `enclosedFraction` changes without the species
+    // changing, and that recomputed profile's curves/grid are perfectly
+    // valid to animate between.
+    const lastAnimatedSpeciesRef = useRef<string | null>(null);
 
     // Initialize visualizer - only once
     useEffect(() => {
@@ -207,10 +209,12 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         const context = visualizerContextRef.current;
         if (!context || !showShellView || !atomProfile) return;
 
-        // Only animate between two views of the same solved element -- see
-        // lastAnimatedProfileZRef's own doc comment above.
-        const animate = lastAnimatedProfileZRef.current === atomProfile.Z && !prefersReducedMotion;
-        lastAnimatedProfileZRef.current = atomProfile.Z;
+        // Only animate between two views of the same solved species -- see
+        // lastAnimatedSpeciesRef's own doc comment above. A profile without
+        // a species key can only be a neutral ground state (String(Z)).
+        const profileSpecies = atomProfile.speciesKey ?? String(atomProfile.Z);
+        const animate = lastAnimatedSpeciesRef.current === profileSpecies && !prefersReducedMotion;
+        lastAnimatedSpeciesRef.current = profileSpecies;
 
         // The shared log grid's outer radius: sizes the cut face, the
         // discard radius, and the camera framing alike (see
@@ -265,6 +269,11 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 // resolves as a maximum of the total, so without this it
                 // has a colour index and no ring to apply it to.
                 valenceEmphasis: atomProfile.shells[atomProfile.shells.length - 1]?.emphasis,
+                // An ion or excited atom is framed on at least the neutral
+                // atom's drawn radius, so the reference ring is on screen
+                // and stepping Na -> Na⁺ -> Na leaves the camera where it is
+                // (ruling C12). Undefined for a neutral ground state.
+                framingFloor: atomProfile.reference?.displayRadius,
             }, { animate });
         } else {
             const shell = atomProfile.shells.find(s => s.n === atomSelectedShell);
@@ -337,7 +346,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             dispatch(endCompositionBuild());
             return;
         }
-        const cacheKey = shellMeshCacheKey(atomProfile.Z, atomSelectedShell, COMPOSITE_ORBITAL_RESOLUTION, enclosedFraction, isolatedL);
+        // By species: Fe²⁺'s 3d lobes are not neutral iron's.
+        const cacheKey = shellMeshCacheKey(atomProfile.speciesKey ?? atomProfile.Z, atomSelectedShell, COMPOSITE_ORBITAL_RESOLUTION, enclosedFraction, isolatedL);
 
         // A different shell's (or a stale fraction's) lobes must not linger
         // while the new ones are being computed -- cleared synchronously,
@@ -408,6 +418,25 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             dispatch(endCompositionBuild());
         };
     }, [atomMode, atomLevel, atomProfile, atomSelectedShell, atomSelectedSubshell, enclosedFraction, dispatch]);
+
+    // The neutral atom's edge, at the whole-atom level only: a shell view is
+    // framed on one shell, where the whole atom's edge means nothing.
+    // `atomProfile` is a dependency so a new ion's view gets its ring again
+    // after updateAtomViewInScene (above) has rebuilt the scene.
+    const referenceRadius = atomMode === 'atom' && atomLevel === 'atom' && atomProfile?.reference
+        ? atomProfile.reference.displayRadius
+        : null;
+    useEffect(() => {
+        setReferenceRing(visualizerContextRef.current, referenceRadius);
+    }, [referenceRadius, atomProfile]);
+
+    // Spec §3.5: an anion LDA cannot bind is reported, and nothing is drawn
+    // -- not even the previous species' picture, which would otherwise sit
+    // under a message saying there is nothing to show. clearScene (ruling
+    // C7) also takes the reference ring down and stops anything in flight.
+    useEffect(() => {
+        if (atomMode === 'atom' && atomUnbound) clearScene(visualizerContextRef.current);
+    }, [atomMode, atomUnbound]);
 
     // Addendum 2's selection affordance: at the whole-atom level the rings on
     // the cut face are clickable, and a click opens the shell that owns that
