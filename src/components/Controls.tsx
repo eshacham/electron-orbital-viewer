@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Box,
   FormControl,
@@ -148,28 +148,21 @@ const Controls: React.FC<ControlsProps> = ({
   // entirely -- the selects stay visible but frozen, so the way back to a
   // single orbital is obvious rather than a control that vanished.
   const combinationActive = combination.kind !== 'none';
-  // Local state for dropdown options, derived from props
-  const [lOptions, setLOptions] = useState<number[]>([0,1,2]);
-  const [mlOptions, setMlOptions] = useState<number[]>([-2, -1, 0, 1, 2]);
+  // The dropdown options follow from n and l directly. They were state
+  // seeded for n = 3 and corrected in an effect, so the first render of any
+  // other selection (a restored link's 4f, say) handed MUI an out-of-range
+  // value for a frame.
+  const lOptions = React.useMemo(() => Array.from({ length: initialN }, (_, i) => i), [initialN]);
+  const mlOptions = React.useMemo(() => Array.from({ length: 2 * initialL + 1 }, (_, i) => i - initialL), [initialL]);
 
-  // Effect to update l options when n changes
+  // If the current l is not valid for a new n, reset it; ml follows from the l effect.
   useEffect(() => {
-    const newLOptions = Array.from({ length: initialN }, (_, i) => i);
-    setLOptions(newLOptions);
-    // If current L is not valid for new N, reset it; ml follows from the l effect.
-    if (!newLOptions.includes(initialL)) {
-      onLChange(newLOptions[0] !== undefined ? newLOptions[0] : 0);
-    }
-  }, [initialN, onLChange]); // initialL is intentionally not here to avoid loops if L is reset
+    if (!lOptions.includes(initialL)) onLChange(lOptions[0] ?? 0);
+  }, [lOptions, onLChange]); // initialL is intentionally not here to avoid loops if L is reset
 
-  // Effect to update ml options when l changes
   useEffect(() => {
-    const newMlOptions = Array.from({ length: 2 * initialL + 1 }, (_, i) => i - initialL);
-    setMlOptions(newMlOptions);
-    if (!newMlOptions.includes(initialMl)) {
-      onMlChange(newMlOptions[0] !== undefined ? newMlOptions[0] : 0);
-    }
-  }, [initialL, onMlChange]); // initialMl is intentionally not here
+    if (!mlOptions.includes(initialMl)) onMlChange(mlOptions[0] ?? 0);
+  }, [mlOptions, onMlChange]); // initialMl is intentionally not here
 
   // On a phone #controls is one horizontally scrolling strip, and it keeps
   // whatever scroll position it was left at. Drilling into a shell inserts
