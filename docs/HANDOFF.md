@@ -646,7 +646,11 @@ Atom mode's Z no longer has to mean a neutral atom. A Charge stepper (−2 to
 +3, clamped to whatever `ion_configurations.ts`'s NIST table actually offers
 for that element) and an Excite menu (promotes one electron from the
 valence subshell up — `species.ts`'s `excitationSources`/
-`excitationTargets`) select one of three things the SCF can now solve: a
+`excitationTargets`: every open subshell, plus the outermost shell's
+occupied subshells, except that shell's s and p when it also holds a d or f
+(Fe³⁺ 3s/3p, Pd 4s/4p are core; their d is the valence); targets in
+hydrogen-like (n, l) order for a cation, Madelung order for a neutral, four
+per source) select one of three things the SCF can now solve: a
 neutral ground state, an ion, or an excited atom with one electron moved.
 All three are carried as a single `AtomSpecies = { Z, charge, excitation }`
 and a single `speciesKey` string that the caches, the worker protocol and
