@@ -22,10 +22,11 @@ const nodesAt = (energy: number) => {
 };
 
 describe('findEigenvalue Phase B stays with the requested state (ruling T7-c)', () => {
-    // Pu and Am 7s -> 5f in scalar mode: a 5f bound by a few mHa gave no sign
-    // change near its own root, so Phase B -- whose upper end is capped just
-    // below zero -- only widened downward, until it took in the 4f root
-    // (-16 Ha, no nodes) and bisected on that instead.
+    // A level with no root of its own in the bracket (hydrogen 7s on a 40 a0
+    // grid) used to let Phase B -- whose upper end is capped just below zero
+    // -- widen downward until it took in the state below and bisected on
+    // that. (Pu and Am 7s -> 5f were first blamed on this; their 5f is simply
+    // not bound, which ruling T7-b reports as a verdict.)
     it('does not walk down onto the state below', () => {
         const result = findEigenvalue({
             targetNodes: 1, eLow: -10, eHigh: -1e-12, nodesAt,

@@ -3,6 +3,7 @@ import { UnboundElectronError } from '../../src/atom/scf_shared';
 import { AtomSpecies } from '../../src/atom/species';
 import { NIST_FIRST_IONISATION_EV } from '../../src/atom/ionisation_references';
 import { wholeAtomFramingRadius } from '../../src/atom/framing';
+import * as deltaScf from '../../src/atom/delta_scf';
 
 jest.setTimeout(120000);
 
@@ -60,6 +61,20 @@ describe('atom worker, species protocol', () => {
     it('reports a disallowed species on the energies path as an error too', () => {
         const { response } = handleAtomWorkerRequest({ type: 'energies', Z: 11, charge: 2, excitation: null, requestId: 6 });
         expect(response).toEqual({ type: 'error', message: expect.stringMatching(/not offered/), requestId: 6 });
+    });
+
+    // Re-review of T7-f: the energies' spin-polarised LDA can fail to bind a
+    // level the picture's restricted LDA binds (Tb 6s -> 4f); the reply says
+    // which calculation, for which species, not the solver's bare sentence.
+    it('names the species and the spin-polarised ΔSCF when the energies find a level unbound', () => {
+        const spy = jest.spyOn(deltaScf, 'excitationEnergy').mockImplementation(() => { throw new UnboundElectronError(4, 3); });
+        try {
+            const excitation = { from: { n: 6, l: 0 }, to: { n: 4, l: 3 } };
+            const { response } = handleAtomWorkerRequest({ type: 'energies', Z: 65, charge: 0, excitation, requestId: 9 });
+            expect(response).toEqual({ type: 'error', requestId: 9, message: expect.stringMatching(/^Spin-polarised ΔSCF for Terbium, excited 6s → 4f: its 4f electron is not bound in the spin-polarised LDA/) });
+        } finally {
+            spy.mockRestore();
+        }
     });
 
     // Ruling T7-f: a failure names the species and the method that failed,

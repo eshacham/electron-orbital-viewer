@@ -356,10 +356,21 @@ export function handleAtomWorkerRequest(data: AtomWorkerRequest): { response: At
             // same "not offered" error solveSpecies would for the 'solve'
             // path, caught below like any other throw from this branch.
             speciesConfiguration(species);
-            return {
-                response: { type: 'energies', speciesKey: speciesKey(species), ionisation: ionisationEnergy(species), excitation: excitationEnergy(species), requestId },
-                transfer: [],
-            };
+            try {
+                return {
+                    response: { type: 'energies', speciesKey: speciesKey(species), ionisation: ionisationEnergy(species), excitation: excitationEnergy(species), requestId },
+                    transfer: [],
+                };
+            } catch (error) {
+                if (!(error instanceof UnboundElectronError)) throw error;
+                // The picture's restricted LDA can bind a level the energies'
+                // spin-polarised LDA does not (Tb-Er 6s -> 4f): say which
+                // calculation, for which species, rather than the solver's
+                // bare sentence under a picture that shows the level bound.
+                const label = subshellLabel(error.n, error.l) + (error.j === undefined ? '' : jLabel(error.j));
+                const message = `Spin-polarised ΔSCF for ${speciesTitle(species)}: its ${label} electron is not bound in the spin-polarised LDA the energies use (the picture's spin-restricted LDA binds it), so no energy is given.`;
+                return { response: { type: 'error', message, requestId }, transfer: [] };
+            }
         }
         // Checked before the solve, so a species that is not offered says so
         // plainly rather than as a failed SCF.
