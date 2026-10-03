@@ -7,35 +7,33 @@
  * solution already in quantum_functions.ts, so this is validated against that
  * rather than against itself.
  */
-import { RadialGrid, integrateOnGrid, cumulativeIntegral } from './radial_grid';
+import { RadialGrid, integrateOnGrid } from './radial_grid';
 import { numerovForward, numerovBackward, countNodes } from './numerov';
+import {
+    RESCALE_THRESHOLD, RESCALE_FACTOR, DECAY_GROWTH_FACTOR, findEigenvalue, assertGridHoldsState,
+} from './eigenvalue_search';
 
 export interface RadialState {
     n: number;
     l: number;
-    /** Eigenvalue in Hartree. Negative for a bound state. */
+    /** Eigenvalue in Hartree (rest mass excluded for relativistic states). Negative for a bound state. */
     energy: number;
-    /** u(r) = r*R(r), normalised so that the integral of u^2 dr is 1. */
+    /**
+     * u(r) = r*R(r), normalised so that the integral of u^2 dr is 1. For a
+     * relativistic state this is the large component G, and it is G^2 + Q^2
+     * -- not u^2 alone -- that integrates to 1 and that the density is built
+     * from.
+     */
     u: Float64Array;
-    /** R(r) = u(r)/r, the radial wave function itself. */
+    /** R(r) = u(r)/r, the radial wave function itself (the one the level-3 renderer draws). */
     R: Float64Array;
+    /** Small component F = r*f, present only for relativistic states. */
+    Q?: Float64Array;
+    /** Total angular momentum j = l ± 1/2, present only for Dirac (spin-orbit) states. */
+    j?: number;
+    /** Dirac quantum number, present only for Dirac states: -(l+1) for j = l + 1/2, l for j = l - 1/2. */
+    kappa?: number;
 }
-
-const MAX_BISECTIONS = 200;
-const ENERGY_TOLERANCE = 1e-13;
-
-// Outward integration can run into the classically forbidden region at low
-// trial energies and blow up before matchIndex would have stopped it (see
-// buildG/matchIndex below); a plain magnitude threshold with a periodic
-// rescale keeps it finite without perturbing the node count or the
-// logarithmic-derivative match, since both are invariant under a uniform
-// positive rescale of the whole array computed so far.
-const RESCALE_THRESHOLD = 1e100;
-const RESCALE_FACTOR = 1e-100;
-
-// How far past the classical turning point Phase A's node count needs to look
-// before it can trust what it has seen (see countNodesForBracketing below).
-const DECAY_GROWTH_FACTOR = 1e6;
 
 /**
  * g(t) for y'' = g y, the log-grid form of the radial equation.
@@ -150,6 +148,12 @@ function countNodesForBracketing(grid: RadialGrid, g: Float64Array, l: number, m
     return countNodes(y, 0, stopIndex);
 }
 
+/** Phase A's node count at one trial energy. */
+function nodesAt(grid: RadialGrid, l: number, potential: Float64Array, energy: number): number {
+    const g = buildG(grid, l, potential, energy);
+    return countNodesForBracketing(grid, g, l, matchIndex(g));
+}
+
 /**
  * Seeds the inward integration with the WKB decay rate at the outer edge,
  * rather than a hard wall (y = 0 there).
@@ -211,33 +215,10 @@ export function solveRadialState(
         if (Number.isFinite(value)) eLow = eLow === -Infinity ? value : Math.min(eLow, value);
     }
     if (!Number.isFinite(eLow) || eLow >= 0) eLow = -1e4;
-    let eHigh = -1e-12;
+    const eHigh = -1e-12;
 
-    // Phase A: bracket the eigenvalue by node count (see
-    // countNodesForBracketing for why this cannot stop at the turning point).
-    //
-    // This stops at a loose relative width rather than driving all the way to
-    // ENERGY_TOLERANCE, deliberately. countNodesForBracketing's decay-growth
-    // cutoff is itself an approximation, and how close its node-count
-    // transition sits to the true eigenvalue varies from state to state — for
-    // hydrogen n=4, l=0 it is off by about 1e-5 relative. Phase B, bisecting
-    // on the physically exact log-derivative mismatch, corrects that bias,
-    // but only if it is left a bracket that actually contains the true root.
-    // A fixed width is not reliable enough for that on its own — how far
-    // Phase A's converged interval sits from the true root turned out, when
-    // measured, to depend on incidental details like the search's starting
-    // point, not just on its width — so Phase B widens outward below until it
-    // finds a genuine sign change rather than trusting Phase A's width as-is.
-    for (let iteration = 0; iteration < MAX_BISECTIONS; iteration++) {
-        const energy = 0.5 * (eLow + eHigh);
-        const g = buildG(grid, l, potential, energy);
-        const match = matchIndex(g);
-        if (countNodesForBracketing(grid, g, l, match) > targetNodes) eHigh = energy;
-        else eLow = energy;
-        if (eHigh - eLow < Math.abs(eHigh) * 1e-3) break;
-    }
-
-    // Phase B: refine on the logarithmic-derivative mismatch at the match point.
+    // Phase B's mismatch is the logarithmic derivative at the match point;
+    // the search itself (both phases) is shared with the relativistic solver.
     const mismatch = (energy: number): number => {
         const g = buildG(grid, l, potential, energy);
         const match = matchIndex(g);
@@ -249,40 +230,11 @@ export function solveRadialState(
         const inwardSlope = (scale * (inward[match + 1] - inward[match - 1])) / (2 * grid.dx);
         return (outwardSlope - inwardSlope) / outward[match];
     };
-
-    let low = eLow;
-    let high = eHigh;
-    let fLow = mismatch(low);
-    let fHigh = mismatch(high);
-    // Expand geometrically around Phase A's bracket until the mismatch
-    // function actually changes sign across it, or until the expansion has
-    // clearly gone further than any plausible eigenvalue gap. Halving this
-    // width back down would only rediscover Phase A's own bias; growing it is
-    // what gives Phase B room to find the true root instead.
-    const centre = 0.5 * (low + high);
-    let halfWidth = Math.max(0.5 * (high - low), Math.abs(centre) * 1e-6);
-    for (let expansion = 0; expansion < 60; expansion++) {
-        if (Number.isFinite(fLow) && Number.isFinite(fHigh) && fLow * fHigh < 0) break;
-        halfWidth *= 2;
-        low = Math.min(centre - halfWidth, eLow);
-        high = Math.max(centre + halfWidth, eHigh);
-        if (high >= 0) high = -Number.EPSILON;
-        fLow = mismatch(low);
-        fHigh = mismatch(high);
-    }
-
-    let energy = 0.5 * (low + high);
-    if (Number.isFinite(fLow) && Number.isFinite(fHigh) && fLow * fHigh < 0) {
-        for (let iteration = 0; iteration < MAX_BISECTIONS; iteration++) {
-            const middle = 0.5 * (low + high);
-            const value = mismatch(middle);
-            if (!Number.isFinite(value)) break;
-            if (value * fLow > 0) low = middle;
-            else high = middle;
-            energy = 0.5 * (low + high);
-            if (high - low < Math.abs(high) * 1e-14 + ENERGY_TOLERANCE) break;
-        }
-    }
+    const { energy } = findEigenvalue({
+        targetNodes, eLow, eHigh,
+        nodesAt: trial => nodesAt(grid, l, potential, trial),
+        mismatchAt: mismatch,
+    });
 
     // Final wave function: outward up to the match point, inward beyond it,
     // scaled to agree where they meet.
@@ -305,35 +257,7 @@ export function solveRadialState(
     const norm = Math.sqrt(integrateOnGrid(grid, uSquared));
     if (!(norm > 0)) throw new Error(`Radial solver did not converge for n=${n}, l=${l}.`);
 
-    // Containment guard (ruling R21): a grid too small for the requested state
-    // does not fail loudly on its own — the hard-wall-like inward seed just
-    // forces the solution toward zero at whatever edge it is given, so a
-    // single point check at rMax (e.g. u(rMax)^2 against the peak) is not a
-    // reliable signal: measured directly for hydrogen 7s truncated at rMax=40,
-    // that ratio comes out *smaller* than for a correctly sized grid, because
-    // the boundary condition manufactures a small value there regardless of
-    // whether the true state has actually decayed by then. What does not lie
-    // is the norm itself: a state that does not fit is forced to pack an
-    // outsized share of its probability into the last sliver of the grid
-    // simply to be normalisable at all. Measured across gridForAtom(1, n) for
-    // n=1..7 and n=26,l=1/Z=26 etc., a correctly sized grid keeps under
-    // 5e-5 of the norm in the outermost 1% of grid points; truncating
-    // hydrogen 7s to rMax=40 (a third of the ~150 a0 it needs) pushes that
-    // figure to 0.15 — a three-thousand-fold jump, so 1e-2 leaves a wide,
-    // safe margin on both sides.
-    const cumulativeUSquared = cumulativeIntegral(grid, uSquared);
-    const totalUSquared = cumulativeUSquared[grid.size - 1];
-    const tailStart = Math.floor(grid.size * 0.99);
-    const tailFraction = totalUSquared > 0
-        ? (totalUSquared - cumulativeUSquared[tailStart]) / totalUSquared
-        : 1;
-    if (tailFraction > 1e-2) {
-        throw new Error(
-            `Radial grid (rMax=${grid.rMax}) is too small to hold n=${n}, l=${l}: ` +
-            `${(tailFraction * 100).toFixed(1)}% of the electron's probability lies ` +
-            `in the outermost 1% of the grid. Use a grid sized for this n.`
-        );
-    }
+    assertGridHoldsState(grid, uSquared, n, l);
 
     // Sign convention: R > 0 as r -> 0, matching the analytic solution.
     const firstSignificant = u.findIndex(value => Math.abs(value) > 1e-12 * norm);
@@ -360,6 +284,5 @@ export function solveRadialState(
 export function hasBoundState(
     grid: RadialGrid, n: number, l: number, potential: Float64Array, below: number = -1e-4
 ): boolean {
-    const g = buildG(grid, l, potential, below);
-    return countNodesForBracketing(grid, g, l, matchIndex(g)) > n - l - 1;
+    return nodesAt(grid, l, potential, below) > n - l - 1;
 }
