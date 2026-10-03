@@ -1,4 +1,6 @@
-import { handleAtomWorkerRequest } from '../../src/workers/atomWorker';
+import { handleAtomWorkerRequest, solveFailureMessage } from '../../src/workers/atomWorker';
+import { UnboundElectronError } from '../../src/atom/scf_shared';
+import { AtomSpecies } from '../../src/atom/species';
 import { NIST_FIRST_IONISATION_EV } from '../../src/atom/ionisation_references';
 import { wholeAtomFramingRadius } from '../../src/atom/framing';
 
@@ -60,10 +62,44 @@ describe('atom worker, species protocol', () => {
         expect(response).toEqual({ type: 'error', message: expect.stringMatching(/not offered/), requestId: 6 });
     });
 
+    // Ruling T7-f: a failure names the species and the method that failed,
+    // not just whatever the solver said. Sm 6s -> 4f's promoted 4f is not
+    // bound (ruling T7-b): an explained verdict like an unbound anion's, so
+    // it is an 'unbound' reply too.
+    it('reports a promoted electron LDA does not bind as unbound, naming the species and the method', () => {
+        const excitation = { from: { n: 6, l: 0 }, to: { n: 4, l: 3 } };
+        const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 62, charge: 0, excitation, enclosedFraction: 0.9, requestId: 8 });
+        expect(response).toEqual({
+            type: 'unbound',
+            message: 'Non-relativistic SCF for Samarium, excited 6s → 4f: the promoted 4f electron is not bound (LDA binds it by less than 10⁻⁴ Ha).',
+            requestId: 8,
+        });
+    });
+
     // Not tested here: an anion's energies request (e.g. Cl-, Z=17 charge=-1)
     // also reaches UnboundAnionError, via solvePolarised rather than
     // assertStatesBound's restricted-LDA path -- confirmed by hand to reply
     // 'unbound' with the same "its 3p electron" message, but the
     // spin-polarised SCF it requires takes several seconds, too slow for the
     // default suite's budget.
+});
+
+describe('solveFailureMessage (ruling T7-f)', () => {
+    const samarium: AtomSpecies = { Z: 62, charge: 0, excitation: { from: { n: 6, l: 0 }, to: { n: 4, l: 3 } } };
+    const ytterbium: AtomSpecies = { Z: 70, charge: 0, excitation: null };
+
+    it('names the mode, the species and the promoted electron', () => {
+        expect(solveFailureMessage(samarium, 'scalar', new UnboundElectronError(4, 3))).toBe(
+            'Scalar-relativistic SCF for Samarium, excited 6s → 4f: the promoted 4f electron is not bound (LDA binds it by less than 10⁻⁴ Ha).');
+    });
+
+    it('names the j-level of a Dirac failure, and calls an electron that was not promoted just that', () => {
+        expect(solveFailureMessage(ytterbium, 'spinOrbit', new UnboundElectronError(4, 3, 3.5))).toBe(
+            'Dirac (spin–orbit) SCF for Ytterbium: the 4f⁷⁄₂ electron is not bound (LDA binds it by less than 10⁻⁴ Ha).');
+    });
+
+    it('keeps any other failure\'s own explanation after the species and mode', () => {
+        expect(solveFailureMessage(ytterbium, 'off', new Error('Radial grid (rMax=140) is too small to hold n=4, l=3.'))).toBe(
+            'Non-relativistic SCF for Ytterbium failed: Radial grid (rMax=140) is too small to hold n=4, l=3.');
+    });
 });

@@ -142,7 +142,8 @@ export function useAtomSolver(
             // let a slower earlier solve land after a faster later one.
             if (event.data.requestId !== requestId) return;
 
-            // Spec §3.5: an anion LDA cannot bind has no profile to read, and
+            // Spec §3.5: an anion LDA cannot bind (or an excitation whose
+            // promoted electron it does not bind) has no profile to read, and
             // is reported as itself rather than as a solve error. Never
             // cached: nothing was solved, and re-picking it is cheap -- the
             // SCF gives up within a few iterations.

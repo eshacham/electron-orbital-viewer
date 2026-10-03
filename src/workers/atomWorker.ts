@@ -1,6 +1,8 @@
 import { AtomSolution, solveAtom, solveSpecies } from '../atom/scf';
-import { UnboundAnionError } from '../atom/scf_shared';
-import { AtomSpecies, Excitation, isNeutralGround, speciesConfiguration, speciesKey } from '../atom/species';
+import { UnboundAnionError, UnboundElectronError } from '../atom/scf_shared';
+import { AtomSpecies, Excitation, isNeutralGround, speciesConfiguration, speciesKey, speciesTitle } from '../atom/species';
+import { RelativityMode, jLabel, scfLabel } from '../atom/relativity';
+import { subshellLabel } from '../atom/configurations';
 import { EnergyReading, excitationEnergy, ionisationEnergy } from '../atom/delta_scf';
 import { AtomProfile, buildAtomProfile, packRadialCurve, subshellSamplingRadius, compositeSamplingRadius } from '../atom/atom_profile';
 import { wholeAtomFramingRadius } from '../atom/framing';
@@ -306,13 +308,34 @@ export type AtomWorkerRequest =
 /**
  * `'unbound'` is a distinct reply from `'error'` (spec §3.5): an anion LDA
  * cannot bind is an expected, explained outcome, not a failure to show
- * alongside a genuine solve error.
+ * alongside a genuine solve error -- and so, since ruling T7-b, is an
+ * excited species whose promoted electron LDA does not bind (Sm 6s → 4f).
  */
 export type AtomWorkerResponse =
     | { type: 'success'; profile: SerialisedAtomProfile; requestId: number }
     | { type: 'unbound'; message: string; requestId: number }
     | { type: 'error'; message: string; requestId: number }
     | { type: 'energies'; speciesKey: string; ionisation: EnergyReading | null; excitation: EnergyReading | null; requestId: number };
+
+/**
+ * What the user reads when a solve fails (ruling T7-f): the method and the
+ * species first -- "Scalar-relativistic SCF for Samarium, excited 6s → 4f"
+ * -- then why. An electron the field does not bind (UnboundElectronError,
+ * ruling T7-b) is said in words, "the promoted 4f electron is not bound",
+ * rather than with the solver's own sentence; anything else keeps its own
+ * explanation. The worker solves without relativity today; Task 8 passes
+ * the request's mode.
+ */
+export function solveFailureMessage(species: AtomSpecies, relativity: RelativityMode, error: unknown): string {
+    const what = `${scfLabel(relativity)} for ${speciesTitle(species)}`;
+    if (error instanceof UnboundElectronError) {
+        const label = subshellLabel(error.n, error.l) + (error.j === undefined ? '' : jLabel(error.j));
+        const to = species.excitation?.to;
+        const promoted = to !== undefined && to.n === error.n && to.l === error.l ? 'promoted ' : '';
+        return `${what}: the ${promoted}${label} electron is not bound (LDA binds it by less than 10⁻⁴ Ha).`;
+    }
+    return `${what} failed: ${error instanceof Error ? error.message : 'unknown error'}`;
+}
 
 /**
  * One request in, one response out -- exported so the protocol is tested
@@ -338,7 +361,18 @@ export function handleAtomWorkerRequest(data: AtomWorkerRequest): { response: At
                 transfer: [],
             };
         }
-        const atom = solveSpecies(species);
+        // Checked before the solve, so a species that is not offered says so
+        // plainly rather than as a failed SCF.
+        speciesConfiguration(species);
+        let atom: AtomSolution;
+        try {
+            atom = solveSpecies(species);
+        } catch (error) {
+            if (error instanceof UnboundAnionError) throw error;
+            const message = solveFailureMessage(species, 'off', error);
+            const type = error instanceof UnboundElectronError ? 'unbound' : 'error';
+            return { response: { type, message, requestId }, transfer: [] };
+        }
         const reference = isNeutralGround(species) ? null : referenceRadiiFor(species.Z, data.enclosedFraction);
         const profile = buildSerialisedAtomProfile(atom, data.enclosedFraction, { speciesKey: speciesKey(species), reference });
         return { response: { type: 'success', profile, requestId }, transfer: transferListFor(profile) };

@@ -107,6 +107,19 @@ export function relativityLabel(mode: RelativityMode): string {
     }
 }
 
+/**
+ * The SCF a failure message names (ruling T7-f): "Scalar-relativistic SCF
+ * for Samarium, excited 6s → 4f: ...". A failure has to say which method
+ * failed, since the same species may solve in another mode.
+ */
+export function scfLabel(mode: RelativityMode): string {
+    switch (mode) {
+        case 'off': return 'Non-relativistic SCF';
+        case 'scalar': return 'Scalar-relativistic SCF';
+        case 'spinOrbit': return 'Dirac (spin–orbit) SCF';
+    }
+}
+
 /** The one-line method statement every displayed number in atom mode answers to (spec §3.1). */
 export function methodStatement(mode: RelativityMode): string {
     switch (mode) {
