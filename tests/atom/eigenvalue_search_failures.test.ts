@@ -1,8 +1,16 @@
-import { findEigenvalue } from '../../src/atom/eigenvalue_search';
+import { findEigenvalue, StateNotFoundError } from '../../src/atom/eigenvalue_search';
+import { makeRadialGrid } from '../../src/atom/radial_grid';
+import { solveRadialState } from '../../src/atom/radial_solver';
+import { solveDiracState } from '../../src/atom/relativistic_solver';
 
 // How the eigenvalue search and the solvers built on it fail, kept apart
 // from eigenvalue_search.test.ts, whose bit-for-bit pins stay as recorded.
-//
+function potentialOf(grid: { r: Float64Array; size: number }, v: (r: number) => number): Float64Array {
+    const out = new Float64Array(grid.size);
+    for (let j = 0; j < grid.size; j++) out[j] = v(grid.r[j]);
+    return out;
+}
+
 // A synthetic spectrum E_k = -1/2k^2 stands in for any equation: the search
 // sees only a node count and a mismatch, and each mismatch below has its
 // only root where the requested state is not.
@@ -48,5 +56,25 @@ describe('findEigenvalue Phase B stays with the requested state (ruling T7-c)', 
             expect(result.bracketed).toBe(true);
             expect(result.energy).toBeCloseTo(root, 12);
         }
+    });
+});
+
+describe('the Schrödinger solver refuses a state it did not find (ruling T7-b)', () => {
+    // Task 4's follow-up: with no room for 5g on a 10 a0 grid the search
+    // brackets nothing, and the solver used to hand back the widest
+    // bracket's midpoint (-156.25 Ha) as if it were an eigenvalue.
+    it('throws when the search bracketed no root, as the relativistic solver does', () => {
+        const grid = makeRadialGrid(1e-6, 10, 2001);
+        const solve = () => solveRadialState(grid, 5, 4, potentialOf(grid, r => -1 / r));
+        expect(solve).toThrow(StateNotFoundError);
+        expect(solve).toThrow('Radial grid (rMax=10) is too small to hold n=5, l=4, or the potential does not bind it: '
+            + 'the outward and inward solutions match at no energy below zero.');
+    });
+
+    it('is the same error class the relativistic solver and the containment guard throw', () => {
+        const grid = makeRadialGrid(1e-6, 10, 2001);
+        const v = potentialOf(grid, r => -1 / r);
+        expect(() => solveDiracState(grid, 5, -5, v, 1)).toThrow(StateNotFoundError);
+        expect(() => solveRadialState(grid, 3, 0, v)).toThrow(StateNotFoundError);
     });
 });

@@ -7,6 +7,7 @@
  */
 import { RadialGrid } from './radial_grid';
 import { RadialState, hasBoundState } from './radial_solver';
+import { StateNotFoundError } from './eigenvalue_search';
 import { SubshellOccupancy, subshellLabel } from './configurations';
 import { jLabel } from './relativity';
 
@@ -125,7 +126,11 @@ export function linearMix(previous: Float64Array, next: Float64Array, beta: numb
     return mixed;
 }
 
-/** An anion's electron bound by less than this (Ha) counts as unbound: its ~70 a0 decay length does not fit the grid. */
+/**
+ * An electron bound by less than this (Ha) counts as unbound: its ~70 a0
+ * decay length does not fit the grid. Named for the anions it was first
+ * needed for; UnboundElectronError's levels use it too.
+ */
 export const ANION_BINDING_THRESHOLD = 1e-4;
 
 /**
@@ -147,6 +152,51 @@ export class UnboundAnionError extends Error {
         this.l = l;
         if (j !== undefined) this.j = j;
         Object.setPrototypeOf(this, UnboundAnionError.prototype);
+    }
+}
+
+/**
+ * The same verdict for a neutral atom or a cation (ruling T7-b): an occupied
+ * level that the self-consistent field pushes out of the bound spectrum.
+ * Measured: the promoted 4f of Pr-Eu 6s -> 4f leaves it around the tenth
+ * iteration without relativity and never returns, however small the mixing
+ * step; with scalar relativity the 4f of Ce and Tb-Tm 6s -> 4f (bound by
+ * 3-66 mHa without it) and the 5f of Pu and Am 7s -> 5f do the same. The
+ * radial solvers can only say they found no state (StateNotFoundError,
+ * whose message also suspects the grid); solveOccupiedLevel below asks the
+ * node count whether the level is bound at all and, where it is not, says
+ * so instead -- an LDA verdict, not a grid that is too small.
+ */
+export class UnboundElectronError extends Error {
+    readonly n: number;
+    readonly l: number;
+    /** The j-level, when a spin-orbit (Dirac) solve is the one that found it unbound. */
+    readonly j?: number;
+    constructor(n: number, l: number, j?: number) {
+        const label = subshellLabel(n, l) + (j === undefined ? '' : jLabel(j));
+        super(`LDA does not bind the ${label} electron in this configuration: it is not bound by 10⁻⁴ Ha or more.`);
+        this.name = 'UnboundElectronError';
+        this.n = n;
+        this.l = l;
+        if (j !== undefined) this.j = j;
+        Object.setPrototypeOf(this, UnboundElectronError.prototype);
+    }
+}
+
+/**
+ * One occupied level's solve, with the radial solver's "found no state"
+ * read the way ruling T7-b asks: if the level has no bound root at all
+ * (`isBound`, a node count, false), the failure is `unbound()`'s verdict --
+ * UnboundAnionError for an anion, UnboundElectronError otherwise. If it does
+ * have one, the solver failed to find a state that exists, and its own
+ * diagnostic stands.
+ */
+export function solveOccupiedLevel<T>(solve: () => T, isBound: () => boolean, unbound: () => Error): T {
+    try {
+        return solve();
+    } catch (error) {
+        if (error instanceof StateNotFoundError && !isBound()) throw unbound();
+        throw error;
     }
 }
 

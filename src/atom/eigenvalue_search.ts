@@ -36,11 +36,48 @@ export interface EigenvalueResult {
      * When it did not, `energy` is only the middle of the widest bracket it
      * tried -- about -150 Hartree after its 60 doublings, whatever the state
      * -- not an eigenvalue of anything: measured for hydrogen 5g on a 10 a0
-     * grid, which has no room for it, the Schrödinger solver returns -156.25.
-     * radial_solver predates this flag and keeps its behaviour unchanged;
-     * the relativistic solver refuses such a result.
+     * grid, which has no room for it, the Schrödinger solver used to return
+     * -156.25. Both solvers now refuse such a result (StateNotFoundError).
      */
     bracketed: boolean;
+}
+
+/**
+ * Thrown by both radial solvers when they cannot return the bound state
+ * asked for: the search bracketed no root, the root it found is a different
+ * state (the wrong node count), or the state spills off the grid (the
+ * containment guard below). From inside one solve a grid with no room for
+ * the state looks exactly like a potential that does not bind it, so the
+ * message names both; telling them apart takes the caller's knowledge of
+ * the potential -- the SCF asks the node count whether the level is bound
+ * at all (scf.ts, ruling T7-b) and only then blames anything.
+ *
+ * Two message shapes, both starting "Radial grid (rMax=...) is too small to
+ * hold <state>": "..., or the potential does not bind it: <evidence>." from
+ * the search, and ": <x>% of the electron's probability lies in the
+ * outermost 1% of the grid. ..." from the containment guard.
+ */
+export class StateNotFoundError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'StateNotFoundError';
+        Object.setPrototypeOf(this, StateNotFoundError.prototype);
+    }
+}
+
+/** The search's own refusal: `evidence` says which check failed. */
+export function stateNotFound(grid: RadialGrid, state: string, evidence: string): StateNotFoundError {
+    return new StateNotFoundError(
+        `Radial grid (rMax=${grid.rMax}) is too small to hold ${state}, or the potential does not bind it: ${evidence}.`
+    );
+}
+
+/** The evidence when Phase B bracketed nothing (see EigenvalueResult.bracketed). */
+export const NO_ROOT_EVIDENCE = 'the outward and inward solutions match at no energy below zero';
+
+/** The evidence when the converged state has the wrong node count, i.e. is some other state. */
+export function wrongNodesEvidence(nodes: number, targetNodes: number): string {
+    return `the solver converged on a state with ${nodes} nodes, not ${targetNodes}`;
 }
 
 export function findEigenvalue(search: EigenvalueSearch): EigenvalueResult {
@@ -190,7 +227,7 @@ export function assertGridHoldsState(grid: RadialGrid, density: Float64Array, st
         ? (total - cumulative[tailStart]) / total
         : 1;
     if (tailFraction > 1e-2) {
-        throw new Error(
+        throw new StateNotFoundError(
             `Radial grid (rMax=${grid.rMax}) is too small to hold ${state}: ` +
             `${(tailFraction * 100).toFixed(1)}% of the electron's probability lies ` +
             `in the outermost 1% of the grid. Use a grid sized for this n.`

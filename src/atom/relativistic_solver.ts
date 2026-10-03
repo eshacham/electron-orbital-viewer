@@ -30,7 +30,7 @@ import { countNodes } from './numerov';
 import { CoefficientFn, midpointValues, rk4Step } from './coupled_rk4';
 import { SPEED_OF_LIGHT, diracHydrogenicEnergy, jForKappa, lForKappa } from './relativity';
 import { RESCALE_THRESHOLD, RESCALE_FACTOR, DECAY_GROWTH_FACTOR } from './integrator_constants';
-import { findEigenvalue, assertGridHoldsState } from './eigenvalue_search';
+import { findEigenvalue, assertGridHoldsState, stateNotFound, NO_ROOT_EVIDENCE, wrongNodesEvidence } from './eigenvalue_search';
 
 export type CoupledChannel = { kind: 'scalar'; l: number } | { kind: 'dirac'; kappa: number };
 
@@ -220,16 +220,6 @@ function stateName(n: number, channel: CoupledChannel): string {
     return `n=${n}, l=${lForKappa(kappa)}, j=${2 * Math.abs(kappa) - 1}/2 (κ = ${kappa})`;
 }
 
-/**
- * A grid with no room for the state looks, from inside the search, exactly
- * like a potential that does not bind it, so the message names both.
- */
-function notHeld(grid: RadialGrid, state: string, evidence: string): Error {
-    return new Error(
-        `Radial grid (rMax=${grid.rMax}) is too small to hold ${state}, or the potential does not bind it: ${evidence}.`
-    );
-}
-
 function solveCoupledState(grid: RadialGrid, n: number, channel: CoupledChannel, potential: Float64Array, Z: number): RadialState {
     if (channel.kind === 'dirac' && (!Number.isInteger(channel.kappa) || channel.kappa === 0)) {
         throw new Error('κ must be a non-zero integer.');
@@ -264,7 +254,7 @@ function solveCoupledState(grid: RadialGrid, n: number, channel: CoupledChannel,
         ),
         mismatchAt: mismatch,
     });
-    if (!bracketed) throw notHeld(grid, name, 'the outward and inward solutions match at no energy below zero');
+    if (!bracketed) throw stateNotFound(grid, name, NO_ROOT_EVIDENCE);
 
     // Final components: outward up to the match point, inward beyond it,
     // scaled to agree where they meet.
@@ -295,7 +285,7 @@ function solveCoupledState(grid: RadialGrid, n: number, channel: CoupledChannel,
     // count, which is what names the state, is checked last.
     const nodes = countNodes(G, 0, grid.size - 1);
     if (nodes !== targetNodes) {
-        throw notHeld(grid, name, `the solver converged on a state with ${nodes} nodes, not ${targetNodes}`);
+        throw stateNotFound(grid, name, wrongNodesEvidence(nodes, targetNodes));
     }
 
     // Sign convention: G > 0 as r -> 0, as radial_solver.
@@ -328,4 +318,25 @@ export function solveDiracState(
     grid: RadialGrid, n: number, kappa: number, potential: Float64Array, Z: number,
 ): RadialState {
     return solveCoupledState(grid, n, { kind: 'dirac', kappa }, potential, Z);
+}
+
+/**
+ * Whether `potential` holds a bound (n, l) Koelling–Harmon state, or with
+ * `kappa` a Dirac one, below `below` Hartree: radial_solver's hasBoundState,
+ * asked of the relativistic equation itself (the oscillation theorem holds
+ * for both). The SCF asks this when a solve fails (ruling T7-b), so that a
+ * level relativity has pushed out of the bound spectrum -- the 4f of
+ * Ce 6s -> 4f in scalar mode, bound by 66 mHa without relativity -- is
+ * reported as not bound rather than as a grid too small to hold it.
+ */
+export function hasBoundRelativisticState(
+    grid: RadialGrid, n: number, l: number, potential: Float64Array, Z: number,
+    kappa?: number, below: number = -1e-4,
+): boolean {
+    const channel: CoupledChannel = kappa === undefined ? { kind: 'scalar', l } : { kind: 'dirac', kappa };
+    const nodes = countNodesForBracketing(
+        grid, coefficientsFor(channel, below), potential, midpointValues(potential), channel, Z,
+        matchIndex(grid, potential, below, l),
+    );
+    return nodes > n - l - 1;
 }

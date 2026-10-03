@@ -10,7 +10,7 @@
 import { RadialGrid, integrateOnGrid } from './radial_grid';
 import { numerovForward, numerovBackward, countNodes } from './numerov';
 import { RESCALE_THRESHOLD, RESCALE_FACTOR, DECAY_GROWTH_FACTOR } from './integrator_constants';
-import { findEigenvalue, assertGridHoldsState } from './eigenvalue_search';
+import { findEigenvalue, assertGridHoldsState, stateNotFound, NO_ROOT_EVIDENCE, wrongNodesEvidence } from './eigenvalue_search';
 
 export interface RadialState {
     n: number;
@@ -200,6 +200,31 @@ function integrateInward(grid: RadialGrid, g: Float64Array, to: number): Float64
     return y;
 }
 
+/**
+ * Nodes of u, counting only sign changes between points that carry
+ * amplitude. The inward integration leaves sign-alternating noise around
+ * 1e-150 of the peak in the far tail (measured: 145 "nodes" for Hf3+ 1s), so
+ * a raw count of every sign change names no state; anything under 1e-8 of
+ * the peak is skipped. Measured over every iteration of every offered
+ * species' SCF (ions and excitations, Z = 1-118, restricted and
+ * spin-polarised), this count equals n - l - 1 for every state the search
+ * bracketed.
+ */
+function significantNodes(u: Float64Array): number {
+    let peak = 0;
+    for (let j = 0; j < u.length; j++) peak = Math.max(peak, Math.abs(u[j]));
+    const floor = 1e-8 * peak;
+    let nodes = 0;
+    let previous = 0;
+    for (let j = 0; j < u.length; j++) {
+        if (!(Math.abs(u[j]) > floor)) continue;
+        const sign = u[j] > 0 ? 1 : -1;
+        if (previous !== 0 && sign !== previous) nodes++;
+        previous = sign;
+    }
+    return nodes;
+}
+
 export function solveRadialState(
     grid: RadialGrid, n: number, l: number, potential: Float64Array
 ): RadialState {
@@ -229,11 +254,16 @@ export function solveRadialState(
         const inwardSlope = (scale * (inward[match + 1] - inward[match - 1])) / (2 * grid.dx);
         return (outwardSlope - inwardSlope) / outward[match];
     };
-    const { energy } = findEigenvalue({
+    const { energy, bracketed } = findEigenvalue({
         targetNodes, eLow, eHigh,
         nodesAt: trial => nodesAt(grid, l, potential, trial),
         mismatchAt: mismatch,
     });
+    // Ruling T7-b: no root is no state. This used to return the widest
+    // bracket's midpoint as if it were an eigenvalue (-192 Ha for the 4f of
+    // Pr-Eu 6s -> 4f, which the SCF then "converged" around).
+    const name = `n=${n}, l=${l}`;
+    if (!bracketed) throw stateNotFound(grid, name, NO_ROOT_EVIDENCE);
 
     // Final wave function: outward up to the match point, inward beyond it,
     // scaled to agree where they meet.
@@ -256,7 +286,12 @@ export function solveRadialState(
     const norm = Math.sqrt(integrateOnGrid(grid, uSquared));
     if (!(norm > 0)) throw new Error(`Radial solver did not converge for n=${n}, l=${l}.`);
 
-    assertGridHoldsState(grid, uSquared, `n=${n}, l=${l}`);
+    assertGridHoldsState(grid, uSquared, name);
+
+    // A root that is some other state (the node count names the state), as
+    // in relativistic_solver.ts.
+    const nodes = significantNodes(u);
+    if (nodes !== targetNodes) throw stateNotFound(grid, name, wrongNodesEvidence(nodes, targetNodes));
 
     // Sign convention: R > 0 as r -> 0, matching the analytic solution.
     const firstSignificant = u.findIndex(value => Math.abs(value) > 1e-12 * norm);

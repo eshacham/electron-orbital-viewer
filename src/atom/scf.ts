@@ -12,8 +12,8 @@
  * potential stops moving.
  */
 import { RadialGrid, gridForAtom, integrateOnGrid } from './radial_grid';
-import { RadialState, solveRadialState } from './radial_solver';
-import { solveScalarRelativisticState, solveDiracState } from './relativistic_solver';
+import { RadialState, solveRadialState, hasBoundState } from './radial_solver';
+import { solveScalarRelativisticState, solveDiracState, hasBoundRelativisticState } from './relativistic_solver';
 import { RelativityMode, RELATIVISTIC_EXCHANGE_CORRECTION, splitByJ, jForKappa } from './relativity';
 import { configurationFor, SubshellOccupancy } from './configurations';
 import {
@@ -33,6 +33,8 @@ import {
     linearMix,
     ANION_BINDING_THRESHOLD,
     UnboundAnionError,
+    UnboundElectronError,
+    solveOccupiedLevel,
     assertStatesBound,
     highestPrincipalQuantumNumber,
     totalElectronsOf,
@@ -120,30 +122,38 @@ function solveOrbital(grid: RadialGrid, Z: number, spec: OrbitalSpec, potential:
     return solveDiracState(grid, spec.n, spec.kappa ?? -(spec.l + 1), potential, Z);
 }
 
-function solveOrbitals(
-    grid: RadialGrid, Z: number, specs: OrbitalSpec[], potential: Float64Array, relativity: RelativityMode,
-): Array<RadialState & { electrons: number }> {
-    return specs.map(spec => ({ ...solveOrbital(grid, Z, spec, potential, relativity), electrons: spec.electrons }));
+/** Whether `potential` binds this orbital by ANION_BINDING_THRESHOLD or more, asked of its own radial equation. */
+function orbitalIsBound(grid: RadialGrid, Z: number, spec: OrbitalSpec, potential: Float64Array, relativity: RelativityMode): boolean {
+    if (relativity === 'off') return hasBoundState(grid, spec.n, spec.l, potential, -ANION_BINDING_THRESHOLD);
+    const kappa = relativity === 'spinOrbit' ? spec.kappa ?? -(spec.l + 1) : undefined;
+    return hasBoundRelativisticState(grid, spec.n, spec.l, potential, Z, kappa, -ANION_BINDING_THRESHOLD);
 }
 
 /**
- * solveOrbitals for an anion in a relativistic mode. The non-relativistic
- * pre-check (ruling C12) can pass while the relativistic equation, which
- * binds d and f slightly less, finds no bound state at all -- and its solver
- * then throws (no root, or a state the grid cannot hold) where the
- * Schrödinger solver would have handed back nonsense. For an anion that is
- * the unbound verdict, not a solve failure, so it is reported as one,
- * naming the j-level when the Dirac equation is the one that failed.
+ * Every occupied orbital in one potential. A solve that finds no state is
+ * read through solveOccupiedLevel (ruling T7-b): a level the potential does
+ * not bind is the unbound verdict -- the anion's (UnboundAnionError), or for
+ * a neutral atom or cation UnboundElectronError -- naming the j-level when
+ * the Dirac equation is the one that failed; a level it does bind is a
+ * solver failure and keeps the solver's own message.
+ *
+ * An anion in a relativistic mode is the one exception, kept as it was: the
+ * non-relativistic pre-check (ruling C12) can pass while the relativistic
+ * equation, which binds d and f slightly less, finds no bound state at
+ * all, and for an anion any failure to solve its levels there is reported
+ * as the unbound verdict.
  */
-function solveAnionOrbitalsRelativistic(
-    grid: RadialGrid, Z: number, specs: OrbitalSpec[], potential: Float64Array, relativity: RelativityMode,
+function solveOrbitals(
+    grid: RadialGrid, Z: number, specs: OrbitalSpec[], potential: Float64Array, relativity: RelativityMode, isAnion: boolean,
 ): Array<RadialState & { electrons: number }> {
     return specs.map(spec => {
-        try {
-            return { ...solveOrbital(grid, Z, spec, potential, relativity), electrons: spec.electrons };
-        } catch {
-            throw new UnboundAnionError(spec.n, spec.l, spec.kappa === undefined ? undefined : jForKappa(spec.kappa));
+        const j = spec.kappa === undefined ? undefined : jForKappa(spec.kappa);
+        const unbound = () => (isAnion ? new UnboundAnionError(spec.n, spec.l, j) : new UnboundElectronError(spec.n, spec.l, j));
+        const solve = () => ({ ...solveOrbital(grid, Z, spec, potential, relativity), electrons: spec.electrons });
+        if (isAnion && relativity !== 'off') {
+            try { return solve(); } catch { throw unbound(); }
         }
+        return solveOccupiedLevel(solve, () => orbitalIsBound(grid, Z, spec, potential, relativity), unbound);
     });
 }
 
@@ -261,7 +271,7 @@ function solveOneElectronRelativistic(
     Z: number, grid: RadialGrid, configuration: SubshellOccupancy[], relativity: RelativityMode,
 ): AtomSolution {
     const potential = bareCoulombPotential(grid, Z);
-    const states = solveOrbitals(grid, Z, orbitalSpecsFor(configuration, relativity), potential, relativity);
+    const states = solveOrbitals(grid, Z, orbitalSpecsFor(configuration, relativity), potential, relativity, false);
     const D = buildD(grid, states);
     const density = densityFromD(grid, D);
     const totalEnergy = sumOfEigenvalues(states);
@@ -397,12 +407,10 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions
         // marginal anion's verdict could in principle differ. Two later
         // checks close the gap from the relativistic side: a relativistic
         // solve that finds no bound state reports the anion unbound
-        // (solveAnionOrbitalsRelativistic), and the final check below is on
+        // (solveOrbitals), and the final check below is on
         // the relativistic eigenvalues themselves.
         if (isAnion) assertStatesBound(grid, configuration, potential);
-        states = isAnion && relativity !== 'off'
-            ? solveAnionOrbitalsRelativistic(grid, Z, specs, potential, relativity)
-            : solveOrbitals(grid, Z, specs, potential, relativity);
+        states = solveOrbitals(grid, Z, specs, potential, relativity, isAnion);
         D = buildD(grid, states);
 
         const newPotential = meanFieldPotential(grid, Z, D, relativisticExchange);

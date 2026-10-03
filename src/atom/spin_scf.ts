@@ -13,14 +13,29 @@
  * averages away (O's ΔSCF ionisation energy comes out 22 % high).
  */
 import { RadialGrid, gridForAtom, integrateOnGrid } from './radial_grid';
-import { RadialState, solveRadialState } from './radial_solver';
+import { RadialState, solveRadialState, hasBoundState } from './radial_solver';
 import { SubshellOccupancy } from './configurations';
 import { hartreePotential, hartreeEnergy, densityFromD, spinExchangePotential, spinExchangeEnergyDensity } from './hartree';
 import { spinCorrelation } from './correlation';
 import {
-    ANION_BINDING_THRESHOLD, UnboundAnionError, assertStatesBound, buildD, highestPrincipalQuantumNumber, linearMix,
+    ANION_BINDING_THRESHOLD, UnboundAnionError, UnboundElectronError, solveOccupiedLevel, assertStatesBound, buildD, highestPrincipalQuantumNumber, linearMix,
     maxWeightedDelta, nextBeta, screenedStartingPotential, totalElectronsOf, CONVERGENCE_TOLERANCE, INITIAL_BETA, MAX_ITERATIONS,
 } from './scf_shared';
+
+/**
+ * One spin channel's (n, l) level, read as scf.ts reads its own (ruling
+ * T7-b): a level this channel's potential does not bind is the unbound
+ * verdict, not a solver failure. Measured: without it, the ΔSCF energies
+ * of Pr, Nd and Eu 6s -> 4f "converged" around a 4f at -192 Ha, and Tb-Er
+ * 6s -> 4f iterated around one to the iteration cap.
+ */
+function solveSpinLevel(grid: RadialGrid, n: number, l: number, potential: Float64Array, isAnion: boolean): RadialState {
+    return solveOccupiedLevel(
+        () => solveRadialState(grid, n, l, potential),
+        () => hasBoundState(grid, n, l, potential, -ANION_BINDING_THRESHOLD),
+        () => (isAnion ? new UnboundAnionError(n, l) : new UnboundElectronError(n, l)),
+    );
+}
 
 export interface SpinOccupancy { n: number; l: number; up: number; down: number }
 
@@ -127,8 +142,8 @@ export function solvePolarisedOnGrid(Z: number, grid: RadialGrid, configuration:
         // Before the solve, for the same reason as scf.ts: solveRadialState
         // would hand back a state for an (n, l) the potential no longer binds.
         if (isAnion) { assertStatesBound(grid, upSpecs, vUp); assertStatesBound(grid, downSpecs, vDown); }
-        upStates = upSpecs.map(c => ({ ...solveRadialState(grid, c.n, c.l, vUp), electrons: c.up }));
-        downStates = downSpecs.map(c => ({ ...solveRadialState(grid, c.n, c.l, vDown), electrons: c.down }));
+        upStates = upSpecs.map(c => ({ ...solveSpinLevel(grid, c.n, c.l, vUp, isAnion), electrons: c.up }));
+        downStates = downSpecs.map(c => ({ ...solveSpinLevel(grid, c.n, c.l, vDown, isAnion), electrons: c.down }));
         const next = polarisedPotentials(grid, Z, buildD(grid, upStates), buildD(grid, downStates));
         const delta = Math.max(maxWeightedDelta(grid, vUp, next.up), maxWeightedDelta(grid, vDown, next.down));
         if (delta < CONVERGENCE_TOLERANCE) { converged = true; vUp = next.up; vDown = next.down; break; }
