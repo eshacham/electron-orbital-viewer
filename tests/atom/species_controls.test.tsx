@@ -3,6 +3,7 @@ import { render, fireEvent, screen, within, act } from '@testing-library/react';
 import SpeciesControls from '../../src/components/SpeciesControls';
 import { EnergiesState } from '../../src/store/atomSlice';
 import { UnboundAnionError } from '../../src/atom/scf_shared';
+import { DELTA_SCF_METHOD } from '../../src/atom/delta_scf';
 
 const idle: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
 const renderControls = (overrides: Partial<React.ComponentProps<typeof SpeciesControls>> = {}) => {
@@ -170,6 +171,31 @@ describe('SpeciesControls', () => {
         expect(line).not.toHaveTextContent('waiting');
     });
 
+    // Final review M6: "—" alone does not say why. Na²⁺ would break the neon
+    // core, so the app offers no Na²⁺ and Na⁺ has no ionisation to show.
+    it('says why there is no ionisation energy when the next ion is not offered', () => {
+        renderControls({
+            species: { Z: 11, charge: 1, excitation: null },
+            energies: { speciesKey: '11+1', status: 'done', ionisation: null, excitation: null, message: null },
+        });
+        expect(screen.getByText(/Ionisation energy/).closest('.species-energy')).toHaveTextContent('Ionisation energy: — (next ion not offered)');
+    });
+
+    // Final review M4: the full method was only a `title`, which neither a
+    // keyboard nor a touch screen can reach.
+    it('shows the full ΔSCF method on keyboard focus and on tap', () => {
+        renderControls({ energies: { speciesKey: '11', status: 'done', ionisation: { valueEv: 5.37, fromLabel: 'Na', toLabel: 'Na⁺' }, excitation: null, message: null } });
+        const label = screen.getByText('ΔSCF, LDA');
+        expect(label).toHaveAttribute('tabindex', '0');
+        expect(screen.queryByRole('tooltip')).toBeNull();
+        act(() => { label.focus(); });
+        expect(screen.getByRole('tooltip')).toHaveTextContent(DELTA_SCF_METHOD);
+        expect(label).toHaveAccessibleDescription(DELTA_SCF_METHOD);
+        act(() => { label.blur(); });
+        fireEvent.click(label);
+        expect(screen.getByRole('tooltip')).toHaveTextContent(DELTA_SCF_METHOD);
+    });
+
     it('says it is computing while the ΔSCF runs', () => {
         renderControls({ energies: { ...idle, speciesKey: '11', status: 'computing' } });
         expect(screen.getByText(/computing/i)).toBeInTheDocument();
@@ -205,6 +231,15 @@ describe('SpeciesControls', () => {
         const compare = screen.getByLabelText('size compared with the neutral atom');
         expect(compare).toHaveTextContent('dashed ring: neutral Na, drawn radius 3.20 a₀');
         expect(compare).toHaveTextContent('Na⁺ 1.60 a₀ (−50 %)');
+    });
+
+    // Final review M9: the exports print three significant figures; the
+    // screen must print the same number for the same ring.
+    it('prints radii to three significant figures, as the exports do', () => {
+        renderControls({ species: { Z: 55, charge: 0, excitation: { from: { n: 6, l: 0 }, to: { n: 6, l: 1 } } }, radii: { displayRadius: 12.34, reference: { displayRadius: 19.96, contourRadius: 5, framingRadius: 19.96 } } });
+        const compare = screen.getByLabelText('size compared with the neutral atom');
+        expect(compare).toHaveTextContent('drawn radius 20.0 a₀');
+        expect(compare).toHaveTextContent('Cs* 12.3 a₀');
     });
 
     // M11: a rounded 0 % reads as a typo ("−0 %"); say plainly that the

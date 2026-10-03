@@ -5,6 +5,7 @@ import { subshellLabel, configurationLabelOf } from '../atom/configurations';
 import { AtomSpecies, isNeutralGround, speciesConfiguration, speciesSymbol, speciesTitle } from '../atom/species';
 import { selectSpeciesEnergies, speciesOf } from '../store/atomSlice';
 import { DELTA_SCF_LABEL, DELTA_SCF_METHOD } from '../atom/delta_scf';
+import { formatDrawnRadius } from '../atom/format_radius';
 import { selectShownBasicOrbital, selectShownEnclosedFraction } from '../store/orbitalSlice';
 import { combinationTitle } from '../combinations';
 import { MAX_FIELD_AU } from '../field_source';
@@ -126,13 +127,13 @@ export function referenceRingCaption(state: RootState): string | null {
     const species = speciesOf(state.atom);
     if (isNeutralGround(species)) return null;
     const neutralSymbol = speciesSymbol({ Z: species.Z, charge: 0, excitation: null });
-    // Three significant figures, trailing zeros kept (19.95 a0 reads "20.0", not "20").
-    const radius = profile.reference.displayRadius.toPrecision(3);
+    const radius = formatDrawnRadius(profile.reference.displayRadius);
     return `dashed ring: neutral ${neutralSymbol} drawn radius ${radius} a₀`;
 }
 
 /**
- * 'Na → Na⁺: 5.14 eV (ΔSCF, LDA)' -- an optional CSV comment line (brief,
+ * 'Na → Na⁺: 5.14 eV (ΔSCF, LDA)', or 'Na 3s → 3p excitation: 2.19 eV
+ * (ΔSCF, LDA)' for an excited atom -- an optional CSV comment line (brief,
  * requirement 3), only once the selected species' own ΔSCF energy has
  * actually landed (`selectSpeciesEnergies`, ruling C5): a reply can still be
  * in flight for a species no longer selected, and nothing is shown for that
@@ -146,5 +147,8 @@ export function deltaScfCsvComment(state: RootState): string | null {
     if (!energies || energies.status !== 'done') return null;
     const reading = state.atom.excitation ? energies.excitation : energies.ionisation;
     if (!reading) return null;
-    return `${reading.fromLabel} → ${reading.toLabel}: ${reading.valueEv.toFixed(2)} eV (${DELTA_SCF_LABEL}); ${DELTA_SCF_METHOD}`;
+    // An excitation's toLabel already names it ('Na 3s → 3p'); prefixing
+    // fromLabel and another arrow read as two transitions (final review M5).
+    const what = state.atom.excitation ? `${reading.toLabel} excitation` : `${reading.fromLabel} → ${reading.toLabel}`;
+    return `${what}: ${reading.valueEv.toFixed(2)} eV (${DELTA_SCF_LABEL}); ${DELTA_SCF_METHOD}`;
 }

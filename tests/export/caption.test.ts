@@ -118,5 +118,16 @@ describe('export captions', () => {
             expect(line).toContain('47.29 eV');
             expect(line).toContain(DELTA_SCF_LABEL);
         });
+
+        // Final review M5: "Na → Na 3s → 3p" read as two transitions.
+        it('names an excitation as one, not as an arrow into an arrow', () => {
+            const store = sodiumExcitedStore();
+            store.dispatch(energiesSucceeded({
+                speciesKey: '11:3s>3p',
+                ionisation: null,
+                excitation: { valueEv: 2.185, fromLabel: 'Na', toLabel: 'Na 3s → 3p' },
+            }));
+            expect(deltaScfCsvComment(store.getState())).toMatch(/^Na 3s → 3p excitation: 2\.19 eV \(ΔSCF, LDA\); /);
+        });
     });
 });

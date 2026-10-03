@@ -1,11 +1,12 @@
 import React, { useRef, useState } from 'react';
-import { Box, Button, Menu, MenuItem, Typography, Alert } from '@mui/material';
+import { Box, Button, Menu, MenuItem, Typography, Alert, Tooltip } from '@mui/material';
 import {
     AtomSpecies, Excitation, SubshellRef, excitationSources, excitationTargets, excitationLabel, speciesSymbol, speciesKey,
 } from '../atom/species';
 import { allowedCharges } from '../atom/ion_configurations';
 import { DELTA_SCF_LABEL, DELTA_SCF_METHOD, EnergyReading, ionisedSpeciesOf } from '../atom/delta_scf';
 import { NIST_FIRST_IONISATION_EV } from '../atom/ionisation_references';
+import { formatDrawnRadius } from '../atom/format_radius';
 import type { EnergiesState } from '../store/atomSlice';
 import type { ReferenceRadii } from '../workers/atomWorker';
 
@@ -55,19 +56,43 @@ function ionisationQualifier(species: AtomSpecies, reading: EnergyReading | null
  * for one not asked yet: the energies wait for the species' picture (ruling
  * C15), and until then the line says so.
  */
-function energyValueText(reading: EnergyReading | null, status: EnergiesState['status']): string {
+function energyValueText(reading: EnergyReading | null, status: EnergiesState['status'], noValueReason?: string): string {
     if (status === 'idle') return 'waiting for the picture…';
     if (status === 'computing') return 'computing…';
-    return reading ? `${reading.valueEv.toFixed(2)} eV` : '—';
+    if (reading) return `${reading.valueEv.toFixed(2)} eV`;
+    return noValueReason ? `— (${noValueReason})` : '—';
 }
 
+/**
+ * "ΔSCF, LDA", with the full method one hover, focus or tap away (spec
+ * §3.1; final review M4). A `title` alone reached only a mouse: the label is
+ * focusable, and focus or a tap opens the same tooltip a hover does, which
+ * the label carries as its accessible description while open.
+ */
+const MethodLabel: React.FC = () => {
+    const [open, setOpen] = useState(false);
+    return (
+        <Tooltip title={DELTA_SCF_METHOD} describeChild open={open} onOpen={() => setOpen(true)} onClose={() => setOpen(false)}>
+            <span
+                className="species-method"
+                tabIndex={0}
+                onFocus={() => setOpen(true)}
+                onBlur={() => setOpen(false)}
+                onClick={() => setOpen(true)}
+            >
+                {DELTA_SCF_LABEL}
+            </span>
+        </Tooltip>
+    );
+};
+
 /** "5.37 eV  ΔSCF, LDA", the method one hover away (spec §3.1). */
-const EnergyLine: React.FC<{ label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number }> =
-    ({ label, reading, status, measuredEv }) => (
+const EnergyLine: React.FC<{ label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number; noValueReason?: string }> =
+    ({ label, reading, status, measuredEv, noValueReason }) => (
         <Typography variant="body2" className="species-energy">
             {label}:{' '}
-            {energyValueText(reading, status)}
-            {' '}<span className="species-method" title={DELTA_SCF_METHOD}>{DELTA_SCF_LABEL}</span>
+            {energyValueText(reading, status, noValueReason)}
+            {' '}<MethodLabel />
             {measuredEv !== undefined && reading && <span className="species-measured"> · measured {measuredEv.toFixed(3)} eV (NIST)</span>}
         </Typography>
     );
@@ -209,6 +234,12 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
                             reading={reading}
                             status={effectiveEnergies.status}
                             measuredEv={measuredEv}
+                            // Final review M6: Na⁺'s next electron would
+                            // break the neon core, and nothing past Z = 108
+                            // has a tabulated ion -- either way the app
+                            // offers no next ion, so there is nothing to
+                            // subtract, and the line says so.
+                            noValueReason={ionisedSpeciesOf(species) === null ? 'next ion not offered' : undefined}
                         />
                     )}
                     {effectiveEnergies.status === 'failed' && effectiveEnergies.message && (
@@ -224,8 +255,8 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
                         return (
                             <Typography variant="caption" display="block" className="species-compare" aria-label="size compared with the neutral atom">
                                 <span className="species-compare-swatch" aria-hidden="true" />
-                                dashed ring: neutral {neutralSymbol}, drawn radius {reference.displayRadius.toFixed(2)} a₀ ·{' '}
-                                {speciesSymbol(species)} {radii.displayRadius.toFixed(2)} a₀ ({sizeNote})
+                                dashed ring: neutral {neutralSymbol}, drawn radius {formatDrawnRadius(reference.displayRadius)} a₀ ·{' '}
+                                {speciesSymbol(species)} {formatDrawnRadius(radii.displayRadius)} a₀ ({sizeNote})
                             </Typography>
                         );
                     })()}
