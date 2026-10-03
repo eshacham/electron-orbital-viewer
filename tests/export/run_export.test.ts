@@ -2,7 +2,7 @@
 // load (see orbital_controls_factory.ts), so the factory is mocked.
 jest.mock('../../src/export/gltf_exporter_factory', () => ({ exportGlb: jest.fn(async () => new ArrayBuffer(12)) }));
 
-import { runExport, exportAvailability, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON, COMPOSITION_FAILED_REASON } from '../../src/export/run_export';
+import { runExport, exportAvailability, cubeJobFor, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON, COMPOSITION_FAILED_REASON } from '../../src/export/run_export';
 import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted, levelUp } from '../../src/store/atomSlice';
 import {
     setCombination, startOrbitalCalculation, failOrbitalCalculation, startCompositionBuild, endCompositionBuild, failCompositionBuild,
@@ -11,7 +11,7 @@ import {
 import { basicOrbitalParams } from '../../src/orbital_presets';
 import { selectionProblem } from '../../src/combinations';
 import { NOTHING_TO_EXPORT_REASON } from '../../src/export/surfaces';
-import { makeStore, neonStore, readText, baseContext, octahedron, exportHandle } from './fixtures';
+import { makeStore, neonStore, sodiumIonStore, chlorideUnboundStore, readText, baseContext, octahedron, exportHandle } from './fixtures';
 
 // Fix round 1, M3: startOrbitalCalculation sets currentParams before the
 // render finishes, and failOrbitalCalculation does not clear it back out --
@@ -309,6 +309,67 @@ describe('runExport: cube', () => {
             postMessage(request: { requestId: number }) { setTimeout(() => worker.onmessage?.({ data: { type: 'success', blob: new Blob(['c']), requestId: request.requestId } } as MessageEvent)); } };
         const result = await runExport('cube', { ...baseContext(neonStore().getState()), createCubeWorker: () => worker });
         expect(result.filename).toBe('orbital-viewer_Ne_atom.cube');
+    });
+});
+
+// Task 12b (ruling C4): an unbound anion draws nothing (spec §3.5), and
+// every export kind must say so with the store's own message -- never the
+// generic "waiting for the atom" reason, which would read as if a solve
+// were merely still running.
+describe('exportAvailability and runExport: an unbound anion', () => {
+    it('refuses every kind with the store\'s own unbound message, not WAITING_FOR_ATOM_REASON', async () => {
+        const store = chlorideUnboundStore();
+        const message = store.getState().atom.unbound!;
+        expect(message).toMatch(/^LDA does not bind this anion/);
+
+        const availability = exportAvailability(store.getState());
+        expect(availability.png).toBe(message);
+        expect(availability['png-plain']).toBe(message);
+        expect(availability.csv).toBe(message);
+        expect(availability.cube).toBe(message);
+        expect(availability.stl).toBe(message);
+        expect(availability.glb).toBe(message);
+
+        for (const kind of ['png', 'png-plain', 'csv', 'cube', 'stl', 'glb'] as const) {
+            expect(availability[kind]).not.toBe(WAITING_FOR_ATOM_REASON);
+            await expect(runExport(kind, { ...baseContext(store.getState()), handle: exportHandle() })).rejects.toThrow(message);
+        }
+    });
+});
+
+// Task 12b (ruling C4): the picture's own PNG/CSV/cube text all say what is
+// on screen, including the dashed neutral-comparison ring an ion's
+// whole-atom view adds (profile.reference).
+describe('runExport: an ion\'s exports name the species and the reference ring', () => {
+    it('adds the ring line to the PNG caption', async () => {
+        const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+        const context = { ...baseContext(sodiumIonStore().getState()), handle: exportHandle({ capturePng }), phaseLegend: false };
+        await runExport('png', context);
+        expect(capturePng).toHaveBeenLastCalledWith(expect.objectContaining({
+            caption: [
+                'Sodium ion Na⁺ (Z = 11), 1s² 2s² 2p⁶, whole atom, 90% contour',
+                expect.stringMatching(/^central-field SCF/),
+                'dashed ring: neutral Na drawn radius 1.28 a₀',
+            ],
+        }));
+    });
+
+    it('adds the ring line as a CSV comment', async () => {
+        const context = { ...baseContext(sodiumIonStore().getState()), csvCurves: [{ label: 'total', points: [{ r: 0.1, value: 1 }] }] };
+        const text = await readText((await runExport('csv', context)).blob);
+        expect(text).toContain('# dashed ring: neutral Na drawn radius 1.28 a₀');
+    });
+
+    it('adds the ring line to the cube job\'s description', () => {
+        const job = cubeJobFor(sodiumIonStore().getState());
+        expect(job.type).toBe('radialCube');
+        if (job.type === 'radialCube') expect(job.description).toContain('dashed ring: neutral Na drawn radius 1.28 a₀');
+    });
+
+    it('names an ion\'s file stem with an ASCII charge suffix', async () => {
+        const state = sodiumIonStore().getState();
+        const csvCurves = [{ label: 'total', points: [{ r: 0.1, value: 1 }] }];
+        expect((await runExport('csv', { ...baseContext(state), csvCurves })).filename).toBe('orbital-viewer_Na+1_atom.csv');
     });
 });
 

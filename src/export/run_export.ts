@@ -4,7 +4,7 @@ import { hydrogenicSource } from '../field_source';
 import { ORBITAL_RESOLUTION, BASIC_ORBITALS_Z } from '../orbital_presets';
 import { subshellLabel } from '../atom/configurations';
 import { CsvCurve, radialCurvesToCsv } from './csv';
-import { exportFileStem, ATOM_METHOD, methodStatement, shellLabel, viewDescription } from './caption';
+import { exportFileStem, ATOM_METHOD, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment } from './caption';
 import { CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
@@ -73,6 +73,11 @@ export const COMPOSITION_FAILED_REASON = 'This shell\'s orbital lobes failed to 
 
 function drawnReason(state: RootState): string | null {
     if (state.atom.mode === 'atom') {
+        // Task 12b (ruling C4): an unbound anion is a verdict (spec §3.5),
+        // not a solve still in progress -- every export must say so in the
+        // store's own words, never the generic "waiting" reason, which
+        // would read as if trying again later would help.
+        if (state.atom.unbound) return state.atom.unbound;
         if (!state.atom.profile) return WAITING_FOR_ATOM_REASON;
         // Atom mode's level 3 renders through the same orbital request as
         // Basic Orbitals, so a failed one leaves nothing on screen either.
@@ -126,6 +131,11 @@ export const WHOLE_ATOM_GEOMETRY_REASON = 'The whole-atom view is a shaded cut f
  * picture is a shaded cut face with no surface behind it.
  */
 function geometryReason(state: RootState): string | null {
+    // Ruling C4: checked before the whole-atom-view refusal below -- an
+    // unbound anion is always at the whole-atom level (no profile ever
+    // lands to drill down into), and its own message must win over the
+    // generic "this view has no surface" one.
+    if (state.atom.mode === 'atom' && state.atom.unbound) return state.atom.unbound;
     if (state.atom.mode === 'atom' && state.atom.level === 'atom') return WHOLE_ATOM_GEOMETRY_REASON;
     return pngReason(state);
 }
@@ -144,6 +154,8 @@ export const CUBE_BUSY_REASON = 'The surface is still being computed.';
  */
 export function cubeReason(state: RootState): string | null {
     if (state.atom.mode === 'atom' && state.atom.level !== 'orbital') {
+        // Ruling C4: an unbound anion's own message, not WAITING_FOR_ATOM_REASON.
+        if (state.atom.unbound) return state.atom.unbound;
         // setElement nulls the profile unconditionally (see atomSlice), so
         // isSolving is never true here with a profile still in place --
         // "no profile yet" is the only way to be waiting at these levels.
@@ -172,6 +184,10 @@ export function cubeJobFor(state: RootState): CubeJob {
         const subshell = atom.level === 'shell' && sub ? profile.subshells.find(s => s.n === sub.n && s.l === sub.l) : undefined;
         const shell = atom.level === 'shell' ? profile.shells.find(s => s.n === atom.selectedShell) : undefined;
         const what = subshell ? `${subshellLabel(subshell.n, subshell.l)} subshell` : shell ? shellLabel(shell.n) : 'total';
+        // Task 12b: an ion or excited atom's whole-atom cube also names the
+        // dashed neutral-comparison ring, same as the PNG caption and CSV
+        // comments (ruling C4) -- null for anything that draws no such ring.
+        const ring = referenceRingCaption(state);
         return {
             type: 'radialCube',
             curve: { D: subshell?.curve ?? shell?.curve ?? profile.total, rMin: profile.rMin, dx: profile.dx, size: profile.size },
@@ -179,7 +195,7 @@ export function cubeJobFor(state: RootState): CubeJob {
             atoms: [{ Z: profile.Z, position: [0, 0, 0] }],
             title,
             // Carry from Task 12: features finer than the grid spacing (a heavy atom's 1s) are not resolved.
-            description: `rho(r) = D(r)/(4 pi r^2), ${what} electron density, electrons/bohr^3, box enclosing 99.9%, finer features (e.g. a heavy atom's 1s) not resolved; ${ATOM_METHOD}; lengths in bohr`,
+            description: `rho(r) = D(r)/(4 pi r^2), ${what} electron density, electrons/bohr^3, box enclosing 99.9%, finer features (e.g. a heavy atom's 1s) not resolved; ${ATOM_METHOD}${ring ? `; ${ring}` : ''}; lengths in bohr`,
         };
     }
     const { currentParams, currentField } = state.orbital;
@@ -202,7 +218,11 @@ export function cubeJobFor(state: RootState): CubeJob {
  * exactly when nothing is.
  */
 function csvReason(state: RootState): string | null {
-    if (state.atom.mode === 'atom') return state.atom.profile ? null : WAITING_FOR_ATOM_REASON;
+    if (state.atom.mode === 'atom') {
+        // Ruling C4: an unbound anion's own message, not WAITING_FOR_ATOM_REASON.
+        if (state.atom.unbound) return state.atom.unbound;
+        return state.atom.profile ? null : WAITING_FOR_ATOM_REASON;
+    }
     return drawnReason(state);
 }
 
@@ -219,6 +239,14 @@ function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
     const comments = [
         viewDescription(state), `quantity: ${quantity}`, `method: ${methodStatement(state)}`, 'r in bohr (a0)', `view: ${shareUrl}`,
     ];
+    // Task 12b (ruling C4): the dashed neutral-comparison ring an ion or
+    // excited atom's whole-atom view draws, and (optional) a landed ΔSCF
+    // energy for the selected species -- both null, and so skipped, for
+    // anything that has neither.
+    const ring = referenceRingCaption(state);
+    if (ring) comments.push(ring);
+    const deltaScf = deltaScfCsvComment(state);
+    if (deltaScf) comments.push(deltaScf);
     // Fix round 1 (M5): at the orbital level the curve on screen is still
     // the whole subshell's D(r) (RadialPlot draws one curve per subshell,
     // not per orbital -- see App.tsx's atomCurves) -- worth saying, since a
@@ -238,9 +266,16 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
         case 'png':
         case 'png-plain': {
             if (!context.handle) throw new Error(VIEW_NOT_READY_REASON);
+            // Task 12b (ruling C4): the dashed neutral-comparison ring an ion
+            // or excited atom's whole-atom view draws gets its own caption
+            // line, same wording as the CSV/cube comment -- null, and so
+            // omitted, for anything that draws no such ring.
+            const ring = referenceRingCaption(context.state);
+            const caption = [viewDescription(context.state), methodStatement(context.state)];
+            if (ring) caption.push(ring);
             const overlays = kind === 'png'
                 ? {
-                    caption: [viewDescription(context.state), methodStatement(context.state)],
+                    caption,
                     phaseLegend: Boolean(context.phaseLegend),
                     // Ruling C5: describe the combination key too, when App has one on screen.
                     combinationLegend: context.combinationLegend,

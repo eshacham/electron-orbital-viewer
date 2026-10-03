@@ -1,6 +1,7 @@
 import { createAppStore, RootState } from '../../src/store';
-import { setElement, solveSucceeded } from '../../src/store/atomSlice';
-import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
+import { setElement, setCharge, setExcitation, solveSucceeded, solveUnbound } from '../../src/store/atomSlice';
+import { AtomSpecies, speciesKey } from '../../src/atom/species';
+import { SerialisedAtomProfile, ReferenceRadii } from '../../src/workers/atomWorker';
 import { ExportContext } from '../../src/export/run_export';
 import type { ExportSurface } from '../../src/export/surfaces';
 import type { ViewerExportHandle } from '../../src/export/handle';
@@ -27,6 +28,48 @@ export function neonStore() {
     const store = makeStore();
     store.dispatch(setElement(10));
     store.dispatch(solveSucceeded(neonProfile()));
+    return store;
+}
+
+/**
+ * Neon-shaped (see neonProfile), re-keyed for any species -- good enough for
+ * the whole-atom-level export tests that use it: none of them drill down,
+ * so the shells'/subshells' actual occupancy never has to match the species
+ * for real. `reference` carries the neutral comparison radii Task 10's ring
+ * needs (null for a neutral ground state, which is its own reference).
+ */
+export function speciesProfile(species: AtomSpecies, reference: ReferenceRadii | null = null): SerialisedAtomProfile {
+    return { ...neonProfile(), Z: species.Z, charge: species.charge, speciesKey: speciesKey(species), reference };
+}
+
+/** Sodium ion Na⁺ (Z = 11), with a neutral-sodium reference ring. */
+export function sodiumIonStore() {
+    const store = makeStore();
+    store.dispatch(setElement(11));
+    store.dispatch(setCharge(1));
+    const species: AtomSpecies = { Z: 11, charge: 1, excitation: null };
+    const reference: ReferenceRadii = { displayRadius: 1.2838, contourRadius: 1.2, framingRadius: 1.9 };
+    store.dispatch(solveSucceeded(speciesProfile(species, reference)));
+    return store;
+}
+
+/** Sodium, excited 3s → 3p (Z = 11) -- a neutral excited atom, so no reference ring. */
+export function sodiumExcitedStore() {
+    const store = makeStore();
+    store.dispatch(setElement(11));
+    const excitation = { from: { n: 3, l: 0 }, to: { n: 3, l: 1 } };
+    store.dispatch(setExcitation(excitation));
+    const species: AtomSpecies = { Z: 11, charge: 0, excitation };
+    store.dispatch(solveSucceeded(speciesProfile(species)));
+    return store;
+}
+
+/** Chlorine's anion, which this LDA does not bind (Global Constraints, fact 3) -- every export refuses with the store's own message. */
+export function chlorideUnboundStore() {
+    const store = makeStore();
+    store.dispatch(setElement(17));
+    store.dispatch(setCharge(-1));
+    store.dispatch(solveUnbound('LDA does not bind this anion: its 3p electron is not bound by 10⁻⁴ Ha or more.'));
     return store;
 }
 
