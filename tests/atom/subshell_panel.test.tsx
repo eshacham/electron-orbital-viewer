@@ -275,6 +275,60 @@ describe('SubshellPanel with spin–orbit', () => {
         expect(Array.from(container.querySelectorAll('.subshell-ml-button')).some(b => b.getAttribute('aria-pressed') === 'true')).toBe(false);
     });
 
+    // Fix round 1, I1: the unisolated shell draws every j-level's l lobes
+    // overlapping, which needs the same caveat as an isolated one.
+    it('gives the basis caveat for the whole shell too, naming its j-levels', () => {
+        const { container } = render(
+            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={null}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        expect(container.querySelector('.subshell-j-note')!.textContent)
+            .toBe('Each j-level is drawn as its l orbitals\' lobes, sized by its own radial function — a basis choice. '
+                + '6p½ and 6p³⁄₂ overlap here; a j-level\'s own states have other shapes (a p½ state is spherical).');
+    });
+
+    // M3: the p½ example only where there is a p level to be it.
+    it('names every j-level of a shell with several, and keeps the p½ example to p levels', () => {
+        const a = () => new Float64Array(4);
+        const level = (l: number, j: number, electrons: number, energy: number): SerialisedSubshell =>
+            ({ n: 5, l, j, electrons, energy, curve: a(), R: a(), samplingRadius: 5, compositeSamplingRadius: 5 });
+        const fifthShell = [level(0, 0.5, 2, -3), level(1, 0.5, 2, -2), level(1, 1.5, 4, -1.8), level(2, 1.5, 4, -0.6), level(2, 2.5, 6, -0.5)];
+        const { container, rerender } = render(
+            <SubshellPanel subshells={fifthShell} shellN={5} selectedSubshell={null}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        expect(container.querySelector('.subshell-j-note')!.textContent)
+            .toMatch(/ 5p½, 5p³⁄₂, 5d³⁄₂ and 5d⁵⁄₂ overlap here; .*\(a p½ state is spherical\)\.$/);
+        rerender(
+            <SubshellPanel subshells={fifthShell} shellN={5} selectedSubshell={{ n: 5, l: 2, j: 2.5 }}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        expect(container.querySelector('.subshell-j-note')!.textContent)
+            .toBe('The lobes are the d orbitals\' shapes, sized by 5d⁵⁄₂\'s own radial function — a basis choice. '
+                + 'A j-level mixes mₗ with spin, so its own states have other shapes.');
+        // A shell with only d levels: no p½ example either.
+        rerender(
+            <SubshellPanel subshells={fifthShell.filter(s => s.l !== 1)} shellN={5} selectedSubshell={null}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        expect(container.querySelector('.subshell-j-note')!.textContent)
+            .toMatch(/ 5d³⁄₂ and 5d⁵⁄₂ overlap here; a j-level's own states have other shapes\.$/);
+    });
+
+    it('gives no caveat for a shell of s½ levels only', () => {
+        const { container } = render(
+            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={null}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        expect(container.querySelector('.subshell-j-note')).not.toBeNull();
+        const sOnly = leadLikeSpinOrbit().filter(s => s.l === 0);
+        const { container: sContainer } = render(
+            <SubshellPanel subshells={sOnly} shellN={6} selectedSubshell={null}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        expect(sContainer.querySelector('.subshell-j-note')).toBeNull();
+    });
+
     it('does not claim an s½ level looks different from its sphere', () => {
         const { container } = render(
             <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={{ n: 6, l: 0, j: 0.5 }}
@@ -298,9 +352,9 @@ describe('SubshellPanel with spin–orbit', () => {
             <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={null}
                 relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
         );
-        for (const energy of Array.from(container.querySelectorAll('.subshell-chip-energy'))) {
-            expect(energy.getAttribute('title')).toMatch(/Dirac/);
-        }
+        const energies = Array.from(container.querySelectorAll('.subshell-chip-energy'));
+        expect(energies).toHaveLength(3);
+        for (const energy of energies) expect(energy.getAttribute('title')).toMatch(/Dirac/);
     });
 
     it('states the scalar method too', () => {
@@ -308,9 +362,9 @@ describe('SubshellPanel with spin–orbit', () => {
             <SubshellPanel subshells={neonLikeSubshells()} shellN={2} selectedSubshell={null}
                 relativity="scalar" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
         );
-        for (const energy of Array.from(container.querySelectorAll('.subshell-chip-energy'))) {
-            expect(energy.getAttribute('title')).toMatch(/Koelling–Harmon/);
-        }
+        const energies = Array.from(container.querySelectorAll('.subshell-chip-energy'));
+        expect(energies).toHaveLength(2);
+        for (const energy of energies) expect(energy.getAttribute('title')).toMatch(/Koelling–Harmon/);
     });
 
     it('leaves the non-relativistic panel exactly as it was', () => {
@@ -326,6 +380,11 @@ describe('SubshellPanel with spin–orbit', () => {
         expect(container.querySelector('.subshell-j-note')).toBeNull();
         fireEvent.click(chips[0]);
         expect(onSelectSubshell).toHaveBeenCalledWith(2, 0);
+        const { container: wholeShell } = render(
+            <SubshellPanel subshells={neonLikeSubshells()} shellN={2} selectedSubshell={null}
+                relativity="scalar" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        expect(wholeShell.querySelector('.subshell-j-note')).toBeNull();
     });
 
     it('formats electron counts', () => {

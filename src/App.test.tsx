@@ -8,8 +8,8 @@ import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, r
 import { setSurfaceStyle, setBasicSelection, requestCut } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
-import { computeSamplingRadius, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
-import { clearProfileCacheForTests } from './atom/profile_cache';
+import { computeSamplingRadius, SHELL_VIEW_CUT_AXIS, DEFAULT_ENCLOSED_FRACTION } from './orbital_presets';
+import { clearProfileCacheForTests, setCachedProfile } from './atom/profile_cache';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from './url_state';
 import type { ViewerExportHandle } from './export/handle';
 import App from './App';
@@ -917,6 +917,27 @@ describe('App: relativity', () => {
         const params = store.getState().orbital.currentParams!;
         expect(params.rMax).toBeCloseTo(1.9);
         expect(params.radialSamples!.R[0]).toBe(2);
+    });
+
+    // Fix round 1, M2: the busy label names the j-level, as the crumb does.
+    it('names the j-level while its orbital is computed', () => {
+        installMatchMedia(false);
+        // The picture is already solved, so the canvas is busy with the orbital alone.
+        setCachedProfile('18', DEFAULT_ENCLOSED_FRACTION, { ...spinOrbitArgon(), speciesKey: '18' }, 'spinOrbit');
+        jest.useFakeTimers();
+        try {
+            renderWithProvider(<App />, {
+                mode: 'atom', Z: 18, relativityOverride: 'spinOrbit',
+                level: 'orbital', selectedShell: 2,
+                selectedSubshell: { n: 2, l: 1, j: 1.5 },
+                selectedOrbital: { n: 2, l: 1, ml: 0, j: 1.5 },
+                profile: spinOrbitArgon(),
+            });
+            act(() => { jest.advanceTimersByTime(500); });
+            expect(screen.getByText('Computing 2p_z · 2p³⁄₂…')).toBeInTheDocument();
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     function spinOrbitArgon(): SerialisedAtomProfile {

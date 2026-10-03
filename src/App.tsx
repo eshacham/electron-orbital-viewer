@@ -532,7 +532,9 @@ function App() {
         ? (showAtomBusy
             ? `Solving ${speciesTitle(species)}…`
             : atomOrbitalBusy && atomSelectedOrbital
-                ? `Computing ${orbitalName(atomSelectedOrbital.n, atomSelectedOrbital.l, atomSelectedOrbital.ml)}…`
+                // A j-level's orbital is named as its crumb is: 6p_z · 6p³⁄₂.
+                ? `Computing ${orbitalName(atomSelectedOrbital.n, atomSelectedOrbital.l, atomSelectedOrbital.ml)}${
+                    atomSelectedOrbital.j === undefined ? '' : ` · ${subshellLabel(atomSelectedOrbital.n, atomSelectedOrbital.l, atomSelectedOrbital.j)}`}…`
                 : null)
         : (showBusy
             ? (renderedField
