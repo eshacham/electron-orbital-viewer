@@ -11,6 +11,7 @@
  * it is also physically independent of these two.
  */
 import { RadialGrid, integrateOnGrid, cumulativeIntegral } from './radial_grid';
+import { SPEED_OF_LIGHT } from './relativity';
 
 /**
  * V_H(r) by Gauss's law in spherical symmetry: the charge enclosed within r
@@ -60,29 +61,66 @@ export function densityFromD(grid: RadialGrid, D: Float64Array): Float64Array {
 
 const EXCHANGE_COEFFICIENT = Math.pow(3 / Math.PI, 1 / 3);
 
-/** Dirac/Slater local-density exchange potential, V_x(r) = -(3ρ/π)^(1/3). */
-export function exchangePotential(density: Float64Array): Float64Array {
+/** β = p_F / (m c): the Fermi momentum of the local electron gas in units of mc. */
+export function relativisticBeta(rho: number): number {
+    return Math.cbrt(3 * Math.PI * Math.PI * Math.max(rho, 0)) / SPEED_OF_LIGHT;
+}
+
+/**
+ * MacDonald–Vosko: ε_x^R = ε_x Φ(β), Φ = 1 - (3/2) [(βη - asinh β)/β²]².
+ * Below β = 1e-2 the bracket is a difference of two nearly equal numbers,
+ * so its series (2/3)β - β³/5 is used instead (error O(β⁵)).
+ */
+export function macDonaldVoskoEnergyFactor(beta: number): number {
+    if (beta === 0) return 1;
+    let bracket: number;
+    if (beta < 1e-2) {
+        bracket = (2 / 3) * beta - (beta * beta * beta) / 5;
+    } else {
+        const eta = Math.sqrt(1 + beta * beta);
+        bracket = (beta * eta - Math.asinh(beta)) / (beta * beta);
+    }
+    return 1 - 1.5 * bracket * bracket;
+}
+
+/** MacDonald–Vosko: V_x^R = V_x Ψ(β), Ψ = -1/2 + (3/2) asinh β / (βη). No cancellation, so no series. */
+export function macDonaldVoskoPotentialFactor(beta: number): number {
+    if (beta === 0) return 1;
+    const eta = Math.sqrt(1 + beta * beta);
+    return -0.5 + (1.5 * Math.asinh(beta)) / (beta * eta);
+}
+
+/**
+ * Dirac/Slater local-density exchange potential, V_x(r) = -(3ρ/π)^(1/3),
+ * optionally with the MacDonald–Vosko relativistic correction -- which is
+ * what NIST's RLDA and ScRLDA tables use, and so what the relativistic modes
+ * must use for those tables to validate them (relativity.ts's
+ * RELATIVISTIC_EXCHANGE_CORRECTION).
+ */
+export function exchangePotential(density: Float64Array, relativistic = false): Float64Array {
     const v = new Float64Array(density.length);
     for (let j = 0; j < density.length; j++) {
         const rho = Math.max(density[j], 0);
-        v[j] = -EXCHANGE_COEFFICIENT * Math.cbrt(rho);
+        const plain = -EXCHANGE_COEFFICIENT * Math.cbrt(rho);
+        v[j] = relativistic ? plain * macDonaldVoskoPotentialFactor(relativisticBeta(rho)) : plain;
     }
     return v;
 }
 
-/** Exchange energy per electron, ε_x(ρ) = -(3/4)(3/π)^(1/3) ρ^(1/3). */
-function exchangeEnergyDensity(density: Float64Array): Float64Array {
+/** Exchange energy per electron, ε_x(ρ) = -(3/4)(3/π)^(1/3) ρ^(1/3), optionally corrected as above. */
+function exchangeEnergyDensity(density: Float64Array, relativistic: boolean): Float64Array {
     const eps = new Float64Array(density.length);
     for (let j = 0; j < density.length; j++) {
         const rho = Math.max(density[j], 0);
-        eps[j] = -0.75 * EXCHANGE_COEFFICIENT * Math.cbrt(rho);
+        const plain = -0.75 * EXCHANGE_COEFFICIENT * Math.cbrt(rho);
+        eps[j] = relativistic ? plain * macDonaldVoskoEnergyFactor(relativisticBeta(rho)) : plain;
     }
     return eps;
 }
 
 /** E_x = ∫ D(r) ε_x(ρ(r)) dr. */
-export function exchangeEnergy(grid: RadialGrid, D: Float64Array, density: Float64Array): number {
-    const eps = exchangeEnergyDensity(density);
+export function exchangeEnergy(grid: RadialGrid, D: Float64Array, density: Float64Array, relativistic = false): number {
+    const eps = exchangeEnergyDensity(density, relativistic);
     const integrand = new Float64Array(grid.size);
     for (let j = 0; j < grid.size; j++) integrand[j] = D[j] * eps[j];
     return integrateOnGrid(grid, integrand);
