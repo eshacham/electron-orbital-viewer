@@ -129,5 +129,17 @@ describe('export captions', () => {
             }));
             expect(deltaScfCsvComment(store.getState())).toMatch(/^Na 3s → 3p excitation: 2\.19 eV \(ΔSCF, LDA\); /);
         });
+
+        // Ruling FR-1: the export says what the screen says about a negative one.
+        it('notes a negative excitation energy in the CSV comment too', () => {
+            const store = sodiumExcitedStore();
+            store.dispatch(energiesSucceeded({
+                speciesKey: '11:3s>3p',
+                ionisation: null,
+                excitation: { valueEv: -0.5, fromLabel: 'Na', toLabel: 'Na 3s → 3p' },
+            }));
+            expect(deltaScfCsvComment(store.getState()))
+                .toMatch(/^Na 3s → 3p excitation: -0\.50 eV \(ΔSCF, LDA; below the ground configuration in LDA — a known LDA error for s→d transfer\); /);
+        });
     });
 });

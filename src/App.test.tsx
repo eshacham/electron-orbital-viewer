@@ -347,8 +347,10 @@ describe('App', () => {
             worker.onmessage({ data: { type: 'success', profile: { ...hydrogenProfile(), converged: false }, requestId } });
         });
 
-        expect(screen.getByText(/did not converge/i)).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent(/did not converge/i);
         expect(screen.queryByLabelText('subshells')).not.toBeInTheDocument();
+        // Ruling FR-2: the energies, which wait for the picture, say why they never came.
+        expect(screen.getAllByText(/not computed — the picture's SCF did not converge/).length).toBeGreaterThan(0);
     });
 
     // Addendum 3: the periodic table replaces the dropdown on desktop, and

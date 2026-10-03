@@ -4,7 +4,7 @@ import {
     AtomSpecies, Excitation, SubshellRef, excitationSources, excitationTargets, excitationLabel, speciesSymbol, speciesKey,
 } from '../atom/species';
 import { allowedCharges } from '../atom/ion_configurations';
-import { DELTA_SCF_LABEL, DELTA_SCF_METHOD, EnergyReading, ionisedSpeciesOf } from '../atom/delta_scf';
+import { BELOW_GROUND_NOTE, DELTA_SCF_LABEL, DELTA_SCF_METHOD, EnergyReading, ionisedSpeciesOf } from '../atom/delta_scf';
 import { NIST_FIRST_IONISATION_EV } from '../atom/ionisation_references';
 import { formatDrawnRadius } from '../atom/format_radius';
 import type { EnergiesState } from '../store/atomSlice';
@@ -18,6 +18,8 @@ interface SpeciesControlsProps {
     /** The drawn radius of what is on screen and of the neutral reference, when both are known. */
     radii: { displayRadius: number; reference: ReferenceRadii | null } | null;
     unbound: string | null;
+    /** The species' picture solve failed, so the energies, which wait for it (ruling C15), will never start. */
+    pictureFailed?: boolean;
 }
 
 const NO_ENERGIES: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
@@ -56,10 +58,14 @@ function ionisationQualifier(species: AtomSpecies, reading: EnergyReading | null
  * for one not asked yet: the energies wait for the species' picture (ruling
  * C15), and until then the line says so.
  */
-function energyValueText(reading: EnergyReading | null, status: EnergiesState['status'], noValueReason?: string): string {
-    if (status === 'idle') return 'waiting for the picture…';
+function energyValueText(reading: EnergyReading | null, status: EnergiesState['status'], noValueReason?: string, pictureFailed = false): string {
+    // Ruling FR-2: "waiting" would wait for ever on a picture that failed.
+    if (status === 'idle') return pictureFailed ? 'not computed — the picture\'s SCF did not converge' : 'waiting for the picture…';
     if (status === 'computing') return 'computing…';
-    if (reading) return `${reading.valueEv.toFixed(2)} eV`;
+    if (reading) {
+        const value = `${reading.valueEv.toFixed(2).replace('-', '−')} eV`;
+        return reading.valueEv < 0 ? `${value} (${BELOW_GROUND_NOTE})` : value;
+    }
     return noValueReason ? `— (${noValueReason})` : '—';
 }
 
@@ -87,11 +93,13 @@ const MethodLabel: React.FC = () => {
 };
 
 /** "5.37 eV  ΔSCF, LDA", the method one hover away (spec §3.1). */
-const EnergyLine: React.FC<{ label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number; noValueReason?: string }> =
-    ({ label, reading, status, measuredEv, noValueReason }) => (
+const EnergyLine: React.FC<{
+    label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number; noValueReason?: string; pictureFailed?: boolean;
+}> =
+    ({ label, reading, status, measuredEv, noValueReason, pictureFailed }) => (
         <Typography variant="body2" className="species-energy">
             {label}:{' '}
-            {energyValueText(reading, status, noValueReason)}
+            {energyValueText(reading, status, noValueReason, pictureFailed)}
             {' '}<MethodLabel />
             {measuredEv !== undefined && reading && <span className="species-measured"> · measured {measuredEv.toFixed(3)} eV (NIST)</span>}
         </Typography>
@@ -107,7 +115,7 @@ const FOCUS_RING = { '&.Mui-focusVisible': { outline: '2px solid #1565c0', outli
  * that describe them and the size comparison against the neutral atom.
  * Presentational: every change goes out through a callback.
  */
-const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChange, onExcitationChange, energies, radii, unbound }) => {
+const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChange, onExcitationChange, energies, radii, unbound, pictureFailed = false }) => {
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const decreaseRef = useRef<HTMLButtonElement>(null);
     const increaseRef = useRef<HTMLButtonElement>(null);
@@ -227,6 +235,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
                             label={`Excitation energy ${excitationLabel(species.excitation)}`}
                             reading={reading}
                             status={effectiveEnergies.status}
+                            pictureFailed={pictureFailed}
                         />
                     ) : (
                         <EnergyLine
@@ -234,6 +243,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
                             reading={reading}
                             status={effectiveEnergies.status}
                             measuredEv={measuredEv}
+                            pictureFailed={pictureFailed}
                             // Final review M6: Na⁺'s next electron would
                             // break the neon core, and nothing past Z = 108
                             // has a tabulated ion -- either way the app

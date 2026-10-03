@@ -196,6 +196,37 @@ describe('SpeciesControls', () => {
         expect(screen.getByRole('tooltip')).toHaveTextContent(DELTA_SCF_METHOD);
     });
 
+    // Ruling FR-1: LDA puts some s → d excited configurations below the
+    // ground one; a bare negative number would read as a bug or a typo.
+    it('notes a negative excitation energy as LDA ordering the configurations wrongly', () => {
+        renderControls({
+            species: { Z: 28, charge: 0, excitation: { from: { n: 4, l: 0 }, to: { n: 3, l: 2 } } },
+            energies: { speciesKey: '28:4s>3d', status: 'done', ionisation: null, excitation: { valueEv: -1.572, fromLabel: 'Ni', toLabel: 'Ni 4s → 3d' }, message: null },
+        });
+        expect(screen.getByText(/Excitation energy/).closest('.species-energy'))
+            .toHaveTextContent('−1.57 eV (below the ground configuration in LDA — a known LDA error for s→d transfer)');
+    });
+
+    it('adds no note to a positive excitation energy', () => {
+        renderControls({
+            species: { Z: 11, charge: 0, excitation: { from: { n: 3, l: 0 }, to: { n: 3, l: 1 } } },
+            energies: { speciesKey: '11:3s>3p', status: 'done', ionisation: null, excitation: { valueEv: 2.19, fromLabel: 'Na', toLabel: 'Na 3s → 3p' }, message: null },
+        });
+        expect(screen.queryByText(/below the ground configuration/)).toBeNull();
+    });
+
+    // Ruling FR-2: the energies wait for the picture (C15); a picture that
+    // never lands must not leave them "waiting" for ever.
+    it('says the energies were not computed when the picture\'s SCF did not converge', () => {
+        renderControls({
+            species: { Z: 19, charge: 0, excitation: { from: { n: 4, l: 0 }, to: { n: 4, l: 2 } } },
+            pictureFailed: true,
+        });
+        const line = screen.getByText(/Excitation energy/).closest('.species-energy')!;
+        expect(line).toHaveTextContent('not computed — the picture\'s SCF did not converge');
+        expect(line).not.toHaveTextContent('waiting');
+    });
+
     it('says it is computing while the ΔSCF runs', () => {
         renderControls({ energies: { ...idle, speciesKey: '11', status: 'computing' } });
         expect(screen.getByText(/computing/i)).toBeInTheDocument();

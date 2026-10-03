@@ -25,6 +25,15 @@ export const DELTA_SCF_METHOD =
 
 export interface EnergyReading { valueEv: number; fromLabel: string; toLabel: string }
 
+/**
+ * Ruling FR-1: shown beside a negative excitation energy, on screen and in
+ * the CSV comment. LDA over-binds d relative to s, so for Ti-Ni 4s -> 3d,
+ * Y+/Zr/Tc/Ru/Rh 5s -> 4d and Ba+ 6s -> 5d it puts the "excited"
+ * configuration below the ground one (docs/HANDOFF.md lists them). A bare
+ * "-1.57 eV" would read as a bug; this says what it is (spec §3.5).
+ */
+export const BELOW_GROUND_NOTE = 'below the ground configuration in LDA — a known LDA error for s→d transfer';
+
 const cache = new Map<string, number>();
 
 /**

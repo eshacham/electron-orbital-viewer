@@ -573,6 +573,7 @@ function App() {
             energies={atomEnergies}
             radii={atomProfile ? { displayRadius: atomProfile.displayRadius, reference: atomProfile.reference ?? null } : null}
             unbound={atomUnbound}
+            pictureFailed={atomError !== null}
         />
     );
 

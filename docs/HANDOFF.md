@@ -757,6 +757,33 @@ Recorded for review, per the session's standing authority.
   option is for Phase 4's relativistic solve, started from the *same*
   species' non-relativistic one. K 4s → 4d therefore still does not
   converge, and says so by name.
+- **Twelve offered excitations have a negative ΔSCF energy, and say why**
+  (final review, ruling FR-1). LDA over-binds d relative to s, so it puts
+  these "excited" configurations below the ground one they start from;
+  measured by the Z ≤ 56 sweep (`ATOM_SLOW_TESTS=1`,
+  `tests/atom/excitation_sweep_*.test.ts`), picture = restricted total-energy
+  gap, energy = the spin-polarised ΔSCF shown on screen:
+
+  | Excitation | picture | ΔSCF energy |
+  | --- | --- | --- |
+  | Ti 4s → 3d | above ground | −0.311 eV |
+  | V 4s → 3d | above ground | −1.209 eV |
+  | Mn 4s → 3d | 0.025 Ha below | positive |
+  | Fe 4s → 3d | 0.042 Ha below | positive |
+  | Co 4s → 3d | 0.058 Ha below | −0.720 eV |
+  | Ni 4s → 3d | 0.075 Ha below | −1.572 eV |
+  | Y⁺ 5s → 4d | 0.005 Ha below | −0.655 eV |
+  | Zr 5s → 4d | above ground | −0.376 eV |
+  | Tc 5s → 4d | 0.058 Ha below | −0.634 eV |
+  | Ru 5s → 4d | 0.031 Ha below | positive |
+  | Rh 5s → 4d | 0.055 Ha below | −0.704 eV |
+  | Ba⁺ 6s → 5d | 0.001 Ha below | positive |
+
+  A negative energy is shown with "below the ground configuration in LDA —
+  a known LDA error for s→d transfer" (`BELOW_GROUND_NOTE`, on screen and
+  in the CSV comment). The only offered species for Z ≤ 56 that does not
+  converge is K 4s → 4d; its energy line says the energies were not
+  computed because the picture's SCF did not converge (ruling FR-2).
 - **Phase 4 must thread relativity into the worker's neutral reference
   solve, not only the selected species' own solve** (Phase 3 follow-up).
   The reference ring and the camera's framing floor both come from solving
