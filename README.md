@@ -79,7 +79,7 @@ open, and read off how big it actually is.
   [Ar] 3d⁵ 4s¹. An Excite menu promotes one electron from the valence
   subshell to a higher one (Na 3s → 3p and similar). Either way, a dashed
   ring on the cut face marks the neutral atom's own drawn radius, so Na⁺'s
-  shrinkage or Cl⁻'s swelling reads directly against it. Ionisation and
+  shrinkage or Br⁻'s swelling reads directly against it. Ionisation and
   excitation energies are **ΔSCF** — differences of spin-polarised LDA total
   energies, never an orbital eigenvalue — labelled "ΔSCF, LDA": H–Ar's first
   ionisation energies land within 7.6 % of NIST (worst case helium), and
