@@ -76,10 +76,22 @@ export function startingPotentialFor(grid: RadialGrid, Z: number, supplied: Floa
     return Float64Array.from(supplied);
 }
 
+/**
+ * D(r) = sum over occupied of occ*(u^2 + Q^2). A relativistic state's
+ * normalisation is shared between its large and small components, so its
+ * small component Q must count here or the density would hold fewer than
+ * its electrons. Non-relativistic states have no Q and add exactly what
+ * they always have, bit for bit.
+ */
 export function buildD(grid: RadialGrid, states: Array<RadialState & { electrons: number }>): Float64Array {
     const D = new Float64Array(grid.size);
     for (const state of states) {
-        for (let j = 0; j < grid.size; j++) D[j] += state.electrons * state.u[j] * state.u[j];
+        const { u, Q } = state;
+        if (Q) {
+            for (let j = 0; j < grid.size; j++) D[j] += state.electrons * (u[j] * u[j] + Q[j] * Q[j]);
+        } else {
+            for (let j = 0; j < grid.size; j++) D[j] += state.electrons * u[j] * u[j];
+        }
     }
     return D;
 }

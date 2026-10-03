@@ -13,6 +13,8 @@
  */
 import { RadialGrid, gridForAtom, integrateOnGrid } from './radial_grid';
 import { RadialState, solveRadialState } from './radial_solver';
+import { solveScalarRelativisticState, solveDiracState } from './relativistic_solver';
+import { RelativityMode, RELATIVISTIC_EXCHANGE_CORRECTION, splitByJ } from './relativity';
 import { configurationFor, SubshellOccupancy } from './configurations';
 import {
     hartreePotential,
@@ -47,25 +49,38 @@ export interface AtomSolution {
     /** The occupancies actually solved, sorted by (n, l) -- an ion's or an excited atom's own. */
     configuration: SubshellOccupancy[];
     grid: RadialGrid;
-    /** One entry per occupied subshell, ordered by (n, l). */
+    /**
+     * One entry per occupied subshell, ordered by (n, l) -- with spin-orbit,
+     * one per j-level instead, j - 1/2 before j + 1/2 (each carrying j and
+     * kappa). Every relativistic state carries its small component Q.
+     */
     states: Array<RadialState & { electrons: number }>;
-    /** Converged total radial distribution, D(r) = sum over occupied of occ*u^2. */
+    /** Converged total radial distribution, D(r) = sum over occupied of occ*(u^2 + Q^2). */
     D: Float64Array;
     density: Float64Array;
     potential: Float64Array;
     totalEnergy: number;
     iterations: number;
     converged: boolean;
+    /** Which radial equation produced `states` ('off' = Schrödinger). */
+    relativity: RelativityMode;
 }
 
 /**
  * Options for one SCF solve. An object rather than more positional
- * parameters so later physics layers on without another signature change:
- * Phase 4 adds `relativity` here.
+ * parameters so later physics layers on without another signature change.
  */
 export interface ScfOptions {
     /** Defaults to the neutral ground state, configurationFor(Z). */
     configuration?: SubshellOccupancy[];
+    /**
+     * Which radial equation the orbitals obey; 'off' (the default) is the
+     * Schrödinger equation the app has always solved. 'scalar' is
+     * Koelling–Harmon, 'spinOrbit' the radial Dirac equation with each l > 0
+     * subshell split into its j-levels. Both relativistic modes also apply
+     * the MacDonald–Vosko correction to exchange (relativity.ts).
+     */
+    relativity?: RelativityMode;
     /**
      * Start the loop from this potential instead of the screened guess; it
      * must be on the solve's own grid. Omitted, the loop starts exactly as it
@@ -83,18 +98,47 @@ export interface ScfOptions {
     startingPotential?: Float64Array;
 }
 
+/** One orbital the loop solves: a subshell, or with spin-orbit one of its j-levels (kappa set). */
+interface OrbitalSpec { n: number; l: number; electrons: number; kappa?: number }
+
+/**
+ * With spin-orbit, each l > 0 subshell becomes two j-levels sharing its
+ * electrons by 2j+1 (relativity.ts's splitByJ), lower j first. The species
+ * itself -- its configuration, its excitation -- stays in (n, l) (ruling
+ * C13): Na 3s -> 3p puts a third of the promoted electron in 3p½ and two
+ * thirds in 3p³⁄₂, the same spherical averaging as every open subshell.
+ */
+function orbitalSpecsFor(configuration: SubshellOccupancy[], relativity: RelativityMode): OrbitalSpec[] {
+    if (relativity !== 'spinOrbit') return configuration.map(({ n, l, electrons }) => ({ n, l, electrons }));
+    return configuration.flatMap(subshell =>
+        splitByJ(subshell).map(({ n, l, kappa, electrons }) => ({ n, l, kappa, electrons })));
+}
+
+function solveOrbital(grid: RadialGrid, Z: number, spec: OrbitalSpec, potential: Float64Array, relativity: RelativityMode): RadialState {
+    if (relativity === 'off') return solveRadialState(grid, spec.n, spec.l, potential);
+    if (relativity === 'scalar') return solveScalarRelativisticState(grid, spec.n, spec.l, potential, Z);
+    return solveDiracState(grid, spec.n, spec.kappa ?? -(spec.l + 1), potential, Z);
+}
+
+function solveOrbitals(
+    grid: RadialGrid, Z: number, specs: OrbitalSpec[], potential: Float64Array, relativity: RelativityMode,
+): Array<RadialState & { electrons: number }> {
+    return specs.map(spec => ({ ...solveOrbital(grid, Z, spec, potential, relativity), electrons: spec.electrons }));
+}
+
 /**
  * Composes the mean-field potential from its independent physical pieces
  * (ruling R20): the bare nucleus, the classical electron-electron repulsion,
  * and the LDA exchange-correlation hole. Kept as one small function, rather
- * than scattered through the loop body, so a planned scalar-relativistic v2
- * can swap in a different kinetic treatment while reusing this composition
- * unchanged.
+ * than scattered through the loop body, so the relativistic modes swap in a
+ * different kinetic treatment (the radial equation, in solveOrbital) while
+ * reusing this composition -- changed only by the MacDonald–Vosko flag on
+ * exchange.
  */
-function meanFieldPotential(grid: RadialGrid, Z: number, D: Float64Array): Float64Array {
+function meanFieldPotential(grid: RadialGrid, Z: number, D: Float64Array, relativisticExchange: boolean): Float64Array {
     const density = densityFromD(grid, D);
     const vHartree = hartreePotential(grid, D);
-    const vExchange = exchangePotential(density);
+    const vExchange = exchangePotential(density, relativisticExchange);
     const v = new Float64Array(grid.size);
     for (let j = 0; j < grid.size; j++) {
         v[j] = -Z / grid.r[j] + vHartree[j] + vExchange[j] + correlationPotential(density[j]);
@@ -111,18 +155,23 @@ function meanFieldPotential(grid: RadialGrid, Z: number, D: Float64Array): Float
  * twice), which is why the Hartree and exchange-correlation potential
  * contributions are subtracted back out and replaced by the once-counted
  * Hartree and exchange-correlation *energies*.
+ *
+ * Unchanged in form for the relativistic modes: their eigenvalues have the
+ * rest mass removed, so sum(occ*eps_i) still counts the kinetic and nuclear
+ * energy once and the interaction twice, exactly as above.
  */
 function totalEnergyOf(
     grid: RadialGrid,
     states: Array<RadialState & { electrons: number }>,
     D: Float64Array,
-    density: Float64Array
+    density: Float64Array,
+    relativisticExchange: boolean
 ): number {
     const vHartree = hartreePotential(grid, D);
-    const vExchange = exchangePotential(density);
+    const vExchange = exchangePotential(density, relativisticExchange);
 
     const eHartree = hartreeEnergy(grid, D, vHartree);
-    const eExchange = exchangeEnergy(grid, D, density);
+    const eExchange = exchangeEnergy(grid, D, density, relativisticExchange);
     const eCorrelation = correlationEnergy(grid, D, density);
 
     const doubleCountedXC = new Float64Array(grid.size);
@@ -146,8 +195,17 @@ function totalEnergyOf(
  * has the exact hydrogenic solution for this case, the SCF machinery is
  * bypassed entirely rather than asked to approximate an answer already known
  * exactly.
+ *
+ * The relativistic modes bypass the loop for the same reason, but their
+ * total is the solver's own eigenvalues, occupancy-weighted over the
+ * j-levels (ruling C3): those are the Dirac (or Koelling–Harmon) energies of
+ * the bare nucleus to 1e-6 (relativistic_solver.test.ts), with nothing to
+ * double-count.
  */
-function solveOneElectronAtom(Z: number, grid: RadialGrid, configuration: SubshellOccupancy[]): AtomSolution {
+function solveOneElectronAtom(
+    Z: number, grid: RadialGrid, configuration: SubshellOccupancy[], relativity: RelativityMode,
+): AtomSolution {
+    if (relativity !== 'off') return solveOneElectronRelativistic(Z, grid, configuration, relativity);
     // Its own subshell, not 1s: an excited hydrogen (1s -> 2p) is reachable now.
     const subshell = configuration.find(s => s.electrons > 0)!;
     const potential = bareCoulombPotential(grid, Z);
@@ -169,7 +227,19 @@ function solveOneElectronAtom(Z: number, grid: RadialGrid, configuration: Subshe
         totalEnergy: -(Z * Z) / (2 * subshell.n * subshell.n),
         iterations: 1,
         converged: true,
+        relativity: 'off',
     };
+}
+
+function solveOneElectronRelativistic(
+    Z: number, grid: RadialGrid, configuration: SubshellOccupancy[], relativity: RelativityMode,
+): AtomSolution {
+    const potential = bareCoulombPotential(grid, Z);
+    const states = solveOrbitals(grid, Z, orbitalSpecsFor(configuration, relativity), potential, relativity);
+    const D = buildD(grid, states);
+    const density = densityFromD(grid, D);
+    const totalEnergy = states.reduce((sum, state) => sum + state.electrons * state.energy, 0);
+    return { Z, charge: Z - 1, configuration, grid, states, D, density, potential, totalEnergy, iterations: 1, converged: true, relativity };
 }
 
 // Ruling R28, generalised from Z to species: a species' LDA solution is a
@@ -182,7 +252,9 @@ function solveOneElectronAtom(Z: number, grid: RadialGrid, configuration: Subshe
 // meant to be cheap to call repeatedly from anywhere (the worker, tests, the
 // store) once warmed. A neutral ground state's key is String(Z) and
 // solveAtom goes through here, so solveAtom(Z) keeps returning one memoised
-// object exactly as before.
+// object exactly as before. A relativistic solve is a pure function of its
+// species and mode, keyed `${speciesKey}@${mode}` (ruling C2); 'off' keeps
+// the bare species key, so nothing that existed before Phase 4 moves.
 const solveSpeciesCache = new Map<string, AtomSolution>();
 
 /**
@@ -198,23 +270,45 @@ const solveSpeciesCache = new Map<string, AtomSolution>();
  * weighted potential change grows instead of shrinking damps that
  * oscillation directly, and is a strictly local, self-correcting response —
  * it never needs to guess in advance which elements will need it.
+ *
+ * A relativistic solve starts from the same species' converged
+ * non-relativistic potential (ruling C2): the worker needs that solve anyway
+ * for the comparison curve, it is on the same grid (gridForAtom depends only
+ * on Z and the highest n), and starting next to the answer saves iterations
+ * -- 47 -> 37 for gold, 103 -> 37 for Cs 6s -> 5d. Measured against a cold
+ * (screened) start for Au, Au+, Pb2+, Au and Cs with spin-orbit, and the
+ * excitations Cs 6s -> 5d, 6s -> 6d and 6s -> 6p, Au and Hg 6s -> 6p,
+ * U 7s -> 6d and Na 3s -> 3d, both starts land on the same solution: max
+ * r*|delta V| <= 3.3e-7, inside the loop's own 1e-6 tolerance, and total
+ * energies within 1.1e-8 relative. The same species' seed is not the
+ * neutral-atom seed Phase 3 found converging to nonsense for excitations:
+ * it already has the excited species' own Coulomb tail. Where that solve did
+ * not converge (K 4s -> 4d), there is no answer to start next to, and the
+ * relativistic loop starts from the screened guess as the non-relativistic
+ * one did. An unbound anion's verdict propagates from the non-relativistic
+ * solve unchanged.
  */
-export function solveSpecies(species: AtomSpecies): AtomSolution {
-    const key = speciesKey(species);
+export function solveSpecies(species: AtomSpecies, relativity: RelativityMode = 'off'): AtomSolution {
+    const key = relativity === 'off' ? speciesKey(species) : `${speciesKey(species)}@${relativity}`;
     const cached = solveSpeciesCache.get(key);
     if (cached) return cached;
 
     const configuration = speciesConfiguration(species);
     const highestN = highestPrincipalQuantumNumber(configuration);
     const grid = gridForAtom(species.Z, highestN);
-    const solution = solveAtomOnGrid(species.Z, grid, { configuration });
+    let startingPotential: Float64Array | undefined;
+    if (relativity !== 'off') {
+        const nonRelativistic = solveSpecies(species, 'off');
+        if (nonRelativistic.converged) startingPotential = nonRelativistic.potential;
+    }
+    const solution = solveAtomOnGrid(species.Z, grid, { configuration, relativity, startingPotential });
     solveSpeciesCache.set(key, solution);
     return solution;
 }
 
-/** Neutral ground state of Z (unchanged behaviour; see solveSpecies). */
-export function solveAtom(Z: number): AtomSolution {
-    return solveSpecies(neutralGround(Z));
+/** Neutral ground state of Z (unchanged behaviour for 'off'; see solveSpecies). */
+export function solveAtom(Z: number, relativity: RelativityMode = 'off'): AtomSolution {
+    return solveSpecies(neutralGround(Z), relativity);
 }
 
 /**
@@ -234,10 +328,13 @@ export function solveAtom(Z: number): AtomSolution {
  * (spec §3.5): the verdict is reported, never drawn around.
  */
 export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions = {}): AtomSolution {
+    const relativity = options.relativity ?? 'off';
+    const relativisticExchange = relativity !== 'off' && RELATIVISTIC_EXCHANGE_CORRECTION;
     const configuration = (options.configuration ?? configurationFor(Z)).filter(s => s.electrons > 0);
     const electrons = totalElectronsOf(configuration);
     if (electrons === 0) throw new Error(`Z=${Z} with no electrons has nothing to solve.`);
-    if (electrons === 1) return solveOneElectronAtom(Z, grid, configuration);
+    if (electrons === 1) return solveOneElectronAtom(Z, grid, configuration, relativity);
+    const specs = orbitalSpecsFor(configuration, relativity);
 
     // Only an anion can lose its outermost bound state (see UnboundAnionError);
     // neutral atoms and cations run exactly the loop they always have.
@@ -267,14 +364,16 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions
         // Before the solve, not after: solveRadialState searches only E < 0
         // and would hand back a state for an (n, l) the potential no longer
         // binds -- the nonsense (H- at -379 Ha) this guard exists to stop.
+        // In a relativistic mode this asks the non-relativistic question of
+        // the same potential (ruling C12), an approximation: relativity
+        // binds s and p½ slightly more and d and f slightly less, so a
+        // marginal anion's verdict could in principle differ. The final
+        // check below is on the relativistic eigenvalues themselves.
         if (isAnion) assertStatesBound(grid, configuration, potential);
-        states = configuration.map(subshell => ({
-            ...solveRadialState(grid, subshell.n, subshell.l, potential),
-            electrons: subshell.electrons,
-        }));
+        states = solveOrbitals(grid, Z, specs, potential, relativity);
         D = buildD(grid, states);
 
-        const newPotential = meanFieldPotential(grid, Z, D);
+        const newPotential = meanFieldPotential(grid, Z, D, relativisticExchange);
         const delta = maxWeightedDelta(grid, potential, newPotential);
 
         if (delta < CONVERGENCE_TOLERANCE) {
@@ -299,7 +398,7 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions
     }
 
     const density = densityFromD(grid, D);
-    const totalEnergy = totalEnergyOf(grid, states, D, density);
+    const totalEnergy = totalEnergyOf(grid, states, D, density, relativisticExchange);
 
-    return { Z, charge: Z - electrons, configuration, grid, states, D, density, potential, totalEnergy, iterations, converged };
+    return { Z, charge: Z - electrons, configuration, grid, states, D, density, potential, totalEnergy, iterations, converged, relativity };
 }
