@@ -9,9 +9,10 @@ import rlda from './fixtures/nist_rlda.json';
 jest.setTimeout(600000);
 
 // The default set is built around neon (one non-relativistic, one scalar and
-// one spin-orbit solve, each memoised) plus one- to three-electron species,
-// ~10 s in one worker. Argon, carbon, helium, sodium, chlorine and the
-// warm-versus-cold comparisons (~2 min) run with ATOM_SLOW_TESTS=1.
+// one spin-orbit solve, each memoised) plus helium, carbon and one- to
+// three-electron species, ~12 s in one worker. Argon and heavier, sodium,
+// chlorine and the warm-versus-cold comparisons (~2 min) run with
+// ATOM_SLOW_TESTS=1.
 const SLOW = process.env.ATOM_SLOW_TESTS === '1';
 const itSlow = SLOW ? it : it.skip;
 
@@ -101,10 +102,9 @@ describe('relativistic SCF', () => {
             expect(Math.abs((solveAtom(Z, mode).totalEnergy - off) / off)).toBeLessThan(1e-3);
         }
     };
-    it('Z=10: switching relativity on moves the total energy by less than 0.1 %', () => movesLessThanTenthOfAPercent(10));
-    itSlow.each([2, 6])('Z=%i: switching relativity on moves the total energy by less than 0.1 %', movesLessThanTenthOfAPercent);
+    it.each([2, 6, 10])('Z=%i: switching relativity on moves the total energy by less than 0.1 %', movesLessThanTenthOfAPercent);
 
-    itSlow('scalar and spin–orbit totals agree closely for a light atom', () => {
+    it('scalar and spin–orbit totals agree closely for a light atom', () => {
         // Measured for carbon: -37.434114 vs -37.434115.
         const scalar = solveAtom(6, 'scalar').totalEnergy;
         const dirac = solveAtom(6, 'spinOrbit').totalEnergy;
@@ -169,6 +169,51 @@ describe('relativistic SCF', () => {
         for (const mode of ['scalar', 'spinOrbit'] as const) {
             expect(() => solveSpecies({ Z: 1, charge: -1, excitation: null }, mode)).toThrow(UnboundAnionError);
         }
+    });
+    // Forced (ruling C12's gap): the non-relativistic pre-check passes but the
+    // relativistic solver finds no p state. Real cases are rare -- relativity
+    // binds every state of a bare nucleus more -- so the solver is made to
+    // fail for l = 1 in a fresh module registry. For an anion that is the
+    // unbound verdict, naming the j-level under Dirac; for a neutral atom it
+    // stays the solver's own error.
+    it('reports the unbound verdict when only the relativistic solve fails to bind', () => {
+        jest.isolateModules(() => {
+            jest.doMock('../../src/atom/relativistic_solver', () => {
+                const actual = jest.requireActual<typeof import('../../src/atom/relativistic_solver')>('../../src/atom/relativistic_solver');
+                const noRoot = () => { throw new Error('the potential does not bind it'); };
+                return {
+                    ...actual,
+                    solveScalarRelativisticState: (...args: Parameters<typeof actual.solveScalarRelativisticState>) =>
+                        (args[2] === 1 ? noRoot() : actual.solveScalarRelativisticState(...args)),
+                    solveDiracState: (...args: Parameters<typeof actual.solveDiracState>) =>
+                        ([1, -2].includes(args[2]) ? noRoot() : actual.solveDiracState(...args)),
+                };
+            });
+            const scf = require('../../src/atom/scf') as typeof import('../../src/atom/scf');
+            const shared = require('../../src/atom/scf_shared') as typeof import('../../src/atom/scf_shared');
+            const fluoride = [{ n: 1, l: 0, electrons: 2 }, { n: 2, l: 0, electrons: 2 }, { n: 2, l: 1, electrons: 6 }];
+            const grid = gridForAtom(9, 2);
+            const caught = (Z: number, relativity: 'scalar' | 'spinOrbit') => {
+                try { scf.solveAtomOnGrid(Z, grid, { configuration: fluoride, relativity }); } catch (error) { return error as Error; }
+                throw new Error('expected the solve to throw');
+            };
+
+            const scalar = caught(9, 'scalar') as InstanceType<typeof shared.UnboundAnionError>;
+            expect(scalar).toBeInstanceOf(shared.UnboundAnionError);
+            expect([scalar.n, scalar.l, scalar.j]).toEqual([2, 1, undefined]);
+            expect(scalar.message).toContain('its 2p electron');
+
+            const dirac = caught(9, 'spinOrbit') as InstanceType<typeof shared.UnboundAnionError>;
+            expect(dirac).toBeInstanceOf(shared.UnboundAnionError);
+            expect([dirac.n, dirac.l, dirac.j]).toEqual([2, 1, 0.5]);
+            expect(dirac.message).toContain('its 2p½ electron');
+
+            // Ne with the same ten electrons is no anion: the failure is the solver's.
+            const neutral = caught(10, 'scalar');
+            expect(neutral).not.toBeInstanceOf(shared.UnboundAnionError);
+            expect(neutral.message).toBe('the potential does not bind it');
+        });
+        jest.dontMock('../../src/atom/relativistic_solver');
     });
     itSlow('reports an unbound anion in a relativistic mode too (Cl⁻)', () => {
         for (const mode of ['scalar', 'spinOrbit'] as const) {

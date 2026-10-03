@@ -14,7 +14,7 @@
 import { RadialGrid, gridForAtom, integrateOnGrid } from './radial_grid';
 import { RadialState, solveRadialState } from './radial_solver';
 import { solveScalarRelativisticState, solveDiracState } from './relativistic_solver';
-import { RelativityMode, RELATIVISTIC_EXCHANGE_CORRECTION, splitByJ } from './relativity';
+import { RelativityMode, RELATIVISTIC_EXCHANGE_CORRECTION, splitByJ, jForKappa } from './relativity';
 import { configurationFor, SubshellOccupancy } from './configurations';
 import {
     hartreePotential,
@@ -127,6 +127,32 @@ function solveOrbitals(
 }
 
 /**
+ * solveOrbitals for an anion in a relativistic mode. The non-relativistic
+ * pre-check (ruling C12) can pass while the relativistic equation, which
+ * binds d and f slightly less, finds no bound state at all -- and its solver
+ * then throws (no root, or a state the grid cannot hold) where the
+ * Schrödinger solver would have handed back nonsense. For an anion that is
+ * the unbound verdict, not a solve failure, so it is reported as one,
+ * naming the j-level when the Dirac equation is the one that failed.
+ */
+function solveAnionOrbitalsRelativistic(
+    grid: RadialGrid, Z: number, specs: OrbitalSpec[], potential: Float64Array, relativity: RelativityMode,
+): Array<RadialState & { electrons: number }> {
+    return specs.map(spec => {
+        try {
+            return { ...solveOrbital(grid, Z, spec, potential, relativity), electrons: spec.electrons };
+        } catch {
+            throw new UnboundAnionError(spec.n, spec.l, spec.kappa === undefined ? undefined : jForKappa(spec.kappa));
+        }
+    });
+}
+
+/** sum(occ*eps_i): every electron's eigenvalue, weighted by its (possibly fractional) occupancy. */
+function sumOfEigenvalues(states: Array<RadialState & { electrons: number }>): number {
+    return states.reduce((sum, state) => sum + state.electrons * state.energy, 0);
+}
+
+/**
  * Composes the mean-field potential from its independent physical pieces
  * (ruling R20): the bare nucleus, the classical electron-electron repulsion,
  * and the LDA exchange-correlation hole. Kept as one small function, rather
@@ -179,7 +205,7 @@ function totalEnergyOf(
         doubleCountedXC[j] = D[j] * (vExchange[j] + correlationPotential(density[j]));
     }
 
-    const sumEigenvalues = states.reduce((sum, state) => sum + state.electrons * state.energy, 0);
+    const sumEigenvalues = sumOfEigenvalues(states);
 
     return sumEigenvalues - eHartree - integrateOnGrid(grid, doubleCountedXC) + eExchange + eCorrelation;
 }
@@ -238,7 +264,7 @@ function solveOneElectronRelativistic(
     const states = solveOrbitals(grid, Z, orbitalSpecsFor(configuration, relativity), potential, relativity);
     const D = buildD(grid, states);
     const density = densityFromD(grid, D);
-    const totalEnergy = states.reduce((sum, state) => sum + state.electrons * state.energy, 0);
+    const totalEnergy = sumOfEigenvalues(states);
     return { Z, charge: Z - 1, configuration, grid, states, D, density, potential, totalEnergy, iterations: 1, converged: true, relativity };
 }
 
@@ -276,13 +302,14 @@ const solveSpeciesCache = new Map<string, AtomSolution>();
  * for the comparison curve, it is on the same grid (gridForAtom depends only
  * on Z and the highest n), and starting next to the answer saves iterations
  * -- 47 -> 37 for gold, 103 -> 37 for Cs 6s -> 5d. Measured against a cold
- * (screened) start for Au, Au+, Pb2+, Au and Cs with spin-orbit, and the
- * excitations Cs 6s -> 5d, 6s -> 6d and 6s -> 6p, Au and Hg 6s -> 6p,
- * U 7s -> 6d and Na 3s -> 3d, both starts land on the same solution: max
- * r*|delta V| <= 3.3e-7, inside the loop's own 1e-6 tolerance, and total
- * energies within 1.1e-8 relative. The same species' seed is not the
- * neutral-atom seed Phase 3 found converging to nonsense for excitations:
- * it already has the excited species' own Coulomb tail. Where that solve did
+ * (screened) start -- in scalar mode for Au, Au+, Pb2+ and the excitations
+ * Cs 6s -> 5d, Cs 6s -> 6d, Au 6s -> 6p, Hg 6s -> 6p and U 7s -> 6d; with
+ * spin-orbit for Au, Cs 6s -> 6p and Na 3s -> 3d -- both starts land on the
+ * same solution: max r*|delta V| <= 3.3e-7, inside the loop's own 1e-6
+ * tolerance, and total energies within 6.3e-8 relative (1.1e-8 for the
+ * heavy samples). The same species' seed is not the neutral-atom seed
+ * Phase 3 found converging to nonsense for excitations: it already has the
+ * excited species' own Coulomb tail. Where that solve did
  * not converge (K 4s -> 4d), there is no answer to start next to, and the
  * relativistic loop starts from the screened guess as the non-relativistic
  * one did. An unbound anion's verdict propagates from the non-relativistic
@@ -367,10 +394,15 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions
         // In a relativistic mode this asks the non-relativistic question of
         // the same potential (ruling C12), an approximation: relativity
         // binds s and p½ slightly more and d and f slightly less, so a
-        // marginal anion's verdict could in principle differ. The final
-        // check below is on the relativistic eigenvalues themselves.
+        // marginal anion's verdict could in principle differ. Two later
+        // checks close the gap from the relativistic side: a relativistic
+        // solve that finds no bound state reports the anion unbound
+        // (solveAnionOrbitalsRelativistic), and the final check below is on
+        // the relativistic eigenvalues themselves.
         if (isAnion) assertStatesBound(grid, configuration, potential);
-        states = solveOrbitals(grid, Z, specs, potential, relativity);
+        states = isAnion && relativity !== 'off'
+            ? solveAnionOrbitalsRelativistic(grid, Z, specs, potential, relativity)
+            : solveOrbitals(grid, Z, specs, potential, relativity);
         D = buildD(grid, states);
 
         const newPotential = meanFieldPotential(grid, Z, D, relativisticExchange);
