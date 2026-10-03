@@ -17,12 +17,12 @@ describe('MacDonald–Vosko relativistic exchange', () => {
         expect(macDonaldVoskoPotentialFactor(0)).toBe(1);
         const b = 1e-3;
         expect(macDonaldVoskoEnergyFactor(b)).toBeCloseTo(1 - (2 / 3) * b * b, 12);
-        // D1 (preflight): the next term in Ψ's expansion is +0.8β⁴ = 8.0e-13 at
-        // β = 1e-3, which is itself above toBeCloseTo(12)'s 5e-13 threshold, so
-        // that precision fails by construction, not because of a bug. Precision
-        // 11 (and thus a 5e-12 threshold) comfortably clears the 8.0e-13 term
-        // while still catching a wrong leading coefficient.
-        expect(macDonaldVoskoPotentialFactor(b)).toBeCloseTo(1 - b * b, 11);
+        // D1 (preflight): Ψ's next expansion term is +0.8β⁴ = 8.0e-13 at β = 1e-3,
+        // which is itself above toBeCloseTo(12)'s 5e-13 threshold, so comparing
+        // against the truncated 1 - β² fails by construction at 12 digits. Pinning
+        // the β⁴ coefficient directly, instead of loosening the tolerance against
+        // the truncated form, keeps this a tight check on Ψ rather than a looser one.
+        expect(macDonaldVoskoPotentialFactor(b)).toBeCloseTo(1 - b * b + 0.8 * b ** 4, 12);
     });
 
     it('matches independently computed values at β = 1', () => {
@@ -32,7 +32,16 @@ describe('MacDonald–Vosko relativistic exchange', () => {
 
     it('is continuous across the series switch-over at β = 1e-2', () => {
         expect(macDonaldVoskoEnergyFactor(0.00999)).toBeCloseTo(0.9999334705837514, 11);
-        expect(macDonaldVoskoEnergyFactor(0.01001)).toBeCloseTo(macDonaldVoskoEnergyFactor(0.00999), 5);
+        // Direct comparison of the two branches at the switch-over itself: 1e-2 is
+        // not < 1e-2, so macDonaldVoskoEnergyFactor(beta) takes the closed form.
+        // Mirror hartree.ts's series here (same coefficients) and check it agrees
+        // with the closed form to far better than the series's next omitted term
+        // (O(β⁷), ~3e-13 relative at this β — comfortably inside 1e-12).
+        const beta = 1e-2;
+        const seriesBracket = (2 / 3) * beta - beta ** 3 / 5 + (3 / 28) * beta ** 5;
+        const seriesValue = 1 - 1.5 * seriesBracket * seriesBracket;
+        const closedFormValue = macDonaldVoskoEnergyFactor(beta);
+        expect(Math.abs((seriesValue - closedFormValue) / closedFormValue)).toBeLessThan(1e-12);
     });
 
     it.each([1e-2, 1, 1e3, 1e5, 1e6])('potential is the functional derivative of the energy at ρ = %p', rho => {
@@ -50,7 +59,12 @@ describe('MacDonald–Vosko relativistic exchange', () => {
         }
         const grid = makeRadialGrid(1e-3, 10, 3);
         const D = Float64Array.of(1, 2, 3);
-        expect(exchangeEnergy(grid, D, density)).toBe(exchangeEnergy(grid, D, density, false));
+        // Pinned against the value this exact call returned before the relativistic
+        // flag was added (the non-relativistic formula itself is untouched by this
+        // task). Comparing default-argument to explicit-false, as this did before,
+        // is tautological — false is the default, so the two calls are the same
+        // code path by construction and can never disagree.
+        expect(exchangeEnergy(grid, D, density)).toBe(-734.7184796343604);
         expect(exchangeEnergy(grid, D, density, true)).toBeGreaterThan(exchangeEnergy(grid, D, density));
     });
 });

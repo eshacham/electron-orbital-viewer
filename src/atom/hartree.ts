@@ -68,14 +68,17 @@ export function relativisticBeta(rho: number): number {
 
 /**
  * MacDonald–Vosko: ε_x^R = ε_x Φ(β), Φ = 1 - (3/2) [(βη - asinh β)/β²]².
- * Below β = 1e-2 the bracket is a difference of two nearly equal numbers,
- * so its series (2/3)β - β³/5 is used instead (error O(β⁵)).
+ * Below β = 1e-2 the bracket is computed directly as a difference of two
+ * nearly equal numbers, which loses relative precision in the bracket to
+ * cancellation; its series (2/3)β - β³/5 + (3/28)β⁵ is used instead there
+ * (next omitted term O(β⁷), ~3·10⁻¹³ relative to the bracket at the β = 1e-2
+ * switch-over — see the direct series/closed-form comparison in the tests).
  */
 export function macDonaldVoskoEnergyFactor(beta: number): number {
     if (beta === 0) return 1;
     let bracket: number;
     if (beta < 1e-2) {
-        bracket = (2 / 3) * beta - (beta * beta * beta) / 5;
+        bracket = (2 / 3) * beta - (beta * beta * beta) / 5 + (3 / 28) * beta ** 5;
     } else {
         const eta = Math.sqrt(1 + beta * beta);
         bracket = (beta * eta - Math.asinh(beta)) / (beta * beta);
@@ -92,7 +95,7 @@ export function macDonaldVoskoPotentialFactor(beta: number): number {
 
 /**
  * Dirac/Slater local-density exchange potential, V_x(r) = -(3ρ/π)^(1/3),
- * optionally with the MacDonald–Vosko relativistic correction -- which is
+ * optionally with the MacDonald–Vosko relativistic correction — which is
  * what NIST's RLDA and ScRLDA tables use, and so what the relativistic modes
  * must use for those tables to validate them (relativity.ts's
  * RELATIVISTIC_EXCHANGE_CORRECTION).
