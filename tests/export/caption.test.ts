@@ -6,7 +6,7 @@ import { energiesSucceeded } from '../../src/store/atomSlice';
 import { DELTA_SCF_LABEL } from '../../src/atom/delta_scf';
 import { MAX_FIELD_AU } from '../../src/field_source';
 import { N2_MAX_FIELD_AU } from '../../src/stark';
-import { makeStore, neonStore, sodiumIonStore, sodiumExcitedStore } from './fixtures';
+import { makeStore, neonStore, sodiumIonStore, sodiumExcitedStore, goldStore, goldIonStore } from './fixtures';
 
 describe('export captions', () => {
     it('names each atom level, with the method', () => {
@@ -140,6 +140,61 @@ describe('export captions', () => {
             }));
             expect(deltaScfCsvComment(store.getState()))
                 .toMatch(/^Na 3s → 3p excitation: -0\.50 eV \(ΔSCF, LDA; below the ground configuration in LDA — a known LDA error for s→d transfer\); /);
+        });
+    });
+
+    // Task 12b (ruling C7): every export states the DRAWN profile's own
+    // relativistic treatment -- the profile's mode (ruling C9), never the
+    // requested one -- and never ATOM_METHOD's "non-relativistic" wording
+    // for a relativistic picture.
+    describe('exports state the relativity of the picture they show (ruling C7)', () => {
+        it('keeps off byte-identical, and gives scalar/spin–orbit their own method text', () => {
+            expect(methodStatement(goldStore('off').getState())).toBe(ATOM_METHOD);
+
+            const scalarMethod = methodStatement(goldStore('scalar').getState());
+            expect(scalarMethod).not.toBe(ATOM_METHOD);
+            expect(scalarMethod).toMatch(/scalar-relativistic/);
+            expect(scalarMethod).not.toMatch(/non-relativistic/);
+
+            const spinOrbitMethod = methodStatement(goldStore('spinOrbit').getState());
+            expect(spinOrbitMethod).toMatch(/radial Dirac/);
+            expect(spinOrbitMethod).not.toMatch(/non-relativistic/);
+        });
+
+        it('names the mode in viewDescription, after the usual level part', () => {
+            expect(viewDescription(goldStore('off').getState())).toBe('Gold (Au, Z = 79), whole atom, 90% contour');
+            expect(viewDescription(goldStore('scalar').getState())).toBe('Gold (Au, Z = 79), whole atom, scalar-relativistic, 90% contour');
+            expect(viewDescription(goldStore('spinOrbit').getState())).toBe('Gold (Au, Z = 79), whole atom, with spin–orbit, 90% contour');
+        });
+
+        it('names a j-level subshell and its mode together', () => {
+            const store = goldStore('spinOrbit', { j: true });
+            store.dispatch(drillToSubshell(6, 1, 1.5));
+            expect(viewDescription(store.getState())).toBe('Gold (Au, Z = 79), 6p³⁄₂ subshell, with spin–orbit, 90% contour');
+        });
+
+        it('names a j-level orbital as its l orbital, with its j-level crumb -- the angular shape is still the l orbital\'s', () => {
+            const store = goldStore('spinOrbit', { j: true });
+            store.dispatch(drillToOrbital(6, 1, 0, 1.5));
+            expect(viewDescription(store.getState())).toBe('Gold (Au, Z = 79), 6p_z · 6p³⁄₂, with spin–orbit, 90% contour');
+        });
+
+        it('adds a scalar/spin–orbit suffix to the file stem, ASCII and after any j-level suffix', () => {
+            expect(exportFileStem(goldStore('off').getState())).toBe('orbital-viewer_Au_atom');
+            expect(exportFileStem(goldStore('scalar').getState())).toBe('orbital-viewer_Au_atom_scalar');
+
+            const spinOrbit = goldStore('spinOrbit', { j: true });
+            spinOrbit.dispatch(drillToSubshell(6, 1, 1.5));
+            expect(exportFileStem(spinOrbit.getState())).toBe('orbital-viewer_Au_subshell_n6_l1_j3-2_so');
+
+            spinOrbit.dispatch(drillToOrbital(6, 1, 0, 1.5));
+            expect(exportFileStem(spinOrbit.getState())).toBe('orbital-viewer_Au_n6_l1_ml0_j3-2_so');
+        });
+
+        it('names the reference ring\'s own mode for a relativistic ion, and stays unchanged for off', () => {
+            expect(referenceRingCaption(goldIonStore('off').getState())).toBe('dashed ring: neutral Au drawn radius 1.60 a₀');
+            expect(referenceRingCaption(goldIonStore('scalar').getState())).toBe('dashed ring: neutral Au drawn radius 1.60 a₀, scalar-relativistic');
+            expect(referenceRingCaption(goldIonStore('spinOrbit').getState())).toBe('dashed ring: neutral Au drawn radius 1.60 a₀, with spin–orbit');
         });
     });
 });

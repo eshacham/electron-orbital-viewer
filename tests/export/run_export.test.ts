@@ -3,7 +3,7 @@
 jest.mock('../../src/export/gltf_exporter_factory', () => ({ exportGlb: jest.fn(async () => new ArrayBuffer(12)) }));
 
 import { runExport, exportAvailability, cubeJobFor, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON, COMPOSITION_FAILED_REASON } from '../../src/export/run_export';
-import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted, levelUp } from '../../src/store/atomSlice';
+import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted, solveSucceeded, levelUp } from '../../src/store/atomSlice';
 import {
     setCombination, startOrbitalCalculation, failOrbitalCalculation, startCompositionBuild, endCompositionBuild, failCompositionBuild,
     setLevelTransition,
@@ -11,7 +11,7 @@ import {
 import { basicOrbitalParams } from '../../src/orbital_presets';
 import { selectionProblem } from '../../src/combinations';
 import { NOTHING_TO_EXPORT_REASON } from '../../src/export/surfaces';
-import { makeStore, neonStore, sodiumIonStore, chlorideUnboundStore, readText, baseContext, octahedron, exportHandle } from './fixtures';
+import { makeStore, neonStore, sodiumIonStore, chlorideUnboundStore, readText, baseContext, octahedron, exportHandle, goldStore } from './fixtures';
 
 // Fix round 1, M3: startOrbitalCalculation sets currentParams before the
 // render finishes, and failOrbitalCalculation does not clear it back out --
@@ -382,5 +382,81 @@ describe('runExport: glTF', () => {
         const result = await runExport('glb', { ...baseContext(store.getState()), handle });
         expect(result.filename).toBe('orbital-viewer_Ne_shell_n2.glb');
         expect(result.blob.type).toBe('model/gltf-binary');
+    });
+});
+
+/** The shared log grid a goldProfile's curves are sampled on (see run_export.ts's own profileRGrid) -- csvCurves must share it, since radialCurvesToCsv refuses columns sampled at different radii. */
+function gridFor(profile: { rMin: number; dx: number; size: number }): number[] {
+    return Array.from({ length: profile.size }, (_, j) => profile.rMin * Math.exp(j * profile.dx));
+}
+
+// Task 12b (ruling C7): the PNG caption already carries the mode through
+// methodStatement (pinned directly in caption.test.ts); this exercises it
+// end to end through runExport, the way the existing "carries the caption
+// and method" PNG test does for off.
+describe('runExport: PNG caption carries the mode (ruling C7)', () => {
+    it('names the drawn profile\'s mode in the method line', async () => {
+        const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+        const context = { ...baseContext(goldStore('scalar').getState()), handle: exportHandle({ capturePng }), phaseLegend: false };
+        await runExport('png', context);
+        expect(capturePng).toHaveBeenLastCalledWith(expect.objectContaining({
+            caption: ['Gold (Au, Z = 79), whole atom, scalar-relativistic, 90% contour', expect.stringMatching(/^central-field SCF, scalar-relativistic/)],
+        }));
+    });
+});
+
+// Task 12b (ruling C7), requirement 4: the CSV carries the same dashed
+// non-relativistic curves RadialPlot overlays (Task 12), or -- when there
+// is none -- the reason said as a comment instead.
+describe('runExport: CSV includes the dashed non-relativistic comparison curves (ruling C7)', () => {
+    it('adds a column per comparison curve, headed "... non-relativistic"', async () => {
+        const store = goldStore('scalar', { comparison: true });
+        const profile = store.getState().atom.profile!;
+        const rGrid = gridFor(profile);
+        const csvCurves = [{ label: 'n=6', points: rGrid.map((r, j) => ({ r, value: profile.shells[1].curve[j] })) }];
+        const text = await readText((await runExport('csv', { ...baseContext(store.getState()), csvCurves })).blob);
+        const header = text.split('\n').find(line => line.startsWith('r_bohr'))!;
+        expect(header).toContain('n=6');
+        expect(header).toContain('n=6 non-relativistic');
+    });
+
+    it('states the isolated j-level twin\'s scaling as the on-screen legend does (Task 12)', async () => {
+        const store = goldStore('spinOrbit', { j: true, comparison: true });
+        store.dispatch(drillToSubshell(6, 1, 1.5));
+        const profile = store.getState().atom.profile!;
+        const rGrid = gridFor(profile);
+        const pThreeHalves = profile.subshells.find(s => s.l === 1 && s.j === 1.5)!;
+        const csvCurves = [{ label: '6p³⁄₂', points: rGrid.map((r, j) => ({ r, value: pThreeHalves.curve[j] })) }];
+        const text = await readText((await runExport('csv', { ...baseContext(store.getState()), csvCurves })).blob);
+        expect(text).toContain('# dashed: non-relativistic 6p, scaled to the 4 electrons shown');
+    });
+
+    it('adds the comparisonUnavailable reason as a comment when there is no baseline', async () => {
+        const store = goldStore('scalar');
+        const reason = 'No non-relativistic comparison: Pr-Eu 6s -> 4f has no non-relativistic answer.';
+        store.dispatch(solveSucceeded({ ...store.getState().atom.profile!, comparisonUnavailable: reason }));
+        const profile = store.getState().atom.profile!;
+        const csvCurves = [{ label: 'n=6', points: gridFor(profile).map((r, j) => ({ r, value: profile.shells[1].curve[j] })) }];
+        const text = await readText((await runExport('csv', { ...baseContext(store.getState()), csvCurves })).blob);
+        expect(text).toContain(`# ${reason}`);
+    });
+
+    it('adds no comparison column and no comment for an off-mode profile (byte-identical case)', async () => {
+        const store = neonStore();
+        const csvCurves = [{ label: 'n=1', points: [{ r: 0.1, value: 1 }, { r: 0.2, value: 2 }] }];
+        const text = await readText((await runExport('csv', { ...baseContext(store.getState()), csvCurves })).blob);
+        // Exactly the same output the pre-existing, pinned CSV test expects
+        // (tests/export/run_export.test.ts, "writes the plotted curves...")
+        // -- no comparison column, no extra comment line, for a profile with
+        // no `nonRelativistic`/`comparisonUnavailable` (every profile before
+        // Phase 4, and every off-mode one since).
+        expect(text).toBe(
+            '# Neon (Ne, Z = 10), whole atom, 90% contour\n'
+            + '# quantity: D(r) = 4*pi*r^2*rho(r), electrons per bohr (the radial distribution, not the density)\n'
+            + '# method: central-field SCF, LDA exchange + VWN5 correlation, non-relativistic, spherically averaged\n'
+            + '# r in bohr (a0)\n'
+            + '# view: http://x/#mode=atom&Z=10\n'
+            + 'r_bohr,n=1\n0.1,1\n0.2,2\n'
+        );
     });
 });

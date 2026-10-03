@@ -3,8 +3,10 @@ import { selectionProblem } from '../combinations';
 import { hydrogenicSource } from '../field_source';
 import { ORBITAL_RESOLUTION, BASIC_ORBITALS_Z } from '../orbital_presets';
 import { subshellSpokenLabel } from '../atom/configurations';
+import { buildComparisonCurves } from '../atom/comparison_curves';
+import type { SerialisedAtomProfile } from '../workers/atomWorker';
 import { CsvCurve, radialCurvesToCsv } from './csv';
-import { exportFileStem, ATOM_METHOD, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment } from './caption';
+import { exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment } from './caption';
 import { CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
@@ -190,6 +192,11 @@ export function cubeJobFor(state: RootState): CubeJob {
         const shell = atom.level === 'shell' ? profile.shells.find(s => s.n === atom.selectedShell) : undefined;
         // The cube header stays plain ASCII: a j-level reads "6p j = 3/2", not "6p³⁄₂".
         const what = subshell ? `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)} subshell` : shell ? shellLabel(shell.n) : 'total';
+        // Task 12b (ruling C7): a j-level's curve is that j-level's own
+        // density, G^2 + F^2 (both Dirac radial components, Task 10) --
+        // not the plain |R|^2 an off/scalar subshell's curve holds -- said
+        // here so the file does not read as the ordinary radial density.
+        const jNote = subshell?.j !== undefined ? 'j-level density, G^2 + F^2' : null;
         // Task 12b: an ion or excited atom's whole-atom cube also names the
         // dashed neutral-comparison ring, same as the PNG caption and CSV
         // comments (ruling C4) -- null for anything that draws no such ring.
@@ -200,8 +207,12 @@ export function cubeJobFor(state: RootState): CubeJob {
             resolution: ORBITAL_RESOLUTION,
             atoms: [{ Z: profile.Z, position: [0, 0, 0] }],
             title,
-            // Carry from Task 12: features finer than the grid spacing (a heavy atom's 1s) are not resolved.
-            description: `rho(r) = D(r)/(4 pi r^2), ${what} electron density, electrons/bohr^3, box enclosing 99.9%, finer features (e.g. a heavy atom's 1s) not resolved; ${ATOM_METHOD}${ring ? `; ${ring}` : ''}; lengths in bohr`,
+            // Carry from Task 12: features finer than the grid spacing (a
+            // heavy atom's 1s) are not resolved. Task 12b: the method line
+            // is the drawn profile's own (methodStatement), never the
+            // non-relativistic ATOM_METHOD for a relativistic picture.
+            description: `rho(r) = D(r)/(4 pi r^2), ${what} electron density, electrons/bohr^3, box enclosing 99.9%, finer features (e.g. a heavy atom's 1s) not resolved`
+                + `${jNote ? `; ${jNote}` : ''}; ${methodStatement(state)}${ring ? `; ${ring}` : ''}; lengths in bohr`,
         };
     }
     const { currentParams, currentField } = state.orbital;
@@ -210,9 +221,16 @@ export function cubeJobFor(state: RootState): CubeJob {
     // currentParams carries the real Z (a solved profile's, at atom mode's
     // level 3); a combination's sources are always hydrogen's own.
     const Z = currentParams?.Z ?? BASIC_ORBITALS_Z;
+    // Task 12b (ruling C7, Task 10 carry M4): with spin–orbit, atom mode's
+    // level-3 orbital is drawn as the j-level's R(r) times the plain l-basis
+    // real spherical harmonic -- the large component only, not the true
+    // |j, m_j> angular shape (spec §3.6) -- so the cube says so rather than
+    // reading as the full relativistic wavefunction.
+    const jLevelNote = atom.mode === 'atom' && atom.level === 'orbital' && atom.selectedOrbital?.j !== undefined
+        ? 'large component, l-basis angular part' : null;
     return {
         type: 'fieldCube', source, resolution, atoms: [{ Z, position: [0, 0, 0] }], title,
-        description: `psi(x,y,z), real, bohr^-3/2, on the grid as drawn; ${methodStatement(state)}; lengths in bohr`,
+        description: `psi(x,y,z), real, bohr^-3/2, on the grid as drawn; ${methodStatement(state)}${jLevelNote ? `; ${jLevelNote}` : ''}; lengths in bohr`,
     };
 }
 
@@ -238,6 +256,11 @@ export function exportAvailability(state: RootState): ExportAvailability {
     return { png, 'png-plain': png, csv: csvReason(state), stl: geometry, glb: geometry, cube: cubeReason(state) };
 }
 
+/** The shared log grid a profile's curves are sampled on -- the same formula App.tsx's atomRGrid uses, so a comparison curve built here lines up exactly with the already-plotted columns it is appended beside (radialCurvesToCsv requires identical radii across every column). */
+function profileRGrid(profile: Pick<SerialisedAtomProfile, 'rMin' | 'dx' | 'size'>): number[] {
+    return Array.from({ length: profile.size }, (_, j) => profile.rMin * Math.exp(j * profile.dx));
+}
+
 function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
     const quantity = state.atom.mode === 'atom'
         ? 'D(r) = 4*pi*r^2*rho(r), electrons per bohr (the radial distribution, not the density)'
@@ -261,7 +284,25 @@ function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
     if (state.atom.mode === 'atom' && state.atom.level === 'orbital') {
         comments.push('note: D(r) is the subshell\'s, independent of m_l -- every orbital in this subshell shares the same curve');
     }
-    return radialCurvesToCsv(csvCurves, comments);
+    // Task 12b (ruling C7): the same dashed non-relativistic curves the
+    // radial plot overlays (Task 12's buildComparisonCurves, extracted so
+    // this and RadialPlot share one matching/scaling/colour rule) --
+    // appended as extra columns, headed with their own "... non-relativistic"
+    // label, or (when there is none) the reason said as a comment instead.
+    let curves = csvCurves;
+    const profile = state.atom.mode === 'atom' ? state.atom.profile : null;
+    if (profile) {
+        const { curves: comparison, note } = buildComparisonCurves({
+            profile, level: state.atom.level, selectedShell: state.atom.selectedShell, selectedSubshell: state.atom.selectedSubshell,
+            rGrid: profileRGrid(profile),
+        });
+        if (comparison.length > 0) curves = [...csvCurves, ...comparison.map(({ label, points }) => ({ label, points }))];
+        // The isolated j-level twin's scaling, stated exactly as the
+        // on-screen legend states it (Task 12's comparisonNote).
+        if (note) comments.push(note);
+        if (profile.comparisonUnavailable) comments.push(profile.comparisonUnavailable);
+    }
+    return radialCurvesToCsv(curves, comments);
 }
 
 export async function runExport(kind: ExportKind, context: ExportContext): Promise<ExportResult> {

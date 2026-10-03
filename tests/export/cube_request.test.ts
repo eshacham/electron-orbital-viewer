@@ -8,7 +8,7 @@ import { setCombination, startOrbitalCalculation, startFieldCalculation, finishO
 import { basicOrbitalParams } from '../../src/orbital_presets';
 import { fieldRequestFor } from '../../src/combinations';
 import { hydrogenicSource } from '../../src/field_source';
-import { makeStore, neonStore, neonProfile, readText } from './fixtures';
+import { makeStore, neonStore, neonProfile, readText, goldStore } from './fixtures';
 
 function fakeWorker(reply: (request: CubeRequest) => unknown): CubeWorkerHandle & { terminate: jest.Mock } {
     const worker = {
@@ -121,6 +121,60 @@ describe('cube requests', () => {
         expect(job.type).toBe('fieldCube');
         if (job.type !== 'fieldCube') throw new Error('unreachable');
         expect(job.source).toEqual(hydrogenicSource(params));
+    });
+
+    // Task 12b (ruling C7, Task 10 carry M4): a j-level's curve already
+    // holds G^2 + F^2 (both Dirac radial components), not the plain |R|^2
+    // an off/scalar subshell's curve holds -- the cube file says so.
+    describe('Task 12b: a j-level cube names its own density, and a spin–orbit orbital its large component', () => {
+        it('says a j-level subshell cube is that j-level\'s own density, G^2 + F^2', () => {
+            const store = goldStore('spinOrbit', { j: true });
+            store.dispatch(drillToSubshell(6, 1, 1.5));
+            const job = cubeJobFor(store.getState());
+            expect(job.type).toBe('radialCube');
+            if (job.type === 'radialCube') expect(job.description).toContain('j-level density, G^2 + F^2');
+        });
+
+        it('adds no j-level density note for a scalar (non-split) subshell', () => {
+            const store = goldStore('scalar');
+            store.dispatch(drillToSubshell(6, 1));
+            const job = cubeJobFor(store.getState());
+            if (job.type === 'radialCube') expect(job.description).not.toContain('j-level density');
+        });
+
+        // Same setup as the M4 test above ("carries the SCF profile's own Z
+        // and numerical R(r) for an atom-mode orbital"), on a j-level
+        // subshell: the orbital-level cube is still R(r) times the plain
+        // l-basis real spherical harmonic (Task 9/10), never the true
+        // |j, m_j> angular shape, which the file must say rather than imply.
+        it('says a spin–orbit orbital-level cube is the large component only, l-basis angular part', () => {
+            const store = goldStore('spinOrbit', { j: true });
+            store.dispatch(drillToOrbital(6, 1, 0, 1.5));
+            const profile = store.getState().atom.profile!;
+            const subshell = profile.subshells.find(s => s.n === 6 && s.l === 1 && s.j === 1.5)!;
+            const radialSamples = { R: subshell.R, rMin: profile.rMin, dx: profile.dx, size: profile.size };
+            store.dispatch(startOrbitalCalculation({
+                n: 6, l: 1, ml: 0, Z: profile.Z, resolution: 64, rMax: subshell.samplingRadius,
+                enclosedFraction: 0.9, radialSamples,
+            }));
+            const job = cubeJobFor(store.getState());
+            expect(job.type).toBe('fieldCube');
+            if (job.type === 'fieldCube') expect(job.description).toContain('large component, l-basis angular part');
+        });
+
+        it('adds no large-component note for a scalar orbital, which has no j-level at all', () => {
+            const store = goldStore('scalar');
+            store.dispatch(drillToOrbital(6, 1, 0));
+            const profile = store.getState().atom.profile!;
+            const subshell = profile.subshells.find(s => s.n === 6 && s.l === 1)!;
+            const radialSamples = { R: subshell.R, rMin: profile.rMin, dx: profile.dx, size: profile.size };
+            store.dispatch(startOrbitalCalculation({
+                n: 6, l: 1, ml: 0, Z: profile.Z, resolution: 64, rMax: subshell.samplingRadius,
+                enclosedFraction: 0.9, radialSamples,
+            }));
+            const job = cubeJobFor(store.getState());
+            if (job.type === 'fieldCube') expect(job.description).not.toContain('large component');
+        });
     });
 
     // M4: Stark "Both" overlays the lower and upper n=2 states, same shape of

@@ -1,7 +1,8 @@
 import { createAppStore, RootState } from '../../src/store';
 import { setElement, setCharge, setExcitation, solveSucceeded, solveUnbound } from '../../src/store/atomSlice';
 import { AtomSpecies, speciesKey } from '../../src/atom/species';
-import { SerialisedAtomProfile, ReferenceRadii } from '../../src/workers/atomWorker';
+import { SerialisedAtomProfile, ReferenceRadii, SerialisedComparison } from '../../src/workers/atomWorker';
+import { RelativityMode } from '../../src/atom/relativity';
 import { ExportContext } from '../../src/export/run_export';
 import type { ExportSurface } from '../../src/export/surfaces';
 import type { ViewerExportHandle } from '../../src/export/handle';
@@ -28,6 +29,58 @@ export function neonStore() {
     const store = makeStore();
     store.dispatch(setElement(10));
     store.dispatch(solveSucceeded(neonProfile()));
+    return store;
+}
+
+/**
+ * Gold-shaped (Z = 79), for Task 12b's relativistic export tests: an inner
+ * shell plus a 6s/6p valence, with the 6p split into its two j-levels when
+ * `j` is asked for (spin–orbit) and a same-species non-relativistic
+ * comparison baseline (ruling C5) when `comparison` is asked for. Real
+ * gold's actual configuration doesn't matter to a caption/CSV-shape test --
+ * only that the shape (shells, subshells, j, a matching baseline) is there
+ * to read, same spirit as neonProfile above.
+ */
+export function goldProfile(relativity: RelativityMode, options: { j?: boolean; comparison?: boolean } = {}): SerialisedAtomProfile {
+    const size = 401, rMin = 1e-4, dx = Math.log(30 / rMin) / (size - 1);
+    const D = new Float64Array(size);
+    for (let j = 0; j < size; j++) { const r = rMin * Math.exp(j * dx); D[j] = 4 * r * r * Math.exp(-2 * r); }
+    const shell = (n: number, electrons: number) => ({ n, electrons, contourRadius: n, curve: D, emphasis: new Float32Array(size) });
+    const sub = (n: number, l: number, electrons: number, j?: number) => ({
+        n, l, ...(j === undefined ? {} : { j }), electrons, energy: -1, curve: D, R: new Float64Array(size), samplingRadius: 3, compositeSamplingRadius: 3,
+    });
+    const pSubshells = options.j ? [sub(6, 1, 2, 0.5), sub(6, 1, 4, 1.5)] : [sub(6, 1, 6)];
+    const nonRelativistic: SerialisedComparison | undefined = options.comparison ? {
+        framingRadius: 10,
+        shells: [{ n: 6, contourRadius: 6, curve: D }],
+        subshells: [{ n: 6, l: 1, electrons: 6, curve: D }],
+    } : undefined;
+    return {
+        Z: 79, converged: true, rMin, dx, size, total: Float32Array.from(D), totalEmphasis: new Float32Array(size),
+        contourRadius: 6, valencePeakRadius: 6, displayRadius: 6, shellPeaks: new Float64Array([6]),
+        shellIndexAtR: new Float32Array(size),
+        shells: [shell(5, 18), shell(6, 1)],
+        subshells: [sub(5, 2, 10), ...pSubshells],
+        relativity, nonRelativistic,
+    };
+}
+
+/** Neutral gold, drawn in the given mode -- see goldProfile. */
+export function goldStore(relativity: RelativityMode, options: { j?: boolean; comparison?: boolean } = {}) {
+    const store = makeStore();
+    store.dispatch(setElement(79));
+    store.dispatch(solveSucceeded(goldProfile(relativity, options)));
+    return store;
+}
+
+/** Au⁺ (Z = 79), drawn in the given mode, with a neutral-gold reference ring -- for the ring caption's mode-naming test. */
+export function goldIonStore(relativity: RelativityMode) {
+    const store = makeStore();
+    store.dispatch(setElement(79));
+    store.dispatch(setCharge(1));
+    const reference: ReferenceRadii = { displayRadius: 1.6, contourRadius: 1.5, framingRadius: 2 };
+    const species: AtomSpecies = { Z: 79, charge: 1, excitation: null };
+    store.dispatch(solveSucceeded({ ...goldProfile(relativity), charge: 1, speciesKey: speciesKey(species), reference }));
     return store;
 }
 

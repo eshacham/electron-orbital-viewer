@@ -3,20 +3,45 @@ import { elementFor } from '../elements';
 import { orbitalName } from '../orbital_names';
 import { subshellLabel, configurationLabelOf } from '../atom/configurations';
 import { AtomSpecies, isNeutralGround, speciesConfiguration, speciesSymbol, speciesTitle } from '../atom/species';
-import { selectSpeciesEnergies, speciesOf } from '../store/atomSlice';
+import { selectSpeciesEnergies, speciesOf, profileRelativity } from '../store/atomSlice';
 import { BELOW_GROUND_NOTE, DELTA_SCF_LABEL, DELTA_SCF_METHOD } from '../atom/delta_scf';
 import { formatDrawnRadius } from '../atom/format_radius';
 import { selectShownBasicOrbital, selectShownEnclosedFraction } from '../store/orbitalSlice';
 import { combinationTitle } from '../combinations';
 import { MAX_FIELD_AU } from '../field_source';
 import { N2_MAX_FIELD_AU } from '../stark';
+import { RelativityMode, methodStatement as relativityMethodStatement } from '../atom/relativity';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
 export const ATOM_METHOD = 'central-field SCF, LDA exchange + VWN5 correlation, non-relativistic, spherically averaged';
 export const BASIC_METHOD = 'exact one-electron (hydrogenic) solution, Z = 1';
 
+/**
+ * Inline wording for a profile's relativistic treatment, used wherever a
+ * caption names the mode in running text (viewDescription, the reference
+ * ring caption) rather than in a full method sentence -- '' for off, so
+ * every off caption's parts list is exactly what it was before Phase 4
+ * ("off is today's app, byte for byte"). Matches App.tsx's SOLVING_SUFFIX
+ * wording, without its own parentheses.
+ */
+function modeCaptionText(mode: RelativityMode): string {
+    switch (mode) {
+        case 'off': return '';
+        case 'scalar': return 'scalar-relativistic';
+        case 'spinOrbit': return 'with spin–orbit';
+    }
+}
+
 export function methodStatement(state: RootState): string {
-    if (state.atom.mode === 'atom') return ATOM_METHOD;
+    if (state.atom.mode === 'atom') {
+        // Task 12b (ruling C7): the *drawn* profile's mode (ruling C9), not
+        // the switch's -- off keeps ATOM_METHOD's own wording byte-identical
+        // (pinned by existing tests), since relativity.ts's own 'off' text
+        // reads differently. Scalar/spin–orbit must never claim
+        // "non-relativistic", which ATOM_METHOD alone would.
+        const mode = state.atom.profile ? profileRelativity(state.atom.profile) : 'off';
+        return mode === 'off' ? ATOM_METHOD : relativityMethodStatement(mode);
+    }
     const combination = state.orbital.combination;
     if (combination.kind === 'hybrid') {
         return `${BASIC_METHOD}; hybrids are linear combinations of these, a basis choice rather than a state of the free atom (qualitative)`;
@@ -48,14 +73,26 @@ export function viewDescription(state: RootState): string {
         const o = selectShownBasicOrbital(state);
         return `Hydrogen ${orbitalName(o.n, o.l, o.ml)}, ${percent}`;
     }
-    const { Z, level, selectedShell, selectedSubshell, selectedOrbital } = state.atom;
+    const { Z, level, selectedShell, selectedSubshell, selectedOrbital, profile } = state.atom;
     const levelPart = level === 'orbital' && selectedOrbital
-        ? orbitalName(selectedOrbital.n, selectedOrbital.l, selectedOrbital.ml)
+        ? (selectedOrbital.j === undefined
+            // With spin–orbit the orbital's own crumb names its j-level too
+            // (LevelNav's "6p_z · 6p³⁄₂" pattern) -- the angular shape drawn
+            // is still the l orbital's (spec §3.6); only R(r) is the
+            // j-level's, which the method line states.
+            ? orbitalName(selectedOrbital.n, selectedOrbital.l, selectedOrbital.ml)
+            : `${orbitalName(selectedOrbital.n, selectedOrbital.l, selectedOrbital.ml)} · ${subshellLabel(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j)}`)
         : level === 'shell' && selectedSubshell
-            ? `${subshellLabel(selectedSubshell.n, selectedSubshell.l)} subshell`
+            ? `${subshellLabel(selectedSubshell.n, selectedSubshell.l, selectedSubshell.j)} subshell`
             : level === 'shell' && selectedShell !== null
                 ? shellLabel(selectedShell)
                 : 'whole atom';
+
+    // Task 12b (ruling C7): the drawn profile's own mode (ruling C9), not
+    // the switch's -- '' for off, so an off caption's joined parts are
+    // exactly what they always were (empty entries vanish from the join).
+    const modeText = modeCaptionText(profile ? profileRelativity(profile) : 'off');
+    const modeParts = modeText ? [modeText] : [];
 
     // A neutral ground state's caption stays byte-identical (existing tests
     // pin it): the name is the element alone, with no configuration -- the
@@ -66,11 +103,11 @@ export function viewDescription(state: RootState): string {
     if (isNeutralGround(species)) {
         const element = elementFor(Z);
         const name = element ? `${element.name} (${element.symbol}, Z = ${Z})` : `Z = ${Z}`;
-        return `${name}, ${levelPart}, ${percent}`;
+        return [name, levelPart, ...modeParts, percent].join(', ');
     }
     const name = `${speciesTitle(species)} (Z = ${Z})`;
     const configuration = configurationLabelOf(speciesConfiguration(species));
-    return `${name}, ${configuration}, ${levelPart}, ${percent}`;
+    return [name, configuration, levelPart, ...modeParts, percent].join(', ');
 }
 
 /**
@@ -87,6 +124,25 @@ function speciesFileSuffix(species: AtomSpecies): string {
     return `${charge}${excitation}`;
 }
 
+/**
+ * ASCII j-level suffix for a file stem: j = 1.5 (i.e. 3/2) -> '_j3-2' (j is
+ * always a half-integer, so `j * 2` is always a whole number). Absent for a
+ * non-relativistic selection (`j === undefined`), so a stem that never had
+ * a j-level stays unchanged.
+ */
+function jFileSuffix(j: number | undefined): string {
+    return j === undefined ? '' : `_j${j * 2}-2`;
+}
+
+/** ASCII mode suffix for a file stem (brief, requirement 3): '' for off, so every off stem stays byte-identical. */
+function modeFileSuffix(mode: RelativityMode): string {
+    switch (mode) {
+        case 'off': return '';
+        case 'scalar': return '_scalar';
+        case 'spinOrbit': return '_so';
+    }
+}
+
 /** ASCII only: file names travel through systems that mangle "²". */
 export function exportFileStem(state: RootState): string {
     if (state.atom.mode !== 'atom') {
@@ -98,17 +154,22 @@ export function exportFileStem(state: RootState): string {
         const o = selectShownBasicOrbital(state);
         return `orbital-viewer_H_basic_n${o.n}_l${o.l}_ml${o.ml}`;
     }
-    const { Z, level, selectedShell, selectedSubshell, selectedOrbital } = state.atom;
+    const { Z, level, selectedShell, selectedSubshell, selectedOrbital, profile } = state.atom;
     const symbol = elementFor(Z)?.symbol ?? `Z${Z}`;
     // A neutral ground state's suffix is '', so `base` is exactly `symbol`
     // and every stem below stays byte-identical to before ions existed.
     const base = `${symbol}${speciesFileSuffix(speciesOf(state.atom))}`;
-    if (level === 'orbital' && selectedOrbital) {
-        return `orbital-viewer_${base}_n${selectedOrbital.n}_l${selectedOrbital.l}_ml${selectedOrbital.ml}`;
-    }
-    if (level === 'shell' && selectedSubshell) return `orbital-viewer_${base}_subshell_n${selectedSubshell.n}_l${selectedSubshell.l}`;
-    if (level === 'shell' && selectedShell !== null) return `orbital-viewer_${base}_shell_n${selectedShell}`;
-    return `orbital-viewer_${base}_atom`;
+    const stem = level === 'orbital' && selectedOrbital
+        ? `orbital-viewer_${base}_n${selectedOrbital.n}_l${selectedOrbital.l}_ml${selectedOrbital.ml}${jFileSuffix(selectedOrbital.j)}`
+        : level === 'shell' && selectedSubshell
+            ? `orbital-viewer_${base}_subshell_n${selectedSubshell.n}_l${selectedSubshell.l}${jFileSuffix(selectedSubshell.j)}`
+            : level === 'shell' && selectedShell !== null
+                ? `orbital-viewer_${base}_shell_n${selectedShell}`
+                : `orbital-viewer_${base}_atom`;
+    // Task 12b (ruling C7): the drawn profile's own mode, appended last so
+    // it reads as a qualifier of the whole stem rather than part of any one
+    // level/j segment -- off adds nothing, so every existing stem is unchanged.
+    return `${stem}${modeFileSuffix(profile ? profileRelativity(profile) : 'off')}`;
 }
 
 /**
@@ -128,7 +189,11 @@ export function referenceRingCaption(state: RootState): string | null {
     if (isNeutralGround(species)) return null;
     const neutralSymbol = speciesSymbol({ Z: species.Z, charge: 0, excitation: null });
     const radius = formatDrawnRadius(profile.reference.displayRadius);
-    return `dashed ring: neutral ${neutralSymbol} drawn radius ${radius} a₀`;
+    // Task 12b (ruling C7): the neutral comparison solves in the species'
+    // own mode (ruling C4), so the ring's mode is the profile's -- '' for
+    // off, so an off ring's caption is exactly what it always was.
+    const modeText = modeCaptionText(profileRelativity(profile));
+    return `dashed ring: neutral ${neutralSymbol} drawn radius ${radius} a₀${modeText ? `, ${modeText}` : ''}`;
 }
 
 /**
