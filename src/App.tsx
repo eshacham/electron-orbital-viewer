@@ -66,6 +66,7 @@ import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
+import { buildComparisonCurves } from './atom/comparison_curves';
 import { useUrlStateSync } from './useUrlStateSync';
 import { hasSharedView, encodeStateOf } from './url_state';
 import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
@@ -556,46 +557,19 @@ function App() {
     }, [atomProfile, atomLevel, atomSelectedShell, atomSelectedSubshell, atomRGrid]);
 
     // The same curves the plot is showing, from the non-relativistic solve,
-    // dashed (spec §5 Phase 4). Matched on (n) at the atom level and on
-    // (n, l) at the shell level -- the non-relativistic atom has no j-levels.
-    // Where the solid curves are j-levels, the dashed (n, l) curve is scaled
-    // to the electrons actually shown, so an isolated 6p³⁄₂ (4 e⁻) is
-    // compared with 4 electrons' worth of non-relativistic 6p, not 6.
-    const comparisonCurves: RadialCurve[] = useMemo(() => {
-        const reference = atomProfile?.nonRelativistic;
-        if (!atomProfile || !reference) return [];
-        const pointsFor = (curve: Float64Array, scale: number) =>
-            atomRGrid.map((r, j) => ({ r, value: scale * curve[j] }));
-        if (atomLevel === 'atom') {
-            return atomProfile.shells.flatMap((shell, i) => {
-                const match = reference.shells.find(s => s.n === shell.n);
-                return match ? [{
-                    label: `n=${shell.n} non-relativistic`,
-                    color: CURVE_COLORS[i % CURVE_COLORS.length],
-                    dashed: true,
-                    points: pointsFor(match.curve, 1),
-                }] : [];
-            });
-        }
-        const shellSubshells = atomProfile.subshells.filter(s => s.n === atomSelectedShell);
-        const shown = atomSelectedSubshell
-            ? shellSubshells.filter(s => s.l === atomSelectedSubshell.l && s.j === atomSelectedSubshell.j)
-            : shellSubshells;
-        const curves: RadialCurve[] = [];
-        for (const l of Array.from(new Set(shown.map(s => s.l)))) {
-            const match = reference.subshells.find(s => s.n === atomSelectedShell && s.l === l);
-            if (!match || !(match.electrons > 0)) continue;
-            const shownElectrons = shown.filter(s => s.l === l).reduce((sum, s) => sum + s.electrons, 0);
-            const first = shellSubshells.find(s => s.l === l)!;
-            curves.push({
-                label: `${subshellLabel(match.n, l)} non-relativistic`,
-                color: CURVE_COLORS[shellSubshells.indexOf(first) % CURVE_COLORS.length],
-                dashed: true,
-                points: pointsFor(match.curve, shownElectrons / match.electrons),
-            });
-        }
-        return curves;
-    }, [atomProfile, atomLevel, atomSelectedShell, atomSelectedSubshell, atomRGrid]);
+    // dashed (spec §5 Phase 4) -- extracted to a pure helper (fix round 1,
+    // I2) so the matching, scaling and colour rules are unit-testable on
+    // their own rather than only through a rendered component tree.
+    const { curves: comparisonCurves, note: comparisonNote } = useMemo(
+        () => buildComparisonCurves({
+            profile: atomProfile,
+            level: atomLevel,
+            selectedShell: atomSelectedShell,
+            selectedSubshell: atomSelectedSubshell,
+            rGrid: atomRGrid,
+        }),
+        [atomProfile, atomLevel, atomSelectedShell, atomSelectedSubshell, atomRGrid]
+    );
 
     // Phone: the element is chosen from a full-screen list opened from the
     // element name, since the periodic table does not fit.
@@ -795,6 +769,7 @@ function App() {
                 width={width}
                 collapsible={collapsible}
                 curves={[...atomCurves, ...comparisonCurves]}
+                comparisonNote={comparisonNote}
                 peaks={Array.from(atomProfile.shellPeaks)}
                 cutFaceNote={atomLevel !== 'orbital'}
                 hoverRadius={atomHoverRadius}

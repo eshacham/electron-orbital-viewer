@@ -79,6 +79,14 @@ interface RadialPlotProps {
      * exists. At the orbital level there is none.
      */
     cutFaceNote?: boolean;
+    /**
+     * States why a dashed comparison curve's height is less than "the
+     * whole subshell" -- an isolated j-level, scaled to just the electrons
+     * it shows (App.tsx's `buildComparisonCurves`). Absent whenever no
+     * dashed curve on screen needs the explanation (ruling: no scaling, no
+     * note).
+     */
+    comparisonNote?: string | null;
     /** Drawing width in px; defaults to 150 compact, 260 otherwise. */
     width?: number;
     /** Starts folded to its title, as on a phone, where room is short. */
@@ -133,7 +141,7 @@ function dominantCurveLabelAt(curves: RadialCurve[], r: number): string | null {
  */
 const RadialPlot: React.FC<RadialPlotProps> = ({
     n, l, Z, rMax, compact = false,
-    curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear', cutFaceNote = false,
+    curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear', cutFaceNote = false, comparisonNote = null,
     width, collapsible = false,
 }) => {
     // On a phone, or a window too narrow for both side panels, the plot sits
@@ -372,6 +380,9 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                         </span>
                     )}
                 </div>
+            )}
+            {isMultiCurve && comparisonNote && (
+                <div className="radial-plot-note radial-plot-comparison-note">{comparisonNote}</div>
             )}
             {/* Always rendered (rather than only while hovering), reserving
                 its line's height at all times -- otherwise the legend above

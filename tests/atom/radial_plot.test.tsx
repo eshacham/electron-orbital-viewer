@@ -231,5 +231,20 @@ describe('RadialPlot', () => {
             );
             expect(container.querySelector('.radial-plot-hover-readout')!.textContent).toMatch(/K shell$/);
         });
+
+        // Fix round 1: an isolated j-level's dashed twin is scaled to just
+        // the electrons shown, which the label and legend key alone do not
+        // say -- this states it explicitly, beside the legend.
+        it('states a scaled comparison curve\'s note beside the legend', () => {
+            const { container, rerender } = render(
+                <RadialPlot n={1} l={0} Z={79} rMax={10} curves={withComparison()} comparisonNote="dashed: non-relativistic 6p, scaled to the 4 electrons shown" />
+            );
+            expect(container.querySelector('.radial-plot-comparison-note')!.textContent)
+                .toBe('dashed: non-relativistic 6p, scaled to the 4 electrons shown');
+
+            // Absent (the usual case: no scaling to explain) -> nothing rendered.
+            rerender(<RadialPlot n={1} l={0} Z={79} rMax={10} curves={withComparison()} />);
+            expect(container.querySelector('.radial-plot-comparison-note')).toBeNull();
+        });
     });
 });
