@@ -4,6 +4,7 @@ import {
     isValidExcitation, chargeSuffix, speciesSymbol, speciesTitle, excitationLabel, encodeSpeciesParams, decodeSpeciesParams,
     AtomSpecies,
 } from '../../src/atom/species';
+import { ionConfigurationFor } from '../../src/atom/ion_configurations';
 
 const ref = (label: string) => ({ n: Number(label[0]), l: 'spdf'.indexOf(label[1]) });
 const labels = (refs: Array<{ n: number; l: number }>) => refs.map(r => `${r.n}${'spdf'[r.l]}`);
@@ -41,7 +42,7 @@ describe('species', () => {
             .toBe('1s² 2s¹ 2p³');
     });
 
-    it('offers the outermost shell as the source, and the four next subshells as targets', () => {
+    it('offers a neutral main-group atom its outermost shell as the source, and the four next subshells as targets', () => {
         expect(labels(excitationSources(11, 0))).toEqual(['3s']);
         expect(labels(excitationTargets(11, 0, ref('3s')))).toEqual(['3p', '4s', '3d', '4p']);
         expect(labels(excitationSources(6, 0))).toEqual(['2s', '2p']);
@@ -49,6 +50,62 @@ describe('species', () => {
         expect(labels(excitationTargets(26, 0, ref('4s')))).toEqual(['3d', '4p', '5s', '4d']);
         expect(labels(excitationTargets(10, 0, ref('2p')))).toEqual(['3s', '3p', '3d']);
         expect(excitationSources(17, -1)).toEqual([]);          // no excitation of an anion
+    });
+
+    // Final review I1: the open subshell is the valence of a d or f ion, and
+    // a closed d10 with nothing outside it is the valence of Cu+ and Pd --
+    // while a closed core under a valence shell (Na 2p, K 3p) stays out.
+    // Targets run in hydrogen-like (n, l) order for a cation, Madelung order
+    // for a neutral atom, and an empty subshell the ground state skipped
+    // (Pd's 5s, Ca+'s 3d) always counts as above.
+    it.each([
+        // [what, Z, charge, sources, { source: targets }]
+        ['Fe³⁺ excites its open 3d, and its 3s/3p into 3d', 26, 3, ['3s', '3p', '3d'],
+            { '3s': ['3d', '4s', '4p', '4d'], '3p': ['3d', '4s', '4p', '4d'], '3d': ['4s', '4p', '4d'] }],
+        ['Cu⁺ excites its d¹⁰ into the empty 4s', 29, 1, ['3s', '3p', '3d'],
+            { '3d': ['4s', '4p', '4d'], '3s': ['4s', '4p', '4d'] }],
+        ['Pd excites its d¹⁰ into the 5s the ground state left empty', 46, 0, ['4s', '4p', '4d'],
+            { '4d': ['5s', '5p', '5d'] }],
+        ['Gd³⁺ excites its open 4f', 64, 3, ['4f', '5s', '5p'],
+            { '4f': ['5d', '6s', '6p', '6d'], '5p': ['5d', '6s', '6p', '6d'] }],
+        ['U³⁺ excites its open 5f', 92, 3, ['5f', '6s', '6p'],
+            { '5f': ['6d', '7s', '7p', '7d'] }],
+        ['Na keeps the D line first and leaves its 2p core alone', 11, 0, ['3s'],
+            { '3s': ['3p', '4s', '3d', '4p'] }],
+        ['C excites 2s into its half-empty 2p', 6, 0, ['2s', '2p'],
+            { '2s': ['2p', '3s', '3p', '3d'], '2p': ['3s', '3p', '3d'] }],
+        ['Ne offers the n = 3 shell, nothing past it', 10, 0, ['2s', '2p'],
+            { '2p': ['3s', '3p', '3d'] }],
+        ['K leaves its 3p core alone', 19, 0, ['4s'],
+            { '4s': ['3d', '4p', '5s', '4d'] }],
+        ['Ca⁺ reaches the 3d its ground state skipped (the 729 nm line)', 20, 1, ['4s'],
+            { '4s': ['3d', '4p', '4d', '5s'] }],
+    ] as Array<[string, number, number, string[], Record<string, string[]>]>)('%s', (_what, Z, charge, sources, targets) => {
+        expect(labels(excitationSources(Z, charge))).toEqual(sources);
+        for (const [from, expected] of Object.entries(targets)) {
+            expect(labels(excitationTargets(Z, charge, ref(from)))).toEqual(expected);
+            for (const to of expected) {
+                const excited = speciesConfiguration({ Z, charge, excitation: { from: ref(from), to: ref(to) } });
+                expect(excited.reduce((sum, s) => sum + s.electrons, 0)).toBe(Z - charge);   // one electron moved, none lost
+            }
+        }
+    });
+
+    it('never offers more than four targets, the source itself, or a full subshell', () => {
+        for (let Z = 1; Z <= 118; Z++) {
+            for (const charge of [0, 1, 2, 3]) {
+                for (const from of excitationSources(Z, charge)) {
+                    const targets = excitationTargets(Z, charge, from);
+                    expect(targets.length).toBeLessThanOrEqual(4);
+                    expect(targets.some(t => t.n === from.n && t.l === from.l)).toBe(false);
+                    const ground = ionConfigurationFor(Z, charge);
+                    for (const t of targets) {
+                        const held = ground.find(s => s.n === t.n && s.l === t.l)?.electrons ?? 0;
+                        expect(held).toBeLessThan(2 * (2 * t.l + 1));
+                    }
+                }
+            }
+        }
     });
 
     it('validates an excitation against the species it would apply to', () => {

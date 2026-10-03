@@ -16,11 +16,16 @@ export interface AtomSpecies { Z: number; charge: number; excitation: Excitation
 export const MAX_EXCITATION_TARGETS = 4;
 const LETTERS = 'spdf';
 const capacity = (l: number) => 2 * (2 * l + 1);
-// Madelung (n+l, then n) order, encoded as a single sortable number -- the
-// same rule the neutral-atom table's comment describes as "roughly" filling
-// order, used here only to pick targets *after* the source, never to derive
-// a ground state (this file never second-guesses ion_configurations.ts).
+// Two energy-like orders, each encoded as a single sortable number, used
+// only to pick targets *above* the source -- never to derive a ground state
+// (this file never second-guesses ion_configurations.ts). A neutral atom's
+// outer subshells sit in Madelung (n+l, then n) order, which is why K's 4s
+// fills before its 3d; a cation's do not -- with the screening electron gone,
+// the levels fall back towards the hydrogen-like (n, then l) order, which is
+// why Fe3+ is 3d5 and not 3d3 4s2, and why its 3d -> 4s is an excitation.
 const madelung = ({ n, l }: SubshellRef) => (n + l) * 10 + n;
+const hydrogenLike = ({ n, l }: SubshellRef) => n * 10 + l;
+const orderFor = (charge: number) => (charge > 0 ? hydrogenLike : madelung);
 const same = (a: SubshellRef, b: SubshellRef) => a.n === b.n && a.l === b.l;
 const refLabel = (r: SubshellRef) => subshellLabel(r.n, r.l);
 
@@ -34,35 +39,62 @@ export function speciesKey(species: AtomSpecies): string {
     return `${species.Z}${charge}${excitation}`;
 }
 
-/** Occupied subshells of the outermost shell. None for an anion: its extra electron is barely held as it is. */
+/**
+ * The valence subshells an electron can be promoted out of (spec §5 Phase
+ * 3, "an Excite action on the valence subshell"): every open subshell, plus
+ * every occupied subshell of the outermost shell. Sorted by (n, l).
+ *
+ * "Outermost shell" alone misreads valence twice over. A d or f ion's open
+ * subshell sits a shell inside its outermost one (Fe3+ 3d5 under nothing,
+ * Gd3+ 4f7 under 5s2 5p6) and is exactly what its chemistry and spectrum are
+ * about, so every open subshell counts wherever it sits. The outermost
+ * shell's closed d10 counts too -- Cu+ and Ag+ (3d10, 4d10), Zn2+, Hg2+, and
+ * neutral Pd, whose 5s is empty -- because nothing lies outside it: it is the
+ * least bound subshell the species has. A closed subshell under a shell that
+ * *is* occupied stays out (Na 2p, K 3p, Zn 3d under 4s2): that is a core
+ * excitation, tens of eV up and not what "excite" means here. None for an
+ * anion: its extra electron is barely held as it is.
+ */
 export function excitationSources(Z: number, charge: number): SubshellRef[] {
     if (charge < 0 || !allowedCharges(Z).includes(charge)) return [];
     const configuration = ionConfigurationFor(Z, charge);
     const valenceN = valenceShellOf(configuration);
-    return configuration.filter(s => s.n === valenceN && s.electrons > 0).map(({ n, l }) => ({ n, l }));
+    return configuration
+        .filter(s => s.electrons > 0 && (s.n === valenceN || s.electrons < capacity(s.l)))
+        .map(({ n, l }) => ({ n, l }))
+        .sort(hydrogenLikeOrder);
 }
 
+function hydrogenLikeOrder(a: SubshellRef, b: SubshellRef): number { return hydrogenLike(a) - hydrogenLike(b); }
+
 /**
- * Candidate destinations for one promoted electron: n from (valence n - 1)
- * to (valence n + 1), capped at 7, s/p/d only, not full, not the source, and
- * strictly after the source in Madelung order -- so "excite" always means
- * "up", never a relabelling of the ground state. The first four by that
- * order (Na 3s -> 3p, 4s, 3d, 4p puts the sodium D line first).
+ * Candidate destinations for one promoted electron: any subshell up to one
+ * shell past the outermost (capped at n = 7) that is not full and not the
+ * source -- s, p and d when empty, and an open f (Gd's 4f7 can take one
+ * more); an empty f is never a low-lying destination. A target must lie
+ * *above* the source in the species' order (see orderFor), so "excite"
+ * always means "up": later in that order, or empty in the ground state -- an
+ * empty subshell the order puts earlier is one the ground state itself
+ * skipped (Pd's 5s under 4d10, Ca+'s 3d under 4s), and the ground state is
+ * the better witness that it lies higher. The first four by that order (Na
+ * 3s -> 3p, 4s, 3d, 4p puts the sodium D line first).
  */
 export function excitationTargets(Z: number, charge: number, from: SubshellRef): SubshellRef[] {
     if (!excitationSources(Z, charge).some(s => same(s, from))) return [];
     const configuration = ionConfigurationFor(Z, charge);
     const valenceN = valenceShellOf(configuration);
+    const order = orderFor(charge);
     const candidates: SubshellRef[] = [];
-    for (let n = Math.max(1, valenceN - 1); n <= Math.min(7, valenceN + 1); n++) {
-        for (let l = 0; l <= Math.min(2, n - 1); l++) {
+    for (let n = 1; n <= Math.min(7, valenceN + 1); n++) {
+        for (let l = 0; l <= Math.min(3, n - 1); l++) {
             const target = { n, l };
-            if (same(target, from) || madelung(target) <= madelung(from)) continue;
+            if (same(target, from)) continue;
             const occupied = configuration.find(s => same(s, target))?.electrons ?? 0;
-            if (occupied < capacity(l)) candidates.push(target);
+            if (occupied === capacity(l) || (occupied === 0 && l === 3)) continue;
+            if (occupied === 0 || order(target) > order(from)) candidates.push(target);
         }
     }
-    return candidates.sort((a, b) => madelung(a) - madelung(b)).slice(0, MAX_EXCITATION_TARGETS);
+    return candidates.sort((a, b) => order(a) - order(b)).slice(0, MAX_EXCITATION_TARGETS);
 }
 
 export function isValidExcitation(Z: number, charge: number, excitation: Excitation): boolean {
