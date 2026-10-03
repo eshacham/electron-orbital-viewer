@@ -953,3 +953,16 @@ html, body, #root {
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
+
+/* Relativity (Controls). Three labels in a 300 px panel: let "With
+   spin–orbit" wrap rather than overflow, on a phone's View tab too. */
+.relativity-controls .MuiToggleButton-root {
+  white-space: normal;
+  line-height: 1.2;
+}
+/* Dark on the light card, like the helper text above it but a step
+   stronger: it carries the number the switch exists to show. */
+.relativity-what-changed {
+  color: rgba(0, 0, 0, 0.78);
+  font-variant-numeric: tabular-nums;
+}

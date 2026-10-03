@@ -1,6 +1,7 @@
 import { buildSerialisedAtomProfile, SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { solveAtom, AtomSolution } from '../../src/atom/scf';
 import { buildAtomProfile, packRadialCurve } from '../../src/atom/atom_profile';
+import { wholeAtomFramingRadius } from '../../src/atom/framing';
 
 /**
  * The worker cannot hand a class instance or a closure across the boundary,
@@ -141,6 +142,15 @@ describe('relativistic payload', () => {
         expect(profile.valenceS!.label).toBe('2s½');
         expect(profile.nonRelativistic!.shells[0].curve.length).toBe(profile.size);
         expect(profile.comparisonUnavailable).toBeNull();
+    });
+
+    // Ruling C14: the comparison carries where its own whole-atom view, and
+    // each of its shells, would be framed -- the floor that keeps the camera
+    // still across a relativity switch.
+    it('carries the non-relativistic framing radius and shell contours', () => {
+        const baseline = buildAtomProfile(solveAtom(10), 0.9);
+        expect(profile.nonRelativistic!.framingRadius).toBe(wholeAtomFramingRadius(baseline));
+        expect(profile.nonRelativistic!.shells.map(s => s.contourRadius)).toEqual(baseline.shells.map(s => s.contourRadius));
     });
 
     it('stays plain and survives structuredClone', () => {

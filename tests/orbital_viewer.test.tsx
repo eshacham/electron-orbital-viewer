@@ -415,3 +415,75 @@ describe('OrbitalViewer: shell lobes and the relativistic mode', () => {
     });
 });
 
+
+// Ruling C14: switching relativity must not re-zoom the camera onto the
+// contracted atom -- that would hide the very contraction the switch is
+// there to show. A relativistic picture is framed on at least where its own
+// non-relativistic solve was framed, so off -> scalar -> spin–orbit leaves
+// the camera (and the scale bar) where it was.
+describe('OrbitalViewer: framing across a relativity switch', () => {
+    beforeEach(() => { clearShellMeshCacheForTests(); jest.clearAllMocks(); });
+
+    /** A relativistic neon whose non-relativistic comparison was framed at 2.4 a₀, with an n = 2 contour of 2.2. */
+    function contracted(relativity: 'scalar' | 'spinOrbit') {
+        const base = neonProfile();
+        return {
+            ...base, relativity,
+            nonRelativistic: {
+                framingRadius: 2.4,
+                shells: base.shells.map(s => ({ n: s.n, contourRadius: s.n === 2 ? 2.2 : s.contourRadius, curve: s.curve })),
+                subshells: [],
+            },
+        };
+    }
+
+    it('frames a relativistic whole atom on its non-relativistic framing at least', () => {
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(10));
+            store.dispatch(setRelativity('scalar'));
+            store.dispatch(solveSucceeded(contracted('scalar')));
+        });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        expect(updateAtomViewInScene).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ framingFloor: 2.4 }), expect.anything());
+    });
+
+    it('takes the larger of an ion\'s two floors', () => {
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(10));
+            store.dispatch(setCharge(1));
+            store.dispatch(setRelativity('scalar'));
+            store.dispatch(solveSucceeded({ ...contracted('scalar'), speciesKey: '10+1', reference: { displayRadius: 2, contourRadius: 2.1, framingRadius: 1.7 } }));
+        });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        expect(updateAtomViewInScene).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ framingFloor: 2.4 }), expect.anything());
+    });
+
+    // setRelativity keeps an open shell (off <-> scalar), so the shell view
+    // holds the same way: on the non-relativistic shell's contour.
+    it('frames an open shell on its non-relativistic contour at least', () => {
+        (createShellCompositionWorker as jest.Mock).mockReturnValue(fakeCompositionWorker());
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(10));
+            store.dispatch(setRelativity('scalar'));
+            store.dispatch(solveSucceeded(contracted('scalar')));
+        });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        act(() => { store.dispatch(drillToShell(2)); });
+        expect(updateAtomViewInScene).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ contourRadius: 2, framingFloor: 2.2 }), expect.anything());
+    });
+
+    it('sets no floor on a non-relativistic shell view', () => {
+        (createShellCompositionWorker as jest.Mock).mockReturnValue(fakeCompositionWorker());
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(10));
+            store.dispatch(solveSucceeded(neonProfile()));
+        });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        act(() => { store.dispatch(drillToShell(2)); });
+        expect((updateAtomViewInScene as jest.Mock).mock.calls.at(-1)![1].framingFloor).toBeUndefined();
+    });
+});

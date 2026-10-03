@@ -134,6 +134,22 @@ export function methodStatement(mode: RelativityMode): string {
     }
 }
 
+/**
+ * The level of theory in a few words, for a number that has to state its
+ * method in the same line (spec §3.1) -- the "what changed" readout, the
+ * reference-ring note, the ΔSCF tooltip -- where `methodStatement`'s full
+ * sentence would crowd out the number itself. MacDonald–Vosko is named
+ * because it is what sets these numbers apart from a plain relativistic
+ * kinetic energy on top of the usual LDA (RELATIVISTIC_EXCHANGE_CORRECTION).
+ */
+export function shortMethodLabel(mode: RelativityMode): string {
+    switch (mode) {
+        case 'off': return 'non-relativistic LDA';
+        case 'scalar': return 'scalar-relativistic LDA (MacDonald–Vosko exchange)';
+        case 'spinOrbit': return 'Dirac LDA (MacDonald–Vosko exchange)';
+    }
+}
+
 const URL_VALUES: Record<RelativityMode, string> = { off: 'off', scalar: 'scalar', spinOrbit: 'so' };
 
 /**

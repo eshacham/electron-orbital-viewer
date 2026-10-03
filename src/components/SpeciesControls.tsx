@@ -4,7 +4,8 @@ import {
     AtomSpecies, Excitation, SubshellRef, excitationSources, excitationTargets, excitationLabel, speciesSymbol, speciesKey,
 } from '../atom/species';
 import { allowedCharges } from '../atom/ion_configurations';
-import { BELOW_GROUND_NOTE, DELTA_SCF_LABEL, DELTA_SCF_METHOD, EnergyReading, ionisedSpeciesOf } from '../atom/delta_scf';
+import { BELOW_GROUND_NOTE, DELTA_SCF_LABEL, EnergyReading, deltaScfMethod, ionisedSpeciesOf } from '../atom/delta_scf';
+import { RelativityMode, shortMethodLabel } from '../atom/relativity';
 import { NIST_FIRST_IONISATION_EV } from '../atom/ionisation_references';
 import { formatDrawnRadius } from '../atom/format_radius';
 import type { EnergiesState } from '../store/atomSlice';
@@ -15,11 +16,23 @@ interface SpeciesControlsProps {
     onChargeChange: (charge: number) => void;
     onExcitationChange: (excitation: Excitation | null) => void;
     energies: EnergiesState;
-    /** The drawn radius of what is on screen and of the neutral reference, when both are known. */
-    radii: { displayRadius: number; reference: ReferenceRadii | null } | null;
+    /**
+     * The drawn radius of what is on screen and of the neutral reference,
+     * when both are known; `referenceUnavailable` is why there is no
+     * reference when the neutral atom failed in the species' mode.
+     */
+    radii: { displayRadius: number; reference: ReferenceRadii | null; referenceUnavailable?: string | null } | null;
     unbound: string | null;
     /** The species' picture solve failed, so the energies, which wait for it (ruling C15), will never start. */
     pictureFailed?: boolean;
+    /**
+     * The mode the picture on screen was solved in (ruling C9: the drawn
+     * profile's). The ΔSCF energies are non-relativistic whatever it is
+     * (ruling C6), and their tooltip says so when it differs; the ring
+     * note's radii are the picture's, so they state its method. 'off', the
+     * default, leaves both exactly as they were.
+     */
+    pictureRelativity?: RelativityMode;
 }
 
 const NO_ENERGIES: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
@@ -79,10 +92,10 @@ function energyValueText(reading: EnergyReading | null, status: EnergiesState['s
  * focusable, and focus or a tap opens the same tooltip a hover does, which
  * the label carries as its accessible description while open.
  */
-const MethodLabel: React.FC = () => {
+const MethodLabel: React.FC<{ method: string }> = ({ method }) => {
     const [open, setOpen] = useState(false);
     return (
-        <Tooltip title={DELTA_SCF_METHOD} describeChild open={open} onOpen={() => setOpen(true)} onClose={() => setOpen(false)}>
+        <Tooltip title={method} describeChild open={open} onOpen={() => setOpen(true)} onClose={() => setOpen(false)}>
             <span
                 className="species-method"
                 tabIndex={0}
@@ -99,12 +112,13 @@ const MethodLabel: React.FC = () => {
 /** "5.37 eV  ΔSCF, LDA", the method one hover away (spec §3.1). */
 const EnergyLine: React.FC<{
     label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number; noValueReason?: string; pictureFailed?: boolean; isExcitation?: boolean;
+    method: string;
 }> =
-    ({ label, reading, status, measuredEv, noValueReason, pictureFailed, isExcitation }) => (
+    ({ label, reading, status, measuredEv, noValueReason, pictureFailed, isExcitation, method }) => (
         <Typography variant="body2" className="species-energy">
             {label}:{' '}
             {energyValueText(reading, status, noValueReason, pictureFailed, isExcitation)}
-            {' '}<MethodLabel />
+            {' '}<MethodLabel method={method} />
             {measuredEv !== undefined && reading && <span className="species-measured"> · measured {measuredEv.toFixed(3)} eV (NIST)</span>}
         </Typography>
     );
@@ -119,7 +133,9 @@ const FOCUS_RING = { '&.Mui-focusVisible': { outline: '2px solid #1565c0', outli
  * that describe them and the size comparison against the neutral atom.
  * Presentational: every change goes out through a callback.
  */
-const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChange, onExcitationChange, energies, radii, unbound, pictureFailed = false }) => {
+const SpeciesControls: React.FC<SpeciesControlsProps> = ({
+    species, onChargeChange, onExcitationChange, energies, radii, unbound, pictureFailed = false, pictureRelativity = 'off',
+}) => {
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const decreaseRef = useRef<HTMLButtonElement>(null);
     const increaseRef = useRef<HTMLButtonElement>(null);
@@ -129,6 +145,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
     const options = sources.flatMap(from => excitationTargets(species.Z, species.charge, from).map(to => ({ from, to })));
     const isAnion = species.charge < 0;
     const reference = radii?.reference ?? null;
+    const energyMethod = deltaScfMethod(pictureRelativity);
 
     // Ruling C5: a reply already in flight (or left behind by a fast
     // stepper) can describe a species no longer selected -- SpeciesControls
@@ -238,6 +255,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
                         <EnergyLine
                             label={`Excitation energy ${excitationLabel(species.excitation)}`}
                             isExcitation
+                            method={energyMethod}
                             reading={reading}
                             status={effectiveEnergies.status}
                             pictureFailed={pictureFailed}
@@ -245,6 +263,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
                     ) : (
                         <EnergyLine
                             label={ionisationLabel}
+                            method={energyMethod}
                             reading={reading}
                             status={effectiveEnergies.status}
                             measuredEv={measuredEv}
@@ -272,9 +291,19 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
                                 <span className="species-compare-swatch" aria-hidden="true" />
                                 dashed ring: neutral {neutralSymbol}, drawn radius {formatDrawnRadius(reference.displayRadius)} a₀ ·{' '}
                                 {speciesSymbol(species)} {formatDrawnRadius(radii.displayRadius)} a₀ ({sizeNote})
+                                {/* Spec §3.1: both radii come from the picture's own mode (ruling C4). */}
+                                {pictureRelativity !== 'off' && ` · both ${shortMethodLabel(pictureRelativity)}`}
                             </Typography>
                         );
                     })()}
+                    {/* Task 8 carry: the neutral atom failed in this mode, so
+                        there is no ring (and no camera floor) -- the place
+                        the ring is described says why. */}
+                    {radii && !reference && radii.referenceUnavailable && (
+                        <Typography variant="caption" display="block" className="species-compare">
+                            {radii.referenceUnavailable}
+                        </Typography>
+                    )}
                 </>
             )}
         </Box>

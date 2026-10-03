@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, within } from '@testing-library/react';
-import LevelNav, { NavigationTarget } from '../../src/components/LevelNav';
+import LevelNav, { NavigationTarget, relativisticEnergiesSentence } from '../../src/components/LevelNav';
 import { speciesConfiguration } from '../../src/atom/species';
 
 describe('LevelNav', () => {
@@ -399,5 +399,35 @@ describe('LevelNav for a species', () => {
         expect(Array.from(crumbs.querySelectorAll('button')).map(b => [b.textContent, b.getAttribute('aria-label')]))
             .toEqual([['Argon', null], ['M shell (n=3)', null], ['3p', null], ['3p_z', null]]);
         expect(container.querySelector('.visually-hidden')).toBeNull();
+    });
+
+    // Ruling C6: ΔSCF stays non-relativistic in every mode; with a
+    // relativistic picture the About text has to say the two differ.
+    describe('the energies against a relativistic picture', () => {
+        const aboutText = (relativity?: 'off' | 'scalar' | 'spinOrbit') => {
+            const { getByRole, container, unmount } = render(
+                <LevelNav Z={79} relativity={relativity} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+            );
+            fireEvent.click(getByRole('button', { name: /about this model/i }));
+            const text = container.querySelector('.level-nav-about')!.textContent!;
+            unmount();
+            return text;
+        };
+
+        it('adds nothing to a non-relativistic picture\'s paragraph', () => {
+            expect(relativisticEnergiesSentence('off')).toBe('');
+            expect(aboutText('off')).toBe(aboutText());
+            expect(aboutText()).toContain('extra electron at all. The individual s/p/d/f');
+        });
+
+        it.each([
+            ['scalar', /This picture is scalar-relativistic; the ΔSCF energies are not/],
+            ['spinOrbit', /This picture includes spin–orbit coupling \(Dirac equation\); the ΔSCF energies do not/],
+        ] as const)('says so for %s', (mode, pattern) => {
+            const text = aboutText(mode);
+            expect(text).toMatch(pattern);
+            expect(text).toMatch(/non-relativistic/);
+            expect(text).toContain('extra electron at all. This picture');
+        });
     });
 });

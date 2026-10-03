@@ -10,6 +10,13 @@ import { radialProfile, PLOT_SAMPLE_COUNT } from '../radial_distribution';
  */
 export interface RadialCurve {
     label: string;
+    /**
+     * What a screen reader should say instead of `label`, when that differs:
+     * "6p³⁄₂" is read as superscripts and a fraction slash, so a j-level's
+     * curve says "6p j = 3/2" (as LevelNav's crumbs do). Absent everywhere
+     * else, which leaves the visible label as the name.
+     */
+    spokenLabel?: string;
     color: string;
     points: Array<{ r: number; value: number }>;
 }
@@ -328,10 +335,18 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
             {isMultiCurve && (
                 <div className="radial-plot-legend">
                     {curves!.map(curve => (
-                        <span key={curve.label} className="radial-plot-legend-item">
-                            <span className="radial-plot-legend-swatch" style={{ background: curve.color }} />
-                            {curve.label}
-                        </span>
+                        // Plain text has no accessible name to set, so a
+                        // spoken form rides beside the item, hidden from
+                        // sight, with the visible one hidden from readers --
+                        // a sibling rather than a child, so the item's own
+                        // text stays exactly the label it always was.
+                        <React.Fragment key={curve.label}>
+                            <span className="radial-plot-legend-item" aria-hidden={curve.spokenLabel ? true : undefined}>
+                                <span className="radial-plot-legend-swatch" style={{ background: curve.color }} />
+                                {curve.label}
+                            </span>
+                            {curve.spokenLabel && <span className="visually-hidden">{curve.spokenLabel}</span>}
+                        </React.Fragment>
                     ))}
                     {/* The short ticks on the baseline were unexplained. */}
                     {(peaks ?? []).length > 0 && (

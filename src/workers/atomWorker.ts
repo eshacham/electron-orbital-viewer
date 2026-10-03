@@ -65,7 +65,15 @@ export interface SerialisedSubshell {
  * spin–orbit -- the non-relativistic atom has no j-levels.
  */
 export interface SerialisedComparison {
-    shells: Array<{ n: number; curve: Float64Array }>;
+    /**
+     * Where the non-relativistic picture's whole-atom view frames the camera
+     * (atom/framing.ts). A relativistic picture is framed on at least this
+     * (ruling C14), so switching relativity leaves the camera, and the scale
+     * bar, where they were and the contraction shows against a fixed scale.
+     */
+    framingRadius: number;
+    /** `contourRadius` likewise floors an open shell's framing across the switch. */
+    shells: Array<{ n: number; contourRadius: number; curve: Float64Array }>;
     subshells: Array<{ n: number; l: number; electrons: number; curve: Float64Array }>;
 }
 
@@ -256,7 +264,8 @@ export function buildSerialisedAtomProfile(
         }
         const baseline = buildAtomProfile(nonRelativistic, enclosedFraction);
         comparison = {
-            shells: baseline.shells.map(shell => ({ n: shell.n, curve: shell.curve.values })),
+            framingRadius: wholeAtomFramingRadius(baseline),
+            shells: baseline.shells.map(shell => ({ n: shell.n, contourRadius: shell.contourRadius, curve: shell.curve.values })),
             subshells: baseline.subshells.map(s => ({ n: s.n, l: s.l, electrons: s.electrons, curve: s.curve.values })),
         };
     }

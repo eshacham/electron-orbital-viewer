@@ -12,16 +12,37 @@
 import { AtomSpecies, speciesConfiguration, speciesKey, speciesSymbol, speciesTitle, excitationLabel } from './species';
 import { allowedCharges } from './ion_configurations';
 import { solvePolarised } from './spin_scf';
+import { RelativityMode, shortMethodLabel } from './relativity';
 
 export const HARTREE_IN_EV = 27.211386245988;
 export const DELTA_SCF_LABEL = 'ΔSCF, LDA';
-export const DELTA_SCF_METHOD =
+const DELTA_SCF_HEAD =
     'ΔSCF: the difference of two self-consistent total energies, each from a central-field, spin-polarised ' +
-    'LDA calculation (Slater exchange + VWN5 correlation, spherically averaged, non-relativistic) — a ' +
-    'different, spin-restricted form of the same LDA draws the picture on screen. Occupations ' +
+    'LDA calculation (Slater exchange + VWN5 correlation, spherically averaged, non-relativistic) — ';
+const DELTA_SCF_TAIL =
+    ' Occupations ' +
     'follow Hund\'s rule (maximum spin), so an excitation out of a closed subshell lands in the highest-spin ' +
     'state it can reach — He 1s→2s gives 2³S, Mg 3s→3p gives ³P. One-electron species are exact. ' +
     'Never an orbital eigenvalue.';
+export const DELTA_SCF_METHOD =
+    DELTA_SCF_HEAD + 'a ' +
+    'different, spin-restricted form of the same LDA draws the picture on screen.' + DELTA_SCF_TAIL;
+
+/**
+ * The tooltip for the picture actually on screen (ruling C6). ΔSCF stays
+ * non-relativistic in every mode -- spin-polarised MacDonald–Vosko exchange
+ * is out of scope, and these energies are validated only through argon --
+ * so with a relativistic picture "the same LDA draws the picture" stops
+ * being true, and a heavy atom's energy would otherwise read as carrying
+ * the relativistic shifts its picture shows. 'off' is DELTA_SCF_METHOD,
+ * word for word.
+ */
+export function deltaScfMethod(pictureMode: RelativityMode): string {
+    if (pictureMode === 'off') return DELTA_SCF_METHOD;
+    return DELTA_SCF_HEAD + 'the picture on screen is not: it is drawn by a spin-restricted '
+        + `${shortMethodLabel(pictureMode)}, so these energies leave out the relativistic shifts the picture shows.`
+        + DELTA_SCF_TAIL;
+}
 
 export interface EnergyReading { valueEv: number; fromLabel: string; toLabel: string }
 

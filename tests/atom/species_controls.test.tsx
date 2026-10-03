@@ -3,7 +3,7 @@ import { render, fireEvent, screen, within, act } from '@testing-library/react';
 import SpeciesControls from '../../src/components/SpeciesControls';
 import { EnergiesState } from '../../src/store/atomSlice';
 import { UnboundAnionError } from '../../src/atom/scf_shared';
-import { DELTA_SCF_METHOD } from '../../src/atom/delta_scf';
+import { DELTA_SCF_METHOD, deltaScfMethod } from '../../src/atom/delta_scf';
 
 const idle: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
 const renderControls = (overrides: Partial<React.ComponentProps<typeof SpeciesControls>> = {}) => {
@@ -289,6 +289,41 @@ describe('SpeciesControls', () => {
         expect(compare).toHaveTextContent('≈ same size');
         expect(compare).not.toHaveTextContent('−0 %');
         expect(compare).not.toHaveTextContent('+0 %');
+    });
+
+    // Ruling C6: with a relativistic picture the tooltip says the energies
+    // beside it are not relativistic.
+    it('words the ΔSCF method for the picture on screen', () => {
+        renderControls({
+            species: { Z: 79, charge: 0, excitation: null }, pictureRelativity: 'scalar',
+            energies: { speciesKey: '79', status: 'done', ionisation: { valueEv: 9.1, fromLabel: 'Au', toLabel: 'Au⁺' }, excitation: null, message: null },
+        });
+        const label = screen.getByText('ΔSCF, LDA');
+        act(() => { label.focus(); });
+        expect(screen.getByRole('tooltip')).toHaveTextContent(deltaScfMethod('scalar'));
+        expect(label).toHaveAccessibleDescription(deltaScfMethod('scalar'));
+    });
+
+    // Spec §3.1: the radii of a relativistic picture are relativistic numbers.
+    it('states the method of a relativistic picture\'s radii', () => {
+        renderControls({
+            species: { Z: 79, charge: 1, excitation: null }, pictureRelativity: 'spinOrbit',
+            radii: { displayRadius: 2.9, reference: { displayRadius: 3.1, contourRadius: 2, framingRadius: 3.1 } },
+        });
+        expect(screen.getByLabelText('size compared with the neutral atom')).toHaveTextContent(/both Dirac LDA \(MacDonald–Vosko exchange\)$/);
+    });
+
+    it('leaves a non-relativistic ring note as it was', () => {
+        renderControls({ species: { Z: 11, charge: 1, excitation: null }, radii: { displayRadius: 1.6, reference: { displayRadius: 3.2, contourRadius: 1.94, framingRadius: 3.2 } } });
+        expect(screen.getByLabelText('size compared with the neutral atom')).toHaveTextContent(/\(−50 %\)$/);
+    });
+
+    // Task 8 carry: when the neutral atom fails in the species' mode there is
+    // no ring, and the place it would be noted says why.
+    it('says why there is no reference ring', () => {
+        const why = 'No neutral reference ring: Scalar-relativistic SCF for Gold: did not converge.';
+        renderControls({ species: { Z: 79, charge: 1, excitation: null }, radii: { displayRadius: 2.9, reference: null, referenceUnavailable: why } });
+        expect(screen.getByText(why)).toHaveClass('species-compare');
     });
 
     it('states an unbound anion plainly, with the solver\'s own message', () => {

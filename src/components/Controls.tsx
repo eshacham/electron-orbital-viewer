@@ -23,6 +23,8 @@ import { orbitalName } from '../orbital_names';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
 import CombinationControls from './CombinationControls';
 import { CombinationSelection, NO_COMBINATION, combinationTitle, selectionProblem } from '../combinations';
+import { RelativityMode, shortMethodLabel } from '../atom/relativity';
+import type { ValenceSContraction } from '../atom/relativistic_comparison';
 
 interface ControlsProps {
   /**
@@ -79,6 +81,34 @@ interface ControlsProps {
 
   /** Share and Export (ShareExportBar), under Reset View. */
   actions?: React.ReactNode;
+
+  /**
+   * The Relativity switch (spec §5 Phase 4; layout contract §3.8: here, in
+   * the right-hand panel on a desktop and the View tab on a phone). The
+   * *effective* mode -- the user's choice, or the element's default -- so
+   * the switch shows what is being solved for. Atom mode only; omitted, the
+   * panel is exactly as it was.
+   */
+  relativity?: RelativityMode;
+  /** The user has not chosen: `relativity` is the element's default (scalar from Cs, off below). */
+  relativityIsDefault?: boolean;
+  onRelativityChange?: (mode: RelativityMode) => void;
+  /** What the picture on screen says about relativity, for the readout under the switch; null with no picture. */
+  relativityReadout?: RelativityReadout | null;
+}
+
+/**
+ * The drawn profile's side of the readout (ruling C9): everything here
+ * describes the picture on screen, which during a re-solve is still the old
+ * mode's, never the switch's.
+ */
+export interface RelativityReadout {
+  /** The mode the drawn profile was solved in. */
+  pictureMode: RelativityMode;
+  /** Its valence-s contraction against the same species' non-relativistic solve, when there is one. */
+  change: ValenceSContraction | null;
+  /** Why a relativistic picture has nothing to compare against (the worker's own words), or null. */
+  comparisonUnavailable: string | null;
 }
 
 const ISO_MIN = 0.000000001;
@@ -106,6 +136,93 @@ export function cutDepthLabel(clipPosition: number): string {
   return `${depth}% — ${depth < 50 ? 'short of' : 'past'} the nucleus`;
 }
 
+/** What each mode is, in one line; "Default for this element" while the user has not chosen (spec §3.1). */
+export function relativityHelp(mode: RelativityMode, isDefault: boolean): string {
+  const base = {
+    off: 'Schrödinger equation — no relativistic effects.',
+    scalar: 'Scalar-relativistic (Koelling–Harmon): mass-velocity and Darwin terms, no spin–orbit.',
+    spinOrbit: 'Dirac equation: each l > 0 subshell splits into j = l − ½ and j = l + ½.',
+  }[mode];
+  return isDefault ? `${base} Default for this element.` : base;
+}
+
+/**
+ * A percentage that never rounds a real change to nothing: hydrogen's 1s
+ * moves by about a thousandth of a percent, and "0.00 %" would read as no
+ * change at all.
+ */
+function formatPercent(size: number): string {
+  if (size >= 1) return size.toFixed(1);
+  if (size >= 0.01) return size.toFixed(2);
+  if (size >= 1e-4) return size.toPrecision(2);
+  return size === 0 ? '0' : 'less than 0.0001';
+}
+
+/**
+ * Enough decimal places for the two radii to differ where they really do:
+ * carbon's 2s moves by 5·10⁻⁴ a₀, which at two places printed as
+ * "1.58 → 1.58" beside "contracts by 0.03 %". Two places at least, six at
+ * most (hydrogen's 1s moves by a few 10⁻⁵ a₀).
+ */
+function radiusDecimals(difference: number): number {
+  if (!(difference > 0)) return 2;
+  return Math.min(6, Math.max(2, Math.ceil(-Math.log10(difference))));
+}
+
+/**
+ * The valence-s contraction, with the comparison it is measured against
+ * named. Two things a reader could otherwise assume wrongly are said
+ * outright (Task 8): the shell is the outermost *occupied* s, which for an
+ * excited species is not the neutral's valence (Au 6s → 6p reports 5s), and
+ * the value is an LDA one -- ⟨r⟩ of LDA orbitals, smaller than the
+ * Dirac–Fock contractions textbooks quote (gold's 6s: 14 % here) -- so the
+ * method goes in the same sentence as the number (spec §3.1).
+ */
+export function whatChangedText(change: ValenceSContraction, mode: RelativityMode): string {
+  const size = Math.abs(change.contractionPercent);
+  const verb = change.contractionPercent >= 0 ? 'contracts' : 'expands';
+  const before = change.nonRelativisticMeanRadius;
+  const after = change.relativisticMeanRadius;
+  const digits = radiusDecimals(Math.abs(before - after));
+  return `What changed: ${change.label} ${verb} by ${formatPercent(size)} % `
+    + `(⟨r⟩ ${before.toFixed(digits)} → ${after.toFixed(digits)} a₀) — `
+    + `the outermost occupied s shell, ${shortMethodLabel(mode)} against the same species' non-relativistic LDA solve.`;
+}
+
+/** How the readout names a picture's mode: "still scalar-relativistic". */
+const PICTURE_MODE_WORDS: Record<RelativityMode, string> = {
+  off: 'non-relativistic',
+  scalar: 'scalar-relativistic',
+  spinOrbit: 'the Dirac (spin–orbit) one',
+};
+const SOLVING_WORDS: Record<RelativityMode, string> = {
+  off: 'the non-relativistic picture',
+  scalar: 'the scalar-relativistic picture',
+  spinOrbit: 'the picture with spin–orbit',
+};
+
+/**
+ * The readout's text, or null for nothing to say. Ruling C9: it speaks for
+ * the picture on screen. While the switch and the picture disagree a new
+ * mode is solving, and the old picture's contraction must not sit under a
+ * switch that names another method -- so it says what is coming and what is
+ * still drawn instead. A non-relativistic picture is its own baseline, so
+ * it has nothing to report; a relativistic one without a baseline (Pr–Eu
+ * 6s → 4f: LDA does not bind the 4f without relativity) says why.
+ */
+export function relativityReadoutText(switchMode: RelativityMode, readout: RelativityReadout | null): string | null {
+  if (!readout) return null;
+  if (readout.pictureMode !== switchMode) {
+    return `Solving ${SOLVING_WORDS[switchMode]}… the picture on screen is still ${PICTURE_MODE_WORDS[readout.pictureMode]}.`;
+  }
+  if (readout.pictureMode === 'off') return null;
+  if (readout.change) return whatChangedText(readout.change, readout.pictureMode);
+  return readout.comparisonUnavailable;
+}
+
+/** Phase 1's CombinationControls: MUI upper-cases button text, which "With spin–orbit" does not survive. */
+const KEEP_CASE = { '& .MuiToggleButton-root': { textTransform: 'none' } } as const;
+
 const Controls: React.FC<ControlsProps> = ({
   mode = 'hydrogenic',
   onModeChange,
@@ -128,6 +245,10 @@ const Controls: React.FC<ControlsProps> = ({
   open = true,
   compact = false,
   actions,
+  relativity,
+  relativityIsDefault = false,
+  onRelativityChange,
+  relativityReadout = null,
 }) => {
   const isAtomMode = mode === 'atom';
   // Bug fix (task 22, bug 6): levels 1-2 in atom mode render a spherical
@@ -219,6 +340,41 @@ const Controls: React.FC<ControlsProps> = ({
           <ToggleButton value="hydrogenic" aria-label="basic orbitals mode">Basic Orbitals</ToggleButton>
         </ToggleButtonGroup>
       </FormControl>
+
+      {/* Relativity (spec §5 Phase 4), next to Mode: both choose the model
+          rather than the view. The group is named "relativity treatment",
+          not "relativity", so it and its fieldset (legend "Relativity")
+          are two distinct groups to a screen reader and to a role query.
+          The readout under it is a polite live region, mounted whenever
+          the switch is, so a new contraction is announced when it lands
+          (a region inserted together with its text often is not). */}
+      {isAtomMode && onRelativityChange && relativity && (
+        <FormControl component="fieldset" margin="normal" fullWidth className="relativity-controls">
+          <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Relativity</FormLabel>
+          <ToggleButtonGroup
+            value={relativity}
+            exclusive
+            onChange={(event: React.MouseEvent<HTMLElement>, value: RelativityMode | null) => {
+              if (value !== null) onRelativityChange(value);
+            }}
+            aria-label="relativity treatment"
+            size="small"
+            fullWidth
+            sx={KEEP_CASE}
+          >
+            <ToggleButton value="off" aria-label="relativity off">Off</ToggleButton>
+            <ToggleButton value="scalar" aria-label="scalar relativistic">Scalar</ToggleButton>
+            <ToggleButton value="spinOrbit" aria-label="with spin–orbit">With spin–orbit</ToggleButton>
+          </ToggleButtonGroup>
+          <FormHelperText className="relativity-help" sx={{ mx: 0 }}>
+            {relativityHelp(relativity, relativityIsDefault)}
+          </FormHelperText>
+          <Typography variant="body2" component="div" role="status" className="relativity-what-changed"
+            sx={{ mt: 0.75, fontSize: '0.75rem', lineHeight: 1.35 }}>
+            {relativityReadoutText(relativity, relativityReadout)}
+          </Typography>
+        </FormControl>
+      )}
 
       {!isAtomMode && (
         <>

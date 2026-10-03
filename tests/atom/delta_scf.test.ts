@@ -1,11 +1,12 @@
 // tests/atom/delta_scf.test.ts
 import {
     ionisationEnergy, excitationEnergy, ionisedSpeciesOf, polarisedTotalEnergy,
-    HARTREE_IN_EV, DELTA_SCF_LABEL, DELTA_SCF_METHOD, clearDeltaScfCacheForTests,
+    HARTREE_IN_EV, DELTA_SCF_LABEL, DELTA_SCF_METHOD, deltaScfMethod, clearDeltaScfCacheForTests,
 } from '../../src/atom/delta_scf';
 import { NIST_FIRST_IONISATION_EV, NA_D_LINE_EV } from '../../src/atom/ionisation_references';
 import { neutralGround } from '../../src/atom/species';
 import * as spinScf from '../../src/atom/spin_scf';
+import { shortMethodLabel } from '../../src/atom/relativity';
 
 jest.setTimeout(120000);
 const SLOW = process.env.ATOM_SLOW_TESTS === '1';
@@ -26,6 +27,19 @@ describe('ΔSCF energies', () => {
         // A reader who only ever hovers an energy must still be told the
         // picture is not what produced the number next to it.
         expect(DELTA_SCF_METHOD).toMatch(/spin-restricted/);
+    });
+
+    // Ruling C6: the energies stay non-relativistic whatever the picture is,
+    // and with a relativistic picture the tooltip has to say the two differ.
+    it('says the picture is relativistic but the energies are not', () => {
+        expect(deltaScfMethod('off')).toBe(DELTA_SCF_METHOD);
+        for (const mode of ['scalar', 'spinOrbit'] as const) {
+            const method = deltaScfMethod(mode);
+            expect(method).toMatch(/non-relativistic/);
+            expect(method).toContain(shortMethodLabel(mode));
+            expect(method).not.toMatch(/same LDA draws the picture/);
+            expect(method).toMatch(/Never an orbital eigenvalue\.$/);
+        }
     });
 
     it('is exact for hydrogen and He+ (one-electron bypass)', () => {

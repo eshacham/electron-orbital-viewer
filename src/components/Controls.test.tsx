@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import Controls, { cutDepthLabel } from './Controls';
+import Controls, { cutDepthLabel, relativityHelp, whatChangedText, relativityReadoutText } from './Controls';
 
 const baseProps = {
   initialN: 3,
@@ -268,5 +268,110 @@ describe('Combination picker', () => {
     fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
     fireEvent.click(within(screen.getByRole('listbox')).getByText('sp'));
     expect(onCombinationChange).toHaveBeenCalledWith({ kind: 'hybrid', hybrid: 'sp', member: 'all' });
+  });
+});
+
+describe('Relativity control', () => {
+  const gold = { n: 6, label: '6s', nonRelativisticMeanRadius: 3.21, relativisticMeanRadius: 2.66, contractionPercent: 17.13 };
+  const scalarGold = { pictureMode: 'scalar' as const, change: gold, comparisonUnavailable: null };
+
+  // Preflight D5: the fieldset (legend "Relativity") and the toggle group
+  // are both groups, so the group is queried by its own, distinct name.
+  it('offers Off / Scalar / With spin–orbit in atom mode and reports the choice', () => {
+    const onRelativityChange = jest.fn();
+    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="scalar" relativityIsDefault
+      onRelativityChange={onRelativityChange} />);
+    const group = screen.getByRole('group', { name: 'relativity treatment' });
+    expect(within(group).getByRole('button', { name: /relativity off/i })).toHaveTextContent('Off');
+    expect(within(group).getByRole('button', { name: /scalar relativistic/i })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(group).getByRole('button', { name: /with spin–orbit/i }));
+    expect(onRelativityChange).toHaveBeenCalledWith('spinOrbit');
+    expect(screen.getByText(/Koelling–Harmon/)).toBeInTheDocument();
+    expect(screen.getByText(/default for this element/i)).toBeInTheDocument();
+  });
+
+  // Ruling C15 / Phase 1's CombinationControls: MUI upper-cases button text
+  // unless told not to, which turns "With spin–orbit" into a shout.
+  it('keeps the labels\' own case', () => {
+    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="off" onRelativityChange={() => {}} />);
+    const group = screen.getByRole('group', { name: 'relativity treatment' });
+    expect(getComputedStyle(within(group).getByRole('button', { name: /with spin–orbit/i })).textTransform).toBe('none');
+  });
+
+  it('is absent in Basic Orbitals mode', () => {
+    render(<Controls {...baseProps} relativity="scalar" onRelativityChange={() => {}} />);
+    expect(screen.queryByRole('group', { name: 'relativity treatment' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Relativity' })).toBeNull();
+  });
+
+  it('shows what changed, with its method, in a polite status region', () => {
+    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="scalar"
+      onRelativityChange={() => {}} relativityReadout={scalarGold} />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveClass('relativity-what-changed');
+    expect(status).toHaveTextContent(/6s contracts by 17\.1 %/);
+    expect(status).toHaveTextContent(/3\.21 → 2\.66 a₀/);
+    expect(status).toHaveTextContent(/scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
+  });
+
+  // A live region inserted together with its text is not reliably
+  // announced, so the region is there, empty, before there is anything to say.
+  it('keeps the status region mounted while there is nothing to report', () => {
+    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="off" onRelativityChange={() => {}} relativityReadout={null} />);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('words the helper and readout honestly at the edges', () => {
+    expect(relativityHelp('off', false)).toMatch(/Schrödinger/);
+    expect(relativityHelp('spinOrbit', false)).not.toMatch(/default/i);
+    expect(whatChangedText({ ...gold, contractionPercent: 0.034 }, 'scalar')).toMatch(/contracts by 0\.03 %/);
+    expect(whatChangedText({ ...gold, contractionPercent: -0.5 }, 'scalar')).toMatch(/expands by 0\.50 %/);
+    // Hydrogen's 1s barely moves; "0.00 %" would read as no change at all.
+    expect(whatChangedText({ ...gold, contractionPercent: 0.0013 }, 'scalar')).toMatch(/contracts by 0\.0013 %/);
+    expect(whatChangedText(gold, 'scalar')).toMatch(/non-relativistic LDA/);
+  });
+
+  // Found live: carbon's 2s read "⟨r⟩ 1.58 → 1.58 a₀" beside "contracts by
+  // 0.03 %" -- two equal numbers that contradict the percentage.
+  it('prints the radii to enough places that a small change is visible', () => {
+    const carbon = { n: 2, label: '2s', nonRelativisticMeanRadius: 1.58123, relativisticMeanRadius: 1.58071, contractionPercent: 0.033 };
+    expect(whatChangedText(carbon, 'scalar')).toMatch(/⟨r⟩ 1\.5812 → 1\.5807 a₀/);
+    expect(whatChangedText(gold, 'scalar')).toMatch(/⟨r⟩ 3\.21 → 2\.66 a₀/);
+  });
+
+  // Task 8 carry: the reported s is the outermost *occupied* one (Au 6s → 6p
+  // reports 5s), and an LDA value -- the text must say both.
+  it('names the shell as the outermost occupied s, and the value as LDA', () => {
+    const text = whatChangedText({ ...gold, n: 5, label: '5s', contractionPercent: 4.2 }, 'scalar');
+    expect(text).toMatch(/^What changed: 5s contracts/);
+    expect(text).toMatch(/outermost occupied s/);
+    expect(text).toMatch(/LDA/);
+    expect(whatChangedText({ ...gold, label: '6s½' }, 'spinOrbit')).toMatch(/Dirac LDA \(MacDonald–Vosko exchange\)/);
+  });
+
+  // Ruling C9: the readout speaks for the picture on screen, not the switch.
+  describe('relativityReadoutText', () => {
+    it('reports the drawn profile\'s change when the switch agrees with it', () => {
+      expect(relativityReadoutText('scalar', scalarGold)).toBe(whatChangedText(gold, 'scalar'));
+    });
+
+    it('says a new mode is solving, and what the picture still is, while they disagree', () => {
+      const text = relativityReadoutText('spinOrbit', scalarGold)!;
+      expect(text).toMatch(/Solving/);
+      expect(text).toMatch(/still scalar-relativistic/);
+      expect(text).not.toMatch(/contracts/);
+      expect(relativityReadoutText('scalar', { pictureMode: 'off', change: null, comparisonUnavailable: null })).toMatch(/still non-relativistic/);
+    });
+
+    it('has nothing to say about a non-relativistic picture, or before there is one', () => {
+      expect(relativityReadoutText('off', { pictureMode: 'off', change: null, comparisonUnavailable: null })).toBeNull();
+      expect(relativityReadoutText('scalar', null)).toBeNull();
+    });
+
+    // Task 8 carry: Pr–Eu 6s → 4f have no non-relativistic answer to compare against.
+    it('says why there is no comparison where the readout would be', () => {
+      const why = 'No non-relativistic comparison: LDA does not bind the 4f without relativity.';
+      expect(relativityReadoutText('scalar', { pictureMode: 'scalar', change: null, comparisonUnavailable: why })).toBe(why);
+    });
   });
 });

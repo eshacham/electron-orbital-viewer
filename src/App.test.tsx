@@ -963,6 +963,9 @@ describe('App: relativity', () => {
         });
         const legend = () => Array.from(container.querySelectorAll('.radial-plot-legend-item')).map(e => e.textContent);
         expect(legend()).toEqual(['2s½', '2p½', '2p³⁄₂']);
+        // Task 11 (Task 10 carry): each j-level is also named aloud.
+        expect(Array.from(container.querySelectorAll('.radial-plot-legend .visually-hidden')).map(e => e.textContent))
+            .toEqual(['2s j = 1/2', '2p j = 1/2', '2p j = 3/2']);
         fireEvent.click(screen.getByRole('button', { name: /^2p j = 3\/2,/ }));
         expect(store.getState().atom.selectedSubshell).toEqual({ n: 2, l: 1, j: 1.5 });
         // The radial plot isolates the same j-level.
@@ -992,5 +995,97 @@ describe('App: relativity', () => {
         const energies = Array.from(container.querySelectorAll('.subshell-chip-energy'));
         expect(energies).toHaveLength(3);
         for (const energy of energies) expect(energy.getAttribute('title')).toMatch(/Dirac/);
+    });
+
+    // Task 11: the switch, its default, its readout and its busy label.
+    describe('the Relativity switch', () => {
+        const goldChange = { n: 6, label: '6s', nonRelativisticMeanRadius: 3.21, relativisticMeanRadius: 2.76, contractionPercent: 14.1 };
+        /** A gold-sized stand-in: argon's shape, gold's Z and a scalar solve's payload. */
+        function scalarGold(): SerialisedAtomProfile {
+            return { ...argonLikeProfile(), Z: 79, speciesKey: '79', relativity: 'scalar', valenceS: goldChange, nonRelativistic: null, comparisonUnavailable: null };
+        }
+        const switchIn = (root: HTMLElement = document.body) => within(root).getByRole('group', { name: 'relativity treatment' });
+        const readout = (container: HTMLElement) => container.querySelector('.relativity-what-changed')!;
+
+        it('sits in the right-hand view panel, at scalar by default for gold', () => {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79 });
+            const group = switchIn(container.querySelector('.view-panel') as HTMLElement);
+            expect(within(group).getByRole('button', { name: 'scalar relativistic' })).toHaveAttribute('aria-pressed', 'true');
+            expect(screen.getByText(/Default for this element/)).toBeInTheDocument();
+        });
+
+        it('is off by default for a light atom', () => {
+            installMatchMedia(false);
+            renderWithProvider(<App />, { mode: 'atom', Z: 6 });
+            expect(within(switchIn()).getByRole('button', { name: 'relativity off' })).toHaveAttribute('aria-pressed', 'true');
+            expect(screen.getByText(/Default for this element/)).toBeInTheDocument();
+        });
+
+        it('records a choice as the user\'s own, which then stops claiming to be the default', () => {
+            installMatchMedia(false);
+            const { store } = renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
+            fireEvent.click(within(switchIn()).getByRole('button', { name: 'with spin–orbit' }));
+            expect(store.getState().atom.relativityOverride).toBe('spinOrbit');
+            expect(within(switchIn()).getByRole('button', { name: 'with spin–orbit' })).toHaveAttribute('aria-pressed', 'true');
+            expect(screen.queryByText(/Default for this element/)).toBeNull();
+        });
+
+        it('names the mode it is solving in', () => {
+            installMatchMedia(false);
+            jest.useFakeTimers();
+            try {
+                renderWithProvider(<App />, { mode: 'atom', Z: 79, isSolving: true });
+                act(() => { jest.advanceTimersByTime(500); });
+                expect(screen.getByText('Solving Gold (scalar-relativistic)…')).toBeInTheDocument();
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('says what changed for the drawn picture, with its method', () => {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
+            expect(readout(container)).toHaveAttribute('role', 'status');
+            expect(readout(container)).toHaveTextContent('What changed: 6s contracts by 14.1 % (⟨r⟩ 3.21 → 2.76 a₀)');
+            expect(readout(container)).toHaveTextContent(/scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
+        });
+
+        // Ruling C9: while spin–orbit solves, the scalar picture is still up,
+        // and its 6s figure must not sit under a switch that says spin–orbit.
+        it('speaks for the picture on screen while another mode solves', () => {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, {
+                mode: 'atom', Z: 79, relativityOverride: 'spinOrbit', isSolving: true, profile: scalarGold(),
+            });
+            expect(readout(container)).toHaveTextContent('Solving the picture with spin–orbit… the picture on screen is still scalar-relativistic.');
+        });
+
+        it('says why a relativistic picture has no comparison', () => {
+            installMatchMedia(false);
+            const why = 'No non-relativistic comparison: LDA does not bind the 4f without relativity.';
+            const { container } = renderWithProvider(<App />, {
+                mode: 'atom', Z: 79, profile: { ...scalarGold(), valenceS: null, comparisonUnavailable: why },
+            });
+            expect(readout(container)).toHaveTextContent(why);
+        });
+
+        it('is on the View tab of a phone', () => {
+            installMatchMedia(true);
+            renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
+            expect(screen.queryByRole('group', { name: 'relativity treatment' })).toBeNull();
+            fireEvent.click(screen.getByRole('tab', { name: 'View' }));
+            expect(switchIn(screen.getByRole('tabpanel'))).toBeInTheDocument();
+            expect(within(screen.getByRole('tabpanel')).getByText(/6s contracts by 14\.1 %/)).toBeInTheDocument();
+        });
+
+        // Ruling C6: the ΔSCF energies stay non-relativistic; with a
+        // relativistic picture, the About text says the two differ.
+        it('says in About this model that a relativistic picture\'s energies are not', () => {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
+            fireEvent.click(screen.getByRole('button', { name: /about this model/i }));
+            expect(container.querySelector('.level-nav-about')!.textContent).toMatch(/This picture is scalar-relativistic; the ΔSCF energies are not/);
+        });
     });
 });

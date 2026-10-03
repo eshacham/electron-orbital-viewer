@@ -1,6 +1,6 @@
 import {
     SPEED_OF_LIGHT, defaultRelativityFor, kappaFor, lForKappa, jForKappa, splitByJ,
-    diracHydrogenicEnergy, jLabel, relativityLabel, methodStatement,
+    diracHydrogenicEnergy, jLabel, relativityLabel, methodStatement, shortMethodLabel,
     encodeRelativityParam, decodeRelativityParam,
 } from '../../src/atom/relativity';
 
@@ -72,6 +72,14 @@ describe('relativity vocabulary', () => {
         expect(methodStatement('scalar')).toMatch(/MacDonald–Vosko/);
         expect(methodStatement('spinOrbit')).toMatch(/Dirac/);
         expect(methodStatement('spinOrbit')).toMatch(/2j\+1/);
+    });
+
+    // Spec §3.1 on a single line: what a relativistic number beside a
+    // readout or a ring note says it is.
+    it('names each mode\'s level of theory in a few words', () => {
+        expect(shortMethodLabel('off')).toBe('non-relativistic LDA');
+        expect(shortMethodLabel('scalar')).toBe('scalar-relativistic LDA (MacDonald–Vosko exchange)');
+        expect(shortMethodLabel('spinOrbit')).toBe('Dirac LDA (MacDonald–Vosko exchange)');
     });
 
     it('round-trips through a URL parameter and ignores anything unknown', () => {

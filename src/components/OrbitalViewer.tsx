@@ -69,6 +69,12 @@ interface OrbitalViewerProps {
     exportHandleRef?: React.MutableRefObject<ViewerExportHandle | null>;
 }
 
+/** The larger of whichever framing floors there are; undefined when there are none. */
+function largestFloor(...floors: Array<number | undefined>): number | undefined {
+    const present = floors.filter((floor): floor is number => floor !== undefined);
+    return present.length > 0 ? Math.max(...present) : undefined;
+}
+
 const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbitalFailed, enclosedFraction, exportHandleRef }) => {
     const dispatch = useAppDispatch();
     const canvasHostRef = useRef<HTMLDivElement>(null);
@@ -263,9 +269,12 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 // An ion or excited atom is framed on at least where the
                 // neutral atom's own view was framed, so stepping Na -> Na⁺
                 // -> Na leaves the camera where it is (ruling C12; see
-                // ReferenceRadii.framingRadius). Undefined for a neutral
-                // ground state.
-                framingFloor: atomProfile.reference?.framingRadius,
+                // ReferenceRadii.framingRadius); a relativistic picture on
+                // at least where its own non-relativistic solve was, so
+                // switching relativity does too and gold's contraction
+                // shows against an unchanged scale (ruling C14). Undefined
+                // for a non-relativistic neutral ground state.
+                framingFloor: largestFloor(atomProfile.reference?.framingRadius, atomProfile.nonRelativistic?.framingRadius),
             }, { animate });
         } else {
             const shell = atomProfile.shells.find(s => s.n === atomSelectedShell);
@@ -282,6 +291,10 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 // below) -- see backdropOpacityFor's doc comment for why
                 // this needs to be known here rather than left implicit.
                 isComposition: true,
+                // The open shell holds across a relativity switch as the
+                // whole atom does (ruling C14): setRelativity keeps it open
+                // between off and scalar so its contraction can be watched.
+                framingFloor: atomProfile.nonRelativistic?.shells.find(s => s.n === shell.n)?.contourRadius,
             }, { animate });
         }
     }, [showShellView, atomLevel, atomProfile, atomSelectedShell, prefersReducedMotion]);

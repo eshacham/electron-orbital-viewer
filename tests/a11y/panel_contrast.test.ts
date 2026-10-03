@@ -39,6 +39,9 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     { selector: '.species-method', declared: 'color: #1f4e9a', fg: '#1f4e9a', bg: LIGHT_96 },
     { selector: '.species-measured', declared: 'color: rgba(0, 0, 0, 0.62)', fg: 'rgba(0, 0, 0, 0.62)', bg: LIGHT_96 },
     { selector: '.species-compare', declared: 'color: rgba(0, 0, 0, 0.7)', fg: 'rgba(0, 0, 0, 0.7)', bg: LIGHT_96 },
+    // Phase 4: the Relativity switch's "what changed" readout, on #controls's
+    // light card (the phone's View tab is the same light sheet).
+    { selector: '.relativity-what-changed', declared: 'color: rgba(0, 0, 0, 0.78)', fg: 'rgba(0, 0, 0, 0.78)', bg: LIGHT_96 },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {

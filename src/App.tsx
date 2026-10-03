@@ -36,15 +36,19 @@ import {
     setHoverRadius as setAtomHoverRadius,
     setCharge,
     setExcitation,
+    setRelativity,
     speciesOf,
+    effectiveRelativity,
+    profileRelativity,
 } from './store/atomSlice';
-import { subshellLabel } from './atom/configurations';
+import { RelativityMode } from './atom/relativity';
+import { subshellLabel, subshellSpokenLabel } from './atom/configurations';
 import { useAtomSolver } from './atom/useAtomSolver';
 import { useDeltaScfEnergies } from './atom/useDeltaScfEnergies';
 import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidExcitation, isNeutralGround } from './atom/species';
 import { allowedCharges } from './atom/ion_configurations';
 import SpeciesControls from './components/SpeciesControls';
-import Controls from './components/Controls';
+import Controls, { RelativityReadout } from './components/Controls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
 import { appTheme } from './theme';
@@ -79,6 +83,13 @@ import { createExportWorker } from './workers/createExportWorker';
 const PLOT_WIDTH = 278;
 /** The plot's width in the phone sheet, which is at most 400 px across. */
 const PHONE_PLOT_WIDTH = 300;
+
+/** The canvas busy label's mode, after the species: "Solving Gold (scalar-relativistic)…". 'off' adds nothing. */
+const SOLVING_SUFFIX: Record<RelativityMode, string> = {
+    off: '',
+    scalar: ' (scalar-relativistic)',
+    spinOrbit: ' (with spin–orbit)',
+};
 
 /** How long a render has to take before the viewer is told it is working. */
 const BUSY_INDICATOR_DELAY_MS = 400;
@@ -116,6 +127,21 @@ function App() {
         [atomZ, atomCharge, atomExcitation]
     );
     const isAtomMode = atomMode === 'atom';
+
+    // The Relativity switch shows the effective mode -- the user's choice, or
+    // the element's default -- since that is what is being solved for.
+    // Everything that describes the picture on screen reads the drawn
+    // profile's own mode instead (ruling C9): during a re-solve the two
+    // differ, and the old picture must not be labelled as the new method.
+    const relativity = useAppSelector(state => effectiveRelativity(state.atom));
+    const relativityIsDefault = useAppSelector(state => state.atom.relativityOverride === null);
+    const pictureRelativity: RelativityMode = atomProfile ? profileRelativity(atomProfile) : relativity;
+    // Memoised: Controls is React.memo, and a fresh object every render would defeat it.
+    const relativityReadout = useMemo<RelativityReadout | null>(() => atomProfile && {
+        pictureMode: profileRelativity(atomProfile),
+        change: atomProfile.valenceS ?? null,
+        comparisonUnavailable: atomProfile.comparisonUnavailable ?? null,
+    }, [atomProfile]);
 
     // Basic Orbitals' view state -- n/l/mₗ, the enclosed fraction, and Phase
     // 1's combination -- lives in the store, not in App: a shared link's URL
@@ -256,6 +282,16 @@ function App() {
         dispatch(solveStarted());
         dispatch(clearPendingCut());
     }, [dispatch, atomZ, atomCharge]);
+
+    // A relativity switch is the same species seen through a different
+    // equation, so -- like a charge step -- the camera stays where it is:
+    // gold's 6s pulling in against an unchanged scale bar is the point
+    // (the viewer frames a relativistic picture on at least its
+    // non-relativistic framing, ruling C14). setRelativity keeps the old
+    // picture up until the new one lands and starts the solve itself.
+    const handleRelativityChange = useCallback((mode: RelativityMode) => {
+        dispatch(setRelativity(mode));
+    }, [dispatch]);
 
     const handleLevelNavigate = useCallback((target: NavigationTarget) => {
         switch (target.level) {
@@ -513,6 +549,7 @@ function App() {
             : shellSubshells;
         return subshells.map(subshell => ({
             label: subshellLabel(subshell.n, subshell.l, subshell.j),
+            ...(subshell.j === undefined ? {} : { spokenLabel: subshellSpokenLabel(subshell.n, subshell.l, subshell.j) }),
             color: CURVE_COLORS[shellSubshells.indexOf(subshell) % CURVE_COLORS.length],
             points: atomRGrid.map((r, j) => ({ r, value: subshell.curve[j] })),
         }));
@@ -530,7 +567,9 @@ function App() {
     const atomOrbitalBusy = isAtomMode && atomLevel === 'orbital' && showBusy;
     const canvasBusyLabel = isAtomMode
         ? (showAtomBusy
-            ? `Solving ${speciesTitle(species)}…`
+            // Names the mode being solved for: a relativistic solve is two
+            // SCFs (the comparison too), so a wait needs its reason.
+            ? `Solving ${speciesTitle(species)}${SOLVING_SUFFIX[relativity]}…`
             : atomOrbitalBusy && atomSelectedOrbital
                 // A j-level's orbital is named as its crumb is: 6p_z · 6p³⁄₂.
                 ? `Computing ${orbitalName(atomSelectedOrbital.n, atomSelectedOrbital.l, atomSelectedOrbital.ml)}${
@@ -581,9 +620,14 @@ function App() {
             onChargeChange={handleChargeChange}
             onExcitationChange={handleExcitationChange}
             energies={atomEnergies}
-            radii={atomProfile ? { displayRadius: atomProfile.displayRadius, reference: atomProfile.reference ?? null } : null}
+            radii={atomProfile ? {
+                displayRadius: atomProfile.displayRadius,
+                reference: atomProfile.reference ?? null,
+                referenceUnavailable: atomProfile.referenceUnavailable ?? null,
+            } : null}
             unbound={atomUnbound}
             pictureFailed={atomError !== null}
+            pictureRelativity={pictureRelativity}
         />
     );
 
@@ -601,6 +645,7 @@ function App() {
         selectedOrbital: atomSelectedOrbital,
         onNavigate: handleLevelNavigate,
         onChangeElement: isNarrow ? () => setElementPickerOpen(true) : () => setTableOpen(true),
+        relativity: pictureRelativity,
     };
 
     const availability = useAppSelector(exportAvailability, shallowEqual);
@@ -659,6 +704,10 @@ function App() {
             onSurfaceStyleChange={handleSurfaceStyleChange}
             isBusy={isAtomMode ? showAtomBusy : showBusy}
             actions={shareExportBar}
+            relativity={relativity}
+            relativityIsDefault={relativityIsDefault}
+            onRelativityChange={handleRelativityChange}
+            relativityReadout={relativityReadout}
         />
     );
 

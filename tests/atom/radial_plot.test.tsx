@@ -176,4 +176,20 @@ describe('RadialPlot', () => {
         fireEvent.click(getByRole('button', { name: /D\(r\) plot/ }));
         expect(container.querySelector('svg')).not.toBeNull();
     });
+
+    // Task 10 carry: "6p³⁄₂" is read as superscripts and a fraction slash.
+    // The visible label stays as it is; the spoken one rides beside it.
+    it('says a j-level curve\'s name aloud as "6p j = 3/2"', () => {
+        const curves: RadialCurve[] = [
+            { label: '6s½', spokenLabel: '6s j = 1/2', color: '#f00', points: [{ r: 0, value: 0 }, { r: 1, value: 1 }] },
+            { label: '6p³⁄₂', spokenLabel: '6p j = 3/2', color: '#0f0', points: [{ r: 0, value: 0 }, { r: 1, value: 1 }] },
+            { label: 'n=1', color: '#00f', points: [{ r: 0, value: 0 }, { r: 1, value: 1 }] },
+        ];
+        const { container } = render(<RadialPlot n={1} l={0} Z={79} rMax={2} curves={curves} />);
+        const items = Array.from(container.querySelectorAll('.radial-plot-legend-item'));
+        expect(items.map(item => item.textContent)).toEqual(['6s½', '6p³⁄₂', 'n=1']);
+        expect(items.map(item => item.getAttribute('aria-hidden'))).toEqual(['true', 'true', null]);
+        const legend = container.querySelector('.radial-plot-legend')!;
+        expect(Array.from(legend.querySelectorAll('.visually-hidden')).map(e => e.textContent)).toEqual(['6s j = 1/2', '6p j = 3/2']);
+    });
 });

@@ -6,6 +6,7 @@ import {
     valenceShellOf, valenceConfigurationLabelOf,
 } from '../atom/configurations';
 import { orbitalName } from '../orbital_names';
+import type { RelativityMode } from '../atom/relativity';
 
 /**
  * Where a breadcrumb segment or shell chip should take the app.
@@ -77,6 +78,12 @@ interface LevelNavProps {
      * than inviting a click that can do nothing.
      */
     shellsUnavailable?: boolean;
+    /**
+     * The mode the picture on screen was solved in (ruling C9: the drawn
+     * profile's, not the switch's). Defaults to 'off', whose About text is
+     * exactly what it always was.
+     */
+    relativity?: RelativityMode;
 }
 
 // Old X-ray shell letters, matching atom_profile.ts's private shellName
@@ -90,6 +97,27 @@ function shellName(n: number): string {
 }
 
 const METHOD_STATEMENT = 'central-field SCF, LDA exchange with VWN correlation, spherically averaged';
+
+/**
+ * Ruling C6: the ionisation and excitation energies are ΔSCF differences
+ * from a non-relativistic spin-polarised LDA in every mode (spin-polarised
+ * MacDonald–Vosko exchange is out of scope, and ΔSCF is validated only
+ * through argon). With a relativistic picture that has to be said, or a
+ * heavy atom's energies read as carrying the relativistic shifts its picture
+ * shows. Empty for 'off', which leaves the paragraph as it always was.
+ */
+export function relativisticEnergiesSentence(mode: RelativityMode): string {
+    switch (mode) {
+        case 'off':
+            return '';
+        case 'scalar':
+            return ' This picture is scalar-relativistic; the ΔSCF energies are not — they stay non-relativistic, '
+                + 'so for a heavy atom they leave out the relativistic shifts the picture shows.';
+        case 'spinOrbit':
+            return ' This picture includes spin–orbit coupling (Dirac equation); the ΔSCF energies do not — they stay '
+                + 'non-relativistic, so for a heavy atom they leave out the relativistic shifts the picture shows.';
+    }
+}
 
 interface Crumb {
     key: string;
@@ -130,6 +158,7 @@ function subshellTarget(n: number, l: number, j: number | undefined): Navigation
 const LevelNav: React.FC<LevelNavProps> = ({
     Z, selectedShell, selectedSubshell, selectedOrbital, onNavigate, onChangeElement, children,
     variant = 'full', configuration, speciesSymbol, speciesTitle, speciesControls, shellsUnavailable = false,
+    relativity = 'off',
 }) => {
     const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -401,7 +430,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     eigenvalues. The picture on screen is drawn from a
                     simpler, spin-restricted form of that LDA, and in it
                     most anions — Cl⁻ included — have no bound state for
-                    their extra electron at all. The individual s/p/d/f
+                    their extra electron at all.{relativisticEnergiesSentence(relativity)} The individual s/p/d/f
                     lobes you can select below are a basis choice, not
                     separate physical objects: a partially filled subshell's
                     electrons are smeared uniformly over all of it, not
