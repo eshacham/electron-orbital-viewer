@@ -1,0 +1,165 @@
+{
+  "source": "NIST SRD 141, Atomic Reference Data for Electronic Structure Calculations (Kotochigova, Levine, Shirley, Stiles, Clark, Phys. Rev. A 55, 191 (1997); erratum 56, 5191), https://www.nist.gov/pml/atomic-reference-data-electronic-structure-calculations -- neutral-atom tables, ScRLDA column. Per-element pages: https://www.nist.gov/pml/atomic-reference-data-electronic-structure-calculations/atomic-reference-data-electronic-7-{8,16,35,52,63,64,70,90} (Ne, Ar, Kr, Xe, Au, Hg, Rn, U), reached from the index at https://www.nist.gov/pml/atomic-reference-data-electronic-structure-calculations/atomic-reference-data-electronic-7. Method facts confirmed on the Procedure page https://www.nist.gov/pml/atomic-reference-data-electronic-structure-calculations/atomic-reference-data-electronic-3 on 2026-10-03: 'In the RLDA and ScRLDA calculations, we use the relativistic corrections to the energy-density functional proposed by MacDonald and Vosko'; VWN correlation throughout; alpha^-1 = 137.0359895 (1986 CODATA); j occupation proportional to 2j+1 ('if there were 2 electrons in a p shell, we assign an electron population of 4/3 to the p3/2 states and 2/3 to the p1/2 states'). The Procedure page never mentions a nuclear model; treated here as a point nucleus per the plan's solver. One transcription anomaly on the Krypton page (4p row, both RLDA and ScRLDA cells) was resolved mechanically -- see generate_nist_relativity_fixtures.py's docstring.",
+  "column": "ScRLDA",
+  "transcribedOn": "2026-10-03",
+  "method": {
+    "correlation": "VWN",
+    "relativisticExchangeCorrection": true,
+    "speedOfLight": 137.0359895,
+    "jOccupation": "proportional-to-2j+1"
+  },
+  "atoms": [
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "configuration": "[He] 2s2 2p6",
+      "Etot": -128.336369,
+      "eigenvalues": {
+        "1s": -30.315584,
+        "2s": -1.32613,
+        "2p": -0.497551
+      }
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "configuration": "[Ne] 3s2 3p6",
+      "Etot": -527.516861,
+      "eigenvalues": {
+        "1s": -114.090739,
+        "2s": -10.862548,
+        "2p": -8.443407,
+        "3s": -0.890665,
+        "3p": -0.381755
+      }
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "configuration": "[Ar] 3d10 4s2 4p6",
+      "Etot": -2783.9873,
+      "eigenvalues": {
+        "1s": -517.653657,
+        "2s": -68.244623,
+        "2p": -60.457306,
+        "3s": -9.643676,
+        "3p": -7.154156,
+        "3d": -3.005055,
+        "4s": -0.851681,
+        "4p": -0.345161
+      }
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "configuration": "[Kr] 4d10 5s2 5p6",
+      "Etot": -7430.574788,
+      "eigenvalues": {
+        "1s": -1255.733395,
+        "2s": -195.699538,
+        "2p": -175.890898,
+        "3s": -40.033422,
+        "3p": -33.608877,
+        "3d": -24.016322,
+        "4s": -7.2174,
+        "4p": -5.174908,
+        "4d": -2.187468,
+        "5s": -0.73233,
+        "5p": -0.308113
+      }
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "configuration": "[Xe] 4f14 5d10 6s1",
+      "Etot": -18963.123612,
+      "eigenvalues": {
+        "1s": -2948.072638,
+        "2s": -520.718432,
+        "2p": -450.888397,
+        "3s": -122.965344,
+        "3p": -102.670737,
+        "3d": -80.917806,
+        "4s": -26.660632,
+        "4p": -19.991252,
+        "4d": -11.962303,
+        "4f": -3.011085,
+        "5s": -3.976365,
+        "5p": -2.199902,
+        "5d": -0.262411,
+        "6s": -0.221999
+      }
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "configuration": "[Xe] 4f14 5d10 6s2",
+      "Etot": -19572.039277,
+      "eigenvalues": {
+        "1s": -3035.505153,
+        "2s": -538.563629,
+        "2p": -465.159286,
+        "3s": -127.870661,
+        "3p": -106.622314,
+        "3d": -84.195815,
+        "4s": -28.086349,
+        "4p": -21.105095,
+        "4d": -12.800533,
+        "4f": -3.554327,
+        "5s": -4.33481,
+        "5p": -2.446106,
+        "5d": -0.371655,
+        "6s": -0.260552
+      }
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "configuration": "[Xe] 4f14 5d10 6s2 6p6",
+      "Etot": -23492.950469,
+      "eigenvalues": {
+        "1s": -3598.855827,
+        "2s": -655.954489,
+        "2p": -557.005834,
+        "3s": -160.97905,
+        "3p": -132.962557,
+        "3d": -106.090128,
+        "4s": -38.353106,
+        "4p": -29.165132,
+        "4d": -19.059234,
+        "4f": -7.995594,
+        "5s": -7.383977,
+        "5p": -4.687307,
+        "5d": -1.708347,
+        "6s": -0.811281,
+        "6p": -0.289891
+      }
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "configuration": "[Rn] 5f3 6d1 7s2",
+      "Etot": -27899.641656,
+      "eigenvalues": {
+        "1s": -4234.557545,
+        "2s": -792.37388,
+        "2p": -659.14087,
+        "3s": -200.210831,
+        "3p": -163.188263,
+        "3d": -131.090673,
+        "4s": -51.001789,
+        "4p": -38.892032,
+        "4d": -26.70564,
+        "4f": -13.72924,
+        "5s": -11.350493,
+        "5p": -7.590528,
+        "5d": -3.638317,
+        "5f": -0.13339,
+        "6s": -1.757867,
+        "6p": -0.856604,
+        "6d": -0.091405,
+        "7s": -0.160828
+      }
+    }
+  ]
+}
