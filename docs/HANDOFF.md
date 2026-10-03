@@ -148,6 +148,71 @@ These cost real effort to arrive at; do not undo them without reading why.
   mid-solve: the link encodes `atom.pendingView` in preference to the
   transient whole-atom view still on screen, so it carries the view that
   was actually asked for.
+- **Ion configurations are a NIST table, not a rule** (Phase 3). "Remove the
+  outermost electron" gets 52 of the 301 offered cations wrong — V⁺ is 3d⁴,
+  not 3d³ 4s¹; Y⁺ is 5s²; La⁺ is 5d²; every lanthanide 3+ ion is pure 4fⁿ;
+  Th²⁺ is 5f 6d. `ion_configurations.ts` transcribes NIST ASD's Ground
+  Shells column instead, checked entry by entry against a committed extract
+  (`tests/atom/fixtures/nist_ion_ground_configurations.json`,
+  `tests/atom/ion_configurations.test.ts`).
+- **Pictures are restricted LDA; ΔSCF energies are spin-polarised LDA**
+  (Phase 3). Restricted ΔSCF puts O, F and S 12–22 % off experiment — an
+  atom and its ion have different numbers of unpaired electrons, and
+  restricted LDA ignores the exchange energy that difference carries.
+  Spin-polarised LDA (`spin_scf.ts`) puts all of H–Ar within 7.6 % and
+  reproduces NIST's own LSD totals to 10⁻⁵ relative error.
+- **Anions are checked for a bound HOMO every iteration, not only at the
+  end** (Phase 3). `hasBoundState` (threshold 10⁻⁴ Ha) throws
+  `UnboundAnionError` the moment a subshell's energy is not safely below
+  zero; without it the loop converges to nonsense (H⁻ at −379 Ha) instead of
+  failing honestly. Cl⁻ is unbound in this LDA; the spec's Br < Br⁻, I < I⁻
+  radius ordering is asserted on the two anions this LDA does bind.
+- **A neutral ground state's species key is exactly `String(Z)`** (Phase 3).
+  `speciesKey({ Z, charge: 0, excitation: null })` returns the bare number,
+  so every cache key (profile cache, mesh cache, energies cache) that
+  existed before ions did is unchanged; Phase 4 appends relativity to these
+  same keys.
+- **The reference ring is its own unstencilled mesh, not a second radius on
+  the existing cut face** (Phase 3). The cut face's cap is stencilled to the
+  current sphere, and a cation's neutral edge sits outside that stencil — a
+  single mesh cannot show both.
+- **The reference ring is drawn at the neutral's `displayRadius`** (ruling
+  C11, Phase 3) — the same "drawn radius" the size-compare line quotes —
+  not its `contourRadius`, so the ring is a like-for-like comparison against
+  what is actually on screen. The camera's framing floor is a separate
+  number, the neutral's own `framingRadius` (ruling C12): an earlier version
+  floored on `displayRadius` and left He → He⁺ moving the camera 23.5 %,
+  because a neutral is often framed well inside its own sphere.
+- **ΔSCF occupations follow Hund's rule (maximum spin)** (Phase 3), not an
+  arbitrary assignment within a degenerate configuration: an excitation out
+  of a closed subshell lands in the highest-spin state it can reach — He
+  1s→2s is 2³S, Mg 3s→3p is ³P — because spin-polarised LDA needs one
+  occupation to solve, and the physically real one has the most unpaired
+  spins.
+- **An enclosed-fraction change mid-ΔSCF runs both workers at once** (Phase
+  3). Ruling C15 only covers the moment a species is first selected — ΔSCF
+  waits for that species' picture to land so the two solves don't contend
+  for CPU — but a user who then drags the enclosed-fraction control while
+  ΔSCF is still running starts a second picture solve alongside it,
+  deliberately: gating that too would make the energy line wait on a
+  setting that doesn't change it.
+- **The energies cache holds 32 entries, keyed by `speciesKey` alone**
+  (`energies_cache.ts`, Phase 3) — a ΔSCF result does not depend on the
+  enclosed fraction, so the species is a pure cache key, and 32 comfortably
+  covers a session's worth of stepped charges and excitations without the
+  tens-of-seconds re-solve that stepping Na → Na⁺ → Na would otherwise cost
+  every time.
+- **An unbound anion is a verdict, not an error** (Phase 3). `state.atom.unbound`
+  carries the message; the canvas is cleared (there is no profile to draw),
+  the shell/subshell chips are disabled, and every export's refusal reason
+  reads that same message rather than "waiting for the atom to finish
+  solving" (ruling C4) — an anion this LDA cannot bind is reported, not
+  silently worked around.
+- **Exports name the species they show, not just the element** (Task 12b,
+  Phase 3): `caption.ts`'s title line and the PNG caption read e.g. "Sodium
+  ion Na⁺" or "Sodium, excited 3s → 3p"; exported file names get an ASCII
+  suffix (`Na+1`, `Na_3s-3p`); a PNG with a reference ring on screen gets its
+  own caption line naming the neutral it is compared against.
 
 ## Known limits of the model — quantified, and stated in the README
 
@@ -570,6 +635,58 @@ phase plan, or isn't visible from reading one file.
   (`reportTransitionState`, once per change, up to a frame late) into
   `orbital.levelTransition`. PNG, STL and glTF wait on all three.
 
+## Phase 3 — ions and excited states (2026-09-25)
+
+Atom mode's Z no longer has to mean a neutral atom. A Charge stepper (−2 to
++3, clamped to whatever `ion_configurations.ts`'s NIST table actually offers
+for that element) and an Excite menu (promotes one electron from the
+valence subshell up — `species.ts`'s `excitationSources`/
+`excitationTargets`) select one of three things the SCF can now solve: a
+neutral ground state, an ion, or an excited atom with one electron moved.
+All three are carried as a single `AtomSpecies = { Z, charge, excitation }`
+and a single `speciesKey` string that the caches, the worker protocol and
+the URL all key on alike.
+
+### URL state
+
+- **Key order: `Z`, then the species keys (`charge`, `excite`), then
+  `level`/`n`/`l`/`ml`** (`encodeAtomKeys`/`decodeAtomKeys`,
+  `src/url_state.ts` — ruling C2). Decoding runs `setElement` →
+  `setCharge` → `setExcitation` → `solveStarted` → `requestAtomView`, in
+  that order, because `setCharge`/`setExcitation` clear `pendingView` as
+  part of resetting for a new species (the same reset `setElement` already
+  did) — the view a link asked for has to be requested *after* that reset,
+  not before it, or it is cleared the instant it lands. **Phase 4 inserts
+  `rel` right after `Z`**, ahead of `charge`/`excite`, so the eventual order
+  is `Z`, `rel`, `charge`, `excite`, `level`, `n`, `l`, `ml`.
+- **A neutral ground state's link stays byte-identical to Phase 2's.**
+  `encodeSpeciesParams` writes nothing for `{ charge: 0, excitation: null }`,
+  so every link made before ions existed still encodes and decodes exactly
+  as it did.
+- **An unoffered charge or excitation is ignored, not clamped** (ruling
+  C14) — `decodeSpeciesParams` falls back to the neutral ground state for a
+  charge the element doesn't offer, or an excitation the current charge
+  doesn't offer, the same way a shell/orbital key for a level the element
+  lacks falls back to the whole atom.
+- **The round-trip property test gained two shapes, `ion` and `excited`**
+  (`tests/url_state.test.ts`'s `Shape` union and `randomView`, ruling C3) —
+  its fixture profiles now carry a `speciesKey` matching whatever species
+  the random draw picked, because `applyPendingView` only lands a link's
+  view on the profile that matches the selected species (ruling C1);
+  without that, an ion's or an excited atom's round trip would silently
+  stop at `level: 'atom'` instead of exercising the rest of the key set.
+
+### Validation
+
+H–Ar's ΔSCF first ionisation energies land within 7.6 % of NIST (helium is
+the worst case: 22.72 eV against 24.587 eV); sodium's 3s → 3p excitation
+energy comes out 2.18 eV against the D line's 2.104 eV — both inside the
+spec's 10 % bar. `tests/atom/delta_scf_nist.test.ts` checks the full sweep
+(gated behind `ATOM_SLOW_TESTS=1`, ~3 minutes) against a committed results
+file, `src/validation/ion_results.json`, with a fast subset (He, Li) also
+recomputed on every default `npx jest` run so a silent regression in the
+committed numbers cannot hide behind the slow gate alone.
+
 ## Judgment calls made without asking
 
 Recorded for review, per the session's standing authority.
@@ -625,6 +742,14 @@ Recorded for review, per the session's standing authority.
   an additional export alongside the current per-member one, so a strict
   external manifold checker (trimesh, Netfabb) inspecting the file as one
   body does not warn on it. See "Phase 2 — share and export" above.
+- **Phase 4 must thread relativity into the worker's neutral reference
+  solve, not only the selected species' own solve** (Phase 3 follow-up).
+  The reference ring and the camera's framing floor both come from solving
+  the neutral atom a second time inside `atomWorker.ts`; if that second
+  solve stays non-relativistic while the main solve gains `rel`, the two
+  will silently stop agreeing on what "the same element, unexcited" looks
+  like — a relativistic ion compared against a non-relativistic neutral
+  reference.
 
 ### Known, accepted, not scheduled
 - `prefers-reduced-motion` for the level transitions is verified at unit
@@ -646,6 +771,14 @@ with expected durations so a multi-minute foreground wait reads as normal.
 
 **Expensive SCF sweeps are gated behind `ATOM_SLOW_TESTS=1`.** The default
 suite is ~57 s; the full set is ~2 min. Do not un-gate them.
+
+**A jest worker SIGSEGV has now been seen three times during a full run**
+(`atom_worker_contract.test.ts` once in Phase 2, `delta_scf.test.ts` once
+more and `atom_worker_contract.test.ts` again during Phase 3) — always
+passes alone or on an immediate rerun, never yet reproduced in isolation.
+Not root-caused. If it recurs, try bounding `workerIdleMemoryLimit`/
+`maxWorkers` in the jest config before assuming a real regression in the
+code under test.
 
 **A test that needs a real store builds one with `createAppStore()` (or
 reuses its `SERIALIZABLE_CHECK`), never a bare `configureStore`.**

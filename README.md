@@ -72,6 +72,21 @@ open, and read off how big it actually is.
 - **A convergence guarantee.** Every neutral atom, Z = 1 to 118, reaches a
   converged self-consistent solution; the app never renders one that has not
   (see [How it works](#how-it-works)).
+- **Ions and excited states.** A Charge stepper beside the element (−2 to
+  +3, only where the element actually has one) solves the real ion, from a
+  NIST-derived table of measured ground configurations rather than a
+  "remove the outermost electron" guess — Fe²⁺ is [Ar] 3d⁶, not
+  [Ar] 3d⁵ 4s¹. An Excite menu promotes one electron from the valence
+  subshell to a higher one (Na 3s → 3p and similar). Either way, a dashed
+  ring on the cut face marks the neutral atom's own drawn radius, so Na⁺'s
+  shrinkage or Cl⁻'s swelling reads directly against it. Ionisation and
+  excitation energies are **ΔSCF** — differences of spin-polarised LDA total
+  energies, never an orbital eigenvalue — labelled "ΔSCF, LDA": H–Ar's first
+  ionisation energies land within 7.6 % of NIST (worst case helium), and
+  sodium's 3s → 3p comes out 2.18 eV against the D line's 2.104 eV. Most
+  anions are not bound at all in this LDA — H⁻, C⁻, O⁻, F⁻, S⁻, Cl⁻ and O²⁻
+  among them — and the app says so rather than drawing a wrong picture;
+  bromine's and iodine's anions are.
 
 ### Basic Orbitals mode
 
@@ -153,8 +168,14 @@ along x, at a 90% contour:
 | `surf` | `solid` or `wire` |
 | `cam` | `<azimuth>,<elevation>`, whole degrees; left out at the canonical view, and a link with no `cam` key resets a moved camera to canonical rather than leaving it where it was |
 | `Z`, `level` (`atom`\|`shell`\|`orbital`), `n`, `l`, `ml` | atom mode's element and drill-down |
+| `charge` | atom mode's ion charge, an integer; ignored (falls back to neutral) unless the element actually offers it |
+| `excite` | atom mode's promoted electron, `<from>-<to>` e.g. `3s-3p`; ignored (falls back to the ground state) unless the current element and charge offer that promotion |
 | `n`, `l`, `ml` | Basic Orbitals' quantum numbers |
 | `combo` (`sp`\|`sp2`\|`sp3`\|`field`\|`none`), `member` (a hybrid's index, or `all`), `level` (a field's: 1 or 2), `F` (field strength, a.u.), `stark` (`lower`\|`upper`\|`both`) | the Combination picker |
+
+Atom mode's own keys always appear in the order `Z`, `charge`, `excite`,
+`level`, `n`, `l`, `ml` — so a neutral ground state's link (no `charge` or
+`excite`) is byte-identical to one made before ions existed.
 
 `frac`, `cut`, `op` and `surf` are always written, even at their defaults, so
 a link reproduces the sender's picture in any tab rather than whatever that
@@ -405,8 +426,14 @@ silvery like most metals. This app computes the non-relativistic number, so
 for gold and its heavy neighbours the energies (not the shapes — see below)
 are the least trustworthy numbers on screen.
 
-**Neutral atoms only.** No ions, no cations or anions of any element — Z sets
-both the nuclear charge and the electron count together.
+**Isolated atoms and their ions — no molecules.** An ion or an excited atom
+uses the same model with its own electron count or one electron moved, so
+this is still one atom at a time; no spin–orbit coupling either. **Most
+anions are not bound at all in this LDA** — H⁻, C⁻, O⁻, F⁻, S⁻, Cl⁻ and O²⁻
+among the elements light enough to validate — and the app reports that
+rather than drawing a picture for an electron the model does not actually
+keep; Br⁻ and I⁻ are bound, and the spec's size-ordering check runs against
+those two.
 
 **Orbital eigenvalues are not ionisation energies.** Koopmans' theorem, which
 would let you read an ionisation energy straight off an eigenvalue, does not

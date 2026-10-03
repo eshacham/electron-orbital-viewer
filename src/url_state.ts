@@ -1,5 +1,5 @@
 import type { RootState, AppDispatch } from './store';
-import { setMode, setElement, solveStarted, requestAtomView, PendingAtomView, ViewMode } from './store/atomSlice';
+import { setMode, setElement, setCharge, setExcitation, solveStarted, requestAtomView, speciesOf, PendingAtomView, ViewMode } from './store/atomSlice';
 import {
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, requestCut, restoreCamera,
     setSurfaceStyle, selectShownBasicOrbital, selectShownEnclosedFraction, BasicSelection, CutSetting,
@@ -10,6 +10,7 @@ import { CombinationSelection, NO_COMBINATION, DEFAULT_FIELD_AU } from './combin
 import { HybridKind } from './hybrids';
 import { CameraAngles } from './camera_angles';
 import { ClipAxis } from './types/orbital';
+import { encodeSpeciesParams, decodeSpeciesParams } from './atom/species';
 
 /**
  * The URL hash is the view (spec §4.3). This module owns reading and writing
@@ -198,7 +199,10 @@ function encodeAtomKeys(state: RootState): Record<string, string> {
     // Mid-solve, the link is the view that was asked for, not the whole atom shown meanwhile.
     const view: PendingAtomView = atom.pendingView
         ?? { level: atom.level, shell: atom.selectedShell, subshell: atom.selectedSubshell, orbital: atom.selectedOrbital };
-    const keys: Record<string, string> = { Z: String(atom.Z), level: view.level };
+    // {Z, ...species keys, level, n, l, ml} (ruling C2): a neutral ground
+    // state offers no charge/excite, so its link stays byte-identical to
+    // Phase 2's; Phase 4 later inserts `rel` right after Z, ahead of these.
+    const keys: Record<string, string> = { Z: String(atom.Z), ...encodeSpeciesParams(speciesOf(atom)), level: view.level };
     if (view.level !== 'atom' && view.shell !== null) {
         keys.n = String(view.shell);
         if (view.subshell) keys.l = String(view.subshell.l);
@@ -213,6 +217,14 @@ function decodeAtomKeys(params: URLSearchParams, dispatch: AppDispatch): void {
     // Without an element there is no solve to land a level on.
     if (Z === null) return;
     dispatch(setElement(Z));
+    // setCharge/setExcitation clear pendingView (they reset for a new
+    // species, ruling C1), so they must run before requestAtomView, which
+    // sets the view this link actually asked for (ruling C2). An unoffered
+    // charge or excitation (ruling C14) is ignored by decodeSpeciesParams,
+    // which falls back to the neutral ground state.
+    const { charge, excitation } = decodeSpeciesParams(Z, params);
+    if (charge !== 0) dispatch(setCharge(charge));
+    if (excitation) dispatch(setExcitation(excitation));
     dispatch(solveStarted());
     dispatch(requestAtomView(parseAtomView(params)));
 }

@@ -2,7 +2,7 @@ import {
     setEnclosedFraction, setBasicSelection, setSurfaceStyle, setCombination, cameraMoved,
     startOrbitalCalculation, selectShownBasicOrbital, selectShownEnclosedFraction,
 } from '../src/store/orbitalSlice';
-import { setMode, setElement, solveSucceeded, drillToShell, drillToSubshell, drillToOrbital } from '../src/store/atomSlice';
+import { setMode, setElement, setCharge, setExcitation, solveSucceeded, drillToShell, drillToSubshell, drillToOrbital, speciesOf } from '../src/store/atomSlice';
 import {
     registerUrlKeys, resetUrlKeysForTests, encodeStateOf, applyStateTo, encodeState, applyState,
     bindUrlStateStore, hasSharedView, urlModeOf, ANY_MODE, registerBuiltInUrlKeys, parseNumberInRange,
@@ -12,6 +12,8 @@ import { CombinationSelection, selectionProblem, fieldRequestFor } from '../src/
 import { createAppStore } from '../src/store';
 import type { RootState } from '../src/store';
 import type { SerialisedAtomProfile } from '../src/workers/atomWorker';
+import { AtomSpecies, speciesKey as computeSpeciesKey, excitationSources, excitationTargets } from '../src/atom/species';
+import { allowedCharges } from '../src/atom/ion_configurations';
 
 // Production's serializableCheck exceptions (ruling R16), not a bare
 // configureStore: a plain store prints a console.error for every
@@ -97,8 +99,13 @@ describe('url_state registry', () => {
 });
 
 
-/** Every shell up to maxN, every subshell up to f: any view is reachable. */
-function profileFor(Z: number, maxN = 7): SerialisedAtomProfile {
+/**
+ * Every shell up to maxN, every subshell up to f: any view is reachable.
+ * Carries `species`' own speciesKey (default: Z's neutral ground state) so
+ * `applyPendingView` recognises this as that species' own picture (ruling
+ * C1) -- without it, an ion or excited atom's pending view would never land.
+ */
+function profileFor(Z: number, maxN = 7, species: AtomSpecies = { Z, charge: 0, excitation: null }): SerialisedAtomProfile {
     const shells: SerialisedAtomProfile['shells'] = [];
     const subshells: SerialisedAtomProfile['subshells'] = [];
     for (let n = 1; n <= maxN; n++) {
@@ -108,7 +115,8 @@ function profileFor(Z: number, maxN = 7): SerialisedAtomProfile {
         }
     }
     return {
-        Z, converged: true, rMin: 1e-3, dx: 0.1, size: 3, total: new Float32Array(3), totalEmphasis: new Float32Array(3),
+        Z, converged: true, speciesKey: computeSpeciesKey(species), rMin: 1e-3, dx: 0.1, size: 3,
+        total: new Float32Array(3), totalEmphasis: new Float32Array(3),
         contourRadius: maxN, valencePeakRadius: maxN, displayRadius: maxN, shellPeaks: new Float64Array([1]),
         shellIndexAtR: new Float32Array(3), shells, subshells,
     };
@@ -119,7 +127,7 @@ function restore(hash: string, maxN = 7) {
     const store = makeStore();
     applyStateTo(hash, store.dispatch);
     const { atom } = store.getState();
-    if (atom.mode === 'atom' && atom.pendingView) store.dispatch(solveSucceeded(profileFor(atom.Z, maxN)));
+    if (atom.mode === 'atom' && atom.pendingView) store.dispatch(solveSucceeded(profileFor(atom.Z, maxN, speciesOf(atom))));
     return store;
 }
 
@@ -132,7 +140,7 @@ function mulberry32(seed: number): () => number {
     };
 }
 
-type Shape = 'atom' | 'shell' | 'subshell' | 'orbital' | 'basic' | 'hybrid' | 'field';
+type Shape = 'atom' | 'shell' | 'subshell' | 'orbital' | 'ion' | 'excited' | 'basic' | 'hybrid' | 'field';
 
 function randomView(rand: () => number, shape: Shape) {
     const int = (min: number, max: number) => min + Math.floor(rand() * (max - min + 1));
@@ -152,7 +160,23 @@ function randomView(rand: () => number, shape: Shape) {
     } else {
         const Z = int(1, 118);
         store.dispatch(setElement(Z));
-        store.dispatch(solveSucceeded(profileFor(Z)));
+        let species: AtomSpecies = { Z, charge: 0, excitation: null };
+        if (shape === 'ion' || shape === 'excited') {
+            const charge = pick(allowedCharges(Z));
+            store.dispatch(setCharge(charge));
+            species = { Z, charge, excitation: null };
+            if (shape === 'excited') {
+                const sources = excitationSources(Z, charge);
+                const from = sources.length > 0 ? pick(sources) : null;
+                const targets = from ? excitationTargets(Z, charge, from) : [];
+                if (from && targets.length > 0) {
+                    const to = pick(targets);
+                    store.dispatch(setExcitation({ from, to }));
+                    species = { Z, charge, excitation: { from, to } };
+                }
+            }
+        }
+        store.dispatch(solveSucceeded(profileFor(Z, 7, species)));
         const n = int(1, 7), l = int(0, Math.min(3, n - 1)), ml = int(-l, l);
         if (shape === 'shell') store.dispatch(drillToShell(n));
         if (shape === 'subshell') store.dispatch(drillToSubshell(n, l));
@@ -178,7 +202,10 @@ function viewOf(state: RootState) {
     return {
         mode: atom.mode,
         atom: atom.mode === 'atom'
-            ? { Z: atom.Z, level: atom.level, shell: atom.selectedShell, subshell: atom.selectedSubshell, orbital: atom.selectedOrbital }
+            ? {
+                Z: atom.Z, charge: atom.charge, excitation: atom.excitation,
+                level: atom.level, shell: atom.selectedShell, subshell: atom.selectedSubshell, orbital: atom.selectedOrbital,
+            }
             : null,
         basic: atom.mode === 'hydrogenic' ? { orbital: selectShownBasicOrbital(state), combination: orbital.combination } : null,
         // The contour on screen (final review I1), which a link must reproduce.
@@ -195,7 +222,7 @@ describe('built-in URL keys', () => {
     beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); });
 
     // Spec §5 Phase 2: "URL round-trip property test over every mode and level".
-    it.each<Shape>(['atom', 'shell', 'subshell', 'orbital', 'basic', 'hybrid', 'field'])(
+    it.each<Shape>(['atom', 'shell', 'subshell', 'orbital', 'ion', 'excited', 'basic', 'hybrid', 'field'])(
         'round-trips random %s views',
         shape => {
             const rand = mulberry32(shape.length * 7919);
@@ -288,6 +315,23 @@ describe('built-in URL keys', () => {
     it('a link to an orbital the element lacks opens the whole atom', () => {
         const store = restore('#mode=atom&Z=1&level=orbital&n=3&l=2&ml=0', 1);
         expect(store.getState().atom).toMatchObject({ level: 'atom', pendingView: null });
+    });
+
+    // Task 13 Step 1: charge and excite share like every other atom key.
+    it('round-trips an ion and an excited atom', () => {
+        let store = restore('#mode=atom&Z=11&charge=1');
+        expect(store.getState().atom).toMatchObject({ Z: 11, charge: 1, excitation: null });
+        expect(encodeStateOf(store.getState())).toMatch(/(^|&)charge=1(&|$)/);
+        store = restore('#mode=atom&Z=11&excite=3s-3p');
+        expect(store.getState().atom.excitation).toEqual({ from: { n: 3, l: 0 }, to: { n: 3, l: 1 } });
+        expect(encodeStateOf(store.getState())).toMatch(/(^|&)excite=3s-3p(&|$)/);
+    });
+
+    // Ruling C14: an unoffered charge or excitation is ignored, not clamped.
+    it('ignores a charge or excitation the element does not offer', () => {
+        const store = restore('#mode=atom&Z=11&charge=3&excite=3s-9z');
+        expect(store.getState().atom).toMatchObject({ Z: 11, charge: 0, excitation: null });
+        expect(encodeStateOf(store.getState())).not.toMatch(/charge=|excite=/);
     });
 
     // Review Focus 3.
