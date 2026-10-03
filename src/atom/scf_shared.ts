@@ -203,7 +203,8 @@ export function solveOccupiedLevel<T>(solve: () => T, isBound: () => boolean, un
 /**
  * Throws UnboundAnionError for the first subshell `potential` cannot bind
  * by at least ANION_BINDING_THRESHOLD -- checked before each iteration's
- * solve, since solveRadialState would otherwise return a state for it anyway.
+ * solve, since solveRadialState finds and returns a state bound by less
+ * than that (and, before ruling T7-b, returned one even with no root).
  */
 export function assertStatesBound(grid: RadialGrid, subshells: Array<{ n: number; l: number }>, potential: Float64Array): void {
     for (const { n, l } of subshells) {

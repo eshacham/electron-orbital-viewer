@@ -312,8 +312,9 @@ export function solveRadialState(
  * energy has exactly as many nodes as there are eigenvalues beneath it, so
  * more than n - l - 1 nodes means the (n, l) state lies below. Used by the
  * SCF's anion guard, where the extra electron's state can leave the bound
- * spectrum mid-iteration and solveRadialState (which only searches E < 0)
- * would otherwise return a nonsense state rather than fail.
+ * spectrum mid-iteration (solveRadialState used to return a nonsense state
+ * there rather than fail), and since ruling T7-b to read a solve that found
+ * no state: with no root below `below`, that is the unbound verdict.
  */
 export function hasBoundState(
     grid: RadialGrid, n: number, l: number, potential: Float64Array, below: number = -1e-4

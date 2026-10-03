@@ -94,8 +94,9 @@ export interface ScfOptions {
      * K 4s -> 4d "converges" in 39 iterations to -904 Ha with a 4d eigenvalue
      * of -168 Ha. A neutral atom's LDA potential has no Coulomb tail, so it
      * binds no diffuse 4d at all, and the radial solver -- which searches
-     * only E < 0 -- hands back a state anyway (the H- failure UnboundAnionError
-     * exists for). C 2s -> 3d, Na 3s -> 3d and He 1s -> 2p do the same.
+     * only E < 0 -- handed back a state anyway (the H- failure UnboundAnionError
+     * exists for; since ruling T7-b it refuses instead). C 2s -> 3d,
+     * Na 3s -> 3d and He 1s -> 2p did the same.
      */
     startingPotential?: Float64Array;
 }
@@ -434,8 +435,11 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions
 
     for (iterations = 1; iterations <= MAX_ITERATIONS; iterations++) {
         // Before the solve, not after: solveRadialState searches only E < 0
-        // and would hand back a state for an (n, l) the potential no longer
-        // binds -- the nonsense (H- at -379 Ha) this guard exists to stop.
+        // and used to hand back a state for an (n, l) the potential no longer
+        // binds -- the nonsense (H- at -379 Ha) this guard was written to
+        // stop. It now refuses a state with no root (ruling T7-b), but this
+        // check is still the one that draws the line at 10⁻⁴ Ha, which a
+        // barely bound state the solver can find would pass.
         // In a relativistic mode this asks the non-relativistic question of
         // the same potential (ruling C12), an approximation: relativity
         // binds s and p½ slightly more and d and f slightly less, so a

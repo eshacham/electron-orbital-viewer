@@ -8,7 +8,8 @@
  * field does not bind, ruling T7-b) or a non-convergence result; anything
  * else thrown (a grid too small, a radial solve that failed) is a bug, and
  * fails the shard -- as does an excited picture far below its own ground
- * state (an unbound electron placed anyway; see SPURIOUS_BELOW_GROUND_HA).
+ * state (an unbound electron placed anyway -- impossible since ruling T7-b,
+ * kept as a guard; see SPURIOUS_BELOW_GROUND_HA).
  * An excitation LDA puts slightly below its ground configuration is LDA,
  * not a bug: it is listed, not failed.
  *
@@ -98,7 +99,8 @@ export function sweepOne(species: AtomSpecies): SweepOutcome {
         picture = solution.converged ? 'converged' : 'unconverged';
         // A converged excited state below its own ground state is not an
         // answer: it is an unbound electron the radial solver placed anyway
-        // (the -904 Ha K 4s -> 4d the HANDOFF records).
+        // (the -904 Ha K 4s -> 4d the HANDOFF records; the solver refuses
+        // such a state since ruling T7-b, so this is now only a guard).
         if (picture === 'converged' && species.excitation) {
             const below = solveSpecies({ ...species, excitation: null }).totalEnergy - solution.totalEnergy;
             if (below > SPURIOUS_BELOW_GROUND_HA) throw new Error(`${below.toFixed(3)} Ha below its own ground state`);

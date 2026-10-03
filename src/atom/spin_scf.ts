@@ -139,8 +139,8 @@ export function solvePolarisedOnGrid(Z: number, grid: RadialGrid, configuration:
     let iterations = 0;
 
     for (iterations = 1; iterations <= MAX_ITERATIONS; iterations++) {
-        // Before the solve, for the same reason as scf.ts: solveRadialState
-        // would hand back a state for an (n, l) the potential no longer binds.
+        // Before the solve, for the same reason as scf.ts: this is the check
+        // that draws the line at 10⁻⁴ Ha, not merely at a root existing.
         if (isAnion) { assertStatesBound(grid, upSpecs, vUp); assertStatesBound(grid, downSpecs, vDown); }
         upStates = upSpecs.map(c => ({ ...solveSpinLevel(grid, c.n, c.l, vUp, isAnion), electrons: c.up }));
         downStates = downSpecs.map(c => ({ ...solveSpinLevel(grid, c.n, c.l, vDown, isAnion), electrons: c.down }));
