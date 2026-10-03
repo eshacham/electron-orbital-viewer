@@ -14,7 +14,11 @@ const config: Config = {
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   verbose: true,
   cache: true,
-  maxWorkers: '50%' // Use up to half of CPU cores
+  maxWorkers: '50%', // Use up to half of CPU cores
+  // Recycle a worker once it idles above 1 GB: the SCF suites leave large
+  // memoised solutions behind, and three full runs have lost a worker to
+  // SIGSEGV mid-suite (each test passed alone and on rerun).
+  workerIdleMemoryLimit: '1GB'
 };
 
 export default config;
