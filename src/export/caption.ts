@@ -4,7 +4,7 @@ import { orbitalName } from '../orbital_names';
 import { subshellLabel, configurationLabelOf } from '../atom/configurations';
 import { AtomSpecies, isNeutralGround, speciesConfiguration, speciesSymbol, speciesTitle } from '../atom/species';
 import { selectSpeciesEnergies, speciesOf, profileRelativity } from '../store/atomSlice';
-import { BELOW_GROUND_NOTE, DELTA_SCF_LABEL, DELTA_SCF_METHOD } from '../atom/delta_scf';
+import { BELOW_GROUND_NOTE, DELTA_SCF_LABEL, deltaScfMethod } from '../atom/delta_scf';
 import { formatDrawnRadius } from '../atom/format_radius';
 import { selectShownBasicOrbital, selectShownEnclosedFraction } from '../store/orbitalSlice';
 import { combinationTitle } from '../combinations';
@@ -216,5 +216,8 @@ export function deltaScfCsvComment(state: RootState): string | null {
     // fromLabel and another arrow read as two transitions (final review M5).
     const what = state.atom.excitation ? `${reading.toLabel} excitation` : `${reading.fromLabel} → ${reading.toLabel}`;
     const label = state.atom.excitation && reading.valueEv < 0 ? `${DELTA_SCF_LABEL}; ${BELOW_GROUND_NOTE}` : DELTA_SCF_LABEL;   // ruling FR-1: excitations only
-    return `${what}: ${reading.valueEv.toFixed(2)} eV (${label}); ${DELTA_SCF_METHOD}`;
+    // Ruling C6: the energies are non-relativistic whatever the picture is,
+    // and the method text says which picture it sits beside.
+    const mode = state.atom.profile ? profileRelativity(state.atom.profile) : 'off';
+    return `${what}: ${reading.valueEv.toFixed(2)} eV (${label}); ${deltaScfMethod(mode)}`;
 }

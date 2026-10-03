@@ -179,6 +179,20 @@ describe('export captions', () => {
             expect(viewDescription(store.getState())).toBe('Gold (Au, Z = 79), 6p_z · 6p³⁄₂, with spin–orbit, 90% contour');
         });
 
+        // Ruling C6: beside a relativistic picture the CSV's ΔSCF line says
+        // the energies are not relativistic, not that the same LDA drew it.
+        it('gives a relativistic picture\'s ΔSCF CSV line the mode-aware method', () => {
+            const store = goldStore('scalar');
+            store.dispatch(energiesSucceeded({
+                speciesKey: '79',
+                ionisation: { valueEv: 9.1, fromLabel: 'Au', toLabel: 'Au⁺' },
+                excitation: null,
+            }));
+            const line = deltaScfCsvComment(store.getState());
+            expect(line).toContain('the picture on screen is not');
+            expect(line).not.toContain('the same LDA draws');
+        });
+
         it('adds a scalar/spin–orbit suffix to the file stem, ASCII and after any j-level suffix', () => {
             expect(exportFileStem(goldStore('off').getState())).toBe('orbital-viewer_Au_atom');
             expect(exportFileStem(goldStore('scalar').getState())).toBe('orbital-viewer_Au_atom_scalar');
