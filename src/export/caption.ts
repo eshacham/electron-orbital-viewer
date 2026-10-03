@@ -126,8 +126,8 @@ export function referenceRingCaption(state: RootState): string | null {
     const species = speciesOf(state.atom);
     if (isNeutralGround(species)) return null;
     const neutralSymbol = speciesSymbol({ Z: species.Z, charge: 0, excitation: null });
-    // 3 s.f. (brief): Number(...) drops a trailing zero toPrecision would keep (1.280 -> 1.28).
-    const radius = Number(profile.reference.displayRadius.toPrecision(3));
+    // Three significant figures, trailing zeros kept (19.95 a0 reads "20.0", not "20").
+    const radius = profile.reference.displayRadius.toPrecision(3);
     return `dashed ring: neutral ${neutralSymbol} drawn radius ${radius} a₀`;
 }
 
