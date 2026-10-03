@@ -275,6 +275,8 @@ describe('LevelNav', () => {
         // Constraints' "Cl⁻ reported as unbound").
         expect(about.textContent).toMatch(/spin-restricted/i);
         expect(about.textContent).toMatch(/Cl⁻/);
+        // Final review M7: UI copy uses real dashes, never a typed "--".
+        expect(about.textContent).not.toContain('--');
     });
 });
 

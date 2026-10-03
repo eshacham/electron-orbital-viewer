@@ -355,7 +355,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     spin-polarised form of the same LDA, never orbital
                     eigenvalues. The picture on screen is drawn from a
                     simpler, spin-restricted form of that LDA, and in it
-                    most anions -- Cl⁻ included -- have no bound state for
+                    most anions — Cl⁻ included — have no bound state for
                     their extra electron at all. The individual s/p/d/f
                     lobes you can select below are a basis choice, not
                     separate physical objects: a partially filled subshell's
