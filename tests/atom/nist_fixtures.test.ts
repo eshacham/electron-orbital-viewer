@@ -1,6 +1,7 @@
 import srlda from './fixtures/nist_srlda.json';
 import rlda from './fixtures/nist_rlda.json';
 import { configurationFor } from '../../src/atom/configurations';
+import { RELATIVISTIC_EXCHANGE_CORRECTION } from '../../src/atom/relativity';
 
 /**
  * Transcription checks. The fixtures are typed in by hand from NIST's web
@@ -81,5 +82,10 @@ describe('the two columns agree where physics says they must', () => {
                 expect(Math.abs((atom.Etot - lda[Z]) / lda[Z])).toBeLessThan(0.005);
             }
         }
+    });
+
+    it('the app applies the relativistic exchange correction exactly when NIST did', () => {
+        expect(RELATIVISTIC_EXCHANGE_CORRECTION).toBe(SCALAR.method.relativisticExchangeCorrection);
+        expect(RELATIVISTIC_EXCHANGE_CORRECTION).toBe(DIRAC.method.relativisticExchangeCorrection);
     });
 });
