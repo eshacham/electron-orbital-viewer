@@ -349,4 +349,55 @@ describe('LevelNav for a species', () => {
         expect(container.querySelector('.level-nav-valence')).toHaveTextContent('3s² 3p⁶');
         expect(container.querySelector('.level-nav-shell-hint')).toHaveTextContent(/nothing is drawn/i);
     });
+    it('names j-levels in the breadcrumb and navigates with j', () => {
+        const onNavigate = jest.fn();
+        const { getByText } = render(
+            <LevelNav Z={82} selectedShell={6} selectedSubshell={{ n: 6, l: 1, j: 1.5 }}
+                selectedOrbital={{ n: 6, l: 1, ml: 0, j: 1.5 }} onNavigate={onNavigate} />
+        );
+        fireEvent.click(getByText('← Back to 6p³⁄₂'));
+        expect(onNavigate).toHaveBeenCalledWith({ level: 'subshell', n: 6, l: 1, j: 1.5 });
+    });
+
+    it('carries j through every crumb, and says j-levels aloud', () => {
+        const onNavigate = jest.fn();
+        const { getByRole, container } = render(
+            <LevelNav Z={82} selectedShell={6} selectedSubshell={{ n: 6, l: 1, j: 0.5 }}
+                selectedOrbital={{ n: 6, l: 1, ml: 1, j: 0.5 }} onNavigate={onNavigate} />
+        );
+        const crumbs = within(getByRole('navigation', { name: 'breadcrumb' }));
+        fireEvent.click(crumbs.getByRole('button', { name: '6p j = 1/2' }));
+        expect(onNavigate).toHaveBeenLastCalledWith({ level: 'subshell', n: 6, l: 1, j: 0.5 });
+        fireEvent.click(crumbs.getByRole('button', { name: '6p_x of 6p j = 1/2' }));
+        expect(onNavigate).toHaveBeenLastCalledWith({ level: 'orbital', n: 6, l: 1, ml: 1, j: 0.5 });
+        expect(crumbs.getByText('6p_x · 6p½')).toBeTruthy();
+        expect(getByRole('button', { name: 'Back to 6p j = 1/2' })).toBeTruthy();
+        expect(container.querySelector('.level-nav-shell-hint')).toHaveTextContent('One orbital of 6p½');
+    });
+
+    it('says j-levels aloud in the phone header too', () => {
+        const { getByRole, container } = render(
+            <LevelNav Z={82} selectedShell={6} selectedSubshell={{ n: 6, l: 1, j: 1.5 }}
+                selectedOrbital={null} onNavigate={() => {}} variant="header" />
+        );
+        expect(getByRole('button', { name: 'back to P shell (n=6)' })).toBeTruthy();
+        const location = container.querySelector('.level-nav-location')!;
+        expect(location.querySelector('[aria-hidden="true"]')!.textContent).toBe('P shell (n=6) · 6p³⁄₂');
+        expect(location.querySelector('.visually-hidden')!.textContent).toBe('P shell (n=6) · 6p j = 3/2');
+    });
+
+    it('leaves non-relativistic crumbs exactly as they were', () => {
+        const onNavigate = jest.fn();
+        const { getByText, getByRole, container } = render(
+            <LevelNav Z={18} selectedShell={3} selectedSubshell={{ n: 3, l: 1 }}
+                selectedOrbital={{ n: 3, l: 1, ml: 0 }} onNavigate={onNavigate} />
+        );
+        fireEvent.click(getByText('← Back to 3p'));
+        expect(onNavigate).toHaveBeenCalledWith({ level: 'subshell', n: 3, l: 1 });
+        expect(getByText('← Back to 3p').getAttribute('aria-label')).toBeNull();
+        const crumbs = getByRole('navigation', { name: 'breadcrumb' });
+        expect(Array.from(crumbs.querySelectorAll('button')).map(b => [b.textContent, b.getAttribute('aria-label')]))
+            .toEqual([['Argon', null], ['M shell (n=3)', null], ['3p', null], ['3p_z', null]]);
+        expect(container.querySelector('.visually-hidden')).toBeNull();
+    });
 });

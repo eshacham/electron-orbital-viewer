@@ -208,6 +208,16 @@ export function subshellLabel(n: number, l: number, j?: number): string {
     return `${n}${shellLetter(l)}${j === undefined ? '' : jLabel(j)}`;
 }
 
+/**
+ * subshellLabel for a screen reader, which reads "6p³⁄₂" as something like
+ * "6 p cubed fraction slash subscript 2": (6, 1, 1.5) -> "6p j = 3/2".
+ * Without j it is subshellLabel itself, so a caller can use it everywhere
+ * and still give an accessible name only where the two differ.
+ */
+export function subshellSpokenLabel(n: number, l: number, j?: number): string {
+    return j === undefined ? subshellLabel(n, l) : `${n}${shellLetter(l)} j = ${2 * j}/2`;
+}
+
 /** Renders any configuration — an ion's or an excited atom's included. `configurationLabel` below is the neutral-atom case. */
 export function configurationLabelOf(configuration: SubshellOccupancy[]): string {
     return configuration

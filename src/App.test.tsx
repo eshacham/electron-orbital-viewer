@@ -918,4 +918,58 @@ describe('App: relativity', () => {
         expect(params.rMax).toBeCloseTo(1.9);
         expect(params.radialSamples!.R[0]).toBe(2);
     });
+
+    function spinOrbitArgon(): SerialisedAtomProfile {
+        const argon = argonLikeProfile();
+        const p = argon.subshells.find(s => s.n === 2 && s.l === 1)!;
+        return {
+            ...argon, relativity: 'spinOrbit',
+            subshells: [
+                ...argon.subshells.filter(s => s.l === 0).map(s => ({ ...s, j: 0.5 })),
+                { ...p, j: 0.5, electrons: 2, energy: -8.6 },
+                { ...p, j: 1.5, electrons: 4, energy: -8.4 },
+            ],
+        };
+    }
+
+    // Task 9 carry: a spin–orbit chip used to do nothing, since its (n, l)
+    // names no subshell of a j-split profile.
+    it('drills through a spin–orbit j-level from its chip, and Back returns to that j-level', () => {
+        installMatchMedia(false);
+        const { store, container } = renderWithProvider(<App />, {
+            mode: 'atom', Z: 18, relativityOverride: 'spinOrbit',
+            level: 'shell', selectedShell: 2, profile: spinOrbitArgon(),
+        });
+        const legend = () => Array.from(container.querySelectorAll('.radial-plot-legend-item')).map(e => e.textContent);
+        expect(legend()).toEqual(['2s½', '2p½', '2p³⁄₂']);
+        fireEvent.click(screen.getByRole('button', { name: /^2p j = 3\/2,/ }));
+        expect(store.getState().atom.selectedSubshell).toEqual({ n: 2, l: 1, j: 1.5 });
+        // The radial plot isolates the same j-level.
+        expect(legend()).toEqual(['2p³⁄₂']);
+        fireEvent.click(screen.getByRole('button', { name: '2p_x' }));
+        expect(store.getState().atom.level).toBe('orbital');
+        expect(store.getState().atom.selectedOrbital).toEqual({ n: 2, l: 1, ml: 1, j: 1.5 });
+        fireEvent.click(screen.getByRole('button', { name: 'Back to 2p j = 3/2' }));
+        expect(store.getState().atom.level).toBe('shell');
+        expect(store.getState().atom.selectedSubshell).toEqual({ n: 2, l: 1, j: 1.5 });
+        // A chip is a toggle: the selected j-level's chip clears it, the other one switches to it.
+        fireEvent.click(screen.getByRole('button', { name: /^2p j = 1\/2,/ }));
+        expect(store.getState().atom.selectedSubshell).toEqual({ n: 2, l: 1, j: 0.5 });
+        fireEvent.click(screen.getByRole('button', { name: /^2p j = 1\/2,/ }));
+        expect(store.getState().atom.selectedSubshell).toBeNull();
+    });
+
+    // Ruling C9: what describes the drawn picture reads the profile's mode,
+    // not the switch's -- a spin–orbit picture still up while a scalar
+    // solve runs is labelled as the Dirac result it is.
+    it('labels the energies with the drawn profile\'s method', () => {
+        installMatchMedia(false);
+        const { container } = renderWithProvider(<App />, {
+            mode: 'atom', Z: 18, relativityOverride: 'scalar', isSolving: true,
+            level: 'shell', selectedShell: 2, profile: spinOrbitArgon(),
+        });
+        const energies = Array.from(container.querySelectorAll('.subshell-chip-energy'));
+        expect(energies).toHaveLength(3);
+        for (const energy of energies) expect(energy.getAttribute('title')).toMatch(/Dirac/);
+    });
 });

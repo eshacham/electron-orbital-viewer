@@ -198,3 +198,40 @@ describe('orbitalShade', () => {
         }
     });
 });
+
+describe('j-levels', () => {
+    it('gives each j-level its own lobes and colour, with the same fill fraction as the whole subshell', () => {
+        // Uranium's 5f3 split by 2j+1: 9/7 in 5f⁵⁄₂, 12/7 in 5f⁷⁄₂.
+        const components = shellComposition([
+            { n: 5, l: 3, j: 2.5, electrons: 9 / 7 },
+            { n: 5, l: 3, j: 3.5, electrons: 12 / 7 },
+        ]);
+        expect(components).toHaveLength(14);
+        expect(components.filter(c => c.j === 2.5).every(c => c.colorIndex === 0)).toBe(true);
+        expect(components.filter(c => c.j === 3.5).every(c => c.colorIndex === 1)).toBe(true);
+        for (const c of components) {
+            expect(c.occupancyFraction).toBeCloseTo(3 / 14, 12);   // = 5f3 without spin–orbit
+            expect(c.occupancyFraction).toBeLessThanOrEqual(1);
+        }
+    });
+
+    it('fills a closed j-level exactly, whatever its 2j+1', () => {
+        // Lead's closed 5d: 4 in 5d³⁄₂ and 6 in 5d⁵⁄₂, each full.
+        const components = shellComposition([
+            { n: 5, l: 2, j: 1.5, electrons: 4 },
+            { n: 5, l: 2, j: 2.5, electrons: 6 },
+        ]);
+        expect(components.every(c => c.occupancyFraction === 1)).toBe(true);
+    });
+
+    it('isolates one j-level, keeping its colour', () => {
+        const components = shellComposition([
+            { n: 6, l: 1, j: 0.5, electrons: 2 },
+            { n: 6, l: 1, j: 1.5, electrons: 4 },
+        ]);
+        const isolated = isolateSubshell(components, 1, 1.5);
+        expect(isolated).toHaveLength(3);
+        expect(isolated.every(c => c.j === 1.5 && c.colorIndex === 1 && c.occupancyFraction === 1)).toBe(true);
+        expect(isolateSubshell(components, 1)).toHaveLength(6);
+    });
+});

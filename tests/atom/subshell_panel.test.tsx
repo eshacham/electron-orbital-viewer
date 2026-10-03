@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
-import SubshellPanel, { spreadLabels } from '../../src/components/SubshellPanel';
+import SubshellPanel, { spreadLabels, formatElectrons } from '../../src/components/SubshellPanel';
 import { SerialisedSubshell } from '../../src/workers/atomWorker';
 
 /** A neon-shaped list of subshells: 1s (n=1), 2s and 2p (n=2). */
@@ -205,5 +205,131 @@ describe('spreadLabels', () => {
 
     it('leaves well-separated labels where they are', () => {
         expect(spreadLabels([10, 60], 11, 0, 100)).toEqual([10, 60]);
+    });
+});
+
+function leadLikeSpinOrbit(): SerialisedSubshell[] {
+    const a = () => new Float64Array(4);
+    return [
+        { n: 6, l: 0, j: 0.5, electrons: 2, energy: -0.47, curve: a(), R: a(), samplingRadius: 5, compositeSamplingRadius: 5 },
+        { n: 6, l: 1, j: 0.5, electrons: 2 / 3, energy: -0.16, curve: a(), R: a(), samplingRadius: 6, compositeSamplingRadius: 6 },
+        { n: 6, l: 1, j: 1.5, electrons: 4 / 3, energy: -0.12, curve: a(), R: a(), samplingRadius: 6, compositeSamplingRadius: 6 },
+    ];
+}
+
+describe('SubshellPanel with spin–orbit', () => {
+    it('shows one chip per j-level, labelled 6p½ / 6p³⁄₂, with 2j+1 capacity and fractional occupancy', () => {
+        const { container } = render(
+            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={null}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        const labels = Array.from(container.querySelectorAll('.subshell-chip-label')).map(e => e.textContent);
+        expect(labels).toEqual(['6s½', '6p½', '6p³⁄₂']);
+        const text = container.textContent ?? '';
+        expect(text).toMatch(/0\.67 of 2 e⁻/);
+        expect(text).toMatch(/1\.33 of 4 e⁻/);
+        expect(text).toMatch(/2 of 2 e⁻/);
+        // The energy diagram names the j-levels too.
+        const diagramLabels = Array.from(container.querySelectorAll('.subshell-energy-label')).map(e => e.textContent);
+        expect(diagramLabels).toEqual(['6s½', '6p½', '6p³⁄₂']);
+    });
+
+    it('reports j with the selection, and marks only the chosen j-level', () => {
+        const onSelectSubshell = jest.fn();
+        const { container } = render(
+            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={{ n: 6, l: 1, j: 1.5 }}
+                relativity="spinOrbit" onSelectSubshell={onSelectSubshell} onSelectOrbital={() => {}} />
+        );
+        const chips = container.querySelectorAll('.subshell-chip');
+        expect(chips[1].getAttribute('aria-pressed')).toBe('false');
+        expect(chips[2].getAttribute('aria-pressed')).toBe('true');
+        fireEvent.click(chips[1]);
+        expect(onSelectSubshell).toHaveBeenCalledWith(6, 1, 0.5);
+        // The lobes drawn for a j-level are the l basis; say so (spec §3.3).
+        expect(container.textContent).toMatch(/j-level/);
+        expect(container.querySelector('.subshell-j-note')!.textContent)
+            .toBe('The lobes are the p orbitals\' shapes, sized by 6p³⁄₂\'s own radial function — a basis choice. '
+                + 'A j-level mixes mₗ with spin, so its own states have other shapes (a p½ state is spherical).');
+        expect(container.querySelector('.subshell-isolate-hint')!.textContent).toMatch(/Showing 6p³⁄₂ alone/);
+    });
+
+    it('drills into an orbital of the chosen j-level, and marks it only for that j-level', () => {
+        const onSelectOrbital = jest.fn();
+        const { container, rerender } = render(
+            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={{ n: 6, l: 1, j: 0.5 }}
+                selectedOrbital={{ n: 6, l: 1, ml: 0, j: 0.5 }}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={onSelectOrbital} />
+        );
+        const buttons = container.querySelectorAll('.subshell-ml-button');
+        expect(buttons).toHaveLength(3);
+        expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
+        fireEvent.click(buttons[2]);
+        expect(onSelectOrbital).toHaveBeenCalledWith(6, 1, 1, 0.5);
+        expect(container.querySelector('.subshell-isolate-hint')!.textContent).toMatch(/one orbital of 6p½/);
+        // An orbital of the other j-level is not this row's current one.
+        rerender(
+            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={{ n: 6, l: 1, j: 0.5 }}
+                selectedOrbital={{ n: 6, l: 1, ml: 0, j: 1.5 }}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={onSelectOrbital} />
+        );
+        expect(Array.from(container.querySelectorAll('.subshell-ml-button')).some(b => b.getAttribute('aria-pressed') === 'true')).toBe(false);
+    });
+
+    it('does not claim an s½ level looks different from its sphere', () => {
+        const { container } = render(
+            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={{ n: 6, l: 0, j: 0.5 }}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        expect(container.querySelector('.subshell-j-note')).toBeNull();
+    });
+
+    it('gives j-level chips a name a screen reader can say', () => {
+        const { getByRole } = render(
+            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={null}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        expect(getByRole('button', { name: /^6p j = 3\/2, 1\.33 of 4 electrons, -0\.120 Ha orbital energy$/ })).toBeTruthy();
+        expect(getByRole('button', { name: /^6p j = 1\/2,/ })).toBeTruthy();
+        expect(getByRole('button', { name: /^6s j = 1\/2,/ })).toBeTruthy();
+    });
+
+    it('states the method on every energy', () => {
+        const { container } = render(
+            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={null}
+                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        for (const energy of Array.from(container.querySelectorAll('.subshell-chip-energy'))) {
+            expect(energy.getAttribute('title')).toMatch(/Dirac/);
+        }
+    });
+
+    it('states the scalar method too', () => {
+        const { container } = render(
+            <SubshellPanel subshells={neonLikeSubshells()} shellN={2} selectedSubshell={null}
+                relativity="scalar" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        for (const energy of Array.from(container.querySelectorAll('.subshell-chip-energy'))) {
+            expect(energy.getAttribute('title')).toMatch(/Koelling–Harmon/);
+        }
+    });
+
+    it('leaves the non-relativistic panel exactly as it was', () => {
+        const onSelectSubshell = jest.fn();
+        const { container } = render(
+            <SubshellPanel subshells={neonLikeSubshells()} shellN={2} selectedSubshell={{ n: 2, l: 1 }}
+                onSelectSubshell={onSelectSubshell} onSelectOrbital={() => {}} />
+        );
+        const chips = container.querySelectorAll('.subshell-chip');
+        expect(Array.from(chips).map(c => c.getAttribute('aria-label'))).toEqual([null, null]);
+        expect(Array.from(chips).map(c => c.getAttribute('data-j'))).toEqual([null, null]);
+        expect(container.querySelector('.subshell-chip-energy')!.getAttribute('title')).toBeNull();
+        expect(container.querySelector('.subshell-j-note')).toBeNull();
+        fireEvent.click(chips[0]);
+        expect(onSelectSubshell).toHaveBeenCalledWith(2, 0);
+    });
+
+    it('formats electron counts', () => {
+        expect(formatElectrons(2)).toBe('2');
+        expect(formatElectrons(9 / 7)).toBe('1.29');
     });
 });

@@ -261,8 +261,8 @@ function App() {
         switch (target.level) {
             case 'atom': dispatch(goToLevel('atom')); break;
             case 'shell': dispatch(drillToShell(target.n)); break;
-            case 'subshell': dispatch(drillToSubshell(target.n, target.l)); break;
-            case 'orbital': dispatch(drillToOrbital(target.n, target.l, target.ml)); break;
+            case 'subshell': dispatch(drillToSubshell(target.n, target.l, target.j)); break;
+            case 'orbital': dispatch(drillToOrbital(target.n, target.l, target.ml, target.j)); break;
         }
     }, [dispatch]);
 
@@ -272,17 +272,20 @@ function App() {
     // clicking the selected one again clears the isolation and returns to
     // the overlapping view, which stays the default because the overlap is
     // the teaching point (spec §2). This is also the subshell-level half of
-    // the "is there a way to unselect one?" affordance.
-    const handleSelectSubshell = useCallback((selN: number, selL: number) => {
-        if (atomSelectedSubshell && atomSelectedSubshell.n === selN && atomSelectedSubshell.l === selL) {
+    // the "is there a way to unselect one?" affordance. With spin–orbit a
+    // chip is one j-level: only that j-level's own chip clears it, and its
+    // sibling's switches to the sibling.
+    const handleSelectSubshell = useCallback((selN: number, selL: number, selJ?: number) => {
+        if (atomSelectedSubshell && atomSelectedSubshell.n === selN && atomSelectedSubshell.l === selL
+            && atomSelectedSubshell.j === selJ) {
             dispatch(clearSubshell());
             return;
         }
-        dispatch(drillToSubshell(selN, selL));
+        dispatch(drillToSubshell(selN, selL, selJ));
     }, [dispatch, atomSelectedSubshell]);
 
-    const handleSelectOrbital = useCallback((selN: number, selL: number, selMl: number) => {
-        dispatch(drillToOrbital(selN, selL, selMl));
+    const handleSelectOrbital = useCallback((selN: number, selL: number, selMl: number, selJ?: number) => {
+        dispatch(drillToOrbital(selN, selL, selMl, selJ));
     }, [dispatch]);
 
     const handleAtomHoverRadius = useCallback((r: number | null) => {
@@ -559,6 +562,8 @@ function App() {
                 selectedOrbital={atomSelectedOrbital}
                 onSelectSubshell={handleSelectSubshell}
                 onSelectOrbital={handleSelectOrbital}
+                // Ruling C9: the drawn profile's mode, not the switch's.
+                relativity={atomProfile.relativity ?? 'off'}
             />
         )
         : null;

@@ -3,12 +3,12 @@ import { buildCubeBlob, requestCube, CubeWorkerHandle, CubeRequest } from '../..
 // Redux -- so ruling C8 keeps them out of cube_request.ts (which the worker
 // imports) and in run_export.ts instead, alongside the other reason functions.
 import { cubeJobFor, cubeReason } from '../../src/export/run_export';
-import { drillToShell, drillToSubshell, drillToOrbital, setMode } from '../../src/store/atomSlice';
+import { drillToShell, drillToSubshell, drillToOrbital, setMode, setElement, setRelativity, solveSucceeded } from '../../src/store/atomSlice';
 import { setCombination, startOrbitalCalculation, startFieldCalculation, finishOrbitalCalculation } from '../../src/store/orbitalSlice';
 import { basicOrbitalParams } from '../../src/orbital_presets';
 import { fieldRequestFor } from '../../src/combinations';
 import { hydrogenicSource } from '../../src/field_source';
-import { makeStore, neonStore, readText } from './fixtures';
+import { makeStore, neonStore, neonProfile, readText } from './fixtures';
 
 function fakeWorker(reply: (request: CubeRequest) => unknown): CubeWorkerHandle & { terminate: jest.Mock } {
     const worker = {
@@ -39,6 +39,28 @@ describe('cube requests', () => {
         expect(cubeJobFor(store.getState())).toMatchObject({ type: 'radialCube', description: expect.stringContaining('n = 2 shell') });
         store.dispatch(drillToSubshell(2, 1));
         expect(cubeJobFor(store.getState())).toMatchObject({ description: expect.stringContaining('2p subshell') });
+    });
+
+    // Ruling C7/C8 (Task 10's part): with spin–orbit an isolated subshell
+    // is one j-level, and the cube is that j-level's density, not the first
+    // (n, l) found.
+    it('takes the isolated j-level\'s curve with spin–orbit', () => {
+        const store = makeStore();
+        store.dispatch(setElement(10));
+        store.dispatch(setRelativity('spinOrbit'));
+        const neon = neonProfile();
+        const p = neon.subshells.find(s => s.n === 2 && s.l === 1)!;
+        const pHalf = { ...p, j: 0.5, electrons: 2, curve: new Float64Array(neon.size).fill(1) };
+        const pThreeHalves = { ...p, j: 1.5, electrons: 4, curve: new Float64Array(neon.size).fill(2) };
+        store.dispatch(solveSucceeded({
+            ...neon, relativity: 'spinOrbit',
+            subshells: [...neon.subshells.filter(s => s.l === 0).map(s => ({ ...s, j: 0.5 })), pHalf, pThreeHalves],
+        }));
+        store.dispatch(drillToShell(2));
+        store.dispatch(drillToSubshell(2, 1, 1.5));
+        const job = cubeJobFor(store.getState());
+        expect(job.type === 'radialCube' && job.curve.D).toBe(pThreeHalves.curve);
+        expect(job).toMatchObject({ description: expect.stringContaining('2p j = 3/2 subshell') });
     });
 
     it('re-samples the drawn orbital for Basic Orbitals, and refuses an overlay', () => {

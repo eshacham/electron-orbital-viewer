@@ -1,8 +1,9 @@
 import React from 'react';
 import { Box, Chip, Typography, Button } from '@mui/material';
 import { SerialisedSubshell } from '../workers/atomWorker';
-import { subshellLabel } from '../atom/configurations';
-import { orbitalName } from '../orbital_names';
+import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
+import { RelativityMode, methodStatement } from '../atom/relativity';
+import { orbitalName, shellLetter } from '../orbital_names';
 import { CURVE_COLORS, orbitalShade } from '../curve_colors';
 
 interface SubshellPanelProps {
@@ -14,16 +15,26 @@ interface SubshellPanelProps {
     subshells: SerialisedSubshell[];
     /** n of the currently selected shell. */
     shellN: number;
-    /** The subshell currently drilled into, if any — shows the mₗ row when set. */
-    selectedSubshell: { n: number; l: number } | null;
+    /**
+     * The subshell currently drilled into, if any — shows the mₗ row when
+     * set. With spin–orbit it is one j-level, and `j` says which.
+     */
+    selectedSubshell: { n: number; l: number; j?: number } | null;
     /**
      * The individual orbital currently being rendered (level 3), if any.
      * The panel stays mounted at that level so the mL row does not vanish
      * behind the user; this is what marks which of its buttons is current.
      */
-    selectedOrbital?: { n: number; l: number; ml: number } | null;
-    onSelectSubshell: (n: number, l: number) => void;
-    onSelectOrbital: (n: number, l: number, ml: number) => void;
+    selectedOrbital?: { n: number; l: number; ml: number; j?: number } | null;
+    /** `j` is the chip's j-level with spin–orbit, undefined otherwise. */
+    onSelectSubshell: (n: number, l: number, j?: number) => void;
+    onSelectOrbital: (n: number, l: number, ml: number, j?: number) => void;
+    /**
+     * The mode the drawn profile was solved in (ruling C9: what describes the
+     * picture reads the profile's mode, not the switch's). Only a
+     * relativistic one adds anything; 'off' is the panel as it always was.
+     */
+    relativity?: RelativityMode;
 }
 
 const DIAGRAM_WIDTH = 220;
@@ -33,6 +44,24 @@ const DIAGRAM_PADDING = 6;
 const DIAGRAM_LABEL_WIDTH = 44;
 /** Closest two labels may sit, in px, before they are pushed apart. */
 const LABEL_SPACING = 11;
+
+/**
+ * Whole numbers as they are; a fractional j-level share (spin–orbit on an
+ * open subshell: lead's 6p² is 2/3 in 6p½ and 4/3 in 6p³⁄₂) to two places.
+ */
+export function formatElectrons(electrons: number): string {
+    return Number.isInteger(electrons) ? String(electrons) : electrons.toFixed(2);
+}
+
+/** A subshell's capacity: 2(2l+1), or 2j+1 for one j-level. */
+function capacityOf(subshell: Pick<SerialisedSubshell, 'l' | 'j'>): number {
+    return subshell.j === undefined ? 2 * (2 * subshell.l + 1) : 2 * subshell.j + 1;
+}
+
+/** Same subshell, and with spin–orbit the same j-level (j absent on both otherwise). */
+function sameSubshell(a: { n: number; l: number; j?: number } | null, b: { n: number; l: number; j?: number }): boolean {
+    return a !== null && a.n === b.n && a.l === b.l && a.j === b.j;
+}
 
 /**
  * Label positions for rules at `ys`, pushed apart so none overlap: a shell's
@@ -97,7 +126,7 @@ function ruleY(energy: number, minEnergy: number, maxEnergy: number): number {
  * the label here is deliberately "orbital energy" throughout.
  */
 const SubshellPanel: React.FC<SubshellPanelProps> = ({
-    subshells, shellN, selectedSubshell, selectedOrbital = null, onSelectSubshell, onSelectOrbital,
+    subshells, shellN, selectedSubshell, selectedOrbital = null, onSelectSubshell, onSelectOrbital, relativity = 'off',
 }) => {
     const shellSubshells = subshells.filter(s => s.n === shellN);
 
@@ -106,7 +135,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
     const maxEnergy = Math.max(...energies);
 
     const activeSubshell = selectedSubshell && selectedSubshell.n === shellN
-        ? shellSubshells.find(s => s.l === selectedSubshell.l) ?? null
+        ? shellSubshells.find(s => sameSubshell(selectedSubshell, s)) ?? null
         : null;
     // The subshell's own curve colour: its position within the shell, which
     // is exactly the index App.tsx's atomCurves and shell_composition.ts's
@@ -119,15 +148,23 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
         <Box className="subshell-panel" aria-label="subshells">
             <Box className="subshell-chip-row" role="group" aria-label="subshells in this shell">
                 {shellSubshells.map(subshell => {
-                    const isSelected = selectedSubshell !== null
-                        && selectedSubshell.n === subshell.n
-                        && selectedSubshell.l === subshell.l;
+                    const isSelected = sameSubshell(selectedSubshell, subshell);
+                    const electrons = formatElectrons(subshell.electrons);
+                    const capacity = capacityOf(subshell);
+                    const energy = subshell.energy.toFixed(3);
                     return (
                         <Chip
                             key={subshellKey(subshell)}
                             className={`subshell-chip${isSelected ? ' selected' : ''}`}
                             data-n={subshell.n}
                             data-l={subshell.l}
+                            data-j={subshell.j}
+                            // "6p³⁄₂" is read aloud as superscripts and a
+                            // fraction slash; a j-level chip says "6p j = 3/2"
+                            // instead. Without j the visible text already
+                            // reads well and stays the name.
+                            aria-label={subshell.j === undefined ? undefined
+                                : `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons, ${energy} Ha orbital energy`}
                             color={isSelected ? 'primary' : 'default'}
                             // A toggle, not a one-way selection: pressed means
                             // this subshell's orbitals are isolated in the 3D
@@ -135,21 +172,30 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                             // the overlapping view (Addendum 2's readability
                             // follow-up -- see App.tsx's handleSelectSubshell).
                             aria-pressed={isSelected}
-                            onClick={() => onSelectSubshell(subshell.n, subshell.l)}
+                            // j only for a j-level, so without spin–orbit the
+                            // call is exactly the (n, l) it always was.
+                            onClick={() => (subshell.j === undefined
+                                ? onSelectSubshell(subshell.n, subshell.l)
+                                : onSelectSubshell(subshell.n, subshell.l, subshell.j))}
                             label={
                                 <span className="subshell-chip-content">
-                                    <span className="subshell-chip-label">{subshellLabel(subshell.n, subshell.l)}</span>
+                                    <span className="subshell-chip-label">{subshellLabel(subshell.n, subshell.l, subshell.j)}</span>
                                     {' · '}
                                     {/* Addendum 2's explicit occupancy readout ("2p: 2 of 6") -- carbon's
                                         2p2 and neon's 2p6 look identical as a bare electron count, but
                                         "2 of 6" vs "6 of 6" says outright which one is full. Capacity is
-                                        2*(2l+1): two spins in each of the 2l+1 real orbitals. */}
+                                        2*(2l+1): two spins in each of the 2l+1 real orbitals -- or 2j+1
+                                        for a j-level, whose share of an open subshell is fractional. */}
                                     <span className="subshell-chip-occupancy">
-                                        {subshell.electrons} of {2 * (2 * subshell.l + 1)} e⁻
+                                        {electrons} of {capacity} e⁻
                                     </span>
                                     {' · '}
-                                    <span className="subshell-chip-energy">
-                                        {subshell.energy.toFixed(3)} Ha (orbital energy)
+                                    {/* Spec §3.1: a relativistic eigenvalue states its method. */}
+                                    <span
+                                        className="subshell-chip-energy"
+                                        title={relativity === 'off' ? undefined : `orbital energy (eigenvalue): ${methodStatement(relativity)}`}
+                                    >
+                                        {energy} Ha (orbital energy)
                                     </span>
                                 </span>
                             }
@@ -166,11 +212,23 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                 overlap is real (spec §2). */}
             <Typography variant="caption" className="subshell-isolate-hint" display="block">
                 {selectedOrbital
-                    ? `Showing one orbital of ${subshellLabel(selectedOrbital.n, selectedOrbital.l)} — pick another below, or Back for the whole subshell`
+                    ? `Showing one orbital of ${subshellLabel(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j)} — pick another below, or Back for the whole subshell`
                     : selectedSubshell
-                        ? `Showing ${subshellLabel(selectedSubshell.n, selectedSubshell.l)} alone — click its chip again for the whole shell`
+                        ? `Showing ${subshellLabel(selectedSubshell.n, selectedSubshell.l, selectedSubshell.j)} alone — click its chip again for the whole shell`
                         : 'Click a subshell to show its orbitals on their own'}
             </Typography>
+
+            {/* Spec §3.6: a j-level is drawn with its own R(r) times the real
+                l orbitals, the renderer's one basis. That is honest about its
+                size but not its shape -- a |j, m_j⟩ state mixes mₗ with spin,
+                and a p½ level's density is spherical -- so say which part of
+                the picture is a basis choice. Not for s½, whose sphere is
+                its true shape. */}
+            {activeSubshell && activeSubshell.j !== undefined && activeSubshell.l > 0 && (
+                <Typography variant="caption" className="subshell-j-note" display="block">
+                    {`The lobes are the ${shellLetter(activeSubshell.l)} orbitals' shapes, sized by ${subshellLabel(activeSubshell.n, activeSubshell.l, activeSubshell.j)}'s own radial function — a basis choice. A j-level mixes mₗ with spin, so its own states have other shapes (a p½ state is spherical).`}
+                </Typography>
+            )}
 
             {activeSubshell && (
                 <Box className="subshell-ml-row" role="group" aria-label="magnetic quantum number">
@@ -179,17 +237,12 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                             key={ml}
                             size="small"
                             className={`subshell-ml-button${
-                                selectedOrbital
-                                && selectedOrbital.n === activeSubshell.n
-                                && selectedOrbital.l === activeSubshell.l
-                                && selectedOrbital.ml === ml ? ' selected' : ''}`}
-                            aria-pressed={Boolean(
-                                selectedOrbital
-                                && selectedOrbital.n === activeSubshell.n
-                                && selectedOrbital.l === activeSubshell.l
-                                && selectedOrbital.ml === ml
-                            )}
-                            onClick={() => onSelectOrbital(activeSubshell.n, activeSubshell.l, ml)}
+                                sameSubshell(selectedOrbital, activeSubshell)
+                                && selectedOrbital!.ml === ml ? ' selected' : ''}`}
+                            aria-pressed={sameSubshell(selectedOrbital, activeSubshell) && selectedOrbital!.ml === ml}
+                            onClick={() => (activeSubshell.j === undefined
+                                ? onSelectOrbital(activeSubshell.n, activeSubshell.l, ml)
+                                : onSelectOrbital(activeSubshell.n, activeSubshell.l, ml, activeSubshell.j))}
                         >
                             {/* The legend for the isolated composition view
                                 (Addendum 2's readability follow-up): each of
@@ -250,7 +303,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                     y={labelYs[i]}
                                     dominantBaseline="middle"
                                 >
-                                    {subshellLabel(sub.n, sub.l)}
+                                    {subshellLabel(sub.n, sub.l, sub.j)}
                                 </text>
                             </g>
                         );

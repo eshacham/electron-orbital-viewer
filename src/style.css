@@ -786,6 +786,25 @@ html, body, #root {
   margin: 2px 0 4px;
   line-height: 1.3;
 }
+/* With spin–orbit: which part of a j-level's picture is a basis choice. */
+.subshell-j-note {
+  opacity: 0.7;
+  margin: 0 0 4px;
+  line-height: 1.3;
+}
+/* Read by a screen reader, never seen: a j-level's spoken name ("6p j = 3/2")
+   next to the visible "6p³⁄₂" where plain text has no aria-label to carry it. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 .subshell-energy-diagram {
   display: block;
 }

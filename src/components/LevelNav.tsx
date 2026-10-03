@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { Box, Breadcrumbs, Link, Chip, Typography, Collapse, Button } from '@mui/material';
 import { elementFor } from '../elements';
-import { SubshellOccupancy, configurationFor, shellsOf, configurationLabelOf, subshellLabel, valenceShellOf, valenceConfigurationLabelOf } from '../atom/configurations';
+import {
+    SubshellOccupancy, configurationFor, shellsOf, configurationLabelOf, subshellLabel, subshellSpokenLabel,
+    valenceShellOf, valenceConfigurationLabelOf,
+} from '../atom/configurations';
 import { orbitalName } from '../orbital_names';
 
 /**
@@ -12,18 +15,21 @@ import { orbitalName } from '../orbital_names';
  * driven by props, never by a store reference of its own) while leaving the
  * actual dispatching (drillToShell/drillToSubshell/drillToOrbital, or
  * however "back to the whole atom" is implemented) entirely to the caller.
+ *
+ * With spin–orbit a subshell is one of its j-levels, and `j` says which; it
+ * is absent otherwise, so a non-relativistic target is exactly what it was.
  */
 export type NavigationTarget =
     | { level: 'atom' }
     | { level: 'shell'; n: number }
-    | { level: 'subshell'; n: number; l: number }
-    | { level: 'orbital'; n: number; l: number; ml: number };
+    | { level: 'subshell'; n: number; l: number; j?: number }
+    | { level: 'orbital'; n: number; l: number; ml: number; j?: number };
 
 interface LevelNavProps {
     Z: number;
     selectedShell: number | null;
-    selectedSubshell: { n: number; l: number } | null;
-    selectedOrbital: { n: number; l: number; ml: number } | null;
+    selectedSubshell: { n: number; l: number; j?: number } | null;
+    selectedOrbital: { n: number; l: number; ml: number; j?: number } | null;
     onNavigate: (target: NavigationTarget) => void;
     /**
      * Opens an element picker. Given on a phone, where the periodic table
@@ -88,7 +94,24 @@ const METHOD_STATEMENT = 'central-field SCF, LDA exchange with VWN correlation, 
 interface Crumb {
     key: string;
     label: string;
+    /**
+     * What a screen reader should say instead, when that differs: "6p³⁄₂"
+     * is read as superscripts and a fraction slash, so a j-level crumb says
+     * "6p j = 3/2". Absent everywhere else, which leaves the visible text as
+     * the name, as it always was.
+     */
+    spoken?: string;
     target: NavigationTarget;
+}
+
+/** "6p j = 3/2" for a j-level; undefined when the visible label already reads aloud correctly. */
+function spokenSubshell(n: number, l: number, j: number | undefined): string | undefined {
+    return j === undefined ? undefined : subshellSpokenLabel(n, l, j);
+}
+
+/** A subshell target with j only when there is one, so a non-relativistic target keeps its old shape. */
+function subshellTarget(n: number, l: number, j: number | undefined): NavigationTarget {
+    return j === undefined ? { level: 'subshell', n, l } : { level: 'subshell', n, l, j };
 }
 
 /**
@@ -155,11 +178,12 @@ const LevelNav: React.FC<LevelNavProps> = ({
      * behind you. This is the affordance that fixes that; the breadcrumb
      * stays for jumping more than one level at a time.
      */
-    const parent: { label: string; target: NavigationTarget } | null =
+    const parent: { label: string; spoken?: string; target: NavigationTarget } | null =
         selectedOrbital
             ? {
-                label: subshellLabel(selectedOrbital.n, selectedOrbital.l),
-                target: { level: 'subshell', n: selectedOrbital.n, l: selectedOrbital.l },
+                label: subshellLabel(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j),
+                spoken: spokenSubshell(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j),
+                target: subshellTarget(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j),
             }
             : selectedSubshell
                 ? { label: shellName(selectedSubshell.n), target: { level: 'shell', n: selectedSubshell.n } }
@@ -172,14 +196,19 @@ const LevelNav: React.FC<LevelNavProps> = ({
     if (selectedSubshell) {
         crumbs.push({
             key: 'subshell',
-            label: subshellLabel(selectedSubshell.n, selectedSubshell.l),
-            target: { level: 'subshell', n: selectedSubshell.n, l: selectedSubshell.l },
+            label: subshellLabel(selectedSubshell.n, selectedSubshell.l, selectedSubshell.j),
+            spoken: spokenSubshell(selectedSubshell.n, selectedSubshell.l, selectedSubshell.j),
+            target: subshellTarget(selectedSubshell.n, selectedSubshell.l, selectedSubshell.j),
         });
     }
     if (selectedOrbital) {
+        const { n, l, ml, j } = selectedOrbital;
+        // A j-level's orbital is the real l orbital drawn with that j-level's
+        // R(r) (spec §3.6), so both halves of its name matter: 6p_x · 6p½.
         crumbs.push({
             key: 'orbital',
-            label: orbitalName(selectedOrbital.n, selectedOrbital.l, selectedOrbital.ml),
+            label: j === undefined ? orbitalName(n, l, ml) : `${orbitalName(n, l, ml)} · ${subshellLabel(n, l, j)}`,
+            spoken: j === undefined ? undefined : `${orbitalName(n, l, ml)} of ${subshellSpokenLabel(n, l, j)}`,
             target: { level: 'orbital', ...selectedOrbital },
         });
     }
@@ -187,6 +216,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
     if (variant === 'header') {
         // Where you are, past the element the button already names.
         const location = crumbs.slice(1).map(crumb => crumb.label).join(' · ');
+        const spokenLocation = crumbs.slice(1).map(crumb => crumb.spoken ?? crumb.label).join(' · ');
         return (
             <Box className="level-nav level-nav-header" aria-label="level navigation">
                 {parent && (
@@ -194,7 +224,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                         size="small"
                         className="level-nav-back"
                         onClick={() => onNavigate(parent.target)}
-                        aria-label={`back to ${parent.label}`}
+                        aria-label={`back to ${parent.spoken ?? parent.label}`}
                     >
                         ←
                     </Button>
@@ -210,7 +240,19 @@ const LevelNav: React.FC<LevelNavProps> = ({
                         {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
                     </Button>
                 )}
-                {location && <span className="level-nav-location">{location}</span>}
+                {location && (
+                    <span className="level-nav-location">
+                        {spokenLocation === location ? location : (
+                            // Plain text has no accessible name to set, so a
+                            // j-level's spoken form rides along, hidden from
+                            // sight, with the visible one hidden from readers.
+                            <>
+                                <span aria-hidden="true">{location}</span>
+                                <span className="visually-hidden">{spokenLocation}</span>
+                            </>
+                        )}
+                    </span>
+                )}
             </Box>
         );
     }
@@ -227,6 +269,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     size="small"
                     className="level-nav-back"
                     onClick={() => onNavigate(parent.target)}
+                    aria-label={parent.spoken === undefined ? undefined : `Back to ${parent.spoken}`}
                 >
                     ← Back to {parent.label}
                 </Button>
@@ -254,6 +297,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                         type="button"
                         underline="hover"
                         color="inherit"
+                        aria-label={crumb.spoken}
                         onClick={() => onNavigate(crumb.target)}
                     >
                         {crumb.label}
@@ -316,7 +360,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                         // not the current subject -- saying "M shell only"
                         // here would describe a view you are no longer
                         // looking at.
-                        ? `One orbital of ${subshellLabel(selectedOrbital.n, selectedOrbital.l)} — Back steps out one level at a time`
+                        ? `One orbital of ${subshellLabel(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j)} — Back steps out one level at a time`
                         : selectedShell === null
                             ? 'Click a ring in the 3D view, or a shell above, to open it'
                             : `${shellName(selectedShell)} only — click it again, or the ✕, for the whole atom`}

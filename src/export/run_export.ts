@@ -2,7 +2,7 @@ import type { RootState } from '../store';
 import { selectionProblem } from '../combinations';
 import { hydrogenicSource } from '../field_source';
 import { ORBITAL_RESOLUTION, BASIC_ORBITALS_Z } from '../orbital_presets';
-import { subshellLabel } from '../atom/configurations';
+import { subshellSpokenLabel } from '../atom/configurations';
 import { CsvCurve, radialCurvesToCsv } from './csv';
 import { exportFileStem, ATOM_METHOD, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment } from './caption';
 import { CombinationLegendItem } from './png';
@@ -182,9 +182,14 @@ export function cubeJobFor(state: RootState): CubeJob {
     if (atom.mode === 'atom' && atom.level !== 'orbital' && atom.profile) {
         const profile = atom.profile;
         const sub = atom.selectedSubshell;
-        const subshell = atom.level === 'shell' && sub ? profile.subshells.find(s => s.n === sub.n && s.l === sub.l) : undefined;
+        // j too: with spin–orbit (n, l) is two j-levels with their own
+        // densities, and the selection names one of them.
+        const subshell = atom.level === 'shell' && sub
+            ? profile.subshells.find(s => s.n === sub.n && s.l === sub.l && s.j === sub.j)
+            : undefined;
         const shell = atom.level === 'shell' ? profile.shells.find(s => s.n === atom.selectedShell) : undefined;
-        const what = subshell ? `${subshellLabel(subshell.n, subshell.l)} subshell` : shell ? shellLabel(shell.n) : 'total';
+        // The cube header stays plain ASCII: a j-level reads "6p j = 3/2", not "6p³⁄₂".
+        const what = subshell ? `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)} subshell` : shell ? shellLabel(shell.n) : 'total';
         // Task 12b: an ion or excited atom's whole-atom cube also names the
         // dashed neutral-comparison ring, same as the PNG caption and CSV
         // comments (ruling C4) -- null for anything that draws no such ring.

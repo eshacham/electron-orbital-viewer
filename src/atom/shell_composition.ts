@@ -13,12 +13,23 @@
  * no physical basis for picking a subset to draw, so every mₗ of an occupied
  * subshell is emitted here, never a subset. Picking two lobes out of three
  * to render would assert an occupancy the model does not have.
+ *
+ * With spin–orbit a subshell is two j-levels, each with its own radial
+ * function. A j-level is drawn with the same real l lobes as its subshell,
+ * sized by that j-level's own R(r) -- a basis choice, as the lobes already
+ * are. Its true |j, m_j⟩ states mix mₗ with spin and have other angular
+ * shapes (a p½ level is spherical), so the lobes say how big a j-level is,
+ * not what shape its electrons take.
  */
 
 export interface ShellCompositionSubshell {
     n: number;
     l: number;
-    /** Electrons actually occupying this subshell (0 < electrons <= 2*(2l+1)). */
+    /**
+     * Electrons actually occupying this subshell (0 < electrons <= 2*(2l+1)),
+     * or with spin–orbit this j-level (0 < electrons <= 2j+1; fractional
+     * when an open subshell is shared between its j-levels).
+     */
     electrons: number;
     /** The j-level, with spin–orbit only; carried to the components so each is drawn with its own R(r). */
     j?: number;
@@ -38,7 +49,8 @@ export interface OrbitalComponent {
      * open one spreads the subshell's electrons equally across its mₗ
      * states first (Unsöld): carbon's 2p² puts 2/3 of an electron in each
      * of three orbitals, which is occupancyFraction (2/3)/2 = 1/3 of that
-     * orbital's own pair.
+     * orbital's own pair. A j-level is measured against its own 2j+1
+     * (see shellComposition).
      */
     occupancyFraction: number;
     /**
@@ -92,9 +104,14 @@ export function shellComposition(subshells: ShellCompositionSubshell[]): Orbital
     const components: OrbitalComponent[] = [];
     subshells.forEach((subshell, colorIndex) => {
         const { n, l, j, electrons } = subshell;
-        const statesInSubshell = 2 * l + 1;
-        const electronsPerOrbital = electrons / statesInSubshell;
-        const occupancyFraction = electronsPerOrbital / 2;
+        // How full this subshell (or j-level) is, shared equally by its
+        // lobes. A j-level holds 2j+1 electrons, not 2(2l+1): dividing its
+        // own share by the whole subshell's capacity would draw a full 6p³⁄₂
+        // two-thirds empty. With the 2j+1 split both j-levels then come out
+        // exactly as full as the subshell would be without spin–orbit
+        // (uranium's 5f³: 3/14 either way).
+        const capacity = j === undefined ? 2 * (2 * l + 1) : 2 * j + 1;
+        const occupancyFraction = electrons / capacity;
         for (let ml = -l; ml <= l; ml++) {
             components.push(j === undefined ? { n, l, ml, occupancyFraction, colorIndex } : { n, l, j, ml, occupancyFraction, colorIndex });
         }
@@ -116,10 +133,10 @@ export function shellComposition(subshells: ShellCompositionSubshell[]): Orbital
  * overlapping, and matches its own curve in the radial plot.
  *
  * `l` of null means no isolation, i.e. the full shell. With spin–orbit `j`
- * names which of l's two j-levels to keep; without, it is undefined and
- * matches the components, which carry none.
+ * names which of l's two j-levels to keep; left out, every component of l
+ * is kept (both j-levels, or the one plain subshell without spin–orbit).
  */
 export function isolateSubshell(components: OrbitalComponent[], l: number | null, j?: number): OrbitalComponent[] {
     if (l === null) return components;
-    return components.filter(component => component.l === l && component.j === j);
+    return components.filter(component => component.l === l && (j === undefined || component.j === j));
 }
