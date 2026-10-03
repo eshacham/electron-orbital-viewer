@@ -150,6 +150,6 @@ export function deltaScfCsvComment(state: RootState): string | null {
     // An excitation's toLabel already names it ('Na 3s → 3p'); prefixing
     // fromLabel and another arrow read as two transitions (final review M5).
     const what = state.atom.excitation ? `${reading.toLabel} excitation` : `${reading.fromLabel} → ${reading.toLabel}`;
-    const label = reading.valueEv < 0 ? `${DELTA_SCF_LABEL}; ${BELOW_GROUND_NOTE}` : DELTA_SCF_LABEL;   // ruling FR-1
+    const label = state.atom.excitation && reading.valueEv < 0 ? `${DELTA_SCF_LABEL}; ${BELOW_GROUND_NOTE}` : DELTA_SCF_LABEL;   // ruling FR-1: excitations only
     return `${what}: ${reading.valueEv.toFixed(2)} eV (${label}); ${DELTA_SCF_METHOD}`;
 }

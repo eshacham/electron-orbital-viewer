@@ -58,13 +58,17 @@ function ionisationQualifier(species: AtomSpecies, reading: EnergyReading | null
  * for one not asked yet: the energies wait for the species' picture (ruling
  * C15), and until then the line says so.
  */
-function energyValueText(reading: EnergyReading | null, status: EnergiesState['status'], noValueReason?: string, pictureFailed = false): string {
+function energyValueText(reading: EnergyReading | null, status: EnergiesState['status'], noValueReason?: string, pictureFailed = false, isExcitation = false): string {
     // Ruling FR-2: "waiting" would wait for ever on a picture that failed.
-    if (status === 'idle') return pictureFailed ? 'not computed — the picture\'s SCF did not converge' : 'waiting for the picture…';
+    // The picture's error is either an unconverged SCF or a worker failure;
+    // both leave the energies unasked, so say that rather than guess which.
+    if (status === 'idle') return pictureFailed ? 'not computed — the picture\'s solve failed' : 'waiting for the picture…';
     if (status === 'computing') return 'computing…';
     if (reading) {
         const value = `${reading.valueEv.toFixed(2).replace('-', '−')} eV`;
-        return reading.valueEv < 0 ? `${value} (${BELOW_GROUND_NOTE})` : value;
+        // Ruling FR-1's note is about an excited configuration landing below
+        // the ground one; a negative ionisation energy would be another fault.
+        return isExcitation && reading.valueEv < 0 ? `${value} (${BELOW_GROUND_NOTE})` : value;
     }
     return noValueReason ? `— (${noValueReason})` : '—';
 }
@@ -94,12 +98,12 @@ const MethodLabel: React.FC = () => {
 
 /** "5.37 eV  ΔSCF, LDA", the method one hover away (spec §3.1). */
 const EnergyLine: React.FC<{
-    label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number; noValueReason?: string; pictureFailed?: boolean;
+    label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number; noValueReason?: string; pictureFailed?: boolean; isExcitation?: boolean;
 }> =
-    ({ label, reading, status, measuredEv, noValueReason, pictureFailed }) => (
+    ({ label, reading, status, measuredEv, noValueReason, pictureFailed, isExcitation }) => (
         <Typography variant="body2" className="species-energy">
             {label}:{' '}
-            {energyValueText(reading, status, noValueReason, pictureFailed)}
+            {energyValueText(reading, status, noValueReason, pictureFailed, isExcitation)}
             {' '}<MethodLabel />
             {measuredEv !== undefined && reading && <span className="species-measured"> · measured {measuredEv.toFixed(3)} eV (NIST)</span>}
         </Typography>
@@ -233,6 +237,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({ species, onChargeChan
                     {species.excitation ? (
                         <EnergyLine
                             label={`Excitation energy ${excitationLabel(species.excitation)}`}
+                            isExcitation
                             reading={reading}
                             status={effectiveEnergies.status}
                             pictureFailed={pictureFailed}

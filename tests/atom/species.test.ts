@@ -54,17 +54,18 @@ describe('species', () => {
 
     // Final review I1: the open subshell is the valence of a d or f ion, and
     // a closed d10 with nothing outside it is the valence of Cu+ and Pd --
-    // while a closed core under a valence shell (Na 2p, K 3p) stays out.
+    // while a closed core under a valence shell (Na 2p, K 3p), or the s/p of
+    // a shell whose d is the valence (Fe3+ 3s/3p, Pd 4s/4p), stays out.
     // Targets run in hydrogen-like (n, l) order for a cation, Madelung order
     // for a neutral atom, and an empty subshell the ground state skipped
     // (Pd's 5s, Ca+'s 3d) always counts as above.
     it.each([
         // [what, Z, charge, sources, { source: targets }]
-        ['Fe³⁺ excites its open 3d, and its 3s/3p into 3d', 26, 3, ['3s', '3p', '3d'],
-            { '3s': ['3d', '4s', '4p', '4d'], '3p': ['3d', '4s', '4p', '4d'], '3d': ['4s', '4p', '4d'] }],
-        ['Cu⁺ excites its d¹⁰ into the empty 4s', 29, 1, ['3s', '3p', '3d'],
-            { '3d': ['4s', '4p', '4d'], '3s': ['4s', '4p', '4d'] }],
-        ['Pd excites its d¹⁰ into the 5s the ground state left empty', 46, 0, ['4s', '4p', '4d'],
+        ['Fe³⁺ excites its open 3d, not the 3s/3p core beneath it', 26, 3, ['3d'],
+            { '3d': ['4s', '4p', '4d'] }],
+        ['Cu⁺ excites its d¹⁰ into the empty 4s', 29, 1, ['3d'],
+            { '3d': ['4s', '4p', '4d'] }],
+        ['Pd excites its d¹⁰ into the 5s the ground state left empty', 46, 0, ['4d'],
             { '4d': ['5s', '5p', '5d'] }],
         ['Gd³⁺ excites its open 4f', 64, 3, ['4f', '5s', '5p'],
             { '4f': ['5d', '6s', '6p', '6d'], '5p': ['5d', '6s', '6p', '6d'] }],

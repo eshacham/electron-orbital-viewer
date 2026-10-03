@@ -215,6 +215,14 @@ describe('SpeciesControls', () => {
         expect(screen.queryByText(/below the ground configuration/)).toBeNull();
     });
 
+    it('keeps the s→d note off an ionisation energy, even a negative one', () => {
+        renderControls({
+            species: { Z: 35, charge: -1, excitation: null },
+            energies: { speciesKey: '35-1', status: 'done', ionisation: { valueEv: -0.2, fromLabel: 'Br⁻', toLabel: 'Br' }, excitation: null, message: null },
+        });
+        expect(screen.queryByText(/below the ground configuration/)).toBeNull();
+    });
+
     // Ruling FR-2: the energies wait for the picture (C15); a picture that
     // never lands must not leave them "waiting" for ever.
     it('says the energies were not computed when the picture\'s SCF did not converge', () => {
@@ -223,7 +231,7 @@ describe('SpeciesControls', () => {
             pictureFailed: true,
         });
         const line = screen.getByText(/Excitation energy/).closest('.species-energy')!;
-        expect(line).toHaveTextContent('not computed — the picture\'s SCF did not converge');
+        expect(line).toHaveTextContent('not computed — the picture\'s solve failed');
         expect(line).not.toHaveTextContent('waiting');
     });
 

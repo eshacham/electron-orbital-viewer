@@ -17,10 +17,10 @@ export const HARTREE_IN_EV = 27.211386245988;
 export const DELTA_SCF_LABEL = 'ΔSCF, LDA';
 export const DELTA_SCF_METHOD =
     'ΔSCF: the difference of two self-consistent total energies, each from a central-field, spin-polarised ' +
-    'LDA calculation (Slater exchange + VWN5 correlation, spherically averaged, non-relativistic) -- a ' +
+    'LDA calculation (Slater exchange + VWN5 correlation, spherically averaged, non-relativistic) — a ' +
     'different, spin-restricted form of the same LDA draws the picture on screen. Occupations ' +
     'follow Hund\'s rule (maximum spin), so an excitation out of a closed subshell lands in the highest-spin ' +
-    'state it can reach -- He 1s→2s gives 2³S, Mg 3s→3p gives ³P. One-electron species are exact. ' +
+    'state it can reach — He 1s→2s gives 2³S, Mg 3s→3p gives ³P. One-electron species are exact. ' +
     'Never an orbital eigenvalue.';
 
 export interface EnergyReading { valueEv: number; fromLabel: string; toLabel: string }

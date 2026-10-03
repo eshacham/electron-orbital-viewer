@@ -50,7 +50,8 @@ export function speciesKey(species: AtomSpecies): string {
  * about, so every open subshell counts wherever it sits. The outermost
  * shell's closed d10 counts too -- Cu+ and Ag+ (3d10, 4d10), Zn2+, Hg2+, and
  * neutral Pd, whose 5s is empty -- because nothing lies outside it: it is the
- * least bound subshell the species has. A closed subshell under a shell that
+ * least bound subshell the species has, and that shell's own s and p, which
+ * lie well below its d, stay out. A closed subshell under a shell that
  * *is* occupied stays out (Na 2p, K 3p, Zn 3d under 4s2): that is a core
  * excitation, tens of eV up and not what "excite" means here. None for an
  * anion: its extra electron is barely held as it is.
@@ -59,8 +60,13 @@ export function excitationSources(Z: number, charge: number): SubshellRef[] {
     if (charge < 0 || !allowedCharges(Z).includes(charge)) return [];
     const configuration = ionConfigurationFor(Z, charge);
     const valenceN = valenceShellOf(configuration);
+    // An outermost shell that holds a d or f (Cu+ 3s2 3p6 3d10, Fe3+ 3d5, Pd
+    // 4s2 4p6 4d10) has its s and p tens of eV below that d: those are core,
+    // not valence, whatever their n.
+    const outerHoldsDOrF = configuration.some(s => s.n === valenceN && s.l >= 2 && s.electrons > 0);
+    const isOpen = (s: SubshellOccupancy) => s.electrons < capacity(s.l);
     return configuration
-        .filter(s => s.electrons > 0 && (s.n === valenceN || s.electrons < capacity(s.l)))
+        .filter(s => s.electrons > 0 && (isOpen(s) || (s.n === valenceN && !(outerHoldsDOrF && s.l < 2))))
         .map(({ n, l }) => ({ n, l }))
         .sort(hydrogenLikeOrder);
 }
