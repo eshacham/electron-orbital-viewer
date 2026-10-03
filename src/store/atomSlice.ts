@@ -61,8 +61,10 @@ export interface AtomState {
     /** What to solve alongside Z: one promoted electron `isValidExcitation` accepts, or the ground state. */
     excitation: Excitation | null;
     /**
-     * The worker's "LDA does not bind this anion…" message (spec §3.5: shown,
-     * not drawn). Set instead of `profile` and instead of `error`: an
+     * The worker's "LDA does not bind …" verdict (spec §3.5: shown, not
+     * drawn) -- for an anion whose extra electron is not bound, or, since
+     * ruling T7-b, an excited species whose promoted electron is not (Sm
+     * 6s → 4f). Set instead of `profile` and instead of `error`: an
      * explained physical outcome, not a failure of the solver.
      */
     unbound: string | null;

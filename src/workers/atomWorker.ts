@@ -1,6 +1,6 @@
 import { AtomSolution, solveAtom, solveSpecies } from '../atom/scf';
 import { UnboundAnionError, UnboundElectronError } from '../atom/scf_shared';
-import { AtomSpecies, Excitation, isNeutralGround, speciesConfiguration, speciesKey, speciesTitle } from '../atom/species';
+import { AtomSpecies, Excitation, isNeutralGround, neutralGround, speciesConfiguration, speciesKey, speciesTitle } from '../atom/species';
 import { RelativityMode, scfLabel } from '../atom/relativity';
 import { subshellLabel } from '../atom/configurations';
 import { ValenceSContraction, valenceSContraction } from '../atom/relativistic_comparison';
@@ -105,6 +105,14 @@ export interface SerialisedAtomProfile {
      * neutral ground state, which is its own reference.
      */
     reference?: ReferenceRadii | null;
+    /**
+     * Why an ion or excited atom carries no reference ring: the neutral atom
+     * failed in the same mode (ruling C4 solves it in the species' own
+     * mode). The ring is an extra, so its failure costs the ring and the
+     * camera's framing floor, never the picture; this says so, naming the
+     * method that failed. Null whenever there is nothing to explain.
+     */
+    referenceUnavailable?: string | null;
     /**
      * Which radial equation drew this profile; absent means 'off', which
      * keeps every hand-built test profile valid. The store compares it with
@@ -229,6 +237,7 @@ export function buildSerialisedAtomProfile(
     extras: {
         speciesKey?: string;
         reference?: ReferenceRadii | null;
+        referenceUnavailable?: string | null;
         nonRelativistic?: AtomSolution | null;
         comparisonUnavailable?: string | null;
     } = {}
@@ -258,6 +267,7 @@ export function buildSerialisedAtomProfile(
         charge: atom.charge,
         speciesKey: extras.speciesKey ?? String(atom.Z),
         reference: extras.reference ?? null,
+        referenceUnavailable: extras.referenceUnavailable ?? null,
         rMin: grid.rMin,
         dx: grid.dx,
         size: grid.size,
@@ -489,12 +499,20 @@ export function handleAtomWorkerRequest(data: AtomWorkerRequest): { response: At
             const type = error instanceof UnboundElectronError ? 'unbound' : 'error';
             return { response: { type, message, requestId }, transfer: [] };
         }
-        const reference = isNeutralGround(species) ? null : referenceRadiiFor(species.Z, data.enclosedFraction, relativity);
+        let reference: ReferenceRadii | null = null;
+        let referenceUnavailable: string | null = null;
+        if (!isNeutralGround(species)) {
+            try {
+                reference = referenceRadiiFor(species.Z, data.enclosedFraction, relativity);
+            } catch (error) {
+                referenceUnavailable = `No neutral reference ring: ${solveFailureMessage(neutralGround(species.Z), relativity, error)}`;
+            }
+        }
         const { nonRelativistic, comparisonUnavailable } = relativity === 'off'
             ? { nonRelativistic: null, comparisonUnavailable: null }
             : nonRelativisticBaseline(species);
         const profile = buildSerialisedAtomProfile(atom, data.enclosedFraction, {
-            speciesKey: speciesKey(species), reference, nonRelativistic, comparisonUnavailable,
+            speciesKey: speciesKey(species), reference, referenceUnavailable, nonRelativistic, comparisonUnavailable,
         });
         return { response: { type: 'success', profile, requestId }, transfer: transferListFor(profile) };
     } catch (error) {

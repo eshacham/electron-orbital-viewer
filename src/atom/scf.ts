@@ -294,6 +294,15 @@ function solveOneElectronRelativistic(
 // the bare species key, so nothing that existed before Phase 4 moves.
 const solveSpeciesCache = new Map<string, AtomSolution>();
 
+// A non-relativistic solve's failure, by species key: the verdict (Pr-Eu
+// 6s -> 4f's unbound 4f, an unbound anion) is as pure a function of the
+// species as an answer is. A relativistic request asks for the
+// non-relativistic solve twice -- the warm-start probe below and the
+// worker's comparison baseline -- and again on every repeat, so without
+// this a species whose non-relativistic solve fails pays for that failing
+// SCF over and over. Off only: that is the solve asked for repeatedly.
+const failedNonRelativisticSolves = new Map<string, unknown>();
+
 /**
  * Solves every occupied subshell of a species -- an element, a charge and
  * at most one promoted electron -- self-consistently, once per species.
@@ -342,6 +351,7 @@ export function solveSpecies(species: AtomSpecies, relativity: RelativityMode = 
     const key = relativity === 'off' ? speciesKey(species) : `${speciesKey(species)}@${relativity}`;
     const cached = solveSpeciesCache.get(key);
     if (cached) return cached;
+    if (failedNonRelativisticSolves.has(key)) throw failedNonRelativisticSolves.get(key);
 
     const configuration = speciesConfiguration(species);
     const highestN = highestPrincipalQuantumNumber(configuration);
@@ -358,7 +368,14 @@ export function solveSpecies(species: AtomSpecies, relativity: RelativityMode = 
             }
         }
     }
-    solution ??= solveAtomOnGrid(species.Z, grid, { configuration, relativity });
+    if (!solution) {
+        try {
+            solution = solveAtomOnGrid(species.Z, grid, { configuration, relativity });
+        } catch (error) {
+            if (relativity === 'off') failedNonRelativisticSolves.set(key, error);
+            throw error;
+        }
+    }
     solveSpeciesCache.set(key, solution);
     return solution;
 }

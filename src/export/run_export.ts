@@ -73,8 +73,9 @@ export const COMPOSITION_FAILED_REASON = 'This shell\'s orbital lobes failed to 
 
 function drawnReason(state: RootState): string | null {
     if (state.atom.mode === 'atom') {
-        // Task 12b (ruling C4): an unbound anion is a verdict (spec §3.5),
-        // not a solve still in progress -- every export must say so in the
+        // Task 12b (ruling C4): an unbound anion -- or, since ruling T7-b,
+        // an excitation whose promoted electron LDA does not bind -- is a
+        // verdict (spec §3.5), not a solve still in progress -- every export must say so in the
         // store's own words, never the generic "waiting" reason, which
         // would read as if trying again later would help.
         if (state.atom.unbound) return state.atom.unbound;

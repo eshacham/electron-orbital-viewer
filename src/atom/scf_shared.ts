@@ -9,7 +9,6 @@ import { RadialGrid } from './radial_grid';
 import { RadialState, hasBoundState } from './radial_solver';
 import { StateNotFoundError } from './eigenvalue_search';
 import { SubshellOccupancy, subshellLabel } from './configurations';
-import { jLabel } from './relativity';
 
 export const MAX_ITERATIONS = 200;
 // Ruling: "max|delta-V * r| < 1e-6" — measured in r*V (a Hartree-like unit
@@ -145,7 +144,7 @@ export class UnboundAnionError extends Error {
     /** The j-level, when a spin-orbit (Dirac) solve is the one that found it unbound. */
     readonly j?: number;
     constructor(n: number, l: number, j?: number) {
-        const label = subshellLabel(n, l) + (j === undefined ? '' : jLabel(j));
+        const label = subshellLabel(n, l, j);
         super(`LDA does not bind this anion: its ${label} electron is not bound by 10⁻⁴ Ha or more.`);
         this.name = 'UnboundAnionError';
         this.n = n;
@@ -173,7 +172,7 @@ export class UnboundElectronError extends Error {
     /** The j-level, when a spin-orbit (Dirac) solve is the one that found it unbound. */
     readonly j?: number;
     constructor(n: number, l: number, j?: number) {
-        const label = subshellLabel(n, l) + (j === undefined ? '' : jLabel(j));
+        const label = subshellLabel(n, l, j);
         super(`LDA does not bind the ${label} electron in this configuration: it is not bound by 10⁻⁴ Ha or more.`);
         this.name = 'UnboundElectronError';
         this.n = n;

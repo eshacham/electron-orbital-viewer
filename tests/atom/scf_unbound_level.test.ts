@@ -25,6 +25,18 @@ describe('an occupied level the field does not bind is a verdict, not a picture'
         expect(unbound.message).toBe('LDA does not bind the 4f electron in this configuration: it is not bound by 10⁻⁴ Ha or more.');
     });
 
+    // The verdict is as pure a function of the species as an answer is, and
+    // a relativistic request asks for it twice (the warm-start probe and the
+    // worker's comparison baseline) and again on every repeat: memoised, the
+    // same error comes back at once rather than a second failing SCF.
+    it('remembers the verdict: a repeat throws the very same error without solving again', () => {
+        const first = thrownBy(() => solveSpecies(sixSToFourF(62)));
+        const started = performance.now();
+        const second = thrownBy(() => solveSpecies(sixSToFourF(62)));
+        expect(second).toBe(first);
+        expect(performance.now() - started).toBeLessThan(50);
+    });
+
     it('Pr 6s → 4f: so does the spin-polarised solve behind its ΔSCF energy', () => {
         const species = sixSToFourF(59);
         expect(() => solvePolarised(59, speciesConfiguration(species))).toThrow(UnboundElectronError);

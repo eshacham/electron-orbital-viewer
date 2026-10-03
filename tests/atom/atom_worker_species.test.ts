@@ -166,6 +166,25 @@ describe('atom worker, relativity', () => {
         expect(scalar.profile.reference!.contourRadius).not.toBe(off.profile.reference!.contourRadius);
     });
 
+    // Fix round 1 (M2): the ring is an extra, so a neutral that fails in the
+    // ion's mode costs the ring, never the ion's own picture -- and the
+    // payload says why, naming the mode that failed.
+    it('lands the ion without a ring when the neutral reference fails in its mode', () => {
+        const spy = jest.spyOn(scf, 'solveAtom').mockImplementation(() => { throw new Error('boom'); });
+        try {
+            const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 2, charge: 1, excitation: null, enclosedFraction: 0.9, relativity: 'scalar', requestId: 18 });
+            if (response.type !== 'success') throw new Error(response.type);
+            expect(response.profile.reference).toBeNull();
+            expect(response.profile.referenceUnavailable).toBe('No neutral reference ring: Scalar-relativistic SCF for Helium failed: boom');
+        } finally {
+            spy.mockRestore();
+        }
+        const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 2, charge: 1, excitation: null, enclosedFraction: 0.9, relativity: 'scalar', requestId: 19 });
+        if (response.type !== 'success') throw new Error(response.type);
+        expect(response.profile.reference).not.toBeNull();
+        expect(response.profile.referenceUnavailable).toBeNull();
+    });
+
     it('names the requested mode when the solve fails', () => {
         const spy = jest.spyOn(scf, 'solveSpecies').mockImplementation(() => { throw new UnboundElectronError(4, 3, 3.5); });
         try {

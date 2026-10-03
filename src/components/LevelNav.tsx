@@ -65,7 +65,8 @@ interface LevelNavProps {
     speciesControls?: React.ReactNode;
     /**
      * Nothing is drawn for this species -- an anion LDA does not bind (spec
-     * §3.5) -- so there is no shell to open. The configuration and valence
+     * §3.5), or an excited species whose promoted electron it does not
+     * (ruling T7-b) -- so there is no shell to open. The configuration and valence
      * lines still name the species; the chips are shown disabled rather
      * than inviting a click that can do nothing.
      */

@@ -37,7 +37,12 @@ export function meanRadius(grid: RadialGrid, state: RadialState): number {
     return integrateOnGrid(grid, integrand);
 }
 
-/** The occupied s state with the highest n -- the valence s (palladium's is 4s: it has no 5s electron). */
+/**
+ * The occupied s state with the highest n -- the valence s (palladium's is
+ * 4s: it has no 5s electron). Occupied in *this* species: for an excited
+ * species that is not always the shell the neutral's valence would suggest
+ * -- Au 6s → 6p has no 6s electron, so its "valence s" is the 5s.
+ */
 function outermostS(atom: AtomSolution): (RadialState & { electrons: number }) | undefined {
     let best: (RadialState & { electrons: number }) | undefined;
     for (const state of atom.states) {
@@ -47,6 +52,13 @@ function outermostS(atom: AtomSolution): (RadialState & { electrons: number }) |
 }
 
 /**
+ * The contraction of the outermost *occupied* s (see outermostS), which is
+ * why the result carries its own `n` and `label`: a reader must be told
+ * which shell it is (5s for Au 6s → 6p), never assume the neutral's
+ * valence. An LDA value like every number here -- ⟨r⟩ of LDA orbitals, not
+ * Dirac–Fock ones (gold's 6s: 14 % here against the Dirac–Fock textbook
+ * ~17-20 %) -- so a display states the method with it.
+ *
  * Null when there is no s to compare (no s electron at all) or the two
  * solves' outermost s differ in n -- they cannot for one species, whose
  * configuration both solves share, but a mismatched pair must not be read
