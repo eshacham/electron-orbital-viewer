@@ -372,3 +372,35 @@ describe('atom profile', () => {
         });
     });
 });
+
+import { solveAtom as solveAtomForRelativity } from '../../src/atom/scf';
+
+describe('relativistic profiles', () => {
+    it('sums subshell curves, small component included, back to D', () => {
+        const atom = solveAtomForRelativity(10, 'spinOrbit');
+        const profile = buildAtomProfile(atom, 0.9);
+        for (const j of [100, 800, 1500]) {
+            const sum = profile.subshells.reduce((acc, s) => acc + s.curve.values[j], 0);
+            expect(sum).toBeCloseTo(atom.D[j], 10);
+        }
+        expect(profile.subshells.map(s => s.curve.label)).toEqual(['1s½', '2s½', '2p½', '2p³⁄₂']);
+        expect(profile.subshells[3].j).toBe(1.5);
+    });
+
+    it('leaves j off a profile without spin–orbit', () => {
+        const profile = buildAtomProfile(solveAtomForRelativity(10, 'scalar'), 0.9);
+        expect(profile.subshells.map(s => s.curve.label)).toEqual(['1s', '2s', '2p']);
+        expect(profile.subshells.every(s => !('j' in s))).toBe(true);
+    });
+
+    it('finds each j-level\'s own radial function, and only with its j', () => {
+        const atom = solveAtomForRelativity(10, 'spinOrbit');
+        const half = atom.states.find(s => s.l === 1 && s.j === 0.5)!;
+        const threeHalves = atom.states.find(s => s.l === 1 && s.j === 1.5)!;
+        const r = atom.grid.r[900];
+        expect(radialFunctionFor(atom, 2, 1, 0.5)(r)).toBeCloseTo(half.R[900], 12);
+        expect(radialFunctionFor(atom, 2, 1, 1.5)(r)).toBeCloseTo(threeHalves.R[900], 12);
+        expect(() => radialFunctionFor(atom, 2, 1)).toThrow(/n=2, l=1\)/);
+        expect(() => radialFunctionFor(atom, 3, 1, 1.5)).toThrow(/j=1.5/);
+    });
+});

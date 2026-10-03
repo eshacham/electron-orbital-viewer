@@ -1,5 +1,7 @@
 import { handleAtomWorkerRequest, solveFailureMessage } from '../../src/workers/atomWorker';
 import { UnboundElectronError } from '../../src/atom/scf_shared';
+import * as scf from '../../src/atom/scf';
+import { buildAtomProfile } from '../../src/atom/atom_profile';
 import { AtomSpecies } from '../../src/atom/species';
 import { NIST_FIRST_IONISATION_EV } from '../../src/atom/ionisation_references';
 import { wholeAtomFramingRadius } from '../../src/atom/framing';
@@ -116,5 +118,104 @@ describe('solveFailureMessage (ruling T7-f)', () => {
     it('keeps any other failure\'s own explanation after the species and mode', () => {
         expect(solveFailureMessage(ytterbium, 'off', new Error('Radial grid (rMax=140) is too small to hold n=4, l=3.'))).toBe(
             'Non-relativistic SCF for Ytterbium failed: Radial grid (rMax=140) is too small to hold n=4, l=3.');
+    });
+});
+
+describe('atom worker, relativity', () => {
+    it('solves in the requested mode and carries the same species\' non-relativistic comparison', () => {
+        // Li+ rather than a heavier ion only for the default suite's time;
+        // the j-split of a p shell is pinned in atom_worker_contract.
+        const { response, transfer } = handleAtomWorkerRequest({ type: 'solve', Z: 3, charge: 1, excitation: null, enclosedFraction: 0.9, relativity: 'spinOrbit', requestId: 11 });
+        if (response.type !== 'success') throw new Error(response.type);
+        const { profile } = response;
+        expect(profile.relativity).toBe('spinOrbit');
+        // The cache key stays the species' own; the mode is carried beside it.
+        expect(profile.speciesKey).toBe('3+1');
+        expect(profile.subshells.map(s => [s.n, s.l, s.j])).toEqual([[1, 0, 0.5]]);
+        // Ruling C5: Li+'s own non-relativistic solve -- 1s², no 2s -- not neutral lithium's.
+        expect(profile.nonRelativistic!.subshells.map(s => [s.n, s.l, s.electrons])).toEqual([[1, 0, 2]]);
+        expect(profile.valenceS!.label).toBe('1s½');
+        expect(profile.reference).not.toBeNull();
+        expect(profile.comparisonUnavailable).toBeNull();
+        for (const curve of [...profile.nonRelativistic!.shells, ...profile.nonRelativistic!.subshells].map(c => c.curve)) {
+            expect(transfer).toContain(curve.buffer);
+        }
+        // postMessage rejects a transfer list that names one buffer twice.
+        expect(new Set(transfer).size).toBe(transfer.length);
+    });
+
+    it('treats an absent mode as off, exactly as before', () => {
+        const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 11, charge: 1, excitation: null, enclosedFraction: 0.9, requestId: 12 });
+        if (response.type !== 'success') throw new Error(response.type);
+        expect(response.profile.relativity).toBe('off');
+        expect(response.profile.nonRelativistic).toBeNull();
+        expect(response.profile.valenceS).toBeNull();
+    });
+
+    // Ruling C4: an ion's reference ring is the neutral atom solved in the
+    // ion's own mode, cached per mode -- the off request first, so a key that
+    // ignored the mode would serve the off radii to the scalar request.
+    it('draws the reference ring from the neutral atom in the same mode', () => {
+        const off = handleAtomWorkerRequest({ type: 'solve', Z: 3, charge: 1, excitation: null, enclosedFraction: 0.9, requestId: 13 }).response;
+        const scalar = handleAtomWorkerRequest({ type: 'solve', Z: 3, charge: 1, excitation: null, enclosedFraction: 0.9, relativity: 'scalar', requestId: 14 }).response;
+        if (off.type !== 'success' || scalar.type !== 'success') throw new Error('Li+ did not solve');
+        const neutralScalar = buildAtomProfile(scf.solveAtom(3, 'scalar'), 0.9);
+        expect(scalar.profile.reference!.contourRadius).toBe(neutralScalar.contourRadius);
+        expect(scalar.profile.reference!.displayRadius).toBe(neutralScalar.displayRadius);
+        expect(scalar.profile.reference!.framingRadius).toBe(wholeAtomFramingRadius(neutralScalar));
+        expect(scalar.profile.reference!.contourRadius).not.toBe(off.profile.reference!.contourRadius);
+    });
+
+    it('names the requested mode when the solve fails', () => {
+        const spy = jest.spyOn(scf, 'solveSpecies').mockImplementation(() => { throw new UnboundElectronError(4, 3, 3.5); });
+        try {
+            const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 70, enclosedFraction: 0.9, relativity: 'spinOrbit', requestId: 15 });
+            expect(response).toEqual({
+                type: 'unbound',
+                message: 'Dirac (spin–orbit) SCF for Ytterbium: the 4f⁷⁄₂ electron is not bound (LDA binds it by less than 10⁻⁴ Ha).',
+                requestId: 15,
+            });
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    // Ruling T7-b: for Pr-Eu 6s -> 4f the non-relativistic solve finds the
+    // promoted 4f unbound while a relativistic mode may bind it. The
+    // relativistic picture still lands, with no dashed curve and no "what
+    // changed", and says why. Simulated on helium so it costs next to
+    // nothing: the real solveSpecies answers the relativistic request, the
+    // off one throws.
+    it('lands the relativistic picture without a comparison when the non-relativistic solve finds a level unbound', () => {
+        const real = scf.solveSpecies;
+        const spy = jest.spyOn(scf, 'solveSpecies').mockImplementation((species, relativity = 'off') => {
+            if (relativity === 'off') throw new UnboundElectronError(4, 3);
+            return real(species, relativity);
+        });
+        try {
+            const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 2, enclosedFraction: 0.9, relativity: 'scalar', requestId: 16 });
+            if (response.type !== 'success') throw new Error(response.type);
+            expect(response.profile.relativity).toBe('scalar');
+            expect(response.profile.nonRelativistic).toBeNull();
+            expect(response.profile.valenceS).toBeNull();
+            expect(response.profile.comparisonUnavailable).toBe('No non-relativistic comparison: LDA does not bind the 4f without relativity.');
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it('draws no comparison from a non-relativistic solve that did not converge', () => {
+        const real = scf.solveSpecies;
+        const spy = jest.spyOn(scf, 'solveSpecies').mockImplementation((species, relativity = 'off') =>
+            relativity === 'off' ? { ...real(species, 'off'), converged: false } : real(species, relativity));
+        try {
+            const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 2, enclosedFraction: 0.9, relativity: 'scalar', requestId: 17 });
+            if (response.type !== 'success') throw new Error(response.type);
+            expect(response.profile.nonRelativistic).toBeNull();
+            expect(response.profile.valenceS).toBeNull();
+            expect(response.profile.comparisonUnavailable).toBe('No non-relativistic comparison: the non-relativistic SCF did not converge.');
+        } finally {
+            spy.mockRestore();
+        }
     });
 });

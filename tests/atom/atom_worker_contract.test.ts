@@ -126,3 +126,47 @@ describe('atom worker serialisation contract', () => {
         }
     });
 });
+
+describe('relativistic payload', () => {
+    let profile: SerialisedAtomProfile;
+    beforeAll(() => {
+        profile = buildSerialisedAtomProfile(solveAtom(10, 'spinOrbit'), 0.9, { nonRelativistic: solveAtom(10) });
+    });
+
+    it('carries the mode, j per subshell, comparison curves and the valence-s change', () => {
+        expect(profile.relativity).toBe('spinOrbit');
+        expect(profile.subshells.map(s => [s.n, s.l, s.j])).toEqual([[1, 0, 0.5], [2, 0, 0.5], [2, 1, 0.5], [2, 1, 1.5]]);
+        expect(profile.nonRelativistic!.shells.map(s => s.n)).toEqual([1, 2]);
+        expect(profile.nonRelativistic!.subshells.map(s => [s.n, s.l, s.electrons])).toEqual([[1, 0, 2], [2, 0, 2], [2, 1, 6]]);
+        expect(profile.valenceS!.label).toBe('2s½');
+        expect(profile.nonRelativistic!.shells[0].curve.length).toBe(profile.size);
+        expect(profile.comparisonUnavailable).toBeNull();
+    });
+
+    it('stays plain and survives structuredClone', () => {
+        const clone = structuredClone(profile);
+        expect(clone.nonRelativistic!.subshells[2].curve).toEqual(profile.nonRelativistic!.subshells[2].curve);
+        expect(clone.valenceS).toEqual(profile.valenceS);
+    });
+
+    it('omits comparison data for a non-relativistic solve', () => {
+        const plain = buildSerialisedAtomProfile(solveAtom(10), 0.9);
+        expect(plain.relativity).toBe('off');
+        expect(plain.nonRelativistic).toBeNull();
+        expect(plain.valenceS).toBeNull();
+        expect(plain.comparisonUnavailable).toBeNull();
+        expect(plain.subshells.every(s => !('j' in s))).toBe(true);
+    });
+
+    // Ruling T7-b: Pr-Eu 6s -> 4f has no non-relativistic answer at all, so a
+    // relativistic picture of it has nothing to be compared against -- it
+    // still lands, without the dashed curve, and says why.
+    it('carries the stated reason, and no comparison, when the non-relativistic baseline is missing', () => {
+        const reason = 'No non-relativistic comparison: LDA does not bind the 4f without relativity.';
+        const lone = buildSerialisedAtomProfile(solveAtom(10, 'scalar'), 0.9, { comparisonUnavailable: reason });
+        expect(lone.relativity).toBe('scalar');
+        expect(lone.nonRelativistic).toBeNull();
+        expect(lone.valenceS).toBeNull();
+        expect(lone.comparisonUnavailable).toBe(reason);
+    });
+});

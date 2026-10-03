@@ -1,5 +1,6 @@
 import { MAX_ATOMIC_NUMBER } from '../elements';
 import { shellLetter } from '../orbital_names';
+import { jLabel } from './relativity';
 
 /**
  * Ground-state electron configurations for the neutral atoms, Z = 1..118.
@@ -198,9 +199,13 @@ function superscript(value: number): string {
     return String(value).split('').map(digit => SUPERSCRIPT_DIGITS[Number(digit)]).join('');
 }
 
-/** e.g. (2, 1) -> "2p". */
-export function subshellLabel(n: number, l: number): string {
-    return `${n}${shellLetter(l)}`;
+/**
+ * e.g. (2, 1) -> "2p"; with a j-level, (6, 1, 1.5) -> "6p³⁄₂" (spec §5
+ * Phase 4 notation). relativity.ts imports only a type from this module, so
+ * the import above is no runtime cycle.
+ */
+export function subshellLabel(n: number, l: number, j?: number): string {
+    return `${n}${shellLetter(l)}${j === undefined ? '' : jLabel(j)}`;
 }
 
 /** Renders any configuration — an ion's or an excited atom's included. `configurationLabel` below is the neutral-atom case. */

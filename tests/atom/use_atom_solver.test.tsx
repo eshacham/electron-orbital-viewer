@@ -418,7 +418,22 @@ describe('useAtomSolver with species', () => {
         act(() => {
             worker.onmessage!({ data: { type: 'success', profile: minimalProfile({ Z: 19, converged: false }), requestId: lastRequestId(worker) } } as MessageEvent);
         });
-        expect(store.getState().atom.error).toBe('The SCF calculation for Potassium, excited 4s → 4d did not converge.');
+        expect(store.getState().atom.error).toBe('Non-relativistic SCF for Potassium, excited 4s → 4d did not converge.');
+    });
+
+    // Ruling T7-f: the method is named too, read from the reply's own profile
+    // -- the mode that actually ran -- so a relativistic failure says so.
+    it('names the mode that did not converge', () => {
+        const store = buildStore();
+        const worker = fakeWorker();
+        store.dispatch(setElement(79));
+        renderHook(() => useAtomSolver(0.9, () => worker), {
+            wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+        });
+        act(() => {
+            worker.onmessage!({ data: { type: 'success', profile: minimalProfile({ Z: 79, converged: false, relativity: 'scalar' }), requestId: lastRequestId(worker) } } as MessageEvent);
+        });
+        expect(store.getState().atom.error).toBe('Scalar-relativistic SCF for Gold did not converge.');
     });
 
     it('turns an unbound reply into the unbound state, not a profile or an error', () => {

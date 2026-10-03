@@ -56,6 +56,11 @@ describe('electron configurations', () => {
         expect(subshellLabel(4, 3)).toBe('4f');
     });
 
+    it('labels a j-level in the spec\'s notation', () => {
+        expect(subshellLabel(6, 1, 1.5)).toBe('6p³⁄₂');
+        expect(subshellLabel(2, 0, 0.5)).toBe('2s½');
+    });
+
     it('orders subshells by n then l regardless of filling order', () => {
         const chromium = configurationFor(24);
         const keys = chromium.map(s => s.n * 10 + s.l);

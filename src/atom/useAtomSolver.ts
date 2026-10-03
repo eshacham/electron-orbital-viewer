@@ -5,6 +5,7 @@ import { createAtomWorker } from '../workers/createAtomWorker';
 import type { AtomWorkerResponse } from '../workers/atomWorker';
 import { getCachedProfile, setCachedProfile } from './profile_cache';
 import { speciesKey, speciesTitle } from './species';
+import { scfLabel } from './relativity';
 
 /**
  * Every reply atomWorker.ts can post, `requestId` echoed from the request
@@ -168,8 +169,12 @@ export function useAtomSolver(
                 dispatch(solveSucceeded(profile));
             } else {
                 // Named by species, not Z: "Z=19" says neither the element
-                // nor that it was K 4s -> 4d, not K, that failed.
-                dispatch(solveFailed(`The SCF calculation for ${speciesTitle({ Z, charge, excitation })} did not converge.`));
+                // nor that it was K 4s -> 4d, not K, that failed. And by
+                // method (ruling T7-f), read from the profile itself -- the
+                // mode that actually ran -- since the same species may
+                // converge in another.
+                const method = scfLabel(profile.relativity ?? 'off');
+                dispatch(solveFailed(`${method} for ${speciesTitle({ Z, charge, excitation })} did not converge.`));
             }
         };
         worker.onerror = (event) => {

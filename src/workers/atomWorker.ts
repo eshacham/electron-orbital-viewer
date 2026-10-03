@@ -1,8 +1,9 @@
 import { AtomSolution, solveAtom, solveSpecies } from '../atom/scf';
 import { UnboundAnionError, UnboundElectronError } from '../atom/scf_shared';
 import { AtomSpecies, Excitation, isNeutralGround, speciesConfiguration, speciesKey, speciesTitle } from '../atom/species';
-import { RelativityMode, jLabel, scfLabel } from '../atom/relativity';
+import { RelativityMode, scfLabel } from '../atom/relativity';
 import { subshellLabel } from '../atom/configurations';
+import { ValenceSContraction, valenceSContraction } from '../atom/relativistic_comparison';
 import { EnergyReading, excitationEnergy, ionisationEnergy } from '../atom/delta_scf';
 import { AtomProfile, buildAtomProfile, packRadialCurve, subshellSamplingRadius, compositeSamplingRadius } from '../atom/atom_profile';
 import { wholeAtomFramingRadius } from '../atom/framing';
@@ -23,6 +24,8 @@ export interface SerialisedShell {
 export interface SerialisedSubshell {
     n: number;
     l: number;
+    /** The j-level; present only with spin–orbit, where each (n, l) with l > 0 is two entries. */
+    j?: number;
     electrons: number;
     /** Eigenvalue in Hartree (negative for a bound state). */
     energy: number;
@@ -53,6 +56,17 @@ export interface SerialisedSubshell {
      * `compositeSamplingRadius` in atom_profile.ts for the measurements.
      */
     compositeSamplingRadius: number;
+}
+
+/**
+ * The same species' non-relativistic solve, on the same grid, reduced to the
+ * curves the radial plot overlays dashed (spec §5 Phase 4: "the radial plot
+ * overlays the non-relativistic curve for comparison"). Per (n, l) even with
+ * spin–orbit -- the non-relativistic atom has no j-levels.
+ */
+export interface SerialisedComparison {
+    shells: Array<{ n: number; curve: Float64Array }>;
+    subshells: Array<{ n: number; l: number; electrons: number; curve: Float64Array }>;
 }
 
 /** The neutral ground state's radii, carried alongside an ion or excited atom's profile for the reference ring. */
@@ -91,6 +105,32 @@ export interface SerialisedAtomProfile {
      * neutral ground state, which is its own reference.
      */
     reference?: ReferenceRadii | null;
+    /**
+     * Which radial equation drew this profile; absent means 'off', which
+     * keeps every hand-built test profile valid. The store compares it with
+     * the mode the switch shows, so a picture from the other mode is never
+     * taken for the current one (ruling C9).
+     */
+    relativity?: RelativityMode;
+    /**
+     * The same species' non-relativistic curves, for the dashed overlay
+     * (ruling C5: the species itself, not the neutral atom). Null for a
+     * non-relativistic profile, which is its own baseline, and for a
+     * relativistic one whose baseline does not exist (see
+     * `comparisonUnavailable`).
+     */
+    nonRelativistic?: SerialisedComparison | null;
+    /** The valence s shell's relativistic contraction, "what changed"; null wherever `nonRelativistic` is. */
+    valenceS?: ValenceSContraction | null;
+    /**
+     * Why a relativistic profile carries no comparison, in words for the
+     * reader: Pr-Eu 6s -> 4f have no non-relativistic answer at all (LDA does
+     * not bind the promoted 4f without relativity, ruling T7-b), yet a
+     * relativistic mode may bind it. The picture still lands; this says why
+     * there is nothing dashed beside it. Null whenever there is nothing to
+     * explain.
+     */
+    comparisonUnavailable?: string | null;
     /**
      * The shared log grid every curve and R array below is sampled on:
      * r_j = rMin * e^(j*dx), j = 0..size-1. One set of parameters suffices
@@ -179,15 +219,38 @@ export interface SerialisedAtomProfile {
  * `extras` is optional so existing callers (and hand-built test fixtures)
  * that only ever solved a neutral atom still type-check unchanged;
  * `speciesKey` defaults to `String(atom.Z)`, which is exactly a neutral
- * ground state's own key.
+ * ground state's own key. `nonRelativistic` is the same species' converged
+ * non-relativistic solve, passed only with a relativistic `atom`;
+ * `comparisonUnavailable` says why it is missing when it is.
  */
 export function buildSerialisedAtomProfile(
     atom: AtomSolution,
     enclosedFraction: number,
-    extras: { speciesKey?: string; reference?: ReferenceRadii | null } = {}
+    extras: {
+        speciesKey?: string;
+        reference?: ReferenceRadii | null;
+        nonRelativistic?: AtomSolution | null;
+        comparisonUnavailable?: string | null;
+    } = {}
 ): SerialisedAtomProfile {
     const profile: AtomProfile = buildAtomProfile(atom, enclosedFraction);
     const { grid } = atom;
+    const nonRelativistic = extras.nonRelativistic ?? null;
+    let comparison: SerialisedComparison | null = null;
+    if (nonRelativistic) {
+        // The dashed curve is drawn against the same radius axis, so it must
+        // live on the same grid; solveSpecies sizes both with gridForAtom(Z,
+        // highest n), which the two solves of one species share.
+        const reference = nonRelativistic.grid;
+        if (reference.size !== grid.size || reference.rMin !== grid.rMin || reference.dx !== grid.dx) {
+            throw new Error('The non-relativistic comparison was solved on a different grid.');
+        }
+        const baseline = buildAtomProfile(nonRelativistic, enclosedFraction);
+        comparison = {
+            shells: baseline.shells.map(shell => ({ n: shell.n, curve: shell.curve.values })),
+            subshells: baseline.subshells.map(s => ({ n: s.n, l: s.l, electrons: s.electrons, curve: s.curve.values })),
+        };
+    }
 
     return {
         Z: atom.Z,
@@ -219,6 +282,7 @@ export function buildSerialisedAtomProfile(
         subshells: profile.subshells.map((subshell, i) => ({
             n: subshell.n,
             l: subshell.l,
+            ...(subshell.j !== undefined ? { j: subshell.j } : {}),
             electrons: subshell.electrons,
             energy: subshell.energy,
             curve: subshell.curve.values,
@@ -240,30 +304,38 @@ export function buildSerialisedAtomProfile(
             samplingRadius: subshellSamplingRadius(grid, subshell.curve.values),
             compositeSamplingRadius: compositeSamplingRadius(grid, subshell.curve.values, subshell.contourRadius),
         })),
+        relativity: atom.relativity,
+        nonRelativistic: comparison,
+        valenceS: nonRelativistic ? valenceSContraction(nonRelativistic, atom) : null,
+        comparisonUnavailable: extras.comparisonUnavailable ?? null,
     };
 }
 
-// Keyed on `${Z}:${enclosedFraction}` -- an ion's reference ring is always
-// the *neutral* atom's radii, so this is deliberately independent of charge
-// and excitation. Without it, every ion or excited-atom request would rerun
-// buildAtomProfile on the neutral solution from scratch even though
-// solveAtom(Z) itself is already memoised; the SCF part was never the
-// expense here, but there is no reason to repeat even the cheap part on
-// every request for the same (Z, fraction) pair.
+// Keyed on the neutral atom's own solve key and the fraction -- an ion's
+// reference ring is always the *neutral* atom's radii, so this is
+// deliberately independent of charge and excitation, but not of the mode
+// (ruling C4): `${Z}:${enclosedFraction}` without relativity, exactly as
+// before, and `${Z}@${relativity}:${enclosedFraction}` with it, built on the
+// solve cache's own `${speciesKey}@${relativity}` (ruling C2). Without it,
+// every ion or excited-atom request would rerun buildAtomProfile on the
+// neutral solution from scratch even though solveAtom(Z) itself is already
+// memoised; the SCF part was never the expense here, but there is no reason
+// to repeat even the cheap part on every request for the same (Z, mode,
+// fraction).
 const referenceRadiiCache = new Map<string, ReferenceRadii>();
 
 /**
- * The neutral ground state's radii for the reference ring. Phase 4: when
- * `relativity` becomes a solve option (Global Constraints), this neutral
- * reference solve must be passed the same `relativity` as the ion's own
- * solve -- comparing a relativistic ion against a non-relativistic neutral
- * reference would silently compare two different methods.
+ * The neutral ground state's radii for the reference ring, solved in the
+ * ion's own mode (ruling C4): comparing a relativistic ion against a
+ * non-relativistic neutral reference would silently compare two different
+ * methods, in the ring and in the camera's framing floor alike.
  */
-function referenceRadiiFor(Z: number, enclosedFraction: number): ReferenceRadii {
-    const key = `${Z}:${enclosedFraction}`;
+function referenceRadiiFor(Z: number, enclosedFraction: number, relativity: RelativityMode): ReferenceRadii {
+    const neutralKey = relativity === 'off' ? String(Z) : `${Z}@${relativity}`;
+    const key = `${neutralKey}:${enclosedFraction}`;
     const hit = referenceRadiiCache.get(key);
     if (hit) return hit;
-    const neutral = buildAtomProfile(solveAtom(Z), enclosedFraction);
+    const neutral = buildAtomProfile(solveAtom(Z, relativity), enclosedFraction);
     const radii: ReferenceRadii = {
         displayRadius: neutral.displayRadius,
         contourRadius: neutral.contourRadius,
@@ -283,6 +355,10 @@ function transferListFor(profile: SerialisedAtomProfile): Transferable[] {
     ];
     for (const shell of profile.shells) buffers.push(shell.curve.buffer, shell.emphasis.buffer);
     for (const subshell of profile.subshells) buffers.push(subshell.curve.buffer, subshell.R.buffer);
+    // Fresh arrays from the comparison's own buildAtomProfile, never shared
+    // with the curves above, so no buffer is listed twice.
+    for (const shell of profile.nonRelativistic?.shells ?? []) buffers.push(shell.curve.buffer);
+    for (const subshell of profile.nonRelativistic?.subshells ?? []) buffers.push(subshell.curve.buffer);
     return buffers;
 }
 
@@ -290,7 +366,8 @@ function transferListFor(profile: SerialisedAtomProfile): Transferable[] {
 /**
  * `'solve'` carries a species -- `charge`/`excitation` default to a neutral
  * ground state so every existing caller (and hand-built test fixture) that
- * only ever named a `Z` still type-checks. `'energies'` is a separate
+ * only ever named a `Z` still type-checks, and an absent `relativity` means
+ * 'off' for the same reason. `'energies'` is a separate
  * request so a slow ΔSCF energies solve (useDeltaScfEnergies' own worker,
  * Task 9) never queues in front of a picture solve on this one.
  *
@@ -302,7 +379,7 @@ function transferListFor(profile: SerialisedAtomProfile): Transferable[] {
  * latest dispatched request.
  */
 export type AtomWorkerRequest =
-    | { type: 'solve'; Z: number; charge?: number; excitation?: Excitation | null; enclosedFraction: number; requestId: number }
+    | { type: 'solve'; Z: number; charge?: number; excitation?: Excitation | null; enclosedFraction: number; relativity?: RelativityMode; requestId: number }
     | { type: 'energies'; Z: number; charge: number; excitation: Excitation | null; requestId: number };
 
 /**
@@ -323,18 +400,45 @@ export type AtomWorkerResponse =
  * -- then why. An electron the field does not bind (UnboundElectronError,
  * ruling T7-b) is said in words, "the promoted 4f electron is not bound",
  * rather than with the solver's own sentence; anything else keeps its own
- * explanation. The worker solves without relativity today; Task 8 passes
- * the request's mode.
+ * explanation. The mode is the request's: the same species may solve in
+ * another one.
  */
 export function solveFailureMessage(species: AtomSpecies, relativity: RelativityMode, error: unknown): string {
     const what = `${scfLabel(relativity)} for ${speciesTitle(species)}`;
     if (error instanceof UnboundElectronError) {
-        const label = subshellLabel(error.n, error.l) + (error.j === undefined ? '' : jLabel(error.j));
+        const label = subshellLabel(error.n, error.l, error.j);
         const to = species.excitation?.to;
         const promoted = to !== undefined && to.n === error.n && to.l === error.l ? 'promoted ' : '';
         return `${what}: the ${promoted}${label} electron is not bound (LDA binds it by less than 10⁻⁴ Ha).`;
     }
     return `${what} failed: ${error instanceof Error ? error.message : 'unknown error'}`;
+}
+
+/**
+ * The same species' non-relativistic solve, the baseline for the dashed
+ * curves and "what changed" (ruling C5) -- or, where there is none, why not.
+ * A relativistic picture never waits on its baseline: Pr-Eu 6s -> 4f have no
+ * non-relativistic answer (the promoted 4f is unbound without relativity,
+ * ruling T7-b) and a relativistic mode may still bind it, so a failed or
+ * unconverged baseline costs only the comparison, never the picture. Usually
+ * a cache hit: solveSpecies warm-starts the relativistic solve from exactly
+ * this one.
+ */
+function nonRelativisticBaseline(species: AtomSpecies): { nonRelativistic: AtomSolution | null; comparisonUnavailable: string | null } {
+    const none = (why: string) => ({ nonRelativistic: null, comparisonUnavailable: `No non-relativistic comparison: ${why}` });
+    let baseline: AtomSolution;
+    try {
+        baseline = solveSpecies(species, 'off');
+    } catch (error) {
+        if (error instanceof UnboundElectronError) {
+            return none(`LDA does not bind the ${subshellLabel(error.n, error.l, error.j)} without relativity.`);
+        }
+        return none(`the non-relativistic SCF failed (${error instanceof Error ? error.message : 'unknown error'}).`);
+    }
+    // Ruling R17 holds for the dashed curve as for the picture: an
+    // iteration limit's last guess is not drawn as an answer.
+    if (!baseline.converged) return none('the non-relativistic SCF did not converge.');
+    return { nonRelativistic: baseline, comparisonUnavailable: null };
 }
 
 /**
@@ -367,7 +471,7 @@ export function handleAtomWorkerRequest(data: AtomWorkerRequest): { response: At
                 // spin-polarised LDA does not (Tb-Er 6s -> 4f): say which
                 // calculation, for which species, rather than the solver's
                 // bare sentence under a picture that shows the level bound.
-                const label = subshellLabel(error.n, error.l) + (error.j === undefined ? '' : jLabel(error.j));
+                const label = subshellLabel(error.n, error.l, error.j);
                 const message = `Spin-polarised ΔSCF for ${speciesTitle(species)}: its ${label} electron is not bound in the spin-polarised LDA the energies use (the picture's spin-restricted LDA binds it), so no energy is given.`;
                 return { response: { type: 'error', message, requestId }, transfer: [] };
             }
@@ -375,17 +479,23 @@ export function handleAtomWorkerRequest(data: AtomWorkerRequest): { response: At
         // Checked before the solve, so a species that is not offered says so
         // plainly rather than as a failed SCF.
         speciesConfiguration(species);
+        const relativity = data.relativity ?? 'off';
         let atom: AtomSolution;
         try {
-            atom = solveSpecies(species);
+            atom = solveSpecies(species, relativity);
         } catch (error) {
             if (error instanceof UnboundAnionError) throw error;
-            const message = solveFailureMessage(species, 'off', error);
+            const message = solveFailureMessage(species, relativity, error);
             const type = error instanceof UnboundElectronError ? 'unbound' : 'error';
             return { response: { type, message, requestId }, transfer: [] };
         }
-        const reference = isNeutralGround(species) ? null : referenceRadiiFor(species.Z, data.enclosedFraction);
-        const profile = buildSerialisedAtomProfile(atom, data.enclosedFraction, { speciesKey: speciesKey(species), reference });
+        const reference = isNeutralGround(species) ? null : referenceRadiiFor(species.Z, data.enclosedFraction, relativity);
+        const { nonRelativistic, comparisonUnavailable } = relativity === 'off'
+            ? { nonRelativistic: null, comparisonUnavailable: null }
+            : nonRelativisticBaseline(species);
+        const profile = buildSerialisedAtomProfile(atom, data.enclosedFraction, {
+            speciesKey: speciesKey(species), reference, nonRelativistic, comparisonUnavailable,
+        });
         return { response: { type: 'success', profile, requestId }, transfer: transferListFor(profile) };
     } catch (error) {
         if (error instanceof UnboundAnionError) return { response: { type: 'unbound', message: error.message, requestId }, transfer: [] };

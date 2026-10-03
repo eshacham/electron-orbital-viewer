@@ -45,6 +45,8 @@ export interface AtomProfile {
     subshells: Array<{
         n: number;
         l: number;
+        /** The j-level; present only with spin–orbit, where each (n, l) with l > 0 is two entries. */
+        j?: number;
         electrons: number;
         energy: number;
         curve: RadialCurve;
@@ -106,16 +108,26 @@ function shellName(n: number): string {
 }
 
 /**
- * A single subshell's contribution to D(r): D_nl(r) = occ * u(r)^2.
+ * A single subshell's contribution to D(r): D_nl(r) = occ * u(r)^2, or
+ * occ * (G² + F²) for a relativistic state.
  *
- * This mirrors buildD in scf.ts exactly (D itself is just the sum of these
- * over every state), which is what makes "subshells sum to their shell" and
- * "shells sum to the total" hold as identities rather than approximations.
+ * This mirrors buildD in scf_shared.ts exactly (D itself is just the sum of
+ * these over every state), which is what makes "subshells sum to their
+ * shell" and "shells sum to the total" hold as identities rather than
+ * approximations.
  */
 function subshellCurveOf(state: RadialState & { electrons: number }): Float64Array {
     const values = new Float64Array(state.u.length);
-    for (let j = 0; j < values.length; j++) {
-        values[j] = state.electrons * state.u[j] * state.u[j];
+    const { u, Q } = state;
+    // The small component is part of the electron's density, and buildD
+    // counts it, so it has to be counted here too for the subshells to keep
+    // summing exactly to D. Two loops, each the same expression buildD uses,
+    // so the sums stay identities to the last bit -- and a non-relativistic
+    // curve is the same floating-point product it always was.
+    if (Q) {
+        for (let j = 0; j < values.length; j++) values[j] = state.electrons * (u[j] * u[j] + Q[j] * Q[j]);
+    } else {
+        for (let j = 0; j < values.length; j++) values[j] = state.electrons * u[j] * u[j];
     }
     return values;
 }
@@ -350,9 +362,10 @@ export function buildAtomProfile(atom: AtomSolution, fraction: number): AtomProf
         return {
             n: state.n,
             l: state.l,
+            ...(state.j !== undefined ? { j: state.j } : {}),
             electrons: state.electrons,
             energy: state.energy,
-            curve: { label: subshellLabel(state.n, state.l), values },
+            curve: { label: subshellLabel(state.n, state.l, state.j), values },
             contourRadius: radiusEnclosing(grid, values, fraction),
         };
     });
@@ -464,11 +477,16 @@ export function subshellSamplingRadius(grid: RadialGrid, curve: Float64Array): n
  * there is no numerical R to interpolate for a subshell the SCF never
  * solved, and silently returning zero would render as "orbital exists but
  * is empty" instead of the caller's actual mistake.
+ *
+ * With spin–orbit each j-level has its own R, so `j` must name one; without
+ * it, `j` must be absent. Either mismatch throws the same way, rather than
+ * quietly handing back the other j-level's (or the other mode's) function.
  */
-export function radialFunctionFor(atom: AtomSolution, n: number, l: number): (r: number) => number {
-    const state = atom.states.find(s => s.n === n && s.l === l);
+export function radialFunctionFor(atom: AtomSolution, n: number, l: number, j?: number): (r: number) => number {
+    const state = atom.states.find(s => s.n === n && s.l === l && s.j === j);
     if (!state) {
-        throw new Error(`(n=${n}, l=${l}) is not an occupied subshell of Z=${atom.Z}.`);
+        const level = j === undefined ? `(n=${n}, l=${l})` : `(n=${n}, l=${l}, j=${j})`;
+        throw new Error(`${level} is not an occupied subshell of Z=${atom.Z}.`);
     }
     return (r: number) => interpolateOnGrid(atom.grid, state.R, r);
 }
