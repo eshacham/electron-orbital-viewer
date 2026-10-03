@@ -788,6 +788,38 @@ Recorded for review, per the session's standing authority.
   in the CSV comment). The only offered species for Z ≤ 56 that does not
   converge is K 4s → 4d; its energy line says the energies were not
   computed because the picture's SCF did not converge (ruling FR-2).
+- **Scalar-relativistic solve fails outright for a deep promotion into an
+  already partially-filled 4f or 5f** (ruling C11's slow sweep,
+  `ATOM_SLOW_TESTS=1 tests/atom/relativistic_heavy_sweep_*.test.ts`; 1,812
+  species, Z = 55..118, every offered ion and excitation, scalar mode — the
+  element's own default). Non-relativistically the same configuration
+  converges fine; only `relativistic_solver.ts`'s eigenvalue search cannot
+  find the requested state once the mass-velocity/Darwin terms are in, and
+  throws its own "radial grid too small, or the potential does not bind it"
+  diagnostic (`eigenvalue_search.ts`'s non-relativistic guard, never
+  exercised by Phase 3's own Z ≤ 56 sweep). Exactly like `UnboundAnionError`,
+  `handleAtomWorkerRequest`'s catch-all turns this into a shown `type:
+  'error'` reply (spec §3.5) — the user sees a failure message, not a
+  crash — so it is recorded here rather than fixed blind:
+
+  | Excitation | Elements affected |
+  | --- | --- |
+  | 6s → 4f | Ce, Pr, Nd, Pm, Sm, Eu, Tb, Dy, Ho, Er, Tm (11) |
+  | 6s → 5d | Pr, Nd, Ho, Er, Tm, Yb (6) |
+  | 7s → 5f | Pa, U, Np, Pu, Am, Bk, Cf, Es, Fm, Md (10) |
+
+  Gd (4f⁷, half-filled), Lu and No (4f¹⁴/5f¹⁴, full) and La/Ac/Th/Cm/Lr are
+  not affected — consistent with the failure needing an already
+  substantially-but-not-fully occupied f shell to land in. Every other
+  offered ion and excitation for Z ≥ 55 converges.
+- **Two neutral atoms fail their own spin-orbit ground state**: Tm and Yb
+  (`relativistic_heavy_sweep_so_*.test.ts`, spin-orbit, neutrals only). Not
+  an exotic excitation — picking Thulium or Ytterbium from the periodic
+  table and switching Relativity to *With spin–orbit* hits this today. The
+  radial Dirac equation cannot find their own 4f⁷⁄₂ level (`"n=4, l=3,
+  j=7/2 (κ = -4)"`); both have a nearly-full (Tm, 4f¹³) or exactly-full
+  (Yb, 4f¹⁴) 4f shell, the same territory as the excitation failures above.
+  Every other neutral Z = 55..118 converges with spin-orbit.
 - **Phase 4 must thread relativity into the worker's neutral reference
   solve, not only the selected species' own solve** (Phase 3 follow-up).
   The reference ring and the camera's framing floor both come from solving

@@ -1,0 +1,1934 @@
+{
+  "generator": "tests/atom/relativistic_nist.test.ts with ATOM_SLOW_TESTS=1 WRITE_VALIDATION=1",
+  "generatedOn": "2026-10-03",
+  "entries": [
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "column": "ScRLDA",
+      "quantity": "Etot",
+      "app": -128.3361415091574,
+      "reference": -128.336369
+    },
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "column": "ScRLDA",
+      "quantity": "1s",
+      "app": -30.314846933291918,
+      "reference": -30.315584
+    },
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "column": "ScRLDA",
+      "quantity": "2s",
+      "app": -1.3260874359436832,
+      "reference": -1.32613
+    },
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "column": "ScRLDA",
+      "quantity": "2p",
+      "app": -0.49751454580233984,
+      "reference": -0.497551
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "ScRLDA",
+      "quantity": "Etot",
+      "app": -527.5160163344426,
+      "reference": -527.516861
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "ScRLDA",
+      "quantity": "1s",
+      "app": -114.08381902083991,
+      "reference": -114.090739
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "ScRLDA",
+      "quantity": "2s",
+      "app": -10.861808061639044,
+      "reference": -10.862548
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "ScRLDA",
+      "quantity": "2p",
+      "app": -8.442558334340879,
+      "reference": -8.443407
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "ScRLDA",
+      "quantity": "3s",
+      "app": -0.8906106765061248,
+      "reference": -0.890665
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "ScRLDA",
+      "quantity": "3p",
+      "app": -0.38171347681419426,
+      "reference": -0.381755
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "ScRLDA",
+      "quantity": "Etot",
+      "app": -2783.9818959486192,
+      "reference": -2783.9873
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "ScRLDA",
+      "quantity": "1s",
+      "app": -517.5694953175637,
+      "reference": -517.653657
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "ScRLDA",
+      "quantity": "2s",
+      "app": -68.23208998229047,
+      "reference": -68.244623
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "ScRLDA",
+      "quantity": "2p",
+      "app": -60.44259698058215,
+      "reference": -60.457306
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "ScRLDA",
+      "quantity": "3s",
+      "app": -9.642156843256164,
+      "reference": -9.643676
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "ScRLDA",
+      "quantity": "3p",
+      "app": -7.152604506776967,
+      "reference": -7.154156
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "ScRLDA",
+      "quantity": "3d",
+      "app": -3.0046027469292054,
+      "reference": -3.005055
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "ScRLDA",
+      "quantity": "4s",
+      "app": -0.8515921247123766,
+      "reference": -0.851681
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "ScRLDA",
+      "quantity": "4p",
+      "app": -0.34510604970608916,
+      "reference": -0.345161
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "Etot",
+      "app": -7430.554400017635,
+      "reference": -7430.574788
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "1s",
+      "app": -1255.3497406908814,
+      "reference": -1255.733395
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "2s",
+      "app": -195.62858071002762,
+      "reference": -195.699538
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "2p",
+      "app": -175.811958933602,
+      "reference": -175.890898
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "3s",
+      "app": -40.02003025257153,
+      "reference": -40.033422
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "3p",
+      "app": -33.59511976721204,
+      "reference": -33.608877
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "3d",
+      "app": -24.007238223398772,
+      "reference": -24.016322
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "4s",
+      "app": -7.215427686132862,
+      "reference": -7.2174
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "4p",
+      "app": -5.1730973107529445,
+      "reference": -5.174908
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "4d",
+      "app": -2.1869764169940975,
+      "reference": -2.187468
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "5s",
+      "app": -0.7322112410157613,
+      "reference": -0.73233
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "ScRLDA",
+      "quantity": "5p",
+      "app": -0.3080455183368729,
+      "reference": -0.308113
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "Etot",
+      "app": -18963.00443059339,
+      "reference": -18963.123612
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "1s",
+      "app": -2946.3940412087577,
+      "reference": -2948.072638
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "2s",
+      "app": -520.3661079409151,
+      "reference": -520.718432
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "2p",
+      "app": -450.53663334753514,
+      "reference": -450.888397
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "3s",
+      "app": -122.88530734408695,
+      "reference": -122.965344
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "3p",
+      "app": -102.5947188966291,
+      "reference": -102.670737
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "3d",
+      "app": -80.8624603712218,
+      "reference": -80.917806
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "4s",
+      "app": -26.645040781098686,
+      "reference": -26.660632
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "4p",
+      "app": -19.977738190405255,
+      "reference": -19.991252
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "4d",
+      "app": -11.95575604858858,
+      "reference": -11.962303
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "4f",
+      "app": -3.0116956742002565,
+      "reference": -3.011085
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "5s",
+      "app": -3.974390771581961,
+      "reference": -3.976365
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "5p",
+      "app": -2.198548969960932,
+      "reference": -2.199902
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "5d",
+      "app": -0.2624105800625233,
+      "reference": -0.262411
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "ScRLDA",
+      "quantity": "6s",
+      "app": -0.2219096376753394,
+      "reference": -0.221999
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "Etot",
+      "app": -19571.911767149057,
+      "reference": -19572.039277
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "1s",
+      "app": -3033.736073397266,
+      "reference": -3035.505153
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "2s",
+      "app": -538.1905313048819,
+      "reference": -538.563629
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "2p",
+      "app": -464.7888819912967,
+      "reference": -465.159286
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "3s",
+      "app": -127.78535910640525,
+      "reference": -127.870661
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "3p",
+      "app": -106.54167803514434,
+      "reference": -106.622314
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "3d",
+      "app": -84.13701282262845,
+      "reference": -84.195815
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "4s",
+      "app": -28.06955056352654,
+      "reference": -28.086349
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "4p",
+      "app": -21.09059165739259,
+      "reference": -21.105095
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "4d",
+      "app": -12.793416303185094,
+      "reference": -12.800533
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "4f",
+      "app": -3.5548009873772175,
+      "reference": -3.554327
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "5s",
+      "app": -4.33262814513253,
+      "reference": -4.33481
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "5p",
+      "app": -2.4446051631033114,
+      "reference": -2.446106
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "5d",
+      "app": -0.371639951642183,
+      "reference": -0.371655
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "ScRLDA",
+      "quantity": "6s",
+      "app": -0.26045444114979477,
+      "reference": -0.260552
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "Etot",
+      "app": -23492.760239582105,
+      "reference": -23492.950469
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "1s",
+      "app": -3596.452309222944,
+      "reference": -3598.855827
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "2s",
+      "app": -655.4329197846175,
+      "reference": -655.954489
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "2p",
+      "app": -556.5067674197082,
+      "reference": -557.005834
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "3s",
+      "app": -160.85509032425773,
+      "reference": -160.97905
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "3p",
+      "app": -132.84895102691246,
+      "reference": -132.962557
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "3d",
+      "app": -106.00664714658087,
+      "reference": -106.090128
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "4s",
+      "app": -38.32684564428949,
+      "reference": -38.353106
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "4p",
+      "app": -29.143009157066974,
+      "reference": -29.165132
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "4d",
+      "app": -19.047502566739656,
+      "reference": -19.059234
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "4f",
+      "app": -7.9943975651661745,
+      "reference": -7.995594
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "5s",
+      "app": -7.379862736270775,
+      "reference": -7.383977
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "5p",
+      "app": -4.684397051056413,
+      "reference": -4.687307
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "5d",
+      "app": -1.7079435439571484,
+      "reference": -1.708347
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "6s",
+      "app": -0.8109899160167935,
+      "reference": -0.811281
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "ScRLDA",
+      "quantity": "6p",
+      "app": -0.28979773606783477,
+      "reference": -0.289891
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "Etot",
+      "app": -27899.35821110922,
+      "reference": -27899.641656
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "1s",
+      "app": -4231.32079020833,
+      "reference": -4234.557545
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "2s",
+      "app": -791.6522733785968,
+      "reference": -792.37388
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "2p",
+      "app": -658.4794232810385,
+      "reference": -659.14087
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "3s",
+      "app": -200.03279225221107,
+      "reference": -200.210831
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "3p",
+      "app": -163.030874269367,
+      "reference": -163.188263
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "3d",
+      "app": -130.97468637710762,
+      "reference": -131.090673
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "4s",
+      "app": -50.96088525067445,
+      "reference": -51.001789
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "4p",
+      "app": -38.8584789608279,
+      "reference": -38.892032
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "4d",
+      "app": -26.686538049919562,
+      "reference": -26.70564
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "4f",
+      "app": -13.72427594886232,
+      "reference": -13.72924
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "5s",
+      "app": -11.342522777061266,
+      "reference": -11.350493
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "5p",
+      "app": -7.5847230890910975,
+      "reference": -7.590528
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "5d",
+      "app": -3.6364711552678477,
+      "reference": -3.638317
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "5f",
+      "app": -0.13405190090198604,
+      "reference": -0.13339
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "6s",
+      "app": -1.7567489819566107,
+      "reference": -1.757867
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "6p",
+      "app": -0.8559989423305316,
+      "reference": -0.856604
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "6d",
+      "app": -0.09142606733301889,
+      "reference": -0.091405
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "ScRLDA",
+      "quantity": "7s",
+      "app": -0.1607531114891551,
+      "reference": -0.160828
+    },
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "column": "RLDA",
+      "quantity": "Etot",
+      "app": -128.33617607541677,
+      "reference": -128.336403
+    },
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "column": "RLDA",
+      "quantity": "1s",
+      "app": -30.314375201872792,
+      "reference": -30.314393
+    },
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "column": "RLDA",
+      "quantity": "2s",
+      "app": -1.326051597718116,
+      "reference": -1.326075
+    },
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "column": "RLDA",
+      "quantity": "2p-",
+      "app": -0.5000199988241245,
+      "reference": -0.50004
+    },
+    {
+      "Z": 10,
+      "symbol": "Ne",
+      "column": "RLDA",
+      "quantity": "2p+",
+      "app": -0.4962113549391761,
+      "reference": -0.496232
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "RLDA",
+      "quantity": "Etot",
+      "app": -527.5182149044442,
+      "reference": -527.519049
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "RLDA",
+      "quantity": "1s",
+      "app": -114.07702126264329,
+      "reference": -114.077082
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "RLDA",
+      "quantity": "2s",
+      "app": -10.8608493255644,
+      "reference": -10.860926
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "RLDA",
+      "quantity": "2p-",
+      "app": -8.49611620185952,
+      "reference": -8.496195
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "RLDA",
+      "quantity": "2p+",
+      "app": -8.414424539138526,
+      "reference": -8.414503
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "RLDA",
+      "quantity": "3s",
+      "app": -0.8905737573088042,
+      "reference": -0.890597
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "RLDA",
+      "quantity": "3p-",
+      "app": -0.38609728083348466,
+      "reference": -0.386117
+    },
+    {
+      "Z": 18,
+      "symbol": "Ar",
+      "column": "RLDA",
+      "quantity": "3p+",
+      "app": -0.3795162150858013,
+      "reference": -0.379536
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "Etot",
+      "app": -2784.1945116344123,
+      "reference": -2784.199238
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "1s",
+      "app": -517.4563053777274,
+      "reference": -517.45641
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "2s",
+      "app": -68.20945688555732,
+      "reference": -68.209637
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "2p-",
+      "app": -61.753000058621765,
+      "reference": -61.753188
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "2p+",
+      "app": -59.78952542107067,
+      "reference": -59.789712
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "3s",
+      "app": -9.639167821277969,
+      "reference": -9.639319
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "3p-",
+      "app": -7.347174952438645,
+      "reference": -7.347319
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "3p+",
+      "app": -7.057433920113038,
+      "reference": -7.057577
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "3d-",
+      "app": -3.0320093626627167,
+      "reference": -3.03214
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "3d+",
+      "app": -2.984151651309982,
+      "reference": -2.984281
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "4s",
+      "app": -0.8513461774988131,
+      "reference": -0.851373
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "4p-",
+      "app": -0.3613028229076506,
+      "reference": -0.361325
+    },
+    {
+      "Z": 36,
+      "symbol": "Kr",
+      "column": "RLDA",
+      "quantity": "4p+",
+      "app": -0.3374015052000592,
+      "reference": -0.33742
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "Etot",
+      "app": -7433.485916615547,
+      "reference": -7433.498065
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "1s",
+      "app": -1254.7137672485733,
+      "reference": -1254.713974
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "2s",
+      "app": -195.47724730538215,
+      "reference": -195.477659
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "2p-",
+      "app": -183.89649549548278,
+      "reference": -183.896903
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "2p+",
+      "app": -172.08327543425457,
+      "reference": -172.083686
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "3s",
+      "app": -39.98860244802816,
+      "reference": -39.988929
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "3p-",
+      "app": -35.13230945354013,
+      "reference": -35.13264
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "3p+",
+      "app": -32.88769265768974,
+      "reference": -32.888012
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "3d-",
+      "app": -24.270834385360402,
+      "reference": -24.271177
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "3d+",
+      "app": -23.793996065277994,
+      "reference": -23.794336
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "4s",
+      "app": -7.20931767807977,
+      "reference": -7.209464
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "4p-",
+      "app": -5.483977676693626,
+      "reference": -5.484117
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "4p+",
+      "app": -5.031889125178137,
+      "reference": -5.032027
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "4d-",
+      "app": -2.2282070402654606,
+      "reference": -2.228325
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "4d+",
+      "app": -2.1550316783016283,
+      "reference": -2.155148
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "5s",
+      "app": -0.7313091025657337,
+      "reference": -0.731339
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "5p-",
+      "app": -0.34018059741576956,
+      "reference": -0.340204
+    },
+    {
+      "Z": 54,
+      "symbol": "Xe",
+      "column": "RLDA",
+      "quantity": "5p+",
+      "app": -0.29382775978819986,
+      "reference": -0.293849
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "Etot",
+      "app": -18998.592182105054,
+      "reference": -18998.624707
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "1s",
+      "app": -2942.788656038698,
+      "reference": -2942.788882
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "2s",
+      "app": -519.4255241255312,
+      "reference": -519.426078
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "2p-",
+      "app": -498.4204936447869,
+      "reference": -498.421027
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "2p+",
+      "app": -431.8641376429025,
+      "reference": -431.864681
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "3s",
+      "app": -122.64796533205626,
+      "reference": -122.648439
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "3p-",
+      "app": -113.15069442410575,
+      "reference": -113.151177
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "3p+",
+      "app": -98.44814165927087,
+      "reference": -98.448596
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "3d-",
+      "app": -82.61851349592766,
+      "reference": -82.619014
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "3d+",
+      "app": -79.44021576417572,
+      "reference": -79.440709
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "4s",
+      "app": -26.58994534503094,
+      "reference": -26.590306
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "4p-",
+      "app": -22.530353947568322,
+      "reference": -22.530703
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "4p+",
+      "app": -18.99367960681571,
+      "reference": -18.994015
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "4d-",
+      "app": -12.329147851177193,
+      "reference": -12.329462
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "4d+",
+      "app": -11.667104242501757,
+      "reference": -11.667413
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "4f-",
+      "app": -3.080673220449797,
+      "reference": -3.080939
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "4f+",
+      "app": -2.9405788388534635,
+      "reference": -2.940841
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "5s",
+      "app": -3.9662955424544073,
+      "reference": -3.966374
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "5p-",
+      "app": -2.6426624738119893,
+      "reference": -2.642732
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "5p+",
+      "app": -2.036115205658936,
+      "reference": -2.03618
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "5d-",
+      "app": -0.29784288354939287,
+      "reference": -0.29788
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "5d+",
+      "app": -0.2414993613147558,
+      "reference": -0.241534
+    },
+    {
+      "Z": 79,
+      "symbol": "Au",
+      "column": "RLDA",
+      "quantity": "6s",
+      "app": -0.22254261481984927,
+      "reference": -0.222547
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "Etot",
+      "app": -19610.65225735627,
+      "reference": -19610.685763
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "1s",
+      "app": -3029.9000469486077,
+      "reference": -3029.900293
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "2s",
+      "app": -537.1861582558306,
+      "reference": -537.186737
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "2p-",
+      "app": -515.7070567853998,
+      "reference": -515.707614
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "2p+",
+      "app": -445.0958087053492,
+      "reference": -445.096377
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "3s",
+      "app": -127.52993531560183,
+      "reference": -127.530438
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "3p-",
+      "app": -117.8072616699195,
+      "reference": -117.807774
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "3p+",
+      "app": -102.14976583031529,
+      "reference": -102.150248
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "3d-",
+      "app": -86.00042886769599,
+      "reference": -86.000958
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "3d+",
+      "app": -82.62598176491252,
+      "reference": -82.626504
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "4s",
+      "app": -28.009365282999187,
+      "reference": -28.009753
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "4p-",
+      "app": -23.832572859096782,
+      "reference": -23.832949
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "4p+",
+      "app": -20.04069767735029,
+      "reference": -20.041059
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "4d-",
+      "app": -13.19352752019307,
+      "reference": -13.193867
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "4d+",
+      "app": -12.482922183645128,
+      "reference": -12.483256
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "4f-",
+      "app": -3.6298295467224087,
+      "reference": -3.630123
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "4f+",
+      "app": -3.475745112973537,
+      "reference": -3.476034
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "5s",
+      "app": -4.323342844679319,
+      "reference": -4.323437
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "5p-",
+      "app": -2.937287607085298,
+      "reference": -2.937372
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "5p+",
+      "app": -2.265053428426774,
+      "reference": -2.265133
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "5d-",
+      "app": -0.4136027554990923,
+      "reference": -0.413653
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "5d+",
+      "app": -0.3458435639002132,
+      "reference": -0.345891
+    },
+    {
+      "Z": 80,
+      "symbol": "Hg",
+      "column": "RLDA",
+      "quantity": "6s",
+      "app": -0.2608782724646481,
+      "reference": -0.260888
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "Etot",
+      "app": -23556.28356700419,
+      "reference": -23556.323085
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "1s",
+      "app": -3590.910880245688,
+      "reference": -3590.911234
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "2s",
+      "app": -653.9429337335298,
+      "reference": -653.94365
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "2p-",
+      "app": -629.3835853744606,
+      "reference": -629.384272
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "2p+",
+      "app": -529.7447570173076,
+      "reference": -529.745459
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "3s",
+      "app": -160.4511221337234,
+      "reference": -160.451783
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "3p-",
+      "app": -149.29017746877025,
+      "reference": -149.290847
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "3p+",
+      "app": -126.7261147457581,
+      "reference": -126.726749
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "3d-",
+      "app": -108.61002521600939,
+      "reference": -108.610708
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "3d+",
+      "app": -103.8580560727283,
+      "reference": -103.858731
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "4s",
+      "app": -38.21526160831159,
+      "reference": -38.215793
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "4p-",
+      "app": -33.29156801888212,
+      "reference": -33.292086
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "4p+",
+      "app": -27.60679305080144,
+      "reference": -27.607283
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "4d-",
+      "app": -19.629878138328767,
+      "reference": -19.630351
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "4d+",
+      "app": -18.565147063124517,
+      "reference": -18.56561
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "4f-",
+      "app": -8.101564509103186,
+      "reference": -8.102001
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "4f+",
+      "app": -7.843074459587415,
+      "reference": -7.843506
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "5s",
+      "app": -7.349319083467742,
+      "reference": -7.349489
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "5p-",
+      "app": -5.55821760153894,
+      "reference": -5.558376
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "5p+",
+      "app": -4.35968969403657,
+      "reference": -4.359837
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "5d-",
+      "app": -1.793702408416443,
+      "reference": -1.793818
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "5d+",
+      "app": -1.6311247961238662,
+      "reference": -1.631236
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "6s",
+      "app": -0.8049129210900126,
+      "reference": -0.80495
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "6p-",
+      "app": -0.3874708957188414,
+      "reference": -0.387498
+    },
+    {
+      "Z": 86,
+      "symbol": "Rn",
+      "column": "RLDA",
+      "quantity": "6p+",
+      "app": -0.2556707299426203,
+      "reference": -0.255692
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "Etot",
+      "app": -28001.085196716675,
+      "reference": -28001.132325
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "1s",
+      "app": -4223.418559798787,
+      "reference": -4223.419021
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "2s",
+      "app": -789.4889634269307,
+      "reference": -789.489782
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "2p-",
+      "app": -761.3736949497643,
+      "reference": -761.374476
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "2p+",
+      "app": -622.8472958460023,
+      "reference": -622.848095
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "3s",
+      "app": -199.42902710727998,
+      "reference": -199.429806
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "3p-",
+      "app": -186.66292782955975,
+      "reference": -186.663713
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "3p+",
+      "app": -154.70028398731156,
+      "reference": -154.701027
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "3d-",
+      "app": -134.54038638108034,
+      "reference": -134.54118
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "3d+",
+      "app": -128.01587244205282,
+      "reference": -128.016657
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "4s",
+      "app": -50.78832187104849,
+      "reference": -50.788948
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "4p-",
+      "app": -45.03655796726691,
+      "reference": -45.037171
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "4p+",
+      "app": -36.68804321308378,
+      "reference": -36.68861
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "4d-",
+      "app": -27.528750701450754,
+      "reference": -27.529306
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "4d+",
+      "app": -25.984887804349405,
+      "reference": -25.985429
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "4f-",
+      "app": -13.888983898942044,
+      "reference": -13.889514
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "4f+",
+      "app": -13.48494591849802,
+      "reference": -13.48547
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "5s",
+      "app": -11.295386799908531,
+      "reference": -11.295587
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "5p-",
+      "app": -9.057775910142492,
+      "reference": -9.057964
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "5p+",
+      "app": -7.069120728110604,
+      "reference": -7.069296
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "5d-",
+      "app": -3.797270293159152,
+      "reference": -3.797416
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "5d+",
+      "app": -3.501076034881684,
+      "reference": -3.501217
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "5f-",
+      "app": -0.14672250981698914,
+      "reference": -0.146788
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "5f+",
+      "app": -0.11598451114075452,
+      "reference": -0.116047
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "6s",
+      "app": -1.747990584218441,
+      "reference": -1.74804
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "6p-",
+      "app": -1.101079239490915,
+      "reference": -1.101119
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "6p+",
+      "app": -0.7757518338490004,
+      "reference": -0.775784
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "6d-",
+      "app": -0.103029450628435,
+      "reference": -0.103041
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "6d+",
+      "app": -0.08479215968681925,
+      "reference": -0.084802
+    },
+    {
+      "Z": 92,
+      "symbol": "U",
+      "column": "RLDA",
+      "quantity": "7s",
+      "app": -0.1609423668362483,
+      "reference": -0.160947
+    }
+  ]
+}
