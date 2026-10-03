@@ -340,6 +340,11 @@ html, body, #root {
   height: 7px;
   background: rgba(255, 255, 255, 0.6);
 }
+.radial-plot-legend-dash {
+  display: inline-block;
+  width: 14px;
+  border-top: 2px dashed rgba(255, 255, 255, 0.75);
+}
 /* Phone: the plot folds to its title, which is a button, so the panel's
    own click-through has to make an exception for it. */
 .radial-plot-toggle {

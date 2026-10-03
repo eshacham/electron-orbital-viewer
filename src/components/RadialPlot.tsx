@@ -18,6 +18,13 @@ export interface RadialCurve {
      */
     spokenLabel?: string;
     color: string;
+    /**
+     * A comparison curve (the non-relativistic solve beside a relativistic
+     * one): drawn dashed on the same scale, keyed once in the legend, never
+     * named by the hover readout -- the readout says which shell is there,
+     * which the solid curves answer.
+     */
+    dashed?: boolean;
     points: Array<{ r: number; value: number }>;
 }
 
@@ -90,7 +97,7 @@ function dominantCurveLabelAt(curves: RadialCurve[], r: number): string | null {
     let bestLabel: string | null = null;
     let bestValue = -Infinity;
     for (const curve of curves) {
-        if (curve.points.length === 0) continue;
+        if (curve.dashed || curve.points.length === 0) continue;
         // Nearest sample by r; the curves passed in are dense enough (the
         // same grids the atom solver already samples on) that this is
         // indistinguishable from interpolating for the purpose of a label.
@@ -193,7 +200,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                 const y = PADDING.top + plotHeight * (1 - point.value / globalMax);
                 return `${x.toFixed(2)},${y.toFixed(2)}`;
             });
-            return { label: curve.label, color: curve.color, line: `M ${points.join(' L ')}` };
+            return { label: curve.label, color: curve.color, dashed: Boolean(curve.dashed), line: `M ${points.join(' L ')}` };
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isMultiCurve, curves, rMax, scale, plotWidth, plotHeight]);
@@ -294,7 +301,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                         // the real colour. Addendum 2's whole point is that
                         // the plot's per-n colours and the 3D view's agree;
                         // they could not, because the plot was monochrome.
-                        style={{ stroke: curve.color }}
+                        style={{ stroke: curve.color, strokeDasharray: curve.dashed ? '4 3' : undefined }}
                         fill="none"
                     />
                 ))}
@@ -334,7 +341,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
             </svg>
             {isMultiCurve && (
                 <div className="radial-plot-legend">
-                    {curves!.map(curve => (
+                    {curves!.filter(curve => !curve.dashed).map(curve => (
                         // Plain text has no accessible name to set, so a
                         // spoken form rides beside the item, hidden from
                         // sight, with the visible one hidden from readers --
@@ -353,6 +360,15 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                         <span className="radial-plot-legend-key">
                             <span className="radial-plot-legend-peak" />
                             peaks of the total
+                        </span>
+                    )}
+                    {/* One key for every dashed curve, rather than listing
+                        each comparison curve individually beside its solid
+                        twin -- the colour already ties them together. */}
+                    {curves!.some(curve => curve.dashed) && (
+                        <span className="radial-plot-legend-key radial-plot-legend-dashed">
+                            <span className="radial-plot-legend-dash" />
+                            non-relativistic
                         </span>
                     )}
                 </div>

@@ -25,6 +25,10 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     { selector: '.radial-plot-note', declared: 'color: rgba(255, 255, 255, 0.55)', fg: 'rgba(255, 255, 255, 0.55)', bg: DARK_85 },
     { selector: '.radial-plot-scale', declared: 'color: rgba(255, 255, 255, 0.7)', fg: 'rgba(255, 255, 255, 0.7)', bg: DARK_85 },
     { selector: '.phase-legend', declared: `background: ${DARK_85}`, fg: '#ffffff', bg: DARK_85 },
+    // Task 12: the "non-relativistic" dashed-curve key in the radial plot's
+    // legend is plain text in this rule (no colour of its own), so it reads
+    // at the same contrast as every other legend item.
+    { selector: '.radial-plot-legend', declared: 'color: rgba(255, 255, 255, 0.85)', fg: 'rgba(255, 255, 255, 0.85)', bg: DARK_85 },
     // MUI's secondary text (helper lines, legends) on the controls card.
     { selector: '#controls', declared: `background-color: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.6)', bg: LIGHT_96 },
     { selector: '.side-panel .level-nav', declared: `background-color: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },

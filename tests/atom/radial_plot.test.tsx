@@ -192,4 +192,44 @@ describe('RadialPlot', () => {
         const legend = container.querySelector('.radial-plot-legend')!;
         expect(Array.from(legend.querySelectorAll('.visually-hidden')).map(e => e.textContent)).toEqual(['6s j = 1/2', '6p j = 3/2']);
     });
+
+    describe('non-relativistic comparison curves', () => {
+        function withComparison(): RadialCurve[] {
+            return [
+                ...twoCurves(),
+                { label: 'K shell non-relativistic', color: '#ff0000', dashed: true, points: [{ r: 0, value: 0 }, { r: 1, value: 20 }, { r: 2, value: 1 }] },
+            ];
+        }
+
+        it('draws them dashed, in their shell\'s colour', () => {
+            const { container } = render(<RadialPlot n={1} l={0} Z={79} rMax={10} curves={withComparison()} />);
+            const lines = container.querySelectorAll<SVGPathElement>('.radial-plot-line');
+            expect(lines).toHaveLength(3);
+            expect(lines[2].style.stroke).toBe('#ff0000');
+            expect(lines[2].style.strokeDasharray).toBe('4 3');
+            expect(lines[0].style.strokeDasharray).toBe('');
+        });
+
+        it('puts every curve on one vertical scale, so the comparison is honest', () => {
+            const { container } = render(<RadialPlot n={1} l={0} Z={79} rMax={10} curves={withComparison()} />);
+            const lines = container.querySelectorAll<SVGPathElement>('.radial-plot-line');
+            // The dashed curve's peak (20) is the global maximum: it reaches the top padding (y = 8).
+            expect(lines[2].getAttribute('d')).toMatch(/,8\.00/);
+            expect(lines[0].getAttribute('d')).not.toMatch(/,8\.00/);
+        });
+
+        it('keys the dashes once in the legend instead of listing each curve twice', () => {
+            const { container } = render(<RadialPlot n={1} l={0} Z={79} rMax={10} curves={withComparison()} />);
+            const items = Array.from(container.querySelectorAll('.radial-plot-legend-item')).map(e => e.textContent);
+            expect(items).toEqual(['K shell', 'L shell']);
+            expect(container.querySelector('.radial-plot-legend-dashed')!.textContent).toMatch(/non-relativistic/);
+        });
+
+        it('never names a dashed curve in the hover readout', () => {
+            const { container } = render(
+                <RadialPlot n={1} l={0} Z={79} rMax={10} curves={withComparison()} hoverRadius={1} onHoverRadius={() => {}} />
+            );
+            expect(container.querySelector('.radial-plot-hover-readout')!.textContent).toMatch(/K shell$/);
+        });
+    });
 });
