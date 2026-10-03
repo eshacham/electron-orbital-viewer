@@ -99,6 +99,14 @@ describe('Dirac solver against the exact Dirac hydrogen spectrum', () => {
         expect(solve).toThrow(/too small/);
         expect(solve).toThrow(reason as RegExp);
     });
+
+    it('names j and κ in a Dirac failure, so 5p½ and 5p³⁄₂ read differently', () => {
+        const grid = makeRadialGrid(1e-6, 40, 2001);
+        const v = coulomb(grid, 1);
+        expect(() => solveDiracState(grid, 5, 1, v, 1)).toThrow('n=5, l=1, j=1/2 (κ = 1)');
+        expect(() => solveDiracState(grid, 5, -2, v, 1)).toThrow('n=5, l=1, j=3/2 (κ = -2)');
+        expect(() => solveScalarRelativisticState(grid, 5, 1, v, 1)).toThrow(/hold n=5, l=1[,:]/);
+    });
 });
 
 describe('convergence order on the Dirac hydrogen oracle', () => {

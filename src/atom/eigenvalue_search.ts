@@ -17,19 +17,6 @@ import { RadialGrid, cumulativeIntegral } from './radial_grid';
 const MAX_BISECTIONS = 200;
 const ENERGY_TOLERANCE = 1e-13;
 
-// Outward integration can run into the classically forbidden region at low
-// trial energies and blow up before the match point would have stopped it; a
-// plain magnitude threshold with a periodic rescale keeps it finite without
-// perturbing the node count or the match, since both are invariant under a
-// uniform positive rescale of the whole array computed so far.
-export const RESCALE_THRESHOLD = 1e100;
-export const RESCALE_FACTOR = 1e-100;
-
-// How far past the classical turning point Phase A's node count needs to look
-// before it can trust what it has seen (see radial_solver's
-// countNodesForBracketing).
-export const DECAY_GROWTH_FACTOR = 1e6;
-
 export interface EigenvalueSearch {
     /** n - l - 1: the node count that identifies the state being sought. */
     targetNodes: number;
@@ -125,7 +112,7 @@ export function findEigenvalue(search: EigenvalueSearch): EigenvalueResult {
  * Containment guard (ruling R21): throws if the state packs more than 1% of
  * its probability into the outermost 1% of the grid. `density` is the
  * unnormalised radial probability -- u^2 for a Schrödinger state, G^2 + F^2
- * for a relativistic one.
+ * for a relativistic one; `state` names it in the message ("n=2, l=1").
  *
  * A grid too small for the requested state does not fail loudly on its own —
  * the hard-wall-like inward seed just forces the solution toward zero at
@@ -143,7 +130,7 @@ export function findEigenvalue(search: EigenvalueSearch): EigenvalueResult {
  * to 0.15 — a three-thousand-fold jump, so 1e-2 leaves a wide, safe margin on
  * both sides.
  */
-export function assertGridHoldsState(grid: RadialGrid, density: Float64Array, n: number, l: number): void {
+export function assertGridHoldsState(grid: RadialGrid, density: Float64Array, state: string): void {
     const cumulative = cumulativeIntegral(grid, density);
     const total = cumulative[grid.size - 1];
     const tailStart = Math.floor(grid.size * 0.99);
@@ -152,7 +139,7 @@ export function assertGridHoldsState(grid: RadialGrid, density: Float64Array, n:
         : 1;
     if (tailFraction > 1e-2) {
         throw new Error(
-            `Radial grid (rMax=${grid.rMax}) is too small to hold n=${n}, l=${l}: ` +
+            `Radial grid (rMax=${grid.rMax}) is too small to hold ${state}: ` +
             `${(tailFraction * 100).toFixed(1)}% of the electron's probability lies ` +
             `in the outermost 1% of the grid. Use a grid sized for this n.`
         );

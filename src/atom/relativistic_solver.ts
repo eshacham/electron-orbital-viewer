@@ -29,9 +29,8 @@ import { RadialState } from './radial_solver';
 import { countNodes } from './numerov';
 import { CoefficientFn, midpointValues, rk4Step } from './coupled_rk4';
 import { SPEED_OF_LIGHT, diracHydrogenicEnergy, jForKappa, lForKappa } from './relativity';
-import {
-    RESCALE_THRESHOLD, RESCALE_FACTOR, DECAY_GROWTH_FACTOR, findEigenvalue, assertGridHoldsState,
-} from './eigenvalue_search';
+import { RESCALE_THRESHOLD, RESCALE_FACTOR, DECAY_GROWTH_FACTOR } from './integrator_constants';
+import { findEigenvalue, assertGridHoldsState } from './eigenvalue_search';
 
 export type CoupledChannel = { kind: 'scalar'; l: number } | { kind: 'dirac'; kappa: number };
 
@@ -210,12 +209,24 @@ function countNodesForBracketing(
 }
 
 /**
+ * The state as error messages name it: "n=2, l=1" for Koelling–Harmon, and
+ * with j and κ for Dirac ("n=2, l=1, j=1/2 (κ = 1)"), so that a failure of
+ * 2p½ cannot be mistaken for one of 2p³⁄₂. j is written as a fraction rather
+ * than with relativity's jLabel, which stops at f (j = 7/2).
+ */
+function stateName(n: number, channel: CoupledChannel): string {
+    if (channel.kind === 'scalar') return `n=${n}, l=${channel.l}`;
+    const { kappa } = channel;
+    return `n=${n}, l=${lForKappa(kappa)}, j=${2 * Math.abs(kappa) - 1}/2 (κ = ${kappa})`;
+}
+
+/**
  * A grid with no room for the state looks, from inside the search, exactly
  * like a potential that does not bind it, so the message names both.
  */
-function notHeld(grid: RadialGrid, n: number, l: number, evidence: string): Error {
+function notHeld(grid: RadialGrid, state: string, evidence: string): Error {
     return new Error(
-        `Radial grid (rMax=${grid.rMax}) is too small to hold n=${n}, l=${l}, or the potential does not bind it: ${evidence}.`
+        `Radial grid (rMax=${grid.rMax}) is too small to hold ${state}, or the potential does not bind it: ${evidence}.`
     );
 }
 
@@ -229,6 +240,7 @@ function solveCoupledState(grid: RadialGrid, n: number, channel: CoupledChannel,
     if (!(Z > 0)) throw new Error('The relativistic solver needs a nuclear charge Z > 0 for its origin boundary condition.');
 
     const targetNodes = n - l - 1;
+    const name = stateName(n, channel);
     const mid = midpointValues(potential);
 
     // Phase B's mismatch: equal G and equal F at one point is equal G and
@@ -252,7 +264,7 @@ function solveCoupledState(grid: RadialGrid, n: number, channel: CoupledChannel,
         ),
         mismatchAt: mismatch,
     });
-    if (!bracketed) throw notHeld(grid, n, l, 'the outward and inward solutions match at no energy below zero');
+    if (!bracketed) throw notHeld(grid, name, 'the outward and inward solutions match at no energy below zero');
 
     // Final components: outward up to the match point, inward beyond it,
     // scaled to agree where they meet.
@@ -273,17 +285,17 @@ function solveCoupledState(grid: RadialGrid, n: number, channel: CoupledChannel,
     for (let j = 0; j < grid.size; j++) density[j] = G[j] * G[j] + F[j] * F[j];
     const norm = Math.sqrt(integrateOnGrid(grid, density));
     if (!(norm > 0) || !Number.isFinite(norm)) {
-        throw new Error(`Relativistic radial solver did not converge for n=${n}, l=${l}.`);
+        throw new Error(`Relativistic radial solver did not converge for ${name}.`);
     }
 
-    assertGridHoldsState(grid, density, n, l);
+    assertGridHoldsState(grid, density, name);
 
     // The search can also bracket a root that is not this state -- measured
     // for hydrogen 2s on a 10 a0 grid, a state with two nodes -- so the node
     // count, which is what names the state, is checked last.
     const nodes = countNodes(G, 0, grid.size - 1);
     if (nodes !== targetNodes) {
-        throw notHeld(grid, n, l, `the solver converged on a state with ${nodes} nodes, not ${targetNodes}`);
+        throw notHeld(grid, name, `the solver converged on a state with ${nodes} nodes, not ${targetNodes}`);
     }
 
     // Sign convention: G > 0 as r -> 0, as radial_solver.

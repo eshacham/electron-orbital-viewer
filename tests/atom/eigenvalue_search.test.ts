@@ -22,6 +22,9 @@ function checksum(u: Float64Array): number {
 // toBeCloseTo): a refactor that perturbs a single bit of any energy or any
 // point of u fails here. The full pre/post comparison (457 states, bound-state
 // checks and five complete SCF atoms) is in Phase 4 Task 4's report.
+// The pins are exact doubles, so they also pin V8's Math.exp/pow/log: if they
+// fail right after a Node/V8 upgrade and nothing in src/atom changed, re-record
+// them -- that is the runtime's libm moving, not a solver bug.
 describe('radial_solver is bit-for-bit unchanged by the extraction', () => {
     const hydrogen = (r: number) => -1 / r;
     const iron = (r: number) => -26 / r;

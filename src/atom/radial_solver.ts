@@ -9,9 +9,8 @@
  */
 import { RadialGrid, integrateOnGrid } from './radial_grid';
 import { numerovForward, numerovBackward, countNodes } from './numerov';
-import {
-    RESCALE_THRESHOLD, RESCALE_FACTOR, DECAY_GROWTH_FACTOR, findEigenvalue, assertGridHoldsState,
-} from './eigenvalue_search';
+import { RESCALE_THRESHOLD, RESCALE_FACTOR, DECAY_GROWTH_FACTOR } from './integrator_constants';
+import { findEigenvalue, assertGridHoldsState } from './eigenvalue_search';
 
 export interface RadialState {
     n: number;
@@ -257,7 +256,7 @@ export function solveRadialState(
     const norm = Math.sqrt(integrateOnGrid(grid, uSquared));
     if (!(norm > 0)) throw new Error(`Radial solver did not converge for n=${n}, l=${l}.`);
 
-    assertGridHoldsState(grid, uSquared, n, l);
+    assertGridHoldsState(grid, uSquared, `n=${n}, l=${l}`);
 
     // Sign convention: R > 0 as r -> 0, matching the analytic solution.
     const firstSignificant = u.findIndex(value => Math.abs(value) > 1e-12 * norm);
