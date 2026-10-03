@@ -12,6 +12,17 @@ const config: Config = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
+  // The two exhaustive SCF sweeps (Phase 3's excitation_sweep_<k> and
+  // Phase 4's relativistic_heavy_sweep_<k> shards) are hours of work and run
+  // only with ATOM_SLOW_TESTS=1. Gating each test with it.skip was not
+  // enough: jest still compiled every shard and set up a suite for it,
+  // seconds of a ~60 s default run for nothing (ruling T7-e). They are left
+  // out of the default run instead; the shard files stay, since they are
+  // what lets one slow invocation run shards side by side.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    ...(process.env.ATOM_SLOW_TESTS === '1' ? [] : ['/tests/atom/relativistic_heavy_sweep', '/tests/atom/excitation_sweep']),
+  ],
   verbose: true,
   cache: true,
   maxWorkers: '50%', // Use up to half of CPU cores
