@@ -311,7 +311,20 @@ describe('Relativity control', () => {
     expect(status).toHaveClass('relativity-what-changed');
     expect(status).toHaveTextContent(/6s contracts by 17\.1 %/);
     expect(status).toHaveTextContent(/3\.21 → 2\.66 a₀/);
-    expect(status).toHaveTextContent(/scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
+    expect(status).toHaveTextContent(/Scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
+  });
+
+  // Fix round 1, M1: the readout wrapped mid-number ("3.31 →" / "2.85 a₀")
+  // in the 300 px panel, and "⟨r⟩" alone is a symbol many readers will not know.
+  it('names the mean radius and keeps its two values on one line', () => {
+    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="scalar"
+      onRelativityChange={() => {}} relativityReadout={scalarGold} />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(/mean radius ⟨r⟩ 3\.21 → 2\.66 a₀/);
+    const radii = status.querySelector('.relativity-radii') as HTMLElement;
+    expect(radii).toHaveTextContent(/^⟨r⟩ 3\.21 → 2\.66 a₀$/);
+    expect(radii.style.whiteSpace).toBe('nowrap');
+    expect(status.textContent).toBe(whatChangedText(gold, 'scalar'));
   });
 
   // A live region inserted together with its text is not reliably
@@ -344,7 +357,8 @@ describe('Relativity control', () => {
   it('names the shell as the outermost occupied s, and the value as LDA', () => {
     const text = whatChangedText({ ...gold, n: 5, label: '5s', contractionPercent: 4.2 }, 'scalar');
     expect(text).toMatch(/^What changed: 5s contracts/);
-    expect(text).toMatch(/outermost occupied s/);
+    // Non-breaking, so the "s" is never left alone at the start of a line (found live).
+    expect(text).toMatch(/outermost occupied\u00a0s\)/);
     expect(text).toMatch(/LDA/);
     expect(whatChangedText({ ...gold, label: '6s½' }, 'spinOrbit')).toMatch(/Dirac LDA \(MacDonald–Vosko exchange\)/);
   });

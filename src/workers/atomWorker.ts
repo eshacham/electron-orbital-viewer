@@ -70,6 +70,8 @@ export interface SerialisedComparison {
      * (atom/framing.ts). A relativistic picture is framed on at least this
      * (ruling C14), so switching relativity leaves the camera, and the scale
      * bar, where they were and the contraction shows against a fixed scale.
+     * For an ion or an excited atom it also includes the off neutral's
+     * framing, the floor its own off picture has, so the two agree.
      */
     framingRadius: number;
     /** `contourRadius` likewise floors an open shell's framing across the switch. */
@@ -248,6 +250,12 @@ export function buildSerialisedAtomProfile(
         referenceUnavailable?: string | null;
         nonRelativistic?: AtomSolution | null;
         comparisonUnavailable?: string | null;
+        /**
+         * Where the non-relativistic neutral atom was framed, for an ion or
+         * an excited atom: its off picture is floored there too, so the
+         * comparison's framing must be (fix round 1, I1).
+         */
+        comparisonFramingFloor?: number;
     } = {}
 ): SerialisedAtomProfile {
     const profile: AtomProfile = buildAtomProfile(atom, enclosedFraction);
@@ -264,7 +272,7 @@ export function buildSerialisedAtomProfile(
         }
         const baseline = buildAtomProfile(nonRelativistic, enclosedFraction);
         comparison = {
-            framingRadius: wholeAtomFramingRadius(baseline),
+            framingRadius: Math.max(wholeAtomFramingRadius(baseline), extras.comparisonFramingFloor ?? 0),
             shells: baseline.shells.map(shell => ({ n: shell.n, contourRadius: shell.contourRadius, curve: shell.curve.values })),
             subshells: baseline.subshells.map(s => ({ n: s.n, l: s.l, electrons: s.electrons, curve: s.curve.values })),
         };
@@ -520,8 +528,24 @@ export function handleAtomWorkerRequest(data: AtomWorkerRequest): { response: At
         const { nonRelativistic, comparisonUnavailable } = relativity === 'off'
             ? { nonRelativistic: null, comparisonUnavailable: null }
             : nonRelativisticBaseline(species);
+        // Ruling C14 for an ion or excited atom (fix round 1, I1): its off
+        // picture is framed on at least the *off* neutral's framing (the
+        // reference ring's floor, ruling C12), so the relativistic picture's
+        // comparison floor has to include that too -- the ion's own off
+        // framing and the neutral in the ion's mode alone left Au⁺ zooming
+        // in 14 % on the switch. Both solves are memoised; a failed off
+        // neutral costs only this floor, as it would cost the off ring.
+        let comparisonFramingFloor: number | undefined;
+        if (nonRelativistic && !isNeutralGround(species)) {
+            try {
+                comparisonFramingFloor = referenceRadiiFor(species.Z, data.enclosedFraction, 'off').framingRadius;
+            } catch {
+                comparisonFramingFloor = undefined;
+            }
+        }
         const profile = buildSerialisedAtomProfile(atom, data.enclosedFraction, {
             speciesKey: speciesKey(species), reference, referenceUnavailable, nonRelativistic, comparisonUnavailable,
+            comparisonFramingFloor,
         });
         return { response: { type: 'success', profile, requestId }, transfer: transferListFor(profile) };
     } catch (error) {

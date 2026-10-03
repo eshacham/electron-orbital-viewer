@@ -721,6 +721,25 @@ describe('relativity in the atom slice', () => {
         expect(effectiveRelativity(state)).toBe('scalar');
     });
 
+    // Fix round 1, I2: choosing the element's own default is "follow the
+    // default" again, not a choice that sticks -- otherwise clicking Scalar
+    // back on gold would carry scalar onto carbon, and the helper would stop
+    // saying "Default for this element" for a mode that is the default.
+    it('treats choosing the element\'s default as following the default again', () => {
+        let state = reducer(undefined, setElement(79));
+        state = reducer(state, setRelativity('off'));
+        expect(state.relativityOverride).toBe('off');
+        state = reducer(state, setElement(55));
+        expect(effectiveRelativity(state)).toBe('off');          // Cs stays off: a real choice persists
+        state = reducer(state, setRelativity('scalar'));          // Cs's own default
+        expect(state.relativityOverride).toBeNull();
+        state = reducer(state, setElement(6));
+        expect(effectiveRelativity(state)).toBe('off');           // carbon follows its own default
+        expect(state.relativityOverride).toBeNull();
+        state = reducer(state, setRelativity('off'));             // already carbon's default
+        expect(state.relativityOverride).toBeNull();
+    });
+
     it('starts a new solve when the effective mode changes, and only then', () => {
         let state = reducer(undefined, setElement(79));
         const nonce = state.solveNonce;

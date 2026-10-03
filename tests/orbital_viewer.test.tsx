@@ -49,6 +49,7 @@ import { createShellCompositionWorker } from '../src/workers/createShellComposit
 import { clearShellMeshCacheForTests, setCachedShellMeshes, shellMeshCacheKey } from '../src/atom/shell_mesh_cache';
 import { COMPOSITE_ORBITAL_RESOLUTION } from '../src/atom/shell_composition';
 import { neonProfile } from './export/fixtures';
+import { framingRadiusFor } from '../src/atom/framing';
 import { initVisualizer, attachShellCompositionLobes } from '../src/orbital_visualizer';
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
@@ -448,6 +449,10 @@ describe('OrbitalViewer: framing across a relativity switch', () => {
         expect(updateAtomViewInScene).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ framingFloor: 2.4 }), expect.anything());
     });
 
+    // The ring's floor is the neutral in the ion's own mode (1.7 here); the
+    // comparison's is the larger of the ion's own off framing and the off
+    // neutral's (2.4, as the worker builds it -- fix round 1, I1). The
+    // viewer takes the larger of the two.
     it('takes the larger of an ion\'s two floors', () => {
         const store = createAppStore();
         act(() => {
@@ -458,6 +463,37 @@ describe('OrbitalViewer: framing across a relativity switch', () => {
         });
         render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
         expect(updateAtomViewInScene).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ framingFloor: 2.4 }), expect.anything());
+    });
+
+    // Fix round 1, I1, with gold's own numbers: Au⁺ off is framed on the off
+    // neutral (3.354 a₀); scalar draws a smaller ion, rings the scalar
+    // neutral (2.886) and floors on the comparison, which carries the off
+    // neutral's 3.354. Both views end up framed on the same radius.
+    it('frames an Au⁺-like cation identically off and scalar', () => {
+        const framedOn = () => {
+            const [, params] = (updateAtomViewInScene as jest.Mock).mock.calls.at(-1)!;
+            return Math.max(framingRadiusFor(params.contourRadius, params.outermostFeatureR), params.framingFloor ?? 0);
+        };
+        const base = { ...neonProfile(), Z: 79, speciesKey: '79+1', charge: 1 };
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(79));
+            store.dispatch(setCharge(1));
+            store.dispatch(setRelativity('off'));
+            store.dispatch(solveSucceeded({ ...base, displayRadius: 3.1, reference: { displayRadius: 3.6, contourRadius: 4, framingRadius: 3.354 } }));
+        });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        const off = framedOn();
+        act(() => {
+            store.dispatch(setRelativity('scalar'));
+            store.dispatch(solveSucceeded({
+                ...base, displayRadius: 2.7, relativity: 'scalar',
+                reference: { displayRadius: 3.1, contourRadius: 3.5, framingRadius: 2.886 },
+                nonRelativistic: { framingRadius: 3.354, shells: [], subshells: [] },
+            }));
+        });
+        expect(framedOn()).toBe(off);
+        expect(off).toBe(3.354);
     });
 
     // setRelativity keeps an open shell (off <-> scalar), so the shell view

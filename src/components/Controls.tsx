@@ -179,14 +179,32 @@ function radiusDecimals(difference: number): number {
  * method goes in the same sentence as the number (spec §3.1).
  */
 export function whatChangedText(change: ValenceSContraction, mode: RelativityMode): string {
+  const parts = whatChangedParts(change, mode);
+  return parts.before + parts.radii + parts.after;
+}
+
+/**
+ * The same sentence in three pieces, so the readout can keep the radii
+ * together: in a 300 px panel "3.31 →" and "2.85 a₀" otherwise land on
+ * different lines (fix round 1, M1). ⟨r⟩ is named as the mean radius for a
+ * reader who does not know the symbol.
+ */
+export interface WhatChangedParts { before: string; radii: string; after: string }
+
+export function whatChangedParts(change: ValenceSContraction, mode: RelativityMode): WhatChangedParts {
   const size = Math.abs(change.contractionPercent);
   const verb = change.contractionPercent >= 0 ? 'contracts' : 'expands';
-  const before = change.nonRelativisticMeanRadius;
-  const after = change.relativisticMeanRadius;
-  const digits = radiusDecimals(Math.abs(before - after));
-  return `What changed: ${change.label} ${verb} by ${formatPercent(size)} % `
-    + `(⟨r⟩ ${before.toFixed(digits)} → ${after.toFixed(digits)} a₀) — `
-    + `the outermost occupied s shell, ${shortMethodLabel(mode)} against the same species' non-relativistic LDA solve.`;
+  const nonRelativistic = change.nonRelativisticMeanRadius;
+  const relativistic = change.relativisticMeanRadius;
+  const digits = radiusDecimals(Math.abs(nonRelativistic - relativistic));
+  const method = shortMethodLabel(mode);
+  return {
+    before: `What changed: ${change.label} ${verb} by ${formatPercent(size)} % (mean radius `,
+    radii: `⟨r⟩ ${nonRelativistic.toFixed(digits)} → ${relativistic.toFixed(digits)} a₀`,
+    // A non-breaking space: a lone "s)." at the start of a line reads as a typo.
+    after: `; the outermost occupied\u00a0s). ${method[0].toUpperCase()}${method.slice(1)} `
+      + 'against the same species\' non-relativistic LDA.',
+  };
 }
 
 /** How the readout names a picture's mode: "still scalar-relativistic". */
@@ -211,14 +229,32 @@ const SOLVING_WORDS: Record<RelativityMode, string> = {
  * 6s → 4f: LDA does not bind the 4f without relativity) says why.
  */
 export function relativityReadoutText(switchMode: RelativityMode, readout: RelativityReadout | null): string | null {
+  const content = relativityReadoutContent(switchMode, readout);
+  return content === null || typeof content === 'string' ? content : content.before + content.radii + content.after;
+}
+
+/** relativityReadoutText's decision, with a contraction left in pieces for the readout to lay out. */
+function relativityReadoutContent(switchMode: RelativityMode, readout: RelativityReadout | null): string | WhatChangedParts | null {
   if (!readout) return null;
   if (readout.pictureMode !== switchMode) {
     return `Solving ${SOLVING_WORDS[switchMode]}… the picture on screen is still ${PICTURE_MODE_WORDS[readout.pictureMode]}.`;
   }
   if (readout.pictureMode === 'off') return null;
-  if (readout.change) return whatChangedText(readout.change, readout.pictureMode);
+  if (readout.change) return whatChangedParts(readout.change, readout.pictureMode);
   return readout.comparisonUnavailable;
 }
+
+/** The readout's content, with a contraction's radii held on one line. */
+const ReadoutContent: React.FC<{ content: string | WhatChangedParts | null }> = ({ content }) => {
+  if (content === null || typeof content === 'string') return <>{content}</>;
+  return (
+    <>
+      {content.before}
+      <span className="relativity-radii" style={{ whiteSpace: 'nowrap' }}>{content.radii}</span>
+      {content.after}
+    </>
+  );
+};
 
 /** Phase 1's CombinationControls: MUI upper-cases button text, which "With spin–orbit" does not survive. */
 const KEEP_CASE = { '& .MuiToggleButton-root': { textTransform: 'none' } } as const;
@@ -371,7 +407,7 @@ const Controls: React.FC<ControlsProps> = ({
           </FormHelperText>
           <Typography variant="body2" component="div" role="status" className="relativity-what-changed"
             sx={{ mt: 0.75, fontSize: '0.75rem', lineHeight: 1.35 }}>
-            {relativityReadoutText(relativity, relativityReadout)}
+            <ReadoutContent content={relativityReadoutContent(relativity, relativityReadout)} />
           </Typography>
         </FormControl>
       )}

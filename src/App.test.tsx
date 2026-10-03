@@ -1047,8 +1047,8 @@ describe('App: relativity', () => {
             installMatchMedia(false);
             const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
             expect(readout(container)).toHaveAttribute('role', 'status');
-            expect(readout(container)).toHaveTextContent('What changed: 6s contracts by 14.1 % (⟨r⟩ 3.21 → 2.76 a₀)');
-            expect(readout(container)).toHaveTextContent(/scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
+            expect(readout(container)).toHaveTextContent('What changed: 6s contracts by 14.1 % (mean radius ⟨r⟩ 3.21 → 2.76 a₀');
+            expect(readout(container)).toHaveTextContent(/Scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
         });
 
         // Ruling C9: while spin–orbit solves, the scalar picture is still up,

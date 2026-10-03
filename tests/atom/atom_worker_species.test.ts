@@ -1,4 +1,4 @@
-import { handleAtomWorkerRequest, solveFailureMessage } from '../../src/workers/atomWorker';
+import { handleAtomWorkerRequest, solveFailureMessage, SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { UnboundElectronError } from '../../src/atom/scf_shared';
 import * as scf from '../../src/atom/scf';
 import { buildAtomProfile } from '../../src/atom/atom_profile';
@@ -142,6 +142,24 @@ describe('atom worker, relativity', () => {
         }
         // postMessage rejects a transfer list that names one buffer twice.
         expect(new Set(transfer).size).toBe(transfer.length);
+    });
+
+    // Fix round 1, I1 (ruling C14 for cations): off frames an ion on at
+    // least the neutral's *off* framing, so a relativistic picture must too
+    // -- floored on the scalar neutral and the ion's own off framing alone,
+    // Au⁺ zoomed in 14 % on the switch. Li⁺ for the default suite's time:
+    // its contraction is tiny, but any difference at all fails toBe.
+    it('frames a cation identically off and relativistic', () => {
+        const framing = (profile: SerialisedAtomProfile) => Math.max(
+            wholeAtomFramingRadius(profile), profile.reference?.framingRadius ?? 0, profile.nonRelativistic?.framingRadius ?? 0);
+        const solve = (relativity: 'off' | 'scalar' | 'spinOrbit', requestId: number) => {
+            const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 3, charge: 1, excitation: null, enclosedFraction: 0.9, relativity, requestId });
+            if (response.type !== 'success') throw new Error(response.type);
+            return response.profile;
+        };
+        const off = framing(solve('off', 21));
+        expect(framing(solve('scalar', 22))).toBe(off);
+        expect(framing(solve('spinOrbit', 23))).toBe(off);
     });
 
     it('treats an absent mode as off, exactly as before', () => {

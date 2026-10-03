@@ -499,9 +499,15 @@ const atomSlice = createSlice({
         // land), because (6, 1) and 6p½/6p³⁄₂ do not name each other (Review
         // Focus 1); off <-> scalar keeps them, since (n, l) names the same
         // subshell in both and watching it contract is the point.
+        //
+        // Choosing the element's own default is following the default again
+        // (fix round 1, I2): an override equal to the default would stick to
+        // the next element -- Scalar clicked back on gold carried onto carbon
+        // -- and the helper would stop saying "Default for this element" for
+        // the mode that is. A real departure (Off on gold) still persists.
         setRelativity: (state, action: PayloadAction<RelativityMode | null>) => {
             const before = effectiveRelativity(state);
-            state.relativityOverride = action.payload;
+            state.relativityOverride = action.payload === defaultRelativityFor(state.Z) ? null : action.payload;
             const after = effectiveRelativity(state);
             if (after === before) return;
             state.solveNonce += 1;
