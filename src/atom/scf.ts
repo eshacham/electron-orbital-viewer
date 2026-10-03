@@ -319,11 +319,23 @@ const solveSpeciesCache = new Map<string, AtomSolution>();
  * tolerance, and total energies within 6.3e-8 relative (1.1e-8 for the
  * heavy samples). The same species' seed is not the neutral-atom seed
  * Phase 3 found converging to nonsense for excitations: it already has the
- * excited species' own Coulomb tail. Where that solve did
- * not converge (K 4s -> 4d), there is no answer to start next to, and the
- * relativistic loop starts from the screened guess as the non-relativistic
- * one did. An unbound anion's verdict propagates from the non-relativistic
- * solve unchanged.
+ * excited species' own Coulomb tail. Where that solve did not converge
+ * (K 4s -> 4d) or found a level unbound (Pr-Eu 6s -> 4f), there is no answer
+ * to start next to, and the relativistic loop starts from the screened guess
+ * as the non-relativistic one did. An unbound anion's verdict propagates
+ * from the non-relativistic solve unchanged.
+ *
+ * And where the warm start fails, the screened one gets its turn (ruling
+ * T7-a). The heavy sweep found 16 species whose warm-started solve throws
+ * in its first iterations while a cold one converges: the relativistic
+ * equation, asked in the non-relativistic potential, finds a barely bound
+ * f level pushed out of the bound spectrum (Tm and Yb with spin-orbit,
+ * their own 4f⁷⁄₂; Pr, Nd, Ho, Er, Tm, Yb 6s -> 5d, the 4f; Pa, U, Np, Bk,
+ * Cf, Es, Fm, Md 7s -> 5f, the 5f, which ends bound by 2-42 mHa). So a
+ * warm-started solve that throws or does not converge is discarded and the
+ * species solved again from the screened guess, whose outcome -- answer or
+ * verdict -- is the one reported. The warm start is kept wherever it works:
+ * it is where the iterations are saved.
  */
 export function solveSpecies(species: AtomSpecies, relativity: RelativityMode = 'off'): AtomSolution {
     const key = relativity === 'off' ? speciesKey(species) : `${speciesKey(species)}@${relativity}`;
@@ -333,14 +345,37 @@ export function solveSpecies(species: AtomSpecies, relativity: RelativityMode = 
     const configuration = speciesConfiguration(species);
     const highestN = highestPrincipalQuantumNumber(configuration);
     const grid = gridForAtom(species.Z, highestN);
-    let startingPotential: Float64Array | undefined;
+    let solution: AtomSolution | null = null;
     if (relativity !== 'off') {
-        const nonRelativistic = solveSpecies(species, 'off');
-        if (nonRelativistic.converged) startingPotential = nonRelativistic.potential;
+        const startingPotential = convergedNonRelativisticPotential(species);
+        if (startingPotential) {
+            try {
+                const warm = solveAtomOnGrid(species.Z, grid, { configuration, relativity, startingPotential });
+                if (warm.converged) solution = warm;
+            } catch {
+                // Retried from the screened start below, which reports its own verdict.
+            }
+        }
     }
-    const solution = solveAtomOnGrid(species.Z, grid, { configuration, relativity, startingPotential });
+    solution ??= solveAtomOnGrid(species.Z, grid, { configuration, relativity });
     solveSpeciesCache.set(key, solution);
     return solution;
+}
+
+/**
+ * The relativistic solve's warm start: the same species' converged
+ * non-relativistic potential, or null when there is none to start next to
+ * (that solve did not converge, or found a level unbound). An anion's
+ * unbound verdict is final in every mode, so it propagates.
+ */
+function convergedNonRelativisticPotential(species: AtomSpecies): Float64Array | null {
+    try {
+        const nonRelativistic = solveSpecies(species, 'off');
+        return nonRelativistic.converged ? nonRelativistic.potential : null;
+    } catch (error) {
+        if (error instanceof UnboundAnionError) throw error;
+        return null;
+    }
 }
 
 /** Neutral ground state of Z (unchanged behaviour for 'off'; see solveSpecies). */
