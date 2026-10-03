@@ -171,7 +171,12 @@ These cost real effort to arrive at; do not undo them without reading why.
   `speciesKey({ Z, charge: 0, excitation: null })` returns the bare number,
   so every cache key (profile cache, mesh cache, energies cache) that
   existed before ions did is unchanged; Phase 4 appends relativity to these
-  same keys.
+  same keys — all of them, including the ones a search for "cache" in the
+  UI layer misses: `solveSpeciesCache` in `scf.ts` (keyed by `speciesKey`),
+  `delta_scf.ts`'s `cache` (by `speciesKey`),
+  `energies_cache.ts`, and the worker's `referenceRadiiCache` (keyed
+  `${Z}:${fraction}`). A relativistic solve that misses any one of them
+  returns the non-relativistic answer memoised under the same key.
 - **The reference ring is its own unstencilled mesh, not a second radius on
   the existing cut face** (Phase 3). The cut face's cap is stencilled to the
   current sphere, and a cation's neutral edge sits outside that stencil — a
@@ -742,6 +747,16 @@ Recorded for review, per the session's standing authority.
   an additional export alongside the current per-member one, so a strict
   external manifold checker (trimesh, Netfabb) inspecting the file as one
   body does not warn on it. See "Phase 2 — share and export" above.
+- **`ScfOptions.startingPotential` exists; do not seed an excited state
+  from its neutral ground state** (final review I2, measured). Started from
+  potassium's converged neutral potential, K 4s → 4d "converges" in 39
+  iterations to −904 Ha with a 4d eigenvalue of −168 Ha: a neutral atom's
+  LDA potential has no Coulomb tail, binds no diffuse 4d, and the radial
+  solver returns a state anyway. C 2s → 3d, Na 3s → 3d and He 1s → 2p do the
+  same; the spin-polarised He 1s → 2s collapses its 2s onto the 1s. The
+  option is for Phase 4's relativistic solve, started from the *same*
+  species' non-relativistic one. K 4s → 4d therefore still does not
+  converge, and says so by name.
 - **Phase 4 must thread relativity into the worker's neutral reference
   solve, not only the selected species' own solve** (Phase 3 follow-up).
   The reference ring and the camera's framing floor both come from solving

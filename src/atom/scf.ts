@@ -35,7 +35,7 @@ import {
     highestPrincipalQuantumNumber,
     totalElectronsOf,
     bareCoulombPotential,
-    screenedStartingPotential,
+    startingPotentialFor,
     buildD,
     maxWeightedDelta,
 } from './scf_shared';
@@ -61,11 +61,26 @@ export interface AtomSolution {
 /**
  * Options for one SCF solve. An object rather than more positional
  * parameters so later physics layers on without another signature change:
- * Phase 4 adds `relativity` and `startingPotential` here.
+ * Phase 4 adds `relativity` here.
  */
 export interface ScfOptions {
     /** Defaults to the neutral ground state, configurationFor(Z). */
     configuration?: SubshellOccupancy[];
+    /**
+     * Start the loop from this potential instead of the screened guess; it
+     * must be on the solve's own grid. Omitted, the loop starts exactly as it
+     * always has. For Phase 4, which starts a relativistic solve from the
+     * same species' converged non-relativistic one.
+     *
+     * Not a cure for an excited state that will not converge (final review
+     * I2, measured): started from its element's converged neutral potential,
+     * K 4s -> 4d "converges" in 39 iterations to -904 Ha with a 4d eigenvalue
+     * of -168 Ha. A neutral atom's LDA potential has no Coulomb tail, so it
+     * binds no diffuse 4d at all, and the radial solver -- which searches
+     * only E < 0 -- hands back a state anyway (the H- failure UnboundAnionError
+     * exists for). C 2s -> 3d, Na 3s -> 3d and He 1s -> 2p do the same.
+     */
+    startingPotential?: Float64Array;
 }
 
 /**
@@ -228,13 +243,14 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions
     // neutral atoms and cations run exactly the loop they always have.
     const isAnion = electrons > Z;
 
-    // Screened, not bare Coulomb (see screenedStartingPotential's doc
-    // comment in scf_shared.ts for the full reasoning): starting from a
+    // Screened, not bare Coulomb, unless the caller supplies a potential to
+    // start from (see screenedStartingPotential's doc comment in
+    // scf_shared.ts for the full reasoning): starting from a
     // guess that is already closer to self-consistent gives the loop less
     // charge-sloshing room, which matters most for exactly the near-degenerate transition-
     // metal/lanthanide/actinide configurations the adaptive beta below also
     // exists for.
-    let potential = screenedStartingPotential(grid, Z);
+    let potential = startingPotentialFor(grid, Z, options.startingPotential);
     let beta = INITIAL_BETA;
     let previousDelta = Infinity;
 

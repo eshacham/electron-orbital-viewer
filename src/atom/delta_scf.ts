@@ -9,7 +9,7 @@
  * the exchange energy that difference carries. Spin-polarised LDA puts all
  * of H-Ar within 7.6 % (He; He+ is exact, He is not).
  */
-import { AtomSpecies, speciesConfiguration, speciesKey, speciesSymbol, excitationLabel } from './species';
+import { AtomSpecies, speciesConfiguration, speciesKey, speciesSymbol, speciesTitle, excitationLabel } from './species';
 import { allowedCharges } from './ion_configurations';
 import { solvePolarised } from './spin_scf';
 
@@ -39,7 +39,7 @@ export function polarisedTotalEnergy(species: AtomSpecies): number {
     if (hit !== undefined) return hit;
     const solution = solvePolarised(species.Z, speciesConfiguration(species));
     if (!solution.converged) {
-        throw new Error(`The spin-polarised SCF did not converge for ${speciesSymbol(species)}; no ΔSCF energy is available for it.`);
+        throw new Error(`The spin-polarised SCF did not converge for ${speciesTitle(species)}; no ΔSCF energy is available for it.`);
     }
     cache.set(key, solution.totalEnergy);
     return solution.totalEnergy;

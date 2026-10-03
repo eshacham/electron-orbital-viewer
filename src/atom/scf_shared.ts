@@ -67,6 +67,15 @@ export function screenedStartingPotential(grid: RadialGrid, Z: number): Float64A
     return v;
 }
 
+/** The loop's first potential: a caller's (checked against the grid) or the screened guess. */
+export function startingPotentialFor(grid: RadialGrid, Z: number, supplied: Float64Array | undefined): Float64Array {
+    if (!supplied) return screenedStartingPotential(grid, Z);
+    if (supplied.length !== grid.size) {
+        throw new Error(`startingPotential has ${supplied.length} points; the grid has ${grid.size}.`);
+    }
+    return Float64Array.from(supplied);
+}
+
 export function buildD(grid: RadialGrid, states: Array<RadialState & { electrons: number }>): Float64Array {
     const D = new Float64Array(grid.size);
     for (const state of states) {

@@ -2,7 +2,7 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createAppStore } from '../../src/store';
-import { setElement, setMode, drillToShell, setCharge } from '../../src/store/atomSlice';
+import { setElement, setMode, drillToShell, setCharge, setExcitation } from '../../src/store/atomSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { clearProfileCacheForTests, getCachedProfile, setCachedProfile } from '../../src/atom/profile_cache';
 
@@ -403,6 +403,22 @@ describe('useAtomSolver with species', () => {
         });
         expect(getCachedProfile('11+1', 0.9)).toBe(ion);
         expect(getCachedProfile('11', 0.9)).toEqual(minimalProfile({ Z: 11 }));
+    });
+
+    // Final review I2: "Z=19" named neither the element nor the excitation.
+    it('names the species, excitation included, when its solve did not converge', () => {
+        const store = buildStore();
+        const worker = fakeWorker();
+        store.dispatch(setElement(19));
+        setCachedProfile('19', 0.9, minimalProfile({ Z: 19 }));
+        renderHook(() => useAtomSolver(0.9, () => worker), {
+            wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+        });
+        act(() => { store.dispatch(setExcitation({ from: { n: 4, l: 0 }, to: { n: 4, l: 2 } })); });
+        act(() => {
+            worker.onmessage!({ data: { type: 'success', profile: minimalProfile({ Z: 19, converged: false }), requestId: lastRequestId(worker) } } as MessageEvent);
+        });
+        expect(store.getState().atom.error).toBe('The SCF calculation for Potassium, excited 4s → 4d did not converge.');
     });
 
     it('turns an unbound reply into the unbound state, not a profile or an error', () => {

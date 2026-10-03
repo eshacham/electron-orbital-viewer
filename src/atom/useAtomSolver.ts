@@ -4,7 +4,7 @@ import { solveStarted, solveSucceeded, solveFailed, solveUnbound } from '../stor
 import { createAtomWorker } from '../workers/createAtomWorker';
 import type { AtomWorkerResponse } from '../workers/atomWorker';
 import { getCachedProfile, setCachedProfile } from './profile_cache';
-import { speciesKey } from './species';
+import { speciesKey, speciesTitle } from './species';
 
 /**
  * Every reply atomWorker.ts can post, `requestId` echoed from the request
@@ -166,11 +166,13 @@ export function useAtomSolver(
                 setCachedProfile(key, enclosedFraction, profile);
                 dispatch(solveSucceeded(profile));
             } else {
-                dispatch(solveFailed(`The SCF calculation for Z=${Z} did not converge.`));
+                // Named by species, not Z: "Z=19" says neither the element
+                // nor that it was K 4s -> 4d, not K, that failed.
+                dispatch(solveFailed(`The SCF calculation for ${speciesTitle({ Z, charge, excitation })} did not converge.`));
             }
         };
         worker.onerror = (event) => {
-            dispatch(solveFailed(event.message || `Could not solve Z=${Z}.`));
+            dispatch(solveFailed(event.message || `Could not solve ${speciesTitle({ Z, charge, excitation })}.`));
         };
 
         worker.postMessage({ type: 'solve', Z, charge, excitation, enclosedFraction, requestId });

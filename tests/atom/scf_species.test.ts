@@ -1,6 +1,7 @@
 import { solveAtom, solveAtomOnGrid, solveSpecies } from '../../src/atom/scf';
-import { UnboundAnionError } from '../../src/atom/scf_shared';
+import { UnboundAnionError, screenedStartingPotential } from '../../src/atom/scf_shared';
 import { gridForAtom } from '../../src/atom/radial_grid';
+import { ionConfigurationFor } from '../../src/atom/ion_configurations';
 import { buildAtomProfile } from '../../src/atom/atom_profile';
 import { neutralGround, AtomSpecies } from '../../src/atom/species';
 import { configurationLabelOf } from '../../src/atom/configurations';
@@ -58,6 +59,26 @@ describe('solveSpecies', () => {
             expect((caught as UnboundAnionError).message).toContain(`its ${label} electron`);
             expect([(caught as UnboundAnionError).n, (caught as UnboundAnionError).l]).toEqual([n, l]);
         }
+    });
+
+    // Final review I2 / Phase 4: an optional starting potential, additive --
+    // omitted, the loop starts from the screened guess exactly as before.
+    it('starts from a supplied potential: same answer, and only on its own grid', () => {
+        const grid = gridForAtom(11);
+        const cold = solveAtomOnGrid(11, grid, { configuration: ionConfigurationFor(11, 1) });
+        const warm = solveAtomOnGrid(11, grid, { configuration: ionConfigurationFor(11, 1), startingPotential: solveAtom(11).potential });
+        expect(warm.converged).toBe(true);
+        expect(Math.abs((warm.totalEnergy - cold.totalEnergy) / cold.totalEnergy)).toBeLessThan(1e-7);
+        expect(() => solveAtomOnGrid(11, grid, { startingPotential: new Float64Array(3) })).toThrow(/grid/);
+    });
+
+    it('defaults to the screened start, bit for bit (neutral atoms unchanged)', () => {
+        const grid = gridForAtom(6);
+        const omitted = solveAtomOnGrid(6, grid);
+        const explicit = solveAtomOnGrid(6, grid, { startingPotential: screenedStartingPotential(grid, 6) });
+        expect(explicit.iterations).toBe(omitted.iterations);
+        expect(explicit.totalEnergy).toBe(omitted.totalEnergy);
+        expect(Array.from(explicit.potential)).toEqual(Array.from(omitted.potential));
     });
 
     it('refuses a configuration with no electrons', () => {
