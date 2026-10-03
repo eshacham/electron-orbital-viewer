@@ -788,38 +788,59 @@ Recorded for review, per the session's standing authority.
   in the CSV comment). The only offered species for Z ≤ 56 that does not
   converge is K 4s → 4d; its energy line says the energies were not
   computed because the picture's SCF did not converge (ruling FR-2).
-- **Scalar-relativistic solve fails outright for a deep promotion into an
-  already partially-filled 4f or 5f** (ruling C11's slow sweep,
-  `ATOM_SLOW_TESTS=1 tests/atom/relativistic_heavy_sweep_*.test.ts`; 1,812
-  species, Z = 55..118, every offered ion and excitation, scalar mode — the
-  element's own default). Non-relativistically the same configuration
-  converges fine; only `relativistic_solver.ts`'s eigenvalue search cannot
-  find the requested state once the mass-velocity/Darwin terms are in, and
-  throws its own "radial grid too small, or the potential does not bind it"
-  diagnostic (`eigenvalue_search.ts`'s non-relativistic guard, never
-  exercised by Phase 3's own Z ≤ 56 sweep). Exactly like `UnboundAnionError`,
-  `handleAtomWorkerRequest`'s catch-all turns this into a shown `type:
-  'error'` reply (spec §3.5) — the user sees a failure message, not a
-  crash — so it is recorded here rather than fixed blind:
+- **Which heavy species do not converge, and why** (ruling C11's slow
+  sweep after Task 7's fix round; `ATOM_SLOW_TESTS=1
+  tests/atom/relativistic_heavy_sweep_*.test.ts`: all 1,812 offered species
+  for Z = 55..118, every ion and excitation, in scalar mode and without
+  relativity, plus the 64 neutrals with spin-orbit). Every outcome that is
+  not "converged" is pinned in the sweep's `KNOWN_FAILURES`, both ways, so
+  this list cannot drift from the code. Everything else converges -- Tm and
+  Yb with spin-orbit included.
 
-  | Excitation | Elements affected |
-  | --- | --- |
-  | 6s → 4f | Ce, Pr, Nd, Pm, Sm, Eu, Tb, Dy, Ho, Er, Tm (11) |
-  | 6s → 5d | Pr, Nd, Ho, Er, Tm, Yb (6) |
-  | 7s → 5f | Pa, U, Np, Pu, Am, Bk, Cf, Es, Fm, Md (10) |
+  *An honest LDA verdict, shown as such* ("Scalar-relativistic SCF for
+  Samarium, excited 6s → 4f: the promoted 4f electron is not bound",
+  `UnboundElectronError`, ruling T7-b): the promoted f electron leaves the
+  bound spectrum during the self-consistent iterations and does not come
+  back, from either start.
 
-  Gd (4f⁷, half-filled), Lu and No (4f¹⁴/5f¹⁴, full) and La/Ac/Th/Cm/Lr are
-  not affected — consistent with the failure needing an already
-  substantially-but-not-fully occupied f shell to land in. Every other
-  offered ion and excitation for Z ≥ 55 converges.
-- **Two neutral atoms fail their own spin-orbit ground state**: Tm and Yb
-  (`relativistic_heavy_sweep_so_*.test.ts`, spin-orbit, neutrals only). Not
-  an exotic excitation — picking Thulium or Ytterbium from the periodic
-  table and switching Relativity to *With spin–orbit* hits this today. The
-  radial Dirac equation cannot find their own 4f⁷⁄₂ level (`"n=4, l=3,
-  j=7/2 (κ = -4)"`); both have a nearly-full (Tm, 4f¹³) or exactly-full
-  (Yb, 4f¹⁴) 4f shell, the same territory as the excitation failures above.
-  Every other neutral Z = 55..118 converges with spin-orbit.
+  | Excitation | Mode | Elements | Why |
+  | --- | --- | --- | --- |
+  | 6s → 4f | off and scalar | Pr, Nd, Pm, Sm, Eu (5) | unbound even without relativity: halving the mixing down to 1e-4 still pushes the 4f out. Until this round the Schrödinger solver handed back a 4f at −192 Ha here and the SCF "converged" around it -- drawn in off mode since Phase 3, and the warm seed and dashed baseline in Phase 4 |
+  | 6s → 4f | scalar | Ce, Tb, Dy, Ho, Er, Tm (6) | the 4f is bound by only 3–66 mHa without relativity; the scalar shift (about +0.1 Ha for a 4f) unbinds it |
+  | 7s → 5f | scalar | Pu, Am (2) | the 5f is bound by 0.10 and 0.12 Ha without relativity; the scalar shift of the 5f across these excitations is +0.13 (Pa) to +0.24 Ha (Md), about +0.17 Ha here |
+
+  The spin-polarised ΔSCF energies of Pr, Nd, Eu and Tb–Er 6s → 4f give
+  the same verdict (they "converged" on garbage or ran out of iterations).
+
+  *Unbound anions* (`UnboundAnionError`, as since Phase 3): Pb⁻, Bi⁻, Po⁻,
+  Po²⁻ in both modes; At⁻ only with scalar relativity -- it holds its 6p
+  without relativity and loses it with.
+
+  *What converges now that did not* (rulings T7-a, T7-c): 16 species whose
+  relativistic solve, warm-started from the non-relativistic potential,
+  found a barely bound f level pushed out in its first iterations, while a
+  cold (screened) start converges: Tm and Yb with spin-orbit (their own
+  4f⁷⁄₂), 6s → 5d of Pr, Nd, Ho, Er, Tm, Yb (the 4f), and 7s → 5f of Pa, U,
+  Np, Bk, Cf, Es, Fm, Md (the 5f, which ends bound by only 2–42 mHa).
+  `solveSpecies` now retries from the screened start whenever the warm
+  start throws or does not converge. Task 7 had recorded all 29 failures as
+  the solver not finding states "once the mass-velocity/Darwin terms are
+  in"; that was wrong on both counts: 16 were the missing fallback, 13 are
+  physics.
+
+  *Still a solver limitation*: none in the sweep. A `StateNotFoundError`
+  (the radial solvers' "too small to hold …, or the potential does not bind
+  it" and containment messages) now reaches the user only for a level the
+  node count says *is* bound and the search still cannot find. The search
+  can still bracket a false root at a discontinuity of its mismatch (one
+  was measured for Pu 7s → 5f, mid-SCF, at −10.1 Ha); the node-count check
+  catches it, and for Pu the level was not bound anyway.
+
+  Off mode is otherwise untouched, measured over all 3,146 offered species
+  (Z = 1–118, old code against new): restricted, 3,119 identical bit for
+  bit (total energy and iteration count) and 22 anions with identical
+  verdicts; spin-polarised, 3,117 and 22 likewise. Phase 3's own Z ≤ 56
+  sweep is unchanged, its 12 below-ground excitations included.
 - **Phase 4 must thread relativity into the worker's neutral reference
   solve, not only the selected species' own solve** (Phase 3 follow-up).
   The reference ring and the camera's framing floor both come from solving
@@ -848,7 +869,24 @@ this way before the cause was found. Always state this in a dispatch, along
 with expected durations so a multi-minute foreground wait reads as normal.
 
 **Expensive SCF sweeps are gated behind `ATOM_SLOW_TESTS=1`.** The default
-suite is ~57 s; the full set is ~2 min. Do not un-gate them.
+suite is ~60 s (floored by `tests/orbital_presets.test.ts`, ~60 s on its own
+worker). The two exhaustive sweeps -- `excitation_sweep_<k>` (80 shards,
+Z ≤ 56) and `relativistic_heavy_sweep_<k>` (80 scalar + 3 spin-orbit
+shards, Z ≥ 55) -- are left out of the default run by `jest.config.ts`
+rather than merely skipped, and each is hours of worker time. Run them in
+batches that fit a ten-minute foreground command, e.g.
+`ATOM_SLOW_TESTS=1 npx jest --maxWorkers=7 "relativistic_heavy_sweep_(15|16|17|18|19|20|21)\.test"`
+(7 heavy shards ≈ 8 min, 8 excitation shards ≈ 8 min on a 10-core
+machine). Each shard checks its outcomes against its sweep's
+`KNOWN_FAILURES` both ways; update the list and this file together. The
+rest of the slow set (NIST, warm/cold, SCF, ΔSCF) is ~12 min. Jest runs
+the solver about 3.5× slower than plain node (measured: Au scalar 14 s
+under jest, 3.9 s bundled with esbuild); for exploratory sweeps a bundled
+script is the faster tool. `relativistic_nist.test.ts` logs the cost of a
+seeded scalar platinum solve against the non-relativistic one instead of
+asserting it (wall-clock ratios under parallel workers are not a stable
+test): measured 8.1 s against 6.8 s, ratio 1.18, budget ~3. Do not un-gate
+them.
 
 **A jest worker SIGSEGV has now been seen three times during a full run**
 (`atom_worker_contract.test.ts` once in Phase 2, `delta_scf.test.ts` once
