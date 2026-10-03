@@ -2,7 +2,10 @@ import {
     setEnclosedFraction, setBasicSelection, setSurfaceStyle, setCombination, cameraMoved,
     startOrbitalCalculation, selectShownBasicOrbital, selectShownEnclosedFraction,
 } from '../src/store/orbitalSlice';
-import { setMode, setElement, setCharge, setExcitation, solveSucceeded, drillToShell, drillToSubshell, drillToOrbital, speciesOf } from '../src/store/atomSlice';
+import {
+    setMode, setElement, setCharge, setExcitation, solveSucceeded, drillToShell, drillToSubshell, drillToOrbital, speciesOf,
+    setRelativity, effectiveRelativity,
+} from '../src/store/atomSlice';
 import {
     registerUrlKeys, resetUrlKeysForTests, encodeStateOf, applyStateTo, encodeState, applyState,
     bindUrlStateStore, hasSharedView, urlModeOf, ANY_MODE, registerBuiltInUrlKeys, parseNumberInRange,
@@ -14,6 +17,7 @@ import type { RootState } from '../src/store';
 import type { SerialisedAtomProfile } from '../src/workers/atomWorker';
 import { AtomSpecies, speciesKey as computeSpeciesKey, excitationSources, excitationTargets } from '../src/atom/species';
 import { allowedCharges } from '../src/atom/ion_configurations';
+import type { RelativityMode } from '../src/atom/relativity';
 
 // Production's serializableCheck exceptions (ruling R16), not a bare
 // configureStore: a plain store prints a console.error for every
@@ -99,22 +103,32 @@ describe('url_state registry', () => {
 });
 
 
+/** The j-levels a subshell has with spin–orbit: j = ½ for s, l ∓ ½ otherwise. */
+const jLevelsOf = (l: number) => (l === 0 ? [0.5] : [l - 0.5, l + 0.5]);
+
 /**
  * Every shell up to maxN, every subshell up to f: any view is reachable.
  * Carries `species`' own speciesKey (default: Z's neutral ground state) so
  * `applyPendingView` recognises this as that species' own picture (ruling
  * C1) -- without it, an ion or excited atom's pending view would never land.
+ * Likewise `relativity` (ruling C9): a picture lands only in the mode the
+ * switch shows, and with spin–orbit every subshell is its j-levels.
  */
-function profileFor(Z: number, maxN = 7, species: AtomSpecies = { Z, charge: 0, excitation: null }): SerialisedAtomProfile {
+function profileFor(
+    Z: number, maxN = 7, species: AtomSpecies = { Z, charge: 0, excitation: null }, relativity: RelativityMode = 'off',
+): SerialisedAtomProfile {
     const shells: SerialisedAtomProfile['shells'] = [];
     const subshells: SerialisedAtomProfile['subshells'] = [];
     for (let n = 1; n <= maxN; n++) {
         shells.push({ n, electrons: 2, contourRadius: n, curve: new Float64Array(3), emphasis: new Float32Array(3) });
         for (let l = 0; l <= Math.min(3, n - 1); l++) {
-            subshells.push({ n, l, electrons: 2, energy: -1 / n, curve: new Float64Array(3), R: new Float64Array(3), samplingRadius: n, compositeSamplingRadius: n });
+            const entry = { n, l, electrons: 2, energy: -1 / n, curve: new Float64Array(3), R: new Float64Array(3), samplingRadius: n, compositeSamplingRadius: n };
+            if (relativity === 'spinOrbit') subshells.push(...jLevelsOf(l).map(j => ({ ...entry, j })));
+            else subshells.push(entry);
         }
     }
     return {
+        ...(relativity === 'off' ? {} : { relativity }),
         Z, converged: true, speciesKey: computeSpeciesKey(species), rMin: 1e-3, dx: 0.1, size: 3,
         total: new Float32Array(3), totalEmphasis: new Float32Array(3),
         contourRadius: maxN, valencePeakRadius: maxN, displayRadius: maxN, shellPeaks: new Float64Array([1]),
@@ -127,7 +141,7 @@ function restore(hash: string, maxN = 7) {
     const store = makeStore();
     applyStateTo(hash, store.dispatch);
     const { atom } = store.getState();
-    if (atom.mode === 'atom' && atom.pendingView) store.dispatch(solveSucceeded(profileFor(atom.Z, maxN, speciesOf(atom))));
+    if (atom.mode === 'atom' && atom.pendingView) store.dispatch(solveSucceeded(profileFor(atom.Z, maxN, speciesOf(atom), effectiveRelativity(atom))));
     return store;
 }
 
@@ -140,7 +154,7 @@ function mulberry32(seed: number): () => number {
     };
 }
 
-type Shape = 'atom' | 'shell' | 'subshell' | 'orbital' | 'ion' | 'excited' | 'basic' | 'hybrid' | 'field';
+type Shape = 'atom' | 'shell' | 'subshell' | 'orbital' | 'ion' | 'excited' | 'relativity' | 'jlevel' | 'basic' | 'hybrid' | 'field';
 
 function randomView(rand: () => number, shape: Shape) {
     const int = (min: number, max: number) => min + Math.floor(rand() * (max - min + 1));
@@ -176,11 +190,18 @@ function randomView(rand: () => number, shape: Shape) {
                 }
             }
         }
-        store.dispatch(solveSucceeded(profileFor(Z, 7, species)));
+        // Every override, the element's own default included: a link must
+        // reproduce the mode shown, whichever way the store came by it.
+        if (shape === 'relativity') store.dispatch(setRelativity(pick([null, 'off', 'scalar', 'spinOrbit'] as const)));
+        if (shape === 'jlevel') store.dispatch(setRelativity('spinOrbit'));
+        const relativity = effectiveRelativity(store.getState().atom);
+        store.dispatch(solveSucceeded(profileFor(Z, 7, species, relativity)));
         const n = int(1, 7), l = int(0, Math.min(3, n - 1)), ml = int(-l, l);
-        if (shape === 'shell') store.dispatch(drillToShell(n));
-        if (shape === 'subshell') store.dispatch(drillToSubshell(n, l));
-        if (shape === 'orbital') store.dispatch(drillToOrbital(n, l, ml));
+        const j = relativity === 'spinOrbit' ? pick(jLevelsOf(l)) : undefined;
+        const depth = shape === 'relativity' || shape === 'jlevel' ? pick(['atom', 'shell', 'subshell', 'orbital'] as const) : shape;
+        if (depth === 'shell') store.dispatch(drillToShell(n));
+        if (depth === 'subshell') store.dispatch(drillToSubshell(n, l, j));
+        if (depth === 'orbital') store.dispatch(drillToOrbital(n, l, ml, j));
     }
     store.dispatch(setEnclosedFraction(pick(ENCLOSED_FRACTIONS)));
     store.dispatch(setSurfaceStyle({
@@ -203,7 +224,7 @@ function viewOf(state: RootState) {
         mode: atom.mode,
         atom: atom.mode === 'atom'
             ? {
-                Z: atom.Z, charge: atom.charge, excitation: atom.excitation,
+                Z: atom.Z, charge: atom.charge, excitation: atom.excitation, relativity: effectiveRelativity(atom),
                 level: atom.level, shell: atom.selectedShell, subshell: atom.selectedSubshell, orbital: atom.selectedOrbital,
             }
             : null,
@@ -222,7 +243,7 @@ describe('built-in URL keys', () => {
     beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); });
 
     // Spec §5 Phase 2: "URL round-trip property test over every mode and level".
-    it.each<Shape>(['atom', 'shell', 'subshell', 'orbital', 'ion', 'excited', 'basic', 'hybrid', 'field'])(
+    it.each<Shape>(['atom', 'shell', 'subshell', 'orbital', 'ion', 'excited', 'relativity', 'jlevel', 'basic', 'hybrid', 'field'])(
         'round-trips random %s views',
         shape => {
             const rand = mulberry32(shape.length * 7919);
@@ -425,5 +446,72 @@ describe('built-in URL keys', () => {
             opacity: 0.5, mode: 'wireframe', clipAxis: 'x', clipPosition: 0,
         });
         expect(store.getState().orbital.enclosedFraction).toBe(0.9);
+    });
+
+    // Ruling C1: a link without rel (every Phase 2/3 link) or with one this
+    // app does not know shows off -- what it showed when it was copied --
+    // and the override is only kept where it differs from the element's
+    // default, so the element's own default keeps following the element.
+    it('decodes rel against the element\'s default, an absent or unknown rel meaning off', () => {
+        const cases: Array<[string, RelativityMode | null, RelativityMode]> = [
+            ['#mode=atom&Z=79&rel=so', 'spinOrbit', 'spinOrbit'],
+            ['#mode=atom&Z=79&rel=scalar', null, 'scalar'],
+            ['#mode=atom&Z=79&rel=off', 'off', 'off'],
+            ['#mode=atom&Z=79&rel=nonsense', 'off', 'off'],
+            ['#mode=atom&Z=79', 'off', 'off'],
+            ['#mode=atom&Z=6', null, 'off'],
+            ['#mode=atom&Z=6&rel=scalar', 'scalar', 'scalar'],
+        ];
+        for (const [hash, override, effective] of cases) {
+            const atom = restore(hash).getState().atom;
+            expect([hash, atom.relativityOverride, effectiveRelativity(atom)]).toEqual([hash, override, effective]);
+        }
+    });
+
+    it('replaces an override the tab already had, and a link with no Z leaves it alone', () => {
+        const store = makeStore();
+        store.dispatch(setRelativity('spinOrbit'));
+        applyStateTo('#mode=atom&Z=6', store.dispatch);
+        expect(store.getState().atom.relativityOverride).toBeNull();
+        store.dispatch(setRelativity('scalar'));
+        applyStateTo('#mode=atom&Z=abc', store.dispatch);
+        expect(store.getState().atom.relativityOverride).toBe('scalar');
+    });
+
+    // Phase 2/3 links reproduce byte for byte: off writes no rel.
+    it('writes rel right after Z whenever the mode shown is not off, and j after l', () => {
+        expect(encodeStateOf(restore('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0').getState())).toMatch(/^mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=/);
+        expect(encodeStateOf(restore('#mode=atom&Z=79&level=shell&n=6').getState())).toMatch(/^mode=atom&Z=79&level=shell&n=6&frac=/);
+
+        const gold = makeStore();
+        gold.dispatch(setElement(79));
+        gold.dispatch(setCharge(1));
+        expect(encodeStateOf(gold.getState())).toMatch(/^mode=atom&Z=79&rel=scalar&charge=1&level=atom&/);
+        gold.dispatch(setRelativity('spinOrbit'));
+        gold.dispatch(solveSucceeded(profileFor(79, 7, speciesOf(gold.getState().atom), 'spinOrbit')));
+        gold.dispatch(drillToOrbital(6, 1, 0, 1.5));
+        const hash = encodeStateOf(gold.getState());
+        expect(hash).toMatch(/^mode=atom&Z=79&rel=so&charge=1&level=orbital&n=6&l=1&j=3\/2&ml=0&/);
+
+        const restored = restore(`#${hash}`).getState().atom;
+        expect(restored).toMatchObject({ relativityOverride: 'spinOrbit', charge: 1, level: 'orbital', selectedOrbital: { n: 6, l: 1, ml: 0, j: 1.5 } });
+    });
+
+    // Ruling C8: j must be l ± ½; anything else is ignored like any bad key.
+    it('ignores a j that is not l ± ½, and a link\'s j that the mode shown does not have', () => {
+        const pending = (hash: string) => {
+            const store = makeStore();
+            applyStateTo(hash, store.dispatch);
+            return store.getState().atom.pendingView;
+        };
+        expect(pending('#mode=atom&Z=79&rel=so&level=shell&n=6&l=1&j=3/2')!.subshell).toEqual({ n: 6, l: 1, j: 1.5 });
+        expect(pending('#mode=atom&Z=79&rel=so&level=shell&n=6&l=1&j=5/2')!.subshell).toEqual({ n: 6, l: 1 });
+        expect(pending('#mode=atom&Z=79&rel=so&level=shell&n=6&l=0&j=1/2')!.subshell).toEqual({ n: 6, l: 0, j: 0.5 });
+        expect(pending('#mode=atom&Z=79&rel=so&level=shell&n=6&l=0&j=-1/2')!.subshell).toEqual({ n: 6, l: 0 });
+        expect(pending('#mode=atom&Z=79&rel=so&level=shell&n=6&l=1&j=1.5')!.subshell).toEqual({ n: 6, l: 1 });
+
+        // A j-level link restored where the mode is scalar opens the shell.
+        const atom = restore('#mode=atom&Z=79&rel=scalar&level=orbital&n=6&l=1&j=3/2&ml=0').getState().atom;
+        expect(atom).toMatchObject({ level: 'shell', selectedShell: 6, selectedSubshell: null, pendingView: null });
     });
 });

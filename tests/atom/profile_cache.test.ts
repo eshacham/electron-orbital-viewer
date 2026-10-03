@@ -12,4 +12,15 @@ describe('profile cache keyed by species', () => {
         expect(getCachedProfile('11', 0.9)!.Z).toBe(11);
         expect(getCachedProfile('11+1', 0.9)!.Z).toBe(111);
     });
+
+    // Ruling C2: a relativistic profile is a different picture of the same species.
+    it('keeps the modes apart, off under the species key alone', () => {
+        setCachedProfile('79', 0.9, profile(1));
+        setCachedProfile('79', 0.9, profile(2), 'scalar');
+        setCachedProfile('79', 0.9, profile(3), 'spinOrbit');
+        expect(getCachedProfile('79', 0.9)!.Z).toBe(1);
+        expect(getCachedProfile('79', 0.9, 'off')!.Z).toBe(1);
+        expect(getCachedProfile('79', 0.9, 'scalar')!.Z).toBe(2);
+        expect(getCachedProfile('79', 0.9, 'spinOrbit')!.Z).toBe(3);
+    });
 });

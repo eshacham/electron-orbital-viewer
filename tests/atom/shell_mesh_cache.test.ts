@@ -38,4 +38,14 @@ describe('shellMeshCacheKey', () => {
         expect(shellMeshCacheKey('26', 3, 32, 0.9)).toBe(shellMeshCacheKey(26, 3, 32, 0.9));
         expect(shellMeshCacheKey('11+1', 2, 32, 0.9)).not.toBe(shellMeshCacheKey(11, 2, 32, 0.9));
     });
+
+    // Ruling C2: species@mode for a relativistic mode; off keeps today's string.
+    it('separates relativity modes and j-levels, and keeps the non-relativistic key unchanged', () => {
+        expect(shellMeshCacheKey(26, 3, 32, 0.9, null, 'off')).toBe(shellMeshCacheKey(26, 3, 32, 0.9, null));
+        expect(shellMeshCacheKey(26, 3, 32, 0.9, null, 'off')).toBe('26:3:32:0.9:all');
+        expect(shellMeshCacheKey(79, 6, 32, 0.9, null, 'scalar')).not.toBe(shellMeshCacheKey(79, 6, 32, 0.9, null, 'off'));
+        expect(shellMeshCacheKey(79, 6, 32, 0.9, null, 'scalar')).not.toBe(shellMeshCacheKey(79, 6, 32, 0.9, null, 'spinOrbit'));
+        expect(shellMeshCacheKey(79, 6, 32, 0.9, 1, 'spinOrbit', 0.5)).not.toBe(shellMeshCacheKey(79, 6, 32, 0.9, 1, 'spinOrbit', 1.5));
+        expect(shellMeshCacheKey('79+1', 6, 32, 0.9, null, 'scalar')).toBe('79+1@scalar:6:32:0.9:all');
+    });
 });

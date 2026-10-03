@@ -2,7 +2,7 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createAppStore } from '../../src/store';
-import { setElement, setMode, drillToShell, setCharge, setExcitation } from '../../src/store/atomSlice';
+import { setElement, setMode, drillToShell, setCharge, setExcitation, setRelativity } from '../../src/store/atomSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { clearProfileCacheForTests, getCachedProfile, setCachedProfile } from '../../src/atom/profile_cache';
 
@@ -91,7 +91,7 @@ describe('useAtomSolver', () => {
         expect(store.getState().atom.isSolving).toBe(true);
         expect(createWorker).toHaveBeenCalledTimes(1);
         expect(worker.postMessage).toHaveBeenCalledWith({
-            type: 'solve', Z: 1, charge: 0, excitation: null, enclosedFraction: 0.9, requestId: expect.any(Number),
+            type: 'solve', Z: 1, charge: 0, excitation: null, enclosedFraction: 0.9, relativity: 'off', requestId: expect.any(Number),
         });
     });
 
@@ -183,7 +183,7 @@ describe('useAtomSolver', () => {
         expect(worker.terminate).not.toHaveBeenCalled();
         expect(createWorker).toHaveBeenCalledTimes(1);
         expect(worker.postMessage).toHaveBeenLastCalledWith({
-            type: 'solve', Z: 6, charge: 0, excitation: null, enclosedFraction: 0.9, requestId: expect.any(Number),
+            type: 'solve', Z: 6, charge: 0, excitation: null, enclosedFraction: 0.9, relativity: 'off', requestId: expect.any(Number),
         });
     });
 
@@ -262,7 +262,7 @@ describe('useAtomSolver', () => {
 
         expect(createWorker).toHaveBeenCalledTimes(1);
         expect(worker.postMessage).toHaveBeenLastCalledWith({
-            type: 'solve', Z: 1, charge: 0, excitation: null, enclosedFraction: 0.5, requestId: expect.any(Number),
+            type: 'solve', Z: 1, charge: 0, excitation: null, enclosedFraction: 0.5, relativity: 'off', requestId: expect.any(Number),
         });
     });
 
@@ -394,7 +394,7 @@ describe('useAtomSolver with species', () => {
         expect(worker.postMessage).not.toHaveBeenCalled();         // neutral Na was cached
         act(() => { store.dispatch(setCharge(1)); });
         expect(worker.postMessage).toHaveBeenLastCalledWith({
-            type: 'solve', Z: 11, charge: 1, excitation: null, enclosedFraction: 0.9, requestId: expect.any(Number),
+            type: 'solve', Z: 11, charge: 1, excitation: null, enclosedFraction: 0.9, relativity: 'off', requestId: expect.any(Number),
         });
 
         const ion = minimalProfile({ Z: 11, charge: 1, speciesKey: '11+1' });
@@ -473,5 +473,76 @@ describe('useAtomSolver with species', () => {
             worker.onmessage!({ data: { type: 'success', profile: chlorine, requestId: lastRequestId(worker) } } as MessageEvent);
         });
         expect(store.getState().atom).toMatchObject({ unbound: null, isSolving: false, profile: chlorine });
+    });
+});
+
+describe('useAtomSolver with relativity', () => {
+    // Review Focus 2: the profile on screen always carries the mode the
+    // switch shows; a stale reply for the other mode is dropped, and a
+    // cached profile for the other mode is never served.
+    it('keys requests and cache hits by relativity', () => {
+        const store = buildStore();
+        const worker = fakeWorker();
+        renderHook(() => useAtomSolver(0.9, () => worker), {
+            wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+        });
+        act(() => { store.dispatch(setElement(79)); });
+        expect(worker.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ Z: 79, relativity: 'scalar' }));
+        const scalarId = lastRequestId(worker);
+        act(() => { store.dispatch(setRelativity('spinOrbit')); });
+        expect(worker.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ Z: 79, relativity: 'spinOrbit' }));
+
+        // The superseded scalar reply lands late: dropped.
+        act(() => {
+            worker.onmessage!({ data: { type: 'success', profile: minimalProfile({ Z: 79, relativity: 'scalar' }), requestId: scalarId } } as MessageEvent);
+        });
+        expect(store.getState().atom.profile).toBeNull();
+
+        act(() => {
+            worker.onmessage!({ data: { type: 'success', profile: minimalProfile({ Z: 79, relativity: 'spinOrbit' }), requestId: lastRequestId(worker) } } as MessageEvent);
+        });
+        expect(store.getState().atom.profile!.relativity).toBe('spinOrbit');
+
+        // Scalar was never cached (its reply was dropped), so switching back asks the worker again...
+        const calls = worker.postMessage.mock.calls.length;
+        act(() => { store.dispatch(setRelativity('scalar')); });
+        expect(worker.postMessage.mock.calls.length).toBe(calls + 1);
+        act(() => {
+            worker.onmessage!({ data: { type: 'success', profile: minimalProfile({ Z: 79, relativity: 'scalar' }), requestId: lastRequestId(worker) } } as MessageEvent);
+        });
+        // ...and spin–orbit, which was cached, comes back without one.
+        act(() => { store.dispatch(setRelativity('spinOrbit')); });
+        expect(worker.postMessage.mock.calls.length).toBe(calls + 1);
+        expect(store.getState().atom.profile!.relativity).toBe('spinOrbit');
+    });
+
+    // Ruling C2: off keeps the bare species key; other modes get their own.
+    it('caches under the species key for off and under species@mode otherwise', () => {
+        const store = buildStore();
+        const worker = fakeWorker();
+        store.dispatch(setElement(79));
+        renderHook(() => useAtomSolver(0.9, () => worker), {
+            wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+        });
+        const gold = minimalProfile({ Z: 79, relativity: 'scalar' });
+        act(() => {
+            worker.onmessage!({ data: { type: 'success', profile: gold, requestId: lastRequestId(worker) } } as MessageEvent);
+        });
+        expect(getCachedProfile('79', 0.9, 'scalar')).toBe(gold);
+        expect(getCachedProfile('79', 0.9)).toBeUndefined();
+    });
+
+    it('a mode switch starts no solve in Basic Orbitals, and the one it asked for runs on return', () => {
+        const store = buildStore();
+        const worker = fakeWorker();
+        renderHook(() => useAtomSolver(0.9, () => worker), {
+            wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+        });
+        act(() => { store.dispatch(setMode('hydrogenic')); });
+        const calls = worker.postMessage.mock.calls.length;
+        act(() => { store.dispatch(setRelativity('scalar')); });
+        expect(worker.postMessage.mock.calls.length).toBe(calls);
+        act(() => { store.dispatch(setMode('atom')); });
+        expect(worker.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ Z: 1, relativity: 'scalar' }));
     });
 });

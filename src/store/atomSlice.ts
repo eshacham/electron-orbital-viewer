@@ -3,6 +3,7 @@ import { SerialisedAtomProfile } from '../workers/atomWorker';
 import { AtomSpecies, Excitation, isValidExcitation, speciesKey } from '../atom/species';
 import { allowedCharges } from '../atom/ion_configurations';
 import type { EnergyReading } from '../atom/delta_scf';
+import { RelativityMode, defaultRelativityFor } from '../atom/relativity';
 
 /**
  * State for the three-level multi-electron drill-down (whole atom -> shell
@@ -18,7 +19,8 @@ import type { EnergyReading } from '../atom/delta_scf';
  * `drillToOrbital` and `levelUp` are pure, synchronous navigation over the
  * `profile` this slice already holds -- none of them dispatch a solve, and
  * none of them clear or refetch `profile`. Only a species change --
- * `setElement`, `setCharge`, `setExcitation` -- starts one (elsewhere, in the
+ * `setElement`, `setCharge`, `setExcitation` -- or a change of the
+ * relativistic treatment (`setRelativity`) starts one (elsewhere, in the
  * effect that owns the worker -- this slice only records the request via
  * `solveStarted`/`solveSucceeded`/`solveFailed`/`solveUnbound`), plus the
  * enclosed fraction, which is not state here at all.
@@ -28,15 +30,25 @@ export type ViewMode = 'atom' | 'hydrogenic';
 export type ViewLevel = 'atom' | 'shell' | 'orbital';
 
 /**
+ * A subshell, or with spin–orbit one of its j-levels. `j` is absent exactly
+ * when the profile it was picked from has none, so a non-relativistic
+ * selection keeps the shape (and the equality) it always had.
+ */
+export interface SubshellSelection { n: number; l: number; j?: number; }
+export interface OrbitalSelection { n: number; l: number; ml: number; j?: number; }
+
+/**
  * A view asked for before it can be shown: a shared link names a shell or
  * an orbital, but occupancy is only known once the SCF lands. Applied by
- * solveSucceeded, as deep as the profile allows.
+ * solveSucceeded, as deep as the profile allows -- and a subshell only on a
+ * profile with the same j-levels (ruling C8): a link's 6p³⁄₂ names nothing
+ * in a scalar picture, nor a link's 6p in a spin–orbit one.
  */
 export interface PendingAtomView {
     level: ViewLevel;
     shell: number | null;
-    subshell: { n: number; l: number } | null;
-    orbital: { n: number; l: number; ml: number } | null;
+    subshell: SubshellSelection | null;
+    orbital: OrbitalSelection | null;
 }
 
 /**
@@ -70,10 +82,24 @@ export interface AtomState {
     unbound: string | null;
     /** ΔSCF results for `energies.speciesKey` only -- see EnergiesState. */
     energies: EnergiesState;
+    /**
+     * The user's Relativity choice, or null to follow the element's default
+     * (scalar from Cs, off before -- spec §5 Phase 4). Kept across element
+     * changes: someone comparing heavy atoms with spin–orbit on expects it
+     * to stay on. Read it through `effectiveRelativity`, never directly.
+     */
+    relativityOverride: RelativityMode | null;
     level: ViewLevel;
     selectedShell: number | null;
-    selectedSubshell: { n: number; l: number } | null;
-    selectedOrbital: { n: number; l: number; ml: number } | null;
+    selectedSubshell: SubshellSelection | null;
+    selectedOrbital: OrbitalSelection | null;
+    /**
+     * The picture on screen. Normally the selected species' own in the
+     * selected mode (`pictureLanded`), but after a mode switch it is the old
+     * mode's until the new one lands (ruling C9) -- anything that describes
+     * the picture reads the mode from here (`profile.relativity`), not from
+     * the switch.
+     */
     profile: SerialisedAtomProfile | null;
     isSolving: boolean;
     error: string | null;
@@ -84,7 +110,8 @@ export interface AtomState {
     /**
      * Bumped by every species change (`setElement`, `setCharge`,
      * `setExcitation`), including one that picks the species already
-     * selected -- e.g. Cl⁻ reported unbound, then Cl⁻ picked again.
+     * selected -- e.g. Cl⁻ reported unbound, then Cl⁻ picked again -- and by
+     * a `setRelativity` that changes the effective mode.
      *
      * Bug fix, found live: `setElement` clears `profile` unconditionally,
      * but the effect that actually starts a solve is keyed on
@@ -107,6 +134,7 @@ const initialState: AtomState = {
     excitation: null,
     unbound: null,
     energies: NO_ENERGIES,
+    relativityOverride: null,
     level: 'atom',
     selectedShell: null,
     selectedSubshell: null,
@@ -124,9 +152,34 @@ function shellIsOccupied(profile: SerialisedAtomProfile | null, n: number): bool
     return profile !== null && profile.shells.some(shell => shell.n === n);
 }
 
-/** Whether the solved profile actually occupies subshell (n, l) -- same reasoning as shellIsOccupied, against `subshells` rather than any peak list. */
-function subshellIsOccupied(profile: SerialisedAtomProfile | null, n: number, l: number): boolean {
-    return profile !== null && profile.subshells.some(subshell => subshell.n === n && subshell.l === l);
+/**
+ * Whether the solved profile actually occupies subshell (n, l), or its
+ * j-level (n, l, j) -- same reasoning as shellIsOccupied, against
+ * `subshells` rather than any peak list. j must match exactly, absent
+ * included: in a spin–orbit profile (n, l) alone names no subshell (it is
+ * two j-levels), and in any other profile no subshell has a j.
+ */
+function subshellIsOccupied(profile: SerialisedAtomProfile | null, n: number, l: number, j?: number): boolean {
+    return profile !== null && profile.subshells.some(subshell => subshell.n === n && subshell.l === l && subshell.j === j);
+}
+
+/** j only when there is one, so a non-relativistic selection is exactly `{ n, l }` as it always was. */
+function subshellSelection(n: number, l: number, j: number | undefined): SubshellSelection {
+    return j === undefined ? { n, l } : { n, l, j };
+}
+
+function orbitalSelection(n: number, l: number, ml: number, j: number | undefined): OrbitalSelection {
+    return j === undefined ? { n, l, ml } : { n, l, ml, j };
+}
+
+/** The mode the switch shows: the user's choice, or the element's default when they have not made one. */
+export function effectiveRelativity(state: Pick<AtomState, 'Z' | 'relativityOverride'>): RelativityMode {
+    return state.relativityOverride ?? defaultRelativityFor(state.Z);
+}
+
+/** Which radial equation drew a profile; hand-built fixtures and every pre-Phase-4 profile carry none, and were non-relativistic. */
+function profileRelativity(profile: SerialisedAtomProfile): RelativityMode {
+    return profile.relativity ?? 'off';
 }
 
 export function speciesOf(state: Pick<AtomState, 'Z' | 'charge' | 'excitation'>): AtomSpecies {
@@ -142,9 +195,16 @@ function profileSpeciesKey(profile: SerialisedAtomProfile): string {
     return profile.speciesKey ?? String(profile.Z);
 }
 
-/** Whether the profile on screen is the selected species' own picture, not one left over from before a species change. */
+/**
+ * Whether the profile on screen is the selected species' own picture in the
+ * selected mode, not one left over from before a species change or a mode
+ * switch (ruling C9). A pending link view and the ΔSCF energies both wait
+ * for this.
+ */
 export function pictureLanded(state: AtomState): boolean {
-    return state.profile !== null && profileSpeciesKey(state.profile) === speciesKey(speciesOf(state));
+    return state.profile !== null
+        && profileSpeciesKey(state.profile) === speciesKey(speciesOf(state))
+        && profileRelativity(state.profile) === effectiveRelativity(state);
 }
 
 /**
@@ -179,8 +239,12 @@ function resetForNewSpecies(state: AtomState): void {
 
 /**
  * Opens a pending view to the deepest level the solved profile actually
- * has -- and only on the selected species' own profile (ruling C1): Na⁺ and
- * Na share a Z but not an M shell.
+ * has -- and only on the selected species' own profile in the selected mode
+ * (rulings C1, C9): Na⁺ and Na share a Z but not an M shell, and a scalar
+ * gold and a spin–orbit one share no p subshell. The subshell must match j
+ * too (ruling C8), so a link's j-level lands only on a profile that has it;
+ * otherwise the view stops at the shell, as for any subshell the profile
+ * lacks.
  */
 function applyPendingView(state: AtomState): void {
     const view = state.pendingView;
@@ -195,13 +259,43 @@ function applyPendingView(state: AtomState): void {
     state.level = 'shell';
     state.selectedShell = view.shell;
     const subshell = view.subshell;
-    if (!subshell || subshell.n !== view.shell || !subshellIsOccupied(profile, subshell.n, subshell.l)) return;
-    state.selectedSubshell = { n: subshell.n, l: subshell.l };
+    if (!subshell || subshell.n !== view.shell || !subshellIsOccupied(profile, subshell.n, subshell.l, subshell.j)) return;
+    state.selectedSubshell = subshellSelection(subshell.n, subshell.l, subshell.j);
     const orbital = view.orbital;
-    if (view.level !== 'orbital' || !orbital || orbital.n !== subshell.n || orbital.l !== subshell.l
+    if (view.level !== 'orbital' || !orbital || orbital.n !== subshell.n || orbital.l !== subshell.l || orbital.j !== subshell.j
         || orbital.ml < -subshell.l || orbital.ml > subshell.l) return;
     state.level = 'orbital';
-    state.selectedOrbital = { n: orbital.n, l: orbital.l, ml: orbital.ml };
+    state.selectedOrbital = orbitalSelection(orbital.n, orbital.l, orbital.ml, orbital.j);
+}
+
+/**
+ * Steps the selection back to what a newly landed profile can name. Only a
+ * mode switch can leave one it cannot: the old mode's picture stays on
+ * screen while the new one solves (ruling C9), and a subshell picked on a
+ * scalar picture names nothing once the spin–orbit one lands (Review Focus
+ * 1). Every other re-solve is the same species in the same mode, whose
+ * profile names everything the selection does, so this changes nothing.
+ */
+function dropSelectionTheProfileCannotName(state: AtomState): void {
+    const profile = state.profile;
+    if (state.selectedShell !== null && !shellIsOccupied(profile, state.selectedShell)) {
+        state.level = 'atom';
+        state.selectedShell = null;
+        state.selectedSubshell = null;
+        state.selectedOrbital = null;
+        return;
+    }
+    const subshell = state.selectedSubshell;
+    if (subshell && !subshellIsOccupied(profile, subshell.n, subshell.l, subshell.j)) {
+        state.selectedSubshell = null;
+        state.selectedOrbital = null;
+        if (state.level === 'orbital') state.level = 'shell';
+    }
+}
+
+/** Whether a mode switch changes what names a subshell: only crossing into or out of spin–orbit does ((6, 1) vs 6p½/6p³⁄₂). */
+function changesSubshellNames(before: RelativityMode, after: RelativityMode): boolean {
+    return (before === 'spinOrbit') !== (after === 'spinOrbit');
 }
 
 const atomSlice = createSlice({
@@ -255,6 +349,7 @@ const atomSlice = createSlice({
             state.isSolving = false;
             state.error = null;
             state.unbound = null;
+            dropSelectionTheProfileCannotName(state);
             applyPendingView(state);
         },
 
@@ -299,6 +394,12 @@ const atomSlice = createSlice({
         solveFailed: (state, action: PayloadAction<string>) => {
             state.isSolving = false;
             state.error = action.payload;
+            // Ruling C9: after a mode switch the old mode's picture stays up
+            // while the new one solves, but it must not outlive a failure --
+            // it would stand under a switch that names another mode. A
+            // failed re-solve of the same species and mode (a fraction
+            // change) keeps its picture, as it always has.
+            if (!pictureLanded(state)) state.profile = null;
             // A failed solve leaves no profile to apply the link against, and
             // this Z's solve may be retried later (e.g. useAtomSolver re-runs
             // on an enclosed-fraction change) -- without this, a later
@@ -321,13 +422,14 @@ const atomSlice = createSlice({
         // Selecting a subshell refines the shell level (e.g. highlighting one
         // subshell's curve within the shell's radial plot); it does not by
         // itself descend to the orbital level -- drillToOrbital does that.
-        drillToSubshell: (state, action: PayloadAction<{ n: number; l: number }>) => {
-            const { n, l } = action.payload;
-            if (!subshellIsOccupied(state.profile, n, l)) return;
+        // With spin–orbit it is a j-level: j must name one the profile has.
+        drillToSubshell: (state, action: PayloadAction<SubshellSelection>) => {
+            const { n, l, j } = action.payload;
+            if (!subshellIsOccupied(state.profile, n, l, j)) return;
 
             state.level = 'shell';
             state.selectedShell = n;
-            state.selectedSubshell = { n, l };
+            state.selectedSubshell = subshellSelection(n, l, j);
             state.selectedOrbital = null;
         },
 
@@ -344,15 +446,44 @@ const atomSlice = createSlice({
             state.selectedOrbital = null;
         },
 
-        drillToOrbital: (state, action: PayloadAction<{ n: number; l: number; ml: number }>) => {
-            const { n, l, ml } = action.payload;
-            if (!subshellIsOccupied(state.profile, n, l)) return;
+        drillToOrbital: (state, action: PayloadAction<OrbitalSelection>) => {
+            const { n, l, ml, j } = action.payload;
+            if (!subshellIsOccupied(state.profile, n, l, j)) return;
             if (ml < -l || ml > l) return;
 
             state.level = 'orbital';
             state.selectedShell = n;
-            state.selectedSubshell = { n, l };
-            state.selectedOrbital = { n, l, ml };
+            state.selectedSubshell = subshellSelection(n, l, j);
+            state.selectedOrbital = orbitalSelection(n, l, ml, j);
+        },
+
+        // Not pure navigation: a different mode is a different solve, so a
+        // change of the effective mode bumps solveNonce like a species
+        // change. Unlike one, it keeps the element, its energies (ΔSCF stays
+        // non-relativistic, ruling C6) and the picture on screen until the
+        // new mode's lands (ruling C9), and with them the open shell -- the
+        // thing being compared. Crossing into or out of spin–orbit drops the
+        // subshell and orbital (and trims a link's view still waiting to
+        // land), because (6, 1) and 6p½/6p³⁄₂ do not name each other (Review
+        // Focus 1); off <-> scalar keeps them, since (n, l) names the same
+        // subshell in both and watching it contract is the point.
+        setRelativity: (state, action: PayloadAction<RelativityMode | null>) => {
+            const before = effectiveRelativity(state);
+            state.relativityOverride = action.payload;
+            const after = effectiveRelativity(state);
+            if (after === before) return;
+            state.solveNonce += 1;
+            state.error = null;
+            if (!changesSubshellNames(before, after)) return;
+            state.selectedSubshell = null;
+            state.selectedOrbital = null;
+            if (state.level === 'orbital') state.level = state.selectedShell !== null ? 'shell' : 'atom';
+            const view = state.pendingView;
+            if (view && view.subshell) {
+                state.pendingView = view.shell === null
+                    ? { level: 'atom', shell: null, subshell: null, orbital: null }
+                    : { level: 'shell', shell: view.shell, subshell: null, orbital: null };
+            }
         },
 
         // Reverses exactly one level, clearing that level's own selection --
@@ -419,9 +550,12 @@ export const solveSucceeded = atomSlice.actions.solveSucceeded;
 export const drillToShell = atomSlice.actions.drillToShell;
 // drillToSubshell/drillToOrbital take a single object payload internally;
 // wrapped here so callers pass positional arguments, matching the brief's
-// `drillToSubshell(n, l)` / `drillToOrbital(n, l, ml)`.
-export const drillToSubshell = (n: number, l: number) => atomSlice.actions.drillToSubshell({ n, l });
-export const drillToOrbital = (n: number, l: number, ml: number) => atomSlice.actions.drillToOrbital({ n, l, ml });
+// `drillToSubshell(n, l)` / `drillToOrbital(n, l, ml)`. `j` names a
+// spin–orbit j-level and is left out of the payload when absent, so a
+// non-relativistic action is exactly what it always was.
+export const drillToSubshell = (n: number, l: number, j?: number) => atomSlice.actions.drillToSubshell(subshellSelection(n, l, j));
+export const drillToOrbital = (n: number, l: number, ml: number, j?: number) => atomSlice.actions.drillToOrbital(orbitalSelection(n, l, ml, j));
+export const setRelativity = atomSlice.actions.setRelativity;
 export const clearSubshell = atomSlice.actions.clearSubshell;
 export const levelUp = atomSlice.actions.levelUp;
 export const goToLevel = atomSlice.actions.goToLevel;

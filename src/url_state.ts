@@ -1,5 +1,8 @@
 import type { RootState, AppDispatch } from './store';
-import { setMode, setElement, setCharge, setExcitation, solveStarted, requestAtomView, speciesOf, PendingAtomView, ViewMode } from './store/atomSlice';
+import {
+    setMode, setElement, setCharge, setExcitation, setRelativity, solveStarted, requestAtomView, speciesOf, effectiveRelativity,
+    PendingAtomView, ViewMode,
+} from './store/atomSlice';
 import {
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, requestCut, restoreCamera,
     setSurfaceStyle, selectShownBasicOrbital, selectShownEnclosedFraction, BasicSelection, CutSetting,
@@ -11,6 +14,7 @@ import { HybridKind } from './hybrids';
 import { CameraAngles } from './camera_angles';
 import { ClipAxis } from './types/orbital';
 import { encodeSpeciesParams, decodeSpeciesParams } from './atom/species';
+import { defaultRelativityFor, encodeRelativityParam, decodeRelativityParam } from './atom/relativity';
 
 /**
  * The URL hash is the view (spec §4.3). This module owns reading and writing
@@ -41,9 +45,9 @@ export function urlModeOf(state: RootState): string {
     return URL_MODE[state.atom.mode];
 }
 
-/** ':' and ',' stay readable; '+', spaces and '&' are escaped, since URLSearchParams reads '+' as a space. */
+/** ':', ',' and '/' (j=3/2) stay readable; '+', spaces and '&' are escaped, since URLSearchParams reads '+' as a space. */
 function encodeValue(value: string): string {
-    return encodeURIComponent(value).replace(/%3A/gi, ':').replace(/%2C/gi, ',');
+    return encodeURIComponent(value).replace(/%3A/gi, ':').replace(/%2C/gi, ',').replace(/%2F/gi, '/');
 }
 
 export function encodeStateOf(state: RootState): string {
@@ -179,6 +183,19 @@ function decodeViewKeys(params: URLSearchParams, dispatch: AppDispatch): void {
     dispatch(restoreCamera(parseCamera(params.get('cam'))));
 }
 
+/** A j-level as a link writes it: '1/2', '3/2', '5/2', '7/2' -- the spec's own notation, not 1.5. */
+export function formatJ(j: number): string {
+    return `${2 * j}/2`;
+}
+
+/** Only l ± ½ (j = ½ for s) is a j-level of subshell l (ruling C8); anything else is ignored like any bad key. */
+export function parseJ(value: string | null, l: number): number | null {
+    const match = value ? /^(\d+)\/2$/.exec(value) : null;
+    if (!match) return null;
+    const j = Number(match[1]) / 2;
+    return j === l + 0.5 || (l > 0 && j === l - 0.5) ? j : null;
+}
+
 export function parseAtomView(params: URLSearchParams): PendingAtomView {
     const whole: PendingAtomView = { level: 'atom', shell: null, subshell: null, orbital: null };
     const level = params.get('level');
@@ -188,10 +205,14 @@ export function parseAtomView(params: URLSearchParams): PendingAtomView {
     const shell: PendingAtomView = { level: 'shell', shell: n, subshell: null, orbital: null };
     const l = parseIntInRange(params.get('l'), 0, Math.min(3, n - 1));
     if (l === null) return shell;
-    const subshell: PendingAtomView = { ...shell, subshell: { n, l } };
+    // Whether this j fits the mode the link lands in is applyPendingView's
+    // call, once the profile is there to ask (ruling C8).
+    const j = parseJ(params.get('j'), l) ?? undefined;
+    const named = j === undefined ? { n, l } : { n, l, j };
+    const subshell: PendingAtomView = { ...shell, subshell: named };
     if (level !== 'orbital') return subshell;
     const ml = parseIntInRange(params.get('ml'), -l, l);
-    return ml === null ? subshell : { level: 'orbital', shell: n, subshell: { n, l }, orbital: { n, l, ml } };
+    return ml === null ? subshell : { level: 'orbital', shell: n, subshell: named, orbital: { ...named, ml } };
 }
 
 function encodeAtomKeys(state: RootState): Record<string, string> {
@@ -199,13 +220,21 @@ function encodeAtomKeys(state: RootState): Record<string, string> {
     // Mid-solve, the link is the view that was asked for, not the whole atom shown meanwhile.
     const view: PendingAtomView = atom.pendingView
         ?? { level: atom.level, shell: atom.selectedShell, subshell: atom.selectedSubshell, orbital: atom.selectedOrbital };
-    // {Z, ...species keys, level, n, l, ml} (ruling C2): a neutral ground
-    // state offers no charge/excite, so its link stays byte-identical to
-    // Phase 2's; Phase 4 later inserts `rel` right after Z, ahead of these.
-    const keys: Record<string, string> = { Z: String(atom.Z), ...encodeSpeciesParams(speciesOf(atom)), level: view.level };
+    // {Z, rel, ...species keys, level, n, l, j, ml} (rulings C2, C1, C8): a
+    // neutral ground state offers no charge/excite, and off writes no rel
+    // nor (having no j-levels) j, so a Phase 2/3 view's link stays
+    // byte-identical. rel is the mode shown, not the override: a link has to
+    // say gold was scalar, since it decodes an absent rel as off.
+    const relativity = effectiveRelativity(atom);
+    const keys: Record<string, string> = { Z: String(atom.Z) };
+    if (relativity !== 'off') keys.rel = encodeRelativityParam(relativity)!;
+    Object.assign(keys, encodeSpeciesParams(speciesOf(atom)), { level: view.level });
     if (view.level !== 'atom' && view.shell !== null) {
         keys.n = String(view.shell);
-        if (view.subshell) keys.l = String(view.subshell.l);
+        if (view.subshell) {
+            keys.l = String(view.subshell.l);
+            if (view.subshell.j !== undefined) keys.j = formatJ(view.subshell.j);
+        }
         if (view.level === 'orbital' && view.orbital) keys.ml = String(view.orbital.ml);
     }
     return keys;
@@ -217,6 +246,14 @@ function decodeAtomKeys(params: URLSearchParams, dispatch: AppDispatch): void {
     // Without an element there is no solve to land a level on.
     if (Z === null) return;
     dispatch(setElement(Z));
+    // Ruling C1: no rel, or one this app does not know, is off -- every link
+    // copied before Phase 4 showed the non-relativistic atom, gold
+    // included, and must again. A mode equal to the element's default is
+    // stored as "follow the default" rather than pinned, so the link leaves
+    // the tab as a user who never touched the switch would have it. Before
+    // requestAtomView, which a mode change can trim.
+    const relativity = decodeRelativityParam(params.get('rel')) ?? 'off';
+    dispatch(setRelativity(relativity === defaultRelativityFor(Z) ? null : relativity));
     // setCharge/setExcitation clear pendingView (they reset for a new
     // species, ruling C1), so they must run before requestAtomView, which
     // sets the view this link actually asked for (ruling C2). An unoffered

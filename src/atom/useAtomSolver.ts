@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { solveStarted, solveSucceeded, solveFailed, solveUnbound } from '../store/atomSlice';
+import { solveStarted, solveSucceeded, solveFailed, solveUnbound, effectiveRelativity } from '../store/atomSlice';
 import { createAtomWorker } from '../workers/createAtomWorker';
 import type { AtomWorkerResponse } from '../workers/atomWorker';
 import { getCachedProfile, setCachedProfile } from './profile_cache';
@@ -58,12 +58,15 @@ export interface AtomWorkerHandle {
  * working even if the worker happens to be busy with an unrelated request.
  *
  * Keying the per-request effect on the species (Z, charge, excitation), the
- * fraction and solveNonce is what ensures only a genuine change to what
- * should be solved re-requests anything -- the pure navigation actions in
- * atomSlice (drillToShell, drillToSubshell, drillToOrbital, levelUp,
- * goToLevel) touch none of them, so none of them can retrigger this effect.
- * Both caches are keyed the same way, by `speciesKey` -- a neutral ground
- * state's key is String(Z), exactly what they were keyed by before ions.
+ * fraction, the relativistic treatment and solveNonce is what ensures only a
+ * genuine change to what should be solved re-requests anything -- the pure
+ * navigation actions in atomSlice (drillToShell, drillToSubshell,
+ * drillToOrbital, levelUp, goToLevel) touch none of them, so none of them
+ * can retrigger this effect. Both caches are keyed the same way, by
+ * `speciesKey` -- a neutral ground state's key is String(Z), exactly what
+ * they were keyed by before ions -- and, for a relativistic mode, by
+ * `${speciesKey}@${relativity}` (ruling C2), so a picture in one mode is
+ * never served for another (Review Focus 2).
  *
  * `solveNonce` is there because the others are not sufficient: it is
  * bumped by every species change, and each one clears the profile
@@ -93,6 +96,9 @@ export function useAtomSolver(
     // Re-picking the element already selected must still produce a solve --
     // `setElement` has cleared the profile by then. See AtomState.solveNonce.
     const solveNonce = useAppSelector(state => state.atom.solveNonce);
+    // The mode the switch shows, not the override: following the element's
+    // default (null) still solves gold scalar-relativistically.
+    const relativity = useAppSelector(state => effectiveRelativity(state.atom));
 
     // One worker for this hook's whole lifetime, not one per request -- see
     // the doc comment above. Created lazily (on the first atom-mode
@@ -123,11 +129,12 @@ export function useAtomSolver(
         const key = speciesKey({ Z, charge, excitation });
 
         // Layer 2 of the fix: a solved profile is a pure function of
-        // (species, enclosedFraction), so a hit here needs no worker round
-        // trip at all -- this is what makes a mode switch away and back, or
-        // re-picking the same element, immediate rather than another
+        // (species, enclosedFraction, relativity), so a hit here needs no
+        // worker round trip at all -- this is what makes a mode switch away
+        // and back, re-picking the same element, or flipping the Relativity
+        // switch back to a mode already seen, immediate rather than another
         // multi-second solve.
-        const cached = getCachedProfile(key, enclosedFraction);
+        const cached = getCachedProfile(key, enclosedFraction, relativity);
         if (cached) {
             dispatch(solveSucceeded(cached));
             return;
@@ -165,7 +172,7 @@ export function useAtomSolver(
             // converges -- but silently drawing a wrong picture instead of
             // reporting it would be worse than the ruling it violates.
             if (profile.converged) {
-                setCachedProfile(key, enclosedFraction, profile);
+                setCachedProfile(key, enclosedFraction, profile, relativity);
                 dispatch(solveSucceeded(profile));
             } else {
                 // Named by species, not Z: "Z=19" says neither the element
@@ -181,7 +188,7 @@ export function useAtomSolver(
             dispatch(solveFailed(event.message || `Could not solve ${speciesTitle({ Z, charge, excitation })}.`));
         };
 
-        worker.postMessage({ type: 'solve', Z, charge, excitation, enclosedFraction, requestId });
+        worker.postMessage({ type: 'solve', Z, charge, excitation, enclosedFraction, relativity, requestId });
 
         // No worker cleanup here any more -- the worker is shared across
         // requests (see workerRef's effect above), and the requestId check
@@ -193,5 +200,5 @@ export function useAtomSolver(
         // intentionally-incomplete dependency array pattern Controls.tsx's
         // own n/l effects use.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mode, Z, charge, excitation, enclosedFraction, solveNonce, dispatch]);
+    }, [mode, Z, charge, excitation, enclosedFraction, relativity, solveNonce, dispatch]);
 }

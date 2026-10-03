@@ -149,6 +149,7 @@ const defaultAtomState: AtomState = {
     unbound: null,
     energies: { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null },
     solveNonce: 0,
+    relativityOverride: null,
     level: 'atom',
     selectedShell: null,
     selectedSubshell: null,

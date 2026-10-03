@@ -7,6 +7,7 @@
  * already visited this session needs no worker round trip at all.
  */
 import { LobeMeshData } from '../workers/shellCompositionWorker';
+import { RelativityMode } from './relativity';
 
 // A handful of elements, each with at most a few shells actually visited in
 // one session -- generous headroom without growing without bound across a
@@ -22,15 +23,25 @@ const cache = new Map<string, LobeMeshData[]>();
  * actually computed* -- isolating 3d computes five meshes, not nine, so an
  * isolated entry and a full one are different values under the same
  * (species, n, resolution, fraction) and must not collide.
+ *
+ * `relativity` and `isolatedJ` follow the same reasoning (ruling C2): a
+ * relativistic subshell has a different R(r), so different lobes, and with
+ * spin–orbit an isolated j-level is a different subshell from its partner.
+ * The species becomes `${species}@${relativity}` as in every other cache;
+ * 'off' with no j keeps the original key string exactly.
  */
 export function shellMeshCacheKey(
     species: string | number,
     n: number,
     resolution: number,
     enclosedFraction: number,
-    isolatedL: number | null = null
+    isolatedL: number | null = null,
+    relativity: RelativityMode = 'off',
+    isolatedJ?: number
 ): string {
-    return `${species}:${n}:${resolution}:${enclosedFraction}:${isolatedL ?? 'all'}`;
+    const solved = relativity === 'off' ? `${species}` : `${species}@${relativity}`;
+    const isolated = isolatedJ === undefined ? '' : `:j${isolatedJ}`;
+    return `${solved}:${n}:${resolution}:${enclosedFraction}:${isolatedL ?? 'all'}${isolated}`;
 }
 
 /** Looks up a previously computed shell's lobe meshes, marking it most-recently-used on a hit. */

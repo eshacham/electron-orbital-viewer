@@ -1,5 +1,5 @@
 import { createAppStore } from '../../src/store';
-import {
+import reducer, {
     setMode,
     setElement,
     solveStarted,
@@ -23,6 +23,9 @@ import {
     energiesFailed,
     speciesOf,
     selectSpeciesEnergies,
+    setRelativity,
+    effectiveRelativity,
+    pictureLanded,
 } from '../../src/store/atomSlice';
 import { startOrbitalCalculation } from '../../src/store/orbitalSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
@@ -687,5 +690,177 @@ describe('species in the store', () => {
         expect(store.getState().atom.level).toBe('atom');
         store.dispatch(drillToShell(2));
         expect(store.getState().atom).toMatchObject({ level: 'shell', selectedShell: 2 });
+    });
+});
+
+/** Neon with spin–orbit: 1s½ 2s½ 2p½² 2p³⁄₂⁴, the shape the worker sends in that mode. */
+function spinOrbitNeon(): SerialisedAtomProfile {
+    const base = neonLikeProfile();
+    const p = base.subshells.find(s => s.l === 1)!;
+    return {
+        ...base,
+        relativity: 'spinOrbit',
+        subshells: [
+            ...base.subshells.filter(s => s.l === 0).map(s => ({ ...s, j: 0.5 })),
+            { ...p, j: 0.5, electrons: 2 },
+            { ...p, j: 1.5, electrons: 4 },
+        ],
+    };
+}
+
+describe('relativity in the atom slice', () => {
+    it('follows the element\'s default until the user chooses, then keeps the choice across elements', () => {
+        let state = reducer(undefined, setElement(79));
+        expect(effectiveRelativity(state)).toBe('scalar');
+        state = reducer(state, setElement(6));
+        expect(effectiveRelativity(state)).toBe('off');
+        state = reducer(state, setRelativity('spinOrbit'));
+        state = reducer(state, setElement(79));
+        expect(effectiveRelativity(state)).toBe('spinOrbit');
+        state = reducer(state, setRelativity(null));
+        expect(effectiveRelativity(state)).toBe('scalar');
+    });
+
+    it('starts a new solve when the effective mode changes, and only then', () => {
+        let state = reducer(undefined, setElement(79));
+        const nonce = state.solveNonce;
+        state = reducer(state, setRelativity('scalar'));     // same as the default: nothing to solve
+        expect(state.solveNonce).toBe(nonce);
+        state = reducer(state, setRelativity('spinOrbit'));
+        expect(state.solveNonce).toBe(nonce + 1);
+    });
+
+    it('setRelativity drops a selection the new mode cannot name', () => {
+        let state = reducer(undefined, solveSucceeded(neonLikeProfile()));
+        state = reducer(state, drillToOrbital(2, 1, 0));
+        expect(state.level).toBe('orbital');
+        state = reducer(state, setRelativity('spinOrbit'));
+        expect(state.level).toBe('shell');
+        expect(state.selectedShell).toBe(2);
+        expect(state.selectedSubshell).toBeNull();
+        expect(state.selectedOrbital).toBeNull();
+    });
+
+    // Off <-> scalar is the comparison the switch exists for (the 6s
+    // contracting under the same eye): (n, l) names the same subshell in both.
+    it('keeps the selection between off and scalar, where (n, l) still names the subshell', () => {
+        let state = reducer(undefined, solveSucceeded(neonLikeProfile()));
+        state = reducer(state, drillToOrbital(2, 1, -1));
+        state = reducer(state, setRelativity('scalar'));
+        expect(state).toMatchObject({ level: 'orbital', selectedShell: 2, selectedSubshell: { n: 2, l: 1 }, selectedOrbital: { n: 2, l: 1, ml: -1 } });
+    });
+
+    it('drills into a j-level only when j matches an occupied one', () => {
+        let state = reducer(undefined, solveSucceeded(spinOrbitNeon()));
+        state = reducer(state, drillToSubshell(2, 1));            // no j: names nothing in a spin–orbit profile
+        expect(state.selectedSubshell).toBeNull();
+        state = reducer(state, drillToSubshell(2, 1, 1.5));
+        expect(state.selectedSubshell).toEqual({ n: 2, l: 1, j: 1.5 });
+        state = reducer(state, drillToOrbital(2, 1, -1, 1.5));
+        expect(state.selectedOrbital).toEqual({ n: 2, l: 1, ml: -1, j: 1.5 });
+        state = reducer(state, drillToSubshell(2, 1, 2.5));
+        expect(state.selectedSubshell).toEqual({ n: 2, l: 1, j: 1.5 });   // unchanged
+    });
+
+    it('keeps the old selection shape for non-relativistic profiles', () => {
+        let state = reducer(undefined, solveSucceeded(neonLikeProfile()));
+        state = reducer(state, drillToSubshell(2, 1));
+        expect(state.selectedSubshell).toStrictEqual({ n: 2, l: 1 });
+        state = reducer(state, drillToSubshell(2, 1, 1.5));               // a j the profile does not have
+        expect(state.selectedSubshell).toStrictEqual({ n: 2, l: 1 });
+    });
+
+    // Ruling C9: the picture of the other mode is not this mode's picture.
+    it('counts a picture as landed only in the mode the switch shows', () => {
+        let state = reducer(undefined, setElement(10));
+        state = reducer(state, solveSucceeded(neonLikeProfile()));
+        expect(pictureLanded(state)).toBe(true);
+        state = reducer(state, setRelativity('spinOrbit'));
+        expect(pictureLanded(state)).toBe(false);
+        state = reducer(state, solveSucceeded(spinOrbitNeon()));
+        expect(pictureLanded(state)).toBe(true);
+        // Gold defaults to scalar: an unlabelled (non-relativistic) profile is not its picture.
+        state = reducer(state, setRelativity(null));
+        state = reducer(state, setElement(79));
+        state = reducer(state, solveSucceeded({ ...neonLikeProfile(), Z: 79 }));
+        expect(pictureLanded(state)).toBe(false);
+        state = reducer(state, solveSucceeded({ ...neonLikeProfile(), Z: 79, relativity: 'scalar' }));
+        expect(pictureLanded(state)).toBe(true);
+    });
+
+    // Ruling C9: the old picture stays while the new mode solves, but never
+    // outlives a failure -- it would stand under a switch that says otherwise.
+    it('keeps the old picture while re-solving, and clears it when the new mode fails or is unbound', () => {
+        const switched = () => {
+            let state = reducer(undefined, setElement(10));
+            state = reducer(state, solveSucceeded(neonLikeProfile()));
+            state = reducer(state, setRelativity('scalar'));
+            return reducer(state, solveStarted());
+        };
+        expect(switched().profile).not.toBeNull();
+        expect(reducer(switched(), solveFailed('Scalar-relativistic SCF for Neon did not converge.'))).toMatchObject({ profile: null, isSolving: false });
+        expect(reducer(switched(), solveUnbound('LDA does not bind …'))).toMatchObject({ profile: null, isSolving: false });
+    });
+
+    it('keeps the picture when a solve of the same species and mode fails (a fraction change)', () => {
+        let state = reducer(undefined, setElement(10));
+        state = reducer(state, solveSucceeded(neonLikeProfile()));
+        state = reducer(state, solveFailed('boom'));
+        expect(state.profile).not.toBeNull();
+    });
+
+    // Review Focus 1: a subshell picked on the old picture while the new
+    // mode solves names nothing once the spin–orbit profile lands.
+    it('steps back to the shell when the landed profile cannot name the selection', () => {
+        let state = reducer(undefined, setElement(10));
+        state = reducer(state, solveSucceeded(neonLikeProfile()));
+        state = reducer(state, setRelativity('spinOrbit'));
+        state = reducer(state, drillToOrbital(2, 1, 0));        // on the old, non-relativistic picture
+        state = reducer(state, solveSucceeded(spinOrbitNeon()));
+        expect(state).toMatchObject({ level: 'shell', selectedShell: 2, selectedSubshell: null, selectedOrbital: null });
+    });
+
+    // Ruling C8: a link's view lands only on a matching j.
+    it('lands a linked j-level only on a spin–orbit profile with that j', () => {
+        const view: PendingAtomView = { level: 'orbital', shell: 2, subshell: { n: 2, l: 1, j: 1.5 }, orbital: { n: 2, l: 1, ml: 1, j: 1.5 } };
+        let state = reducer(undefined, setElement(10));
+        state = reducer(state, setRelativity('spinOrbit'));
+        state = reducer(state, requestAtomView(view));
+        // A non-relativistic picture of neon is not the link's.
+        state = reducer(state, solveSucceeded(neonLikeProfile()));
+        expect(state.pendingView).not.toBeNull();
+        state = reducer(state, solveSucceeded(spinOrbitNeon()));
+        expect(state).toMatchObject({ level: 'orbital', selectedSubshell: { n: 2, l: 1, j: 1.5 }, selectedOrbital: { n: 2, l: 1, ml: 1, j: 1.5 }, pendingView: null });
+    });
+
+    it('falls back to the shell when a link\'s j does not fit the mode it lands in', () => {
+        const withJ: PendingAtomView = { level: 'shell', shell: 2, subshell: { n: 2, l: 1, j: 0.5 }, orbital: null };
+        let state = reducer(undefined, setElement(10));
+        state = reducer(state, requestAtomView(withJ));
+        state = reducer(state, solveSucceeded(neonLikeProfile()));
+        expect(state).toMatchObject({ level: 'shell', selectedShell: 2, selectedSubshell: null });
+
+        const withoutJ: PendingAtomView = { level: 'shell', shell: 2, subshell: { n: 2, l: 1 }, orbital: null };
+        state = reducer(undefined, setElement(10));
+        state = reducer(state, setRelativity('spinOrbit'));
+        state = reducer(state, requestAtomView(withoutJ));
+        state = reducer(state, solveSucceeded(spinOrbitNeon()));
+        expect(state).toMatchObject({ level: 'shell', selectedShell: 2, selectedSubshell: null });
+    });
+
+    it('a mode switch before a link lands trims its view to the shell, as it does the selection', () => {
+        let state = reducer(undefined, setElement(10));
+        state = reducer(state, requestAtomView({ level: 'orbital', shell: 2, subshell: { n: 2, l: 1 }, orbital: { n: 2, l: 1, ml: 0 } }));
+        state = reducer(state, setRelativity('spinOrbit'));
+        expect(state.pendingView).toEqual({ level: 'shell', shell: 2, subshell: null, orbital: null });
+    });
+
+    // Ruling C6: ΔSCF energies stay non-relativistic, so a mode switch keeps them.
+    it('keeps the species\' energies across a mode switch', () => {
+        let state = reducer(undefined, setElement(11));
+        state = reducer(state, energiesStarted('11'));
+        state = reducer(state, energiesSucceeded({ speciesKey: '11', ionisation: { valueEv: 5.37, fromLabel: 'Na', toLabel: 'Na⁺' }, excitation: null }));
+        state = reducer(state, setRelativity('scalar'));
+        expect(selectSpeciesEnergies({ atom: state })).toMatchObject({ status: 'done' });
     });
 });
