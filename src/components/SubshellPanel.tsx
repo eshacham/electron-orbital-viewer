@@ -69,6 +69,14 @@ export function spreadLabels(ys: number[], spacing: number, min: number, max: nu
  * line at the top. Falls back to the middle when every subshell shares one
  * energy (a single-subshell atom).
  */
+/**
+ * A React key per subshell entry: with spin–orbit one (n, l) is two j-levels,
+ * so j has to be part of it. Absent j gives today's key.
+ */
+function subshellKey(subshell: Pick<SerialisedSubshell, 'n' | 'l' | 'j'>): string {
+    return subshell.j === undefined ? `${subshell.n}-${subshell.l}` : `${subshell.n}-${subshell.l}-${subshell.j}`;
+}
+
 function ruleY(energy: number, minEnergy: number, maxEnergy: number): number {
     const logOf = (e: number) => Math.log10(Math.max(Math.abs(e), 1e-6));
     const top = logOf(maxEnergy);      // least bound: smallest |E|
@@ -116,7 +124,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                         && selectedSubshell.l === subshell.l;
                     return (
                         <Chip
-                            key={`${subshell.n}-${subshell.l}`}
+                            key={subshellKey(subshell)}
                             className={`subshell-chip${isSelected ? ' selected' : ''}`}
                             data-n={subshell.n}
                             data-l={subshell.l}
@@ -228,7 +236,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                         const y = ruleY(sub.energy, minEnergy, maxEnergy);
                         const lineEnd = DIAGRAM_WIDTH - DIAGRAM_PADDING - DIAGRAM_LABEL_WIDTH;
                         return (
-                            <g key={`label-${sub.n}-${sub.l}`}>
+                            <g key={`label-${subshellKey(sub)}`}>
                                 <line
                                     className="subshell-energy-leader"
                                     x1={lineEnd}
@@ -255,7 +263,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                         ? CURVE_COLORS[shellSubshells.indexOf(subshell) % CURVE_COLORS.length]
                         : undefined;
                     return (
-                        <g key={`${subshell.n}-${subshell.l}`}>
+                        <g key={subshellKey(subshell)}>
                             <line
                                 className={`subshell-energy-rule${isCurrent ? ' current' : ''}`}
                                 x1={DIAGRAM_PADDING}

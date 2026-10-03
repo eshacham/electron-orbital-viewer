@@ -3,7 +3,7 @@ import {
     startOrbitalCalculation, selectShownBasicOrbital, selectShownEnclosedFraction,
 } from '../src/store/orbitalSlice';
 import {
-    setMode, setElement, setCharge, setExcitation, solveSucceeded, drillToShell, drillToSubshell, drillToOrbital, speciesOf,
+    solveFailed, setMode, setElement, setCharge, setExcitation, solveSucceeded, drillToShell, drillToSubshell, drillToOrbital, speciesOf,
     setRelativity, effectiveRelativity,
 } from '../src/store/atomSlice';
 import {
@@ -509,9 +509,22 @@ describe('built-in URL keys', () => {
         expect(pending('#mode=atom&Z=79&rel=so&level=shell&n=6&l=0&j=1/2')!.subshell).toEqual({ n: 6, l: 0, j: 0.5 });
         expect(pending('#mode=atom&Z=79&rel=so&level=shell&n=6&l=0&j=-1/2')!.subshell).toEqual({ n: 6, l: 0 });
         expect(pending('#mode=atom&Z=79&rel=so&level=shell&n=6&l=1&j=1.5')!.subshell).toEqual({ n: 6, l: 1 });
+        expect(pending('#mode=atom&Z=79&rel=so&level=shell&n=6&l=1&j=03/2')!.subshell).toEqual({ n: 6, l: 1 });
 
         // A j-level link restored where the mode is scalar opens the shell.
         const atom = restore('#mode=atom&Z=79&rel=scalar&level=orbital&n=6&l=1&j=3/2&ml=0').getState().atom;
         expect(atom).toMatchObject({ level: 'shell', selectedShell: 6, selectedSubshell: null, pendingView: null });
+    });
+
+    // A failed mode switch shows no picture; its link must not claim a shell.
+    it('writes the whole atom while a failed mode switch has no picture, and the shell again once one lands', () => {
+        const store = restore('#mode=atom&Z=10&level=shell&n=2');
+        store.dispatch(setRelativity('scalar'));
+        store.dispatch(solveFailed('boom'));
+        expect(store.getState().atom.level).toBe('shell');
+        expect(encodeStateOf(store.getState())).toMatch(/^mode=atom&Z=10&rel=scalar&level=atom&frac=/);
+        store.dispatch(setRelativity(null));
+        store.dispatch(solveSucceeded(profileFor(10)));
+        expect(encodeStateOf(store.getState())).toMatch(/^mode=atom&Z=10&level=shell&n=2&frac=/);
     });
 });

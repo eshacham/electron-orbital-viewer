@@ -44,7 +44,7 @@ import OrbitalViewer from '../src/components/OrbitalViewer';
 import {
     startFieldCalculation, startOrbitalCalculation, clearPicture, resetView, restoreCamera,
 } from '../src/store/orbitalSlice';
-import { setMode, setElement, setCharge, solveSucceeded, solveUnbound, drillToShell, goToLevel } from '../src/store/atomSlice';
+import { setMode, setElement, setCharge, solveSucceeded, solveUnbound, drillToShell, drillToSubshell, goToLevel, setRelativity } from '../src/store/atomSlice';
 import { createShellCompositionWorker } from '../src/workers/createShellCompositionWorker';
 import { clearShellMeshCacheForTests, setCachedShellMeshes, shellMeshCacheKey } from '../src/atom/shell_mesh_cache';
 import { COMPOSITE_ORBITAL_RESOLUTION } from '../src/atom/shell_composition';
@@ -364,3 +364,54 @@ describe('OrbitalViewer: ions', () => {
         expect(clearScene).toHaveBeenCalledTimes(1);
     });
 });
+
+// Fix round 1, I1: the lobes are a function of the mode too (ruling C2).
+describe('OrbitalViewer: shell lobes and the relativistic mode', () => {
+    beforeEach(() => { clearShellMeshCacheForTests(); });
+
+    function shellOf(profile: ReturnType<typeof neonProfile>, relativity: 'off' | 'scalar' | 'spinOrbit') {
+        const worker = fakeCompositionWorker();
+        (createShellCompositionWorker as jest.Mock).mockReturnValue(worker);
+        const store = createAppStore();
+        act(() => {
+            store.dispatch(setElement(10));
+            store.dispatch(setRelativity(relativity));
+            store.dispatch(solveSucceeded(profile));
+        });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        act(() => { store.dispatch(drillToShell(2)); });
+        return { store, worker };
+    }
+
+    it('builds a scalar profile\'s lobes rather than serving the off ones of the same species', () => {
+        setCachedShellMeshes(shellMeshCacheKey(10, 2, COMPOSITE_ORBITAL_RESOLUTION, 0.9, null), []);
+        const { worker } = shellOf({ ...neonProfile(), relativity: 'scalar' }, 'scalar');
+        expect(worker.postMessage).toHaveBeenCalledTimes(1);
+        expect(attachShellCompositionLobes).not.toHaveBeenCalled();
+        act(() => { worker.onmessage!({ data: { type: 'success', meshes: [], requestId: 1 } }); });
+        expect(shellMeshCacheKey(10, 2, COMPOSITE_ORBITAL_RESOLUTION, 0.9, null, 'scalar')).not.toBe(shellMeshCacheKey(10, 2, COMPOSITE_ORBITAL_RESOLUTION, 0.9, null));
+    });
+
+    // Each j-level's lobes are drawn with its own R(r), never its partner's.
+    it('samples each j-level with its own radial function, and isolates by j', () => {
+        const base = neonProfile();
+        const p = base.subshells.find(s => s.l === 1)!;
+        const pHalf = { ...p, j: 0.5, R: new Float64Array(base.size).fill(1) };
+        const pThreeHalves = { ...p, j: 1.5, R: new Float64Array(base.size).fill(2) };
+        const profile = {
+            ...base, relativity: 'spinOrbit' as const,
+            subshells: [...base.subshells.filter(s => s.l === 0).map(s => ({ ...s, j: 0.5 })), pHalf, pThreeHalves],
+        };
+        const { store, worker } = shellOf(profile, 'spinOrbit');
+        type Posted = { orbitals: Array<{ l: number; radialSamples: { R: Float64Array } }> };
+        const pOrbitals = (worker.postMessage.mock.calls[0][0] as Posted).orbitals.filter(o => o.l === 1);
+        expect(pOrbitals.map(o => o.radialSamples.R[0])).toEqual([1, 1, 1, 2, 2, 2]);
+
+        const isolated = fakeCompositionWorker();
+        (createShellCompositionWorker as jest.Mock).mockReturnValue(isolated);
+        act(() => { store.dispatch(drillToSubshell(2, 1, 1.5)); });
+        const posted = (isolated.postMessage.mock.calls[0][0] as Posted).orbitals;
+        expect(posted.map(o => o.radialSamples.R[0])).toEqual([2, 2, 2]);
+    });
+});
+

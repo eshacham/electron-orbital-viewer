@@ -190,7 +190,7 @@ export function formatJ(j: number): string {
 
 /** Only l ± ½ (j = ½ for s) is a j-level of subshell l (ruling C8); anything else is ignored like any bad key. */
 export function parseJ(value: string | null, l: number): number | null {
-    const match = value ? /^(\d+)\/2$/.exec(value) : null;
+    const match = value ? /^([1-9]\d*)\/2$/.exec(value) : null;
     if (!match) return null;
     const j = Number(match[1]) / 2;
     return j === l + 0.5 || (l > 0 && j === l - 0.5) ? j : null;
@@ -218,8 +218,12 @@ export function parseAtomView(params: URLSearchParams): PendingAtomView {
 function encodeAtomKeys(state: RootState): Record<string, string> {
     const atom = state.atom;
     // Mid-solve, the link is the view that was asked for, not the whole atom shown meanwhile.
-    const view: PendingAtomView = atom.pendingView
-        ?? { level: atom.level, shell: atom.selectedShell, subshell: atom.selectedSubshell, orbital: atom.selectedOrbital };
+    // With no picture and none asked for -- a mode switch that failed keeps
+    // its level for the way back (atomSlice's solveFailed) -- nothing below
+    // the whole atom is on screen, and the link must not say otherwise.
+    const view: PendingAtomView = atom.pendingView ?? (atom.profile === null
+        ? { level: 'atom', shell: null, subshell: null, orbital: null }
+        : { level: atom.level, shell: atom.selectedShell, subshell: atom.selectedSubshell, orbital: atom.selectedOrbital });
     // {Z, rel, ...species keys, level, n, l, j, ml} (rulings C2, C1, C8): a
     // neutral ground state offers no charge/excite, and off writes no rel
     // nor (having no j-levels) j, so a Phase 2/3 view's link stays

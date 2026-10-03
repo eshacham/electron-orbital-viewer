@@ -415,8 +415,11 @@ function App() {
     useEffect(() => {
         if (!isAtomMode || atomLevel !== 'orbital' || !atomSelectedOrbital || !atomProfile) return;
 
-        const { n: selN, l: selL, ml: selMl } = atomSelectedOrbital;
-        const subshell = atomProfile.subshells.find(s => s.n === selN && s.l === selL);
+        const { n: selN, l: selL, ml: selMl, j: selJ } = atomSelectedOrbital;
+        // j too: with spin–orbit (n, l) is two j-levels, each with its own
+        // R(r) and sampling box. drillToOrbital only accepts a j the
+        // profile has, so this matches exactly one.
+        const subshell = atomProfile.subshells.find(s => s.n === selN && s.l === selL && s.j === selJ);
         // Occupancy was already validated by drillToOrbital; this should
         // always be found, but there is nothing sane to render if it is not.
         if (!subshell) return;
@@ -503,10 +506,10 @@ function App() {
         // position, which is what keeps a lobe and its curve in agreement.
         const shellSubshells = atomProfile.subshells.filter(s => s.n === atomSelectedShell);
         const subshells = atomSelectedSubshell
-            ? shellSubshells.filter(s => s.l === atomSelectedSubshell.l)
+            ? shellSubshells.filter(s => s.l === atomSelectedSubshell.l && s.j === atomSelectedSubshell.j)
             : shellSubshells;
         return subshells.map(subshell => ({
-            label: subshellLabel(subshell.n, subshell.l),
+            label: subshellLabel(subshell.n, subshell.l, subshell.j),
             color: CURVE_COLORS[shellSubshells.indexOf(subshell) % CURVE_COLORS.length],
             points: atomRGrid.map((r, j) => ({ r, value: subshell.curve[j] })),
         }));

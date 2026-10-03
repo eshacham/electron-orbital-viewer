@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { solveStarted, solveSucceeded, solveFailed, solveUnbound, effectiveRelativity } from '../store/atomSlice';
+import { solveStarted, solveSucceeded, solveFailed, solveUnbound, effectiveRelativity, profileRelativity } from '../store/atomSlice';
 import { createAtomWorker } from '../workers/createAtomWorker';
 import type { AtomWorkerResponse } from '../workers/atomWorker';
 import { getCachedProfile, setCachedProfile } from './profile_cache';
@@ -180,7 +180,7 @@ export function useAtomSolver(
                 // method (ruling T7-f), read from the profile itself -- the
                 // mode that actually ran -- since the same species may
                 // converge in another.
-                const method = scfLabel(profile.relativity ?? 'off');
+                const method = scfLabel(profileRelativity(profile));
                 dispatch(solveFailed(`${method} for ${speciesTitle({ Z, charge, excitation })} did not converge.`));
             }
         };

@@ -2,7 +2,7 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createAppStore } from '../../src/store';
-import { setElement, setCharge, setMode, solveStarted, solveSucceeded, solveUnbound } from '../../src/store/atomSlice';
+import { setElement, setCharge, setMode, solveStarted, solveSucceeded, solveUnbound, solveFailed, setRelativity } from '../../src/store/atomSlice';
 import { SerialisedAtomProfile } from '../../src/workers/atomWorker';
 import { clearEnergiesCacheForTests, getCachedEnergies, setCachedEnergies } from '../../src/atom/energies_cache';
 
@@ -182,5 +182,40 @@ describe('useDeltaScfEnergies', () => {
         const create = jest.fn(fake);
         renderHook(() => useDeltaScfEnergies(create), { wrapper: ({ children }) => <Provider store={store}>{children}</Provider> });
         expect(create).not.toHaveBeenCalled();
+    });
+
+    // Ruling C6: ΔSCF energies are the same whichever mode draws the
+    // picture, so a mode switch must not throw away a computation in flight.
+    it('keeps computing across a mode switch, and is not left computing when the new mode fails', () => {
+        const store = createAppStore();
+        store.dispatch(setElement(11));
+        const { workers } = mount(store);
+        act(() => { store.dispatch(solveSucceeded(pictureOf(11, '11'))); });
+        expect(store.getState().atom.energies.status).toBe('computing');
+
+        act(() => { store.dispatch(setRelativity('scalar')); store.dispatch(solveStarted()); });
+        expect(workers[0].terminate).not.toHaveBeenCalled();
+        expect(workers).toHaveLength(1);
+
+        act(() => { store.dispatch(solveFailed('Scalar-relativistic SCF for Sodium did not converge.')); });
+        expect(store.getState().atom.energies.status).not.toBe('computing');
+        expect(workers[0].terminate).toHaveBeenCalled();
+
+        // Back to off: the old picture comes back, and the energies with it.
+        act(() => { store.dispatch(setRelativity(null)); store.dispatch(solveSucceeded(pictureOf(11, '11'))); });
+        expect(workers).toHaveLength(2);
+        expect(store.getState().atom.energies).toMatchObject({ status: 'computing', speciesKey: '11' });
+    });
+
+    it('lets a reply already in flight land after a mode switch', () => {
+        const store = createAppStore();
+        store.dispatch(setElement(11));
+        const { workers } = mount(store);
+        act(() => { store.dispatch(solveSucceeded(pictureOf(11, '11'))); });
+        act(() => { store.dispatch(setRelativity('scalar')); });
+        act(() => {
+            workers[0].onmessage!({ data: { type: 'energies', speciesKey: '11', ionisation: sodium, excitation: null, requestId: requestIdOf(workers[0]) } } as MessageEvent);
+        });
+        expect(store.getState().atom.energies).toMatchObject({ status: 'done', ionisation: sodium });
     });
 });

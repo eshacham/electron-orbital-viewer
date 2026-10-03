@@ -20,12 +20,16 @@ export interface ShellCompositionSubshell {
     l: number;
     /** Electrons actually occupying this subshell (0 < electrons <= 2*(2l+1)). */
     electrons: number;
+    /** The j-level, with spin–orbit only; carried to the components so each is drawn with its own R(r). */
+    j?: number;
 }
 
 export interface OrbitalComponent {
     n: number;
     l: number;
     ml: number;
+    /** The subshell's j-level, present only with spin–orbit (see ShellCompositionSubshell.j). */
+    j?: number;
     /**
      * How full this one real orbital is, out of its own two-electron
      * capacity (spin up + spin down) -- 1 when a full pair sits in it.
@@ -87,12 +91,12 @@ export function compositeResolutionFor(l: number): number {
 export function shellComposition(subshells: ShellCompositionSubshell[]): OrbitalComponent[] {
     const components: OrbitalComponent[] = [];
     subshells.forEach((subshell, colorIndex) => {
-        const { n, l, electrons } = subshell;
+        const { n, l, j, electrons } = subshell;
         const statesInSubshell = 2 * l + 1;
         const electronsPerOrbital = electrons / statesInSubshell;
         const occupancyFraction = electronsPerOrbital / 2;
         for (let ml = -l; ml <= l; ml++) {
-            components.push({ n, l, ml, occupancyFraction, colorIndex });
+            components.push(j === undefined ? { n, l, ml, occupancyFraction, colorIndex } : { n, l, j, ml, occupancyFraction, colorIndex });
         }
     });
     return components;
@@ -111,9 +115,11 @@ export function shellComposition(subshells: ShellCompositionSubshell[]): Orbital
  * full shell, so an isolated 3d keeps exactly the colour it had while
  * overlapping, and matches its own curve in the radial plot.
  *
- * `l` of null means no isolation, i.e. the full shell.
+ * `l` of null means no isolation, i.e. the full shell. With spin–orbit `j`
+ * names which of l's two j-levels to keep; without, it is undefined and
+ * matches the components, which carry none.
  */
-export function isolateSubshell(components: OrbitalComponent[], l: number | null): OrbitalComponent[] {
+export function isolateSubshell(components: OrbitalComponent[], l: number | null, j?: number): OrbitalComponent[] {
     if (l === null) return components;
-    return components.filter(component => component.l === l);
+    return components.filter(component => component.l === l && component.j === j);
 }

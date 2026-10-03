@@ -170,12 +170,15 @@ along x, at a 90% contour:
 | `Z`, `level` (`atom`\|`shell`\|`orbital`), `n`, `l`, `ml` | atom mode's element and drill-down |
 | `charge` | atom mode's ion charge, an integer; ignored (falls back to neutral) unless the element actually offers it |
 | `excite` | atom mode's promoted electron, `<from>-<to>` e.g. `3s-3p`; ignored (falls back to the ground state) unless the current element and charge offer that promotion |
+| `rel` | atom mode's relativistic treatment, `scalar` or `so` (with spin–orbit); written whenever the mode shown is not off, so an absent or unrecognised `rel` means off — which is what every link made before relativity showed |
+| `j` | atom mode's j-level of the subshell `l`, `1/2`, `3/2`, `5/2` or `7/2`; with spin–orbit only, and only l ± ½ (½ for s) — anything else is ignored. A link's `j` that the mode shown does not have opens the shell instead |
 | `n`, `l`, `ml` | Basic Orbitals' quantum numbers |
 | `combo` (`sp`\|`sp2`\|`sp3`\|`field`\|`none`), `member` (a hybrid's index, or `all`), `level` (a field's: 1 or 2), `F` (field strength, a.u.), `stark` (`lower`\|`upper`\|`both`) | the Combination picker |
 
-Atom mode's own keys always appear in the order `Z`, `charge`, `excite`,
-`level`, `n`, `l`, `ml` — so a neutral ground state's link (no `charge` or
-`excite`) is byte-identical to one made before ions existed.
+Atom mode's own keys always appear in the order `Z`, `rel`, `charge`,
+`excite`, `level`, `n`, `l`, `j`, `ml` — so a non-relativistic neutral
+ground state's link (no `rel`, `charge`, `excite` or `j`) is byte-identical
+to one made before ions or relativity existed.
 
 `frac`, `cut`, `op` and `surf` are always written, even at their defaults, so
 a link reproduces the sender's picture in any tab rather than whatever that

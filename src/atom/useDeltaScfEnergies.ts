@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { energiesStarted, energiesSucceeded, energiesFailed, pictureLanded, selectSpeciesEnergies } from '../store/atomSlice';
+import { energiesStarted, energiesSucceeded, energiesFailed, speciesPictureLanded, selectSpeciesEnergies } from '../store/atomSlice';
 import { createAtomWorker } from '../workers/createAtomWorker';
 import { AtomWorkerHandle, AtomWorkerMessage } from './useAtomSolver';
 import { speciesKey } from './species';
@@ -27,6 +27,10 @@ const FAILED = 'The ΔSCF calculation failed.';
  * enclosed fraction: a fraction change re-solves the picture but leaves the
  * profile in place until the new one replaces it, so the landed flag stays
  * true and the energies (which do not depend on the fraction) carry on.
+ * Likewise for a Relativity switch: the energies are non-relativistic in
+ * every mode (ruling C6), so "landed" is the species' picture in any mode
+ * (`speciesPictureLanded`), and the old mode's picture staying up while the
+ * new one solves keeps a computation in flight running.
  *
  * A species computed earlier this session is served from energies_cache.ts
  * without a worker at all: the terminated worker took delta_scf's own
@@ -38,7 +42,7 @@ export function useDeltaScfEnergies(createWorker: () => AtomWorkerHandle = creat
     const Z = useAppSelector(state => state.atom.Z);
     const charge = useAppSelector(state => state.atom.charge);
     const excitation = useAppSelector(state => state.atom.excitation);
-    const landed = useAppSelector(state => pictureLanded(state.atom));
+    const landed = useAppSelector(state => speciesPictureLanded(state.atom));
     // A mode switch away and back re-runs the effect below; energies already
     // in hand for this species are kept rather than recomputed.
     const done = useAppSelector(state => selectSpeciesEnergies(state)?.status === 'done');

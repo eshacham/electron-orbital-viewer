@@ -177,8 +177,13 @@ export function effectiveRelativity(state: Pick<AtomState, 'Z' | 'relativityOver
     return state.relativityOverride ?? defaultRelativityFor(state.Z);
 }
 
-/** Which radial equation drew a profile; hand-built fixtures and every pre-Phase-4 profile carry none, and were non-relativistic. */
-function profileRelativity(profile: SerialisedAtomProfile): RelativityMode {
+/**
+ * Which radial equation drew a profile; hand-built fixtures and every
+ * pre-Phase-4 profile carry none, and were non-relativistic. The one
+ * reading of `profile.relativity` -- the store and the solver hook's
+ * failure message both go through it.
+ */
+export function profileRelativity(profile: SerialisedAtomProfile): RelativityMode {
     return profile.relativity ?? 'off';
 }
 
@@ -202,9 +207,27 @@ function profileSpeciesKey(profile: SerialisedAtomProfile): string {
  * for this.
  */
 export function pictureLanded(state: AtomState): boolean {
-    return state.profile !== null
-        && profileSpeciesKey(state.profile) === speciesKey(speciesOf(state))
-        && profileRelativity(state.profile) === effectiveRelativity(state);
+    return speciesPictureLanded(state) && profileRelativity(state.profile!) === effectiveRelativity(state);
+}
+
+/**
+ * Whether a picture of the selected species is on screen in any mode. What
+ * the ΔSCF energies wait for (ruling C15): they are non-relativistic
+ * whatever the switch says (ruling C6), so a mode switch, which keeps the
+ * old mode's picture up while the new one solves (C9), must not stop them.
+ */
+export function speciesPictureLanded(state: AtomState): boolean {
+    return state.profile !== null && profileSpeciesKey(state.profile) === speciesKey(speciesOf(state));
+}
+
+/**
+ * The energies hook stops when the species' picture goes (a failed or
+ * unbound mode switch takes it away), so a computation it was running must
+ * not be left reading "computing" for good; finished energies stay, since
+ * they hold for every mode.
+ */
+function dropEnergiesInFlightWithThePicture(state: AtomState): void {
+    if (state.profile === null && state.energies.status === 'computing') state.energies = NO_ENERGIES;
 }
 
 /**
@@ -364,6 +387,7 @@ const atomSlice = createSlice({
             state.error = null;
             state.unbound = action.payload;
             state.pendingView = null;
+            dropEnergiesInFlightWithThePicture(state);
         },
 
         energiesStarted: (state, action: PayloadAction<string>) => {
@@ -399,7 +423,15 @@ const atomSlice = createSlice({
             // it would stand under a switch that names another mode. A
             // failed re-solve of the same species and mode (a fraction
             // change) keeps its picture, as it always has.
+            //
+            // The level and selection are kept (as solveUnbound keeps them):
+            // switching back to the mode that drew them restores the same
+            // view, usually from the profile cache. Nothing on screen shows
+            // them meanwhile, so the Share link writes the whole atom while
+            // there is no picture (url_state's encodeAtomKeys) rather than a
+            // shell nobody can see.
             if (!pictureLanded(state)) state.profile = null;
+            dropEnergiesInFlightWithThePicture(state);
             // A failed solve leaves no profile to apply the link against, and
             // this Z's solve may be retried later (e.g. useAtomSolver re-runs
             // on an enclosed-fraction change) -- without this, a later

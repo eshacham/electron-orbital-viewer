@@ -891,3 +891,31 @@ describe('App: Share', () => {
         document.execCommand = originalExecCommand;
     });
 });
+
+describe('App: relativity', () => {
+    beforeEach(() => { clearProfileCacheForTests(); });
+    // Fix round 1, I1: with spin–orbit a level-3 orbital is drawn with its
+    // own j-level's R(r) and sampling box, not the first (n, l) found.
+    it('draws a spin–orbit orbital with the selected j-level\'s radial function', () => {
+        const argon = argonLikeProfile();
+        const p = argon.subshells.find(s => s.n === 2 && s.l === 1)!;
+        const pHalf = { ...p, j: 0.5, samplingRadius: 1.1, R: new Float64Array(argon.size).fill(1) };
+        const pThreeHalves = { ...p, j: 1.5, samplingRadius: 1.9, R: new Float64Array(argon.size).fill(2) };
+        const { store } = renderWithProvider(<App />, {
+            mode: 'atom',
+            Z: 18,
+            relativityOverride: 'spinOrbit',
+            level: 'orbital',
+            selectedShell: 2,
+            selectedSubshell: { n: 2, l: 1, j: 1.5 },
+            selectedOrbital: { n: 2, l: 1, ml: 0, j: 1.5 },
+            profile: {
+                ...argon, relativity: 'spinOrbit',
+                subshells: [...argon.subshells.filter(s => !(s.n === 2 && s.l === 1)), pHalf, pThreeHalves],
+            },
+        });
+        const params = store.getState().orbital.currentParams!;
+        expect(params.rMax).toBeCloseTo(1.9);
+        expect(params.radialSamples!.R[0]).toBe(2);
+    });
+});

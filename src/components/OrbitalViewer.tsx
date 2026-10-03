@@ -327,19 +327,27 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         const isolatedL = atomSelectedSubshell && atomSelectedSubshell.n === atomSelectedShell
             ? atomSelectedSubshell.l
             : null;
+        // With spin–orbit the isolated subshell is one j-level of l; the
+        // selection carries j exactly when the profile's subshells do.
+        const isolatedJ = isolatedL === null ? undefined : atomSelectedSubshell!.j;
 
         // Ascending l, matching the order the radial plot colours a shell's
         // subshells by (App.tsx's atomCurves) -- shellComposition's
         // colorIndex is this array's position, so the two must agree. The
         // isolation filter runs *after* that assignment, so an isolated
         // subshell keeps the colour it had while overlapping.
-        const components = isolateSubshell(shellComposition(shellSubshells), isolatedL);
+        const components = isolateSubshell(shellComposition(shellSubshells), isolatedL, isolatedJ);
         if (components.length === 0) {
             dispatch(endCompositionBuild());
             return;
         }
-        // By species: Fe²⁺'s 3d lobes are not neutral iron's.
-        const cacheKey = shellMeshCacheKey(atomProfile.speciesKey ?? atomProfile.Z, atomSelectedShell, COMPOSITE_ORBITAL_RESOLUTION, enclosedFraction, isolatedL);
+        // By species: Fe²⁺'s 3d lobes are not neutral iron's. And by the
+        // mode that drew the profile (ruling C2): scalar gold's 6s lobes are
+        // not off gold's.
+        const cacheKey = shellMeshCacheKey(
+            atomProfile.speciesKey ?? atomProfile.Z, atomSelectedShell, COMPOSITE_ORBITAL_RESOLUTION, enclosedFraction,
+            isolatedL, atomProfile.relativity ?? 'off', isolatedJ,
+        );
 
         // A different shell's (or a stale fraction's) lobes must not linger
         // while the new ones are being computed -- cleared synchronously,
@@ -369,7 +377,9 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         // diverge under isolation -- createCompositionLobesGroup pairs them
         // strictly by index.
         const orbitalParams: OrbitalParams[] = components.map(component => {
-            const subshell = shellSubshells.find(s => s.l === component.l)!;
+            // j as well as l: with spin–orbit a p shell has two p subshells,
+            // each with its own R(r).
+            const subshell = shellSubshells.find(s => s.l === component.l && s.j === component.j)!;
             return {
                 n: component.n, l: component.l, ml: component.ml,
                 Z: atomProfile.Z,

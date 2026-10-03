@@ -863,4 +863,34 @@ describe('relativity in the atom slice', () => {
         state = reducer(state, setRelativity('scalar'));
         expect(selectSpeciesEnergies({ atom: state })).toMatchObject({ status: 'done' });
     });
+
+    // A failed or unbound mode switch takes the picture away, and the
+    // energies hook with it; energies still computing must not stay so.
+    it('drops energies still computing when a mode switch fails or is unbound, and keeps finished ones', () => {
+        const computing = () => {
+            let state = reducer(undefined, setElement(11));
+            state = reducer(state, solveSucceeded({ ...neonLikeProfile(), Z: 11 }));
+            state = reducer(state, energiesStarted('11'));
+            return reducer(state, setRelativity('scalar'));
+        };
+        expect(reducer(computing(), solveFailed('boom')).energies.status).toBe('idle');
+        expect(reducer(computing(), solveUnbound('LDA does not bind …')).energies.status).toBe('idle');
+
+        let done = reducer(undefined, setElement(11));
+        done = reducer(done, energiesSucceeded({ speciesKey: '11', ionisation: { valueEv: 5.37, fromLabel: 'Na', toLabel: 'Na⁺' }, excitation: null }));
+        done = reducer(done, setRelativity('scalar'));
+        expect(reducer(done, solveFailed('boom')).energies.status).toBe('done');
+    });
+
+    it('a failed mode switch keeps the level and selection, which return with the old mode', () => {
+        let state = reducer(undefined, setElement(10));
+        state = reducer(state, solveSucceeded(neonLikeProfile()));
+        state = reducer(state, drillToShell(2));
+        state = reducer(state, setRelativity('scalar'));
+        state = reducer(state, solveFailed('boom'));
+        expect(state).toMatchObject({ profile: null, level: 'shell', selectedShell: 2 });
+        state = reducer(state, setRelativity(null));
+        state = reducer(state, solveSucceeded(neonLikeProfile()));
+        expect(state).toMatchObject({ level: 'shell', selectedShell: 2 });
+    });
 });
