@@ -80,16 +80,50 @@ export function findEigenvalue(search: EigenvalueSearch): EigenvalueResult {
     // clearly gone further than any plausible eigenvalue gap. Halving this
     // width back down would only rediscover Phase A's own bias; growing it is
     // what gives Phase B room to find the true root instead.
+    //
+    // But never past the neighbouring states (ruling T7-c). Below the energy
+    // where the node count drops under targetNodes lies the state beneath;
+    // above the one where it passes targetNodes + 1 (the requested root sits
+    // at the step from targetNodes to targetNodes + 1, so Phase A's own upper
+    // end already has one node more) lies the state above. Unconfined, a
+    // level whose mismatch has no sign change near its own root -- its upper
+    // end pinned just below zero -- widened downward until it took in a lower
+    // state's root and bisected on that: measured for hydrogen 7s on a 40 a0
+    // grid, which has no room for it, the search returned the 4-node 5s.
+    // Where the expansion would cross a limit it stops at the limit instead
+    // (located by bisection on the node count), so the whole of the
+    // requested state's own interval is still searched. Every expansion that
+    // stays inside the limits evaluates exactly the points it always did.
+    //
+    // This does not make every wrong root impossible: the mismatch also
+    // changes sign across its discontinuities (a pole, or a jump of the match
+    // point), inside the interval as well as outside it -- measured for
+    // Pu 7s -> 5f in scalar mode, mid-SCF, a 5f the potential does not bind
+    // at all, "found" at -10.1 Ha. The node-count check each solver runs on
+    // the finished state still catches those.
     const centre = 0.5 * (low + high);
     let halfWidth = Math.max(0.5 * (high - low), Math.abs(centre) * 1e-6);
+    let lowStopped = false;
+    let highStopped = false;
+    const lowAllowed = (energy: number) => nodesAt(energy) >= targetNodes;
+    const highAllowed = (energy: number) => nodesAt(energy) <= targetNodes + 1;
     for (let expansion = 0; expansion < 60; expansion++) {
         if (Number.isFinite(fLow) && Number.isFinite(fHigh) && fLow * fHigh < 0) break;
+        if (lowStopped && highStopped) break;
         halfWidth *= 2;
-        low = Math.min(centre - halfWidth, eLow);
-        high = Math.max(centre + halfWidth, eHigh);
-        if (high >= 0) high = -Number.EPSILON;
-        fLow = mismatchAt(low);
-        fHigh = mismatchAt(high);
+        if (!lowStopped) {
+            const candidate = Math.min(centre - halfWidth, eLow);
+            if (lowAllowed(candidate)) low = candidate;
+            else { low = lastAllowed(low, candidate, lowAllowed); lowStopped = true; }
+            fLow = mismatchAt(low);
+        }
+        if (!highStopped) {
+            let candidate = Math.max(centre + halfWidth, eHigh);
+            if (candidate >= 0) { candidate = -Number.EPSILON; highStopped = true; }
+            if (highAllowed(candidate)) high = candidate;
+            else { high = lastAllowed(high, candidate, highAllowed); highStopped = true; }
+            fHigh = mismatchAt(high);
+        }
     }
 
     let energy = 0.5 * (low + high);
@@ -106,6 +140,24 @@ export function findEigenvalue(search: EigenvalueSearch): EigenvalueResult {
         }
     }
     return { energy, bracketed };
+}
+
+/**
+ * The energy nearest `outside` that `allowed` still accepts, by bisection
+ * between an accepted point and a rejected one: where the node count
+ * changes, i.e. a neighbouring state's eigenvalue, to the precision Phase A
+ * locates it with.
+ */
+function lastAllowed(inside: number, outside: number, allowed: (energy: number) => boolean): number {
+    let good = inside;
+    let bad = outside;
+    for (let iteration = 0; iteration < MAX_BISECTIONS; iteration++) {
+        const middle = 0.5 * (good + bad);
+        if (allowed(middle)) good = middle;
+        else bad = middle;
+        if (Math.abs(bad - good) < Math.abs(good) * 1e-3) break;
+    }
+    return good;
 }
 
 /**

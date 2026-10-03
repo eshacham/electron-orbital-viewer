@@ -58,10 +58,14 @@ describe('radial_solver is bit-for-bit unchanged by the extraction', () => {
         expect(hasBoundState(grid, 6, 5, coulomb, -0.3)).toBe(false);
     });
 
+    // n=5, not the n=7 this was first recorded with: on this grid the old
+    // search answered a request for 7s with the 4-node 5s (Phase B walked
+    // down onto it -- ruling T7-c), and 14.8 % was that 5s's spill. 5s itself
+    // produced the identical message before the fix and still does.
     it('the containment guard throws the same message', () => {
         const grid = makeRadialGrid(1e-6, 40, 2001);
-        expect(() => solveRadialState(grid, 7, 0, potentialOf(grid, r => -1 / r))).toThrow(
-            "Radial grid (rMax=40) is too small to hold n=7, l=0: 14.8% of the electron's probability lies "
+        expect(() => solveRadialState(grid, 5, 0, potentialOf(grid, r => -1 / r))).toThrow(
+            "Radial grid (rMax=40) is too small to hold n=5, l=0: 14.8% of the electron's probability lies "
             + 'in the outermost 1% of the grid. Use a grid sized for this n.'
         );
     });
