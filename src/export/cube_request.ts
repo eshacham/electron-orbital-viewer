@@ -1,4 +1,6 @@
 import { AnalyticFieldSource } from '../field_source';
+import type { MoleculeBasis } from '../molecules/types';
+import { registerMoleculeBasis } from '../molecules/basis_registry';
 import { CubeAtom, RadialCurveOnGrid, encodeCube, fieldCubeGrid, radialDensityCubeGrid } from './cube';
 
 /**
@@ -6,11 +8,14 @@ import { CubeAtom, RadialCurveOnGrid, encodeCube, fieldCubeGrid, radialDensityCu
  * everything `exportWorker.ts` pulls in (ruling C8, spec §3.7 worker
  * weight). Building a request out of the store's state -- `cubeJobFor`,
  * `cubeReason` -- needs `caption.ts` and `RootState`, so that stays on the
- * main thread, in `run_export.ts`, rather than here.
+ * main thread, in `run_export.ts`, rather than here. `basis_registry.ts` is
+ * plain data (no three.js/Redux), so registering a Bonds basis here keeps
+ * that rule.
  */
 interface CubeMeta { atoms: CubeAtom[]; title: string; description: string; requestId: number; }
 export type CubeRequest =
-    | ({ type: 'fieldCube'; source: AnalyticFieldSource; resolution: number } & CubeMeta)
+    /** `bases`: a 'gaussianMO'/'gaussianDensity' recipe needs its basis registered before it can be evaluated (ruling C5, Task 13b) -- the worker has no registry of its own, so the request carries it. */
+    | ({ type: 'fieldCube'; source: AnalyticFieldSource; resolution: number; bases?: MoleculeBasis[] } & CubeMeta)
     | ({ type: 'radialCube'; curve: RadialCurveOnGrid; resolution: number } & CubeMeta);
 export type CubeResponse =
     | { type: 'success'; blob: Blob; requestId: number }
@@ -20,6 +25,9 @@ type WithoutRequestId<T> = T extends unknown ? Omit<T, 'requestId'> : never;
 export type CubeJob = WithoutRequestId<CubeRequest>;
 
 export function buildCubeBlob(request: CubeRequest): Blob {
+    if (request.type === 'fieldCube') {
+        for (const basis of request.bases ?? []) registerMoleculeBasis(basis);
+    }
     const grid = request.type === 'fieldCube'
         ? fieldCubeGrid(request.source, request.resolution)
         : radialDensityCubeGrid(request.curve, request.resolution);

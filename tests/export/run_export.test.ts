@@ -2,16 +2,19 @@
 // load (see orbital_controls_factory.ts), so the factory is mocked.
 jest.mock('../../src/export/gltf_exporter_factory', () => ({ exportGlb: jest.fn(async () => new ArrayBuffer(12)) }));
 
-import { runExport, exportAvailability, cubeJobFor, BONDS_EXPORT_REASON, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON, COMPOSITION_FAILED_REASON } from '../../src/export/run_export';
+import { runExport, exportAvailability, cubeJobFor, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON, COMPOSITION_FAILED_REASON } from '../../src/export/run_export';
 import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted, solveSucceeded, levelUp, setRelativity } from '../../src/store/atomSlice';
 import {
-    setCombination, startOrbitalCalculation, failOrbitalCalculation, startCompositionBuild, endCompositionBuild, failCompositionBuild,
+    setCombination, startOrbitalCalculation, startFieldCalculation, failOrbitalCalculation, startCompositionBuild, endCompositionBuild, failCompositionBuild,
     setLevelTransition,
 } from '../../src/store/orbitalSlice';
 import { basicOrbitalParams } from '../../src/orbital_presets';
 import { selectionProblem } from '../../src/combinations';
 import { NOTHING_TO_EXPORT_REASON } from '../../src/export/surfaces';
-import { makeStore, neonStore, sodiumIonStore, chlorideUnboundStore, readText, baseContext, octahedron, exportHandle, goldStore, goldProfile } from './fixtures';
+import {
+    makeStore, neonStore, sodiumIonStore, chlorideUnboundStore, readText, baseContext, octahedron, exportHandle, goldStore, goldProfile,
+    bondsMoleculeStore, bondsH2PlusStore, N2_BASIS, N2_META, N2_SCAN, O2_META,
+} from './fixtures';
 
 // Fix round 1, M3: startOrbitalCalculation sets currentParams before the
 // render finishes, and failOrbitalCalculation does not clear it back out --
@@ -525,19 +528,96 @@ describe('runExport: CSV includes the dashed non-relativistic comparison curves 
     });
 });
 
-// Bonds mode's captions, file names and cube are Task 13b's (ruling C5).
-// Until then every export here would describe a hydrogen orbital, so each
-// kind is refused with a stated reason rather than offered misleadingly.
-describe('exportAvailability: Bonds mode', () => {
-    it('refuses every kind with a stated reason, whatever is in the store', async () => {
-        const store = makeStore();
-        store.dispatch(setMode('hydrogenic'));
-        store.dispatch(startOrbitalCalculation(basicOrbitalParams(2, 1, 0, 0.9)));
-        store.dispatch(setMode('bonds'));
-        const availability = exportAvailability(store.getState());
-        for (const kind of ['png', 'png-plain', 'csv', 'stl', 'glb', 'cube'] as const) {
-            expect(availability[kind]).toBe(BONDS_EXPORT_REASON);
-        }
-        await expect(runExport('png', baseContext(store.getState()))).rejects.toThrow(BONDS_EXPORT_REASON);
+// Task 13b (ruling C5): Bonds mode's exports -- captions, file names and the
+// cube name the system, R and method; availability follows the drawn
+// picture, like every other mode.
+describe('Bonds mode exports (ruling C5, Task 13b)', () => {
+    describe('exportAvailability follows the drawn picture, like every other mode', () => {
+        it('refuses with NOTHING_DRAWN_REASON before any Bonds picture lands', () => {
+            const store = makeStore();
+            store.dispatch(setMode('bonds'));
+            const availability = exportAvailability(store.getState());
+            for (const kind of ['png', 'png-plain', 'stl', 'glb', 'cube'] as const) {
+                expect(availability[kind]).toBe(NOTHING_DRAWN_REASON);
+            }
+        });
+
+        it('offers every kind once a picture has landed', () => {
+            const availability = exportAvailability(bondsH2PlusStore().getState());
+            for (const kind of ['png', 'png-plain', 'csv', 'stl', 'glb', 'cube'] as const) {
+                expect(availability[kind]).toBeNull();
+            }
+        });
+
+        it('waits (PICTURE_BUSY_REASON) for a 3D render in flight, but offers CSV at once (it reads the scan/curve, not the mesh)', () => {
+            const store = bondsH2PlusStore();
+            // Re-request the same picture: startFieldCalculation alone, without
+            // the landing finishOrbitalCalculation bondsH2PlusStore also sends.
+            store.dispatch(startFieldCalculation(store.getState().orbital.currentField!));
+            const availability = exportAvailability(store.getState());
+            expect(availability.png).toBe(PICTURE_BUSY_REASON);
+            expect(availability.cube).toBe('The surface is still being computed.');
+            expect(availability.csv).toBeNull();
+        });
+
+        it('refuses every kind, including CSV, after a failed render', async () => {
+            const store = bondsH2PlusStore();
+            store.dispatch(failOrbitalCalculation('worker crashed'));
+            const availability = exportAvailability(store.getState());
+            for (const kind of ['png', 'png-plain', 'csv', 'stl', 'glb', 'cube'] as const) {
+                expect(availability[kind]).toBe(RENDER_FAILED_REASON);
+            }
+            await expect(runExport('png', baseContext(store.getState()))).rejects.toThrow(RENDER_FAILED_REASON);
+        });
+    });
+
+    describe('PNG caption', () => {
+        it('carries the system/R/orbital line and the method line', async () => {
+            const capturePng = jest.fn().mockResolvedValue(new Blob(['png']));
+            const context = { ...baseContext(bondsMoleculeStore().getState()), handle: exportHandle({ capturePng }), bondsScan: N2_SCAN };
+            await runExport('png', context);
+            const overlays = capturePng.mock.calls[0][0];
+            expect(overlays.caption[0]).toBe('N₂ 3σg, R = 2.07 a₀ (1.098 Å)');
+            expect(overlays.caption[1]).toBe('B3LYP/def2-TZVP');
+        });
+    });
+
+    describe('CSV: the potential curve E(R), not a radial curve', () => {
+        it('writes H2+\'s exact curve, both states, with R in a0 and Angstrom and E relative and absolute', async () => {
+            const text = await readText((await runExport('csv', baseContext(bondsH2PlusStore().getState()))).blob);
+            expect(text).toContain('# Exact within Born–Oppenheimer');
+            const header = text.split('\n').find(line => line.startsWith('R_bohr'));
+            expect(header).toBe('R_bohr,R_angstrom,E_1sigma_g_eV,E_1sigma_g_Ha,E_1sigma_u_eV,E_1sigma_u_Ha');
+            const firstRow = text.split('\n').find(line => line.startsWith('0.5,'));
+            expect(firstRow!.split(',')).toHaveLength(6);
+        });
+
+        it('writes a diatomic\'s shipped scan points, zero at the separated atoms, with D_e/R_e comments', async () => {
+            const context = { ...baseContext(bondsMoleculeStore().getState()), bondsScan: N2_SCAN };
+            const text = await readText((await runExport('csv', context)).blob);
+            const lines = text.split('\n');
+            expect(lines[0]).toContain('N₂ potential curve');
+            expect(text).toContain('# Energies: CCSD(T)/aug-cc-pVTZ (frozen core).');
+            expect(text).toContain('D_e = 8.16 eV');
+            expect(text).toContain('R_e = 2.074 a₀');
+            expect(lines).toContain('R_bohr,R_angstrom,E_eV,E_Ha');
+            // Point 1 (R = 2.074): E relative to the separated atoms is (energyHartree - separatedAtomsHartree) * HARTREE_TO_EV.
+            const row = lines.find(line => line.startsWith('2.074,'));
+            expect(row).toBeDefined();
+            const [, , eEv, eHa] = row!.split(',').map(Number);
+            expect(eEv).toBeCloseTo((N2_SCAN.points[1].energyHartree - N2_SCAN.fit.separatedAtomsHartree) * 27.211386245988, 4);
+            expect(eHa).toBeCloseTo(N2_SCAN.points[1].energyHartree, 6);
+        });
+
+        it('refuses a diatomic\'s CSV without the scan (not yet loaded)', async () => {
+            await expect(runExport('csv', baseContext(bondsMoleculeStore().getState()))).rejects.toThrow(/not available/);
+        });
+    });
+
+    describe('cube and file names', () => {
+        it('names the cube and PNG files after the system, R and what is drawn', async () => {
+            const h2plus = await runExport('csv', baseContext(bondsH2PlusStore().getState()));
+            expect(h2plus.filename).toBe('orbital-viewer_H2plus_R2.00_1sigmag.csv');
+        });
     });
 });

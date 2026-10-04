@@ -6,13 +6,23 @@ import { subshellSpokenLabel } from '../atom/configurations';
 import { buildComparisonCurves } from '../atom/comparison_curves';
 import type { SerialisedAtomProfile } from '../workers/atomWorker';
 import { profileRelativity, pictureLanded } from '../store/atomSlice';
-import { CsvCurve, radialCurvesToCsv } from './csv';
+import { CsvCurve, formatNumber, radialCurvesToCsv } from './csv';
 import { exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment, jLevelShapeCaption } from './caption';
 import { CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
 import { encodeGlb } from './gltf';
+import { CubeAtom } from './cube';
 import { CubeJob, CubeWorkerHandle, requestCube } from './cube_request';
+// H2PLUS_CURVE_R from bonds/h2plus.ts, not bonds/useH2PlusCurve.ts (which
+// re-exports it): that module also pulls in createH2PlusCurveWorker.ts's
+// `new Worker(new URL(...), import.meta.url)`, a worker-bundling construct
+// this (non-worker) export module has no reason to load.
+import { H2PLUS_CURVE_R, H2PLUS_LABELS, h2plusCurve as solveH2PlusCurve } from '../bonds/h2plus';
+import { bondsCaptions } from '../bonds/captions';
+import { H_PLUS_H_PLUS_HARTREE } from '../bonds/curve';
+import { BOHR_TO_ANGSTROM, DiatomicId, HARTREE_TO_EV, systemFormula } from '../bonds/systems';
+import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../molecules/types';
 
 export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb' | 'cube';
 
@@ -43,6 +53,16 @@ export interface ExportContext extends ExportOptions {
     combinationLegend?: CombinationLegendItem[] | null;
     /** Builds the cube worker; absent before App has wired it up (structurally, see App.tsx). */
     createCubeWorker?: () => CubeWorkerHandle;
+    /**
+     * Bonds mode (ruling C5, Task 13b): the molecule data behind the drawn
+     * picture, fetched outside Redux (bondsSlice's own comment: "large,
+     * lives in useBondsData's cache") -- `bondsScan` for the potential
+     * curve, the multireference caveat and D_e/R_e; `bondsMeta` for the
+     * cube's atoms (Z, since MoleculeBasis carries only positions). Absent
+     * outside Bonds mode, or null while still loading.
+     */
+    bondsScan?: MoleculeScan | null;
+    bondsMeta?: MoleculeMeta | null;
 }
 
 export interface ExportResult { blob: Blob; filename: string; }
@@ -70,13 +90,6 @@ export const VIEW_NOT_READY_REASON = 'The 3D view is not ready yet.';
 export const PICTURE_BUSY_REASON = 'Wait for the picture to finish computing.';
 
 export const RENDER_FAILED_REASON = 'The last picture failed to compute; nothing to export.';
-
-/**
- * Every caption, file name and cube here describes a hydrogen orbital or an
- * atom; a molecule's own (system, R, method, both nuclei) are ruling C5's
- * Task 13b. Until then Bonds refuses every kind rather than mislabel one.
- */
-export const BONDS_EXPORT_REASON = 'Exports from Bonds mode are not available yet.';
 
 /** Final review I2: a shell view whose lobes failed is not the picture its caption names. */
 export const COMPOSITION_FAILED_REASON = 'This shell\'s orbital lobes failed to compute, so the picture is incomplete.';
@@ -193,14 +206,70 @@ export function cubeReason(state: RootState): string | null {
 }
 
 /**
+ * A molecule's two nuclei, Z and position in bohr (brief, requirement 4),
+ * from `meta.atoms`: `basis.atoms` has the same positions but no Z
+ * (MoleculeBasis carries no element data, only the Gaussian functions), so
+ * the cube needs the meta alongside the basis. Null while the meta has not
+ * loaded, or does not match the basis actually drawn.
+ */
+function moleculeCubeAtoms(basis: MoleculeBasis, meta: MoleculeMeta | null | undefined): CubeAtom[] | null {
+    if (!meta || meta.atoms.length !== basis.atoms.length) return null;
+    return meta.atoms.map(a => ({ Z: a.Z, position: a.position }));
+}
+
+/**
+ * The drawn Bonds picture as a cube job (ruling C5, Task 13b): H₂⁺'s ψ with
+ * both protons at ±R/2 (there is no basis to carry them), or a diatomic's
+ * MO/density ψ/ρ with both nuclei from `meta` and its basis registered for
+ * the worker (`bases`, since the worker has no registry of its own -- see
+ * cube_request.ts). `fieldCubeGrid` (cube.ts) squares a 'gaussianDensity'
+ * recipe's √ρ samples back to ρ; this only writes the description that says so.
+ */
+function bondsCubeJob(state: RootState, title: string, scan: MoleculeScan | null | undefined, meta: MoleculeMeta | null | undefined): CubeJob {
+    const field = state.orbital.currentField;
+    if (!field) throw new Error(NOTHING_DRAWN_REASON);
+    const source = field.sources[0];
+    const recipe = source.recipe;
+    const resolution = field.resolution;
+    const method = methodStatement(state, scan);
+    if (recipe.type === 'h2plus') {
+        const half = recipe.R / 2;
+        const atoms: CubeAtom[] = [{ Z: 1, position: [0, 0, -half] }, { Z: 1, position: [0, 0, half] }];
+        return {
+            type: 'fieldCube', source, resolution, atoms, title,
+            description: `psi(x,y,z), real, bohr^-3/2, H2+ ${H2PLUS_LABELS[recipe.state]}, on the grid as drawn; ${method}; lengths in bohr`,
+        };
+    }
+    if (recipe.type !== 'gaussianMO' && recipe.type !== 'gaussianDensity') throw new Error(NOTHING_DRAWN_REASON);
+    const basis = field.bases?.find(b => b.id === recipe.moleculeId);
+    if (!basis) throw new Error('No basis available for this molecule export.');
+    const atoms = moleculeCubeAtoms(basis, meta);
+    if (!atoms) throw new Error('Molecule data is not available for this export yet.');
+    if (recipe.type === 'gaussianMO') {
+        const orbital = basis.orbitals[recipe.index];
+        const what = orbital ? `${orbital.label}${orbital.spin !== 'restricted' ? ` (${orbital.spin})` : ''} molecular orbital` : 'molecular orbital';
+        return {
+            type: 'fieldCube', source, resolution, atoms, bases: [basis], title,
+            description: `psi(x,y,z), real, bohr^-3/2, ${what}, on the grid as drawn; ${method}; lengths in bohr`,
+        };
+    }
+    return {
+        type: 'fieldCube', source, resolution, atoms, bases: [basis], title,
+        description: `rho(x,y,z), total electron density, electrons/bohr^3, on the grid as drawn; ${method}; lengths in bohr`,
+    };
+}
+
+/**
  * What the view shows, as a cube job: the drawn ψ (a field source, resampled
  * exactly as it was drawn), or ρ(r) = D(r)/(4πr²) of what the cut face shows
  * at atom levels 1-2 (design decisions, "the cube file is resampled on
- * demand").
+ * demand"). `bonds` is Bonds mode's own extra context (ExportContext's
+ * `bondsScan`/`bondsMeta`, ruling C5) -- absent, every other mode ignores it.
  */
-export function cubeJobFor(state: RootState): CubeJob {
+export function cubeJobFor(state: RootState, bonds?: { scan?: MoleculeScan | null; meta?: MoleculeMeta | null }): CubeJob {
     const title = `electron-orbital-viewer: ${viewDescription(state)}`;
     const atom = state.atom;
+    if (atom.mode === 'bonds') return bondsCubeJob(state, title, bonds?.scan, bonds?.meta);
     if (atom.mode === 'atom' && atom.level !== 'orbital' && atom.profile) {
         const profile = atom.profile;
         const sub = atom.selectedSubshell;
@@ -278,11 +347,13 @@ function csvReason(state: RootState): string | null {
     return drawnReason(state);
 }
 
+// Task 13b (ruling C5): Bonds no longer refuses every kind outright --
+// `drawnReason` and friends already read `state.orbital.currentField`/
+// `isLoading`/`renderFailed` generically (a Bonds request is a single-source
+// `currentField`, exactly like a Basic Orbitals combination's), so removing
+// the blanket refusal below is enough: nothing drawn, loading or failed give
+// the same stated reasons every other mode gets.
 export function exportAvailability(state: RootState): ExportAvailability {
-    if (state.atom.mode === 'bonds') {
-        const reason = BONDS_EXPORT_REASON;
-        return { png: reason, 'png-plain': reason, csv: reason, stl: reason, glb: reason, cube: reason };
-    }
     const png = pngReason(state);
     const geometry = geometryReason(state);
     return { png, 'png-plain': png, csv: csvReason(state), stl: geometry, glb: geometry, cube: cubeReason(state) };
@@ -293,7 +364,80 @@ function profileRGrid(profile: Pick<SerialisedAtomProfile, 'rMin' | 'dx' | 'size
     return Array.from({ length: profile.size }, (_, j) => profile.rMin * Math.exp(j * profile.dx));
 }
 
-function csvFor({ state, shareUrl, csvCurves }: ExportContext): string {
+/**
+ * H₂⁺'s exact potential curve, both states, over the slider's own grid
+ * (`H2PLUS_CURVE_R`, the same one the live plot and useH2PlusCurve use) --
+ * computed directly rather than read from the hook's cached (async, worker-
+ * built) result, so the export never has to say "not ready yet": the solve
+ * is a deterministic pure function (bonds/h2plus.ts; ~0.3 s for the whole
+ * range, a one-off cost for a user-initiated export, not a per-frame one).
+ */
+function h2plusCurveCsv(shareUrl: string): string {
+    const R = H2PLUS_CURVE_R;
+    const sigmaG = solveH2PlusCurve(R, '1sigma_g');
+    const sigmaU = solveH2PlusCurve(R, '1sigma_u');
+    const comments = [
+        `H2+ potential curve: E(R), both states (${H2PLUS_LABELS['1sigma_g']} gerade, ${H2PLUS_LABELS['1sigma_u']} ungerade).`,
+        ...bondsCaptions('h2plus', null),
+        `Zero: H + H+ (${H_PLUS_H_PLUS_HARTREE} Ha).`,
+        `view: ${shareUrl}`,
+    ];
+    const lines = comments.map(line => `# ${line}`);
+    lines.push(['R_bohr', 'R_angstrom', 'E_1sigma_g_eV', 'E_1sigma_g_Ha', 'E_1sigma_u_eV', 'E_1sigma_u_Ha'].join(','));
+    R.forEach((r, i) => {
+        const g = sigmaG[i], u = sigmaU[i];
+        lines.push([
+            formatNumber(r, 'R_bohr', r),
+            formatNumber(r * BOHR_TO_ANGSTROM, 'R_angstrom', r),
+            formatNumber((g - H_PLUS_H_PLUS_HARTREE) * HARTREE_TO_EV, 'E_1sigma_g_eV', r),
+            formatNumber(g, 'E_1sigma_g_Ha', r),
+            formatNumber((u - H_PLUS_H_PLUS_HARTREE) * HARTREE_TO_EV, 'E_1sigma_u_eV', r),
+            formatNumber(u, 'E_1sigma_u_Ha', r),
+        ].join(','));
+    });
+    return `${lines.join('\n')}\n`;
+}
+
+/**
+ * A diatomic's shipped potential curve (brief, requirement 5): the scan's own
+ * points, zero at the separated atoms (`scan.fit.separatedAtomsHartree`),
+ * with the same method/validity/D_e/R_e comments the live panel shows
+ * (`bondsCaptions`, reused so the file says exactly what the screen says).
+ */
+function diatomicCurveCsv(system: DiatomicId, scan: MoleculeScan, shareUrl: string): string {
+    const comments = [
+        `${systemFormula(system)} potential curve: E(R), precomputed at ${scan.points.length} bond lengths.`,
+        ...bondsCaptions(system, scan),
+        `view: ${shareUrl}`,
+    ];
+    const lines = comments.map(line => `# ${line}`);
+    lines.push(['R_bohr', 'R_angstrom', 'E_eV', 'E_Ha'].join(','));
+    for (const point of scan.points) {
+        const eRel = (point.energyHartree - scan.fit.separatedAtomsHartree) * HARTREE_TO_EV;
+        lines.push([
+            formatNumber(point.RBohr, 'R_bohr', point.RBohr),
+            formatNumber(point.RBohr * BOHR_TO_ANGSTROM, 'R_angstrom', point.RBohr),
+            formatNumber(eRel, 'E_eV', point.RBohr),
+            formatNumber(point.energyHartree, 'E_Ha', point.RBohr),
+        ].join(','));
+    }
+    return `${lines.join('\n')}\n`;
+}
+
+/**
+ * Brief, requirement 5: Bonds' CSV is the potential curve, not a radial
+ * curve -- H₂⁺'s own exact curve, or the diatomic's shipped scan points
+ * (`context.bondsScan`, ExportContext's own extra data, ruling C5).
+ */
+function bondsCsvFor({ state, shareUrl, bondsScan }: ExportContext): string {
+    if (state.bonds.system === 'h2plus') return h2plusCurveCsv(shareUrl);
+    if (!bondsScan) throw new Error('The potential curve is not available yet.');
+    return diatomicCurveCsv(state.bonds.system as DiatomicId, bondsScan, shareUrl);
+}
+
+function csvFor(context: ExportContext): string {
+    if (context.state.atom.mode === 'bonds') return bondsCsvFor(context);
+    const { state, shareUrl, csvCurves } = context;
     const quantity = state.atom.mode === 'atom'
         ? 'D(r) = 4*pi*r^2*rho(r), electrons per bohr (the radial distribution, not the density)'
         : 'P(r) = r^2*R(r)^2, probability per bohr';
@@ -350,7 +494,7 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             // line, same wording as the CSV/cube comment -- null, and so
             // omitted, for anything that draws no such ring.
             const ring = referenceRingCaption(context.state);
-            const caption = [viewDescription(context.state), methodStatement(context.state)];
+            const caption = [viewDescription(context.state), methodStatement(context.state, context.bondsScan)];
             if (ring) caption.push(ring);
             // Final review I1: j-level lobes are a basis choice the method
             // line does not state -- null, and so omitted, without them.
@@ -381,13 +525,14 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
         }
         case 'glb': {
             if (!context.handle) throw new Error(VIEW_NOT_READY_REASON);
-            const description = `${viewDescription(context.state)}; ${methodStatement(context.state)}`;
+            const description = `${viewDescription(context.state)}; ${methodStatement(context.state, context.bondsScan)}`;
             const buffer = await encodeGlb(context.handle.collectSurfaces(), description);
             return { blob: new Blob([buffer], { type: 'model/gltf-binary' }), filename: `${stem}.glb` };
         }
         case 'cube': {
             if (!context.createCubeWorker) throw new Error('The cube worker is not available.');
-            return { blob: await requestCube(cubeJobFor(context.state), context.createCubeWorker), filename: `${stem}.cube` };
+            const job = cubeJobFor(context.state, { scan: context.bondsScan, meta: context.bondsMeta });
+            return { blob: await requestCube(job, context.createCubeWorker), filename: `${stem}.cube` };
         }
     }
 }

@@ -8,7 +8,8 @@ export { DENSITY_SURFACE_HEX };
 
 /** A single source is drawn in the ψ phase colours; this entry is only what the request's shape asks for. */
 const SINGLE_SOURCE_COLOR = '#ffffff';
-const SPIN_SUFFIX: Record<OrbitalSpin, string> = { restricted: '', alpha: ' (α)', beta: ' (β)' };
+/** Exported for export/caption.ts, which names a drawn orbital's spin the same way. */
+export const SPIN_SUFFIX: Record<OrbitalSpin, string> = { restricted: '', alpha: ' (α)', beta: ' (β)' };
 
 /**
  * h2plusSource solves H₂⁺ again (about 1.2 ms on the main thread) only to

@@ -743,7 +743,8 @@ function App() {
     // a fresh sample: ruling C6, an exported number equals the plotted one.
     const csvCurvesNow = useCallback((): CsvCurve[] => {
         if (isAtomMode) return atomCurves;
-        // Bonds exports are refused until Task 13b (exportAvailability), which also writes their CSV.
+        // Bonds' CSV is the potential curve, built from bondsScan/h2plus's
+        // own data (run_export.ts's bondsCsvFor, ruling C5), not a radial curve.
         if (!isBasicMode) return [];
         if (renderedField) return selectionPlot?.curves ?? [];
         if (!renderedParams) return [];
@@ -759,10 +760,14 @@ function App() {
             // A DOM Worker's onmessage is typed with `this`; this states that
             // it satisfies CubeWorkerHandle's structural shape, which does not care.
             createCubeWorker: createExportWorker as unknown as () => CubeWorkerHandle,
+            // Ruling C5 (Task 13b): Bonds' own loaded data, fetched outside
+            // Redux (useBondsData's cache) -- the scan for captions/CSV, the
+            // meta for a molecule cube's atoms.
+            bondsScan: bondsData.scan, bondsMeta: bondsData.meta,
             ...options,
         });
         downloadBlob(result.blob, result.filename);
-    }, [stateNow, csvCurvesNow, showPhaseLegend, combinationLegend]);
+    }, [stateNow, csvCurvesNow, showPhaseLegend, combinationLegend, bondsData.scan, bondsData.meta]);
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
     const shareExportBar = useMemo(

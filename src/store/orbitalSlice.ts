@@ -306,7 +306,11 @@ function drawnBasicOrbital(state: RootState): OrbitalParams | null {
  * value is already the one drawn.
  */
 export function selectShownEnclosedFraction(state: RootState): number {
-  const drawn = state.atom.mode !== 'atom' && state.orbital.combination.kind === 'none' ? drawnBasicOrbital(state) : null;
+  // Task 13b (ruling C5): explicit -- Bonds is a third mode now, and it never
+  // draws a plain Basic Orbitals orbital (drawnBasicOrbital would read null
+  // for it regardless, since Bonds clears currentParams on entry, but the
+  // check should say what it means rather than lean on that).
+  const drawn = state.atom.mode === 'hydrogenic' && state.orbital.combination.kind === 'none' ? drawnBasicOrbital(state) : null;
   return drawn ? drawn.enclosedFraction : state.orbital.enclosedFraction;
 }
 

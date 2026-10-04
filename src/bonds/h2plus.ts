@@ -53,6 +53,19 @@ export const H2PLUS_LABELS: Record<H2PlusState, string> = { '1sigma_g': '1σg', 
  */
 export const H2PLUS_R_RANGE = { min: 0.5, max: 10 } as const;
 
+/**
+ * The slider's own 0.05 a0 step, spanning its whole range -- one energy per
+ * point the curve plot (and Task 13b's CSV export) can land on. Lives here,
+ * not in useH2PlusCurve.ts (which re-exports it for its existing importers),
+ * so run_export.ts can use it without pulling in createH2PlusCurveWorker.ts's
+ * `new Worker(new URL(...), import.meta.url)` -- a worker-bundling construct
+ * Jest cannot parse, and the export module has no reason to load anyway.
+ */
+export const H2PLUS_CURVE_R: number[] = Array.from(
+    { length: Math.round((H2PLUS_R_RANGE.max - H2PLUS_R_RANGE.min) / 0.05) + 1 },
+    (_, i) => H2PLUS_R_RANGE.min + i * 0.05,
+);
+
 const ANGULAR_TERMS = 24;
 const RADIAL_TERMS = 40;
 

@@ -8,7 +8,8 @@ import { setCombination, startOrbitalCalculation, startFieldCalculation, finishO
 import { basicOrbitalParams } from '../../src/orbital_presets';
 import { fieldRequestFor } from '../../src/combinations';
 import { hydrogenicSource } from '../../src/field_source';
-import { makeStore, neonStore, neonProfile, readText, goldStore } from './fixtures';
+import { registeredBasis } from '../../src/molecules/basis_registry';
+import { makeStore, neonStore, neonProfile, readText, goldStore, bondsMoleculeStore, bondsH2PlusStore, N2_BASIS, N2_META } from './fixtures';
 
 function fakeWorker(reply: (request: CubeRequest) => unknown): CubeWorkerHandle & { terminate: jest.Mock } {
     const worker = {
@@ -239,6 +240,57 @@ describe('cube requests', () => {
             worker.onmessageerror?.({} as MessageEvent);
             await expect(promise).rejects.toThrow('The cube reply could not be read.');
             expect(worker.terminate).toHaveBeenCalled();
+        });
+    });
+
+    // Task 13b (ruling C5): a 'gaussianMO'/'gaussianDensity' recipe needs its
+    // basis registered before field_source.ts's makeFieldEvaluator can
+    // rebuild it (registeredBasis throws otherwise) -- the export worker has
+    // no registry of its own (preflight T7 ↔ T13b), so the request carries
+    // the basis and buildCubeBlob registers it.
+    describe('Bonds cube requests carry and register their basis', () => {
+        it('registers every basis in a fieldCube request\'s `bases` before building', () => {
+            const request: CubeRequest = {
+                type: 'fieldCube',
+                source: hydrogenicSource(basicOrbitalParams(1, 0, 0, 0.9)),
+                resolution: 4,
+                bases: [N2_BASIS],
+                atoms: [{ Z: 7, position: [0, 0, -1.037] }, { Z: 7, position: [0, 0, 1.037] }],
+                title: 't', description: 'd', requestId: 1,
+            };
+            buildCubeBlob(request);
+            expect(registeredBasis('n2@07')).toEqual(N2_BASIS);
+        });
+
+        it('builds H2+\'s cube with both protons at ±R/2, no basis needed', () => {
+            const job = cubeJobFor(bondsH2PlusStore().getState(), {});
+            expect(job.type).toBe('fieldCube');
+            if (job.type !== 'fieldCube') throw new Error('unreachable');
+            expect(job.atoms).toEqual([{ Z: 1, position: [0, 0, -1] }, { Z: 1, position: [0, 0, 1] }]);
+            expect(job.bases).toBeUndefined();
+            expect(job.description).toContain('H2+');
+            expect(job.description).toMatch(/^psi\(x,y,z\)/);
+        });
+
+        it('builds a molecule MO cube with both nuclei (Z from meta, positions from the basis) and the basis to register', () => {
+            const job = cubeJobFor(bondsMoleculeStore().getState(), { meta: N2_META });
+            expect(job.type).toBe('fieldCube');
+            if (job.type !== 'fieldCube') throw new Error('unreachable');
+            expect(job.atoms).toEqual([{ Z: 7, position: [0, 0, -1.037] }, { Z: 7, position: [0, 0, 1.037] }]);
+            expect(job.bases).toEqual([N2_BASIS]);
+            expect(job.description).toMatch(/^psi\(x,y,z\)/);
+            expect(job.description).toContain('3σg');
+        });
+
+        it('builds a molecule density cube that says ρ, not ψ (fieldCubeGrid squares the samples)', () => {
+            const job = cubeJobFor(bondsMoleculeStore({ kind: 'density' }).getState(), { meta: N2_META });
+            if (job.type !== 'fieldCube') throw new Error('unreachable');
+            expect(job.description).toMatch(/^rho\(x,y,z\)/);
+            expect(job.description).toContain('electrons/bohr^3');
+        });
+
+        it('refuses a molecule cube without the meta (no Z to hand)', () => {
+            expect(() => cubeJobFor(bondsMoleculeStore().getState(), {})).toThrow(/not available/);
         });
     });
 });

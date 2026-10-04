@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { createH2PlusCurveWorker } from '../workers/createH2PlusCurveWorker';
 import type { CurveWorkerResponse } from '../workers/h2plusCurveWorker';
-import { H2PLUS_R_RANGE } from './h2plus';
+import { H2PLUS_CURVE_R } from './h2plus';
+
+export { H2PLUS_CURVE_R };
 
 export interface H2PlusCurve {
     R: number[];
@@ -17,12 +19,6 @@ export interface UseH2PlusCurveResult {
 }
 
 const NO_RESULT: UseH2PlusCurveResult = { curve: null, error: null };
-
-/** The slider's own 0.05 a0 step, spanning its whole range -- one energy per point the curve plot can land on. */
-export const H2PLUS_CURVE_R: number[] = Array.from(
-    { length: Math.round((H2PLUS_R_RANGE.max - H2PLUS_R_RANGE.min) / 0.05) + 1 },
-    (_, i) => H2PLUS_R_RANGE.min + i * 0.05,
-);
 
 // Module-level rather than per-hook-instance, so every caller (App.tsx,
 // ruling C7) shares a single computation across remounts instead of

@@ -11,6 +11,11 @@ import { combinationTitle } from '../combinations';
 import { MAX_FIELD_AU } from '../field_source';
 import { N2_MAX_FIELD_AU } from '../stark';
 import { RelativityMode, methodStatement as relativityMethodStatement } from '../atom/relativity';
+import { BondsSystemId, isBondsSystemId, systemFormula } from '../bonds/systems';
+import { H2PLUS_CAPTIONS, lengths, multireferenceCaption } from '../bonds/captions';
+import { H2PLUS_LABELS, H2PlusState } from '../bonds/h2plus';
+import { SPIN_SUFFIX } from '../bonds/bonds_request';
+import type { BasisOrbital, MoleculeScan } from '../molecules/types';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
 export const ATOM_METHOD = 'central-field SCF, LDA exchange + VWN5 correlation, non-relativistic, spherically averaged';
@@ -32,7 +37,30 @@ function modeCaptionText(mode: RelativityMode): string {
     }
 }
 
-export function methodStatement(state: RootState): string {
+/**
+ * Task 13b (ruling C5): H₂⁺'s own exact method (reusing the solver's own
+ * caption, H2PLUS_CAPTIONS[0], rather than restating it), or -- once the scan
+ * is to hand -- the diatomic's shipped density/orbital method plus a
+ * multireference caveat (B₂, C₂) when `scan` says one applies. `scan` is
+ * optional because methodStatement is also called before it has loaded
+ * (e.g. the title line of a cube job requested the instant a picture lands);
+ * the fallback still states a method, just not the molecule-specific one.
+ */
+function bondsMethodStatement(state: RootState, scan: MoleculeScan | null | undefined): string {
+    if (state.bonds.system === 'h2plus') return H2PLUS_CAPTIONS[0];
+    if (!scan) return 'diatomic molecular orbitals and density: B3LYP/def2-TZVP';
+    const caveat = multireferenceCaption(scan);
+    return `${scan.densityMethod}${caveat ? `; ${caveat}` : ''}`;
+}
+
+/**
+ * `bondsScan` is Bonds mode's own extra context (ruling C5): the scan is
+ * fetched outside Redux (bondsSlice's own comment: "large, lives in
+ * useBondsData's cache"), so a caller with it to hand (run_export.ts, via
+ * ExportContext) passes it; every other mode ignores the parameter.
+ */
+export function methodStatement(state: RootState, bondsScan?: MoleculeScan | null): string {
+    if (state.atom.mode === 'bonds') return bondsMethodStatement(state, bondsScan);
     if (state.atom.mode === 'atom') {
         // Task 12b (ruling C7): the *drawn* profile's mode (ruling C9), not
         // the switch's -- off keeps ATOM_METHOD's own wording byte-identical
@@ -42,6 +70,7 @@ export function methodStatement(state: RootState): string {
         const mode = state.atom.profile ? profileRelativity(state.atom.profile) : 'off';
         return mode === 'off' ? ATOM_METHOD : relativityMethodStatement(mode);
     }
+    // Only 'hydrogenic' is left (Basic Orbitals).
     const combination = state.orbital.combination;
     if (combination.kind === 'hybrid') {
         return `${BASIC_METHOD}; hybrids are linear combinations of these, a basis choice rather than a state of the free atom (qualitative)`;
@@ -65,9 +94,66 @@ export function shellLabel(n: number): string {
     return `n = ${n} shell`;
 }
 
+/**
+ * What a Bonds picture is, by `type` alone (never a combination, never atom
+ * mode's species-y bits).
+ */
+type BondsPictureKind =
+    | { kind: 'h2plus'; state: H2PlusState }
+    | { kind: 'mo'; orbital: BasisOrbital }
+    | { kind: 'density'; isoValue: number };
+
+interface BondsDrawnPicture { system: BondsSystemId; R: number; picture: BondsPictureKind; }
+
+/**
+ * What the canvas actually shows in Bonds mode, read off the drawn request
+ * (`state.orbital.currentField`) rather than the panel's selection
+ * (`state.bonds`) -- the same reason atom mode's captions read the drawn
+ * profile and not the switch (ruling C9): the selection can be a step ahead
+ * of the picture while the next one is still loading (Review Focus 1/2).
+ * R comes from the basis' own two atom positions, not `state.bonds.R`, for
+ * the same reason -- a diatomic's basis only ever reaches `currentField`
+ * once it is the one actually drawn (bondsFieldRequest's own geometry guard).
+ * Null only when nothing matching a Bonds recipe is drawn; every caller here
+ * reaches this after `exportAvailability` has already confirmed a picture is
+ * on screen, so null is a defensive fallback, not an expected case.
+ */
+function bondsDrawnPicture(state: RootState): BondsDrawnPicture | null {
+    const field = state.orbital.currentField;
+    if (!field || field.sources.length !== 1) return null;
+    const recipe = field.sources[0].recipe;
+    if (recipe.type === 'h2plus') return { system: 'h2plus', R: recipe.R, picture: { kind: 'h2plus', state: recipe.state } };
+    if (recipe.type !== 'gaussianMO' && recipe.type !== 'gaussianDensity') return null;
+    const basis = field.bases?.find(b => b.id === recipe.moleculeId);
+    if (!basis || basis.atoms.length < 2) return null;
+    const system = basis.id.split('@')[0];
+    if (!isBondsSystemId(system) || system === 'h2plus') return null;
+    const [a, b] = basis.atoms;
+    const R = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    if (recipe.type === 'gaussianMO') {
+        const orbital = basis.orbitals[recipe.index];
+        return orbital ? { system, R, picture: { kind: 'mo', orbital } } : null;
+    }
+    // Always set alongside a 'gaussianDensity' recipe (bondsFieldRequest);
+    // the fallback only guards a request built some other way (e.g. a test).
+    return { system, R, picture: { kind: 'density', isoValue: field.densityIsoValue ?? state.bonds.densityIso } };
+}
+
+function bondsViewDescription(state: RootState): string {
+    const drawn = bondsDrawnPicture(state);
+    const formula = systemFormula(state.bonds.system);
+    if (!drawn) return formula;
+    const where = lengths(drawn.R);
+    const { picture } = drawn;
+    if (picture.kind === 'h2plus') return `${systemFormula(drawn.system)} ${H2PLUS_LABELS[picture.state]}, ${where}`;
+    if (picture.kind === 'mo') return `${systemFormula(drawn.system)} ${picture.orbital.label}${SPIN_SUFFIX[picture.orbital.spin]}, ${where}`;
+    return `${systemFormula(drawn.system)} total density, surface at ρ = ${picture.isoValue} e/a₀³, ${where}`;
+}
+
 export function viewDescription(state: RootState): string {
+    if (state.atom.mode === 'bonds') return bondsViewDescription(state);
     const percent = `${Math.round(selectShownEnclosedFraction(state) * 100)}% contour`;
-    if (state.atom.mode !== 'atom') {
+    if (state.atom.mode === 'hydrogenic') {
         const combination = state.orbital.combination;
         if (combination.kind !== 'none') return `Hydrogen, ${combinationTitle(combination)}, ${percent}`;
         const o = selectShownBasicOrbital(state);
@@ -144,9 +230,47 @@ function modeFileSuffix(mode: RelativityMode): string {
     }
 }
 
+const GREEK_FILE_ASCII: Record<string, string> = { 'σ': 'sigma', 'π': 'pi', 'δ': 'delta', 'φ': 'phi' };
+/** 'σ','π' etc. spelled out, the antibonding '*' dropped (not ASCII, and the stem is unique without it -- see bondsFileStem). */
+function asciiOrbitalLabel(label: string): string {
+    return label.replace(/[σπδφ]/g, ch => GREEK_FILE_ASCII[ch] ?? ch).replace(/\*/g, '');
+}
+
+const SUBSCRIPT_DIGIT_ASCII: Record<string, string> = {
+    '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9',
+};
+/** 'N₂' -> 'N2', 'H₂⁺' -> 'H2plus': BONDS_SYSTEMS' formula strings, ASCII only. */
+function asciiFormula(formula: string): string {
+    return formula.replace(/[₀-₉]/g, ch => SUBSCRIPT_DIGIT_ASCII[ch] ?? ch).replace(/⁺/g, 'plus').replace(/⁻/g, 'minus');
+}
+
+/**
+ * 'orbital-viewer_N2_R2.07_density-0.002', 'orbital-viewer_O2_R2.29_1pig-alpha',
+ * 'orbital-viewer_H2plus_R2.00_1sigmag' (brief, requirement 3): system,
+ * R to the slider's own precision, and what is drawn -- reusing
+ * bondsDrawnPicture so the stem names the same picture viewDescription does.
+ */
+function bondsFileStem(state: RootState): string {
+    const drawn = bondsDrawnPicture(state);
+    // The drawn picture's own system, not the panel's current selection
+    // (which can be a step ahead while the next molecule loads -- same
+    // reasoning as bondsDrawnPicture itself).
+    const system = asciiFormula(systemFormula(drawn?.system ?? state.bonds.system));
+    if (!drawn) return `orbital-viewer_${system}`;
+    const r = `R${drawn.R.toFixed(2)}`;
+    const { picture } = drawn;
+    if (picture.kind === 'h2plus') return `orbital-viewer_${system}_${r}_${picture.state.replace('_', '')}`;
+    if (picture.kind === 'mo') {
+        const spin = picture.orbital.spin === 'restricted' ? '' : `-${picture.orbital.spin}`;
+        return `orbital-viewer_${system}_${r}_${asciiOrbitalLabel(picture.orbital.label)}${spin}`;
+    }
+    return `orbital-viewer_${system}_${r}_density-${picture.isoValue}`;
+}
+
 /** ASCII only: file names travel through systems that mangle "²". */
 export function exportFileStem(state: RootState): string {
-    if (state.atom.mode !== 'atom') {
+    if (state.atom.mode === 'bonds') return bondsFileStem(state);
+    if (state.atom.mode === 'hydrogenic') {
         const combination = state.orbital.combination;
         if (combination.kind === 'hybrid') {
             return `orbital-viewer_H_${combination.hybrid}${combination.member === 'all' ? '' : `_h${combination.member + 1}`}`;

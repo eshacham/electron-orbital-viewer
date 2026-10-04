@@ -74,6 +74,26 @@ describe('Gaussian cube', () => {
         expect(asciiLine('ρ(r) − 4f_z³\nnext')).toBe('rho(r) - 4f_z3 next');
     });
 
+    // Found live (Task 13b): an O₂ orbital title read "1g* ()", its π and α
+    // silently gone -- neither has an NFKD decomposition to ASCII, unlike
+    // 'Å' or a subscript digit, so they must be spelled out first.
+    it('spells out the Greek letters and spin markers Bonds captions use, rather than dropping them', () => {
+        expect(asciiLine('1πg* (α)')).toBe('1pig* (alpha)');
+        expect(asciiLine('3σu* (β)')).toBe('3sigmau* (beta)');
+        expect(asciiLine('H2+ 1σg')).toBe('H2+ 1sigmag');
+    });
+
+    // Found live (Task 13b): NFKD decomposes a superscript minus into U+2212
+    // -- a second non-ASCII character, produced only by normalising -- so
+    // '10⁻¹⁰' silently lost its sign and read '1010' until the minus-sign
+    // replacement moved after normalise. An en dash (Born–Oppenheimer, the
+    // app's own prose style) has no decomposition at all and would simply
+    // vanish without its own replacement.
+    it('keeps the sign of a negative exponent, and turns an en dash into a hyphen rather than dropping it', () => {
+        expect(asciiLine('10⁻¹⁰ Ha')).toBe('10-10 Ha');
+        expect(asciiLine('Born–Oppenheimer')).toBe('Born-Oppenheimer');
+    });
+
     it('refuses a grid whose values do not match its shape', () => {
         const bad: CubeGrid = { ...tiny, values: Float32Array.from({ length: 41 }, () => 0) };
         expect(() => encodeCube(bad, [], 'x', 'y')).toThrow();

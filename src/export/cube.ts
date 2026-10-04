@@ -19,10 +19,24 @@ export function formatCubeValue(value: number): string {
     return `${mantissa}E${e < 0 ? '-' : '+'}${String(Math.abs(e)).padStart(2, '0')}`.padStart(13);
 }
 
-/** Cube comment lines are single-line ASCII. */
+/**
+ * Cube comment lines are single-line ASCII. NFKD handles most of the rest on
+ * its own (e.g. a subscript digit or 'Å' decomposes to plain ASCII, once the
+ * stray combining ring is stripped) -- but a few characters the app's own
+ * captions use have no compatibility decomposition and would otherwise
+ * simply vanish, found live (Task 13b): an O₂ orbital's title read "1g* ()",
+ * its π and α gone, not "1pig* (alpha)"; H₂⁺'s "10⁻¹⁰ Ha" read "1010 Ha" --
+ * NFKD decomposes the superscript minus into U+2212 (a *second* non-ASCII
+ * character, produced only by normalising), so it must be replaced *after*
+ * normalising, not before. Spelled out the same way ψ/ρ already were.
+ */
 export function asciiLine(text: string): string {
-    return text.replace(/ψ/g, 'psi').replace(/ρ/g, 'rho').replace(/−/g, '-')
-        .normalize('NFKD').replace(/[\r\n]+/g, ' ').replace(/[^\x20-\x7E]/g, '').trim();
+    return text.normalize('NFKD')
+        .replace(/ψ/g, 'psi').replace(/ρ/g, 'rho')
+        .replace(/σ/g, 'sigma').replace(/π/g, 'pi').replace(/δ/g, 'delta').replace(/φ/g, 'phi')
+        .replace(/α/g, 'alpha').replace(/β/g, 'beta')
+        .replace(/[−–—]/g, '-')
+        .replace(/[\r\n]+/g, ' ').replace(/[^\x20-\x7E]/g, '').trim();
 }
 
 const fixed = (v: number) => v.toFixed(6).padStart(12);
@@ -59,10 +73,19 @@ export function encodeCube(grid: CubeGrid, atoms: CubeAtom[], title: string, des
     return chunks;
 }
 
-/** The drawn field, re-sampled exactly as the mesh worker sampled it. */
+/**
+ * The drawn field, re-sampled exactly as the mesh worker sampled it. A
+ * 'gaussianDensity' recipe evaluates √ρ (field_source.ts's own convention for
+ * density grids, so the mesh's contour search can square it back); a cube of
+ * it must hold ρ itself, in electrons/bohr³, not the square root (carry from
+ * Task 7/13b).
+ */
 export function fieldCubeGrid(source: AnalyticFieldSource, resolution: number): CubeGrid {
     const field = sampleFieldSource(source, resolution);
-    return { shape: [field.side, field.side, field.side], origin: [field.origin, field.origin, field.origin], spacing: field.step, values: field.samples };
+    const values = source.recipe.type === 'gaussianDensity'
+        ? Float32Array.from(field.samples, v => v * v)
+        : field.samples;
+    return { shape: [field.side, field.side, field.side], origin: [field.origin, field.origin, field.origin], spacing: field.step, values };
 }
 
 /** Built directly: the profile's own grid, whatever its point count. */

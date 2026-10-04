@@ -79,8 +79,8 @@ export function diatomicCurveSpec(system: DiatomicId, scan: MoleculeScan, R: num
     };
 }
 
-/** H + H⁺: the exact limit both H₂⁺ curves approach, Ha. */
-const H_PLUS_H_PLUS_HARTREE = -0.5;
+/** H + H⁺: the exact limit both H₂⁺ curves approach, Ha. Exported for the CSV export (run_export.ts), which states the same zero. */
+export const H_PLUS_H_PLUS_HARTREE = -0.5;
 
 /**
  * H₂⁺'s two exact curves, E = E_el + 1/R, plotted like every molecule's:

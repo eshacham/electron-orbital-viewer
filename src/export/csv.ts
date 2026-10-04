@@ -18,7 +18,8 @@ export interface CsvCurve {
  * "failures are shown, not hidden" rules out. Refusing outright, naming the
  * curve and the radius, turns that into an error the caller sees instead.
  */
-function formatNumber(value: number, label: string, r: number): string {
+/** Exported: run_export.ts's Bonds potential-curve CSV (ruling C5) reuses the same finite-number guard and precision. */
+export function formatNumber(value: number, label: string, r: number): string {
     if (!Number.isFinite(value)) {
         throw new Error(`Cannot export "${label}" at r = ${r}: its value is ${value}, not a finite number.`);
     }
@@ -28,7 +29,7 @@ function formatNumber(value: number, label: string, r: number): string {
 // Fix round 1 (M2): a bare \r (no accompanying \n) would otherwise pass
 // through unquoted and corrupt the row structure for a reader that splits
 // on \r\n or \r alone.
-const quote = (text: string) => (/[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text);
+export const quote = (text: string) => (/[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text);
 
 /**
  * One column per curve against a shared r column. Every curve the app plots

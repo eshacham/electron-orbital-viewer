@@ -6,7 +6,10 @@ import { energiesSucceeded } from '../../src/store/atomSlice';
 import { DELTA_SCF_LABEL } from '../../src/atom/delta_scf';
 import { MAX_FIELD_AU } from '../../src/field_source';
 import { N2_MAX_FIELD_AU } from '../../src/stark';
-import { makeStore, neonStore, sodiumIonStore, sodiumExcitedStore, goldStore, goldIonStore } from './fixtures';
+import {
+    makeStore, neonStore, sodiumIonStore, sodiumExcitedStore, goldStore, goldIonStore,
+    bondsMoleculeStore, bondsH2PlusStore, bondsO2Store, N2_SCAN,
+} from './fixtures';
 
 describe('export captions', () => {
     it('names each atom level, with the method', () => {
@@ -209,6 +212,55 @@ describe('export captions', () => {
             expect(referenceRingCaption(goldIonStore('off').getState())).toBe('dashed ring: neutral Au drawn radius 1.60 a₀');
             expect(referenceRingCaption(goldIonStore('scalar').getState())).toBe('dashed ring: neutral Au drawn radius 1.60 a₀, scalar-relativistic');
             expect(referenceRingCaption(goldIonStore('spinOrbit').getState())).toBe('dashed ring: neutral Au drawn radius 1.60 a₀, with spin–orbit');
+        });
+    });
+
+    // Task 13b (ruling C5): Bonds names the system, R (a₀ and Å), what is
+    // drawn, and the method -- reading the drawn request (currentField), not
+    // the panel's selection, the same way atom mode reads the drawn profile.
+    describe('Bonds mode names the system, R and the method (ruling C5)', () => {
+        it('names H2+\'s state and R, with the exact method, in an ASCII-unique file stem', () => {
+            const store = bondsH2PlusStore();
+            expect(viewDescription(store.getState())).toBe('H₂⁺ 1σg, R = 2.00 a₀ (1.058 Å)');
+            expect(methodStatement(store.getState())).toMatch(/^Exact within Born–Oppenheimer/);
+            expect(exportFileStem(store.getState())).toBe('orbital-viewer_H2plus_R2.00_1sigmag');
+        });
+
+        it('names a diatomic\'s drawn orbital and R from the basis actually drawn, not the panel\'s R', () => {
+            const store = bondsMoleculeStore();
+            expect(viewDescription(store.getState())).toBe('N₂ 3σg, R = 2.07 a₀ (1.098 Å)');
+            expect(exportFileStem(store.getState())).toBe('orbital-viewer_N2_R2.07_3sigmag');
+            // Without the scan (not yet loaded), the method still names the
+            // fixed, universal one -- just not the molecule-specific caveat.
+            expect(methodStatement(store.getState())).toBe('diatomic molecular orbitals and density: B3LYP/def2-TZVP');
+            // With the scan, the shipped method (and no caveat for N₂, which isn't multireference).
+            expect(methodStatement(store.getState(), N2_SCAN)).toBe('B3LYP/def2-TZVP');
+        });
+
+        it('adds the multireference caveat (B₂/C₂) when the scan says so', () => {
+            const store = bondsMoleculeStore();
+            const multireferenceScan = { ...N2_SCAN, validity: { ...N2_SCAN.validity, multireference: true, t1AtRe: 0.05 } };
+            expect(methodStatement(store.getState(), multireferenceScan)).toBe(
+                'B3LYP/def2-TZVP; Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.050 at R_e).',
+            );
+        });
+
+        it('names a density surface by its ρ, and the stem matches the brief\'s own example', () => {
+            const store = bondsMoleculeStore({ kind: 'density' });
+            expect(viewDescription(store.getState())).toBe('N₂ total density, surface at ρ = 0.002 e/a₀³, R = 2.07 a₀ (1.098 Å)');
+            expect(exportFileStem(store.getState())).toBe('orbital-viewer_N2_R2.07_density-0.002');
+        });
+
+        // Brief, requirement 3's own worked example: an unrestricted
+        // molecule's spin-labelled orbital, Greek spelled out, star dropped.
+        it('matches the brief\'s own worked example exactly: O2, R = 2.29, 1pig alpha', () => {
+            const store = bondsO2Store();
+            expect(exportFileStem(store.getState())).toBe('orbital-viewer_O2_R2.29_1pig-alpha');
+        });
+
+        it('names an unrestricted orbital\'s spin in viewDescription', () => {
+            const store = bondsO2Store();
+            expect(viewDescription(store.getState())).toBe('O₂ 1πg* (α), R = 2.29 a₀ (1.212 Å)');
         });
     });
 });
