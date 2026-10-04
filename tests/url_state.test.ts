@@ -10,6 +10,11 @@ import {
     registerUrlKeys, resetUrlKeysForTests, encodeStateOf, applyStateTo, encodeState, applyState,
     bindUrlStateStore, hasSharedView, urlModeOf, ANY_MODE, registerBuiltInUrlKeys, parseNumberInRange,
 } from '../src/url_state';
+import { registerBondsUrlKeys } from '../src/bonds/bonds_url';
+import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIso } from '../src/store/bondsSlice';
+import { DIATOMIC_IDS, DENSITY_ISO_VALUES } from '../src/bonds/systems';
+import { H2PLUS_STATES } from '../src/bonds/h2plus';
+import type { OrbitalSpin } from '../src/molecules/types';
 import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../src/orbital_presets';
 import { CombinationSelection, selectionProblem, fieldRequestFor } from '../src/combinations';
 import { createAppStore } from '../src/store';
@@ -154,7 +159,10 @@ function mulberry32(seed: number): () => number {
     };
 }
 
-type Shape = 'atom' | 'shell' | 'subshell' | 'orbital' | 'ion' | 'excited' | 'relativity' | 'jlevel' | 'basic' | 'hybrid' | 'field';
+type Shape = 'atom' | 'shell' | 'subshell' | 'orbital' | 'ion' | 'excited' | 'relativity' | 'jlevel' | 'basic' | 'hybrid' | 'field' | 'h2plus' | 'diatomic';
+
+/** Bonds mode's own spins (bondsSlice keeps no export of its own copy). */
+const BONDS_SPINS: readonly OrbitalSpin[] = ['restricted', 'alpha', 'beta'];
 
 function randomView(rand: () => number, shape: Shape) {
     const int = (min: number, max: number) => min + Math.floor(rand() * (max - min + 1));
@@ -171,6 +179,27 @@ function randomView(rand: () => number, shape: Shape) {
                 ? { kind: 'field', level: pick([1, 2] as const), field: int(0, 50) / 1000, stark: pick(['lower', 'upper', 'both'] as const) }
                 : { kind: 'none' };
         store.dispatch(setCombination(combination));
+    } else if (shape === 'h2plus' || shape === 'diatomic') {
+        store.dispatch(setMode('bonds'));
+        if (shape === 'h2plus') {
+            // H₂⁺'s own 0.01 a₀ slider step (ruling C14).
+            store.dispatch(setH2PlusR(int(50, 1000) / 100));
+            store.dispatch(setBondsView({ kind: 'h2plus', state: pick(H2PLUS_STATES) }));
+        } else {
+            const system = pick(DIATOMIC_IDS);
+            store.dispatch(selectBondsSystem(system));
+            // A link's own 3-decimal R (C14); generated with no 4th digit so
+            // toFixed(3) can never land on a rounding boundary (preflight D16).
+            store.dispatch(setScanPoint({ system, index: int(0, 20), RBohr: int(500, 10000) / 1000 }));
+            if (rand() < 0.5) {
+                store.dispatch(setDensityIso(pick(DENSITY_ISO_VALUES)));
+                store.dispatch(setBondsView({ kind: 'density' }));
+            } else {
+                store.dispatch(setBondsView({
+                    kind: 'mo', label: pick(['1σg', '2σu*', '1πg*', '3σg']), spin: pick(BONDS_SPINS), component: pick([0, 1]),
+                }));
+            }
+        }
     } else {
         const Z = int(1, 118);
         store.dispatch(setElement(Z));
@@ -218,7 +247,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100 + 0;
 
 /** What a link promises to restore. */
 function viewOf(state: RootState) {
-    const { atom, orbital } = state;
+    const { atom, orbital, bonds } = state;
     const style = orbital.surfaceStyle;
     return {
         mode: atom.mode,
@@ -229,6 +258,14 @@ function viewOf(state: RootState) {
             }
             : null,
         basic: atom.mode === 'hydrogenic' ? { orbital: selectShownBasicOrbital(state), combination: orbital.combination } : null,
+        // What a Bonds link promises to restore (bonds_url.ts): system, R and
+        // view -- not scanIndex, which a link never carries (it is left for
+        // the loaded scan to snap, Task 14's brief), and densityIso only
+        // where the view drawn is the density (the only view whose URL token
+        // carries it).
+        bonds: atom.mode === 'bonds'
+            ? { system: bonds.system, R: bonds.R, view: bonds.view, densityIso: bonds.view.kind === 'density' ? bonds.densityIso : null }
+            : null,
         // The contour on screen (final review I1), which a link must reproduce.
         frac: selectShownEnclosedFraction(state),
         opacity: round2(style.opacity),
@@ -240,10 +277,10 @@ function viewOf(state: RootState) {
 }
 
 describe('built-in URL keys', () => {
-    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); });
+    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerBondsUrlKeys(); });
 
     // Spec §5 Phase 2: "URL round-trip property test over every mode and level".
-    it.each<Shape>(['atom', 'shell', 'subshell', 'orbital', 'ion', 'excited', 'relativity', 'jlevel', 'basic', 'hybrid', 'field'])(
+    it.each<Shape>(['atom', 'shell', 'subshell', 'orbital', 'ion', 'excited', 'relativity', 'jlevel', 'basic', 'hybrid', 'field', 'h2plus', 'diatomic'])(
         'round-trips random %s views',
         shape => {
             const rand = mulberry32(shape.length * 7919);

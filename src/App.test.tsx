@@ -14,6 +14,7 @@ import { createAtomWorker } from './workers/createAtomWorker';
 import { computeSamplingRadius, SHELL_VIEW_CUT_AXIS, DEFAULT_ENCLOSED_FRACTION } from './orbital_presets';
 import { clearProfileCacheForTests, setCachedProfile } from './atom/profile_cache';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from './url_state';
+import { registerBondsUrlKeys } from './bonds/bonds_url';
 import type { ViewerExportHandle } from './export/handle';
 import { createH2PlusCurveWorker } from './workers/createH2PlusCurveWorker';
 import { resetH2PlusCurveForTests } from './bonds/useH2PlusCurve';
@@ -1032,7 +1033,7 @@ describe('App: opening a shared link', () => {
 });
 
 describe('App: Share', () => {
-    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); clearProfileCacheForTests(); });
+    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerBondsUrlKeys(); clearProfileCacheForTests(); });
     afterEach(() => {
         resetUrlKeysForTests();
         window.history.replaceState(null, '', '/');
@@ -1089,19 +1090,31 @@ describe('App: Share', () => {
         }
     });
 
-    // Bonds' own keys arrive with Task 14; until then a Bonds link carries
-    // the view settings alone, and nothing of the Basic or atom selection
-    // the page is not showing.
-    it('copies only the view keys from Bonds mode, without throwing', async () => {
+    // Task 14: Bonds mode gets its own URL keys (bonds_url.ts), registered
+    // next to the built-in ones -- this App test pins the wiring (Share
+    // reaches a real Bonds link, carrying system/R/state and nothing of the
+    // atom or Basic selection, and that link restores the same view). The
+    // key/value rules themselves, including a molecule's, are
+    // tests/bonds/bonds_url.test.ts's job -- it needs no live component tree.
+    it('copies a real Bonds link, that restores the same H2+ view', async () => {
         const writeText = jest.fn().mockResolvedValue(undefined);
         Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-        renderWithProvider(<App />);
+        const { store } = renderWithProvider(<App />);
         fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+        act(() => {
+            store.dispatch(setH2PlusR(3.5));
+            store.dispatch(setBondsView({ kind: 'h2plus', state: '1sigma_u' }));
+        });
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
         await waitFor(() => expect(writeText).toHaveBeenCalled());
         const url = writeText.mock.calls[0][0] as string;
-        expect(url).toMatch(/#frac=/);
-        expect(url).not.toMatch(/mode=|[#&]Z=|[#&]n=/);
+        expect(url).toMatch(/#mode=bonds&system=h2plus&R=3\.500&state=1sigma_u&frac=/);
+        expect(url).not.toMatch(/[#&]Z=|[#&]n=\d|combo=/);
+
+        const landed = createTestStore();
+        applyStateTo(new URL(url).hash, landed.dispatch);
+        expect(landed.getState().bonds).toMatchObject({ system: 'h2plus', R: 3.5, view: { kind: 'h2plus', state: '1sigma_u' } });
+        expect(landed.getState().atom.mode).toBe('bonds');
     });
 
     // Review Focus 5, at the App level (ShareExportBar's own unit test in
