@@ -89,6 +89,8 @@ describe('bondsCaptions', () => {
     it('takes D_e from separated atoms, with their method, and R_e with its fit uncertainty', () => {
         const captions = bondsCaptions('n2', n2Scan).join(' ');
         expect(captions).toMatch(/D_e = 9\.44 eV \(0\.3470 Ha\) from separated atoms, N ⁴S \+ N ⁴S, UCCSD\(T\)\/aug-cc-pVTZ \(UHF reference, frozen core\)/);
+        // Final review M8: the basis's known underbinding (N₂ 9.44 against 9.91 eV).
+        expect(captions).toMatch(/without zero-point energy; aug-cc-pVTZ underbinds by a few % against experiment\./);
         expect(captions).toMatch(/R_e = 2\.086 a₀ \(1\.104 Å\), fitted to the scan points \(fit uncertainty < 0\.001 a₀\); experiment 1\.098 Å \(Huber & Herzberg/);
     });
 

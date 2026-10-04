@@ -109,9 +109,14 @@ function bondCaptions(system: BondsSystemId, scan: MoleculeScan): string[] {
     const reference = experimentalRe(system, scan);
     const experiment = reference !== null
         ? `; experiment ${reference.ReAngstrom} Å${reference.source ? ` (${reference.source})` : ''}` : '';
+    // Final review M8: every v1 D_e falls short of experiment's (Huber &
+    // Herzberg D₀ + ω_e/2): N₂ 9.44 vs 9.91 eV, O₂ 4.98 vs 5.21, F₂ 1.58 vs
+    // 1.66, CO 10.92 vs 11.23, HF 6.04 vs 6.12, Li₂ 1.03 vs 1.06 -- 1-5 %;
+    // H₂ (FCI) 4.71 vs Kołos & Wolniewicz's 4.75, 0.9 %. A triple-zeta basis
+    // misses correlation energy that grows with the bond, so it underbinds.
     return [
         `D_e = ${fit.DeEv.toFixed(2)} eV (${fit.DeHartree.toFixed(4)} Ha) from separated atoms, ${atomsMethod(scan)}: `
-            + 'E(A) + E(B) − E(R_e), without zero-point energy.',
+            + 'E(A) + E(B) − E(R_e), without zero-point energy; aug-cc-pVTZ underbinds by a few % against experiment.',
         `R_e = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted to the scan points `
             + `(fit uncertainty ${uncertainty} a₀)${experiment}.${system === 'li2' ? ` ${li2Caveat(scan, reference !== null)}` : ''}`,
     ];
