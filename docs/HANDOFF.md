@@ -13,13 +13,18 @@ backlog.
 ## Where the work stands
 
 Every item on the previous session's backlog is done, tested and verified in
-the running app. The app now has two modes:
+the running app. The app now has three modes (the third, Bonds, is Phase 5,
+below):
 
 - **Atom mode** (default) — real neutral atoms, Z = 1…118, from a
   self-consistent-field calculation, chosen off a periodic table. Three
   levels: atom → shell → orbital, with core/valence distinguished at the atom
   level and per-subshell isolation at the shell level.
 - **Basic Orbitals mode** — the exact one-electron viewer, fixed at Z = 1.
+- **Bonds mode** — H₂⁺ solved exactly at any bond length, and ten more
+  diatomics from a precomputed CCSD(T)/B3LYP pipeline, each with a potential
+  curve, a molecular-orbital diagram and an electron density (see "Phase 5 —
+  Bonds mode" below).
 
 The physics engine is complete and externally validated. It reproduces NIST's
 LDA total energies to **0.0002 %** (He −2.834829 vs −2.834836; Ne −128.233250
@@ -218,6 +223,104 @@ These cost real effort to arrive at; do not undo them without reading why.
   ion Na⁺" or "Sodium, excited 3s → 3p"; exported file names get an ASCII
   suffix (`Na+1`, `Na_3s-3p`); a PNG with a reference ring on screen gets its
   own caption line naming the neutral it is compared against.
+- **H₂⁺'s λ recurrence is pinned to one sign convention, chosen fresh at every
+  R** (Phase 5, `src/bonds/h2plus.ts`). The nuclei sit at (0, 0, ±R/2) with
+  r₊ the distance to the **+z** nucleus, so μ = (r₋ − r₊)/R = **+1 at the +z
+  nucleus**. `eigenvectorFor`'s sign is arbitrary and picked afresh at every
+  solve, so left alone, dragging the R slider could flip 1σu\*'s two lobes'
+  colours from one frame to the next with nothing in the physics changing.
+  Each factor is pinned independently instead: Λ positive at λ = 1 (it is
+  nodeless, so that fixes it everywhere), M positive at μ = +1 — which makes
+  1σg positive everywhere, and makes 1σu\*'s +z lobe always the positive one
+  and its −z lobe always the negative one, at every R. Losing this pin is the
+  kind of defect a screenshot catches and a unit test (which samples one R at
+  a time) does not.
+- **A molecule's density ships once, computed from the basis, never as
+  twenty downloaded grids** (Phase 5, `src/molecules/gaussian_basis.ts`,
+  `src/bonds/bonds_request.ts`). Shipping a density grid per scan point would
+  multiply each molecule's data by up to twenty and blow the 3 MB budget by
+  itself; instead `basis.json` carries the molecular-orbital coefficients
+  (PySCF's own AO convention, checked to 10⁻¹⁰ against `mol.eval_gto` at
+  generation time) and the app evaluates ρ = Σ occᵢψᵢ² from them directly, at
+  render time, for whichever scan point is selected. The `density.bin.gz`
+  that does ship (one per molecule, at the R_e scan point only) is not what
+  Bonds mode draws from at all — it exists for §4.2's own file-format
+  requirement and for a cross-check test that the TS evaluator reproduces
+  PySCF's own density on that grid, nothing more.
+- **A density surface is drawn at a fixed ρ, never an "enclosed fraction"**
+  (ruling T7-a, Phase 5). A 0.25 a₀ shipped-grid spacing (and the coarser
+  grid Bonds mode actually meshes at, 96³ over a box padded 6.5 a₀ past the
+  outer nucleus) cannot integrate a nitrogen 1s cusp finely enough for "90 %
+  of the electrons" to mean what it says — one misaligned sample can hold
+  0.7–0.9 of the two 1s electrons it represents. Chemists already draw
+  ρ = 0.002 e/a₀³ as the conventional molecular outline, so the panel offers
+  exactly that and two higher values (0.05, 0.2) instead of a percentage;
+  `FieldRenderRequest` carries this as `densityIsoValue`, which the worker
+  turns into the fraction of its own samples above that value so Phase 1's
+  existing contour search can still be reused unmodified.
+- **Where the generated data actually lives, and why not in `dist/` or
+  `public/`** (Phase 5, amendment 2026-09-26). The plan's original design
+  would have copied `public/molecules/` into the build with a small
+  `closeBundle` Vite plugin — until it was noticed that `vite.config.ts` sets
+  `root: 'public'`, which makes Vite resolve `publicDir` to `public/public`,
+  so **nothing under `public/molecules/` was ever going to reach `dist/`**
+  through that mechanism at all (verified: `dist/` holds only `index.html`
+  and `assets/`). Rather than restructure the existing root/publicDir setup
+  for every other asset, the owner moved molecule data to S3 behind
+  CloudFront instead (spec §4.5): `tools/molecules/publish.py` uploads the
+  generated tree to `s3://<bucket>/molecules/<version>/`, with a SHA-256
+  checksum on every object, a committed manifest
+  (`tools/molecules/manifest/<version>.json`) checked byte-for-byte against
+  the local tree before any upload, and the published marker (`index.json`)
+  written last, only once every other object has verified through S3 itself
+  — so a half-finished publish is never mistaken for a finished one, and a
+  resumed run only repeats the objects that did not finish. A published
+  version is immutable by policy (`ensure_unpublished` refuses to overwrite
+  one); a mistake needs a new version (`v2`), not a silent overwrite of `v1`.
+  `infra/deploy.sh` refuses to deploy an app bundle whose
+  `MOLECULE_DATA_VERSION` (`src/molecules/data_version.ts`) does not match
+  `tools/molecules/version.py`'s `DATA_VERSION`, and refuses again unless
+  that version's `index.json` already answers HTTP 200 through CloudFront —
+  so the deploy gate catches both a version bump forgotten in one file and
+  app code shipped ahead of its own data. In development,
+  `vite.config.ts`'s `serveLocalMolecules` middleware serves
+  `tools/molecules/out/` directly (so data can be driven before it is
+  published at all), falling through to a proxy at the real CloudFront
+  distribution otherwise — the same two-tier fallback production's own
+  `fetch` effectively gets, since a `403` (S3's answer for a missing key,
+  not `404`) is what an unpublished version returns either way.
+- **Orbitals are selected and addressed by label, never by index, across a
+  change in R** (Phase 5, `src/store/bondsSlice.ts`'s `BondsView`,
+  `src/bonds/bonds_request.ts`'s `findOrbital`). PySCF's own MO ordering is
+  an artefact of that geometry's SCF, not a stable identity — "3σg" at one
+  scan point is not reliably orbital index 6 at another. `BondsView`'s `mo`
+  variant instead carries `{ label, spin, component }` (the `component`-th
+  orbital sharing that label and spin, for a degenerate pair), so dragging
+  the slider keeps "3σg" selected by what it *is* rather than silently
+  switching to whatever now sits at the old index — which, left unfixed,
+  would occasionally draw the wrong orbital under the right-looking label
+  and no error at all.
+- **B₂'s triplet ground state and He₂'s full-CI treatment are both
+  owner-visible deviations from the plan as first written** (Phase 5,
+  `tools/molecules/molecules.py`, ruling C3). B₂ is not in the spec's own
+  list of diatomics, and its ground state (³Σg⁻, two unpaired electrons in
+  1πu — real paramagnetism, the same physics O₂'s does) only came up because
+  it was added as a teaching case alongside the others; without an explicit
+  `irrep_nelec` pin it is easy for SCF to settle into a different state
+  entirely. He₂ runs at full configuration interaction — four electrons, the
+  owner's explicit instruction — which is more accurate than, and stretches,
+  the spec's "full CI for two electrons" (§7); flagged here rather than
+  quietly taken as in-scope.
+- **1σu\*'s one well sits outside the slider's own range, and the caption
+  says so rather than calling the state flatly repulsive** (Phase 5,
+  `src/bonds/h2plus.ts`). Its total energy decreases monotonically across
+  the whole 0.5–10 a₀ slider — met on its own, that looks like a textbook
+  purely-repulsive antibonding curve — but it is not: past 10 a₀ the curve
+  turns around into a genuine, if tiny, polarisation well, 0.06 mHa deep at
+  R ≈ 12.5 a₀, before rising again towards the H + H⁺ limit. Asserted by a
+  dedicated test rather than discovered live, because nothing about a
+  monotonically falling curve on the visible range would otherwise hint that
+  a well exists just past its edge.
 
 ## Known limits of the model — quantified, and stated in the README
 
@@ -969,6 +1072,223 @@ isolation; see "Process notes").
    measurably saves iterations (above). Where that seed fails, the cold
    start's own verdict is reported instead (T7-a) — the saving is opportunistic,
    never load-bearing for correctness.
+
+## Phase 5 — Bonds mode (2026-10-04)
+
+Atom mode and Basic Orbitals mode both solve one atom; this phase adds a
+third mode, Bonds, which solves molecules — one exactly (H₂⁺, any R, live in
+the browser) and ten more from a real quantum-chemistry pipeline that runs
+offline and ships its results. This section is what differs from the phase
+plan, what the S3 amendment changed on the way, or isn't visible from
+reading one file; the bullets above under "Decisions that are not obvious
+from the code" cover the sharpest individual traps. 15 tasks, each reviewed
+and fixed before the next started; the full ledger is
+`.superpowers/sdd/2026-09-25-phase-5-bonds-mode/progress.md`.
+
+### H₂⁺: exact, not fitted
+
+`src/bonds/h2plus.ts` separates the Schrödinger equation in prolate
+spheroidal coordinates (λ, μ) and finds the one energy at which the μ
+equation's lowest eigenvalue and the λ equation's highest agree — see the
+"Design decisions" section above (written while this phase was planned) for
+the derivation, and the λ-sign-convention bullet above for how the two
+factors are pinned against an arbitrary eigenvector sign. Validated to the
+spec's own bars: R_e = 1.99719 a₀ (spec: 1.997 ± 0.5 %), E(R_e) =
+−0.6026346 Ha (spec: −0.6026 ± 0.1 %), and E_el(1σg, R = 2 a₀) =
+−1.1026342145 Ha against the same published figure to six decimal places —
+all three computed by the solver itself at import time
+(`src/validation/phase5.ts`), never hand-typed. The slider's range, [0.5,
+10] a₀, is a UI choice, not the solver's own limit (it answers up to
+R = 100 a₀, past which the 40-term Jaffé series stops converging); `checkR`
+throws outside (0, 100] rather than return a wrong number, and
+`bondsFieldRequest` clamps every R that could reach it — a URL's, a curve
+click's — before it does.
+
+### The diatomics pipeline, as it actually ran
+
+`tools/molecules/` is the offline tool (`uv venv --python 3.12
+--managed-python tools/molecules/.venv`, `uv pip install --python
+tools/molecules/.venv/bin/python -r tools/molecules/requirements.txt`;
+`requirements.lock` pins every transitive dependency so a rerun months later
+reproduces the same numbers). `generate.py --only <id>` writes one
+molecule's tree to `version.OUT_ROOT`
+(`tools/molecules/out/<DATA_VERSION>/<id>/`, git-ignored); every reference
+calculation is described by a settings dict (molecule, method, basis,
+geometry, reference determinant, pinned occupations, frozen-core count,
+thresholds, PySCF version, and `CACHE_SCHEMA`) and cached under a SHA-256
+hash of it in `tools/molecules/.cache/` — the dict is stored beside the
+value and compared on read, so any change to how a number would be computed,
+including bumping `CACHE_SCHEMA` by hand, misses the cache rather than
+silently reusing a stale one (ruling T4-b). A run cut short resumes where it
+stopped; O₂'s UCCSD(T) points run about 28 s each, so a full molecule is
+minutes, not seconds.
+
+**The validity rule (rulings T4-a, T4-d)** ships a diatomic's curve only as
+far as the first of its twenty computed points where CCSD fails to converge,
+its T1 diagnostic exceeds `max(base limit, 1.5 × T1 at R_e)` (base limit
+0.02 closed-shell, 0.03 open-shell — Lee & Taylor's rule of thumb), or the
+energy stops rising towards dissociation (`fit.py`'s `valid_range`, which
+checks all three in that order and reports whichever fires first, with the
+R and the number behind it, e.g. `"T1 diagnostic 0.0214 exceeds 0.0200 at
+R = 2.5307 a₀"`). The growth allowance (1.5×) exists because an absolute 0.02
+bar alone would fail CO at R_e itself (its own T1 there is 0.018, 90 % of
+the way to the bar) and would leave B₂ and C₂ — already over the bar at
+R_e — with no valid points at all; with it, both ship their full
+below-dissociation range flagged `multireference: true` instead of being
+silently dropped. As generated: N₂ ships 14 of 20 points (stops at R =
+2.53 a₀), O₂ 16 of 20, CO 13 of 20, F₂ 15 of 20, HF 17 of 20; H₂, He₂ and Li₂
+(all exact — full CI or, for Li₂, CCSD(T) that is full CI in its frozen-core
+space) ship all 20. `MIN_VALID_POINTS = 8` would fail the generator loudly
+rather than ship a curve too short to show a minimum; nothing generated hit
+it.
+
+**D_e is always `E(A) + E(B) − E(R_e)` from independent free-atom
+calculations**, at the molecule's own method, basis and each atom's real
+ground spin state (`molecules.ATOM_GROUND_STATES`: N ⁴S, O ³P, B ²P, and so
+on; full CI for H and He) — never read off the last shipped scan point,
+which for seven of the ten molecules is well short of dissociation. No
+counterpoise correction is applied anywhere; for every bound molecule here
+it is far smaller than D_e, but He₂'s entire ~0.04 mHa well is of the same
+order as the correction it does not have, which is exactly why the app
+calls it "no chemical bond" rather than a weak one.
+
+**Why Be₂ is not among the ten** (ruling C4): it reads as included by the
+spec/plan's "the period-2 series, Li₂ … F₂", but its bond order is 0 in the
+simple MO picture (the two valence electrons past Li₂ exactly fill 2σu*,
+cancelling 2σg), and showing that honestly needs its own bond-order-0
+caption and validation row rather than borrowing the bond-order-N captions
+every other molecule in the table shares. `tools/molecules/molecules.py`
+records the reasoning next to `DIATOMICS`; carried forward here as a C4
+line item for whoever adds a future data version.
+
+**Li₂'s frozen core (ruling T4-c)**: both 1s shells are frozen in CCSD(T),
+which makes it exact — full CI — for the two valence electrons that are
+left, so the whole 20-point curve ships with no validity cutoff at all. The
+cost is core–valence correlation, which the frozen core cannot capture: R_e
+comes out 5.102 a₀ (2.700 Å) against Huber & Herzberg's 2.673 Å, about
+1.01 % long. `captions.ts`'s `li2Caveat` computes that percentage from the
+shipped fit rather than a hand-typed number, so it cannot drift from the
+data it describes.
+
+**Orbital selection and labelling** (`tools/molecules/labels.py`): every
+occupied MO plus the virtuals with the largest projection onto PySCF's MINAO
+minimal basis, up to that basis's size, labelled from the molecule's own
+D∞h/C∞v symmetry (`symm.label_orb_symm`) as nσg/nσu*/nπu/nπg*, numbered per
+irrep in energy order; the antibonding star applies to a homonuclear
+molecule only, so CO and HF's `bondOrder` is `null` rather than guessed.
+`SELECTION_TIE_MARGIN = 0.05`: a kept virtual whose MINAO weight beats the
+runner-up by less than 5 % of its own norm is recorded as a `nearTie` on the
+orbital (CO's 6σ at 0.80 R_e, B₂'s β spin at 1.22 R_e are the measured
+cases) — always two σ virtuals of one irrep sharing the valence σ* character,
+so the label is right either way and only the shape is a matter of mixing;
+`orbitalCaveats` (`src/bonds/captions.ts`) surfaces it in the panel rather
+than presenting one arbitrary pick as certain.
+
+### Exact-ρ density surfaces (ruling T7-a)
+
+A molecule's density is never shipped as a per-geometry grid (twenty of
+those would blow the 3 MB budget on their own); the app evaluates
+ρ = Σ occᵢψᵢ² live from the shipped `basis.json` via a new field recipe,
+`{ type: 'gaussianDensity', moleculeId }`, whose evaluator returns √ρ —
+Phase 1's own convention for a density-type grid source — so
+`meshFromSamples` squares it back before marching cubes runs (the same
+convention the cube exporter has to undo explicitly, see Task 13b below).
+The surface is drawn at exactly one of three ρ values (0.002, 0.05,
+0.2 e/a₀³), never a percentage: `FieldRenderRequest.densityIsoValue` is
+converted, inside the worker, into the fraction of its own samples above
+that density, which is what actually lands on Phase 1's existing contour
+search — the UI-facing number stays the physically meaningful one, the
+plumbing underneath is unchanged. `bondAxisMinimumDensity`
+(`src/bonds/bond_density.ts`) samples 200 points on the segment between a
+diatomic's two nuclei from the same basis and occupations, so the panel can
+say, read off the actual density rather than assumed, whether the chosen
+surface is still one envelope around both nuclei or has already separated
+into two — that minimum runs from 0.71 e/a₀³ for N₂ down to 0.0125 for Li₂
+at R_e, so no single ρ value means the same shape for every molecule.
+
+### The molecular-orbital diagram
+
+`buildMoDiagram` (`src/bonds/mo_diagram.ts`) draws Kohn–Sham eigenvalues to
+scale for the valence levels and compresses the 1s cores (more than 1 Ha
+lower) into their own row under a break — stated on screen as orbital
+energies and never as ionisation energies, the same distinction atom mode's
+own diagram already draws, because Koopmans' theorem does not hold exactly
+for a density functional either. Restricted molecules get one level per
+label with ↑↓ from its occupation; the unrestricted ones (O₂, B₂, C₂) draw
+levels at α energies with ↑ from the α orbital and ↓ from the
+same-labelled β one, so O₂'s two unpaired π* electrons show as two
+degenerate boxes each carrying a lone ↑ — Hund's rule, visibly. Clicking a
+box dispatches `BondsView`'s `{ kind: 'mo', label, spin, component }`, never
+a bare index (see the label-not-index bullet above).
+
+### Exports from Bonds (Task 13b, ruling C5)
+
+`src/export/caption.ts`'s `bondsDrawnPicture` reads what is actually on
+screen from the rendered `FieldRenderRequest`'s own recipe — never
+`state.bonds` directly — so an export always matches the drawn picture
+during a load, not the selection that is still in flight (the fix-round-1
+defect this ruling exists to prevent: exporting what the user just clicked
+before the data for it has landed). Every export states the system, R and
+method in both its caption and its ASCII file-name stem
+(`orbital-viewer_N2_2.09_3sigma-g`-style). Bonds' CSV
+(`run_export.ts`'s `bondsCsvFor`) is the potential curve E(R) — H₂⁺'s own
+191-point solved curve (read from the live plot's already-cached
+`H2PlusCurve`, never re-solved on the main thread) or a diatomic's twenty
+shipped scan points — not a radial distribution. The cube exporter
+(`cube_request.ts`, `cube.ts`) carries both nuclei as `CubeAtom`s; for a
+density recipe it squares the evaluator's √ρ back to ρ before writing it,
+the same undo `meshFromSamples` performs for the on-screen surface. Every
+Bonds export is refused outright while `useBondsData` is still loading or
+has failed, or while the drawn picture's own system/scan-point does not yet
+match the current selection — `bondsBlockReason` checks both before
+`cubeJobFor`/`bondsCsvFor` ever run.
+
+### URL state (`src/bonds/bonds_url.ts`, ruling C8)
+
+Three keys, in a fixed order: `system` (`h2plus` or a `DiatomicId`), `R`
+(bohr, three decimals), `state` (`1sigma_g`/`1sigma_u` for H₂⁺;
+`density`/`density:<iso>` for a molecule's total density; `mo:<spin>:<label>
+:<component>` for an orbital, by label, never by index — `#mode=bonds&
+system=n2&R=2.09&state=mo:restricted:3σg:0`). Every value is clamped or
+ignored, never thrown on (Review Focus 4): an unknown `system` is ignored
+outright (`isBondsSystemId`); `R` is parsed only if finite and positive,
+then clamped by the slice itself — `snapH2PlusR` for H₂⁺, the nearest
+shipped scan point once the scan has loaded for a molecule (`R: null` until
+then means "snap to the equilibrium, or the opening point for an unbound
+molecule, once the scan is known" — `useBondsData`'s own job, not the URL
+decoder's); an unparseable or malformed `state` token (`parseState`'s regex
+checks on spin and label) is dropped, leaving the system's own default
+view. `registerBondsUrlKeys()` registers under mode `'bonds'`, alongside the
+shared view-key group (`frac`/`cut`/`op`/`surf`/`cam`) every mode already
+gets from `ANY_MODE`.
+
+### Validation (`src/validation/phase5.ts`)
+
+H₂⁺'s three rows (E_el at R = 2, R_e, E(R_e)) are computed by the app's own
+solver at import time, against Bates, Ledsham & Stewart (1953) and Wind
+(1965). The diatomics' rows are written by `generate.py` into
+`src/validation/generated/phase5_diatomics.json` — committed, not
+recomputed by the TS test suite, since recomputing them means running PySCF
+— and read in verbatim: H₂ R_e 1.404 a₀ (ref. 1.401, ±1 %) and D_e 4.71 eV
+(ref. 4.75, ±2 %); N₂ R_e 1.104 Å (1.098), O₂ 1.213 Å (1.207), F₂ 1.418 Å
+(1.412), CO 1.136 Å (1.128), HF 0.921 Å (0.917), all within the spec's 1 %.
+O₂'s ground state being the triplet is checked directly, not inferred from
+its occupation alone: a `spinCheck` scan point runs the same UCCSD(T) for
+both the triplet and a closed-shell singlet at the same geometry, and the
+triplet comes out 0.0478 Ha (1.30 eV) lower.
+
+### What is still open
+
+- **Be₂** is the obvious next molecule for a `v2` data version — see the
+  dedicated bullet above.
+- **Spin contamination** (⟨S²⟩) is not checked for the UHF/UKS references
+  (O₂, B₂, C₂); nothing observed in the generated data suggests it, but
+  nothing asserts it is small either.
+- **No zero-point energy anywhere** — every D_e here is the bare electronic
+  well depth; a spectroscopic D₀ would need a vibrational frequency this
+  phase does not compute.
+- **The `.cache` and `out/` directories are git-ignored and can grow large**
+  across several data versions on one machine; nothing here prunes them.
 
 ## Judgment calls made without asking
 
