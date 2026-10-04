@@ -4,7 +4,8 @@ import { BondsState, BondsView } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
 import { BONDS_SYSTEMS, BondsSystemId, DENSITY_ISO_VALUES, nearestScanIndex, systemFormula } from '../bonds/systems';
 import { H2PLUS_R_RANGE, h2plusTotalEnergy } from '../bonds/h2plus';
-import { bondsCaptions, frontierText, lengths, orbitalCaveats, signed } from '../bonds/captions';
+import { bondsCaptions, densitySurfaceText, frontierText, lengths, orbitalCaveats, signed } from '../bonds/captions';
+import { bondAxisMinimumDensity } from '../bonds/bond_density';
 import { bondOrderText, h2plusOrbitals } from '../bonds/mo_diagram';
 import MoDiagram from './MoDiagram';
 
@@ -19,13 +20,6 @@ interface BondsPanelProps {
     onView: (view: BondsView) => void;
     onDensityIso: (value: number) => void;
 }
-
-/** What each offered ρ shows (ruling T7-a: the surface is drawn at exactly this ρ, not at an enclosed fraction). */
-const DENSITY_ISO_MEANING: Record<number, string> = {
-    0.002: 'the conventional molecular outline',
-    0.05: 'where the bond shows',
-    0.2: 'around the cores',
-};
 
 const withFullStop = (text: string) => (text.endsWith('.') ? text : `${text}.`);
 
@@ -62,7 +56,8 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
             ? orbitals.filter(o => o.label === view.label && (o.spin ?? 'restricted') === view.spin)[view.component]?.index ?? null
             : null;
 
-    const shownR = isExact ? draftR : bonds.R;
+    // The readout follows the thumb while it is dragged, for a molecule too.
+    const shownR = isExact || bonds.R !== null ? draftR : null;
     const energy = isExact
         ? `E = ${signed(h2plusTotalEnergy(draftR, view.kind === 'h2plus' ? view.state : '1sigma_g'), 5)} Ha (exact, Born–Oppenheimer)`
         : meta ? `E = ${signed(meta.totalEnergyHartree, 5)} Ha, ${meta.method.energies}` : null;
@@ -72,6 +67,9 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
     const frontier = !isExact && meta ? frontierText(meta.orbitals) : null;
     const caveats = isExact ? [] : orbitalCaveats(meta);
     const densityMethod = scan?.densityMethod ?? meta?.method.density ?? null;
+    // Whether a surface is one envelope or splits around each nucleus, read
+    // off the density drawn (≈ 200 basis evaluations, once per point).
+    const minOnAxis = useMemo(() => (data.basis ? bondAxisMinimumDensity(data.basis) : null), [data.basis]);
 
     const status = data.loading ? `Loading ${formula}…`
         : !isExact && meta && bonds.R !== null ? `${formula} at R = ${bonds.R.toFixed(2)} a₀ loaded.` : '';
@@ -129,7 +127,7 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                                 {DENSITY_ISO_VALUES.map(v => <ToggleButton key={v} value={v} aria-label={`ρ = ${v} e/a₀³`}>ρ = {v}</ToggleButton>)}
                             </ToggleButtonGroup>
                             <Typography variant="caption" className="bonds-density-label">
-                                Total electron density{densityMethod ? ` (${densityMethod})` : ''}, surface at ρ = {bonds.densityIso} e/a₀³, {DENSITY_ISO_MEANING[bonds.densityIso] ?? 'as chosen'}.
+                                {densitySurfaceText(bonds.densityIso, densityMethod, minOnAxis)}
                             </Typography>
                         </>
                     )}

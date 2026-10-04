@@ -22,6 +22,19 @@ type ScanResult = { system: BondsSystemId } & ({ scan: MoleculeScan; error: null
 type PointResult = { id: string } & ({ meta: MoleculeMeta; basis: MoleculeBasis; error: null } | { meta: null; basis: null; error: string });
 
 /**
+ * A scan the snap can use, or why it cannot: one with no points
+ * (nearestScanIndex would be −1, Task 8's carry) or whose equilibrium is not
+ * one of its points would otherwise leave the panel loading forever.
+ */
+function checkedScan(scan: MoleculeScan): { scan: MoleculeScan; error: null } | { scan: null; error: string } {
+    const n = scan.points.length;
+    if (n === 0) return { scan: null, error: 'its scan.json lists no scan points' };
+    const e = scan.equilibriumIndex;
+    if (!Number.isInteger(e) || e < 0 || e >= n) return { scan: null, error: `its scan.json's equilibriumIndex ${e} is not one of its ${n} scan points` };
+    return { scan, error: null };
+}
+
+/**
  * What the Bonds selection needs from the molecule data, fetched lazily. Also
  * snaps R to the scan once it is known: to the equilibrium point for a fresh
  * molecule, to the nearest point for an R that came from a URL.
@@ -46,14 +59,13 @@ export function useBondsData(): BondsData {
     useEffect(() => {
         if (system === 'h2plus') return undefined;
         let live = true;
+        // A result from an earlier request for this same molecule (a failure,
+        // say, before the user went to another and came back) is stale the
+        // moment it is asked for again: the loader forgets failures, so this
+        // is a real retry, and until it answers the panel says "loading".
+        setScanResult(null);
         loadScan(system).then(
-            scan => {
-                if (!live) return;
-                setScanResult(scan.points.length > 0
-                    ? { system, scan, error: null }
-                    // nearestScanIndex is −1 here (Task 8's carry): nothing to snap to, so say so.
-                    : { system, scan: null, error: 'its scan.json lists no scan points' });
-            },
+            scan => { if (live) setScanResult({ system, ...checkedScan(scan) }); },
             e => { if (live) setScanResult({ system, scan: null, error: message(e) }); },
         );
         return () => { live = false; };
@@ -64,6 +76,7 @@ export function useBondsData(): BondsData {
 
     useEffect(() => {
         if (!scan || scanIndex !== null || system === 'h2plus') return;
+        // checkedScan has already refused a scan this could fail on; the guard keeps it that way.
         const index = R === null ? scan.equilibriumIndex : nearestScanIndex(scan.points, R);
         if (index < 0 || index >= scan.points.length) return;
         dispatch(setScanPoint({ system, index, RBohr: scan.points[index].RBohr }));
@@ -74,6 +87,7 @@ export function useBondsData(): BondsData {
     useEffect(() => {
         if (id === null) return undefined;
         let live = true;
+        setPointResult(null);
         Promise.all([loadMoleculeMeta(id), loadBasis(id)]).then(
             ([meta, basis]) => { if (live) setPointResult({ id, meta, basis, error: null }); },
             e => { if (live) setPointResult({ id, meta: null, basis: null, error: message(e) }); },

@@ -40,37 +40,80 @@ export function multireferenceCaption(scan: MoleculeScan): string | null {
  * not the molecule's.
  */
 export function validityCaption(scan: MoleculeScan): string | null {
-    const { stoppedAtRBohr, validUpToRBohr, stopReason } = scan.validity;
+    const { stoppedAtRBohr, validUpToRBohr, stopReason, multireference, t1Limit } = scan.validity;
     if (stoppedAtRBohr === null) return null;
+    if (multireference) {
+        // Ruling T4-d: T1 is past the single-reference limit even at R_e, so
+        // the stop is relative -- 1.5 × T1 at R_e -- and the points before it
+        // are no more "valid" than the multireference caveat allows.
+        return `The curve stops at ${lengths(validUpToRBohr)}: at the next point T1 exceeds 1.5 × its value at R_e`
+            + `${t1Limit !== null ? ` (${t1Limit.toFixed(4)})` : ''}${stopReason ? ` — ${stopReason}` : ''}.`;
+    }
     return `Single-reference CCSD(T) is not valid beyond ${lengths(validUpToRBohr)} (the bond breaks into open-shell atoms), `
         + `so the curve stops there${stopReason ? `: ${stopReason}` : ''}.`;
 }
 
 /**
+ * Li₂'s experimental R_e (⁷Li₂ X ¹Σg⁺, 2.6729 Å), which v1's scan.json does
+ * not carry (its `reference.ReAngstrom` is null). Stated here, with its
+ * source, because Li₂'s caveat is a comparison with it.
+ */
+export const LI2_REFERENCE = { ReAngstrom: 2.673, source: 'Huber & Herzberg, Constants of Diatomic Molecules (1979), via NIST Chemistry WebBook' };
+
+/** The experimental R_e a scan is compared with: its own, or Li₂'s from LI2_REFERENCE. */
+function experimentalRe(system: BondsSystemId, scan: MoleculeScan): { ReAngstrom: number; source: string | null } | null {
+    if (scan.reference.ReAngstrom !== null) return { ReAngstrom: scan.reference.ReAngstrom, source: scan.reference.source };
+    return system === 'li2' ? LI2_REFERENCE : null;
+}
+
+/**
  * Ruling T4-c and Task 4's measurement: with both 1s shells frozen, CCSD(T)
  * is full CI for Li₂'s valence pair -- but the frozen cores leave out
- * core–valence correlation, and R_e comes out 1.0 % long. "Exact" must not be
- * read as "exact R_e".
+ * core–valence correlation, and R_e comes out about 1 % long. "Exact" must
+ * not be read as "exact R_e". `referenceStated`: the sentence before has just
+ * given the experimental value and its source.
  */
-export const LI2_CAVEAT = 'Exact only for the valence pair: core–valence correlation is frozen out, so R_e comes out about 1 % long.';
+export function li2Caveat(scan: MoleculeScan, referenceStated = false): string {
+    const longer = ((scan.fit.ReBohr * BOHR_TO_ANGSTROM) / LI2_REFERENCE.ReAngstrom - 1) * 100;
+    return 'Exact only for the valence pair: core–valence correlation is frozen out, so R_e comes out '
+        + `${longer.toFixed(1)} % longer than experiment${referenceStated ? '' : ` (${LI2_REFERENCE.ReAngstrom} Å, ${LI2_REFERENCE.source})`}.`;
+}
 
-/** He₂: a few hundredths of a mHa, the size of the basis-set superposition error left uncorrected. Not a bond. */
-export function unboundCaption(detail: string): string {
+/**
+ * He₂: a real van der Waals well, but a few hundredths of a mHa -- the size
+ * of the basis-set superposition error no counterpoise correction removes
+ * here. Not a bond. `counterpoiseStated`: the sentence before already says
+ * there is no counterpoise correction (it is in the method), so this does not
+ * say it twice.
+ */
+export function unboundCaption(detail: string, counterpoiseStated = false): string {
     return `No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa (${detail}), `
-        + "within this basis' error; no counterpoise correction.";
+        + `comparable to this basis' superposition error${counterpoiseStated ? '' : ', with no counterpoise correction'}.`;
 }
 export const wellMilliHartree = (scan: MoleculeScan) => `${(scan.fit.DeHartree * 1000).toFixed(2)} mHa`;
 
+/**
+ * The separated atoms' method, shortened to "same method" where it ends with
+ * the curve's own (H₂, He₂: "He ¹S + He ¹S, FCI/aug-cc-pVTZ (…)"), so a
+ * caption does not repeat a method -- and its qualifiers -- twice.
+ */
+export function atomsMethod(scan: MoleculeScan): string {
+    const { separatedAtomsMethod } = scan.fit;
+    if (!separatedAtomsMethod.endsWith(scan.energyMethod) || separatedAtomsMethod === scan.energyMethod) return separatedAtomsMethod;
+    return `${separatedAtomsMethod.slice(0, -scan.energyMethod.length).replace(/[,\s]+$/, '')}, same method`;
+}
+
 function bondCaptions(system: BondsSystemId, scan: MoleculeScan): string[] {
-    const { fit, reference } = scan;
+    const { fit } = scan;
     const uncertainty = fit.ReUncertaintyBohr < 0.001 ? '< 0.001' : fit.ReUncertaintyBohr.toFixed(3);
-    const experiment = reference.ReAngstrom !== null
+    const reference = experimentalRe(system, scan);
+    const experiment = reference !== null
         ? `; experiment ${reference.ReAngstrom} Å${reference.source ? ` (${reference.source})` : ''}` : '';
     return [
-        `D_e = ${fit.DeEv.toFixed(2)} eV (${fit.DeHartree.toFixed(4)} Ha) from separated atoms, ${fit.separatedAtomsMethod}: `
+        `D_e = ${fit.DeEv.toFixed(2)} eV (${fit.DeHartree.toFixed(4)} Ha) from separated atoms, ${atomsMethod(scan)}: `
             + 'E(A) + E(B) − E(R_e), without zero-point energy.',
         `R_e = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted to the scan points `
-            + `(fit uncertainty ${uncertainty} a₀)${experiment}.${system === 'li2' ? ` ${LI2_CAVEAT}` : ''}`,
+            + `(fit uncertainty ${uncertainty} a₀)${experiment}.${system === 'li2' ? ` ${li2Caveat(scan, reference !== null)}` : ''}`,
     ];
 }
 
@@ -88,7 +131,7 @@ export function bondsCaptions(system: BondsSystemId, scan: MoleculeScan | null):
     if (scan.fit.bound) {
         captions.push(...bondCaptions(system, scan));
     } else {
-        captions.push(unboundCaption(`${wellMilliHartree(scan)} below the separated atoms, ${scan.fit.separatedAtomsMethod}`));
+        captions.push(unboundCaption(`${wellMilliHartree(scan)} below the separated atoms, ${atomsMethod(scan)}`));
     }
     const validity = validityCaption(scan);
     if (validity) captions.push(validity);
@@ -147,9 +190,29 @@ export function orbitalCaveats(meta: MoleculeMeta | null): string[] {
         const key = `${orbital.label}|${orbital.spin ?? 'restricted'}`;
         if (!tie || seen.has(key)) continue;
         seen.add(key);
-        caveats.push(`${orbital.label}${SPIN_MARK[orbital.spin ?? 'restricted']}: this orbital's shape mixes with a nearby σ* virtual at this R `
-            + `(MINAO weight ${tie.minaoWeight.toFixed(3)} against ${tie.runnerUpMinaoWeight.toFixed(3)} for the virtual at ε = ${signed(tie.runnerUpEnergyHartree, 3)} Ha), `
+        // A tie in MINAO weight, not in energy (the runner-up may lie well
+        // above); and "σ", not "σ*": the antibonding star is for homonuclear
+        // molecules only, and CO's 6σ ties too.
+        caveats.push(`${orbital.label}${SPIN_MARK[orbital.spin ?? 'restricted']}: this orbital's shape mixes with another σ virtual of the same symmetry at this R `
+            + `— a tie in MINAO weight (${tie.minaoWeight.toFixed(3)} against ${tie.runnerUpMinaoWeight.toFixed(3)}), not in energy — `
             + 'so either shape is as fair a picture.');
     }
     return caveats;
+}
+
+/**
+ * What a density surface at `iso` shows (ruling T7-a: drawn at exactly this
+ * ρ). Only 0.002 e/a₀³ has a meaning shared by every molecule -- the
+ * conventional outline; above it, whether the surface is one envelope or a
+ * piece around each nucleus depends on the molecule and R, so it is read off
+ * the density itself (`minOnAxis`, bondAxisMinimumDensity) when that is
+ * known, and not claimed when it is not.
+ */
+export function densitySurfaceText(iso: number, method: string | null, minOnAxis: number | null): string {
+    const meaning = iso === 0.002 ? 'the conventional molecular outline' : 'a higher-density contour, closer to the nuclei';
+    const shape = minOnAxis === null ? ''
+        : minOnAxis > iso
+            ? `: one envelope around both nuclei here (ρ stays above ${minOnAxis.toPrecision(2)} e/a₀³ along the bond)`
+            : `: separate around each nucleus here (ρ falls to ${minOnAxis.toPrecision(2)} e/a₀³ between them)`;
+    return `Total electron density${method ? ` (${method})` : ''}, surface at ρ = ${iso} e/a₀³, ${meaning}${shape}.`;
 }

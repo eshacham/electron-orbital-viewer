@@ -50,8 +50,11 @@ describe('diatomicCurveSpec', () => {
     });
 
     it('adds the multireference caveat for B₂ and C₂', () => {
-        const c2 = { ...n2Scan, validity: { ...n2Scan.validity, multireference: true, t1AtRe: 0.0384 } } as MoleculeScan;
-        expect(diatomicCurveSpec('c2', c2, 2.36).caption).toMatch(/Strongly multireference: single-reference CCSD\(T\) is only qualitative here \(T1 = 0\.038 at R_e\)\./);
+        const c2 = { ...n2Scan, validity: { ...n2Scan.validity, multireference: true, t1AtRe: 0.0384, t1Limit: 0.0576 } } as MoleculeScan;
+        const caption = diatomicCurveSpec('c2', c2, 2.36).caption;
+        expect(caption).toMatch(/Strongly multireference: single-reference CCSD\(T\) is only qualitative here \(T1 = 0\.038 at R_e\)\./);
+        expect(caption).toMatch(/The curve stops at R = 2\.41 a₀ \(1\.273 Å\): at the next point T1 exceeds 1\.5 × its value at R_e \(0\.0576\)/);
+        expect(caption).not.toMatch(/not valid beyond/);
     });
 
     // Task 10's carry: a 0.04 mHa well must not be stretched into a bond.
@@ -62,7 +65,15 @@ describe('diatomicCurveSpec', () => {
         expect(span).toBeGreaterThanOrEqual(1);
         // The well, as a fraction of the plot's height: well under one pixel of a 104 px plot.
         expect((heScan.fit.DeEv / span) * 104).toBeLessThan(0.5);
-        expect(spec.caption).toMatch(/No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa \(0\.04 mHa\), within this basis' error; no counterpoise correction\. At this scale the well is invisible\./);
+        expect(spec.caption).toMatch(/^FCI\/aug-cc-pVTZ \(no counterpoise correction\)\. Zero: He ¹S \+ He ¹S, same method\. /);
+        expect(spec.caption).toMatch(/No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa \(0\.04 mHa\), comparable to this basis' superposition error\. At this scale the well is invisible\./);
+        // Said once, in the method.
+        expect(spec.caption.match(/counterpoise/g)).toHaveLength(1);
+    });
+
+    it("names the experiment Li₂'s R_e is compared with", () => {
+        const li2 = { ...n2Scan, fit: { ...n2Scan.fit, ReBohr: 5.102 }, reference: { ReAngstrom: null, source: null } } as MoleculeScan;
+        expect(diatomicCurveSpec('li2', li2, 5.1).caption).toMatch(/R_e comes out 1\.0 % longer than experiment \(2\.673 Å, Huber & Herzberg/);
     });
 
     it('keeps the marker on the plotted range', () => {
@@ -71,11 +82,15 @@ describe('diatomicCurveSpec', () => {
 });
 
 describe('h2plusCurveSpec', () => {
-    it('plots both exact curves and the H + H⁺ limit, with R_e marked', () => {
+    // Like every molecule's: relative to the separated fragments, in eV.
+    it('plots both exact curves relative to H + H⁺, with R_e and D_e marked', () => {
         const spec = h2plusCurveSpec(curve, 2);
         expect(spec.series.map(s => s.key)).toEqual(['g', 'u', 'limit']);
-        expect(spec.unit).toBe('Ha');
-        expect(spec.referenceR).toEqual({ R: 1.9971924, label: 'Dotted line: R_e = 1.997 a₀ (1.057 Å), E = −0.6026 Ha.' });
+        expect(spec.title).toBe('E − E(H + H⁺)');
+        expect(spec.unit).toBe('eV');
+        expect(spec.series[0].points[2].E).toBeCloseTo((-0.6026 + 0.5) * HARTREE_TO_EV, 10);
+        expect(spec.series[2].points.map(p => p.E)).toEqual([0, 0]);
+        expect(spec.referenceR).toEqual({ R: 1.9971924, label: 'Dotted line: R_e = 1.997 a₀ (1.057 Å), E = −0.6026 Ha; D_e = 2.79 eV (0.1026 Ha) to H + H⁺.' });
         expect(spec.caption).toMatch(/^Exact within Born–Oppenheimer \(nuclei fixed\)/);
         expect(h2plusCurveSpec(curve, 0.1).markerR).toBe(0.5);
     });
@@ -95,7 +110,7 @@ describe('BondsCurvePlot', () => {
 
     it('commits an H₂⁺ R chosen on the curve', () => {
         render(<BondsCurvePlot bonds={h2plus} data={empty} h2plus={{ curve, error: null }} {...props} />);
-        fireEvent.change(screen.getByLabelText('E = E_el + 1/R: choose R'), { target: { value: '3' } });
+        fireEvent.change(screen.getByLabelText('E − E(H + H⁺): choose R'), { target: { value: '3' } });
         expect(props.onCommitH2PlusR).toHaveBeenCalledWith(3);
     });
 

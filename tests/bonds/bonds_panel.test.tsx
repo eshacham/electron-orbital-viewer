@@ -4,8 +4,9 @@ import { resolve } from 'path';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import BondsPanel from '../../src/components/BondsPanel';
 import reducer, { selectBondsSystem, setBondsView, setScanPoint } from '../../src/store/bondsSlice';
-import { bondsCaptions, frontierText, orbitalCaveats } from '../../src/bonds/captions';
-import { MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
+import { bondsCaptions, densitySurfaceText, frontierText, orbitalCaveats } from '../../src/bonds/captions';
+import { bondAxisMinimumDensity } from '../../src/bonds/bond_density';
+import { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
 
 const handlers = { onSelectSystem: jest.fn(), onCommitH2PlusR: jest.fn(), onScanIndex: jest.fn(), onView: jest.fn(), onDensityIso: jest.fn() };
 const empty = { scan: null, meta: null, basis: null, loading: false, error: null };
@@ -15,6 +16,7 @@ const fixture = (file: string) => JSON.parse(readFileSync(resolve(__dirname, '..
 /** The committed N₂ fixtures: generate.py's own output, so these captions meet the real shapes. */
 const n2Scan: MoleculeScan = fixture('scan.json');
 const n2Meta: MoleculeMeta = fixture('meta.json');
+const n2Basis: MoleculeBasis = fixture('basis.json');
 
 // He₂'s shape and numbers as the v1 data ship them (tools/molecules/out/v1/he2/scan.json).
 const heScan = {
@@ -45,7 +47,8 @@ const n2 = reducer(reducer(undefined, selectBondsSystem('n2')), setScanPoint({ s
 /** C₂ and B₂ (ruling T4-d): kept, with T1 at R_e above the single-reference limit. */
 const c2Scan = {
     ...n2Scan, id: 'c2', formula: 'C₂', note: 'C₂ has strong multi-reference character; single-reference CCSD(T) and B3LYP are approximate here.',
-    validity: { ...n2Scan.validity, multireference: true, t1AtRe: 0.03843, t1Limit: 0.05765 },
+    validity: { ...n2Scan.validity, multireference: true, t1AtRe: 0.03843, t1Limit: 0.05765, validUpToRBohr: 3.8742, stoppedAtRBohr: 4.5786,
+        stopReason: 'T1 diagnostic 0.0589 exceeds 0.0576 at R = 4.5786 a₀' },
 } as MoleculeScan;
 /** Li₂ (ruling T4-c): 1s frozen, so CCSD(T) is full CI for the valence pair, and the whole curve ships. */
 const li2Scan = {
@@ -68,8 +71,10 @@ describe('bondsCaptions', () => {
         const he = bondsCaptions('he2', heScan).join(' ');
         expect(he).toMatch(/Energies: FCI\/aug-cc-pVTZ/);
         expect(he).toMatch(/orbital energies are B3LYP\/def2-TZVP Kohn–Sham eigenvalues — not ionisation energies/);
-        expect(he).toMatch(/No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa \(0\.04 mHa below the separated atoms, He ¹S \+ He ¹S, FCI\/aug-cc-pVTZ/);
-        expect(he).toMatch(/within this basis' error; no counterpoise correction/);
+        const unbound = bondsCaptions('he2', heScan).find(c => c.startsWith('No chemical bond'));
+        expect(unbound).toBe("No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa "
+            + "(0.04 mHa below the separated atoms, He ¹S + He ¹S, same method), comparable to this basis' superposition error, "
+            + 'with no counterpoise correction.');
         // He₂ has no bond, so it has no R_e or D_e to state.
         expect(he).not.toMatch(/D_e|R_e =/);
     });
@@ -92,10 +97,19 @@ describe('bondsCaptions', () => {
         expect(bondsCaptions('n2', n2Scan).join(' ')).not.toMatch(/multireference/);
     });
 
+    // Ruling T4-d: past the single-reference limit from the start, so the stop is a relative one, not "valid until".
+    it("says a multireference curve stops where T1 passes 1.5 × its value at R_e", () => {
+        const captions = bondsCaptions('c2', c2Scan).join(' ');
+        expect(captions).toMatch(/The curve stops at R = 3\.87 a₀ \(2\.050 Å\): at the next point T1 exceeds 1\.5 × its value at R_e \(0\.0576\) — T1 diagnostic 0\.0589 exceeds 0\.0576 at R = 4\.5786 a₀\./);
+        expect(captions).not.toMatch(/not valid beyond/);
+    });
+
     it("does not let Li₂'s exact valence treatment imply an exact R_e", () => {
         const captions = bondsCaptions('li2', li2Scan).join(' ');
         expect(captions).toMatch(/exact \(full CI\) for the two valence electrons/);
-        expect(captions).toMatch(/core–valence correlation is frozen out, so R_e comes out about 1 % long/);
+        expect(captions).toMatch(/R_e = 5\.102 a₀ \(2\.700 Å\), fitted to the scan points \(fit uncertainty < 0\.001 a₀\); experiment 2\.673 Å \(Huber & Herzberg, Constants of Diatomic Molecules \(1979\), via NIST Chemistry WebBook\)\. Exact only for the valence pair: core–valence correlation is frozen out, so R_e comes out 1\.0 % longer than experiment\./);
+        // The reference is stated once, where the comparison is made.
+        expect(captions.match(/2\.673 Å/g)).toHaveLength(1);
         expect(captions).not.toMatch(/not valid beyond/);
     });
 
@@ -124,9 +138,31 @@ describe('frontierText and orbitalCaveats', () => {
         const meta = { ...n2Meta, orbitals: n2Meta.orbitals.map(o => (o.label === '3σu*'
             ? { ...o, nearTie: { minaoWeight: 0.3484, runnerUpMinaoWeight: 0.316, runnerUpEnergyHartree: 0.2243 } } : o)) };
         expect(orbitalCaveats(meta)).toEqual([
-            "3σu*: this orbital's shape mixes with a nearby σ* virtual at this R (MINAO weight 0.348 against 0.316 for the virtual at ε = 0.224 Ha), so either shape is as fair a picture.",
+            "3σu*: this orbital's shape mixes with another σ virtual of the same symmetry at this R — a tie in MINAO weight (0.348 against 0.316), "
+                + 'not in energy — so either shape is as fair a picture.',
         ]);
         expect(orbitalCaveats(n2Meta)).toEqual([]);
+    });
+});
+
+describe('the density surface label', () => {
+    // The reviewer's reading of the v1 grids: N₂ 0.71 e/a₀³ at its bond midpoint.
+    it("finds N₂'s lowest ρ along the bond from the shipped basis", () => {
+        expect(bondAxisMinimumDensity(n2Basis)).toBeCloseTo(0.707, 2);
+    });
+
+    it('keeps the conventional meaning for 0.002 only, and says from the data whether the surface is one envelope', () => {
+        expect(densitySurfaceText(0.002, 'B3LYP/def2-TZVP', 0.707)).toBe(
+            'Total electron density (B3LYP/def2-TZVP), surface at ρ = 0.002 e/a₀³, the conventional molecular outline: '
+            + 'one envelope around both nuclei here (ρ stays above 0.71 e/a₀³ along the bond).');
+        expect(densitySurfaceText(0.2, 'B3LYP/def2-TZVP', 0.707)).toBe(
+            'Total electron density (B3LYP/def2-TZVP), surface at ρ = 0.2 e/a₀³, a higher-density contour, closer to the nuclei: '
+            + 'one envelope around both nuclei here (ρ stays above 0.71 e/a₀³ along the bond).');
+        // Li₂ (0.0125 e/a₀³ at its midpoint).
+        expect(densitySurfaceText(0.05, null, 0.0125)).toBe(
+            'Total electron density, surface at ρ = 0.05 e/a₀³, a higher-density contour, closer to the nuclei: '
+            + 'separate around each nucleus here (ρ falls to 0.013 e/a₀³ between them).');
+        expect(densitySurfaceText(0.05, null, null)).toBe('Total electron density, surface at ρ = 0.05 e/a₀³, a higher-density contour, closer to the nuclei.');
     });
 });
 
@@ -159,6 +195,14 @@ describe('BondsPanel', () => {
         expect(slider).toHaveAttribute('aria-valuetext', `R = ${n2Scan.points[7].RBohr.toFixed(2)} a₀ (${(n2Scan.points[7].RBohr * 0.529177210903).toFixed(3)} Å), point 8 of 14`);
         fireEvent.keyDown(slider, { key: 'ArrowRight' });
         expect(handlers.onScanIndex).toHaveBeenLastCalledWith(8);
+        // The readout follows the thumb, before the store (here, never) catches up.
+        expect(screen.getByText(new RegExp(`^R = ${n2Scan.points[8].RBohr.toFixed(2)} a₀`))).toBeInTheDocument();
+    });
+
+    it('says, from the loaded basis, that N₂ at ρ = 0.2 is one envelope', () => {
+        const dense = { ...n2, densityIso: 0.2 };
+        render(<BondsPanel bonds={dense} data={{ ...empty, scan: n2Scan, meta: n2Meta, basis: n2Basis }} note={null} {...handlers} />);
+        expect(screen.getByText(/surface at ρ = 0\.2 e\/a₀³, a higher-density contour, closer to the nuclei: one envelope around both nuclei here/)).toBeInTheDocument();
     });
 
     it('lets an orbital view return to the total density', () => {
@@ -198,7 +242,7 @@ describe('BondsPanel', () => {
         render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta }} note={null} {...handlers} />);
         const list = screen.getByRole('list', { name: 'methods' });
         expect(within(list).getByText(/not valid beyond R = 2\.41 a₀/)).toBeInTheDocument();
-        expect(screen.getByText(/3σu\*: this orbital's shape mixes with a nearby σ\* virtual/)).toBeInTheDocument();
+        expect(screen.getByText(/3σu\*: this orbital's shape mixes with another σ virtual of the same symmetry/)).toBeInTheDocument();
         expect(screen.getByText(/Bond order 3\./)).toBeInTheDocument();
     });
 });

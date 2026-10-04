@@ -115,6 +115,32 @@ describe('useBondsData', () => {
         expect(loadMoleculeMeta).not.toHaveBeenCalled();
     });
 
+    it('reports a scan whose equilibrium index is not one of its points, rather than loading forever', async () => {
+        (loadScan as jest.Mock).mockResolvedValue({ ...scan, equilibriumIndex: 3 });
+        const { store, wrapper } = setup();
+        store.dispatch(selectBondsSystem('n2'));
+        const { result } = renderHook(() => useBondsData(), { wrapper });
+        await waitFor(() => expect(result.current.error).toMatch(/equilibriumIndex 3 is not one of its 3 scan points/));
+        expect(result.current.loading).toBe(false);
+        expect(store.getState().bonds.scanIndex).toBeNull();
+    });
+
+    it('forgets an old failure as soon as the same molecule is asked for again', async () => {
+        const o2 = deferred<typeof scan>();
+        const retry = deferred<typeof scan>();
+        (loadScan as jest.Mock).mockRejectedValueOnce(new Error('offline'))
+            .mockImplementationOnce(() => o2.promise).mockImplementationOnce(() => retry.promise);
+        const { store, wrapper } = setup();
+        store.dispatch(selectBondsSystem('n2'));
+        const { result } = renderHook(() => useBondsData(), { wrapper });
+        await waitFor(() => expect(result.current.error).toBe('offline'));
+        act(() => { store.dispatch(selectBondsSystem('o2')); });
+        act(() => { store.dispatch(selectBondsSystem('n2')); });
+        expect(result.current).toMatchObject({ error: null, loading: true });
+        await act(async () => { retry.resolve(scan); });
+        await waitFor(() => expect(result.current.basis).toEqual({ id: 'n2@01' }));
+    });
+
     it('drops the previous molecule and its error when another is picked', async () => {
         (loadScan as jest.Mock).mockImplementation(async (id: string) => {
             if (id === 'n2') throw new Error('offline');

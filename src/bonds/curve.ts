@@ -1,7 +1,7 @@
 import type { CurveSeries } from '../components/PotentialCurvePlot';
 import { CURVE_COLORS } from '../curve_colors';
 import { MoleculeScan } from '../molecules/types';
-import { LI2_CAVEAT, multireferenceCaption, signed, unboundCaption, validityCaption, wellMilliHartree } from './captions';
+import { atomsMethod, li2Caveat, multireferenceCaption, signed, unboundCaption, validityCaption, wellMilliHartree } from './captions';
 import { H2PLUS_LABELS, H2PLUS_R_RANGE } from './h2plus';
 import { BOHR_TO_ANGSTROM, DiatomicId, HARTREE_TO_EV, systemFormula } from './systems';
 import type { H2PlusCurve } from './useH2PlusCurve';
@@ -52,13 +52,13 @@ export function diatomicCurveSpec(system: DiatomicId, scan: MoleculeScan, R: num
     const pad = 0.05 * span;
     const yRange: [number, number] = [lo - pad, lo + span + pad];
 
-    const parts = [`${scan.energyMethod}. Zero: ${fit.separatedAtomsMethod}.`];
+    const parts = [`${scan.energyMethod}. Zero: ${atomsMethod(scan)}.`];
     const multireference = multireferenceCaption(scan);
     if (multireference) parts.push(multireference);
-    if (!fit.bound) parts.push(`${unboundCaption(wellMilliHartree(scan))} At this scale the well is invisible.`);
+    if (!fit.bound) parts.push(`${unboundCaption(wellMilliHartree(scan), /counterpoise/.test(scan.energyMethod))} At this scale the well is invisible.`);
     const validity = validityCaption(scan);
     if (validity) parts.push(validity);
-    if (system === 'li2') parts.push(LI2_CAVEAT);
+    if (system === 'li2') parts.push(li2Caveat(scan));
 
     return {
         title: 'E − E(separated atoms)',
@@ -79,28 +79,38 @@ export function diatomicCurveSpec(system: DiatomicId, scan: MoleculeScan, R: num
     };
 }
 
-/** H₂⁺'s two exact curves, in Ha, with H + H⁺ (−0.5 Ha) as the limit both approach. */
+/** H + H⁺: the exact limit both H₂⁺ curves approach, Ha. */
+const H_PLUS_H_PLUS_HARTREE = -0.5;
+
+/**
+ * H₂⁺'s two exact curves, E = E_el + 1/R, plotted like every molecule's:
+ * relative to the separated fragments (H + H⁺, −0.5 Ha), in eV, so the depth
+ * of the 1σg well is D_e here too.
+ */
 export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null): CurvePlotSpec {
     const xRange: [number, number] = [H2PLUS_R_RANGE.min, H2PLUS_R_RANGE.max];
-    const along = (E: number[]) => curve.R.map((r, i) => ({ R: r, E: E[i] }));
+    const toEv = (E: number) => (E - H_PLUS_H_PLUS_HARTREE) * HARTREE_TO_EV;
+    const along = (E: number[]) => curve.R.map((r, i) => ({ R: r, E: toEv(E[i]) }));
     const { equilibrium } = curve;
+    const De = H_PLUS_H_PLUS_HARTREE - equilibrium.totalEnergy;
     return {
-        title: 'E = E_el + 1/R',
-        unit: 'Ha',
+        title: 'E − E(H + H⁺)',
+        unit: 'eV',
         series: [
             { key: 'g', label: H2PLUS_LABELS['1sigma_g'], color: CURVE_COLORS[0], points: along(curve.sigmaG) },
             { key: 'u', label: H2PLUS_LABELS['1sigma_u'], color: CURVE_COLORS[1], points: along(curve.sigmaU) },
-            { key: 'limit', label: 'H + H⁺', color: LIMIT_COLOR, points: [{ R: xRange[0], E: -0.5 }, { R: xRange[1], E: -0.5 }] },
+            { key: 'limit', label: 'H + H⁺', color: LIMIT_COLOR, points: [{ R: xRange[0], E: 0 }, { R: xRange[1], E: 0 }] },
         ],
         xRange,
-        // The 1σg well (−0.603 Ha) and the limit, with room above for 1σu* falling towards it.
-        yRange: [-0.65, -0.2],
+        // The 1σg well (−0.103 Ha) and the limit, with room above for 1σu* falling towards it.
+        yRange: [-0.15 * HARTREE_TO_EV, 0.3 * HARTREE_TO_EV],
         markerR: R === null ? null : clampTo(xRange, R),
         snapRs: [],
         referenceR: {
             R: equilibrium.R,
-            label: `Dotted line: R_e = ${equilibrium.R.toFixed(3)} a₀ (${(equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), E = ${signed(equilibrium.totalEnergy, 4)} Ha.`,
+            label: `Dotted line: R_e = ${equilibrium.R.toFixed(3)} a₀ (${(equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), `
+                + `E = ${signed(equilibrium.totalEnergy, 4)} Ha; D_e = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
         },
-        caption: 'Exact within Born–Oppenheimer (nuclei fixed). Grey line: H + H⁺ at −0.5 Ha. 1σu* has no minimum on this range.',
+        caption: 'Exact within Born–Oppenheimer (nuclei fixed). Zero: H + H⁺ (−0.5 Ha), the grey line. 1σu* has no minimum on this range.',
     };
 }
