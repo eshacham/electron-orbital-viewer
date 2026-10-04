@@ -11,6 +11,23 @@ echo "Building React application with production minification..."
 cd "$PROJECT_ROOT"
 npm run build
 
+# Refuse to deploy app code that reads a molecule data version which was
+# never published (spec §4.5): the app's loader fetches
+# /molecules/$DATA_VERSION/... from this CloudFront distribution (the same
+# domain publish.py's distribution_url() resolves from the stack's
+# CloudFrontURL output), and a missing key answers 403, never index.html, so
+# a silent mismatch here would ship a Bonds mode that cannot load anything.
+DATA_VERSION=$(sed -n 's/^DATA_VERSION = "\(.*\)"/\1/p' "$PROJECT_ROOT/tools/molecules/version.py")
+if [ -n "$DATA_VERSION" ]; then
+  MOLECULE_DATA_CDN="https://d3rhfcclqjt4tf.cloudfront.net"
+  STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$MOLECULE_DATA_CDN/molecules/$DATA_VERSION/index.json")
+  if [ "$STATUS" != "200" ]; then
+    echo "Molecule data $DATA_VERSION is not published (index.json answered $STATUS). Run tools/molecules/publish.py $DATA_VERSION first." >&2
+    exit 1
+  fi
+  echo "Molecule data $DATA_VERSION is published; proceeding."
+fi
+
 echo "Deploying to AWS using CDK..."
 cd "$SCRIPT_DIR"
 
