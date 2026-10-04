@@ -105,9 +105,24 @@ def write_tree(files, target):
         for relative, data in files.items():
             (staging / relative).parent.mkdir(parents=True, exist_ok=True)
             (staging / relative).write_bytes(data)
+        # mkdtemp makes the staging directory 0700; the published tree is
+        # served and synced, so give it ordinary permissions.
+        os.chmod(staging, 0o755)
+        # Move the old tree aside first and delete it only once the new one
+        # is in place, so a failed rename still leaves the previous output.
+        retired = target.with_name(f'.{target.name}-retired')
+        if retired.exists():
+            shutil.rmtree(retired)
         if target.exists():
-            shutil.rmtree(target)
-        os.replace(staging, target)
+            os.replace(target, retired)
+        try:
+            os.replace(staging, target)
+        except OSError:
+            if retired.exists():
+                os.replace(retired, target)
+            raise
+        if retired.exists():
+            shutil.rmtree(retired)
     finally:
         if staging.exists():
             shutil.rmtree(staging)
