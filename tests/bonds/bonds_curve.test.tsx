@@ -116,8 +116,11 @@ describe('BondsCurvePlot', () => {
 
     it("snaps a molecule's R chosen on the curve to its nearest scan point", () => {
         render(<BondsCurvePlot bonds={n2} data={{ ...empty, scan: n2Scan }} h2plus={{ curve: null, error: null }} {...props} />);
-        fireEvent.change(screen.getByLabelText('E − E(separated atoms): choose R'), { target: { value: String(n2Scan.points[9].RBohr + 0.001) } });
-        expect(props.onScanIndex).toHaveBeenCalledWith(9);
+        fireEvent.click(screen.getByRole('img', { name: /against R/ }), { clientX: 0 });
+        expect(props.onScanIndex).toHaveBeenLastCalledWith(0);
+        // The keyboard path steps over scan points by index (final review M5).
+        fireEvent.change(screen.getByLabelText('E − E(separated atoms): choose R'), { target: { value: '9' } });
+        expect(props.onScanIndex).toHaveBeenLastCalledWith(9);
     });
 
     it('draws nothing for a molecule whose scan has not loaded (the panel says so)', () => {

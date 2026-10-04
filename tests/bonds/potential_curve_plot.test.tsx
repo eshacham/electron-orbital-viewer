@@ -74,6 +74,20 @@ describe('PotentialCurvePlot', () => {
         expect(onSelectR).toHaveBeenCalledWith(3);
     });
 
+    // Final review M5: stepping by the smallest scan spacing (0.1 a₀ here)
+    // from 1.2 lands on 1.3, which snaps straight back to 1.2 -- the keyboard
+    // was trapped wherever the scan's points thin out. With scan points the
+    // slider steps over their indices instead, and reads R aloud.
+    it('steps a scan by point index, so a sparse stretch cannot trap the arrow keys', () => {
+        const onSelectR = jest.fn();
+        render(<PotentialCurvePlot {...props} markerR={1.2} snapRs={[1, 1.1, 1.2, 2, 4]} onSelectR={onSelectR} />);
+        const slider = screen.getByRole('slider', { name: /potential energy/i }) as HTMLInputElement;
+        expect([slider.min, slider.max, slider.step, slider.value]).toEqual(['0', '4', '1', '2']);
+        expect(slider).toHaveAttribute('aria-valuetext', 'R = 1.20 a₀ (0.64 Å)');
+        fireEvent.change(slider, { target: { value: '3' } });
+        expect(onSelectR).toHaveBeenCalledWith(2);
+    });
+
     it('omits the slider when there is no click handler to drive', () => {
         render(<PotentialCurvePlot {...props} />);
         expect(screen.queryByRole('slider')).toBeNull();

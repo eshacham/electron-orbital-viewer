@@ -21,7 +21,7 @@ interface PotentialCurvePlotProps {
     xRange: [number, number];
     yRange: [number, number];
     markerR: number | null;
-    /** Scan geometries, ticked on the axis: the slider snaps to these. */
+    /** Scan geometries, ticked on the axis: the keyboard slider steps over these, one point per press. */
     snapRs?: number[];
     referenceR?: { R: number; label: string } | null;
     caption: string;
@@ -53,13 +53,14 @@ function formatEnergy(E: number, unit: string): string {
     return `${E} ${unit}`;
 }
 
-/** The slider's step: the scan's own spacing where one is given (so a drag lands only on shipped points), else H₂⁺'s 0.01 a₀ (ruling C14). */
-function sliderStep(snapRs: number[]): number {
-    if (snapRs.length < 2) return 0.01;
-    const sorted = [...snapRs].sort((a, b) => a - b);
-    let min = Infinity;
-    for (let i = 1; i < sorted.length; i++) min = Math.min(min, sorted[i] - sorted[i - 1]);
-    return min > 0 ? min : 0.01;
+/** H₂⁺'s continuous R step, a₀ (ruling C14); a scan steps over its points instead. */
+const CONTINUOUS_STEP = 0.01;
+
+/** The scan point nearest R, by index into the sorted list. */
+function nearestIndex(sorted: number[], R: number): number {
+    let best = 0;
+    sorted.forEach((value, i) => { if (Math.abs(value - R) < Math.abs(sorted[best] - R)) best = i; });
+    return best;
 }
 
 /** An axis end, a₀: two decimals, trailing zeros dropped (H₂⁺'s range stays "0.5 … 10"). */
@@ -88,6 +89,9 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     // position (D14 -- the brief's own sample test expected a dot for both
     // series here, but series u's value at R = 2 sits outside yRange; that
     // dot is correctly missing, not a bug to paper over).
+    const stops = [...snapRs].sort((a, b) => a - b);
+    const stopIndex = nearestIndex(stops, markerR ?? xRange[0]);
+
     const markerEnergies = markerR === null ? [] : series.map(s => ({ s, E: interpolateEnergy(s.points, markerR) }));
     const inRangeMarkers = markerEnergies.filter(
         (m): m is { s: CurveSeries; E: number } => m.E !== null && m.E >= yRange[0] && m.E <= yRange[1],
@@ -146,18 +150,36 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                 role a lie. This is the keyboard path; the svg click is a
                 mouse-only shortcut over the same callback.
             */}
-            {onSelectR && (
+            {onSelectR && (stops.length >= 2 ? (
+                // A scan exists only at its points, which thin out away from
+                // R_e: stepping R by the smallest spacing from a sparse point
+                // landed between it and the next, and the caller's snap sent
+                // it straight back (final review M5). The slider steps over
+                // point indices instead, so each arrow press reaches the
+                // next shipped geometry; aria-valuetext reads R, not the index.
+                <input
+                    type="range"
+                    className="visually-hidden"
+                    aria-label={`${title}: choose R`}
+                    min={0}
+                    max={stops.length - 1}
+                    step={1}
+                    value={stopIndex}
+                    aria-valuetext={`R = ${formatR(stops[stopIndex])}`}
+                    onChange={event => onSelectR(stops[Number(event.target.value)])}
+                />
+            ) : (
                 <input
                     type="range"
                     className="visually-hidden"
                     aria-label={`${title}: choose R`}
                     min={xRange[0]}
                     max={xRange[1]}
-                    step={sliderStep(snapRs)}
+                    step={CONTINUOUS_STEP}
                     value={markerR ?? xRange[0]}
                     onChange={event => onSelectR(Number(event.target.value))}
                 />
-            )}
+            ))}
             <div className="radial-plot-legend">
                 {series.map(s => (
                     <span key={s.key} className="radial-plot-legend-item">
