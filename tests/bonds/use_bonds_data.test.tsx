@@ -10,9 +10,10 @@ jest.mock('../../src/molecules/loader', () => ({
 import { loadScan, loadMoleculeMeta, loadBasis } from '../../src/molecules/loader';
 import { useBondsData } from '../../src/bonds/useBondsData';
 
-const scanOf = (Rs: number[], equilibriumIndex: number) => ({
-    points: Rs.map((RBohr, index) => ({ index, id: `n2@0${index}`, RBohr, energyHartree: -1, dftEnergyHartree: -1, t1Diagnostic: 0.01 })),
+const scanOf = (Rs: number[], equilibriumIndex: number, energies: number[] = Rs.map(() => -1), bound = true) => ({
+    points: Rs.map((RBohr, index) => ({ index, id: `n2@0${index}`, RBohr, energyHartree: energies[index], dftEnergyHartree: -1, t1Diagnostic: 0.01 })),
     equilibriumIndex,
+    fit: { bound },
 });
 const scan = scanOf([1.8, 2.0, 2.2], 1);
 
@@ -54,6 +55,18 @@ describe('useBondsData', () => {
         expect(result.current.meta).toEqual({ id: 'n2@01' });
         expect(result.current.loading).toBe(false);
         expect(loadScan).toHaveBeenCalledWith('n2');
+    });
+
+    // Fix round 1, M4: an unbound pair (He₂) has no bond length, and its
+    // equilibriumIndex is only a placeholder on the repulsive wall; it opens
+    // where its energy is lowest, at van der Waals contact.
+    it('opens an unbound pair at its lowest-energy point, not at the placeholder equilibrium', async () => {
+        (loadScan as jest.Mock).mockResolvedValue(scanOf([2.4, 3.0, 5.85, 7.2], 1, [-5.75, -5.789, -5.8012274, -5.8012102], false));
+        const { store, wrapper } = setup();
+        store.dispatch(selectBondsSystem('he2'));
+        renderHook(() => useBondsData(), { wrapper });
+        await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(2));
+        expect(store.getState().bonds.R).toBe(5.85);
     });
 
     it('snaps a restored R to the nearest scan point', async () => {

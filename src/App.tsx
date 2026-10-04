@@ -100,8 +100,12 @@ const SOLVING_SUFFIX: Record<RelativityMode, string> = {
     spinOrbit: ' (with spin–orbit)',
 };
 
-/** The Electron-enclosed select's note while a molecule's density is drawn (ruling T7-a). */
-const FIXED_RHO_NOTE = 'The density is drawn at a fixed ρ (Bonds panel), not at an enclosed fraction.';
+/**
+ * The Electron-enclosed select's note while a molecule's density is drawn
+ * (ruling T7-a). Says where ρ is chosen in words that hold in both layouts:
+ * the Bonds panel is the left column on a desktop and the Explore tab on a phone.
+ */
+const FIXED_RHO_NOTE = 'The density is drawn at a fixed ρ, chosen with the ρ buttons beside the orbitals — not at an enclosed fraction.';
 
 /** How long a render has to take before the viewer is told it is working. */
 const BUSY_INDICATOR_DELAY_MS = 400;
@@ -447,15 +451,28 @@ function App() {
     // Any change to the selection rebuilds the request, but only a different
     // picture is drawn again: the ρ chosen while an orbital is shown, or the
     // scan point already drawn, asks for nothing -- unless that picture failed.
+    // Why the drawn picture differs from the selection, for the panel. It
+    // belongs to the picture, so it changes when a new request goes out and
+    // not before: while the next scan point loads, the old picture -- and its
+    // note -- stay up (fix round 1, M2).
+    const [bondsNote, setBondsNote] = useState<string | null>(null);
     useEffect(() => {
         if (!bondsRender) return;
+        setBondsNote(bondsRender.note);
         if (renderedField && !renderFailed && samePicture(renderedField, bondsRender.request)) return;
         dispatch(startFieldCalculation(bondsRender.request));
         // renderedField is read, not watched, as in the combination effect above.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [bondsRender, dispatch]);
-    // A density is drawn at a fixed ρ, in one colour: no ψ key, and the enclosed fraction does not apply.
-    const isBondsDensity = isBondsMode && bondsRender?.request.densityIsoValue !== undefined;
+    // A density is drawn at a fixed ρ, in one colour: no ψ key, and the
+    // enclosed fraction does not apply. Read off the picture asked for last,
+    // not the selection (fix round 1, I1): while a scan point's files load,
+    // or after a molecule fails to, the selection has no request and the
+    // density drawn before it is still what is on screen.
+    const drawnDensityIso = isBondsMode ? renderedField?.densityIsoValue : undefined;
+    const isBondsDensity = drawnDensityIso !== undefined;
+    // The canvas says what it is waiting for, as it does for a solve (M2).
+    const showBondsLoading = useDelayedFlag(isBondsMode && bondsData.loading, BUSY_INDICATOR_DELAY_MS);
     // A scan point is the molecule's own: `system` lets the slice refuse it
     // if the user has picked another molecule since (Task 8's carry).
     const bondsScan = bondsData.scan;
@@ -640,11 +657,15 @@ function App() {
                 ? `Computing ${orbitalName(atomSelectedOrbital.n, atomSelectedOrbital.l, atomSelectedOrbital.ml)}${
                     atomSelectedOrbital.j === undefined ? '' : ` · ${subshellLabel(atomSelectedOrbital.n, atomSelectedOrbital.l, atomSelectedOrbital.j)}`}…`
                 : null)
-        : (showBusy
-            ? (renderedField
-                ? `Computing ${renderedField.label}…`
-                : renderedParams ? `Computing ${orbitalName(renderedParams.n, renderedParams.l, renderedParams.ml)}…` : null)
-            : null);
+        // Bonds' files first: while they load, any render still running is
+        // of the selection being left, not the one waited for.
+        : showBondsLoading
+            ? `Loading ${systemFormula(bonds.system)}${bonds.R !== null ? ` at R = ${bonds.R.toFixed(2)} a₀` : ''}…`
+            : (showBusy
+                ? (renderedField
+                    ? `Computing ${renderedField.label}…`
+                    : renderedParams ? `Computing ${orbitalName(renderedParams.n, renderedParams.l, renderedParams.ml)}…` : null)
+                : null);
 
     // A marching-cubes surface is coloured by the sign of ψ, unlike the shell
     // views, which colour by shell or subshell. Say so where it applies.
@@ -789,7 +810,7 @@ function App() {
         <BondsPanel
             bonds={bonds}
             data={bondsData}
-            note={bondsRender?.note ?? null}
+            note={bondsNote}
             onSelectSystem={(id: BondsSystemId) => dispatch(selectBondsSystem(id))}
             onCommitH2PlusR={(R: number) => dispatch(setH2PlusR(R))}
             onScanIndex={handleScanIndex}
@@ -935,7 +956,7 @@ function App() {
                     <div className="phase-legend density-key" aria-label="surface colour key">
                         <span className="phase-legend-item">
                             <span className="phase-legend-swatch" style={{ background: DENSITY_SURFACE_HEX }} />
-                            ρ = {bonds.densityIso} e/a₀³, total electron density
+                            ρ = {drawnDensityIso} e/a₀³, total electron density
                         </span>
                     </div>
                 )}

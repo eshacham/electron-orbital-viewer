@@ -1,4 +1,4 @@
-import type { ScanPoint } from '../molecules/types';
+import type { MoleculeScan, ScanPoint } from '../molecules/types';
 import { H2PLUS_R_RANGE } from './h2plus';
 
 /**
@@ -77,4 +77,15 @@ export function nearestScanIndex(points: readonly ScanPoint[], R: number): numbe
     let best = points.length > 0 ? 0 : -1;
     points.forEach((point, i) => { if (Math.abs(point.RBohr - R) < Math.abs(points[best].RBohr - R)) best = i; });
     return best;
+}
+
+/**
+ * Where a molecule opens: its equilibrium point, or -- for a pair with no
+ * bond (He₂), whose equilibriumIndex is only a placeholder on the repulsive
+ * wall -- the scan's lowest energy, van der Waals contact, where the two
+ * atoms' outlines just separate (fix round 1, M4).
+ */
+export function openingScanIndex(scan: Pick<MoleculeScan, 'points' | 'equilibriumIndex' | 'fit'>): number {
+    if (scan.fit.bound) return scan.equilibriumIndex;
+    return scan.points.reduce((best, point, i) => (point.energyHartree < scan.points[best].energyHartree ? i : best), 0);
 }

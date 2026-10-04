@@ -6,7 +6,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
 import { SERIALIZABLE_CHECK } from './store';
-import bondsReducer, { setDensityIso, setH2PlusR } from './store/bondsSlice';
+import bondsReducer, { setDensityIso, setH2PlusR, setBondsView, setScanPoint, selectBondsSystem } from './store/bondsSlice';
 import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView, setElement } from './store/atomSlice';
 import { setSurfaceStyle, setBasicSelection, requestCut } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
@@ -817,9 +817,45 @@ describe('App', () => {
             expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ρ = 0.002 e/a₀³, total electron density');
             expect(screen.queryByText('ψ > 0')).not.toBeInTheDocument();
             expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
-            expect(screen.getByText(/drawn at a fixed ρ/)).toBeInTheDocument();
+            expect(screen.getByText('The density is drawn at a fixed ρ, chosen with the ρ buttons beside the orbitals — not at an enclosed fraction.')).toBeInTheDocument();
             expect(within(container.querySelector('.view-panel') as HTMLElement)
                 .getByLabelText('potential energy curve')).toBeInTheDocument();
+        });
+
+        // Fix round 1, I1 and M2: the key, the fraction select and the
+        // panel's note describe the picture DRAWN, which stays up while the
+        // next scan point's files load -- and after a molecule fails to load.
+        // The canvas says what it is waiting for.
+        it('keys the drawn density, not the pending selection, while a point loads and after a load fails', async () => {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            chooseSystem('N₂ — Nitrogen');
+            await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
+                .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@07' }));
+            // A label this geometry does not keep: the density is drawn, and the panel says why.
+            act(() => { store.dispatch(setBondsView({ kind: 'mo', label: '4σg', spin: 'restricted', component: 0 })); });
+            const note = '4σg is not among the orbitals kept at this geometry; showing the total density.';
+            expect(screen.getByText(note)).toBeInTheDocument();
+            const drawn = store.getState().orbital.currentField;
+
+            (loadBasis as jest.Mock).mockImplementation(() => new Promise(() => {}));
+            act(() => { store.dispatch(setScanPoint({ system: 'n2', index: 8, RBohr: n2Scan.points[8].RBohr })); });
+            const stillKeyed = () => {
+                expect(store.getState().orbital.currentField).toBe(drawn);
+                expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ρ = 0.002 e/a₀³, total electron density');
+                expect(screen.queryByText('ψ > 0')).not.toBeInTheDocument();
+                expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+            };
+            stillKeyed();
+            expect(screen.getByText(note)).toBeInTheDocument();
+            expect(await screen.findByText(`Loading N₂ at R = ${n2Scan.points[8].RBohr.toFixed(2)} a₀…`, {}, { timeout: 2000 })).toBeInTheDocument();
+
+            (loadScan as jest.Mock).mockRejectedValue(new Error('Could not load /molecules/v1/o2/scan.json (HTTP 403)'));
+            act(() => { store.dispatch(selectBondsSystem('o2')); });
+            expect(await screen.findByText(/O₂ could not be loaded/)).toBeInTheDocument();
+            stillKeyed();
+            // A failure is not a wait: the cue goes (the mocked viewer never finishes, so "Computing…" may remain).
+            await waitFor(() => expect(screen.queryByText(/^Loading O₂/)).not.toBeInTheDocument());
         });
 
         // Ruling C9: a molecule that fails to load is said once, in the

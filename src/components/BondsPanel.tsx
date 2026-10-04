@@ -106,7 +106,19 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                     onChangeCommitted={(_, v) => {
                         const index = nearestScanIndex(scan.points, v as number);
                         if (index >= 0) onScanIndex(index);
-                    }} />
+                    }}
+                    // WAI-ARIA slider: Home and End go to the first and last
+                    // points. MUI with step={null} treats them as one mark
+                    // down or up, so they are taken in the capture phase,
+                    // before its own handler sees them.
+                    slotProps={{ input: { onKeyDownCapture: (event: React.KeyboardEvent<HTMLInputElement>) => {
+                        if (event.key !== 'Home' && event.key !== 'End') return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const index = event.key === 'Home' ? 0 : scan.points.length - 1;
+                        setDraftR(scan.points[index].RBohr);
+                        onScanIndex(index);
+                    } } }} />
             )}
             {energy && <Typography variant="body2" className="bonds-energy">{energy}</Typography>}
 

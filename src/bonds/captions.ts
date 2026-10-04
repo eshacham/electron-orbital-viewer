@@ -1,5 +1,5 @@
 import { MoleculeMeta, MoleculeOrbitalInfo, MoleculeScan } from '../molecules/types';
-import { BOHR_TO_ANGSTROM, BondsSystemId, HARTREE_TO_EV } from './systems';
+import { BOHR_TO_ANGSTROM, BondsSystemId, HARTREE_TO_EV, openingScanIndex } from './systems';
 
 /** A signed number as the panel prints it: a true minus sign (U+2212), not a hyphen. */
 export function signed(value: number, digits: number): string {
@@ -132,6 +132,8 @@ export function bondsCaptions(system: BondsSystemId, scan: MoleculeScan | null):
         captions.push(...bondCaptions(system, scan));
     } else {
         captions.push(unboundCaption(`${wellMilliHartree(scan)} below the separated atoms, ${atomsMethod(scan)}`));
+        const opening = scan.points[openingScanIndex(scan)];
+        if (opening) captions.push(`The view opens at ${lengths(opening.RBohr)}, the lowest energy on the scan: van der Waals contact, not a bond.`);
     }
     const validity = validityCaption(scan);
     if (validity) captions.push(validity);

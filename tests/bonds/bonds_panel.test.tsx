@@ -79,6 +79,13 @@ describe('bondsCaptions', () => {
         expect(he).not.toMatch(/D_e|R_e =/);
     });
 
+    // Fix round 1, M4: He₂ opens at its lowest-energy point; say what that is.
+    it('says an unbound pair opens at van der Waals contact, not a bond', () => {
+        const contact = bondsCaptions('he2', heScan).find(c => /van der Waals contact/.test(c));
+        expect(contact).toBe('The view opens at R = 3.60 a₀ (1.905 Å), the lowest energy on the scan: van der Waals contact, not a bond.');
+        expect(bondsCaptions('n2', n2Scan).some(c => /van der Waals contact/.test(c))).toBe(false);
+    });
+
     it('takes D_e from separated atoms, with their method, and R_e with its fit uncertainty', () => {
         const captions = bondsCaptions('n2', n2Scan).join(' ');
         expect(captions).toMatch(/D_e = 9\.44 eV \(0\.3470 Ha\) from separated atoms, N ⁴S \+ N ⁴S, UCCSD\(T\)\/aug-cc-pVTZ \(UHF reference, frozen core\)/);
@@ -197,6 +204,20 @@ describe('BondsPanel', () => {
         expect(handlers.onScanIndex).toHaveBeenLastCalledWith(8);
         // The readout follows the thumb, before the store (here, never) catches up.
         expect(screen.getByText(new RegExp(`^R = ${n2Scan.points[8].RBohr.toFixed(2)} a₀`))).toBeInTheDocument();
+    });
+
+    // Fix round 1, M5 (WAI-ARIA slider): Home and End go to the first and
+    // last points; MUI's own handling with step={null} moved one mark.
+    it('jumps to the first and last scan points with Home and End', () => {
+        handlers.onScanIndex.mockClear();
+        render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
+        const slider = screen.getByRole('slider', { name: 'Internuclear distance R' });
+        fireEvent.keyDown(slider, { key: 'End' });
+        expect(handlers.onScanIndex).toHaveBeenLastCalledWith(n2Scan.points.length - 1);
+        expect(screen.getByText(new RegExp(`^R = ${n2Scan.points[n2Scan.points.length - 1].RBohr.toFixed(2)} a₀`))).toBeInTheDocument();
+        fireEvent.keyDown(slider, { key: 'Home' });
+        expect(handlers.onScanIndex).toHaveBeenLastCalledWith(0);
+        expect(handlers.onScanIndex).toHaveBeenCalledTimes(2);
     });
 
     it('says, from the loaded basis, that N₂ at ρ = 0.2 is one envelope', () => {

@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setScanPoint } from '../store/bondsSlice';
 import { loadBasis, loadMoleculeMeta, loadScan } from '../molecules/loader';
 import { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../molecules/types';
-import { BondsSystemId, DiatomicId, nearestScanIndex, pointId } from './systems';
+import { BondsSystemId, DiatomicId, nearestScanIndex, openingScanIndex, pointId } from './systems';
 
 export interface BondsData {
     scan: MoleculeScan | null;
@@ -37,7 +37,8 @@ function checkedScan(scan: MoleculeScan): { scan: MoleculeScan; error: null } | 
 /**
  * What the Bonds selection needs from the molecule data, fetched lazily. Also
  * snaps R to the scan once it is known: to the equilibrium point for a fresh
- * molecule, to the nearest point for an R that came from a URL.
+ * molecule (an unbound one's lowest energy, openingScanIndex), to the nearest
+ * point for an R that came from a URL.
  *
  * Every result is kept with the selection it answers (the system, or the
  * point id), and only a result that matches the current selection is
@@ -77,7 +78,7 @@ export function useBondsData(): BondsData {
     useEffect(() => {
         if (!scan || scanIndex !== null || system === 'h2plus') return;
         // checkedScan has already refused a scan this could fail on; the guard keeps it that way.
-        const index = R === null ? scan.equilibriumIndex : nearestScanIndex(scan.points, R);
+        const index = R === null ? openingScanIndex(scan) : nearestScanIndex(scan.points, R);
         if (index < 0 || index >= scan.points.length) return;
         dispatch(setScanPoint({ system, index, RBohr: scan.points[index].RBohr }));
     }, [scan, scanIndex, R, system, dispatch]);
