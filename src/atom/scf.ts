@@ -25,7 +25,7 @@ import {
     hartreeEnergy,
 } from './hartree';
 import { correlationPotential, correlationEnergy } from './correlation';
-import { AtomSpecies, neutralGround, speciesConfiguration, speciesKey } from './species';
+import { AtomSpecies, isNeutralGround, neutralGround, speciesConfiguration, speciesKey } from './species';
 import {
     MAX_ITERATIONS,
     CONVERGENCE_TOLERANCE,
@@ -302,7 +302,52 @@ function solveOneElectronRelativistic(
 // object exactly as before. A relativistic solve is a pure function of its
 // species and mode, keyed `${speciesKey}@${mode}` (ruling C2); 'off' keeps
 // the bare species key, so nothing that existed before Phase 4 moves.
+//
+// Bounded (final review recommendation): ions, excitations and three modes
+// widen the key space to thousands of species, each holding a grid's worth
+// of orbitals (a heavy atom's is several hundred kilobytes), so everything
+// but a neutral ground state without relativity is kept least recently
+// used first, at most SOLVE_CACHE_LIMIT of them -- a session revisits a
+// handful of species, and the worker asks for the same few (picture,
+// comparison, reference ring) together. The neutral ground states are kept
+// for good, as before Phase 3: at most 118, and solveAtom(Z)'s one-object
+// identity is what callers (and tests) rely on.
+const SOLVE_CACHE_LIMIT = 48;
+let solveCacheLimit = SOLVE_CACHE_LIMIT;
+const neutralGroundCache = new Map<string, AtomSolution>();
 const solveSpeciesCache = new Map<string, AtomSolution>();
+
+function cachedSolution(key: string): AtomSolution | undefined {
+    const pinned = neutralGroundCache.get(key);
+    if (pinned) return pinned;
+    const hit = solveSpeciesCache.get(key);
+    if (hit) {
+        // Map iterates in insertion order, so re-inserting on a hit makes
+        // that order double as recency (profile_cache.ts does the same).
+        solveSpeciesCache.delete(key);
+        solveSpeciesCache.set(key, hit);
+    }
+    return hit;
+}
+
+function rememberSolution(key: string, species: AtomSpecies, relativity: RelativityMode, solution: AtomSolution): void {
+    if (relativity === 'off' && isNeutralGround(species)) {
+        neutralGroundCache.set(key, solution);
+        return;
+    }
+    solveSpeciesCache.set(key, solution);
+    while (solveSpeciesCache.size > solveCacheLimit) {
+        const oldest = solveSpeciesCache.keys().next().value;
+        if (oldest === undefined) break;
+        solveSpeciesCache.delete(oldest);
+    }
+}
+
+/** Test-only: a smaller bound, so eviction can be exercised on a few cheap species. Returns the restore. */
+export function setSolveCacheLimitForTests(limit: number): () => void {
+    solveCacheLimit = limit;
+    return () => { solveCacheLimit = SOLVE_CACHE_LIMIT; };
+}
 
 // A non-relativistic solve's failure, by species key: the verdict (Pr-Eu
 // 6s -> 4f's unbound 4f, an unbound anion) is as pure a function of the
@@ -359,7 +404,7 @@ const failedNonRelativisticSolves = new Map<string, unknown>();
  */
 export function solveSpecies(species: AtomSpecies, relativity: RelativityMode = 'off'): AtomSolution {
     const key = relativity === 'off' ? speciesKey(species) : `${speciesKey(species)}@${relativity}`;
-    const cached = solveSpeciesCache.get(key);
+    const cached = cachedSolution(key);
     if (cached) return cached;
     if (failedNonRelativisticSolves.has(key)) throw failedNonRelativisticSolves.get(key);
 
@@ -386,7 +431,7 @@ export function solveSpecies(species: AtomSpecies, relativity: RelativityMode = 
             throw error;
         }
     }
-    solveSpeciesCache.set(key, solution);
+    rememberSolution(key, species, relativity, solution);
     return solution;
 }
 

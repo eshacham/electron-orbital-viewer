@@ -1,4 +1,4 @@
-import { solveAtom, solveAtomOnGrid, solveSpecies } from '../../src/atom/scf';
+import { solveAtom, solveAtomOnGrid, solveSpecies, setSolveCacheLimitForTests } from '../../src/atom/scf';
 import { UnboundAnionError, screenedStartingPotential } from '../../src/atom/scf_shared';
 import { gridForAtom } from '../../src/atom/radial_grid';
 import { ionConfigurationFor } from '../../src/atom/ion_configurations';
@@ -21,6 +21,30 @@ describe('solveSpecies', () => {
     it('solveAtom(Z) is the neutral ground state, one cached object', () => {
         expect(solveSpecies(neutralGround(10))).toBe(solveAtom(10));
         expect(solveAtom(10).charge).toBe(0);
+    });
+
+    // Final review recommendation: the memo is bounded (least recently used
+    // goes first) so a long session's ions, excitations and modes cannot
+    // grow it without limit -- except the neutral ground states without
+    // relativity, at most 118, which keep solveAtom(Z)'s one-object identity
+    // for good. Exercised at a limit of two, on species that solve in
+    // milliseconds.
+    it('bounds the memo, least recently used first, but never drops a neutral ground state', () => {
+        const restore = setSolveCacheLimitForTests(2);
+        try {
+            const helium = solveAtom(2);
+            const heliumIon = solveSpecies(ion(2, 1));
+            const lithiumIon = solveSpecies(ion(3, 1));
+            expect(solveSpecies(ion(2, 1))).toBe(heliumIon);   // a hit, now the most recent
+            solveSpecies(ion(4, 2));                            // evicts Li+, the least recent
+            expect(solveSpecies(ion(2, 1))).toBe(heliumIon);
+            const again = solveSpecies(ion(3, 1));
+            expect(again).not.toBe(lithiumIon);
+            expect(again.totalEnergy).toBe(lithiumIon.totalEnergy);
+            expect(solveAtom(2)).toBe(helium);
+        } finally {
+            restore();
+        }
     });
 
     it('solves Na+ with ten electrons, and draws it smaller than Na (spec: Na+ < Na)', () => {
