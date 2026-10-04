@@ -73,13 +73,32 @@ def select_orbitals(mol, coeff, occ):
     """Every occupied orbital, plus the virtuals most like minimal-basis valence
     orbitals (largest projection onto MINAO) up to the minimal-basis size: the
     textbook diagram's σ*/π*, not the triple-zeta basis's diffuse extras."""
+    return select_with_margin(mol, coeff, occ)[0]
+
+
+def select_with_margin(mol, coeff, occ):
+    """select_orbitals's choice, and how clear-cut it was: the weakest virtual
+    kept and the strongest left out, as {'kept', 'keptWeight', 'runnerUp',
+    'runnerUpWeight'} (MO indices, MINAO weights), or None when the cut-off
+    falls past either end of the virtuals.
+
+    The weights are the fraction of each orbital's norm inside the minimal
+    basis. Where valence σ* character is shared between two virtuals of one
+    irrep (an avoided crossing with a diffuse orbital, as in CO and B₂ at
+    0.80 R_e), the two weights come out nearly equal, and which one is "the"
+    σ* is decided by less than the scan step changes; callers record that
+    rather than trust the ranking silently."""
     minao, projector = _minao_projector(mol)
     occupied = [i for i in range(len(occ)) if occ[i] > 0]
     virtual = [i for i in range(len(occ)) if occ[i] == 0]
     weight = {i: float(coeff[:, i] @ projector @ coeff[:, i]) for i in virtual}
     wanted = max(0, minao.nao - len(occupied))
-    chosen = sorted(virtual, key=lambda i: -weight[i])[:wanted]
-    return sorted(occupied + chosen)
+    ranked = sorted(virtual, key=lambda i: -weight[i])
+    margin = None
+    if 0 < wanted < len(ranked):
+        kept, runner_up = ranked[wanted - 1], ranked[wanted]
+        margin = {'kept': kept, 'keptWeight': weight[kept], 'runnerUp': runner_up, 'runnerUpWeight': weight[runner_up]}
+    return sorted(occupied + ranked[:wanted]), margin
 
 
 def bond_order(labels, occupations, homonuclear):

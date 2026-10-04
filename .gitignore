@@ -6,6 +6,8 @@ dist/*
 cdk.out/
 __pycache__/
 tools/molecules/.cache/
+# Generated molecule data: published to S3 by version, never committed (spec §4.5)
+tools/molecules/out/
 .pytest_cache/
 
 # SDD workspace and browser-automation output are scratch, not source
