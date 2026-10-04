@@ -14,6 +14,7 @@
 import { RadialGrid, gridForAtom, integrateOnGrid } from './radial_grid';
 import { RadialState, solveRadialState, hasBoundState } from './radial_solver';
 import { solveScalarRelativisticState, solveDiracState, hasBoundRelativisticState } from './relativistic_solver';
+import { StateNotFoundError } from './eigenvalue_search';
 import { RelativityMode, RELATIVISTIC_EXCHANGE_CORRECTION, splitByJ, jForKappa } from './relativity';
 import { configurationFor, SubshellOccupancy } from './configurations';
 import {
@@ -139,11 +140,12 @@ function orbitalIsBound(grid: RadialGrid, Z: number, spec: OrbitalSpec, potentia
  * the Dirac equation is the one that failed; a level it does bind is a
  * solver failure and keeps the solver's own message.
  *
- * An anion in a relativistic mode is the one exception, kept as it was: the
+ * An anion in a relativistic mode is the one exception: the
  * non-relativistic pre-check (ruling C12) can pass while the relativistic
  * equation, which binds d and f slightly less, finds no bound state at
- * all, and for an anion any failure to solve its levels there is reported
- * as the unbound verdict.
+ * all, and for an anion the solver's "found no state" there
+ * (StateNotFoundError) is reported as the unbound verdict without asking
+ * the node count. Any other solver failure keeps its own message.
  */
 function solveOrbitals(
     grid: RadialGrid, Z: number, specs: OrbitalSpec[], potential: Float64Array, relativity: RelativityMode, isAnion: boolean,
@@ -153,7 +155,14 @@ function solveOrbitals(
         const unbound = () => (isAnion ? new UnboundAnionError(spec.n, spec.l, j) : new UnboundElectronError(spec.n, spec.l, j));
         const solve = () => ({ ...solveOrbital(grid, Z, spec, potential, relativity), electrons: spec.electrons });
         if (isAnion && relativity !== 'off') {
-            try { return solve(); } catch { throw unbound(); }
+            // Only the solver's "found no state" is the verdict (final
+            // review M7); anything else it throws is a failure of its own.
+            try {
+                return solve();
+            } catch (error) {
+                if (error instanceof StateNotFoundError) throw unbound();
+                throw error;
+            }
         }
         return solveOccupiedLevel(solve, () => orbitalIsBound(grid, Z, spec, potential, relativity), unbound);
     });

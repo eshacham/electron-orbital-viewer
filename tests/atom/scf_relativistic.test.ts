@@ -180,7 +180,8 @@ describe('relativistic SCF', () => {
         jest.isolateModules(() => {
             jest.doMock('../../src/atom/relativistic_solver', () => {
                 const actual = jest.requireActual<typeof import('../../src/atom/relativistic_solver')>('../../src/atom/relativistic_solver');
-                const noRoot = () => { throw new Error('the potential does not bind it'); };
+                const { StateNotFoundError } = jest.requireActual<typeof import('../../src/atom/eigenvalue_search')>('../../src/atom/eigenvalue_search');
+                const noRoot = () => { throw new StateNotFoundError('the potential does not bind it'); };
                 return {
                     ...actual,
                     solveScalarRelativisticState: (...args: Parameters<typeof actual.solveScalarRelativisticState>) =>
@@ -215,6 +216,31 @@ describe('relativistic SCF', () => {
         });
         jest.dontMock('../../src/atom/relativistic_solver');
     });
+    // Final review M7: only "found no state" is the anion's verdict; any
+    // other solver failure (a bug, a non-converging search) keeps its own
+    // message rather than being dressed up as physics.
+    it('keeps a relativistic solver failure that is not "no state" as itself, for an anion too', () => {
+        jest.isolateModules(() => {
+            jest.doMock('../../src/atom/relativistic_solver', () => {
+                const actual = jest.requireActual<typeof import('../../src/atom/relativistic_solver')>('../../src/atom/relativistic_solver');
+                const broken = () => { throw new Error('Relativistic radial solver did not converge for 2p.'); };
+                return {
+                    ...actual,
+                    solveScalarRelativisticState: (...args: Parameters<typeof actual.solveScalarRelativisticState>) =>
+                        (args[2] === 1 ? broken() : actual.solveScalarRelativisticState(...args)),
+                };
+            });
+            const scf = require('../../src/atom/scf') as typeof import('../../src/atom/scf');
+            const shared = require('../../src/atom/scf_shared') as typeof import('../../src/atom/scf_shared');
+            const fluoride = [{ n: 1, l: 0, electrons: 2 }, { n: 2, l: 0, electrons: 2 }, { n: 2, l: 1, electrons: 6 }];
+            let caught: unknown = null;
+            try { scf.solveAtomOnGrid(9, gridForAtom(9, 2), { configuration: fluoride, relativity: 'scalar' }); } catch (error) { caught = error; }
+            expect(caught).not.toBeInstanceOf(shared.UnboundAnionError);
+            expect((caught as Error).message).toBe('Relativistic radial solver did not converge for 2p.');
+        });
+        jest.dontMock('../../src/atom/relativistic_solver');
+    });
+
     // Final review I2/M2: the converged anion's last check is on the
     // eigenvalues of the mode that ran, so under Dirac it names the j-level
     // that failed it, as the solver-side verdict above does.
