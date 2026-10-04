@@ -137,10 +137,18 @@ function checkFraction(enclosedFraction: number): void {
     }
 }
 
+/**
+ * The sampling cube of an analytic source: (resolution + 1) points per axis
+ * over [−rMax, rMax]. One definition, so every sampling route (point by
+ * point, a recipe's grid route, a combination's shared terms) lays its
+ * samples on the same points.
+ */
+function cubeOf(rMax: number, resolution: number): { side: number; step: number; origin: number } {
+    return { side: resolution + 1, step: (2 * rMax) / resolution, origin: -rMax };
+}
+
 export function sampleEvaluator(evaluate: FieldEvaluator, rMax: number, resolution: number): SampledField {
-    const side = resolution + 1;
-    const step = (2 * rMax) / resolution;
-    const origin = -rMax;
+    const { side, step, origin } = cubeOf(rMax, resolution);
     const samples = new Float32Array(side * side * side);
     let index = 0;
     for (let i = 0; i < side; i++) {
@@ -163,9 +171,7 @@ export function sampleEvaluator(evaluate: FieldEvaluator, rMax: number, resoluti
 function sampleAnalytic(source: AnalyticFieldSource, evaluate: FieldEvaluator, resolution: number): SampledField {
     const onGrid = fieldOnGrid(source.recipe);
     if (!onGrid) return sampleEvaluator(evaluate, source.rMax, resolution);
-    const side = resolution + 1;
-    const step = (2 * source.rMax) / resolution;
-    const origin = -source.rMax;
+    const { side, step, origin } = cubeOf(source.rMax, resolution);
     const samples = onGrid({ shape: [side, side, side], origin: [origin, origin, origin], spacing: step });
     return { samples, side, step, origin };
 }
@@ -310,7 +316,8 @@ export function generateFieldMeshes(request: FieldRenderRequest): MeshData[] {
         // Built first: it validates the terms, and it colours the vertices.
         const evaluate = makeFieldEvaluator(recipe);
 
-        const combined = new Float64Array((resolution + 1) ** 3);
+        const cube = cubeOf(source.rMax, resolution);
+        const combined = new Float64Array(cube.side ** 3);
         for (const term of recipe.terms) {
             const { n, l, ml, Z } = term.orbital;
             const key = `${source.rMax}|${n},${l},${ml},${Z}`;
@@ -322,12 +329,7 @@ export function generateFieldMeshes(request: FieldRenderRequest): MeshData[] {
             for (let i = 0; i < combined.length; i++) combined[i] += term.coefficient * values[i];
         }
 
-        const field: SampledField = {
-            samples: Float32Array.from(combined),
-            side: resolution + 1,
-            step: (2 * source.rMax) / resolution,
-            origin: -source.rMax,
-        };
+        const field: SampledField = { samples: Float32Array.from(combined), ...cube };
         return meshFromSamples(field, enclosedFraction, evaluate);
     });
 }

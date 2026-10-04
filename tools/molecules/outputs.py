@@ -44,6 +44,20 @@ ORBITAL_BASIS = 'def2-tzvp'
 SELECTION_TIE_MARGIN = 0.05
 FIXTURE_POINTS = [(0.0, 0.0, 0.0), (0.0, 0.0, 0.5), (0.3, -0.2, 1.1), (1.0, 0.5, -0.7), (-1.5, 0.8, 2.0),
                   (0.2, 0.2, -1.9), (2.5, -1.0, 0.3), (0.0, 1.2, 0.0), (-0.6, -0.6, 0.9), (3.0, 2.0, -2.5)]
+# Added to FIXTURE_POINTS per molecule: each nucleus, and a point
+# |(0.03, -0.02, 0.035)| = 0.051 a0 off it (off the axis, so p, d and f are
+# nonzero there). The tight core s AOs are largest and steepest there, and
+# the fixed points above come no nearer a nucleus than 0.36 a0 (review M3).
+# Every nucleus, not just one: HF's first atom is the hydrogen.
+NUCLEUS_OFFSET = (0.03, -0.02, 0.035)
+
+
+def fixture_points(atoms):
+    points = [list(p) for p in FIXTURE_POINTS]
+    for atom in atoms:
+        nucleus = [float(c) for c in atom]
+        points += [nucleus, [c + d for c, d in zip(nucleus, NUCLEUS_OFFSET)]]
+    return points
 
 
 def write_json(path, data):
@@ -270,12 +284,12 @@ def molecule_for_basis(basis_atoms, symbols, spin):
 
 def orbital_values(mol, basis, molecule_id):
     """PySCF's own AO values (`aos[point][ao]`, eval_gto) and MO values (its
-    AOs, the shipped coefficients) at FIXTURE_POINTS, for the TS evaluator to
-    match; the density is the shipped orbitals' Σ occ ψ². The AOs are kept
+    AOs, the shipped coefficients) at fixture_points (FIXTURE_POINTS and two
+    at each nucleus), for the TS evaluator to match; the density is the shipped orbitals' Σ occ ψ². The AOs are kept
     as well as the orbitals because symmetry leaves some AOs (δ d and f
     functions in a σ/π molecule) out of every orbital, where an error in them
     would not show."""
-    points = np.asarray(FIXTURE_POINTS)
+    points = np.asarray(fixture_points(basis['atoms']))
     ao = mol.eval_gto('GTOval_sph', points)
     orbitals = basis['orbitals']
     values = [ao @ np.asarray(o['coefficients']) for o in orbitals]

@@ -218,9 +218,9 @@ export function makeFieldEvaluator(recipe: FieldRecipe): FieldEvaluator {
  * makeFieldEvaluator's closure. Only the Gaussian recipes have one: a
  * molecule at 96³ is 0.9 M points of up to 62 AOs each, and sampling it a
  * grid row at a time from per-axis tables (gaussian_basis.ts, sampleOnGrid)
- * takes O₂'s 97³ density from 1.45 s to 0.25 s (0.4–0.5 s meshed; Apple
- * M2 Pro, task-7 report), inside §3.7's 1.5 s on a 2020 laptop with room
- * for one that is twice as slow. The values are
+ * takes O₂'s 97³ density from ~1.45 s point by point to ~0.25 s (~0.4–0.5 s
+ * with the mesh; CPU time on an Apple M2 Pro, Node 24), inside §3.7's 1.5 s
+ * on a 2020 laptop with room for one that is twice as slow. The values are
  * makeFieldEvaluator's to float32 storage (tests/molecules/gaussian_basis.test.ts).
  */
 export function fieldOnGrid(recipe: FieldRecipe): ((grid: GridSpec) => Float32Array) | null {

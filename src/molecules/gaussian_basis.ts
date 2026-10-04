@@ -343,7 +343,9 @@ function angularRow(l: number, dx: number, dy: number, dz: Float64Array, at: num
  *
  * Shells no requested orbital uses are left out, and a shell whose
  * screening radius (makeAOEvaluator's) ends before the row comes near its
- * atom is skipped for that whole row. Measured on O₂ (task-7 report).
+ * atom is skipped for that whole row. O₂'s density on 97³ points (CPU time,
+ * Apple M2 Pro, Node 24): ~1.45 s point by point, ~0.25 s here; its HOMO
+ * ~0.7 s against ~0.06 s.
  */
 function sampleOnGrid(basis: MoleculeBasis, orbitals: OrbitalTerms[], quantity: GridQuantity, grid: GridSpec): Float32Array {
     const used = new Uint8Array(basis.nao);

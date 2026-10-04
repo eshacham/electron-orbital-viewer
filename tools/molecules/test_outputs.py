@@ -160,7 +160,7 @@ def test_fixtures_are_reduced_copies_of_the_generated_files(tmp_path):
     orbital values at a few points."""
     import generate
     from basis_export import evaluate_aos
-    from outputs import FIXTURE_POINTS, write_fixtures
+    from outputs import FIXTURE_POINTS, fixture_points, write_fixtures
     out_root, dest = tmp_path / 'out', tmp_path / 'fixtures'
     mol, mf = _kohn_sham('h2', 1.00)
     r = float(mol.atom_coord(1)[2] - mol.atom_coord(0)[2])
@@ -179,14 +179,24 @@ def test_fixtures_are_reduced_copies_of_the_generated_files(tmp_path):
     rho = np.frombuffer(gzip.decompress((dest / 'h2' / 'density.bin.gz').read_bytes()), dtype='<f4')
     assert np.array_equal(rho, density_on_grid(basis['shells'], basis['atoms'], basis['orbitals'], small['grid']))
     values = json.loads((dest / 'h2.json').read_text())
-    ao = mol.eval_gto('GTOval_sph', np.asarray(FIXTURE_POINTS))
+    # The fixed points, then for each nucleus one on it and one 0.05 a0 off
+    # it, where the tight core s AOs are large and steep (review M3).
+    points = fixture_points(basis['atoms'])
+    assert values['points'] == points
+    assert points[:len(FIXTURE_POINTS)] == [list(p) for p in FIXTURE_POINTS]
+    extra = points[len(FIXTURE_POINTS):]
+    assert len(extra) == 2 * len(basis['atoms'])
+    for atom, (on, near) in zip(basis['atoms'], zip(extra[::2], extra[1::2])):
+        assert on == atom
+        assert abs(np.linalg.norm(np.asarray(near) - np.asarray(atom)) - 0.05) < 0.002
+    ao = mol.eval_gto('GTOval_sph', np.asarray(points))
     # Every AO on its own as well: an AO no shipped orbital uses (a δ d or f
     # function in a σ/π molecule) is invisible in the orbital values.
     assert np.array_equal(np.asarray(values['aos']), ao)
     for orbital, shipped in zip(values['orbitals'], basis['orbitals']):
         assert orbital['index'] == shipped['index']
         assert np.allclose(orbital['values'], ao @ np.asarray(shipped['coefficients']), rtol=0, atol=1e-13)
-    ours = evaluate_aos(basis['shells'], basis['atoms'], FIXTURE_POINTS)
+    ours = evaluate_aos(basis['shells'], basis['atoms'], points)
     density = sum(o['occupation'] * (ours @ np.asarray(o['coefficients'])) ** 2 for o in basis['orbitals'])
     assert np.allclose(values['density'], density, rtol=1e-10, atol=0)
     assert sum(p.stat().st_size for p in dest.rglob('*') if p.is_file()) < 1024 * 1024
