@@ -3,7 +3,7 @@ import { marchingCubes } from './marching_cubes';
 import { isoLevelForEnclosedFraction } from './radial_distribution';
 import {
     AnalyticFieldSource, FieldEvaluator, FieldSource, GridFieldSource,
-    hydrogenicSource, makeFieldEvaluator, FieldRenderRequest,
+    hydrogenicSource, makeFieldEvaluator, FieldRenderRequest, fieldOnGrid,
 } from './field_source';
 import { makeWaveFunctionEvaluator } from './quantum_functions';
 
@@ -155,9 +155,25 @@ export function sampleEvaluator(evaluate: FieldEvaluator, rMax: number, resoluti
     return { samples, side, step, origin };
 }
 
+/**
+ * An analytic source's samples: on the (resolution + 1)³ grid sampleEvaluator
+ * uses, through the recipe's whole-grid route where it has one
+ * (field_source.fieldOnGrid), else point by point with `evaluate`.
+ */
+function sampleAnalytic(source: AnalyticFieldSource, evaluate: FieldEvaluator, resolution: number): SampledField {
+    const onGrid = fieldOnGrid(source.recipe);
+    if (!onGrid) return sampleEvaluator(evaluate, source.rMax, resolution);
+    const side = resolution + 1;
+    const step = (2 * source.rMax) / resolution;
+    const origin = -source.rMax;
+    const samples = onGrid({ shape: [side, side, side], origin: [origin, origin, origin], spacing: step });
+    return { samples, side, step, origin };
+}
+
 export function sampleFieldSource(source: AnalyticFieldSource, resolution: number): SampledField {
     checkBox(resolution, source.rMax);
-    return sampleEvaluator(makeFieldEvaluator(source.recipe), source.rMax, resolution);
+    // Built even when the grid route samples: it is what validates the recipe.
+    return sampleAnalytic(source, makeFieldEvaluator(source.recipe), resolution);
 }
 
 /**
@@ -173,12 +189,16 @@ export function sampleFieldSource(source: AnalyticFieldSource, resolution: numbe
  * phases meet.
  */
 export function meshFromSamples(field: SampledField, enclosedFraction: number, signAt: FieldEvaluator): MeshData {
-    const { samples, side, step, origin } = field;
-    const isoLevel = isoLevelForEnclosedFraction(samples, enclosedFraction);
+    const isoLevel = isoLevelForEnclosedFraction(field.samples, enclosedFraction);
     if (!(isoLevel > 0)) {
         throw new Error('No isosurface for this orbital');
     }
+    return meshAtLevel(field, isoLevel, signAt);
+}
 
+/** The surface |sample|² = isoLevel, however the level was chosen. */
+function meshAtLevel(field: SampledField, isoLevel: number, signAt: FieldEvaluator): MeshData {
+    const { samples, side, step, origin } = field;
     // Meshing needs float64: near the surface |psi|^2 and isoLevel are within a
     // rounding error of each other, and their difference decides the sign.
     const values = new Float64Array(samples.length);
@@ -258,7 +278,7 @@ export function generateFieldMesh(source: FieldSource, resolution: number, enclo
     checkBox(resolution, source.rMax);
     checkFraction(enclosedFraction);
     const evaluate = makeFieldEvaluator(source.recipe);
-    return meshFromSamples(sampleEvaluator(evaluate, source.rMax, resolution), enclosedFraction, evaluate);
+    return meshFromSamples(sampleAnalytic(source, evaluate, resolution), enclosedFraction, evaluate);
 }
 
 /** One orbital's isosurface; unchanged behaviour, now a field source like any other. */
@@ -310,4 +330,30 @@ export function generateFieldMeshes(request: FieldRenderRequest): MeshData[] {
         };
         return meshFromSamples(field, enclosedFraction, evaluate);
     });
+}
+
+/**
+ * A density drawn at a fixed ρ rather than an enclosed fraction (the plan's
+ * Design decisions). The sampled sum cannot stand for the electron count
+ * when the grid is coarser than a 1s cusp (one sample near a nitrogen
+ * nucleus holds a third of its core), so "90 % of the electrons" would be
+ * off by up to 15 %; a value of ρ means the same thing on any grid, and
+ * ρ = 0.002 e/a₀³ is chemistry's molecular outline. The samples are √ρ (a
+ * 'gaussianDensity' recipe), so the contour is drawn at the value itself --
+ * no fraction is searched for, and none of the search's histogram rounding
+ * reaches the surface. Anything else is refused: ψ² of one orbital at a
+ * value of ρ would be drawn without its phase.
+ */
+export function generateIsoValueMesh(source: AnalyticFieldSource, resolution: number, isoValue: number): MeshData {
+    if (!(isoValue > 0) || !Number.isFinite(isoValue)) throw new Error('Invalid parameters: isoValue must be positive');
+    if (source.recipe.type !== 'gaussianDensity') {
+        throw new Error(`A density iso-value is drawn only for a 'gaussianDensity' source; ${source.id} is '${source.recipe.type}'`);
+    }
+    const field = sampleFieldSource(source, resolution);
+    let peak = 0;
+    for (let i = 0; i < field.samples.length; i++) peak = Math.max(peak, field.samples[i] * field.samples[i]);
+    if (!(peak > isoValue)) {
+        throw new Error(`No part of this density reaches ρ = ${isoValue} e/a₀³ inside the box (its largest sample is ${peak.toPrecision(3)})`);
+    }
+    return meshAtLevel(field, isoValue, () => 1);
 }

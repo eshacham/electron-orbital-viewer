@@ -269,15 +269,18 @@ def molecule_for_basis(basis_atoms, symbols, spin):
 
 
 def orbital_values(mol, basis, molecule_id):
-    """PySCF's own MO values (its AOs, the shipped coefficients) at
-    FIXTURE_POINTS, for the TS evaluator to match; the density is the shipped
-    orbitals' Σ occ ψ²."""
+    """PySCF's own AO values (`aos[point][ao]`, eval_gto) and MO values (its
+    AOs, the shipped coefficients) at FIXTURE_POINTS, for the TS evaluator to
+    match; the density is the shipped orbitals' Σ occ ψ². The AOs are kept
+    as well as the orbitals because symmetry leaves some AOs (δ d and f
+    functions in a σ/π molecule) out of every orbital, where an error in them
+    would not show."""
     points = np.asarray(FIXTURE_POINTS)
     ao = mol.eval_gto('GTOval_sph', points)
     orbitals = basis['orbitals']
     values = [ao @ np.asarray(o['coefficients']) for o in orbitals]
     density = sum(o['occupation'] * v ** 2 for o, v in zip(orbitals, values))
-    return {'moleculeId': molecule_id, 'points': points.tolist(),
+    return {'moleculeId': molecule_id, 'points': points.tolist(), 'aos': ao.tolist(),
             'orbitals': [{'index': o['index'], 'values': v.tolist()} for o, v in zip(orbitals, values)],
             'density': density.tolist()}
 

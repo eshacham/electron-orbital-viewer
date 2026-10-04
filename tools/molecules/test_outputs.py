@@ -180,6 +180,9 @@ def test_fixtures_are_reduced_copies_of_the_generated_files(tmp_path):
     assert np.array_equal(rho, density_on_grid(basis['shells'], basis['atoms'], basis['orbitals'], small['grid']))
     values = json.loads((dest / 'h2.json').read_text())
     ao = mol.eval_gto('GTOval_sph', np.asarray(FIXTURE_POINTS))
+    # Every AO on its own as well: an AO no shipped orbital uses (a δ d or f
+    # function in a σ/π molecule) is invisible in the orbital values.
+    assert np.array_equal(np.asarray(values['aos']), ao)
     for orbital, shipped in zip(values['orbitals'], basis['orbitals']):
         assert orbital['index'] == shipped['index']
         assert np.allclose(orbital['values'], ao @ np.asarray(shipped['coefficients']), rtol=0, atol=1e-13)

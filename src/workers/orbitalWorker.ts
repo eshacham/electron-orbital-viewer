@@ -1,6 +1,7 @@
 import { MeshData, OrbitalParams } from '@/types/orbital';
 import { FieldRenderRequest } from '../field_source';
-import { generateOrbitalMesh, generateFieldMeshes } from '../orbital_mesh';
+import { generateOrbitalMesh, generateFieldMeshes, generateIsoValueMesh } from '../orbital_mesh';
+import { registerMoleculeBasis } from '../molecules/basis_registry';
 
 type WorkerMessageData =
     | { type: 'calculate'; params: OrbitalParams }
@@ -45,7 +46,14 @@ worker.onmessage = (e: MessageEvent<WorkerMessageData>) => {
             // buffer over rather than copying it.
             worker.postMessage(response, [meshData.densityMap.data.buffer]);
         } else if (message.type === 'calculateFields') {
-            const meshes = generateFieldMeshes(message.request);
+            const { request } = message;
+            // A molecule's recipe names its basis; the request carries the
+            // basis itself, registered before any evaluator is rebuilt.
+            for (const basis of request.bases ?? []) registerMoleculeBasis(basis);
+            const isoValue = request.densityIsoValue;
+            const meshes = isoValue !== undefined
+                ? request.sources.map(source => generateIsoValueMesh(source, request.resolution, isoValue))
+                : generateFieldMeshes(request);
             const response: WorkerFieldsSuccessResponse = { type: 'fieldsSuccess', meshes };
             worker.postMessage(response, meshes.map(mesh => mesh.densityMap.data.buffer));
         }

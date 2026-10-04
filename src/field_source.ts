@@ -2,6 +2,9 @@ import { makeWaveFunctionEvaluator } from './quantum_functions';
 import { RadialGrid, interpolateOnGrid } from './atom/radial_grid';
 import { OrbitalParams } from './types/orbital';
 import { H2PlusState, h2plusEvaluator, solveH2Plus } from './bonds/h2plus';
+import type { GridSpec, MoleculeBasis } from './molecules/types';
+import { registeredBasis } from './molecules/basis_registry';
+import { densityEvaluator, densityOnGrid, moEvaluator, moOnGrid } from './molecules/gaussian_basis';
 
 /**
  * Everything the renderer draws is one of two sources (spec §4.1): an analytic
@@ -44,7 +47,29 @@ export interface H2PlusRecipe {
     state: H2PlusState;
 }
 
-export type FieldRecipe = HydrogenicRecipe | CombinationRecipe | Polarized1sRecipe | H2PlusRecipe;
+/** One molecular orbital from a shipped Gaussian basis (Phases 5–6). */
+export interface GaussianMORecipe {
+    type: 'gaussianMO';
+    /** A registered basis's id, e.g. 'n2@07' (see FieldRenderRequest.bases). */
+    moleculeId: string;
+    /** Position in the basis's `orbitals`. */
+    index: number;
+}
+
+/**
+ * A molecule's total density, evaluated from its basis (Phase 5). Evaluates
+ * √ρ, the convention generateFieldMesh already uses for density grids: the
+ * contour search squares its samples, so it sees ρ itself, and every vertex
+ * is "positive" -- a density has no phase.
+ */
+export interface GaussianDensityRecipe {
+    type: 'gaussianDensity';
+    moleculeId: string;
+}
+
+export type FieldRecipe =
+    | HydrogenicRecipe | CombinationRecipe | Polarized1sRecipe | H2PlusRecipe
+    | GaussianMORecipe | GaussianDensityRecipe;
 
 /** An analytic field, evaluated on demand in a worker. */
 export interface AnalyticFieldSource {
@@ -90,6 +115,13 @@ export interface FieldRenderRequest {
     resolution: number;
     enclosedFraction: number;
     label: string;
+    /** Bases the worker registers before evaluating 'gaussianMO'/'gaussianDensity' recipes. */
+    bases?: MoleculeBasis[];
+    /**
+     * Draw each source at this value of ρ (e/a₀³) instead of at an enclosed
+     * fraction. 'gaussianDensity' sources only; see generateIsoValueMesh for why.
+     */
+    densityIsoValue?: number;
 }
 
 /**
@@ -168,9 +200,39 @@ export function makeFieldEvaluator(recipe: FieldRecipe): FieldEvaluator {
         case 'combination': return combinationEvaluator(recipe);
         case 'polarized1s': return polarized1sEvaluator(recipe.field);
         case 'h2plus': return h2plusEvaluator(solveH2Plus(recipe.R, recipe.state));
+        case 'gaussianMO': return moEvaluator(registeredBasis(recipe.moleculeId), recipe.index);
+        case 'gaussianDensity': {
+            const rho = densityEvaluator(registeredBasis(recipe.moleculeId));
+            return (x, y, z) => Math.sqrt(rho(x, y, z));
+        }
         default: {
             const unhandled: never = recipe;
             throw new Error(`Unknown field recipe: ${JSON.stringify(unhandled)}`);
         }
+    }
+}
+
+/**
+ * The recipe's values over a whole grid at once (z-fastest), where that is
+ * much cheaper than point by point -- or null, and the caller samples
+ * makeFieldEvaluator's closure. Only the Gaussian recipes have one: a
+ * molecule at 96³ is 0.9 M points of up to 62 AOs each, and sampling it a
+ * grid row at a time from per-axis tables (gaussian_basis.ts, sampleOnGrid)
+ * takes O₂'s 97³ density from 1.45 s to 0.25 s (0.4–0.5 s meshed; Apple
+ * M2 Pro, task-7 report), inside §3.7's 1.5 s on a 2020 laptop with room
+ * for one that is twice as slow. The values are
+ * makeFieldEvaluator's to float32 storage (tests/molecules/gaussian_basis.test.ts).
+ */
+export function fieldOnGrid(recipe: FieldRecipe): ((grid: GridSpec) => Float32Array) | null {
+    switch (recipe.type) {
+        case 'gaussianMO': {
+            const basis = registeredBasis(recipe.moleculeId);
+            return grid => moOnGrid(basis, recipe.index, grid);
+        }
+        case 'gaussianDensity': {
+            const basis = registeredBasis(recipe.moleculeId);
+            return grid => densityOnGrid(basis, grid, { root: true });
+        }
+        default: return null;
     }
 }
