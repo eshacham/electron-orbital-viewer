@@ -109,14 +109,21 @@ export function useH2PlusCurve(enabled: boolean): UseH2PlusCurveResult {
         if (curve !== null || error !== null) {
             setValue({ curve, error });
         } else {
+            // A retry after an error (below) must not keep showing the old reason while it runs.
+            setValue(NO_RESULT);
             void startCurve().then(() => { if (live) setValue({ curve, error }); });
         }
         return () => {
             live = false;
             enabledCount -= 1;
             // Ruling M1: stop the worker only once nobody enabled is left
-            // waiting on it.
-            if (enabledCount === 0) stopCurve();
+            // waiting on it. A curve is kept for the session; an error is
+            // forgotten (final review M6), so coming back asks again rather
+            // than showing a failure that may have been transient.
+            if (enabledCount === 0) {
+                stopCurve();
+                error = null;
+            }
         };
     }, [enabled]);
 

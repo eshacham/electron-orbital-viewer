@@ -73,6 +73,26 @@ describe('useH2PlusCurve', () => {
         expect(worker.terminate).toHaveBeenCalledTimes(1);
     });
 
+    // Final review M6: a failure was cached for the session, so leaving
+    // Bonds and coming back showed the same error without asking again. A
+    // curve is still kept; an error is forgotten once the last view leaves.
+    it('retries after an error once the view is left and re-entered', async () => {
+        const { result, rerender } = renderHook(
+            ({ enabled }) => useH2PlusCurve(enabled),
+            { initialProps: { enabled: true } },
+        );
+        await act(async () => { worker.onerror!({ message: 'Script error' }); });
+        expect(result.current).toEqual({ curve: null, error: 'Script error' });
+
+        rerender({ enabled: false });
+        rerender({ enabled: true });
+        expect(createH2PlusCurveWorker).toHaveBeenCalledTimes(2);
+        expect(result.current).toEqual({ curve: null, error: null });
+
+        await act(async () => { worker.onmessage!({ data: curveMessage }); });
+        expect(result.current).toEqual({ curve, error: null });
+    });
+
     // Ruling M1: two enabled callers (e.g. the diagram and the curve plot)
     // share one worker; the first leaving must not cut off the second.
     it('keeps the worker running for a second enabled caller after the first leaves', async () => {
