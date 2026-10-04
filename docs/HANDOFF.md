@@ -809,6 +809,13 @@ was (bare `speciesKey`, byte-identical) and keys every other mode
 isolated j-level, since 6p½ and 6p³⁄₂ are different meshes at the same
 (n, l).
 
+The species solve memo is bounded (final review recommendation): a
+neutral ground state without relativity is kept for good (at most 118, so
+`solveAtom(Z)` stays one object), everything else — ions, excitations,
+every relativistic solve — least recently used first, 48 at most
+(`SOLVE_CACHE_LIMIT`). `failedNonRelativisticSolves` (verdicts only, no
+grids) is not bounded.
+
 ### Warm/cold start and the non-relativistic search throwing (rulings T7-a, T7-b)
 
 A relativistic solve seeds from the *same species'* converged
