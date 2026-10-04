@@ -178,7 +178,7 @@ describe('cube requests', () => {
             if (job.type === 'fieldCube') expect(job.description).toContain('large component, l-basis angular part');
         });
 
-        it('adds no large-component note for a scalar orbital, which has no j-level at all', () => {
+        it('notes a scalar orbital is the large component, without the l-basis caveat (it is a genuine l state)', () => {
             const store = goldStore('scalar');
             store.dispatch(drillToOrbital(6, 1, 0));
             const profile = store.getState().atom.profile!;
@@ -189,7 +189,10 @@ describe('cube requests', () => {
                 enclosedFraction: 0.9, radialSamples,
             }));
             const job = cubeJobFor(store.getState());
-            if (job.type === 'fieldCube') expect(job.description).not.toContain('large component');
+            if (job.type === 'fieldCube') {
+                expect(job.description).toContain('large component');
+                expect(job.description).not.toContain('l-basis');
+            }
         });
     });
 

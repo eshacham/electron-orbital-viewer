@@ -243,8 +243,13 @@ export function cubeJobFor(state: RootState): CubeJob {
     // real spherical harmonic -- the large component only, not the true
     // |j, m_j> angular shape (spec §3.6) -- so the cube says so rather than
     // reading as the full relativistic wavefunction.
-    const jLevelNote = atom.mode === 'atom' && atom.level === 'orbital' && atom.selectedOrbital?.j !== undefined
-        ? 'large component, l-basis angular part' : null;
+    // A scalar-relativistic orbital is a genuine l state, but its small
+    // component Q is dropped from the drawn psi too: "large component" alone.
+    const atomOrbital = atom.mode === 'atom' && atom.level === 'orbital';
+    const drawnMode = atom.profile ? profileRelativity(atom.profile) : 'off';
+    const jLevelNote = atomOrbital && atom.selectedOrbital?.j !== undefined
+        ? 'large component, l-basis angular part'
+        : atomOrbital && drawnMode === 'scalar' ? 'large component' : null;
     return {
         type: 'fieldCube', source, resolution, atoms: [{ Z, position: [0, 0, 0] }], title,
         description: `psi(x,y,z), real, bohr^-3/2, on the grid as drawn; ${methodStatement(state)}${jLevelNote ? `; ${jLevelNote}` : ''}; lengths in bohr`,
