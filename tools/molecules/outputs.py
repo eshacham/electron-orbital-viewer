@@ -4,7 +4,11 @@ publish.py, never committed -- spec §4.5), the committed test fixtures under
 tests/fixtures/molecules/, and the validation summary. Shapes are those of
 src/molecules/types.ts."""
 import gzip
+import hashlib
 import json
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +20,9 @@ from labels import label_orbitals, select_with_margin
 from molecules import BOHR_TO_ANGSTROM, DIATOMICS, HUBER_HERZBERG
 
 CACHE_DIR = Path(__file__).resolve().parent / '.cache'
+# Bump when the meaning of a cached value changes (2: result dicts with
+# convergence and T1, keyed by settings rather than by name).
+CACHE_SCHEMA = 2
 GRID_SPACING = 0.25
 GRID_PADDING = 6.5
 # The TS tests' density grid: odd, so it has a centre point like the shipped
@@ -41,33 +48,68 @@ FIXTURE_POINTS = [(0.0, 0.0, 0.0), (0.0, 0.0, 0.5), (0.3, -0.2, 1.1), (1.0, 0.5,
 
 def write_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, separators=(',', ':')) + '\n', encoding='utf-8')
+    partial = path.with_name(f'.{path.name}.partial')
+    partial.write_bytes(json_bytes(data))
+    partial.replace(path)
 
 
 def read_json(path):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
-def cached(key, compute):
-    """compute(), remembered in CACHE_DIR under `key`, so a generator run cut
-    short resumes where it stopped. Written to a temporary name and renamed,
-    so an interrupted write never leaves a half file that reads as a value."""
-    path = CACHE_DIR / f'{key}.json'
+def cached(settings, compute):
+    """compute(), remembered in CACHE_DIR under a hash of `settings` (a dict
+    naming everything that decides the value; quantum.reference_setup builds
+    them), so a generator run cut short resumes where it stopped. The dict is
+    stored beside the value and compared on read: any difference, including
+    CACHE_SCHEMA, recomputes rather than reuse a value computed another way
+    (ruling T4-b). Written to a temporary name and renamed, so an
+    interrupted write never leaves a half file that reads as a value."""
+    settings = json.loads(json.dumps({**settings, 'cacheSchema': CACHE_SCHEMA}, sort_keys=True))
+    digest = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()[:20]
+    path = CACHE_DIR / f'{settings.get("id", "value")}-{digest}.json'
     if path.exists():
-        return json.loads(path.read_text())['value']
+        stored = json.loads(path.read_text())
+        if stored.get('settings') == settings:
+            return stored['value']
     value = compute()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     partial = path.with_suffix('.partial')
-    partial.write_text(json.dumps({'value': value}))
+    partial.write_text(json.dumps({'settings': settings, 'value': value}))
     partial.replace(path)
     return value
 
 
 def energy_method_label(d, spin):
+    # No counterpoise correction anywhere; it matters only for He₂, whose
+    # well is the size of the basis-set superposition error (see its note).
     if d.energy_method == 'fci':
-        return 'FCI/aug-cc-pVTZ'
+        return 'FCI/aug-cc-pVTZ (no counterpoise correction)'
     return ('UCCSD(T)/aug-cc-pVTZ (UHF reference, frozen core)' if spin
             else 'CCSD(T)/aug-cc-pVTZ (frozen core)')
+
+
+def write_tree(files, target):
+    """Write {relative path: bytes} as the directory `target`, replacing
+    whatever was there, via a sibling staging directory renamed into place:
+    a run that fails part-way leaves the previous output, never half of a
+    new one (review M6)."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f'.{target.name}-', dir=target.parent))
+    try:
+        for relative, data in files.items():
+            (staging / relative).parent.mkdir(parents=True, exist_ok=True)
+            (staging / relative).write_bytes(data)
+        if target.exists():
+            shutil.rmtree(target)
+        os.replace(staging, target)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+
+
+def json_bytes(data):
+    return (json.dumps(data, ensure_ascii=False, separators=(',', ':')) + '\n').encode('utf-8')
 
 
 def atoms_of(mol):
@@ -233,21 +275,30 @@ def write_fixtures(out_root, dest, *, density_id='n2', basis_ids=('o2', 'hf')):
                                 f'{", ".join(missing or [density_id])}: run generate.py --only {" ".join(ids)} first')
     meta = read_json(out_root / density_id / 'meta.json')
     small = dict(meta, grid=grid_spec(_separation(meta), side=FIXTURE_GRID_SIDE))
+    files = {}   # built and measured in full before anything is written (review M6)
     for molecule_id in ids:
         basis = read_json(out_root / molecule_id / 'basis.json')
         atoms_meta = read_json(out_root / molecule_id / 'meta.json')
         mol = molecule_for_basis(basis['atoms'], [ELEMENTS[a['Z']] for a in atoms_meta['atoms']], atoms_meta['spin'])
         check_against_pyscf(mol, basis['shells'])
-        write_json(dest / f'{molecule_id}.json', orbital_values(mol, basis, molecule_id))
-        write_json(dest / molecule_id / 'basis.json', basis)
+        files[f'{molecule_id}.json'] = json_bytes(orbital_values(mol, basis, molecule_id))
+        files[f'{molecule_id}/basis.json'] = json_bytes(basis)
         if molecule_id == density_id:
-            write_json(dest / molecule_id / 'meta.json', small)
-            write_json(dest / molecule_id / 'scan.json', read_json(out_root / molecule_id / 'scan.json'))
+            files[f'{molecule_id}/meta.json'] = json_bytes(small)
+            files[f'{molecule_id}/scan.json'] = json_bytes(read_json(out_root / molecule_id / 'scan.json'))
             density = density_on_grid(basis['shells'], basis['atoms'], basis['orbitals'], small['grid'])
-            (dest / molecule_id / 'density.bin.gz').write_bytes(gzip_floats(density))
-    total = sum(p.stat().st_size for p in dest.rglob('*') if p.is_file())
+            files[f'{molecule_id}/density.bin.gz'] = gzip_floats(density)
+    total = sum(len(data) for data in files.values())
     if total > FIXTURE_BUDGET_BYTES:
-        raise AssertionError(f'fixtures under {dest} total {total} bytes, over the {FIXTURE_BUDGET_BYTES} budget')
+        raise AssertionError(f'fixtures would total {total} bytes, over the {FIXTURE_BUDGET_BYTES} budget; nothing written')
+    # File by file (each atomically), not write_tree: tests/fixtures/molecules
+    # may hold fixtures this function does not own.
+    for relative, data in files.items():
+        path = dest / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        partial = path.with_name(f'.{path.name}.partial')
+        partial.write_bytes(data)
+        partial.replace(path)
     return total
 
 

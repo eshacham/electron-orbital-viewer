@@ -39,7 +39,9 @@ class Diatomic:
 DIATOMICS = (
     Diatomic('h2', 'Hydrogen', 'H₂', ('H', 'H'), 0, 0.7414, 'fci', 0.7414, HUBER_HERZBERG),
     Diatomic('he2', 'Helium dimer', 'He₂', ('He', 'He'), 0, 1.5875, 'fci', None, None,
-             'No chemical bond: bond order 0. The full-CI curve has only a van der Waals well of a few hundredths of a mHa, invisible at this scale.'),
+             'No chemical bond: bond order 0. The full-CI curve has only a van der Waals well of a few hundredths of a mHa, '
+             'invisible at this scale; no counterpoise correction is applied, and basis-set superposition error is of '
+             'the same order as that well.'),
     Diatomic('li2', 'Lithium', 'Li₂', ('Li', 'Li'), 0, 2.6729, 'ccsd(t)', None, HUBER_HERZBERG),
     Diatomic('b2', 'Boron', 'B₂', ('B', 'B'), 2, 1.5900, 'ccsd(t)', None, HUBER_HERZBERG,
              'Ground state is the triplet ³Σg⁻: two unpaired electrons in 1πu.'),
@@ -61,3 +63,8 @@ IRREP_NELEC_DOOH = {
     'o2': {'A1g': (3, 3), 'A1u': (2, 2), 'E1ux': (1, 1), 'E1uy': (1, 1), 'E1gx': (1, 0), 'E1gy': (1, 0)},
 }
 DOOH_TO_D2H = {'A1g': 'Ag', 'A1u': 'B1u', 'E1ux': 'B3u', 'E1uy': 'B2u', 'E1gx': 'B2g', 'E1gy': 'B3g'}
+
+# Free-atom ground states (2S, term) for D_e = E(A) + E(B) - E(AB, R_e) at the
+# molecule's own method and basis (ruling T4-a).
+ATOM_GROUND_STATES = {'H': (1, '²S'), 'He': (0, '¹S'), 'Li': (1, '²S'), 'B': (1, '²P'),
+                      'C': (2, '³P'), 'N': (3, '⁴S'), 'O': (2, '³P'), 'F': (1, '²P')}

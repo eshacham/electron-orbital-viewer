@@ -76,9 +76,41 @@ def test_cached_computes_once(tmp_path, monkeypatch):
     import outputs
     monkeypatch.setattr(outputs, 'CACHE_DIR', tmp_path)
     calls = []
-    assert cached('k', lambda: calls.append(1) or 1.5) == 1.5
-    assert cached('k', lambda: calls.append(1) or 9.9) == 1.5
+    settings = {'id': 'n2', 'RBohr': repr(2.0), 'reference': 'RHF'}
+    assert cached(settings, lambda: calls.append(1) or 1.5) == 1.5
+    assert cached(dict(settings), lambda: calls.append(1) or 9.9) == 1.5
     assert calls == [1]
+
+
+def test_a_change_of_reference_misses_the_cache(tmp_path, monkeypatch):
+    """Ruling T4-b: anything that decides the number is in the key, and the
+    stored settings are compared on read."""
+    import outputs
+    monkeypatch.setattr(outputs, 'CACHE_DIR', tmp_path)
+    assert cached({'id': 'o2', 'reference': 'UHF'}, lambda: 1.0) == 1.0
+    assert cached({'id': 'o2', 'reference': 'RHF'}, lambda: 2.0) == 2.0
+    assert cached({'id': 'o2', 'reference': 'UHF'}, lambda: 3.0) == 1.0
+    # A file whose stored settings disagree with its name (a hash collision,
+    # or a hand edit) is recomputed, not trusted.
+    path = next(tmp_path.glob('o2-*.json'))
+    stored = json.loads(path.read_text())
+    stored['settings']['reference'] = 'ROHF'
+    path.write_text(json.dumps(stored))
+    recomputed = [cached({'id': 'o2', 'reference': r}, lambda: 4.0) for r in ('UHF', 'RHF')]
+    assert sorted(recomputed) == [2.0, 4.0]
+    monkeypatch.setattr(outputs, 'CACHE_SCHEMA', outputs.CACHE_SCHEMA + 1)
+    assert cached({'id': 'o2', 'reference': 'RHF'}, lambda: 5.0) == 5.0
+
+
+def test_reference_settings_name_what_decides_the_energy():
+    from quantum import reference_setup
+    o2 = _BY_ID['o2']
+    triplet = reference_setup(o2, 2.28)[2]
+    singlet = reference_setup(o2, 2.28, spin=0, symmetry=False)[2]
+    assert (triplet['reference'], singlet['reference']) == ('UHF', 'RHF')
+    assert triplet['pinned'] and singlet['pinned'] is None
+    assert triplet['frozen'] == 2 and triplet['RBohr'] == repr(2.28)
+    assert {'method', 'basis', 'spin', 'thresholds', 'pyscf', 'symmetry'} <= set(triplet)
 
 
 def test_generator_writes_under_the_versioned_out_root():
@@ -161,3 +193,23 @@ def test_fixtures_say_what_to_generate_first(tmp_path):
     from outputs import write_fixtures
     with pytest.raises(FileNotFoundError, match=r'generate\.py --only n2'):
         write_fixtures(tmp_path / 'out', tmp_path / 'fixtures', density_id='n2', basis_ids=('o2', 'hf'))
+
+
+def test_a_refused_curve_writes_nothing(tmp_path, monkeypatch):
+    """Review M6: validation happens before any file is written. A curve
+    that turns over before R_e has fewer than eight valid points and is
+    refused; the molecule's folder must not appear."""
+    import generate
+    from molecules import SCAN_FACTORS
+    energies = [-1.0 - 0.01 * k for k in range(5)] + [-1.06 + 0.01 * k for k in range(15)]
+    energies[5] = energies[4] - 0.001
+    energies[6] = energies[5] - 0.002   # minimum at 6, then
+    energies[7] = energies[6] - 0.0     # flat: a turnover at index 7
+    results = iter([{'energyHartree': e, 'converged': True, 't1Diagnostic': 0.01, 'failure': None}
+                    for e in energies])
+    monkeypatch.setattr(generate, 'reference_point', lambda d, r, **kw: next(results))
+    monkeypatch.setattr(generate, 'separated_atoms', lambda d: (0.0, 'mock atoms'))
+    with pytest.raises(ValueError, match=r'n2: single-reference CCSD\(T\) is valid for only 7 of 20 points'):
+        generate.run_molecule(_BY_ID['n2'], 'abc', out=tmp_path)
+    assert list(tmp_path.iterdir()) == []
+    assert len(SCAN_FACTORS) == 20
