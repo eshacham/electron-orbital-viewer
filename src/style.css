@@ -977,3 +977,55 @@ html, body, #root {
   color: rgba(0, 0, 0, 0.78);
   font-variant-numeric: tabular-nums;
 }
+
+/* MoDiagram (Task 11). Sits in BondsPanel, on the same light, translucent
+   card as LevelNav (ruling C6) -- dark-on-light, not the dark-panel
+   treatment a diagram floating over the 3D view might suggest. */
+.mo-diagram {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.87);
+}
+.mo-levels {
+  position: relative;
+}
+.mo-level {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transform: translateY(-50%);
+}
+.mo-box {
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.87);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+/* The theme primary already reads at 4.5:1+ on the light card (panel_contrast
+   checks it generically); selection is never carried by this outline alone
+   -- aria-pressed and the box's own accessible name say so too. */
+.mo-box.selected {
+  outline: 2px solid #1565c0;
+}
+.mo-label {
+  margin-left: 6px;
+}
+.mo-break {
+  position: absolute;
+  left: 0;
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 11px;
+}
+.mo-note {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 11px;
+}
+.mo-footer {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 11px;
+}

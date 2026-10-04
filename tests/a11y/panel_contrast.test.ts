@@ -46,6 +46,13 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     // Phase 4: the Relativity switch's "what changed" readout, on #controls's
     // light card (the phone's View tab is the same light sheet).
     { selector: '.relativity-what-changed', declared: 'color: rgba(0, 0, 0, 0.78)', fg: 'rgba(0, 0, 0, 0.78)', bg: LIGHT_96 },
+    // Task 11 (ruling C6): MoDiagram sits in BondsPanel, on the same light
+    // card as LevelNav, so its strokes and captions need dark-on-light too.
+    { selector: '.mo-diagram', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
+    { selector: '.mo-box', declared: 'border-bottom: 2px solid rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
+    { selector: '.mo-break', declared: 'color: rgba(0, 0, 0, 0.6)', fg: 'rgba(0, 0, 0, 0.6)', bg: LIGHT_96 },
+    { selector: '.mo-note', declared: 'color: rgba(0, 0, 0, 0.6)', fg: 'rgba(0, 0, 0, 0.6)', bg: LIGHT_96 },
+    { selector: '.mo-footer', declared: 'color: rgba(0, 0, 0, 0.6)', fg: 'rgba(0, 0, 0, 0.6)', bg: LIGHT_96 },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {
