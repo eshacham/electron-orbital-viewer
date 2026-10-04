@@ -1,5 +1,5 @@
 import { createAppStore, RootState } from '../../src/store';
-import { setElement, setCharge, setExcitation, solveSucceeded, solveUnbound } from '../../src/store/atomSlice';
+import { setElement, setCharge, setExcitation, setRelativity, solveSucceeded, solveUnbound } from '../../src/store/atomSlice';
 import { AtomSpecies, speciesKey } from '../../src/atom/species';
 import { SerialisedAtomProfile, ReferenceRadii, SerialisedComparison } from '../../src/workers/atomWorker';
 import { RelativityMode } from '../../src/atom/relativity';
@@ -70,6 +70,9 @@ export function goldProfile(relativity: RelativityMode, options: { j?: boolean; 
 export function goldStore(relativity: RelativityMode, options: { j?: boolean; comparison?: boolean } = {}) {
     const store = makeStore();
     store.dispatch(setElement(79));
+    // The switch shows the picture's own mode, as once its solve has landed
+    // (pictureLanded): exports wait while the two differ (final review M5).
+    store.dispatch(setRelativity(relativity));
     store.dispatch(solveSucceeded(goldProfile(relativity, options)));
     return store;
 }
@@ -79,6 +82,7 @@ export function goldIonStore(relativity: RelativityMode) {
     const store = makeStore();
     store.dispatch(setElement(79));
     store.dispatch(setCharge(1));
+    store.dispatch(setRelativity(relativity));
     const reference: ReferenceRadii = { displayRadius: 1.6, contourRadius: 1.5, framingRadius: 2 };
     const species: AtomSpecies = { Z: 79, charge: 1, excitation: null };
     store.dispatch(solveSucceeded({ ...goldProfile(relativity), charge: 1, speciesKey: speciesKey(species), reference }));

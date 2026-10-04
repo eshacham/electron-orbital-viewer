@@ -3,7 +3,7 @@
 jest.mock('../../src/export/gltf_exporter_factory', () => ({ exportGlb: jest.fn(async () => new ArrayBuffer(12)) }));
 
 import { runExport, exportAvailability, cubeJobFor, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON, COMPOSITION_FAILED_REASON } from '../../src/export/run_export';
-import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted, solveSucceeded, levelUp } from '../../src/store/atomSlice';
+import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted, solveSucceeded, levelUp, setRelativity } from '../../src/store/atomSlice';
 import {
     setCombination, startOrbitalCalculation, failOrbitalCalculation, startCompositionBuild, endCompositionBuild, failCompositionBuild,
     setLevelTransition,
@@ -11,7 +11,7 @@ import {
 import { basicOrbitalParams } from '../../src/orbital_presets';
 import { selectionProblem } from '../../src/combinations';
 import { NOTHING_TO_EXPORT_REASON } from '../../src/export/surfaces';
-import { makeStore, neonStore, sodiumIonStore, chlorideUnboundStore, readText, baseContext, octahedron, exportHandle, goldStore } from './fixtures';
+import { makeStore, neonStore, sodiumIonStore, chlorideUnboundStore, readText, baseContext, octahedron, exportHandle, goldStore, goldProfile } from './fixtures';
 
 // Fix round 1, M3: startOrbitalCalculation sets currentParams before the
 // render finishes, and failOrbitalCalculation does not clear it back out --
@@ -316,6 +316,25 @@ describe('runExport: cube', () => {
 // every export kind must say so with the store's own message -- never the
 // generic "waiting for the atom" reason, which would read as if a solve
 // were merely still running.
+// Final review M5: a relativity switch keeps the old mode's picture up while
+// the new one solves (ruling C9), but the view link a file embeds already
+// names the new mode -- so every export waits, and file and link never
+// disagree about which picture they describe.
+describe('exportAvailability: a picture re-solving for a relativity switch', () => {
+    it('refuses every kind while the picture on screen is the old mode\'s, and allows them once the new one lands', () => {
+        const store = goldStore('scalar');
+        store.dispatch(drillToShell(6));
+        store.dispatch(setRelativity('spinOrbit'));
+        store.dispatch(solveStarted());
+        expect(exportAvailability(store.getState())).toEqual({
+            png: PICTURE_BUSY_REASON, 'png-plain': PICTURE_BUSY_REASON, csv: PICTURE_BUSY_REASON,
+            stl: PICTURE_BUSY_REASON, glb: PICTURE_BUSY_REASON, cube: PICTURE_BUSY_REASON,
+        });
+        store.dispatch(solveSucceeded(goldProfile('spinOrbit', { j: true })));
+        expect(exportAvailability(store.getState())).toEqual({ png: null, 'png-plain': null, csv: null, stl: null, glb: null, cube: null });
+    });
+});
+
 describe('exportAvailability and runExport: an unbound anion', () => {
     it('refuses every kind with the store\'s own unbound message, not WAITING_FOR_ATOM_REASON', async () => {
         const store = chlorideUnboundStore();

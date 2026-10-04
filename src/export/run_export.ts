@@ -5,7 +5,7 @@ import { ORBITAL_RESOLUTION, BASIC_ORBITALS_Z } from '../orbital_presets';
 import { subshellSpokenLabel } from '../atom/configurations';
 import { buildComparisonCurves } from '../atom/comparison_curves';
 import type { SerialisedAtomProfile } from '../workers/atomWorker';
-import { profileRelativity } from '../store/atomSlice';
+import { profileRelativity, pictureLanded } from '../store/atomSlice';
 import { CsvCurve, radialCurvesToCsv } from './csv';
 import { exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment, jLevelShapeCaption } from './caption';
 import { CombinationLegendItem } from './png';
@@ -74,15 +74,28 @@ export const RENDER_FAILED_REASON = 'The last picture failed to compute; nothing
 /** Final review I2: a shell view whose lobes failed is not the picture its caption names. */
 export const COMPOSITION_FAILED_REASON = 'This shell\'s orbital lobes failed to compute, so the picture is incomplete.';
 
+/**
+ * Atom mode's own refusals, shared by every export kind: a verdict, no
+ * picture yet, or (final review M5) the previous mode's picture still up
+ * while a relativity switch re-solves (ruling C9). That picture is real,
+ * and its captions would name its own mode -- but the view link every file
+ * embeds already names the new one, so file and link would disagree.
+ */
+function atomPictureReason(state: RootState): string | null {
+    // Task 12b (ruling C4): an unbound anion -- or, since ruling T7-b,
+    // an excitation whose promoted electron LDA does not bind -- is a
+    // verdict (spec §3.5), not a solve still in progress -- every export must say so in the
+    // store's own words, never the generic "waiting" reason, which
+    // would read as if trying again later would help.
+    if (state.atom.unbound) return state.atom.unbound;
+    if (!state.atom.profile) return WAITING_FOR_ATOM_REASON;
+    return pictureLanded(state.atom) ? null : PICTURE_BUSY_REASON;
+}
+
 function drawnReason(state: RootState): string | null {
     if (state.atom.mode === 'atom') {
-        // Task 12b (ruling C4): an unbound anion -- or, since ruling T7-b,
-        // an excitation whose promoted electron LDA does not bind -- is a
-        // verdict (spec §3.5), not a solve still in progress -- every export must say so in the
-        // store's own words, never the generic "waiting" reason, which
-        // would read as if trying again later would help.
-        if (state.atom.unbound) return state.atom.unbound;
-        if (!state.atom.profile) return WAITING_FOR_ATOM_REASON;
+        const picture = atomPictureReason(state);
+        if (picture) return picture;
         // Atom mode's level 3 renders through the same orbital request as
         // Basic Orbitals, so a failed one leaves nothing on screen either.
         // The shell levels draw from the profile; a stale flag from an
@@ -159,11 +172,10 @@ export const CUBE_BUSY_REASON = 'The surface is still being computed.';
 export function cubeReason(state: RootState): string | null {
     if (state.atom.mode === 'atom' && state.atom.level !== 'orbital') {
         // Ruling C4: an unbound anion's own message, not WAITING_FOR_ATOM_REASON.
-        if (state.atom.unbound) return state.atom.unbound;
         // setElement nulls the profile unconditionally (see atomSlice), so
-        // isSolving is never true here with a profile still in place --
-        // "no profile yet" is the only way to be waiting at these levels.
-        return state.atom.profile ? null : WAITING_FOR_ATOM_REASON;
+        // a species change is "no profile yet"; a relativity switch keeps
+        // the old picture, which atomPictureReason refuses (M5).
+        return atomPictureReason(state);
     }
     const reason = drawnReason(state);
     if (reason) return reason;
@@ -249,8 +261,7 @@ export function cubeJobFor(state: RootState): CubeJob {
 function csvReason(state: RootState): string | null {
     if (state.atom.mode === 'atom') {
         // Ruling C4: an unbound anion's own message, not WAITING_FOR_ATOM_REASON.
-        if (state.atom.unbound) return state.atom.unbound;
-        return state.atom.profile ? null : WAITING_FOR_ATOM_REASON;
+        return atomPictureReason(state);
     }
     return drawnReason(state);
 }
