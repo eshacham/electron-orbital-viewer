@@ -14,6 +14,11 @@ jest.mock('../src/workers/createAtomWorker', () => ({
 }));
 // Ruling C1: App imports createExportWorker (import.meta.url), unparseable by ts-jest.
 jest.mock('../src/workers/createExportWorker', () => ({ createExportWorker: jest.fn() }));
+// Ruling C7: useH2PlusCurve(enabled) is another import.meta.url worker module; this
+// suite renders App too (M6), so it needs the same mock as src/App.test.tsx.
+jest.mock('../src/workers/createH2PlusCurveWorker', () => ({
+    createH2PlusCurveWorker: jest.fn(() => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null })),
+}));
 // The picker's controls cannot reach a refused selection (the slider is
 // clamped); Phase 2's URL state will. This stands in for it: any selection
 // can be typed in, and the real picker still renders beside it, Alert and all.

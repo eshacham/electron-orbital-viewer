@@ -3,7 +3,7 @@ import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ClipAxis, MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
 import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { createOrbitalMaterial, applySurfaceStyle, updateClipPlane, setGroupOpacity } from './orbital_material';
-import { createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCaps } from './clip_caps';
+import { createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCaps, setCapsPositiveColour } from './clip_caps';
 import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
 import { createOrbitalWorker } from './workers/createOrbitalWorker';
 import { createOrbitalControls } from './orbital_controls_factory';
@@ -27,6 +27,11 @@ import {
     disposeCompositionLobes
 } from './atom/shell_composition_view';
 import { FieldRenderRequest } from './field_source';
+// Imported from systems.ts rather than bonds_request.ts (preflight T8<->T9):
+// bonds_request.ts also pulls in store/bondsSlice and h2plus, which this
+// module -- the shared rendering core, not Bonds-specific -- has no other
+// reason to depend on.
+import { DENSITY_SURFACE_HEX } from './bonds/systems';
 import { createFieldOverlayGroup } from './field_overlay_view';
 import { markExportSurface } from './export/surfaces';
 import { CANONICAL_CAMERA_DIRECTION } from './camera_angles';
@@ -37,6 +42,9 @@ import {
     setReferenceRingWidth,
     disposeReferenceRing
 } from './atom/reference_ring';
+
+/** One colour for a total density (spec §4.1): ψ's red and blue would claim a phase it does not have. */
+export const DENSITY_SURFACE_COLOUR = new THREE.Color(DENSITY_SURFACE_HEX);
 
 // Add export to make it available to OrbitalViewer
 export interface VisualizerContext {
@@ -1224,7 +1232,8 @@ export async function updateFieldInScene(
                 if (e.data.type === 'fieldsSuccess') {
                     const meshes = e.data.meshes;
                     if (meshes.length === 1) {
-                        updateSceneWithMeshData(context, meshes[0]);
+                        updateSceneWithMeshData(context, meshes[0], false,
+                            request.densityIsoValue !== undefined ? DENSITY_SURFACE_COLOUR : undefined);
                     } else {
                         showFieldOverlay(context, meshes, request.colors, request.memberLabels);
                     }
@@ -1707,7 +1716,9 @@ function startAnimationLoop(context: VisualizerContext) {
 function updateSceneWithMeshData(
     context: VisualizerContext,
     meshData: MeshData,
-    crossFadeFromShellView: boolean = false
+    crossFadeFromShellView: boolean = false,
+    /** A density has no ψ sign to colour by (ruling T7-a); when set, every vertex and the cut face take this one colour instead. */
+    uniformColour?: THREE.Color
 ) {
     if (!context || context.isDisposed) {
         console.warn('Visualizer: Cannot update scene - context is disposed or null');
@@ -1736,19 +1747,29 @@ function updateSceneWithMeshData(
         const positions = new Float32Array(meshData.positions.flat());
         const colors = new Float32Array(meshData.positions.length * 3); // RGB for each vertex
 
-        // Assign colors based on ψ sign
-        meshData.psiSigns.forEach((sign, index) => {
-            const colorIndex = index * 3;
-            if (sign === 1) {
-                colors[colorIndex] = 1; // Red
-                colors[colorIndex + 1] = 0;
-                colors[colorIndex + 2] = 0;
-            } else {
-                colors[colorIndex] = 0; // Blue
-                colors[colorIndex + 1] = 0;
-                colors[colorIndex + 2] = 1;
-            }
-        });
+        if (uniformColour) {
+            // One colour throughout: a density carries no phase to split red/blue by.
+            meshData.psiSigns.forEach((_sign, index) => {
+                const colorIndex = index * 3;
+                colors[colorIndex] = uniformColour.r;
+                colors[colorIndex + 1] = uniformColour.g;
+                colors[colorIndex + 2] = uniformColour.b;
+            });
+        } else {
+            // Assign colors based on ψ sign
+            meshData.psiSigns.forEach((sign, index) => {
+                const colorIndex = index * 3;
+                if (sign === 1) {
+                    colors[colorIndex] = 1; // Red
+                    colors[colorIndex + 1] = 0;
+                    colors[colorIndex + 2] = 0;
+                } else {
+                    colors[colorIndex] = 0; // Blue
+                    colors[colorIndex + 1] = 0;
+                    colors[colorIndex + 2] = 1;
+                }
+            });
+        }
 
         const positionAttribute = new THREE.Float32BufferAttribute(positions, 3);
         geometry.setAttribute('position', positionAttribute);
@@ -1770,6 +1791,7 @@ function updateSceneWithMeshData(
             densityMap: meshData.densityMap,
             opacity: context.surfaceStyle.opacity
         });
+        if (uniformColour) setCapsPositiveColour(caps, uniformColour);
         group.add(caps);
         context.currentCaps = caps;
         refreshCaps(context);

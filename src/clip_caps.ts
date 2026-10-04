@@ -210,6 +210,14 @@ export function setCapsOpacity(caps: THREE.Object3D | null, opacity: number): vo
     });
 }
 
+/** Recolours the cut face's "positive" shade; a density has no phase, so it takes the surface's own colour. */
+export function setCapsPositiveColour(caps: THREE.Group, colour: THREE.Color): void {
+    caps.traverse(object => {
+        const material = (object as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
+        if (material?.uniforms?.positivePhase) material.uniforms.positivePhase.value.copy(colour);
+    });
+}
+
 /** Frees the density texture; the geometry is shared and disposed with the mesh. */
 export function disposeCaps(caps: THREE.Object3D | null): void {
     if (!caps) return;

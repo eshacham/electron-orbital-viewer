@@ -54,6 +54,14 @@ jest.mock('./workers/createAtomWorker', () => ({
 // covered directly in tests/export/cube_request.test.ts and run_export.test.ts.
 jest.mock('./workers/createExportWorker', () => ({ createExportWorker: jest.fn() }));
 
+// Ruling C7: App gates the H2+ curve worker to Bonds mode with H2+ selected,
+// via useH2PlusCurve(enabled) -- another import.meta.url module, mocked here
+// for the same reason as createAtomWorker/createExportWorker above. Nothing
+// in this suite drives it; see tests/bonds/use_h2plus_curve.test.tsx.
+jest.mock('./workers/createH2PlusCurveWorker', () => ({
+    createH2PlusCurveWorker: jest.fn(() => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null })),
+}));
+
 /** A matchMedia stand-in reporting a fixed narrow/wide state (see tests/useMediaQuery.test.tsx for the original). */
 function installMatchMedia(matches: boolean) {
     (window as unknown as { matchMedia: unknown }).matchMedia = (media: string) => ({
