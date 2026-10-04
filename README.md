@@ -452,7 +452,8 @@ metals. *Scalar* (Koelling–Harmon: the mass-velocity and Darwin terms) is
 on by default from caesium onward, where that error passes a few percent;
 *With spin–orbit* (the full Dirac equation) is available for any element on
 request. Both are validated against NIST's own ScRLDA/RLDA reference tables
-to within 1% everywhere, and within 0.1% for Z ≤ 18 specifically against
+to within 1 % for the eight validated atoms (Ne, Ar, Kr, Xe, Au, Hg, Rn, U),
+and within 0.1% for Z ≤ 18 specifically against
 NIST's own relativistic columns — switching relativity on still moves a
 light atom's own numbers measurably (argon's total energy by 0.30%, its 3s
 orbital energy by 0.82%), which is real physics the non-relativistic number
@@ -467,13 +468,15 @@ this is still one atom at a time. Spin–orbit coupling is a relativity mode
 (above), not always included: with it on, a p/d/f subshell's j-levels
 (6p½, 6p³⁄₂, …) carry real orbital energies and real radial functions R(r) —
 but the orbital lobe you can drill down to still draws the ordinary l-basis
-angular shape, never the true |j, mⱼ⟩ angular dependence, which mixes two
-l-values' spin states and has no analogue in this renderer. **Most
+angular shape, never the true |j, mⱼ⟩ angular dependence: its large
+component keeps the one l but mixes two mₗ values with the two spin states,
+which has no analogue in this renderer. **Most
 anions are not bound at all in this LDA** — H⁻, C⁻, O⁻, F⁻, S⁻, Cl⁻ and O²⁻
 among the elements light enough to validate — and the app reports that
 rather than drawing a picture for an electron the model does not actually
 keep; Br⁻ and I⁻ are bound, and the spec's size-ordering check runs against
-those two.
+those two (without relativity: forced into a relativistic mode, both are
+reported unbound by an approximate check — see `docs/HANDOFF.md`).
 
 **Orbital eigenvalues are not ionisation energies.** Koopmans' theorem, which
 would let you read an ionisation energy straight off an eigenvalue, does not

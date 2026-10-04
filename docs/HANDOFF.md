@@ -246,6 +246,24 @@ Both are inside the spec's 1 % bar for every element, with wide margin.
 Restricted to Z ≤ 18 (Ne, Ar) — the spec's tighter bar — the worst case in
 either column is Ar 3p at 0.011 %, inside the 0.1 % the spec asks there.
 
+**A systematic ~0.1 % scalar core-level offset** (final review
+recommendation; not a bug as far as anything here measures). Every scalar
+core eigenvalue of the heavy atoms is *less* bound than NIST's ScRLDA by a
+near-constant fraction that grows gently with Z: U 1s by 3.24 Ha (0.076 %),
+2s by 0.72 Ha (0.091 %), 2p by 0.66 Ha (0.100 %), 3s–5p 0.07–0.10 %; Au, Hg
+and Rn's 1s/2s/2p 0.06–0.09 %. The RLDA column, solved by the same code with
+the same exchange, grid and nucleus, matches to about 0.001 % (U core
+levels within 1 mHa), and the scalar *total* energies match to 0.001 % — so
+the offset sits in how the scalar eigenvalue is defined, not in the
+self-consistent field. The likely cause is a convention difference in the
+scalar equation rather than a defect: whether the small component Q² is
+counted in the scalar density (it is here, as in the Dirac case), or the
+exact form of the Koelling–Harmon centrifugal term (j-averaged κ(κ+1)
+against l(l+1), with or without the relativistic mass in it). Nobody has
+traced it to one of these; it is ten times inside the spec's bar, but a
+future change to the scalar equation should be checked against it rather
+than against the 1 % bar alone.
+
 **The light-atom finding behind that 0.1 % bar's wording** (recorded in
 `global-constraints.md` while this phase was planned, carried forward here
 because it is still the right reading): switching relativity *on* moves
@@ -271,8 +289,9 @@ non-relativistic model except the first two:
 - **A j-level's orbital is drawn with the plain l-basis angular shape**
   (spec §3.6): level 3 shows R(r) of that j-level times the ordinary real
   spherical harmonic, the large component only — not the true
-  |j, mⱼ⟩ angular dependence, which mixes two l values' spin states and has
-  no analogue in this renderer. Exports say so explicitly ("large
+  |j, mⱼ⟩ angular dependence, whose large component keeps the one l but
+  mixes two mₗ values with the two spin states (the small component carries
+  the other l), and has no analogue in this renderer. Exports say so explicitly ("large
   component, l-basis angular part", `run_export.ts`); D(r) and the radial
   curves are the real, relativistic R(r) and do not have this limit.
 - **Level 3 has no relativity framing floor.** The whole-atom and open-shell
