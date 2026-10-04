@@ -336,7 +336,7 @@ export function solveH2Plus(R: number, state: H2PlusState): H2PlusSolution {
     const radialM = radialMatrix(p, R);
     const v = eigenvectorFor(radialM.diag, radialM.off, extremeEigenvalue(radialM.diag, radialM.off, 'highest'));
     // Undo the symmetrisation. With D = diag(dₙ), D⁻¹SD is the recurrence's
-    // own matrix when dₙ₊₁/dₙ = √(γₙ₊₁/αₙ), so its eigenvector -- the Jaffé
+    // own matrix when dₙ₊₁/dₙ = √(αₙ/γₙ₊₁), so its eigenvector -- the Jaffé
     // coefficients -- is gₙ = vₙ/dₙ with d₀ = 1 and dₙ₊₁ = dₙ(n + 1)/|n − σ|
     // (σ ∈ (0, 1), never an integer, so no factor vanishes).
     const radial = new Float64Array(v.length);
