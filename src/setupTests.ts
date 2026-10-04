@@ -45,24 +45,29 @@ if (typeof globalThis.TextDecoder === 'undefined') {
     globalThis.TextEncoder = TextEncoder;
 }
 
-// jsdom does not implement matchMedia, which the responsive layout reads to
-// decide between the sidebar and the phone sheet. Report desktop width.
-if (!window.matchMedia) {
-    window.matchMedia = (query: string) => ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-}
+// Both of the below are jsdom-only globals: the molecule loader's tests run
+// under the node environment instead (they need Node's real fetch, Blob and
+// DecompressionStream), where `window`/`HTMLCanvasElement` do not exist.
+if (typeof window !== 'undefined') {
+    // jsdom does not implement matchMedia, which the responsive layout reads to
+    // decide between the sidebar and the phone sheet. Report desktop width.
+    if (!window.matchMedia) {
+        window.matchMedia = (query: string) => ({
+            matches: false,
+            media: query,
+            onchange: null,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+            dispatchEvent: () => false,
+        }) as unknown as MediaQueryList;
+    }
 
-// jsdom's canvas has no drawing context without the optional `canvas`
-// package: getContext returns null, but prints a "Not implemented" error
-// first. The visualizer already handles null (its text labels are skipped),
-// so answer null quietly -- the same behaviour, without the noise. Tests that
-// need a context supply their own stand-in canvas.
-HTMLCanvasElement.prototype.getContext = (() => null) as HTMLCanvasElement['getContext'];
+    // jsdom's canvas has no drawing context without the optional `canvas`
+    // package: getContext returns null, but prints a "Not implemented" error
+    // first. The visualizer already handles null (its text labels are skipped),
+    // so answer null quietly -- the same behaviour, without the noise. Tests that
+    // need a context supply their own stand-in canvas.
+    HTMLCanvasElement.prototype.getContext = (() => null) as HTMLCanvasElement['getContext'];
+}
