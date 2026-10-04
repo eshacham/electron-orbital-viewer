@@ -5,6 +5,7 @@ import { ORBITAL_RESOLUTION, BASIC_ORBITALS_Z } from '../orbital_presets';
 import { subshellSpokenLabel } from '../atom/configurations';
 import { buildComparisonCurves } from '../atom/comparison_curves';
 import type { SerialisedAtomProfile } from '../workers/atomWorker';
+import { profileRelativity } from '../store/atomSlice';
 import { CsvCurve, radialCurvesToCsv } from './csv';
 import { exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment, jLevelShapeCaption } from './caption';
 import { CombinationLegendItem } from './png';
@@ -192,11 +193,15 @@ export function cubeJobFor(state: RootState): CubeJob {
         const shell = atom.level === 'shell' ? profile.shells.find(s => s.n === atom.selectedShell) : undefined;
         // The cube header stays plain ASCII: a j-level reads "6p j = 3/2", not "6p³⁄₂".
         const what = subshell ? `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)} subshell` : shell ? shellLabel(shell.n) : 'total';
-        // Task 12b (ruling C7): a j-level's curve is that j-level's own
-        // density, G^2 + F^2 (both Dirac radial components, Task 10) --
-        // not the plain |R|^2 an off/scalar subshell's curve holds -- said
-        // here so the file does not read as the ordinary radial density.
-        const jNote = subshell?.j !== undefined ? 'j-level density, G^2 + F^2' : null;
+        // Task 12b (ruling C7), final review M4: every relativistic curve
+        // counts the small component, G^2 + F^2 (atom_profile's
+        // subshellCurveOf: the scalar equation's Q as well as the Dirac F),
+        // not the plain |R|^2 an off curve holds -- said here so the file
+        // does not read as the ordinary radial density. A j-level's curve is
+        // also that one j-level's alone, which the note names. Off: none.
+        const relativistic = profileRelativity(profile) !== 'off';
+        const jNote = !relativistic ? null
+            : subshell?.j !== undefined ? 'j-level density, G^2 + F^2' : 'density with the small component, G^2 + F^2';
         // Task 12b: an ion or excited atom's whole-atom cube also names the
         // dashed neutral-comparison ring, same as the PNG caption and CSV
         // comments (ruling C4) -- null for anything that draws no such ring.

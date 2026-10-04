@@ -135,11 +135,27 @@ describe('cube requests', () => {
             if (job.type === 'radialCube') expect(job.description).toContain('j-level density, G^2 + F^2');
         });
 
-        it('adds no j-level density note for a scalar (non-split) subshell', () => {
+        // Final review M4: a scalar-relativistic state has a small component
+        // too, and its curves count it (atom_profile's subshellCurveOf), so
+        // a scalar cube is G^2 + F^2 as well -- just not a j-level's.
+        it('says a scalar subshell or shell cube counts the small component too, without calling it a j-level', () => {
             const store = goldStore('scalar');
             store.dispatch(drillToSubshell(6, 1));
+            const subshell = cubeJobFor(store.getState());
+            if (subshell.type !== 'radialCube') throw new Error('expected a radial cube');
+            expect(subshell.description).toContain('density with the small component, G^2 + F^2');
+            expect(subshell.description).not.toContain('j-level density');
+            const shell = goldStore('scalar');
+            shell.dispatch(drillToShell(6));
+            const shellJob = cubeJobFor(shell.getState());
+            if (shellJob.type === 'radialCube') expect(shellJob.description).toContain('density with the small component, G^2 + F^2');
+        });
+
+        it('adds no small-component note without relativity', () => {
+            const store = neonStore();
+            store.dispatch(drillToSubshell(2, 1));
             const job = cubeJobFor(store.getState());
-            if (job.type === 'radialCube') expect(job.description).not.toContain('j-level density');
+            if (job.type === 'radialCube') expect(job.description).not.toContain('G^2');
         });
 
         // Same setup as the M4 test above ("carries the SCF profile's own Z
