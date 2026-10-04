@@ -80,11 +80,16 @@ def cached(settings, compute):
     return value
 
 
-def energy_method_label(d, spin):
+def energy_method_label(d, spin, *, exact=False):
+    """`exact`: CCSD(T) with two correlated electrons (Li₂, both 1s frozen),
+    which is full CI in that space -- said so, since that is why its whole
+    curve ships while other CCSD(T) curves stop (ruling T4-c)."""
     # No counterpoise correction anywhere; it matters only for He₂, whose
     # well is the size of the basis-set superposition error (see its note).
     if d.energy_method == 'fci':
         return 'FCI/aug-cc-pVTZ (no counterpoise correction)'
+    if exact:
+        return 'CCSD(T)/aug-cc-pVTZ, 1s frozen: exact (full CI) for the two valence electrons'
     return ('UCCSD(T)/aug-cc-pVTZ (UHF reference, frozen core)' if spin
             else 'CCSD(T)/aug-cc-pVTZ (frozen core)')
 

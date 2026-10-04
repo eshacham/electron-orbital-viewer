@@ -18,6 +18,11 @@ BOUND_THRESHOLD_HARTREE = 1e-3
 # wavefunction (ruling T4-a): 0.02 for closed shells, 0.03 for open shells.
 T1_LIMIT_CLOSED = 0.02
 T1_LIMIT_OPEN = 0.03
+# Ruling T4-d: a curve may also run until T1 has grown by half over its value
+# at R_e. That keeps CO (T1 0.018 at R_e, so 0.02 cut it 2 % out) from being
+# judged by an absolute bar it nearly fails at equilibrium, and gives B₂ and
+# C₂ (over the bar even at R_e) a curve at all, flagged multireference.
+T1_GROWTH_ALLOWED = 1.5
 # The fewest points a shipped CCSD(T) curve may have: R_e is scan point 07,
 # so this is every compressed point plus R_e itself (ruling T4-a).
 MIN_VALID_POINTS = 8
@@ -50,6 +55,17 @@ def fit_minimum(r, e, separated_atoms_hartree):
             'DeHartree': de, 'DeEv': de * HARTREE_TO_EV, 'bound': bool(de > BOUND_THRESHOLD_HARTREE)}
 
 
+def t1_rule(points, base_limit, equilibrium_index):
+    """The T1 limit a curve is held to (ruling T4-d): max(base_limit,
+    T1_GROWTH_ALLOWED × T1 at R_e), and whether the molecule is strongly
+    multireference (T1 at R_e already over base_limit), which the UI captions
+    as "only qualitative here". T1 at R_e is None if that point failed, and
+    the base limit then stands (the curve stops before R_e and is refused)."""
+    at_re = points[equilibrium_index]['t1Diagnostic'] if points[equilibrium_index]['converged'] else None
+    limit = base_limit if at_re is None else max(base_limit, T1_GROWTH_ALLOWED * at_re)
+    return {'t1AtRe': at_re, 't1Limit': limit, 'multireference': bool(at_re is not None and at_re > base_limit)}
+
+
 def valid_range(points, *, t1_limit):
     """How many scan points, from the most compressed outwards, a curve may
     ship. `points` carry RBohr, energyHartree, converged, t1Diagnostic and
@@ -71,7 +87,7 @@ def valid_range(points, *, t1_limit):
         if not p['converged']:
             first_failure = (k, p['failure'])
         elif t1_limit is not None and p['t1Diagnostic'] > t1_limit:
-            first_failure = (k, f'T1 diagnostic {p["t1Diagnostic"]:.4f} exceeds {t1_limit}')
+            first_failure = (k, f'T1 diagnostic {p["t1Diagnostic"]:.4f} exceeds {t1_limit:.4f}')
         if first_failure:
             break
     computed = first_failure[0] if first_failure else len(points)

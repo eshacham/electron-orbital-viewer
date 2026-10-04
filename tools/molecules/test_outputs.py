@@ -213,3 +213,34 @@ def test_a_refused_curve_writes_nothing(tmp_path, monkeypatch):
         generate.run_molecule(_BY_ID['n2'], 'abc', out=tmp_path)
     assert list(tmp_path.iterdir()) == []
     assert len(SCAN_FACTORS) == 20
+
+
+def test_a_multireference_molecule_ships_flagged(tmp_path, monkeypatch):
+    """Ruling T4-d end to end: T1 over the closed-shell bar at R_e (as for
+    C₂) keeps the curve, to 1.5 × T1(R_e), and every meta says
+    multireference with the T1 it was judged on. Energies are mocked; the
+    Kohn-Sham orbitals and the files are real."""
+    import generate
+    energies = [-1.0 - 0.01 * k for k in range(8)] + [-1.07 + 0.002 * k for k in range(1, 13)]
+    t1 = [0.03] * 8 + [0.03 + 0.003 * k for k in range(1, 13)]   # limit 0.045: 0.045 at 12, 0.048 at 13
+    results = iter([{'energyHartree': e, 'converged': True, 't1Diagnostic': t, 'failure': None}
+                    for e, t in zip(energies, t1)])
+    monkeypatch.setattr(generate, 'reference_point', lambda d, r, **kw: next(results))
+    monkeypatch.setattr(generate, 'separated_atoms', lambda d: (-0.9, 'mock atoms'))
+    generate.run_molecule(_BY_ID['n2'], 'abc', out=tmp_path)
+    scan = json.loads((tmp_path / 'n2' / 'scan.json').read_text())
+    assert scan['validity']['multireference'] is True and scan['validity']['t1AtRe'] == 0.03
+    assert scan['validity']['pointsShipped'] == len(scan['points']) == 13
+    assert 'T1 diagnostic 0.0480 exceeds 0.0450' in scan['validity']['stopReason']
+    assert not (tmp_path / 'n2' / 'scan' / '13').exists()
+    for meta in [tmp_path / 'n2' / 'meta.json', *(tmp_path / 'n2' / 'scan').glob('*/meta.json')]:
+        data = json.loads(meta.read_text())
+        assert data['multireference'] is True and data['t1AtRe'] == 0.03
+    assert [p.name for p in tmp_path.iterdir()] == ['n2']   # no staging directory left behind
+
+
+def test_lithium_says_why_its_whole_curve_ships():
+    from outputs import energy_method_label
+    li2 = _BY_ID['li2']
+    assert 'exact (full CI) for the two valence electrons' in energy_method_label(li2, 0, exact=True)
+    assert 'exact' in li2.note and energy_method_label(_BY_ID['n2'], 0) == 'CCSD(T)/aug-cc-pVTZ (frozen core)'

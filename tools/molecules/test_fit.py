@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from fit import MIN_VALID_POINTS, fit_minimum, valid_range
+from fit import MIN_VALID_POINTS, T1_LIMIT_CLOSED, T1_LIMIT_OPEN, fit_minimum, t1_rule, valid_range
 from molecules import HARTREE_TO_EV, SCAN_FACTORS
 
 
@@ -81,3 +81,42 @@ def test_a_turnover_before_a_t1_failure_wins():
         p['t1Diagnostic'] = 0.5
     assert valid_range(late, t1_limit=0.02)['count'] == 11
     assert MIN_VALID_POINTS == 8
+
+
+def rising(t1_values):
+    """A bound curve (minimum at R_e, scan point 07) carrying these T1 values."""
+    energies = [1.0 - 0.1 * k for k in range(8)] + [0.31 + 0.01 * k for k in range(12)]
+    curve = points(energies)
+    for p, t1 in zip(curve, t1_values):
+        p['t1Diagnostic'] = t1
+    return curve
+
+
+def test_the_t1_limit_grows_with_t1_at_equilibrium_so_a_co_like_curve_runs_further():
+    """CO: T1 0.018 at R_e and rising 0.0014 a step. Under the bare 0.02 the
+    curve stops one step out; 1.5 × T1(R_e) = 0.027 carries it to where T1
+    has grown by half, and a closed-shell molecule this close to the bar is
+    not flagged multireference."""
+    curve = rising([0.010 + 0.0012 * k for k in range(8)] + [0.0184 + 0.0014 * k for k in range(1, 13)])
+    assert valid_range(curve, t1_limit=T1_LIMIT_CLOSED)['count'] == 9
+    rule = t1_rule(curve, T1_LIMIT_CLOSED, 7)
+    assert rule == {'t1AtRe': curve[7]['t1Diagnostic'], 't1Limit': 1.5 * curve[7]['t1Diagnostic'], 'multireference': False}
+    validity = valid_range(curve, t1_limit=rule['t1Limit'])
+    assert validity['count'] == 14 and curve[13]['t1Diagnostic'] <= rule['t1Limit'] < curve[14]['t1Diagnostic']
+
+
+def test_a_molecule_over_the_bar_at_equilibrium_is_multireference_yet_keeps_a_curve():
+    # B₂-like: open shell, T1 0.038–0.040 near R_e, over the 0.03 bar everywhere.
+    curve = rising([0.038 + 0.0003 * k for k in range(8)] + [0.040 + 0.002 * k for k in range(1, 13)])
+    rule = t1_rule(curve, T1_LIMIT_OPEN, 7)
+    assert rule['multireference'] is True and rule['t1AtRe'] > T1_LIMIT_OPEN
+    assert rule['t1Limit'] == 1.5 * rule['t1AtRe']
+    assert valid_range(curve, t1_limit=T1_LIMIT_OPEN)['count'] == 0
+    assert valid_range(curve, t1_limit=rule['t1Limit'])['count'] == 18   # T1 0.060 at 17, 0.062 at 18
+
+
+def test_a_small_t1_at_equilibrium_leaves_the_base_limit():
+    curve = rising([0.01] * 20)
+    assert t1_rule(curve, T1_LIMIT_CLOSED, 7) == {'t1AtRe': 0.01, 't1Limit': T1_LIMIT_CLOSED, 'multireference': False}
+    curve[7].update(converged=False, t1Diagnostic=None, energyHartree=None)
+    assert t1_rule(curve, T1_LIMIT_CLOSED, 7)['t1AtRe'] is None

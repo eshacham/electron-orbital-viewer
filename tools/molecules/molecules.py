@@ -42,7 +42,9 @@ DIATOMICS = (
              'No chemical bond: bond order 0. The full-CI curve has only a van der Waals well of a few hundredths of a mHa, '
              'invisible at this scale; no counterpoise correction is applied, and basis-set superposition error is of '
              'the same order as that well.'),
-    Diatomic('li2', 'Lithium', 'Li₂', ('Li', 'Li'), 0, 2.6729, 'ccsd(t)', None, HUBER_HERZBERG),
+    Diatomic('li2', 'Lithium', 'Li₂', ('Li', 'Li'), 0, 2.6729, 'ccsd(t)', None, HUBER_HERZBERG,
+             'Both 1s shells are frozen, so CCSD(T) correlates only the two valence electrons, where it is exact '
+             '(full CI): the whole curve is kept.'),
     Diatomic('b2', 'Boron', 'B₂', ('B', 'B'), 2, 1.5900, 'ccsd(t)', None, HUBER_HERZBERG,
              'Ground state is the triplet ³Σg⁻: two unpaired electrons in 1πu.'),
     Diatomic('c2', 'Carbon', 'C₂', ('C', 'C'), 0, 1.2425, 'ccsd(t)', None, HUBER_HERZBERG,

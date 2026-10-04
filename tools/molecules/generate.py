@@ -21,7 +21,7 @@ import pyscf
 import scipy
 
 from basis_export import CONVENTION, check_against_pyscf, export_shells
-from fit import MIN_VALID_POINTS, T1_LIMIT_CLOSED, T1_LIMIT_OPEN, fit_minimum, valid_range
+from fit import MIN_VALID_POINTS, T1_LIMIT_CLOSED, T1_LIMIT_OPEN, fit_minimum, t1_rule, valid_range
 from labels import bond_order
 from molecules import ANGSTROM_TO_BOHR, ATOM_GROUND_STATES, DIATOMICS, EQUILIBRIUM_INDEX, REPO_ROOT, SCAN_FACTORS
 from outputs import (DENSITY_METHOD, atoms_of, cached, check_scan_labels, density_on_grid, energy_method_label,
@@ -108,17 +108,22 @@ def run_molecule(d, commit, out=OUT):
         print(f'  {d.id}@{i:02d}: R = {r:.4f} bohr, {energy}{t1}', flush=True)
 
     exact = is_exact(d, r_ref)
-    validity = valid_range(results, t1_limit=None if exact else (T1_LIMIT_OPEN if d.spin else T1_LIMIT_CLOSED))
+    # Ruling T4-d: one rule for every CCSD(T) molecule -- T1 may reach the
+    # larger of the base limit and 1.5 × its value at R_e.
+    rule = ({'t1AtRe': None, 't1Limit': None, 'multireference': False} if exact
+            else t1_rule(results, T1_LIMIT_OPEN if d.spin else T1_LIMIT_CLOSED, EQUILIBRIUM_INDEX))
+    validity = valid_range(results, t1_limit=rule['t1Limit'])
     shipped = results[:validity['count']]
     limit, limit_method = separated_atoms(d)
     fit = fit_minimum([p['RBohr'] for p in shipped], [p['energyHartree'] for p in shipped], limit) if shipped else None
     check_curve(d, validity, fit or {'ReBohr': None}, exact)
     fit['separatedAtomsHartree'] = limit
     fit['separatedAtomsMethod'] = limit_method
-    print(f'{d.id}: {validity["count"]} of {len(radii)} points valid'
+    print(f'{d.id}: {validity["count"]} of {len(radii)} points valid, T1 limit {rule["t1Limit"]}'
+          + (' (multireference)' if rule['multireference'] else '')
           + (f' (stopped: {validity["stopReason"]})' if validity['stopReason'] else ''), flush=True)
 
-    method = {'density': DENSITY_METHOD, 'energies': energy_method_label(d, d.spin)}
+    method = {'density': DENSITY_METHOD, 'energies': energy_method_label(d, d.spin, exact=exact)}
     generator = provenance(commit)
     references = ([{'quantity': 'R_e', 'value': d.reference_re_angstrom, 'unit': 'Å', 'source': d.reference_source}]
                   if d.reference_re_angstrom else [])
@@ -142,6 +147,9 @@ def run_molecule(d, commit, out=OUT):
                     'atoms': [{'Z': int(mol.atom_charge(k)), 'position': atoms[k]} for k in range(2)],
                     'geometrySource': source, 'method': method, 'totalEnergyHartree': e_ref,
                     'dftEnergyHartree': float(mf.e_tot), 'spin': d.spin, 'bondOrder': order,
+                    # Ruling T4-d: captioned "strongly multireference: single-reference
+                    # CCSD(T) is only qualitative here (T1 = … at R_e)".
+                    'multireference': rule['multireference'], 't1AtRe': rule['t1AtRe'],
                     'orbitals': [{k: o[k] for k in META_ORBITAL_KEYS if k in o} for o in orbitals],
                     'references': references, 'generator': generator}
             if grid:
@@ -177,7 +185,7 @@ def run_molecule(d, commit, out=OUT):
         'energyMethod': method['energies'], 'densityMethod': DENSITY_METHOD, 'points': points,
         'equilibriumIndex': EQUILIBRIUM_INDEX, 'fit': fit, 'spinCheck': spin_check, 'note': d.note,
         'validity': {'pointsComputed': len(radii), 'pointsShipped': len(shipped), 'exact': exact,
-                     't1Limit': None if exact else (T1_LIMIT_OPEN if d.spin else T1_LIMIT_CLOSED),
+                     't1Limit': rule['t1Limit'], 't1AtRe': rule['t1AtRe'], 'multireference': rule['multireference'],
                      'validUpToRBohr': validity['validUpToRBohr'], 'stoppedAtRBohr': validity['stoppedAtRBohr'],
                      'stopReason': validity['stopReason']},
         'reference': {'ReAngstrom': d.reference_re_angstrom, 'source': d.reference_source}})
