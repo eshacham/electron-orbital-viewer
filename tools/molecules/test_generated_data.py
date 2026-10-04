@@ -116,4 +116,5 @@ def test_open_shells_put_two_unpaired_electrons_in_the_pi_pair(mol_id, label):
 def test_validation_summary_matches_the_scans():
     rows = load(REPO_ROOT / 'src' / 'validation' / 'generated' / 'phase5_diatomics.json')
     assert {(r['system'], r['quantity']) for r in rows} == {
-        ('H₂', 'R_e'), ('H₂', 'D_e'), ('N₂', 'R_e'), ('O₂', 'R_e'), ('F₂', 'R_e'), ('CO', 'R_e'), ('HF', 'R_e')}
+        ('H₂', 'R_e'), ('H₂', 'D_e'), ('N₂', 'R_e'), ('O₂', 'R_e'),
+        ('O₂', 'E(closed-shell singlet) − E(triplet)'), ('F₂', 'R_e'), ('CO', 'R_e'), ('HF', 'R_e')}
