@@ -202,6 +202,29 @@ def test_fixtures_are_reduced_copies_of_the_generated_files(tmp_path):
     assert sum(p.stat().st_size for p in dest.rglob('*') if p.is_file()) < 1024 * 1024
 
 
+def test_basis_fixtures_carry_their_meta_as_written(tmp_path):
+    """The final review's I1: the MO diagram's α/β order caption is tested
+    on O₂'s real orbital list, so the basis-only fixtures (o2, hf) ship their
+    meta.json too -- as generated, grid and all, unlike the density one."""
+    import generate
+    from outputs import write_fixtures
+    out_root, dest = tmp_path / 'out', tmp_path / 'fixtures'
+    mol, mf = _kohn_sham('h2', 1.00)
+    r = float(mol.atom_coord(1)[2] - mol.atom_coord(0)[2])
+    for molecule_id in ('h2', 'h2b'):
+        basis = {'id': molecule_id, **generate.basis_json(mol, mf)}
+        meta = {'id': molecule_id, 'atoms': [{'Z': 1, 'position': p} for p in basis['atoms']], 'spin': 0,
+                'grid': grid_spec(r), 'orbitals': [{'index': 0, 'label': '1σg'}]}
+        for name, data in (('meta', meta), ('basis', basis), ('scan', {'id': molecule_id, 'points': []})):
+            (out_root / molecule_id).mkdir(parents=True, exist_ok=True)
+            (out_root / molecule_id / f'{name}.json').write_text(json.dumps(data))
+
+    write_fixtures(out_root, dest, density_id='h2', basis_ids=('h2b',))
+
+    assert json.loads((dest / 'h2b' / 'meta.json').read_text()) == json.loads((out_root / 'h2b' / 'meta.json').read_text())
+    assert not (dest / 'h2b' / 'scan.json').exists() and not (dest / 'h2b' / 'density.bin.gz').exists()
+
+
 def test_fixtures_say_what_to_generate_first(tmp_path):
     from outputs import write_fixtures
     with pytest.raises(FileNotFoundError, match=r'generate\.py --only n2'):

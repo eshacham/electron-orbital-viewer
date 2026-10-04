@@ -303,8 +303,9 @@ def write_fixtures(out_root, dest, *, density_id='n2', basis_ids=('o2', 'hf')):
     """The committed fixtures the TS tests read, as reduced copies of the
     generated files (so they test the data that is published): density_id's
     meta, basis and scan as written, its density on a FIXTURE_GRID_SIDE³ grid
-    (meta.grid says so), basis_ids' basis.json, and for every one of them
-    PySCF's orbital values at FIXTURE_POINTS (<id>.json)."""
+    (meta.grid says so), basis_ids' basis and meta as written (the MO
+    diagram's tests read O₂'s real α/β orbital list), and for every one of
+    them PySCF's orbital values at FIXTURE_POINTS (<id>.json)."""
     ids = (density_id,) + tuple(i for i in basis_ids if i != density_id)
     missing = [i for i in ids if not (out_root / i / 'basis.json').exists()]
     if missing or not (out_root / density_id / 'scan.json').exists():
@@ -325,6 +326,8 @@ def write_fixtures(out_root, dest, *, density_id='n2', basis_ids=('o2', 'hf')):
             files[f'{molecule_id}/scan.json'] = json_bytes(read_json(out_root / molecule_id / 'scan.json'))
             density = density_on_grid(basis['shells'], basis['atoms'], basis['orbitals'], small['grid'])
             files[f'{molecule_id}/density.bin.gz'] = gzip_floats(density)
+        else:
+            files[f'{molecule_id}/meta.json'] = json_bytes(atoms_meta)
     total = sum(len(data) for data in files.values())
     if total > FIXTURE_BUDGET_BYTES:
         raise AssertionError(f'fixtures would total {total} bytes, over the {FIXTURE_BUDGET_BYTES} budget; nothing written')

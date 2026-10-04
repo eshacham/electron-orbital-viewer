@@ -1,8 +1,14 @@
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { buildMoDiagram, bondOrderText, h2plusOrbitals } from '../../src/bonds/mo_diagram';
+import { buildMoDiagram, bondOrderText, h2plusOrbitals, spinOrderNote } from '../../src/bonds/mo_diagram';
 import MoDiagram from '../../src/components/MoDiagram';
-import { MoleculeOrbitalInfo } from '../../src/molecules/types';
+import { MoleculeMeta, MoleculeOrbitalInfo } from '../../src/molecules/types';
+
+/** The generated v1 meta.json (tests/fixtures/molecules: copies of what is published). */
+const fixtureOrbitals = (id: string): MoleculeOrbitalInfo[] =>
+    (JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules', id, 'meta.json'), 'utf8')) as MoleculeMeta).orbitals;
 
 const r = (index: number, label: string, energyHartree: number, occupation: number): MoleculeOrbitalInfo =>
     ({ index, label, energyHartree, occupation, spin: 'restricted' });
@@ -48,7 +54,63 @@ describe('buildMoDiagram', () => {
     });
 });
 
+// Final review I1: O₂'s diagram draws α energies, where 1πu (−0.573 Ha) lies
+// below 3σg (−0.559 Ha); in β (3σg −0.521, 1πu −0.470) and in the
+// photoelectron spectrum (b⁴Σg⁻, a 3σg hole, 18.17 eV above a⁴Πu's 16.10 eV,
+// adiabatic) the order is the textbook O₂ one. The diagram must say so.
+describe('spinOrderNote', () => {
+    it("names O2's swapped pair from the generated orbitals, with the photoelectron spectra", () => {
+        const model = buildMoDiagram(fixtureOrbitals('o2'));
+        expect(model.betaOrderSwaps).toEqual([{ lower: '3σg', upper: '1πu', occupied: true }]);
+        expect(spinOrderNote(model)).toBe(
+            'Levels drawn at α energies; in β — and in photoelectron spectra — 3σg lies below 1πu. ↓ marks the matching β orbital.');
+    });
+
+    it('has nothing to say for a restricted molecule (N2 and HF from the generated data, F2 as v1 ships it)', () => {
+        const f2 = [r(0, '1σg', -24.797, 2), r(1, '1σu*', -24.797, 2), r(2, '2σg', -1.355, 2), r(3, '2σu*', -1.116, 2),
+            r(4, '3σg', -0.611, 2), r(5, '1πu', -0.549, 2), r(6, '1πu', -0.549, 2), r(7, '1πg*', -0.421, 2), r(8, '1πg*', -0.421, 2),
+            r(9, '3σu*', -0.162, 0)];
+        for (const orbitals of [fixtureOrbitals('n2'), fixtureOrbitals('hf'), f2]) {
+            const model = buildMoDiagram(orbitals);
+            expect(model.betaOrderSwaps).toEqual([]);
+            expect(spinOrderNote(model)).toBeNull();
+        }
+    });
+
+    it('keeps the plain α note when α and β agree on the order', () => {
+        const model = buildMoDiagram(o2);
+        expect(model.betaOrderSwaps).toEqual([]);
+        expect(spinOrderNote(model)).toBe('Levels drawn at α energies; ↓ marks the matching β orbital.');
+    });
+
+    // B₂ (v1): in β, 3σg (−0.161) lies below 1πu (−0.136), both empty. A
+    // photoelectron spectrum only ionises occupied levels, so it is not cited.
+    it('leaves the photoelectron spectra out when the swapped β levels are empty', () => {
+        const b2 = [o2alpha(0, '2σu*', -0.302, 1), o2alpha(1, '1πu', -0.253, 1), o2alpha(2, '1πu', -0.253, 1), o2alpha(3, '3σg', -0.171, 0),
+            o2beta(4, '2σu*', -0.270, 1), o2beta(5, '3σg', -0.161, 0), o2beta(6, '1πu', -0.136, 0), o2beta(7, '1πu', -0.136, 0)];
+        const model = buildMoDiagram(b2);
+        expect(model.betaOrderSwaps).toEqual([{ lower: '3σg', upper: '1πu', occupied: false }]);
+        expect(spinOrderNote(model)).toBe('Levels drawn at α energies; in β, 3σg lies below 1πu. ↓ marks the matching β orbital.');
+    });
+
+    it('ignores the core pair, drawn side by side rather than in energy order', () => {
+        const model = buildMoDiagram([o2alpha(0, '1σg', -19.2928, 1), o2alpha(1, '1σu*', -19.2927, 1), o2alpha(2, '2σg', -1.3, 1),
+            o2beta(3, '1σg', -19.2619, 1), o2beta(4, '1σu*', -19.2622, 1), o2beta(5, '2σg', -1.25, 1)]);
+        expect(model.betaOrderSwaps).toEqual([]);
+    });
+});
+
 describe('MoDiagram', () => {
+    it("captions O2's α/β order swap under the diagram", () => {
+        render(<MoDiagram orbitals={fixtureOrbitals('o2')} selectedIndex={null} />);
+        expect(screen.getByText(/in β — and in photoelectron spectra — 3σg lies below 1πu/)).toBeInTheDocument();
+    });
+
+    it('says nothing about spin order for N2', () => {
+        const { container } = render(<MoDiagram orbitals={fixtureOrbitals('n2')} selectedIndex={null} />);
+        expect(container.querySelector('.mo-note')).toBeNull();
+    });
+
     it('draws arrows and selects a box on click', () => {
         const onSelect = jest.fn();
         render(<MoDiagram orbitals={n2} selectedIndex={6} onSelect={onSelect} footer="Bond order 3" />);

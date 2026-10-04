@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { DiagramBox, DiagramLevel, buildMoDiagram } from '../bonds/mo_diagram';
+import { DiagramBox, DiagramLevel, buildMoDiagram, spinOrderNote } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
 
 interface MoDiagramProps {
@@ -49,6 +49,7 @@ function boxLabel(level: DiagramLevel, box: DiagramBox, index: number): string {
  */
 const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect, footer, width = 260 }) => {
     const model = useMemo(() => buildMoDiagram(orbitals), [orbitals]);
+    const note = spinOrderNote(model);
     const valence = model.levels.filter(level => !level.core);
     const core = model.levels.filter(level => level.core);
     const energies = valence.map(level => level.energyHartree);
@@ -92,7 +93,7 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
                 {core.length > 0 && <div className="mo-break" style={{ top: HEIGHT - CORE_BAND }}>≈ core</div>}
                 {core.map((level, i) => renderLevel(level, CORE_ROW_Y, i * CORE_COLUMN))}
             </div>
-            {model.unrestricted && <div className="mo-note">α energies; ↓ marks the matching β orbital.</div>}
+            {note && <div className="mo-note">{note}</div>}
             {footer && <div className="mo-footer">{footer}</div>}
         </div>
     );
