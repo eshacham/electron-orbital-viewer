@@ -460,6 +460,12 @@ html, body, #root {
   font-variant-numeric: tabular-nums;
 }
 
+/* Task 10: PotentialCurvePlot, E(R) with the current R marked. */
+.potential-marker { stroke: #ffffff; stroke-width: 1; stroke-dasharray: 3 2; }
+.potential-reference { stroke: #8bc34a; stroke-width: 1; stroke-dasharray: 1 3; }
+.potential-axis-label { fill: #9aa4ad; font-size: 9px; }
+.potential-reference-note { color: #c5e1a5; }
+
 
 /* ---------------------------------------------------------------------------
    Phone layout: a one-line header across the top, and a tabbed sheet along
