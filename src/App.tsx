@@ -71,7 +71,7 @@ import { buildComparisonCurves, radialPlotRange } from './atom/comparison_curves
 import { useUrlStateSync } from './useUrlStateSync';
 import { hasSharedView, encodeStateOf } from './url_state';
 import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
-import { exportAvailability, runExport, ExportKind, ExportOptions } from './export/run_export';
+import { exportAvailability, exportItemsFor, runExport, ExportKind, ExportOptions } from './export/run_export';
 import { CsvCurve } from './export/csv';
 import { downloadBlob } from './export/download';
 import { ViewerExportHandle } from './export/handle';
@@ -737,7 +737,14 @@ function App() {
         pictureShown: atomProfile !== null,
     };
 
-    const availability = useAppSelector(exportAvailability, shallowEqual);
+    // Fix round 1 (I1): in Bonds mode, exportAvailability also needs
+    // useBondsData's own loading/error (not in Redux) to refuse a picture
+    // that is stale against the panel's current selection -- so this can no
+    // longer be the bare selector `useAppSelector(exportAvailability, ...)`.
+    const availability = useAppSelector(
+        state => exportAvailability(state, isBondsMode ? { loading: bondsData.loading, error: bondsData.error } : undefined),
+        shallowEqual,
+    );
     // What the plot shows, at the moment of export -- the same curves
     // already computed for the radial plot (atomCurves, selectionPlot), not
     // a fresh sample: ruling C6, an exported number equals the plotted one.
@@ -762,17 +769,29 @@ function App() {
             createCubeWorker: createExportWorker as unknown as () => CubeWorkerHandle,
             // Ruling C5 (Task 13b): Bonds' own loaded data, fetched outside
             // Redux (useBondsData's cache) -- the scan for captions/CSV, the
-            // meta for a molecule cube's atoms.
-            bondsScan: bondsData.scan, bondsMeta: bondsData.meta,
+            // meta for a molecule cube's atoms, loading/error for the
+            // mismatch gate above (fix round 1, I1). h2plusCurve is the live
+            // plot's own cached curve (fix round 1, I2): the CSV must not
+            // re-solve it on the main thread.
+            bondsScan: bondsData.scan, bondsMeta: bondsData.meta, bondsLoading: bondsData.loading, bondsError: bondsData.error,
+            h2plusCurve: h2plusCurve.curve,
             ...options,
         });
         downloadBlob(result.blob, result.filename);
-    }, [stateNow, csvCurvesNow, showPhaseLegend, combinationLegend, bondsData.scan, bondsData.meta]);
+    }, [
+        stateNow, csvCurvesNow, showPhaseLegend, combinationLegend,
+        bondsData.scan, bondsData.meta, bondsData.loading, bondsData.error, h2plusCurve.curve,
+    ]);
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
     const shareExportBar = useMemo(
-        () => <ShareExportBar onShare={handleShare} onExport={handleExport} availability={availability} stlSolids={stlSolids} />,
-        [handleShare, handleExport, availability, stlSolids]
+        () => (
+            <ShareExportBar
+                onShare={handleShare} onExport={handleExport} availability={availability} stlSolids={stlSolids}
+                items={exportItemsFor(atomMode)}
+            />
+        ),
+        [handleShare, handleExport, availability, stlSolids, atomMode]
     );
 
     const controls = (

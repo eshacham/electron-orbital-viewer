@@ -94,6 +94,18 @@ describe('Gaussian cube', () => {
         expect(asciiLine('Born–Oppenheimer')).toBe('Born-Oppenheimer');
     });
 
+    // Fix round 1 (I3): the reorder (normalise, *then* replace) only changes
+    // output for text containing one of the characters it now specifically
+    // handles (σ/π/δ/φ/α/β, or a minus/en/em dash, including one NFKD
+    // produces as a decomposition byproduct) -- deliberately, not as a side
+    // effect. A title with none of them -- the ordinary atom/Basic Orbitals
+    // case -- is provably untouched: nothing in the old or new pipeline acts
+    // on it differently.
+    it('leaves a title with none of the affected characters byte-identical to before the fix', () => {
+        expect(asciiLine('Neon (Ne, Z = 10), whole atom, 90% contour')).toBe('Neon (Ne, Z = 10), whole atom, 90% contour');
+        expect(asciiLine('Hydrogen 3d_z², 90% contour')).toBe('Hydrogen 3d_z2, 90% contour');
+    });
+
     it('refuses a grid whose values do not match its shape', () => {
         const bad: CubeGrid = { ...tiny, values: Float32Array.from({ length: 41 }, () => 0) };
         expect(() => encodeCube(bad, [], 'x', 'y')).toThrow();

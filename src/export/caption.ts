@@ -15,7 +15,7 @@ import { BondsSystemId, isBondsSystemId, systemFormula } from '../bonds/systems'
 import { H2PLUS_CAPTIONS, lengths, multireferenceCaption } from '../bonds/captions';
 import { H2PLUS_LABELS, H2PlusState } from '../bonds/h2plus';
 import { SPIN_SUFFIX } from '../bonds/bonds_request';
-import type { BasisOrbital, MoleculeScan } from '../molecules/types';
+import type { BasisOrbital, MoleculeBasis, MoleculeScan } from '../molecules/types';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
 export const ATOM_METHOD = 'central-field SCF, LDA exchange + VWN5 correlation, non-relativistic, spherically averaged';
@@ -38,19 +38,30 @@ function modeCaptionText(mode: RelativityMode): string {
 }
 
 /**
- * Task 13b (ruling C5): H₂⁺'s own exact method (reusing the solver's own
- * caption, H2PLUS_CAPTIONS[0], rather than restating it), or -- once the scan
- * is to hand -- the diatomic's shipped density/orbital method plus a
- * multireference caveat (B₂, C₂) when `scan` says one applies. `scan` is
- * optional because methodStatement is also called before it has loaded
- * (e.g. the title line of a cube job requested the instant a picture lands);
- * the fallback still states a method, just not the molecule-specific one.
+ * Task 13b (ruling C5), fix round 1 (I1, M2): H₂⁺'s own exact method
+ * (reusing the solver's own caption, H2PLUS_CAPTIONS[0], rather than
+ * restating it), or -- once a *matching* scan is to hand -- the diatomic's
+ * shipped density/orbital and energy methods, in bondsCaptions' own
+ * wording, plus a multireference caveat (B₂, C₂) when `scan.validity` says
+ * one applies.
+ *
+ * The system this reads is `bondsDrawnPicture`'s, never
+ * `state.bonds.system` directly: fix round 1's own probe -- H₂⁺ drawn,
+ * N₂ selected, while N₂ is still loading -- would otherwise take the
+ * selection's branch and label an H₂⁺ picture with N₂'s CCSD(T) method.
+ * `scan` is accepted only when `scan.id` matches that drawn system (a scan
+ * for some other molecule, mid-switch, must not be read as this one's); the
+ * fallback still states a method, just not the molecule-specific one --
+ * methodStatement is also called before any scan has loaded at all (e.g.
+ * the title line of a cube job requested the instant a picture lands).
  */
 function bondsMethodStatement(state: RootState, scan: MoleculeScan | null | undefined): string {
-    if (state.bonds.system === 'h2plus') return H2PLUS_CAPTIONS[0];
-    if (!scan) return 'diatomic molecular orbitals and density: B3LYP/def2-TZVP';
+    const drawn = bondsDrawnPicture(state);
+    const system = drawn?.system ?? state.bonds.system;
+    if (system === 'h2plus') return H2PLUS_CAPTIONS[0];
+    if (!scan || scan.id !== system) return 'diatomic molecular orbitals and density: B3LYP/def2-TZVP';
     const caveat = multireferenceCaption(scan);
-    return `${scan.densityMethod}${caveat ? `; ${caveat}` : ''}`;
+    return `Orbitals and density: ${scan.densityMethod}; energies: ${scan.energyMethod}${caveat ? `; ${caveat}` : ''}`;
 }
 
 /**
@@ -95,34 +106,62 @@ export function shellLabel(n: number): string {
 }
 
 /**
+ * A drawn molecular orbital: `component`/`componentCount` are the orbital's
+ * 0-based position among every orbital sharing its label and spin (a
+ * degenerate π pair has two) -- fix round 1 (M1): without this, exporting
+ * each half of a degenerate pair separately produces the same file name and
+ * the same description, as if only one had been exported.
+ */
+interface BondsDrawnMo { kind: 'mo'; orbital: BasisOrbital; component: number; componentCount: number; }
+
+/**
  * What a Bonds picture is, by `type` alone (never a combination, never atom
  * mode's species-y bits).
  */
 type BondsPictureKind =
     | { kind: 'h2plus'; state: H2PlusState }
-    | { kind: 'mo'; orbital: BasisOrbital }
+    | BondsDrawnMo
     | { kind: 'density'; isoValue: number };
 
-interface BondsDrawnPicture { system: BondsSystemId; R: number; picture: BondsPictureKind; }
+export interface BondsDrawnPicture {
+    system: BondsSystemId;
+    R: number;
+    /** The scan point id the drawn basis belongs to (e.g. 'n2@07'); null for H2+, which carries no basis. */
+    moleculeId: string | null;
+    /** The basis actually drawn, for a cube export to register with the worker; null for H2+. */
+    basis: MoleculeBasis | null;
+    /** The contour the picture was actually rendered at (field.enclosedFraction) -- fix round 1 (M6). */
+    enclosedFraction: number;
+    picture: BondsPictureKind;
+}
 
 /**
  * What the canvas actually shows in Bonds mode, read off the drawn request
  * (`state.orbital.currentField`) rather than the panel's selection
  * (`state.bonds`) -- the same reason atom mode's captions read the drawn
  * profile and not the switch (ruling C9): the selection can be a step ahead
- * of the picture while the next one is still loading (Review Focus 1/2).
+ * of the picture while the next one is still loading (Review Focus 1/2; fix
+ * round 1, I1: this is exactly the reviewer's probe -- H₂⁺ drawn, N₂
+ * selected -- and every Bonds caption/cube/CSV function reads this, never
+ * `state.bonds` directly, so the selection can never leak into them).
  * R comes from the basis' own two atom positions, not `state.bonds.R`, for
  * the same reason -- a diatomic's basis only ever reaches `currentField`
  * once it is the one actually drawn (bondsFieldRequest's own geometry guard).
- * Null only when nothing matching a Bonds recipe is drawn; every caller here
- * reaches this after `exportAvailability` has already confirmed a picture is
- * on screen, so null is a defensive fallback, not an expected case.
+ * Exported: `exportAvailability`/`cubeJobFor`/`csvFor` (run_export.ts) use
+ * it to check a selection against the drawn picture, and to accept `scan`/
+ * `meta` only when their ids match what is actually on screen. Null only
+ * when nothing matching a Bonds recipe is drawn.
  */
-function bondsDrawnPicture(state: RootState): BondsDrawnPicture | null {
+export function bondsDrawnPicture(state: RootState): BondsDrawnPicture | null {
     const field = state.orbital.currentField;
     if (!field || field.sources.length !== 1) return null;
     const recipe = field.sources[0].recipe;
-    if (recipe.type === 'h2plus') return { system: 'h2plus', R: recipe.R, picture: { kind: 'h2plus', state: recipe.state } };
+    if (recipe.type === 'h2plus') {
+        return {
+            system: 'h2plus', R: recipe.R, moleculeId: null, basis: null,
+            enclosedFraction: field.enclosedFraction, picture: { kind: 'h2plus', state: recipe.state },
+        };
+    }
     if (recipe.type !== 'gaussianMO' && recipe.type !== 'gaussianDensity') return null;
     const basis = field.bases?.find(b => b.id === recipe.moleculeId);
     if (!basis || basis.atoms.length < 2) return null;
@@ -130,24 +169,39 @@ function bondsDrawnPicture(state: RootState): BondsDrawnPicture | null {
     if (!isBondsSystemId(system) || system === 'h2plus') return null;
     const [a, b] = basis.atoms;
     const R = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    const common = { system, R, moleculeId: basis.id, basis, enclosedFraction: field.enclosedFraction };
     if (recipe.type === 'gaussianMO') {
         const orbital = basis.orbitals[recipe.index];
-        return orbital ? { system, R, picture: { kind: 'mo', orbital } } : null;
+        if (!orbital) return null;
+        const matches = basis.orbitals.filter(o => o.label === orbital.label && o.spin === orbital.spin);
+        const component = matches.findIndex(o => o.index === orbital.index);
+        return { ...common, picture: { kind: 'mo', orbital, component, componentCount: matches.length } };
     }
     // Always set alongside a 'gaussianDensity' recipe (bondsFieldRequest);
     // the fallback only guards a request built some other way (e.g. a test).
-    return { system, R, picture: { kind: 'density', isoValue: field.densityIsoValue ?? state.bonds.densityIso } };
+    return { ...common, picture: { kind: 'density', isoValue: field.densityIsoValue ?? state.bonds.densityIso } };
+}
+
+/** '' for a non-degenerate orbital; ' (component 1 of 2)' etc. otherwise (fix round 1, M1). */
+function componentNote(picture: BondsDrawnMo): string {
+    return picture.componentCount > 1 ? ` (component ${picture.component + 1} of ${picture.componentCount})` : '';
 }
 
 function bondsViewDescription(state: RootState): string {
     const drawn = bondsDrawnPicture(state);
-    const formula = systemFormula(state.bonds.system);
-    if (!drawn) return formula;
+    if (!drawn) return systemFormula(state.bonds.system);
     const where = lengths(drawn.R);
     const { picture } = drawn;
-    if (picture.kind === 'h2plus') return `${systemFormula(drawn.system)} ${H2PLUS_LABELS[picture.state]}, ${where}`;
-    if (picture.kind === 'mo') return `${systemFormula(drawn.system)} ${picture.orbital.label}${SPIN_SUFFIX[picture.orbital.spin]}, ${where}`;
-    return `${systemFormula(drawn.system)} total density, surface at ρ = ${picture.isoValue} e/a₀³, ${where}`;
+    const name = systemFormula(drawn.system);
+    // Fix round 1 (M6): the drawn contour, named the way every other mode's
+    // caption names it -- except a density surface, which already states its
+    // own fixed ρ and draws at no enclosed fraction at all.
+    const percent = `${Math.round(drawn.enclosedFraction * 100)}% contour`;
+    if (picture.kind === 'h2plus') return `${name} ${H2PLUS_LABELS[picture.state]}, ${where}, ${percent}`;
+    if (picture.kind === 'mo') {
+        return `${name} ${picture.orbital.label}${SPIN_SUFFIX[picture.orbital.spin]}${componentNote(picture)}, ${where}, ${percent}`;
+    }
+    return `${name} total density, surface at ρ = ${picture.isoValue} e/a₀³, ${where}`;
 }
 
 export function viewDescription(state: RootState): string {
@@ -262,7 +316,11 @@ function bondsFileStem(state: RootState): string {
     if (picture.kind === 'h2plus') return `orbital-viewer_${system}_${r}_${picture.state.replace('_', '')}`;
     if (picture.kind === 'mo') {
         const spin = picture.orbital.spin === 'restricted' ? '' : `-${picture.orbital.spin}`;
-        return `orbital-viewer_${system}_${r}_${asciiOrbitalLabel(picture.orbital.label)}${spin}`;
+        // Fix round 1 (M1): a degenerate pair's two halves would otherwise
+        // share one file name -- the second exported silently overwrites
+        // (or, depending on the browser, numbers itself "(1)") the first.
+        const component = picture.componentCount > 1 ? `-${picture.component + 1}` : '';
+        return `orbital-viewer_${system}_${r}_${asciiOrbitalLabel(picture.orbital.label)}${spin}${component}`;
     }
     return `orbital-viewer_${system}_${r}_density-${picture.isoValue}`;
 }

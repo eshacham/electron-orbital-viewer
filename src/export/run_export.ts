@@ -1,4 +1,5 @@
 import type { RootState } from '../store';
+import type { ViewMode } from '../store/atomSlice';
 import { selectionProblem } from '../combinations';
 import { hydrogenicSource } from '../field_source';
 import { ORBITAL_RESOLUTION, BASIC_ORBITALS_Z } from '../orbital_presets';
@@ -7,21 +8,25 @@ import { buildComparisonCurves } from '../atom/comparison_curves';
 import type { SerialisedAtomProfile } from '../workers/atomWorker';
 import { profileRelativity, pictureLanded } from '../store/atomSlice';
 import { CsvCurve, formatNumber, radialCurvesToCsv } from './csv';
-import { exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment, jLevelShapeCaption } from './caption';
+import {
+    exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment, jLevelShapeCaption,
+    bondsDrawnPicture,
+} from './caption';
 import { CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
 import { encodeGlb } from './gltf';
 import { CubeAtom } from './cube';
 import { CubeJob, CubeWorkerHandle, requestCube } from './cube_request';
-// H2PLUS_CURVE_R from bonds/h2plus.ts, not bonds/useH2PlusCurve.ts (which
-// re-exports it): that module also pulls in createH2PlusCurveWorker.ts's
-// `new Worker(new URL(...), import.meta.url)`, a worker-bundling construct
-// this (non-worker) export module has no reason to load.
-import { H2PLUS_CURVE_R, H2PLUS_LABELS, h2plusCurve as solveH2PlusCurve } from '../bonds/h2plus';
-import { bondsCaptions } from '../bonds/captions';
+import { H2PLUS_LABELS } from '../bonds/h2plus';
+import { bondsCaptions, signed } from '../bonds/captions';
 import { H_PLUS_H_PLUS_HARTREE } from '../bonds/curve';
-import { BOHR_TO_ANGSTROM, DiatomicId, HARTREE_TO_EV, systemFormula } from '../bonds/systems';
+// H2PlusCurve as a type only: bonds/useH2PlusCurve.ts also pulls in
+// createH2PlusCurveWorker.ts's `new Worker(new URL(...), import.meta.url)`,
+// a worker-bundling construct Jest cannot parse; a type-only import is
+// erased at compile time, so this module never actually loads it.
+import type { H2PlusCurve } from '../bonds/useH2PlusCurve';
+import { BOHR_TO_ANGSTROM, DiatomicId, HARTREE_TO_EV, pointId, systemFormula } from '../bonds/systems';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../molecules/types';
 
 export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb' | 'cube';
@@ -37,6 +42,16 @@ export const EXPORT_ITEMS: ExportItem[] = [
     { kind: 'stl', label: '3D print (STL)', detail: 'each solid watertight, in millimetres' },
     { kind: 'cube', label: 'Field grid (Gaussian cube)', detail: 'the sampled ψ or ρ, in bohr — for VMD, VESTA, Avogadro' },
 ];
+
+/**
+ * Fix round 1 (M5): Bonds' CSV is the potential curve E(R), not a radial
+ * curve -- the menu item's own label should say so, not borrow the
+ * atom/Basic Orbitals wording. Every other kind's label is mode-independent.
+ */
+export function exportItemsFor(mode: ViewMode): ExportItem[] {
+    if (mode !== 'bonds') return EXPORT_ITEMS;
+    return EXPORT_ITEMS.map(item => (item.kind === 'csv' ? { ...item, label: 'Potential curve (CSV)' } : item));
+}
 
 export interface ExportOptions { longestSideMm?: number; }
 
@@ -58,11 +73,26 @@ export interface ExportContext extends ExportOptions {
      * picture, fetched outside Redux (bondsSlice's own comment: "large,
      * lives in useBondsData's cache") -- `bondsScan` for the potential
      * curve, the multireference caveat and D_e/R_e; `bondsMeta` for the
-     * cube's atoms (Z, since MoleculeBasis carries only positions). Absent
-     * outside Bonds mode, or null while still loading.
+     * cube's atoms (Z, since MoleculeBasis carries only positions). Each is
+     * accepted only once its own id matches the *drawn* system/basis
+     * (`bondsDrawnPicture`, caption.ts) -- fix round 1 (I1): a scan/meta
+     * fetched for a newly-selected molecule must not be read onto the
+     * previous one's still-showing picture. Absent outside Bonds mode, or
+     * null while still loading.
      */
     bondsScan?: MoleculeScan | null;
     bondsMeta?: MoleculeMeta | null;
+    /** Fix round 1 (I2): the live plot's own cached curve (useH2PlusCurve) -- the CSV must not re-solve it on the main thread. */
+    h2plusCurve?: H2PlusCurve | null;
+    /**
+     * Fix round 1 (I1): `useBondsData`'s own loading/error, mirrored into
+     * `exportAvailability` the same way `atomPictureReason` reads
+     * `state.atom.unbound` -- a verdict is shown in the store's own words,
+     * not the generic "waiting" reason, which would read as if trying again
+     * later would help.
+     */
+    bondsLoading?: boolean;
+    bondsError?: string | null;
 }
 
 export interface ExportResult { blob: Blob; filename: string; }
@@ -90,6 +120,17 @@ export const VIEW_NOT_READY_REASON = 'The 3D view is not ready yet.';
 export const PICTURE_BUSY_REASON = 'Wait for the picture to finish computing.';
 
 export const RENDER_FAILED_REASON = 'The last picture failed to compute; nothing to export.';
+
+/**
+ * Fix round 1 (I1): shown whenever the drawn Bonds picture does not match
+ * the panel's current selection (a molecule or point switch whose new
+ * picture has not landed yet) or `useBondsData` is still loading -- the same
+ * "stale picture, new selection" situation atom mode's `atomPictureReason`
+ * already guards against for a relativity switch.
+ */
+export const BONDS_LOADING_REASON = 'Wait for the molecule to load.';
+/** Fix round 1 (I2): the H2+ CSV needs the live plot's cached curve (ExportContext.h2plusCurve), never a main-thread re-solve. */
+export const H2PLUS_CURVE_NOT_READY_REASON = 'The potential curve is still computing.';
 
 /** Final review I2: a shell view whose lobes failed is not the picture its caption names. */
 export const COMPOSITION_FAILED_REASON = 'This shell\'s orbital lobes failed to compute, so the picture is incomplete.';
@@ -209,11 +250,14 @@ export function cubeReason(state: RootState): string | null {
  * A molecule's two nuclei, Z and position in bohr (brief, requirement 4),
  * from `meta.atoms`: `basis.atoms` has the same positions but no Z
  * (MoleculeBasis carries no element data, only the Gaussian functions), so
- * the cube needs the meta alongside the basis. Null while the meta has not
- * loaded, or does not match the basis actually drawn.
+ * the cube needs the meta alongside the basis. Fix round 1 (M4): accepted
+ * only when `meta.id === basis.id` exactly -- the drawn basis' own id, e.g.
+ * 'n2@07' -- not merely a matching atom count, which a *different* scan
+ * point of the same molecule (or a coincidentally-sized different molecule)
+ * would also pass.
  */
 function moleculeCubeAtoms(basis: MoleculeBasis, meta: MoleculeMeta | null | undefined): CubeAtom[] | null {
-    if (!meta || meta.atoms.length !== basis.atoms.length) return null;
+    if (!meta || meta.id !== basis.id) return null;
     return meta.atoms.map(a => ({ Z: a.Z, position: a.position }));
 }
 
@@ -223,34 +267,39 @@ function moleculeCubeAtoms(basis: MoleculeBasis, meta: MoleculeMeta | null | und
  * MO/density ψ/ρ with both nuclei from `meta` and its basis registered for
  * the worker (`bases`, since the worker has no registry of its own -- see
  * cube_request.ts). `fieldCubeGrid` (cube.ts) squares a 'gaussianDensity'
- * recipe's √ρ samples back to ρ; this only writes the description that says so.
+ * recipe's √ρ samples back to ρ; this only writes the description that says
+ * so. Built from `bondsDrawnPicture` throughout (fix round 1, I1): the same
+ * function `exportAvailability` used to refuse a stale picture, so the
+ * system this reads can never be the panel's newer selection.
  */
 function bondsCubeJob(state: RootState, title: string, scan: MoleculeScan | null | undefined, meta: MoleculeMeta | null | undefined): CubeJob {
-    const field = state.orbital.currentField;
-    if (!field) throw new Error(NOTHING_DRAWN_REASON);
+    const drawn = bondsDrawnPicture(state);
+    if (!drawn) throw new Error(NOTHING_DRAWN_REASON);
+    const field = state.orbital.currentField!;
     const source = field.sources[0];
-    const recipe = source.recipe;
     const resolution = field.resolution;
     const method = methodStatement(state, scan);
-    if (recipe.type === 'h2plus') {
-        const half = recipe.R / 2;
+    const { picture } = drawn;
+    if (picture.kind === 'h2plus') {
+        const half = drawn.R / 2;
         const atoms: CubeAtom[] = [{ Z: 1, position: [0, 0, -half] }, { Z: 1, position: [0, 0, half] }];
         return {
             type: 'fieldCube', source, resolution, atoms, title,
-            description: `psi(x,y,z), real, bohr^-3/2, H2+ ${H2PLUS_LABELS[recipe.state]}, on the grid as drawn; ${method}; lengths in bohr`,
+            description: `psi(x,y,z), real, bohr^-3/2, H2+ ${H2PLUS_LABELS[picture.state]}, on the grid as drawn; ${method}; lengths in bohr`,
         };
     }
-    if (recipe.type !== 'gaussianMO' && recipe.type !== 'gaussianDensity') throw new Error(NOTHING_DRAWN_REASON);
-    const basis = field.bases?.find(b => b.id === recipe.moleculeId);
+    const basis = drawn.basis;
     if (!basis) throw new Error('No basis available for this molecule export.');
     const atoms = moleculeCubeAtoms(basis, meta);
     if (!atoms) throw new Error('Molecule data is not available for this export yet.');
-    if (recipe.type === 'gaussianMO') {
-        const orbital = basis.orbitals[recipe.index];
-        const what = orbital ? `${orbital.label}${orbital.spin !== 'restricted' ? ` (${orbital.spin})` : ''} molecular orbital` : 'molecular orbital';
+    if (picture.kind === 'mo') {
+        const spin = picture.orbital.spin !== 'restricted' ? ` (${picture.orbital.spin})` : '';
+        // Fix round 1 (M1): names which half of a degenerate pair this is,
+        // matching the file stem's own '-1'/'-2' suffix.
+        const component = picture.componentCount > 1 ? ` (component ${picture.component + 1} of ${picture.componentCount})` : '';
         return {
             type: 'fieldCube', source, resolution, atoms, bases: [basis], title,
-            description: `psi(x,y,z), real, bohr^-3/2, ${what}, on the grid as drawn; ${method}; lengths in bohr`,
+            description: `psi(x,y,z), real, bohr^-3/2, ${picture.orbital.label}${spin}${component} molecular orbital, on the grid as drawn; ${method}; lengths in bohr`,
         };
     }
     return {
@@ -347,13 +396,46 @@ function csvReason(state: RootState): string | null {
     return drawnReason(state);
 }
 
+/**
+ * Fix round 1 (I1): the drawn picture can be a step behind the panel's
+ * selection -- a molecule switch, or a scan-point slide, whose new render
+ * has not landed (or failed to) -- and every Bonds export must refuse
+ * rather than read the method/CSV/cube off the *new* selection while the
+ * canvas (and `bondsDrawnPicture`) still show the old one. Checked in this
+ * order, the same shape as `atomPictureReason`: a load error is a verdict,
+ * shown in the store's own words; "still loading" and "selection ahead of
+ * the picture" both read the same generic reason, since either will resolve
+ * once the fetch catches up. Null (nothing to block) falls through to the
+ * ordinary nothing-drawn/busy/failed reasons below, which already handle
+ * "nothing drawn at all" (the very first load, before anything has landed).
+ */
+function bondsBlockReason(state: RootState, bondsLoad?: { loading: boolean; error: string | null }): string | null {
+    if (bondsLoad?.error) return bondsLoad.error;
+    if (bondsLoad?.loading) return BONDS_LOADING_REASON;
+    const drawn = bondsDrawnPicture(state);
+    if (!drawn) return null;
+    const bonds = state.bonds;
+    if (drawn.system !== bonds.system) return BONDS_LOADING_REASON;
+    if (bonds.system !== 'h2plus' && bonds.scanIndex !== null
+        && drawn.moleculeId !== pointId(bonds.system as DiatomicId, bonds.scanIndex)) {
+        return BONDS_LOADING_REASON;
+    }
+    return null;
+}
+
 // Task 13b (ruling C5): Bonds no longer refuses every kind outright --
 // `drawnReason` and friends already read `state.orbital.currentField`/
 // `isLoading`/`renderFailed` generically (a Bonds request is a single-source
-// `currentField`, exactly like a Basic Orbitals combination's), so removing
-// the blanket refusal below is enough: nothing drawn, loading or failed give
-// the same stated reasons every other mode gets.
-export function exportAvailability(state: RootState): ExportAvailability {
+// `currentField`, exactly like a Basic Orbitals combination's), so beyond
+// `bondsBlockReason` above (fix round 1, I1) nothing else is Bonds-specific:
+// nothing drawn, loading or failed give the same stated reasons every other
+// mode gets. `bondsLoad` is Bonds' own extra context (`useBondsData`'s
+// loading/error, not in Redux); every other mode ignores it.
+export function exportAvailability(state: RootState, bondsLoad?: { loading: boolean; error: string | null }): ExportAvailability {
+    if (state.atom.mode === 'bonds') {
+        const reason = bondsBlockReason(state, bondsLoad);
+        if (reason) return { png: reason, 'png-plain': reason, csv: reason, stl: reason, glb: reason, cube: reason };
+    }
     const png = pngReason(state);
     const geometry = geometryReason(state);
     return { png, 'png-plain': png, csv: csvReason(state), stl: geometry, glb: geometry, cube: cubeReason(state) };
@@ -365,27 +447,28 @@ function profileRGrid(profile: Pick<SerialisedAtomProfile, 'rMin' | 'dx' | 'size
 }
 
 /**
- * H₂⁺'s exact potential curve, both states, over the slider's own grid
- * (`H2PLUS_CURVE_R`, the same one the live plot and useH2PlusCurve use) --
- * computed directly rather than read from the hook's cached (async, worker-
- * built) result, so the export never has to say "not ready yet": the solve
- * is a deterministic pure function (bonds/h2plus.ts; ~0.3 s for the whole
- * range, a one-off cost for a user-initiated export, not a per-frame one).
+ * H₂⁺'s exact potential curve, both states -- the live plot's own cached
+ * curve (`context.h2plusCurve`, `useH2PlusCurve`), never re-solved here
+ * (fix round 1, I2: the full range is ~1 s of eigenproblems, not something
+ * to do on the main thread during a user-initiated export when the hook has
+ * almost certainly already solved it). The equilibrium comment (fix round 1,
+ * M3) is the curve's own `equilibrium`, the same number the plot's dotted
+ * line states (bonds/curve.ts's `h2plusCurveSpec`).
  */
-function h2plusCurveCsv(shareUrl: string): string {
-    const R = H2PLUS_CURVE_R;
-    const sigmaG = solveH2PlusCurve(R, '1sigma_g');
-    const sigmaU = solveH2PlusCurve(R, '1sigma_u');
+function h2plusCurveCsv(curve: H2PlusCurve, shareUrl: string): string {
+    const De = H_PLUS_H_PLUS_HARTREE - curve.equilibrium.totalEnergy;
     const comments = [
         `H2+ potential curve: E(R), both states (${H2PLUS_LABELS['1sigma_g']} gerade, ${H2PLUS_LABELS['1sigma_u']} ungerade).`,
         ...bondsCaptions('h2plus', null),
+        `R_e = ${curve.equilibrium.R.toFixed(3)} a₀ (${(curve.equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), `
+            + `E = ${signed(curve.equilibrium.totalEnergy, 4)} Ha (exact); D_e = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
         `Zero: H + H+ (${H_PLUS_H_PLUS_HARTREE} Ha).`,
         `view: ${shareUrl}`,
     ];
     const lines = comments.map(line => `# ${line}`);
     lines.push(['R_bohr', 'R_angstrom', 'E_1sigma_g_eV', 'E_1sigma_g_Ha', 'E_1sigma_u_eV', 'E_1sigma_u_Ha'].join(','));
-    R.forEach((r, i) => {
-        const g = sigmaG[i], u = sigmaU[i];
+    curve.R.forEach((r, i) => {
+        const g = curve.sigmaG[i], u = curve.sigmaU[i];
         lines.push([
             formatNumber(r, 'R_bohr', r),
             formatNumber(r * BOHR_TO_ANGSTROM, 'R_angstrom', r),
@@ -426,13 +509,24 @@ function diatomicCurveCsv(system: DiatomicId, scan: MoleculeScan, shareUrl: stri
 
 /**
  * Brief, requirement 5: Bonds' CSV is the potential curve, not a radial
- * curve -- H₂⁺'s own exact curve, or the diatomic's shipped scan points
- * (`context.bondsScan`, ExportContext's own extra data, ruling C5).
+ * curve -- H₂⁺'s own exact curve (`context.h2plusCurve`), or the diatomic's
+ * shipped scan points (`context.bondsScan`). The system is
+ * `bondsDrawnPicture`'s, not the panel's selection (fix round 1, I1), and
+ * `bondsScan` is accepted only when its own id matches that drawn system --
+ * `exportAvailability` already refuses the mismatched case before this is
+ * ever reached from `runExport`, but `csvFor`/`cubeJobFor` are also called
+ * directly (tests, and `cubeJobFor` from the cube path), so the guard is
+ * repeated here rather than assumed.
  */
-function bondsCsvFor({ state, shareUrl, bondsScan }: ExportContext): string {
-    if (state.bonds.system === 'h2plus') return h2plusCurveCsv(shareUrl);
-    if (!bondsScan) throw new Error('The potential curve is not available yet.');
-    return diatomicCurveCsv(state.bonds.system as DiatomicId, bondsScan, shareUrl);
+function bondsCsvFor({ state, shareUrl, bondsScan, h2plusCurve }: ExportContext): string {
+    const drawn = bondsDrawnPicture(state);
+    const system = drawn?.system ?? state.bonds.system;
+    if (system === 'h2plus') {
+        if (!h2plusCurve) throw new Error(H2PLUS_CURVE_NOT_READY_REASON);
+        return h2plusCurveCsv(h2plusCurve, shareUrl);
+    }
+    if (!bondsScan || bondsScan.id !== system) throw new Error('The potential curve is not available yet.');
+    return diatomicCurveCsv(system as DiatomicId, bondsScan, shareUrl);
 }
 
 function csvFor(context: ExportContext): string {
@@ -482,7 +576,14 @@ function csvFor(context: ExportContext): string {
 }
 
 export async function runExport(kind: ExportKind, context: ExportContext): Promise<ExportResult> {
-    const reason = exportAvailability(context.state)[kind];
+    // Fix round 1 (I1): the same mismatch/loading/error gate the live menu
+    // uses (App.tsx), repeated here so a direct runExport call -- a menu
+    // item clicked the instant before a state change would have disabled it,
+    // or a caller that skips the menu -- cannot bypass it.
+    const bondsLoad = context.state.atom.mode === 'bonds'
+        ? { loading: Boolean(context.bondsLoading), error: context.bondsError ?? null }
+        : undefined;
+    const reason = exportAvailability(context.state, bondsLoad)[kind];
     if (reason) throw new Error(reason);
     const stem = exportFileStem(context.state);
     switch (kind) {

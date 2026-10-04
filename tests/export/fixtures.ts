@@ -12,6 +12,7 @@ import { CANONICAL_CAMERA_ANGLES } from '../../src/camera_angles';
 import { bondsFieldRequest } from '../../src/bonds/bonds_request';
 import type { BondsView } from '../../src/store/bondsSlice';
 import { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
+import type { H2PlusCurve } from '../../src/bonds/useH2PlusCurve';
 
 /** A store with production's middleware config (see createAppStore), so a typed-array payload does not print serializableCheck's console.error. */
 export const makeStore = () => createAppStore();
@@ -133,6 +134,23 @@ export function chlorideUnboundStore() {
     store.dispatch(setElement(17));
     store.dispatch(setCharge(-1));
     store.dispatch(solveUnbound('LDA does not bind this anion: its 3p electron is not bound by 10⁻⁴ Ha or more.'));
+    return store;
+}
+
+/**
+ * Fluorine's anion F⁻ (Z = 9, charge -1), which this LDA *does* bind -- for
+ * fix round 1 (I3), pinning that a cube title's charge superscript survives
+ * `asciiLine` as a trailing hyphen ('F-') rather than vanishing. `⁻`
+ * (U+207B SUPERSCRIPT MINUS) decomposes under NFKD into U+2212 MINUS SIGN, a
+ * *second* non-ASCII character produced only by normalising -- the same
+ * mechanism as H₂⁺'s '10⁻¹⁰ Ha' losing its sign, found live.
+ */
+export function fluorideIonStore() {
+    const store = makeStore();
+    store.dispatch(setElement(9));
+    store.dispatch(setCharge(-1));
+    const species: AtomSpecies = { Z: 9, charge: -1, excitation: null };
+    store.dispatch(solveSucceeded(speciesProfile(species)));
     return store;
 }
 
@@ -264,6 +282,32 @@ export function bondsH2PlusStore() {
     store.dispatch(finishOrbitalCalculation({ isoLevel: 1e-4 }));
     return store;
 }
+
+/**
+ * Fix round 1 (I1), the reviewer's own probe: H₂⁺'s picture is drawn and
+ * landed, then the panel is switched to N₂ -- `selectBondsSystem` updates
+ * `state.bonds.system` at once, but nothing has re-rendered yet, so
+ * `state.orbital.currentField` still holds H₂⁺'s request. Every Bonds export
+ * must read the *drawn* H₂⁺ picture (or refuse outright), never N₂'s method/
+ * scan/meta layered onto it.
+ */
+export function bondsMismatchStore() {
+    const store = bondsH2PlusStore();
+    store.dispatch(selectBondsSystem('n2'));
+    return store;
+}
+
+/**
+ * A small, fast stand-in for useH2PlusCurve's real (solved) curve -- fix
+ * round 1 (I2): the CSV must read this rather than re-solving on the main
+ * thread, so tests exercising it no longer need the ~1 s real solve either.
+ */
+export const FAKE_H2PLUS_CURVE: H2PlusCurve = {
+    R: [0.5, 1, 2, 3],
+    sigmaG: [-0.3, -0.9, -1.1026342144951868, -0.97],
+    sigmaU: [-0.1, -0.4, -0.6675343922018, -0.55],
+    equilibrium: { R: 1.997193, totalEnergy: -0.602634619 },
+};
 
 /** A closed octahedron of half-width 1 bohr, wound outward. */
 export function octahedron(name = 'octa'): ExportSurface {

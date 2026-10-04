@@ -3,7 +3,7 @@ import {
     Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, InputLabel,
     ListItemText, Menu, MenuItem, Select, Snackbar, TextField,
 } from '@mui/material';
-import { EXPORT_ITEMS, ExportAvailability, ExportKind, ExportOptions } from '../export/run_export';
+import { EXPORT_ITEMS, ExportAvailability, ExportItem, ExportKind, ExportOptions } from '../export/run_export';
 
 /** The longest side of a print, offered as a choice (a desk model to a display piece). */
 const PRINT_SIZES_MM = [30, 50, 80, 120];
@@ -17,6 +17,8 @@ interface ShareExportBarProps {
     availability?: ExportAvailability;
     /** How many separate solids an STL would hold right now (the viewer's surfaces), read as the print dialog opens. */
     stlSolids?: () => number;
+    /** Fix round 1 (M5): the menu's own items -- defaults to EXPORT_ITEMS, but Bonds' CSV reads "Potential curve", not "Radial curves" (run_export.ts's exportItemsFor). */
+    items?: ExportItem[];
 }
 
 /**
@@ -24,7 +26,7 @@ interface ShareExportBarProps {
  * the right-hand panel on a desktop and in the View tab on a phone: no new
  * panel over the canvas (spec §3.8).
  */
-const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, availability, stlSolids }) => {
+const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, availability, stlSolids, items = EXPORT_ITEMS }) => {
     const [notice, setNotice] = useState<string | null>(null);
     // Fix round 1 (M6): MUI's Snackbar starts its auto-hide timer once, when
     // `open` first turns true, and does not notice a later change to
@@ -107,7 +109,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
                         onClose={() => setMenuAnchor(null)}
                         slotProps={{ list: { disabledItemsFocusable: true } }}
                     >
-                        {EXPORT_ITEMS.map(item => {
+                        {items.map(item => {
                             const reason = availability?.[item.kind] ?? null;
                             const unavailable = reason !== null || exporting;
                             return (

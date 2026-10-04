@@ -8,7 +8,7 @@ import { MAX_FIELD_AU } from '../../src/field_source';
 import { N2_MAX_FIELD_AU } from '../../src/stark';
 import {
     makeStore, neonStore, sodiumIonStore, sodiumExcitedStore, goldStore, goldIonStore,
-    bondsMoleculeStore, bondsH2PlusStore, bondsO2Store, N2_SCAN,
+    bondsMoleculeStore, bondsH2PlusStore, bondsO2Store, bondsMismatchStore, N2_SCAN,
 } from './fixtures';
 
 describe('export captions', () => {
@@ -219,33 +219,36 @@ describe('export captions', () => {
     // drawn, and the method -- reading the drawn request (currentField), not
     // the panel's selection, the same way atom mode reads the drawn profile.
     describe('Bonds mode names the system, R and the method (ruling C5)', () => {
-        it('names H2+\'s state and R, with the exact method, in an ASCII-unique file stem', () => {
+        it('names H2+\'s state, R and the drawn contour, with the exact method, in an ASCII-unique file stem', () => {
             const store = bondsH2PlusStore();
-            expect(viewDescription(store.getState())).toBe('H₂⁺ 1σg, R = 2.00 a₀ (1.058 Å)');
+            expect(viewDescription(store.getState())).toBe('H₂⁺ 1σg, R = 2.00 a₀ (1.058 Å), 90% contour');
             expect(methodStatement(store.getState())).toMatch(/^Exact within Born–Oppenheimer/);
             expect(exportFileStem(store.getState())).toBe('orbital-viewer_H2plus_R2.00_1sigmag');
         });
 
-        it('names a diatomic\'s drawn orbital and R from the basis actually drawn, not the panel\'s R', () => {
+        it('names a diatomic\'s drawn orbital, R and the drawn contour from the basis actually drawn, not the panel\'s R', () => {
             const store = bondsMoleculeStore();
-            expect(viewDescription(store.getState())).toBe('N₂ 3σg, R = 2.07 a₀ (1.098 Å)');
+            expect(viewDescription(store.getState())).toBe('N₂ 3σg, R = 2.07 a₀ (1.098 Å), 90% contour');
             expect(exportFileStem(store.getState())).toBe('orbital-viewer_N2_R2.07_3sigmag');
             // Without the scan (not yet loaded), the method still names the
             // fixed, universal one -- just not the molecule-specific caveat.
             expect(methodStatement(store.getState())).toBe('diatomic molecular orbitals and density: B3LYP/def2-TZVP');
-            // With the scan, the shipped method (and no caveat for N₂, which isn't multireference).
-            expect(methodStatement(store.getState(), N2_SCAN)).toBe('B3LYP/def2-TZVP');
+            // With the scan, the shipped method in bondsCaptions' own wording (fix round 1, M2).
+            expect(methodStatement(store.getState(), N2_SCAN)).toBe(
+                'Orbitals and density: B3LYP/def2-TZVP; energies: CCSD(T)/aug-cc-pVTZ (frozen core)',
+            );
         });
 
         it('adds the multireference caveat (B₂/C₂) when the scan says so', () => {
             const store = bondsMoleculeStore();
             const multireferenceScan = { ...N2_SCAN, validity: { ...N2_SCAN.validity, multireference: true, t1AtRe: 0.05 } };
             expect(methodStatement(store.getState(), multireferenceScan)).toBe(
-                'B3LYP/def2-TZVP; Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.050 at R_e).',
+                'Orbitals and density: B3LYP/def2-TZVP; energies: CCSD(T)/aug-cc-pVTZ (frozen core); '
+                + 'Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.050 at R_e).',
             );
         });
 
-        it('names a density surface by its ρ, and the stem matches the brief\'s own example', () => {
+        it('names a density surface by its ρ, with no contour fraction (it is drawn at a fixed ρ, not an enclosed fraction)', () => {
             const store = bondsMoleculeStore({ kind: 'density' });
             expect(viewDescription(store.getState())).toBe('N₂ total density, surface at ρ = 0.002 e/a₀³, R = 2.07 a₀ (1.098 Å)');
             expect(exportFileStem(store.getState())).toBe('orbital-viewer_N2_R2.07_density-0.002');
@@ -253,14 +256,59 @@ describe('export captions', () => {
 
         // Brief, requirement 3's own worked example: an unrestricted
         // molecule's spin-labelled orbital, Greek spelled out, star dropped.
+        // O2_BASIS's 1πg* has only one orbital per spin (no degenerate
+        // pair), so the stem carries no component suffix (see the dedicated
+        // degenerate-pair test below for that case).
         it('matches the brief\'s own worked example exactly: O2, R = 2.29, 1pig alpha', () => {
             const store = bondsO2Store();
             expect(exportFileStem(store.getState())).toBe('orbital-viewer_O2_R2.29_1pig-alpha');
         });
 
-        it('names an unrestricted orbital\'s spin in viewDescription', () => {
+        it('names an unrestricted orbital\'s spin and the drawn contour in viewDescription', () => {
             const store = bondsO2Store();
-            expect(viewDescription(store.getState())).toBe('O₂ 1πg* (α), R = 2.29 a₀ (1.212 Å)');
+            expect(viewDescription(store.getState())).toBe('O₂ 1πg* (α), R = 2.29 a₀ (1.212 Å), 90% contour');
+        });
+
+        // Fix round 1 (M1): N2_BASIS's '1πg*' (restricted) has two entries
+        // (index 1, 2) -- a genuine degenerate pair -- so exporting each
+        // component separately must not produce the same name twice.
+        describe('a degenerate π pair gets a distinguishing suffix (fix round 1, M1)', () => {
+            it('names component 1 of 2, with a "-1" file-stem suffix', () => {
+                const store = bondsMoleculeStore({ kind: 'mo', label: '1πg*', spin: 'restricted', component: 0 });
+                expect(viewDescription(store.getState())).toContain('1πg* (component 1 of 2)');
+                expect(exportFileStem(store.getState())).toBe('orbital-viewer_N2_R2.07_1pig-1');
+            });
+
+            it('names component 2 of 2, with a "-2" file-stem suffix', () => {
+                const store = bondsMoleculeStore({ kind: 'mo', label: '1πg*', spin: 'restricted', component: 1 });
+                expect(viewDescription(store.getState())).toContain('1πg* (component 2 of 2)');
+                expect(exportFileStem(store.getState())).toBe('orbital-viewer_N2_R2.07_1pig-2');
+            });
+
+            it('adds no component note or suffix for a non-degenerate orbital (3σg, one match)', () => {
+                const store = bondsMoleculeStore();
+                expect(viewDescription(store.getState())).not.toContain('component');
+                expect(exportFileStem(store.getState())).not.toMatch(/-\d$/);
+            });
+        });
+
+        // Fix round 1 (I1): the reviewer's own probe. H₂⁺ is drawn; N₂ is
+        // selected but has not rendered yet (bondsMismatchStore). Every
+        // Bonds caption must still read the *drawn* H₂⁺ picture -- never
+        // N₂'s scan, even when one is handed in, since it cannot possibly
+        // belong to what is on screen.
+        describe('reads the drawn picture, never the selection, while a new molecule is still loading (fix round 1, I1)', () => {
+            it('viewDescription and exportFileStem stay H2+\'s, although N2 is selected', () => {
+                const store = bondsMismatchStore();
+                expect(store.getState().bonds.system).toBe('n2');
+                expect(viewDescription(store.getState())).toMatch(/^H₂⁺ 1σg/);
+                expect(exportFileStem(store.getState())).toBe('orbital-viewer_H2plus_R2.00_1sigmag');
+            });
+
+            it('methodStatement names H2+\'s own exact method, even when handed N2\'s scan', () => {
+                const store = bondsMismatchStore();
+                expect(methodStatement(store.getState(), N2_SCAN)).toMatch(/^Exact within Born–Oppenheimer/);
+            });
         });
     });
 });

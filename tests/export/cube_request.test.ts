@@ -9,7 +9,9 @@ import { basicOrbitalParams } from '../../src/orbital_presets';
 import { fieldRequestFor } from '../../src/combinations';
 import { hydrogenicSource } from '../../src/field_source';
 import { registeredBasis } from '../../src/molecules/basis_registry';
-import { makeStore, neonStore, neonProfile, readText, goldStore, bondsMoleculeStore, bondsH2PlusStore, N2_BASIS, N2_META } from './fixtures';
+import {
+    makeStore, neonStore, neonProfile, readText, goldStore, bondsMoleculeStore, bondsH2PlusStore, N2_BASIS, N2_META, fluorideIonStore,
+} from './fixtures';
 
 function fakeWorker(reply: (request: CubeRequest) => unknown): CubeWorkerHandle & { terminate: jest.Mock } {
     const worker = {
@@ -32,6 +34,28 @@ describe('cube requests', () => {
         expect(text.split('\n')[0]).toBe('electron-orbital-viewer: Neon (Ne, Z = 10), whole atom, 90% contour');
         expect(text.split('\n')[1]).toMatch(/^rho\(r\) = D\(r\)\/\(4 pi r\^2\), total electron density/);
         expect(text.split('\n')[6].trim().split(/\s+/)).toEqual(['10', '10.000000', '0.000000', '0.000000', '0.000000']);
+        // Fix round 1 (I3): this title has none of the characters asciiLine's
+        // fix touches, so it is the control case -- byte-identical to before.
+    });
+
+    // Fix round 1 (I3): asciiLine's fix is deliberate, not incidental --
+    // pinned end to end (viewDescription through the actual encoded file),
+    // not only as a unit test of asciiLine itself (cube.test.ts).
+    describe('asciiLine\'s fix reaches the actual cube file (fix round 1, I3)', () => {
+        it('keeps an anion\'s charge sign as a trailing hyphen, rather than silently reading as neutral', async () => {
+            const job = cubeJobFor(fluorideIonStore().getState());
+            const text = await readText(buildCubeBlob({ ...job, resolution: 8, requestId: 1 } as CubeRequest));
+            const title = text.split('\n')[0];
+            expect(title).toContain('Fluorine ion F-');
+            // The old bug: the charge sign vanished outright, reading as the neutral atom.
+            expect(title).not.toContain('F (Z');
+        });
+
+        it('writes "spin-orbit" in a spin-orbit cube title, not "spinorbit" (an en dash has no ASCII decomposition)', async () => {
+            const job = cubeJobFor(goldStore('spinOrbit').getState());
+            const text = await readText(buildCubeBlob({ ...job, resolution: 8, requestId: 1 } as CubeRequest));
+            expect(text.split('\n')[0]).toContain('with spin-orbit');
+        });
     });
 
     it('takes the subshell\'s curve at the shell level when one is isolated', () => {
