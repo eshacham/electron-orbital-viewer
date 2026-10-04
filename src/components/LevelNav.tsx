@@ -6,7 +6,7 @@ import {
     valenceShellOf, valenceConfigurationLabelOf,
 } from '../atom/configurations';
 import { orbitalName } from '../orbital_names';
-import type { RelativityMode } from '../atom/relativity';
+import { methodStatement, type RelativityMode } from '../atom/relativity';
 
 /**
  * Where a breadcrumb segment or shell chip should take the app.
@@ -96,7 +96,29 @@ function shellName(n: number): string {
     return `${PRINCIPAL_SHELL_LETTERS[n - 1] ?? `n=${n}`} shell (n=${n})`;
 }
 
-const METHOD_STATEMENT = 'central-field SCF, LDA exchange with VWN correlation, spherically averaged';
+/**
+ * The relativity clause of "About this model" -- the rest of the paragraph
+ * (central-field averaging, LDA/VWN, ions and excitations, the
+ * spin-restricted picture and its unbound anions, the basis-choice caveat)
+ * does not depend on the mode, so only this one sentence changes with it.
+ * Phase 3 widened the non-relativistic wording from "neutral … no ions" to
+ * "isolated atoms and their ions"; all three variants keep that ions
+ * wording and vary only the relativity statement.
+ */
+export function aboutRelativitySentence(mode: RelativityMode): string {
+    switch (mode) {
+        case 'off':
+            return 'It is non-relativistic and describes isolated atoms and their ions — no molecules, no spin-orbit coupling.';
+        case 'scalar':
+            return 'Relativity is included at the scalar-relativistic level (Koelling–Harmon: the mass-velocity and Darwin terms), '
+                + 'which captures how heavy atoms’ s and p shells contract, but not spin–orbit splitting. '
+                + 'It describes isolated atoms and their ions — no molecules.';
+        case 'spinOrbit':
+            return 'Relativity is included in full through the radial Dirac equation, so each subshell with l > 0 splits into '
+                + 'j = l ± ½ levels, occupied in proportion to 2j + 1 so the atom stays spherical. '
+                + 'It describes isolated atoms and their ions — no molecules.';
+    }
+}
 
 /**
  * Ruling C6: the ionisation and excitation energies are ΔSCF differences
@@ -411,7 +433,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     it made tall enough to push the controls below it under
                     the fold. */}
                 <Typography variant="caption" className="level-nav-method" display="block">
-                    {METHOD_STATEMENT}
+                    {methodStatement(relativity)}
                 </Typography>
                 <Typography variant="body2" className="level-nav-about">
                     This is a central-field model: each electron moves in the
@@ -420,9 +442,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     sublevels rather than resolved into individual
                     determinants. Exchange and correlation come from the
                     local density approximation (LDA) with the VWN
-                    correlation functional. It is non-relativistic and
-                    describes isolated atoms and their ions — no molecules,
-                    no spin-orbit coupling. An ion or an excited atom uses
+                    correlation functional. {aboutRelativitySentence(relativity)} An ion or an excited atom uses
                     the same model with its own electron count or one
                     electron moved; ionisation and excitation energies are
                     ΔSCF differences of total energies from the

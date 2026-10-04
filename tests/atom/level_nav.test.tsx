@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, within } from '@testing-library/react';
-import LevelNav, { NavigationTarget, relativisticEnergiesSentence } from '../../src/components/LevelNav';
+import LevelNav, { NavigationTarget, relativisticEnergiesSentence, aboutRelativitySentence } from '../../src/components/LevelNav';
 import { speciesConfiguration } from '../../src/atom/species';
 
 describe('LevelNav', () => {
@@ -428,6 +428,30 @@ describe('LevelNav for a species', () => {
             expect(text).toMatch(pattern);
             expect(text).toMatch(/non-relativistic/);
             expect(text).toContain('extra electron at all. This picture');
+        });
+    });
+
+    // Carry from Task 11: the "It is non-relativistic … no spin-orbit
+    // coupling" clause used to sit next to Task 11's new ΔSCF sentence
+    // unchanged in every mode, so a relativistic picture's About text
+    // contradicted itself. aboutRelativitySentence makes that clause
+    // mode-aware; off keeps today's wording verbatim.
+    describe('the relativity clause of About this model', () => {
+        it.each([
+            ['scalar', /Koelling–Harmon/, /scalar-relativistic/],
+            ['spinOrbit', /Dirac/, /j = l ± ½/],
+        ] as const)('states the %s method in About this model', (mode, methodPattern, sentencePattern) => {
+            const { getByRole, container } = render(
+                <LevelNav Z={79} relativity={mode} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+            );
+            fireEvent.click(getByRole('button', { name: /about this model/i }));
+            expect(container.querySelector('.level-nav-method')!.textContent).toMatch(methodPattern);
+            expect(container.querySelector('.level-nav-about')!.textContent).toMatch(sentencePattern);
+            expect(container.querySelector('.level-nav-about')!.textContent).not.toMatch(/It is non-relativistic/);
+        });
+
+        it('keeps the non-relativistic wording when relativity is off', () => {
+            expect(aboutRelativitySentence('off')).toMatch(/non-relativistic/);
         });
     });
 });

@@ -221,26 +221,72 @@ These cost real effort to arrive at; do not undo them without reading why.
 
 ## Known limits of the model — quantified, and stated in the README
 
-Relativistic error scales roughly as Z². Measured against NIST's ScRLDA:
+**Relativity is no longer only a measured gap — it is a switch (Phase 4).**
+*Off* is exactly the non-relativistic model above, and its Z²-scaling error
+against NIST's ScRLDA (Ne 1s/2s/2p 0.032 %/0.250 %/0.097 %, Au 6s 26.9 %, the
+effect that makes gold yellow) is unchanged and still the reason *Scalar* is
+the default from caesium onward (`defaultRelativityFor`, Z ≥ 55). *Scalar*
+is Koelling–Harmon (mass-velocity and Darwin terms, no spin–orbit); *With
+spin–orbit* is the full radial Dirac equation, splitting every l > 0
+subshell into j = l ± ½ levels occupied in proportion to 2j + 1. Both apply
+the MacDonald–Vosko relativistic correction to LDA exchange, because NIST's
+own ScRLDA/RLDA tables do (judgment call 2 below) — the validation below
+would not mean what it claims otherwise.
 
-| | error vs relativistic |
-| --- | --- |
-| Ne 1s / 2s / 2p | 0.032 % / 0.250 % / 0.097 % |
-| Au 1s | 9.0 % |
-| Au 5d | 16.1 % |
-| **Au 6s** | **26.9 %** |
+**Validated against NIST, within the spec's bars** (`tests/atom/
+relativistic_nist.test.ts`, `src/validation/relativity_results.json`, 241
+entries across Ne, Ar, Kr, Xe, Au, Hg, Rn, U):
 
-So: sub-1 % through krypton, ~1–2 % at xenon, 10–27 % from gold. Gold's 6s
-error is exactly the effect that makes gold yellow.
+| Column | Worst Etot | Worst eigenvalue |
+| --- | --- | --- |
+| ScRLDA (scalar) | U, 0.0010 % | U 5f, 0.496 % |
+| RLDA (spin–orbit) | Ne, 0.00018 % | U 5f₊, 0.054 % |
 
-The *visual* content is far more robust than the numeric: orbital shapes,
-node counts, shell topology and occupancy are exact at any Z; only energies
-degrade.
+Both are inside the spec's 1 % bar for every element, with wide margin.
+Restricted to Z ≤ 18 (Ne, Ar) — the spec's tighter bar — the worst case in
+either column is Ar 3p at 0.011 %, inside the 0.1 % the spec asks there.
 
-**Planned v2 is scalar-relativistic (Koelling–Harmon)** — roughly 150 lines
-against one modified ODE, reusing the same shooting method and plugging into
-the same `RadialState` interface. It would take gold's 6s from 27 % to under
-1 %.
+**The light-atom finding behind that 0.1 % bar's wording** (recorded in
+`global-constraints.md` while this phase was planned, carried forward here
+because it is still the right reading): switching relativity *on* moves
+argon's total energy by 0.30 % and its 3s eigenvalue by 0.82 % from the
+non-relativistic answer — real physics, consistent with this file's own Ne
+2s figure above (0.25 %), not noise. Reread literally ("light atoms
+unchanged within 0.1 % when relativity is on") the spec would be false. Read
+as "for Z ≤ 18, the relativistic calculation agrees with NIST's own
+relativistic columns within 0.1 %" — the table above — it is true and
+carries the spec's actual intent: that the *relativistic* result is right,
+not that relativity has no effect on a light atom.
+
+**Known remaining approximations**, all of them already true of the
+non-relativistic model except the first two:
+- **Point nucleus** in every mode, matching NIST's own tables (confirmed
+  against NIST's Procedure page, Task 1) — a finite nuclear size would shift
+  s eigenvalues for the heaviest elements by an amount this model cannot see.
+- **Spherically averaged over j, not just over l.** An open subshell's
+  electrons are shared between its j-levels in proportion to 2j + 1
+  (`splitByJ`), exactly as they were already shared uniformly across an
+  l-subshell's mₗ states — a continuation of the model's central-field
+  assumption, not a new one.
+- **A j-level's orbital is drawn with the plain l-basis angular shape**
+  (spec §3.6): level 3 shows R(r) of that j-level times the ordinary real
+  spherical harmonic, the large component only — not the true
+  |j, mⱼ⟩ angular dependence, which mixes two l values' spin states and has
+  no analogue in this renderer. Exports say so explicitly ("large
+  component, l-basis angular part", `run_export.ts`); D(r) and the radial
+  curves are the real, relativistic R(r) and do not have this limit.
+- **Level 3 has no relativity framing floor.** The whole-atom and open-shell
+  views hold the camera across a mode switch (`framingRadius`/
+  `contourRadius`, ruling C14), but the marching-cubes orbital at level 3
+  frames on its own sampling box and can re-zoom when a mode switch changes
+  that box. Accepted (Task 11 M2): the effect the floor exists to keep
+  visible — a heavy atom's s/p shell contracting — is a shell-level
+  phenomenon, not one a single orbital's own view depends on holding still.
+
+The *visual* content is otherwise exactly as robust as before: orbital
+shapes, node counts, shell topology and occupancy are exact at any Z in
+every mode; only energies and, now, s/p shell contraction are the numbers
+relativity changes.
 
 ---
 
@@ -696,6 +742,198 @@ file, `src/validation/ion_results.json`, with a fast subset (He, Li) also
 recomputed on every default `npx jest` run so a silent regression in the
 committed numbers cannot hide behind the slow gate alone.
 
+## Phase 4 — relativity (2026-09-25)
+
+Atom mode gained a Relativity switch (Off / Scalar / With spin–orbit,
+Controls panel — layout contract §3.8). See "Known limits" above for the
+modes, the NIST validation and the remaining approximations; this section is
+what differs from the phase plan, costs money (time), or isn't visible from
+reading one file.
+
+### URL state (ruling C1)
+
+- **`rel` sits right after `Z`**, ahead of `charge`/`excite`
+  (`encodeAtomKeys`/`decodeAtomKeys`): `Z`, `rel`, `charge`, `excite`,
+  `level`, `n`, `l`, `ml`, with `j` after `l` once a link names a j-level
+  (ruling C8).
+- **Absent or invalid `rel` decodes to off**, so every link made before this
+  phase — and a hand-edited `rel=nonsense` — still reproduces exactly the
+  picture it showed. The encoder writes `rel` whenever the *effective* mode
+  is not off, so a default-scalar gold link encodes `rel=scalar` even though
+  nobody touched the switch.
+- **An explicit choice that happens to equal the element's default
+  renormalises to `null`** (ruling T11-a, fixing I2 found in Task 11's
+  review): picking Scalar on gold, then Carbon, then back to gold must show
+  "Default for this element" again on gold, not a frozen explicit "scalar"
+  that can never go back to following the default. The override is global
+  (persists across element picks, so Argon inherits a Carbon-picked Off) but
+  is renormalised to `null` the moment it equals the newly selected
+  element's own default — matching the URL decoder's own normalisation, so
+  "what the override variable holds" and "what a link encodes" never
+  disagree.
+
+### Cache keys (ruling C2)
+
+Every relativity-sensitive cache — the species solve
+(`solveSpeciesCache`), the serialised profile (`profile_cache.ts`), the
+shell mesh (`shell_mesh_cache.ts`) and the neutral reference ring
+(`atomWorker.ts`'s `referenceRadiiFor`) — keys `off` exactly as it always
+was (bare `speciesKey`, byte-identical) and keys every other mode
+`${speciesKey}@${relativity}`. `shell_mesh_cache` additionally folds in the
+isolated j-level, since 6p½ and 6p³⁄₂ are different meshes at the same
+(n, l).
+
+### Warm/cold start and the non-relativistic search throwing (rulings T7-a, T7-b)
+
+A relativistic solve seeds from the *same species'* converged
+non-relativistic potential rather than the screened guess — it is on the
+same grid (`gridForAtom` depends only on Z and the highest n) and starting
+next to the answer saves iterations (47 → 37 for neutral gold, measured
+again below). Where that seed throws or fails to converge, `solveSpecies`
+retries from the screened (cold) start and reports its outcome instead
+(ruling T7-a) — found necessary for 16 heavy species where the relativistic
+equation, asked in the non-relativistic potential, finds a barely bound f
+level pushed out of the bound spectrum in its first iterations (Tm/Yb with
+spin–orbit, and several 6s→5d/7s→5f excitations; see the Backlog sweep
+entry below for the full list).
+
+The non-relativistic eigenvalue search now throws the same "no bound state"
+diagnostic the relativistic one always has, rather than silently returning
+whatever root it last tried (ruling T7-b) — before this, Pr–Eu's 6s → 4f
+excitation "converged" in off mode with a phantom 4f at −192 Ha, shipped
+since Phase 3. A verdict from either solver is classified one of six ways
+by the heavy sweep (`relativistic_heavy_sweep.ts`): `converged`,
+`unconverged`, `unbound` (an anion's electron is not bound, as always),
+`notBound`/`noBoundState` (an honest LDA verdict — the promoted or valence
+electron the species asks for is simply not bound in this method, not a
+solver bug), or `error` (an actual bug, the only outcome that fails the
+sweep). `KNOWN_FAILURES` pins every non-`converged` outcome **both ways** —
+a species that starts converging when the list says it shouldn't fails the
+shard exactly as one that stops converging does — so neither a regression
+nor an unnoticed fix can drift past the suite silently. The full
+classification, including which excitations are unbound and why, is in the
+Backlog's "Which heavy species do not converge" entry below.
+
+### ΔSCF energies stay non-relativistic (ruling C6)
+
+Ionisation and excitation energies are, in every relativity mode, ΔSCF
+differences from the non-relativistic spin-polarised LDA — spin-polarised
+MacDonald–Vosko exchange is out of scope, and ΔSCF is validated only
+through argon (Phase 3's table above). With a relativistic picture on
+screen this has to be said or a heavy atom's shown energy reads as
+carrying a relativistic shift it does not include: `deltaScfMethod
+(pictureMode)` (`delta_scf.ts`) and LevelNav's
+`relativisticEnergiesSentence(mode)` both state plainly that the picture is
+drawn by the switch's method while the energies stay the non-relativistic
+one, whenever the picture is not off. The energies caches are untouched —
+keyed by `speciesKey` alone, not cleared by a relativity switch — since the
+numbers they hold do not depend on it.
+
+### A missing comparison or reference is named, not silently dropped
+
+The dashed non-relativistic curve and the "what changed" valence-s
+contraction need the *same species'* non-relativistic solve (ruling C5);
+where that solve fails or does not converge (the Pr–Eu 6s → 4f case above,
+or any species whose off-mode solve itself does not converge),
+`comparisonUnavailable` carries why ("No non-relativistic comparison: …")
+and is shown in the readout's place rather than the readout silently
+vanishing. Independently, the neutral reference ring's own second solve
+inside the worker can fail on its own account; `referenceUnavailable`
+covers that case the same way, shown where the reference-ring note would
+be. The two are unrelated: a picture can have a comparison but no
+reference, or vice versa.
+
+### Cost (ruling C16)
+
+A relativistic pick costs two solves (the non-relativistic one the worker
+needs anyway for the comparison curve, then the relativistic one warm-seeded
+from it); an ion or excitation of a heavy element costs up to four (its own
+pair, plus the neutral reference's pair for the ring and the camera's
+framing floor). Accepted per ruling C16. Measured directly (bundled with
+esbuild, run under plain Node rather than jest — the process notes below
+explain why jest is not the tool for this): non-relativistic seed solve,
+then the relativistic solve warm-started from it, then the same relativistic
+solve cold (screened-start, no seed), for three neutral heavy atoms and one
+heavy ion:
+
+| Species | Mode | NR seed | Warm (iterations) | Cold (iterations) |
+| --- | --- | --- | --- | --- |
+| Au | scalar | 0.94 s | 2.71 s (37) | 3.41 s (47) |
+| Au | spin–orbit | — (cached) | 4.85 s (37) | 6.08 s (47) |
+| U | scalar | 1.19 s | 4.47 s (38) | 5.73 s (48) |
+| U | spin–orbit | — (cached) | 6.50 s (38) | 8.20 s (48) |
+| Og | scalar | 1.17 s | 4.90 s (39) | 5.61 s (45) |
+| Og | spin–orbit | — (cached) | 7.15 s (39) | 8.61 s (47) |
+| Au⁺ | scalar | 0.79 s | 3.11 s (37) | 3.83 s (45) |
+| Au⁺ | spin–orbit | — (cached) | 4.57 s (37) | 5.41 s (44) |
+
+("— (cached)" marks spin–orbit's reuse of the already-measured neutral/ionic
+non-relativistic seed in the same run.) A first-ever pick's real cost is NR
+seed + warm, e.g. Og with spin–orbit from cold: 1.17 + 7.15 ≈ 8.3 s — the
+Review Focus 5 case, confirmed live to converge without error. The warm
+start saves iterations everywhere measured (10 fewer for Au and Au⁺, also
+10 for U, 6–8 for Og) without exception; it does not always save wall time
+once the NR seed's own cost is counted, because the app needs that NR solve
+regardless, for the comparison curve. An Au-scalar total of 3.65 s here
+matches the 3.9 s Task 7 logged bundling the same way, cross-checking the
+method.
+
+### Payload size
+
+A relativistic profile's serialised payload carries the non-relativistic
+comparison curves alongside the drawn ones (for the dashed overlay and the
+valence-s contraction), which costs uranium's payload about +390 KB over
+its non-relativistic size. Accepted per ruling C16 (Task 8 review) — the
+comparison is wanted on every relativistic pick, not an opt-in extra.
+
+### Staleness checks and the slow suite
+
+`relativistic_nist.test.ts` includes a fast default-run subset (mirroring
+Phase 3's He/Li ion-validation subset above): neon is cheap enough to
+re-solve on every `npx jest` run and compare against the committed
+`relativity_results.json` to 1e-6, so a solver regression that moves the
+committed NIST numbers is caught without `ATOM_SLOW_TESTS=1`. The two
+exhaustive sweeps (`excitation_sweep_<k>`, `relativistic_heavy_sweep_<k>`)
+are excluded from the default run entirely via `jest.config.ts`'s
+`testPathIgnorePatterns` (not merely `.skip`, which still compiles and sets
+up every shard — ruling T7-e) unless `ATOM_SLOW_TESTS=1`; see "Process
+notes" below for batching them. `jest.config.ts` also sets
+`workerIdleMemoryLimit: '1GB'`, recycling a worker once it idles above that —
+the heavy SCF suites leave large memoised solutions behind, and a full run
+has lost a worker to SIGSEGV mid-suite three times (never yet reproduced in
+isolation; see "Process notes").
+
+### Judgment calls made without asking (this phase)
+
+1. **RK4 over Numerov for the relativistic radial equations**
+   (`coupled_rk4.ts`, Task 3). Numerov needs a single second-order ODE; the
+   coupled Koelling–Harmon and Dirac equations are a first-order pair for
+   the large and small components (G, F) with no Numerov-compatible
+   second-order form. RK4 needs the potential at the half-step too, supplied
+   by 4-point midpoint interpolation at the same fourth order, so the whole
+   integrator stays fourth-order accurate on the same log-r grid the
+   non-relativistic Numerov solver already uses.
+2. **The MacDonald–Vosko relativistic exchange correction is always on in
+   both relativistic modes**, not an independent toggle, because NIST's own
+   ScRLDA and RLDA tables both use it — the validation above is a comparison
+   against those tables, and comparing against the right correction is the
+   only way it means anything. `RELATIVISTIC_EXCHANGE_CORRECTION` records
+   this as a fact about the fixtures, not a choice this app made
+   independently.
+3. **`relativityOverride` is global, persisting across element picks, but
+   renormalises to the new element's own default** (ruling T11-a, above) —
+   found live in Task 11's review (I2): without the renormalisation,
+   choosing Scalar on gold then visiting carbon and returning to gold shows
+   an explicit "scalar" that can never again read "Default for this
+   element", even though scalar *is* gold's default.
+4. **The relativistic SCF is seeded from the same species' converged
+   non-relativistic potential (NR-seeded), not the screened guess** (ruling
+   C2) — it is on the same grid, the worker needs the non-relativistic
+   solve anyway for the comparison curve, and starting next to the answer
+   measurably saves iterations (above). Where that seed fails, the cold
+   start's own verdict is reported instead (T7-a) — the saving is opportunistic,
+   never load-bearing for correctness.
+
 ## Judgment calls made without asking
 
 Recorded for review, per the session's standing authority.
@@ -745,7 +983,6 @@ Recorded for review, per the session's standing authority.
   `displayRadius` now tracking the valence shell, a size comparison against
   the previously selected element would be cheap and would finally make the
   contraction-across-a-period, jump-at-a-new-one pattern visible.
-- **Scalar-relativistic v2** (see "Known limits").
 - **STL's union outer shell** (Phase 2 follow-up) — marching cubes on
   max_i f_i across a shell's lobes or an overlay's members, in a worker, as
   an additional export alongside the current per-member one, so a strict

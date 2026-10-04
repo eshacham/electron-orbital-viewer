@@ -87,6 +87,29 @@ open, and read off how big it actually is.
   anions are not bound at all in this LDA — H⁻, C⁻, O⁻, F⁻, S⁻, Cl⁻ and O²⁻
   among them — and the app says so rather than drawing a wrong picture;
   bromine's and iodine's anions are.
+- **Relativity, as a switch.** *Off* is the model above exactly as
+  described. *Scalar* (Koelling–Harmon: the mass-velocity and Darwin
+  terms, no spin–orbit) is the default from caesium (Z = 55) onward, where
+  the non-relativistic error passes a few percent; *With spin–orbit* (the
+  full radial Dirac equation) is available for any element on request, and
+  both are validated against NIST's own ScRLDA/RLDA tables to within 1 %
+  (see [Limitations](#limitations)). With spin–orbit on, every p/d/f
+  subshell splits into its j-levels (6p½, 6p³⁄₂, …), each occupied in
+  proportion to 2j + 1 — uranium's open 5f³ reads "1.29 of 6 e⁻" in 5f⁵⁄₂ —
+  and the orbital energy diagram, the subshell chips and the breadcrumb all
+  name the j-level rather than the plain subshell. Switching to a
+  relativistic mode adds a dashed curve to the radial plot (the same
+  species' own non-relativistic D(r), for a direct before/after comparison)
+  and a "what changed" readout naming the outermost occupied s shell's
+  contraction, e.g. gold's 6s contracting 14.1 % (mean radius 3.31 → 2.85
+  a₀) — both state their method in the same line, and both say plainly when
+  they are unavailable (an unconverged or unbound non-relativistic
+  baseline) rather than silently vanishing. The ionisation/excitation
+  energies stay non-relativistic ΔSCF in every mode — the UI says so
+  whenever the picture itself is relativistic, so a heavy atom's shown
+  energy never reads as carrying a shift it does not include. Every export
+  (image, CSV, cube) names the mode, and any j-level, in its caption and
+  file name.
 
 ### Basic Orbitals mode
 
@@ -418,20 +441,34 @@ enough to match NIST's own published LDA values (see
 and it carries a self-interaction error that LDA does not fully cancel — see
 the ionisation-energy point below.
 
-**Non-relativistic — sub-1% through krypton, tens of percent by gold.**
-Relativistic corrections scale roughly with Z², so they are genuinely
-negligible for light elements and genuinely not for heavy ones. Measured
-against NIST's scalar-relativistic reference: neon's orbital energies are
-within 0.25%, but gold's 6s orbital energy is **27% away** from the
-relativistic value — precisely the relativistic contraction of the 6s
-orbital that is the textbook explanation for why gold is yellow rather than
-silvery like most metals. This app computes the non-relativistic number, so
-for gold and its heavy neighbours the energies (not the shapes — see below)
-are the least trustworthy numbers on screen.
+**Relativity is a switch, not a fixed approximation — but *Off* keeps its
+old error, uncorrected.** Relativistic corrections scale roughly with Z², so
+they are genuinely negligible for light elements and genuinely not for heavy
+ones: with the switch *Off*, neon's orbital energies are still within 0.25%
+of the relativistic value, but gold's 6s is still **27% away** —
+precisely the relativistic contraction of the 6s orbital that is the
+textbook explanation for why gold is yellow rather than silvery like most
+metals. *Scalar* (Koelling–Harmon: the mass-velocity and Darwin terms) is
+on by default from caesium onward, where that error passes a few percent;
+*With spin–orbit* (the full Dirac equation) is available for any element on
+request. Both are validated against NIST's own ScRLDA/RLDA reference tables
+to within 1% everywhere, and within 0.1% for Z ≤ 18 specifically against
+NIST's own relativistic columns — switching relativity on still moves a
+light atom's own numbers measurably (argon's total energy by 0.30%, its 3s
+orbital energy by 0.82%), which is real physics the non-relativistic number
+was never claiming to capture, not an error in either number. *Off* is still
+offered and still computes the plain non-relativistic number exactly as
+before — now clearly labelled as such, and no longer the only number this
+app can show for a heavy atom.
 
 **Isolated atoms and their ions — no molecules.** An ion or an excited atom
 uses the same model with its own electron count or one electron moved, so
-this is still one atom at a time; no spin–orbit coupling either. **Most
+this is still one atom at a time. Spin–orbit coupling is a relativity mode
+(above), not always included: with it on, a p/d/f subshell's j-levels
+(6p½, 6p³⁄₂, …) carry real orbital energies and real radial functions R(r) —
+but the orbital lobe you can drill down to still draws the ordinary l-basis
+angular shape, never the true |j, mⱼ⟩ angular dependence, which mixes two
+l-values' spin states and has no analogue in this renderer. **Most
 anions are not bound at all in this LDA** — H⁻, C⁻, O⁻, F⁻, S⁻, Cl⁻ and O²⁻
 among the elements light enough to validate — and the app reports that
 rather than drawing a picture for an electron the model does not actually
