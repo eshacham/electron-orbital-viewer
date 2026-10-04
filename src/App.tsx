@@ -656,6 +656,7 @@ function App() {
         onNavigate: handleLevelNavigate,
         onChangeElement: isNarrow ? () => setElementPickerOpen(true) : () => setTableOpen(true),
         relativity: pictureRelativity,
+        pictureShown: atomProfile !== null,
     };
 
     const availability = useAppSelector(exportAvailability, shallowEqual);

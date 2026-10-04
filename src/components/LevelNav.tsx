@@ -84,6 +84,12 @@ interface LevelNavProps {
      * exactly what it always was.
      */
     relativity?: RelativityMode;
+    /**
+     * Whether a picture is on screen at all (final review M6): with none --
+     * an unbound verdict, a failed solve -- About says nothing about "this
+     * picture", whichever mode the switch is in. Defaults to true.
+     */
+    pictureShown?: boolean;
 }
 
 // Old X-ray shell letters, matching atom_profile.ts's private shellName
@@ -181,6 +187,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
     Z, selectedShell, selectedSubshell, selectedOrbital, onNavigate, onChangeElement, children,
     variant = 'full', configuration, speciesSymbol, speciesTitle, speciesControls, shellsUnavailable = false,
     relativity = 'off',
+    pictureShown = true,
 }) => {
     const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -450,7 +457,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     eigenvalues. The picture on screen is drawn from a
                     simpler, spin-restricted form of that LDA, and in it
                     most anions — Cl⁻ included — have no bound state for
-                    their extra electron at all.{relativisticEnergiesSentence(relativity)} The individual s/p/d/f
+                    their extra electron at all.{pictureShown ? relativisticEnergiesSentence(relativity) : ''} The individual s/p/d/f
                     lobes you can select below are a basis choice, not
                     separate physical objects: a partially filled subshell's
                     electrons are smeared uniformly over all of it, not

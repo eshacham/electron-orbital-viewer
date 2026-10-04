@@ -429,6 +429,19 @@ describe('LevelNav for a species', () => {
             expect(text).toMatch(/non-relativistic/);
             expect(text).toContain('extra electron at all. This picture');
         });
+
+        // Final review M6: with no picture on screen (an unbound verdict, a
+        // failed solve) there is no "this picture" to describe -- the
+        // paragraph reads as off's does at that point, whatever the switch says.
+        it('says nothing about "this picture" when there is none', () => {
+            const { getByRole, container } = render(
+                <LevelNav Z={85} relativity="scalar" pictureShown={false} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+            );
+            fireEvent.click(getByRole('button', { name: /about this model/i }));
+            const text = container.querySelector('.level-nav-about')!.textContent!;
+            expect(text).not.toMatch(/This picture/);
+            expect(text).toContain('extra electron at all. The individual s/p/d/f');
+        });
     });
 
     // Carry from Task 11: the "It is non-relativistic … no spin-orbit

@@ -1054,6 +1054,19 @@ describe('App: relativity', () => {
             expect(within(switchIn()).getByRole('button', { name: 'relativity off' })).toHaveAttribute('aria-pressed', 'true');
         });
 
+        // Final review M6: no picture, no "this picture" -- the switch's mode
+        // still names the method being solved for, but nothing is drawn in it.
+        it('says nothing about "this picture" in About when the verdict left none', () => {
+            installMatchMedia(false);
+            renderWithProvider(<App />, {
+                mode: 'atom', Z: 85, charge: -1,
+                unbound: 'Scalar-relativistic SCF for Astatine ion At⁻: LDA does not bind this anion: its 6p electron is not bound by 10⁻⁴ Ha or more.',
+            });
+            const about = screen.getAllByRole('button', { name: /about this model/i })[0];
+            fireEvent.click(about);
+            expect(document.querySelector('.level-nav-about')!.textContent).not.toMatch(/This picture/);
+        });
+
         it('names the mode it is solving in', () => {
             installMatchMedia(false);
             jest.useFakeTimers();
