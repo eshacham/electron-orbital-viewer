@@ -88,6 +88,12 @@ describe('PotentialCurvePlot', () => {
         expect(onSelectR).toHaveBeenCalledWith(2);
     });
 
+    // Final review M9: the plot, its caption and text alternative are one named figure.
+    it('is a named figure', () => {
+        render(<PotentialCurvePlot {...props} />);
+        expect(screen.getByRole('figure', { name: 'potential energy curve' })).toBeInTheDocument();
+    });
+
     it('omits the slider when there is no click handler to drive', () => {
         render(<PotentialCurvePlot {...props} />);
         expect(screen.queryByRole('slider')).toBeNull();

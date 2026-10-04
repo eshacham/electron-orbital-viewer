@@ -100,6 +100,7 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     return (
         <div
             className={`radial-plot potential-curve${onSelectR ? ' interactive' : ''}`}
+            role="figure"
             aria-label="potential energy curve"
             style={{ maxWidth: width + 22 }}
         >

@@ -87,7 +87,7 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
     );
 
     return (
-        <div className="mo-diagram" style={{ width }} aria-label="molecular orbital energy diagram">
+        <div className="mo-diagram" style={{ width }} role="group" aria-label="molecular orbital energy diagram">
             <div className="mo-levels" style={{ height: HEIGHT }}>
                 {valence.map((level, i) => renderLevel(level, ys[i]))}
                 {core.length > 0 && <div className="mo-break" style={{ top: HEIGHT - CORE_BAND }}>≈ core</div>}

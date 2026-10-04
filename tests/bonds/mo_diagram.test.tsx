@@ -106,6 +106,13 @@ describe('MoDiagram', () => {
         expect(screen.getByText(/in β — and in photoelectron spectra — 3σg lies below 1πu/)).toBeInTheDocument();
     });
 
+    // Final review M9: aria-label on a bare div is not reliably announced; a
+    // group (it holds the level buttons) is a named landmark for them.
+    it('is a named group of level buttons', () => {
+        render(<MoDiagram orbitals={n2} selectedIndex={null} />);
+        expect(screen.getByRole('group', { name: 'molecular orbital energy diagram' })).toBeInTheDocument();
+    });
+
     it('says nothing about spin order for N2', () => {
         const { container } = render(<MoDiagram orbitals={fixtureOrbitals('n2')} selectedIndex={null} />);
         expect(container.querySelector('.mo-note')).toBeNull();
