@@ -1,4 +1,4 @@
-import { buildComparisonCurves, ComparisonCurvesInput } from '../../src/atom/comparison_curves';
+import { buildComparisonCurves, ComparisonCurvesInput, radialPlotRange } from '../../src/atom/comparison_curves';
 import { CURVE_COLORS } from '../../src/curve_colors';
 
 const RGRID = [0, 1, 2];
@@ -29,6 +29,7 @@ describe('buildComparisonCurves', () => {
                 subshells: [],
                 nonRelativistic: {
                     framingRadius: 1,
+                    displayRadius: 1,
                     shells: [
                         { n: 1, contourRadius: 1, curve: curve([1, 2, 3]) },
                         { n: 2, contourRadius: 1, curve: curve([4, 5, 6]) },
@@ -61,6 +62,7 @@ describe('buildComparisonCurves', () => {
                 subshells: shellSubshells as any,
                 nonRelativistic: {
                     framingRadius: 1,
+                    displayRadius: 1,
                     shells: [],
                     subshells: [
                         { n: 5, l: 0, electrons: 2, curve: curve([1, 1, 1]) },
@@ -98,6 +100,7 @@ describe('buildComparisonCurves', () => {
                 subshells: shellSubshells as any,
                 nonRelativistic: {
                     framingRadius: 1,
+                    displayRadius: 1,
                     shells: [],
                     subshells: [
                         { n: 6, l: 1, electrons: 6, curve: curve([6, 12, 18]) },
@@ -133,6 +136,7 @@ describe('buildComparisonCurves', () => {
                 subshells: shellSubshells as any,
                 nonRelativistic: {
                     framingRadius: 1,
+                    displayRadius: 1,
                     shells: [],
                     subshells: [{ n: 6, l: 0, electrons: 2, curve: curve([1, 1, 1]) }],
                 },
@@ -158,6 +162,7 @@ describe('buildComparisonCurves', () => {
                 subshells: shellSubshells as any,
                 nonRelativistic: {
                     framingRadius: 1,
+                    displayRadius: 1,
                     shells: [],
                     // No (n=6, l=2) entry at all, and an unoccupied one elsewhere.
                     subshells: [{ n: 6, l: 1, electrons: 0, curve: curve([1, 1, 1]) }],
@@ -169,5 +174,36 @@ describe('buildComparisonCurves', () => {
             rGrid: RGRID,
         };
         expect(buildComparisonCurves(input)).toEqual({ curves: [], note: null });
+    });
+});
+
+// Final review M3: the plot's range covers the dashed curve too, so its
+// tail is not clipped where it runs past the relativistic sphere, and the
+// axis does not rescale when relativity is switched (gold's 6s contracts
+// inward of the non-relativistic one, so the old range was the larger).
+describe('radialPlotRange', () => {
+    const base = {
+        displayRadius: 4, contourRadius: 3.5,
+        shells: [{ n: 5, contourRadius: 2 }, { n: 6, contourRadius: 3.5 }],
+    };
+    const comparison = {
+        displayRadius: 5, framingRadius: 1,
+        shells: [{ n: 5, contourRadius: 2.1, curve: curve([]) }, { n: 6, contourRadius: 4.2, curve: curve([]) }],
+        subshells: [],
+    };
+
+    it('is the drawn radius alone with no comparison (off, byte-identical)', () => {
+        expect(radialPlotRange({ ...base, nonRelativistic: null }, 'atom', null)).toBe(4);
+        expect(radialPlotRange({ ...base, nonRelativistic: null }, 'shell', 6)).toBe(3.5);
+    });
+
+    it('is the larger of the drawn and the non-relativistic radius at the atom level', () => {
+        expect(radialPlotRange({ ...base, nonRelativistic: comparison }, 'atom', null)).toBe(5);
+        expect(radialPlotRange({ ...base, displayRadius: 6, nonRelativistic: comparison }, 'atom', null)).toBe(6);
+    });
+
+    it('is the larger of the two shells\' contour radii at the shell level', () => {
+        expect(radialPlotRange({ ...base, nonRelativistic: comparison }, 'shell', 6)).toBe(4.2);
+        expect(radialPlotRange({ ...base, nonRelativistic: comparison }, 'orbital', 5)).toBe(2.1);
     });
 });

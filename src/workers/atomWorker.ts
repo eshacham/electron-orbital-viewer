@@ -74,6 +74,8 @@ export interface SerialisedComparison {
      * framing, the floor its own off picture has, so the two agree.
      */
     framingRadius: number;
+    /** The non-relativistic picture's drawn radius: the radial plot's range covers it too, so the dashed tail is not clipped (final review M3). */
+    displayRadius: number;
     /** `contourRadius` likewise floors an open shell's framing across the switch. */
     shells: Array<{ n: number; contourRadius: number; curve: Float64Array }>;
     subshells: Array<{ n: number; l: number; electrons: number; curve: Float64Array }>;
@@ -273,6 +275,7 @@ export function buildSerialisedAtomProfile(
         const baseline = buildAtomProfile(nonRelativistic, enclosedFraction);
         comparison = {
             framingRadius: Math.max(wholeAtomFramingRadius(baseline), extras.comparisonFramingFloor ?? 0),
+            displayRadius: baseline.displayRadius,
             shells: baseline.shells.map(shell => ({ n: shell.n, contourRadius: shell.contourRadius, curve: shell.curve.values })),
             subshells: baseline.subshells.map(s => ({ n: s.n, l: s.l, electrons: s.electrons, curve: s.curve.values })),
         };

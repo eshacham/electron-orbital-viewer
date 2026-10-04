@@ -489,7 +489,7 @@ describe('OrbitalViewer: framing across a relativity switch', () => {
             store.dispatch(solveSucceeded({
                 ...base, displayRadius: 2.7, relativity: 'scalar',
                 reference: { displayRadius: 3.1, contourRadius: 3.5, framingRadius: 2.886 },
-                nonRelativistic: { framingRadius: 3.354, shells: [], subshells: [] },
+                nonRelativistic: { framingRadius: 3.354, displayRadius: 3.354, shells: [], subshells: [] },
             }));
         });
         expect(framedOn()).toBe(off);

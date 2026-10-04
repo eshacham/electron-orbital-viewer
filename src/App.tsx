@@ -66,7 +66,7 @@ import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
-import { buildComparisonCurves } from './atom/comparison_curves';
+import { buildComparisonCurves, radialPlotRange } from './atom/comparison_curves';
 import { useUrlStateSync } from './useUrlStateSync';
 import { hasSharedView, encodeStateOf } from './url_state';
 import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
@@ -498,26 +498,17 @@ function App() {
     // chosen to comfortably hold the outermost orbital's tail -- for argon
     // that is 44 a0 against shell peaks at 0.06/0.29/1.22, so a linear axis
     // against the grid crushes every peak into the first few percent of the
-    // plot. 1.2x the contour radius keeps every peak visible with some tail
-    // included. Tracks the drill-down level, same as `atomCurves` below, so
+    // plot. Tracks the drill-down level, same as `atomCurves` below, so
     // drilling into a shell zooms the plot in exactly as it zooms the 3D
-    // view in (see updateAtomViewInScene's camera-framing fix).
+    // view in (see updateAtomViewInScene's camera-framing fix). Exactly the
+    // drawn radius, with no headroom (bug fix, reported from the running
+    // app): the curve used to run 20% past the edge of the sphere beside
+    // it -- and, with a non-relativistic comparison, at least that
+    // picture's own radius, so the dashed tail is not clipped (final review
+    // M3; see radialPlotRange).
     const atomPlotRange = useMemo(() => {
         if (!atomProfile) return 1;
-        const radius = atomLevel === 'atom'
-            // displayRadius, matching the sphere actually drawn (see
-            // AtomProfile.displayRadius): the plot and the 3D view show the
-            // same object, so an axis that stopped short of the valence
-            // shell while the sphere reached past it would put a ring on
-            // screen with no curve under it.
-            ? atomProfile.displayRadius
-            : (atomProfile.shells.find(s => s.n === atomSelectedShell)?.contourRadius ?? atomProfile.contourRadius);
-        // Exactly the drawn radius, with no headroom (bug fix, reported from
-        // the running app): the plot's curve used to run 20% past the edge
-        // of the sphere beside it, which reads as the sphere being larger
-        // and darker than it is -- "the line continues beyond the dark blue
-        // shell". The two views show the same object over the same range now.
-        return radius;
+        return radialPlotRange(atomProfile, atomLevel, atomSelectedShell);
     }, [atomProfile, atomLevel, atomSelectedShell]);
 
     // The plot answers "what am I looking at", so it narrows as the drill-down

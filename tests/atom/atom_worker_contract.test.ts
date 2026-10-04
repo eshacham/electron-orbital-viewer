@@ -151,6 +151,8 @@ describe('relativistic payload', () => {
         const baseline = buildAtomProfile(solveAtom(10), 0.9);
         expect(profile.nonRelativistic!.framingRadius).toBe(wholeAtomFramingRadius(baseline));
         expect(profile.nonRelativistic!.shells.map(s => s.contourRadius)).toEqual(baseline.shells.map(s => s.contourRadius));
+        // Final review M3: and its drawn radius, which the radial plot's range covers.
+        expect(profile.nonRelativistic!.displayRadius).toBe(baseline.displayRadius);
     });
 
     it('stays plain and survives structuredClone', () => {

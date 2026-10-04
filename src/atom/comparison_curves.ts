@@ -100,3 +100,26 @@ export function buildComparisonCurves({
     }
     return { curves, note };
 }
+
+/**
+ * The radial plot's horizontal range: sized to what is being shown, not the
+ * sampling grid's rMax (spec bugfix) -- the drawn sphere at the atom level
+ * (displayRadius: the plot and the 3D view show the same object, with no
+ * headroom), the selected shell's contour below it. With a non-relativistic
+ * comparison the range is at least the comparison's own (final review M3):
+ * the dashed curve reaches further wherever relativity contracts the
+ * picture, and its tail must not be clipped; and since the comparison is
+ * the off picture's own radius, switching relativity leaves the axis where
+ * it was, as ruling C14 leaves the camera. Off has no comparison, so its
+ * range is exactly what it always was.
+ */
+export function radialPlotRange(
+    profile: Pick<SerialisedAtomProfile, 'displayRadius' | 'contourRadius' | 'nonRelativistic'> & { shells: ReadonlyArray<{ n: number; contourRadius: number }> },
+    level: ViewLevel,
+    selectedShell: number | null,
+): number {
+    const reference = profile.nonRelativistic;
+    if (level === 'atom') return Math.max(profile.displayRadius, reference?.displayRadius ?? 0);
+    const own = profile.shells.find(s => s.n === selectedShell)?.contourRadius ?? profile.contourRadius;
+    return Math.max(own, reference?.shells.find(s => s.n === selectedShell)?.contourRadius ?? 0);
+}

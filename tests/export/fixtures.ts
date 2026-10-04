@@ -52,6 +52,7 @@ export function goldProfile(relativity: RelativityMode, options: { j?: boolean; 
     const pSubshells = options.j ? [sub(6, 1, 2, 0.5), sub(6, 1, 4, 1.5)] : [sub(6, 1, 6)];
     const nonRelativistic: SerialisedComparison | undefined = options.comparison ? {
         framingRadius: 10,
+        displayRadius: 10,
         shells: [{ n: 6, contourRadius: 6, curve: D }],
         subshells: [{ n: 6, l: 1, electrons: 6, curve: D }],
     } : undefined;
