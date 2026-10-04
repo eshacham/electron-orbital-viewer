@@ -442,6 +442,20 @@ export function solveFailureMessage(species: AtomSpecies, relativity: Relativity
 }
 
 /**
+ * An unbound anion's verdict as the user reads it (final review I2): in a
+ * relativistic mode it names the SCF and the species first, as every other
+ * failure does (ruling T7-f) -- "Scalar-relativistic SCF for Astatine ion
+ * At⁻: LDA does not bind this anion: ..." -- since the same anion may read
+ * differently in another mode. Off keeps the bare sentence it always had
+ * ("off is today's app, byte for byte"), as does the energies path, which
+ * is never relativistic (ruling C6).
+ */
+function unboundAnionMessage(data: AtomWorkerRequest, species: AtomSpecies, error: UnboundAnionError): string {
+    const relativity = data.type === 'solve' ? data.relativity ?? 'off' : 'off';
+    return relativity === 'off' ? error.message : `${scfLabel(relativity)} for ${speciesTitle(species)}: ${error.message}`;
+}
+
+/**
  * The same species' non-relativistic solve, the baseline for the dashed
  * curves and "what changed" (ruling C5) -- or, where there is none, why not.
  * A relativistic picture never waits on its baseline: Pr-Eu 6s -> 4f have no
@@ -549,7 +563,7 @@ export function handleAtomWorkerRequest(data: AtomWorkerRequest): { response: At
         });
         return { response: { type: 'success', profile, requestId }, transfer: transferListFor(profile) };
     } catch (error) {
-        if (error instanceof UnboundAnionError) return { response: { type: 'unbound', message: error.message, requestId }, transfer: [] };
+        if (error instanceof UnboundAnionError) return { response: { type: 'unbound', message: unboundAnionMessage(data, species, error), requestId }, transfer: [] };
         return { response: { type: 'error', message: error instanceof Error ? error.message : 'Unknown error', requestId }, transfer: [] };
     }
 }

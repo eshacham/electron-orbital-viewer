@@ -1,5 +1,5 @@
 import { handleAtomWorkerRequest, solveFailureMessage, SerialisedAtomProfile } from '../../src/workers/atomWorker';
-import { UnboundElectronError } from '../../src/atom/scf_shared';
+import { UnboundAnionError, UnboundElectronError } from '../../src/atom/scf_shared';
 import * as scf from '../../src/atom/scf';
 import { buildAtomProfile } from '../../src/atom/atom_profile';
 import { AtomSpecies } from '../../src/atom/species';
@@ -42,6 +42,33 @@ describe('atom worker, species protocol', () => {
     it('answers an unbound anion with an explicit unbound reply, not a profile', () => {
         const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 17, charge: -1, excitation: null, enclosedFraction: 0.9, requestId: 3 });
         expect(response).toEqual({ type: 'unbound', message: expect.stringMatching(/^LDA does not bind this anion: its 3p electron/), requestId: 3 });
+    });
+
+    // Final review I2: a relativistic mode's unbound verdict names the mode
+    // and the species, as every other failure does (ruling T7-f) -- the
+    // same anion may read differently in another mode (At⁻ holds its 6p
+    // without relativity). Off keeps its own message, byte for byte.
+    it('names the mode and the species in a relativistic unbound-anion verdict', () => {
+        const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 1, charge: -1, excitation: null, enclosedFraction: 0.9, relativity: 'scalar', requestId: 8 });
+        expect(response).toEqual({
+            type: 'unbound',
+            message: 'Scalar-relativistic SCF for Hydrogen ion H⁻: LDA does not bind this anion: its 1s electron is not bound by 10⁻⁴ Ha or more.',
+            requestId: 8,
+        });
+    });
+
+    it('names the j-level when the Dirac solve is the one that finds the anion unbound', () => {
+        const spy = jest.spyOn(scf, 'solveSpecies').mockImplementation(() => { throw new UnboundAnionError(6, 1, 1.5); });
+        try {
+            const { response } = handleAtomWorkerRequest({ type: 'solve', Z: 85, charge: -1, excitation: null, enclosedFraction: 0.9, relativity: 'spinOrbit', requestId: 9 });
+            expect(response).toEqual({
+                type: 'unbound',
+                message: 'Dirac (spin–orbit) SCF for Astatine ion At⁻: LDA does not bind this anion: its 6p³⁄₂ electron is not bound by 10⁻⁴ Ha or more.',
+                requestId: 9,
+            });
+        } finally {
+            spy.mockRestore();
+        }
     });
 
     it('computes ΔSCF energies on request', () => {

@@ -1,5 +1,5 @@
 import { solveAtom, solveAtomOnGrid, solveSpecies } from '../../src/atom/scf';
-import { UnboundAnionError } from '../../src/atom/scf_shared';
+import { UnboundAnionError, assertOutermostBound } from '../../src/atom/scf_shared';
 import { gridForAtom, integrateOnGrid } from '../../src/atom/radial_grid';
 import { diracHydrogenicEnergy } from '../../src/atom/relativity';
 import { AtomSpecies, neutralGround, speciesConfiguration } from '../../src/atom/species';
@@ -215,6 +215,22 @@ describe('relativistic SCF', () => {
         });
         jest.dontMock('../../src/atom/relativistic_solver');
     });
+    // Final review I2/M2: the converged anion's last check is on the
+    // eigenvalues of the mode that ran, so under Dirac it names the j-level
+    // that failed it, as the solver-side verdict above does.
+    it('names the j-level in the converged anion\'s final binding check', () => {
+        const level = (n: number, l: number, energy: number, j?: number) => ({ n, l, energy, ...(j === undefined ? {} : { j }) });
+        const caught = (states: ReturnType<typeof level>[]) => {
+            try { assertOutermostBound(states); } catch (error) { return error as InstanceType<typeof UnboundAnionError>; }
+            throw new Error('expected the check to throw');
+        };
+        const dirac = caught([level(6, 1, -0.3, 0.5), level(6, 1, -5e-5, 1.5)]);
+        expect(dirac).toBeInstanceOf(UnboundAnionError);
+        expect(dirac.message).toContain('its 6p³⁄₂ electron');
+        expect(caught([level(6, 1, -5e-5)]).message).toContain('its 6p electron');
+        expect(() => assertOutermostBound([level(6, 1, -0.3, 0.5), level(6, 1, -0.2, 1.5)])).not.toThrow();
+    });
+
     itSlow('reports an unbound anion in a relativistic mode too (Cl⁻)', () => {
         for (const mode of ['scalar', 'spinOrbit'] as const) {
             expect(() => solveSpecies({ Z: 17, charge: -1, excitation: null }, mode)).toThrow(UnboundAnionError);

@@ -62,8 +62,14 @@ export interface HeavySweepOutcome { key: string; verdict: Verdict; error?: stri
  * 83 shards, after rulings T7-a/b/c). docs/HANDOFF.md explains each group.
  */
 export const KNOWN_FAILURES: Readonly<Record<string, Exclude<Verdict, 'converged' | 'error'>>> = {
-    // Anions LDA does not bind (spec §3.5). At- holds its 6p without
-    // relativity and loses it with: relativity binds p slightly less.
+    // Anions LDA does not bind (spec §3.5). Pb-, Bi-, Po- and Po2- are
+    // unbound without relativity, and their scalar (and spin-orbit) verdicts
+    // are inherited from that solve -- the relativistic SCF warm-starts from
+    // it and rethrows its verdict, so no relativistic solve runs at all
+    // (final review I2). At- holds its 6p without relativity (by 12.5 mHa)
+    // and loses it in the scalar SCF's first iterations, to ruling C12's
+    // non-relativistic bound-state check of the relativistic potential --
+    // an approximation, not the relativistic eigenvalue itself.
     '82-1@off': 'unbound', '83-1@off': 'unbound', '84-1@off': 'unbound', '84-2@off': 'unbound',
     '82-1@scalar': 'unbound', '83-1@scalar': 'unbound', '84-1@scalar': 'unbound', '84-2@scalar': 'unbound', '85-1@scalar': 'unbound',
     // 6s -> 4f, Pr-Eu: the promoted 4f leaves the bound spectrum even

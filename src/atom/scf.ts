@@ -36,6 +36,7 @@ import {
     UnboundElectronError,
     solveOccupiedLevel,
     assertStatesBound,
+    assertOutermostBound,
     highestPrincipalQuantumNumber,
     totalElectronsOf,
     bareCoulombPotential,
@@ -488,10 +489,7 @@ export function solveAtomOnGrid(Z: number, grid: RadialGrid, options: ScfOptions
     // A converged anion can still hold its outermost electron by less than
     // the grid can represent (see ANION_BINDING_THRESHOLD); that is the same
     // verdict as unbound.
-    if (isAnion && converged) {
-        const highest = states.reduce((top, s) => (s.energy > top.energy ? s : top), states[0]);
-        if (highest.energy >= -ANION_BINDING_THRESHOLD) throw new UnboundAnionError(highest.n, highest.l);
-    }
+    if (isAnion && converged) assertOutermostBound(states);
 
     const density = densityFromD(grid, D);
     const totalEnergy = totalEnergyOf(grid, states, D, density, relativisticExchange);

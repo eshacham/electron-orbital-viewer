@@ -1051,7 +1051,31 @@ Recorded for review, per the session's standing authority.
 
   *Unbound anions* (`UnboundAnionError`, as since Phase 3): Pb⁻, Bi⁻, Po⁻,
   Po²⁻ in both modes; At⁻ only with scalar relativity -- it holds its 6p
-  without relativity and loses it with.
+  without relativity and loses it with. How each verdict is reached
+  differs, and the relativistic ones are weaker than they read (final
+  review I2):
+
+  - Pb⁻, Bi⁻, Po⁻ and Po²⁻ in scalar and spin–orbit are **inherited**, not
+    separately solved: they are unbound without relativity, the
+    relativistic solve's warm start (`convergedNonRelativisticPotential`)
+    rethrows that verdict, and no relativistic SCF runs. The same holds for
+    every lighter anion this LDA does not bind (H⁻, C⁻, O⁻, O²⁻, F⁻, Si⁻,
+    P⁻, S⁻, S²⁻, Cl⁻, Ge⁻, As⁻, Se⁻, Se²⁻, Sn⁻, Sb⁻, Te⁻, Te²⁻) when a
+    relativistic mode is forced on.
+  - At⁻ (scalar, its default; and spin–orbit), and Br⁻ and I⁻ when a
+    relativistic mode is forced on, are bound without relativity (HOMO
+    −12.5, −2.1 and −9.9 mHa, measured) and are reported unbound by ruling
+    C12's **non-relativistic** bound-state check of the relativistic SCF's
+    potential in its first iterations, not by a relativistic eigenvalue.
+    For a p electron the scalar equation binds slightly more than the
+    Schrödinger one in the same potential, so these three verdicts could
+    be an artefact of the approximation; nothing here measures that.
+
+  The verdict names the mode and the species in a relativistic mode
+  ("Scalar-relativistic SCF for Astatine ion At⁻: LDA does not bind this
+  anion: …"), and the converged anion's final check on the relativistic
+  eigenvalues names the j-level with spin–orbit; off keeps its bare
+  sentence.
 
   *What converges now that did not* (rulings T7-a, T7-c): 16 species whose
   relativistic solve, warm-started from the non-relativistic potential,

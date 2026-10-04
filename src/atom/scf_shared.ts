@@ -210,3 +210,15 @@ export function assertStatesBound(grid: RadialGrid, subshells: Array<{ n: number
         if (!hasBoundState(grid, n, l, potential, -ANION_BINDING_THRESHOLD)) throw new UnboundAnionError(n, l);
     }
 }
+
+/**
+ * A converged anion's last check: its outermost electron, the highest
+ * eigenvalue, must be bound by at least ANION_BINDING_THRESHOLD, or the
+ * grid cannot represent it and the verdict is the same as unbound. Names
+ * the j-level when the states carry one (final review I2): under Dirac the
+ * level that fails is a j-level, and the message says which.
+ */
+export function assertOutermostBound(states: ReadonlyArray<{ n: number; l: number; j?: number; energy: number }>): void {
+    const highest = states.reduce((top, s) => (s.energy > top.energy ? s : top), states[0]);
+    if (highest.energy >= -ANION_BINDING_THRESHOLD) throw new UnboundAnionError(highest.n, highest.l, highest.j);
+}
