@@ -1,6 +1,6 @@
 import type { RootState } from '../store';
 import { elementFor } from '../elements';
-import { orbitalName } from '../orbital_names';
+import { orbitalName, shellLetter } from '../orbital_names';
 import { subshellLabel, configurationLabelOf } from '../atom/configurations';
 import { AtomSpecies, isNeutralGround, speciesConfiguration, speciesSymbol, speciesTitle } from '../atom/species';
 import { selectSpeciesEnergies, speciesOf, profileRelativity } from '../store/atomSlice';
@@ -79,7 +79,8 @@ export function viewDescription(state: RootState): string {
             // With spin–orbit the orbital's own crumb names its j-level too
             // (LevelNav's "6p_z · 6p³⁄₂" pattern) -- the angular shape drawn
             // is still the l orbital's (spec §3.6); only R(r) is the
-            // j-level's, which the method line states.
+            // j-level's, which jLevelShapeCaption's own line says (the
+            // method line does not).
             ? orbitalName(selectedOrbital.n, selectedOrbital.l, selectedOrbital.ml)
             : `${orbitalName(selectedOrbital.n, selectedOrbital.l, selectedOrbital.ml)} · ${subshellLabel(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j)}`)
         : level === 'shell' && selectedSubshell
@@ -194,6 +195,37 @@ export function referenceRingCaption(state: RootState): string | null {
     // off, so an off ring's caption is exactly what it always was.
     const modeText = modeCaptionText(profileRelativity(profile));
     return `dashed ring: neutral ${neutralSymbol} drawn radius ${radius} a₀${modeText ? `, ${modeText}` : ''}`;
+}
+
+/** The tail every j-level lobe caveat shares: what the drawn shape is not. */
+const J_LEVEL_SHAPE_TAIL = 'a basis choice; a |j, m_j⟩ state\'s shape differs';
+
+/**
+ * 'lobes: the p orbitals' shapes sized by 6p½'s R(r) — a basis choice; ...'
+ * -- final review I1: with spin–orbit a j-level's lobes are the real l
+ * orbitals sized by that j-level's own radial function (spec §3.6), the
+ * caveat SubshellPanel states on screen, so a PNG of those lobes carries it
+ * as a caption line of its own. Null wherever no j-level lobes are drawn:
+ * hydrogenic mode, no profile, off or scalar (no j), the whole-atom level
+ * (a cut face, no lobes), or only s½ levels -- an s½ sphere is its true shape.
+ */
+export function jLevelShapeCaption(state: RootState): string | null {
+    if (state.atom.mode !== 'atom') return null;
+    const { level, selectedShell, selectedSubshell, selectedOrbital, profile } = state.atom;
+    if (!profile) return null;
+    if (level === 'orbital' && selectedOrbital) {
+        const { n, l, j } = selectedOrbital;
+        if (j === undefined || l === 0) return null;
+        return `lobes: the ${shellLetter(l)} orbital's shape sized by ${subshellLabel(n, l, j)}'s R(r) — ${J_LEVEL_SHAPE_TAIL}`;
+    }
+    if (level !== 'shell') return null;
+    if (selectedSubshell) {
+        const { n, l, j } = selectedSubshell;
+        if (j === undefined || l === 0) return null;
+        return `lobes: the ${shellLetter(l)} orbitals' shapes sized by ${subshellLabel(n, l, j)}'s R(r) — ${J_LEVEL_SHAPE_TAIL}`;
+    }
+    const levels = profile.subshells.filter(s => s.n === selectedShell && s.j !== undefined && s.l > 0);
+    return levels.length > 0 ? `lobes: the l orbitals' shapes sized by each j-level's R(r) — ${J_LEVEL_SHAPE_TAIL}` : null;
 }
 
 /**

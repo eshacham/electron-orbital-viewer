@@ -405,6 +405,51 @@ describe('runExport: PNG caption carries the mode (ruling C7)', () => {
     });
 });
 
+// Final review I1: with spin–orbit a j-level's lobes are the l orbitals'
+// shapes sized by its own R(r) (spec §3.6) -- a basis choice the panel
+// states on screen, so a PNG of those lobes carries it too; the method line
+// alone does not say it.
+describe('runExport: PNG caption states the j-level angular-shape caveat (final review I1)', () => {
+    async function captionOf(store: ReturnType<typeof goldStore>): Promise<string[]> {
+        const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+        await runExport('png', { ...baseContext(store.getState()), handle: exportHandle({ capturePng }), phaseLegend: false });
+        return capturePng.mock.calls[capturePng.mock.calls.length - 1][0].caption;
+    }
+
+    it('names the isolated j-level at the subshell level', async () => {
+        const store = goldStore('spinOrbit', { j: true });
+        store.dispatch(drillToShell(6));
+        store.dispatch(drillToSubshell(6, 1, 0.5));
+        expect(await captionOf(store)).toContain('lobes: the p orbitals\' shapes sized by 6p½\'s R(r) — a basis choice; a |j, m_j⟩ state\'s shape differs');
+    });
+
+    it('speaks of each j-level at the shell level, where their lobes overlap', async () => {
+        const store = goldStore('spinOrbit', { j: true });
+        store.dispatch(drillToShell(6));
+        expect(await captionOf(store)).toContain('lobes: the l orbitals\' shapes sized by each j-level\'s R(r) — a basis choice; a |j, m_j⟩ state\'s shape differs');
+    });
+
+    it('names the orbital\'s j-level at the orbital level', async () => {
+        const store = goldStore('spinOrbit', { j: true });
+        store.dispatch(drillToShell(6));
+        store.dispatch(drillToSubshell(6, 1, 1.5));
+        store.dispatch(drillToOrbital(6, 1, 0, 1.5));
+        expect(await captionOf(store)).toContain('lobes: the p orbital\'s shape sized by 6p³⁄₂\'s R(r) — a basis choice; a |j, m_j⟩ state\'s shape differs');
+    });
+
+    it('adds nothing where no j-level lobes are drawn: whole atom, scalar, or a shell with no j-level beyond s', async () => {
+        const whole = goldStore('spinOrbit', { j: true });
+        expect(await captionOf(whole)).toHaveLength(2);
+        const scalar = goldStore('scalar');
+        scalar.dispatch(drillToShell(6));
+        scalar.dispatch(drillToSubshell(6, 1));
+        expect(await captionOf(scalar)).toHaveLength(2);
+        const inner = goldStore('spinOrbit', { j: true });
+        inner.dispatch(drillToShell(5));
+        expect(await captionOf(inner)).toHaveLength(2);
+    });
+});
+
 // Task 12b (ruling C7), requirement 4: the CSV carries the same dashed
 // non-relativistic curves RadialPlot overlays (Task 12), or -- when there
 // is none -- the reason said as a comment instead.

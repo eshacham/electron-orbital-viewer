@@ -6,7 +6,7 @@ import { subshellSpokenLabel } from '../atom/configurations';
 import { buildComparisonCurves } from '../atom/comparison_curves';
 import type { SerialisedAtomProfile } from '../workers/atomWorker';
 import { CsvCurve, radialCurvesToCsv } from './csv';
-import { exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment } from './caption';
+import { exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment, jLevelShapeCaption } from './caption';
 import { CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
@@ -320,6 +320,10 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             const ring = referenceRingCaption(context.state);
             const caption = [viewDescription(context.state), methodStatement(context.state)];
             if (ring) caption.push(ring);
+            // Final review I1: j-level lobes are a basis choice the method
+            // line does not state -- null, and so omitted, without them.
+            const shape = jLevelShapeCaption(context.state);
+            if (shape) caption.push(shape);
             const overlays = kind === 'png'
                 ? {
                     caption,
