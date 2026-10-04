@@ -1,0 +1,7 @@
+# Offline molecule pipeline for Bonds mode (Phase 5). Python 3.12: PySCF 2.8.0
+# ships one py3-none-macosx_11_0_arm64 wheel per release, and numpy/scipy/h5py
+# all have cp312 arm64 wheels, so 3.12 is fully covered on this machine.
+pyscf==2.8.0
+numpy>=1.26,<3
+scipy>=1.11
+pytest>=8.0

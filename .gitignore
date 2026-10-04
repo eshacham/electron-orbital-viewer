@@ -5,6 +5,8 @@ dist/*
 .venv/
 cdk.out/
 __pycache__/
+tools/molecules/.cache/
+.pytest_cache/
 
 # SDD workspace and browser-automation output are scratch, not source
 .superpowers/
