@@ -17,7 +17,7 @@ from pyscf.data.elements import ELEMENTS
 
 from basis_export import check_against_pyscf, evaluate_aos
 from labels import label_orbitals, select_with_margin
-from molecules import BOHR_TO_ANGSTROM, DIATOMICS, HUBER_HERZBERG
+from molecules import BOHR_TO_ANGSTROM, DIATOMICS, HARTREE_TO_EV, HUBER_HERZBERG
 
 CACHE_DIR = Path(__file__).resolve().parent / '.cache'
 # Bump when the meaning of a cached value changes (2: result dicts with
@@ -352,9 +352,14 @@ def row(quantity, system, app, reference, unit, tolerance, source, method):
             'tolerancePercent': tolerance, 'referenceSource': source, 'method': method}
 
 
+OXYGEN_GROUND_STATE = ('ground state X ³Σg⁻, lowest singlet a ¹Δg at T_e = 7918 cm⁻¹ (0.98 eV): '
+                       'Huber & Herzberg, Constants of Diatomic Molecules (1979)')
+
+
 def validation_rows(out_root):
     """Rows for src/validation/generated/phase5_diatomics.json (Task 14 adds
-    `phase: 5`): every asserted R_e, and H₂'s D_e, from the scans on disk."""
+    `phase: 5`): every asserted R_e, H₂'s D_e, and O₂'s triplet ground state,
+    from the scans on disk."""
     rows = []
     for d in DIATOMICS:
         path = out_root / d.id / 'scan.json'
@@ -372,4 +377,14 @@ def validation_rows(out_root):
         else:
             rows.append(row('R_e', d.formula, scan['fit']['ReBohr'] * BOHR_TO_ANGSTROM,
                             d.reference_re_angstrom, 'Å', 1, d.reference_source, method))
+        check = scan.get('spinCheck')
+        if check is not None:
+            # A sign, not a target (final review M7): the closed-shell
+            # determinant is no spectroscopic state (it mixes a ¹Δg and
+            # b ¹Σg⁺), so no measured gap is its reference -- only that the
+            # triplet lies lower, as X ³Σg⁻ does.
+            gap = (check['singletHartree'] - check['tripletHartree']) * HARTREE_TO_EV
+            rows.append(dict(row('E(closed-shell singlet) − E(triplet)', d.formula, gap, 0, 'eV', 0,
+                                 OXYGEN_GROUND_STATE, f"{check['method']}, at R = {check['RBohr']:.2f} a₀"),
+                             bound='above'))
     return rows

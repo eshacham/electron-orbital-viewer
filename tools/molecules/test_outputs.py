@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from pyscf import gto
 
-from molecules import ANGSTROM_TO_BOHR, DIATOMICS
+from molecules import ANGSTROM_TO_BOHR, DIATOMICS, HARTREE_TO_EV
 from outputs import (SELECTION_TIE_MARGIN, assign_roles, cached, check_scan_labels, density_on_grid, grid_spec,
                      orbital_entries)
 
@@ -280,3 +280,27 @@ def test_lithium_says_why_its_whole_curve_ships():
     li2 = _BY_ID['li2']
     assert 'exact (full CI) for the two valence electrons' in energy_method_label(li2, 0, exact=True)
     assert 'exact' in li2.note and energy_method_label(_BY_ID['n2'], 0) == 'CCSD(T)/aug-cc-pVTZ (frozen core)'
+
+
+def test_validation_rows_carry_the_oxygen_spin_check_as_a_bound(tmp_path):
+    """Final review M7: the triplet-below-singlet check generate.py already
+    runs becomes a validation row -- a sign, not a target: the closed-shell
+    determinant is no spectroscopic state, so no measured gap is its
+    reference. `bound: 'above'` says app must exceed reference (0)."""
+    from outputs import validation_rows
+    fit = {'ReBohr': 2.29, 'DeEv': 5.0}
+    for d in DIATOMICS:
+        if d.id in ('h2', 'o2'):
+            scan = {'energyMethod': 'M', 'fit': fit,
+                    'spinCheck': {'RBohr': 2.28, 'tripletHartree': -150.14, 'singletHartree': -150.09, 'method': 'S'}
+                    if d.id == 'o2' else None}
+            (tmp_path / d.id).mkdir()
+            (tmp_path / d.id / 'scan.json').write_text(json.dumps(scan))
+    rows = validation_rows(tmp_path)
+    spin = [r for r in rows if r['quantity'] == 'E(closed-shell singlet) − E(triplet)']
+    assert len(spin) == 1
+    assert spin[0]['system'] == 'O₂' and spin[0]['unit'] == 'eV' and spin[0]['bound'] == 'above'
+    assert spin[0]['reference'] == 0 and spin[0]['tolerancePercent'] == 0
+    assert abs(spin[0]['app'] - 0.05 * HARTREE_TO_EV) < 1e-9
+    assert spin[0]['method'] == 'S, at R = 2.28 a₀'
+    assert 'bound' not in rows[0]

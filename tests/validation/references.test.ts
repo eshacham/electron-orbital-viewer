@@ -1,4 +1,4 @@
-import { VALIDATION, relativeErrorPercent } from '../../src/validation/references';
+import { VALIDATION, relativeErrorPercent, rowPasses } from '../../src/validation/references';
 import { solveAtom } from '../../src/atom/scf';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -14,7 +14,7 @@ describe('validation table', () => {
     it.each(VALIDATION.map(row => [`phase ${row.phase}: ${row.system} ${row.quantity}`, row] as const))(
         '%s agrees with its reference within the stated tolerance',
         (_name, row) => {
-            expect(relativeErrorPercent(row)).toBeLessThanOrEqual(row.tolerancePercent);
+            expect(rowPasses(row)).toBe(true);
         }
     );
 
@@ -23,11 +23,23 @@ describe('validation table', () => {
             expect(row.unit.length).toBeGreaterThan(0);
             expect(row.referenceSource.length).toBeGreaterThan(0);
             expect(row.method.length).toBeGreaterThan(0);
+            // A bound row (O₂'s triplet below the singlet) has no target to
+            // be near: its reference is the bound itself, often 0.
+            if (row.bound) continue;
             expect(row.reference).not.toBe(0);
             expect(row.tolerancePercent).toBeGreaterThan(0);
         }
         const keys = VALIDATION.map(row => `${row.phase}|${row.system}|${row.quantity}`);
         expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    it('passes a target row within its tolerance and a bound row only strictly beyond its bound', () => {
+        const target = { ...VALIDATION[0], app: 101, reference: 100, tolerancePercent: 1 };
+        expect(rowPasses(target)).toBe(true);
+        expect(rowPasses({ ...target, app: 102 })).toBe(false);
+        const bound = { ...VALIDATION[0], app: 0.5, reference: 0, tolerancePercent: 0, bound: 'above' as const };
+        expect(rowPasses(bound)).toBe(true);
+        expect(rowPasses({ ...bound, app: 0 })).toBe(false);
     });
 
     it('measures the error relative to the reference, whatever its sign', () => {

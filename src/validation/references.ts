@@ -30,6 +30,14 @@ export interface ValidationRow {
     tolerancePercent: number;
     referenceSource: string;
     method: string;
+    /**
+     * Absent: a target -- `app` within `tolerancePercent` of `reference`.
+     * 'above': a bound -- `app` must strictly exceed `reference`, and
+     * `tolerancePercent` is unused (0). For a claim that is a sign, not a
+     * number with a measured counterpart: O₂'s closed-shell singlet above
+     * its triplet (that determinant is no spectroscopic state to match).
+     */
+    bound?: 'above';
 }
 
 const NIST_LDA = 'NIST Atomic Reference Data (LDA)';
@@ -47,4 +55,10 @@ export const VALIDATION: ValidationRow[] = [...PHASE_0_ROWS, ...PHASE_1_ROWS, ..
 
 export function relativeErrorPercent(row: ValidationRow): number {
     return (Math.abs(row.app - row.reference) / Math.abs(row.reference)) * 100;
+}
+
+/** Whether a row holds: a bound beyond its reference, a target within its tolerance. */
+export function rowPasses(row: ValidationRow): boolean {
+    if (row.bound === 'above') return row.app > row.reference;
+    return relativeErrorPercent(row) <= row.tolerancePercent;
 }
