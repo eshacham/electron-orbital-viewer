@@ -1230,7 +1230,7 @@ during a load, not the selection that is still in flight (the fix-round-1
 defect this ruling exists to prevent: exporting what the user just clicked
 before the data for it has landed). Every export states the system, R and
 method in both its caption and its ASCII file-name stem
-(`orbital-viewer_N2_2.09_3sigma-g`-style). Bonds' CSV
+(`orbital-viewer_N2_R2.07_3sigmag`-style). Bonds' CSV
 (`run_export.ts`'s `bondsCsvFor`) is the potential curve E(R) — H₂⁺'s own
 191-point solved curve (read from the live plot's already-cached
 `H2PlusCurve`, never re-solved on the main thread) or a diatomic's twenty
