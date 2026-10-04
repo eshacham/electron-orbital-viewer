@@ -1,9 +1,9 @@
 // vite.config.ts
-import { existsSync, createReadStream } from 'fs';
+import { existsSync, statSync, createReadStream } from 'fs';
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { resolve } from 'path';
+import { resolve, sep } from 'path';
 
 // Serves the stack's CloudFront distribution: publish.py uploads the
 // generated molecule data there (spec §4.5), never into this repo's build.
@@ -23,9 +23,16 @@ function serveLocalMolecules(): Plugin {
     configureServer(server) {
       server.middlewares.use('/molecules', (req, res, next) => {
         const file = resolve(root, `.${decodeURIComponent((req.url ?? '').split('?')[0])}`);
-        if (!file.startsWith(root) || !existsSync(file)) return next();
+        // Node's own router already rejects a raw ".." segment with 400; this
+        // is defence in depth against anything that reaches this far (e.g. a
+        // sibling directory that merely shares `root` as a string prefix,
+        // which a bare `startsWith(root)` would wrongly allow).
+        if (file !== root && !file.startsWith(root + sep)) return next();
+        if (!existsSync(file) || !statSync(file).isFile()) return next();
         res.setHeader('Content-Type', file.endsWith('.json') ? 'application/json' : 'application/octet-stream');
-        createReadStream(file).pipe(res);
+        const stream = createReadStream(file);
+        stream.on('error', next);
+        stream.pipe(res);
       });
     },
   };
