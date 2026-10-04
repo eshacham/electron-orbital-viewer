@@ -137,7 +137,7 @@ describe('useH2PlusCurve', () => {
         expect(worker.postMessage).toHaveBeenCalledTimes(2);
     });
 
-    it('spans the slider range in 0.05 a0 steps', () => {
+    it('samples the slider range every 0.05 a0 (the slider itself steps 0.01 a0)', () => {
         expect(H2PLUS_CURVE_R[0]).toBe(0.5);
         expect(H2PLUS_CURVE_R[H2PLUS_CURVE_R.length - 1]).toBeCloseTo(10, 12);
         expect(H2PLUS_CURVE_R).toHaveLength(191);

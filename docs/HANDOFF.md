@@ -255,9 +255,10 @@ These cost real effort to arrive at; do not undo them without reading why.
   0.7–0.9 of the two 1s electrons it represents. Chemists already draw
   ρ = 0.002 e/a₀³ as the conventional molecular outline, so the panel offers
   exactly that and two higher values (0.05, 0.2) instead of a percentage;
-  `FieldRenderRequest` carries this as `densityIsoValue`, which the worker
-  turns into the fraction of its own samples above that value so Phase 1's
-  existing contour search can still be reused unmodified.
+  `FieldRenderRequest` carries this as `densityIsoValue`, and the worker
+  draws the contour at that value itself (`generateIsoValueMesh`, squaring
+  the recipe's √ρ samples) — no enclosed fraction is computed or searched
+  for, so none of Phase 1's histogram rounding reaches the surface.
 - **Where the generated data actually lives, and why not in `dist/` or
   `public/`** (Phase 5, amendment 2026-09-26). The plan's original design
   would have copied `public/molecules/` into the build with a small
@@ -1194,11 +1195,10 @@ Phase 1's own convention for a density-type grid source — so
 `meshFromSamples` squares it back before marching cubes runs (the same
 convention the cube exporter has to undo explicitly, see Task 13b below).
 The surface is drawn at exactly one of three ρ values (0.002, 0.05,
-0.2 e/a₀³), never a percentage: `FieldRenderRequest.densityIsoValue` is
-converted, inside the worker, into the fraction of its own samples above
-that density, which is what actually lands on Phase 1's existing contour
-search — the UI-facing number stays the physically meaningful one, the
-plumbing underneath is unchanged. `bondAxisMinimumDensity`
+0.2 e/a₀³), never a percentage: `FieldRenderRequest.densityIsoValue` goes to
+`generateIsoValueMesh` (`src/orbital_mesh.ts`), which marches cubes at that
+ρ directly — it is never converted into an enclosed fraction, so Phase 1's
+contour search (and its histogram rounding) is bypassed for Bonds densities. `bondAxisMinimumDensity`
 (`src/bonds/bond_density.ts`) samples 200 points on the segment between a
 diatomic's two nuclei from the same basis and occupations, so the panel can
 say, read off the actual density rather than assumed, whether the chosen
@@ -1214,10 +1214,20 @@ lower) into their own row under a break — stated on screen as orbital
 energies and never as ionisation energies, the same distinction atom mode's
 own diagram already draws, because Koopmans' theorem does not hold exactly
 for a density functional either. Restricted molecules get one level per
-label with ↑↓ from its occupation; the unrestricted ones (O₂, B₂, C₂) draw
-levels at α energies with ↑ from the α orbital and ↓ from the
-same-labelled β one, so O₂'s two unpaired π* electrons show as two
-degenerate boxes each carrying a lone ↑ — Hund's rule, visibly. Clicking a
+label with ↑↓ from its occupation (C₂ among them: a closed-shell singlet,
+run restricted); the unrestricted ones (O₂, B₂) draw levels at α energies
+with ↑ from the α orbital and ↓ from the same-labelled β one, so O₂'s two
+unpaired π* electrons show as two degenerate boxes each carrying a lone ↑ —
+Hund's rule, visibly. Drawing α energies can hide an order β puts the other
+way (final review I1): O₂'s α levels have 1πu (−0.573 Ha) below 3σg
+(−0.559), but β (3σg −0.521, 1πu −0.470) and the photoelectron spectrum
+(b ⁴Σg⁻, a 3σg hole, above a ⁴Πu) put 3σg lower — the textbook O₂-versus-N₂
+swap. `buildMoDiagram` records every valence pair whose β order differs
+(`betaOrderSwaps`), and `spinOrderNote` names them under the diagram, citing
+photoelectron spectra only when both swapped β levels are occupied (a
+spectrum ionises only occupied levels): O₂ gets "in β — and in
+photoelectron spectra — 3σg lies below 1πu", B₂ (whose swapped β pair is
+empty) "in β, 3σg lies below 1πu", restricted molecules nothing. Clicking a
 box dispatches `BondsView`'s `{ kind: 'mo', label, spin, component }`, never
 a bare index (see the label-not-index bullet above).
 
@@ -1233,8 +1243,9 @@ method in both its caption and its ASCII file-name stem
 (`orbital-viewer_N2_R2.07_3sigmag`-style). Bonds' CSV
 (`run_export.ts`'s `bondsCsvFor`) is the potential curve E(R) — H₂⁺'s own
 191-point solved curve (read from the live plot's already-cached
-`H2PlusCurve`, never re-solved on the main thread) or a diatomic's twenty
-shipped scan points — not a radial distribution. The cube exporter
+`H2PlusCurve`, never re-solved on the main thread) or a diatomic's shipped
+scan points (up to twenty: 13–20 ship; curves stop where single-reference
+CCSD(T) stops being valid) — not a radial distribution. The cube exporter
 (`cube_request.ts`, `cube.ts`) carries both nuclei as `CubeAtom`s; for a
 density recipe it squares the evaluator's √ρ back to ρ before writing it,
 the same undo `meshFromSamples` performs for the on-screen surface. Every
@@ -1275,20 +1286,73 @@ recomputed by the TS test suite, since recomputing them means running PySCF
 O₂'s ground state being the triplet is checked directly, not inferred from
 its occupation alone: a `spinCheck` scan point runs the same UCCSD(T) for
 both the triplet and a closed-shell singlet at the same geometry, and the
-triplet comes out 0.0478 Ha (1.30 eV) lower.
+triplet comes out 0.0478 Ha (1.30 eV) lower. That check is a row too
+(final review M7): "O₂ E(closed-shell singlet) − E(triplet)", app 1.30 eV,
+written by `validation_rows` from the scan's `spinCheck`. It is a *bound*,
+not a target — the closed-shell determinant mixes a ¹Δg and b ¹Σg⁺, so no
+measured gap is its reference — so `ValidationRow` gained an optional
+`bound: 'above'` (app must exceed `reference`, here 0; `tolerancePercent`
+0 and unused), and `rowPasses()` checks either kind. Phase 7's Methods page
+must render a bound row as "> 0", not as a percentage error.
 
 ### What is still open
 
 - **Be₂** is the obvious next molecule for a `v2` data version — see the
   dedicated bullet above.
 - **Spin contamination** (⟨S²⟩) is not checked for the UHF/UKS references
-  (O₂, B₂, C₂); nothing observed in the generated data suggests it, but
-  nothing asserts it is small either.
+  (O₂ and B₂; C₂ is a closed-shell singlet, run restricted); nothing
+  observed in the generated data suggests it, but nothing asserts it is
+  small either.
 - **No zero-point energy anywhere** — every D_e here is the bare electronic
   well depth; a spectroscopic D₀ would need a vibrational frequency this
-  phase does not compute.
+  phase does not compute. D_e also falls 1–5 % short of experiment's
+  (aug-cc-pVTZ underbinds: N₂ 9.44 eV against 9.91, F₂ 1.58 against 1.66;
+  H₂ at full CI 0.9 %), and the D_e caption says so.
 - **The `.cache` and `out/` directories are git-ignored and can grow large**
   across several data versions on one machine; nothing here prunes them.
+
+#### For Phase 6
+
+- **A `v2` must regenerate all ten diatomics at the same commit as the new
+  molecules.** `publish.py` refuses a tree whose `meta.json` files name more
+  than one generator commit (or a `-dirty` one): the manifest records a
+  single `generatedBy.commit`, and v1 is published and immutable, so v2
+  cannot reuse v1's files as they stand. That is cheap only with the
+  settings cache (`tools/molecules/.cache/`, ruling T4-b) still on disk —
+  a rerun then re-solves only the DFT and grid steps; from a cold cache O₂'s
+  UCCSD(T) alone is ~28 s a point. If regenerating everything becomes the
+  bottleneck, make provenance per molecule in the manifest (one commit per
+  molecule id) rather than relaxing the check.
+- **The v1 `density.bin.gz` grids are point-sampled, not voxel-averaged.**
+  `outputs.density_on_grid` writes ρ at each node; summed as Σρ·h³ over the
+  shipped 0.25 a₀ grid they integrate to the electron count +0.0 % (H₂),
+  +0.4 % (HF), +0.5 % (He₂), +1.0 % (O₂), +1.7 % (Li₂), +3.2 % (C₂), +5.0 %
+  (F₂), +6.8 % (CO), +12.0 % (B₂) and +14.6 % (N₂) — one node near a 1s
+  cusp stands for far more charge than its voxel holds. Bonds mode never
+  draws these grids (it evaluates ρ from `basis.json`), so v1 is unaffected,
+  but Phase 6's "integrates to N within 0.5 %" needs voxel-averaged writing
+  (e.g. sub-sampling each voxel, or integrating the Gaussians over it
+  analytically) in `density_on_grid`, and a test that sums a grid.
+- **Diatomic-only code paths Phase 6 must generalise:**
+  `DIATOMIC_IDS` / `BONDS_SYSTEMS` (`src/bonds/systems.ts`, a fixed list);
+  `bondsDrawnPicture`'s `const [a, b] = basis.atoms` R
+  (`src/export/caption.ts`, and every caption/stem that prints one R); the
+  URL's `MO_LABEL` regex (σ/π/δ g/u labels only) and its `[01]` component
+  check (two-fold degeneracy at most) in `src/bonds/bonds_url.ts`;
+  `bondAxisMinimumDensity` (`src/bonds/bond_density.ts`, two atoms or null);
+  `generateIsoValueMesh` (`src/orbital_mesh.ts`, refuses anything but a
+  `gaussianDensity` recipe — a grid source will need its own path); the MO
+  diagram's core detection (`buildMoDiagram`: one widest gap over 1 Ha —
+  SF₆ has S 1s, then S 2s/2p and F 1s, each separated by more than 1 Ha,
+  so a single split misfiles levels); and `orbitalSlice`'s `isBondsField`,
+  which treats any `gaussianMO`/`gaussianDensity` recipe as Bonds — a
+  Phase 6 molecule drawn from the same recipes would be cleared on
+  switching to Basic Orbitals as if it were a Bonds picture.
+- **Ruling C13 is deferred to Phase 6:** Phase 1's carry-forward "report
+  large negative densities in grid sources" has no Phase 5 home (Bonds
+  draws no grids). Phase 6 draws grids and must report them. v1's grids
+  hold none (`density_on_grid` zeroes values below `ZERO_BELOW`, and the
+  smallest shipped sample is ≥ 0).
 
 ## Judgment calls made without asking
 

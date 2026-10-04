@@ -54,8 +54,10 @@ export const H2PLUS_LABELS: Record<H2PlusState, string> = { '1sigma_g': '1σg', 
 export const H2PLUS_R_RANGE = { min: 0.5, max: 10 } as const;
 
 /**
- * The slider's own 0.05 a0 step, spanning its whole range -- one energy per
- * point the curve plot (and Task 13b's CSV export) can land on. Lives here,
+ * The curve's sampling, every 0.05 a₀ across the slider's whole range --
+ * one energy per point the curve plot draws through (and Task 13b's CSV
+ * export writes). The slider itself steps 0.01 a₀ (ruling C14); the plot
+ * interpolates between these samples. Lives here,
  * not in useH2PlusCurve.ts (which re-exports it for its existing importers),
  * so run_export.ts can use it without pulling in createH2PlusCurveWorker.ts's
  * `new Worker(new URL(...), import.meta.url)` -- a worker-bundling construct

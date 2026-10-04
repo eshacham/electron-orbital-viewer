@@ -160,15 +160,18 @@ the picture, cut it open, and read off how big it actually is.
   outside what the slider shows, and the caption says so rather than call
   the curve something it is not.
 - **Ten more diatomics, precomputed.** H₂, He₂, Li₂, B₂, C₂, N₂, O₂, F₂, CO
-  and HF, each a 20-point bond-length scan — dense near R_e, sparse out
-  towards dissociation — computed once, offline, and shipped rather than
+  and HF, each a bond-length scan of up to twenty points (13–20 ship;
+  curves stop where single-reference CCSD(T) stops being valid) — dense
+  near R_e, sparse out towards dissociation — computed once, offline, and
+  shipped rather than
   solved in the browser. Energies are CCSD(T)/aug-cc-pVTZ (full CI for H₂,
   and for He₂ too — four electrons is still exact within the basis and
   cheap, going further than the two-electron case the spec itself asks for);
-  densities and orbitals are B3LYP/def2-TZVP; O₂, B₂ and C₂ run unrestricted,
-  with their occupations pinned so the self-consistent field cannot wander
-  into another state. The slider snaps to one of the twenty computed points
-  — there is no geometry between them, because nothing between them was ever
+  densities and orbitals are B3LYP/def2-TZVP; O₂ and B₂ (triplets) run
+  unrestricted and C₂ (a closed-shell singlet) restricted, all three with
+  their occupations pinned so the self-consistent field cannot wander into
+  another state. The slider snaps to one of the shipped scan points — there
+  is no geometry between them, because nothing between them was ever
   calculated. R_e lands within 1 % of experiment everywhere the spec checks
   it: N₂ 1.104 Å (1.098), O₂ 1.213 Å (1.207), F₂ 1.418 Å (1.412), CO 1.136 Å
   (1.128), HF 0.921 Å (0.917); H₂'s R_e (1.404 a₀ against 1.401) and D_e
@@ -203,6 +206,8 @@ the picture, cut it open, and read off how big it actually is.
   calculations at the molecule's own method, basis and ground spin state
   (N: ⁴S, O: ³P, and so on — full CI for H and He), so D_e = E(A) + E(B) −
   E(R_e) compares like with like, with no counterpoise correction.
+  aug-cc-pVTZ underbinds by a few % against experiment (N₂ 9.44 eV against
+  9.91, O₂ 4.98 against 5.21; H₂ at full CI 0.9 %), and the caption says so.
 - **He₂ has no chemical bond.** At full CI, its curve shows only a van der
   Waals well about 0.04 mHa deep — the same order as this basis's own
   superposition error. Bond order 0; the view opens not at a fitted
@@ -241,8 +246,11 @@ the picture, cut it open, and read off how big it actually is.
   mode draws. O₂'s two unpaired electrons show exactly where Hund's rule
   puts them, each a single up arrow in a degenerate 1πg\* box; He₂'s HOMO is
   already antibonding, which is what its bond order 0 means. The
-  unrestricted molecules (O₂, B₂, C₂) draw α energies, with a down arrow
-  marking the matching β orbital.
+  unrestricted molecules (O₂, B₂) draw α energies, with a down arrow
+  marking the matching β orbital; where β orders two levels the other way,
+  the diagram names them. O₂'s α levels put 1πu just below 3σg, but in β —
+  and in its photoelectron spectrum — 3σg lies below 1πu, the textbook
+  O₂-versus-N₂ swap, and the caption under the diagram says exactly that.
 - **The density is drawn at a fixed value, not a fraction.** The app
   evaluates ρ = Σ occᵢψᵢ² directly from the molecule's own shipped Gaussian
   basis, at exactly one of three choices — 0.002, 0.05 or 0.2 e/a₀³ — never
@@ -346,7 +354,7 @@ along x, at a 90% contour:
 | `n`, `l`, `ml` | Basic Orbitals' quantum numbers |
 | `combo` (`sp`\|`sp2`\|`sp3`\|`field`\|`none`), `member` (a hybrid's index, or `all`), `level` (a field's: 1 or 2), `F` (field strength, a.u.), `stark` (`lower`\|`upper`\|`both`) | the Combination picker |
 | `system` | Bonds mode's system — `h2plus` or one of the ten diatomic ids (`h2`, `he2`, `li2`, `b2`, `c2`, `n2`, `o2`, `f2`, `co`, `hf`); an id this app does not offer is ignored, falling back to H₂⁺ |
-| `R` | Bonds mode's internuclear distance, in bohr; H₂⁺ clamps and rounds it to its slider's 0.01 a₀ step within [0.5, 10], a diatomic snaps it to the nearest of its twenty shipped scan points once the scan has loaded |
+| `R` | Bonds mode's internuclear distance, in bohr; H₂⁺ clamps and rounds it to its slider's 0.01 a₀ step within [0.5, 10], a diatomic snaps it to the nearest of its shipped scan points (up to twenty: 13–20 ship; curves stop where single-reference CCSD(T) stops being valid) once the scan has loaded |
 | `state` | Bonds mode's drawn picture — `1sigma_g` or `1sigma_u` for H₂⁺; `density` or `density:<iso>` (one of 0.002, 0.05, 0.2) for a molecule's total density; `mo:<restricted\|alpha\|beta>:<label>:<component>` for a molecular orbital by its label (e.g. `mo:restricted:3σg:0`), never by index, so the link still finds "3σg" if PySCF's own ordering differs at another R |
 
 Atom mode's own keys always appear in the order `Z`, `rel`, `charge`,
@@ -387,8 +395,10 @@ like any other malformed key, not parsed as a number nobody wrote.
   the same count the plot itself draws; atom mode's curves are the SCF's own
   grid samples. Bonds mode's CSV is its potential curve E(R) instead of a
   radial distribution — H₂⁺'s own 191-point solved curve, or a diatomic's
-  twenty shipped scan points — with the method and, for a diatomic, the
-  multireference or validity-cutoff caveat in the comment lines too.
+  shipped scan points (up to twenty: 13–20 ship; curves stop where
+  single-reference CCSD(T) stops being valid) — with the method and, for a
+  diatomic, the multireference or validity-cutoff caveat in the comment
+  lines too.
 - **3D model (glTF, `.glb`)** — binary, colours kept, scaled so the model is
   20 cm across (a convenient AR/tabletop size); the scale back to bohr
   (`metresPerBohr`) is recorded in the root node's `extras`.
@@ -555,9 +565,10 @@ eigenvalue and the λ equation's highest agree, by bisection on a bracket
 derived from the physics itself (both states lie between the He⁺ united
 atom's 1s and the separated H 1s limits). Dragging the slider resolves a new
 R on every release, in well under a millisecond per point; the potential
-curve across the whole 0.5–10 a₀ range (191 points, the slider's own 0.05 a₀
-step) is computed once per session, off the main thread, in its own worker,
-and cached for the rest of it.
+curve across the whole 0.5–10 a₀ range (191 points, sampled every 0.05 a₀;
+the slider itself steps 0.01 a₀) is computed once per session, off the main
+thread, in its own worker, and cached for the rest of it — a failure is not
+cached, so returning to H₂⁺ asks again.
 
 **A diatomic's picture comes from its own shipped Gaussian basis, not a
 downloaded mesh.** `basis.json` carries the molecular-orbital coefficients
@@ -738,8 +749,9 @@ electronic problem; there is no nuclear motion, no vibrational levels, no
 zero-point energy. D_e is the bare electronic well depth, stated as such; the
 true, spectroscopic D₀ is always a little smaller.
 
-**A diatomic is sampled only at twenty geometries.** The slider snaps to the
-nearest of them; nothing between two scan points was ever calculated, so
+**A diatomic is sampled only at up to twenty geometries** (13–20 ship; curves
+stop where single-reference CCSD(T) stops being valid). The slider snaps to
+the nearest of them; nothing between two scan points was ever calculated, so
 there is no continuous potential curve to read off more finely than that —
 the spacing itself is the method's own compromise between resolving R_e
 (dense there) and reaching towards dissociation (sparse further out).
