@@ -290,6 +290,16 @@ describe('Relativity control', () => {
     expect(screen.getByText(/default for this element/i)).toBeInTheDocument();
   });
 
+  // Final review I3: clicking the mode already shown is choosing it again
+  // (an exclusive toggle reports that as null) -- passed on, so the store
+  // can treat choosing the element's default as following the default.
+  it('reports a click on the mode already selected as choosing it again', () => {
+    const onRelativityChange = jest.fn();
+    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="scalar" onRelativityChange={onRelativityChange} />);
+    fireEvent.click(within(screen.getByRole('group', { name: 'relativity treatment' })).getByRole('button', { name: /scalar relativistic/i }));
+    expect(onRelativityChange).toHaveBeenCalledWith('scalar');
+  });
+
   // Ruling C15 / Phase 1's CombinationControls: MUI upper-cases button text
   // unless told not to, which turns "With spin–orbit" into a shout.
   it('keeps the labels\' own case', () => {

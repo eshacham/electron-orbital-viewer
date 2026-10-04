@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
 import { SERIALIZABLE_CHECK } from './store';
-import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView } from './store/atomSlice';
+import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView, setElement } from './store/atomSlice';
 import { setSurfaceStyle, setBasicSelection, requestCut } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
@@ -1029,6 +1029,29 @@ describe('App: relativity', () => {
             expect(store.getState().atom.relativityOverride).toBe('spinOrbit');
             expect(within(switchIn()).getByRole('button', { name: 'with spin–orbit' })).toHaveAttribute('aria-pressed', 'true');
             expect(screen.queryByText(/Default for this element/)).toBeNull();
+        });
+
+        // Final review I3 (ruling T11-a): a real departure persists across
+        // element picks, so Scalar chosen on carbon is still the choice on
+        // gold -- where it is also the default, and the helper says so.
+        // Clicking it there is choosing the default, which follows the
+        // default again: carbon is then off.
+        it('round trip: Scalar chosen on carbon reads as the default on gold, and re-choosing it there follows the default again', () => {
+            installMatchMedia(false);
+            const { store } = renderWithProvider(<App />, { mode: 'atom', Z: 6 });
+            fireEvent.click(within(switchIn()).getByRole('button', { name: 'scalar relativistic' }));
+            expect(store.getState().atom.relativityOverride).toBe('scalar');
+            expect(screen.queryByText(/Default for this element/)).toBeNull();
+
+            act(() => { store.dispatch(setElement(79)); });
+            expect(store.getState().atom.relativityOverride).toBe('scalar');
+            expect(within(switchIn()).getByRole('button', { name: 'scalar relativistic' })).toHaveAttribute('aria-pressed', 'true');
+            expect(screen.getByText(/Default for this element/)).toBeInTheDocument();
+
+            fireEvent.click(within(switchIn()).getByRole('button', { name: 'scalar relativistic' }));
+            expect(store.getState().atom.relativityOverride).toBeNull();
+            act(() => { store.dispatch(setElement(6)); });
+            expect(within(switchIn()).getByRole('button', { name: 'relativity off' })).toHaveAttribute('aria-pressed', 'true');
         });
 
         it('names the mode it is solving in', () => {

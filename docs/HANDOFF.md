@@ -761,16 +761,23 @@ reading one file.
   picture it showed. The encoder writes `rel` whenever the *effective* mode
   is not off, so a default-scalar gold link encodes `rel=scalar` even though
   nobody touched the switch.
-- **An explicit choice that happens to equal the element's default
-  renormalises to `null`** (ruling T11-a, fixing I2 found in Task 11's
-  review): picking Scalar on gold, then Carbon, then back to gold must show
-  "Default for this element" again on gold, not a frozen explicit "scalar"
-  that can never go back to following the default. The override is global
-  (persists across element picks, so Argon inherits a Carbon-picked Off) but
-  is renormalised to `null` the moment it equals the newly selected
-  element's own default — matching the URL decoder's own normalisation, so
-  "what the override variable holds" and "what a link encodes" never
-  disagree.
+- **Choosing the current element's default clears the override** (ruling
+  T11-a, fixing I2 found in Task 11's review; corrected in the final
+  review, I3). As built: `setRelativity` stores `null` when the mode chosen
+  equals the *current* element's default, and the mode otherwise;
+  `setElement` never touches the override. So a real departure persists
+  across element picks — Scalar chosen on carbon is still the override on
+  gold, and Off chosen on gold still applies on uranium — and the only way
+  back to following the default is to choose the current element's
+  default. Two things make that reachable and visible: the "Default for
+  this element" helper is derived from `effective === defaultRelativityFor(Z)`
+  (not from the override being `null`), so Scalar on gold reads as the
+  default whichever element it was chosen on; and clicking the
+  already-selected button re-chooses it (the toggle's null is passed on as
+  the shown mode), so clicking Scalar on gold clears a carried-over
+  override and carbon is off again. The URL decoder normalises the same way
+  against the decoded element, so a link whose `rel` is its element's
+  default opens following the default, as if nobody had touched the switch.
 
 ### Cache keys (ruling C2)
 
@@ -920,12 +927,15 @@ isolation; see "Process notes").
    only way it means anything. `RELATIVISTIC_EXCHANGE_CORRECTION` records
    this as a fact about the fixtures, not a choice this app made
    independently.
-3. **`relativityOverride` is global, persisting across element picks, but
-   renormalises to the new element's own default** (ruling T11-a, above) —
-   found live in Task 11's review (I2): without the renormalisation,
-   choosing Scalar on gold then visiting carbon and returning to gold shows
-   an explicit "scalar" that can never again read "Default for this
-   element", even though scalar *is* gold's default.
+3. **`relativityOverride` is global, persisting across element picks;
+   choosing the current element's default clears it** (ruling T11-a, above)
+   — `setRelativity` normalises, `setElement` does not. Found live in Task
+   11's review (I2): without the normalisation, choosing Scalar on gold
+   froze an explicit "scalar" that followed the user to carbon. The final
+   review (I3) found the helper still keyed to `override === null`, so
+   Scalar carried from carbon onto gold did not read "Default for this
+   element"; it now compares the effective mode with the element's
+   default, and re-clicking the selected mode re-chooses it.
 4. **The relativistic SCF is seeded from the same species' converged
    non-relativistic potential (NR-seeded), not the screened guess** (ruling
    C2) — it is on the same grid, the worker needs the non-relativistic

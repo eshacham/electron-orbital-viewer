@@ -41,7 +41,7 @@ import {
     effectiveRelativity,
     profileRelativity,
 } from './store/atomSlice';
-import { RelativityMode } from './atom/relativity';
+import { RelativityMode, defaultRelativityFor } from './atom/relativity';
 import { subshellLabel, subshellSpokenLabel } from './atom/configurations';
 import { useAtomSolver } from './atom/useAtomSolver';
 import { useDeltaScfEnergies } from './atom/useDeltaScfEnergies';
@@ -135,7 +135,10 @@ function App() {
     // profile's own mode instead (ruling C9): during a re-solve the two
     // differ, and the old picture must not be labelled as the new method.
     const relativity = useAppSelector(state => effectiveRelativity(state.atom));
-    const relativityIsDefault = useAppSelector(state => state.atom.relativityOverride === null);
+    // Whether the mode shown is this element's default, whoever chose it
+    // (final review I3): Scalar chosen on carbon persists onto gold, where it
+    // is the default, and the helper says so.
+    const relativityIsDefault = useAppSelector(state => effectiveRelativity(state.atom) === defaultRelativityFor(state.atom.Z));
     const pictureRelativity: RelativityMode = atomProfile ? profileRelativity(atomProfile) : relativity;
     // Memoised: Controls is React.memo, and a fresh object every render would defeat it.
     const relativityReadout = useMemo<RelativityReadout | null>(() => atomProfile && {

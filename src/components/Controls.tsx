@@ -90,7 +90,7 @@ interface ControlsProps {
    * panel is exactly as it was.
    */
   relativity?: RelativityMode;
-  /** The user has not chosen: `relativity` is the element's default (scalar from Cs, off below). */
+  /** `relativity` is this element's default (scalar from Cs, off below), whoever chose it -- a choice carried over from another element can be. */
   relativityIsDefault?: boolean;
   onRelativityChange?: (mode: RelativityMode) => void;
   /** What the picture on screen says about relativity, for the readout under the switch; null with no picture. */
@@ -136,7 +136,7 @@ export function cutDepthLabel(clipPosition: number): string {
   return `${depth}% — ${depth < 50 ? 'short of' : 'past'} the nucleus`;
 }
 
-/** What each mode is, in one line; "Default for this element" while the user has not chosen (spec §3.1). */
+/** What each mode is, in one line; "Default for this element" when it is that element's default (spec §3.1). */
 export function relativityHelp(mode: RelativityMode, isDefault: boolean): string {
   const base = {
     off: 'Schrödinger equation — no relativistic effects.',
@@ -391,7 +391,11 @@ const Controls: React.FC<ControlsProps> = ({
             value={relativity}
             exclusive
             onChange={(event: React.MouseEvent<HTMLElement>, value: RelativityMode | null) => {
-              if (value !== null) onRelativityChange(value);
+              // An exclusive toggle reports a click on the selected button
+              // as null: that is choosing the shown mode again, which the
+              // store reads as following the default when it is the
+              // element's default (final review I3), so pass it on.
+              onRelativityChange(value ?? relativity);
             }}
             aria-label="relativity treatment"
             size="small"
