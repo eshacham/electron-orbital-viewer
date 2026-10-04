@@ -337,12 +337,16 @@ describe('SubshellPanel with spin–orbit', () => {
         expect(container.querySelector('.subshell-j-note')).toBeNull();
     });
 
-    it('gives j-level chips a name a screen reader can say', () => {
+    // Final review M8: the name replaces the visible text, whose energy
+    // carries its method only as a hover title -- so the name says it too.
+    it('gives j-level chips a name a screen reader can say, method included', () => {
         const { getByRole } = render(
             <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={null}
                 relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
         );
-        expect(getByRole('button', { name: /^6p j = 3\/2, 1\.33 of 4 electrons, -0\.120 Ha orbital energy$/ })).toBeTruthy();
+        expect(getByRole('button', {
+            name: /^6p j = 3\/2, 1\.33 of 4 electrons, -0\.120 Ha orbital energy \(Dirac LDA \(MacDonald–Vosko exchange\)\)$/,
+        })).toBeTruthy();
         expect(getByRole('button', { name: /^6p j = 1\/2,/ })).toBeTruthy();
         expect(getByRole('button', { name: /^6s j = 1\/2,/ })).toBeTruthy();
     });

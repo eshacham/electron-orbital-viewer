@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Chip, Typography, Button } from '@mui/material';
 import { SerialisedSubshell } from '../workers/atomWorker';
 import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
-import { RelativityMode, methodStatement } from '../atom/relativity';
+import { RelativityMode, methodStatement, shortMethodLabel } from '../atom/relativity';
 import { orbitalName, shellLetter } from '../orbital_names';
 import { CURVE_COLORS, orbitalShade } from '../curve_colors';
 
@@ -194,9 +194,13 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                             // "6p³⁄₂" is read aloud as superscripts and a
                             // fraction slash; a j-level chip says "6p j = 3/2"
                             // instead. Without j the visible text already
-                            // reads well and stays the name.
+                            // reads well and stays the name. The name replaces
+                            // the visible text, whose energy states its method
+                            // only as a hover title, so it names the method
+                            // too (spec §3.1, final review M8).
                             aria-label={subshell.j === undefined ? undefined
-                                : `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons, ${energy} Ha orbital energy`}
+                                : `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons, `
+                                    + `${energy} Ha orbital energy (${shortMethodLabel(relativity)})`}
                             color={isSelected ? 'primary' : 'default'}
                             // A toggle, not a one-way selection: pressed means
                             // this subshell's orbitals are isolated in the 3D
