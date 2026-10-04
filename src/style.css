@@ -1029,3 +1029,54 @@ html, body, #root {
   color: rgba(0, 0, 0, 0.6);
   font-size: 11px;
 }
+
+/* BondsPanel (Task 12). Ruling C6: dark-on-light, as LevelNav -- its own
+   light card in the desktop side panel, and on the phone sheet (already
+   light) without one. Every colour is pinned at 4.5:1 on that card in
+   tests/a11y/panel_contrast.test.ts. */
+.bonds-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: rgba(0, 0, 0, 0.87);
+}
+.side-panel .bonds-panel {
+  background-color: rgba(240, 240, 240, 0.96);
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+.bonds-captions {
+  margin: 0;
+  padding-left: 16px;
+  color: rgba(0, 0, 0, 0.62);
+  font-size: 11px;
+}
+.bonds-density-label {
+  color: rgba(0, 0, 0, 0.7);
+}
+.bonds-frontier {
+  color: rgba(0, 0, 0, 0.7);
+}
+/* Why the picture differs from the selection, and orbital caveats: a
+   warning colour, but dark enough to read as body text on the light card. */
+.bonds-note {
+  color: #8a4100;
+}
+/* The phone header's one line ("N₂ · R = 2.07 a₀"): its own light chip,
+   the same as LevelNav's header, since nothing else sits behind it but the
+   scene. */
+.bonds-header {
+  display: block;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 12px 12px;
+  border-radius: 10px;
+  background: rgba(240, 240, 240, 0.96);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.87);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

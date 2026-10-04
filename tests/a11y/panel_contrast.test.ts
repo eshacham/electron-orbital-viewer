@@ -53,6 +53,16 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     { selector: '.mo-break', declared: 'color: rgba(0, 0, 0, 0.6)', fg: 'rgba(0, 0, 0, 0.6)', bg: LIGHT_96 },
     { selector: '.mo-note', declared: 'color: rgba(0, 0, 0, 0.6)', fg: 'rgba(0, 0, 0, 0.6)', bg: LIGHT_96 },
     { selector: '.mo-footer', declared: 'color: rgba(0, 0, 0, 0.6)', fg: 'rgba(0, 0, 0, 0.6)', bg: LIGHT_96 },
+    // Task 12 (ruling C6): BondsPanel is a light card in the side panel and
+    // sits on the light phone sheet, so its text is dark-on-light; the
+    // phone header's one line has its own light chip, like LevelNav's.
+    { selector: '.side-panel .bonds-panel', declared: `background-color: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
+    { selector: '.bonds-panel', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
+    { selector: '.bonds-captions', declared: 'color: rgba(0, 0, 0, 0.62)', fg: 'rgba(0, 0, 0, 0.62)', bg: LIGHT_96 },
+    { selector: '.bonds-density-label', declared: 'color: rgba(0, 0, 0, 0.7)', fg: 'rgba(0, 0, 0, 0.7)', bg: LIGHT_96 },
+    { selector: '.bonds-frontier', declared: 'color: rgba(0, 0, 0, 0.7)', fg: 'rgba(0, 0, 0, 0.7)', bg: LIGHT_96 },
+    { selector: '.bonds-note', declared: 'color: #8a4100', fg: '#8a4100', bg: LIGHT_96 },
+    { selector: '.bonds-header', declared: `background: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {
