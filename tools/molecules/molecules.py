@@ -26,7 +26,7 @@ class Diatomic:
     r_ref_angstrom: float       # scan centre: experimental R_e where one exists
     energy_method: str          # 'fci' or 'ccsd(t)'
     reference_re_angstrom: float | None   # asserted within 1 %; None = not asserted
-    reference_source: str
+    reference_source: str | None          # None = no published value is asserted
     note: str | None = None
 
 
@@ -38,7 +38,7 @@ class Diatomic:
 # this table shares. Deferred to a future data version; see HANDOFF.
 DIATOMICS = (
     Diatomic('h2', 'Hydrogen', 'H₂', ('H', 'H'), 0, 0.7414, 'fci', 0.7414, HUBER_HERZBERG),
-    Diatomic('he2', 'Helium dimer', 'He₂', ('He', 'He'), 0, 1.5875, 'fci', None, 'no chemical bond',
+    Diatomic('he2', 'Helium dimer', 'He₂', ('He', 'He'), 0, 1.5875, 'fci', None, None,
              'No chemical bond: bond order 0. The full-CI curve has only a van der Waals well of a few hundredths of a mHa, invisible at this scale.'),
     Diatomic('li2', 'Lithium', 'Li₂', ('Li', 'Li'), 0, 2.6729, 'ccsd(t)', None, HUBER_HERZBERG),
     Diatomic('b2', 'Boron', 'B₂', ('B', 'B'), 2, 1.5900, 'ccsd(t)', None, HUBER_HERZBERG,

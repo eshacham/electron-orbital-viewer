@@ -1,6 +1,9 @@
 # Offline molecule pipeline for Bonds mode (Phase 5). Python 3.12: PySCF 2.8.0
 # ships one py3-none-macosx_11_0_arm64 wheel per release, and numpy/scipy/h5py
 # all have cp312 arm64 wheels, so 3.12 is fully covered on this machine.
+# requirements.lock pins every transitive dependency actually installed
+# (`uv pip freeze`); regenerate it whenever this file changes. Task 4/15's
+# README documents how to rebuild the venv from it.
 pyscf==2.8.0
 numpy>=1.26,<3
 scipy>=1.11
