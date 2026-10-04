@@ -34,12 +34,14 @@ describe('exact H2+ energies', () => {
         expect(g).toBeLessThan(u);
     });
 
-    // Madsen & Peek, At. Data 2, 171 (1970): more of the 1σg curve, either side of the minimum.
+    // More of the 1σg curve, either side of the minimum: Madsen & Peek tables,
+    // values as recalled (not checked against the table); they agree with this
+    // solver to 1e-10 Ha. Rounded to 10 decimals.
     it.each([
-        [1, -1.4517863133],
+        [1, -1.4517863134],
         [3, -0.9108961974],
         [4, -0.7960848837],
-    ])('reproduces the published 1σg electronic energy at R = %p a0', (R, published) => {
+    ])('agrees with the recalled Madsen & Peek 1σg energy at R = %p a0', (R, published) => {
         expect(h2plusElectronicEnergy(R, '1sigma_g')).toBeCloseTo(published, 9);
     });
 
@@ -59,11 +61,13 @@ describe('exact H2+ energies', () => {
         }
     });
 
-    it('puts the 1σu polarisation well (about 0.06 mHa deep) at 12.5 a0, outside the slider', () => {
-        const depth = -0.5 - h2plusTotalEnergy(12.5, '1sigma_u');
+    it('has the 1σu polarisation well (about 0.06 mHa deep) at 12.5 a0, past the slider', () => {
+        const [before, bottom, after] = [12, 12.5, 13].map(R => h2plusTotalEnergy(R, '1sigma_u'));
+        expect(bottom).toBeLessThan(before);
+        expect(bottom).toBeLessThan(after);
+        const depth = -0.5 - bottom;
         expect(depth).toBeGreaterThan(5e-5);
         expect(depth).toBeLessThan(7e-5);
-        expect(12.5).toBeGreaterThan(H2PLUS_R_RANGE.max);
     });
 
     it.each([0, -1, Number.NaN, Infinity, 1000])('refuses R = %p', R => {

@@ -138,9 +138,14 @@ const P_TOLERANCE = 1e-13;
 
 /**
  * The p at which the two separated equations agree, by bisection on the sign
- * of the mismatch, which is monotone in p (checked on 4000 points of
- * [10⁻³, 40] at every 0.05 a₀ of the slider when this was written), so no
- * spurious root can be picked up and no derivative is needed.
+ * of the mismatch, which needs no derivative. On the slider's range the
+ * bracket below, [0.45R, 1.05R], lies inside [10⁻³, 40], where the mismatch
+ * was checked monotone with a single sign change (4000 points of p at every
+ * 0.05 a₀ from 0.5 to 10 a₀, both states, when this was written), so no
+ * spurious root can be picked up there. Off the slider (down to 10⁻⁴ a₀, up
+ * to MAX_R) monotonicity was not swept; there the sign check guards the
+ * bracket, and the united-atom and H + H⁺ limits the tests assert vouch for
+ * the root found.
  *
  * The bracket comes from the physics rather than a fixed interval: both
  * states lie between the He⁺ united atom's 1s and the separated atoms' H 1s,
@@ -183,11 +188,13 @@ export function h2plusCurve(Rs: readonly number[], state: H2PlusState): number[]
 
 /**
  * The minimum of the 1σg curve, by golden-section search on [1.5, 2.5] a₀ (the
- * curve has one minimum there and no derivative is to hand). Narrowing the
- * bracket to 10⁻⁷ a₀ is past what the curve can resolve: near the bottom the
- * energy moves by only ~k(δR)²/2 ≈ 10⁻¹⁵ Ha for δR = 10⁻⁷ (k ≈ 0.1 Ha/a₀²),
- * below its own rounding, so R_e is good to about 10⁻⁶ a₀ and E(R_e) to
- * rounding.
+ * curve has one minimum there and no derivative is to hand). Each energy
+ * carries a floor of about 5 × 10⁻¹⁴ Ha, set by P_TOLERANCE and by the
+ * eigenvalue bisection's own tolerance (tridiagonal.ts), not by double
+ * rounding. Near the bottom the curve rises only as k(δR)²/2 (k ≈ 0.1 Ha/a₀²),
+ * so that floor hides any δR below about 10⁻⁶ a₀: narrowing the bracket to
+ * 10⁻⁷ a₀ goes past it, R_e is good to about 10⁻⁶ a₀ (it returns 1.9971924),
+ * and E(R_e), flat to first order, to the floor.
  */
 export function h2plusEquilibrium(): { R: number; totalEnergy: number } {
     const f = (R: number) => h2plusTotalEnergy(R, '1sigma_g');
