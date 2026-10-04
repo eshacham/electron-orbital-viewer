@@ -1,6 +1,7 @@
 import { makeWaveFunctionEvaluator } from './quantum_functions';
 import { RadialGrid, interpolateOnGrid } from './atom/radial_grid';
 import { OrbitalParams } from './types/orbital';
+import { H2PlusState, h2plusEvaluator, solveH2Plus } from './bonds/h2plus';
 
 /**
  * Everything the renderer draws is one of two sources (spec §4.1): an analytic
@@ -35,7 +36,15 @@ export interface Polarized1sRecipe {
     field: number;
 }
 
-export type FieldRecipe = HydrogenicRecipe | CombinationRecipe | Polarized1sRecipe;
+/** H₂⁺ solved exactly at internuclear distance R, nuclei at z = ±R/2 (Phase 5). */
+export interface H2PlusRecipe {
+    type: 'h2plus';
+    /** Internuclear distance, a0. */
+    R: number;
+    state: H2PlusState;
+}
+
+export type FieldRecipe = HydrogenicRecipe | CombinationRecipe | Polarized1sRecipe | H2PlusRecipe;
 
 /** An analytic field, evaluated on demand in a worker. */
 export interface AnalyticFieldSource {
@@ -158,6 +167,7 @@ export function makeFieldEvaluator(recipe: FieldRecipe): FieldEvaluator {
         case 'hydrogenic': return hydrogenicEvaluator(recipe);
         case 'combination': return combinationEvaluator(recipe);
         case 'polarized1s': return polarized1sEvaluator(recipe.field);
+        case 'h2plus': return h2plusEvaluator(solveH2Plus(recipe.R, recipe.state));
         default: {
             const unhandled: never = recipe;
             throw new Error(`Unknown field recipe: ${JSON.stringify(unhandled)}`);
