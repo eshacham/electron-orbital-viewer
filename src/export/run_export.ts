@@ -71,6 +71,13 @@ export const PICTURE_BUSY_REASON = 'Wait for the picture to finish computing.';
 
 export const RENDER_FAILED_REASON = 'The last picture failed to compute; nothing to export.';
 
+/**
+ * Every caption, file name and cube here describes a hydrogen orbital or an
+ * atom; a molecule's own (system, R, method, both nuclei) are ruling C5's
+ * Task 13b. Until then Bonds refuses every kind rather than mislabel one.
+ */
+export const BONDS_EXPORT_REASON = 'Exports from Bonds mode are not available yet.';
+
 /** Final review I2: a shell view whose lobes failed is not the picture its caption names. */
 export const COMPOSITION_FAILED_REASON = 'This shell\'s orbital lobes failed to compute, so the picture is incomplete.';
 
@@ -272,6 +279,10 @@ function csvReason(state: RootState): string | null {
 }
 
 export function exportAvailability(state: RootState): ExportAvailability {
+    if (state.atom.mode === 'bonds') {
+        const reason = BONDS_EXPORT_REASON;
+        return { png: reason, 'png-plain': reason, csv: reason, stl: reason, glb: reason, cube: reason };
+    }
     const png = pngReason(state);
     const geometry = geometryReason(state);
     return { png, 'png-plain': png, csv: csvReason(state), stl: geometry, glb: geometry, cube: cubeReason(state) };

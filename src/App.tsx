@@ -40,6 +40,7 @@ import {
     speciesOf,
     effectiveRelativity,
     profileRelativity,
+    ViewMode,
 } from './store/atomSlice';
 import { RelativityMode, defaultRelativityFor } from './atom/relativity';
 import { subshellLabel, subshellSpokenLabel } from './atom/configurations';
@@ -237,7 +238,7 @@ function App() {
         if ('clipAxis' in change || 'clipPosition' in change) dispatch(clearPendingCut());
     }, [dispatch]);
 
-    const handleModeChange = useCallback((newMode: 'atom' | 'hydrogenic') => {
+    const handleModeChange = useCallback((newMode: ViewMode) => {
         dispatch(setMode(newMode));
         // A link's cut, still waiting on an atom-mode solve that has not
         // finished yet, must not land on the other mode's view once that

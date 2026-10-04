@@ -84,6 +84,13 @@ describe('samePicture', () => {
     it('tells a new n = 1 field apart: that shape does depend on F', () => {
         expect(samePicture(request(field(1, 0.01)), request(field(1, 0.02)))).toBe(false);
     });
+
+    // Phase 5: a density is drawn at a fixed ρ, which its source does not name.
+    it('tells a density drawn at another ρ apart', () => {
+        const density = { ...request(field(2, 0.001)), densityIsoValue: 0.002 };
+        expect(samePicture(density, { ...density, densityIsoValue: 0.05 })).toBe(false);
+        expect(samePicture(density, { ...density })).toBe(true);
+    });
 });
 
 describe('titles and legends', () => {

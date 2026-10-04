@@ -2,7 +2,7 @@
 // load (see orbital_controls_factory.ts), so the factory is mocked.
 jest.mock('../../src/export/gltf_exporter_factory', () => ({ exportGlb: jest.fn(async () => new ArrayBuffer(12)) }));
 
-import { runExport, exportAvailability, cubeJobFor, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON, COMPOSITION_FAILED_REASON } from '../../src/export/run_export';
+import { runExport, exportAvailability, cubeJobFor, BONDS_EXPORT_REASON, WAITING_FOR_ATOM_REASON, NOTHING_DRAWN_REASON, PICTURE_BUSY_REASON, VIEW_NOT_READY_REASON, RENDER_FAILED_REASON, COMPOSITION_FAILED_REASON } from '../../src/export/run_export';
 import { setMode, drillToShell, drillToSubshell, drillToOrbital, solveStarted, solveSucceeded, levelUp, setRelativity } from '../../src/store/atomSlice';
 import {
     setCombination, startOrbitalCalculation, failOrbitalCalculation, startCompositionBuild, endCompositionBuild, failCompositionBuild,
@@ -522,5 +522,22 @@ describe('runExport: CSV includes the dashed non-relativistic comparison curves 
             + '# view: http://x/#mode=atom&Z=10\n'
             + 'r_bohr,n=1\n0.1,1\n0.2,2\n'
         );
+    });
+});
+
+// Bonds mode's captions, file names and cube are Task 13b's (ruling C5).
+// Until then every export here would describe a hydrogen orbital, so each
+// kind is refused with a stated reason rather than offered misleadingly.
+describe('exportAvailability: Bonds mode', () => {
+    it('refuses every kind with a stated reason, whatever is in the store', async () => {
+        const store = makeStore();
+        store.dispatch(setMode('hydrogenic'));
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(2, 1, 0, 0.9)));
+        store.dispatch(setMode('bonds'));
+        const availability = exportAvailability(store.getState());
+        for (const kind of ['png', 'png-plain', 'csv', 'stl', 'glb', 'cube'] as const) {
+            expect(availability[kind]).toBe(BONDS_EXPORT_REASON);
+        }
+        await expect(runExport('png', baseContext(store.getState()))).rejects.toThrow(BONDS_EXPORT_REASON);
     });
 });

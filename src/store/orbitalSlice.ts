@@ -207,9 +207,25 @@ const orbitalSlice = createSlice({
   // basicRenderNonce, so App re-renders whatever the store's own selection
   // and combination currently hold -- the selection now lives here, not in
   // App's local state, so there is nothing left for App to "re-request" from.
+  // Bonds draws only its own requests, so entering it drops a plain orbital
+  // too (Basic Orbitals', or atom mode's level 3): the viewer redraws
+  // whatever is in the store when the mode changes, and a hydrogen orbital
+  // would stand under a molecule's name until Bonds' own request landed.
+  // A failure message about that orbital goes with it, as in clearPicture.
+  // Atom mode re-requests its level-3 orbital on the way back, and Basic
+  // Orbitals has the nonce.
   extraReducers: builder => {
     builder.addCase(setMode, (state, action) => {
       if (action.payload === 'hydrogenic') state.basicRenderNonce += 1;
+      if (action.payload === 'bonds') {
+        state.currentParams = null;
+        state.currentField = null;
+        state.isLoading = false;
+        state.error = null;
+        state.renderFailed = false;
+        state.isoLevel = null;
+        return;
+      }
       if (action.payload !== 'atom' || !state.currentField) return;
       state.currentField = null;
       state.isLoading = false;

@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './orbitalSlice';
 import atomReducer from './atomSlice';
+import bondsReducer from './bondsSlice';
 
 /**
  * Builds a store with production's middleware config. Exported (rather than
@@ -19,7 +20,8 @@ export function createAppStore() {
   return configureStore({
     reducer: {
       orbital: orbitalReducer,
-      atom: atomReducer
+      atom: atomReducer,
+      bonds: bondsReducer,
     },
     // Ruling R16: an atom profile's D(r)/R(r) curves are deliberately kept as
     // typed arrays all the way into the store -- converting them to plain

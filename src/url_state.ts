@@ -31,7 +31,7 @@ interface KeyGroup { encoder: UrlEncoder; decoder: UrlDecoder; }
 const registry = new Map<string, KeyGroup[]>();
 
 /** The URL's name for each stored mode. The stored value names the model; the URL names what the user picked. */
-const URL_MODE: Record<ViewMode, string> = { atom: 'atom', hydrogenic: 'basic' };
+const URL_MODE: Record<ViewMode, string> = { atom: 'atom', hydrogenic: 'basic', bonds: 'bonds' };
 
 export function registerUrlKeys(mode: string, encoder: UrlEncoder, decoder: UrlDecoder): void {
     registry.set(mode, [...(registry.get(mode) ?? []), { encoder, decoder }]);
