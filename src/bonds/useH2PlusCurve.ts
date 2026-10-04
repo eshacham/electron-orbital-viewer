@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createH2PlusCurveWorker } from '../workers/createH2PlusCurveWorker';
+import type { CurveWorkerResponse } from '../workers/h2plusCurveWorker';
 import { H2PLUS_R_RANGE } from './h2plus';
 
 export interface H2PlusCurve {
@@ -9,30 +10,63 @@ export interface H2PlusCurve {
     equilibrium: { R: number; totalEnergy: number };
 }
 
+/** Small and flat, rather than a thrown/caught error: the caller (App.tsx, Task 13) shows whichever of these is set. */
+export interface UseH2PlusCurveResult {
+    curve: H2PlusCurve | null;
+    error: string | null;
+}
+
+const NO_RESULT: UseH2PlusCurveResult = { curve: null, error: null };
+
 /** The slider's own 0.05 a0 step, spanning its whole range -- one energy per point the curve plot can land on. */
 export const H2PLUS_CURVE_R: number[] = Array.from(
     { length: Math.round((H2PLUS_R_RANGE.max - H2PLUS_R_RANGE.min) / 0.05) + 1 },
     (_, i) => H2PLUS_R_RANGE.min + i * 0.05,
 );
 
-// Module-level rather than per-hook-instance, so the one call site Bonds mode
-// has (App.tsx, ruling C7) shares a single computation across remounts
-// instead of re-solving a curve it has already seen this session.
+// Module-level rather than per-hook-instance, so every caller (App.tsx,
+// ruling C7) shares a single computation across remounts instead of
+// re-solving a curve it has already seen this session.
 let curve: H2PlusCurve | null = null;
+let error: string | null = null;
 let activeWorker: Worker | null = null;
-let pending: Promise<H2PlusCurve> | null = null;
+let pending: Promise<void> | null = null;
+/**
+ * How many currently-enabled hooks are waiting on the shared worker (ruling
+ * M1): a lone caller's own cleanup must not terminate a computation another
+ * enabled caller (e.g. the diagram and the curve plot, both reading this at
+ * once) is still waiting on.
+ */
+let enabledCount = 0;
 
-function startCurve(): Promise<H2PlusCurve> {
+function recordResult(result: UseH2PlusCurveResult): void {
+    curve = result.curve;
+    error = result.error;
+    activeWorker = null;
+    pending = null;
+}
+
+function startCurve(): Promise<void> {
     if (!pending) {
         const worker = createH2PlusCurveWorker();
         activeWorker = worker;
         pending = new Promise(resolve => {
-            worker.onmessage = (event: MessageEvent<H2PlusCurve>) => {
-                curve = event.data;
+            worker.onmessage = (event: MessageEvent<CurveWorkerResponse>) => {
+                const data = event.data;
                 worker.terminate();
-                activeWorker = null;
-                pending = null;
-                resolve(event.data);
+                recordResult(data.type === 'error'
+                    ? { curve: null, error: data.message }
+                    : { curve: { R: data.R, sigmaG: data.sigmaG, sigmaU: data.sigmaU, equilibrium: data.equilibrium }, error: null });
+                resolve();
+            };
+            // I1: a worker that fails outright (rather than catching its own
+            // error and posting one, as h2plusCurveWorker.ts does) must still
+            // resolve to a stated reason -- otherwise this promise, and every
+            // caller awaiting it, would hang forever.
+            worker.onerror = (event: ErrorEvent) => {
+                worker.terminate();
+                recordResult({ curve: null, error: event.message || 'Could not compute the H₂⁺ potential curve.' });
+                resolve();
             };
             worker.postMessage({ R: H2PLUS_CURVE_R });
         });
@@ -56,8 +90,10 @@ function stopCurve(): void {
 
 export function resetH2PlusCurveForTests(): void {
     curve = null;
+    error = null;
     activeWorker = null;
     pending = null;
+    enabledCount = 0;
 }
 
 /**
@@ -67,22 +103,26 @@ export function resetH2PlusCurveForTests(): void {
  * mode; the caller (App.tsx) instead passes `isBondsMode && system ===
  * 'h2plus'`, so the worker exists only for as long as that view does.
  */
-export function useH2PlusCurve(enabled: boolean): H2PlusCurve | null {
-    const [value, setValue] = useState<H2PlusCurve | null>(enabled ? curve : null);
+export function useH2PlusCurve(enabled: boolean): UseH2PlusCurveResult {
+    const [value, setValue] = useState<UseH2PlusCurveResult>(() => (enabled ? { curve, error } : NO_RESULT));
 
     useEffect(() => {
         if (!enabled) return undefined;
-        if (curve) {
-            setValue(curve);
-            return undefined;
-        }
+        enabledCount += 1;
         let live = true;
-        void startCurve().then(result => { if (live) setValue(result); });
+        if (curve !== null || error !== null) {
+            setValue({ curve, error });
+        } else {
+            void startCurve().then(() => { if (live) setValue({ curve, error }); });
+        }
         return () => {
             live = false;
-            stopCurve();
+            enabledCount -= 1;
+            // Ruling M1: stop the worker only once nobody enabled is left
+            // waiting on it.
+            if (enabledCount === 0) stopCurve();
         };
     }, [enabled]);
 
-    return enabled ? value : null;
+    return enabled ? value : NO_RESULT;
 }
