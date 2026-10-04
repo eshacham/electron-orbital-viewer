@@ -95,6 +95,13 @@ interface ControlsProps {
   onRelativityChange?: (mode: RelativityMode) => void;
   /** What the picture on screen says about relativity, for the readout under the switch; null with no picture. */
   relativityReadout?: RelativityReadout | null;
+  /**
+   * When set, the enclosed fraction does not apply to what is drawn, and this
+   * says why: Bonds mode draws a molecule's density at a fixed ρ (ruling
+   * T7-a), so the select is disabled rather than left offering a choice that
+   * changes nothing.
+   */
+  fractionNote?: string;
 }
 
 /**
@@ -285,8 +292,13 @@ const Controls: React.FC<ControlsProps> = ({
   relativityIsDefault = false,
   onRelativityChange,
   relativityReadout = null,
+  fractionNote,
 }) => {
   const isAtomMode = mode === 'atom';
+  // Basic Orbitals' own controls (n/l/mₗ, combinations, Update Orbital, the
+  // Z = 1 note) belong to that mode alone, not to "not atom mode": Bonds is
+  // a third mode with none of them.
+  const isBasicMode = mode === 'hydrogenic';
   // Bug fix (task 22, bug 6): levels 1-2 in atom mode render a spherical
   // shell view straight from the shader (orbital_visualizer.ts's
   // updateAtomViewInScene / shell_view.ts) rather than a marching-cubes
@@ -355,10 +367,10 @@ const Controls: React.FC<ControlsProps> = ({
         position: 'relative',
       }}
     >
-      {/* Atom (a real neutral element, SCF-solved) vs Basic Orbitals (the
-          exact one-electron reference at Z = 1, below). Always visible, at
-          every level, since it is how you get back out of atom mode's
-          drill-down entirely. */}
+      {/* Atom (a real neutral element, SCF-solved), Basic Orbitals (the
+          exact one-electron reference at Z = 1, below) and Bonds (diatomic
+          molecules, spec §5 Phase 5). Always visible, at every level, since
+          it is how you get back out of atom mode's drill-down entirely. */}
       <FormControl component="fieldset" margin="normal" fullWidth>
         <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Mode</FormLabel>
         <ToggleButtonGroup
@@ -374,6 +386,7 @@ const Controls: React.FC<ControlsProps> = ({
         >
           <ToggleButton value="atom" aria-label="atom mode">Atom</ToggleButton>
           <ToggleButton value="hydrogenic" aria-label="basic orbitals mode">Basic Orbitals</ToggleButton>
+          <ToggleButton value="bonds" aria-label="bonds mode">Bonds</ToggleButton>
         </ToggleButtonGroup>
       </FormControl>
 
@@ -416,7 +429,7 @@ const Controls: React.FC<ControlsProps> = ({
         </FormControl>
       )}
 
-      {!isAtomMode && (
+      {isBasicMode && (
         <>
           <Typography id="orbital-name" variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
             {combinationActive
@@ -483,6 +496,7 @@ const Controls: React.FC<ControlsProps> = ({
           value={initialEnclosedFraction.toString()}
           label="Electron enclosed"
           onChange={(e: SelectChangeEvent<string>) => onEnclosedFractionChange(parseFloat(e.target.value))}
+          disabled={Boolean(fractionNote)}
         >
           {ENCLOSED_FRACTIONS.map(fraction => (
             <MenuItem key={fraction} value={fraction.toString()}>
@@ -497,11 +511,13 @@ const Controls: React.FC<ControlsProps> = ({
               marching-cubes wording below would be a claim this view never
               makes. Level 3 in atom mode *does* go through marching cubes
               (a numerical R(r) override), so it keeps the usual wording. */}
-          {isAtomMode && atomLevel !== 'orbital'
-            ? 'contour enclosing this fraction of the electron density'
-            : isoLevel === null
-              ? 'contour of constant |ψ|²'
-              : `|ψ|² = ${isoLevel.toExponential(2)}`}
+          {fractionNote
+            ? fractionNote
+            : isAtomMode && atomLevel !== 'orbital'
+              ? 'contour enclosing this fraction of the electron density'
+              : isoLevel === null
+                ? 'contour of constant |ψ|²'
+                : `|ψ|² = ${isoLevel.toExponential(2)}`}
         </FormHelperText>
       </FormControl>
 
@@ -528,7 +544,7 @@ const Controls: React.FC<ControlsProps> = ({
           </Select>
           <FormHelperText>neutral atom, central-field SCF</FormHelperText>
         </FormControl>
-      )) : (
+      )) : isBasicMode && (
         /* Addendum 2's mode rename: the element control is gone and Z is
            fixed at 1, so this mode is exactly one electron bound to one
            proton -- the case the Schrodinger equation solves exactly. Spec
@@ -666,7 +682,7 @@ const Controls: React.FC<ControlsProps> = ({
             SubshellPanel dispatch navigation directly); there is nothing
             here to "update" the way a hydrogen-like n/l/ml choice needs an
             explicit trigger. */}
-        {!isAtomMode && !combinationActive && (
+        {isBasicMode && !combinationActive && (
           <Button
             id="update-orbital"
             variant="contained"

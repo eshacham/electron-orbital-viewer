@@ -104,4 +104,14 @@ describe('PotentialCurvePlot', () => {
         render(<PotentialCurvePlot {...props} />);
         expect(screen.getByRole('img', { name: /potential energy/i })).toBeInTheDocument();
     });
+
+    // Found live (Task 13, N₂): the axis ends were printed as raw floats --
+    // "1.6594818936013664 … R (2.4062487457219808 a₀ · 1.27 Å)".
+    it('prints the R axis ends to two decimals, as R is printed everywhere else', () => {
+        const { container } = render(<PotentialCurvePlot {...props} xRange={[1.6594818936013664, 2.4062487457219808]} markerR={2} />);
+        const scale = container.querySelector('.radial-plot-scale')!;
+        expect(scale).toHaveTextContent('1.66');
+        expect(scale).toHaveTextContent('R (2.41 a₀ · 1.27 Å)');
+        expect(scale.textContent).not.toMatch(/\d{5}/);
+    });
 });

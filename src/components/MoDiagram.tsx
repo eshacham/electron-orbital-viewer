@@ -15,7 +15,13 @@ interface MoDiagramProps {
 }
 
 const HEIGHT = 220;
-const CORE_BAND = 28;
+/**
+ * The core band under the valence levels: the "≈ core" line, then the core
+ * row, each clear of its neighbours (levels are 18 px boxes centred on their
+ * y; the break is one 13 px line). At 28 px the break was drawn across both.
+ */
+const CORE_BAND = 44;
+const CORE_ROW_Y = HEIGHT - CORE_BAND + 26;
 const BOX = 22;
 const MIN_ROW = 20;
 /** Core levels (1σg, 1σu*: millihartree apart) share the band's one row, side by side. */
@@ -83,8 +89,8 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
         <div className="mo-diagram" style={{ width }} aria-label="molecular orbital energy diagram">
             <div className="mo-levels" style={{ height: HEIGHT }}>
                 {valence.map((level, i) => renderLevel(level, ys[i]))}
-                {core.length > 0 && <div className="mo-break" style={{ top: HEIGHT - CORE_BAND - 8 }}>≈ core</div>}
-                {core.map((level, i) => renderLevel(level, HEIGHT - CORE_BAND + 4, i * CORE_COLUMN))}
+                {core.length > 0 && <div className="mo-break" style={{ top: HEIGHT - CORE_BAND }}>≈ core</div>}
+                {core.map((level, i) => renderLevel(level, CORE_ROW_Y, i * CORE_COLUMN))}
             </div>
             {model.unrestricted && <div className="mo-note">α energies; ↓ marks the matching β orbital.</div>}
             {footer && <div className="mo-footer">{footer}</div>}

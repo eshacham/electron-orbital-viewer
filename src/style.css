@@ -443,6 +443,15 @@ html, body, #root {
 }
 .phase-legend-swatch.positive { background: #e02020; }
 .phase-legend-swatch.negative { background: #2040ff; }
+/* A molecule's density key is wider than the ψ key, and Bonds' side panel
+   narrows the free canvas: centred, it ran under a long scale readout (found
+   live, Task 13, N₂ at 1440 px). It sits at the free area's right edge
+   instead, 2·centre − left being that edge. One class, ahead of the phone
+   rules below, so they still move it to the top right there. */
+.density-key {
+  left: calc(2 * var(--free-center-x, 50%) - var(--free-left, 0px) - 20px);
+  transform: translateX(-100%);
+}
 
 .radial-plot-peak {
   stroke: rgba(255, 255, 255, 0.6);
@@ -1045,6 +1054,12 @@ html, body, #root {
   border-radius: 8px;
   padding: 10px 14px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+/* MUI upper-cases button text, and Greek does not survive it: "1σg" became
+   "1ΣG" and "ρ = 0.002" became "Ρ = 0.002" (found live, Task 13) -- a
+   different symbol, not a style. Same fix as Controls' KEEP_CASE. */
+.bonds-panel .MuiToggleButton-root {
+  text-transform: none;
 }
 .bonds-captions {
   margin: 0;

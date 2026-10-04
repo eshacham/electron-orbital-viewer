@@ -42,6 +42,25 @@ describe('orbitalSlice field requests', () => {
         expect(state.isLoading).toBe(false);
     });
 
+    // Found live (Task 13): Bonds → Basic Orbitals left N₂'s density on the
+    // canvas under "3d_z²" and the ψ key until the orbital landed. Leaving
+    // Bonds drops its picture, as entering it drops Basic's; a Basic
+    // Orbitals field (a hybrid restored by a link while already in the mode)
+    // stays, since nothing would draw it again.
+    it('drops a Bonds picture on the way to Basic Orbitals, but keeps its own combination', () => {
+        const h2plus = { ...request, sources: [{ kind: 'analytic' as const, id: 'h2plus:2.0000:1sigma_g', rMax: 12, recipe: { type: 'h2plus' as const, R: 2, state: '1sigma_g' as const } }] };
+        let state = reducer(undefined, startFieldCalculation(h2plus));
+        state = reducer(state, finishOrbitalCalculation({ isoLevel: 1e-3 }));
+        state = reducer(state, setMode('hydrogenic'));
+        expect(state.currentField).toBeNull();
+        expect(state.isoLevel).toBeNull();
+        expect(state.basicRenderNonce).toBe(1);
+
+        state = reducer(state, startFieldCalculation(request));
+        state = reducer(state, setMode('hydrogenic'));
+        expect(state.currentField).toEqual(request);
+    });
+
     // Final review: a selection with a problem (a field above the bound limit,
     // reachable once Phase 2 decodes URLs) must not leave the previous
     // picture standing under the new selection's title (spec §3.5).

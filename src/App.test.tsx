@@ -1,9 +1,12 @@
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react'; // Add screen import
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
 import { SERIALIZABLE_CHECK } from './store';
+import bondsReducer, { setDensityIso, setH2PlusR } from './store/bondsSlice';
 import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView, setElement } from './store/atomSlice';
 import { setSurfaceStyle, setBasicSelection, requestCut } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
@@ -12,6 +15,10 @@ import { computeSamplingRadius, SHELL_VIEW_CUT_AXIS, DEFAULT_ENCLOSED_FRACTION }
 import { clearProfileCacheForTests, setCachedProfile } from './atom/profile_cache';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from './url_state';
 import type { ViewerExportHandle } from './export/handle';
+import { createH2PlusCurveWorker } from './workers/createH2PlusCurveWorker';
+import { resetH2PlusCurveForTests } from './bonds/useH2PlusCurve';
+import { loadScan, loadMoleculeMeta, loadBasis } from './molecules/loader';
+import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from './molecules/types';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -61,6 +68,18 @@ jest.mock('./workers/createExportWorker', () => ({ createExportWorker: jest.fn()
 jest.mock('./workers/createH2PlusCurveWorker', () => ({
     createH2PlusCurveWorker: jest.fn(() => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null })),
 }));
+
+// Bonds mode loads a molecule's files lazily (useBondsData); here they come
+// from the committed N₂ fixtures instead of the network. The rest of the
+// loader is the real one.
+jest.mock('./molecules/loader', () => ({
+    ...jest.requireActual('./molecules/loader'),
+    loadScan: jest.fn(), loadMoleculeMeta: jest.fn(), loadBasis: jest.fn(),
+}));
+const n2Fixture = (file: string) => JSON.parse(readFileSync(resolve(__dirname, '../tests/fixtures/molecules/n2', file), 'utf8'));
+const n2Scan: MoleculeScan = n2Fixture('scan.json');
+const n2Meta: MoleculeMeta = n2Fixture('meta.json');
+const n2Basis: MoleculeBasis = n2Fixture('basis.json');
 
 /** A matchMedia stand-in reporting a fixed narrow/wide state (see tests/useMediaQuery.test.tsx for the original). */
 function installMatchMedia(matches: boolean) {
@@ -171,7 +190,7 @@ const defaultAtomState: AtomState = {
 
 // Simple store setup
 const createTestStore = (atomState?: Partial<AtomState>) => configureStore({
-    reducer: { orbital: orbitalReducer, atom: atomReducer },
+    reducer: { orbital: orbitalReducer, atom: atomReducer, bonds: bondsReducer },
     middleware: getDefaultMiddleware => getDefaultMiddleware({ serializableCheck: SERIALIZABLE_CHECK }),
     preloadedState: atomState ? { atom: { ...defaultAtomState, ...atomState } } : undefined,
 });
@@ -678,6 +697,159 @@ describe('App', () => {
         });
     });
 
+    describe('Bonds mode', () => {
+        const chooseCombination = (option: string | RegExp) => {
+            fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
+            fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
+        };
+        const chooseFraction = (option: string) => {
+            fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
+            fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
+        };
+        const chooseSystem = (option: string) => {
+            fireEvent.mouseDown(screen.getByRole('combobox', { name: 'System' }));
+            fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
+        };
+
+        beforeEach(() => {
+            installMatchMedia(false);
+            resetH2PlusCurveForTests();
+            (createH2PlusCurveWorker as jest.Mock).mockClear();
+            (loadScan as jest.Mock).mockReset().mockResolvedValue(n2Scan);
+            // Each scan point's files carry that point's id (n2@07), which is what the request checks.
+            (loadMoleculeMeta as jest.Mock).mockReset().mockImplementation(async (id: string) => ({ ...n2Meta, id }));
+            (loadBasis as jest.Mock).mockReset().mockImplementation(async (id: string) => ({ ...n2Basis, id }));
+        });
+
+        it('draws exact H2+ and shows the Bonds panel beside the curve', () => {
+            const { store, container } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'h2plus', R: 2, state: '1sigma_g' });
+            expect(screen.getByText(/Exact within Born–Oppenheimer/)).toBeInTheDocument();
+            expect(screen.getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
+            // Layout contract §3.8: the panel down the left, the curve under the controls on the right.
+            expect(container.querySelector('.side-panel .bonds-panel')).not.toBeNull();
+            expect(within(container.querySelector('.view-panel') as HTMLElement)
+                .getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
+            expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ψ > 0');
+        });
+
+        // Ruling C7: the curve's worker exists only while Bonds shows H₂⁺.
+        it('starts the H2+ curve worker only in Bonds with H2+, and stops it on the way out', () => {
+            renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            expect(createH2PlusCurveWorker).not.toHaveBeenCalled();
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            expect(createH2PlusCurveWorker).toHaveBeenCalledTimes(1);
+            const worker = (createH2PlusCurveWorker as jest.Mock).mock.results[0].value;
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            expect(worker.terminate).toHaveBeenCalled();
+        });
+
+        // Task 9's carry: a curve that could not be computed says why, where the curve would be.
+        it('shows why the H2+ curve could not be computed', async () => {
+            const { container } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            const worker = (createH2PlusCurveWorker as jest.Mock).mock.results[0].value;
+            await act(async () => { worker.onmessage({ data: { type: 'error', message: 'no root in the bracket' } }); });
+            expect(within(container.querySelector('.view-panel') as HTMLElement).getByRole('alert'))
+                .toHaveTextContent('The H₂⁺ potential curves could not be computed: no root in the bracket');
+        });
+
+        it('redraws only for a different picture, not for every change to the selection', () => {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            const drawn = store.getState().orbital.currentField;
+            // A ρ chosen while H₂⁺'s orbital is shown changes the selection, not the picture.
+            act(() => { store.dispatch(setDensityIso(0.05)); });
+            expect(store.getState().orbital.currentField).toBe(drawn);
+            act(() => { store.dispatch(setH2PlusR(3)); });
+            expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'h2plus', R: 3, state: '1sigma_g' });
+        });
+
+        // Review Focus 1.
+        it('Bonds and back restores the Basic Orbitals request', () => {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: 'basic orbitals mode' }));
+            const basic = store.getState().orbital.currentParams;
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            expect(store.getState().orbital.currentParams).toBeNull();
+            fireEvent.click(screen.getByRole('button', { name: 'basic orbitals mode' }));
+            expect(store.getState().orbital.currentField).toBeNull();
+            expect(store.getState().orbital.currentParams).toEqual(basic);
+        });
+
+        // Review Focus 1, Task 8's carry: a combination chosen in Basic
+        // Orbitals persists, but is drawn there and nowhere else -- not on
+        // the way through atom mode into Bonds, not when the enclosed
+        // fraction changes while Bonds is showing, and again on the way back.
+        it('keeps a Basic combination out of Bonds, through atom mode and a fraction change, and redraws it on return', () => {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            chooseCombination('sp³');
+            fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            expect(store.getState().orbital.currentField?.sources.map(s => s.id)).toEqual(['h2plus:2.0000:1sigma_g']);
+            expect(screen.queryByLabelText('combination colour key')).not.toBeInTheDocument();
+
+            chooseFraction('75%');
+            const drawn = store.getState().orbital.currentField;
+            expect(drawn?.sources.map(s => s.recipe.type)).toEqual(['h2plus']);
+            expect(drawn?.enclosedFraction).toBe(0.75);
+
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            expect(store.getState().orbital.currentField?.sources.map(s => s.id))
+                .toEqual(['hybrid:sp3:0', 'hybrid:sp3:1', 'hybrid:sp3:2', 'hybrid:sp3:3']);
+            expect(store.getState().orbital.currentField?.enclosedFraction).toBe(0.75);
+            expect(screen.getByLabelText('combination colour key')).toBeInTheDocument();
+        });
+
+        it('draws a molecule\'s density at a fixed ρ, says so beside the fraction, and keys the grey surface', async () => {
+            const { store, container } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            chooseSystem('N₂ — Nitrogen');
+            await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
+                .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@07' }));
+            expect(loadScan).toHaveBeenCalledWith('n2');
+            expect(store.getState().bonds).toMatchObject({ system: 'n2', scanIndex: 7 });
+            expect(store.getState().orbital.currentField?.densityIsoValue).toBe(0.002);
+
+            expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ρ = 0.002 e/a₀³, total electron density');
+            expect(screen.queryByText('ψ > 0')).not.toBeInTheDocument();
+            expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+            expect(screen.getByText(/drawn at a fixed ρ/)).toBeInTheDocument();
+            expect(within(container.querySelector('.view-panel') as HTMLElement)
+                .getByLabelText('potential energy curve')).toBeInTheDocument();
+        });
+
+        // Ruling C9: a molecule that fails to load is said once, in the
+        // panel; the orbital slice's Snackbar is for pictures that fail.
+        it('reports a molecule that fails to load in the panel only', async () => {
+            (loadScan as jest.Mock).mockRejectedValue(new Error('Could not load /molecules/v1/n2/scan.json (HTTP 403)'));
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            chooseSystem('N₂ — Nitrogen');
+            expect(await screen.findByText(/N₂ could not be loaded/)).toBeInTheDocument();
+            expect(store.getState().orbital.error).toBeNull();
+            expect(screen.getAllByRole('alert')).toHaveLength(1);
+        });
+
+        it('on a phone: the header names the system and R, and the sheet has Explore, View and Plot', async () => {
+            installMatchMedia(true);
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('tab', { name: 'View' }));
+            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'View', 'Plot']);
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            chooseSystem('N₂ — Nitrogen');
+            await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
+            expect(screen.getByText('N₂ · R = 2.07 a₀')).toBeInTheDocument();
+            expect(within(screen.getByRole('tabpanel')).getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('tab', { name: 'Plot' }));
+            expect(within(screen.getByRole('tabpanel')).getByLabelText('potential energy curve')).toBeInTheDocument();
+        });
+    });
+
     it('switching to Basic Orbitals draws the selection held in the store', () => {
         const { store } = renderWithProvider(<App />);
         act(() => { store.dispatch(setBasicSelection({ n: 2, l: 1, ml: 1 })); });
@@ -879,6 +1051,21 @@ describe('App: Share', () => {
         } finally {
             mockViewerHandle = null;
         }
+    });
+
+    // Bonds' own keys arrive with Task 14; until then a Bonds link carries
+    // the view settings alone, and nothing of the Basic or atom selection
+    // the page is not showing.
+    it('copies only the view keys from Bonds mode, without throwing', async () => {
+        const writeText = jest.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+        renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        await waitFor(() => expect(writeText).toHaveBeenCalled());
+        const url = writeText.mock.calls[0][0] as string;
+        expect(url).toMatch(/#frac=/);
+        expect(url).not.toMatch(/mode=|[#&]Z=|[#&]n=/);
     });
 
     // Review Focus 5, at the App level (ShareExportBar's own unit test in

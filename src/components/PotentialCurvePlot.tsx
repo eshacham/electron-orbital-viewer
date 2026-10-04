@@ -62,6 +62,9 @@ function sliderStep(snapRs: number[]): number {
     return min > 0 ? min : 0.01;
 }
 
+/** An axis end, a₀: two decimals, trailing zeros dropped (H₂⁺'s range stays "0.5 … 10"). */
+const axisR = (R: number) => String(Number(R.toFixed(2)));
+
 const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, caption, width, onSelectR,
 }) => {
@@ -163,8 +166,9 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                 ))}
             </div>
             <div className="radial-plot-scale" style={{ width }}>
-                <span>{xRange[0]}</span>
-                <span>R ({xRange[1]} a₀ · {(xRange[1] * BOHR_TO_ANGSTROM).toFixed(2)} Å)</span>
+                {/* A scan's ends are arbitrary floats; R is shown to 0.01 a₀ everywhere else. */}
+                <span>{axisR(xRange[0])}</span>
+                <span>R ({axisR(xRange[1])} a₀ · {(xRange[1] * BOHR_TO_ANGSTROM).toFixed(2)} Å)</span>
             </div>
             <div className="radial-plot-note">{caption}</div>
             {/* The validity stop / R_e / D_e reference a caller passes is

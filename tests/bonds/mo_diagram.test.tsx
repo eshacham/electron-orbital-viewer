@@ -74,4 +74,18 @@ describe('MoDiagram', () => {
         render(<MoDiagram orbitals={o2} selectedIndex={null} onSelect={jest.fn()} />);
         expect(screen.getByRole('button', { name: /1πg\* \(1 of 2\), -0\.350 Ha, occupation 1, alpha spin/ })).toBeInTheDocument();
     });
+
+    // Found live (Task 13, N₂): the "≈ core" break was drawn across the 1σg
+    // box below it and the 2σg box above. Levels are centred on their top
+    // (translateY(-50%)) with 18 px boxes; the label is an 11 px line (13 px tall).
+    it('keeps the core break clear of the lowest valence level and the core row', () => {
+        const { container } = render(<MoDiagram orbitals={n2} selectedIndex={null} />);
+        const top = (el: Element) => parseFloat((el as HTMLElement).style.top);
+        const levels = Array.from(container.querySelectorAll('.mo-level'));
+        const core = levels.filter(el => el.textContent?.includes('1σg') || el.textContent?.includes('1σu*'));
+        const valence = levels.filter(el => !core.includes(el));
+        const breakTop = top(container.querySelector('.mo-break')!);
+        expect(Math.max(...valence.map(top)) + 9).toBeLessThanOrEqual(breakTop);
+        core.forEach(el => expect(breakTop + 13).toBeLessThanOrEqual(top(el) - 9));
+    });
 });

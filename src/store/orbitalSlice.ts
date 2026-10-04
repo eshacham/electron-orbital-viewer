@@ -87,6 +87,10 @@ const initialState: OrbitalState = {
   levelTransition: false,
 };
 
+/** Bonds mode's recipes (Phase 5): what only Bonds asks the viewer to draw. */
+const BONDS_RECIPES: ReadonlySet<string> = new Set(['h2plus', 'gaussianMO', 'gaussianDensity']);
+const isBondsField = (request: FieldRenderRequest) => request.sources.some(source => BONDS_RECIPES.has(source.recipe.type));
+
 const orbitalSlice = createSlice({
   name: 'orbital',
   initialState,
@@ -213,10 +217,24 @@ const orbitalSlice = createSlice({
   // would stand under a molecule's name until Bonds' own request landed.
   // A failure message about that orbital goes with it, as in clearPicture.
   // Atom mode re-requests its level-3 orbital on the way back, and Basic
-  // Orbitals has the nonce.
+  // Orbitals has the nonce. Leaving Bonds for Basic Orbitals drops the
+  // molecule too, or it would stand under the orbital's title and ψ key
+  // until that orbital landed (found live, Task 13); Basic Orbitals' own
+  // field -- a link re-choosing the mode it is already in -- stays, since
+  // nothing would ask for it again.
   extraReducers: builder => {
     builder.addCase(setMode, (state, action) => {
-      if (action.payload === 'hydrogenic') state.basicRenderNonce += 1;
+      if (action.payload === 'hydrogenic') {
+        state.basicRenderNonce += 1;
+        if (state.currentField && isBondsField(state.currentField)) {
+          state.currentField = null;
+          state.isLoading = false;
+          state.isoLevel = null;
+          state.error = null;
+          state.renderFailed = false;
+        }
+        return;
+      }
       if (action.payload === 'bonds') {
         state.currentParams = null;
         state.currentField = null;
@@ -226,7 +244,7 @@ const orbitalSlice = createSlice({
         state.isoLevel = null;
         return;
       }
-      if (action.payload !== 'atom' || !state.currentField) return;
+      if (!state.currentField) return;
       state.currentField = null;
       state.isLoading = false;
     });

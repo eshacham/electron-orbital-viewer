@@ -77,6 +77,13 @@ import { downloadBlob } from './export/download';
 import { ViewerExportHandle } from './export/handle';
 import { CubeWorkerHandle } from './export/cube_request';
 import { createExportWorker } from './workers/createExportWorker';
+import BondsPanel from './components/BondsPanel';
+import BondsCurvePlot from './components/BondsCurvePlot';
+import { useBondsData } from './bonds/useBondsData';
+import { useH2PlusCurve } from './bonds/useH2PlusCurve';
+import { bondsFieldRequest, DENSITY_SURFACE_HEX } from './bonds/bonds_request';
+import { BondsSystemId, systemFormula } from './bonds/systems';
+import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIso, BondsView } from './store/bondsSlice';
 
 /**
  * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
@@ -92,6 +99,9 @@ const SOLVING_SUFFIX: Record<RelativityMode, string> = {
     scalar: ' (scalar-relativistic)',
     spinOrbit: ' (with spin–orbit)',
 };
+
+/** The Electron-enclosed select's note while a molecule's density is drawn (ruling T7-a). */
+const FIXED_RHO_NOTE = 'The density is drawn at a fixed ρ (Bonds panel), not at an enclosed fraction.';
 
 /** How long a render has to take before the viewer is told it is working. */
 const BUSY_INDICATOR_DELAY_MS = 400;
@@ -129,6 +139,13 @@ function App() {
         [atomZ, atomCharge, atomExcitation]
     );
     const isAtomMode = atomMode === 'atom';
+    // Three modes now (spec §5 Phase 5), so "not atom mode" no longer means
+    // Basic Orbitals: everything that belongs to Basic Orbitals alone -- its
+    // render effects, the combination key, its plot and CSV curves -- asks
+    // for it by name, or a hybrid persisted from Basic Orbitals would be
+    // drawn (and keyed, and exported) over a molecule.
+    const isBasicMode = atomMode === 'hydrogenic';
+    const isBondsMode = atomMode === 'bonds';
 
     // The Relativity switch shows the effective mode -- the user's choice, or
     // the element's default -- since that is what is being solved for.
@@ -376,7 +393,7 @@ function App() {
     // place before anything is drawn. A combination draws through Phase 1's
     // own effect below instead.
     useEffect(() => {
-        if (basicRenderNonce === 0 || isAtomMode || combination.kind !== 'none') return;
+        if (basicRenderNonce === 0 || !isBasicMode || combination.kind !== 'none') return;
         dispatch(startOrbitalCalculation(basicOrbitalParams(n, l, ml, enclosedFraction)));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [basicRenderNonce]);
@@ -392,7 +409,11 @@ function App() {
     useEffect(() => {
         const previous = previousCombinationRef.current;
         previousCombinationRef.current = combination;
-        if (isAtomMode) return;
+        // Basic Orbitals only. Keyed on the mode itself rather than "is it
+        // atom mode", so the switch back from either other mode redraws a
+        // persisted combination, and an enclosed-fraction change made in
+        // Bonds draws nothing here.
+        if (!isBasicMode) return;
         if (combination.kind === 'none') {
             if (previous.kind !== 'none') dispatch(startOrbitalCalculation(basicOrbitalParams(n, l, ml, enclosedFraction)));
             return;
@@ -408,11 +429,44 @@ function App() {
         // combination is drawn must not replace it. renderedField is read,
         // not watched: only a new selection asks for a picture.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAtomMode, combination, enclosedFraction, dispatch]);
+    }, [atomMode, combination, enclosedFraction, dispatch]);
+
+    // Bonds mode (spec §5 Phase 5). The selection is in bondsSlice; the data
+    // for it loads lazily (useBondsData), and each complete selection becomes
+    // one field request -- the same path Basic Orbitals' combinations take.
+    // A molecule that fails to load is reported by the panel alone (ruling
+    // C9): the canvas keeps the picture it had, which is not a failed render.
+    const bonds = useAppSelector(state => state.bonds);
+    const bondsData = useBondsData();
+    // Ruling C7: the exact curves' worker runs only while H₂⁺ is on screen.
+    const h2plusCurve = useH2PlusCurve(isBondsMode && bonds.system === 'h2plus');
+    const bondsRender = useMemo(
+        () => (isBondsMode ? bondsFieldRequest(bonds, bondsData.basis, enclosedFraction) : null),
+        [isBondsMode, bonds, bondsData.basis, enclosedFraction],
+    );
+    // Any change to the selection rebuilds the request, but only a different
+    // picture is drawn again: the ρ chosen while an orbital is shown, or the
+    // scan point already drawn, asks for nothing -- unless that picture failed.
+    useEffect(() => {
+        if (!bondsRender) return;
+        if (renderedField && !renderFailed && samePicture(renderedField, bondsRender.request)) return;
+        dispatch(startFieldCalculation(bondsRender.request));
+        // renderedField is read, not watched, as in the combination effect above.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [bondsRender, dispatch]);
+    // A density is drawn at a fixed ρ, in one colour: no ψ key, and the enclosed fraction does not apply.
+    const isBondsDensity = isBondsMode && bondsRender?.request.densityIsoValue !== undefined;
+    // A scan point is the molecule's own: `system` lets the slice refuse it
+    // if the user has picked another molecule since (Task 8's carry).
+    const bondsScan = bondsData.scan;
+    const handleScanIndex = useCallback((index: number) => {
+        const point = bondsScan?.points[index];
+        if (point && bonds.system !== 'h2plus') dispatch(setScanPoint({ system: bonds.system, index, RBohr: point.RBohr }));
+    }, [bondsScan, bonds.system, dispatch]);
 
     // The cut belongs to the shell views. Levels 1-2 draw nothing but their
     // cut face, so they need one; an orbital -- atom mode's level 3, or any
-    // Basic Orbitals render -- is a closed surface, and the inherited
+    // Basic Orbitals or Bonds render -- is a closed surface, and the inherited
     // half-cut hid half of it: 4f_z³ arrived as a single lobe, with the Off
     // button at the bottom of a scrolled panel. Moving into an orbital view
     // clears the cut, and moving back to a shell view restores whatever it
@@ -598,9 +652,11 @@ function App() {
     // curves), so they follow the selection rather than every render.
     const selectionLegend = useMemo(() => overlayLegend(combination), [combination]);
     const selectionPlot = useMemo(() => combinationCurves(combination), [combination]);
-    const combinationLegend = !isAtomMode && renderedField ? selectionLegend : null;
-    // Not over an empty canvas: a refused combination draws nothing.
-    const showPhaseLegend = (isAtomMode ? atomLevel === 'orbital' : Boolean(renderedParams || renderedField)) && !combinationLegend;
+    const combinationLegend = isBasicMode && renderedField ? selectionLegend : null;
+    // Not over an empty canvas: a refused combination draws nothing. A
+    // molecule's density has no phase; it has its own key below.
+    const showPhaseLegend = (isAtomMode ? atomLevel === 'orbital' : Boolean(renderedParams || renderedField))
+        && !combinationLegend && !isBondsDensity;
 
     // The drill-down's next step. On a desktop it lives in the navigation
     // card it continues, where the orbital buttons are in view; on a phone
@@ -666,11 +722,13 @@ function App() {
     // a fresh sample: ruling C6, an exported number equals the plotted one.
     const csvCurvesNow = useCallback((): CsvCurve[] => {
         if (isAtomMode) return atomCurves;
+        // Bonds exports are refused until Task 13b (exportAvailability), which also writes their CSV.
+        if (!isBasicMode) return [];
         if (renderedField) return selectionPlot?.curves ?? [];
         if (!renderedParams) return [];
         const { n: pn, l: pl, Z: pZ, rMax } = renderedParams;
         return [{ label: 'P(r)', points: radialProfile(pn, pl, pZ, rMax, PLOT_SAMPLE_COUNT).map(p => ({ r: p.r, value: p.probability })) }];
-    }, [isAtomMode, atomCurves, renderedField, selectionPlot, renderedParams]);
+    }, [isAtomMode, isBasicMode, atomCurves, renderedField, selectionPlot, renderedParams]);
     const handleExport = useCallback(async (kind: ExportKind, options: ExportOptions) => {
         // The file's "view:" link names the angle on screen, as Share's does.
         const state = stateNow();
@@ -720,11 +778,34 @@ function App() {
             relativityIsDefault={relativityIsDefault}
             onRelativityChange={handleRelativityChange}
             relativityReadout={relativityReadout}
+            fractionNote={isBondsDensity ? FIXED_RHO_NOTE : undefined}
+        />
+    );
+
+    // Bonds mode's navigation (layout contract §3.8): the desktop's left
+    // column, the phone's Explore tab. The curve is not in it -- it goes
+    // where every mode's plot goes (renderRadialPlot).
+    const bondsPanel = (
+        <BondsPanel
+            bonds={bonds}
+            data={bondsData}
+            note={bondsRender?.note ?? null}
+            onSelectSystem={(id: BondsSystemId) => dispatch(selectBondsSystem(id))}
+            onCommitH2PlusR={(R: number) => dispatch(setH2PlusR(R))}
+            onScanIndex={handleScanIndex}
+            onView={(view: BondsView) => dispatch(setBondsView(view))}
+            onDensityIso={(value: number) => dispatch(setDensityIso(value))}
         />
     );
 
     const renderRadialPlot = (width: number, collapsible: boolean) => {
-        if (!isAtomMode) {
+        if (isBondsMode) {
+            return (
+                <BondsCurvePlot bonds={bonds} data={bondsData} h2plus={h2plusCurve} width={width}
+                    onCommitH2PlusR={R => dispatch(setH2PlusR(R))} onScanIndex={handleScanIndex} />
+            );
+        }
+        if (isBasicMode) {
             // A combination's plot is its ingredients and the result (see
             // combinationCurves): the weighted sum is its exact radial distribution.
             const combinationPlot = renderedField ? selectionPlot : null;
@@ -775,8 +856,15 @@ function App() {
     };
 
     // The phone sheet's tabs, one job each. Basic Orbitals has no drill-down,
-    // so its orbital choice and view settings share one tab.
-    const phoneTabs = isAtomMode
+    // so its orbital choice and view settings share one tab; Bonds has its
+    // panel, as atom mode has its drill-down.
+    const phoneTabs = isBondsMode
+        ? [
+            { key: 'explore', label: 'Explore', content: bondsPanel },
+            { key: 'view', label: 'View', content: controls },
+            { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
+        ]
+        : isAtomMode
         ? [
             {
                 key: 'explore',
@@ -843,6 +931,14 @@ function App() {
                         </span>
                     </div>
                 )}
+                {isBondsDensity && (
+                    <div className="phase-legend density-key" aria-label="surface colour key">
+                        <span className="phase-legend-item">
+                            <span className="phase-legend-swatch" style={{ background: DENSITY_SURFACE_HEX }} />
+                            ρ = {bonds.densityIso} e/a₀³, total electron density
+                        </span>
+                    </div>
+                )}
                 {combinationLegend && (
                     <div className="phase-legend" aria-label="combination colour key">
                         {combinationLegend.map(item => (
@@ -875,6 +971,14 @@ function App() {
                                 <LevelNav {...levelNavProps} variant="header" />
                             </div>
                         )}
+                        {isBondsMode && (
+                            <div className="phone-header">
+                                <span className="bonds-header">
+                                    {systemFormula(bonds.system)} · {bonds.R !== null ? `R = ${bonds.R.toFixed(2)} a₀`
+                                        : bondsData.error ? 'not loaded' : 'loading…'}
+                                </span>
+                            </div>
+                        )}
                         <PhoneSheet tabs={phoneTabs} active={phoneTab} onChange={setPhoneTab} />
                     </>
                 ) : (
@@ -885,6 +989,7 @@ function App() {
                                     {subshellPanel}
                                 </LevelNav>
                             )}
+                            {isBondsMode && bondsPanel}
                         </Box>
                         <Box className={`view-panel${viewPanelOpen ? '' : ' folded'}`}>
                             {isMedium && (

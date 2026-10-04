@@ -399,3 +399,32 @@ describe('Relativity control', () => {
     });
   });
 });
+
+// Phase 5: Bonds is the third mode. It has no n/l/mₗ, no element and
+// nothing to "update", and when a density is drawn at a fixed ρ the
+// enclosed fraction does not apply -- the select says so rather than
+// offer a choice that changes nothing.
+describe('Controls: Bonds mode', () => {
+  it('offers Bonds in the mode switch', () => {
+    const onModeChange = jest.fn();
+    render(<Controls {...baseProps} mode="hydrogenic" onModeChange={onModeChange} />);
+    fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+    expect(onModeChange).toHaveBeenCalledWith('bonds');
+  });
+
+  it('has no n/l/mL, no element, no Update Orbital, and says why the fraction is fixed', () => {
+    render(<Controls {...baseProps} mode="bonds" fractionNote="the density is drawn at a fixed ρ" />);
+    expect(screen.queryByLabelText('Principal (n)')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
+    expect(screen.queryByText(/One electron, Z = 1/)).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
+    expect(screen.getByText('the density is drawn at a fixed ρ')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('keeps the enclosed fraction for an orbital, where it does apply', () => {
+    render(<Controls {...baseProps} mode="bonds" />);
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByText('|ψ|² = 1.00e-5')).toBeInTheDocument();
+  });
+});
