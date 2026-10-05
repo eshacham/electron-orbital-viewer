@@ -65,7 +65,7 @@ export interface MoleculeMeta {
     bondOrder?: number | null;
     /** True where single-reference CCSD(T)/B3LYP are only qualitative at R_e (B₂, C₂; ruling T4-d). Absent for Phase 6 library metas, which never carry a T1 diagnostic. */
     multireference?: boolean;
-    t1AtRe?: number;
+    t1AtRe?: number | null;
     orbitals: MoleculeOrbitalInfo[];
     /** Present only where density.bin.gz ships. */
     grid?: GridSpec;
