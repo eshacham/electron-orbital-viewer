@@ -71,6 +71,9 @@ def test_validation_rows_have_the_phase1_shape(water):
     assert set(by_quantity) == {'bond length O–H', 'angle H–O–H', 'dipole moment', 'electrons in shipped density grid'}
     assert by_quantity['bond length O–H']['app'] == pytest.approx(0.958, abs=2e-3)
     assert by_quantity['angle H–O–H']['unit'] == '°' and by_quantity['dipole moment']['tolerancePercent'] == pytest.approx(10.0)
+    # D28 (ruling, W/progress.md): the dipole floor (10 % or 0.05 D, whichever
+    # is larger) must be visible in the row's own method, not just in code.
+    assert by_quantity['dipole moment']['method'].endswith('tolerance 10 % or 0.05 D, whichever is larger')
 
 
 # D1 (preflight controller correction): basis.json must be built from Phase

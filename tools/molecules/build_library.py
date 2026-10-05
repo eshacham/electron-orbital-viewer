@@ -171,7 +171,13 @@ def validation_rows(entry, meta):
         if ref.quantity == 'dipole':
             if ref.value == 0:
                 continue      # a percentage of zero is meaningless; test_library_data asserts |μ| < 0.01 D instead
-            quantity, app, method = 'dipole moment', meta['dipoleDebye'], meta['method']['density']
+            # D28 (ruling, W/progress.md): the dipole floor (10 % or 0.05 D,
+            # whichever is larger — library.dipole()) is a deliberate
+            # deviation from the spec's verbatim "within 10 %"; the row's
+            # method states it so the deviation is visible on the Methods
+            # page, not just in this module's comments.
+            quantity, app = 'dipole moment', meta['dipoleDebye']
+            method = f'{meta["method"]["density"]}; tolerance 10 % or 0.05 D, whichever is larger'
         elif ref.quantity in ('bond', 'angle'):
             quantity = f'{"bond length" if ref.quantity == "bond" else "angle"} {ref.label}'
             app, method = measure(ref, coords), meta['geometrySource']
