@@ -63,9 +63,9 @@ export interface MoleculeMeta {
     spin?: number;
     /** (bonding − antibonding)/2 for homonuclear diatomics; null where g/u counting does not apply (CO, HF). */
     bondOrder?: number | null;
-    /** True where single-reference CCSD(T)/B3LYP are only qualitative at R_e (B₂, C₂; ruling T4-d). */
-    multireference: boolean;
-    t1AtRe: number;
+    /** True where single-reference CCSD(T)/B3LYP are only qualitative at R_e (B₂, C₂; ruling T4-d). Absent for Phase 6 library metas, which never carry a T1 diagnostic. */
+    multireference?: boolean;
+    t1AtRe?: number;
     orbitals: MoleculeOrbitalInfo[];
     /** Present only where density.bin.gz ships. */
     grid?: GridSpec;
