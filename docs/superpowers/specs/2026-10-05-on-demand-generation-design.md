@@ -341,7 +341,7 @@ with a badge and a one-line explanation, always visible on the molecule.
 Absent `tier` means validated (v1/v2 files predate it). The owner sees a
 "Computed" category listing the month's `DONE` jobs (`GET /jobs?status=DONE`);
 nobody else sees a list. A computed molecule's share link
-(`…#mode=molecules&job=<key>`) opens for anyone, reading
+(`…#mode=molecule&job=<key>`) opens for anyone, reading
 `/molecules/jobs/<key>/`. The loader takes a base URL per entry (versioned
 library path, or the jobs path) instead of one global base.
 
