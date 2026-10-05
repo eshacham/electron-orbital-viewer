@@ -121,11 +121,29 @@ export function pickMoleculePart(overlay: THREE.Object3D, raycaster: THREE.Rayca
     return null;
 }
 
-/** Materials are per-group; the two shared geometries are module-level and live for the page. */
+/**
+ * Materials are per-group; the two ball-and-stick geometries (SPHERE, STICK)
+ * are module-level and live for the page. An ArrowHelper's own
+ * `dispose()` is NOT used here, and we never recurse into its line/cone
+ * children either: their geometries are three.js module-level statics
+ * shared by every ArrowHelper in the process (see ArrowHelper's
+ * constructor), so disposing them would take out the next molecule's (or
+ * any other overlay's) dipole arrow geometry too. Only the arrow's two
+ * materials -- which are per-instance -- are ours to dispose.
+ */
+function disposeNode(node: THREE.Object3D): void {
+    if (node instanceof THREE.ArrowHelper) {
+        (Array.isArray(node.line.material) ? node.line.material : [node.line.material]).forEach(m => m.dispose());
+        (Array.isArray(node.cone.material) ? node.cone.material : [node.cone.material]).forEach(m => m.dispose());
+        return;
+    }
+    if (node instanceof THREE.Mesh) {
+        if (node.geometry !== SPHERE && node.geometry !== STICK) node.geometry.dispose();
+        (Array.isArray(node.material) ? node.material : [node.material]).forEach(m => m.dispose());
+    }
+    node.children.forEach(disposeNode);
+}
+
 export function disposeOverlay(group: THREE.Object3D): void {
-    group.traverse(child => {
-        if (child instanceof THREE.ArrowHelper) child.dispose();
-        else if (child instanceof THREE.Mesh && child.geometry !== SPHERE && child.geometry !== STICK) child.geometry.dispose();
-        if (child instanceof THREE.Mesh) (Array.isArray(child.material) ? child.material : [child.material]).forEach(m => m.dispose());
-    });
+    group.children.forEach(disposeNode);
 }

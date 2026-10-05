@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { detectBonds, anglesAtAtom, describePick, buildBallAndStick, pickMoleculePart, bondLabel } from '../../src/molecules/ball_and_stick';
+import { detectBonds, anglesAtAtom, describePick, buildBallAndStick, pickMoleculePart, bondLabel, disposeOverlay } from '../../src/molecules/ball_and_stick';
 import { dipoleArrow, formatDipole } from '../../src/molecules/dipole';
 import { waterAtoms, methaneAtoms, ozoneAtoms, waterMeta, methaneMeta } from './fixtures';
 
@@ -72,5 +72,19 @@ describe('the dipole arrow', () => {
     it('states the method and the experimental value', () => {
         expect(formatDipole(waterMeta())).toBe('μ = 1.86 D (B3LYP/def2-TZVP) · experiment 1.855 D');
         expect(formatDipole(methaneMeta())).toBe('μ = 0 by symmetry (computed 0.00 D, B3LYP/def2-TZVP)');
+    });
+    it('disposes an arrow’s own materials but never its line/cone geometry, which every ArrowHelper in the process shares', () => {
+        const group = new THREE.Group();
+        const arrow = dipoleArrow(waterMeta())!;
+        group.add(arrow);
+        const lineGeometryDispose = jest.spyOn(arrow.line.geometry, 'dispose');
+        const coneGeometryDispose = jest.spyOn(arrow.cone.geometry, 'dispose');
+        disposeOverlay(group);
+        expect(lineGeometryDispose).not.toHaveBeenCalled();
+        expect(coneGeometryDispose).not.toHaveBeenCalled();
+        // a second, unrelated arrow still finds its geometry intact and shared, not disposed out from under it.
+        const second = dipoleArrow(waterMeta())!;
+        expect(second.cone.geometry).toBe(arrow.cone.geometry);
+        expect(second.line.geometry).toBe(arrow.line.geometry);
     });
 });
