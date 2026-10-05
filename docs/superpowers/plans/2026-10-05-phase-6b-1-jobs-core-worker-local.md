@@ -1101,7 +1101,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
   - `store.Store` (Protocol) and `store.FileStore(root: Path, cap_micros: int = CAP_MICROS)` with:
     - `get_job(key) -> dict | None`;
     - `create_job(record) -> tuple[bool, dict]`: atomically creates the job if its key is absent and reserves `record['reservedMicros']` in `record['month']`. Returns `(False, existing)` when the key exists. Raises `BudgetExhausted` and writes nothing when the cap would be passed;
-    - `requeue_failed(key, decision, now) -> dict`: FAILED → QUEUED, `attempt + 1`, a new reservation, `settled=False`. Raises `JobRefused('invalid-request', 409)` if the job is not FAILED, and `BudgetExhausted` if over the cap;
+    - `requeue_failed(key, decision, now) -> dict`: FAILED → QUEUED, `attempt + 1`, a new reservation charged to `month_of(now)` (the record's `month` moves with it), `settled=False`. Raises `JobRefused('invalid-request', 409)` if the job is not FAILED, and `BudgetExhausted` if over the cap;
     - `claim(key, attempt, now) -> bool`: → RUNNING. Allowed from QUEUED or STARTING, or from RUNNING with a lower recorded attempt;
     - `update_job(key, changes, expect_status: set | None = None) -> bool`;
     - `settle(key, actual_micros) -> bool`: exactly once per reservation;
@@ -1194,6 +1194,19 @@ def test_requeue_only_failed_and_reserves_again(store):
     rec = store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
     assert rec['status'] == 'QUEUED' and rec['attempt'] == 2 and rec['error'] is None and not rec['settled']
     assert store.meter('2026-10') == {'spent': 100, 'reserved': 500, 'committed': 600, 'cap': 10_000}
+
+
+def test_a_retry_in_a_later_month_is_charged_to_that_month(store):
+    store.create_job(record())
+    store.update_job('a' * 64, {'status': 'FAILED'})
+    store.settle('a' * 64, 100)
+    november = datetime(2026, 11, 2, 9, 0, tzinfo=timezone.utc)
+    rec = store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, november)
+    assert rec['month'] == '2026-11'
+    assert store.meter('2026-10') == {'spent': 100, 'reserved': 0, 'committed': 100, 'cap': 10_000}
+    assert store.meter('2026-11')['reserved'] == 500
+    store.settle('a' * 64, 40)
+    assert store.meter('2026-11') == {'spent': 40, 'reserved': 0, 'committed': 40, 'cap': 10_000}
 
 
 def test_update_with_expected_status(store):
@@ -1389,8 +1402,11 @@ class FileStore:
                 raise JobRefused('invalid-request', 'only a failed job can be retried', 409)
             if not rec['settled']:
                 raise JobRefused('invalid-request', 'the failed attempt is still being settled; retry in a minute', 409)
-            self._reserve(rec['month'], decision['reservationMicros'])
+            # A retry is a new submission: it is charged to the month it is made in (spec §6.4).
+            month = month_of(now)
+            self._reserve(month, decision['reservationMicros'])
             rec.update({'status': 'QUEUED', 'attempt': rec['attempt'] + 1, 'error': None, 'settled': False,
+                        'month': month,
                         'reservedMicros': decision['reservationMicros'],
                         'sizing': {k: v for k, v in decision.items() if k != 'reservationMicros'},
                         'submittedAt': iso(now), 'startedAt': None, 'endedAt': None, 'heartbeatAt': None,
