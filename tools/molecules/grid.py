@@ -3,9 +3,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
-# The ρ = 0.001 surface lies 2.5-3.5 a0 beyond the nuclei; 5 a0 keeps it clear
-# of the walls with room for the tail the integral needs.
-SURFACE_MARGIN_BOHR = 5.0
+# The ρ = 0.001 surface lies 2.5-3.5 a0 beyond the nuclei; 5 a0 would keep it
+# clear of the walls with room for the tail the integral needs, but the
+# library's properties basis (B3LYP/def2-TZVPD -- ruling T7-TZVPD) adds
+# diffuse functions whose longer tail pushes the face density above
+# check_box's limit at 5 a0 (measured: up to 4.7e-5 at the face, HCN worst).
+# A3 probe (task-7-report.md) found 6.5 a0 is the smallest margin, in
+# 0.5 a0 steps from 5.0, that keeps every library molecule's face density
+# below half of FACE_DENSITY_LIMIT (headroom), so bumped here.
+SURFACE_MARGIN_BOHR = 6.5
 
 
 @dataclass(frozen=True)

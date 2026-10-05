@@ -21,7 +21,7 @@ def test_grid_is_a_centred_cube_z_fastest():
 
 def test_grid_for_adds_the_margin_to_the_furthest_coordinate():
     grid = grid_for(np.array([[0.0, 0.0, 0.0], [0.0, -3.0, 1.0]]), 96)
-    assert grid.half_width == pytest.approx(8.0) and grid.as_meta()['shape'] == [96, 96, 96]
+    assert grid.half_width == pytest.approx(9.5) and grid.as_meta()['shape'] == [96, 96, 96]
 
 
 def test_axis_order_fixture_matches_c_order():
