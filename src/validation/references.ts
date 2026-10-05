@@ -38,6 +38,14 @@ export interface ValidationRow {
      * its triplet (that determinant is no spectroscopic state to match).
      */
     bound?: 'above';
+    /**
+     * A documented, owner-accepted exception (ruling T7-O3): this row is
+     * known to fall outside its tolerance, for the physical reason given
+     * here (shown beside the row, not hidden -- spec §3.5). When set,
+     * `rowPasses` is expected to be `false`; the test asserts both
+     * directions, so a known miss that starts passing fails the test too.
+     */
+    knownMiss?: string;
 }
 
 const NIST_LDA = 'NIST Atomic Reference Data (LDA)';

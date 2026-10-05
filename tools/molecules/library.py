@@ -18,6 +18,12 @@ EXPERIMENT = 'experiment (CCCBDB)'
 OPTIMISED = 'B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)'
 CRC = 'CRC Handbook, via CCCBDB'
 PLAUSIBLE = 'experiment (CCCBDB); plausibility check of the optimised geometry'
+# Ruling T7-O3: ozone ships as a documented known exception rather than a
+# hidden failure (spec §3.5) -- its dipole misses tolerance at the owner's
+# chosen property method (B3LYP/def2-TZVPD) for a real physical reason, not
+# a bug.
+OZONE_MULTIREFERENCE_CAVEAT = ('Ozone has strong multireference character: single-reference B3LYP '
+                                'overestimates its dipole moment.')
 
 Atom = tuple[str, tuple[float, float, float]]
 
@@ -31,6 +37,10 @@ class Reference:
     tolerance: float       # absolute, in `unit`
     atoms: tuple[int, ...] = ()
     label: str = ''
+    # A documented, owner-accepted exception (ruling T7-O3): non-empty only
+    # for a reference the method is known to miss. The validation row (and
+    # the app's readout) show this instead of hiding the miss (spec §3.5).
+    known_miss: str = ''
 
 
 @dataclass(frozen=True)
@@ -45,18 +55,22 @@ class LibraryMolecule:
     zmatrix: str = ''
     spin: int = 0
     references: tuple[Reference, ...] = ()
+    # Shown by the app's readout (Task 14) alongside a known-miss reference;
+    # same text as that reference's known_miss, since the two are the same
+    # documented exception (ruling T7-O3).
+    caveat: str = ''
 
     @property
     def optimised(self) -> bool:
         return self.geometry_source == OPTIMISED
 
 
-def dipole(value, source=CRC):
+def dipole(value, source=CRC, known_miss=''):
     # Spec §3.2 says, verbatim, "dipoles within 10 % of experiment"; we floor
     # that tolerance at 0.05 D (D28 — a deliberate, documented deviation),
-    # because below 0.5 D a strict 10 % band is tighter than B3LYP/def2-TZVP
+    # because below 0.5 D a strict 10 % band is tighter than B3LYP/def2-TZVPD
     # basis-set noise, which would fail small, correctly-computed dipoles.
-    return Reference('dipole', value, 'D', source, max(0.1 * abs(value), 0.05))
+    return Reference('dipole', value, 'D', source, max(0.1 * abs(value), 0.05), known_miss=known_miss)
 
 
 def zero_dipole():
@@ -224,7 +238,9 @@ LIBRARY: tuple[LibraryMolecule, ...] = (
     M('sf6', 'Sulfur hexafluoride', 'SF6', 'polarity', ('hybridisation',), E, octahedral('S', 'F', 1.561),
       references=(bond(0, 1, 1.561, 'S–F'), angle(1, 0, 3, 90.0, 'F–S–F'), zero_dipole())),
     M('o3', 'Ozone', 'O3', 'polarity', ('first-examples',), E, bent('O', 'O', 1.278, 116.8),
-      references=(bond(0, 1, 1.278, 'O–O'), angle(1, 0, 2, 116.8, 'O–O–O'), dipole(0.53))),
+      references=(bond(0, 1, 1.278, 'O–O'), angle(1, 0, 2, 116.8, 'O–O–O'),
+                   dipole(0.53, known_miss=OZONE_MULTIREFERENCE_CAVEAT)),
+      caveat=OZONE_MULTIREFERENCE_CAVEAT),
     M('no2', 'Nitrogen dioxide', 'NO2', 'polarity', ('radical',), E, bent('N', 'O', 1.194, 133.9), spin=1,
       references=(bond(0, 1, 1.194, 'N–O'), angle(1, 0, 2, 133.9, 'O–N–O'), dipole(0.316))),
     M('so2', 'Sulfur dioxide', 'SO2', 'polarity', (), E, bent('S', 'O', 1.431, 119.3),

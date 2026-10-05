@@ -43,8 +43,23 @@ def test_geometry_matches_its_stated_source(entry):
 
 @EACH
 def test_dipole_within_tolerance(entry):
+    # Ruling T7-O3: a documented known miss (ozone's multireference dipole)
+    # is pinned OUTSIDE tolerance, not just excused -- so a method change
+    # that quietly fixes it (or a regression that breaks another molecule)
+    # is caught either way.
     ref = next(r for r in entry.references if r.quantity == 'dipole')
-    assert abs(meta(entry)['dipoleDebye'] - ref.value) <= ref.tolerance
+    diff = abs(meta(entry)['dipoleDebye'] - ref.value)
+    if ref.known_miss:
+        assert diff > ref.tolerance, f'{entry.id}: expected to still miss tolerance ({ref.known_miss})'
+    else:
+        assert diff <= ref.tolerance
+
+
+def test_o3_meta_carries_its_known_miss_caveat():
+    m = meta(by_id('o3'))
+    entry = by_id('o3')
+    assert m.get('caveat') == entry.caveat
+    assert entry.caveat
 
 
 @EACH

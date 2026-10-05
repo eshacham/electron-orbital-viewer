@@ -12,9 +12,13 @@ describe('validation table', () => {
     });
 
     it.each(VALIDATION.map(row => [`phase ${row.phase}: ${row.system} ${row.quantity}`, row] as const))(
-        '%s agrees with its reference within the stated tolerance',
+        '%s agrees with its reference within the stated tolerance, unless documented as a known miss',
         (_name, row) => {
-            expect(rowPasses(row)).toBe(true);
+            // A plain row must pass; a documented known miss (ruling T7-O3,
+            // e.g. ozone's dipole) must still fail -- pinned both ways, so
+            // either a regression or a caveat that quietly stopped applying
+            // is caught.
+            expect(rowPasses(row)).toBe(!row.knownMiss);
         }
     );
 
@@ -31,6 +35,15 @@ describe('validation table', () => {
         }
         const keys = VALIDATION.map(row => `${row.phase}|${row.system}|${row.quantity}`);
         expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    it('pins a known miss both ways: failing as documented, and catching it if it stops failing', () => {
+        const stillMissing = { ...VALIDATION[0], app: 105, reference: 100, tolerancePercent: 1, knownMiss: 'documented exception' };
+        expect(rowPasses(stillMissing)).toBe(!stillMissing.knownMiss); // false === false: the miss is still there, as documented
+
+        const noLongerMissing = { ...stillMissing, app: 100.5 };
+        // true !== false: if the per-row test above used this row, it would now fail -- surfacing a caveat that needs removing.
+        expect(rowPasses(noLongerMissing)).not.toBe(!noLongerMissing.knownMiss);
     });
 
     it('passes a target row within its tolerance and a bound row only strictly beyond its bound', () => {

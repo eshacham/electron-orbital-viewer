@@ -35,6 +35,12 @@ REPO = Path(__file__).resolve().parents[2]
 # version.OUT_ROOT (not a committed public/ tree), and the validation summary
 # next to Phase 5's, under src/validation/generated/.
 ROWS = REPO / 'src' / 'validation' / 'generated' / 'phase6_library.json'
+# Ruling T7-TZVPD (owner decision 2026-10-05): the library's properties
+# (density, dipole, ESP, orbitals) move to B3LYP/def2-TZVPD -- the added
+# diffuse functions bring every dipole but ozone's within tolerance.
+# Geometry is unaffected: optimise.FINAL_BASIS stays def2-TZVP, and
+# geometry_for keeps checking against it.
+PROPERTY_BASIS = 'def2-TZVPD'
 BUDGET_BYTES = 3_000_000
 GRID_POINTS_TRIES = (96, 88, 80)
 FACE_DENSITY_LIMIT = 1e-5
@@ -99,7 +105,7 @@ def library_basis_json(mol, mf, rows):
                           'coefficients': [float(c) for c in mf.mo_coeff[:, r['index']]]} for r in rows]}
 
 
-def build_molecule(entry, out_root=OUT_ROOT, basis='def2-TZVP', xc='B3LYP', grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES):
+def build_molecule(entry, out_root=OUT_ROOT, basis=PROPERTY_BASIS, xc='B3LYP', grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES):
     atoms, optimisation = geometry_for(entry)
     mol, mf = run_dft(atoms, entry.spin, basis, xc)
     dm = total_dm(mf)
@@ -148,6 +154,10 @@ def build_molecule(entry, out_root=OUT_ROOT, basis='def2-TZVP', xc='B3LYP', grid
         }
         if optimisation:
             meta['geometryOptimisation'] = optimisation
+        if entry.caveat:
+            # Ruling T7-O3: a known, owner-accepted exception is shown, not
+            # hidden (spec §3.5) -- the app's readout (Task 14) displays this.
+            meta['caveat'] = entry.caveat
         (out / 'meta.json').write_text(json.dumps(meta, indent=1, ensure_ascii=False) + '\n')
         if _size(out) <= budget:
             return {'id': entry.id, 'name': entry.name, 'formula': entry.formula, 'category': entry.category, 'tags': list(entry.tags)}
@@ -183,10 +193,16 @@ def validation_rows(entry, meta):
             app, method = measure(ref, coords), meta['geometrySource']
         else:
             continue
-        rows.append({'phase': 6, 'quantity': quantity, 'system': entry.formula, 'app': round(float(app), 4),
-                     'reference': ref.value, 'unit': UNITS.get(ref.unit, ref.unit),
-                     'tolerancePercent': round(100 * ref.tolerance / abs(ref.value), 3),
-                     'referenceSource': ref.source, 'method': method})
+        row = {'phase': 6, 'quantity': quantity, 'system': entry.formula, 'app': round(float(app), 4),
+               'reference': ref.value, 'unit': UNITS.get(ref.unit, ref.unit),
+               'tolerancePercent': round(100 * ref.tolerance / abs(ref.value), 3),
+               'referenceSource': ref.source, 'method': method}
+        if ref.known_miss:
+            # Ruling T7-O3: a row known to fall outside its tolerance carries
+            # the reason beside it, rather than passing silently or being
+            # dropped (spec §3.5); references.test.ts pins it both ways.
+            row['knownMiss'] = ref.known_miss
+        rows.append(row)
     rows.append({'phase': 6, 'quantity': 'electrons in shipped density grid', 'system': entry.formula,
                  'app': round(meta['densityIntegral'], 4), 'reference': meta['electronCount'], 'unit': 'e',
                  'tolerancePercent': 0.5, 'referenceSource': 'electron count',
