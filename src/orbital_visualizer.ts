@@ -42,6 +42,7 @@ import {
     setReferenceRingWidth,
     disposeReferenceRing
 } from './atom/reference_ring';
+import { disposeOverlay } from './molecules/ball_and_stick';
 
 /** One colour for a total density (spec §4.1): ψ's red and blue would claim a phase it does not have. */
 export const DENSITY_SURFACE_COLOUR = new THREE.Color(DENSITY_SURFACE_HEX);
@@ -178,6 +179,12 @@ export interface VisualizerContext {
     onTransitionChange?: (active: boolean) => void;
     /** What `onTransitionChange` was last told, so it hears each change once rather than every frame. */
     reportedTransition?: boolean;
+    /**
+     * A molecule's ball-and-stick and dipole arrow. Kept apart from
+     * currentOrbitalGroup so switching density / ESP / orbital, which
+     * replaces that group, leaves the structure in place.
+     */
+    moleculeOverlay?: THREE.Group | null;
 }
 
 /**
@@ -418,14 +425,10 @@ const hit = new THREE.Vector3();
  * so nothing that requires it can be exercised in a test.
  */
 export function radiusUnderPointer(context: VisualizerContext, event: PointerEvent): number | null {
-    const canvas = context.renderer.domElement;
-    const bounds = canvas.getBoundingClientRect();
-    pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
-    pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
-    raycaster.setFromCamera(pointer, context.camera);
+    const { ray } = pointerRaycaster(context, event);
     // Only meaningful when there is a cut face to read a radius off.
     if (context.surfaceStyle.clipAxis === 'none') return null;
-    return raycaster.ray.intersectPlane(context.clipPlane, hit) ? hit.length() : null;
+    return ray.intersectPlane(context.clipPlane, hit) ? hit.length() : null;
 }
 
 /**
@@ -679,6 +682,13 @@ export function getScaleBar(
 
 export function cleanupVisualizer(context: VisualizerContext | null) {
     if (context) {
+        // D21: disposed independently of, and before, the isDisposed flag --
+        // setMoleculeOverlay itself refuses once that flag is set.
+        if (context.moleculeOverlay) {
+            context.scene.remove(context.moleculeOverlay);
+            disposeOverlay(context.moleculeOverlay);
+            context.moleculeOverlay = null;
+        }
         context.isDisposed = true;  // Set flag first
         if (context.animationFrameId) {
             cancelAnimationFrame(context.animationFrameId);
@@ -1267,6 +1277,58 @@ export async function updateFieldInScene(
 }
 
 /**
+ * Draws a mesh computed elsewhere (a molecule's density grid, meshed in its
+ * own worker) with the same caps, cut extent, framing and axes discipline as
+ * an orbital. Supersedes anything in flight: the newest request owns the
+ * scene. Re-frames only when the box changes, so a molecule's density and
+ * its orbitals, which share one box, keep the user's camera. Reuses
+ * `frameToSurface` rather than duplicating its framing/clearing logic (D20).
+ */
+export interface PresentFieldMeshOptions { vertexColors?: Float32Array; boxRMax: number; showAxes?: boolean }
+
+export function presentFieldMesh(context: VisualizerContext | null, meshData: MeshData, options: PresentFieldMeshOptions): number {
+    if (!context || context.isDisposed) return 0;
+    context.activeWorker?.terminate();
+    context.activeWorker = null;
+    context.requestCounter++;
+    cancelTransition(context);
+    updateSceneWithMeshData(context, meshData, false, DENSITY_SURFACE_COLOUR, options.vertexColors);
+    const surfaceRadius = meshRadius(meshData) || options.boxRMax;
+    frameToSurface(context, surfaceRadius, options.boxRMax, context.framedBox !== options.boxRMax, !!options.showAxes);
+    return surfaceRadius;
+}
+
+/** Clears the surface (not the overlay), e.g. on entering Molecules with nothing chosen yet (D20: reuses clearScene). */
+export function clearFieldMesh(context: VisualizerContext | null): void {
+    clearScene(context);
+    if (context) context.framedBox = undefined;
+}
+
+/**
+ * Attaches, replaces or removes a molecule's ball-and-stick/dipole overlay,
+ * independent of whatever surface is drawn. Replacing disposes the old one
+ * (Task 10's `disposeOverlay`, which disposes only owned resources).
+ */
+export function setMoleculeOverlay(context: VisualizerContext | null, overlay: THREE.Group | null): void {
+    if (!context || context.isDisposed) return;
+    if (context.moleculeOverlay) {
+        context.scene.remove(context.moleculeOverlay);
+        disposeOverlay(context.moleculeOverlay);
+    }
+    context.moleculeOverlay = overlay;
+    if (overlay) context.scene.add(overlay);
+}
+
+/** The shared raycaster, aimed through the pointer (the same arithmetic radiusUnderPointer uses). */
+export function pointerRaycaster(context: VisualizerContext, event: PointerEvent): THREE.Raycaster {
+    const bounds = context.renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+    pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, context.camera);
+    return raycaster;
+}
+
+/**
  * Stops the render still in flight, if any, and makes its result a no-op when
  * it lands: nothing asks for it any more (a combination dropped on the way to
  * atom mode). The scene itself is left as it is.
@@ -1718,7 +1780,14 @@ function updateSceneWithMeshData(
     meshData: MeshData,
     crossFadeFromShellView: boolean = false,
     /** A density has no ψ sign to colour by (ruling T7-a); when set, every vertex and the cut face take this one colour instead. */
-    uniformColour?: THREE.Color
+    uniformColour?: THREE.Color,
+    /**
+     * A caller-supplied colouring (the ESP map) that overrides the per-vertex
+     * colours outright -- unlike `uniformColour`, which the cut-away caps
+     * still take (D15): an ESP cap in the vertex-coloured gradient would
+     * read as a stray value rather than the material of the cut.
+     */
+    vertexColors?: Float32Array
 ) {
     if (!context || context.isDisposed) {
         console.warn('Visualizer: Cannot update scene - context is disposed or null');
@@ -1747,7 +1816,13 @@ function updateSceneWithMeshData(
         const positions = new Float32Array(meshData.positions.flat());
         const colors = new Float32Array(meshData.positions.length * 3); // RGB for each vertex
 
-        if (uniformColour) {
+        if (vertexColors) {
+            // A caller-supplied colouring (the ESP map) replaces the phase colours outright.
+            if (vertexColors.length !== meshData.positions.length * 3) {
+                throw new Error(`mesh has ${meshData.positions.length} vertices, vertex colours given for ${vertexColors.length / 3}`);
+            }
+            colors.set(vertexColors);
+        } else if (uniformColour) {
             // One colour throughout: a density carries no phase to split red/blue by.
             meshData.psiSigns.forEach((_sign, index) => {
                 const colorIndex = index * 3;
