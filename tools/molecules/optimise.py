@@ -77,7 +77,7 @@ def geometry_for(entry: LibraryMolecule):
         return list(entry.atoms), {}
     path = GEOMETRY_DIR / f'{entry.id}.xyz'
     if not path.exists():
-        raise FileNotFoundError(f'{entry.id}: no geometry at {path}; run `python tools/molecules/optimise.py {entry.id}`')
+        raise FileNotFoundError(f'{entry.id}: no geometry at {path}; run `tools/molecules/.venv/bin/python tools/molecules/optimise.py {entry.id}`')
     atoms, comment = read_xyz(path)
     fields = _comment_fields(comment)
     if fields.get('converged') != 'true':

@@ -22,6 +22,6 @@ it('the committed manifest keeps every molecule within 3 MB', () => {
     const id = file.path.includes('/') ? file.path.split('/')[0] : null;
     if (id) perMolecule.set(id, (perMolecule.get(id) ?? 0) + file.bytes);
   }
-  const over = [...perMolecule].filter(([, bytes]) => bytes > 3_145_728).map(([id]) => id);
+  const over = [...perMolecule].filter(([, bytes]) => bytes > 3_000_000).map(([id]) => id);
   expect(over).toEqual([]);
 });

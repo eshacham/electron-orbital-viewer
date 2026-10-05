@@ -43,7 +43,7 @@ from typing import Callable, Optional
 HERE = Path(__file__).resolve().parent
 STACK = "ElectronOrbitalViewerStack"
 CACHE_CONTROL = "public, max-age=31536000, immutable"
-BUDGET_BYTES = 3_145_728
+BUDGET_BYTES = 3_000_000
 CONTENT_TYPES = {".json": "application/json", ".gz": "application/octet-stream"}
 
 Runner = Callable[[list[str]], str]

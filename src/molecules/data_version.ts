@@ -2,4 +2,4 @@
  * tools/molecules/version.py's DATA_VERSION (checked by tests/molecules/data_version.test.ts) --
  * bump both together whenever the generated data changes, since a published
  * version is immutable (ruling C2). */
-export const MOLECULE_DATA_VERSION = 'v1';
+export const MOLECULE_DATA_VERSION = 'v2';
