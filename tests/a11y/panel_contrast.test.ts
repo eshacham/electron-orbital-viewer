@@ -63,6 +63,11 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     { selector: '.bonds-frontier', declared: 'color: rgba(0, 0, 0, 0.7)', fg: 'rgba(0, 0, 0, 0.7)', bg: LIGHT_96 },
     { selector: '.bonds-note', declared: 'color: #8a4100', fg: '#8a4100', bg: LIGHT_96 },
     { selector: '.bonds-header', declared: `background: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
+    // Task 9: the ESP key sits over the 3D view like .phase-legend, so it
+    // needs the same dark-on-translucent treatment (ruling D29: own rows,
+    // since the CSS now uses separate rules rather than a combined selector).
+    { selector: '.esp-legend', declared: `background: ${DARK_85}`, fg: '#ffffff', bg: DARK_85 },
+    { selector: '.esp-legend-note', declared: 'opacity: 0.85', fg: 'rgba(255, 255, 255, 0.85)', bg: DARK_85 },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {

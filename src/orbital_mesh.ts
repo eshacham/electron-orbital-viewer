@@ -359,3 +359,17 @@ export function generateIsoValueMesh(source: AnalyticFieldSource, resolution: nu
     }
     return meshAtLevel(field, isoValue, () => 1);
 }
+
+/**
+ * A grid source's isosurface, drawn EXACTLY at `isoValue` (ruling D4 --
+ * the ESP surface, ρ = 0.001 e/a₀³, the convention ESP maps are drawn on).
+ * Unlike `generateFieldMesh`'s enclosed-fraction route, no fraction is
+ * searched for: the voxel-averaged grid's own distribution does not change
+ * what ρ = 0.001 means, so every molecule's ESP map is drawn on the same
+ * surface. Additive beside `generateFieldMesh` and `generateIsoValueMesh`,
+ * for a grid field rather than an analytic one.
+ */
+export function generateGridIsoValueMesh(source: GridFieldSource, isoValue: number): MeshData {
+    if (!(isoValue > 0) || !Number.isFinite(isoValue)) throw new Error('Invalid parameters: isoValue must be positive');
+    return meshAtLevel(gridAsSampledField(source, source.shape[0] - 1), isoValue, () => 1);
+}

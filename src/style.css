@@ -611,6 +611,16 @@ html, body, #root {
     gap: 8px;
     font-size: 12px;
   }
+  /* Task 9 (ruling D30): the legend stack takes the same phone placement as
+     .phase-legend -- top-right, under the header -- rather than an
+     undefined --phone-sheet-height bottom offset. */
+  .molecule-legend-stack {
+    top: 62px;
+    bottom: auto;
+    left: auto;
+    right: 12px;
+    transform: none;
+  }
 }
 
 /* The element, as a button, at the head of the navigation card on a phone. */
@@ -685,6 +695,10 @@ html, body, #root {
      sheet). Pull it in by the sheet's own width so it stays over the free
      canvas, matching how .phone-header's max-width makes the same room. */
   .phase-legend {
+    right: calc(46vw + 12px);
+  }
+  /* Same sheet-aware pull-in as .phase-legend (D30), for the sideways phone. */
+  .molecule-legend-stack {
     right: calc(46vw + 12px);
   }
 }
@@ -1094,4 +1108,48 @@ html, body, #root {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Task 9: the ESP key and (later) the molecule readout share the ψ legend's
+   bottom-centre slot (.phase-legend), stacked -- spec §3.8 reuses that slot
+   rather than adding a new floating panel. Separate rules throughout
+   (ruling D29), not a combined selector: panel_contrast's rule() helper only
+   finds a standalone `^.selector {` rule, and a combined one would also
+   defeat it for any class it is joined with. */
+.molecule-legend-stack {
+  position: absolute;
+  left: var(--free-center-x, 50%);
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 24px));
+}
+.esp-legend {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(8, 8, 10, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+}
+.esp-legend-bar {
+  height: 10px;
+  width: 240px;
+  border-radius: 3px;
+  margin: 2px auto;
+}
+.esp-legend-ticks {
+  display: flex;
+  justify-content: space-between;
+  width: 240px;
+  margin: 0 auto;
+}
+.esp-legend-note {
+  opacity: 0.85;
 }
