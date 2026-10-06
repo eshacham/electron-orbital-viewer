@@ -69,4 +69,10 @@ describe('loadEspGrid and asLibraryMeta', () => {
         void espGrid;
         expect(() => asLibraryMeta(old as never)).toThrow('h2o: meta.json has no espGrid');
     });
+    // Every library surface is meshed from, or framed on, the density grid's box (render_plan's gridHalfWidth).
+    it('refuses a meta.json with no density grid', () => {
+        const { grid, ...old } = waterMeta() as unknown as Record<string, unknown>;
+        void grid;
+        expect(() => asLibraryMeta(old as never)).toThrow('h2o: meta.json has no grid');
+    });
 });

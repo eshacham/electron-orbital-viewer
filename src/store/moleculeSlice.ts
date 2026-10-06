@@ -98,11 +98,17 @@ const moleculeSlice = createSlice({
             state.espRange = action.payload.espRange ?? null;
         },
         renderFailed: (state, action: PayloadAction<string>) => { state.renderLabel = null; state.renderError = action.payload; },
+        /**
+         * A render abandoned before it landed (the mode left mid-mesh, ruling
+         * D38): nothing is computing any more, so the busy label comes down;
+         * the last result and any error stay as they were.
+         */
+        renderCancelled: (state) => { state.renderLabel = null; },
     },
 });
 
 export const {
     indexLoaded, indexFailed, selectMolecule, metaLoaded, metaFailed, linkRejected, setSurface, setShowStructure, setShowDipole,
-    setPick, renderStarted, renderFinished, renderFailed,
+    setPick, renderStarted, renderFinished, renderFailed, renderCancelled,
 } = moleculeSlice.actions;
 export default moleculeSlice.reducer;

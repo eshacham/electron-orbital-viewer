@@ -1,5 +1,5 @@
 import reducer, {
-    selectMolecule, metaLoaded, metaFailed, setSurface, renderStarted, renderFinished, renderFailed, indexLoaded,
+    selectMolecule, metaLoaded, metaFailed, setSurface, renderStarted, renderFinished, renderFailed, renderCancelled, indexLoaded,
     linkRejected,
 } from '../../src/store/moleculeSlice';
 import { encodeMoleculeUrl, decodeMoleculeUrl } from '../../src/molecules/url_keys';
@@ -73,6 +73,14 @@ describe('moleculeSlice', () => {
         s = reducer(s, renderFailed('No isosurface'));
         expect(s.renderError).toBe('No isosurface');
         expect(reducer(s, indexLoaded([])).index).toEqual([]);
+    });
+    // Ruling D38: a render abandoned mid-flight (the mode left, the molecule
+    // cleared) takes its busy label down and leaves the last result alone.
+    it('drops the busy label of an abandoned render, keeping the last result', () => {
+        let s = reducer(init(), renderFinished({ isoLevel: 0.02 }));
+        s = reducer(s, renderStarted('Computing 1b1…'));
+        s = reducer(s, renderCancelled());
+        expect([s.renderLabel, s.isoLevel, s.renderError]).toEqual([null, 0.02, null]);
     });
 });
 

@@ -4,6 +4,8 @@ import { Provider } from 'react-redux';
 import { createAppStore } from '../src/store';
 
 jest.mock('../src/workers/createShellCompositionWorker', () => ({ createShellCompositionWorker: jest.fn() }));
+// The Molecules hook (Phase 6) meshes grids in its own worker; import.meta.url does not load under ts-jest (D16).
+jest.mock('../src/workers/createGridMeshWorker', () => ({ createGridMeshWorker: jest.fn() }));
 jest.mock('../src/orbital_visualizer', () => ({
     initVisualizer: jest.fn(() => ({
         requestCounter: 0,
@@ -28,6 +30,10 @@ jest.mock('../src/orbital_visualizer', () => ({
     clearShellCompositionLobes: jest.fn(),
     attachShellCompositionLobes: jest.fn(),
     setReferenceRing: jest.fn(),
+    presentFieldMesh: jest.fn(),
+    clearFieldMesh: jest.fn(),
+    setMoleculeOverlay: jest.fn(),
+    pointerRaycaster: jest.fn(),
 }));
 // Only applyCameraAngles is mocked (as a spy to record call order); the rest
 // of the module -- isCanonicalAngles etc., which orbitalSlice's own reducers
@@ -54,7 +60,7 @@ import { initVisualizer, attachShellCompositionLobes } from '../src/orbital_visu
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
-import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital, updateAtomViewInScene, setReferenceRing, getScaleBar } from '../src/orbital_visualizer';
+import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital, updateAtomViewInScene, setReferenceRing, getScaleBar, clearFieldMesh } from '../src/orbital_visualizer';
 import { applyCameraAngles, cameraAnglesOf } from '../src/camera_angles';
 
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
@@ -93,6 +99,18 @@ describe('OrbitalViewer with nothing requested', () => {
         act(() => { store.dispatch(setMode('atom')); });
         expect(cancelPendingRender).toHaveBeenCalledTimes(1);
         expect(clearScene).not.toHaveBeenCalled();
+    });
+
+    // D6: Molecules mode draws outside the orbital slice, so "nothing asked
+    // for" is its normal state -- clearScene there would kill its MO worker.
+    it('leaves the scene to the molecule hook in Molecules mode', () => {
+        const store = renderViewer();
+        act(() => { store.dispatch(startFieldCalculation(request)); });
+        act(() => { store.dispatch(setMode('molecule')); });
+        expect(clearScene).not.toHaveBeenCalled();
+        // No molecule chosen yet: the hook itself takes the old picture down.
+        expect(clearFieldMesh).toHaveBeenCalled();
+        expect(updateFieldInScene).toHaveBeenCalledTimes(1);
     });
 
     it('does nothing of the kind while something is requested', () => {

@@ -21,6 +21,8 @@ export interface MoleculeReference {
 }
 
 export interface LibraryExtras {
+    /** Optional on a diatomic's meta.json; every library molecule ships its density grid, and its box frames every surface. */
+    grid: GridSpec;
     /** Debye, from − to + (IUPAC), in the frame of `atoms`. */
     dipoleVectorDebye: [number, number, number];
     espGrid: GridSpec;
@@ -44,7 +46,7 @@ export const LIBRARY_CATEGORIES: ReadonlyArray<{ key: string; label: string }> =
     { key: 'biomolecule-fragments', label: 'Biomolecule fragments' },
 ];
 
-const REQUIRED: Array<keyof LibraryExtras> = ['dipoleVectorDebye', 'espGrid', 'espRangeOnSurface', 'electronCount', 'symmetry'];
+const REQUIRED: Array<keyof LibraryExtras> = ['grid', 'dipoleVectorDebye', 'espGrid', 'espRangeOnSurface', 'electronCount', 'symmetry'];
 
 /** A meta.json from before the library cannot be drawn honestly (no ESP, no dipole direction); say so rather than guess. */
 export function asLibraryMeta(meta: MoleculeMeta): LibraryMoleculeMeta {

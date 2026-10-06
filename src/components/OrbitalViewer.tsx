@@ -39,6 +39,7 @@ import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '.
 import { createShellCompositionWorker } from '../workers/createShellCompositionWorker';
 import { LobeMeshData } from '../workers/shellCompositionWorker';
 import { OrbitalParams } from '../types/orbital';
+import { useMoleculeView } from '../molecules/useMoleculeView';
 
 interface ShellCompositionSuccessMessage {
     type: 'success';
@@ -200,10 +201,14 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // comes down too -- the panel now describes something that is not drawn
     // (spec §3.5); atom mode's own views replace it. Declared ahead of the
     // shell-view effects so that, in the same commit, they run after this and
-    // their requests are the newest.
+    // their requests are the newest. Molecules mode draws outside the orbital
+    // slice (useMoleculeView), so there "nothing asked for" is the normal
+    // state: clearing here would kill its MO worker mid-render and leave its
+    // busy label up for ever (D6).
     useEffect(() => {
         const context = visualizerContextRef.current;
         if (!context || stateParams || fieldRequest) return;
+        if (atomMode === 'molecule') return;
         if (atomMode === 'atom') cancelPendingRender(context);
         else clearScene(context);
     }, [stateParams, fieldRequest, atomMode]);
@@ -490,6 +495,9 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // way when the level changes).
     useEffect(() => {
         if (!visualizerContextRef.current || !stateParams || showShellView) return;
+        // A Basic Orbitals request left in the orbital slice must never draw
+        // over a molecule: the molecule hook owns the scene in that mode.
+        if (atomMode === 'molecule') return;
 
         console.log('OrbitalViewer: Using state params:', stateParams);
 
@@ -523,6 +531,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // effects never both draw; either way the newest request owns the scene.
     useEffect(() => {
         if (!visualizerContextRef.current || !fieldRequest || atomMode === 'atom' || showShellView) return;
+        if (atomMode === 'molecule') return;
         updateFieldInScene(visualizerContextRef.current, fieldRequest)
             .then(outcome => {
                 if (outcome.status === 'superseded') return;
@@ -615,6 +624,13 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // Molecules mode's surface, overlay and picking (Phase 6). Called last
+    // (D6): its effects run after every effect above in the same commit, so
+    // nothing declared earlier can clear or supersede a molecule render that
+    // has just started. The context already exists -- the initialisation
+    // effect is the first declared, so it ran first on mount.
+    useMoleculeView(visualizerContextRef, atomMode === 'molecule', enclosedFraction);
 
     return (
         <>
