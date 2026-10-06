@@ -8,6 +8,7 @@ pluggy==1.6.0
 pygments==2.21.0
 pyscf==2.8.0
 pytest==9.1.1
+rfc8785==0.1.4
 scipy==1.18.1
 setuptools==84.0.0
 six==1.17.0

@@ -15,3 +15,6 @@ tools/molecules/out/
 .playwright-mcp/
 *.png
 infra/owner.env
+
+# Local job backend state (Phase 6B): job records, meter, resolution cache
+tools/jobs/.state/

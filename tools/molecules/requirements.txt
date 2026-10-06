@@ -9,3 +9,6 @@ numpy>=1.26,<3
 scipy>=1.11
 pytest>=8.0
 geometric==1.1.1
+
+# On-demand jobs (Phase 6B): RFC 8785 canonical JSON for job keys.
+rfc8785==0.1.4
