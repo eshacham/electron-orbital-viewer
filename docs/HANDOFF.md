@@ -1801,6 +1801,150 @@ optimisation's `meta.json` `geometryOptimisation` carries `resumedFrom: n`
   files term scales with vCPU count on Fargate and likely divide it by
   `speedup` there instead).
 
+## Phase 6B-2 — the interface (2026-10-06)
+
+Spec: `docs/superpowers/specs/2026-10-05-on-demand-generation-design.md` §9.
+This phase ships the UI behind 6B-1's jobs core: the computed tier
+throughout Molecules mode, the owner's request/status/provenance panels,
+sign-in, and `/admin.html`. The AWS backend itself (DynamoDB, Batch, S3,
+Cognito, the HTTP API) is 6B-3.
+
+### What shipped
+
+- **A computed tier and the `job` URL key** — `#mode=molecule&job=<64-hex
+  key>` opens any computed molecule's result for anyone, with an explicit
+  "no finished result yet" message before `done.json` exists, and no stale
+  or blank picture left over from whatever was open before.
+- **The provenance panel**, "How this was computed", on every molecule of
+  either tier: method, geometry source, caveats, and — for a computed
+  molecule — its input/output/geometry files, generator commit and sizing
+  version, plus (owner only) the job's own wall time and cost.
+- **The request panel and its preview** — a name, SMILES or pasted XYZ in; a
+  ball-and-stick SVG, formula, charge, multiplicity, electron count, the
+  resolved recipe and the owner's predicted time and cost out — before
+  Submit ever sends anything but what was previewed.
+- **Live status** — stage, latest energy (with its method), a log tail,
+  elapsed time and cost, polled every 5 s while a job is `QUEUED`,
+  `STARTING` or `RUNNING`, never two requests in flight for one key, none
+  while the tab is hidden; `DONE` opens the molecule by itself.
+- **Owner sign-in** — Cognito managed login with TOTP MFA via
+  `oidc-client-ts` (code + PKCE), the access token kept in memory only and
+  the refresh token in `sessionStorage`; "not configured in this build"
+  whenever the build has no Cognito settings.
+- **The where-jobs-run choice** — This Mac or AWS, persisted in
+  `localStorage` under `eov.jobs.target`, shared by `/` and `/admin.html`;
+  a production build ignores it and always uses the deployed API.
+- **`/admin.html`**, the owner's dashboard — a plain, sortable, filterable
+  jobs table (predicted against actual) and a cost panel (spent, reserved,
+  remaining, projected, a hand-drawn daily-spend chart, AWS's billed
+  figure) — a second Vite entry whose code never reaches the main bundle,
+  checked on every build by `npm run check:admin-split`.
+
+### Rulings made in this plan
+
+- **The id carries the tier.** A computed molecule's id is its
+  64-character lowercase-hex job key. Library ids match `^[a-z0-9]+$` (no
+  `-`, no length cap), so a job key can never collide with one: no library
+  id is 64 hex characters, and `isJobKey` is tested before any library
+  lookup. `moleculePath(id)` chooses the base from the id alone —
+  `/molecules/<DATA_VERSION>/<id>` for the library,
+  `/molecules/jobs/<key>` for a job — so Phase 6's meta/basis/density/ESP
+  loads, and the MO worker (handed only `recipe.moleculeId`), work
+  unchanged.
+- **The preview is drawn in SVG**, not a second WebGL context: it reuses
+  Phase 6's bonding rule, radii and CPK colours but not its `THREE.Group`,
+  renders under jsdom like the rest of the UI, and can be turned by
+  dragging.
+- **Ball-and-stick now covers H–Kr** (Cordero et al. 2008 radii, Jmol
+  colours) — Phase 6's tables covered only the library's nine elements, and
+  a computed molecule may hold any element up to krypton (spec §5.1).
+- **The sign-in link sits under Share/Export**, the app's only menu row, in
+  the view settings; the "where jobs run" choice sits beside it on the dev
+  server.
+- **`#mode=molecule&job=<key>`** is the share link — Phase 6 already names
+  the mode `molecule` in links, not `molecules` (see Findings below).
+- **The session is restored from the refresh token.** `OwnerAuth` copies
+  `{refresh_token, scope, profile}` to `sessionStorage` after every sign-in
+  or renewal; on load it seeds an in-memory `User` from that and calls
+  `signinSilent()`, which takes the refresh-token grant in `oidc-client-ts`
+  3.5.0. Closing the tab signs out, since the access and ID tokens never
+  leave memory. **D23:** after a Cognito redirect, the default view renders
+  briefly before the saved view is restored from the returned `state` —
+  accepted.
+- The owner's cost comes from the job record (`GET /api/v1/jobs/{key}`'s
+  `actualUsd`/`reservedUsd`), never from the published molecule —
+  `meta.provenance.costUsd` is always null.
+- Retry rebuilds the request as XYZ from the canonical atoms (already
+  rounded to 10⁻⁵ Å), with explicit charge and multiplicity, so it
+  reproduces the same key without needing the original form.
+- **Live verification (ruling D6).** Each live check runs a throwaway job
+  server (`:8797`, temporary state and result directories) and its own
+  Vite (`:5401`, started with `JOBS_LOCAL_API_URL` and `JOBS_OUT_ROOT`
+  pointing at them) and its own headless Chromium, all started and stopped
+  inside one foreground command — never the owner's `:5391`/`:8787` dev
+  session, `tools/jobs/.state`, `tools/molecules/out`, or its Playwright
+  MCP window. A real job runs end to end through this throwaway stack from
+  request to `DONE`; only the figures a local job cannot produce itself
+  (AWS's billed costs, in the dashboard) are stubbed. `README.md`'s
+  dev-server paragraph names both environment variables.
+
+### Layout and live-check notes
+
+- **`/admin.html`'s cost panel sits beside the table only from 1880 px
+  wide** (Task 15); narrower, it sits below the table instead. Run
+  `npm run check:admin-split` after every build, not just once — it is the
+  check that the split survives a dependency or chunking change, not a
+  one-time proof.
+- **A running local job shows no stage, latest energy or log tail** (Task
+  12): the worker reports those from its first heartbeat, at 30 s, and most
+  local jobs (water, ammonia, a single-point run) finish before that. A
+  longer job, or any job on AWS, shows them throughout.
+- **On a landscape phone, the legend stack already touches the molecule's
+  top** (ruling T16-c) — true of Phase 6's own stack before this phase, not
+  introduced by the compact tier badge, which adds no height of its own
+  there.
+
+### What 6B-3 must supply
+
+- The four `VITE_*` values at build: `VITE_JOBS_API_URL`,
+  `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN`.
+- Cognito callback **and** sign-out URLs for `<CloudFront>/`,
+  `<CloudFront>/admin.html`, `http://localhost:5173/`,
+  `http://localhost:5173/admin.html`, `http://localhost:5391/` and
+  `http://localhost:5391/admin.html`, with scopes `openid email`.
+- HTTP API CORS allowing the `Authorization` and `Content-Type` headers and
+  the `GET`/`POST` methods from those same origins.
+- S3 result objects under `molecules/jobs/` serving `.py`, `.log` and
+  `.xyz` as `text/plain; charset=utf-8`.
+- Nothing for `done.json` 403 caching: CloudFront's default error-caching
+  TTL is 10 s, shorter than the 5 s poll's tolerance for a job that has
+  just finished — no site-stack change needed.
+- The `billing` record shaped `{ usd, through }`.
+- `JOBS_AWS_API_URL` for the dev proxy.
+- Keep Cognito refresh-token rotation **off** — `oidc-client-ts`'s own
+  renewal timer bypasses the single-refresh guard this phase's client
+  relies on for a 401 mid-session, and rotation would race it. Call
+  Cognito's `/oauth2/revoke` on sign-out, since closing the tab alone only
+  drops the client's own copy of the refresh token, not the token itself.
+
+### Findings
+
+- Spec §9.1 writes `mode=molecules`; Phase 6's own links say `molecule`.
+  This plan follows Phase 6.
+- Spec §9.3 names `geometrySource.name`; 6B-1 writes `title` and `query`
+  instead. This plan follows 6B-1's actual shape.
+- Phase 6's `LibraryExtras.geometryOptimisation` was `{converged,
+  maxGradient}`; 6B-1's worker writes `{steps, converged}` (and
+  `resumedFrom` on a resumed attempt). The type is widened to match, rather
+  than cast around.
+- Task 1 Step 3's diatomic-only probe (`caption.ts`, `orbitalSlice.ts`,
+  `bonds_url.ts`, `MoDiagram.tsx`, `src/bonds/*.ts`) found nothing to
+  report: every hit is either squarely inside `src/bonds/`, or
+  `orbitalSlice.ts`'s `isBondsField` guard, or `caption.ts`'s
+  `bondsDrawnPicture`, which returns `null` before reaching the line in
+  question unless the system is a Bonds one — a molecule's own drawn
+  picture can never reach it.
+
 ## Judgment calls made without asking
 
 Recorded for review, per the session's standing authority.

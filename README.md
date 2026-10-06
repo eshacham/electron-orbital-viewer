@@ -424,6 +424,73 @@ read off how big it actually is.
 
 ---
 
+## Computed molecules (on request, owner only)
+
+Molecules mode's 25-molecule library (above) is picked and built ahead of
+time. On top of it, the owner can request any further molecule — by name,
+SMILES or pasted XYZ — computed on demand against the same real
+quantum-chemistry pipeline the library itself comes from. Every molecule
+carries a visible tier badge: **Validated** for one of the 25 library
+molecules, checked against an experimental or published reference, or
+**Computed** for one requested on demand, by the same method but not
+benchmarked against anything. "Computed" is a promise about the method, not
+about accuracy — nobody has checked this particular result against
+experiment.
+
+A computed molecule's link, `#mode=molecule&job=<64-character job key>`,
+opens for anyone — there is no sign-in to view one. Before the job has
+finished, or if it failed, the link says so explicitly ("This computed
+molecule has no finished result yet: its job may still be running, or it
+failed. Open the link again once it has finished.") rather than a blank
+screen or a stale picture left over from whatever was open before.
+
+**"How this was computed"**, on every molecule of either tier, states the
+method, where the geometry came from (CCCBDB experiment or a
+B3LYP/def2-TZVP optimisation for the library; a PubChem record or pasted
+XYZ coordinates for a computed one) and what to be wary of. For a computed
+molecule it also links the files that produced it — `input.py` (the exact
+PySCF script; open it and run it again), `output.log`, `geometry.xyz` and
+`job.json`, plus `timings.json` for an optimisation — served as plain
+text, not downloaded. The owner, signed in or on This Mac, sees one more
+line: the job's own wall time and cost, read from the job record itself,
+never from the published molecule.
+
+**Requesting one** is owner-only, and only where the build knows how to run
+jobs: on the dev server, or in a production build once signed in. On the
+dev server, start the local job server (needed only for This Mac; never
+for AWS):
+
+```bash
+cd tools && ../tools/molecules/.venv/bin/python -m jobs.local_server
+```
+
+Then choose **This Mac** in the "where jobs run" group next to
+Share/Export. The side panel's "Request a molecule" takes a name, SMILES or
+pasted XYZ, previews what it resolved to (formula, charge, electrons, a
+ball-and-stick SVG, which recipe and sizing it would run, and the owner's
+predicted time and cost) and submits it. The status panel then polls every
+5 seconds — stage, latest energy, a log tail, elapsed time and the
+Fargate-sized cost estimate — until the job finishes and opens itself, or
+fails with the option to retry the same atoms as a new attempt.
+
+**`/admin.html`** is the owner's dashboard: every job this month in a
+plain, sortable, filterable table (predicted against actual time and
+memory, with the same file links), and a cost panel — spent, reserved,
+remaining, projected by month end, a day-by-day spend chart and, on AWS,
+the billed figure from Cost Explorer. It is a second Vite entry, built and
+shipped entirely apart from the main page: `npm run check:admin-split`
+fails the build if that ever stops being true.
+
+**Build-time settings:**
+
+| Variable | What it does |
+| --- | --- |
+| `VITE_JOBS_API_URL` | the deployed API's base URL (production only; the dev server always uses the local proxy below) |
+| `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN` | Cognito managed login; leave any one unset and sign-in says "not configured in this build" |
+| `JOBS_AWS_API_URL` | dev-server only: where the proxy sends an "AWS" request (`/api/aws/…`); unset, AWS falls through to the local server, which the UI reports as not configured |
+
+---
+
 ## Share and export
 
 **The address bar is always the link.** Every change — element, level,
@@ -967,6 +1034,13 @@ npm run dev        # http://localhost:5173
 npm test           # 3200+ tests
 npm run build      # production bundle into dist/
 ```
+
+The dev server proxies "This Mac" jobs to `127.0.0.1:8787` (the local job
+server, [above](#computed-molecules-on-request-owner-only)) and serves
+computed molecules from `tools/molecules/out`; two environment variables
+point it elsewhere instead — `JOBS_LOCAL_API_URL` and `JOBS_OUT_ROOT` —
+which is how this project's own live checks run their own throwaway job
+server and result directory without touching a running dev session's.
 
 Bonds mode's ten diatomics and Molecules mode's 25-molecule library share one
 offline Python pipeline under `tools/molecules/` — see [Bonds mode](#bonds-mode)
