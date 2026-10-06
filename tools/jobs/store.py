@@ -5,6 +5,20 @@ in Phase 6B-3. Its methods are the conditional operations the AWS version
 makes in one DynamoDB transaction, so the local backend exercises the same
 semantics: create-if-absent together with the reservation, settle exactly
 once, claim only from a state that allows it.
+
+Fix round 1 (Ruling T5-a): the meter used to be a second file, written
+alongside the job record, so a crash between the two writes could double-
+reserve on retry or drive the meter negative (the review reproduced both).
+There is now no meter file at all: each record already carries its own
+unsettled reservation (`reservedMicros`/`settled`/`month`) and a ledger of
+its settled charges (`charges`), and `meter()` sums these over every record
+under the lock. Every money-moving method (`create_job`, `requeue_failed`,
+`settle`) becomes exactly one atomic record write, so there is no window in
+which a crash can land half of an operation: either the write lands (via
+`os.replace`) and the meter reflects it, or it does not and the meter is as
+if the call never happened. DynamoStore (6B-3) keeps its own transactional
+meter item, already atomic by a different mechanism, and runs this same
+test file as its contract.
 """
 import fcntl
 import hashlib
@@ -30,7 +44,8 @@ class Store(Protocol):
     def create_job(self, record: dict) -> tuple[bool, dict]: ...
     def requeue_failed(self, key: str, decision: dict, now) -> dict: ...
     def claim(self, key: str, attempt: int, now) -> bool: ...
-    def update_job(self, key: str, changes: dict, expect_status: set | None = None) -> bool: ...
+    def update_job(self, key: str, changes: dict, expect_status: set | None = None,
+                    attempt: int | None = None) -> bool: ...
     def settle(self, key: str, actual_micros: int) -> bool: ...
     def list_jobs(self, month: str, status: str | None = None) -> list[dict]: ...
     def meter(self, month: str) -> dict: ...
@@ -73,19 +88,20 @@ class FileStore:
     def _job_path(self, key):
         return self.root / 'jobs' / f'{key}.json'
 
-    def _meter_path(self, month):
-        return self.root / f'meter-{month}.json'
+    def _all_records(self):
+        return [json.loads(p.read_text()) for p in (self.root / 'jobs').glob('*.json')]
 
     def _meter(self, month):
-        m = self._read(self._meter_path(month), {'spent': 0, 'reserved': 0, 'committed': 0})
-        return {**m, 'cap': self.cap}
-
-    def _reserve(self, month, micros):
-        m = self._meter(month)
-        if m['committed'] + micros > self.cap:
-            raise BudgetExhausted(m)
-        self._write(self._meter_path(month), {'spent': m['spent'], 'reserved': m['reserved'] + micros,
-                                              'committed': m['committed'] + micros})
+        # Derived, not stored: spent is every settled charge billed to this
+        # month (a job may carry charges from more than one month, across
+        # retries); reserved is every unsettled record currently sitting in
+        # it. Nothing here is written, so a reader never needs the lock to
+        # get a consistent snapshot beyond what a single `glob` gives it.
+        records = self._all_records()
+        spent = sum(charge['micros'] for r in records for charge in r.get('charges', ())
+                    if charge['month'] == month)
+        reserved = sum(r['reservedMicros'] for r in records if not r['settled'] and r['month'] == month)
+        return {'spent': spent, 'reserved': reserved, 'committed': spent + reserved, 'cap': self.cap}
 
     def get_job(self, key):
         return self._read(self._job_path(key))
@@ -95,8 +111,10 @@ class FileStore:
             existing = self.get_job(record['key'])
             if existing is not None:
                 return False, existing
-            self._reserve(record['month'], record['reservedMicros'])
-            self._write(self._job_path(record['key']), record)
+            m = self._meter(record['month'])
+            if m['committed'] + record['reservedMicros'] > self.cap:
+                raise BudgetExhausted(m)
+            self._write(self._job_path(record['key']), record)      # the one write: job and reservation together
             return True, record
 
     def requeue_failed(self, key, decision, now):
@@ -108,14 +126,17 @@ class FileStore:
                 raise JobRefused('invalid-request', 'the failed attempt is still being settled; retry in a minute', 409)
             # A retry is a new submission: it is charged to the month it is made in (spec §6.4).
             month = month_of(now)
-            self._reserve(month, decision['reservationMicros'])
+            m = self._meter(month)
+            if m['committed'] + decision['reservationMicros'] > self.cap:
+                raise BudgetExhausted(m)
             rec.update({'status': 'QUEUED', 'attempt': rec['attempt'] + 1, 'error': None, 'settled': False,
                         'month': month,
                         'reservedMicros': decision['reservationMicros'],
                         'sizing': {k: v for k, v in decision.items() if k != 'reservationMicros'},
                         'submittedAt': iso(now), 'startedAt': None, 'endedAt': None, 'heartbeatAt': None,
-                        'stage': None, 'logTail': [], 'actual': None, 'runnerJobId': None})
-            self._write(self._job_path(key), rec)
+                        'stage': None, 'latestEnergyHartree': None, 'logTail': [], 'actual': None,
+                        'runnerJobId': None})
+            self._write(self._job_path(key), rec)                   # the one write: job and reservation together
             return rec
 
     def claim(self, key, attempt, now):
@@ -130,10 +151,16 @@ class FileStore:
             self._write(self._job_path(key), rec)
             return True
 
-    def update_job(self, key, changes, expect_status=None):
+    def update_job(self, key, changes, expect_status=None, attempt=None):
         with self._locked():
             rec = self.get_job(key)
             if rec is None or (expect_status is not None and rec['status'] not in expect_status):
+                return False
+            # The worker passes its own attempt on every heartbeat and on its
+            # final status write (Task 9), so a superseded attempt — one a
+            # Spot reclaim or a Batch retry has already moved past — can
+            # never clobber the current one.
+            if attempt is not None and rec['attempt'] != attempt:
                 return False
             rec.update(changes)
             self._write(self._job_path(key), rec)
@@ -144,17 +171,17 @@ class FileStore:
             rec = self.get_job(key)
             if rec is None or rec['settled']:
                 return False
-            m = self._meter(rec['month'])
-            self._write(self._meter_path(rec['month']), {
-                'spent': m['spent'] + actual_micros, 'reserved': m['reserved'] - rec['reservedMicros'],
-                'committed': m['committed'] + actual_micros - rec['reservedMicros']})
-            rec.update({'settled': True, 'actualMicros': rec['actualMicros'] + actual_micros})
+            # Settling is appending one charge and flipping `settled`, in the
+            # same write as the reservation it closes out: the meter can
+            # never see the charge without the reservation going away, or
+            # the other way round.
+            rec.update({'settled': True, 'actualMicros': rec['actualMicros'] + actual_micros,
+                        'charges': rec.get('charges', []) + [{'month': rec['month'], 'micros': actual_micros}]})
             self._write(self._job_path(key), rec)
             return True
 
     def list_jobs(self, month, status=None):
-        records = [json.loads(p.read_text()) for p in (self.root / 'jobs').glob('*.json')]
-        chosen = [r for r in records if r['month'] == month and (status is None or r['status'] == status)]
+        chosen = [r for r in self._all_records() if r['month'] == month and (status is None or r['status'] == status)]
         return sorted(chosen, key=lambda r: (r['submittedAt'], r['key']))
 
     def meter(self, month):

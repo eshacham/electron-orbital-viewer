@@ -123,3 +123,72 @@ def test_public_view_converts_money_and_hides_internals(store):
         assert hidden not in view
     store.settle('a' * 64, 250)
     assert public_view(store.get_job('a' * 64))['actualUsd'] == 0.00025
+
+
+# --- fix round 1 (Rulings T5-a, T5-b): the meter is derived from job records, ---
+# --- so a crash can never land half of a two-write money operation. ---
+
+def test_create_job_crash_before_its_one_write_leaves_no_trace(store, monkeypatch):
+    real_write = store._write
+    monkeypatch.setattr(store, '_write', lambda *a, **k: (_ for _ in ()).throw(OSError('simulated crash')))
+    with pytest.raises(OSError):
+        store.create_job(record())
+    monkeypatch.setattr(store, '_write', real_write)
+    # nothing was persisted: no job, no reservation anywhere
+    assert store.get_job('a' * 64) is None
+    assert store.meter('2026-10') == {'spent': 0, 'reserved': 0, 'committed': 0, 'cap': 10_000}
+    # a retry (the real caller behaviour after a crash) applies exactly once
+    created, rec = store.create_job(record())
+    assert created and rec['status'] == 'QUEUED'
+    assert store.meter('2026-10') == {'spent': 0, 'reserved': 1_000, 'committed': 1_000, 'cap': 10_000}
+
+
+def test_settle_crash_before_its_one_write_leaves_the_reservation_intact(store, monkeypatch):
+    store.create_job(record())
+    real_write = store._write
+    monkeypatch.setattr(store, '_write', lambda *a, **k: (_ for _ in ()).throw(OSError('simulated crash')))
+    with pytest.raises(OSError):
+        store.settle('a' * 64, 300)
+    monkeypatch.setattr(store, '_write', real_write)
+    # the crash happened before the record's one write landed: still reserved, not spent
+    assert store.meter('2026-10') == {'spent': 0, 'reserved': 1_000, 'committed': 1_000, 'cap': 10_000}
+    # a retry applies exactly once
+    assert store.settle('a' * 64, 300)
+    assert not store.settle('a' * 64, 300)
+    assert store.meter('2026-10') == {'spent': 300, 'reserved': 0, 'committed': 300, 'cap': 10_000}
+
+
+def test_requeue_failed_crash_before_its_one_write_leaves_no_trace(store, monkeypatch):
+    store.create_job(record())
+    store.update_job('a' * 64, {'status': 'FAILED'})
+    store.settle('a' * 64, 100)
+    real_write = store._write
+    monkeypatch.setattr(store, '_write', lambda *a, **k: (_ for _ in ()).throw(OSError('simulated crash')))
+    with pytest.raises(OSError):
+        store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
+    monkeypatch.setattr(store, '_write', real_write)
+    # still FAILED and settled, no second reservation anywhere
+    rec = store.get_job('a' * 64)
+    assert rec['status'] == 'FAILED' and rec['attempt'] == 1
+    assert store.meter('2026-10') == {'spent': 100, 'reserved': 0, 'committed': 100, 'cap': 10_000}
+    # a retry applies exactly once
+    rec = store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
+    assert rec['status'] == 'QUEUED' and rec['attempt'] == 2
+    assert store.meter('2026-10') == {'spent': 100, 'reserved': 500, 'committed': 600, 'cap': 10_000}
+
+
+def test_update_job_attempt_guard(store):
+    store.create_job(record())
+    assert store.claim('a' * 64, 2, NOW)                           # a Batch retry straight from QUEUED
+    assert not store.update_job('a' * 64, {'stage': 'SCF'}, attempt=1)      # a superseded attempt
+    assert store.get_job('a' * 64)['stage'] is None
+    assert store.update_job('a' * 64, {'stage': 'SCF'}, attempt=2)
+    assert store.get_job('a' * 64)['stage'] == 'SCF'
+
+
+def test_requeue_failed_resets_latest_energy(store):
+    store.create_job(record())
+    store.update_job('a' * 64, {'status': 'FAILED', 'latestEnergyHartree': -76.4})
+    store.settle('a' * 64, 100)
+    rec = store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
+    assert rec['latestEnergyHartree'] is None
