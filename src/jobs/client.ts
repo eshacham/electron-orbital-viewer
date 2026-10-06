@@ -1,8 +1,11 @@
 import type { UnknownAction } from '@reduxjs/toolkit';
-import { createJobsApi, JobsApi } from './api';
+import { createJobsApi, JobsApi, JobsApiError } from './api';
 import { BUILD_ENV } from './build_env';
 import { ownerAuth } from './owner_session';
-import { sessionExpired, setTarget, JobsState, JobsTarget, TARGET_STORAGE_KEY } from '../store/jobsSlice';
+import { JobPoller } from './poller';
+import {
+    sessionExpired, setTarget, JobsState, JobsTarget, TARGET_STORAGE_KEY, jobFetchFailed, jobUpdated,
+} from '../store/jobsSlice';
 
 export interface JobsStoreLike {
     getState(): { jobs: JobsState };
@@ -10,10 +13,12 @@ export interface JobsStoreLike {
 }
 
 let bound: JobsStoreLike | null = null;
+let poller: Pick<JobPoller, 'watch' | 'restart'> | null = null;
 
 /** main.tsx and admin/main.tsx bind their store once; from then on the API follows its target and session. */
 export function bindJobsClient(store: JobsStoreLike | null): void {
     bound = store;
+    poller = null;
 }
 
 function requireStore(): JobsStoreLike {
@@ -29,6 +34,32 @@ export function jobsApi(): JobsApi {
         refresh: async () => (await ownerAuth()?.refresh()) ?? false,
         onSessionExpired: () => { store.dispatch(sessionExpired()); },
     });
+}
+
+/** The page's one poller, so every panel following a job shares its requests. */
+export function jobsPoller(): Pick<JobPoller, 'watch' | 'restart'> {
+    if (poller) return poller;
+    const store = requireStore();
+    poller = new JobPoller({
+        fetchJob: key => jobsApi().get(key),
+        onUpdate: view => { store.dispatch(jobUpdated(view)); },
+        onError: (key, error) => { store.dispatch(jobFetchFailed({ key, message: error instanceof Error ? error.message : String(error) })); },
+        isFatal: error => error instanceof JobsApiError
+            && (error.status === 401 || error.status === 404 || error.code === 'not-configured' || error.code === 'aws-not-configured'),
+        now: () => Date.now(),
+        setTimer: (callback, ms) => window.setTimeout(callback, ms),
+        clearTimer: handle => window.clearTimeout(handle as number),
+        hidden: () => document.visibilityState === 'hidden',
+        onVisibilityChange: listener => {
+            document.addEventListener('visibilitychange', listener);
+            return () => document.removeEventListener('visibilitychange', listener);
+        },
+    });
+    return poller;
+}
+
+export function setJobsPollerForTests(next: Pick<JobPoller, 'watch' | 'restart'> | null): void {
+    poller = next;
 }
 
 /** The dev server's "where jobs run" choice, remembered so / and /admin.html agree. */
