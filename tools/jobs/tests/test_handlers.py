@@ -107,6 +107,10 @@ def test_budget_refusal(api):
     ({'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}, 'multiplicity': 2}, 'bad-multiplicity', 422),
     ({'recipe': 'single', 'molecule': {'name': 'unobtainium'}}, 'unknown-compound', 422),
     ({'recipe': 'single', 'molecule': {'xyz': 'Rb 0 0 0'}}, 'element-out-of-range', 422),
+    ({'recipe': ['single'], 'molecule': {'xyz': WATER_XYZ}}, 'invalid-request', 400),
+    ({'recipe': 'single', 'molecule': 'water'}, 'invalid-request', 400),
+    ({'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}, 'charge': True}, 'invalid-request', 400),
+    ({'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}, 'charge': -100000}, 'bad-multiplicity', 422),
 ])
 def test_refusals(api, body, code, status):
     got_status, got = call(api, 'POST', '/api/v1/jobs', body)
@@ -115,10 +119,86 @@ def test_refusals(api, body, code, status):
 
 def test_malformed_json_and_routes(api):
     assert api.handle('POST', '/api/v1/jobs', {}, b'{not json')[1]['error']['code'] == 'invalid-request'
+    assert api.handle('POST', '/api/v1/jobs', {}, b'[1, 2, 3]')[1]['error']['code'] == 'invalid-request'
     assert api.handle('GET', '/api/v1/jobs/' + 'f' * 64, {}, None)[0] == 404
     assert api.handle('GET', '/api/v1/jobs/not-a-key', {}, None)[0] == 404
     assert api.handle('DELETE', '/api/v1/jobs', {}, None)[0] == 404
     assert api.handle('GET', '/api/v1/jobs', {'month': '2026-13x'}, None)[0] == 400
+
+
+def test_job_route_requires_an_exact_path(api):
+    call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    assert api.handle('GET', f'/api/v1/jobs/x/{WATER_KEY}', {}, None)[0] == 404
+    assert api.handle('GET', f'/api/v1/jobs/{WATER_KEY}/x', {}, None)[0] == 404
+
+
+def test_bad_recipe_with_a_name_never_calls_pubchem(api):
+    def must_not_be_called(*a, **k):
+        raise AssertionError('resolve should not have been called for a recipe this invalid')
+    api.resolve = must_not_be_called
+    status, body = call(api, 'POST', '/api/v1/jobs', {'recipe': 'scan', 'molecule': {'name': 'water'}})
+    assert status == 400 and body['error']['code'] == 'invalid-request'
+
+
+def test_runner_failure_write_is_guarded_against_a_race(api):
+    def broken(record):
+        # Simulates something else (a worker claiming a retried attempt,
+        # say) moving the job on before the runner's own failure write
+        # would otherwise land.
+        api.store.update_job(record['key'], {'status': 'RUNNING', 'attempt': 2})
+        raise RuntimeError('Batch said no')
+    api.runner.submit = broken
+    status, view = call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    assert status == 201
+    record = api.store.get_job(WATER_KEY)
+    assert record['status'] == 'RUNNING' and record['attempt'] == 2
+    assert api.store.meter('2026-10')['reserved'] == record['reservedMicros']
+
+
+def test_preview_skips_budget_refusal_for_an_existing_active_job(api):
+    call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    api.store.cap = 1
+    status, body = call(api, 'POST', '/api/v1/jobs/preview', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    assert status == 200 and body['decision']['ok'] is True and body['existing']['status'] == 'QUEUED'
+
+
+def test_preview_skips_budget_refusal_for_an_existing_done_job(api):
+    call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    api.store.update_job(WATER_KEY, {'status': 'DONE', 'endedAt': '2026-10-09T08:00:00Z'})
+    api.store.cap = 1
+    status, body = call(api, 'POST', '/api/v1/jobs/preview', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    assert status == 200 and body['decision']['ok'] is True and body['existing']['status'] == 'DONE'
+
+
+def test_retry_that_loses_the_race_to_another_retry_returns_200(api):
+    call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    api.store.update_job(WATER_KEY, {'status': 'FAILED', 'error': {'code': 'x', 'message': 'm'}})
+    api.store.settle(WATER_KEY, 10)
+    real_requeue = api.store.requeue_failed
+
+    def requeue_then_report_losing_the_race(key, decision, now):
+        real_requeue(key, decision, now)      # our own write lands...
+        from jobs.errors import JobRefused
+        raise JobRefused('invalid-request', 'only a failed job can be retried', 409)   # ...but we're told we lost
+
+    api.store.requeue_failed = requeue_then_report_losing_the_race
+    status, view = call(api, 'POST', '/api/v1/jobs',
+                         {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}, 'retry': True})
+    assert status == 200 and view['status'] == 'QUEUED' and view['attempt'] == 2
+
+
+def test_retry_while_still_unsettled_keeps_409(api):
+    call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    api.store.update_job(WATER_KEY, {'status': 'FAILED', 'error': {'code': 'x', 'message': 'm'}})
+    status, body = call(api, 'POST', '/api/v1/jobs',
+                         {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}, 'retry': True})
+    assert status == 409 and body['error']['code'] == 'invalid-request'
+
+
+def test_costs_for_a_past_month_with_no_records(api):
+    status, costs = api.handle('GET', '/api/v1/costs', {'month': '2026-09'}, None)
+    assert status == 200 and costs['month'] == '2026-09'
+    assert costs['spentUsd'] == 0.0 and costs['daily'] == [] and costs['projectionUsd'] == 0.0
 
 
 def test_get_and_list(api):

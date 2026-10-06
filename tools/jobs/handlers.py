@@ -9,13 +9,15 @@ import re
 
 from jobs import pubchem, sizing
 from jobs.basis_counts import basis_functions
-from jobs.canonical import canonical_job, check_atoms, electron_count, formula, job_key, multiplicity_for, parse_xyz
+from jobs.canonical import (RECIPES, canonical_job, check_atoms, electron_count, formula, job_key,
+                             multiplicity_for, parse_xyz)
 from jobs.errors import JobRefused
 from jobs.model import ACTIVE, STATUSES, iso, month_of, new_record, public_view, usd, utc_now
 from jobs.prices import RETRIEVED
 from jobs.store import BudgetExhausted
 
 KEY = re.compile(r'^[0-9a-f]{64}$')
+JOB_PATH = re.compile(r'^/api/v1/jobs/([^/]+)$')
 MONTH = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
 MAX_NAME = 200
 _FIELDS = {'recipe', 'molecule', 'charge', 'multiplicity', 'retry'}
@@ -38,8 +40,9 @@ class Api:
                 return self.submit(self._json(body))
             if method == 'GET' and path == '/api/v1/jobs':
                 return 200, self.list(query)
-            if method == 'GET' and path.startswith('/api/v1/jobs/'):
-                return 200, self.get(path.rsplit('/', 1)[1])
+            job_path = JOB_PATH.match(path)
+            if method == 'GET' and job_path:
+                return 200, self.get(job_path.group(1))
             if method == 'GET' and path == '/api/v1/costs':
                 return 200, self.costs(query)
             raise JobRefused('not-found', f'no route {method} {path}', 404)
@@ -61,6 +64,12 @@ class Api:
         unknown = set(body) - _FIELDS
         if unknown:
             raise _bad(f'unknown field(s): {", ".join(sorted(unknown))}')
+        recipe = body.get('recipe')
+        if not (isinstance(recipe, str) and recipe in RECIPES):
+            # Checked before any geometry parsing or PubChem lookup: a bad
+            # recipe is a client mistake worth 400, not a reason to spend a
+            # network round trip resolving a molecule that will be refused anyway.
+            raise _bad(f'recipe must be one of {", ".join(RECIPES)}')
         molecule = body.get('molecule')
         if not isinstance(molecule, dict) or len(molecule) != 1 or next(iter(molecule)) not in ('name', 'smiles', 'xyz'):
             raise _bad('molecule must be exactly one of {"name"}, {"smiles"} or {"xyz"}')
@@ -74,7 +83,7 @@ class Api:
                 raise _bad(f'{field} must be an integer')
         if not isinstance(body.get('retry', False), bool):
             raise _bad('retry must be true or false')
-        return body.get('recipe'), kind, text, body.get('charge'), body.get('multiplicity'), body.get('retry', False)
+        return recipe, kind, text, body.get('charge'), body.get('multiplicity'), body.get('retry', False)
 
     def _geometry(self, kind, text):
         if kind == 'xyz':
@@ -95,6 +104,14 @@ class Api:
         check_atoms(atoms)
         charge = default_charge if charge is None else charge
         electrons = electron_count(atoms, charge)
+        # An occupation the property basis cannot hold at all (each basis
+        # function seats at most two electrons) — most often a charge typo
+        # with a stray digit or two, not a real molecule.
+        n_property = basis_functions(atoms, RECIPES[recipe]['basis'])
+        if electrons > 2 * n_property:
+            raise JobRefused('bad-multiplicity',
+                              f'{electrons} electrons cannot occupy {n_property} basis functions '
+                              f'({RECIPES[recipe]["basis"]}, at most {2 * n_property})')
         multiplicity = multiplicity_for(electrons, multiplicity)
         job = canonical_job(recipe, atoms, charge, multiplicity)
         f = formula(atoms)
@@ -113,16 +130,20 @@ class Api:
     def preview(self, body):
         p = self._prepare(body)
         month = month_of(self.now())
+        existing = self.store.get_job(p['key'])
         try:
             d = self._decide(p['job'])
-            meter = self.store.meter(month)
-            if meter['committed'] + d['reservationMicros'] > meter['cap']:
-                raise BudgetExhausted(meter)
+            # A known job that is already active or finished costs nothing
+            # new to submit (dedupe, not a fresh reservation), so a tight
+            # budget must not make its preview look refused.
+            if existing is None or existing['status'] == 'FAILED':
+                meter = self.store.meter(month)
+                if meter['committed'] + d['reservationMicros'] > meter['cap']:
+                    raise BudgetExhausted(meter)
             decision = {'ok': True, 'sizing': {k: v for k, v in d.items() if k != 'reservationMicros'},
                         'reservedUsd': usd(d['reservationMicros'])}
         except JobRefused as e:
             decision = {'ok': False, 'error': {'code': e.code, 'message': e.message}}
-        existing = self.store.get_job(p['key'])
         mol = p['job']['molecule']
         return {'key': p['key'], 'job': p['job'], 'name': p['name'], 'formula': p['formula'],
                 'electronCount': p['electrons'],
@@ -141,7 +162,19 @@ class Api:
             raise JobRefused('paused', 'Generation is paused by the owner (infra/jobs.sh resume)', 503)
         decision = self._decide(p['job'])
         if existing is not None:
-            record, status = self.store.requeue_failed(p['key'], decision, self.now()), 200
+            try:
+                record, status = self.store.requeue_failed(p['key'], decision, self.now()), 200
+            except JobRefused:
+                # Another caller's retry (or the worker settling the old
+                # attempt) may have already moved the job on by the time
+                # ours lands; the store's 409 is real only if the job is
+                # still the FAILED one we looked at above — otherwise we
+                # simply lost a race with an equivalent retry and should
+                # hand back whatever it left behind.
+                current = self.store.get_job(p['key'])
+                if current is not None and current['status'] != 'FAILED':
+                    return 200, public_view(current)
+                raise
         else:
             created, record = self.store.create_job(new_record(
                 key=p['key'], job=p['job'], decision=decision, name=p['name'], formula=p['formula'],
@@ -152,9 +185,15 @@ class Api:
         try:
             self.store.update_job(p['key'], {'runnerJobId': self.runner.submit(record)})
         except Exception as e:                       # the runner's own error, shown to the owner verbatim
-            self.store.update_job(p['key'], {'status': 'FAILED', 'endedAt': iso(self.now()),
-                                             'error': {'code': 'submit-failed', 'message': str(e)}})
-            self.store.settle(p['key'], 0)
+            # Guarded: only mark FAILED (and release the reservation) if the
+            # job is still the one we just queued, under this same attempt —
+            # never clobber a worker that has since claimed or finished it.
+            failed = self.store.update_job(
+                p['key'], {'status': 'FAILED', 'endedAt': iso(self.now()),
+                           'error': {'code': 'submit-failed', 'message': str(e)}},
+                expect_status={'QUEUED', 'STARTING'}, attempt=record['attempt'])
+            if failed:
+                self.store.settle(p['key'], 0)
         return status, public_view(self.store.get_job(p['key']))
 
     def get(self, key):
