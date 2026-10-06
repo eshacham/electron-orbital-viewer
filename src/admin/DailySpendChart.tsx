@@ -29,7 +29,7 @@ const DailySpendChart: React.FC<DailySpendChartProps> = ({ month, daily, width }
     return (
         <figure className="daily-spend">
             <figcaption className="daily-spend-title">Daily spend, {month} (settled jobs; spent)</figcaption>
-            <svg width={width} height={HEIGHT} role="img" aria-label={`daily spend in ${month}`}>
+            <svg width={width} height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} role="img" aria-label={`daily spend in ${month}`}>
                 <line className="daily-spend-axis" x1={PAD.left} y1={base} x2={width - PAD.right} y2={base} />
                 <text className="daily-spend-label" x={PAD.left - 4} y={PAD.top + 8} textAnchor="end">{formatUsd(max)}</text>
                 <text className="daily-spend-label" x={PAD.left - 4} y={base} textAnchor="end">$0</text>

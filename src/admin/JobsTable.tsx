@@ -39,7 +39,14 @@ function JobRow({ job }: { job: JobView }) {
         <TableRow hover>
             <TableCell>{job.name} · {formatFormula(job.formula)}<br /><code>{shortKey(job.key)}</code></TableCell>
             <TableCell>{job.recipe}</TableCell>
-            <TableCell>{methodSummary(job)}</TableCell>
+            {/* Each method stays whole and the cell breaks only at the arrow: an
+                optimisation's two methods side by side would otherwise widen the
+                table past a laptop's screen. */}
+            <TableCell className="admin-method">
+                {methodSummary(job).split(' → ').map((part, i, parts) => (
+                    <React.Fragment key={i}>{i > 0 && ' '}<span className="admin-nowrap">{part}{i < parts.length - 1 ? ' →' : ''}</span></React.Fragment>
+                ))}
+            </TableCell>
             <TableCell>{sizing.size} · {sizing.vcpu} vCPU · {sizing.memoryGB} GB</TableCell>
             <TableCell>{capacityLabel(sizing.capacity)}{job.attempt > 1 ? ` · attempt ${job.attempt}` : ''}</TableCell>
             <TableCell>

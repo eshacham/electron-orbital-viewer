@@ -62,8 +62,12 @@ export function signInHere(page: OwnerPage): void {
     void ownerAuth()?.signIn(`${page}${window.location.hash}`);
 }
 
-/** The bar wired to whichever page's store holds `jobs` (the viewer's, or /admin.html's). */
-export function ConnectedOwnerBar({ page = '/', showDashboardLink = true }: { page?: OwnerPage; showDashboardLink?: boolean }) {
+/**
+ * The bar wired to whichever page's store holds `jobs` (the viewer's, or
+ * /admin.html's). `page` has no default: a page that forgot to name itself
+ * would sign the owner in and land them on the other page.
+ */
+export function ConnectedOwnerBar({ page, showDashboardLink = true }: { page: OwnerPage; showDashboardLink?: boolean }) {
     const jobs = useSelector((state: { jobs: JobsState }) => state.jobs);
     const isOwner = useSelector(selectIsOwner);
     return (

@@ -55,6 +55,15 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: '../dist',
       emptyOutDir: true,
+      rollupOptions: {
+        // Two pages: the viewer, and the owner's dashboard (spec §9.4), each
+        // with its own entry chunk, so the dashboard's code never ships to a
+        // visitor (tools/check_admin_split.mjs proves it on every build).
+        input: {
+          main: resolve(__dirname, 'public/index.html'),
+          admin: resolve(__dirname, 'public/admin.html'),
+        },
+      },
     },
     resolve: {
       alias: [
@@ -62,6 +71,7 @@ export default defineConfig(({ mode }) => {
           find: /^\/main.tsx$/,
           replacement: resolve(__dirname, 'src/main.tsx')
         },
+        { find: /^\/admin.tsx$/, replacement: resolve(__dirname, 'src/admin/main.tsx') },
         {
           find: /^\.\.\/src\/(.*)/,
           replacement: resolve(__dirname, 'src/$1')

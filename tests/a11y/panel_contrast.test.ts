@@ -9,12 +9,14 @@ import { appTheme } from '../../src/theme';
  * These pin WCAG AA (4.5:1) on the colours style.css actually declares.
  */
 const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+/** The owner's dashboard has its own stylesheet: /admin.html never loads style.css. */
+const adminCss = readFileSync(resolve(__dirname, '../../src/admin/admin.css'), 'utf8');
 /** The top-level rule for `selector` -- anchored to a line start, so `.view-panel .radial-plot {` is not mistaken for `.radial-plot {`. */
-function rule(selector: string): string {
+function rule(selector: string, sheet: string = css): string {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const match = new RegExp(`^\\s*${escaped} \\{`, 'm').exec(css);
+    const match = new RegExp(`^\\s*${escaped} \\{`, 'm').exec(sheet);
     if (!match) throw new Error(`No rule for ${selector}`);
-    return css.slice(match.index, css.indexOf('}', match.index));
+    return sheet.slice(match.index, sheet.indexOf('}', match.index));
 }
 
 const DARK_85 = 'rgba(8, 8, 10, 0.85)';
@@ -98,10 +100,31 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     { selector: '.molecule-jobs .job-status', declared: `background-color: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
 ];
 
+const WHITE = '#ffffff';
+const ADMIN_PAIRS: Array<{ selector: string; declared: string; fg: string }> = [
+    { selector: '.eov-admin-dashboard', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)' },
+    { selector: '.admin-note', declared: 'color: #5f6368', fg: '#5f6368' },
+    { selector: '.admin-error', declared: 'color: #b71c1c', fg: '#b71c1c' },
+    { selector: '.cost-billed', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)' },
+    { selector: '.daily-spend-title', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)' },
+    // SVG text is painted by fill, not color.
+    { selector: '.daily-spend-label', declared: 'fill: #555555', fg: '#555555' },
+    { selector: '.daily-spend-bar', declared: 'fill: #1565c0', fg: '#1565c0' },
+];
+
 describe('panel text meets WCAG AA over any backdrop', () => {
     it.each(PAIRS.map(p => [p.selector, p] as const))('%s', (selector, pair) => {
         expect(rule(selector)).toContain(pair.declared);
         expect(worstCaseContrast(pair.fg, pair.bg)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    // Phase 6B-2 Task 15: /admin.html is a plain white document, not a panel
+    // over the scene, so its text is checked against white alone. Its
+    // secondary text declares a real colour rather than fading body text
+    // with opacity, so the figure checked is the figure painted.
+    it.each(ADMIN_PAIRS.map(p => [p.selector, p] as const))('admin.css %s', (selector, pair) => {
+        expect(rule(selector, adminCss)).toContain(pair.declared);
+        expect(worstCaseContrast(pair.fg, WHITE, [WHITE])).toBeGreaterThanOrEqual(4.5);
     });
 
     it('the theme primary reads on the light cards, and white reads on it', () => {

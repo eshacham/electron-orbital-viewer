@@ -1,0 +1,43 @@
+/* src/admin/admin.css -- the owner's dashboard: a scrolling document on a
+   white page, unlike the viewer's fixed full-window canvas. /admin.html never
+   loads style.css, so every class the dashboard uses is styled here. Secondary
+   text declares a real colour rather than fading body text with opacity, so
+   tests/a11y/panel_contrast.test.ts checks the colour actually painted. */
+html, body, #root { margin: 0; min-height: 100%; font-family: 'Roboto', sans-serif; }
+.eov-admin-dashboard { max-width: 1440px; margin: 0 auto; padding: 16px; box-sizing: border-box; background: #ffffff; color: rgba(0, 0, 0, 0.87); }
+.admin-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; margin-bottom: 12px; }
+.admin-controls, .admin-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
+/* The table needs about 1360px to show every column, so the cost panel sits
+   beside it only on a screen wide enough for both; at a laptop's 1440px it
+   goes below, rather than pushing half the table behind a sideways scroll. */
+.admin-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.cost-panel { min-width: 0; max-width: 440px; }
+@media (min-width: 1880px) {
+  .eov-admin-dashboard { max-width: 1880px; }
+  .admin-grid { grid-template-columns: minmax(0, 1fr) 440px; }
+}
+/* min-width: 0 lets the grid column shrink below the table's width, so the
+   table's own box scrolls rather than the page. */
+.admin-jobs { min-width: 0; }
+/* A phone scrolls the table inside its own box, never the page (spec §9.7). */
+.admin-table-scroll { overflow-x: auto; max-width: 100%; }
+.admin-table-scroll table { min-width: 1360px; }
+/* Figures and times never break mid-value; the headers and the explanatory
+   notes may wrap, so that every column fits a laptop's width. */
+.admin-table-scroll td, .admin-table-scroll th { white-space: nowrap; vertical-align: top; padding: 6px 10px; }
+.admin-table-scroll th { white-space: normal; }
+.admin-table-scroll td.admin-method { white-space: normal; }
+.admin-nowrap { white-space: nowrap; }
+.admin-note { font-size: 0.75rem; color: #5f6368; white-space: normal; }
+.admin-error { color: #b71c1c; white-space: normal; }
+.cost-figures { margin: 8px 0; padding-left: 18px; }
+.cost-billed { margin: 8px 0; color: rgba(0, 0, 0, 0.87); }
+.daily-spend { margin: 8px 0; }
+.daily-spend-title { font-size: 0.875rem; font-weight: 500; color: rgba(0, 0, 0, 0.87); }
+/* The chart draws at a fixed width; its viewBox lets a phone scale it down. */
+.daily-spend svg { display: block; max-width: 100%; height: auto; }
+.daily-spend-bar { fill: #1565c0; }
+.daily-spend-axis { stroke: #757575; }
+.daily-spend-label { font-size: 10px; fill: #555555; }
+.owner-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.owner-bar-target { display: flex; align-items: center; gap: 6px; }

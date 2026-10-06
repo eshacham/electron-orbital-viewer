@@ -53,6 +53,12 @@ describe('<JobsTable>', () => {
         expect(dataRows()[0]).toHaveTextContent('Water');
         expect(dataRows()[0]).toHaveTextContent('1 min 10 s');
     });
+    it('keeps each method whole, so the cell can break only at the arrow', () => {
+        render(<JobsTable jobs={[failed]} />);
+        const cell = within(dataRows()[0]).getAllByRole('cell')[2];
+        expect(cell).toHaveTextContent('B3LYP/def2-SVP → B3LYP/def2-TZVPD');
+        expect([...cell.querySelectorAll('.admin-nowrap')].map(span => span.textContent)).toEqual(['B3LYP/def2-SVP →', 'B3LYP/def2-TZVPD']);
+    });
     it('filters by status, and says why a job failed', () => {
         render(<JobsTable jobs={JOBS} />);
         fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'FAILED' } });
