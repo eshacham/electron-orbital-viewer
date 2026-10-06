@@ -1,5 +1,6 @@
 import type { GridFieldSource } from '../field_source';
 import { MOLECULE_DATA_VERSION } from './data_version';
+import { isJobKey, jobBaseUrl } from './job_paths';
 import { MoleculeBasis, MoleculeIndexEntry, MoleculeMeta, MoleculeScan } from './types';
 
 /**
@@ -20,9 +21,19 @@ export class MoleculeLoadError extends Error {
 const MOLECULE_ID = /^[a-z0-9]+$/;
 const SCAN_POINT = /^\d{2}$/;
 
-/** 'n2' → /molecules/<version>/n2; 'n2@07' (scan point 7) → /molecules/<version>/n2/scan/07. */
+/**
+ * 'n2' → /molecules/<version>/n2; 'n2@07' (scan point 7) → /molecules/<version>/n2/scan/07;
+ * a 64-hex job key → /molecules/jobs/<key> (spec §5.3).
+ */
 export function moleculePath(id: string): string {
-    const [base, point, extra] = id.split('@');
+    // A computed molecule's id is its job key, so the id alone says where it
+    // lives: meta, basis, density and ESP loads -- and the MO worker, which
+    // is handed nothing but the id -- need no second argument (spec §9.1).
+    if (isJobKey(id)) return jobBaseUrl(id);
+    // D2: the isJobKey guard above narrows id to `never` for the rest of this
+    // function (it returned already whenever `id is string` held); the cast
+    // restores the type tsc needs to see .split on.
+    const [base, point, extra] = (id as string).split('@');
     if (!MOLECULE_ID.test(base) || extra !== undefined || (point !== undefined && !SCAN_POINT.test(point))) {
         throw new MoleculeLoadError(`Not a molecule id: ${JSON.stringify(id)}`);
     }
@@ -69,8 +80,44 @@ export function loadMoleculeIndex(): Promise<MoleculeIndexEntry[]> {
     return cached('index', () => fetchJson<MoleculeIndexEntry[]>(`${MOLECULES_BASE_URL}/index.json`));
 }
 
+export const RESULT_NOT_FINISHED =
+    'This computed molecule has no finished result yet: its job may still be running, or it failed. Open the link again once it has finished.';
+
+/**
+ * done.json is written last (spec §5.3), so a folder without it is a job
+ * still running, one that failed, or one interrupted half-way through its
+ * files: none of them is a result, and drawing any of it would be a stale or
+ * partial picture. S3 behind CloudFront answers a missing object with 403
+ * (no list permission), not 404, so both mean "not there". no-store: a 404
+ * the browser cached while the job ran must not hide the result once it
+ * exists.
+ */
+async function requireFinishedResult(key: string): Promise<void> {
+    const url = `${jobBaseUrl(key)}/done.json`;
+    let response: Response;
+    try {
+        response = await fetch(url, { cache: 'no-store' });
+    } catch (error) {
+        throw new MoleculeLoadError(`Could not reach ${url}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (response.status === 404 || response.status === 403) throw new MoleculeLoadError(RESULT_NOT_FINISHED);
+    if (!response.ok) throw new MoleculeLoadError(`Could not load ${url} (HTTP ${response.status})`);
+    let done: { files?: Record<string, unknown> };
+    try {
+        done = (await response.json()) as { files?: Record<string, unknown> };
+    } catch {
+        throw new MoleculeLoadError(`${url} is not valid JSON`);
+    }
+    if (!done || !done.files || typeof done.files['meta.json'] !== 'string') {
+        throw new MoleculeLoadError(`${url} does not list meta.json: this result is incomplete`);
+    }
+}
+
 export function loadMoleculeMeta(id: string): Promise<MoleculeMeta> {
-    return cached(`meta:${id}`, () => fetchJson<MoleculeMeta>(`${moleculePath(id)}/meta.json`));
+    return cached(`meta:${id}`, async () => {
+        if (isJobKey(id)) await requireFinishedResult(id);
+        return fetchJson<MoleculeMeta>(`${moleculePath(id)}/meta.json`);
+    });
 }
 
 /** The id comes from the path asked for, so a basis.json written without one still registers correctly. */
