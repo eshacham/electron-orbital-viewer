@@ -290,3 +290,38 @@ def test_resume_reads_the_last_frame_and_ignores_a_damaged_trajectory(env):
     for damaged in (b'2\nstep 1\nH 0.0 0.0', b'two\n', b'2\nstep 1\nH 0.0 0.0 x\nH 0 0 1\n', b'\n'):
         sink.put_attempt(key, 1, 'trajectory.xyz', damaged)
         assert _resume_atoms(sink, key, 2) is None, damaged
+
+
+# --- final-review fix wave -----------------------------------------------------
+
+def test_a_resumed_optimisation_is_recorded_as_resumed(env):
+    """M4: attempt 2 of an optimise job starts from attempt 1's last frame;
+    both input.py and meta.json's geometryOptimisation say so."""
+    store, sink, jobs = env
+    key = queue(store, [[1, 0, 0, 0], [1, 0, 0, 0.80]], method=None, recipe='optimise')
+    sink.put_attempt(key, 1, 'trajectory.xyz', b'2\nstep 1\nH 0.0 0.0 0.0\nH 0.0 0.0 0.76\n')
+    store.update_job(key, {'attempt': 2})
+    assert run_job(key, store, sink, attempt=2, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    meta = json.loads((jobs / key / 'meta.json').read_text())
+    assert meta['geometryOptimisation']['resumedFrom'] == 1 and meta['geometryOptimisation']['converged']
+    text = (jobs / key / 'input.py').read_text()
+    assert "# Resumed from attempt 1's last trajectory frame" in text and '0.76' in text
+
+
+def test_an_interrupted_worker_marks_its_attempt_failed(env, monkeypatch):
+    """I1: Ctrl-C (or the local server stopping) reaches the worker as
+    KeyboardInterrupt, which its `except Exception` does not catch; the
+    record used to stay RUNNING for ever. It now ends FAILED (worker-crashed)
+    under its own attempt, and the interrupt still propagates. Settling stays
+    with the runner (Ruling T5-b)."""
+    store, sink, jobs = env
+    key = queue(store, H2)
+
+    def interrupted(*args, **kwargs):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(worker, 'render_input', interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        run_job(key, store, sink, grid_points=(32,))
+    rec = store.get_job(key)
+    assert rec['status'] == 'FAILED' and rec['error']['code'] == 'worker-crashed'
+    assert 'interrupted' in rec['error']['message'] and not rec['settled']

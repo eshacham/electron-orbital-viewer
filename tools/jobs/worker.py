@@ -41,6 +41,7 @@ CAVEATS = {
 }
 BOX_TOO_SMALL = ('the electron density reaches the edge of the sampling box (a diffuse anion); '
                  'this phase cannot draw it')
+INTERRUPTED = 'the worker was interrupted (KeyboardInterrupt) before this job finished'
 
 
 def _peak_memory_gb():
@@ -136,6 +137,19 @@ def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, hear
     work = Path(tempfile.mkdtemp(prefix=f'job-{key[:8]}-'))
     try:
         return _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work)
+    except KeyboardInterrupt:
+        # I1: Ctrl-C, or the local server stopping (its worker subprocess
+        # shares the terminal's SIGINT), skips `_run`'s `except Exception`
+        # and would leave the record RUNNING for ever. Say so on the record,
+        # under this attempt only, then let the interrupt go on. Settling is
+        # still the runner's (Ruling T5-b): cli --wait does it at once, the
+        # local runner's start-up sweep does it otherwise. SIGTERM is left
+        # alone: on AWS it means a Spot reclaim, and the retry must find the
+        # job still claimable.
+        store.update_job(key, {'status': 'FAILED', 'endedAt': iso(utc_now()), 'stage': None,
+                               'error': {'code': 'worker-crashed', 'message': INTERRUPTED}},
+                         expect_status={'RUNNING'}, attempt=attempt)
+        raise
     finally:
         # D18: the scratch copy is only a staging area; everything worth
         # keeping is in the sink by now (or the job has failed).
@@ -156,7 +170,7 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     frames = []
 
     start = _resume_atoms(sink, key, attempt) if recipe == 'optimise' and attempt > 1 else None
-    input_text = render_input(job, key, start=start)
+    input_text = render_input(job, key, start=start, resumed_from=attempt - 1 if start else None)
     (work / 'input.py').write_text(input_text)
 
     def beat():
@@ -220,7 +234,10 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
                            'costUsd': None},
         }
         if info:
-            fields['geometryOptimisation'] = info    # Ruling D13: {steps, converged}; 6B-2 widens the TS type
+            # Ruling D13: {steps, converged}; 6B-2 widens the TS type. A
+            # resumed run (M4) also names the attempt whose last frame it
+            # started from: its `steps` count only this attempt's.
+            fields['geometryOptimisation'] = {**info, 'resumedFrom': attempt - 1} if start else info
         write_molecule_files(work / 'result', mol, mf, fields, grid_points or GRID_POINTS_TRIES, commit=commit)
         _patch_wall_seconds(work / 'result' / 'meta.json', round(time.monotonic() - began, 2))
     except Exception as e:

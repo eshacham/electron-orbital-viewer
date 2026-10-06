@@ -1,5 +1,6 @@
 import http.client
 import json
+import os
 import sys
 import threading
 import time
@@ -23,13 +24,13 @@ DECISION = {'version': 0, 'size': 'S', 'vcpu': 2, 'memoryGB': 8, 'capacity': 'lo
             'reservationMicros': 0, 'predictedCostMicros': 0}
 
 
-def _h2_record(store, bond_length, name='H2'):
+def _h2_record(store, bond_length, name='H2', backend='local'):
     """A trivially valid single-point H2 job, far enough from any other
     bond length used in the same test that the two get different keys."""
     job = canonical_job('single', [[1, 0, 0, 0], [1, 0, 0, bond_length]], 0, 1)
     key = job_key(job)
     record = new_record(key=key, job=job, decision={**DECISION, 'reservationMicros': 5}, name=name,
-                        formula='H2', electron_count=2, geometry_source={'kind': 'xyz'}, backend='local', now=NOW)
+                        formula='H2', electron_count=2, geometry_source={'kind': 'xyz'}, backend=backend, now=NOW)
     store.create_job(record)
     return store.get_job(key)
 
@@ -228,3 +229,156 @@ def test_cli_submit_of_an_already_failed_job_exits_1(cli_env, capsys):
     assert cli.main(['submit', '--xyz', xyz, '--wait']) == 1
     out, err = capsys.readouterr()
     assert 'FAILED' in out and 'scf-not-converged' in err and 'SCF gave up' in err
+
+
+# --- final-review fix wave -----------------------------------------------------
+
+STALE = '2026-10-05T12:00:00Z'          # long past the 90 s a live heartbeat allows
+
+
+def test_a_new_local_runner_recovers_what_the_last_one_left(tmp_path):
+    """I1: the local server stopping mid-job used to leave records QUEUED,
+    STARTING or RUNNING for ever, holding their reservations. A new runner
+    sweeps every local record (all months) once, at start."""
+    from jobs.model import iso, utc_now
+    store = FileStore(tmp_path / 'state')
+    queued = _h2_record(store, 0.70, name='queued')
+    starting = _h2_record(store, 0.72, name='starting')
+    stale = _h2_record(store, 0.74, name='running-stale')
+    live = _h2_record(store, 0.76, name='running-live')
+    done = _h2_record(store, 0.78, name='done-unsettled')
+    failed = _h2_record(store, 0.80, name='failed-unsettled')
+    aws = _h2_record(store, 0.82, name='aws-queued', backend='aws')
+    store.update_job(starting['key'], {'status': 'STARTING'})
+    store.update_job(stale['key'], {'status': 'RUNNING', 'heartbeatAt': STALE})
+    store.update_job(live['key'], {'status': 'RUNNING', 'heartbeatAt': iso(utc_now())})
+    store.update_job(done['key'], {'status': 'DONE'})
+    store.update_job(failed['key'], {'status': 'FAILED', 'error': {'code': 'scf-not-converged', 'message': 'x'}})
+
+    LocalRunner(store, tmp_path / 'out', tmp_path / 'state', python=sys.executable, worker_args=('-c', 'pass'))
+
+    for rec in (starting, stale):
+        got = store.get_job(rec['key'])
+        assert got['status'] == 'FAILED' and got['settled'], rec['name']
+        assert got['error'] == {'code': 'worker-crashed',
+                                'message': 'the local server stopped before this job finished'}
+    got = store.get_job(done['key'])
+    assert got['status'] == 'DONE' and got['settled'] and got['error'] is None
+    got = store.get_job(failed['key'])
+    assert got['status'] == 'FAILED' and got['settled'] and got['error']['code'] == 'scf-not-converged'
+    got = store.get_job(live['key'])                 # another process (cli --wait) may own it
+    assert got['status'] == 'RUNNING' and not got['settled']
+    assert store.get_job(aws['key'])['status'] == 'QUEUED'          # not this runner's
+    # The QUEUED one is run again: the stand-in worker exits without reporting.
+    got = _wait_for(store, queued['key'], lambda r: r['status'] == 'FAILED' and r['settled'])
+    assert got['status'] == 'FAILED' and 'worker exited with 0' in got['error']['message']
+    assert store.meter('2026-10')['reserved'] == 5 + 5               # only the live RUNNING and the aws job
+
+
+def _sentinel_then(store, runner, key):
+    """Submit `key`, then a second job behind it; once the second has run,
+    the runner has finished with the first (one job at a time)."""
+    runner.submit(store.get_job(key))
+    after = _h2_record(store, 1.10, name='sentinel')
+    runner.submit(after)
+    _wait_for(store, after['key'], lambda r: r['settled'])
+
+
+def test_the_runner_leaves_alone_a_job_another_runner_already_has(tmp_path):
+    """I4: a key already RUNNING (claimed by cli --wait) and then queued to
+    the local runner too: the runner used to run its own worker anyway, see
+    the record still RUNNING, and mark it FAILED under the live run."""
+    from jobs.model import iso, utc_now
+    store = FileStore(tmp_path / 'state')
+    rec = _h2_record(store, 0.74)
+    assert store.claim(rec['key'], 1, utc_now())
+    store.update_job(rec['key'], {'heartbeatAt': iso(utc_now())})
+    runner = LocalRunner(store, tmp_path / 'out', tmp_path / 'state', python=sys.executable,
+                         worker_args=('-c', 'pass'))
+    _sentinel_then(store, runner, rec['key'])
+    got = store.get_job(rec['key'])
+    assert got['status'] == 'RUNNING' and got['error'] is None and not got['settled']
+
+
+def test_the_runner_does_not_fail_a_job_its_worker_calls_a_duplicate(tmp_path):
+    """I4: between the runner's STARTING and its worker's claim, cli --wait
+    can claim the job; the worker then prints `duplicate` and exits 0. The
+    job is the other run's, not a crash."""
+    store = FileStore(tmp_path / 'state')
+    rec = _h2_record(store, 0.74)
+    runner = LocalRunner(store, tmp_path / 'out', tmp_path / 'state', python=sys.executable,
+                         worker_args=('-c', 'print("duplicate")'))
+    _sentinel_then(store, runner, rec['key'])
+    got = store.get_job(rec['key'])
+    assert got['status'] != 'FAILED' and not got['settled']
+
+
+def test_cli_wait_runs_a_retried_job_as_its_current_attempt(cli_env, monkeypatch, capsys):
+    """I4: the CLI used to run every job as attempt 1, so a retried job
+    (attempt 2) was claimed by a worker the store thought superseded."""
+    cli, xyz, store = cli_env
+    assert cli.main(['enqueue', '--xyz', xyz]) == 0
+    key = capsys.readouterr().out.split()[0]
+    store.update_job(key, {'status': 'FAILED'})
+    store.settle(key, 0)
+    store.requeue_failed(key, store.get_job(key)['sizing'] | {'reservationMicros': 0}, NOW)
+    seen = []
+
+    def fake_run_job(k, st, sink, attempt=1, **kwargs):
+        seen.append(attempt)
+        assert st.claim(k, attempt, NOW)
+        st.update_job(k, {'status': 'DONE'}, attempt=attempt)
+        return 'DONE'
+    monkeypatch.setattr(cli, 'run_job', fake_run_job)
+    assert cli.main(['submit', '--xyz', xyz, '--wait']) == 0
+    assert seen == [2] and store.get_job(key)['status'] == 'DONE' and store.get_job(key)['settled']
+
+
+def test_cli_wait_interrupted_fails_and_settles_then_reraises(cli_env, monkeypatch, capsys):
+    """I1: Ctrl-C during submit --wait used to leave the job RUNNING and its
+    reservation held until something noticed."""
+    cli, xyz, store = cli_env
+
+    def interrupted(k, st, sink, attempt=1, **kwargs):
+        st.claim(k, attempt, NOW)
+        raise KeyboardInterrupt
+    monkeypatch.setattr(cli, 'run_job', interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        cli.main(['submit', '--xyz', xyz, '--wait'])
+    rec = store.get_job(capsys.readouterr().out.split()[0])
+    assert rec['status'] == 'FAILED' and rec['error']['code'] == 'worker-crashed'
+    assert 'interrupted' in rec['error']['message']
+    assert rec['settled'] and store.meter(rec['month'])['reserved'] == 0
+
+
+def test_cli_passes_charge_multiplicity_and_retry(cli_env, capsys):
+    """M6: the CLI can ask for everything the API takes."""
+    cli, xyz, store = cli_env
+    assert cli.main(['enqueue', '--xyz', xyz, '--charge', '1', '--multiplicity', '2']) == 0
+    key = capsys.readouterr().out.split()[0]
+    molecule = store.get_job(key)['job']['molecule']
+    assert (molecule['charge'], molecule['multiplicity']) == (1, 2)
+    store.update_job(key, {'status': 'FAILED'})
+    store.settle(key, 0)
+    assert cli.main(['enqueue', '--xyz', xyz, '--charge', '1', '--multiplicity', '2']) == 0
+    assert store.get_job(key)['status'] == 'FAILED'                  # without --retry: the old record
+    assert cli.main(['enqueue', '--xyz', xyz, '--charge', '1', '--multiplicity', '2', '--retry']) == 0
+    rec = store.get_job(key)
+    assert rec['status'] == 'QUEUED' and rec['attempt'] == 2
+
+
+@pytest.mark.skipif(os.environ.get('JOBS_SLOW') != '1', reason='runs the real worker, PySCF and all, in a subprocess')
+def test_local_runner_runs_the_real_worker_on_h2(tmp_path, monkeypatch):
+    """M5: the real `python -m jobs.worker` command line, end to end, through
+    the runner the local server uses."""
+    monkeypatch.setenv('JOBS_GENERATOR_COMMIT', 'test')
+    store = FileStore(tmp_path / 'state')
+    rec = _h2_record(store, 0.74)
+    runner = LocalRunner(store, tmp_path / 'out', tmp_path / 'state', grid_points=(32,))
+    runner.submit(rec)
+    got = _wait_for(store, rec['key'], lambda r: r['settled'], tries=2400)
+    assert got['status'] == 'DONE', got['error']
+    root = tmp_path / 'out' / 'jobs' / rec['key']
+    assert (root / 'done.json').exists() and got['actual']['wallSeconds'] > 0
+    assert 'converged SCF energy' in (root / 'output.log').read_text()
+    assert store.meter('2026-10')['reserved'] == 0

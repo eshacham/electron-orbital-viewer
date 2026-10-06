@@ -4,6 +4,7 @@ PubChem's 3D conformers are MMFF94-optimised and exist for most small
 compounds, not for salts or very large or flexible ones; those are refused
 with a suggestion to paste an XYZ. Stdlib only: this runs in the api Lambda.
 """
+import http.client
 import json
 import urllib.error
 import urllib.request
@@ -17,6 +18,12 @@ from jobs.errors import JobRefused
 BASE = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
 TIMEOUT_SECONDS = 10
 Fetch = Callable[[str, 'bytes | None'], 'tuple[int, bytes]']
+# What a body this phase cannot read raises on its way through json, the SDF
+# reader or the dict lookups: an HTML error page sent with HTTP 200 by a
+# proxy, a truncated read, a reshaped JSON answer. All mean PubChem did not
+# give a usable answer this time, not that the request was wrong (I2).
+UNREADABLE = (ValueError, KeyError, IndexError, TypeError, AttributeError, http.client.HTTPException)
+UNREADABLE_MESSAGE = 'PubChem sent a response this phase cannot read; try again, or paste an XYZ'
 
 
 def urllib_fetch(url, data=None):
@@ -38,6 +45,8 @@ def _get(fetch, url, data=None):
         status, body = fetch(url, data)
     except OSError as e:
         raise JobRefused('pubchem-unavailable', f'PubChem did not answer ({e}); try again, or paste an XYZ', 503)
+    except http.client.HTTPException as e:      # IncompleteRead, BadStatusLine: the answer broke off
+        raise JobRefused('pubchem-unavailable', f'{UNREADABLE_MESSAGE} ({type(e).__name__})', 503)
     if status >= 500 or status in (429, 503):
         raise JobRefused('pubchem-unavailable', f'PubChem is unavailable (HTTP {status}); try again, or paste an XYZ', 503)
     return status, body
@@ -71,6 +80,15 @@ def _today():
 
 
 def resolve(kind: str, text: str, fetch: Fetch = urllib_fetch, today: Callable[[], str] = _today) -> dict:
+    # JobRefused (unknown-compound, no-3d-structure, an out-of-range element
+    # in the SDF) is not among UNREADABLE and passes through unchanged.
+    try:
+        return _resolve(kind, text, fetch, today)
+    except UNREADABLE as e:
+        raise JobRefused('pubchem-unavailable', f'{UNREADABLE_MESSAGE} ({type(e).__name__})', 503)
+
+
+def _resolve(kind, text, fetch, today):
     text = text.strip()
     if kind == 'name':
         # PubChem's name lookup is case-insensitive; lower-casing here keeps

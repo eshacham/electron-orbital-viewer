@@ -117,3 +117,15 @@ def test_optimise_reports_steps_and_runs_standalone(tmp_path, monkeypatch):
     assert abs(mol.atom_coord(1)[2] - mol.atom_coord(0)[2]) * 0.529177 < 0.85
     run = subprocess.run([sys.executable, 'input.py'], cwd=tmp_path, capture_output=True, text=True)
     assert run.returncode == 0 and 'E =' in run.stdout
+
+
+def test_a_resumed_optimisation_says_where_it_started():
+    """M4: input.py is what ran, so a resumed attempt must not read as if it
+    started from the submitted geometry."""
+    job = canonical_job('optimise', H2, 0, 1)
+    fresh = render_input(job, 'k' * 64)
+    assert 'Resumed' not in fresh
+    resumed = render_input(job, 'k' * 64, start=[('H', (0.0, 0.0, 0.0)), ('H', (0.0, 0.0, 0.77))], resumed_from=1)
+    assert "# Resumed from attempt 1's last trajectory frame" in resumed
+    assert "('H', (0.0, 0.0, 0.77))" in resumed
+    compile(resumed, 'input.py', 'exec')

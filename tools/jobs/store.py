@@ -11,10 +11,14 @@ alongside the job record, so a crash between the two writes could double-
 reserve on retry or drive the meter negative (the review reproduced both).
 There is now no meter file at all: each record already carries its own
 unsettled reservation (`reservedMicros`/`settled`/`month`) and a ledger of
-its settled charges (`charges`), and `meter()` sums these over every record
-under the lock. Every money-moving method (`create_job`, `requeue_failed`,
-`settle`) becomes exactly one atomic record write, so there is no window in
-which a crash can land half of an operation: either the write lands (via
+its settled charges (`charges`), and the meter sums these over every record.
+The public `meter()` is lock-free by design (each record is replaced whole by
+`os.replace`, so a reader sees every record either before or after a write);
+the cap check inside `create_job`/`requeue_failed` computes the same sum
+under the lock, so no two writers can both fit under the cap. Every
+money-moving method (`create_job`, `requeue_failed`, `settle`) becomes
+exactly one atomic record write, so there is no window in which a crash can
+land half of an operation: either the write lands (via
 `os.replace`) and the meter reflects it, or it does not and the meter is as
 if the call never happened. DynamoStore (6B-3) keeps its own transactional
 meter item, already atomic by a different mechanism, and runs this same
@@ -24,6 +28,7 @@ import fcntl
 import hashlib
 import json
 import os
+import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Protocol
@@ -48,6 +53,10 @@ class Store(Protocol):
                     attempt: int | None = None) -> bool: ...
     def settle(self, key: str, actual_micros: int) -> bool: ...
     def list_jobs(self, month: str, status: str | None = None) -> list[dict]: ...
+    # Every record a backend owns, across all months: what LocalRunner's
+    # start-up sweep reads (I1). 6B-3's DynamoStore implements it or, if
+    # reconcile makes it unnecessary there, returns [].
+    def jobs_with_backend(self, backend: str) -> list[dict]: ...
     def meter(self, month: str) -> dict: ...
     def get_resolution(self, query: str) -> dict | None: ...
     def put_resolution(self, query: str, value: dict) -> None: ...
@@ -84,9 +93,20 @@ class FileStore:
         return json.loads(path.read_text()) if path.exists() else default
 
     def _write(self, path: Path, value) -> None:
-        tmp = path.with_suffix(path.suffix + '.tmp')
-        tmp.write_text(json.dumps(value, indent=1, ensure_ascii=False))
-        os.replace(tmp, path)          # atomic: a reader never sees half a record
+        # A temp file of its own per write, in the same directory (so
+        # os.replace stays a same-filesystem rename): writes that skip the
+        # lock (put_resolution, from concurrent request threads) used to
+        # share one `<name>.tmp`, and one writer's replace moved the other's
+        # file out from under it. The `.tmp` suffix keeps it out of `*.json` globs.
+        handle = tempfile.NamedTemporaryFile('w', dir=path.parent, prefix=path.name + '.', suffix='.tmp',
+                                             delete=False, encoding='utf-8')
+        try:
+            with handle:
+                handle.write(json.dumps(value, indent=1, ensure_ascii=False))
+            os.replace(handle.name, path)       # atomic: a reader never sees half a record
+        except BaseException:
+            Path(handle.name).unlink(missing_ok=True)
+            raise
 
     def _job_path(self, key):
         return self.root / 'jobs' / f'{key}.json'
@@ -133,7 +153,7 @@ class FileStore:
             if m['committed'] + decision['reservationMicros'] > self.cap:
                 raise BudgetExhausted(m)
             rec.update({'status': 'QUEUED', 'attempt': rec['attempt'] + 1, 'error': None, 'settled': False,
-                        'month': month,
+                        'month': month, 'peakMemoryGB': None,
                         'reservedMicros': decision['reservationMicros'],
                         'sizing': {k: v for k, v in decision.items() if k != 'reservationMicros'},
                         'submittedAt': iso(now), 'startedAt': None, 'endedAt': None, 'heartbeatAt': None,
@@ -145,8 +165,11 @@ class FileStore:
     def claim(self, key, attempt, now):
         with self._locked():
             rec = self.get_job(key)
-            allowed = rec is not None and (rec['status'] in ('QUEUED', 'STARTING') or
-                                           (rec['status'] == 'RUNNING' and rec['attempt'] < attempt))
+            # Never an attempt older than the record's: a retry has moved the
+            # job on, and a worker started for the earlier attempt must not
+            # run it under the newer number (I4).
+            allowed = rec is not None and attempt >= rec['attempt'] and (
+                rec['status'] in ('QUEUED', 'STARTING') or (rec['status'] == 'RUNNING' and rec['attempt'] < attempt))
             if not allowed:
                 return False
             rec.update({'status': 'RUNNING', 'attempt': max(attempt, rec['attempt']), 'startedAt': iso(now),
@@ -186,6 +209,9 @@ class FileStore:
     def list_jobs(self, month, status=None):
         chosen = [r for r in self._all_records() if r['month'] == month and (status is None or r['status'] == status)]
         return sorted(chosen, key=lambda r: (r['submittedAt'], r['key']))
+
+    def jobs_with_backend(self, backend):
+        return [r for r in self._all_records() if r.get('backend') == backend]
 
     def meter(self, month):
         return self._meter(month)

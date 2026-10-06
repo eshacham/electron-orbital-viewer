@@ -6,6 +6,8 @@ answer identically by construction.
 import calendar
 import json
 import re
+import sys
+import traceback
 
 from jobs import pubchem, sizing
 from jobs.basis_counts import basis_functions
@@ -48,6 +50,15 @@ class Api:
             raise JobRefused('not-found', f'no route {method} {path}', 404)
         except JobRefused as e:
             return e.status, {'error': {'code': e.code, 'message': e.message}}
+        except Exception as e:
+            # Last resort (I2): a bug must still answer in the API's own error
+            # shape. Raised out of here, the local server drops the connection
+            # and the UI sees a network error with no reason; the traceback
+            # goes to stderr, where the owner looks for the cause.
+            traceback.print_exc(file=sys.stderr)
+            lines = str(e).strip().splitlines()
+            message = f'{type(e).__name__}: {lines[-1]}' if lines else type(e).__name__
+            return 500, {'error': {'code': 'internal-error', 'message': message[:300]}}
 
     @staticmethod
     def _json(body):

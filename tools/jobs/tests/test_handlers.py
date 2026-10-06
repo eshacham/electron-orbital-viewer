@@ -219,3 +219,26 @@ def test_costs_projection_and_daily(api):
     assert costs['daily'] == [{'date': '2026-10-09', 'usd': 0.1}]
     assert costs['projectionUsd'] == pytest.approx(0.1 * 31 / 10, abs=1e-6)
     assert costs['billing'] is None and costs['pricesRetrieved'] == '2026-10-04'
+
+
+# --- final-review fix wave (I2) --------------------------------------------------
+
+def test_pubchem_html_with_200_is_a_503_not_a_dropped_connection(tmp_path):
+    from jobs import pubchem
+    api = Api(FileStore(tmp_path), NullRunner(), now=lambda: NOW, backend='local',
+              resolve=lambda kind, text: pubchem.resolve(kind, text, fetch=lambda url, data=None: (200, b'<html>')))
+    status, body = call(api, 'POST', '/api/v1/jobs/preview', {'recipe': 'single', 'molecule': {'name': 'water'}})
+    assert status == 503 and body['error']['code'] == 'pubchem-unavailable'
+
+
+def test_an_unexpected_error_is_a_500_json_answer(api, monkeypatch, capsys):
+    """A bug in a handler must still answer: the local server otherwise
+    drops the connection, and the UI sees a network error with no reason."""
+    def broken(body):
+        raise ZeroDivisionError('division by zero\nsecond line names the culprit')
+    monkeypatch.setattr(api, 'preview', broken)
+    status, body = call(api, 'POST', '/api/v1/jobs/preview', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    assert status == 500
+    assert body == {'error': {'code': 'internal-error',
+                              'message': 'ZeroDivisionError: second line names the culprit'}}
+    assert 'Traceback' in capsys.readouterr().err          # the owner can still find the cause

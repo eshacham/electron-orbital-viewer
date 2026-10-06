@@ -31,7 +31,8 @@ def new_record(*, key, job, decision, name, formula, electron_count, geometry_so
             'geometrySource': geometry_source, 'sizing': sizing, 'reservedMicros': decision['reservationMicros'],
             'actualMicros': 0, 'settled': False, 'charges': [], 'month': month_of(now), 'submittedAt': iso(now),
             'startedAt': None, 'endedAt': None, 'heartbeatAt': None, 'stage': None, 'latestEnergyHartree': None,
-            'logTail': [], 'actual': None, 'error': None, 'backend': backend, 'runnerJobId': None}
+            'logTail': [], 'peakMemoryGB': None, 'actual': None, 'error': None, 'backend': backend,
+            'runnerJobId': None}
 
 
 def public_view(record: dict) -> dict:

@@ -154,3 +154,11 @@ def test_files_term_is_independent_of_vcpu_and_counted_in_decide():
 
     d = sizing.decide(job)
     assert d['predictedSeconds'] == pytest.approx(round(small['scfSeconds'] + small['filesSeconds'], 1))
+
+
+def test_every_decision_says_it_is_a_fargate_estimate():
+    """M1: a local run is sized and timed as if on Fargate (the Mac runs it
+    single-threaded and without a time limit), so the figures say so."""
+    job = canonical_job('single', WATER, 0, 1)
+    assert sizing.decide(job)['estimateFor'] == 'fargate'
+    assert sizing.decide(job, local=True)['estimateFor'] == 'fargate'

@@ -21,13 +21,13 @@ so the same viewer renders both.
 | `sizing.py` | `decide()`: size, timeout, capacity, attempts, reservation — deterministic, no PySCF |
 | `prices.py` | Fargate us-east-1 Linux/ARM prices, retrieved 2026-10-04 |
 | `model.py` | Job record shape, statuses, `public_view` (hides store bookkeeping) |
-| `store.py` | `Store` contract + `FileStore`: create/claim/update/settle, the meter |
+| `store.py` | `Store` contract + `FileStore`: create/claim/update/settle, the meter (derived from the records), `jobs_with_backend` for the runner's start-up sweep |
 | `input_template.py` | Renders `input.py`, the exact PySCF script a job runs |
-| `handlers.py` | `Api.handle`: the HTTP routes, framework-independent |
+| `handlers.py` | `Api.handle`: the HTTP routes, framework-independent; an unexpected error answers 500 `internal-error`, never a dropped connection |
 | `local_server.py` | Runs `Api` on `127.0.0.1:8787` for the Vite dev server to proxy to |
-| `runner.py` | `LocalRunner` (subprocess) and `NullRunner`; `BatchRunner` is 6B-3 |
+| `runner.py` | `LocalRunner` (subprocess, one job at a time, recovers what a stopped server left at start-up) and `NullRunner`; `BatchRunner` is 6B-3 |
 | `sink.py` | `Sink` contract + `LocalSink`, writing to `tools/molecules/out/jobs/`; `S3Sink` is 6B-3 |
-| `worker.py` | Runs one job end to end: claim, execute, write Phase 6's files, settle. Imports PySCF |
+| `worker.py` | Runs one job end to end: claim, execute, write Phase 6's files, record the outcome. Never settles — the runner or `cli --wait` does (Ruling T5-b). Imports PySCF |
 | `make_basis_counts.py` | Regenerates `basis_counts.json` from PySCF after a PySCF upgrade |
 | `calibrate.py` | Fits `sizing.CONSTANTS` from finished jobs' `timings.json`/`job.json` |
 | `cli.py` | `enqueue`/`submit`/`generation`, see below |
@@ -54,6 +54,23 @@ Lambda will in 6B-3. `/molecules/jobs/<key>/…` is served from
 `tools/molecules/out/jobs/` by the existing local-molecules middleware, the
 same way Phase 6's library files are.
 
+**Sizing figures are Fargate estimates, even for a local job.** Every
+decision carries `estimateFor: "fargate"`: the size, predicted time and
+timeout are what the job would get on AWS. A local run is not time-limited
+(nothing enforces `timeoutSeconds` here), costs $0, and runs on this Mac's
+PySCF, which is single-threaded (`lib.num_threads() == 1`) — so it takes
+longer than the estimate whenever the estimate assumes more than one vCPU.
+
+**Stopping the server mid-job.** The runner's queue lives in memory, so when
+a new `LocalRunner` starts it sweeps every local record once, in every month:
+`QUEUED` jobs are queued again; `STARTING` jobs, and `RUNNING` ones whose
+heartbeat is more than 90 s old, become `FAILED` (`worker-crashed`, "the
+local server stopped before this job finished") and settle at $0; a
+finished job that was never settled is settled. A `RUNNING` job with a live
+heartbeat is left alone — `cli submit --wait`, in another terminal, may be
+running it. A worker stopped by Ctrl-C marks its own attempt `FAILED` on the
+way out.
+
 ## CLI
 
 Run from `tools/`, with the venv, for anything that touches PySCF:
@@ -63,13 +80,18 @@ python -m jobs.cli enqueue --name water              # queue without running
 python -m jobs.cli enqueue --smiles "CCO"             # queue by SMILES
 python -m jobs.cli enqueue --xyz path/to/molecule.xyz # queue a pasted geometry
 python -m jobs.cli submit --name benzene --wait       # run to completion in the foreground
+python -m jobs.cli submit --xyz no2.xyz --multiplicity 2 --wait   # --charge N / --multiplicity M, as the API takes them
+python -m jobs.cli submit --name water --retry --wait # run a FAILED job again, as a new attempt
 python -m jobs.cli generation off|on                  # the local kill switch (spec §10)
 ```
 
 `enqueue` only creates the job record (via `NullRunner`) — it is what the
 container smoke test below uses to hand the worker image something to run.
-`submit --wait` runs the worker in-process and prints the final status
-(`DONE`, `FAILED worker-error: …`, or `duplicate` for an existing job).
+`submit --wait` runs the worker in-process, as the record's current attempt
+(a retried job is attempt 2 or later), settles the job at $0, and prints the
+final status (`DONE`, `FAILED worker-error: …`, or `duplicate` for an
+existing job). Ctrl-C during `--wait` marks the job `FAILED`
+(`worker-crashed`) and settles it before the interrupt ends the command.
 
 ## The worker image
 
@@ -122,8 +144,8 @@ Expect the container to print `DONE`, the record to show `DONE` with
 `actual.threads` (Linux PySCF is OpenMP-enabled, so this is normally greater
 than 1 — a local Mac run shows 1, see below) and a Linux `peakMemoryGB`, and
 the script to print `checksums ok`. Nothing ran this job through the local
-runner or the CLI's own `--wait`, so settle it by hand to keep the local
-meter's book tidy:
+runner or the CLI's own `--wait`, so it is not settled yet; the next local
+server start settles it (the runner's start-up sweep), or settle it by hand:
 
 ```bash
 cd tools && ../tools/molecules/.venv/bin/python -c "from jobs.store import FileStore; from jobs.local_server import STATE_ROOT; FileStore(STATE_ROOT).settle('$KEY', 0)"; cd ..
@@ -131,7 +153,10 @@ cd tools && ../tools/molecules/.venv/bin/python -c "from jobs.store import FileS
 
 ## Where state and results live
 
-- `tools/jobs/.state/` — `FileStore`'s job records and the meter (gitignored).
+- `tools/jobs/.state/` — `FileStore`'s job records (`jobs/`), the PubChem
+  resolution cache (`resolve/`) and the kill switch (`config.json`);
+  gitignored. There is no meter file: the meter is summed from the job
+  records' own reservations and charges (Ruling T5-a).
 - `tools/molecules/out/jobs/<key>/` — a job's result files once it reaches
   `DONE`: `meta.json`, `basis.json`, `density.bin.gz`, `esp.bin.gz`,
   `geometry.xyz`, `input.py`, `output.log`, `timings.json`, `job.json`, and

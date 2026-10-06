@@ -129,3 +129,39 @@ def test_parse_sdf_zero_atoms_is_refused():
 def test_normalise_query():
     assert normalise_query('name', '  Caffeine   Anhydrous ') == 'name:caffeine anhydrous'
     assert normalise_query('smiles', ' CCO ') == 'smiles:CCO'
+
+
+# --- final-review fix wave (I2) --------------------------------------------------
+
+def _answers_at(stage_url, body):
+    """The standard water responses, except one URL that answers 200 with `body`."""
+    responses = {**standard_responses(), stage_url: body}
+    return fake_fetch(responses)
+
+
+CIDS, SDF, TITLE = (f'{BASE}/compound/name/water/cids/JSON', f'{BASE}/compound/cid/962/record/SDF?record_type=3d',
+                    f'{BASE}/compound/cid/962/property/Title/JSON')
+HTML = b'<html><body>Service temporarily unavailable</body></html>'
+
+
+@pytest.mark.parametrize('url, body', [(CIDS, HTML), (SDF, HTML), (TITLE, HTML), (CIDS, b'[]'), (SDF, b'[]'),
+                                       (TITLE, b'[]'), (TITLE, b'{"PropertyTable": {"Properties": []}}'),
+                                       (CIDS, b'\xff\xfe'), (SDF, b'\xff\xfe'), (TITLE, b'\xff\xfe')])
+def test_an_unreadable_200_is_pubchem_unavailable(url, body):
+    """A proxy's HTML error page (or any body this phase cannot parse) sent
+    with HTTP 200 used to raise straight out of resolve, and the server
+    dropped the connection instead of answering."""
+    with pytest.raises(JobRefused) as e:
+        resolve('name', 'water', _answers_at(url, body))
+    assert e.value.code == 'pubchem-unavailable' and e.value.status == 503
+    assert 'cannot read' in e.value.message
+
+
+def test_a_truncated_response_is_pubchem_unavailable():
+    import http.client
+
+    def cut_off(url, data=None):
+        raise http.client.IncompleteRead(b'{"Identif')
+    with pytest.raises(JobRefused) as e:
+        resolve('name', 'water', cut_off)
+    assert e.value.code == 'pubchem-unavailable' and e.value.status == 503

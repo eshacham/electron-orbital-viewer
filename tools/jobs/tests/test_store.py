@@ -192,3 +192,61 @@ def test_requeue_failed_resets_latest_energy(store):
     store.settle('a' * 64, 100)
     rec = store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
     assert rec['latestEnergyHartree'] is None
+
+
+# --- final-review fix wave -----------------------------------------------------
+
+def test_concurrent_writes_of_one_file_never_collide(store):
+    """I3: every writer used to share one `<name>.tmp`, so two threads writing
+    the same file raced: one's os.replace moved the other's temp file away
+    and the loser raised FileNotFoundError."""
+    errors = []
+
+    def write_many(i):
+        try:
+            for n in range(40):
+                store.put_resolution('name:water', {'cid': 962, 'writer': i, 'n': n})
+        except Exception as e:                  # pragma: no cover - the failure being pinned
+            errors.append(e)
+
+    threads = [threading.Thread(target=write_many, args=(i,)) for i in range(12)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert errors == []
+    assert store.get_resolution('name:water')['cid'] == 962
+    assert not [p for p in (store.root / 'resolve').iterdir() if not p.name.endswith('.json')]   # no temp files left
+
+
+def test_claim_refuses_an_attempt_older_than_the_record(store):
+    """I4: a worker for attempt 1 must not run a job a retry has already
+    moved to attempt 2, even while it is QUEUED."""
+    store.create_job(record())
+    store.update_job('a' * 64, {'status': 'FAILED'})
+    store.settle('a' * 64, 0)
+    store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
+    assert not store.claim('a' * 64, 1, NOW)
+    assert store.get_job('a' * 64)['status'] == 'QUEUED'
+    assert store.claim('a' * 64, 2, NOW)
+
+
+def test_peak_memory_starts_empty_and_resets_on_requeue(store):
+    """M2: only a heartbeat writes peakMemoryGB; a new record has the field
+    (as None) and a retry clears the failed attempt's figure."""
+    store.create_job(record())
+    assert store.get_job('a' * 64)['peakMemoryGB'] is None
+    store.update_job('a' * 64, {'status': 'FAILED', 'peakMemoryGB': 1.25})
+    store.settle('a' * 64, 0)
+    rec = store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
+    assert rec['peakMemoryGB'] is None
+
+
+def test_jobs_with_backend_spans_every_month(store):
+    """I1: the local runner's start-up sweep needs every record of its
+    backend, whatever month it was submitted in."""
+    store.create_job(record('a' * 64))
+    store.create_job(record('b' * 64, now=datetime(2026, 9, 30, 23, 0, tzinfo=timezone.utc)))
+    aws = record('c' * 64)
+    aws['backend'] = 'aws'
+    store.create_job(aws)
+    assert sorted(r['key'] for r in store.jobs_with_backend('local')) == ['a' * 64, 'b' * 64]
+    assert [r['key'] for r in store.jobs_with_backend('aws')] == ['c' * 64]

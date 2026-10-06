@@ -128,8 +128,11 @@ def decide(job: dict, local: bool = False) -> dict:
         capacity, attempts = 'spot', SPOT_ATTEMPTS
     else:
         capacity, attempts = 'on-demand', 1
-    return {'version': SIZING_VERSION, 'size': size.name, 'vcpu': size.vcpu, 'memoryGB': size.memory_gb,
-            'capacity': capacity, 'attempts': attempts, 'basisFunctions': n,
+    # estimateFor (M1): size, time and timeout are Fargate figures even for a
+    # local run, which this Mac runs single-threaded and with no time limit;
+    # the field lets 6B-2 label them "Fargate estimate" rather than a promise.
+    return {'version': SIZING_VERSION, 'estimateFor': 'fargate', 'size': size.name, 'vcpu': size.vcpu,
+            'memoryGB': size.memory_gb, 'capacity': capacity, 'attempts': attempts, 'basisFunctions': n,
             'predictedSeconds': round(seconds, 1), 'predictedMemoryGB': round(memory, 2),
             'timeoutSeconds': timeout,
             'reservationMicros': attempts * cost_micros(capacity, size.vcpu, size.memory_gb, timeout),
