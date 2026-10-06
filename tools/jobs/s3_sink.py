@@ -59,6 +59,14 @@ class S3Sink:
                 raise FileExistsError(f's3://{self.bucket}/{PREFIX}/{key}/{name} already exists')
             raise
 
+    def get_result(self, key, name):
+        try:
+            return self.s3.get_object(Bucket=self.bucket, Key=f'{PREFIX}/{key}/{name}')['Body'].read()
+        except ClientError as e:
+            if e.response['Error']['Code'] in MISSING_CODES:
+                return None
+            raise
+
     def put_done(self, key, data):
         self.put_result(key, 'done.json', data)
 

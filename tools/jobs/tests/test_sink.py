@@ -33,3 +33,11 @@ def test_clear_partial_is_a_no_op_when_nothing_was_ever_written(tmp_path):
     sink.clear_partial(KEY)          # must not raise
     sink.put_result(KEY, 'meta.json', b'first')
     assert (sink.root / KEY / 'meta.json').read_bytes() == b'first'
+
+
+def test_get_result_reads_a_root_file_or_says_none(tmp_path):
+    # Follow-up 1: the worker reads a complete root an earlier attempt left, to check it.
+    sink = LocalSink(tmp_path)
+    assert sink.get_result(KEY, 'done.json') is None
+    sink.put_done(KEY, b'{"files": {}}')
+    assert sink.get_result(KEY, 'done.json') == b'{"files": {}}'

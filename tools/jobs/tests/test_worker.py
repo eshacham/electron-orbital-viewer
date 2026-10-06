@@ -162,19 +162,79 @@ def test_scf_failure_keeps_the_attempt_files_and_writes_no_result(env, monkeypat
     assert not (jobs / key / 'done.json').exists() and not (jobs / key / 'meta.json').exists()
 
 
-def test_a_leftover_result_file_fails_the_job_rather_than_leaving_it_running(env):
-    # D17: a result file the worker cannot write must end the job FAILED, not
-    # leave it RUNNING. Since D7 (6B-3) a half-written root is cleared first,
-    # so the case left is a complete root (done.json present), which is never touched.
+@pytest.mark.parametrize('done', [
+    lambda key: {'key': key, 'files': {'meta.json': hashlib.sha256(b'other').hexdigest()}},     # tampered
+    lambda key: {'key': key, 'files': {'meta.json': hashlib.sha256(b'{}').hexdigest(),
+                                       'basis.json': hashlib.sha256(b'{}').hexdigest()}},     # a file missing
+    lambda key: None,                                                                          # unreadable
+], ids=['tampered', 'missing', 'unreadable'])
+def test_a_leftover_result_file_fails_the_job_rather_than_leaving_it_running(env, done):
+    # D17: a result folder the worker cannot use must end the job FAILED, not
+    # leave it RUNNING. Since D7 a half-written root is cleared, and since the
+    # Task 4 follow-up a complete one is accepted; what is left is a done.json
+    # whose files do not match it, which is never touched.
     store, sink, jobs = env
     key = queue(store, H2)
     sink.put_result(key, 'meta.json', b'{}')
-    sink.put_done(key, b'{}')
+    written = json.dumps(done(key)).encode() if done(key) else b'not json'
+    sink.put_done(key, written)
     assert run_job(key, store, sink, grid_points=(32,)) == 'FAILED'
     rec = store.get_job(key)
     assert rec['status'] == 'FAILED' and rec['error']['code'] == 'worker-error'
-    assert 'meta.json' in rec['error']['message'] and 'already' in rec['error']['message']
-    assert (jobs / key / 'meta.json').read_bytes() == b'{}' and (jobs / key / 'done.json').read_bytes() == b'{}'
+    assert 'done.json' in rec['error']['message'] and 'does not match' in rec['error']['message']
+    assert (jobs / key / 'meta.json').read_bytes() == b'{}' and (jobs / key / 'done.json').read_bytes() == written
+    assert not (jobs / key / 'basis.json').exists()
+
+
+class Reclaimed(BaseException):
+    """Fargate stopping the task: nothing in the worker catches it."""
+
+
+def test_a_complete_root_left_by_a_reclaimed_attempt_ends_done(env, monkeypatch):
+    # Task 4 follow-up: a Spot reclaim between put_done and the final
+    # update_job leaves a complete root and a RUNNING record. The key is
+    # content-addressed, so that root is this job's answer: the retry checks
+    # it against done.json and ends DONE rather than failing for ever.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    real = store.update_job
+
+    def reclaimed(k, changes, **kwargs):
+        if changes.get('status') == 'DONE':
+            raise Reclaimed
+        return real(k, changes, **kwargs)
+    monkeypatch.setattr(store, 'update_job', reclaimed)
+    with pytest.raises(Reclaimed):
+        run_job(key, store, sink, grid_points=(32,))
+    monkeypatch.setattr(store, 'update_job', real)
+    done = (jobs / key / 'done.json').read_bytes()
+    assert store.get_job(key)['status'] == 'RUNNING'
+    assert run_job(key, store, sink, attempt=2, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    rec = store.get_job(key)
+    assert rec['status'] == 'DONE' and rec['attempt'] == 2 and rec['error'] is None
+    assert (jobs / key / 'done.json').read_bytes() == done
+
+
+@pytest.mark.parametrize('moved', [{'attempt': 2}, {'status': 'FAILED'}], ids=['retried', 'failed'])
+def test_an_attempt_that_no_longer_owns_the_job_writes_no_root(env, monkeypatch, moved):
+    # Task 4 follow-up: ownership is checked again right before the root
+    # writes; an attempt that has lost it keeps its attempt files but leaves
+    # the root to the owner, and says it was superseded.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    slow_writes(monkeypatch, 0, before=lambda *a: store.update_job(key, moved))
+    assert run_job(key, store, sink, grid_points=(32,)) == 'superseded'
+    assert [p.name for p in (jobs / key).iterdir() if p.is_file()] == []
+    assert (jobs / key / 'attempts' / '1' / 'output.log').exists()
+    assert {k: store.get_job(key)[k] for k in moved} == moved and store.get_job(key)['endedAt'] is None
+
+
+def test_a_result_file_another_attempt_wrote_meanwhile_is_explained():
+    # Task 4 follow-up: since D7 clears a partial root and a complete one is
+    # accepted, FileExistsError means a second writer raced this one.
+    message = _classify(FileExistsError(17, 'File exists', '/out/jobs/k/meta.json'))['message']
+    assert 'meta.json' in message and 'while this attempt was writing' in message
+    assert 'Clear the folder' not in message
 
 
 def test_a_partial_root_from_an_earlier_attempt_is_cleared_then_written(env):

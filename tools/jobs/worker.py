@@ -255,38 +255,51 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
                'memoryGB': sizing['memoryGB'], 'capacity': sizing['capacity'],
                'stages': progress.durations(ended), **actual,
                'startedAt': record['startedAt'], 'endedAt': iso(utc_now())}
-    # D17: copying the files out is protected too. A result folder an earlier
-    # attempt left half-written refuses the first name it already has
-    # (FileExistsError); the job must end FAILED saying so, not sit in
-    # RUNNING until something notices the worker has gone.
+    # D17: copying the files out is protected too. A result file the worker
+    # cannot write (FileExistsError) must end the job FAILED saying so, not
+    # leave it RUNNING until something notices the worker has gone.
     try:
         log_bytes = log.read_bytes() if log.exists() else b''
         for name, data in (('input.py', input_text.encode()), ('output.log', log_bytes),
                            ('timings.json', json.dumps(timings, indent=1).encode())):
             sink.put_attempt(key, attempt, name, data)
         if error is None:
-            files = {name: (work / 'result' / name).read_bytes() for name in RESULT_FILES}
-            files.update({'job.json': json.dumps({'key': key, 'job': job, 'geometrySource': record['geometrySource'],
-                                                  'sizing': sizing, 'imageDigest': image_digest,
-                                                  'generatorCommit': commit}, indent=1).encode(),
-                          'input.py': input_text.encode(), 'output.log': log_bytes,
-                          'geometry.xyz': _xyz(final_atoms, f'{record["formula"]} job {key}').encode(),
-                          'timings.json': json.dumps(timings, indent=1).encode()})
-            if frames:
-                files['trajectory.xyz'] = ''.join(frames).encode()
-            # D7: an earlier attempt reclaimed part-way through these writes
-            # leaves a root without done.json, which would refuse every name
-            # it already has. Only the attempt that owns the record clears it:
-            # one a retry has moved past must not delete what the current
-            # attempt may be writing.
-            if (store.get_job(key) or {}).get('attempt') == attempt:
+            # Ownership again, right before the root writes: the root belongs
+            # to whichever attempt owns the record, and one that a retry (or a
+            # sweep marking it FAILED) has moved past must neither clear nor
+            # write it. Its final write would be refused anyway (Ruling T5-b).
+            current = store.get_job(key) or {}
+            if current.get('attempt') != attempt or current.get('status') != 'RUNNING':
+                return 'superseded'
+            existing = sink.get_result(key, 'done.json')
+            if existing is not None:
+                # A complete root already: an earlier attempt was reclaimed
+                # between put_done and its final record write. The key is
+                # content-addressed, so that set is this job's answer if its
+                # files still match done.json; clear_partial never clears it,
+                # so failing here would fail the key for ever.
+                error = _check_complete(sink, key, existing)
+            else:
+                files = {name: (work / 'result' / name).read_bytes() for name in RESULT_FILES}
+                files.update({'job.json': json.dumps({'key': key, 'job': job,
+                                                      'geometrySource': record['geometrySource'],
+                                                      'sizing': sizing, 'imageDigest': image_digest,
+                                                      'generatorCommit': commit}, indent=1).encode(),
+                              'input.py': input_text.encode(), 'output.log': log_bytes,
+                              'geometry.xyz': _xyz(final_atoms, f'{record["formula"]} job {key}').encode(),
+                              'timings.json': json.dumps(timings, indent=1).encode()})
+                if frames:
+                    files['trajectory.xyz'] = ''.join(frames).encode()
+                # D7: an earlier attempt reclaimed part-way through these
+                # writes leaves a root without done.json, which would refuse
+                # every name it already has. Ownership was checked just above.
                 sink.clear_partial(key)
-            for name, data in files.items():
-                sink.put_result(key, name, data)
-            # done.json last: its presence is what says the set is complete.
-            sink.put_done(key, json.dumps({'key': key,
-                                           'files': {n: hashlib.sha256(d).hexdigest() for n, d in files.items()},
-                                           'writtenAt': iso(utc_now())}, indent=1).encode())
+                for name, data in files.items():
+                    sink.put_result(key, name, data)
+                # done.json last: its presence is what says the set is complete.
+                sink.put_done(key, json.dumps({'key': key,
+                                               'files': {n: hashlib.sha256(d).hexdigest() for n, d in files.items()},
+                                               'writtenAt': iso(utc_now())}, indent=1).encode())
     except Exception as e:
         error = error or _classify(e)               # the run's own failure is the more useful reason
 
@@ -298,6 +311,27 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
         # this one's, is the job's. Like a duplicate, this is not a failure.
         return 'superseded'
     return 'FAILED' if error else 'DONE'
+
+
+def _check_complete(sink, key, done_bytes):
+    """None if the root's files match the done.json found there (and it lists
+    every file the app reads), else the error that says which do not."""
+    try:
+        listed = json.loads(done_bytes)['files']
+        problems = [f'{name} is not listed' for name in RESULT_FILES if name not in listed]
+        for name, digest in listed.items():
+            data = sink.get_result(key, name)
+            if data is None:
+                problems.append(f'{name} is missing')
+            elif hashlib.sha256(data).hexdigest() != digest:
+                problems.append(f'{name} has changed')
+    except (ValueError, KeyError, TypeError, AttributeError):
+        problems = ['done.json itself cannot be read']
+    if not problems:
+        return None
+    return {'code': 'worker-error',
+            'message': (f'the result folder already holds a done.json that does not match its files '
+                        f'({"; ".join(problems)}). Results are never overwritten: clear the folder, then retry.')[:500]}
 
 
 def _threads():
@@ -324,10 +358,13 @@ def _classify(e):
         # as F⁻ trip it, and the owner needs to be told what happened instead.
         return {'code': 'box-too-small', 'message': BOX_TOO_SMALL}
     if isinstance(e, FileExistsError):
+        # D7 clears a partial root and a complete one is accepted, so this
+        # now means a second writer raced this attempt (Task 4 follow-up).
         found = Path(e.filename).name if e.filename else 'a result file'
         return {'code': 'worker-error',
-                'message': f'{found} is already in the result folder: an earlier attempt stopped part-way through '
-                           'writing its results, and results are never overwritten. Clear the folder, then retry.'}
+                'message': f'{found} appeared in the result folder while this attempt was writing it: another '
+                           'attempt wrote the same job at the same time, and results are never overwritten. Retry: '
+                           'the retry accepts a complete set or clears a partial one.'}
     last = traceback.format_exception_only(e)[-1].strip()
     return {'code': 'worker-error', 'message': last[:500]}
 

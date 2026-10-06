@@ -88,3 +88,20 @@ def test_get_attempt_treats_access_denied_as_missing():
                               service_message='Access Denied', http_status_code=403)
         assert S3Sink(BUCKET, client=client).get_attempt(KEY, 1, 'trajectory.xyz') is None
         stub.assert_no_pending_responses()
+
+
+def test_get_result_reads_a_root_file_or_says_none(s3):
+    # Follow-up 1: the worker reads a complete root an earlier attempt left, to check it.
+    sink = S3Sink(BUCKET, client=s3)
+    assert sink.get_result(KEY, 'done.json') is None
+    sink.put_done(KEY, b'{"files": {}}')
+    assert sink.get_result(KEY, 'done.json') == b'{"files": {}}'
+
+
+def test_get_result_treats_access_denied_as_missing():
+    client = boto3.client('s3', region_name='us-east-1')
+    with Stubber(client) as stub:
+        stub.add_client_error('get_object', service_error_code='AccessDenied',
+                              service_message='Access Denied', http_status_code=403)
+        assert S3Sink(BUCKET, client=client).get_result(KEY, 'done.json') is None
+        stub.assert_no_pending_responses()
