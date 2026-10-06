@@ -1,4 +1,7 @@
+from types import SimpleNamespace
+
 import numpy as np
+import pytest
 from pyscf import gto
 from pyscf.dft import numint
 
@@ -87,3 +90,15 @@ def test_table_rows_address_basis_json_positions():
     mol, mf = scf('ch4')
     table = orbital_table(mol, mf)
     assert [r['index'] for r in table] == list(range(len(table)))
+
+
+def test_table_raises_value_error_when_position_is_not_index():
+    # Phase 6 final review carry-forward: a bare `assert` is a no-op under
+    # `python -O`, and the worker now runs this at request time (not just
+    # in a controlled build), so the precondition must raise even then.
+    # A virtual sandwiched between occupied orbitals (not possible under
+    # real RKS/ROKS aufbau, but cheap to fake) breaks position == index.
+    mol = SimpleNamespace(symmetry=False)
+    mf = SimpleNamespace(mo_energy=np.array([-1.0, -0.5, -0.4]), mo_occ=np.array([2.0, 0.0, 2.0]))
+    with pytest.raises(ValueError):
+        orbital_table(mol, mf)

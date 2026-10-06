@@ -68,6 +68,9 @@ def orbital_table(mol, mf, extra_virtuals=5):
     # runs starting at 0 — so a row's position in this list equals its
     # PySCF index. Pin that precondition here, where it would otherwise
     # silently rot if a future change (e.g. reordering virtuals by label)
-    # broke it.
-    assert [r['index'] for r in rows] == list(range(len(rows)))
+    # broke it. A bare `assert` is a no-op under `python -O`; the on-demand
+    # worker (Phase 6B-1) runs this at request time, not just in a
+    # controlled library build, so the guard must not be optimised away.
+    if [r['index'] for r in rows] != list(range(len(rows))):
+        raise ValueError('orbital_table rows are not addressable by position: position != PySCF index')
     return rows

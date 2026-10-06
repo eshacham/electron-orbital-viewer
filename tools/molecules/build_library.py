@@ -105,16 +105,25 @@ def library_basis_json(mol, mf, rows):
                           'coefficients': [float(c) for c in mf.mo_coeff[:, r['index']]]} for r in rows]}
 
 
-def build_molecule(entry, out_root=OUT_ROOT, basis=PROPERTY_BASIS, xc='B3LYP', grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES):
-    atoms, optimisation = geometry_for(entry)
-    mol, mf = run_dft(atoms, entry.spin, basis, xc)
+_FIELD_KEYS = ('id', 'name', 'formula', 'geometrySource', 'references', 'multiplicity', 'method')
+
+
+def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES, commit=None):
+    """Phase 6's per-molecule files for an SCF that has already run. Shared
+    with the on-demand worker (tools/jobs/worker.py), which brings its own
+    geometry and convergence ladder but must write exactly what the library
+    writes, so the app reads both the same way. Writes into `out` directly:
+    the worker points it at a scratch folder and copies only a finished set.
+    `commit` lets a caller without git (D2: the worker's container) supply
+    the commit rather than have this shell out and fail."""
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=True)
     dm = total_dm(mf)
     coords = mol.atom_coords()
-    out = Path(out_root) / entry.id
-    out.mkdir(parents=True, exist_ok=True)
     orbitals = orbital_table(mol, mf)
     (out / 'basis.json').write_text(json.dumps(library_basis_json(mol, mf, orbitals), separators=(',', ':')))
     dipole = np.asarray(mf.dip_moment(unit='Debye', verbose=0), dtype=float)
+    extra = {k: v for k, v in fields.items() if k not in _FIELD_KEYS}
     for points in grid_points:
         grid, esp_grid = grid_for(coords, points), grid_for(coords, points // 2)
         raw_density = voxel_averaged_density(mol, dm, grid)
@@ -130,10 +139,10 @@ def build_molecule(entry, out_root=OUT_ROOT, basis=PROPERTY_BASIS, xc='B3LYP', g
         write_float32_gz(out / 'density.bin.gz', density)
         write_float32_gz(out / 'esp.bin.gz', compact_float32(esp))
         meta = {
-            'id': entry.id, 'name': entry.name, 'formula': entry.formula,
+            'id': fields['id'], 'name': fields['name'], 'formula': fields['formula'],
             'atoms': [{'Z': int(mol.atom_charge(i)), 'position': [float(v) for v in coords[i]]} for i in range(mol.natm)],
-            'geometrySource': entry.geometry_source,
-            'method': {'density': f'{xc}/{basis}', 'energies': f'{xc}/{basis}'},
+            'geometrySource': fields['geometrySource'],
+            'method': {'density': fields['method'], 'energies': fields['method']},
             'totalEnergyHartree': float(mf.e_tot),
             'dipoleDebye': float(np.linalg.norm(dipole)),
             'dipoleVectorDebye': [float(v) for v in dipole],
@@ -143,25 +152,37 @@ def build_molecule(entry, out_root=OUT_ROOT, basis=PROPERTY_BASIS, xc='B3LYP', g
             'espRangeOnSurface': list(esp_surface_range(esp, eval_density(mol, dm, esp_coords))),
             'electronCount': int(mol.nelectron),
             'densityIntegral': float(density.astype(np.float64).sum() * grid.spacing ** 3),
-            'multiplicity': entry.spin + 1,
+            'multiplicity': fields['multiplicity'],
             'symmetry': {'pointGroup': mol.topgroup, 'labelGroup': mol.groupname},
-            'references': [_reference_json(r) for r in entry.references],
+            'references': fields['references'],
             # D2 (preflight controller correction): generate.provenance gives
             # everything that decides the numbers (pyscf/numpy/scipy/python
-            # versions, xc variant, dataVersion) and the one commit shared
-            # with the diatomics; only `script` is this module's own.
-            'generator': {**provenance(_commit()), 'script': 'tools/molecules/build_library.py'},
+            # versions, xc variant, dataVersion); the commit is the one
+            # shared with the diatomics unless the caller supplies its own
+            # (the worker's container has no git -- Task 9 passes it in).
+            'generator': {**provenance(_commit() if commit is None else commit), 'script': 'tools/molecules/build_library.py'},
+            **extra,
         }
-        if optimisation:
-            meta['geometryOptimisation'] = optimisation
-        if entry.caveat:
-            # Ruling T7-O3: a known, owner-accepted exception is shown, not
-            # hidden (spec §3.5) -- the app's readout (Task 14) displays this.
-            meta['caveat'] = entry.caveat
         (out / 'meta.json').write_text(json.dumps(meta, indent=1, ensure_ascii=False) + '\n')
         if _size(out) <= budget:
-            return {'id': entry.id, 'name': entry.name, 'formula': entry.formula, 'category': entry.category, 'tags': list(entry.tags)}
-    raise BudgetExceeded(f'{entry.id}: {_size(out)} bytes at {grid_points[-1]}³ exceeds {budget}')
+            return meta
+    raise BudgetExceeded(f'{fields["id"]}: {_size(out)} bytes at {grid_points[-1]}³ exceeds {budget}')
+
+
+def build_molecule(entry, out_root=OUT_ROOT, basis=PROPERTY_BASIS, xc='B3LYP', grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES):
+    atoms, optimisation = geometry_for(entry)
+    mol, mf = run_dft(atoms, entry.spin, basis, xc)
+    fields = {'id': entry.id, 'name': entry.name, 'formula': entry.formula, 'geometrySource': entry.geometry_source,
+              'references': [_reference_json(r) for r in entry.references], 'multiplicity': entry.spin + 1,
+              'method': f'{xc}/{basis}'}
+    if optimisation:
+        fields['geometryOptimisation'] = optimisation
+    if entry.caveat:
+        # Ruling T7-O3: a known, owner-accepted exception is shown, not
+        # hidden (spec §3.5) -- the app's readout (Task 14) displays this.
+        fields['caveat'] = entry.caveat
+    write_molecule_files(Path(out_root) / entry.id, mol, mf, fields, grid_points, budget)
+    return {'id': entry.id, 'name': entry.name, 'formula': entry.formula, 'category': entry.category, 'tags': list(entry.tags)}
 
 
 def merge_index(path, entries):
