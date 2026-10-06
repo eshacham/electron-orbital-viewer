@@ -229,11 +229,16 @@ class Api:
         month = self._month(query)
         records = self.store.list_jobs(month)
         meter = self.store.meter(month)
+        # The month's own charges, by the day each was dated (D16): a record
+        # retried into this month also carries last month's charge, which
+        # belongs to last month's spend. Ledgers written before charges were
+        # dated fall back to the record's end time.
         daily = {}
         for r in records:
-            if r['settled'] and r['actualMicros'] and r['endedAt']:
-                day = r['endedAt'][:10]
-                daily[day] = daily.get(day, 0) + r['actualMicros']
+            for c in r.get('charges', ()):
+                at = c.get('at') or r['endedAt']
+                if c['month'] == month and c['micros'] and at:
+                    daily[at[:10]] = daily.get(at[:10], 0) + c['micros']
         now = self.now()
         year, mon = map(int, month.split('-'))
         days = calendar.monthrange(year, mon)[1]

@@ -12,3 +12,8 @@ geometric==1.1.1
 
 # On-demand jobs (Phase 6B): RFC 8785 canonical JSON for job keys.
 rfc8785==0.1.4
+
+# Phase 6B-3: the worker's AWS mode (boto3), and DynamoDB/S3 tests on moto.
+# moto is test-only, but the lock is this venv's freeze, as pytest already is.
+boto3==1.43.108
+moto[dynamodb,s3]==5.2.3

@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Protocol
 
 from jobs.errors import JobRefused
-from jobs.model import iso, month_of
+from jobs.model import iso, month_of, utc_now
 from jobs.prices import CAP_MICROS
 
 
@@ -42,6 +42,13 @@ class BudgetExhausted(JobRefused):
     def __init__(self, meter: dict):
         super().__init__('budget', f'Monthly budget reached: ${meter["spent"] / 1e6:.2f} spent, '
                                    f'${meter["reserved"] / 1e6:.2f} reserved of ${meter["cap"] / 1e6:.2f}')
+
+
+def charge(record: dict, micros: int) -> dict:
+    """One entry of a record's ledger: billed to the month the attempt was
+    submitted in, dated when the attempt ended (or, failing that, when it
+    was settled), as both backends append it."""
+    return {'month': record['month'], 'micros': micros, 'at': record.get('endedAt') or iso(utc_now())}
 
 
 class Store(Protocol):
@@ -200,9 +207,11 @@ class FileStore:
             # Settling is appending one charge and flipping `settled`, in the
             # same write as the reservation it closes out: the meter can
             # never see the charge without the reservation going away, or
-            # the other way round.
+            # the other way round. The charge carries its own date (D16) so
+            # the dashboard's daily spend adds charges, not a record's
+            # running total, which spans months after a retry.
             rec.update({'settled': True, 'actualMicros': rec['actualMicros'] + actual_micros,
-                        'charges': rec.get('charges', []) + [{'month': rec['month'], 'micros': actual_micros}]})
+                        'charges': rec.get('charges', []) + [charge(rec, actual_micros)]})
             self._write(self._job_path(key), rec)
             return True
 

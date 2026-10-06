@@ -6,6 +6,7 @@ import pytest
 from jobs.handlers import Api
 from jobs.runner import NullRunner
 from jobs.store import FileStore
+from jobs.tests.stores import make_store
 
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=timezone.utc)
 WATER_XYZ = '3\nwater\nO 0 0 0.11779\nH 0 0.75545 -0.47116\nH 0 -0.75545 -0.47116\n'
@@ -20,10 +21,10 @@ def fake_resolve(kind, text, *a, **k):
     raise JobRefused('unknown-compound', f'PubChem does not know "{text}"')
 
 
-@pytest.fixture
-def api(tmp_path):
-    return Api(FileStore(tmp_path, cap_micros=8_800_000), NullRunner(), resolve=fake_resolve,
-               now=lambda: NOW, backend='aws')
+@pytest.fixture(params=['file', 'dynamo'])
+def api(request, tmp_path):
+    with make_store(request.param, tmp_path, cap_micros=8_800_000) as store:
+        yield Api(store, NullRunner(), resolve=fake_resolve, now=lambda: NOW, backend='aws')
 
 
 def call(api, method, path, body=None, query=None):
@@ -219,6 +220,23 @@ def test_costs_projection_and_daily(api):
     assert costs['daily'] == [{'date': '2026-10-09', 'usd': 0.1}]
     assert costs['projectionUsd'] == pytest.approx(0.1 * 31 / 10, abs=1e-6)
     assert costs['billing'] is None and costs['pricesRetrieved'] == '2026-10-04'
+
+
+def test_costs_daily_matches_spent_after_a_retry_in_a_later_month(api):
+    """D16: daily used to add a record's whole actualMicros on its endedAt,
+    so a job failed in October and retried in November put October's charge
+    on a November day, and November's daily no longer summed to spentUsd."""
+    call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    api.store.update_job(WATER_KEY, {'status': 'FAILED', 'endedAt': '2026-10-10T12:30:00Z',
+                                     'error': {'code': 'scf-not-converged', 'message': 'm'}})
+    api.store.settle(WATER_KEY, 100_000)
+    api.now = lambda: datetime(2026, 11, 2, 9, 0, tzinfo=timezone.utc)
+    call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}, 'retry': True})
+    api.store.update_job(WATER_KEY, {'status': 'DONE', 'endedAt': '2026-11-02T09:40:00Z'})
+    api.store.settle(WATER_KEY, 50_000)
+    status, costs = api.handle('GET', '/api/v1/costs', {'month': '2026-11'}, None)
+    assert status == 200 and costs['spentUsd'] == 0.05
+    assert costs['daily'] == [{'date': '2026-11-02', 'usd': 0.05}]
 
 
 # --- final-review fix wave (I2) --------------------------------------------------
