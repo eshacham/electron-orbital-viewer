@@ -43,6 +43,9 @@ CEILING_SECONDS = {'single': 3600, 'optimise': 7200}
 SPOT_LIMIT_SECONDS = 3600
 SPOT_ATTEMPTS = 3
 OPEN_SHELL_FACTOR = 1.5
+# Fargate Spot runs Linux/ARM64 Batch jobs (AWS What's New 2025-08-14; checked 2026-10-05, Phase 6B-3
+# Task 1, and proven by Task 12's first job). False sends everything on-demand with one attempt.
+SPOT_AVAILABLE = True
 
 
 def speedup(vcpu: int) -> float:
@@ -124,7 +127,7 @@ def decide(job: dict, local: bool = False) -> dict:
     timeout = int(min(max(math.ceil(TIMEOUT_FACTOR * seconds), MIN_TIMEOUT_SECONDS), ceiling))
     if local:
         capacity, attempts = 'local', 1
-    elif seconds <= SPOT_LIMIT_SECONDS:
+    elif SPOT_AVAILABLE and seconds <= SPOT_LIMIT_SECONDS:
         capacity, attempts = 'spot', SPOT_ATTEMPTS
     else:
         capacity, attempts = 'on-demand', 1
