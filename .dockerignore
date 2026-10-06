@@ -1,0 +1,10 @@
+# The worker image needs only the generator and tools/jobs (allow-list): it
+# must not be able to see the Electron app, node_modules, or the rest of the
+# repo, so a careless COPY can't balloon the image or leak unrelated files.
+*
+!tools/molecules/*.py
+!tools/molecules/requirements.lock
+!tools/jobs/
+tools/jobs/.state/
+tools/jobs/tests/
+**/__pycache__/

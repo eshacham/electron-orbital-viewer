@@ -1589,6 +1589,146 @@ on-demand molecule's properties are computed at the same basis as this
 library's 25 — otherwise a user comparing a library molecule against an
 on-demand one would be comparing two different methods without being told.
 
+## Phase 6B-1 — on-demand generation: jobs core, worker, local backend (2026-10-06)
+
+Spec: `docs/superpowers/specs/2026-10-05-on-demand-generation-design.md`.
+This phase ships everything behind the on-demand "compute this molecule"
+flow except the UI (6B-2) and the AWS backend (6B-3): canonicalisation and
+keying (`tools/jobs/canonical.py`), PubChem resolution
+(`tools/jobs/pubchem.py`), deterministic sizing and pricing
+(`tools/jobs/sizing.py`, `prices.py`), a crash-safe local store and meter
+(`tools/jobs/store.py`), the framework-independent request handlers
+(`tools/jobs/handlers.py`), a local HTTP server and subprocess runner
+(`local_server.py`, `runner.py`), a worker that runs one job end to end and
+writes Phase 6's own result files (`worker.py`), a CLI (`cli.py`), and the
+ARM64 Docker image this task adds (`tools/jobs/Dockerfile`), verified under
+OrbStack. See `tools/jobs/README.md` for the module map and how to run it.
+
+### Sizing version 1
+
+Fitted (Task 11) from three real local runs — water (N 58), benzene (N
+276), caffeine (N 614, run by the controller in the background per Ruling
+D6) — all on an **Apple M2 Pro**, where PySCF's macOS wheel is
+single-threaded (`lib.num_threads() == 1` regardless of `OMP_NUM_THREADS`).
+Fitted constants in `sizing.CONSTANTS`:
+
+```
+m0 = 0.412, m2 = 3.73, t0 = 5.0, t3 = 19400.0, g = 1.5, f2 = 2480.0
+```
+
+`t0` and `g` are held fixed (the brief/Ruling D14); 6B-3 refits both, plus
+`speedup`, from a real AWS Fargate ladder. This task's own container smoke
+test (methane) measured `actual.threads == 10` inside the Linux image —
+confirming the Mac's single-threaded number is a local artefact, not a
+property of PySCF itself, and that 6B-3's refit will see real OpenMP
+speedup the local fit never could.
+
+### Rulings made in this phase
+
+- **D6** — the controller ran the caffeine calibration job itself, in the
+  background, as one command (precedent: Ruling T7-gen), because PySCF's
+  single-threaded macOS wheel put caffeine at an estimated ~55 minutes,
+  longer than one foreground implementer call can run. Water and benzene
+  ran in the foreground.
+- **D13** — the worker writes `geometryOptimisation: {steps, converged}`;
+  6B-2 widens the TS type (`src/molecules/library_types.ts`) to
+  `{ converged; maxGradient?; steps? }` rather than the worker computing a
+  final SVP gradient it does not otherwise need.
+- **D14** — the sizing model gained a second, separate term for the
+  file-writing stage: `predicted seconds = OPEN_SHELL(...) ×
+  [SCF/speedup(c)] + f2·(N/1000)²`, with `f2` **not** divided by `speedup`
+  (Phase 6's grid-writing code has no threading on the Mac).
+  `provenance.wallSeconds` is taken *after* the files are written, not just
+  after the SCF. `f2` is fitted from the `writing files` stage alone;
+  sizing tests that assume pure SCF scaling monkeypatch `f2 = 0`.
+- **D15** — a `RuntimeError` from `build_library.check_box` (small anions,
+  e.g. F⁻, whose diffuse density reaches the sampling box's face) is
+  reclassified from `worker-error` to `box-too-small` with a message an
+  owner can read, rather than the grid-maintainer-facing message
+  `check_box` itself raises. No margin change.
+- **T5-a** (Critical) — `FileStore`'s meter is *derived*: each job record
+  carries its own unsettled reservation and a per-month list of settled
+  charges, and `meter(month)` sums them under the lock. Create/requeue/settle
+  are each one atomic record write, so a crash between two writes can never
+  double-apply or half-apply money. 6B-3's `DynamoStore` keeps its own
+  transactional meter item but must pass the same contract tests.
+- **T5-b** — `update_job` gained an optional attempt guard (`rec['attempt']
+  == attempt` when given); the worker passes its attempt on every heartbeat
+  and its final status write, so a superseded attempt can never clobber the
+  current one's record. Settlement happens exactly once per reservation,
+  done by the runner/reconcile, never by the worker itself.
+  `latestEnergyHartree` resets on requeue.
+- **T6-a** — handler hardening: the recipe type/whitelist is checked in
+  `_request` before any PubChem call; a runner-failure write is guarded
+  (`expect_status` QUEUED/STARTING + attempt, settle only if the guarded
+  update succeeded); a preview skips the budget refusal when an existing job
+  is DONE or already active (resubmitting would cost nothing); a charge is
+  refused as `bad-multiplicity` when electrons exceed 2× the property
+  basis's function count; a concurrent Retry that finds the job no longer
+  FAILED returns 200 with the current record; the job route matches only an
+  exact 64-hex key.
+- **T11-a** — `decide()` must also clear a **time headroom** against the
+  recipe's ceiling, not just pick the cheapest size that fits memory:
+  `TIME_HEADROOM = 1.5`; it walks sizes smallest-first and picks the first
+  whose predicted seconds × 1.5 is still ≤ the recipe's ceiling (clamping
+  the timeout, as before, to `clamp(3 × predicted, 600, ceiling)`, which is
+  then always ≥ 1.5× predicted). If no size clears the time bar, the job is
+  refused `too-long`, naming the fastest memory-qualifying size. Without
+  this, caffeine sized to S with a 3600 s ceiling-clamped timeout against a
+  measured single-threaded wall time of 4466 s — a timeout that could never
+  succeed.
+- **D2** — the Dockerfile adds `ARG GENERATOR_COMMIT=unknown` and
+  `ENV JOBS_GENERATOR_COMMIT=${GENERATOR_COMMIT}` right after `FROM`; the
+  image is built with `--build-arg GENERATOR_COMMIT=$(git rev-parse HEAD)`;
+  the worker reads `JOBS_GENERATOR_COMMIT` from the environment in
+  preference to shelling out to `git` (which the image has neither the
+  binary nor a repository for). Verified in this task's smoke test:
+  `meta.json`'s `generator.commit` and `provenance.generatorCommit` both
+  equalled the build's `git rev-parse HEAD`.
+- **D12** — `geometric` has no `linux/aarch64` wheel and builds from its
+  pure-Python sdist during the image build; this is expected and was seen
+  again in this task's build (~0.4 s). The base image must stay glibc ≥
+  2.28 (`python:3.12-slim` qualifies; `h5py` 3.16.0 has no manylinux2014
+  wheel, so an older base would not).
+- **`meta.provenance.costUsd` is always `null`**; a job's actual cost lives
+  on the job record (the store's ledger), not duplicated into the published
+  molecule metadata.
+- **The charge default comes from PubChem's SDF formal charge** (the `M
+  CHG` line), not always 0 — ammonium resolves to charge +1. Spec §5.1's
+  "charge defaults to 0" remains the default only for a pasted XYZ, which
+  has no SDF to read a formal charge from.
+- **The worker reads the canonical job from the store record**, not from a
+  `job.json` fetched from S3, and writes `job.json` itself alongside the
+  other result files once the job is done.
+- **`/api/aws` is a path prefix, not a header** (spec §12) — the same route
+  table serves both backends, distinguished by URL rather than by a header
+  a proxy or cache could drop.
+
+### What 6B-3 must add behind these interfaces
+
+- `DynamoStore`, meeting the same `Store` contract `FileStore` does
+  (including the T5-a derived-meter contract tests and the T5-b attempt
+  guard).
+- `BatchRunner`, submitting to AWS Batch in place of `LocalRunner`'s
+  subprocess.
+- `S3Sink`, writing the same file set `LocalSink` does. It must clear a
+  partial result root (one with no `done.json`) before re-queuing a retry —
+  otherwise a retry fails forever with "already in the result folder."
+- `worker --aws`, and settlement folded into reconcile.
+- Carried-forward gaps from this phase's review: `costs.daily` versus
+  `spentUsd` after a cross-month retry needs dated ledger entries the
+  current meter does not keep; the `api` Lambda must itself enforce the
+  131072-byte request body limit (`local_server` enforces it locally, but a
+  Lambda in front of API Gateway cannot rely on that); and sizing version 1
+  is unverified on real hardware — before trusting it, measure real
+  multi-vCPU SCF speedup and file-writing-stage speedup on Fargate (the
+  files term `f2·(N/1000)²` is not divided by `speedup` today because the
+  Mac's grid-writing code is single-threaded regardless of vCPU count, but
+  PySCF's grid/ESP code is OpenMP-threaded on Linux — this task's own
+  container run saw `threads == 10` — so 6B-3 should re-measure whether the
+  files term scales with vCPU count on Fargate and likely divide it by
+  `speedup` there instead).
+
 ## Judgment calls made without asking
 
 Recorded for review, per the session's standing authority.
