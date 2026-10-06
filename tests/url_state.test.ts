@@ -15,6 +15,7 @@ import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIs
 import { DIATOMIC_IDS, DENSITY_ISO_VALUES } from '../src/bonds/systems';
 import { H2PLUS_STATES } from '../src/bonds/h2plus';
 import { registerMoleculeUrlKeys } from '../src/molecules/url_keys';
+import { registerComputedUrlKeys } from '../src/jobs/url_keys';
 import { selectMolecule, setShowDipole, setShowStructure, MoleculeSurface } from '../src/store/moleculeSlice';
 import type { OrbitalSpin } from '../src/molecules/types';
 import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../src/orbital_presets';
@@ -169,6 +170,20 @@ const BONDS_SPINS: readonly OrbitalSpin[] = ['restricted', 'alpha', 'beta'];
 /** A handful of real library ids (lower-case alnum, as the loader's MOLECULE_ID requires). */
 const MOLECULE_IDS = ['h2o', 'nh3', 'ch4', 'benzene', 'co2'] as const;
 
+/**
+ * Two fixed job keys (64 lower-case hex, job_paths.ts's JOB_KEY), mixed in
+ * with the library ids so the round-trip property test also exercises a
+ * computed molecule's own `job=` URL key (jobs/url_keys.ts), not only a
+ * library `id=` -- otherwise a regression in round-tripping a job-keyed
+ * selection's surface/struct/dipole/camera would go uncaught (preflight
+ * Important fix round 1, ruling T5-a).
+ */
+const JOB_KEYS = [
+    'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa',
+    '90b69a88d14117e8ef9378279a7ea100ecd60700cacd9b0f15dbc732f227842f',
+] as const;
+const MOLECULE_SELECTIONS = [...MOLECULE_IDS, ...JOB_KEYS] as const;
+
 function randomView(rand: () => number, shape: Shape) {
     const int = (min: number, max: number) => min + Math.floor(rand() * (max - min + 1));
     const pick = <T,>(items: readonly T[]) => items[Math.floor(rand() * items.length)];
@@ -212,7 +227,7 @@ function randomView(rand: () => number, shape: Shape) {
         // meta yet to validate an mo index against (moleculeSlice.ts).
         const kind = pick(['density', 'esp', 'mo'] as const);
         const surface: MoleculeSurface = kind === 'mo' ? { kind: 'mo', index: int(0, 30) } : { kind };
-        store.dispatch(selectMolecule({ id: pick(MOLECULE_IDS), surface }));
+        store.dispatch(selectMolecule({ id: pick(MOLECULE_SELECTIONS), surface }));
         store.dispatch(setShowStructure(rand() < 0.8));
         store.dispatch(setShowDipole(rand() < 0.8));
     } else {
@@ -298,7 +313,7 @@ function viewOf(state: RootState) {
 }
 
 describe('built-in URL keys', () => {
-    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerBondsUrlKeys(); registerMoleculeUrlKeys(); });
+    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerBondsUrlKeys(); registerMoleculeUrlKeys(); registerComputedUrlKeys(); });
 
     // Spec §5 Phase 2: "URL round-trip property test over every mode and level".
     it.each<Shape>(['atom', 'shell', 'subshell', 'orbital', 'ion', 'excited', 'relativity', 'jlevel', 'basic', 'hybrid', 'field', 'h2plus', 'diatomic', 'molecule'])(
