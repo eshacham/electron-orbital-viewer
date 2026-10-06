@@ -81,6 +81,9 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     // card (.side-panel .level-nav), each its own rule.
     { selector: '.molecule-caption', declared: 'opacity: 0.75', fg: 'rgba(0, 0, 0, 0.6525)', bg: LIGHT_96 },
     { selector: '.molecule-orbital-degeneracy', declared: 'opacity: 0.7', fg: 'rgba(0, 0, 0, 0.609)', bg: LIGHT_96 },
+    // Task 16 (ruling D29): the orbital list's card in Molecules' plot slot,
+    // its own LIGHT_96 card in the right-hand column.
+    { selector: '.molecule-orbital-card', declared: `background-color: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {

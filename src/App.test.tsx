@@ -6,6 +6,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import orbitalReducer from './store/orbitalSlice';
 import { SERIALIZABLE_CHECK } from './store';
+import moleculeReducer from './store/moleculeSlice';
 import bondsReducer, { setDensityIso, setH2PlusR, setBondsView, setScanPoint, selectBondsSystem } from './store/bondsSlice';
 import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView, setElement } from './store/atomSlice';
 import { setSurfaceStyle, setBasicSelection, requestCut } from './store/orbitalSlice';
@@ -191,7 +192,8 @@ const defaultAtomState: AtomState = {
 
 // Simple store setup
 const createTestStore = (atomState?: Partial<AtomState>) => configureStore({
-    reducer: { orbital: orbitalReducer, atom: atomReducer, bonds: bondsReducer },
+    // App reads state.molecule too (Phase 6's Molecules mode).
+    reducer: { orbital: orbitalReducer, atom: atomReducer, bonds: bondsReducer, molecule: moleculeReducer },
     middleware: getDefaultMiddleware => getDefaultMiddleware({ serializableCheck: SERIALIZABLE_CHECK }),
     preloadedState: atomState ? { atom: { ...defaultAtomState, ...atomState } } : undefined,
 });

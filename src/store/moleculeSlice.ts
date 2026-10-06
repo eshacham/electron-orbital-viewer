@@ -54,6 +54,9 @@ const moleculeSlice = createSlice({
             state.renderError = null;
             state.pick = null;
             state.espRange = null;
+            // The contour drawn belonged to the molecule being left (and the
+            // view clears its surface until the new meta lands).
+            state.isoLevel = null;
             state.loadNonce += 1;
             // An orbital index means nothing in another molecule; density and ESP carry over.
             state.surface = action.payload.surface ?? (state.surface.kind === 'mo' ? { kind: 'density' } : state.surface);

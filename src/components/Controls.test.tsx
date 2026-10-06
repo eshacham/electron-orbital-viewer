@@ -428,3 +428,38 @@ describe('Controls: Bonds mode', () => {
     expect(screen.getByText('|ψ|² = 1.00e-5')).toBeInTheDocument();
   });
 });
+
+// Phase 6: Molecules is the fourth mode. Like Bonds it has no Basic
+// Orbitals controls; it does take children (the structure and dipole
+// switches), and its density keeps the fraction, with the helper stating
+// the ρ that fraction produced (ruling D22's isoNote, which never disables).
+describe('Controls: Molecules mode', () => {
+  it('offers Molecules in the mode switch', () => {
+    const onModeChange = jest.fn();
+    render(<Controls {...baseProps} mode="hydrogenic" onModeChange={onModeChange} />);
+    fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
+    expect(onModeChange).toHaveBeenCalledWith('molecule');
+  });
+
+  it('has no Basic Orbitals controls, shows its children, and states ρ without disabling the fraction', () => {
+    render(
+      <Controls {...baseProps} mode="molecule" isoNote="ρ = 2.34e-3 e/a₀³">
+        <span>structure switches</span>
+      </Controls>
+    );
+    expect(screen.queryByLabelText('Principal (n)')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
+    expect(screen.queryByText(/One electron, Z = 1/)).toBeNull();
+    expect(screen.getByText('structure switches')).toBeInTheDocument();
+    expect(screen.getByText('ρ = 2.34e-3 e/a₀³')).toBeInTheDocument();
+    expect(screen.queryByText(/\|ψ\|² =/)).toBeNull();
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('lets fractionNote win over isoNote, and disable the select', () => {
+    render(<Controls {...baseProps} mode="molecule" fractionNote="fixed" isoNote="ρ = 1e-3" />);
+    expect(screen.getByText('fixed')).toBeInTheDocument();
+    expect(screen.queryByText('ρ = 1e-3')).toBeNull();
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+  });
+});

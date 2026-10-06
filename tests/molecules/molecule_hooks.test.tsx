@@ -19,7 +19,7 @@ import { loadBasis, loadMoleculeIndex, loadMoleculeMeta } from '../../src/molecu
 import { getDensityGrid, getEspGrid } from '../../src/molecules/grid_cache';
 import { createGridMeshWorker } from '../../src/workers/createGridMeshWorker';
 import {
-    cancelPendingRender, presentFieldMesh, setMoleculeOverlay, updateFieldInScene, VisualizerContext,
+    cancelPendingRender, clearFieldMesh, presentFieldMesh, setMoleculeOverlay, updateFieldInScene, VisualizerContext,
 } from '../../src/orbital_visualizer';
 import type { MoleculeBasis } from '../../src/molecules/types';
 import { useMoleculeLoader } from '../../src/molecules/useMoleculeLoader';
@@ -277,6 +277,28 @@ describe('useMoleculeView', () => {
         rerender(<Provider store={store}><Harness active={false} context={context} /></Provider>);
         await flush();
         expect(cancelPendingRender).toHaveBeenCalledWith(context);
+        expect(store.getState().molecule.renderLabel).toBeNull();
+    });
+    // Task 15's carry, fixed in Task 16 (spec §3.5: "never a stale picture"):
+    // a surface that fails must not leave the previous one standing beside
+    // its error -- the density under an "ESP failed" alert reads as the ESP.
+    it('clears the previous surface when the next one fails, and records why', async () => {
+        (getEspGrid as jest.Mock).mockRejectedValue(new Error('Could not load /molecules/v2/h2o/esp.bin.gz (HTTP 404)'));
+        const worker = fakeWorker();
+        (createGridMeshWorker as jest.Mock).mockReturnValue(worker);
+        (getDensityGrid as jest.Mock).mockResolvedValue(densityGrid());
+        const context = fakeContext();
+        const store = makeStore();
+        render(<Provider store={store}><Harness active context={context} /></Provider>);
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o', surface: { kind: 'esp' } })); store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() })); });
+        await flush();
+        (clearFieldMesh as jest.Mock).mockClear();
+        const request = worker.postMessage.mock.calls[0][0];
+        act(() => { worker.onmessage!({ data: { type: 'success', meshData: meshOf(0.001), requestId: request.requestId } }); });
+        await flush();
+        expect(presentFieldMesh).not.toHaveBeenCalled();
+        expect(clearFieldMesh).toHaveBeenCalledWith(context);
+        expect(store.getState().molecule.renderError).toMatch(/HTTP 404/);
         expect(store.getState().molecule.renderLabel).toBeNull();
     });
 });

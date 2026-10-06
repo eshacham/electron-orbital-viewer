@@ -102,6 +102,13 @@ interface ControlsProps {
    * changes nothing.
    */
   fractionNote?: string;
+  /**
+   * Replaces the helper text under the enclosed fraction *without* disabling
+   * it (ruling D22): Molecules mode still draws its density and orbitals at
+   * a fraction, and says which contour that produced -- ρ in e/a₀³ for a
+   * density, which the |ψ|² wording would misname.
+   */
+  isoNote?: string;
 }
 
 /**
@@ -293,6 +300,7 @@ const Controls: React.FC<ControlsProps> = ({
   onRelativityChange,
   relativityReadout = null,
   fractionNote,
+  isoNote,
 }) => {
   const isAtomMode = mode === 'atom';
   // Basic Orbitals' own controls (n/l/mₗ, combinations, Update Orbital, the
@@ -368,8 +376,9 @@ const Controls: React.FC<ControlsProps> = ({
       }}
     >
       {/* Atom (a real neutral element, SCF-solved), Basic Orbitals (the
-          exact one-electron reference at Z = 1, below) and Bonds (diatomic
-          molecules, spec §5 Phase 5). Always visible, at every level, since
+          exact one-electron reference at Z = 1, below), Bonds (diatomic
+          molecules, spec §5 Phase 5) and Molecules (the polyatomic library,
+          Phase 6). Always visible, at every level, since
           it is how you get back out of atom mode's drill-down entirely. */}
       <FormControl component="fieldset" margin="normal" fullWidth>
         <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Mode</FormLabel>
@@ -387,6 +396,7 @@ const Controls: React.FC<ControlsProps> = ({
           <ToggleButton value="atom" aria-label="atom mode">Atom</ToggleButton>
           <ToggleButton value="hydrogenic" aria-label="basic orbitals mode">Basic Orbitals</ToggleButton>
           <ToggleButton value="bonds" aria-label="bonds mode">Bonds</ToggleButton>
+          <ToggleButton value="molecule" aria-label="molecule mode">Molecules</ToggleButton>
         </ToggleButtonGroup>
       </FormControl>
 
@@ -513,6 +523,8 @@ const Controls: React.FC<ControlsProps> = ({
               (a numerical R(r) override), so it keeps the usual wording. */}
           {fractionNote
             ? fractionNote
+            : isoNote
+            ? isoNote
             : isAtomMode && atomLevel !== 'orbital'
               ? 'contour enclosing this fraction of the electron density'
               : isoLevel === null
@@ -558,8 +570,9 @@ const Controls: React.FC<ControlsProps> = ({
         </FormHelperText>
       )}
 
-      {/* SubshellPanel at level 2; empty at every other level (see App.tsx). */}
-      {isAtomMode && children}
+      {/* SubshellPanel at level 2; empty at every other level (see App.tsx).
+          In Molecules mode, the structure and dipole switches. */}
+      {(isAtomMode || mode === 'molecule') && children}
 
       {/* Surface, opacity and cut-away are view-only: they restyle the existing
           mesh, so none of them re-runs the calculation. Surface (solid vs

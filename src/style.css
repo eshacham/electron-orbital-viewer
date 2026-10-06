@@ -611,16 +611,6 @@ html, body, #root {
     gap: 8px;
     font-size: 12px;
   }
-  /* Task 9 (ruling D30): the legend stack takes the same phone placement as
-     .phase-legend -- top-right, under the header -- rather than an
-     undefined --phone-sheet-height bottom offset. */
-  .molecule-legend-stack {
-    top: 62px;
-    bottom: auto;
-    left: auto;
-    right: 12px;
-    transform: none;
-  }
 }
 
 /* The element, as a button, at the head of the navigation card on a phone. */
@@ -695,10 +685,6 @@ html, body, #root {
      sheet). Pull it in by the sheet's own width so it stays over the free
      canvas, matching how .phone-header's max-width makes the same room. */
   .phase-legend {
-    right: calc(46vw + 12px);
-  }
-  /* Same sheet-aware pull-in as .phase-legend (D30), for the sideways phone. */
-  .molecule-legend-stack {
     right: calc(46vw + 12px);
   }
 }
@@ -1118,13 +1104,16 @@ html, body, #root {
    defeat it for any class it is joined with. */
 .molecule-legend-stack {
   position: absolute;
-  left: var(--free-center-x, 50%);
+  /* At the free area's right edge, as .density-key (2·centre − left being
+     that edge): centred, the readout's chip ran under the scale readout
+     at the free area's bottom left (found live, Task 16, water at 1440 px). */
+  left: calc(2 * var(--free-center-x, 50%) - var(--free-left, 0px) - 20px);
   bottom: 20px;
-  transform: translateX(-50%);
+  transform: translateX(-100%);
   z-index: 10;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 6px;
   pointer-events: none;
   max-width: min(420px, calc(100vw - 24px));
@@ -1259,4 +1248,74 @@ html, body, #root {
 
 .molecule-view-options {
   gap: 2px;
+}
+
+/* Task 16: Molecules mode's plot slot (ruling D23) -- the orbital list on
+   the same light card as the navigation column, the width of the controls
+   card above it in the right-hand column. Own rule (ruling D29). */
+.molecule-orbital-card {
+  background-color: rgba(240, 240, 240, 0.96);
+  color: rgba(0, 0, 0, 0.87);
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  width: 300px;
+  box-sizing: border-box;
+}
+/* An orbital's ψ key joins the readout in the stack rather than sitting
+   over it in the same slot. */
+.molecule-legend-stack .phase-legend {
+  position: static;
+  transform: none;
+}
+/* On a phone the sheet is the card: no chrome of its own inside it, as
+   for #controls and the radial plot there. */
+@media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
+  .phone-sheet-body .molecule-orbital-card {
+    width: auto;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+}
+
+/* Ruling D30 (Task 9's deferral, fixed in Task 16): on a phone the legend
+   stack takes .phase-legend's phone placement -- top right, under the
+   header -- and its compact padding and type. These come after the base
+   rule above on purpose: a media query adds no specificity, so the phone
+   rules Task 9 placed earlier in the file lost to the base rule's left,
+   bottom and transform. It starts below the scale readout (top left at
+   60px, about 34px tall) rather than level with it as the one-line ψ key
+   does: the stack is near full width, and the readout's own width follows
+   the scale, so no right-hand inset would reliably clear it (found live,
+   Task 16, pyridine at 390 and 844 px). */
+@media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
+  .molecule-legend-stack {
+    top: 104px;
+    bottom: auto;
+    left: auto;
+    right: 12px;
+    transform: none;
+    gap: 4px;
+  }
+  .molecule-legend-stack .esp-legend {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .molecule-legend-stack .molecule-readout {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .molecule-legend-stack .phase-legend {
+    padding: 4px 8px;
+    gap: 8px;
+    font-size: 12px;
+  }
+}
+/* The sideways phone docks the sheet at the right: the same pull-in as
+   .phase-legend gets there, so the stack stays over the free canvas. */
+@media (max-height: 500px) {
+  .molecule-legend-stack {
+    right: calc(46vw + 12px);
+  }
 }

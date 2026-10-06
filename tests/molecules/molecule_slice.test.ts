@@ -22,6 +22,13 @@ describe('moleculeSlice', () => {
         expect(s.isLoadingMeta).toBe(true);
         expect(s.loadNonce).toBe(nonce + 1);
     });
+    // Task 16: the view settings state the contour drawn (ruling D22's
+    // isoNote); the last molecule's ρ must not stand under the next one's name.
+    it('forgets the last molecule\'s contour when another is chosen', () => {
+        let s = reducer(init(), selectMolecule({ id: 'h2o' }));
+        s = reducer(s, renderFinished({ isoLevel: 0.002 }));
+        expect(reducer(s, selectMolecule({ id: 'nh3' })).isoLevel).toBeNull();
+    });
     it('ignores a meta that arrives for a molecule no longer selected', () => {
         let s = reducer(init(), selectMolecule({ id: 'h2o' }));
         s = reducer(s, selectMolecule({ id: 'nh3' }));

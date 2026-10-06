@@ -84,6 +84,15 @@ import { useH2PlusCurve } from './bonds/useH2PlusCurve';
 import { bondsFieldRequest, DENSITY_SURFACE_HEX } from './bonds/bonds_request';
 import { BondsSystemId, systemFormula } from './bonds/systems';
 import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIso, BondsView } from './store/bondsSlice';
+import { selectMolecule, setSurface, setShowStructure, setShowDipole, MoleculeSurface } from './store/moleculeSlice';
+import { useMoleculeLoader } from './molecules/useMoleculeLoader';
+import { formatDipole } from './molecules/dipole';
+import MoleculeNav from './components/MoleculeNav';
+import MoleculePickerDialog from './components/MoleculePickerDialog';
+import MoleculeReadout from './components/MoleculeReadout';
+import MoleculeViewOptions from './components/MoleculeViewOptions';
+import MoleculeOrbitalList from './components/MoleculeOrbitalList';
+import EspLegend from './components/EspLegend';
 
 /**
  * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
@@ -106,6 +115,18 @@ const SOLVING_SUFFIX: Record<RelativityMode, string> = {
  * the Bonds panel is the left column on a desktop and the Explore tab on a phone.
  */
 const FIXED_RHO_NOTE = 'The density is drawn at a fixed ρ, chosen with the ρ buttons beside the orbitals — not at an enclosed fraction.';
+
+/**
+ * The Electron-enclosed select's note while a molecule's ESP map is drawn
+ * (ruling D22): the map is always drawn on the ρ = 0.001 surface (ruling
+ * D4), so the fraction does not apply and the select is disabled.
+ */
+const ESP_SURFACE_NOTE = 'Fixed at ρ = 0.001 e/a₀³ — the surface ESP maps are conventionally drawn on, not an enclosed fraction';
+
+/** What a failed Molecules render was trying to draw, for its alert. */
+const SURFACE_NAME: Record<MoleculeSurface['kind'], string> = {
+    density: 'the density', esp: 'the electrostatic potential', mo: 'the orbital',
+};
 
 /** How long a render has to take before the viewer is told it is working. */
 const BUSY_INDICATOR_DELAY_MS = 400;
@@ -150,6 +171,7 @@ function App() {
     // drawn (and keyed, and exported) over a molecule.
     const isBasicMode = atomMode === 'hydrogenic';
     const isBondsMode = atomMode === 'bonds';
+    const isMoleculeMode = atomMode === 'molecule';
 
     // The Relativity switch shows the effective mode -- the user's choice, or
     // the element's default -- since that is what is being solved for.
@@ -481,6 +503,27 @@ function App() {
         if (point && bonds.system !== 'h2plus') dispatch(setScanPoint({ system: bonds.system, index, RBohr: point.RBohr }));
     }, [bondsScan, bonds.system, dispatch]);
 
+    // Molecules mode (Phase 6). The selection and what is drawn live in
+    // moleculeSlice; the index loads when the mode opens and a molecule's
+    // files when it is picked (spec §4.2), and OrbitalViewer's
+    // useMoleculeView draws them. Nothing here starts a hydrogen render:
+    // the Basic Orbitals effects above ask for that mode by name.
+    const molecule = useAppSelector(state => state.molecule);
+    useMoleculeLoader(isMoleculeMode);
+    // Phone: the molecule is chosen from a full-screen list opened from the
+    // name in the header, as an element is.
+    const [moleculePickerOpen, setMoleculePickerOpen] = useState(false);
+    const showMoleculeBusy = useDelayedFlag(
+        isMoleculeMode && (molecule.renderLabel !== null || molecule.isLoadingMeta), BUSY_INDICATOR_DELAY_MS);
+    // The structure has to show through the density, so entering the mode
+    // lowers an untouched full opacity, once. A user's own choice -- any
+    // other value -- is theirs and stays.
+    useEffect(() => {
+        if (isMoleculeMode && surfaceStyle.opacity === 1) dispatch(setSurfaceStyle({ opacity: 0.6 }));
+        // surfaceStyle is read, not watched: only the change of mode matters.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isMoleculeMode]);
+
     // The cut belongs to the shell views. Levels 1-2 draw nothing but their
     // cut face, so they need one; an orbital -- atom mode's level 3, or any
     // Basic Orbitals or Bonds render -- is a closed surface, and the inherited
@@ -647,7 +690,11 @@ function App() {
     // at the bottom of the controls -- often scrolled out of view. The
     // canvas now dims and says what it is working on.
     const atomOrbitalBusy = isAtomMode && atomLevel === 'orbital' && showBusy;
-    const canvasBusyLabel = isAtomMode
+    const canvasBusyLabel = isMoleculeMode
+        ? (showMoleculeBusy
+            ? (molecule.renderLabel ?? `Loading ${molecule.index?.find(e => e.id === molecule.selectedId)?.name ?? molecule.selectedId}…`)
+            : null)
+        : isAtomMode
         ? (showAtomBusy
             // Names the mode being solved for: a relativistic solve is two
             // SCFs (the comparison too), so a wait needs its reason.
@@ -676,8 +723,14 @@ function App() {
     const combinationLegend = isBasicMode && renderedField ? selectionLegend : null;
     // Not over an empty canvas: a refused combination draws nothing. A
     // molecule's density has no phase; it has its own key below.
-    const showPhaseLegend = (isAtomMode ? atomLevel === 'orbital' : Boolean(renderedParams || renderedField))
-        && !combinationLegend && !isBondsDensity;
+    // In Molecules mode only an orbital has a sign: the density is one
+    // colour and the ESP map has its own key (EspLegend).
+    // Neither key stands over a surface that failed (and was cleared).
+    const moleculeKeysShown = isMoleculeMode && molecule.meta !== null && molecule.renderError === null;
+    const showPhaseLegend = isMoleculeMode
+        ? moleculeKeysShown && molecule.surface.kind === 'mo'
+        : (isAtomMode ? atomLevel === 'orbital' : Boolean(renderedParams || renderedField))
+            && !combinationLegend && !isBondsDensity;
 
     // The drill-down's next step. On a desktop it lives in the navigation
     // card it continues, where the orbital buttons are in view; on a phone
@@ -794,6 +847,34 @@ function App() {
         [handleShare, handleExport, availability, stlSolids, atomMode]
     );
 
+    // Molecules mode's navigation (layout contract §3.8): the whole card in
+    // the desktop's left column; on a phone, the name in the header and the
+    // rest in the Explore tab -- LevelNav's split.
+    const moleculeNavProps = {
+        entries: molecule.index, indexError: molecule.indexError, meta: molecule.meta, selectedId: molecule.selectedId,
+        isLoading: molecule.isLoadingMeta, surface: molecule.surface,
+        onSelectMolecule: (id: string) => dispatch(selectMolecule({ id })),
+        onSurfaceChange: (surface: MoleculeSurface) => dispatch(setSurface(surface)),
+        onOpenPicker: () => setMoleculePickerOpen(true),
+    };
+    // The structure and dipole switches belong with the view settings
+    // (Controls' children slot), with the dipole's value and -- for ozone --
+    // the caveat that must never be separated from it (ruling T7-O3).
+    const moleculeOptions = isMoleculeMode && molecule.meta && (
+        <MoleculeViewOptions showStructure={molecule.showStructure} showDipole={molecule.showDipole}
+            onShowStructure={on => dispatch(setShowStructure(on))} onShowDipole={on => dispatch(setShowDipole(on))}
+            dipoleText={formatDipole(molecule.meta)} caveat={molecule.meta.caveat ?? null} />
+    );
+    // What the enclosed fraction produced, under its select (ruling D22).
+    // Only once the surface asked for has landed: while the next one
+    // computes, the last contour belongs to the surface being left, and a
+    // density's ρ must not be read as an orbital's |ψ|².
+    const moleculeSurfaceLanded = molecule.renderLabel === null && molecule.renderError === null && molecule.isoLevel !== null;
+    const moleculeIsoNote = !isMoleculeMode || molecule.surface.kind === 'esp' ? undefined
+        : !moleculeSurfaceLanded ? (molecule.surface.kind === 'density' ? 'contour of constant ρ' : undefined)
+        : molecule.surface.kind === 'mo' ? `|ψ|² = ${molecule.isoLevel!.toExponential(2)}`
+        : `ρ = ${molecule.isoLevel!.toExponential(2)} e/a₀³`;
+
     const controls = (
         <Controls
             mode={atomMode}
@@ -823,8 +904,12 @@ function App() {
             relativityIsDefault={relativityIsDefault}
             onRelativityChange={handleRelativityChange}
             relativityReadout={relativityReadout}
-            fractionNote={isBondsDensity ? FIXED_RHO_NOTE : undefined}
-        />
+            fractionNote={isBondsDensity ? FIXED_RHO_NOTE
+                : isMoleculeMode && molecule.surface.kind === 'esp' ? ESP_SURFACE_NOTE : undefined}
+            isoNote={moleculeIsoNote}
+        >
+            {moleculeOptions || null}
+        </Controls>
     );
 
     // Bonds mode's navigation (layout contract §3.8): the desktop's left
@@ -844,6 +929,19 @@ function App() {
     );
 
     const renderRadialPlot = (width: number, collapsible: boolean) => {
+        // Ruling D23: where the other modes plot, Molecules lists its
+        // orbitals by energy (degenerate sets grouped by energy, which
+        // MoDiagram's label grouping cannot do for these point groups).
+        if (isMoleculeMode) {
+            return molecule.meta && (
+                <div className="molecule-orbital-card">
+                    <MoleculeOrbitalList orbitals={molecule.meta.orbitals}
+                        selectedIndex={molecule.surface.kind === 'mo' ? molecule.surface.index : null}
+                        onSelect={index => dispatch(setSurface({ kind: 'mo', index }))}
+                        method={molecule.meta.method.density} symmetry={molecule.meta.symmetry} />
+                </div>
+            );
+        }
         if (isBondsMode) {
             return (
                 <BondsCurvePlot bonds={bonds} data={bondsData} h2plus={h2plusCurve} width={width}
@@ -903,7 +1001,13 @@ function App() {
     // The phone sheet's tabs, one job each. Basic Orbitals has no drill-down,
     // so its orbital choice and view settings share one tab; Bonds has its
     // panel, as atom mode has its drill-down.
-    const phoneTabs = isBondsMode
+    const phoneTabs = isMoleculeMode
+        ? [
+            { key: 'explore', label: 'Explore', content: <MoleculeNav {...moleculeNavProps} variant="body" /> },
+            { key: 'view', label: 'View', content: controls },
+            { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
+        ]
+        : isBondsMode
         ? [
             { key: 'explore', label: 'Explore', content: bondsPanel },
             { key: 'view', label: 'View', content: controls },
@@ -923,6 +1027,17 @@ function App() {
             { key: 'view', label: 'Orbital & view', content: controls },
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ];
+
+    const phaseLegend = (
+        <div className="phase-legend" aria-label="surface colour key">
+            <span className="phase-legend-item">
+                <span className="phase-legend-swatch positive" />ψ &gt; 0
+            </span>
+            <span className="phase-legend-item">
+                <span className="phase-legend-swatch negative" />ψ &lt; 0
+            </span>
+        </div>
+    );
 
     return (
         <ThemeProvider theme={appTheme}>
@@ -966,15 +1081,28 @@ function App() {
                 {isAtomMode && atomUnbound && !(isNarrow && phoneTab !== 'explore') && (
                     <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
                 )}
-                {showPhaseLegend && (
-                    <div className="phase-legend" aria-label="surface colour key">
-                        <span className="phase-legend-item">
-                            <span className="phase-legend-swatch positive" />ψ &gt; 0
-                        </span>
-                        <span className="phase-legend-item">
-                            <span className="phase-legend-swatch negative" />ψ &lt; 0
-                        </span>
+                {showPhaseLegend && !isMoleculeMode && phaseLegend}
+                {/* Molecules: the pick readout, the ESP key and an orbital's
+                    ψ key share the bottom-centre slot, stacked (spec §3.8:
+                    no new floating panel). */}
+                {isMoleculeMode && molecule.meta && (molecule.showStructure || (moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend) && (
+                    <div className="molecule-legend-stack">
+                        {molecule.showStructure && (
+                            <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}
+                                geometrySource={molecule.meta.geometrySource} touch={isNarrow} />
+                        )}
+                        {moleculeKeysShown && molecule.surface.kind === 'esp' && <EspLegend range={molecule.espRange} method={molecule.meta.method.density} />}
+                        {showPhaseLegend && phaseLegend}
                     </div>
+                )}
+                {/* A molecule that did not load, or a surface that did not
+                    draw (spec §3.5). Said once, here -- not as a Snackbar too
+                    (Bonds' ruling C9) -- and a failed surface is cleared
+                    rather than left standing beside its own error. */}
+                {isMoleculeMode && (molecule.error || molecule.renderError) && (
+                    <Alert severity="error" className="atom-error">
+                        {molecule.error ?? `Could not draw ${SURFACE_NAME[molecule.surface.kind]}: ${molecule.renderError}`}
+                    </Alert>
                 )}
                 {isBondsDensity && (
                     <div className="phase-legend density-key" aria-label="surface colour key">
@@ -1016,6 +1144,11 @@ function App() {
                                 <LevelNav {...levelNavProps} variant="header" />
                             </div>
                         )}
+                        {isMoleculeMode && (
+                            <div className="phone-header">
+                                <MoleculeNav {...moleculeNavProps} variant="header" />
+                            </div>
+                        )}
                         {isBondsMode && (
                             <div className="phone-header">
                                 <span className="bonds-header">
@@ -1035,6 +1168,7 @@ function App() {
                                 </LevelNav>
                             )}
                             {isBondsMode && bondsPanel}
+                            {isMoleculeMode && <MoleculeNav {...moleculeNavProps} />}
                         </Box>
                         <Box className={`view-panel${viewPanelOpen ? '' : ' folded'}`}>
                             {isMedium && (
@@ -1051,6 +1185,16 @@ function App() {
                             {renderRadialPlot(PLOT_WIDTH, isMedium)}
                         </Box>
                     </>
+                )}
+                {isMoleculeMode && isNarrow && (
+                    <MoleculePickerDialog
+                        open={moleculePickerOpen}
+                        entries={molecule.index}
+                        error={molecule.indexError}
+                        selectedId={molecule.selectedId}
+                        onSelect={id => dispatch(selectMolecule({ id }))}
+                        onClose={() => setMoleculePickerOpen(false)}
+                    />
                 )}
                 {isAtomMode && isNarrow && (
                     <ElementPickerDialog

@@ -101,6 +101,11 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
             } catch (error) {
                 if (isSuperseded(error) || !current()) return;
                 landed = true;
+                // Spec §3.5, "never a stale picture": the surface still drawn
+                // is the one being left (the density under a failed ESP map
+                // would read as the map). The structure overlay is not the
+                // thing that failed and stays; App shows the error.
+                clearFieldMesh(context);
                 dispatch(renderFailed(message(error)));
             }
         })();
