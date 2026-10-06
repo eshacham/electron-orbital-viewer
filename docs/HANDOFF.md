@@ -1825,12 +1825,21 @@ Cognito, the HTTP API) is 6B-3.
   Submit ever sends anything but what was previewed.
 - **Live status** — stage, latest energy (with its method), a log tail,
   elapsed time and cost, polled every 5 s while a job is `QUEUED`,
-  `STARTING` or `RUNNING`, never two requests in flight for one key, none
-  while the tab is hidden; `DONE` opens the molecule by itself.
+  `STARTING` or `RUNNING`, never two requests in flight for one key (even
+  across an unmount and remount), each abandoned after 15 s as a passing
+  "could not be refreshed", none while the tab is hidden; `DONE` opens the
+  molecule by itself. The followed job is watched from `App`
+  (`useFollowedJob`), not the status panel, so it still opens with the
+  phone sheet folded; the request draft lives in the jobs slice.
 - **Owner sign-in** — Cognito managed login with TOTP MFA via
   `oidc-client-ts` (code + PKCE), the access token kept in memory only and
-  the refresh token in `sessionStorage`; "not configured in this build"
-  whenever the build has no Cognito settings.
+  the refresh token in `sessionStorage`. Without Cognito settings the dev
+  server and `/admin.html` say "not configured in this build" and the
+  production viewer shows visitors no sign-in line (ruling R4-rec). A
+  sign-in that does not complete is said in fixed words in a dismissible
+  alert on whichever mode the return lands on, and an error answer with
+  `state` goes back to the view the owner left. Only a refusal ends a
+  session; a renewal that cannot reach Cognito keeps the refresh token.
 - **The where-jobs-run choice** — This Mac or AWS, persisted in
   `localStorage` under `eov.jobs.target`, shared by `/` and `/admin.html`;
   a production build ignores it and always uses the deployed API.
@@ -1838,15 +1847,18 @@ Cognito, the HTTP API) is 6B-3.
   jobs table (predicted against actual) and a cost panel (spent, reserved,
   remaining, projected, a hand-drawn daily-spend chart, AWS's billed
   figure) — a second Vite entry whose code never reaches the main bundle,
-  checked on every build by `npm run check:admin-split`.
+  checked on every deploy: `infra/deploy.sh` runs
+  `node tools/check_admin_split.mjs dist` after its build and refuses to
+  ship on failure.
 
 ### Rulings made in this plan
 
 - **The id carries the tier.** A computed molecule's id is its
-  64-character lowercase-hex job key. Library ids match `^[a-z0-9]+$` (no
-  `-`, no length cap), so a job key can never collide with one: no library
-  id is 64 hex characters, and `isJobKey` is tested before any library
-  lookup. `moleculePath(id)` chooses the base from the id alone —
+  64-character lowercase-hex job key (a link with it upper-cased is
+  lower-cased, since hex is case-blind). Library ids match `^[a-z0-9]+$`
+  (no `-`, no length cap), so the pattern alone would admit a 64-hex
+  library id; none exists — library ids are short names — and `isJobKey`
+  is tested before any library lookup. `moleculePath(id)` chooses the base from the id alone —
   `/molecules/<DATA_VERSION>/<id>` for the library,
   `/molecules/jobs/<key>` for a job — so Phase 6's meta/basis/density/ESP
   loads, and the MO worker (handed only `recipe.moleculeId`), work
@@ -1891,8 +1903,9 @@ Cognito, the HTTP API) is 6B-3.
 ### Layout and live-check notes
 
 - **`/admin.html`'s cost panel sits beside the table only from 1880 px
-  wide** (Task 15); narrower, it sits below the table instead. Run
-  `npm run check:admin-split` after every build, not just once — it is the
+  wide** (Task 15); narrower, it sits below the table instead. The split
+  check runs in `infra/deploy.sh` after every deploy's build; run
+  `npm run check:admin-split` by hand after any other build — it is the
   check that the split survives a dependency or chunking change, not a
   one-time proof.
 - **A running local job shows no stage, latest energy or log tail** (Task
@@ -1916,9 +1929,21 @@ Cognito, the HTTP API) is 6B-3.
   the `GET`/`POST` methods from those same origins.
 - S3 result objects under `molecules/jobs/` serving `.py`, `.log` and
   `.xyz` as `text/plain; charset=utf-8`.
-- Nothing for `done.json` 403 caching: CloudFront's default error-caching
-  TTL is 10 s, shorter than the 5 s poll's tolerance for a job that has
-  just finished — no site-stack change needed.
+- **`done.json` 403 caching.** CloudFront caches an error answer for 10 s by
+  default. If anyone reads a job's `done.json` through the same edge in the
+  10 s before it finishes (the owner checking the share link in another
+  tab, say), the DONE auto-open can get that cached 403 and say "no
+  finished result yet" under a status that says Done. The client now reads
+  the result once more 11 s after a DONE-triggered open that reports "not
+  finished" (`useFollowedJob`); 6B-3 should still set an error-caching
+  minimum TTL of 0 for 403 on `molecules/jobs/*`, so a shared link opened
+  just after a job finishes is not held back either.
+- **Keep the data bucket unlistable** — no `s3:ListBucket` for the
+  CloudFront OAC. A missing object then answers 403. With list permission
+  it would answer 404, and the distribution-wide `ErrorResponse(404 →
+  /index.html, 200)` (`infra/infra_stack.py`) would turn a missing
+  `done.json` into the HTML page: the loader would report "is not valid
+  JSON" instead of "not finished".
 - The `billing` record shaped `{ usd, through }`.
 - `JOBS_AWS_API_URL` for the dev proxy.
 - Keep Cognito refresh-token rotation **off** — `oidc-client-ts`'s own

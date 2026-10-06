@@ -58,7 +58,9 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         // Two pages: the viewer, and the owner's dashboard (spec §9.4), each
         // with its own entry chunk, so the dashboard's code never ships to a
-        // visitor (tools/check_admin_split.mjs proves it on every build).
+        // visitor (tools/check_admin_split.mjs proves it on the built files:
+        // infra/deploy.sh runs it after every deploy's build and refuses to
+        // ship on failure; `npm run check:admin-split` runs it by hand).
         input: {
           main: resolve(__dirname, 'public/index.html'),
           admin: resolve(__dirname, 'public/admin.html'),

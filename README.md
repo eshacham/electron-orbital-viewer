@@ -450,8 +450,10 @@ B3LYP/def2-TZVP optimisation for the library; a PubChem record or pasted
 XYZ coordinates for a computed one) and what to be wary of. For a computed
 molecule it also links the files that produced it — `input.py` (the exact
 PySCF script; open it and run it again), `output.log`, `geometry.xyz` and
-`job.json`, plus `timings.json` for an optimisation — served as plain
-text, not downloaded. The owner, signed in or on This Mac, sees one more
+`job.json`, plus `trajectory.xyz` for an optimisation. The dev server
+serves them as plain text, to read in the browser rather than download;
+in production that depends on the S3 content types Phase 6B-3 sets
+(`docs/HANDOFF.md`). The owner, signed in or on This Mac, sees one more
 line: the job's own wall time and cost, read from the job record itself,
 never from the published molecule.
 
@@ -469,24 +471,29 @@ Share/Export. The side panel's "Request a molecule" takes a name, SMILES or
 pasted XYZ, previews what it resolved to (formula, charge, electrons, a
 ball-and-stick SVG, which recipe and sizing it would run, and the owner's
 predicted time and cost) and submits it. The status panel then polls every
-5 seconds — stage, latest energy, a log tail, elapsed time and the
-Fargate-sized cost estimate — until the job finishes and opens itself, or
-fails with the option to retry the same atoms as a new attempt.
+5 seconds — stage, latest energy, a log tail, elapsed time against the
+Fargate time estimate, and the cost reserved or spent — until the job
+finishes and opens itself, or fails with the option to retry the same
+atoms as a new attempt. The job is followed for as long as the page is
+open, whatever the mode or the phone sheet shows, and the typed request
+survives folding the sheet or switching tabs.
 
 **`/admin.html`** is the owner's dashboard: every job this month in a
 plain, sortable, filterable table (predicted against actual time and
 memory, with the same file links), and a cost panel — spent, reserved,
 remaining, projected by month end, a day-by-day spend chart and, on AWS,
 the billed figure from Cost Explorer. It is a second Vite entry, built and
-shipped entirely apart from the main page: `npm run check:admin-split`
-fails the build if that ever stops being true.
+shipped entirely apart from the main page: `infra/deploy.sh` runs
+`node tools/check_admin_split.mjs dist` after its build and refuses to
+deploy if that ever stops being true (`npm run check:admin-split` runs the
+same check by hand after any build).
 
 **Build-time settings:**
 
 | Variable | What it does |
 | --- | --- |
 | `VITE_JOBS_API_URL` | the deployed API's base URL (production only; the dev server always uses the local proxy below) |
-| `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN` | Cognito managed login; leave any one unset and sign-in says "not configured in this build" |
+| `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN` | Cognito managed login; leave any one unset and there is no sign-in: the dev server and `/admin.html` say "not configured in this build", and the production viewer shows visitors no sign-in line at all |
 | `JOBS_AWS_API_URL` | dev-server only: where the proxy sends an "AWS" request (`/api/aws/…`); unset, AWS falls through to the local server, which the UI reports as not configured |
 
 ---

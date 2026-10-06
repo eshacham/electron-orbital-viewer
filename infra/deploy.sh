@@ -11,6 +11,14 @@ echo "Building React application with production minification..."
 cd "$PROJECT_ROOT"
 npm run build
 
+# The owner's dashboard (/admin.html) is a second Vite entry whose code must
+# never reach the viewer's bundle (Phase 6B-2, spec §9.4). The Jest
+# import-graph test guards the sources; this guards what is about to ship --
+# a dependency or chunking change can merge the two without any source
+# changing. Non-zero refuses the deploy (set -e).
+echo "Checking the dashboard stays out of the main bundle..."
+node tools/check_admin_split.mjs dist
+
 # Refuse to deploy app code that reads a molecule data version which was
 # never published (spec §4.5): the app bundles MOLECULE_DATA_VERSION from
 # src/molecules/data_version.ts and fetches /molecules/$DATA_VERSION/...
