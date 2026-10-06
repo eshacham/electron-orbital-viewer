@@ -16,6 +16,21 @@
 set -euo pipefail
 
 STACK=ElectronOrbitalViewerComputeStack
+# The compute stack lives in us-east-1 only: pinned, so a shell or profile
+# pointing elsewhere cannot aim a pause or a meter read at the wrong region,
+# and asserted (check_region) before the first AWS call.
+REGION=us-east-1
+export AWS_REGION="$REGION" AWS_DEFAULT_REGION="$REGION"
+
+check_region() {
+  local resolved
+  resolved=$(aws configure list 2>/dev/null | awk '{ gsub(/:/, " "); if ($1 == "region") { print $2; exit } }')
+  if [ "$resolved" != "$REGION" ]; then
+    echo "The AWS CLI resolves region '${resolved:-none}', not $REGION; refusing to call AWS." >&2
+    exit 1
+  fi
+}
+
 output() {
   aws cloudformation describe-stacks --stack-name "$STACK" \
     --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
@@ -56,6 +71,22 @@ api() {
   rm -f "$out"
 }
 
+# Arguments first, so a usage error never reaches the AWS CLI.
+case "${1:-}" in
+  api) [ $# -ge 3 ] || { echo "usage: $0 api METHOD PATH [JSON]" >&2; exit 2; } ;;
+  wait)
+    [ $# -ge 2 ] || { echo "usage: $0 wait KEY [SECONDS]" >&2; exit 2; }
+    # A non-number would make the elapsed-time test fail every round and the
+    # loop never stop.
+    case "${3:-480}" in
+      ''|*[!0-9]*|0*) echo "SECONDS must be a positive whole number (got '${3:-}')." >&2; exit 2 ;;
+    esac
+    ;;
+esac
+case "${1:-}" in
+  pause|resume|status|api|wait) check_region ;;
+esac
+
 case "${1:-}" in
   pause|resume)
     [ "$1" = pause ] && value=false || value=true
@@ -86,11 +117,9 @@ else:
     echo "budget stop (deny batch:SubmitJob on the api role): $([ "$attached" = 0 ] && echo not attached || echo ATTACHED)"
     ;;
   api)
-    [ $# -ge 3 ] || { echo "usage: $0 api METHOD PATH [JSON]" >&2; exit 2; }
     api "$2" "$3" "${4:-}"
     ;;
   wait)
-    [ $# -ge 2 ] || { echo "usage: $0 wait KEY [SECONDS]" >&2; exit 2; }
     key=$2 limit=${3:-480} start=$(date +%s)
     while :; do
       line=$(api GET "/api/v1/jobs/$key" | python3 -c '

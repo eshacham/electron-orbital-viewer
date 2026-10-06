@@ -1,9 +1,9 @@
 # Electron Orbital Viewer — AWS
 
-Two CDK stacks in us-east-1:
+Two CDK stacks in us-east-1. `deploy.sh` and `jobs.sh` pin `AWS_REGION`/`AWS_DEFAULT_REGION` to us-east-1, and refuse to run if the AWS CLI still resolves another region.
 
 - **ElectronOrbitalViewerStack** (`infra_stack.py`): the site (S3 + CloudFront) and the molecule data bucket (`molecules/…`, served through CloudFront with Origin Access Control).
-- **ElectronOrbitalViewerComputeStack** (`compute_stack.py`, `cost_guards.py`): on-demand generation (spec `docs/superpowers/specs/2026-10-05-on-demand-generation-design.md` §10–§11). It holds AWS Batch on Fargate / Fargate Spot (ARM64), the jobs table (DynamoDB), the worker repository (ECR), three Lambdas (`api`, `reconcile`, `billing`), an HTTP API behind Cognito (TOTP MFA), the $10 budget with its deny-SubmitJob action, cost-anomaly alerts and four alarms. It imports the data bucket by name and never changes the site stack. `deploy.sh destroy-compute` removes every fixed cost and leaves the site and all results.
+- **ElectronOrbitalViewerComputeStack** (`compute_stack.py`, `cost_guards.py`): on-demand generation (spec `docs/superpowers/specs/2026-10-05-on-demand-generation-design.md` §10–§11). It holds AWS Batch on Fargate / Fargate Spot (ARM64), the jobs table (DynamoDB), the worker repository (ECR), three Lambdas (`api`, `reconcile`, `billing`), an HTTP API behind Cognito (TOTP MFA), the $10 budget with its deny-SubmitJob action, four alarms, and cost-anomaly alerts (off until you turn them on; see below). It imports the data bucket by name and never changes the site stack. `deploy.sh destroy-compute` removes every fixed cost and leaves the site and all results.
 
 ## Prerequisites
 
@@ -44,9 +44,14 @@ When `ANOMALY_MONITOR` is unset, `deploy.sh` keeps whatever the deployed stack h
 
 ### Destroying the compute stack
 
-`deploy.sh destroy-compute` empties the worker repository and destroys the compute stack. The site and every result in the data bucket stay. **The jobs table is retained**: its job history and monthly meters survive, and it costs next to nothing. Delete it by hand if you want it gone. A later redeploy creates a **new, empty table**, so if you redeploy in the same month, the meter starts again at $0 and does not count what that month has already spent. The $10 AWS Budget, which counts the account's real cost, is still the backstop.
+`deploy.sh destroy-compute` first checks that the app synthesises, then empties the worker repository and destroys the compute stack. The site and every result in the data bucket stay. **The jobs table is retained**: its job history and monthly meters survive, and it costs next to nothing. Delete it by hand if you want it gone. A later redeploy creates a **new, empty table**, so if you redeploy in the same month, the meter starts again at $0 and does not count what that month has already spent. The $10 AWS Budget, which counts the account's real cost, is still the backstop.
 
-## Owner actions (once)
+After `destroy-compute`:
+
+- **The live site still has the deleted stack's API URL and Cognito settings** baked in, so its owner sign-in points at nothing. Run `infra/deploy.sh site` to rebuild it without them (the sign-in is hidden again).
+- **A later redeploy creates a new user pool and a new SNS subscription.** Repeat owner actions 1 and 2 below: confirm the new subscription email, then create your sign-in again and enrol TOTP. The old authenticator entry no longer works. The anomaly monitor comes back off; turn it on again with `ANOMALY_MONITOR=on`.
+
+## Owner actions (once per compute stack: repeat 1–2 after a destroy-compute and redeploy)
 
 1. Confirm the SNS subscription email ("AWS Notification - Subscription Confirmation"). Budget emails need no confirmation.
 2. Create your sign-in. The email is the one in `infra/owner.env`:

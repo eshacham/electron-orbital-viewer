@@ -35,6 +35,16 @@ COMPUTE_STACK=ElectronOrbitalViewerComputeStack
 WORKER_REPOSITORY=electron-orbital-viewer-worker
 PHASE="${1:-all}"
 
+# Both stacks live in us-east-1 (the compute stack's subnets name
+# us-east-1a/b). Pinned here, for the AWS CLI and for the CDK CLI, which
+# resolves AWS_REGION before any profile: a shell or profile pointing
+# elsewhere would otherwise make `output` find no site stack, and `all` would
+# take that for a first run and build a second site in the wrong region.
+REGION=us-east-1
+export AWS_REGION="$REGION" AWS_DEFAULT_REGION="$REGION"
+DUMMY_COMPUTE_CONTEXT=(-c dataBucketName=unused -c siteOrigin=https://unused.invalid
+                       -c alertEmail=unused@example.com -c imageTag=unused)
+
 usage() {
   sed -n '2,13p' "$0"
 }
@@ -47,10 +57,28 @@ output() {
   echo "$value"
 }
 
+resolved_region() {
+  # The region the AWS CLI will actually use (local; no API call). Handles
+  # both `region : us-east-1 : env : ...` (CLI v2) and the older columns.
+  aws configure list 2>/dev/null | awk '{ gsub(/:/, " "); if ($1 == "region") { print $2; exit } }'
+}
+
+check_region() {
+  # The assertion behind the pin above: refuse before any stack lookup if the
+  # CLI resolves anything but us-east-1.
+  local resolved
+  resolved=$(resolved_region)
+  if [ "$resolved" != "$REGION" ]; then
+    echo "The AWS CLI resolves region '${resolved:-none}', not $REGION; refusing to look up or deploy stacks." >&2
+    exit 1
+  fi
+}
+
 check_credentials() {
   # `output` reads a failed lookup as "no such stack" (that is how the first
-  # ever run is recognised), so expired or missing credentials must stop the
-  # script here, not send `all` down the first-run path.
+  # ever run is recognised), so a wrong region (above) or expired or missing
+  # credentials must stop the script here, not send `all` down the first-run path.
+  check_region
   if ! aws sts get-caller-identity --query Account --output text >/dev/null; then
     echo "The AWS CLI has no working credentials; refusing to guess which stacks exist." >&2
     exit 1
@@ -78,8 +106,7 @@ setup_cdk() {
   # Bootstrap the AWS environment with explicit account and region
   echo "Bootstrapping AWS environment..."
   AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-  AWS_REGION=$(aws configure get region)
-  cdk bootstrap aws://${AWS_ACCOUNT}/${AWS_REGION}
+  cdk bootstrap aws://${AWS_ACCOUNT}/${REGION}
   CDK_READY=1
 }
 
@@ -169,15 +196,27 @@ anomaly_monitor() {
   # off until the owner turns it on. Once on, it stays on: an unset
   # ANOMALY_MONITOR follows the deployed stack, so a later routine deploy
   # cannot quietly delete a cost guard.
-  local deployed
+  local types err
   case "${ANOMALY_MONITOR:-}" in
     on|off) echo "$ANOMALY_MONITOR"; return ;;
     "") ;;
     *) echo "ANOMALY_MONITOR must be 'on' or 'off' (got '$ANOMALY_MONITOR')." >&2; return 1 ;;
   esac
-  deployed=$(aws cloudformation list-stack-resources --stack-name "$COMPUTE_STACK" \
-    --query "length(StackResourceSummaries[?ResourceType=='AWS::CE::AnomalyMonitor'])" --output text 2>/dev/null || echo 0)
-  if [ "$deployed" != "0" ] && [ "$deployed" != "None" ] && [ -n "$deployed" ]; then echo on; else echo off; fi
+  # Only "the stack does not exist" means off. Any other failure (throttling,
+  # permissions) aborts: guessing off would delete an enabled monitor. The
+  # resource types come back one per line and are matched with grep, so the
+  # answer is the same however many pages the CLI fetched.
+  err=$(mktemp)
+  if ! types=$(aws cloudformation list-stack-resources --stack-name "$COMPUTE_STACK" \
+      --query 'StackResourceSummaries[].ResourceType' --output text 2>"$err"); then
+    if grep -q 'does not exist' "$err"; then
+      rm -f "$err"; echo off; return
+    fi
+    echo "Could not tell whether $COMPUTE_STACK has the anomaly monitor; set ANOMALY_MONITOR=on or off explicitly:" >&2
+    cat "$err" >&2; rm -f "$err"; return 1
+  fi
+  rm -f "$err"
+  if printf '%s\n' "$types" | tr -s '\t ' '\n\n' | grep -qx 'AWS::CE::AnomalyMonitor'; then echo on; else echo off; fi
 }
 
 deploy_compute() {
@@ -265,19 +304,25 @@ deploy_site() {
 
 destroy_compute() {
   local ids
-  # The repository is also EmptyOnDelete; emptying it first means a destroy
-  # never stalls on a repository that still holds images.
+  # Everything that can fail before the destroy goes first: the app must
+  # synthesise (the site stack's asset is dist/) before any image is deleted,
+  # or a failed destroy would leave a live stack whose jobs cannot pull their
+  # image. The context values only have to be present for the app to define
+  # the stack.
+  [ -d "$PROJECT_ROOT/dist" ] || build_site
+  setup_cdk
+  cd "$SCRIPT_DIR"
+  cdk synth "$COMPUTE_STACK" "${DUMMY_COMPUTE_CONTEXT[@]}" >/dev/null
+  # The repository is also EmptyOnDelete; emptying it here as well means the
+  # destroy never stalls on a repository that still holds images.
   ids=$(aws ecr list-images --repository-name "$WORKER_REPOSITORY" --query 'imageIds' --output json 2>/dev/null || echo '[]')
   if [ "$ids" != "[]" ]; then
     aws ecr batch-delete-image --repository-name "$WORKER_REPOSITORY" --image-ids "$ids" >/dev/null
   fi
-  setup_cdk
-  cd "$SCRIPT_DIR"
-  # The context values only have to be present for the app to define the stack.
-  cdk destroy "$COMPUTE_STACK" --force -c dataBucketName=unused -c siteOrigin=https://unused.invalid \
-    -c alertEmail=unused@example.com -c imageTag=unused
+  cdk destroy "$COMPUTE_STACK" --force "${DUMMY_COMPUTE_CONTEXT[@]}"
   echo "The jobs table is retained (job history and meters); delete it by hand if you want it gone."
   echo "A redeploy creates a new, empty table, so this month's meter starts again at \$0; the \$10 Budget still counts the month."
+  echo "The live site still points at the deleted API and sign-in: run '$0 site' to rebuild it without them."
 }
 
 case "$PHASE" in
