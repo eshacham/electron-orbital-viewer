@@ -17,7 +17,7 @@
 - **Money is integer micro-dollars** everywhere inside `tools/jobs` (`int`, 1 USD = 1_000_000). Only `model.public_view` and the `costs` response convert to USD floats, rounded to 6 decimals.
 - **Compute cap:** `CAP_MICROS = 8_800_000` ($8.80 of the $10/month, spec §6.4). A job is charged to the UTC month it was submitted in.
 - **Key** = lowercase hex SHA-256 of `rfc8785.dumps(canonical_job)`. Coordinates in Å rounded to **10⁻⁵** (`round(x, 5) + 0.0`, so −0.0 becomes 0.0), atoms sorted by (Z, x, y, z). `computeVersion = 1`. Geometry source, image digest and commit are **not** in the key.
-- **Recipes** (method fixed, never client-chosen): `single` = B3LYP/def2-TZVP; `optimise` = B3LYP/def2-SVP geomeTRIC optimisation, then B3LYP/def2-TZVP. RKS for closed shells, ROKS for open shells. Elements **Z 1–36** only.
+- **Recipes** (method fixed, never client-chosen): `single` = B3LYP/def2-TZVPD; `optimise` = B3LYP/def2-SVP geomeTRIC optimisation, then B3LYP/def2-TZVPD (the Phase 6 library's property method — owner decision 2026-10-05). RKS for closed shells, ROKS for open shells. Elements **Z 1–36** only.
 - **Sizes:** S 2 vCPU/8 GB, M 4/16, L 16/64, XL 32/244. Smallest size with memory ≥ **2 ×** predicted. Timeout = clamp(**3 ×** predicted, **600 s**, ceiling), with ceilings **single 3600 s, optimise 7200 s**. **Spot** when predicted ≤ 3600 s, else on-demand. Spot allows **3** attempts, on-demand 1. Reservation = attempts × cost(timeout).
 - **Prices** (us-east-1 Linux/ARM, retrieved 2026-10-04): on-demand $0.03238/vCPU-h, $0.00356/GB-h; Spot $0.01034/vCPU-h, $0.00114/GB-h; local $0.
 - **Statuses:** `QUEUED`, `STARTING`, `RUNNING`, `DONE`, `FAILED`. Heartbeat every **30 s**; the log tail is the last **20** lines, at most **4096** bytes.
@@ -48,7 +48,7 @@ tools/jobs/
   errors.py              JobRefused (code, message, status)
   elements.py            SYMBOLS (Z 1–36), atomic_number(token)
   canonical.py           parse_xyz, check_atoms, electron_count, default/validated multiplicity, formula, canonical_job, job_key, RECIPES
-  basis_counts.json      per-element basis-function counts, def2-SVP and def2-TZVP (generated)
+  basis_counts.json      per-element basis-function counts, def2-SVP and def2-TZVPD (generated)
   basis_counts.py        basis_functions(atoms, basis) — no PySCF
   make_basis_counts.py   regenerates basis_counts.json from PySCF
   pubchem.py             resolve(kind, text, fetch) → geometry; parse_sdf; urllib_fetch
@@ -145,18 +145,18 @@ def test_atomic_number_refuses(token, code):
 def test_known_counts():
     # PySCF 2.8.0, spherical functions (measured 2026-10-05).
     assert COUNTS['def2-SVP']['H'] == 5 and COUNTS['def2-SVP']['O'] == 14
-    assert COUNTS['def2-TZVP']['H'] == 6 and COUNTS['def2-TZVP']['O'] == 31 and COUNTS['def2-TZVP']['Kr'] == 48
+    assert COUNTS['def2-TZVPD']['H'] == 9 and COUNTS['def2-TZVPD']['O'] == 40 and COUNTS['def2-TZVPD']['Kr'] == 57
 
 
 def test_water_benzene_caffeine():
     water = [[8, 0, 0, 0], [1, 0, 0, 1], [1, 0, 1, 0]]
-    assert basis_functions(water, 'def2-TZVP') == 43
+    assert basis_functions(water, 'def2-TZVPD') == 58
     assert basis_functions(water, 'def2-SVP') == 24
     benzene = [[6, 0, 0, i] for i in range(6)] + [[1, 0, 1, i] for i in range(6)]
-    assert basis_functions(benzene, 'def2-TZVP') == 222
+    assert basis_functions(benzene, 'def2-TZVPD') == 276
     caffeine = [[6, 0, 0, i] for i in range(8)] + [[7, 0, 1, i] for i in range(4)] + \
                [[8, 0, 2, i] for i in range(2)] + [[1, 0, 3, i] for i in range(10)]
-    assert basis_functions(caffeine, 'def2-TZVP') == 494
+    assert basis_functions(caffeine, 'def2-TZVPD') == 614
 
 
 @pytest.mark.skipif(os.environ.get('JOBS_SLOW') != '1', reason='builds 72 PySCF molecules')
@@ -284,7 +284,7 @@ from pathlib import Path
 
 from jobs.elements import SYMBOLS
 
-BASES = ('def2-SVP', 'def2-TZVP')
+BASES = ('def2-SVP', 'def2-TZVPD')
 
 
 def counts():
@@ -316,11 +316,11 @@ def basis_functions(atoms, basis: str) -> int:
     return sum(table[SYMBOLS[int(a[0]) - 1]] for a in atoms)
 ```
 
-Generate the table: `cd tools && ../tools/molecules/.venv/bin/python -m jobs.make_basis_counts && cd ..`. The file must contain exactly these values (measured with PySCF 2.8.0 on 2026-10-05):
+Generate the table: `cd tools && ../tools/molecules/.venv/bin/python -m jobs.make_basis_counts && cd ..`. The file must contain exactly these values (measured with PySCF 2.8.0 on 2026-10-05/06):
 
 ```json
 {"def2-SVP": {"H": 5, "He": 5, "Li": 9, "Be": 9, "B": 14, "C": 14, "N": 14, "O": 14, "F": 14, "Ne": 14, "Na": 15, "Mg": 18, "Al": 18, "Si": 18, "P": 18, "S": 18, "Cl": 18, "Ar": 18, "K": 24, "Ca": 24, "Sc": 31, "Ti": 31, "V": 31, "Cr": 31, "Mn": 31, "Fe": 31, "Co": 31, "Ni": 31, "Cu": 31, "Zn": 31, "Ga": 32, "Ge": 32, "As": 32, "Se": 32, "Br": 32, "Kr": 32},
- "def2-TZVP": {"H": 6, "He": 6, "Li": 14, "Be": 19, "B": 31, "C": 31, "N": 31, "O": 31, "F": 31, "Ne": 31, "Na": 32, "Mg": 32, "Al": 37, "Si": 37, "P": 37, "S": 37, "Cl": 37, "Ar": 37, "K": 33, "Ca": 36, "Sc": 45, "Ti": 45, "V": 45, "Cr": 45, "Mn": 45, "Fe": 45, "Co": 45, "Ni": 45, "Cu": 45, "Zn": 48, "Ga": 48, "Ge": 48, "As": 48, "Se": 48, "Br": 48, "Kr": 48}}
+ "def2-TZVPD": {"H": 9, "He": 9, "Li": 17, "Be": 22, "B": 37, "C": 37, "N": 37, "O": 40, "F": 40, "Ne": 40, "Na": 35, "Mg": 35, "Al": 43, "Si": 43, "P": 43, "S": 46, "Cl": 46, "Ar": 46, "K": 36, "Ca": 36, "Sc": 48, "Ti": 48, "V": 48, "Cr": 48, "Mn": 48, "Fe": 48, "Co": 48, "Ni": 48, "Cu": 48, "Zn": 51, "Ga": 54, "Ge": 54, "As": 54, "Se": 57, "Br": 57, "Kr": 57}}
 ```
 
 - [ ] **Step 5: Run the tests to verify they pass**
@@ -346,7 +346,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `elements.atomic_number`, `errors.JobRefused`.
-- Produces: `COMPUTE_VERSION = 1`; `RECIPES: dict[str, dict]` (`{'single': {'xc': 'B3LYP', 'basis': 'def2-TZVP', 'optimiseBasis': None}, 'optimise': {..., 'optimiseBasis': 'def2-SVP'}}`); `parse_xyz(text: str) -> list[list]` (`[Z, x, y, z]`, Å); `check_atoms(atoms) -> None`; `electron_count(atoms, charge: int) -> int`; `multiplicity_for(electrons: int, requested: int | None) -> int`; `formula(atoms) -> str` (Hill order, e.g. `'C8H10N4O2'`, `'H2O'`); `canonical_atoms(atoms) -> list[list]`; `canonical_job(recipe: str, atoms, charge: int, multiplicity: int, method: dict | None = None) -> dict`; `job_key(job: dict) -> str`.
+- Produces: `COMPUTE_VERSION = 1`; `RECIPES: dict[str, dict]` (`{'single': {'xc': 'B3LYP', 'basis': 'def2-TZVPD', 'optimiseBasis': None}, 'optimise': {..., 'optimiseBasis': 'def2-SVP'}}`); `parse_xyz(text: str) -> list[list]` (`[Z, x, y, z]`, Å); `check_atoms(atoms) -> None`; `electron_count(atoms, charge: int) -> int`; `multiplicity_for(electrons: int, requested: int | None) -> int`; `formula(atoms) -> str` (Hill order, e.g. `'C8H10N4O2'`, `'H2O'`); `canonical_atoms(atoms) -> list[list]`; `canonical_job(recipe: str, atoms, charge: int, multiplicity: int, method: dict | None = None) -> dict`; `job_key(job: dict) -> str`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -362,10 +362,10 @@ WATER = [[1, 0.0, -0.75545, -0.47116], [1, 0.0, 0.75545, -0.47116], [8, 0.0, 0.0
 
 
 def test_pinned_keys():
-    # Pinned 2026-10-05 with rfc8785 0.1.4; a change here silently orphans every stored result.
-    assert job_key(canonical_job('single', WATER, 0, 1)) == '85fe9f92fa2c5d614d84e1b6c53294bf68937f614d49ea9a22784d0025bdbd67'
-    assert job_key(canonical_job('optimise', WATER, 0, 1)) == 'b8bb2c63e64ec6c257a654861723ab28aafd5b767022d48e7a0588922fbf7841'
-    assert job_key(canonical_job('single', WATER, 1, 2)) == 'a6ff01c74531280ac9fd9a0cc0dc087ddfe02133aad1007c0187705a693986e1'
+    # Pinned 2026-10-06 (def2-TZVPD) with rfc8785 0.1.4; a change here silently orphans every stored result.
+    assert job_key(canonical_job('single', WATER, 0, 1)) == 'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa'
+    assert job_key(canonical_job('optimise', WATER, 0, 1)) == '03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129'
+    assert job_key(canonical_job('single', WATER, 1, 2)) == '7ccc1f468a6ecd3449b16bcb0dd483d36509971f523d770cdf3717f570753a5a'
 
 
 def test_key_ignores_order_sign_of_zero_and_digits_past_1e5():
@@ -376,7 +376,7 @@ def test_key_ignores_order_sign_of_zero_and_digits_past_1e5():
 def test_canonical_document_shape():
     job = canonical_job('optimise', WATER, 0, 1)
     assert job == {'computeVersion': 1, 'recipe': 'optimise',
-                   'method': {'xc': 'B3LYP', 'basis': 'def2-TZVP', 'optimiseBasis': 'def2-SVP'},
+                   'method': {'xc': 'B3LYP', 'basis': 'def2-TZVPD', 'optimiseBasis': 'def2-SVP'},
                    'molecule': {'atoms': canonical_atoms(WATER), 'charge': 0, 'multiplicity': 1}}
     assert RECIPES['single']['optimiseBasis'] is None
 
@@ -476,8 +476,8 @@ from jobs.errors import JobRefused
 
 COMPUTE_VERSION = 1
 RECIPES = {
-    'single': {'xc': 'B3LYP', 'basis': 'def2-TZVP', 'optimiseBasis': None},
-    'optimise': {'xc': 'B3LYP', 'basis': 'def2-TZVP', 'optimiseBasis': 'def2-SVP'},
+    'single': {'xc': 'B3LYP', 'basis': 'def2-TZVPD', 'optimiseBasis': None},
+    'optimise': {'xc': 'B3LYP', 'basis': 'def2-TZVPD', 'optimiseBasis': 'def2-SVP'},
 }
 MAX_XYZ_BYTES = 65536
 MAX_ATOMS = 200
@@ -873,7 +873,7 @@ def test_prices():
 def test_water_single_is_small_spot_with_the_floor_timeout():
     d = sizing.decide(canonical_job('single', WATER, 0, 1))
     assert (d['size'], d['vcpu'], d['memoryGB'], d['capacity'], d['attempts']) == ('S', 2, 8, 'spot', 3)
-    assert d['basisFunctions'] == 43 and d['timeoutSeconds'] == 600
+    assert d['basisFunctions'] == 58 and d['timeoutSeconds'] == 600
     assert d['reservationMicros'] == 3 * cost_micros('spot', 2, 8, 600)
     assert d['version'] == sizing.SIZING_VERSION
 
@@ -885,10 +885,10 @@ def test_local_backend_reserves_nothing_but_still_sizes():
 
 def test_memory_picks_the_smallest_size_with_headroom(monkeypatch):
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 'm0': 0.0, 'm2': 4.0, 't3': 1.0})
-    # 120 carbons → N = 3720 → 4·3.72² = 55.4 GB predicted → needs 110.7 GB → XL
+    # 120 carbons → N = 4440 (def2-TZVPD) → 4·4.44² = 78.9 GB predicted → needs 157.7 GB → XL
     assert sizing.decide(canonical_job('single', carbons(120), 0, 1))['size'] == 'XL'
-    # 40 carbons → N = 1240 → 6.15 GB → 12.3 GB → M
-    assert sizing.decide(canonical_job('single', carbons(40), 0, 1))['size'] == 'M'
+    # 30 carbons → N = 1110 → 4.93 GB → 9.86 GB → M
+    assert sizing.decide(canonical_job('single', carbons(30), 0, 1))['size'] == 'M'
 
 
 def test_too_large_for_xl(monkeypatch):
@@ -1126,7 +1126,7 @@ from jobs.store import BudgetExhausted, FileStore
 
 NOW = datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc)
 DECISION = {'version': 0, 'size': 'S', 'vcpu': 2, 'memoryGB': 8, 'capacity': 'spot', 'attempts': 3,
-            'basisFunctions': 43, 'predictedSeconds': 20.0, 'predictedMemoryGB': 0.5, 'timeoutSeconds': 600,
+            'basisFunctions': 58, 'predictedSeconds': 20.0, 'predictedMemoryGB': 0.5, 'timeoutSeconds': 600,
             'reservationMicros': 1_000, 'predictedCostMicros': 10}
 
 
@@ -1532,7 +1532,7 @@ from jobs.store import FileStore
 
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=timezone.utc)
 WATER_XYZ = '3\nwater\nO 0 0 0.11779\nH 0 0.75545 -0.47116\nH 0 -0.75545 -0.47116\n'
-WATER_KEY = '85fe9f92fa2c5d614d84e1b6c53294bf68937f614d49ea9a22784d0025bdbd67'
+WATER_KEY = 'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa'
 
 
 def fake_resolve(kind, text, *a, **k):
@@ -1557,7 +1557,7 @@ def call(api, method, path, body=None, query=None):
 def test_preview_by_xyz_writes_nothing(api):
     status, body = call(api, 'POST', '/api/v1/jobs/preview', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
     assert status == 200 and body['key'] == WATER_KEY
-    assert body['formula'] == 'H2O' and body['electronCount'] == 10 and body['basisFunctions'] == 43
+    assert body['formula'] == 'H2O' and body['electronCount'] == 10 and body['basisFunctions'] == 58
     assert body['decision']['ok'] and body['decision']['sizing']['size'] == 'S'
     assert body['existing'] is None and body['geometrySource'] == {'kind': 'xyz'}
     assert body['meter'] == {'month': '2026-10', 'capUsd': 8.8, 'spentUsd': 0.0, 'reservedUsd': 0.0, 'remainingUsd': 8.8}
@@ -1932,7 +1932,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: Phase 6's `build_molecule` body as it is on disk now. The code below follows the Phase 6 plan. If review fixes changed the real function, extract **the real one** with the same seam.
-- Produces: `build_library.write_molecule_files(out: Path, mol, mf, fields: dict, grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES) -> dict`. It writes `basis.json`, `density.bin.gz`, `esp.bin.gz` and `meta.json` into `out`, and returns the meta dict. `fields` supplies `id`, `name`, `formula`, `geometrySource`, `references` (list of JSON references), `multiplicity`, plus optional extra keys that are merged into meta last (`geometryOptimisation`, `tier`, `provenance`). The method string comes from the SCF: `f'{mf.xc}/{mol.basis}'`. It raises `BudgetExceeded` as before.
+- Produces: `build_library.write_molecule_files(out: Path, mol, mf, fields: dict, grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES) -> dict`. It writes `basis.json`, `density.bin.gz`, `esp.bin.gz` and `meta.json` into `out`, and returns the meta dict. `fields` supplies `id`, `name`, `formula`, `geometrySource`, `references` (list of JSON references), `multiplicity`, `method` (the string written to `meta.method.density`/`energies`, e.g. `'B3LYP/def2-TZVPD'` — taken from the caller, never re-derived from PySCF objects), plus optional extra keys that are merged into meta last (`geometryOptimisation`, `caveat`, `tier`, `provenance`). It raises `BudgetExceeded` as before. **The v2 library's files must be reproducible byte for byte by `build_molecule` after the refactor** (same keys, same order, same values).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1946,7 +1946,7 @@ from build_library import run_dft, write_molecule_files
 def test_writes_phase_6_files_from_any_scf(tmp_path):
     mol, mf = run_dft([('H', (0, 0, 0)), ('H', (0, 0, 0.74))], 0, 'def2-SVP', 'B3LYP')
     meta = write_molecule_files(tmp_path, mol, mf, {
-        'id': 'k' * 64, 'name': 'Hydrogen', 'formula': 'H2', 'geometrySource': 'pasted XYZ',
+        'id': 'k' * 64, 'name': 'Hydrogen', 'formula': 'H2', 'geometrySource': 'pasted XYZ', 'method': 'B3LYP/def2-SVP',
         'references': [], 'multiplicity': 1, 'tier': 'computed', 'provenance': {'jobKey': 'k' * 64}},
         grid_points=(32,))
     assert {p.name for p in tmp_path.iterdir()} == {'meta.json', 'density.bin.gz', 'esp.bin.gz', 'basis.json'}
@@ -1962,27 +1962,31 @@ Expected: FAIL, `ImportError: cannot import name 'write_molecule_files'`.
 
 - [ ] **Step 3: Extract the writer**
 
-In `tools/molecules/build_library.py`, replace `build_molecule` with these two functions. The loop body moves verbatim except for the four `entry.*` reads, which now come from `fields`:
+Phase 6 shipped `build_molecule` with the D1/D2/D25/T7-O3 corrections (see `tools/molecules/build_library.py`: `library_basis_json`, `check_density`, `provenance(_commit())`, `PROPERTY_BASIS = 'def2-TZVPD'`, `meta['caveat']`). Extract its body verbatim into `write_molecule_files`; the only changes are where five values come from (`fields` instead of `entry`/arguments). In `tools/molecules/build_library.py`, replace `build_molecule` with:
 
 ```python
+_FIELD_KEYS = ('id', 'name', 'formula', 'geometrySource', 'references', 'multiplicity', 'method')
+
+
 def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES):
     """Phase 6's per-molecule files for an SCF that has already run. Shared
     with the on-demand worker (tools/jobs/worker.py), which brings its own
     geometry and convergence ladder but must write exactly what the library
-    writes, so the app reads both the same way."""
-    import pyscf
+    writes, so the app reads both the same way. Writes into `out` directly:
+    the worker points it at a scratch folder and copies only a finished set."""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     dm = total_dm(mf)
     coords = mol.atom_coords()
-    (out / 'basis.json').write_text(json.dumps(generate.basis_json(mol, mf), separators=(',', ':')))
-    dipole = np.asarray(mf.dip_moment(unit='Debye', verbose=0), dtype=float)
     orbitals = orbital_table(mol, mf)
-    method = f'{mf.xc}/{mol.basis}'
-    extra = {k: v for k, v in fields.items() if k not in ('id', 'name', 'formula', 'geometrySource', 'references', 'multiplicity')}
+    (out / 'basis.json').write_text(json.dumps(library_basis_json(mol, mf, orbitals), separators=(',', ':')))
+    dipole = np.asarray(mf.dip_moment(unit='Debye', verbose=0), dtype=float)
+    extra = {k: v for k, v in fields.items() if k not in _FIELD_KEYS}
     for points in grid_points:
         grid, esp_grid = grid_for(coords, points), grid_for(coords, points // 2)
-        density = compact_float32(voxel_averaged_density(mol, dm, grid), floor=DENSITY_FLOOR)
+        raw_density = voxel_averaged_density(mol, dm, grid)
+        check_density(raw_density)               # D25: before compaction hides it
+        density = compact_float32(raw_density, floor=DENSITY_FLOOR)
         check_box(density)
         esp_coords = esp_grid.coords()
         esp = esp_on_points(mol, dm, esp_coords)
@@ -1992,7 +1996,7 @@ def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, bu
             'id': fields['id'], 'name': fields['name'], 'formula': fields['formula'],
             'atoms': [{'Z': int(mol.atom_charge(i)), 'position': [float(v) for v in coords[i]]} for i in range(mol.natm)],
             'geometrySource': fields['geometrySource'],
-            'method': {'density': method, 'energies': method},
+            'method': {'density': fields['method'], 'energies': fields['method']},
             'totalEnergyHartree': float(mf.e_tot),
             'dipoleDebye': float(np.linalg.norm(dipole)),
             'dipoleVectorDebye': [float(v) for v in dipole],
@@ -2005,7 +2009,7 @@ def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, bu
             'multiplicity': fields['multiplicity'],
             'symmetry': {'pointGroup': mol.topgroup, 'labelGroup': mol.groupname},
             'references': fields['references'],
-            'generator': {'pyscf': pyscf.__version__, 'script': 'tools/molecules/build_library.py', 'commit': _commit()},
+            'generator': {**provenance(_commit()), 'script': 'tools/molecules/build_library.py'},
             **extra,
         }
         (out / 'meta.json').write_text(json.dumps(meta, indent=1, ensure_ascii=False) + '\n')
@@ -2014,18 +2018,23 @@ def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, bu
     raise BudgetExceeded(f'{fields["id"]}: {_size(out)} bytes at {grid_points[-1]}³ exceeds {budget}')
 
 
-def build_molecule(entry, out_root=PUBLIC, basis='def2-TZVP', xc='B3LYP', grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES):
+def build_molecule(entry, out_root=OUT_ROOT, basis=PROPERTY_BASIS, xc='B3LYP', grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES):
     atoms, optimisation = geometry_for(entry)
     mol, mf = run_dft(atoms, entry.spin, basis, xc)
     fields = {'id': entry.id, 'name': entry.name, 'formula': entry.formula, 'geometrySource': entry.geometry_source,
-              'references': [_reference_json(r) for r in entry.references], 'multiplicity': entry.spin + 1}
+              'references': [_reference_json(r) for r in entry.references], 'multiplicity': entry.spin + 1,
+              'method': f'{xc}/{basis}'}
     if optimisation:
         fields['geometryOptimisation'] = optimisation
+    if entry.caveat:
+        fields['caveat'] = entry.caveat      # Ruling T7-O3 (Phase 6)
     write_molecule_files(Path(out_root) / entry.id, mol, mf, fields, grid_points, budget)
     return {'id': entry.id, 'name': entry.name, 'formula': entry.formula, 'category': entry.category, 'tags': list(entry.tags)}
 ```
 
-Phase 6's method string was `f'{xc}/{basis}'`, built from the arguments. Check that `mf.xc` and `mol.basis` give the identical strings (`'B3LYP'`, `'def2-TZVP'`): run `test_build_library.py`, which asserts on `meta.method`. If PySCF normalises either one, use the arguments instead. Add `xc` and `basis` to `fields` and read them from there.
+Key order in `meta.json` must match Phase 6's (the `**extra` lands where `geometryOptimisation` and `caveat` were appended before). **Prove reproducibility:** rebuild one shipped library molecule into a scratch folder with the refactored code and compare it with `tools/molecules/out/v2/<id>/` — every file byte-identical except `meta.json`'s `generator.commit` (and `dataVersion` if it differs). Use a small one (`h2o`, about 15 s): `tools/molecules/.venv/bin/python -c "import build_library as b, library as l; b.build_molecule(l.by_id('h2o'), out_root='/tmp/v2check')"` from `tools/molecules`, then `cmp`/a JSON diff. Report the result.
+
+Also fold in the Phase 6 final review's carry for this file family: `orbitals.orbital_table`'s position == index guard is a bare `assert` (a no-op under `python -O`); make it `raise ValueError(...)` with the same condition, since the worker now runs it at request time.
 
 - [ ] **Step 4: Run both suites**
 
@@ -2072,7 +2081,7 @@ SMALL = {'xc': 'B3LYP', 'basis': 'sto-3g', 'optimiseBasis': None}
 
 def test_rendered_script_is_self_describing():
     text = render_input(canonical_job('single', H2, 0, 1), 'k' * 64)
-    assert "BASIS = 'def2-TZVP'" in text and "XC = 'B3LYP'" in text and 'OPTIMISE_BASIS = None' in text
+    assert "BASIS = 'def2-TZVPD'" in text and "XC = 'B3LYP'" in text and 'OPTIMISE_BASIS = None' in text
     assert "('H', (0.0, 0.0, 0.74))" in text and 'kkkk' in text
     compile(text, 'input.py', 'exec')
 
@@ -2572,6 +2581,7 @@ def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, hear
         fields = {
             'id': key, 'name': record['name'], 'formula': record['formula'],
             'geometrySource': _geometry_source_text(source, recipe), 'references': [],
+            'method': f"{job['method']['xc']}/{job['method']['basis']}",
             'multiplicity': job['molecule']['multiplicity'], 'tier': 'computed',
             'provenance': {'jobKey': key, 'computeVersion': job['computeVersion'], 'recipe': recipe,
                            'geometrySource': source, 'caveats': CAVEATS[recipe], 'generatorCommit': _commit(),
@@ -2997,7 +3007,7 @@ Expected: both succeed. The production build is unaffected because `server` is d
 Run: `tools/molecules/.venv/bin/python -m pytest tools/jobs -q`
 Expected: PASS.
 
-Then, in **one** foreground command (about 1–3 minutes: H₂O at def2-TZVP plus Phase 6's grids):
+Then, in **one** foreground command (about 1–3 minutes: H₂O at def2-TZVPD plus Phase 6's grids):
 
 ```bash
 cd tools && (../tools/molecules/.venv/bin/python -m jobs.local_server > /tmp/jobs-server.log 2>&1 & echo $! > /tmp/jobs-server.pid) && sleep 1 && \
@@ -3043,7 +3053,7 @@ from jobs.sizing import speedup
 def test_fit_recovers_known_constants():
     m0, m2, t0, t3 = 0.4, 3.0, 5.0, 1800.0
     samples = [{'basisFunctions': n, 'threads': 8, 'peakMemoryGB': m0 + m2 * (n / 1000) ** 2,
-                'scfSeconds': (t0 + t3 * (n / 1000) ** 3.5) / speedup(8)} for n in (43, 222, 494)]
+                'scfSeconds': (t0 + t3 * (n / 1000) ** 3.5) / speedup(8)} for n in (58, 276, 614)]
     got = fit(samples, t0=t0)
     assert got['m0'] == pytest.approx(m0, rel=1e-6) and got['m2'] == pytest.approx(m2, rel=1e-6)
     assert got['t3'] == pytest.approx(t3, rel=1e-6)

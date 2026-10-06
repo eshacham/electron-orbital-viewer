@@ -118,7 +118,7 @@ exists; least-privilege IAM per Lambda and for the worker (writes only under
 ```json
 { "computeVersion": 1,
   "recipe": "single",
-  "method": { "xc": "B3LYP", "basis": "def2-TZVP", "optimiseBasis": null },
+  "method": { "xc": "B3LYP", "basis": "def2-TZVPD", "optimiseBasis": null },
   "molecule": { "atoms": [[8, 0.0, 0.0, 0.11779], [1, 0.0, 0.75545, -0.47116], …],
                 "charge": 0, "multiplicity": 1 } }
 ```
@@ -240,7 +240,7 @@ and the prediction.
 
 Recipe; closed or open shell; electron count; atom count; **N**, the number
 of basis functions, summed from a committed per-element table
-(`tools/jobs/basis_counts.json`, Z 1–36, for def2-SVP and def2-TZVP,
+(`tools/jobs/basis_counts.json`, Z 1–36, for def2-SVP and def2-TZVPD,
 generated once from PySCF with spherical functions). The API needs no
 chemistry package.
 
@@ -252,7 +252,7 @@ chemistry package.
   `t_s = (t0 + t3 · (N/1000)^3.5) / speedup(c)`, `speedup(c) = c^0.8`.
 - **Recipe B:** `steps = min(10 + 2 · atoms, 100)` optimisation steps, each
   one SVP single point plus its gradient (`g ·` the SVP single-point time),
-  then one TZVP single point.
+  then one TZVPD single point.
 - Open shells multiply time by 1.5 (ROKS convergence).
 - **Version 1's constants** (`m0, m2, t0, t3, g`) are fitted from local runs
   on the Mac during the implementation plan (H₂O, benzene, caffeine) and
@@ -303,8 +303,8 @@ pushed to ECR by `infra/deploy.sh`. Entry point: `worker run <key>
 
 | Recipe | What | Method | Caveat shown in the UI |
 |---|---|---|---|
-| **A `single`** | One SCF at the given geometry, then Phase 6's files | B3LYP/def2-TZVP; RKS for closed shells, ROKS for open shells (Phase 6's `run_dft`) | "Geometry is PubChem's force-field conformer (or as pasted), not optimised." |
-| **B `optimise`** | geomeTRIC optimisation (`optimise_steps` at def2-SVP), then A at the optimised geometry | B3LYP/def2-SVP optimisation, B3LYP/def2-TZVP single point | "No dispersion correction and no frequency check: not confirmed to be a minimum." |
+| **A `single`** | One SCF at the given geometry, then Phase 6's files | B3LYP/def2-TZVPD; RKS for closed shells, ROKS for open shells (Phase 6's `run_dft`) | "Geometry is PubChem's force-field conformer (or as pasted), not optimised." |
+| **B `optimise`** | geomeTRIC optimisation (`optimise_steps` at def2-SVP), then A at the optimised geometry | B3LYP/def2-SVP optimisation, B3LYP/def2-TZVPD single point | "No dispersion correction and no frequency check: not confirmed to be a minimum." |
 
 Recipe B writes each step's geometry to `attempts/{n}/trajectory.xyz`; a
 retried attempt resumes from the last geometry.
@@ -511,6 +511,11 @@ The approved sections disagreed in a few places; each is settled here.
    `attempts/{n}/` logs, and nothing is written at the result root (§5.3).
 9. **CCSD(T) in sizing:** recipes A and B are DFT only, so the CCSD(T) terms
    of the sizing rule arrive with recipe C.
+
+10. **Property basis def2-TZVPD, not def2-TZVP** (owner decision 2026-10-06,
+    made during Phase 6): def2-TZVP overstated five library dipoles; the diffuse
+    functions of def2-TZVPD fixed four of them, so the library and computed
+    molecules both use B3LYP/def2-TZVPD. Recipe B still optimises at def2-SVP.
 
 ## 15. Plans and sequencing
 

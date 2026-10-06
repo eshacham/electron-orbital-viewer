@@ -21,7 +21,7 @@
 - **Sign-in:** Cognito managed login with TOTP MFA via `oidc-client-ts`, using authorization code + PKCE. The access token is kept in memory only (an `InMemoryWebStorage` user store). The refresh token, with the profile but never an access or ID token, is kept in `sessionStorage` under `eov.owner.session`, so closing the tab signs out. Config comes from `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID` and `VITE_COGNITO_DOMAIN`; if any is unset, sign-in says "not configured". The redirect URIs are `<origin>/` and `<origin>/admin.html`.
 - **Computed results** are read at `/molecules/jobs/<key>/…` (spec §5.3), and only once `done.json` exists and lists `meta.json`. A folder without it is not a result, and the app says so.
 - **Money:** USD at the precision the meter has. From $0.01 up, show 2 decimals. Below that, show 4 significant figures (e.g. "$0.002980"). Always label the figure: spent, reserved or projected (and remaining or billed where those apply).
-- **Every number states its method** (parent spec §3.1). Energies say "B3LYP/def2-TZVP", or "B3LYP/def2-SVP" during an optimisation step. Predictions say "sizing v<version> prediction".
+- **Every number states its method** (parent spec §3.1). Energies say "B3LYP/def2-TZVPD", or "B3LYP/def2-SVP" during an optimisation step. Predictions say "sizing v<version> prediction".
 - **Polling:** `GET /api/v1/jobs/{key}` every **5 s** while the job is `QUEUED`, `STARTING` or `RUNNING`. Never send two requests at once for one key. Stop on `DONE` or `FAILED`, on the last unmount, and while the tab is hidden; resume when it is visible again.
 - **Layout contract (Phase 6, spec §9.7).** The request panel, the status and the provenance panel go in the desktop `.side-panel` and in the phone sheet's Explore tab. The tier badge goes in the existing `.molecule-legend-stack`. The sign-in link sits with Share/Export in the view settings. No new floating panel over the canvas. `/admin.html` is desktop-first, and its table scrolls horizontally on a phone.
 - **Dashboard code lives in `src/admin/` only, and nothing reachable from `src/main.tsx` imports it.**
@@ -560,11 +560,11 @@ describe('times and sizes', () => {
 describe('every number states its method', () => {
     it('labels an energy with the method that produced it', () => {
         const single = jobFixture('get_running').job;
-        expect(formatEnergy(-76.4612, methodOf(single, 'SCF (DIIS)'))).toBe('−76.461200 Ha (B3LYP/def2-TZVP)');
+        expect(formatEnergy(-76.4612, methodOf(single, 'SCF (DIIS)'))).toBe('−76.461200 Ha (B3LYP/def2-TZVPD)');
         const optimise = jobFixture('get_failed').job;
         expect(methodOf(optimise, 'optimisation step 4')).toBe('B3LYP/def2-SVP');
-        expect(methodOf(optimise, 'SCF (DIIS)')).toBe('B3LYP/def2-TZVP');
-        expect(methodOf(optimise)).toBe('B3LYP/def2-TZVP');
+        expect(methodOf(optimise, 'SCF (DIIS)')).toBe('B3LYP/def2-TZVPD');
+        expect(methodOf(optimise)).toBe('B3LYP/def2-TZVPD');
         expect(predictionNote(1)).toBe('sizing v1 prediction');
     });
 });
@@ -577,7 +577,7 @@ describe('jobs and tiers', () => {
         expect(['QUEUED', 'STARTING', 'RUNNING', 'DONE', 'FAILED'].map(s => isActive(s as never))).toEqual([true, true, true, false, false]);
     });
     it('shortens a key for display', () => {
-        expect(shortKey('85fe9f92fa2c5d614d84e1b6c53294bf68937f614d49ea9a22784d0025bdbd67')).toBe('85fe9f92fa…');
+        expect(shortKey('e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa')).toBe('e2698ba0c2…');
     });
     it('treats a file without a tier as validated (v1/v2 predate it)', () => {
         expect(tierOf({})).toBe('validated');
@@ -884,7 +884,7 @@ import { asLibraryMeta } from '../../src/molecules/library_types';
 import type { MoleculeMeta } from '../../src/molecules/types';
 import { waterMeta } from '../molecules/fixtures';
 
-const KEY = '85fe9f92fa2c5d614d84e1b6c53294bf68937f614d49ea9a22784d0025bdbd67';
+const KEY = 'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa';
 const DONE = `/molecules/jobs/${KEY}/done.json`;
 const META = `/molecules/jobs/${KEY}/meta.json`;
 
@@ -1581,7 +1581,7 @@ import { registerMoleculeUrlKeys } from '../../src/molecules/url_keys';
 import { registerComputedUrlKeys, encodeJobUrl, decodeJobUrl } from '../../src/jobs/url_keys';
 import { createAppStore } from '../../src/store';
 
-const KEY = '85fe9f92fa2c5d614d84e1b6c53294bf68937f614d49ea9a22784d0025bdbd67';
+const KEY = 'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa';
 
 beforeEach(() => {
     resetUrlKeysForTests();
@@ -1915,7 +1915,7 @@ import { fixture, jsonResponse, textResponse } from './api_fixtures';
 const DEV: BuildEnv = { dev: true, jobsApiUrl: null, cognito: null };
 const PROD: BuildEnv = { dev: false, jobsApiUrl: 'https://abc.execute-api.us-east-1.amazonaws.com', cognito: null };
 const WATER = { recipe: 'single' as const, molecule: { name: 'water' } };
-const KEY = '85fe9f92fa2c5d614d84e1b6c53294bf68937f614d49ea9a22784d0025bdbd67';
+const KEY = 'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa';
 
 function deps(responses: Response[], token: string | null = null, refreshes = false) {
     const fetch = jest.fn(async (_input: string, _init?: RequestInit) => {
@@ -2298,7 +2298,7 @@ import { BUILD_ENV } from '../../src/jobs/build_env';
 import { resetBuildEnv } from './build_env_stub';
 import { fixture, jsonResponse, textResponse } from './api_fixtures';
 
-const KEY = '85fe9f92fa2c5d614d84e1b6c53294bf68937f614d49ea9a22784d0025bdbd67';
+const KEY = 'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa';
 const makeStore = () => configureStore({ reducer: { jobs: jobsReducer } });
 
 afterEach(() => { resetBuildEnv(); bindJobsClient(null); setOwnerAuthForTests(null); window.localStorage.clear(); });
@@ -3058,7 +3058,7 @@ describe('ProvenancePanel', () => {
     it('states a validated molecule’s method, its geometry and what it was checked against', () => {
         render(<ProvenancePanel meta={waterMeta()} ownerJob={null} />);
         open();
-        expect(screen.getByText('Method: B3LYP/def2-TZVP, PySCF 2.6.0.')).toBeInTheDocument();
+        expect(screen.getByText('Method: B3LYP/def2-TZVPD, PySCF 2.6.0.')).toBeInTheDocument();
         expect(screen.getByText('Geometry: experiment (CCCBDB).')).toBeInTheDocument();
         expect(screen.getByText('dipole: 1.855 D — CRC Handbook, via CCCBDB')).toBeInTheDocument();
         expect(screen.getByText(/Generated by tools\/molecules\/build_library\.py at commit abc1234\./)).toBeInTheDocument();
@@ -3067,7 +3067,7 @@ describe('ProvenancePanel', () => {
     it('links a computed molecule’s PubChem record, states its caveats, and links its four files', () => {
         render(<ProvenancePanel meta={computed()} ownerJob={null} />);
         open();
-        expect(screen.getByText('Method: B3LYP/def2-TZVP, PySCF 2.8.0.')).toBeInTheDocument();
+        expect(screen.getByText('Method: B3LYP/def2-TZVPD, PySCF 2.8.0.')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: '962' })).toHaveAttribute('href', 'https://pubchem.ncbi.nlm.nih.gov/compound/962');
         expect(screen.getByText(/its computed 3D conformer, retrieved 2026-10-10, not optimised\./)).toBeInTheDocument();
         expect(screen.getByText(PROVENANCE.caveats[0])).toBeInTheDocument();
@@ -3360,7 +3360,7 @@ describe('previewing', () => {
         expect(props.preview).toHaveBeenCalledWith({ recipe: 'single', molecule: { name: 'water' } }, expect.any(AbortSignal));
         expect(screen.getByRole('img', { name: 'preview of the resolved structure, 3 atoms' })).toBeInTheDocument();
         const preview = screen.getByLabelText('preview');
-        for (const text of ['H₂O', 'Electrons10', 'Basis functions43 (def2-TZVP)', 'This Mac', 'remaining $8.80']) expect(preview).toHaveTextContent(text);
+        for (const text of ['H₂O', 'Electrons10', 'Basis functions58 (def2-TZVPD)', 'This Mac', 'remaining $8.80']) expect(preview).toHaveTextContent(text);
         expect(preview).toHaveTextContent(/sizing v\d+ prediction/);
         expect(screen.getByRole('link', { name: '962' })).toHaveAttribute('href', 'https://pubchem.ncbi.nlm.nih.gov/compound/962');
         expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
@@ -3699,8 +3699,8 @@ export interface RequestPanelProps {
 
 /** Spec §8.2's recipes and their caveats, as the owner chooses between them. */
 const RECIPES: Array<{ value: Recipe; label: string; detail: string }> = [
-    { value: 'single', label: 'A · single point', detail: 'B3LYP/def2-TZVP at the geometry given. Geometry is PubChem’s force-field conformer (or as pasted), not optimised.' },
-    { value: 'optimise', label: 'B · optimise first', detail: 'B3LYP/def2-SVP optimisation (geomeTRIC), then B3LYP/def2-TZVP. No dispersion correction and no frequency check: not confirmed to be a minimum.' },
+    { value: 'single', label: 'A · single point', detail: 'B3LYP/def2-TZVPD at the geometry given. Geometry is PubChem’s force-field conformer (or as pasted), not optimised.' },
+    { value: 'optimise', label: 'B · optimise first', detail: 'B3LYP/def2-SVP optimisation (geomeTRIC), then B3LYP/def2-TZVPD. No dispersion correction and no frequency check: not confirmed to be a minimum.' },
 ];
 
 interface SubmitAreaProps {
@@ -3897,7 +3897,7 @@ describe('JobStatusView', () => {
         const panel = screen.getByRole('region', { name: 'job status' });
         expect(panel).toHaveTextContent('Running');
         expect(panel).toHaveTextContent('StageSCF (DIIS)');
-        expect(panel).toHaveTextContent('Latest energy−76.461200 Ha (B3LYP/def2-TZVP)');
+        expect(panel).toHaveTextContent('Latest energy−76.461200 Ha (B3LYP/def2-TZVPD)');
         expect(panel).toHaveTextContent(/Elapsed1 min 00 s \(predicted .+, sizing v\d+ prediction\)/);
         expect(panel).toHaveTextContent('CostThis Mac — spent $0.00');
         expect(screen.getByRole('log', { name: 'log tail' })).toHaveTextContent('cycle= 8 E= -76.4612007');
@@ -4650,10 +4650,10 @@ async (page) => {
 
 Then, with `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_take_screenshot`, `browser_network_requests` and `browser_console_messages`:
 
-1. Open `http://localhost:5391/#mode=molecule&job=<KEY>`. Water is drawn from the real files. The canvas's bottom-centre stack starts with the **Computed** badge and its line. The side panel's "How this was computed" lists: method B3LYP/def2-TZVP; geometry "PubChem CID 962 (Water) …, not optimised" with 962 linking to PubChem; the caveat; four file links; and "Owner only: … Cost: spent $0.00 (This Mac)."
+1. Open `http://localhost:5391/#mode=molecule&job=<KEY>`. Water is drawn from the real files. The canvas's bottom-centre stack starts with the **Computed** badge and its line. The side panel's "How this was computed" lists: method B3LYP/def2-TZVPD; geometry "PubChem CID 962 (Water) …, not optimised" with 962 linking to PubChem; the caveat; four file links; and "Owner only: … Cost: spent $0.00 (This Mac)."
 2. Click `input.py`. A new tab shows the Python script as text. Close that tab.
 3. The picker shows a **Computed** chip, and it lists Water.
-4. Open "Request a molecule" and type `water`. Preview shows the dark SVG with three atoms, plus Formula H₂O, Electrons 10, the basis functions, "This Mac", "sizing vN prediction" and "remaining $8.80". Click Submit. The status panel goes Queued → Running (Stage SCF (DIIS), Latest energy −76.461200 Ha (B3LYP/def2-TZVP), a monospace log tail) → Done, and the viewer opens Water by itself.
+4. Open "Request a molecule" and type `water`. Preview shows the dark SVG with three atoms, plus Formula H₂O, Electrons 10, the basis functions, "This Mac", "sizing vN prediction" and "remaining $8.80". Click Submit. The status panel goes Queued → Running (Stage SCF (DIIS), Latest energy −76.461200 Ha (B3LYP/def2-TZVPD), a monospace log tail) → Done, and the viewer opens Water by itself.
 5. `browser_network_requests`: every `GET /api/v1/jobs/<key>` after Submit is about 5 s after the one before, never two at once.
 6. Choose **AWS** under "Jobs run on". The request panel goes away, and the bar reads "Owner sign-in: not configured in this build". Choose **This Mac** again.
 7. `browser_console_messages`: no errors.
@@ -4730,8 +4730,8 @@ describe('jobs table logic', () => {
         expect(jobLinks(running)).toEqual([]);
     });
     it('names the method, and lists the last months', () => {
-        expect(methodSummary(failed)).toBe('B3LYP/def2-SVP → B3LYP/def2-TZVP');
-        expect(methodSummary(done)).toBe('B3LYP/def2-TZVP');
+        expect(methodSummary(failed)).toBe('B3LYP/def2-SVP → B3LYP/def2-TZVPD');
+        expect(methodSummary(done)).toBe('B3LYP/def2-TZVPD');
         expect(recentMonths(new Date('2026-01-15T00:00:00Z'), 3)).toEqual(['2026-01', '2025-12', '2025-11']);
     });
 });
@@ -5539,7 +5539,7 @@ async (page) => {
 }
 ```
 
-1. Open `http://localhost:5391/admin.html`. The page shows "Owner dashboard", "Back to the viewer", the owner bar with "Jobs run on" (This Mac) and no Dashboard link, and the month select at the current month. The table has two rows. Water's row shows Size S, This Mac, Done, three UTC times, "predicted / 1 min 10 s", and links open, input.py … timings.json. The failed row shows "B3LYP/def2-SVP → B3LYP/def2-TZVP", Failed, the SCF message, and attempt 1 links. The cost panel shows spent $0.10, reserved $0.09, remaining $8.61 of the $8.80 cap, projected $0.41 with its formula, two bars (hover shows "…-03: spent $0.10"), and "AWS billed (Cost Explorer, a day behind, as of …-04): billed $0.09; our meter: spent $0.10."
+1. Open `http://localhost:5391/admin.html`. The page shows "Owner dashboard", "Back to the viewer", the owner bar with "Jobs run on" (This Mac) and no Dashboard link, and the month select at the current month. The table has two rows. Water's row shows Size S, This Mac, Done, three UTC times, "predicted / 1 min 10 s", and links open, input.py … timings.json. The failed row shows "B3LYP/def2-SVP → B3LYP/def2-TZVPD", Failed, the SCF message, and attempt 1 links. The cost panel shows spent $0.10, reserved $0.09, remaining $8.61 of the $8.80 cap, projected $0.41 with its formula, two bars (hover shows "…-03: spent $0.10"), and "AWS billed (Cost Explorer, a day behind, as of …-04): billed $0.09; our meter: spent $0.10."
 2. Click the "Time: predicted / actual" header: Water stays first, and the failed row (no actual) goes last both ways. Set Status to FAILED: one row, "1 of 2 jobs".
 3. Click "open" on Water's row: a viewer tab opens the computed molecule. Close it.
 4. Resize to 390×844 with touch emulation, and say so. `browser_evaluate` with `() => ({ page: document.documentElement.scrollWidth <= window.innerWidth, table: (el => el.scrollWidth > el.clientWidth)(document.querySelector('.admin-table-scroll')) })` must give `{ page: true, table: true }`. Swipe the table sideways: it scrolls inside its box.
