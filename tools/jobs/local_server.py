@@ -1,7 +1,7 @@
 """The job API on this Mac (spec §12): 127.0.0.1:8787, no auth, the same
 handlers the api Lambda runs. The Vite dev server proxies /api here.
 
-    tools/molecules/.venv/bin/python -m jobs.local_server      (from tools/)
+    cd tools && ../tools/molecules/.venv/bin/python -m jobs.local_server
 """
 import json
 import sys

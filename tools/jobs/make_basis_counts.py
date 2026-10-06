@@ -1,6 +1,6 @@
 """Regenerates basis_counts.json from PySCF: run after a PySCF upgrade.
 
-    tools/molecules/.venv/bin/python -m jobs.make_basis_counts   (from tools/)
+    cd tools && ../tools/molecules/.venv/bin/python -m jobs.make_basis_counts
 """
 import json
 from pathlib import Path

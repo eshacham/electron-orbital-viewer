@@ -34,10 +34,10 @@ so the same viewer renders both.
 
 ## Running locally
 
-From `tools/`, with the Phase 5/6 venv:
+From the repo root:
 
 ```bash
-tools/molecules/.venv/bin/python -m jobs.local_server
+cd tools && ../tools/molecules/.venv/bin/python -m jobs.local_server
 ```
 
 This serves the job API on `127.0.0.1:8787`, backed by `FileStore` under
