@@ -3,6 +3,7 @@ import os
 
 import aws_cdk as cdk
 
+from compute_stack import ComputeStack, compute_context
 from infra_stack import InfraStack
 
 
@@ -19,5 +20,12 @@ InfraStack(app, "ElectronOrbitalViewerStack",
 
     # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
     )
+
+# On-demand generation (spec 2026-10-05 §10): defined only when infra/deploy.sh
+# passes its four context values, so a site-only deploy needs none of them.
+compute = compute_context(app.node)
+if compute:
+    ComputeStack(app, "ElectronOrbitalViewerComputeStack", **compute,
+                 env=cdk.Environment(account=os.getenv('CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')))
 
 app.synth()

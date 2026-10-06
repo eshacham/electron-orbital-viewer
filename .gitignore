@@ -18,3 +18,7 @@ infra/owner.env
 
 # Local job backend state (Phase 6B): job records, meter, resolution cache
 tools/jobs/.state/
+
+# Phase 6B-3: the assembled Lambda code, and CDK's AZ lookup (it names the AWS account; this repo is public)
+infra/build/
+infra/cdk.context.json
