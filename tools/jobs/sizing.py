@@ -36,6 +36,7 @@ SIZING_VERSION = 1
 # positive, so no clamp applied; t0 and g keep their seeds for 6B-3's AWS fit.
 CONSTANTS = {'m0': 0.412, 'm2': 3.73, 't0': 5.0, 't3': 19400.0, 'g': 1.5, 'f2': 2480.0}
 HEADROOM = 2.0
+TIME_HEADROOM = 1.5
 TIMEOUT_FACTOR = 3.0
 MIN_TIMEOUT_SECONDS = 600
 CEILING_SECONDS = {'single': 3600, 'optimise': 7200}
@@ -90,18 +91,36 @@ def predict_seconds(job: dict, size: Size) -> float:
 
 
 def decide(job: dict, local: bool = False) -> dict:
+    """Pick the smallest worker with enough memory and enough time (Ruling T11-a).
+
+    A worker must clear two independent bars: memory ≥ HEADROOM × predicted,
+    and predicted time × TIME_HEADROOM ≤ the recipe's ceiling. The second bar
+    exists because a bigger worker is also a faster one (more vCPUs speed up
+    the SCF part, Ruling D14's file-writing term aside), so a job too slow
+    for a small worker's ceiling may still fit on a larger one. Sizes are
+    tried smallest first; predicted seconds is non-increasing in vCPU count,
+    so the first one to clear both bars is the cheapest that works. If none
+    does, even the fastest memory-qualifying size is reported as too-long.
+    """
     n = basis_functions(job['molecule']['atoms'], job['method']['basis'])
     memory = predicted_memory_gb(n)
-    fitting = [s for s in SIZES if s.memory_gb >= HEADROOM * memory]
-    if not fitting:
+    memory_fitting = [s for s in SIZES if s.memory_gb >= HEADROOM * memory]
+    if not memory_fitting:
         raise JobRefused('too-large', f'predicted {memory:.0f} GB of memory (N = {n}): beyond the largest Fargate '
                                       f'worker ({SIZES[-1].memory_gb} GB with {HEADROOM:g}× headroom)')
-    size = fitting[0]
-    seconds = predict_seconds(job, size)
     ceiling = CEILING_SECONDS[job['recipe']]
-    if seconds > ceiling:
-        raise JobRefused('too-long', f'predicted {seconds / 3600:.1f} h on {size.name}: longer than this phase allows '
-                                     f'for {job["recipe"]} ({ceiling / 3600:g} h)')
+    size = seconds = None
+    for candidate in memory_fitting:
+        candidate_seconds = predict_seconds(job, candidate)
+        if candidate_seconds * TIME_HEADROOM <= ceiling:
+            size, seconds = candidate, candidate_seconds
+            break
+    if size is None:
+        best = memory_fitting[-1]
+        best_seconds = predict_seconds(job, best)
+        raise JobRefused('too-long', f'predicted {best_seconds / 3600:.1f} h on {best.name} (the fastest size with '
+                                     f'enough memory), {TIME_HEADROOM:g}× margin included: longer than this phase '
+                                     f'allows for {job["recipe"]} ({ceiling / 3600:g} h)')
     timeout = int(min(max(math.ceil(TIMEOUT_FACTOR * seconds), MIN_TIMEOUT_SECONDS), ceiling))
     if local:
         capacity, attempts = 'local', 1
