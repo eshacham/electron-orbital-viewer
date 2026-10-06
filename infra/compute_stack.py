@@ -22,6 +22,7 @@ from aws_cdk import (CfnOutput, Duration, RemovalPolicy, Size, Stack, Tags,
                      aws_s3 as s3, aws_sns as sns, aws_sns_subscriptions as subscriptions)
 from constructs import Construct
 
+from cost_guards import add_cost_guards
 from lambda_bundle import REPO, build_lambda_bundle
 
 sys.path.insert(0, str(REPO / 'tools'))
@@ -247,6 +248,10 @@ class ComputeStack(Stack):
                                'status': '$context.status', 'latencyMs': '$context.responseLatency',
                                'authError': '$context.authorizer.error', 'error': '$context.error.message'}))
 
+        deny_submit = add_cost_guards(self, topic=topic, api_role=api_role, alert_email=alert_email,
+                                      functions={'Api': api_fn, 'Reconcile': reconcile_fn, 'Billing': billing_fn},
+                                      api=api, queue_arns=queue_arns, app_tag=TAGS['app'])
+
         # -- outputs (deploy.sh and jobs.sh read these) ------------------------------
         for name, value in (('JobsApiUrl', api.api_endpoint), ('UserPoolId', pool.user_pool_id),
                             ('UserPoolClientId', client.user_pool_client_id),
@@ -254,5 +259,6 @@ class ComputeStack(Stack):
                             ('CognitoDomain', domain.base_url()), ('JobsTableName', table.table_name),
                             ('WorkerRepositoryUri', repository.repository_uri),
                             ('ApiFunctionName', api_fn.function_name), ('ApiRoleName', api_role.role_name),
+                            ('DenySubmitPolicyArn', deny_submit.managed_policy_arn),
                             ('WorkerLogGroup', worker_logs.log_group_name)):
             CfnOutput(self, name, value=value)

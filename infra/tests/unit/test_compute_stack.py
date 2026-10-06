@@ -245,3 +245,54 @@ def test_the_data_bucket_gets_no_policy_from_this_stack(template):
     # (6B-2); the worker's ListBucket is in its own role's policy, not here.
     template.resource_count_is('AWS::S3::Bucket', 0)
     template.resource_count_is('AWS::S3::BucketPolicy', 0)
+
+
+# -- Task 8: cost guards -------------------------------------------------------
+
+
+def test_batch_failures_email_and_four_alarms(template):
+    rules = props(template, 'AWS::Events::Rule')
+    (failed,) = [r for r in rules if r.get('EventPattern', {}).get('detail', {}).get('status') == ['FAILED']]
+    assert 'Ref' in json.dumps(failed['Targets'][0]['Arn'])               # the alerts topic
+    alarms = props(template, 'AWS::CloudWatch::Alarm')
+    assert len(alarms) == 4 and all(a['AlarmActions'] for a in alarms)
+    assert sorted(a['MetricName'] for a in alarms) == ['5xx', 'Errors', 'Errors', 'Errors']
+    assert {a['Namespace'] for a in alarms} == {'AWS/Lambda', 'AWS/ApiGateway'}   # AWS metrics only, no custom ones
+
+
+def test_budget_and_its_stop_on_the_api_role_only(template):
+    (budget,) = props(template, 'AWS::Budgets::Budget')
+    assert budget['Budget']['BudgetLimit'] == {'Amount': 10, 'Unit': 'USD'} and budget['Budget']['TimeUnit'] == 'MONTHLY'
+    assert sorted(n['Notification']['Threshold'] for n in budget['NotificationsWithSubscribers']) == [50, 80, 100]
+    (action,) = props(template, 'AWS::Budgets::BudgetsAction')
+    assert action['ActionThreshold'] == {'Type': 'PERCENTAGE', 'Value': 100} and action['ApprovalModel'] == 'AUTOMATIC'
+    (api_role,) = template.find_resources('AWS::IAM::Role', {'Properties': {'Description': Match.string_like_regexp('^api Lambda')}})
+    assert action['Definition']['IamActionDefinition']['Roles'] == [{'Ref': api_role}]
+    (deny,) = props(template, 'AWS::IAM::ManagedPolicy')
+    assert deny['PolicyDocument']['Statement'] == [{'Action': 'batch:SubmitJob', 'Effect': 'Deny', 'Resource': '*'}]
+    assert 'Roles' not in deny                                    # attached only by the action, never at deploy
+
+
+def test_cost_anomaly_monitor_off_by_default(template):
+    # Ruling D14: Billing has never seen the `app` tag on a first deploy, so
+    # the CUSTOM tag monitor stays gated behind -c anomalyMonitor=on until the
+    # tag is activated (else CreateAnomalyMonitor risks rolling back the deploy).
+    template.resource_count_is('AWS::CE::AnomalyMonitor', 0)
+    template.resource_count_is('AWS::CE::AnomalySubscription', 0)
+
+
+def test_cost_anomaly_monitor_watches_this_app_when_turned_on():
+    app = cdk.App(context={**CONTEXT, 'anomalyMonitor': 'on'})
+    stack = ComputeStack(app, 'ElectronOrbitalViewerComputeStack', data_bucket_name='data-bucket', site_origin=SITE,
+                         alert_email='owner@example.com', image_tag='abc123',
+                         env=cdk.Environment(account=ACCOUNT, region=REGION))
+    on_template = Template.from_stack(stack)
+    (monitor,) = props(on_template, 'AWS::CE::AnomalyMonitor')
+    assert monitor['MonitorType'] == 'CUSTOM'
+    assert json.loads(monitor['MonitorSpecification'])['Tags']['Values'] == ['electron-orbital-viewer']
+    (sub,) = props(on_template, 'AWS::CE::AnomalySubscription')
+    assert sub['Subscribers'][0]['Type'] == 'SNS'
+
+
+def test_the_deny_policy_is_an_output_for_jobs_sh(template):
+    template.has_output('DenySubmitPolicyArn', {})
