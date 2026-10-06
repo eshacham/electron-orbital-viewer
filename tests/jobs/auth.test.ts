@@ -29,6 +29,7 @@ function setup(href: string, overrides: Partial<UserManagerLike> = {}) {
         signinRedirect: jest.fn(async () => undefined),
         signinRedirectCallback: jest.fn(async () => { stored = user(); return stored; }),
         signinSilent: jest.fn(async () => { stored = user({ access_token: 'access-2' }); return stored; }),
+        revokeTokens: jest.fn(async () => undefined),
         events: { addUserLoaded: jest.fn(), addSilentRenewError: jest.fn() },
         ...overrides,
     };
@@ -191,6 +192,75 @@ describe('a reload, a renewal, and the end of a session', () => {
         expect(location.assign).toHaveBeenCalledWith(logoutUrl(SETTINGS, 'http://localhost:5391', '/'));
         expect(logoutUrl(SETTINGS, 'http://localhost:5391', '/'))
             .toBe('https://eov.auth.us-east-1.amazoncognito.com/logout?client_id=client123&logout_uri=http%3A%2F%2Flocalhost%3A5391%2F');
+    });
+});
+
+describe('revoking the refresh token at sign-out (D11)', () => {
+    afterEach(() => jest.useRealTimers());
+
+    it('asks Cognito to revoke the refresh token before ending the local session', async () => {
+        const { auth, userManager } = setup('http://localhost:5391/?code=abc&state=xyz');
+        await auth.start();
+        await auth.signOut();
+        expect(userManager.revokeTokens).toHaveBeenCalledWith(['refresh_token']);
+        const revokeOrder = (userManager.revokeTokens as jest.Mock).mock.invocationCallOrder[0];
+        const removeOrder = (userManager.removeUser as jest.Mock).mock.invocationCallOrder[0];
+        expect(revokeOrder).toBeLessThan(removeOrder);
+    });
+
+    it('still signs out locally when Cognito refuses the revoke', async () => {
+        const { auth, events, location } = setup('http://localhost:5391/?code=abc&state=xyz', {
+            revokeTokens: jest.fn(async () => { throw new Error('revocation_endpoint said no'); }),
+        });
+        await auth.start();
+        await expect(auth.signOut()).resolves.toBeUndefined();
+        expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
+        expect(events.at(-1)).toEqual({ identity: null, reason: 'signed-out' });
+        expect(location.assign).toHaveBeenCalled();
+    });
+
+    it('still signs out locally when the revoke call hangs', async () => {
+        jest.useFakeTimers();
+        const { auth, events } = setup('http://localhost:5391/?code=abc&state=xyz', {
+            revokeTokens: jest.fn(() => new Promise<void>(() => { /* never settles */ })),
+        });
+        await auth.start();
+        const signingOut = auth.signOut();
+        await jest.advanceTimersByTimeAsync(15_000);
+        await expect(signingOut).resolves.toBeUndefined();
+        expect(events.at(-1)).toEqual({ identity: null, reason: 'signed-out' });
+    });
+
+    it('does not attempt to revoke when there is no signed-in user', async () => {
+        const { auth, userManager } = setup('http://localhost:5391/');
+        await auth.start();
+        await auth.signOut();
+        expect(userManager.revokeTokens).not.toHaveBeenCalled();
+    });
+
+    it('does not attempt to revoke a user with no refresh token', async () => {
+        const { auth, userManager, put } = setup('http://localhost:5391/');
+        put(user({ refresh_token: undefined }));
+        await auth.signOut();
+        expect(userManager.revokeTokens).not.toHaveBeenCalled();
+    });
+
+    it('never puts the refresh token in a console call', async () => {
+        const calls: unknown[] = [];
+        const record = (...args: unknown[]) => { calls.push(args); };
+        const spies = (['log', 'info', 'warn', 'error', 'debug'] as const)
+            .map(level => jest.spyOn(console, level).mockImplementation(record));
+        try {
+            const { auth } = setup('http://localhost:5391/?code=abc&state=xyz', {
+                revokeTokens: jest.fn(async () => { throw new Error('refresh-1 was rejected'); }),
+            });
+            await auth.start();
+            await auth.signOut();
+            const serialised = JSON.stringify(calls);
+            expect(serialised).not.toContain('refresh-1');
+        } finally {
+            spies.forEach(spy => spy.mockRestore());
+        }
     });
 });
 

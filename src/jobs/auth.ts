@@ -37,6 +37,7 @@ export interface UserManagerLike {
     signinRedirect(args?: { state?: unknown }): Promise<void>;
     signinRedirectCallback(url?: string): Promise<User>;
     signinSilent(): Promise<User | null>;
+    revokeTokens(types?: ('access_token' | 'refresh_token')[]): Promise<void>;
     events: {
         addUserLoaded(callback: (user: User) => void): unknown;
         addSilentRenewError(callback: (error: Error) => void): unknown;
@@ -71,6 +72,28 @@ export function makeUserManager(settings: CognitoSettings, origin: string, page:
 }
 
 interface SavedSession { refresh_token: string; scope?: string; profile: User['profile'] }
+
+/**
+ * D11: the upper bound on revoking the refresh token at Cognito during
+ * sign-out. A sign-in service that does not answer must not leave the owner
+ * waiting to be signed out (cf. S3's 15 s on the request itself).
+ */
+const REVOKE_TIMEOUT_MS = 15_000;
+
+/**
+ * Races a promise against a timer, rejecting once `ms` has passed without a
+ * settlement. Used only to bound best-effort work that must never block its
+ * caller -- the rejection here is caught, never surfaced.
+ */
+function withTimeout(promise: Promise<unknown>, ms: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('timed out')), ms);
+        promise.then(
+            () => { clearTimeout(timer); resolve(); },
+            (error: unknown) => { clearTimeout(timer); reject(error); },
+        );
+    });
+}
 
 const identityOf = (user: User): OwnerIdentity => ({ email: typeof user.profile.email === 'string' ? user.profile.email : null });
 
@@ -194,8 +217,27 @@ export class OwnerAuth {
     }
 
     async signOut(): Promise<void> {
+        await this.revokeRefreshToken();
         await this.end('signed-out');
         this.deps.location.assign(logoutUrl(this.settings, this.deps.location.origin, this.page));
+    }
+
+    /**
+     * D11: dropping the client's copy of the refresh token leaves it good at
+     * Cognito for up to 12 h, so sign-out also asks Cognito to revoke it.
+     * Best-effort only, and bounded by REVOKE_TIMEOUT_MS -- a refusal, a hung
+     * request, or no network must never stop the owner being signed out of
+     * this tab, which the unconditional end() below still does.
+     */
+    private async revokeRefreshToken(): Promise<void> {
+        try {
+            const user = await this.deps.userManager.getUser();
+            if (!user?.refresh_token) return;
+            await withTimeout(this.deps.userManager.revokeTokens(['refresh_token']), REVOKE_TIMEOUT_MS);
+        } catch {
+            // Best-effort (D11): never block or fail sign-out, and never log
+            // the error -- it may carry the token this exists to revoke.
+        }
     }
 
     async accessToken(): Promise<string | null> {
