@@ -147,6 +147,21 @@ html, body, #root {
   max-width: 360px;
 }
 
+/* Final review I3: a sign-in that did not complete, said over whichever mode
+   Cognito's return landed on. At the top, above .atom-error's slot, so the
+   two never cover each other; dismissible. MUI's standard error colours,
+   stated so they are tested. */
+.sign-in-error {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: min(420px, calc(100vw - 24px));
+  color: rgb(95, 33, 32);
+  background-color: rgb(253, 237, 237);
+}
+
 #controls {
   position: absolute; /* Position absolutely within #root */
   top: 20px;          /* Distance from the top */

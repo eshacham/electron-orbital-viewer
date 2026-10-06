@@ -54,7 +54,7 @@ const AdminApp: React.FC = () => {
                 <header className="admin-header">
                     <Typography variant="h5" component="h1">Owner dashboard</Typography>
                     <a href="/">Back to the viewer</a>
-                    <ConnectedOwnerBar page="/admin.html" showDashboardLink={false} />
+                    <ConnectedOwnerBar page="/admin.html" showDashboardLink={false} explainUnconfigured />
                 </header>
                 {!isOwner ? (
                     <Alert severity="info">Sign in as the owner to see jobs and costs.</Alert>

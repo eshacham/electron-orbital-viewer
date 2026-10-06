@@ -1,6 +1,6 @@
 import type { UnknownAction } from '@reduxjs/toolkit';
 import { BUILD_ENV } from './build_env';
-import { makeUserManager, OwnerAuth, OwnerPage } from './auth';
+import { makeUserManager, OwnerAuth, OwnerPage, SIGN_IN_FAILED, SignInFailed } from './auth';
 import { sessionChanged, sessionExpired, sessionFailed } from '../store/jobsSlice';
 
 let current: OwnerAuth | null = null;
@@ -18,7 +18,8 @@ export function setOwnerAuthForTests(auth: OwnerAuth | null): void {
  * Once per page, before anything asks for a token: completes a redirect back
  * from Cognito or restores this tab's session, and mirrors the session into
  * the store. Resolves to the path to go back to after a redirect -- its hash
- * is the view the owner left -- or null.
+ * is the view the owner left -- or null. A sign-in that did not complete is
+ * put in the store, and still goes back to the view it left when it can.
  */
 export async function startOwnerSession(dispatch: (action: UnknownAction) => unknown, page: OwnerPage): Promise<string | null> {
     const settings = BUILD_ENV.cognito;
@@ -36,7 +37,7 @@ export async function startOwnerSession(dispatch: (action: UnknownAction) => unk
     try {
         return await auth.start();
     } catch (error) {
-        dispatch(sessionFailed(error instanceof Error ? error.message : String(error)));
-        return null;
+        dispatch(sessionFailed(SIGN_IN_FAILED));
+        return error instanceof SignInFailed ? error.returnTo : null;
     }
 }

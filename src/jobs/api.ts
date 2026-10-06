@@ -51,9 +51,19 @@ export function createJobsApi(target: JobsTarget, env: BuildEnv, deps: JobsApiDe
     const base = apiBase(target, env);
     const isLocal = env.dev && target === 'local';
 
+    /** The token and its renewal can fail to reach Cognito (S2): a passing failure that says so, not a raw rejection. */
+    async function fromSignIn<T>(work: Promise<T>): Promise<T> {
+        try {
+            return await work;
+        } catch (error) {
+            if (error instanceof JobsApiError) throw error;
+            throw new JobsApiError(0, 'unreachable', error instanceof Error ? error.message : String(error));
+        }
+    }
+
     async function send(method: 'GET' | 'POST', path: string, body: unknown, signal: AbortSignal | undefined, retried: boolean): Promise<{ status: number; data: unknown }> {
         if (base === null) throw new JobsApiError(0, 'not-configured', API_NOT_CONFIGURED);
-        const token = await deps.token();
+        const token = await fromSignIn(deps.token());
         const headers: Record<string, string> = {};
         if (body !== undefined) headers['Content-Type'] = 'application/json';
         if (token) headers.Authorization = `Bearer ${token}`;
@@ -78,7 +88,7 @@ export function createJobsApi(target: JobsTarget, env: BuildEnv, deps: JobsApiDe
             // API Gateway's JWT authoriser: a missing, expired or revoked token.
             // One silent refresh, then say so -- never a loop, never silence.
             if (!token) throw new JobsApiError(401, 'sign-in-required', SIGN_IN_REQUIRED);
-            if (!retried && (await deps.refresh())) return send(method, path, body, signal, true);
+            if (!retried && (await fromSignIn(deps.refresh()))) return send(method, path, body, signal, true);
             deps.onSessionExpired();
             throw new JobsApiError(401, 'session-expired', SESSION_ENDED);
         }

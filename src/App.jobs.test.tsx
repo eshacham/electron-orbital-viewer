@@ -5,6 +5,8 @@ import { createAppStore } from './store';
 import { selectMolecule, setShowStructure } from './store/moleculeSlice';
 import { followJob, jobUpdated, sessionChanged, sessionExpired, TARGET_STORAGE_KEY } from './store/jobsSlice';
 import { BUILD_ENV } from './jobs/build_env';
+import { setOwnerAuthForTests, startOwnerSession } from './jobs/owner_session';
+import { SIGN_IN_FAILED } from './jobs/auth';
 import { SESSION_ENDED } from './jobs/api';
 import { currentMonth } from './jobs/format';
 import { loadMoleculeIndex, loadMoleculeMeta, MoleculeLoadError, RESULT_NOT_FINISHED } from './molecules/loader';
@@ -88,7 +90,8 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
         expect(screen.queryByRole('button', { name: 'Computed' })).toBeNull();
         expect(container.querySelector('.molecule-legend-stack')).toHaveTextContent('Validated');
-        expect(screen.getByText('Owner sign-in: not configured in this build')).toBeInTheDocument();
+        // Ruling R4-rec: a production build without sign-in shows visitors no owner plumbing.
+        expect(screen.queryByText(/Owner sign-in/)).toBeNull();
         expect(mockApi.list).not.toHaveBeenCalled();
     });
 
@@ -216,5 +219,45 @@ describe('Molecules mode with on-demand molecules', () => {
         const side = container.querySelector('.side-panel') as HTMLElement;
         expect(within(side).getByRole('alert')).toHaveTextContent(SESSION_ENDED);
         expect(within(side).getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    });
+
+    // V4: the production owner -- signed in through Cognito, no dev server.
+    it('gives the signed-in owner of a production build the request panel, the Computed category and the dashboard link', async () => {
+        BUILD_ENV.cognito = COGNITO;
+        BUILD_ENV.jobsApiUrl = 'https://abc.execute-api.us-east-1.amazonaws.com';
+        const { store, container } = await enterMolecules(false);
+        expect(mockApi.list).not.toHaveBeenCalled();
+        act(() => { store.dispatch(sessionChanged({ signedIn: true, email: 'owner@example.com' })); });
+        await flush();
+        expect(mockApi.list).toHaveBeenCalledWith(currentMonth(), 'DONE');
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        expect(within(side).getByRole('button', { name: 'Request a molecule' })).toBeInTheDocument();
+        expect(within(side).getByRole('button', { name: 'Computed' })).toBeInTheDocument();
+        expect(screen.getByText(/Signed in as owner@example.com/)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/admin.html');
+        expect(screen.queryByRole('group', { name: 'where jobs run' })).toBeNull();
+    });
+});
+
+// Final review I3: Cognito comes back to / with no hash, so the default
+// (atom) mode is on screen, where no OwnerBar is -- the failure must still be said.
+describe('a sign-in that did not complete', () => {
+    afterEach(() => { setOwnerAuthForTests(null); window.history.replaceState(null, '', '/'); });
+
+    it('is said on whatever screen the owner lands on, once, and can be dismissed', async () => {
+        BUILD_ENV.cognito = COGNITO;
+        window.history.replaceState(null, '', '/?error=access_denied&error_description=Visit+evil.example');
+        installMatchMedia(false);
+        const store = createAppStore();
+        await startOwnerSession(store.dispatch, '/');
+        render(<Provider store={store}><App /></Provider>);
+        expect(screen.getByRole('alert')).toHaveTextContent(SIGN_IN_FAILED);
+        expect(screen.queryByText(/evil/)).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
+        await flush();
+        expect(screen.getAllByText(SIGN_IN_FAILED)).toHaveLength(1);
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(screen.queryByText(SIGN_IN_FAILED)).toBeNull();
+        expect(store.getState().jobs.session.error).toBeNull();
     });
 });

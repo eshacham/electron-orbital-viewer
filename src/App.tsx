@@ -99,7 +99,7 @@ import { ConnectedOwnerBar } from './components/OwnerBar';
 import { useComputedList } from './jobs/useComputedList';
 import { useFollowedJob } from './jobs/useFollowedJob';
 import { withComputed } from './jobs/computed';
-import { selectIsOwner } from './store/jobsSlice';
+import { selectIsOwner, sessionErrorDismissed } from './store/jobsSlice';
 import { tierOf } from './molecules/types';
 
 /**
@@ -522,6 +522,7 @@ function App() {
     useMoleculeLoader(isMoleculeMode);
     // The owner's computed molecules join the picker as a Computed category; nobody else's picker changes.
     const isOwner = useAppSelector(selectIsOwner);
+    const signInError = useAppSelector(state => state.jobs.session.error);
     const computedJobs = useAppSelector(state => state.jobs.computed.jobs);
     useComputedList(isMoleculeMode);
     // Always mounted, whatever the mode or the phone sheet shows: a job that finishes still opens (final review I2).
@@ -884,7 +885,7 @@ function App() {
     );
     // The discreet owner sign-in sits with Share and Export in Molecules mode: the app's one menu row (spec §9.5).
     const controlsActions = useMemo(
-        () => (isMoleculeMode ? <>{shareExportBar}<ConnectedOwnerBar page="/" /></> : shareExportBar),
+        () => (isMoleculeMode ? <>{shareExportBar}<ConnectedOwnerBar page="/" showError={false} /></> : shareExportBar),
         [isMoleculeMode, shareExportBar],
     );
 
@@ -1278,6 +1279,15 @@ function App() {
                 {isAtomMode && atomError && (
                     <Alert severity="error" className="atom-error">
                         {atomError}
+                    </Alert>
+                )}
+                {/* Final review I3: Cognito comes back to / with no hash, so a
+                    failed sign-in can land on any mode -- by default atom
+                    mode, which has no owner corner -- and is said here,
+                    whatever is on screen, until dismissed. */}
+                {signInError && (
+                    <Alert severity="error" className="sign-in-error" onClose={() => dispatch(sessionErrorDismissed())}>
+                        {signInError}
                     </Alert>
                 )}
                 <Snackbar

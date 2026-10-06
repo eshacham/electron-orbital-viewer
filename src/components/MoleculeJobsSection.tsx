@@ -3,7 +3,7 @@ import { Accordion, AccordionDetails, AccordionSummary, Alert } from '@mui/mater
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectMolecule } from '../store/moleculeSlice';
 import {
-    followJob, jobFetchFailed, jobUpdated, refreshComputed, requestDraftChanged, requestOpened, selectIsOwner,
+    followJob, jobFetchFailed, jobUpdated, refreshComputed, requestDraftChanged, requestOpened, selectIsOwner, sessionFailed,
 } from '../store/jobsSlice';
 import { tierOf } from '../molecules/types';
 import { isJobKey } from '../molecules/job_paths';
@@ -17,8 +17,6 @@ import RequestPanel from './RequestPanel';
 import JobStatusPanel from './JobStatusPanel';
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-// This section lives on the viewer only (/admin.html has its own panels).
-const signIn = () => signInHere('/');
 
 /**
  * Molecules mode's job pieces, under the navigation card (the desktop side
@@ -60,6 +58,8 @@ const MoleculeJobsSection: React.FC = () => {
     const retry = useCallback(async (view: JobView) => {
         follow((await jobsApi().submit(retryBody(view))).job);
     }, [follow]);
+    // This section lives on the viewer only (/admin.html has its own panels).
+    const signIn = useCallback(() => signInHere('/', text => { dispatch(sessionFailed(text)); }), [dispatch]);
     const editForm = useCallback((change: Partial<RequestForm>) => { dispatch(requestDraftChanged(change)); }, [dispatch]);
     // jobsApi() reads the current target and session at call time, so these never go stale.
     const preview = useCallback((body: JobRequest, signal: AbortSignal) => jobsApi().preview(body, signal), []);

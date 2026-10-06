@@ -98,6 +98,8 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     // as dark text straight on the black scene (found live, ammonia running).
     { selector: '.tier-badge', declared: 'background: rgba(240, 240, 240, 0.94)', fg: 'rgba(0, 0, 0, 0.87)', bg: 'rgba(240, 240, 240, 0.94)' },
     { selector: '.molecule-jobs .job-status', declared: `background-color: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
+    // Final fix wave (I3): the failed-sign-in alert over any mode, on its own opaque pink.
+    { selector: '.sign-in-error', declared: 'background-color: rgb(253, 237, 237)', fg: 'rgb(95, 33, 32)', bg: 'rgb(253, 237, 237)' },
 ];
 
 const WHITE = '#ffffff';

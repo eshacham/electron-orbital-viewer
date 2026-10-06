@@ -33,7 +33,12 @@ export function jobsApi(): JobsApi {
         fetch: (input, init) => fetch(input, init),
         token: async () => (await ownerAuth()?.accessToken()) ?? null,
         refresh: async () => (await ownerAuth()?.refresh()) ?? false,
-        onSessionExpired: () => { store.dispatch(sessionExpired()); },
+        // The sign-in object ends its session too (m8): a renewal that worked but was still refused would otherwise
+        // leave it holding tokens, and never announce a later sign-in, under a page that says "ended".
+        onSessionExpired: () => {
+            void ownerAuth()?.expire();
+            store.dispatch(sessionExpired());
+        },
     });
 }
 

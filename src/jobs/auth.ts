@@ -4,6 +4,29 @@ import type { CognitoSettings } from './build_env';
 export const SESSION_KEY = 'eov.owner.session';
 export type OwnerPage = '/' | '/admin.html';
 export interface OwnerIdentity { email: string | null }
+
+/**
+ * What a failed sign-in says. Fixed words, never the answer's own text: an
+ * error_description arrives in the URL, and anyone can send the owner a
+ * link carrying one (S1).
+ */
+export const SIGN_IN_FAILED = 'Sign-in did not complete: it was cancelled, or Cognito did not accept it. Try again.';
+export const RENEWAL_UNREACHABLE = 'The sign-in service could not be reached to renew the owner session. Try again in a moment.';
+
+/** A sign-in that did not complete, with the path to go back to when the sign-in state still named one. */
+export class SignInFailed extends Error {
+    constructor(readonly returnTo: string | null) {
+        super(SIGN_IN_FAILED);
+        this.name = 'SignInFailed';
+    }
+}
+
+/**
+ * Cognito refused (oidc-client-ts throws its ErrorResponse for an OAuth error
+ * answer, invalid_grant for a refresh token that is no longer good), as
+ * against a network that did not answer: only a refusal ends a session (S2).
+ */
+const isRefusal = (error: unknown): boolean => (error as { name?: unknown } | null)?.name === 'ErrorResponse';
 export interface SessionEvent { identity: OwnerIdentity | null; reason: 'signed-in' | 'signed-out' | 'expired' }
 
 /** The parts of oidc-client-ts's UserManager this module uses; tests pass a fake. */
@@ -42,6 +65,8 @@ export function makeUserManager(settings: CognitoSettings, origin: string, page:
         stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
         automaticSilentRenew: true,
         loadUserInfo: false,
+        // S3: a sign-in service that does not answer fails in 15 s rather than leaving the page waiting.
+        requestTimeoutInSeconds: 15,
     });
 }
 
@@ -53,10 +78,17 @@ const identityOf = (user: User): OwnerIdentity => ({ email: typeof user.profile.
  * oidc-client-ts keeps the return path in this tab's sessionStorage (only a
  * random state id goes to Cognito), but anything on the page can write
  * there, so only a path on this site is trusted -- never another origin.
+ * The browser decides what is "this site" (S4): it reads "/\\host" and a
+ * path with a tab in it as another host, which a prefix check would not see.
  */
-export function safeReturnTo(state: unknown, fallback: string): string {
+export function safeReturnTo(state: unknown, fallback: string, origin: string): string {
     const value = (state as { returnTo?: unknown } | null)?.returnTo;
-    return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : fallback;
+    if (typeof value !== 'string' || !value.startsWith('/')) return fallback;
+    try {
+        return new URL(value, origin).origin === origin ? value : fallback;
+    } catch {
+        return fallback;
+    }
 }
 
 /** Cognito publishes no end_session_endpoint, so sign-out is its own /logout, back to the same page. */
@@ -84,7 +116,7 @@ export class OwnerAuth {
     constructor(private readonly settings: CognitoSettings, private readonly page: OwnerPage, private readonly deps: OwnerAuthDeps) {
         // oidc-client-ts's own renewal timer lands here as well as explicit renewals.
         deps.userManager.events.addUserLoaded(user => this.adopt(user));
-        deps.userManager.events.addSilentRenewError(() => { void this.end('expired'); });
+        deps.userManager.events.addSilentRenewError(error => { if (isRefusal(error)) void this.end('expired'); });
     }
 
     onChange(listener: (event: SessionEvent) => void): () => void {
@@ -92,7 +124,12 @@ export class OwnerAuth {
         return () => { this.listeners.delete(listener); };
     }
 
-    /** Completes a redirect back from Cognito, or restores this tab's session. Resolves to the path to return to after a redirect, else null. */
+    /**
+     * Completes a redirect back from Cognito, or restores this tab's session.
+     * Resolves to the path to return to after a redirect, else null; a
+     * sign-in that did not complete rejects with SignInFailed, which carries
+     * that path too when the stored state named one.
+     */
     start(): Promise<string | null> {
         const run = this.begin();
         this.ready = run.catch(() => undefined);
@@ -101,7 +138,12 @@ export class OwnerAuth {
 
     private async begin(): Promise<string | null> {
         const url = new URL(this.deps.location.href);
-        if (url.searchParams.has('code') && url.searchParams.has('state')) {
+        const origin = this.deps.location.origin;
+        // An error answer with state goes through the callback like a code
+        // does (S1): oidc-client-ts checks the state against this tab's own,
+        // and its ErrorResponse hands back the stored return path, so a
+        // cancelled sign-in lands on the view it left, as a good one does.
+        if (url.searchParams.has('state') && (url.searchParams.has('code') || url.searchParams.has('error'))) {
             // Out of the address bar before the exchange, not after: the URL
             // sync and Share copy location.search, and the exchange is a
             // network round trip.
@@ -109,17 +151,18 @@ export class OwnerAuth {
             try {
                 const user = await this.deps.userManager.signinRedirectCallback(url.href);
                 this.adopt(user);
-                const back = safeReturnTo(user.state, this.page);
+                const back = safeReturnTo(user.state, this.page, origin);
                 this.deps.replaceUrl(back);
                 return back;
             } catch (error) {
-                this.deps.replaceUrl(this.page);
-                throw new Error(`Sign-in did not complete: ${error instanceof Error ? error.message : String(error)}`);
+                const back = safeReturnTo((error as { state?: unknown } | null)?.state, this.page, origin);
+                this.deps.replaceUrl(back);
+                throw new SignInFailed(back === this.page ? null : back);
             }
         }
         if (url.searchParams.has('error')) {
             this.deps.replaceUrl(this.page);
-            throw new Error(`Sign-in did not complete: ${url.searchParams.get('error_description') ?? url.searchParams.get('error')}`);
+            throw new SignInFailed(null);
         }
         const saved = this.saved();
         if (!saved) {
@@ -131,10 +174,17 @@ export class OwnerAuth {
                 access_token: '', token_type: 'Bearer', refresh_token: saved.refresh_token, scope: saved.scope, profile: saved.profile, expires_at: 0,
             }));
             const user = await this.deps.userManager.signinSilent();
-            if (!user) throw new Error('no session');
+            if (!user) throw Object.assign(new Error('no session'), { name: 'ErrorResponse' });
             this.adopt(user);
-        } catch {
-            await this.end('signed-out');
+        } catch (error) {
+            if (isRefusal(error)) {
+                await this.end('signed-out');
+            } else {
+                // S2: unreachable, not refused. Signed out on this load, but the
+                // refresh token stays for the next one.
+                await this.deps.userManager.removeUser();
+                this.emit({ identity: null, reason: 'signed-out' });
+            }
         }
         return null;
     }
@@ -156,22 +206,36 @@ export class OwnerAuth {
         return (await this.deps.userManager.getUser())?.access_token || null;
     }
 
-    /** One silent renewal; a refusal ends the session as an expiry, which the page then says. */
+    /**
+     * One silent renewal. A refusal ends the session as an expiry, which the
+     * page then says, and resolves false; a sign-in service that could not be
+     * reached rejects instead and keeps the session (S2) -- the refresh token
+     * still works once the network is back.
+     */
     refresh(): Promise<boolean> {
         this.renewing ??= this.renew().finally(() => { this.renewing = null; });
         return this.renewing;
     }
 
+    /** A request still refused after a renewal that worked (m8): the session is over here too, not only in the store. */
+    expire(): Promise<void> {
+        return this.end('expired');
+    }
+
     private async renew(): Promise<boolean> {
+        let user: User | null;
         try {
-            const user = await this.deps.userManager.signinSilent();
-            if (!user) throw new Error('no session');
-            this.adopt(user);
-            return true;
-        } catch {
+            user = await this.deps.userManager.signinSilent();
+        } catch (error) {
+            if (!isRefusal(error)) throw new Error(RENEWAL_UNREACHABLE);
+            user = null;
+        }
+        if (!user) {
             await this.end('expired');
             return false;
         }
+        this.adopt(user);
+        return true;
     }
 
     private adopt(user: User): void {

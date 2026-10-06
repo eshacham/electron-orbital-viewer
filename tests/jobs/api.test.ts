@@ -110,4 +110,15 @@ describe('failures say what happened', () => {
         await expect(createJobsApi('aws', PROD, d).get(KEY)).rejects.toMatchObject({ code: 'sign-in-required', message: SIGN_IN_REQUIRED });
         expect(d.onSessionExpired).not.toHaveBeenCalled();
     });
+    // S2: the sign-in service not answering is a passing failure, not an ended session.
+    it('a renewal that could not reach the sign-in service is a passing failure, and ends nothing', async () => {
+        const d = deps([textResponse(401, '{"message":"Unauthorized"}')], 'old-token');
+        d.refresh.mockRejectedValue(new Error('The sign-in service could not be reached to renew the owner session.'));
+        await expect(createJobsApi('aws', PROD, d).get(KEY)).rejects.toMatchObject({ code: 'unreachable', message: expect.stringContaining('could not be reached') });
+        expect(d.onSessionExpired).not.toHaveBeenCalled();
+        const quiet = deps([]);
+        quiet.token.mockRejectedValue(new Error('The sign-in service could not be reached to renew the owner session.'));
+        await expect(createJobsApi('aws', PROD, quiet).get(KEY)).rejects.toMatchObject({ code: 'unreachable' });
+        expect(quiet.fetch).not.toHaveBeenCalled();
+    });
 });
