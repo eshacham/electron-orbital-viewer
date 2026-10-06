@@ -87,7 +87,7 @@ class ComputeStack(Stack):
                                          partition_key=dynamodb.Attribute(name='month', type=dynamodb.AttributeType.STRING),
                                          sort_key=dynamodb.Attribute(name='submittedAt', type=dynamodb.AttributeType.STRING))
         repository = ecr.Repository(self, 'WorkerRepository', repository_name='electron-orbital-viewer-worker',
-                                    removal_policy=RemovalPolicy.DESTROY,
+                                    removal_policy=RemovalPolicy.DESTROY, empty_on_delete=True,
                                     lifecycle_rules=[ecr.LifecycleRule(max_image_count=5,
                                                                        description='keep the last 5 worker images')])
 
@@ -115,11 +115,6 @@ class ComputeStack(Stack):
         # (S3Sink.clear_partial); the bucket is versioned, so it only adds a marker.
         worker_role.add_to_policy(iam.PolicyStatement(actions=['s3:PutObject', 's3:GetObject', 's3:DeleteObject'],
                                                       resources=[bucket.arn_for_objects('molecules/jobs/*')]))
-        # Without ListBucket S3 answers a missing key with AccessDenied, not
-        # NoSuchKey. Granted in this role's own policy, never the bucket's, so
-        # the bucket stays unlistable to CloudFront and everyone else.
-        worker_role.add_to_policy(iam.PolicyStatement(actions=['s3:ListBucket'], resources=[bucket.bucket_arn],
-                                                      conditions={'StringLike': {'s3:prefix': 'molecules/jobs/*'}}))
         worker_logs = log_group('WorkerLogs', WORKER_LOG_GROUP)
         job_definition = batch.EcsJobDefinition(
             self, 'WorkerJob', propagate_tags=True, parameters={'key': 'none'}, timeout=Duration.minutes(10), retry_attempts=3,
@@ -170,8 +165,11 @@ class ComputeStack(Stack):
 
         reconcile_role = lambda_role('ReconcileRole', 'reconcile Lambda: job table, Batch/ECS reads, alerts')
         table.grant_read_write_data(reconcile_role)
-        reconcile_role.add_to_policy(iam.PolicyStatement(actions=['batch:DescribeJobs', 'ecs:DescribeTasks'],
-                                                         resources=['*']))
+        # DescribeJobs takes no resource-level permission; DescribeTasks does.
+        reconcile_role.add_to_policy(iam.PolicyStatement(actions=['batch:DescribeJobs'], resources=['*']))
+        reconcile_role.add_to_policy(iam.PolicyStatement(
+            actions=['ecs:DescribeTasks'],
+            resources=[Stack.of(self).format_arn(service='ecs', resource='task', resource_name='*')]))
         reconcile_role.add_to_policy(iam.PolicyStatement(
             actions=['batch:TerminateJob'], resources=[self.format_arn(service='batch', resource='job', resource_name='*')]))
         topic.grant_publish(reconcile_role)

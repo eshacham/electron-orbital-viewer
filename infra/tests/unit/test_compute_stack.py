@@ -92,17 +92,17 @@ def test_worker_role_writes_only_molecules_jobs(template):
                 if {'Ref': role_id} in p['Properties']['Roles']]
     statements = [s for doc in policies for s in doc]
     s3 = [s for s in statements if any(a.startswith('s3:') for a in (s['Action'] if isinstance(s['Action'], list) else [s['Action']]))]
-    assert len(s3) == 2
-    (objects,) = [s for s in s3 if isinstance(s['Action'], list)]
+    assert len(s3) == 1
     # Delete clears a partial root a reclaimed attempt left (preflight D7); the
     # bucket is versioned, so a delete only adds a marker and loses nothing.
-    assert sorted(objects['Action']) == ['s3:DeleteObject', 's3:GetObject', 's3:PutObject']
-    assert json.dumps(objects['Resource']).endswith('/molecules/jobs/*"]]}')
-    # ListBucket, so a missing key is NoSuchKey rather than AccessDenied (D8):
-    # on the bucket itself, and only for listings under molecules/jobs/.
-    (listing,) = [s for s in s3 if s['Action'] == 's3:ListBucket']
-    assert listing['Resource'] == {'Fn::Join': ['', ['arn:', {'Ref': 'AWS::Partition'}, ':s3:::data-bucket']]}
-    assert listing['Condition'] == {'StringLike': {'s3:prefix': 'molecules/jobs/*'}}
+    assert sorted(s3[0]['Action']) == ['s3:DeleteObject', 's3:GetObject', 's3:PutObject']
+    assert json.dumps(s3[0]['Resource']).endswith('/molecules/jobs/*"]]}')
+    # No ListBucket (Ruling D8-IAM): a GetObject carries no s3:prefix, so a
+    # prefix-scoped grant could not turn a missing key's 403 into a 404, and
+    # S3Sink already reads 403 as missing. Least privilege wins.
+    assert not any('s3:ListBucket' in (s['Action'] if isinstance(s['Action'], list) else [s['Action']])
+                   for p in resources(template, 'AWS::IAM::Policy')
+                   for s in p['Properties']['PolicyDocument']['Statement'])
     ddb = [s for s in statements if 'dynamodb:UpdateItem' in s['Action']]
     assert ddb[0]['Condition']['ForAllValues:StringNotLike']['dynamodb:LeadingKeys'] == \
         ['METER#*', 'CONFIG', 'RESOLVE#*', 'BILLING#*']
@@ -197,6 +197,16 @@ def test_ecr_keeps_the_last_five_images(template):
     (repo,) = props(template, 'AWS::ECR::Repository')
     policy = json.loads(repo['LifecyclePolicy']['LifecyclePolicyText'])
     assert policy['rules'][0]['selection']['countNumber'] == 5
+    # CloudFormation empties it itself (no custom resource), so a plain
+    # `cdk destroy` does not end in DELETE_FAILED on a non-empty repository.
+    assert repo['EmptyOnDelete'] is True
+
+
+def test_reconcile_describes_only_ecs_tasks(template):
+    statements = [s for p in props(template, 'AWS::IAM::Policy') for s in p['PolicyDocument']['Statement']]
+    (describe,) = [s for s in statements if s['Action'] == 'ecs:DescribeTasks']
+    assert describe['Resource'] == {'Fn::Join': ['', ['arn:', {'Ref': 'AWS::Partition'},
+                                                      f':ecs:{REGION}:{ACCOUNT}:task/*']]}
 
 
 def test_outputs_for_deploy_and_jobs_scripts(template):
