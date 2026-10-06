@@ -15,7 +15,7 @@ import { BondsSystemId, isBondsSystemId, systemFormula } from '../bonds/systems'
 import { H2PLUS_CAPTIONS, lengths, multireferenceCaption } from '../bonds/captions';
 import { H2PLUS_LABELS, H2PlusState } from '../bonds/h2plus';
 import { SPIN_SUFFIX } from '../bonds/bonds_request';
-import type { BasisOrbital, MoleculeBasis, MoleculeScan } from '../molecules/types';
+import { tierOf, BasisOrbital, MoleculeBasis, MoleculeScan } from '../molecules/types';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { formatFormula } from '../molecules/catalogue';
 import { formatOrbitalEnergy } from '../molecules/orbital_display';
@@ -120,7 +120,11 @@ function moleculeMethodText(meta: LibraryMoleculeMeta): string {
 function moleculeMethodStatement(state: RootState): string {
     const meta = state.molecule.meta;
     if (!meta) return 'molecule library: no molecule loaded';
-    return `${moleculeMethodText(meta)} (PySCF); geometry: ${meta.geometrySource}`;
+    // Preflight D15 (ruling 16b): a computed molecule's picture says so, and
+    // that nobody has checked it against experiment -- an export travels
+    // without the badge that says it on screen.
+    const tier = tierOf(meta) === 'computed' ? '; computed on request, not benchmarked against experiment' : '';
+    return `${moleculeMethodText(meta)} (PySCF); geometry: ${meta.geometrySource}${tier}`;
 }
 
 export type MoleculeDrawnSurface = 'density' | 'esp' | { mo: number; label: string; role?: string; energyHartree: number };

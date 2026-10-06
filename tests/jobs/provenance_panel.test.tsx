@@ -29,6 +29,18 @@ describe('TierBadge', () => {
         expect(screen.getByRole('note', { name: 'data tier' }))
             .toHaveTextContent('ComputedComputed on request by the same method; not benchmarked against experiment.');
     });
+    // Preflight D13 / ruling T16-c: on a phone the two-line badge pushed the
+    // stack over the molecule; compact, it is the chip alone, its line kept
+    // for a pointer (title) and a screen reader (the note's description).
+    it('compact, is the chip alone, with its line still told', () => {
+        render(<TierBadge tier="computed" compact />);
+        const note = screen.getByRole('note', { name: 'data tier' });
+        expect(note).toHaveClass('compact');
+        expect(note).toHaveAttribute('title', 'Computed on request by the same method; not benchmarked against experiment.');
+        expect(note).toHaveAccessibleDescription('Computed on request by the same method; not benchmarked against experiment.');
+        expect(note.querySelector('.tier-badge-line')).toBeNull();
+        expect(note.querySelector('.visually-hidden')).toHaveTextContent('Computed on request');
+    });
 });
 
 describe('ProvenancePanel', () => {

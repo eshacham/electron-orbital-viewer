@@ -4,6 +4,7 @@ import { indexFailed, indexLoaded, linkRejected, metaFailed, metaLoaded } from '
 import { loadMoleculeIndex, loadMoleculeMeta } from './loader';
 import { asLibraryMeta } from './library_types';
 import { libraryEntries } from './catalogue';
+import { isJobKey } from './job_paths';
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -35,7 +36,8 @@ export function useMoleculeLoader(active: boolean): void {
     // developer text, an unknown one fail as a bare HTTP 403. Once the index
     // is in, either is refused as the link it is (final review M5); before
     // then, a reply for it lands first and this overwrites its message.
-    const isUnknown = (id: string | null) => !!id && index !== null && !index.some(entry => entry.id === id);
+    // A computed molecule's id is its job key: never in the library index, resolved by its own folder (6B-2).
+    const isUnknown = (id: string | null) => !!id && !isJobKey(id) && index !== null && !index.some(entry => entry.id === id);
     useEffect(() => {
         if (active && isUnknown(selectedId)) dispatch(linkRejected(selectedId!));
         // isUnknown reads index and selectedId, both watched.

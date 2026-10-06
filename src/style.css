@@ -1421,3 +1421,26 @@ html, body, #root {
 /* Phase 6B-2 Task 11: the live status panel's header and scrolling log tail. */
 .job-status-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .job-log-tail { margin: 0; max-height: 160px; overflow: auto; padding: 6px 8px; background: #111; color: #e6e6e6; border-radius: 6px; font-size: 0.75rem; white-space: pre; }
+
+/* Phase 6B-2 Task 12: the owner's corner under Share and Export. No opacity
+   on the sign-in link: "discreet" is its caption size, and a faded link
+   would drop below AA on the light card. */
+.owner-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 8px; }
+.owner-bar-target { display: flex; align-items: center; gap: 6px; }
+/* A phone's badge is the chip alone (preflight D13, ruling T16-c): no card
+   behind it, so the stack is no taller than the chip. */
+.tier-badge.compact { padding: 0; background: none; }
+/* A sideways phone has ~130 px between the header and the molecule, and the
+   stack starts at 104 px: even the compact chip, as a row of its own, put
+   the readout's bottom over the molecule's top (found live, Task 12, water
+   at 844x390). There it sits up at the scale readout's level instead, at
+   the stack's right end -- clear of the scale (left) and the header (which
+   ends at ~140 px across) -- and out of the stack's flow, so the stack is
+   no taller than Phase 6 made it. */
+@media (max-height: 500px) {
+  .molecule-legend-stack .tier-badge.compact {
+    position: absolute;
+    top: -44px;
+    right: 0;
+  }
+}

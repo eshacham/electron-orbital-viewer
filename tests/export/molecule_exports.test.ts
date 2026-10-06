@@ -110,6 +110,16 @@ describe('captions and file stems', () => {
         expect(exportFileStem(state)).toBe('orbital-viewer_H2O_density-90');
     });
 
+    // Preflight D15 (ruling 16b): a computed molecule's picture says what it
+    // is, so it can never be passed off as a validated one.
+    it('a computed molecule states its tier; a validated one says nothing extra', () => {
+        const computed = drawnStore({ kind: 'density' }, water({ tier: 'computed' })).getState();
+        expect(methodStatement(computed)).toBe(
+            'B3LYP/def2-TZVPD (PySCF); geometry: experiment (CCCBDB); computed on request, not benchmarked against experiment');
+        expect(methodStatement(drawnStore({ kind: 'density' }, water({ tier: 'validated' })).getState()))
+            .toBe('B3LYP/def2-TZVPD (PySCF); geometry: experiment (CCCBDB)');
+    });
+
     it('water, ESP: the fixed surface and scale', () => {
         const state = drawnStore({ kind: 'esp' }).getState();
         expect(viewDescription(state)).toBe('Water (H₂O), ESP on ρ = 0.001 e/a₀³ surface, ±0.05 Ha/e');

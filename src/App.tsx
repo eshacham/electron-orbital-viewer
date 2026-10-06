@@ -93,6 +93,13 @@ import MoleculeReadout from './components/MoleculeReadout';
 import MoleculeViewOptions from './components/MoleculeViewOptions';
 import MoleculeOrbitalList from './components/MoleculeOrbitalList';
 import EspLegend from './components/EspLegend';
+import MoleculeJobsSection from './components/MoleculeJobsSection';
+import TierBadge from './components/TierBadge';
+import { ConnectedOwnerBar } from './components/OwnerBar';
+import { useComputedList } from './jobs/useComputedList';
+import { withComputed } from './jobs/computed';
+import { selectIsOwner } from './store/jobsSlice';
+import { tierOf } from './molecules/types';
 
 /**
  * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
@@ -512,6 +519,14 @@ function App() {
     // the Basic Orbitals effects above ask for that mode by name.
     const molecule = useAppSelector(state => state.molecule);
     useMoleculeLoader(isMoleculeMode);
+    // The owner's computed molecules join the picker as a Computed category; nobody else's picker changes.
+    const isOwner = useAppSelector(selectIsOwner);
+    const computedJobs = useAppSelector(state => state.jobs.computed.jobs);
+    useComputedList(isMoleculeMode);
+    const moleculeEntries = useMemo(
+        () => withComputed(molecule.index, isOwner ? computedJobs : null),
+        [molecule.index, isOwner, computedJobs],
+    );
     // Phone: the molecule is chosen from a full-screen list opened from the
     // name in the header, as an element is.
     const [moleculePickerOpen, setMoleculePickerOpen] = useState(false);
@@ -864,12 +879,17 @@ function App() {
         ),
         [handleShare, handleExport, availability, stlSolids, atomMode]
     );
+    // The discreet owner sign-in sits with Share and Export in Molecules mode: the app's one menu row (spec §9.5).
+    const controlsActions = useMemo(
+        () => (isMoleculeMode ? <>{shareExportBar}<ConnectedOwnerBar page="/" /></> : shareExportBar),
+        [isMoleculeMode, shareExportBar],
+    );
 
     // Molecules mode's navigation (layout contract §3.8): the whole card in
     // the desktop's left column; on a phone, the name in the header and the
     // rest in the Explore tab -- LevelNav's split.
     const moleculeNavProps = {
-        entries: molecule.index, indexError: molecule.indexError, meta: molecule.meta, selectedId: molecule.selectedId,
+        entries: moleculeEntries, indexError: molecule.indexError, meta: molecule.meta, selectedId: molecule.selectedId,
         isLoading: molecule.isLoadingMeta, surface: molecule.surface,
         onSelectMolecule: (id: string) => dispatch(selectMolecule({ id })),
         onSurfaceChange: (surface: MoleculeSurface) => dispatch(setSurface(surface)),
@@ -917,7 +937,7 @@ function App() {
             surfaceStyle={surfaceStyle}
             onSurfaceStyleChange={handleSurfaceStyleChange}
             isBusy={isAtomMode ? showAtomBusy : showBusy}
-            actions={shareExportBar}
+            actions={controlsActions}
             relativity={relativity}
             relativityIsDefault={relativityIsDefault}
             onRelativityChange={handleRelativityChange}
@@ -1021,7 +1041,15 @@ function App() {
     // panel, as atom mode has its drill-down.
     const phoneTabs = isMoleculeMode
         ? [
-            { key: 'explore', label: 'Explore', content: <MoleculeNav {...moleculeNavProps} variant="body" /> },
+            {
+                key: 'explore', label: 'Explore',
+                content: (
+                    <>
+                        <MoleculeNav {...moleculeNavProps} variant="body" />
+                        <MoleculeJobsSection />
+                    </>
+                ),
+            },
             { key: 'view', label: 'View', content: controls },
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ]
@@ -1111,11 +1139,16 @@ function App() {
                     <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
                 )}
                 {showPhaseLegend && !isMoleculeMode && phaseLegend}
-                {/* Molecules: the pick readout, the ESP key and an orbital's
-                    ψ key share the bottom-centre slot, stacked (spec §3.8:
-                    no new floating panel). */}
-                {isMoleculeMode && molecule.meta && (molecule.showStructure || (moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend || (isNarrow && moleculeAlert)) && (
+                {/* Molecules: the tier badge, the pick readout, the ESP key and
+                    an orbital's ψ key share the bottom-centre slot, stacked
+                    (spec §3.8: no new floating panel). The tier heads it and
+                    is always there (spec §9.1, preflight D12), so the stack
+                    shows whenever a molecule is loaded -- the others keep
+                    their own conditions. A molecule that failed to load has
+                    no meta: the error, no badge. */}
+                {isMoleculeMode && molecule.meta && (
                     <div className="molecule-legend-stack">
+                        <TierBadge tier={tierOf(molecule.meta)} compact={isNarrow} />
                         {isNarrow && moleculeAlert}
                         {molecule.showStructure && (
                             <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}
@@ -1195,7 +1228,12 @@ function App() {
                                 </LevelNav>
                             )}
                             {isBondsMode && bondsPanel}
-                            {isMoleculeMode && <MoleculeNav {...moleculeNavProps} />}
+                            {isMoleculeMode && (
+                                <>
+                                    <MoleculeNav {...moleculeNavProps} />
+                                    <MoleculeJobsSection />
+                                </>
+                            )}
                         </Box>
                         <Box className={`view-panel${viewPanelOpen ? '' : ' folded'}`}>
                             {isMedium && (
@@ -1216,7 +1254,7 @@ function App() {
                 {isMoleculeMode && isNarrow && (
                     <MoleculePickerDialog
                         open={moleculePickerOpen}
-                        entries={molecule.index}
+                        entries={moleculeEntries}
                         error={molecule.indexError}
                         selectedId={molecule.selectedId}
                         onSelect={id => dispatch(selectMolecule({ id }))}
