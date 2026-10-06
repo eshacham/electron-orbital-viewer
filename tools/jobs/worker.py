@@ -274,6 +274,13 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
                           'timings.json': json.dumps(timings, indent=1).encode()})
             if frames:
                 files['trajectory.xyz'] = ''.join(frames).encode()
+            # D7: an earlier attempt reclaimed part-way through these writes
+            # leaves a root without done.json, which would refuse every name
+            # it already has. Only the attempt that owns the record clears it:
+            # one a retry has moved past must not delete what the current
+            # attempt may be writing.
+            if (store.get_job(key) or {}).get('attempt') == attempt:
+                sink.clear_partial(key)
             for name, data in files.items():
                 sink.put_result(key, name, data)
             # done.json last: its presence is what says the set is complete.
@@ -325,20 +332,64 @@ def _classify(e):
     return {'code': 'worker-error', 'message': last[:500]}
 
 
-def main(argv=None):
+def image_digest(environ, fetch=None) -> str:
+    """The image this attempt runs: JOBS_IMAGE_DIGEST if set (tests, local
+    runs), else the digest ECS reports in the task metadata endpoint."""
+    if environ.get('JOBS_IMAGE_DIGEST'):
+        return environ['JOBS_IMAGE_DIGEST']
+    uri = environ.get('ECS_CONTAINER_METADATA_URI_V4')
+    if not uri:
+        return 'unknown'
+    try:
+        if fetch is None:
+            import urllib.request
+            fetch = lambda url: urllib.request.urlopen(url, timeout=2).read()
+        return json.loads(fetch(uri)).get('ImageID') or 'unknown'
+    except Exception:
+        return 'unknown'
+
+
+def aws_attempt(environ) -> int:
+    """Batch numbers attempts from 1 within one Batch job; JOB_ATTEMPT_OFFSET
+    (set by BatchRunner from the record) keeps them rising across the
+    owner's retries, which are new Batch jobs."""
+    return int(environ.get('JOB_ATTEMPT_OFFSET', '0')) + int(environ.get('AWS_BATCH_JOB_ATTEMPT', '1'))
+
+
+def main(argv=None, environ=None):
+    environ = os.environ if environ is None else environ
     parser = argparse.ArgumentParser(prog='python -m jobs.worker')
     sub = parser.add_subparsers(dest='command', required=True)
     run = sub.add_parser('run')
     run.add_argument('key')
-    run.add_argument('--local', required=True, help='out root, e.g. tools/molecules/out')
-    run.add_argument('--state', required=True, help='FileStore root, e.g. tools/jobs/.state')
-    run.add_argument('--attempt', type=int, default=1)
+    where = run.add_mutually_exclusive_group(required=True)
+    where.add_argument('--local', help='out root, e.g. tools/molecules/out')
+    where.add_argument('--aws', action='store_true',
+                       help='DynamoDB table JOBS_TABLE and bucket DATA_BUCKET from the environment (AWS Batch)')
+    run.add_argument('--state', help='FileStore root, e.g. tools/jobs/.state (with --local)')
+    run.add_argument('--attempt', type=int, default=None)
     run.add_argument('--grid-points', default=None, help='comma-separated, e.g. 96,88,80')
     args = parser.parse_args(argv)
     grid = tuple(int(v) for v in args.grid_points.split(',')) if args.grid_points else None
-    status = run_job(args.key, FileStore(args.state), LocalSink(args.local), attempt=args.attempt, grid_points=grid,
-                     image_digest=os.environ.get('JOBS_IMAGE_DIGEST', 'local'))
-    print(status)
+    if args.aws:
+        from jobs.dynamo_store import DynamoStore
+        from jobs.s3_sink import S3Sink
+        store, sink, backend = DynamoStore(environ['JOBS_TABLE']), S3Sink(environ['DATA_BUCKET']), 'aws'
+        attempt = args.attempt or aws_attempt(environ)
+        digest = image_digest(environ)
+    else:
+        if not args.state:
+            parser.error('--local needs --state')
+        store, sink, backend = FileStore(args.state), LocalSink(args.local), 'local'
+        attempt = args.attempt or 1
+        # D18: a local run has no task metadata to ask; it stays labelled 'local'.
+        digest = environ.get('JOBS_IMAGE_DIGEST', 'local')
+    status = run_job(args.key, store, sink, attempt=attempt, backend=backend, grid_points=grid,
+                     image_digest=digest)
+    # In AWS the line lands in CloudWatch: structured, with the job key (spec §11).
+    print(json.dumps({'key': args.key, 'attempt': attempt, 'status': status}) if args.aws else status)
+    # D3: a superseded attempt is not a failure (Ruling T5-b); on AWS a
+    # non-zero exit would end its Batch job FAILED and send a spurious alert.
     return 0 if status in ('DONE', 'duplicate', 'superseded') else 1
 
 

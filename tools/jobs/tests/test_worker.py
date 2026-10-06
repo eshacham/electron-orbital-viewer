@@ -163,14 +163,45 @@ def test_scf_failure_keeps_the_attempt_files_and_writes_no_result(env, monkeypat
 
 
 def test_a_leftover_result_file_fails_the_job_rather_than_leaving_it_running(env):
-    # D17: an earlier attempt that died part-way through writing results.
+    # D17: a result file the worker cannot write must end the job FAILED, not
+    # leave it RUNNING. Since D7 (6B-3) a half-written root is cleared first,
+    # so the case left is a complete root (done.json present), which is never touched.
     store, sink, jobs = env
     key = queue(store, H2)
     sink.put_result(key, 'meta.json', b'{}')
+    sink.put_done(key, b'{}')
     assert run_job(key, store, sink, grid_points=(32,)) == 'FAILED'
     rec = store.get_job(key)
     assert rec['status'] == 'FAILED' and rec['error']['code'] == 'worker-error'
     assert 'meta.json' in rec['error']['message'] and 'already' in rec['error']['message']
+    assert (jobs / key / 'meta.json').read_bytes() == b'{}' and (jobs / key / 'done.json').read_bytes() == b'{}'
+
+
+def test_a_partial_root_from_an_earlier_attempt_is_cleared_then_written(env):
+    # D7: attempt 1 was reclaimed part-way through writing its results (no
+    # done.json). Attempt 2 owns the job, so it clears that root and writes its own.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    assert store.claim(key, 1, NOW)
+    sink.put_result(key, 'meta.json', b'{}')
+    sink.put_result(key, 'job.json', b'{}')
+    assert run_job(key, store, sink, attempt=2, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    done = json.loads((jobs / key / 'done.json').read_text())
+    for name, digest in done['files'].items():
+        assert hashlib.sha256((jobs / key / name).read_bytes()).hexdigest() == digest, name
+    assert json.loads((jobs / key / 'meta.json').read_text())['id'] == key
+    assert json.loads((jobs / key / 'job.json').read_text())['key'] == key
+
+
+def test_a_superseded_worker_does_not_clear_the_root(env, monkeypatch):
+    # D7: the root belongs to whichever attempt owns the record; one that a
+    # retry has moved past must not delete what the current attempt may be writing.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    sink.put_result(key, 'meta.json', b'{}')
+    slow_writes(monkeypatch, 0, before=lambda *a: store.update_job(key, {'attempt': 2}))
+    assert run_job(key, store, sink, grid_points=(32,)) == 'superseded'
+    assert (jobs / key / 'meta.json').read_bytes() == b'{}'
     assert not (jobs / key / 'done.json').exists()
 
 
