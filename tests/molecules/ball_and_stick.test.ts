@@ -15,7 +15,7 @@ describe('bonds from distances', () => {
         expect(detectBonds(ozoneAtoms())).toHaveLength(2);
     });
     it('refuses an element it has no radius for, rather than guessing', () => {
-        expect(() => detectBonds([{ Z: 26, position: [0, 0, 0] }])).toThrow('no covalent radius for Fe');
+        expect(() => detectBonds([{ Z: 37, position: [0, 0, 0] }])).toThrow('no covalent radius for Rb');
     });
 });
 

@@ -3,10 +3,25 @@ import { elementFor } from '../elements';
 import type { MoleculeAtom, MoleculePick } from './library_types';
 
 export const BOHR_TO_ANGSTROM = 0.529177210903;
-/** Cordero et al. 2008 (C sp³). Every element in the library, and no guessing beyond it. */
-export const COVALENT_RADII_ANGSTROM: Record<number, number> = { 1: 0.31, 5: 0.84, 6: 0.76, 7: 0.71, 8: 0.66, 9: 0.57, 14: 1.11, 15: 1.07, 16: 1.05 };
-/** Jmol's CPK palette. */
-export const CPK_COLORS: Record<number, string> = { 1: '#ffffff', 5: '#ffb5b5', 6: '#909090', 7: '#3050f8', 8: '#ff0d0d', 9: '#90e050', 14: '#f0c8a0', 15: '#ff8000', 16: '#ffff30' };
+/**
+ * Cordero et al., Dalton Trans. 2008, 2832, Table 2 (C sp³; Mn, Fe and Co
+ * low-spin): every element a computed molecule may hold (H–Kr, spec §5.1),
+ * and no guessing beyond them.
+ */
+export const COVALENT_RADII_ANGSTROM: Record<number, number> = {
+    1: 0.31, 2: 0.28, 3: 1.28, 4: 0.96, 5: 0.84, 6: 0.76, 7: 0.71, 8: 0.66, 9: 0.57, 10: 0.58,
+    11: 1.66, 12: 1.41, 13: 1.21, 14: 1.11, 15: 1.07, 16: 1.05, 17: 1.02, 18: 1.06,
+    19: 2.03, 20: 1.76, 21: 1.70, 22: 1.60, 23: 1.53, 24: 1.39, 25: 1.39, 26: 1.32, 27: 1.26, 28: 1.24,
+    29: 1.32, 30: 1.22, 31: 1.22, 32: 1.20, 33: 1.19, 34: 1.20, 35: 1.20, 36: 1.16,
+};
+/** Jmol's CPK palette, H–Kr. */
+export const CPK_COLORS: Record<number, string> = {
+    1: '#ffffff', 2: '#d9ffff', 3: '#cc80ff', 4: '#c2ff00', 5: '#ffb5b5', 6: '#909090', 7: '#3050f8', 8: '#ff0d0d',
+    9: '#90e050', 10: '#b3e3f5', 11: '#ab5cf2', 12: '#8aff00', 13: '#bfa6a6', 14: '#f0c8a0', 15: '#ff8000', 16: '#ffff30',
+    17: '#1ff01f', 18: '#80d1e3', 19: '#8f40d4', 20: '#3dff00', 21: '#e6e6e6', 22: '#bfc2c7', 23: '#a6a6ab', 24: '#8a99c7',
+    25: '#9c7ac7', 26: '#e06633', 27: '#f090a0', 28: '#50d050', 29: '#c88033', 30: '#7d80b0', 31: '#c28f8f', 32: '#668f8f',
+    33: '#bd80e3', 34: '#ffa100', 35: '#a62929', 36: '#5cb8d1',
+};
 export const BOND_TOLERANCE = 1.2;
 export const ATOM_RADIUS_FACTOR = 0.4;
 export const BOND_RADIUS_BOHR = 0.12;
