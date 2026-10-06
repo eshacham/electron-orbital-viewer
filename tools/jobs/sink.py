@@ -14,7 +14,9 @@ class Sink(Protocol):
 
 class LocalSink:
     def __init__(self, out_root):
-        self.root = Path(out_root) / 'jobs'
+        # Resolved now: the worker runs input.py from its scratch folder, so a
+        # relative root would otherwise mean somewhere else mid-run.
+        self.root = Path(out_root).resolve() / 'jobs'
 
     def put_attempt(self, key, attempt, name, data):
         path = self.root / key / 'attempts' / str(attempt) / name

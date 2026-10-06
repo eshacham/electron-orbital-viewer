@@ -63,7 +63,10 @@ class FileStore:
     container with the directory mounted) all write here."""
 
     def __init__(self, root, cap_micros: int = CAP_MICROS):
-        self.root = Path(root)
+        # Resolved now: the worker chdirs into its scratch folder while the
+        # heartbeat thread keeps writing here, so a relative root must keep
+        # meaning the directory it was given in.
+        self.root = Path(root).resolve()
         self.cap = cap_micros
         for sub in ('jobs', 'resolve'):
             (self.root / sub).mkdir(parents=True, exist_ok=True)

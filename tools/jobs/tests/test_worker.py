@@ -12,7 +12,8 @@ from jobs.canonical import canonical_job, job_key
 from jobs.model import new_record
 from jobs.sink import LocalSink
 from jobs.store import FileStore
-from jobs.worker import _classify, run_job
+from jobs import worker
+from jobs.worker import _classify, _resume_atoms, run_job
 
 NOW = datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc)
 SVP = {'xc': 'B3LYP', 'basis': 'def2-SVP', 'optimiseBasis': None}
@@ -23,12 +24,26 @@ H2 = [[1, 0, 0, 0], [1, 0, 0, 0.74]]
 TOOLS = Path(__file__).resolve().parents[2]
 
 
-def queue(store, atoms, charge=0, mult=1, method=SVP):
-    job = canonical_job('single', atoms, charge, mult, method=method)
+def queue(store, atoms, charge=0, mult=1, method=SVP, recipe='single'):
+    job = canonical_job(recipe, atoms, charge, mult, method=method)
     key = job_key(job)
     store.create_job(new_record(key=key, job=job, decision=DECISION, name='hydrogen', formula='H2', electron_count=2,
                                 geometry_source={'kind': 'xyz'}, backend='local', now=NOW))
     return key
+
+
+def slow_writes(monkeypatch, seconds, before=None):
+    """Delay write_molecule_files, so heartbeats land while the job runs."""
+    import build_library
+    real = build_library.write_molecule_files
+
+    def slow(*args, **kwargs):
+        if before:
+            before(*args)
+        time.sleep(seconds)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(build_library, 'write_molecule_files', slow)
 
 
 @pytest.fixture
@@ -196,3 +211,82 @@ def test_the_worker_imports_build_library_without_pythonpath():
     result = subprocess.run([sys.executable, '-c', code], cwd=TOOLS, capture_output=True, text=True,
                             env={'PATH': '/usr/bin:/bin'})
     assert result.returncode == 0, result.stderr
+
+
+# --- fix round 1 -------------------------------------------------------------
+
+def test_relative_roots_survive_the_chdir_into_scratch(tmp_path, monkeypatch):
+    # The worker runs input.py from its scratch folder; roots given relative
+    # to the caller's directory must still mean the caller's directory.
+    monkeypatch.setattr('tempfile.tempdir', str(tmp_path / 'scratch'))
+    (tmp_path / 'scratch').mkdir()
+    monkeypatch.chdir(tmp_path)
+    store, sink = FileStore('state'), LocalSink('out')
+    key = queue(store, [[1, 0, 0, 0], [1, 0, 0, 0.80]], method=None, recipe='optimise')
+    slow_writes(monkeypatch, 0.5)
+    assert run_job(key, store, sink, grid_points=(32,), heartbeat_seconds=0.1) == 'DONE'
+    rec = FileStore(tmp_path / 'state').get_job(key)
+    assert rec['peakMemoryGB'] is not None                  # only a heartbeat writes this field
+    assert (tmp_path / 'out' / 'jobs' / key / 'attempts' / '1' / 'trajectory.xyz').exists()
+
+
+def test_a_store_error_does_not_stop_the_heartbeat(env, monkeypatch, capsys):
+    store, sink, jobs = env
+    key = queue(store, H2)
+    real, failed, landed = store.update_job, [], []
+
+    def flaky(k, changes, expect_status=None, attempt=None):
+        if 'heartbeatAt' in changes and not failed:
+            failed.append(1)
+            raise OSError('store briefly unavailable')
+        if 'heartbeatAt' in changes:
+            landed.append(1)
+        return real(k, changes, expect_status=expect_status, attempt=attempt)
+
+    monkeypatch.setattr(store, 'update_job', flaky)
+    slow_writes(monkeypatch, 0.6)
+    assert run_job(key, store, sink, grid_points=(32,), heartbeat_seconds=0.1) == 'DONE'
+    assert failed and landed
+    assert 'store briefly unavailable' in capsys.readouterr().err
+
+
+def test_writing_the_files_may_print_to_the_molecule_stdout(env, monkeypatch):
+    # close_log closes the handle PySCF's objects print to; anything that
+    # prints while the files are written must find somewhere harmless.
+    store, sink, jobs = env
+    key = queue(store, H2)
+
+    def chatter(out, mol, mf, *rest):
+        mol.stdout.write('grid chatter\n')
+        mf.stdout.write('grid chatter\n')
+
+    slow_writes(monkeypatch, 0, before=chatter)
+    assert run_job(key, store, sink, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+
+
+def test_a_superseded_attempt_says_so(env, monkeypatch):
+    # Ruling T5-b: the final write is refused when a later attempt owns the
+    # job; the worker must not report DONE for a record it did not change.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    slow_writes(monkeypatch, 0, before=lambda *a: store.update_job(key, {'attempt': 2}))
+    assert run_job(key, store, sink, grid_points=(32,)) == 'superseded'
+    assert store.get_job(key)['status'] == 'RUNNING' and store.get_job(key)['attempt'] == 2
+
+
+def test_cli_exits_zero_when_superseded(monkeypatch, tmp_path):
+    monkeypatch.setattr(worker, 'run_job', lambda *a, **k: 'superseded')
+    assert worker.main(['run', 'k' * 64, '--local', str(tmp_path / 'o'), '--state', str(tmp_path / 's')]) == 0
+
+
+def test_resume_reads_the_last_frame_and_ignores_a_damaged_trajectory(env):
+    store, sink, jobs = env
+    key = 'k' * 64
+    sink.put_attempt(key, 1, 'trajectory.xyz',
+                     b'2\nstep 1\nH 0.0 0.0 0.0\nH 0.0 0.0 0.8\n2\nstep 2\nH -0.000000 0.0 0.0\nH 0.0 0.0 0.75\n')
+    atoms = _resume_atoms(sink, key, 2)
+    assert atoms == [('H', (0.0, 0.0, 0.0)), ('H', (0.0, 0.0, 0.75))]
+    assert str(atoms[0][1][0]) == '0.0'                     # not -0.0 (Task 8 carry)
+    for damaged in (b'2\nstep 1\nH 0.0 0.0', b'two\n', b'2\nstep 1\nH 0.0 0.0 x\nH 0 0 1\n', b'\n'):
+        sink.put_attempt(key, 1, 'trajectory.xyz', damaged)
+        assert _resume_atoms(sink, key, 2) is None, damaged

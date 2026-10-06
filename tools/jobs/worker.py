@@ -77,13 +77,23 @@ def _commit():
 
 def _resume_atoms(sink, key, attempt):
     """The last geometry a reclaimed optimise attempt reached, so a Spot
-    reclaim costs the steps since the last frame rather than the whole run."""
+    reclaim costs the steps since the last frame rather than the whole run.
+    A trajectory cut off mid-write (the reclaim can land during put_attempt)
+    or otherwise unreadable means starting again from the submitted
+    geometry: slower, never wrong."""
     previous = sink.get_attempt(key, attempt - 1, 'trajectory.xyz')
     if not previous:
         return None
-    lines = previous.decode().strip().splitlines()
-    count = int(lines[0])
-    return [(p[0], (float(p[1]), float(p[2]), float(p[3]))) for p in (line.split() for line in lines[-count:])]
+    try:
+        lines = previous.decode().strip().splitlines()
+        count = int(lines[0])
+        frame = [line.split() for line in lines[-count:]]
+        if count < 1 or len(lines) < count + 2 or any(len(p) != 4 for p in frame):
+            return None
+        # + 0.0: the %.6f text can carry -0.000000, which input.py would show as -0.0
+        return [(p[0], (float(p[1]) + 0.0, float(p[2]) + 0.0, float(p[3]) + 0.0)) for p in frame]
+    except (ValueError, IndexError, UnicodeDecodeError):
+        return None
 
 
 def _patch_wall_seconds(meta_path: Path, wall):
@@ -153,11 +163,18 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
         while not stop.wait(heartbeat_seconds):
             with progress.lock:
                 stage, energy = progress.stage, progress.energy
-            # Ruling T5-b: every write names this attempt, so one that a
-            # reclaim or retry has moved past cannot overwrite the current one.
-            store.update_job(key, {'heartbeatAt': iso(utc_now()), 'stage': stage, 'latestEnergyHartree': energy,
-                                   'logTail': _tail(log), 'peakMemoryGB': _peak_memory_gb()},
-                             expect_status={'RUNNING'}, attempt=attempt)
+            try:
+                # Ruling T5-b: every write names this attempt, so one that a
+                # reclaim or retry has moved past cannot overwrite the current one.
+                store.update_job(key, {'heartbeatAt': iso(utc_now()), 'stage': stage,
+                                       'latestEnergyHartree': energy, 'logTail': _tail(log),
+                                       'peakMemoryGB': _peak_memory_gb()},
+                                 expect_status={'RUNNING'}, attempt=attempt)
+            except Exception as e:
+                # One missed beat is harmless; a dead heartbeat thread would
+                # leave the record frozen for the rest of the run.
+                print(f'worker: heartbeat for {key[:8]} failed ({type(e).__name__}: {e}); retrying',
+                      file=sys.stderr)
 
     def on_step(step, energy, atoms):
         frames.append(_xyz(atoms, f'step {step} E={energy:.10f}'))
@@ -166,7 +183,7 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     heart = threading.Thread(target=beat, daemon=True)
     heart.start()
     began, cwd = time.monotonic(), os.getcwd()
-    error, ns, final_atoms = None, {}, None
+    error, ns, final_atoms, devnull = None, {}, None, None
     try:
         os.chdir(work)                              # geomeTRIC writes its scratch files to the working directory
         ns = runpy.run_path(str(work / 'input.py'), run_name='jobs_input')
@@ -177,8 +194,11 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
             # molecule it builds; closing it flushes the log before the
             # worker reads it for logTail and copies it to the sink.
             ns['close_log']()
-        # The PySCF objects still hold the closed log as their stdout, so
-        # silence them: nothing in writing the files may print to it.
+        # The PySCF objects still hold the closed log as their stdout: point
+        # them somewhere open and quiet them, so anything that prints while
+        # the files are written neither fails nor lands after the log's end.
+        devnull = open(os.devnull, 'w')
+        mol.stdout = mf.stdout = devnull
         mol.verbose = mf.verbose = 0
         progress.on_stage('writing files')
         source = record['geometrySource']
@@ -206,9 +226,11 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     except Exception as e:
         error = _classify(e)
     finally:
+        stop.set()                                  # first: no beat should start while the cwd changes
         os.chdir(cwd)
-        stop.set()
         heart.join()
+        if devnull:
+            devnull.close()
 
     ended = time.monotonic()
     actual = {'wallSeconds': round(ended - began, 2), 'peakMemoryGB': _peak_memory_gb(), 'threads': _threads()}
@@ -244,9 +266,13 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     except Exception as e:
         error = error or _classify(e)               # the run's own failure is the more useful reason
 
-    store.update_job(key, {'status': 'FAILED' if error else 'DONE', 'endedAt': iso(utc_now()), 'stage': None,
-                           'actual': actual, 'error': error, 'logTail': _tail(log)},
-                     expect_status={'RUNNING'}, attempt=attempt)
+    written = store.update_job(key, {'status': 'FAILED' if error else 'DONE', 'endedAt': iso(utc_now()),
+                                     'stage': None, 'actual': actual, 'error': error, 'logTail': _tail(log)},
+                               expect_status={'RUNNING'}, attempt=attempt)
+    if not written:
+        # A later attempt owns the record now (Ruling T5-b): its outcome, not
+        # this one's, is the job's. Like a duplicate, this is not a failure.
+        return 'superseded'
     return 'FAILED' if error else 'DONE'
 
 
@@ -296,7 +322,7 @@ def main(argv=None):
     status = run_job(args.key, FileStore(args.state), LocalSink(args.local), attempt=args.attempt, grid_points=grid,
                      image_digest=os.environ.get('JOBS_IMAGE_DIGEST', 'local'))
     print(status)
-    return 0 if status in ('DONE', 'duplicate') else 1
+    return 0 if status in ('DONE', 'duplicate', 'superseded') else 1
 
 
 if __name__ == '__main__':
