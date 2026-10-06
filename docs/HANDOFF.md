@@ -1466,7 +1466,7 @@ sits comfortably under 2×10⁻⁶.
 ### Ozone: a known miss, pinned both ways
 
 Ozone's dipole stays outside tolerance even at TZVPD (0.66 D against 0.53,
-the floored tolerance still only 0.0529 D) because ozone has strong
+the floored tolerance still only 0.053 D) because ozone has strong
 multireference character that no single-reference method — B3LYP among
 them — describes well. Rather than special-case its tolerance or drop its
 validation row, `ValidationRow` gained an optional `knownMiss?: string`
@@ -1492,7 +1492,8 @@ section, not left to be discovered by someone diffing a tolerance column.
 ### Data: v2, published to S3, not committed
 
 Unlike the plan's original assumption (~50 MB of generated data committed
-to git), the library's 484 generated files are **published to S3 behind
+to git), the library's 483 generated data files (plus the manifest's own copy:
+484 objects under `molecules/v2/`) are **published to S3 behind
 CloudFront as data version v2** — the same serving path Bonds mode's v1
 already used — with a manifest at `tools/molecules/manifest/v2.json` and
 every file's provenance pointing at **one generator commit, `979f341`**.
@@ -1502,8 +1503,9 @@ margin fix above) entirely at that one commit before publishing — nothing
 under `public/molecules/` or `tools/molecules/out/` is committed to git at
 all. The ten diatomics behind Bonds mode were **regenerated at the same
 commit** (ruling P0: `publish.py` would otherwise refuse a v2 mixing v1's
-diatomic provenance with the library's own), and came out byte-identical
-to v1 — confirmed by a TS fixture cross-check — so Bonds mode's own
+diatomic provenance with the library's own), and came out identical to v1
+apart from `meta.json`'s provenance (commit, dataVersion) — confirmed by a
+TS fixture cross-check — so Bonds mode's own
 picture is unchanged by this phase. Their grids **stay point-sampled**
 (ruling D35): Bonds mode never draws them (it evaluates ρ live from
 `basis.json`, as Phase 5 describes above), so voxel-averaging them would
@@ -1518,9 +1520,10 @@ slider's worth of geometries to animate between. A library molecule's point
 group varies far more widely across the 25 (C₂ᵥ, C₃ᵥ, D₆ₕ, Td, Oh and more),
 so rather than generalise `MoDiagram` to all of them, the Plot slot shows
 `MoleculeOrbitalList` instead — every orbital, energy-descending, HOMO and
-LUMO marked, a divider at the HOMO–LUMO gap, degenerate sets collapsed to
-one row with a ×N multiplicity (SF₆'s octahedral HOMO, ×3, is the sharpest
-example). `MoDiagram` itself is untouched and stays Bonds-only; a future
+LUMO marked, a divider at the HOMO–LUMO gap, each member
+of a degenerate set on its own row with a ×N badge giving the set's size
+(SF₆'s octahedral HOMO, three rows each badged ×3, is the sharpest
+example), so every member stays pickable. `MoDiagram` itself is untouched and stays Bonds-only; a future
 phase that wants a polyatomic MO diagram is a separate, deliberate ask, not
 an oversight here.
 

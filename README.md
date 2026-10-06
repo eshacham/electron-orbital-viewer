@@ -355,9 +355,10 @@ read off how big it actually is.
   a library molecule's point-group symmetry varies too widely for one
   diagram component to read well across all 25, so the Plot slot here
   shows `MoleculeOrbitalList` instead — every orbital, energy-descending,
-  with HOMO/LUMO marked and degenerate sets shown as one row ("×3" for
-  SF₆'s triply-degenerate HOMO under its octahedral symmetry) rather than
-  three identical ones.
+  with HOMO/LUMO marked and each member of a degenerate set on its own
+  row, badged with the set's size ("×3" on each of SF₆'s triply-degenerate
+  HOMO rows under its octahedral symmetry), so every orbital can still be
+  picked and drawn.
 - **Exports name the orbital, not just the molecule.** The PNG caption,
   file stem, glTF/STL and the Gaussian-cube header all carry the molecule's
   name, formula and, for an orbital, its label and index (e.g.
@@ -976,11 +977,11 @@ CloudFront (`tools/molecules/publish.py`), versioned and immutable, and the
 running app fetches it from there — in development, a small Vite middleware
 serves it locally instead when it has been generated but not yet published,
 falling back to the published CloudFront copy otherwise. The library ships
-as its own data version, **v2** (484 files; manifest
+as its own data version, **v2** (483 data files plus the manifest; manifest
 `tools/molecules/manifest/v2.json`), published from one generator commit
-(`979f341`) that also regenerated the ten diatomics byte-identically at the
-same commit, so `publish.py` never ships a version mixing two commits'
-provenance.
+(`979f341`) that also regenerated the ten diatomics at the same commit —
+identical to v1 apart from `meta.json`'s provenance (commit, dataVersion) —
+so `publish.py` never ships a version mixing two commits' provenance.
 
 Deployment is an AWS CDK stack (S3 + CloudFront) under `infra/`:
 
