@@ -4,7 +4,7 @@ An interactive 3D viewer for atomic structure, in the browser.
 
 Live: https://d3rhfcclqjt4tf.cloudfront.net
 
-Three modes. **Atom** solves the real, many-electron ground state of any
+Four modes. **Atom** solves the real, many-electron ground state of any
 neutral element from hydrogen to oganesson, from scratch, and lets you drill
 from the whole atom down to a single shell, subshell or orbital — picking the
 element off a real periodic table. **Basic Orbitals** is the idealised
@@ -13,8 +13,12 @@ surface at Z = 1, coloured by the sign of ψ — red where the wave function is
 positive, blue where it is negative. **Bonds** is where atoms become
 molecules: H₂⁺ solved exactly at any bond length, and ten more diatomics from
 a real quantum-chemistry pipeline, each with its own potential curve,
-molecular-orbital diagram and electron density. In every mode, you can turn
-the picture, cut it open, and read off how big it actually is.
+molecular-orbital diagram and electron density. **Molecules** is a library of
+25 real, polyatomic molecules — water to glycine — picked by name, formula or
+category, each with its ball-and-stick geometry, total density, mapped
+electrostatic potential and a full list of molecular orbitals with
+HOMO/LUMO marked. In every mode, you can turn the picture, cut it open, and
+read off how big it actually is.
 
 ---
 
@@ -285,6 +289,107 @@ the picture, cut it open, and read off how big it actually is.
   served through a small Vite dev middleware locally before it is published.
   See [docs/HANDOFF.md](docs/HANDOFF.md) for the publish and deploy details.
 
+### Molecules mode
+
+- **25 real molecules, five categories.** First examples (H₂O, NH₃, CH₄,
+  CO₂), hybridisation (C₂H₂, C₂H₄, C₂H₆, HCN, H₂CO, BF₃, SiH₄), polarity
+  (SF₆, O₃, NO₂, SO₂, PH₃, H₂S, CH₃OH, HCOOH, ethanol, acetone), aromatic
+  (benzene, pyridine) and biomolecule fragments (formamide, glycine) — picked
+  by name, formula or category from a search list, not typed as a formula.
+  Every molecule shows ball-and-stick geometry (hover an atom or bond for its
+  length/angle, each captioned with its source), the total electron density,
+  the electrostatic potential mapped onto that density, and the full list of
+  molecular orbitals with HOMO and LUMO marked and a divider at the
+  HOMO–LUMO gap.
+- **Methods, stated on every number.** Geometry is experimental (CCCBDB)
+  where symmetry fixes it in a few parameters, or B3LYP/def2-TZVP optimised
+  (PySCF + geomeTRIC) for the seven molecules without a usable experimental
+  structure — `meta.geometrySource` names which, on screen, every time.
+  Density, dipole, electrostatic potential and orbitals are all
+  **B3LYP/def2-TZVPD**: the owner's call (2026-10-05) after the plain
+  def2-TZVP basis missed five molecules' dipoles outside tolerance (water,
+  ammonia, hydrogen sulfide, ethanol and ozone); adding def2-TZVPD's diffuse
+  functions brought every one back within tolerance except ozone, which
+  ships as a documented exception (below). NO₂, the one open-shell molecule
+  here, is solved ROKS (restricted open-shell Kohn–Sham) — one orbital set,
+  its unpaired electron a SOMO, not a separate α/β pair.
+- **The electrostatic potential is mapped at exactly ρ = 0.001 e/a₀³** —
+  the conventional ESP isosurface, not an enclosed fraction of the density
+  — on a fixed, symmetric ±0.05 Ha/e (±31.4 kcal/mol) colour scale, the same
+  for every molecule so two molecules' polarity can be compared by eye:
+  red where the surface is negative (electron-rich — lone pairs, π faces),
+  blue where it is positive (electron-poor — acidic H). A molecule whose own
+  range is narrower than the scale reads pale; one that exceeds it is
+  captioned "saturated beyond the scale" rather than silently re-scaled.
+  The total-density surface, by contrast, is still the enclosed fraction
+  (the Electron Enclosed select), but evaluated on a voxel-averaged grid —
+  unlike Bonds mode's fixed-ρ density (see [Bonds mode](#bonds-mode) above)
+  — because voxel averaging, not a fixed value, is what makes a library
+  molecule's grid integrable past a heavy atom's 1s cusp at this box size.
+- **Ozone is a known miss, pinned both ways.** B3LYP/def2-TZVPD gives
+  ozone a dipole of 0.66 D against the experimental 0.53 D — outside even
+  the floored 10 % tolerance below — because ozone has strong
+  multireference character that a single-reference method like B3LYP
+  does not capture well. Rather than hide it or quietly loosen its row's
+  tolerance, ozone's dipole reference carries a `knownMiss` flag (both in
+  the Python reference table and in the TypeScript `ValidationRow` it
+  produces) that the validation table and a test pin to fail exactly as
+  stated; the app's own readout shows the same sentence as a caption next
+  to ozone's dipole.
+- **Dipole tolerance is 10 %, floored at 0.05 D.** The spec states
+  dipoles' tolerance verbatim as "within 10 % of experiment"; for a small
+  dipole (NO₂'s 0.316 D, for instance) a bare 10 % is tighter than the
+  method can be expected to hit, so every dipole row's tolerance is
+  `max(10 % of experiment, 0.05 D)` — a deliberate, documented deviation
+  from the spec's verbatim wording, stated here and in every affected row's
+  method caption.
+- **The box margin is 6.5 bohr past the outermost atom.** Wide enough that
+  def2-TZVPD's diffuse functions — the same ones that fix the dipoles above
+  — do not leak density through the sampling box's own face; HCN, the
+  worst case, still has face density under 2×10⁻⁶ e/a₀³ at this margin. A
+  narrower box that looked fine at def2-TZVP started leaking once the
+  diffuse functions were added, which is why the margin is wider here than
+  Bonds mode's.
+- **The orbital list, not a diagram.** Unlike Bonds mode's two-level
+  molecular-orbital diagram (drawn for a diatomic's cylindrical symmetry),
+  a library molecule's point-group symmetry varies too widely for one
+  diagram component to read well across all 25, so the Plot slot here
+  shows `MoleculeOrbitalList` instead — every orbital, energy-descending,
+  with HOMO/LUMO marked and degenerate sets shown as one row ("×3" for
+  SF₆'s triply-degenerate HOMO under its octahedral symmetry) rather than
+  three identical ones.
+- **Exports name the orbital, not just the molecule.** The PNG caption,
+  file stem, glTF/STL and the Gaussian-cube header all carry the molecule's
+  name, formula and, for an orbital, its label and index (e.g.
+  `orbital-viewer_NH2CH2COOH_mo19-16ap.png` for glycine's HOMO). The ESP
+  surface's cube file states its own semantics in its title line — the
+  raw ESP grid in Ha/e, sampled on the density's ρ = 0.001 surface, never
+  confused with the density values a non-ESP cube carries. The orbital
+  list itself exports as a CSV (index, label, energy in Ha and eV,
+  occupancy, HOMO/LUMO/SOMO role).
+- **Regenerating the data.** The same offline pipeline as Bonds mode
+  (`tools/molecules/`), with the library's own modules:
+
+  ```bash
+  tools/molecules/.venv/bin/python tools/molecules/optimise.py glycine --basis def2-SVP   # repeat until converged
+  tools/molecules/.venv/bin/python tools/molecules/optimise.py glycine                    # def2-TZVP, repeat until converged
+  tools/molecules/.venv/bin/python tools/molecules/build_library.py --only glycine
+  tools/molecules/.venv/bin/python tools/molecules/build_library.py --rows-only
+  tools/molecules/.venv/bin/python tools/molecules/publish.py v2 --manifest-only
+  tools/molecules/.venv/bin/python tools/molecules/publish.py v2 --dry-run
+  ```
+
+  `optimise.py` is only needed for the seven molecules without a usable
+  experimental geometry; `build_library.py --only <id>` builds one
+  molecule's files (meta, grids, basis) into `version.OUT_ROOT/<id>/`
+  without touching the others, and `--rows-only` rebuilds the validation
+  table from whatever is already on disk, without recomputing anything.
+  Every file actually published must come from **one clean generator
+  commit** — `publish.py` refuses to publish a tree mixing provenance from
+  two different commits — so a real `publish.py v2` run (no
+  `--manifest-only`/`--dry-run`) is a deliberate, reviewed step, not a
+  routine part of iterating on one molecule.
+
 ### Across every mode, to look inside
 
 - **A default view per element.** Picking an element gives you the standard
@@ -340,7 +445,7 @@ along x, at a 90% contour:
 
 | Key | Meaning |
 | --- | --- |
-| `mode` | `atom`, `basic` or `bonds` |
+| `mode` | `atom`, `basic`, `bonds` or `molecule` |
 | `frac` | enclosed fraction — one of the presets 0.5, 0.75, 0.9, 0.95, 0.99; any other value is ignored |
 | `cut` | `none`, or `<x\|y\|z>:<depth>` — depth 0–1 as the Depth slider shows it (0 nothing removed, 0.5 through the nucleus, 1 everything) |
 | `op` | opacity, 0.05–1 |
@@ -356,6 +461,9 @@ along x, at a 90% contour:
 | `system` | Bonds mode's system — `h2plus` or one of the ten diatomic ids (`h2`, `he2`, `li2`, `b2`, `c2`, `n2`, `o2`, `f2`, `co`, `hf`); an id this app does not offer is ignored, falling back to H₂⁺ |
 | `R` | Bonds mode's internuclear distance, in bohr; H₂⁺ clamps and rounds it to its slider's 0.01 a₀ step within [0.5, 10], a diatomic snaps it to the nearest of its shipped scan points (up to twenty: 13–20 ship; curves stop where single-reference CCSD(T) stops being valid) once the scan has loaded |
 | `state` | Bonds mode's drawn picture — `1sigma_g` or `1sigma_u` for H₂⁺; `density` or `density:<iso>` (one of 0.002, 0.05, 0.2) for a molecule's total density; `mo:<restricted\|alpha\|beta>:<label>:<component>` for a molecular orbital by its label (e.g. `mo:restricted:3σg:0`), never by index, so the link still finds "3σg" if PySCF's own ordering differs at another R |
+| `id` | Molecules mode's selected molecule, one of the 25 library ids (`h2o`, `glycine`, …); an id this app does not offer shows an explicit "this link names no molecule in the library" message rather than a blank screen |
+| `show` | Molecules mode's drawn surface — `density`, `esp`, or `mo:<index>` by the orbital's numeric index (unlike Bonds, which indexes by label: a library molecule's orbital order does not shift the way a diatomic's can across geometries, since there is no slider here); an index with no matching orbital falls back to `density` once the molecule's data has loaded |
+| `struct`, `dipole` | Molecules mode's ball-and-stick and dipole-arrow visibility, `0` to hide (both default on, so only an off state is ever written) |
 
 Atom mode's own keys always appear in the order `Z`, `rel`, `charge`,
 `excite`, `level`, `n`, `l`, `j`, `ml` — so a non-relativistic neutral
@@ -398,7 +506,10 @@ like any other malformed key, not parsed as a number nobody wrote.
   shipped scan points (up to twenty: 13–20 ship; curves stop where
   single-reference CCSD(T) stops being valid) — with the method and, for a
   diatomic, the multireference or validity-cutoff caveat in the comment
-  lines too.
+  lines too. Molecules mode's CSV is different again: not a curve but the
+  **orbital table** — index, label, energy (Ha and eV), occupancy and
+  HOMO/LUMO/SOMO role for every orbital, in the same energy-descending order
+  the on-screen list shows.
 - **3D model (glTF, `.glb`)** — binary, colours kept, scaled so the model is
   20 cm across (a convenient AR/tabletop size); the scale back to bohr
   (`metresPerBohr`) is recorded in the root node's `extras`.
@@ -423,7 +534,11 @@ like any other malformed key, not parsed as a number nobody wrote.
   refused — it is several fields in one picture, not one grid. Built in a
   Web Worker. Bonds mode's cube carries both nuclei and names the system and
   R in its title; a density surface's cube is ρ itself, not the √ρ the field
-  evaluator sends the renderer.
+  evaluator sends the renderer. Molecules mode's cube follows the same rule
+  for density and orbitals; its **electrostatic potential** cube is
+  different again — the raw ESP grid itself, in Ha/e, not a wavefunction or
+  a density, with a title line that says exactly that ("…, ESP grid
+  (Ha/e)") so it is never mistaken for a surface-value file.
 
 Every export states its method (the same wording the caption, CSV and cube
 headers all use), and refuses with a stated reason rather than writing an
@@ -784,7 +899,39 @@ simple g/u electron count that does not capture either molecule's real
 multireference character; both are captioned where they appear rather than
 silently shown as exact.
 
-### All three modes
+### Molecules mode
+
+**Ozone's dipole is a known miss, by design.** 0.66 D against experiment's
+0.53 D, outside even the floored 10 % tolerance below — stated in ozone's
+own caption and pinned as a `knownMiss` in both the Python reference table
+and the TypeScript validation row, so a test fails if the miss is ever
+silently "fixed" by a tolerance change rather than a real method change.
+
+**The dipole tolerance is floored at 0.05 D**, not a bare 10 % as the spec's
+prose states verbatim — a documented, deliberate deviation (see
+[Molecules mode](#molecules-mode) above), because 10 % of a small dipole
+like NO₂'s 0.316 D is tighter than B3LYP/def2-TZVPD can be expected to hit.
+
+**The electrostatic potential surface is drawn at a fixed ρ, like Bonds
+mode's density — never an enclosed fraction.** Unlike Bonds mode, though,
+Molecules' own *density* surface (not ESP) is the enclosed fraction, just
+evaluated on a voxel-averaged rather than point-sampled grid; the two
+surfaces in this mode follow different rules from each other, and the panel
+names which rule is in force next to each one.
+
+**Geometries are frozen, not interactive.** Unlike Bonds mode's R slider,
+there is no way to stretch, compress or rotate a bond length in Molecules
+mode — each of the 25 molecules is shown at exactly one geometry (CCCBDB
+experiment or a B3LYP/def2-TZVP optimum), and that is the only geometry its
+data file holds.
+
+**The ten diatomics behind Bonds mode are not in this library**, and their
+own grids stay point-sampled as Phase 5 shipped them — they were
+regenerated at the Molecules library's own generator commit (so a published
+version is never a mix of two commits' provenance) but not changed in kind;
+Bonds mode never draws a library molecule, nor vice versa.
+
+### All four modes
 
 **The enclosed fraction, and level 3's box, are of the sampled grid.** The
 sampling box (Basic Orbitals mode, and atom mode's orbital level) holds all but
@@ -816,18 +963,24 @@ it — and the URL's camera key carries direction only, never distance.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 2900+ tests
+npm test           # 3200+ tests
 npm run build      # production bundle into dist/
 ```
 
-Bonds mode's molecule data is a separate, offline Python pipeline under
-`tools/molecules/` — see [Bonds mode](#bonds-mode) above for how to run it.
-It is never built by `npm run build`, and nothing under `/molecules/` ships
-in `dist/`: the generated tree is published to the stack's own S3 bucket
-behind CloudFront (`tools/molecules/publish.py`), versioned and immutable,
-and the running app fetches it from there — in development, a small Vite
-middleware serves it locally instead when it has been generated but not yet
-published, falling back to the published CloudFront copy otherwise.
+Bonds mode's ten diatomics and Molecules mode's 25-molecule library share one
+offline Python pipeline under `tools/molecules/` — see [Bonds mode](#bonds-mode)
+and [Molecules mode](#molecules-mode) above for how to run it. It is never
+built by `npm run build`, and nothing under `/molecules/` ships in `dist/`:
+the generated tree is published to the stack's own S3 bucket behind
+CloudFront (`tools/molecules/publish.py`), versioned and immutable, and the
+running app fetches it from there — in development, a small Vite middleware
+serves it locally instead when it has been generated but not yet published,
+falling back to the published CloudFront copy otherwise. The library ships
+as its own data version, **v2** (484 files; manifest
+`tools/molecules/manifest/v2.json`), published from one generator commit
+(`979f341`) that also regenerated the ten diatomics byte-identically at the
+same commit, so `publish.py` never ships a version mixing two commits'
+provenance.
 
 Deployment is an AWS CDK stack (S3 + CloudFront) under `infra/`:
 
@@ -910,7 +1063,25 @@ nothing in Bonds mode.
 | `src/components/BondsCurvePlot.tsx` | The Bonds potential-curve plot, in the view column (desktop) or Plot tab (phone) |
 | `src/components/MoDiagram.tsx` | The molecular-orbital energy diagram, shared between a diatomic and H₂⁺'s own two levels |
 | `src/store/bondsSlice.ts` | Bonds mode's selection: system, R, scan index, drawn view and density iso-value |
-| `tools/molecules/` | The offline Python pipeline: `molecules.py` (the ten diatomics' geometry and methods), `quantum.py` (PySCF calculations, cached by settings hash), `fit.py` (R_e, D_e, the CCSD(T) validity range), `labels.py` (σ/π orbital labels and selection), `basis_export.py` (the AO convention exported to TS), `outputs.py` (JSON/grid writing), `generate.py` (the CLI), `publish.py` (S3 publishing), `version.py` (`DATA_VERSION`) |
+| `tools/molecules/` | The offline Python pipeline: `molecules.py` (the ten diatomics' geometry and methods), `quantum.py` (PySCF calculations, cached by settings hash), `fit.py` (R_e, D_e, the CCSD(T) validity range), `labels.py` (σ/π orbital labels and selection), `basis_export.py` (the AO convention exported to TS), `outputs.py` (JSON/grid writing), `generate.py` (the CLI), `publish.py` (S3 publishing), `version.py` (`DATA_VERSION`) — plus the 25-molecule library's own `library.py` (the catalogue, categories and references), `optimise.py` (the seven geomeTRIC-optimised geometries), `build_library.py` (the library's build CLI), `density.py` (voxel-averaged density, `check_density`), `esp.py` (the fixed-ρ ESP surface and its range), `grid.py` (the 6.5-bohr-margin sampling box), `orbitals.py` (the library's orbital table), `compact.py` (float32 gzip grid encoding) |
+| `src/molecules/catalogue.ts` | The 25-molecule index: search/category filtering (`filterMolecules`) and formula formatting, read from `public/molecules/index.json` |
+| `src/molecules/library_types.ts` | `LibraryMoleculeMeta`, `LIBRARY_CATEGORIES`, and the REQUIRED-fields guard that refuses a pre-library `meta.json` rather than draw it without ESP/dipole |
+| `src/molecules/binary.ts` | Decodes a library molecule's gzip float32 grids (density, ESP) |
+| `src/molecules/grid_cache.ts` | The session-long cache of up to three most-recently-chosen molecules' grids |
+| `src/molecules/grid_mesh_request.ts` | Builds a `GridMeshRequest` (density or ESP) for the mesh worker from a loaded molecule's grid |
+| `src/molecules/dipole.ts` | The dipole arrow's vector, magnitude and physics-convention direction |
+| `src/molecules/esp.ts`, `src/molecules/esp_color.ts` | The fixed ±0.05 Ha/e diverging colour scale and the per-molecule range shown in the key |
+| `src/molecules/ball_and_stick.ts` | The structure overlay: atoms, bond sticks, and the hover readout's length/angle text |
+| `src/molecules/orbital_display.ts` | Orbital list rows: label, energy in Ha/eV, occupancy, HOMO/LUMO/SOMO role, degenerate-set grouping |
+| `src/molecules/render_plan.ts` | What the canvas should be showing right now, from the store's `surface` plus the loaded meta/grids/basis |
+| `src/molecules/useMoleculeLoader.ts`, `useMoleculeView.ts` | Lazily load a chosen molecule's meta/grid/basis and drive the mesh worker, dropping a stale result if the selection moved on |
+| `src/molecules/url_keys.ts` | Molecules mode's URL keys (`id`, `show`, `struct`, `dipole`) and the explicit `linkRejected` message for a malformed id |
+| `src/store/moleculeSlice.ts` | Molecules mode's selection: id, surface (density/esp/mo), structure/dipole visibility, load/render error state |
+| `src/components/MoleculeNav.tsx` | Desktop `.side-panel` navigation (and the phone header/Explore-tab variants): picker, surface toggle, selected-orbital name |
+| `src/components/MoleculePicker.tsx`, `MoleculePickerDialog.tsx` | The search-plus-category picker, and its full-screen phone dialog |
+| `src/components/MoleculeViewOptions.tsx` | Ball-and-stick/dipole-arrow switches and the dipole caption (with a molecule's `caveat`, e.g. ozone's) |
+| `src/components/MoleculeOrbitalList.tsx` | The Plot slot's full orbital list: HOMO/LUMO marking, the HOMO–LUMO gap divider, HOMO scrolled into view on open |
+| `src/components/MoleculeReadout.tsx` | The hover/pick readout: atom or bond, its length/angle and geometry-source caption |
 
 ---
 

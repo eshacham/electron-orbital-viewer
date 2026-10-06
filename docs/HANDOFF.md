@@ -1354,6 +1354,238 @@ must render a bound row as "> 0", not as a percentage error.
   hold none (`density_on_grid` zeroes values below `ZERO_BELOW`, and the
   smallest shipped sample is ≥ 0).
 
+## Phase 6 — Molecule library (2026-10-05)
+
+A fourth mode, Molecules: 25 real polyatomic molecules (water to glycine),
+picked by name/formula/category, each with ball-and-stick geometry, total
+density, a mapped electrostatic potential and a full orbital list. It shares
+Bonds mode's offline pipeline (`tools/molecules/`) and data-serving path
+(S3 behind CloudFront, a Vite dev middleware locally) but is its own data
+version, its own `src/molecules/` catalogue/store/components, and its own
+set of decisions below. 17 tasks, each reviewed and fixed before the next
+started; the full ledger is
+`.superpowers/sdd/2026-09-25-phase-6-molecule-library/progress.md`.
+
+### Voxel-averaged density, and why
+
+Bonds mode's density is drawn at one of three fixed ρ values, evaluated live
+from `basis.json` (see Phase 5's "Exact-ρ density surfaces" above) — point
+sampling is fine there because the surface is re-evaluated analytically, not
+read off a shipped grid. The library's density, by contrast, *is* a shipped
+grid (§4.1 binds), and a point-sampled grid at this box size under-resolves
+a heavy atom's 1s cusp badly enough that the enclosed-fraction contour the
+spec calls for would be wrong: Phase 5's own v1 diatomic grids, point-sampled
+at a coarser spacing, integrate to the electron count anywhere from +0.4 %
+(HF) to +14.6 % (N₂) — nowhere near this phase's 0.5 % bar. Rather than
+dropping the enclosed-fraction contour for a handful of fixed ρ buttons
+(ruling D4's rejected alternative), the library's grid is **voxel-averaged**
+(`density.voxel_averaged_density`, `density.check_density`): each grid node
+holds the average of ρ sampled finely across its own voxel rather than its
+value at one point, which is what brings every library molecule's density
+integral within the 0.5 % bar. The ESP surface is the opposite case — it is
+drawn at exactly one physically meaningful value (ρ = 0.001 e/a₀³, see
+below), where an enclosed-fraction contour would mean nothing — so it is
+built by a separate, additive code path (`generateGridIsoValueMesh`) that
+never runs `enclosedFractionForDensity` at all. The density select and the
+ESP surface therefore follow two different rules from each other in the
+same mode, and the panel names which rule is in force next to each one.
+
+### The fixed ±0.05 Ha/e ESP scale, and ρ = 0.001
+
+Every molecule's electrostatic potential is coloured on the same symmetric
+±0.05 Ha/e (±31.4 kcal/mol) scale, mapped onto the surface at exactly
+ρ = 0.001 e/a₀³ — the conventional ESP isosurface value, not an enclosed
+fraction of anything. Both are deliberate: a *shared* scale is what makes
+two molecules' polarity comparable by eye (benzene's π faces and water's O
+lone pair read on the same red/blue axis), where a per-molecule auto-scale
+would flatter a weakly polar molecule into looking as dramatic as a
+strongly polar one. A molecule whose own ESP range is narrower than ±0.05
+reads pale rather than being stretched to fill the scale; one that exceeds
+it (several of the 25 do, water among them) is captioned "saturated beyond
+the scale" so the clipping is visible, not silently absorbed. `esp.py`'s
+`esp_surface_range` reports each molecule's actual min/max for that
+caption; `src/molecules/esp_color.ts` never reads it to rescale the colour
+map itself.
+
+### ROKS for NO₂
+
+NO₂ is the one open-shell molecule in the library (a doublet — one unpaired
+electron in its 3b₁-like SOMO). Rather than run unrestricted Kohn–Sham
+(UKS) and carry a second, β-spin orbital set the way Phase 5's O₂ and B₂
+do, NO₂ runs **ROKS** (restricted open-shell Kohn–Sham): one shared set of
+spatial orbitals, the unpaired electron's own orbital marked SOMO rather
+than HOMO. The choice is `orbitals.py`'s and is deliberate, not a
+limitation of the pipeline — a library of 25 molecules shown through one
+`MoleculeOrbitalList` component reads far more consistently with one
+orbital set per molecule than with NO₂ alone needing the α/β split Bonds
+mode's `MoDiagram` already handles for its own two unrestricted diatomics.
+
+### The structure overlay is deliberately unclipped
+
+`buildBallAndStick`'s own comment states it: the atoms and bond sticks are
+never clipped by the cut-away, even when the density or ESP surface next to
+them is. The cut is for seeing inside the surface; the structure is what
+you are looking for once you are in there, so cutting it away with the
+surface would hide the very thing the cut was meant to reveal.
+
+### Framing is keyed on the grid box, not the drawn surface
+
+A molecule's camera framing uses `boxRMax = gridHalfWidth(meta)` — half the
+width of the molecule's own sampling box (`meta.grid.origin[0]`, always
+negative, so its absolute value is the half-width) — never the radius of
+whatever surface happens to be drawn. Density, ESP and every orbital for one
+molecule therefore share one framing, so switching between them does not
+reframe the camera (`orbital_visualizer.ts`'s `prepareBoxFraming` only
+reframes when `boxRMax` itself changes, i.e. on a new molecule, not a new
+surface) — the desktop legend stack's own height is counted separately, as
+a view inset, so it does not fight this rule (see Task 16's "Framing" fix
+round note).
+
+### The B3LYP/def2-TZVPD switch (owner decision 2026-10-05)
+
+Task 7's first pass, at the plan's original B3LYP/def2-TZVP, measured five
+dipoles outside the 10 % tolerance: water (2.07 D against 1.855), ammonia
+(1.71 against 1.471), ozone (0.67 against 0.53), hydrogen sulfide (1.11
+against 0.97) and ethanol (1.60 against 1.44). Asked for a recommendation,
+the controller measured the same five at B3LYP/def2-TZVPD (the same
+functional, with def2-TZVP's basis augmented by diffuse functions) and
+found four back within tolerance (water 1.858, ammonia 1.515, H₂S 0.972,
+ethanol 1.579) with only ozone still missing (0.655, still over its 0.53 D
+reference even floored). The owner chose TZVPD for every one of the 25
+molecules' *properties* — density, dipole, ESP and orbitals — while leaving
+geometries as they already were (CCCBDB experiment, or B3LYP/def2-TZVP
+optimised where there is no usable experimental structure); Bonds mode's
+own ten diatomics are untouched, still def2-TZVP throughout. The wider
+basis's diffuse tails are also why the library's sampling box margin is
+6.5 bohr past the outermost atom rather than a narrower value that would
+have been enough at def2-TZVP alone — the first generation run at a 5.0
+bohr margin failed its own box-leak check at CH₄ (face density 1.2×10⁻⁵,
+over the 1×10⁻⁵ limit); HCN, the worst case at the widened margin, still
+sits comfortably under 2×10⁻⁶.
+
+### Ozone: a known miss, pinned both ways
+
+Ozone's dipole stays outside tolerance even at TZVPD (0.66 D against 0.53,
+the floored tolerance still only 0.0529 D) because ozone has strong
+multireference character that no single-reference method — B3LYP among
+them — describes well. Rather than special-case its tolerance or drop its
+validation row, `ValidationRow` gained an optional `knownMiss?: string`
+field (the Python `Reference` a matching `known_miss`), and
+`references.test.ts` pins `rowPasses(row) === !row.knownMiss` **both
+ways** — the row must fail exactly because it is a known miss, not because
+something else broke, and a future fix that brings ozone's dipole back
+within tolerance must also clear `knownMiss` or the pinned-failure
+assertion itself goes red. `meta.json` carries the same sentence as
+`caveat`, shown in the app next to ozone's dipole reading, not buried in a
+table nobody sees.
+
+### The dipole tolerance floor (ruling D28), restated
+
+The spec's §3.2 is verbatim: "dipoles within 10 % of experiment." For a
+small reference dipole (NO₂'s 0.316 D is the extreme case in this library),
+a bare 10 % is tighter than B3LYP/def2-TZVPD can be expected to land, so
+every dipole row's actual tolerance is `max(10 % of experiment, 0.05 D)` —
+a deliberate, documented deviation from the spec's own wording, stated in
+every affected row's method caption and in the README's own validation
+section, not left to be discovered by someone diffing a tolerance column.
+
+### Data: v2, published to S3, not committed
+
+Unlike the plan's original assumption (~50 MB of generated data committed
+to git), the library's 484 generated files are **published to S3 behind
+CloudFront as data version v2** — the same serving path Bonds mode's v1
+already used — with a manifest at `tools/molecules/manifest/v2.json` and
+every file's provenance pointing at **one generator commit, `979f341`**.
+`publish.py` refuses to publish a tree whose `meta.json` files name more
+than one commit, so Task 7's generation had to run (and rerun, after the
+margin fix above) entirely at that one commit before publishing — nothing
+under `public/molecules/` or `tools/molecules/out/` is committed to git at
+all. The ten diatomics behind Bonds mode were **regenerated at the same
+commit** (ruling P0: `publish.py` would otherwise refuse a v2 mixing v1's
+diatomic provenance with the library's own), and came out byte-identical
+to v1 — confirmed by a TS fixture cross-check — so Bonds mode's own
+picture is unchanged by this phase. Their grids **stay point-sampled**
+(ruling D35): Bonds mode never draws them (it evaluates ρ live from
+`basis.json`, as Phase 5 describes above), so voxel-averaging them would
+cost generation time for no visible difference; the 0.5 % integral bar
+applies only to the 25 library molecules' own grids.
+
+### Orbitals: one list, not a diagram (ruling D23)
+
+Bonds mode's `MoDiagram` draws a two-level diagram that depends on a
+diatomic's cylindrical (D∞h/C∞v) symmetry — σ/π/δ labels, a g/u split, a
+slider's worth of geometries to animate between. A library molecule's point
+group varies far more widely across the 25 (C₂ᵥ, C₃ᵥ, D₆ₕ, Td, Oh and more),
+so rather than generalise `MoDiagram` to all of them, the Plot slot shows
+`MoleculeOrbitalList` instead — every orbital, energy-descending, HOMO and
+LUMO marked, a divider at the HOMO–LUMO gap, degenerate sets collapsed to
+one row with a ×N multiplicity (SF₆'s octahedral HOMO, ×3, is the sharpest
+example). `MoDiagram` itself is untouched and stays Bonds-only; a future
+phase that wants a polyatomic MO diagram is a separate, deliberate ask, not
+an oversight here.
+
+### Exports (Task 16b)
+
+Every export states the molecule and, for an orbital, its label and index,
+in both caption and file-name stem (`orbital-viewer_NH2CH2COOH_mo19-16ap.*`
+for glycine's HOMO). The Gaussian-cube exporter's ESP path is its own case:
+unlike a density or orbital cube (ψ or ρ, Phase 5's existing convention),
+the ESP cube is the raw electrostatic-potential grid itself, in Ha/e — its
+title line says so explicitly ("…, ESP grid (Ha/e)") so it is never
+mistaken for a surface-value file by whatever reads it next. The orbital
+list itself exports as its own CSV — index, label, energy (Ha and eV),
+occupancy, role — independent of the PNG/glTF/STL/cube exports of the
+drawn picture, and (deliberately, unlike Bonds' CSV, which refuses after a
+failed render) still exports even when the last surface render failed,
+since the orbital table does not depend on what is currently drawn.
+
+### Regenerating the data
+
+```bash
+tools/molecules/.venv/bin/python tools/molecules/optimise.py <id> --basis def2-SVP   # repeat until converged
+tools/molecules/.venv/bin/python tools/molecules/optimise.py <id>                    # def2-TZVP, repeat until converged
+tools/molecules/.venv/bin/python tools/molecules/build_library.py --only <id>
+tools/molecules/.venv/bin/python tools/molecules/build_library.py --rows-only
+tools/molecules/.venv/bin/python tools/molecules/publish.py v2 --manifest-only
+tools/molecules/.venv/bin/python tools/molecules/publish.py v2 --dry-run
+```
+
+`optimise.py` is only needed for the seven molecules with no usable
+experimental geometry. As with Bonds mode, every file actually published
+must come from one clean generator commit — a real, non-`--dry-run`,
+non-`--manifest-only` `publish.py v2` is a controller/reviewer step after a
+full regeneration, not a routine part of iterating on one molecule, and a
+published version is immutable: a mistake needs v3, not a v2 patch.
+
+### Owner decisions this phase surfaced
+
+- **The property basis, B3LYP/def2-TZVPD** (above) — asked and decided
+  2026-10-05, the single largest change from the plan as written.
+- **Ozone's known miss** — accepted as a documented exception rather than
+  pursued further (e.g. a multireference method), per the same decision.
+- **The data licence (spec §6.1) is still open.** The spec's own backlog
+  flags this as an owner action, not resolved by this phase: code under
+  ISC (`package.json`) with no stated licence for the generated molecule
+  data itself; the spec's suggested pairing is MIT for the code and
+  CC-BY-4.0 for the data, in a `LICENSE` file neither phase has added.
+- **A Zenodo DOI for v2 is outstanding**, same as v1 before it — the
+  spec asks each data version be archived on Zenodo with its own DOI
+  (owner action) so a figure that cites this app's numbers can cite the
+  exact, immutable data behind them; nothing in this phase or Phase 5
+  before it has done that archiving.
+
+### For 6B
+
+The on-demand spec's on-demand-molecule plans (6B-1/6B-2/6B-3) were written
+assuming def2-TZVP throughout, the plan's original basis before the owner
+decision above. Before 6B-1 starts, its preflight must switch the
+on-demand spec's §5.2/§8.2 (the `RECIPES` basis, the basis-size table, any
+pinned keys computed at def2-TZVP, and sizing-test numbers such as water's
+basis function count, 43 at TZVP versus 58 at TZVPD) to def2-TZVPD, so an
+on-demand molecule's properties are computed at the same basis as this
+library's 25 — otherwise a user comparing a library molecule against an
+on-demand one would be comparing two different methods without being told.
+
 ## Judgment calls made without asking
 
 Recorded for review, per the session's standing authority.
