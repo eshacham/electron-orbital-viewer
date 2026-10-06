@@ -11,6 +11,7 @@ export interface MoleculeIndexEntry {
     formula: string;
     category: string;
     tags: string[];
+    tier?: MoleculeTier;
 }
 
 export interface MoleculeAtom {
@@ -74,6 +75,8 @@ export interface MoleculeMeta {
     references: Array<{ quantity: string; value: number; unit: string; source: string }>;
     generator: { pyscf: string; script: string; commit: string; xc?: string; numpy?: string; scipy?: string; python?: string; dataVersion?: string };
     scan?: string;
+    tier?: MoleculeTier;
+    provenance?: MoleculeProvenance;
 }
 
 export interface BasisShell {
@@ -144,4 +147,29 @@ export interface MoleculeScan {
     spinCheck: { RBohr: number; tripletHartree: number; singletHartree: number; method: string } | null;
     note: string | null;
     reference: { ReAngstrom: number | null; source: string | null };
+}
+
+/** Spec §9.1: the curated library is validated; a molecule computed on request is not benchmarked. Absent means validated. */
+export type MoleculeTier = 'validated' | 'computed';
+
+/** meta.provenance, written by the 6B-1 worker for computed molecules (spec §9.3). */
+export interface MoleculeProvenance {
+    jobKey: string;
+    computeVersion: number;
+    recipe: 'single' | 'optimise';
+    geometrySource: { kind: 'pubchem'; cid: number; title: string; query: string; retrievedAt: string } | { kind: 'xyz' };
+    caveats: string[];
+    generatorCommit: string;
+    imageDigest: string;
+    pyscfVersion: string;
+    sizingVersion: number;
+    size: string;
+    capacity: 'spot' | 'on-demand' | 'local';
+    wallSeconds: number;
+    /** Always null (6B-1): settlement comes after the immutable files; the owner reads the cost from the job record. */
+    costUsd: number | null;
+}
+
+export function tierOf(item: { tier?: MoleculeTier }): MoleculeTier {
+    return item.tier ?? 'validated';
 }

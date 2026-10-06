@@ -7,7 +7,7 @@ const read = (name: string) => JSON.parse(readFileSync(path.join(DIR, `${name}.j
 
 const JOB_VIEW_FIELDS = ['key', 'status', 'attempt', 'recipe', 'job', 'name', 'formula', 'electronCount', 'basisFunctions',
     'geometrySource', 'sizing', 'month', 'submittedAt', 'startedAt', 'endedAt', 'heartbeatAt', 'stage', 'latestEnergyHartree',
-    'logTail', 'actual', 'error', 'backend', 'reservedUsd', 'actualUsd', 'resultUrl'];
+    'logTail', 'actual', 'error', 'backend', 'peakMemoryGB', 'reservedUsd', 'actualUsd', 'resultUrl'];
 // D1: tools/jobs/sizing.py:134 adds `estimateFor: 'fargate'` to decide()'s
 // return -- real for both decision.sizing and the record's own `sizing`
 // (6B-1 ships it, it is not optional).
@@ -47,6 +47,7 @@ describe('6B-1 responses, as its handlers write them', () => {
             expect(Object.keys(view)).toEqual(expect.arrayContaining(JOB_VIEW_FIELDS));
             for (const hidden of ['settled', 'runnerJobId', 'reservedMicros', 'actualMicros']) expect(view).not.toHaveProperty(hidden);
         }
+        expect(read('submit_created').body.peakMemoryGB).toBeNull();
         expect(read('get_running').body.peakMemoryGB).toBe(0.41);
         expect(read('get_running').body.actualUsd).toBeNull();
         expect(read('get_done').body.actual).toEqual({ wallSeconds: 70.2, peakMemoryGB: 0.52, threads: 8 });

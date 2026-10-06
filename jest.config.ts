@@ -12,6 +12,12 @@ const config: Config = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
+  // import.meta does not parse under ts-jest: the one module that reads
+  // import.meta.env (src/jobs/build_env.ts) is replaced by a mutable
+  // stand-in, which a test sets and resetBuildEnv() restores.
+  moduleNameMapper: {
+    '^.+/build_env$': '<rootDir>/tests/jobs/build_env_stub.ts',
+  },
   // The two exhaustive SCF sweeps (Phase 3's excitation_sweep_<k> and
   // Phase 4's relativistic_heavy_sweep_<k> shards) are hours of work and run
   // only with ATOM_SLOW_TESTS=1. Gating each test with it.skip was not
