@@ -47,6 +47,13 @@ def molecule(atoms, basis):
     return mol
 
 
+def close_log():
+    global _log
+    if _log:
+        _log.close()
+    _log = None
+
+
 def make_dft(mol):
     # As tools/molecules/optimise.make_dft: RKS for closed shells, ROKS (one orbital set) for open ones.
     mf = dft.RKS(mol) if mol.spin == 0 else dft.ROKS(mol)
@@ -79,6 +86,7 @@ def converge(mol, on_stage):
 
 def optimise(atoms, on_stage, on_step):
     from pyscf.geomopt.geometric_solver import kernel as geometric_kernel
+    from pyscf.geomopt.geometric_solver import NotConvergedError
     mol = molecule(atoms, OPTIMISE_BASIS)
     steps = []
 
@@ -92,7 +100,7 @@ def optimise(atoms, on_stage, on_step):
 
     try:
         converged, mol_eq = geometric_kernel(make_dft(mol), maxsteps=MAX_STEPS, callback=callback)
-    except Exception as e:      # geomeTRIC raises its own NotConvergedError past MAX_STEPS
+    except NotConvergedError as e:      # geomeTRIC raises this past MAX_STEPS; anything else propagates
         raise OptimisationNotConverged(f'optimisation did not converge in {{MAX_STEPS}} steps ({{e}})')
     if not converged:
         raise OptimisationNotConverged(f'optimisation did not converge in {{MAX_STEPS}} steps')
@@ -113,6 +121,7 @@ def build(on_stage=_quiet, on_step=lambda step, energy, atoms: None, start=None)
 if __name__ == '__main__':
     mol, mf, info = build(on_stage=lambda stage, energy=None: print(stage, '' if energy is None else energy))
     print('E =', mf.e_tot, 'Ha', info)
+    close_log()
 '''
 
 DESCRIPTIONS = {

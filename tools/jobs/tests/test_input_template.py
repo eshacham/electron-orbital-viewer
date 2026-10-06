@@ -57,6 +57,54 @@ def test_ladder_reaches_second_order_and_then_gives_up(tmp_path, monkeypatch):
     assert seen == ['SCF (DIIS)', 'SCF (level shift 0.3 Ha)', 'SCF (second-order)']
 
 
+def test_optimise_wraps_geometric_not_converged(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    method = {'xc': 'B3LYP', 'basis': 'sto-3g', 'optimiseBasis': 'sto-3g'}
+    (tmp_path / 'input.py').write_text(render_input(canonical_job('optimise', H2, 0, 1, method=method), 'k' * 64))
+    ns = runpy.run_path('input.py', run_name='jobs_input')
+    import pyscf.geomopt.geometric_solver as gs
+
+    def boom(*a, **k):
+        raise gs.NotConvergedError('geometry optimization failed to converge')
+
+    monkeypatch.setattr(gs, 'kernel', boom)
+    with pytest.raises(ns['OptimisationNotConverged']):
+        ns['build']()
+
+
+def test_optimise_lets_other_errors_propagate(tmp_path, monkeypatch):
+    # Important fix: only geomeTRIC's own NotConvergedError should be reported as
+    # "did not converge". A MemoryError (or any other bug) must reach the worker
+    # unchanged, so it is never misreported as a convergence failure.
+    monkeypatch.chdir(tmp_path)
+    method = {'xc': 'B3LYP', 'basis': 'sto-3g', 'optimiseBasis': 'sto-3g'}
+    (tmp_path / 'input.py').write_text(render_input(canonical_job('optimise', H2, 0, 1, method=method), 'k' * 64))
+    ns = runpy.run_path('input.py', run_name='jobs_input')
+    import pyscf.geomopt.geometric_solver as gs
+
+    def boom(*a, **k):
+        raise MemoryError('out of memory')
+
+    monkeypatch.setattr(gs, 'kernel', boom)
+    with pytest.raises(MemoryError):
+        ns['build']()
+
+
+def test_close_log_closes_the_handle(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'input.py').write_text(render_input(canonical_job('single', H2, 0, 1, method=SMALL), 'k' * 64))
+    ns = runpy.run_path('input.py', run_name='jobs_input')
+    ns['build']()
+    # runpy.run_path returns a snapshot of the globals at exec time; the live module
+    # dict (where `global _log` assignments actually land) is reachable through any
+    # of its functions' __globals__ (same pattern the brief's own ladder test uses).
+    glob = ns['molecule'].__globals__
+    log = glob['_log']
+    assert log is not None and not log.closed
+    ns['close_log']()
+    assert log.closed and glob['_log'] is None
+
+
 @pytest.mark.skipif(os.environ.get('JOBS_SLOW') != '1', reason='a short geomeTRIC run')
 def test_optimise_reports_steps_and_runs_standalone(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
