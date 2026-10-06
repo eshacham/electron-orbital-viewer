@@ -26,8 +26,8 @@ import { RelativityMode, defaultRelativityFor } from '../atom/relativity';
  * enclosed fraction, which is not state here at all.
  */
 
-/** 'bonds' is Phase 5's Bonds mode; its selection lives in bondsSlice. */
-export type ViewMode = 'atom' | 'hydrogenic' | 'bonds';
+/** 'bonds' is Phase 5's Bonds mode (its selection lives in bondsSlice); 'molecule' is Phase 6's (moleculeSlice). */
+export type ViewMode = 'atom' | 'hydrogenic' | 'bonds' | 'molecule';
 export type ViewLevel = 'atom' | 'shell' | 'orbital';
 
 /**

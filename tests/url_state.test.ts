@@ -14,6 +14,8 @@ import { registerBondsUrlKeys } from '../src/bonds/bonds_url';
 import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIso } from '../src/store/bondsSlice';
 import { DIATOMIC_IDS, DENSITY_ISO_VALUES } from '../src/bonds/systems';
 import { H2PLUS_STATES } from '../src/bonds/h2plus';
+import { registerMoleculeUrlKeys } from '../src/molecules/url_keys';
+import { selectMolecule, setShowDipole, setShowStructure, MoleculeSurface } from '../src/store/moleculeSlice';
 import type { OrbitalSpin } from '../src/molecules/types';
 import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../src/orbital_presets';
 import { CombinationSelection, selectionProblem, fieldRequestFor } from '../src/combinations';
@@ -159,10 +161,13 @@ function mulberry32(seed: number): () => number {
     };
 }
 
-type Shape = 'atom' | 'shell' | 'subshell' | 'orbital' | 'ion' | 'excited' | 'relativity' | 'jlevel' | 'basic' | 'hybrid' | 'field' | 'h2plus' | 'diatomic';
+type Shape = 'atom' | 'shell' | 'subshell' | 'orbital' | 'ion' | 'excited' | 'relativity' | 'jlevel' | 'basic' | 'hybrid' | 'field' | 'h2plus' | 'diatomic' | 'molecule';
 
 /** Bonds mode's own spins (bondsSlice keeps no export of its own copy). */
 const BONDS_SPINS: readonly OrbitalSpin[] = ['restricted', 'alpha', 'beta'];
+
+/** A handful of real library ids (lower-case alnum, as the loader's MOLECULE_ID requires). */
+const MOLECULE_IDS = ['h2o', 'nh3', 'ch4', 'benzene', 'co2'] as const;
 
 function randomView(rand: () => number, shape: Shape) {
     const int = (min: number, max: number) => min + Math.floor(rand() * (max - min + 1));
@@ -200,6 +205,16 @@ function randomView(rand: () => number, shape: Shape) {
                 }));
             }
         }
+    } else if (shape === 'molecule') {
+        store.dispatch(setMode('molecule'));
+        // selectMolecule's own surface field, not setSurface -- a link's id
+        // and show arrive together, and (unlike setSurface) there is no
+        // meta yet to validate an mo index against (moleculeSlice.ts).
+        const kind = pick(['density', 'esp', 'mo'] as const);
+        const surface: MoleculeSurface = kind === 'mo' ? { kind: 'mo', index: int(0, 30) } : { kind };
+        store.dispatch(selectMolecule({ id: pick(MOLECULE_IDS), surface }));
+        store.dispatch(setShowStructure(rand() < 0.8));
+        store.dispatch(setShowDipole(rand() < 0.8));
     } else {
         const Z = int(1, 118);
         store.dispatch(setElement(Z));
@@ -247,7 +262,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100 + 0;
 
 /** What a link promises to restore. */
 function viewOf(state: RootState) {
-    const { atom, orbital, bonds } = state;
+    const { atom, orbital, bonds, molecule } = state;
     const style = orbital.surfaceStyle;
     return {
         mode: atom.mode,
@@ -266,6 +281,12 @@ function viewOf(state: RootState) {
         bonds: atom.mode === 'bonds'
             ? { system: bonds.system, R: bonds.R, view: bonds.view, densityIso: bonds.view.kind === 'density' ? bonds.densityIso : null }
             : null,
+        // What a Molecules link promises to restore (molecules/url_keys.ts):
+        // id, surface and the two toggles -- not meta/pick/render state,
+        // which a link never carries (meta is reloaded, Task 15's brief).
+        molecule: atom.mode === 'molecule'
+            ? { id: molecule.selectedId, surface: molecule.surface, showStructure: molecule.showStructure, showDipole: molecule.showDipole }
+            : null,
         // The contour on screen (final review I1), which a link must reproduce.
         frac: selectShownEnclosedFraction(state),
         opacity: round2(style.opacity),
@@ -277,10 +298,10 @@ function viewOf(state: RootState) {
 }
 
 describe('built-in URL keys', () => {
-    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerBondsUrlKeys(); });
+    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerBondsUrlKeys(); registerMoleculeUrlKeys(); });
 
     // Spec §5 Phase 2: "URL round-trip property test over every mode and level".
-    it.each<Shape>(['atom', 'shell', 'subshell', 'orbital', 'ion', 'excited', 'relativity', 'jlevel', 'basic', 'hybrid', 'field', 'h2plus', 'diatomic'])(
+    it.each<Shape>(['atom', 'shell', 'subshell', 'orbital', 'ion', 'excited', 'relativity', 'jlevel', 'basic', 'hybrid', 'field', 'h2plus', 'diatomic', 'molecule'])(
         'round-trips random %s views',
         shape => {
             const rand = mulberry32(shape.length * 7919);
@@ -359,7 +380,10 @@ describe('built-in URL keys', () => {
                 expect(s.orbital.surfaceStyle).toMatchObject({ opacity: 1, mode: 'solid', clipAxis: 'none' });
                 expect(s.orbital.cameraAngles).toBeNull();
             }],
-            ['#mode=molecule&id=h2o', s => expect(s.atom.mode).toBe('atom')],
+            // A well-formed molecule link switches mode and selects the id
+            // (registerMoleculeUrlKeys is now registered); a bad id does not.
+            ['#mode=molecule&id=h2o', s => expect(s.molecule).toMatchObject({ selectedId: 'h2o' })],
+            ['#mode=molecule&id=H2O!<script>', s => expect(s.molecule).toMatchObject({ selectedId: null })],
             ['#op=&cut=&Z=', s => expect(s.orbital.surfaceStyle.opacity).toBe(1)],
         ];
         for (const [hash, check] of cases) {

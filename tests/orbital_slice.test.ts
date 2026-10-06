@@ -1,6 +1,6 @@
 import { createAppStore } from '../src/store';
 import reducer, {
-    startOrbitalCalculation, startFieldCalculation, finishOrbitalCalculation, clearPicture,
+    startOrbitalCalculation, startFieldCalculation, finishOrbitalCalculation, failOrbitalCalculation, clearPicture,
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, selectShownBasicOrbital,
     DEFAULT_BASIC_SELECTION, cameraMoved, restoreCamera, resetView,
     requestCut, clearPendingCut, startCompositionBuild, endCompositionBuild, failCompositionBuild, setLevelTransition,
@@ -59,6 +59,27 @@ describe('orbitalSlice field requests', () => {
         state = reducer(state, startFieldCalculation(request));
         state = reducer(state, setMode('hydrogenic'));
         expect(state.currentField).toEqual(request);
+    });
+
+    // Ruling D6(iii): Molecules draws its own scene, same as Bonds, so a
+    // stale Basic/atom-mode picture (and a stale failure) must not survive
+    // the switch, nor leave currentParams feeding showPhaseLegend or exports.
+    it('clears Basic/atom-mode state on the way to Molecules, same as Bonds', () => {
+        let state = reducer(undefined, startOrbitalCalculation(basicOrbitalParams(3, 2, 0, 0.9)));
+        state = reducer(state, finishOrbitalCalculation({ isoLevel: 1e-3 }));
+        state = reducer(state, failOrbitalCalculation('boom'));
+        expect(state.currentParams).not.toBeNull();
+        expect(state.isoLevel).toBe(1e-3);
+        expect(state.error).toBe('boom');
+        expect(state.renderFailed).toBe(true);
+
+        state = reducer(state, setMode('molecule'));
+        expect(state.currentParams).toBeNull();
+        expect(state.currentField).toBeNull();
+        expect(state.isLoading).toBe(false);
+        expect(state.error).toBeNull();
+        expect(state.renderFailed).toBe(false);
+        expect(state.isoLevel).toBeNull();
     });
 
     // Final review: a selection with a problem (a field above the bound limit,

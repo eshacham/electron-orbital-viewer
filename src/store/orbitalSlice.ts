@@ -235,7 +235,11 @@ const orbitalSlice = createSlice({
         }
         return;
       }
-      if (action.payload === 'bonds') {
+      // Molecules draws its own scene, same as Bonds (ruling D6(iii)): a
+      // stale Basic/atom picture must not stand under it, nor leave its
+      // currentParams feeding showPhaseLegend or exports once Molecules
+      // has its own readout.
+      if (action.payload === 'bonds' || action.payload === 'molecule') {
         state.currentParams = null;
         state.currentField = null;
         state.isLoading = false;
