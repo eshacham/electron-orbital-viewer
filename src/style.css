@@ -1153,3 +1153,39 @@ html, body, #root {
 .esp-legend-note {
   opacity: 0.85;
 }
+
+/* Task 13: the molecule picker, inline in the navigation column and full
+   screen on a phone (MoleculePickerDialog, mirroring ElementPickerDialog). */
+.molecule-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.molecule-category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.molecule-picker-list {
+  max-height: 280px;
+  overflow-y: auto;
+}
+.molecule-picker-item {
+  gap: 10px;
+}
+.molecule-picker-formula {
+  min-width: 84px;
+  font-weight: 600;
+}
+/* D29: own rule (not combined with -status) so panel_contrast's rule()
+   lookup finds it; on the LIGHT_96 panel-card, not the canvas. */
+.molecule-picker-name {
+  opacity: 0.85;
+}
+.molecule-picker-status {
+  padding: 8px 0;
+  opacity: 0.8;
+}
+.MuiDialog-root .molecule-picker-list {
+  max-height: none;
+}

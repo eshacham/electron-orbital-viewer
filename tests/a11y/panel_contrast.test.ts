@@ -68,6 +68,11 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     // since the CSS now uses separate rules rather than a combined selector).
     { selector: '.esp-legend', declared: `background: ${DARK_85}`, fg: '#ffffff', bg: DARK_85 },
     { selector: '.esp-legend-note', declared: 'opacity: 0.85', fg: 'rgba(255, 255, 255, 0.85)', bg: DARK_85 },
+    // Task 13 (ruling D29): the molecule picker's name and status text sit on
+    // the same LIGHT_96 panel card as LevelNav/BondsPanel, each its own rule
+    // so rule() can find it; opacity scales the inherited text.primary 0.87.
+    { selector: '.molecule-picker-name', declared: 'opacity: 0.85', fg: 'rgba(0, 0, 0, 0.7395)', bg: LIGHT_96 },
+    { selector: '.molecule-picker-status', declared: 'opacity: 0.8', fg: 'rgba(0, 0, 0, 0.696)', bg: LIGHT_96 },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {

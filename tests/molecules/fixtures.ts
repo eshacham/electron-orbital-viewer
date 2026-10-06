@@ -1,4 +1,5 @@
 import type { LibraryMoleculeMeta, MoleculeAtom } from '../../src/molecules/library_types';
+import type { MoleculeIndexEntry } from '../../src/molecules/types';
 
 export const BOHR_PER_ANGSTROM = 1 / 0.529177210903;
 const rad = (deg: number) => (deg * Math.PI) / 180;
@@ -48,3 +49,20 @@ export const methaneMeta = () => waterMeta({
     id: 'ch4', name: 'Methane', formula: 'CH4', atoms: methaneAtoms(), dipoleDebye: 0.0004, dipoleVectorDebye: [0.0004, 0, 0],
     references: [{ quantity: 'dipole', value: 0, unit: 'D', source: 'zero by symmetry', tolerance: 0.01 }],
 });
+
+const ROWS: Array<[string, string, string, string, string[]]> = [
+    ['h2o', 'Water', 'H2O', 'first-examples', ['polarity', 'hybridisation']], ['nh3', 'Ammonia', 'NH3', 'first-examples', ['polarity', 'hybridisation']],
+    ['ch4', 'Methane', 'CH4', 'first-examples', ['hybridisation']], ['co2', 'Carbon dioxide', 'CO2', 'first-examples', ['polarity']],
+    ['c2h2', 'Acetylene', 'C2H2', 'hybridisation', ['sp']], ['c2h4', 'Ethylene', 'C2H4', 'hybridisation', ['sp2']],
+    ['c2h6', 'Ethane', 'C2H6', 'hybridisation', ['sp3']], ['hcn', 'Hydrogen cyanide', 'HCN', 'hybridisation', ['polarity', 'sp']],
+    ['h2co', 'Formaldehyde', 'H2CO', 'hybridisation', ['polarity', 'sp2']], ['bf3', 'Boron trifluoride', 'BF3', 'hybridisation', ['polarity', 'sp2']],
+    ['sih4', 'Silane', 'SiH4', 'hybridisation', ['first-examples']], ['sf6', 'Sulfur hexafluoride', 'SF6', 'polarity', ['hybridisation']],
+    ['o3', 'Ozone', 'O3', 'polarity', ['first-examples']], ['no2', 'Nitrogen dioxide', 'NO2', 'polarity', ['radical']],
+    ['so2', 'Sulfur dioxide', 'SO2', 'polarity', []], ['ph3', 'Phosphine', 'PH3', 'polarity', ['hybridisation']],
+    ['h2s', 'Hydrogen sulfide', 'H2S', 'polarity', ['hybridisation']], ['benzene', 'Benzene', 'C6H6', 'aromatic', []],
+    ['ch3oh', 'Methanol', 'CH3OH', 'polarity', ['biomolecule-fragments', 'hybridisation']], ['hcooh', 'Formic acid', 'HCOOH', 'polarity', ['biomolecule-fragments']],
+    ['ethanol', 'Ethanol', 'C2H5OH', 'polarity', ['biomolecule-fragments']], ['acetone', 'Acetone', '(CH3)2CO', 'polarity', ['biomolecule-fragments']],
+    ['pyridine', 'Pyridine', 'C5H5N', 'aromatic', ['polarity']], ['formamide', 'Formamide', 'HCONH2', 'biomolecule-fragments', ['polarity']],
+    ['glycine', 'Glycine', 'NH2CH2COOH', 'biomolecule-fragments', []],
+];
+export const LIBRARY_INDEX: MoleculeIndexEntry[] = ROWS.map(([id, name, formula, category, tags]) => ({ id, name, formula, category, tags }));
