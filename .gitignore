@@ -22,3 +22,6 @@ tools/jobs/.state/
 # Phase 6B-3: the assembled Lambda code, and CDK's AZ lookup (it names the AWS account; this repo is public)
 infra/build/
 infra/cdk.context.json
+
+# Vite's local env file (JOBS_AWS_API_URL for the dev server's "AWS" choice); infra/owner.env is ignored above
+.env.local

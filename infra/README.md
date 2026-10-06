@@ -1,34 +1,83 @@
-# Electron Orbital Viewer CDK Deployment
+# Electron Orbital Viewer — AWS
 
-This CDK application deploys the Electron Orbital Viewer React app to AWS S3 with CloudFront for content delivery.
+Two CDK stacks in us-east-1:
+
+- **ElectronOrbitalViewerStack** (`infra_stack.py`): the site (S3 + CloudFront) and the molecule data bucket (`molecules/…`, served through CloudFront with Origin Access Control).
+- **ElectronOrbitalViewerComputeStack** (`compute_stack.py`, `cost_guards.py`): on-demand generation (spec `docs/superpowers/specs/2026-10-05-on-demand-generation-design.md` §10–§11). It holds AWS Batch on Fargate / Fargate Spot (ARM64), the jobs table (DynamoDB), the worker repository (ECR), three Lambdas (`api`, `reconcile`, `billing`), an HTTP API behind Cognito (TOTP MFA), the $10 budget with its deny-SubmitJob action, cost-anomaly alerts and four alarms. It imports the data bucket by name and never changes the site stack. `deploy.sh destroy-compute` removes every fixed cost and leaves the site and all results.
 
 ## Prerequisites
 
-- AWS CLI configured with appropriate credentials
-- Node.js and npm installed (for the React app)
-- Python 3.6+ installed (for the CDK app)
+- AWS CLI configured for the account; Node.js and npm; Python 3; the CDK CLI (`npm i -g aws-cdk`).
+- OrbStack running (its `docker buildx` builds the ARM64 worker image).
+- `infra/owner.env` with one line, `ALERT_EMAIL=<your email>`. It is gitignored. Budget, alarm and anomaly emails go there. `deploy.sh` only reads it (it passes the address as the CDK context value `alertEmail`); never commit it or paste its contents anywhere.
 
-## Deployment Steps
+## Deploying
 
-1. Build the React app:
+```
+infra/deploy.sh            # all: compute stack, worker image, then the site built against it
+infra/deploy.sh site       # the site only (rebuilds the frontend with the compute stack's settings)
+infra/deploy.sh compute    # the compute stack only
+infra/deploy.sh image      # build and push the worker image (no-op if ECR already has this content)
+infra/deploy.sh destroy-compute   # empty ECR, destroy the compute stack (the jobs table is retained)
+```
+
+The order matters: the compute stack needs the site's CloudFront origin (CORS and sign-in redirects), and the site's build needs the compute stack's API URL and Cognito settings (`VITE_JOBS_API_URL`, `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN`). `all` handles it. The worker image's tag is a hash of its committed inputs, so commit before deploying. `compute` on its own does not push the image; if the worker's inputs changed, run `image` too (or use `all`). The script warns when the job definition is about to name a tag ECR does not have.
+
+Every site build is followed by two checks that refuse the deploy:
+
+- `node tools/check_admin_split.mjs dist`: the owner's dashboard (`/admin.html`) must not leak into the viewer's bundle (Phase 6B-2).
+- The molecule data version: `tools/molecules/version.py` and `src/molecules/data_version.ts` must agree, and that version's `index.json` must already be published behind CloudFront.
+
+A first compute deploy can take over ten minutes. If a terminal or tool cuts the command off, CloudFormation carries on. Watch `aws cloudformation describe-stacks --stack-name ElectronOrbitalViewerComputeStack --query 'Stacks[0].StackStatus'`, then run the same phase again.
+
+After a deploy, `deploy.sh site` prints `JOBS_AWS_API_URL=…`. Put it in `.env.local` at the repo root (gitignored) for the dev server's "AWS" choice.
+
+### The cost-anomaly monitor (off by default)
+
+The anomaly monitor filters on the `app` cost-allocation tag, and creating it before that tag is active could roll back the whole compute deploy. So the compute phases pass `-c anomalyMonitor=off` until it is turned on:
+
+```
+ANOMALY_MONITOR=on infra/deploy.sh compute    # once step 3 under "Owner actions" has succeeded
+```
+
+When `ANOMALY_MONITOR` is unset, `deploy.sh` keeps whatever the deployed stack has, so a routine redeploy never removes the monitor. `ANOMALY_MONITOR=off` removes it.
+
+### Destroying the compute stack
+
+`deploy.sh destroy-compute` empties the worker repository and destroys the compute stack. The site and every result in the data bucket stay. **The jobs table is retained**: its job history and monthly meters survive, and it costs next to nothing. Delete it by hand if you want it gone. A later redeploy creates a **new, empty table**, so if you redeploy in the same month, the meter starts again at $0 and does not count what that month has already spent. The $10 AWS Budget, which counts the account's real cost, is still the backstop.
+
+## Owner actions (once)
+
+1. Confirm the SNS subscription email ("AWS Notification - Subscription Confirmation"). Budget emails need no confirmation.
+2. Create your sign-in. The email is the one in `infra/owner.env`:
    ```
-   cd ..
-   npm run build
+   source infra/owner.env && aws cognito-idp admin-create-user \
+     --user-pool-id "$(aws cloudformation describe-stacks --stack-name ElectronOrbitalViewerComputeStack --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)" \
+     --username "$ALERT_EMAIL" --user-attributes Name=email,Value="$ALERT_EMAIL" Name=email_verified,Value=true \
+     --desired-delivery-mediums EMAIL
    ```
+   Then sign in from the site's "Owner sign-in", set a password and enrol an authenticator app (TOTP).
+3. **The controller activates the cost-allocation tags with the CLI** (the owner asked for this, 2026-10-05): `aws ce update-cost-allocation-tags-status --cost-allocation-tags-status TagKey=app,Status=Active TagKey=component,Status=Active`. It succeeds only once AWS Billing has seen the tags on a billed resource, which is up to 24 h after the first job; before that it fails with `Tag keys not found: app,component` (checked 2026-10-05). Try it after the first AWS job, and again at each later task until it succeeds; record the result in the ledger. The daily billing figure and the anomaly monitor filter on these tags. Once it has succeeded (`{"Errors": []}`), turn the anomaly monitor on with `ANOMALY_MONITOR=on infra/deploy.sh compute`.
 
-2. Deploy the CDK stack:
-   ```
-   cd cdk
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   cdk deploy
-   ```
+## Controls
 
-3. After deployment, the CloudFront URL will be displayed in the output.
+```
+infra/jobs.sh pause | resume        # the kill switch: POST /api/v1/jobs answers 503 "paused" while paused
+infra/jobs.sh status                # kill switch, this month's meter, whether the budget stop is attached
+infra/jobs.sh api GET /api/v1/costs # the job API through its Lambda, with your AWS credentials
+infra/jobs.sh wait <key>            # follow a job (stops after 8 minutes; run again to keep following)
+```
 
-## Useful CDK Commands
+`jobs.sh api` prints the HTTP status on its first line, then the JSON body. It invokes the api Lambda directly with an HTTP API payload, so it skips Cognito (your IAM credentials are the authority) and API Gateway's throttles.
 
-* `cdk ls`          list all stacks in the app
-* `cdk synth`       emits the synthesized CloudFormation template
-* `cdk deploy`      deploy this stack to your default AWS account/region
-* `cdk diff`        compare deployed stack with current state
-* `cdk destroy`     destroy the deployed stack
+If the budget action fires, it attaches the deny-SubmitJob policy to the api role. Running jobs finish; new ones fail with `submit-failed`. Once you have looked at the cause, undo it with `aws budgets execute-budget-action --execution-type REVERSE_BUDGET_ACTION …` (the ids are under Budgets → electron-orbital-viewer-monthly → Actions), and check with `jobs.sh status`.
+
+## Tests
+
+```
+python3 -m venv infra/.venv   # deploy.sh recreates it on every run; the tests need the dev requirements too
+infra/.venv/bin/python -m pip install -r infra/requirements.txt -r infra/requirements-dev.txt
+(cd infra && .venv/bin/python -m pytest tests -q)
+```
+
+The site stack's test needs `dist/`, so run `npm run build` first if it is absent.

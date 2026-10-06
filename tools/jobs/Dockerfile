@@ -2,8 +2,10 @@
 #   docker buildx build --platform linux/arm64 -f tools/jobs/Dockerfile \
 #     --build-arg GENERATOR_COMMIT=$(git rev-parse HEAD) -t orbital-viewer-worker:local --load .
 #
-# 6B-3 builds this same Dockerfile as a CDK asset, so nothing here may assume
-# a local checkout beyond the generator and tools/jobs (see .dockerignore).
+# In 6B-3 this same Dockerfile is built and pushed by infra/deploy.sh to the
+# compute stack's own ECR repository (tagged with a hash of its committed
+# inputs), so nothing here may assume a local checkout beyond the generator
+# and tools/jobs (see .dockerignore).
 FROM --platform=linux/arm64 python:3.12-slim
 # D2 (preflight controller correction): the image has no git and no .git, so
 # write_molecule_files's commit stamp would otherwise be a FileNotFoundError
