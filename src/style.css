@@ -1400,3 +1400,10 @@ html, body, #root {
 .structure-preview-bond line { stroke-width: 0.14; stroke-linecap: round; }
 .structure-preview-atom { stroke: rgba(0, 0, 0, 0.6); stroke-width: 0.02; }
 .structure-preview-caption { display: flex; align-items: center; gap: 4px; }
+
+/* Phase 6B-2: tier badge (in .molecule-legend-stack) and the jobs panels in the side panel / Explore tab. */
+.tier-badge { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px; background: rgba(240, 240, 240, 0.94); font-size: 0.8125rem; max-width: 520px; }
+.molecule-jobs { display: flex; flex-direction: column; gap: 8px; }
+.molecule-jobs .MuiAccordion-root { border-radius: 10px; background: rgba(240, 240, 240, 0.94); }
+.provenance-body { display: flex; flex-direction: column; gap: 6px; }
+.provenance-list { margin: 0; padding-left: 18px; font-size: 0.875rem; }

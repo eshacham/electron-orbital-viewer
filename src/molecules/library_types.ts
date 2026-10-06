@@ -32,7 +32,13 @@ export interface LibraryExtras {
     densityIntegral: number;
     multiplicity: number;
     symmetry: { pointGroup: string; labelGroup: string };
-    geometryOptimisation?: { converged: boolean; maxGradient: number };
+    geometryOptimisation?: {
+        converged: boolean;
+        maxGradient?: number;
+        steps?: number;
+        /** The attempt whose last frame this run resumed from (6B-1 M4); `steps` then counts this attempt only. */
+        resumedFrom?: number;
+    };
     /** A documented exception to the usual "number states its method" claim (ozone's multireference dipole; ruling T7-O3). */
     caveat?: string;
 }

@@ -9,6 +9,10 @@ import { resolve, sep } from 'path';
 // generated molecule data there (spec §4.5), never into this repo's build.
 const MOLECULE_DATA_CDN = 'https://d3rhfcclqjt4tf.cloudfront.net';
 
+// The provenance panel links a computed job's input.py, output.log and
+// geometry.xyz: shown as text, not downloaded (spec §9.3).
+const TEXT_FILES = /\.(py|log|xyz)$/;
+
 /** Dev only (`apply: 'serve'`, and `server`/plugin config is never part of a
  * production bundle regardless): serves /molecules/<version>/... from
  * tools/molecules/out/ when it has been generated locally, so data can be
@@ -16,7 +20,8 @@ const MOLECULE_DATA_CDN = 'https://d3rhfcclqjt4tf.cloudfront.net';
  * (spec §4.5). Registered via configureServer, so it runs ahead of Vite's
  * own proxy middleware, and a local file always wins. */
 function serveLocalMolecules(): Plugin {
-  const root = resolve(__dirname, 'tools/molecules/out');
+  // A live check points its own Vite at a throwaway job server and result folder.
+  const root = resolve(__dirname, process.env.JOBS_OUT_ROOT ?? 'tools/molecules/out');
   return {
     name: 'serve-local-molecules',
     apply: 'serve',
@@ -29,7 +34,8 @@ function serveLocalMolecules(): Plugin {
         // which a bare `startsWith(root)` would wrongly allow).
         if (file !== root && !file.startsWith(root + sep)) return next();
         if (!existsSync(file) || !statSync(file).isFile()) return next();
-        res.setHeader('Content-Type', file.endsWith('.json') ? 'application/json' : 'application/octet-stream');
+        res.setHeader('Content-Type', file.endsWith('.json') ? 'application/json'
+          : TEXT_FILES.test(file) ? 'text/plain; charset=utf-8' : 'application/octet-stream');
         const stream = createReadStream(file);
         stream.on('error', next);
         stream.pipe(res);
@@ -71,8 +77,9 @@ export default defineConfig(({ mode }) => {
         ...(jobsAwsApiUrl ? {
           '/api/aws': { target: jobsAwsApiUrl, changeOrigin: true, rewrite: (p: string) => p.replace(/^\/api\/aws/, '/api') },
         } : {}),
-        // The local job server (tools/jobs/local_server.py, spec §12).
-        '/api': { target: 'http://127.0.0.1:8787', changeOrigin: false },
+        // The local job server (tools/jobs/local_server.py, spec §12). A live
+        // check points its own Vite at a throwaway job server and result folder.
+        '/api': { target: process.env.JOBS_LOCAL_API_URL ?? 'http://127.0.0.1:8787', changeOrigin: false },
         // Not published yet, or a molecule not generated locally: fetch it from
         // CloudFront, same as production (spec §4.5).
         '/molecules': {
