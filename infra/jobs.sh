@@ -24,7 +24,9 @@ export AWS_REGION="$REGION" AWS_DEFAULT_REGION="$REGION"
 
 check_region() {
   local resolved
-  resolved=$(aws configure list 2>/dev/null | awk '{ gsub(/:/, " "); if ($1 == "region") { print $2; exit } }')
+  # '|| true': under pipefail a failing 'configure list' (say, AWS_PROFILE
+  # naming a missing profile) would otherwise end the script without a word.
+  resolved=$(aws configure list 2>/dev/null | awk '{ gsub(/:/, " "); if ($1 == "region") { print $2 } }' | head -1 || true)
   if [ "$resolved" != "$REGION" ]; then
     echo "The AWS CLI resolves region '${resolved:-none}', not $REGION; refusing to call AWS." >&2
     exit 1
