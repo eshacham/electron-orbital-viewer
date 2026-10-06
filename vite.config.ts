@@ -1,6 +1,6 @@
 // vite.config.ts
 import { existsSync, statSync, createReadStream } from 'fs';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve, sep } from 'path';
@@ -38,37 +38,48 @@ function serveLocalMolecules(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), serveLocalMolecules()],
-  root: 'public',
-  build: {
-    outDir: '../dist',
-    emptyOutDir: true,
-  },
-  resolve: {
-    alias: [
-      {
-        find: /^\/main.tsx$/,
-        replacement: resolve(__dirname, 'src/main.tsx')
-      },
-      {
-        find: /^\.\.\/src\/(.*)/,
-        replacement: resolve(__dirname, 'src/$1')
-      }
-    ]
-  },
-  server: {
-    watch: {
-      usePolling: true,
-      interval: 100
+export default defineConfig(({ mode }) => {
+  // Where "AWS" jobs go in development (Phase 6B-3 prints this URL after
+  // deploying the compute stack). Unset, /api/aws falls through to the local
+  // server, which answers 404 -- the UI says AWS is not configured.
+  const jobsAwsApiUrl = loadEnv(mode, process.cwd(), '').JOBS_AWS_API_URL;
+  return {
+    plugins: [react(), serveLocalMolecules()],
+    root: 'public',
+    build: {
+      outDir: '../dist',
+      emptyOutDir: true,
     },
-    // Not published yet, or a molecule not generated locally: fetch it from
-    // CloudFront, same as production (spec §4.5).
-    proxy: {
-      '/molecules': {
-        target: MOLECULE_DATA_CDN,
-        changeOrigin: true,
-      },
+    resolve: {
+      alias: [
+        {
+          find: /^\/main.tsx$/,
+          replacement: resolve(__dirname, 'src/main.tsx')
+        },
+        {
+          find: /^\.\.\/src\/(.*)/,
+          replacement: resolve(__dirname, 'src/$1')
+        }
+      ]
     },
-  }
+    server: {
+      watch: {
+        usePolling: true,
+        interval: 100
+      },
+      proxy: {
+        ...(jobsAwsApiUrl ? {
+          '/api/aws': { target: jobsAwsApiUrl, changeOrigin: true, rewrite: (p: string) => p.replace(/^\/api\/aws/, '/api') },
+        } : {}),
+        // The local job server (tools/jobs/local_server.py, spec §12).
+        '/api': { target: 'http://127.0.0.1:8787', changeOrigin: false },
+        // Not published yet, or a molecule not generated locally: fetch it from
+        // CloudFront, same as production (spec §4.5).
+        '/molecules': {
+          target: MOLECULE_DATA_CDN,
+          changeOrigin: true,
+        },
+      },
+    }
+  };
 });
