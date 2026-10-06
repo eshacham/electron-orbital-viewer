@@ -1407,3 +1407,13 @@ html, body, #root {
 .molecule-jobs .MuiAccordion-root { border-radius: 10px; background: rgba(240, 240, 240, 0.94); }
 .provenance-body { display: flex; flex-direction: column; gap: 6px; }
 .provenance-list { margin: 0; padding-left: 18px; font-size: 0.875rem; }
+
+/* Phase 6B-2 Task 10: the request panel and its preview. */
+.request-panel, .job-status { display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem; }
+.recipe-detail { display: block; font-size: 0.75rem; opacity: 0.8; }
+.request-optional { display: flex; gap: 8px; }
+.preview-details { display: flex; flex-direction: column; gap: 6px; }
+.preview-facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; }
+.preview-facts dt { font-weight: 600; }
+.preview-facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.mono, .job-log-tail { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
