@@ -73,6 +73,14 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     // so rule() can find it; opacity scales the inherited text.primary 0.87.
     { selector: '.molecule-picker-name', declared: 'opacity: 0.85', fg: 'rgba(0, 0, 0, 0.7395)', bg: LIGHT_96 },
     { selector: '.molecule-picker-status', declared: 'opacity: 0.8', fg: 'rgba(0, 0, 0, 0.696)', bg: LIGHT_96 },
+    // Task 14 (ruling D29): MoleculeReadout is a dark chip over the canvas,
+    // like .esp-legend/.phase-legend -- same background, own rule.
+    { selector: '.molecule-readout', declared: 'background: rgba(8, 8, 10, 0.85)', fg: '#ffffff', bg: DARK_85 },
+    // MoleculeOrbitalList's "not ionisation energies" caption and
+    // MoleculeNav's geometry/method caption both sit on the LIGHT_96 panel
+    // card (.side-panel .level-nav), each its own rule.
+    { selector: '.molecule-caption', declared: 'opacity: 0.75', fg: 'rgba(0, 0, 0, 0.6525)', bg: LIGHT_96 },
+    { selector: '.molecule-orbital-degeneracy', declared: 'opacity: 0.7', fg: 'rgba(0, 0, 0, 0.609)', bg: LIGHT_96 },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {

@@ -1189,3 +1189,74 @@ html, body, #root {
 .MuiDialog-root .molecule-picker-list {
   max-height: none;
 }
+
+/* Task 14: the navigation card (desktop `.molecule-nav`, phone header and
+   Explore-tab body), the orbital list, the pick readout and the structure/
+   dipole view options. Separate rules throughout (ruling D29), not a
+   combined selector. */
+.molecule-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.molecule-nav-formula {
+  font-weight: 400;
+  opacity: 0.8;
+}
+/* Panel-card text (LIGHT_96): the method/geometry caption under the
+   surface toggle (MoleculeNav) and the "not ionisation energies" caption
+   under the orbital list (MoleculeOrbitalList). */
+.molecule-caption {
+  display: block;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+.molecule-orbital-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.molecule-orbital-row {
+  display: grid;
+  grid-template-columns: 48px 28px 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.molecule-orbital-row.selected {
+  border-color: #1976d2;
+  background: rgba(25, 118, 210, 0.08);
+}
+.molecule-orbital-energy {
+  font-variant-numeric: tabular-nums;
+}
+/* Panel-card text (LIGHT_96): the ×N degeneracy tag beside an orbital row. */
+.molecule-orbital-degeneracy {
+  opacity: 0.7;
+}
+
+/* Dark chip over the canvas, like `.esp-legend` (same background/alpha so
+   both read together in `.molecule-legend-stack`); this component does not
+   position itself -- see MoleculeReadout's own comment. */
+.molecule-readout {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(8, 8, 10, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.molecule-view-options {
+  gap: 2px;
+}
