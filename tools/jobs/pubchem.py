@@ -45,11 +45,17 @@ def _get(fetch, url, data=None):
 
 def parse_sdf(text: str):
     lines = text.splitlines()
-    count = int(lines[3][0:3])
+    counts_line = lines[3]
+    count = int(counts_line[0:3])
     atoms = []
     for line in lines[4:4 + count]:
         x, y, z = float(line[0:10]), float(line[10:20]), float(line[20:30])
         atoms.append([atomic_number(line[31:34].strip()), x, y, z])
+    # V3000 moves the atom block into "M  V30" records this fixed-column
+    # reader cannot see, which would otherwise silently return no atoms.
+    if 'V3000' in counts_line or not atoms:
+        raise JobRefused('no-3d-structure',
+                          'PubChem returned a V3000 structure this phase cannot read; paste an XYZ instead')
     charge = 0
     for line in lines[4 + count:]:
         if line.startswith('M  CHG'):
@@ -68,8 +74,10 @@ def resolve(kind: str, text: str, fetch: Fetch = urllib_fetch, today: Callable[[
     text = text.strip()
     if kind == 'name':
         # PubChem's name lookup is case-insensitive; lower-casing here keeps
-        # the URL consistent with normalise_query's cache key (D3).
-        status, body = _get(fetch, f'{BASE}/compound/name/{quote(" ".join(text.lower().split()))}/cids/JSON')
+        # the URL consistent with normalise_query's cache key (D3). safe=''
+        # also escapes a literal "/" (e.g. "cis/trans …"), which quote's
+        # default safe='/' would otherwise leave to split PubChem's path.
+        status, body = _get(fetch, f'{BASE}/compound/name/{quote(" ".join(text.lower().split()), safe="")}/cids/JSON')
     else:
         status, body = _get(fetch, f'{BASE}/compound/smiles/cids/JSON', urlencode({'smiles': text}).encode())
     cids = json.loads(body).get('IdentifierList', {}).get('CID', []) if status == 200 else []

@@ -97,6 +97,35 @@ def test_parse_sdf_water():
     assert atoms[0] == [8, 0.0, 0.0, 0.0] and charge == 0 and len(atoms) == 3
 
 
+def test_name_with_slash_is_escaped_in_the_url():
+    name = 'cis/trans-water'
+    expected_url = f'{BASE}/compound/name/{quote(name.lower(), safe="")}/cids/JSON'
+    responses = {
+        expected_url: 'name_water.json',
+        f'{BASE}/compound/cid/962/record/SDF?record_type=3d': 'cid_962_3d.sdf',
+        f'{BASE}/compound/cid/962/property/Title/JSON': 'cid_962_title.json',
+    }
+    fetch = fake_fetch(responses)
+    got = resolve('name', name, fetch)
+    assert got['cid'] == 962
+    url, _ = fetch.calls[0]
+    assert url == expected_url and '%2F' in url and '/trans' not in url
+
+
+def test_parse_sdf_v3000_is_refused():
+    text = '\n  -OEChem-\n\n  0  0  0  0  0  0  0  0  0  0999 V3000\nM  END\n'
+    with pytest.raises(JobRefused) as e:
+        parse_sdf(text)
+    assert e.value.code == 'no-3d-structure' and 'V3000' in e.value.message
+
+
+def test_parse_sdf_zero_atoms_is_refused():
+    text = '\n  -OEChem-\n\n  0  0  0  0  0  0  0  0  0  0999 V2000\nM  END\n'
+    with pytest.raises(JobRefused) as e:
+        parse_sdf(text)
+    assert e.value.code == 'no-3d-structure'
+
+
 def test_normalise_query():
     assert normalise_query('name', '  Caffeine   Anhydrous ') == 'name:caffeine anhydrous'
     assert normalise_query('smiles', ' CCO ') == 'smiles:CCO'
