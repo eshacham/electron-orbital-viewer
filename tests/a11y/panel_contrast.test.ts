@@ -90,6 +90,12 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     { selector: '.molecule-orbital-gap', declared: 'color: rgba(0, 0, 0, 0.62)', fg: 'rgba(0, 0, 0, 0.62)', bg: LIGHT_96 },
     { selector: '.molecule-nav-orbital', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
     { selector: '.molecule-error', declared: 'background-color: rgb(253, 237, 237)', fg: 'rgb(95, 33, 32)', bg: 'rgb(253, 237, 237)' },
+    // Phase 6B-2 Task 12: the tier badge's line over the canvas, and the
+    // followed job's status under the request panel in the desktop side
+    // panel -- which has no card of its own, so without one the status sat
+    // as dark text straight on the black scene (found live, ammonia running).
+    { selector: '.tier-badge', declared: 'background: rgba(240, 240, 240, 0.94)', fg: 'rgba(0, 0, 0, 0.87)', bg: 'rgba(240, 240, 240, 0.94)' },
+    { selector: '.molecule-jobs .job-status', declared: `background-color: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {

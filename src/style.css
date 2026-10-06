@@ -1444,3 +1444,13 @@ html, body, #root {
     right: 0;
   }
 }
+/* The followed job's status has no card of its own (the accordions above it
+   have MUI's): in the desktop side panel it sat as dark text straight on the
+   black scene (found live, Task 12, ammonia running). The same light card as
+   the accordions, so it reads over anything behind it. */
+.molecule-jobs .job-status {
+  background-color: rgba(240, 240, 240, 0.96);
+  color: rgba(0, 0, 0, 0.87);
+  padding: 8px 16px;
+  border-radius: 10px;
+}
