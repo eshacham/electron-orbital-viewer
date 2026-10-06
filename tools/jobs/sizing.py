@@ -46,6 +46,12 @@ OPEN_SHELL_FACTOR = 1.5
 # Fargate Spot runs Linux/ARM64 Batch jobs (AWS What's New 2025-08-14; checked 2026-10-05, Phase 6B-3
 # Task 1, and proven by Task 12's first job). False sends everything on-demand with one attempt.
 SPOT_AVAILABLE = True
+# D6 (preflight): Fargate bills from pullStartedAt to stoppedAt, which covers
+# the image pull and the stop grace -- neither counted by attemptDurationSeconds
+# (the timeout). Reserving only attempts x cost(timeout) under-reserves every
+# non-local job by that much; add this allowance before pricing the reservation.
+# Local runs have no Fargate bill, so they are untouched (cost_micros('local', ...) is 0 either way).
+BILLING_ALLOWANCE_SECONDS = 120
 
 
 def speedup(vcpu: int) -> float:
@@ -131,6 +137,10 @@ def decide(job: dict, local: bool = False) -> dict:
         capacity, attempts = 'spot', SPOT_ATTEMPTS
     else:
         capacity, attempts = 'on-demand', 1
+    # D6: reserve against the bill, not just the timeout -- see
+    # BILLING_ALLOWANCE_SECONDS. A local run bills nothing, so it keeps the
+    # bare timeout (cost_micros('local', ...) is 0 regardless).
+    reservation_seconds = timeout if local else timeout + BILLING_ALLOWANCE_SECONDS
     # estimateFor (M1): size, time and timeout are Fargate figures even for a
     # local run, which this Mac runs single-threaded and with no time limit;
     # the field lets 6B-2 label them "Fargate estimate" rather than a promise.
@@ -138,5 +148,5 @@ def decide(job: dict, local: bool = False) -> dict:
             'memoryGB': size.memory_gb, 'capacity': capacity, 'attempts': attempts, 'basisFunctions': n,
             'predictedSeconds': round(seconds, 1), 'predictedMemoryGB': round(memory, 2),
             'timeoutSeconds': timeout,
-            'reservationMicros': attempts * cost_micros(capacity, size.vcpu, size.memory_gb, timeout),
+            'reservationMicros': attempts * cost_micros(capacity, size.vcpu, size.memory_gb, reservation_seconds),
             'predictedCostMicros': cost_micros(capacity, size.vcpu, size.memory_gb, seconds)}

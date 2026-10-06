@@ -37,7 +37,10 @@ def test_water_single_is_small_spot_with_the_floor_timeout():
     d = sizing.decide(canonical_job('single', WATER, 0, 1))
     assert (d['size'], d['vcpu'], d['memoryGB'], d['capacity'], d['attempts']) == ('S', 2, 8, 'spot', 3)
     assert d['basisFunctions'] == 58 and d['timeoutSeconds'] == 600
-    assert d['reservationMicros'] == 3 * cost_micros('spot', 2, 8, 600)
+    # D6: billing runs pullStartedAt -> stoppedAt, which includes the image
+    # pull and the stop grace the timeout does not count, so the reservation
+    # covers timeout + BILLING_ALLOWANCE_SECONDS, not the bare timeout.
+    assert d['reservationMicros'] == 3 * cost_micros('spot', 2, 8, 720) == 17_880
     assert d['version'] == sizing.SIZING_VERSION
 
 
