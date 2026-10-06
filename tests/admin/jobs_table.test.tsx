@@ -66,4 +66,12 @@ describe('<JobsTable>', () => {
         expect(dataRows()[0]).toHaveTextContent('SCF did not converge');
         expect(screen.getByText('1 of 3 jobs')).toBeInTheDocument();
     });
+    // M7: an empty month and an over-narrow filter are different things to be told.
+    it('says a month with no jobs has none, and a filter that leaves none matches none', () => {
+        const { rerender } = render(<JobsTable jobs={[]} />);
+        expect(screen.getByText('No jobs this month.')).toBeInTheDocument();
+        rerender(<JobsTable jobs={JOBS} />);
+        fireEvent.change(screen.getByLabelText('Size'), { target: { value: 'XL' } });
+        expect(screen.getByText('No jobs match.')).toBeInTheDocument();
+    });
 });

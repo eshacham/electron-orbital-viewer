@@ -108,7 +108,8 @@ async function requireFinishedResult(key: string): Promise<void> {
     } catch {
         throw new MoleculeLoadError(`${url} is not valid JSON`);
     }
-    if (!done || !done.files || typeof done.files['meta.json'] !== 'string') {
+    const entry = done?.files?.['meta.json'];
+    if (typeof entry !== 'string' || entry === '') {
         throw new MoleculeLoadError(`${url} does not list meta.json: this result is incomplete`);
     }
 }

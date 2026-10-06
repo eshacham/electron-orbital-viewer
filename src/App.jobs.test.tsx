@@ -126,6 +126,8 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(mockApi.list).toHaveBeenCalledWith(currentMonth(), 'DONE');
         const side = container.querySelector('.side-panel') as HTMLElement;
         expect(within(side).getByRole('button', { name: 'Request a molecule' })).toBeInTheDocument();
+        // m5: MUI gives the details region the summary's aria-controls id; nothing else may carry it.
+        expect(container.querySelectorAll('#request-body')).toHaveLength(1);
         fireEvent.click(within(side).getByRole('button', { name: 'Computed' }));
         expect(within(within(side).getByRole('list', { name: 'molecules' })).getAllByRole('button')).toHaveLength(1);
         expect(screen.getByRole('group', { name: 'where jobs run' })).toBeInTheDocument();

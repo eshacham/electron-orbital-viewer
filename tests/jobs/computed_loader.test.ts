@@ -66,6 +66,11 @@ describe('opening a computed molecule', () => {
         routeFetch({ [DONE]: { status: 200, body: { key: KEY, files: {} } }, [META]: finished()[META] });
         await expect(loadMoleculeMeta(KEY)).rejects.toThrow(/does not list meta\.json/);
     });
+    it('refuses a done.json whose meta.json entry is empty (M2)', async () => {
+        const calls = routeFetch({ [DONE]: { status: 200, body: { key: KEY, files: { 'meta.json': '' } } }, [META]: finished()[META] });
+        await expect(loadMoleculeMeta(KEY)).rejects.toThrow(/does not list meta\.json/);
+        expect(calls.map(c => c.url)).toEqual([DONE]);
+    });
 
     it('forgets the failure, so the same link works once the job has finished', async () => {
         routeFetch({});

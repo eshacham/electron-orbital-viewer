@@ -1,4 +1,6 @@
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ProvenancePanel from '../../src/components/ProvenancePanel';
 import TierBadge from '../../src/components/TierBadge';
@@ -28,6 +30,15 @@ describe('TierBadge', () => {
         rerender(<TierBadge tier="computed" />);
         expect(screen.getByRole('note', { name: 'data tier' }))
             .toHaveTextContent('ComputedComputed on request by the same method; not benchmarked against experiment.');
+        // V1: the Computed chip takes the darker amber style.css declares (contrast-tested), not MUI's warning (3.1:1).
+        expect(screen.getByText('Computed').closest('.MuiChip-root')).toHaveClass('tier-chip-computed');
+        expect(screen.getByText('Computed').closest('.MuiChip-root')).not.toHaveClass('MuiChip-colorWarning');
+    });
+    // V2: the compact badge's title is its only pointer hint, and the legend stack takes no pointer events.
+    it('compact, takes the pointer, so its title can show', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+        const rule = /^\.tier-badge\.compact \{[^}]*\}/m.exec(css)?.[0] ?? '';
+        expect(rule).toContain('pointer-events: auto');
     });
     // Preflight D13 / ruling T16-c: on a phone the two-line badge pushed the
     // stack over the molecule; compact, it is the chip alone, its line kept
@@ -75,7 +86,14 @@ describe('ProvenancePanel', () => {
     it('says a resumed optimisation attempt and its step count (D10)', () => {
         render(<ProvenancePanel meta={computed({ recipe: 'optimise', geometrySource: { kind: 'xyz' } }, { geometryOptimisation: { steps: 3, converged: true, resumedFrom: 1 } })} ownerJob={null} />);
         open();
-        expect(screen.getByText(/resumed from attempt 1/)).toBeInTheDocument();
+        // M5: the step count is said once, as this attempt's.
+        expect(screen.getByText('Geometry: optimised at B3LYP/def2-SVP with geomeTRIC, starting from pasted XYZ coordinates, resumed from attempt 1’s last frame (3 steps in this attempt).')).toBeInTheDocument();
+    });
+    // m5: MUI already gives the details region the summary's aria-controls id; a second element with it is invalid.
+    it('leaves one element with its region id', () => {
+        render(<ProvenancePanel meta={computed()} ownerJob={null} />);
+        open();
+        expect(document.querySelectorAll('#provenance-body')).toHaveLength(1);
     });
     it('shows the owner the time against its prediction, and the cost', () => {
         render(<ProvenancePanel meta={computed()} ownerJob={jobFixture('get_done')} />);

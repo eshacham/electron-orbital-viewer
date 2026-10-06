@@ -22,10 +22,18 @@ function Geometry({ provenance, steps, resumedFrom }: { provenance: MoleculeProv
         ? <>PubChem CID <Link href={`${PUBCHEM_COMPOUND_URL}${source.cid}`} {...EXTERNAL}>{source.cid}</Link> ({source.title}), its computed 3D conformer, retrieved {source.retrievedAt}</>
         : <>pasted XYZ coordinates</>;
     if (provenance.recipe === 'single') return <Typography variant="body2">Geometry: {origin}, not optimised.</Typography>;
+    // M5: a resumed attempt's step count is this attempt's, said once, beside the resumption.
+    if (resumedFrom !== null) {
+        return (
+            <Typography variant="body2">
+                Geometry: optimised at B3LYP/def2-SVP with geomeTRIC, starting from {origin}, resumed from attempt {resumedFrom}’s last frame
+                {steps !== null ? ` (${steps} steps in this attempt)` : ''}.
+            </Typography>
+        );
+    }
     return (
         <Typography variant="body2">
-            Geometry: optimised at B3LYP/def2-SVP with geomeTRIC{steps !== null ? ` in ${steps} steps` : ''}, starting from {origin}
-            {resumedFrom !== null ? `, resumed from attempt ${resumedFrom}'s last frame (${steps} steps in this attempt)` : ''}.
+            Geometry: optimised at B3LYP/def2-SVP with geomeTRIC{steps !== null ? ` in ${steps} steps` : ''}, starting from {origin}.
         </Typography>
     );
 }
@@ -57,7 +65,8 @@ const ProvenancePanel: React.FC<ProvenancePanelProps> = ({ meta, ownerJob, owner
     return (
         <Accordion disableGutters className="provenance-panel" slotProps={{ transition: { unmountOnExit: true } }}>
             <AccordionSummary aria-controls="provenance-body" id="provenance-head">How this was computed</AccordionSummary>
-            <AccordionDetails id="provenance-body" className="provenance-body">
+            {/* m5: MUI gives the details' region the summary's aria-controls id itself. */}
+            <AccordionDetails className="provenance-body">
                 <Typography variant="body2">Method: {meta.method.density}, PySCF {provenance?.pyscfVersion ?? meta.generator.pyscf}.</Typography>
                 {provenance ? (
                     <>

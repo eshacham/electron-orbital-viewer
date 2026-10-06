@@ -110,7 +110,9 @@ const JobsTable: React.FC<{ jobs: JobView[] }> = ({ jobs }) => {
                     </TableHead>
                     <TableBody>
                         {rows.map(job => <JobRow key={job.key} job={job} />)}
-                        {rows.length === 0 && <TableRow><TableCell colSpan={COLUMNS.length}>No jobs match.</TableCell></TableRow>}
+                        {rows.length === 0 && (
+                            <TableRow><TableCell colSpan={COLUMNS.length}>{jobs.length === 0 ? 'No jobs this month.' : 'No jobs match.'}</TableCell></TableRow>
+                        )}
                     </TableBody>
                 </Table>
             </TableContainer>

@@ -1,4 +1,12 @@
 /* public/style.css */
+/* A phone's overlays under the header: the scale readout (and anything
+   placed level with it) and the molecule legend stack. Named once, so the
+   tier badge that sits up at the readout's level from inside the stack
+   (V3) follows either if it moves. */
+:root {
+  --phone-overlay-top: 60px;
+  --phone-legend-stack-top: 104px;
+}
 html, body, #root {
   height: 100%;
   /* iOS Safari counts the browser chrome in 100vh, which pushes the bottom of
@@ -611,7 +619,7 @@ html, body, #root {
   /* Small overlays sit just under the header. */
   .scale-readout {
     left: 12px;
-    top: 60px;
+    top: var(--phone-overlay-top);
     bottom: auto;
     padding: 6px 10px 5px;
     font-size: 12px;
@@ -1365,7 +1373,7 @@ html, body, #root {
    Task 16, pyridine at 390 and 844 px). */
 @media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
   .molecule-legend-stack {
-    top: 104px;
+    top: var(--phone-legend-stack-top);
     bottom: auto;
     left: auto;
     right: 12px;
@@ -1443,8 +1451,13 @@ html, body, #root {
 .owner-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 8px; }
 .owner-bar-target { display: flex; align-items: center; gap: 6px; }
 /* A phone's badge is the chip alone (preflight D13, ruling T16-c): no card
-   behind it, so the stack is no taller than the chip. */
-.tier-badge.compact { padding: 0; background: none; }
+   behind it, so the stack is no taller than the chip. It takes the pointer
+   (V2) although the stack it sits in does not: its title is the only place
+   a pointer reads its line. The chip is small, so it hides little of the
+   canvas from a drag. */
+.tier-badge.compact { padding: 0; background: none; pointer-events: auto; }
+/* V1: MUI's warning orange under white text is 3.1:1; this amber is 6.1:1. */
+.tier-badge .tier-chip-computed { background-color: #a84300; color: #ffffff; }
 /* A sideways phone has ~130 px between the header and the molecule, and the
    stack starts at 104 px: even the compact chip, as a row of its own, put
    the readout's bottom over the molecule's top (found live, Task 12, water
@@ -1455,7 +1468,10 @@ html, body, #root {
 @media (max-height: 500px) {
   .molecule-legend-stack .tier-badge.compact {
     position: absolute;
-    top: -44px;
+    /* V3: the scale readout's own top, measured from the stack's -- derived
+       from the two offsets that place them, not a number that silently goes
+       wrong when either moves. */
+    top: calc(var(--phone-overlay-top) - var(--phone-legend-stack-top));
     right: 0;
   }
 }

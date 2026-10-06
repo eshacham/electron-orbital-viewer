@@ -14,6 +14,9 @@ describe('money', () => {
         expect(formatUsd(0.00298)).toBe('$0.002980');
         expect(formatUsd(0.000001)).toBe('$0.000001000');
         expect(formatUsd(0)).toBe('$0.00');
+        // M1: just under a cent rounds to a cent at four figures, and is then shown as cents.
+        expect(formatUsd(0.0099999)).toBe('$0.01');
+        expect(formatUsd(0.009999)).toBe('$0.009999');
     });
     it('always says what the figure is', () => {
         expect(money('spent', 0.1)).toBe('spent $0.10');

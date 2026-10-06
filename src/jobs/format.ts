@@ -10,7 +10,8 @@ export type MoneyLabel = 'spent' | 'reserved' | 'projected' | 'remaining' | 'bil
 export function formatUsd(usd: number): string {
     const sign = usd < 0 ? '−' : '';
     const value = Math.abs(usd);
-    if (value === 0 || value >= 0.01) return `${sign}$${value.toFixed(2)}`;
+    // Rounded first: just under a cent is a cent at four figures ("$0.01000"), and is then shown as one.
+    if (value === 0 || Number(value.toPrecision(4)) >= 0.01) return `${sign}$${value.toFixed(2)}`;
     return `${sign}$${value.toPrecision(4)}`;
 }
 

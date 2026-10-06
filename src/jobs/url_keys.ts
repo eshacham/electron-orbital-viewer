@@ -1,6 +1,6 @@
 import { registerUrlKeys } from '../url_state';
 import type { RootState, AppDispatch } from '../store';
-import { linkRejected, selectMolecule } from '../store/moleculeSlice';
+import { jobLinkRejected, selectMolecule } from '../store/moleculeSlice';
 import { parseSurface } from '../molecules/url_keys';
 import { isJobKey } from '../molecules/job_paths';
 
@@ -13,8 +13,9 @@ export function encodeJobUrl(selectedId: string | null): Record<string, string> 
     return isJobKey(selectedId) ? { job: selectedId } : {};
 }
 
+/** The key is hex, which is case-blind (M2): a link that has been upper-cased on its way still names the job. */
 export function decodeJobUrl(params: URLSearchParams): string | null {
-    const value = params.get('job');
+    const value = params.get('job')?.toLowerCase() ?? null;
     return isJobKey(value) ? value : null;
 }
 
@@ -31,7 +32,7 @@ export function registerComputedUrlKeys(): void {
             } else if (raw) {
                 // Present but rejected (D14) -- a blank Molecules screen would hide
                 // that the link named something (spec §3.5; ruling T12-a's pattern).
-                dispatch(linkRejected(raw));
+                dispatch(jobLinkRejected(raw));
             }
         },
     );

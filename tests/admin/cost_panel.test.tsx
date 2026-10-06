@@ -32,6 +32,10 @@ describe('CostPanel', () => {
         render(<CostPanel costs={{ ...withSpend(), billing: { usd: 0.12, through: '2026-10-09' } }} />);
         expect(screen.getByText('AWS billed (Cost Explorer, a day behind, as of 2026-10-09): billed $0.12; our meter: spent $0.10.')).toBeInTheDocument();
     });
+    it('leaves the date out when the billing job did not say how far it reached (M8)', () => {
+        render(<CostPanel costs={{ ...withSpend(), billing: { usd: 0.12 } as CostsResponse['billing'] }} />);
+        expect(screen.getByText('AWS billed (Cost Explorer, a day behind): billed $0.12; our meter: spent $0.10.')).toBeInTheDocument();
+    });
     it('knows the length of each month', () => {
         expect([daysIn('2026-10'), daysIn('2026-02'), daysIn('2028-02')]).toEqual([31, 28, 29]);
     });

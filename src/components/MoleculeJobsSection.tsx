@@ -76,7 +76,7 @@ const MoleculeJobsSection: React.FC = () => {
                 <Accordion disableGutters className="request-accordion" expanded={jobs.request.open || expired}
                     onChange={(_event, value: boolean) => dispatch(requestOpened(value))}>
                     <AccordionSummary aria-controls="request-body" id="request-head">Request a molecule</AccordionSummary>
-                    <AccordionDetails id="request-body">
+                    <AccordionDetails>
                         <RequestPanel target={jobs.target} form={jobs.request.form} onFormChange={editForm}
                             preview={preview} submit={submit} onOpen={open} onFollow={follow}
                             sessionExpired={expired} onSignIn={signIn} />

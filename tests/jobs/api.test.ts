@@ -121,4 +121,14 @@ describe('failures say what happened', () => {
         await expect(createJobsApi('aws', PROD, quiet).get(KEY)).rejects.toMatchObject({ code: 'unreachable' });
         expect(quiet.fetch).not.toHaveBeenCalled();
     });
+    // M3
+    it('says the dev proxy failed when AWS answers 5xx with no readable error', async () => {
+        const d = deps([textResponse(500, 'proxy error')]);
+        await expect(createJobsApi('aws', DEV, d).get(KEY)).rejects.toMatchObject({ status: 500, code: 'aws-not-configured', message: expect.stringContaining('HTTP 500') });
+    });
+    it('a success whose body is not JSON is an error, not an empty answer', async () => {
+        const d = deps([textResponse(200, '<html>login</html>')]);
+        await expect(createJobsApi('aws', PROD, d).get(KEY)).rejects.toMatchObject({ status: 200, code: 'bad-response' });
+        await expect(createJobsApi('aws', PROD, deps([textResponse(200, '')])).list('2026-10')).rejects.toMatchObject({ code: 'bad-response' });
+    });
 });

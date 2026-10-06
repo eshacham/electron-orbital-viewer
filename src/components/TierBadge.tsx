@@ -17,7 +17,10 @@ export const TIER_TEXT: Record<MoleculeTier, { label: string; line: string }> = 
 const TierBadge: React.FC<{ tier: MoleculeTier; compact?: boolean }> = ({ tier, compact = false }) => {
     const lineId = useId();
     const { label, line } = TIER_TEXT[tier];
-    const chip = <Chip size="small" label={label} color={tier === 'validated' ? 'success' : 'warning'} />;
+    // V1: the computed chip's amber is declared in style.css (.tier-chip-computed), where its contrast is tested.
+    const chip = tier === 'validated'
+        ? <Chip size="small" label={label} color="success" />
+        : <Chip size="small" label={label} className="tier-chip-computed" />;
     if (compact) {
         return (
             <div className={`tier-badge tier-${tier} compact`} role="note" aria-label="data tier" title={line} aria-describedby={lineId}>

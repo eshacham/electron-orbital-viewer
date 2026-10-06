@@ -2,6 +2,8 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { MoleculeIndexEntry } from '../molecules/types';
 import type { LibraryMoleculeMeta, MoleculePick } from '../molecules/library_types';
 import { setMode } from './atomSlice';
+import { isJobKey } from '../molecules/job_paths';
+import { shortKey } from '../jobs/format';
 
 export type { MoleculePick };
 export type MoleculeSurface = { kind: 'density' } | { kind: 'esp' } | { kind: 'mo'; index: number };
@@ -53,6 +55,8 @@ const hasOrbital = (meta: LibraryMoleculeMeta | null, index: number) => !!meta &
 
 /** A URL id is attacker/typo territory -- never echoed back unbounded (ruling T12-a). */
 const truncateId = (id: string) => (id.length > 40 ? `${id.slice(0, 40)}…` : id);
+/** A job key is 64 unbroken characters -- too long for a phone's alert, and its first ten tell it apart (m7). */
+const displayId = (id: string) => (isJobKey(id) ? shortKey(id) : id);
 
 const moleculeSlice = createSlice({
     name: 'molecule',
@@ -96,10 +100,19 @@ const moleculeSlice = createSlice({
             state.drawn = null;
             state.error = `This link names no molecule in the library (“${truncateId(action.payload)}”)`;
         },
+        /** A job= value that is not a job key (m7): a job link is not a library link, and is said as what it is. */
+        jobLinkRejected: (state, action: PayloadAction<string>) => {
+            state.selectedId = null;
+            state.meta = null;
+            state.isLoadingMeta = false;
+            state.drawn = null;
+            const value = action.payload.length > 10 ? shortKey(action.payload) : action.payload;
+            state.error = `This link’s job key is not valid (“${value}”): a job key is 64 hexadecimal characters.`;
+        },
         metaFailed: (state, action: PayloadAction<{ id: string; message: string }>) => {
             if (action.payload.id !== state.selectedId) return;
             state.isLoadingMeta = false;
-            state.error = `Could not load “${action.payload.id}”: ${action.payload.message}`;
+            state.error = `Could not load “${displayId(action.payload.id)}”: ${action.payload.message}`;
         },
         setSurface: (state, action: PayloadAction<MoleculeSurface>) => {
             const surface = action.payload;
@@ -141,7 +154,7 @@ const moleculeSlice = createSlice({
 });
 
 export const {
-    indexLoaded, indexFailed, selectMolecule, metaLoaded, metaFailed, linkRejected, setSurface, setShowStructure, setShowDipole,
+    indexLoaded, indexFailed, selectMolecule, metaLoaded, metaFailed, linkRejected, jobLinkRejected, setSurface, setShowStructure, setShowDipole,
     setPick, renderStarted, renderFinished, renderFailed, renderCancelled,
 } = moleculeSlice.actions;
 export default moleculeSlice.reducer;

@@ -79,10 +79,11 @@ export function createJobsApi(target: JobsTarget, env: BuildEnv, deps: JobsApiDe
         }
         const text = await response.text();
         let data: unknown = null;
+        let readable = true;
         try {
             data = text ? JSON.parse(text) : null;
         } catch {
-            data = null;
+            readable = false;
         }
         if (response.status === 401) {
             // API Gateway's JWT authoriser: a missing, expired or revoked token.
@@ -92,7 +93,13 @@ export function createJobsApi(target: JobsTarget, env: BuildEnv, deps: JobsApiDe
             deps.onSessionExpired();
             throw new JobsApiError(401, 'session-expired', SESSION_ENDED);
         }
-        if (response.ok) return { status: response.status, data };
+        // M3: every route answers JSON, so a success without it (a login page, an empty body) is not an answer.
+        if (response.ok) {
+            if (!readable || data === null) {
+                throw new JobsApiError(response.status, 'bad-response', `The jobs API answered HTTP ${response.status} without a readable body.`);
+            }
+            return { status: response.status, data };
+        }
         const error = (data as { error?: { code?: unknown; message?: unknown } } | null)?.error;
         if (error && typeof error.code === 'string' && typeof error.message === 'string') {
             // With JOBS_AWS_API_URL unset, 6B-1's proxy sends /api/aws on to the local server, which has no such route.
