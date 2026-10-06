@@ -1,4 +1,4 @@
-import { JobPoller, PollerDeps, POLL_INTERVAL_MS } from '../../src/jobs/poller';
+import { JobPoller, PollerDeps, POLL_INTERVAL_MS, POLL_TIMEOUT_MS, PollTimeoutError } from '../../src/jobs/poller';
 import type { JobStatus, JobView } from '../../src/jobs/api_types';
 import { jobFixture } from './api_fixtures';
 
@@ -14,7 +14,16 @@ function harness(hiddenAtStart = false) {
     let nextId = 1;
     const listeners = new Set<() => void>();
     const answers: Array<() => Promise<JobView>> = [];
-    const fetchJob = jest.fn((_key: string) => (answers.shift() ?? (async () => view('RUNNING')))());
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const fetchJob = jest.fn((_key: string, _signal: AbortSignal) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        const settle = () => { inFlight -= 1; };
+        const answer = (answers.shift() ?? (async () => view('RUNNING')))();
+        answer.then(settle, settle);
+        return answer;
+    });
     const deps: PollerDeps = {
         fetchJob,
         onUpdate: jest.fn(),
@@ -40,7 +49,10 @@ function harness(hiddenAtStart = false) {
         await flush();
     }
     const setHidden = (value: boolean) => { hidden = value; listeners.forEach(listener => listener()); };
-    return { poller: new JobPoller(deps), deps, fetchJob, answers, advance, setHidden, listeners };
+    return {
+        poller: new JobPoller(deps), deps, fetchJob, answers, advance, setHidden, listeners,
+        maxInFlight: () => maxInFlight, timers: () => timers.length,
+    };
 }
 
 describe('JobPoller', () => {
@@ -70,9 +82,9 @@ describe('JobPoller', () => {
 
     it('never has two requests in flight for one job', async () => {
         const h = harness();
-        h.answers.push(() => new Promise(() => {}));               // a request that never answers
+        h.answers.push(() => new Promise(() => {}));               // a request that does not answer before its deadline
         h.poller.watch(KEY);
-        await h.advance(20 * POLL_INTERVAL_MS);
+        await h.advance(POLL_TIMEOUT_MS - 1);
         expect(h.fetchJob).toHaveBeenCalledTimes(1);
     });
 
@@ -133,5 +145,56 @@ describe('JobPoller', () => {
         h.poller.restart(KEY);
         await h.advance(0);
         expect(h.fetchJob).toHaveBeenCalledTimes(2);
+    });
+
+    // Final review I4(b): the reviewer's probe. A request still out when the
+    // last panel unmounts must still count when one remounts, or a slow
+    // network (exactly when panels come and go) sends two at once.
+    it('a request still out across an unmount and a remount is never joined by a second', async () => {
+        const h = harness();
+        let answer: (value: JobView) => void = () => undefined;
+        h.answers.push(() => new Promise<JobView>(resolve => { answer = resolve; }));
+        const release = h.poller.watch(KEY);
+        await h.advance(0);
+        release();
+        await h.advance(6000);
+        h.poller.watch(KEY);
+        await h.advance(POLL_INTERVAL_MS);                           // 11 s in: past an interval, inside the deadline
+        expect(h.fetchJob).toHaveBeenCalledTimes(1);
+        expect(h.maxInFlight()).toBe(1);
+        answer(view('RUNNING'));
+        await h.advance(0);
+        expect(h.fetchJob).toHaveBeenCalledTimes(2);
+        expect(h.maxInFlight()).toBe(1);
+    });
+
+    // Final review I4(a): a stalled request (a laptop waking, a phone changing
+    // network) must not freeze the status for as long as the socket lives.
+    it('gives up on a request after its deadline, says the status could not be refreshed, and asks again', async () => {
+        const h = harness();
+        h.answers.push(() => new Promise<JobView>(() => {}));
+        h.poller.watch(KEY);
+        await h.advance(0);
+        const signal = h.fetchJob.mock.calls[0][1];
+        await h.advance(POLL_TIMEOUT_MS - 1);
+        expect(h.deps.onError).not.toHaveBeenCalled();
+        await h.advance(1);
+        expect(signal.aborted).toBe(true);
+        expect(h.deps.onError).toHaveBeenCalledWith(KEY, expect.any(PollTimeoutError));
+        await h.advance(0);
+        expect(h.fetchJob).toHaveBeenCalledTimes(2);
+    });
+
+    it('forgets a job once nobody follows it and its interval has passed (M4)', async () => {
+        const h = harness();
+        h.answers.push(async () => view('DONE'));
+        const release = h.poller.watch(KEY);
+        await h.advance(0);
+        release();
+        await h.advance(POLL_INTERVAL_MS);
+        h.poller.watch('f'.repeat(64))();
+        const internals = h.poller as unknown as { lastSent: Map<string, number>; finished: Set<string> };
+        expect(internals.lastSent.has(KEY)).toBe(false);
+        expect(internals.finished.has(KEY)).toBe(false);
     });
 });

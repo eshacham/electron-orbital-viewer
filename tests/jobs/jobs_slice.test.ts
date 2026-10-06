@@ -1,6 +1,6 @@
 import reducer, {
     setTarget, sessionChanged, sessionExpired, sessionFailed, jobUpdated, jobFetchFailed, followJob, computedLoaded,
-    refreshComputed, selectIsOwner, initialJobsState, JobsState,
+    refreshComputed, selectIsOwner, initialJobsState, JobsState, requestDraftChanged, requestOpened, sessionErrorDismissed,
 } from '../../src/store/jobsSlice';
 import { BUILD_ENV } from '../../src/jobs/build_env';
 import { resetBuildEnv } from './build_env_stub';
@@ -64,6 +64,28 @@ describe('jobs state', () => {
         expect([s.records, s.followedKey, s.computed.jobs]).toEqual([{}, null, null]);
         expect(s.computed.nonce).toBe(nonce + 1);
         expect(reducer(s, refreshComputed()).computed.nonce).toBe(nonce + 2);
+    });
+    // Final review I1: a poll in flight during a switch must not land its This Mac view among the AWS records.
+    it('drops a view that was asked for under the other target', () => {
+        BUILD_ENV.dev = true;
+        const running = jobFixture('get_running');
+        const s = reducer(initialJobsState(), setTarget('aws'));
+        expect(reducer(s, jobUpdated(running, 'local')).records).toEqual({});
+        expect(reducer(s, jobUpdated(running, 'aws')).records[running.key].status).toBe('RUNNING');
+        expect(reducer(s, jobUpdated(running)).records[running.key].status).toBe('RUNNING');
+    });
+    // Final review I2: the form outlives the panel (a folded phone sheet, another tab).
+    it("keeps the owner's request draft and whether its panel is open, across a target switch too", () => {
+        BUILD_ENV.dev = true;
+        let s = reducer(initialJobsState(), requestDraftChanged({ text: 'water', kind: 'name' }));
+        s = reducer(s, requestDraftChanged({ charge: '-1' }));
+        s = reducer(s, requestOpened(true));
+        s = reducer(s, setTarget('aws'));
+        expect(s.request).toEqual({ form: { kind: 'name', text: 'water', recipe: 'single', charge: '-1', multiplicity: '' }, open: true });
+    });
+    it('a failed sign-in can be dismissed', () => {
+        const s = reducer(initialJobsState(), sessionFailed('Sign-in did not complete.'));
+        expect(reducer(s, sessionErrorDismissed()).session.error).toBeNull();
     });
     it('keeps the listed jobs as records too, so opening one needs no second read', () => {
         const list = listFixture('list_done');

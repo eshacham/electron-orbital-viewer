@@ -3,7 +3,7 @@ import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createAppStore } from './store';
 import { selectMolecule, setShowStructure } from './store/moleculeSlice';
-import { sessionChanged, sessionExpired, TARGET_STORAGE_KEY } from './store/jobsSlice';
+import { followJob, jobUpdated, sessionChanged, sessionExpired, TARGET_STORAGE_KEY } from './store/jobsSlice';
 import { BUILD_ENV } from './jobs/build_env';
 import { SESSION_ENDED } from './jobs/api';
 import { currentMonth } from './jobs/format';
@@ -34,9 +34,11 @@ jest.mock('./molecules/loader', () => ({
     loadMoleculeIndex: jest.fn(), loadMoleculeMeta: jest.fn(), loadDensityGrid: jest.fn(), loadBasis: jest.fn(),
 }));
 const mockApi = { preview: jest.fn(), submit: jest.fn(), get: jest.fn(), list: jest.fn(), costs: jest.fn() };
+const mockRelease = jest.fn();
+const mockPoller = { watch: jest.fn(() => mockRelease), restart: jest.fn() };
 jest.mock('./jobs/client', () => ({
     jobsApi: () => mockApi,
-    jobsPoller: () => ({ watch: () => () => undefined, restart: () => undefined }),
+    jobsPoller: () => mockPoller,
     chooseTarget: jest.fn(),
     bindJobsClient: jest.fn(),
 }));
@@ -170,6 +172,39 @@ describe('Molecules mode with on-demand molecules', () => {
         const sheet = screen.getByRole('tabpanel');
         expect(within(sheet).getByRole('button', { name: 'How this was computed' })).toBeInTheDocument();
         expect(within(sheet).getByRole('button', { name: 'Request a molecule' })).toBeInTheDocument();
+    });
+
+    // Final review I2: tapping the open Explore tab folds the sheet and
+    // unmounts the status panel; the job is still followed, and opens.
+    it('on a phone, a followed job that finishes while the sheet is folded still opens in the viewer', async () => {
+        BUILD_ENV.dev = true;
+        const { store } = await enterMolecules(true);
+        await show(store, 'h2o');
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        act(() => {
+            store.dispatch(jobUpdated({ ...jobFixture('get_running'), key: KEY }));
+            store.dispatch(followJob(KEY));
+        });
+        expect(within(screen.getByRole('tabpanel')).getByRole('region', { name: 'job status' })).toHaveTextContent('Running');
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        expect(screen.queryByRole('tabpanel')).toBeNull();
+        expect(mockPoller.watch).toHaveBeenCalledWith(KEY);
+        expect(mockRelease).not.toHaveBeenCalled();
+        act(() => { store.dispatch(jobUpdated(jobFixture('get_done'))); });
+        await flush();
+        expect(store.getState().molecule.selectedId).toBe(KEY);
+    });
+
+    it('on a phone, the request typed survives a switch to another tab and back', async () => {
+        BUILD_ENV.dev = true;
+        await enterMolecules(true);
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Request a molecule' }));
+        fireEvent.change(screen.getByRole('textbox', { name: /^molecule/ }), { target: { value: 'water' } });
+        fireEvent.click(screen.getByRole('tab', { name: 'View' }));
+        expect(screen.queryByRole('textbox', { name: /^molecule/ })).toBeNull();
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        expect(screen.getByRole('textbox', { name: /^molecule/ })).toHaveValue('water');
     });
 
     it('says an ended session, with the way back, rather than hiding the request panel silently', async () => {

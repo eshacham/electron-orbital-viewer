@@ -3,6 +3,7 @@ import { createJobsApi, JobsApi, JobsApiError } from './api';
 import { BUILD_ENV } from './build_env';
 import { ownerAuth } from './owner_session';
 import { JobPoller } from './poller';
+import type { JobView } from './api_types';
 import {
     sessionExpired, setTarget, JobsState, JobsTarget, TARGET_STORAGE_KEY, jobFetchFailed, jobUpdated,
 } from '../store/jobsSlice';
@@ -40,9 +41,16 @@ export function jobsApi(): JobsApi {
 export function jobsPoller(): Pick<JobPoller, 'watch' | 'restart'> {
     if (poller) return poller;
     const store = requireStore();
+    // Where each answer was asked for: one that lands after a switch of target belongs to the other backend (final review I1).
+    const askedUnder = new WeakMap<JobView, JobsTarget>();
     poller = new JobPoller({
-        fetchJob: key => jobsApi().get(key),
-        onUpdate: view => { store.dispatch(jobUpdated(view)); },
+        fetchJob: async (key, signal) => {
+            const target = store.getState().jobs.target;
+            const view = await jobsApi().get(key, signal);
+            askedUnder.set(view, target);
+            return view;
+        },
+        onUpdate: view => { store.dispatch(jobUpdated(view, askedUnder.get(view) ?? null)); },
         onError: (key, error) => { store.dispatch(jobFetchFailed({ key, message: error instanceof Error ? error.message : String(error) })); },
         isFatal: error => error instanceof JobsApiError
             && (error.status === 401 || error.status === 404 || error.code === 'not-configured' || error.code === 'aws-not-configured'),

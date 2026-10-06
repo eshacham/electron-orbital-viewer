@@ -97,6 +97,7 @@ import MoleculeJobsSection from './components/MoleculeJobsSection';
 import TierBadge from './components/TierBadge';
 import { ConnectedOwnerBar } from './components/OwnerBar';
 import { useComputedList } from './jobs/useComputedList';
+import { useFollowedJob } from './jobs/useFollowedJob';
 import { withComputed } from './jobs/computed';
 import { selectIsOwner } from './store/jobsSlice';
 import { tierOf } from './molecules/types';
@@ -523,6 +524,8 @@ function App() {
     const isOwner = useAppSelector(selectIsOwner);
     const computedJobs = useAppSelector(state => state.jobs.computed.jobs);
     useComputedList(isMoleculeMode);
+    // Always mounted, whatever the mode or the phone sheet shows: a job that finishes still opens (final review I2).
+    useFollowedJob();
     const moleculeEntries = useMemo(
         () => withComputed(molecule.index, isOwner ? computedJobs : null),
         [molecule.index, isOwner, computedJobs],

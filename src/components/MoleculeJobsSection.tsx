@@ -1,13 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Accordion, AccordionDetails, AccordionSummary, Alert } from '@mui/material';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectMolecule } from '../store/moleculeSlice';
-import { followJob, jobFetchFailed, jobUpdated, refreshComputed, selectIsOwner } from '../store/jobsSlice';
+import {
+    followJob, jobFetchFailed, jobUpdated, refreshComputed, requestDraftChanged, requestOpened, selectIsOwner,
+} from '../store/jobsSlice';
 import { tierOf } from '../molecules/types';
 import { isJobKey } from '../molecules/job_paths';
 import { jobsApi, jobsPoller } from '../jobs/client';
 import { retryBody } from '../jobs/request_form';
 import type { JobRequest, JobView } from '../jobs/api_types';
+import type { RequestForm } from '../jobs/request_form';
 import { signInHere } from './OwnerBar';
 import ProvenancePanel from './ProvenancePanel';
 import RequestPanel from './RequestPanel';
@@ -28,7 +31,6 @@ const MoleculeJobsSection: React.FC = () => {
     const meta = useAppSelector(state => state.molecule.meta);
     const isOwner = useAppSelector(selectIsOwner);
     const jobs = useAppSelector(state => state.jobs);
-    const [requestOpen, setRequestOpen] = useState(false);
     const computedKey = meta && tierOf(meta) === 'computed' && isJobKey(meta.id) ? meta.id : null;
     const ownerJob = computedKey && isOwner ? jobs.records[computedKey] ?? null : null;
     const ownerJobError = computedKey && isOwner ? jobs.recordErrors[computedKey] ?? null : null;
@@ -37,12 +39,13 @@ const MoleculeJobsSection: React.FC = () => {
     useEffect(() => {
         if (!computedKey || !isOwner || ownerJob || ownerJobError) return undefined;
         let cancelled = false;
+        const target = jobs.target;
         jobsApi().get(computedKey).then(
-            view => { if (!cancelled) dispatch(jobUpdated(view)); },
+            view => { if (!cancelled) dispatch(jobUpdated(view, target)); },
             error => { if (!cancelled) dispatch(jobFetchFailed({ key: computedKey, message: message(error) })); },
         );
         return () => { cancelled = true; };
-    }, [computedKey, isOwner, ownerJob, ownerJobError, dispatch]);
+    }, [computedKey, isOwner, ownerJob, ownerJobError, jobs.target, dispatch]);
 
     const open = useCallback((key: string) => {
         dispatch(selectMolecule({ id: key }));
@@ -53,13 +56,11 @@ const MoleculeJobsSection: React.FC = () => {
         dispatch(followJob(job.key));
         jobsPoller().restart(job.key);
     }, [dispatch]);
+    // A refusal propagates to the status panel, which says it as a refused retry (m6).
     const retry = useCallback(async (view: JobView) => {
-        try {
-            follow((await jobsApi().submit(retryBody(view))).job);
-        } catch (error) {
-            dispatch(jobFetchFailed({ key: view.key, message: message(error) }));
-        }
-    }, [dispatch, follow]);
+        follow((await jobsApi().submit(retryBody(view))).job);
+    }, [follow]);
+    const editForm = useCallback((change: Partial<RequestForm>) => { dispatch(requestDraftChanged(change)); }, [dispatch]);
     // jobsApi() reads the current target and session at call time, so these never go stale.
     const preview = useCallback((body: JobRequest, signal: AbortSignal) => jobsApi().preview(body, signal), []);
     const submit = useCallback((body: JobRequest) => jobsApi().submit(body), []);
@@ -72,11 +73,12 @@ const MoleculeJobsSection: React.FC = () => {
                 <Alert severity="warning">Could not list this month’s computed molecules: {jobs.computed.error}</Alert>
             )}
             {(isOwner || expired) && (
-                <Accordion disableGutters className="request-accordion" expanded={requestOpen || expired}
-                    onChange={(_event, value: boolean) => setRequestOpen(value)}>
+                <Accordion disableGutters className="request-accordion" expanded={jobs.request.open || expired}
+                    onChange={(_event, value: boolean) => dispatch(requestOpened(value))}>
                     <AccordionSummary aria-controls="request-body" id="request-head">Request a molecule</AccordionSummary>
                     <AccordionDetails id="request-body">
-                        <RequestPanel target={jobs.target} preview={preview} submit={submit} onOpen={open} onFollow={follow}
+                        <RequestPanel target={jobs.target} form={jobs.request.form} onFormChange={editForm}
+                            preview={preview} submit={submit} onOpen={open} onFollow={follow}
                             sessionExpired={expired} onSignIn={signIn} />
                     </AccordionDetails>
                 </Accordion>

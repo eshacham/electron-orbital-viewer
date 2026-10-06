@@ -3,7 +3,7 @@ import {
     Alert, Button, FormControlLabel, Radio, RadioGroup, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import PreviewDetails from './PreviewDetails';
-import { EMPTY_FORM, FormProblem, formProblems, formSignature, InputKind, requestBody, RequestForm, retryBody } from '../jobs/request_form';
+import { FormProblem, formProblems, formSignature, InputKind, requestBody, RequestForm, retryBody } from '../jobs/request_form';
 import { PreviewFn, usePreview } from '../jobs/usePreview';
 import { SESSION_ENDED } from '../jobs/api';
 import { isActive, JobRequest, JobView, PreviewResponse, Recipe } from '../jobs/api_types';
@@ -11,6 +11,9 @@ import type { JobsTarget } from '../store/jobsSlice';
 
 export interface RequestPanelProps {
     target: JobsTarget;
+    /** The form as typed, kept by the caller (the jobs slice): a folded phone sheet unmounts this panel (final review I2). */
+    form: RequestForm;
+    onFormChange(change: Partial<RequestForm>): void;
     preview: PreviewFn;
     submit(body: JobRequest): Promise<{ status: number; job: JobView }>;
     onOpen(key: string): void;
@@ -61,8 +64,7 @@ function SubmitArea({ preview, busy, onOpen, onFollow, onSubmit, onRetry }: Subm
  * optional charge and multiplicity; then Preview, which shows what was
  * resolved and how it would run, before anything is submitted or reserved.
  */
-const RequestPanel: React.FC<RequestPanelProps> = ({ target, preview, submit, onOpen, onFollow, sessionExpired, onSignIn }) => {
-    const [form, setForm] = useState<RequestForm>(EMPTY_FORM);
+const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange, preview, submit, onOpen, onFollow, sessionExpired, onSignIn }) => {
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const { state, run, clear } = usePreview(preview);
@@ -72,7 +74,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, preview, submit, on
     const current = state.phase !== 'idle' && state.signature === formSignature(form) ? state : null;
 
     const edit = (change: Partial<RequestForm>) => {
-        setForm(previous => ({ ...previous, ...change }));
+        onFormChange(change);
         clear();
         setSubmitError(null);
     };

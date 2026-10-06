@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import RequestPanel, { RequestPanelProps } from '../../src/components/RequestPanel';
 import { JobsApiError, SESSION_ENDED } from '../../src/jobs/api';
 import type { PreviewResponse } from '../../src/jobs/api_types';
+import { EMPTY_FORM, RequestForm } from '../../src/jobs/request_form';
 import { jobFixture, previewFixture } from './api_fixtures';
 
 function deferred<T>() {
@@ -12,15 +13,22 @@ function deferred<T>() {
 }
 const flush = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
 
-function setup(over: Partial<RequestPanelProps> = {}) {
-    const props: RequestPanelProps = {
+type PanelProps = Omit<RequestPanelProps, 'form' | 'onFormChange'>;
+/** The panel's form lives with its caller (the jobs slice in the app); here, in a parent's state. */
+const Harness: React.FC<PanelProps> = props => {
+    const [form, setForm] = useState<RequestForm>(EMPTY_FORM);
+    return <RequestPanel {...props} form={form} onFormChange={change => setForm(previous => ({ ...previous, ...change }))} />;
+};
+
+function setup(over: Partial<PanelProps> = {}) {
+    const props: PanelProps = {
         target: 'local',
         preview: jest.fn(async () => previewFixture('preview_ok')),
         submit: jest.fn(async () => ({ status: 201, job: jobFixture('submit_created') })),
         onOpen: jest.fn(), onFollow: jest.fn(), sessionExpired: false, onSignIn: jest.fn(),
         ...over,
     };
-    const utils = render(<RequestPanel {...props} />);
+    const utils = render(<Harness {...props} />);
     return { props, ...utils };
 }
 const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -147,7 +155,7 @@ describe('submitting', () => {
     it('an ended session keeps the form, disables it and offers sign-in', () => {
         const { props, rerender } = setup();
         type('molecule', 'water');
-        rerender(<RequestPanel {...props} sessionExpired />);
+        rerender(<Harness {...props} sessionExpired />);
         expect(screen.getByRole('alert')).toHaveTextContent(SESSION_ENDED);
         expect(screen.getByLabelText('molecule')).toHaveValue('water');
         expect(screen.getByLabelText('molecule')).toBeDisabled();

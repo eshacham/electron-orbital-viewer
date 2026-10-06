@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { JobView } from '../jobs/api_types';
+import type { RequestForm } from '../jobs/request_form';
 import { BUILD_ENV } from '../jobs/build_env';
 
 export type JobsTarget = 'local' | 'aws';
@@ -19,6 +20,16 @@ export interface OwnerSession {
 export interface ComputedList { month: string | null; jobs: JobView[] | null; error: string | null; nonce: number }
 
 /**
+ * The owner's request as typed, and whether its panel is open. Kept here,
+ * not in the panel (final review I2): the phone sheet unmounts a tab's
+ * content when it folds or another tab opens, and a pasted XYZ must not go
+ * with it. A preview is not kept -- it is asked for again.
+ */
+export interface RequestDraft { form: RequestForm; open: boolean }
+// request_form.EMPTY_FORM, written out: importing it would pull the element table into /admin.html.
+const EMPTY_DRAFT: RequestForm = { kind: 'name', text: '', recipe: 'single', charge: '', multiplicity: '' };
+
+/**
  * The jobs interface's state: who is signed in, where jobs run, the latest
  * view of every job the page has seen, the one being followed, and the
  * owner's computed list. Shared by the viewer and /admin.html, which mount
@@ -31,6 +42,7 @@ export interface JobsState {
     recordErrors: Record<string, string>;
     followedKey: string | null;
     computed: ComputedList;
+    request: RequestDraft;
 }
 
 /** Production has one API, the deployed one; only the dev server offers This Mac, remembered across its two pages. */
@@ -51,6 +63,7 @@ export function initialJobsState(): JobsState {
         recordErrors: {},
         followedKey: null,
         computed: { month: null, jobs: null, error: null, nonce: 0 },
+        request: { form: { ...EMPTY_DRAFT }, open: false },
     };
 }
 
@@ -84,9 +97,22 @@ const jobsSlice = createSlice({
         sessionFailed: (state, action: PayloadAction<string>) => {
             state.session.error = action.payload;
         },
-        jobUpdated: (state, action: PayloadAction<JobView>) => {
-            state.records[action.payload.key] = action.payload;
-            delete state.recordErrors[action.payload.key];
+        sessionErrorDismissed: state => {
+            state.session.error = null;
+        },
+        /**
+         * `target` is where the request that produced the view was sent. A
+         * view asked for before a switch belongs to the other backend: a key
+         * names the same molecule on both, but a job on this Mac is not a
+         * job on AWS (final review I1).
+         */
+        jobUpdated: {
+            reducer: (state, action: PayloadAction<JobView, string, { target: JobsTarget | null }>) => {
+                if (action.meta.target !== null && action.meta.target !== state.target) return;
+                state.records[action.payload.key] = action.payload;
+                delete state.recordErrors[action.payload.key];
+            },
+            prepare: (view: JobView, target: JobsTarget | null = null) => ({ payload: view, meta: { target } }),
         },
         jobFetchFailed: (state, action: PayloadAction<{ key: string; message: string }>) => {
             state.recordErrors[action.payload.key] = action.payload.message;
@@ -106,6 +132,12 @@ const jobsSlice = createSlice({
         refreshComputed: state => {
             state.computed.nonce += 1;
         },
+        requestDraftChanged: (state, action: PayloadAction<Partial<RequestForm>>) => {
+            Object.assign(state.request.form, action.payload);
+        },
+        requestOpened: (state, action: PayloadAction<boolean>) => {
+            state.request.open = action.payload;
+        },
     },
 });
 
@@ -114,7 +146,7 @@ export const selectIsOwner = (state: { jobs: JobsState }): boolean =>
     state.jobs.session.signedIn || (BUILD_ENV.dev && state.jobs.target === 'local');
 
 export const {
-    setTarget, sessionChanged, sessionExpired, sessionFailed, jobUpdated, jobFetchFailed, followJob, computedLoaded,
-    computedFailed, refreshComputed,
+    setTarget, sessionChanged, sessionExpired, sessionFailed, sessionErrorDismissed, jobUpdated, jobFetchFailed, followJob,
+    computedLoaded, computedFailed, refreshComputed, requestDraftChanged, requestOpened,
 } = jobsSlice.actions;
 export default jobsSlice.reducer;
