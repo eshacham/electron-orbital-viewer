@@ -380,10 +380,14 @@ describe('built-in URL keys', () => {
                 expect(s.orbital.surfaceStyle).toMatchObject({ opacity: 1, mode: 'solid', clipAxis: 'none' });
                 expect(s.orbital.cameraAngles).toBeNull();
             }],
-            // A well-formed molecule link switches mode and selects the id
-            // (registerMoleculeUrlKeys is now registered); a bad id does not.
-            ['#mode=molecule&id=h2o', s => expect(s.molecule).toMatchObject({ selectedId: 'h2o' })],
-            ['#mode=molecule&id=H2O!<script>', s => expect(s.molecule).toMatchObject({ selectedId: null })],
+            // A well-formed molecule link switches mode and selects the id;
+            // a bad one switches mode too but names itself in an explicit
+            // error rather than leaving a blank Molecules screen (spec §3.5;
+            // ruling T12-a).
+            ['#mode=molecule&id=h2o', s => expect(s.molecule).toMatchObject({ selectedId: 'h2o', error: null })],
+            ['#mode=molecule&id=H2O!<script>', s => expect(s.molecule).toMatchObject({
+                selectedId: null, error: 'This link names no molecule in the library (“H2O!<script>”)',
+            })],
             ['#op=&cut=&Z=', s => expect(s.orbital.surfaceStyle.opacity).toBe(1)],
         ];
         for (const [hash, check] of cases) {

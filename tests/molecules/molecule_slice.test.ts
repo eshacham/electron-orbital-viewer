@@ -1,5 +1,6 @@
 import reducer, {
     selectMolecule, metaLoaded, metaFailed, setSurface, renderStarted, renderFinished, renderFailed, indexLoaded,
+    linkRejected,
 } from '../../src/store/moleculeSlice';
 import { encodeMoleculeUrl, decodeMoleculeUrl } from '../../src/molecules/url_keys';
 import { waterMeta } from './fixtures';
@@ -41,6 +42,22 @@ describe('moleculeSlice', () => {
         expect(s.surface).toEqual({ kind: 'density' });
         expect(reducer(s, setSurface({ kind: 'mo', index: 99 })).surface).toEqual({ kind: 'density' });
         expect(reducer(s, setSurface({ kind: 'mo', index: 4 })).surface).toEqual({ kind: 'mo', index: 4 });
+    });
+    // Ruling T12-a / spec §3.5: a bad URL id must not land Molecules mode on
+    // a blank screen -- it is an explicit message, same family as metaFailed's.
+    it('rejects a link naming no molecule, with no stale selection left standing', () => {
+        let s = reducer(init(), selectMolecule({ id: 'h2o' }));
+        s = reducer(s, metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        s = reducer(s, linkRejected('not-a-real-id!!'));
+        expect(s.selectedId).toBeNull();
+        expect(s.meta).toBeNull();
+        expect(s.isLoadingMeta).toBe(false);
+        expect(s.error).toBe('This link names no molecule in the library (“not-a-real-id!!”)');
+    });
+    it('truncates a very long or hostile id in the rejection message', () => {
+        const long = 'x'.repeat(60);
+        const s = reducer(init(), linkRejected(long));
+        expect(s.error).toBe(`This link names no molecule in the library (“${'x'.repeat(40)}…”)`);
     });
     it('reports a failed load explicitly', () => {
         let s = reducer(init(), selectMolecule({ id: 'xyz' }));

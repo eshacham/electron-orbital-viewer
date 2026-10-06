@@ -1,7 +1,7 @@
 import { registerUrlKeys } from '../url_state';
 import type { RootState, AppDispatch } from '../store';
 import { setMode } from '../store/atomSlice';
-import { MoleculeState, MoleculeSurface, selectMolecule, setShowDipole, setShowStructure } from '../store/moleculeSlice';
+import { MoleculeState, MoleculeSurface, linkRejected, selectMolecule, setShowDipole, setShowStructure } from '../store/moleculeSlice';
 
 /**
  * Molecules mode in the URL (spec §4.3), e.g.
@@ -34,7 +34,13 @@ export function encodeMoleculeUrl(state: MoleculeState): Record<string, string> 
     return out;
 }
 
-/** Unknown or malformed values are dropped, never thrown on (spec §4.3). An unknown id fails visibly at load. */
+/**
+ * Unknown or malformed values are dropped, never thrown on (spec §4.3).
+ * A malformed `id` is dropped here too (this stays a pure, exception-free
+ * parse) -- the caller distinguishes "no id given" from "a bad one was"
+ * and dispatches `linkRejected` for the latter (spec §3.5: an explicit
+ * message, never a blank picture; ruling T12-a).
+ */
 export function decodeMoleculeUrl(params: Record<string, string>) {
     const out: { id?: string; surface?: MoleculeSurface; structure?: boolean; dipole?: boolean } = {};
     if (params.id && ID.test(params.id)) out.id = params.id;
@@ -54,8 +60,16 @@ export function registerMoleculeUrlKeys(): void {
         (params: URLSearchParams, dispatch: AppDispatch) => {
             // A mode's own decoder switches to it (Phase 2's convention).
             dispatch(setMode('molecule'));
-            const decoded = decodeMoleculeUrl(Object.fromEntries(params));
-            if (decoded.id) dispatch(selectMolecule({ id: decoded.id, surface: decoded.surface }));
+            const raw = Object.fromEntries(params);
+            const decoded = decodeMoleculeUrl(raw);
+            if (decoded.id) {
+                dispatch(selectMolecule({ id: decoded.id, surface: decoded.surface }));
+            } else if (raw.id) {
+                // Present but rejected by ID -- a blank Molecules screen would
+                // hide that the link named something; no id at all is just
+                // the mode's own empty state (spec §3.5; ruling T12-a).
+                dispatch(linkRejected(raw.id));
+            }
             if (decoded.structure !== undefined) dispatch(setShowStructure(decoded.structure));
             if (decoded.dipole !== undefined) dispatch(setShowDipole(decoded.dipole));
         },

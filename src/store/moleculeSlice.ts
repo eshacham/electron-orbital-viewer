@@ -37,6 +37,9 @@ const initialState: MoleculeState = {
 
 const hasOrbital = (meta: LibraryMoleculeMeta | null, index: number) => !!meta && meta.orbitals.some(o => o.index === index);
 
+/** A URL id is attacker/typo territory -- never echoed back unbounded (ruling T12-a). */
+const truncateId = (id: string) => (id.length > 40 ? `${id.slice(0, 40)}…` : id);
+
 const moleculeSlice = createSlice({
     name: 'molecule',
     initialState,
@@ -60,6 +63,19 @@ const moleculeSlice = createSlice({
             state.meta = action.payload.meta;
             state.isLoadingMeta = false;
             if (state.surface.kind === 'mo' && !hasOrbital(state.meta, state.surface.index)) state.surface = { kind: 'density' };
+        },
+        /**
+         * A URL id that fails url_keys.ts's own id pattern (spec §3.5: a bad
+         * URL id is an explicit message, never a stale or blank picture).
+         * Unlike metaFailed, there is no molecule to leave selected -- the
+         * link named nothing the library has, not a known id that failed to
+         * load -- so this clears any stale selection outright.
+         */
+        linkRejected: (state, action: PayloadAction<string>) => {
+            state.selectedId = null;
+            state.meta = null;
+            state.isLoadingMeta = false;
+            state.error = `This link names no molecule in the library (“${truncateId(action.payload)}”)`;
         },
         metaFailed: (state, action: PayloadAction<{ id: string; message: string }>) => {
             if (action.payload.id !== state.selectedId) return;
@@ -86,7 +102,7 @@ const moleculeSlice = createSlice({
 });
 
 export const {
-    indexLoaded, indexFailed, selectMolecule, metaLoaded, metaFailed, setSurface, setShowStructure, setShowDipole,
+    indexLoaded, indexFailed, selectMolecule, metaLoaded, metaFailed, linkRejected, setSurface, setShowStructure, setShowDipole,
     setPick, renderStarted, renderFinished, renderFailed,
 } = moleculeSlice.actions;
 export default moleculeSlice.reducer;
