@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { indexFailed, indexLoaded, metaFailed, metaLoaded } from '../store/moleculeSlice';
+import { indexFailed, indexLoaded, linkRejected, metaFailed, metaLoaded } from '../store/moleculeSlice';
 import { loadMoleculeIndex, loadMoleculeMeta } from './loader';
 import { asLibraryMeta } from './library_types';
 import { libraryEntries } from './catalogue';
@@ -30,8 +30,23 @@ export function useMoleculeLoader(active: boolean): void {
         return () => { cancelled = true; };
     }, [active, index, indexError, dispatch]);
 
+    // A link's id passes url_keys' pattern without being in the library: a
+    // Bonds diatomic (n2) would load Bonds' meta and fail asLibraryMeta with
+    // developer text, an unknown one fail as a bare HTTP 403. Once the index
+    // is in, either is refused as the link it is (final review M5); before
+    // then, a reply for it lands first and this overwrites its message.
+    const isUnknown = (id: string | null) => !!id && index !== null && !index.some(entry => entry.id === id);
     useEffect(() => {
-        if (!active || !selectedId) return;
+        if (active && isUnknown(selectedId)) dispatch(linkRejected(selectedId!));
+        // isUnknown reads index and selectedId, both watched.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [active, index, selectedId, dispatch]);
+
+    // Read, not watched: the index arriving must not reload a molecule.
+    const unknownRef = useRef(isUnknown);
+    unknownRef.current = isUnknown;
+    useEffect(() => {
+        if (!active || !selectedId || unknownRef.current(selectedId)) return;
         const id = selectedId;
         loadMoleculeMeta(id)
             .then(meta => dispatch(metaLoaded({ id, meta: asLibraryMeta(meta) })))

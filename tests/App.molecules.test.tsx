@@ -168,6 +168,36 @@ describe('Molecules mode', () => {
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.4);
     });
 
+    // Final review I1: the lowered opacity is Molecules' own, so leaving
+    // gives the other modes their full opacity back.
+    it('restores the full opacity it lowered on the way out', async () => {
+        const { store } = await enterMolecules(false);
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
+        fireEvent.click(screen.getByRole('button', { name: 'atom mode' }));
+        await flush();
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+    });
+
+    it('keeps an opacity the user chose inside Molecules on the way out', async () => {
+        const { store } = await enterMolecules(false);
+        act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.4 })); });
+        fireEvent.click(screen.getByRole('button', { name: 'atom mode' }));
+        await flush();
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.4);
+    });
+
+    it('does not raise an opacity it did not lower', async () => {
+        installMatchMedia(false);
+        const store = makeStore();
+        act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.6 })); });
+        render(<Provider store={store}><App /></Provider>);
+        fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
+        await flush();
+        fireEvent.click(screen.getByRole('button', { name: 'atom mode' }));
+        await flush();
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
+    });
+
     // Review (Important): a shared link is applied before the first render,
     // so a link's op=1 is the link's choice -- mounting into Molecules mode
     // is not "entering" it.

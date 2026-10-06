@@ -67,8 +67,11 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
         const drawn = { id: meta.id, surface, enclosedFraction };
         let cancelMesh: (() => void) | null = null;
         dispatch(renderStarted(plan.label));
-        // An orbital still computing for an earlier request must not land over this surface.
-        if (plan.kind === 'grid') cancelPendingRender(context);
+        // An orbital still computing for an earlier request -- this mode's,
+        // or another mode's left in flight -- must not land over this
+        // surface. The MO path too: it awaits loadBasis before its own
+        // render would supersede anything (final review).
+        cancelPendingRender(context);
         (async () => {
             try {
                 if (plan.kind === 'mo') {

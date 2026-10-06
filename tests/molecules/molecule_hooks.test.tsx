@@ -107,6 +107,49 @@ describe('useMoleculeLoader', () => {
         expect(store.getState().molecule.meta).toBeNull();
         expect(store.getState().molecule.error).toMatch(/Could not load “h2o”: h2o: meta.json has no espGrid/);
     });
+    // Final review M5: a link naming a Bonds diatomic (n2) or an id the
+    // library lacks passes url_keys' pattern; once the index is in, it is
+    // refused as a link to nothing in the library -- never Bonds' meta run
+    // through asLibraryMeta's developer text, nor a bare "HTTP 403".
+    const LINK_REFUSAL = /This link names no molecule in the library/;
+    it('refuses a Bonds diatomic or unknown id once the index is in, without fetching it', async () => {
+        (loadMoleculeIndex as jest.Mock).mockResolvedValue([...LIBRARY_INDEX, { id: 'n2', name: 'N2', formula: 'N2', category: 'diatomic', tags: [] }]);
+        const store = makeStore();
+        render(<Provider store={store}><LoaderHarness active /></Provider>);
+        await flush();
+        for (const id of ['n2', 'zzz']) {
+            act(() => { store.dispatch(selectMolecule({ id })); });
+            await flush();
+            expect(store.getState().molecule.error).toMatch(LINK_REFUSAL);
+            expect(store.getState().molecule.error).toContain(`“${id}”`);
+            expect(store.getState().molecule.selectedId).toBeNull();
+        }
+        expect(loadMoleculeMeta).not.toHaveBeenCalled();
+    });
+    it('refuses it too when the link was applied before the index arrived', async () => {
+        const index = deferred<typeof LIBRARY_INDEX>();
+        (loadMoleculeIndex as jest.Mock).mockReturnValue(index.promise);
+        (loadMoleculeMeta as jest.Mock).mockRejectedValue(new Error('HTTP 403'));
+        const store = makeStore();
+        store.dispatch(selectMolecule({ id: 'zzz' }));
+        render(<Provider store={store}><LoaderHarness active /></Provider>);
+        await flush();
+        await act(async () => { index.resolve(LIBRARY_INDEX); await index.promise; });
+        await flush();
+        expect(store.getState().molecule.error).toMatch(LINK_REFUSAL);
+        expect(store.getState().molecule.error).not.toMatch(/HTTP 403/);
+    });
+    it('leaves a library molecule to load as before', async () => {
+        (loadMoleculeIndex as jest.Mock).mockResolvedValue(LIBRARY_INDEX);
+        (loadMoleculeMeta as jest.Mock).mockResolvedValue(waterMeta());
+        const store = makeStore();
+        render(<Provider store={store}><LoaderHarness active /></Provider>);
+        await flush();
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o' })); });
+        await flush();
+        expect(store.getState().molecule.error).toBeNull();
+        expect(store.getState().molecule.meta?.id).toBe('h2o');
+    });
 });
 
 describe('useMoleculeView', () => {
@@ -269,6 +312,24 @@ describe('useMoleculeView', () => {
         act(() => { worker.onmessage!({ data: { type: 'success', meshData: meshOf(1), requestId: request.requestId } }); });
         await flush();
         expect(presentFieldMesh).not.toHaveBeenCalled();
+    });
+    // Final review (cancel line): the MO path awaits loadBasis before its
+    // own updateFieldInScene supersedes anything, so a render another mode
+    // left in flight could land in that window -- it is cancelled up front,
+    // as the grid path's is.
+    it('cancels a render already in flight before an orbital waits for its basis', async () => {
+        const basis = deferred<MoleculeBasis>();
+        (loadBasis as jest.Mock).mockReturnValueOnce(basis.promise);
+        const store = makeStore();
+        const context = fakeContext();
+        render(<Provider store={store}><Harness active context={context} /></Provider>);
+        (cancelPendingRender as jest.Mock).mockClear();
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o', surface: { kind: 'mo', index: 4 } })); store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() })); });
+        expect(cancelPendingRender).toHaveBeenCalledWith(context);
+        expect(updateFieldInScene).not.toHaveBeenCalled();
+        await act(async () => { basis.resolve(waterBasis); await basis.promise; });
+        await flush();
+        expect(updateFieldInScene).toHaveBeenCalledTimes(1);
     });
     it('leaving the mode mid-orbital stops the orbital worker and never leaves the busy label up', async () => {
         (updateFieldInScene as jest.Mock).mockImplementationOnce(() => new Promise(() => {}));

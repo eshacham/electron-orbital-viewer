@@ -106,6 +106,12 @@ describe('Gaussian cube', () => {
         expect(asciiLine('Hydrogen 3d_z², 90% contour')).toBe('Hydrogen 3d_z2, 90% contour');
     });
 
+    // Phase 6 final review M2: NFKD gives ½ a FRACTION SLASH (U+2044), which
+    // has no ASCII form -- replaced after normalising, as the minus is.
+    it('keeps a vulgar or composed fraction as n/m rather than run-together digits', () => {
+        expect(asciiLine('6p½, 6p³⁄₂, j = l ± ½')).toBe('6p1/2, 6p3/2, j = l +/- 1/2');
+    });
+
     it('refuses a grid whose values do not match its shape', () => {
         const bad: CubeGrid = { ...tiny, values: Float32Array.from({ length: 41 }, () => 0) };
         expect(() => encodeCube(bad, [], 'x', 'y')).toThrow();

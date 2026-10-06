@@ -112,6 +112,30 @@ describe('moleculeSlice', () => {
         // A landing that does not say what it drew records nothing.
         expect(reducer(s, renderFinished({ isoLevel: 0.02 })).drawn).toBeNull();
     });
+    // Final review M1: a same-mode setMode (a #mode=molecule link with no id
+    // pasted while in Molecules) leaves the picture up, so it stays exportable.
+    it('keeps what is drawn when the mode set is Molecules again', () => {
+        const drawn = { id: 'h2o', surface: { kind: 'density' as const }, enclosedFraction: 0.9 };
+        let s = reducer(init(), selectMolecule({ id: 'h2o' }));
+        s = reducer(s, metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        s = reducer(s, renderFinished({ isoLevel: 0.02, drawn }));
+        expect(reducer(s, setMode('molecule')).drawn).toEqual(drawn);
+    });
+    // Final review M4: re-clicking the selected orbital (or surface) is not a
+    // new choice -- a fresh object would restart the render and dim the view.
+    it('keeps the same surface object when the same surface is chosen again', () => {
+        let s = reducer(init(), selectMolecule({ id: 'h2o' }));
+        s = reducer(s, metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        s = reducer(s, setSurface({ kind: 'mo', index: 4 }));
+        const before = s;
+        s = reducer(s, setSurface({ kind: 'mo', index: 4 }));
+        expect(s).toBe(before);
+        expect(reducer(s, setSurface({ kind: 'mo', index: 3 })).surface).toEqual({ kind: 'mo', index: 3 });
+        s = reducer(s, setSurface({ kind: 'esp' }));
+        s = reducer(s, renderFinished({ isoLevel: 0.001, espRange: [-0.06, 0.07] }));
+        const esp = s;
+        expect(reducer(s, setSurface({ kind: 'esp' }))).toBe(esp);
+    });
 });
 
 describe('molecule URL keys', () => {

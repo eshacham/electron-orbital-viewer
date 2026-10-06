@@ -692,8 +692,11 @@ export async function moleculeCubeJob(state: RootState): Promise<CubeJob> {
     }
     if (surface === 'esp') {
         const grid = await getEspGrid(meta);
+        // The file is the whole volume grid, not the ρ = 0.001 surface the
+        // view (and the PNG caption) colours by it -- so its title names the
+        // grid (final review M3); the description says how the app uses it.
         return {
-            type: 'gridCube', atoms, title,
+            type: 'gridCube', atoms, title: `electron-orbital-viewer: ${moleculeTitle(meta)} ESP grid (Ha/e), ${meta.method.density}`,
             grid: { shape: grid.shape, origin: grid.origin, spacing: grid.spacing, values: grid.values },
             description: `electrostatic potential V(x,y,z), Ha/e (atomic units), the shipped ${grid.shape.join('x')} grid `
                 + `(nuclear term capped within 0.05 bohr of a nucleus; rounded to 10 mantissa bits); the app colours the rho = ${ESP_SURFACE_DENSITY} `

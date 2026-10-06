@@ -522,12 +522,22 @@ function App() {
     // link is applied before the first render, so opening one already in
     // Molecules mode is not "entering" it, and its op=1 is the link's
     // choice (fix round 1, review Important). Any other value is the
-    // user's and stays.
+    // user's and stays. Leaving hands back what entering took (final
+    // review I1): the other modes would otherwise draw at 60 % and their
+    // links carry op=0.6 -- unless the user has moved the slider since.
     const wasMoleculeModeRef = useRef(isMoleculeMode);
+    const loweredOpacityRef = useRef(false);
     useEffect(() => {
         const entered = isMoleculeMode && !wasMoleculeModeRef.current;
+        const left = !isMoleculeMode && wasMoleculeModeRef.current;
         wasMoleculeModeRef.current = isMoleculeMode;
-        if (entered && surfaceStyle.opacity === 1) dispatch(setSurfaceStyle({ opacity: 0.6 }));
+        if (entered && surfaceStyle.opacity === 1) {
+            loweredOpacityRef.current = true;
+            dispatch(setSurfaceStyle({ opacity: 0.6 }));
+        } else if (left) {
+            if (loweredOpacityRef.current && surfaceStyle.opacity === 0.6) dispatch(setSurfaceStyle({ opacity: 1 }));
+            loweredOpacityRef.current = false;
+        }
         // surfaceStyle is read, not watched: only the change of mode matters.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isMoleculeMode]);

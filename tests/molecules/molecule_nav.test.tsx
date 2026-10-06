@@ -55,6 +55,19 @@ describe('MoleculeOrbitalList', () => {
         expect(lumo.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(divider.compareDocumentPosition(homo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
+    // Final review M6: open-shell NO₂ (ROKS) has a singly occupied orbital
+    // between the HOMO and the LUMO, so its divider spans SOMO -> LUMO.
+    it('names the gap SOMO–LUMO when the highest occupied orbital is a SOMO', () => {
+        const orbitals = [
+            { index: 10, label: '1a2', energyHartree: -0.40, occupation: 2, role: 'HOMO' },
+            { index: 11, label: '6a1', energyHartree: -0.30, occupation: 1, role: 'SOMO' },
+            { index: 12, label: '2b1', energyHartree: -0.10, occupation: 0, role: 'LUMO' },
+        ] as ReturnType<typeof waterMeta>['orbitals'];
+        render(<MoleculeOrbitalList orbitals={orbitals} selectedIndex={null} onSelect={() => {}}
+            method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+        expect(screen.getByRole('separator', { name: 'SOMO–LUMO gap 0.200 Ha (5.44 eV)' })).toHaveTextContent('SOMO–LUMO gap');
+        expect(screen.queryByText(/HOMO–LUMO gap/)).toBeNull();
+    });
     // Ruling T16-b: the list opens scrolled so the HOMO is in view -- by
     // scrolling the list itself, so a desktop's right-hand column does not
     // jump to it as scrollIntoView would.

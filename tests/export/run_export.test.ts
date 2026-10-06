@@ -21,6 +21,7 @@ import {
     bondsMoleculeStore, bondsH2PlusStore, bondsO2Store, bondsMismatchStore, N2_BASIS, N2_META, N2_SCAN, O2_META, FAKE_H2PLUS_CURVE,
 } from './fixtures';
 import { h2plusCurveSpec } from '../../src/bonds/curve';
+import { encodeCube } from '../../src/export/cube';
 
 // Fix round 1, M3: startOrbitalCalculation sets currentParams before the
 // render finishes, and failOrbitalCalculation does not clear it back out --
@@ -437,6 +438,29 @@ describe('runExport: PNG caption carries the mode (ruling C7)', () => {
 // shapes sized by its own R(r) (spec §3.6) -- a basis choice the panel
 // states on screen, so a PNG of those lobes carries it too; the method line
 // alone does not say it.
+// Phase 6 final review M2: NFKD turns ½ into 1, U+2044 FRACTION SLASH, 2
+// -- and the slash, having no ASCII form, was stripped, so a spin-orbit
+// cube read "6p12" and "j = l +/- 12". The cube's own header lines, as
+// encodeCube writes them.
+describe('cubeJobFor: an Atom spin-orbit cube keeps its j-level fractions and the ±', () => {
+    const headerOf = (store: ReturnType<typeof goldStore>) => {
+        const job = cubeJobFor(store.getState());
+        const tiny = { shape: [1, 1, 1] as [number, number, number], origin: [0, 0, 0] as [number, number, number], spacing: 1, values: new Float32Array(1) };
+        return encodeCube(tiny, [], job.title, job.description).join('').split('\n').slice(0, 2);
+    };
+
+    it('writes 6p½ as 6p1/2 and 6p³⁄₂ as 6p3/2, and j = l ± ½ as j = l +/- 1/2', () => {
+        const store = goldStore('spinOrbit', { j: true });
+        store.dispatch(drillToShell(6));
+        store.dispatch(drillToSubshell(6, 1, 0.5));
+        const [title, description] = headerOf(store);
+        expect(title).toBe('electron-orbital-viewer: Gold (Au, Z = 79), 6p1/2 subshell, with spin-orbit, 90% contour');
+        expect(description).toContain('j = l +/- 1/2 levels');
+        store.dispatch(drillToSubshell(6, 1, 1.5));
+        expect(headerOf(store)[0]).toContain('6p3/2 subshell');
+    });
+});
+
 describe('runExport: PNG caption states the j-level angular-shape caveat (final review I1)', () => {
     async function captionOf(store: ReturnType<typeof goldStore>): Promise<string[]> {
         const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));

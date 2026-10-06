@@ -30,14 +30,16 @@ export function formatCubeValue(value: number): string {
  * character, produced only by normalising), so it must be replaced *after*
  * normalising, not before. Spelled out the same way ψ/ρ already were.
  * Task 16b, found live: an ESP title's "±0.05 Ha/e" lost its '±' the same
- * way, reading as a one-sided scale.
+ * way, reading as a one-sided scale. Phase 6 final review M2: NFKD turns
+ * '½' (and '³⁄₂') into digits around U+2044 FRACTION SLASH, which has no
+ * ASCII form either, so a spin-orbit cube read "6p12" until it became '/'.
  */
 export function asciiLine(text: string): string {
     return text.normalize('NFKD')
         .replace(/ψ/g, 'psi').replace(/ρ/g, 'rho')
         .replace(/σ/g, 'sigma').replace(/π/g, 'pi').replace(/δ/g, 'delta').replace(/φ/g, 'phi')
         .replace(/α/g, 'alpha').replace(/β/g, 'beta')
-        .replace(/[−–—]/g, '-').replace(/±/g, '+/-')
+        .replace(/[−–—]/g, '-').replace(/±/g, '+/-').replace(/⁄/g, '/')
         .replace(/[\r\n]+/g, ' ').replace(/[^\x20-\x7E]/g, '').trim();
 }
 

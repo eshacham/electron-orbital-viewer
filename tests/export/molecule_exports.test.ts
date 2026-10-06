@@ -311,9 +311,14 @@ describe('cube', () => {
         expect(job.description).toMatch(/electrostatic potential/);
         expect(job.description).toMatch(/Ha\/e/);
         expect(job.description).toMatch(/0\.05 bohr/);
-        // Found live: asciiLine dropped '±', leaving "surface, 0.05 Ha/e".
+        // Final review M3: the file is the volume grid, not the coloured
+        // ρ = 0.001 surface, so its title names the grid (the description
+        // still says how the app colours the surface by it).
         expect((await readText(buildCubeBlob({ ...job, requestId: 1 }))).split('\n')[0])
-            .toBe('electron-orbital-viewer: Water (H2O), ESP on rho = 0.001 e/a03 surface, +/-0.05 Ha/e');
+            .toBe('electron-orbital-viewer: Water (H2O) ESP grid (Ha/e), B3LYP/def2-TZVPD');
+        expect(job.description).toContain('+/-0.05 Ha/e scale');
+        // The on-screen / PNG description is the surface's, unchanged.
+        expect(viewDescription(drawnStore({ kind: 'esp' }).getState())).toBe('Water (H₂O), ESP on ρ = 0.001 e/a₀³ surface, ±0.05 Ha/e');
     });
 
     it('MO: through the cube worker\'s field path, with the basis registered (as the MO render does)', async () => {

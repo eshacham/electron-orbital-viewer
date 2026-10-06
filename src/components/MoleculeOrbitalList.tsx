@@ -41,7 +41,10 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, sel
     // begin, and the list opens with the HOMO in view.
     const firstOccupied = rows.findIndex(o => o.occupation > 0);
     const gap = firstOccupied > 0 ? rows[firstOccupied - 1].energyHartree - rows[firstOccupied].energyHartree : null;
-    const gapText = gap === null ? null : `HOMO–LUMO gap ${formatOrbitalEnergy(gap)}`;
+    // Open-shell NO₂'s highest occupied orbital is its SOMO, so the gap the
+    // divider spans is SOMO–LUMO, not HOMO–LUMO (final review M6).
+    const lower = firstOccupied >= 0 && rows[firstOccupied].role === 'SOMO' ? 'SOMO' : 'HOMO';
+    const gapText = gap === null ? null : `${lower}–LUMO gap ${formatOrbitalEnergy(gap)}`;
     const homoIndex = (rows.find(o => o.role === 'HOMO') ?? rows[firstOccupied])?.index;
     const listRef = useRef<HTMLDivElement>(null);
     const homoRef = useRef<HTMLButtonElement>(null);

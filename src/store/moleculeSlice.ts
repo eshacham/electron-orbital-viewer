@@ -104,6 +104,11 @@ const moleculeSlice = createSlice({
         setSurface: (state, action: PayloadAction<MoleculeSurface>) => {
             const surface = action.payload;
             if (surface.kind === 'mo' && !hasOrbital(state.meta, surface.index)) return;
+            // The surface already chosen (re-clicking the selected orbital) is
+            // not a new choice: a fresh object would restart the render, dim
+            // the view and refuse exports until it landed (final review M4).
+            if (surface.kind === state.surface.kind
+                && (surface.kind !== 'mo' || state.surface.kind !== 'mo' || surface.index === state.surface.index)) return;
             state.surface = surface;
             if (surface.kind !== 'esp') state.espRange = null;
         },
@@ -128,8 +133,10 @@ const moleculeSlice = createSlice({
     },
     extraReducers: builder => {
         // Another mode takes the canvas; re-entering draws afresh (the view's
-        // effect re-runs on `active`), so nothing drawn carries over.
-        builder.addCase(setMode, state => { state.drawn = null; });
+        // effect re-runs on `active`), so nothing drawn carries over. Setting
+        // Molecules while in Molecules (a #mode=molecule link with no id) takes
+        // nothing off the canvas, so the picture stays exportable (final review M1).
+        builder.addCase(setMode, (state, action) => { if (action.payload !== 'molecule') state.drawn = null; });
     },
 });
 
