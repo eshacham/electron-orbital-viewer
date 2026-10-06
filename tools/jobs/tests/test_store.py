@@ -1,0 +1,125 @@
+import threading
+from datetime import datetime, timezone
+
+import pytest
+
+from jobs.errors import JobRefused
+from jobs.model import new_record, public_view
+from jobs.store import BudgetExhausted, FileStore
+
+NOW = datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc)
+DECISION = {'version': 0, 'size': 'S', 'vcpu': 2, 'memoryGB': 8, 'capacity': 'spot', 'attempts': 3,
+            'basisFunctions': 58, 'predictedSeconds': 20.0, 'predictedMemoryGB': 0.5, 'timeoutSeconds': 600,
+            'reservationMicros': 1_000, 'predictedCostMicros': 10}
+
+
+def record(key='a' * 64, reservation=1_000, now=NOW):
+    return new_record(key=key, job={'recipe': 'single'}, decision={**DECISION, 'reservationMicros': reservation},
+                      name='water', formula='H2O', electron_count=10,
+                      geometry_source={'kind': 'pubchem', 'cid': 962}, backend='local', now=now)
+
+
+@pytest.fixture
+def store(tmp_path):
+    return FileStore(tmp_path, cap_micros=10_000)
+
+
+def test_create_get_and_dedupe(store):
+    created, rec = store.create_job(record())
+    assert created and rec['status'] == 'QUEUED' and rec['month'] == '2026-10'
+    created, again = store.create_job(record())
+    assert not created and again['key'] == rec['key']
+    assert store.meter('2026-10') == {'spent': 0, 'reserved': 1_000, 'committed': 1_000, 'cap': 10_000}
+
+
+def test_cap_is_inclusive_and_refusal_leaves_no_reservation(store):
+    assert store.create_job(record('a' * 64, 9_000))[0]
+    assert store.create_job(record('b' * 64, 1_000))[0]          # lands exactly on the cap: accepted
+    with pytest.raises(BudgetExhausted) as e:
+        store.create_job(record('c' * 64, 1))
+    assert e.value.code == 'budget'
+    assert store.get_job('c' * 64) is None
+    assert store.meter('2026-10')['committed'] == 10_000
+
+
+def test_concurrent_create_reserves_once(store):
+    results = []
+    threads = [threading.Thread(target=lambda: results.append(store.create_job(record())[0])) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert results.count(True) == 1
+    assert store.meter('2026-10')['reserved'] == 1_000
+
+
+def test_settle_exactly_once(store):
+    store.create_job(record())
+    assert store.settle('a' * 64, 300)
+    assert not store.settle('a' * 64, 300)
+    assert store.meter('2026-10') == {'spent': 300, 'reserved': 0, 'committed': 300, 'cap': 10_000}
+    assert store.get_job('a' * 64)['actualMicros'] == 300
+
+
+def test_claim_rules(store):
+    store.create_job(record())
+    assert store.claim('a' * 64, 1, NOW)
+    assert not store.claim('a' * 64, 1, NOW)                      # a duplicate copy of attempt 1
+    assert store.claim('a' * 64, 2, NOW)                          # a Batch retry after a Spot reclaim
+    assert store.get_job('a' * 64)['attempt'] == 2
+
+
+def test_requeue_only_failed_and_reserves_again(store):
+    store.create_job(record())
+    with pytest.raises(JobRefused) as e:
+        store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
+    assert e.value.status == 409
+    store.update_job('a' * 64, {'status': 'FAILED', 'error': {'code': 'x', 'message': 'y'}})
+    store.settle('a' * 64, 100)
+    rec = store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
+    assert rec['status'] == 'QUEUED' and rec['attempt'] == 2 and rec['error'] is None and not rec['settled']
+    assert store.meter('2026-10') == {'spent': 100, 'reserved': 500, 'committed': 600, 'cap': 10_000}
+
+
+def test_a_retry_in_a_later_month_is_charged_to_that_month(store):
+    store.create_job(record())
+    store.update_job('a' * 64, {'status': 'FAILED'})
+    store.settle('a' * 64, 100)
+    november = datetime(2026, 11, 2, 9, 0, tzinfo=timezone.utc)
+    rec = store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, november)
+    assert rec['month'] == '2026-11'
+    assert store.meter('2026-10') == {'spent': 100, 'reserved': 0, 'committed': 100, 'cap': 10_000}
+    assert store.meter('2026-11')['reserved'] == 500
+    store.settle('a' * 64, 40)
+    assert store.meter('2026-11') == {'spent': 40, 'reserved': 0, 'committed': 40, 'cap': 10_000}
+
+
+def test_update_with_expected_status(store):
+    store.create_job(record())
+    assert not store.update_job('a' * 64, {'status': 'DONE'}, expect_status={'RUNNING'})
+    assert store.update_job('a' * 64, {'stage': 'SCF'}, expect_status={'QUEUED'})
+    assert store.get_job('a' * 64)['stage'] == 'SCF'
+
+
+def test_list_resolution_config_billing(store):
+    store.create_job(record('b' * 64, now=NOW.replace(second=0)))
+    store.create_job(record('a' * 64, now=NOW.replace(second=1)))
+    assert [r['key'] for r in store.list_jobs('2026-10')] == ['b' * 64, 'a' * 64]      # by submission time, not key
+    assert store.list_jobs('2026-10', status='DONE') == [] and store.list_jobs('2026-09') == []
+    store.put_resolution('name:water', {'cid': 962})
+    assert store.get_resolution('name:water') == {'cid': 962} and store.get_resolution('name:x') is None
+    assert store.generation_enabled()
+    store.set_generation_enabled(False)
+    assert not store.generation_enabled()
+    assert store.get_billing('2026-10') is None
+    store.put_billing('2026-10', {'usd': 0.12})
+    assert store.get_billing('2026-10') == {'usd': 0.12}
+
+
+def test_public_view_converts_money_and_hides_internals(store):
+    store.create_job(record())
+    view = public_view(store.get_job('a' * 64))
+    assert view['reservedUsd'] == 0.001 and view['actualUsd'] is None
+    assert view['resultUrl'] == '/molecules/jobs/' + 'a' * 64 + '/'
+    for hidden in ('settled', 'runnerJobId', 'reservedMicros', 'actualMicros'):
+        assert hidden not in view
+    store.settle('a' * 64, 250)
+    assert public_view(store.get_job('a' * 64))['actualUsd'] == 0.00025
