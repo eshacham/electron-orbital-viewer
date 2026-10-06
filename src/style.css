@@ -1417,3 +1417,7 @@ html, body, #root {
 .preview-facts dt { font-weight: 600; }
 .preview-facts dd { margin: 0; font-variant-numeric: tabular-nums; }
 .mono, .job-log-tail { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* Phase 6B-2 Task 11: the live status panel's header and scrolling log tail. */
+.job-status-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.job-log-tail { margin: 0; max-height: 160px; overflow: auto; padding: 6px 8px; background: #111; color: #e6e6e6; border-radius: 6px; font-size: 0.75rem; white-space: pre; }
