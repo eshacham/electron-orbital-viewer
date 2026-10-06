@@ -41,6 +41,12 @@ export function measureViewInsets(container: HTMLElement, narrow: boolean): View
         if (side) insets.left = Math.max(0, side.right - bounds.left);
         const view = rectOf('.view-panel');
         if (view) insets.right = Math.max(0, bounds.right - view.left);
+        // Molecules' key stack, bottom-centre (ruling T16-d): the molecule is
+        // framed above it, not under it. Its readout chip is a fixed height
+        // on a desktop (style.css), so hovering atom after atom does not
+        // move this edge -- and the molecule under the pointer with it.
+        const stack = rectOf('.molecule-legend-stack');
+        if (stack) insets.bottom = Math.max(0, bounds.bottom - stack.top);
     }
 
     // Round so sub-pixel layout jitter does not count as a change.
@@ -93,7 +99,7 @@ export function useViewInsets(
             resizeObserver.disconnect();
             resizeObserver.observe(container);
             container
-                .querySelectorAll('.phone-header, .phone-sheet, .side-panel, .view-panel, .periodic-table-panel')
+                .querySelectorAll('.phone-header, .phone-sheet, .side-panel, .view-panel, .periodic-table-panel, .molecule-legend-stack')
                 .forEach(element => resizeObserver.observe(element));
         };
         const mutationObserver = new MutationObserver(() => {

@@ -6,6 +6,10 @@ import { createAppStore } from '../src/store';
 import {
     selectMolecule, metaLoaded, metaFailed, setSurface, renderStarted, renderFinished, renderFailed,
 } from '../src/store/moleculeSlice';
+import { setSurfaceStyle } from '../src/store/orbitalSlice';
+import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from '../src/url_state';
+import { registerMoleculeUrlKeys } from '../src/molecules/url_keys';
+import { PHONE_LANDSCAPE } from '../src/useMediaQuery';
 import App from '../src/App';
 import { LIBRARY_INDEX, waterMeta } from './molecules/fixtures';
 
@@ -28,16 +32,19 @@ jest.mock('../src/molecules/loader', () => ({
     loadDensityGrid: jest.fn(),
 }));
 
-function installMatchMedia(matches: boolean) {
-    (window as unknown as { matchMedia: unknown }).matchMedia = (media: string) => ({ media, matches, addEventListener: () => {}, removeEventListener: () => {} });
+function installMatchMedia(narrow: boolean, landscape = false) {
+    (window as unknown as { matchMedia: unknown }).matchMedia = (media: string) => ({
+        media, matches: media === PHONE_LANDSCAPE ? landscape : narrow, addEventListener: () => {}, removeEventListener: () => {},
+    });
 }
 // D17 / D36: the app's own store, so every slice App reads (bonds too) is there.
 const makeStore = () => createAppStore();
 const flush = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
 
-async function enterMolecules(narrow: boolean) {
-    installMatchMedia(narrow);
+async function enterMolecules(narrow: boolean, { landscape = false, before }: { landscape?: boolean; before?: (store: ReturnType<typeof makeStore>) => void } = {}) {
+    installMatchMedia(narrow, landscape);
     const store = makeStore();
+    before?.(store);
     const utils = render(<Provider store={store}><App /></Provider>);
     if (narrow) fireEvent.click(screen.getByRole('tab', { name: 'View' }));
     fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
@@ -143,6 +150,81 @@ describe('Molecules mode', () => {
         expect(store.getState().orbital.isLoading).toBe(false);
         expect(store.getState().orbital.currentParams).toBeNull();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
+    });
+
+    it('lowers full opacity on the way in from Basic Orbitals too', async () => {
+        installMatchMedia(false);
+        const store = makeStore();
+        render(<Provider store={store}><App /></Provider>);
+        fireEvent.click(screen.getByRole('button', { name: 'basic orbitals mode' }));
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+        fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
+        await flush();
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
+    });
+
+    it('leaves an opacity the user chose alone on the way in', async () => {
+        const { store } = await enterMolecules(false, { before: s => s.dispatch(setSurfaceStyle({ opacity: 0.4 })) });
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.4);
+    });
+
+    // Review (Important): a shared link is applied before the first render,
+    // so a link's op=1 is the link's choice -- mounting into Molecules mode
+    // is not "entering" it.
+    describe('opened from a shared link', () => {
+        beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerMoleculeUrlKeys(); });
+        afterEach(() => { resetUrlKeysForTests(); window.history.replaceState(null, '', '/'); });
+
+        it('keeps the link\'s full opacity', async () => {
+            installMatchMedia(false);
+            const hash = '#mode=molecule&id=h2o&op=1';
+            window.history.replaceState(null, '', `/${hash}`);
+            const store = makeStore();
+            applyStateTo(hash, store.dispatch);
+            expect(store.getState().atom.mode).toBe('molecule');
+            render(<Provider store={store}><App /></Provider>);
+            await flush();
+            expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+        });
+    });
+
+    // Ruling T16-a: the list appears once on a desktop, in the plot slot.
+    it('lists the orbitals once on a desktop, in the right-hand column', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
+        expect(container.querySelectorAll('.molecule-orbital-list')).toHaveLength(1);
+        expect(container.querySelector('.view-panel .molecule-orbital-list')).not.toBeNull();
+        expect(container.querySelector('.side-panel .molecule-nav-orbital')).toHaveTextContent('Showing 1b1 (HOMO)');
+    });
+
+    // Ruling T16-c: a sideways phone gets the compact ESP key.
+    it('uses the compact ESP key on a sideways phone only', async () => {
+        const { store, container, unmount } = await enterMolecules(true, { landscape: true });
+        pickWater(store);
+        act(() => { store.dispatch(setSurface({ kind: 'esp' })); });
+        expect(container.querySelector('.esp-legend.compact')).not.toBeNull();
+        unmount();
+        const upright = await enterMolecules(true);
+        pickWater(upright.store);
+        act(() => { upright.store.dispatch(setSurface({ kind: 'esp' })); });
+        expect(upright.container.querySelector('.esp-legend')).not.toBeNull();
+        expect(upright.container.querySelector('.esp-legend.compact')).toBeNull();
+    });
+
+    // Review Minor 3: on a phone the error joins the key stack (under the
+    // header) instead of sitting over the readout chip at top: 80px.
+    it('puts a failed surface\'s alert in the key stack on a phone, and over the canvas on a desktop', async () => {
+        const phone = await enterMolecules(true);
+        pickWater(phone.store);
+        act(() => { phone.store.dispatch(renderFailed('HTTP 404')); });
+        expect(phone.container.querySelector('.molecule-legend-stack [role="alert"]')).not.toBeNull();
+        phone.unmount();
+        const desk = await enterMolecules(false);
+        pickWater(desk.store);
+        act(() => { desk.store.dispatch(renderFailed('HTTP 404')); });
+        expect(desk.container.querySelector('.molecule-legend-stack [role="alert"]')).toBeNull();
+        expect(screen.getByRole('alert')).toHaveTextContent('HTTP 404');
     });
 
     it('says on the canvas what it is drawing', async () => {

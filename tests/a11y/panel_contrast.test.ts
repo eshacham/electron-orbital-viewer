@@ -84,6 +84,12 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     // Task 16 (ruling D29): the orbital list's card in Molecules' plot slot,
     // its own LIGHT_96 card in the right-hand column.
     { selector: '.molecule-orbital-card', declared: `background-color: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
+    // Fix round 1 (rulings T16-a/b, review Minor 3): the gap divider in the
+    // orbital list and the drawn orbital's name both sit on LIGHT_96 cards;
+    // the phone's in-stack error alert on its own opaque pink.
+    { selector: '.molecule-orbital-gap', declared: 'color: rgba(0, 0, 0, 0.62)', fg: 'rgba(0, 0, 0, 0.62)', bg: LIGHT_96 },
+    { selector: '.molecule-nav-orbital', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
+    { selector: '.molecule-error', declared: 'background-color: rgb(253, 237, 237)', fg: 'rgb(95, 33, 32)', bg: 'rgb(253, 237, 237)' },
 ];
 
 describe('panel text meets WCAG AA over any backdrop', () => {

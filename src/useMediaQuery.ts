@@ -47,6 +47,14 @@ export const NARROW_VIEWPORT = '(max-width: 760px), (max-height: 500px), (max-wi
 export const MEDIUM_VIEWPORT = '(max-width: 1199px)';
 
 /**
+ * A phone turned sideways: the height clause of NARROW_VIEWPORT on its own,
+ * where the sheet docks at the right and the canvas is under 500 px tall.
+ * Only meaningful when NARROW_VIEWPORT matches. (Ruling T16-c: the ESP key
+ * goes compact here.)
+ */
+export const PHONE_LANDSCAPE = '(max-height: 500px)';
+
+/**
  * A user who has asked their OS for reduced motion gets the level-transition
  * animation's instant cut, never a shortened version of the animation itself
  * (level-transition spec addendum) -- so this is read once, at the point

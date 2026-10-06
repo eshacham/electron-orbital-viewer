@@ -3,6 +3,7 @@ import { Button, ToggleButton, ToggleButtonGroup, Typography } from '@mui/materi
 import MoleculePicker from './MoleculePicker';
 import MoleculeOrbitalList from './MoleculeOrbitalList';
 import { formatFormula } from '../molecules/catalogue';
+import { formatOrbitalEnergy } from '../molecules/orbital_display';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeIndexEntry } from '../molecules/types';
 import type { MoleculeSurface } from '../store/moleculeSlice';
@@ -42,6 +43,7 @@ const MoleculeNav: React.FC<MoleculeNavProps> = ({
 
     const choose = (id: string) => { onSelectMolecule(id); setPickerOpen(false); };
     const homo = meta?.orbitals.find(o => o.role === 'HOMO') ?? meta?.orbitals[0];
+    const drawnOrbital = surface.kind === 'mo' ? meta?.orbitals.find(o => o.index === surface.index) : undefined;
     const picker = <MoleculePicker entries={entries} error={indexError} selectedId={selectedId} onSelect={choose} />;
 
     return (
@@ -65,7 +67,17 @@ const MoleculeNav: React.FC<MoleculeNavProps> = ({
                         <ToggleButton value="esp">Electrostatic potential</ToggleButton>
                         <ToggleButton value="mo">Orbitals</ToggleButton>
                     </ToggleButtonGroup>
-                    {surface.kind === 'mo' && (
+                    {/* Ruling T16-a: on a desktop the list is the right-hand
+                        column's (the plot slot), so the card names the orbital
+                        drawn and says where the others are. The phone's
+                        Explore tab keeps the list: its Plot tab is out of sight. */}
+                    {surface.kind === 'mo' && variant === 'full' && drawnOrbital && (
+                        <Typography variant="body2" className="molecule-nav-orbital">
+                            Showing {drawnOrbital.label}{drawnOrbital.role ? ` (${drawnOrbital.role})` : ''}, {formatOrbitalEnergy(drawnOrbital.energyHartree)}
+                            {' '}— pick another in the orbital list on the right.
+                        </Typography>
+                    )}
+                    {surface.kind === 'mo' && variant === 'body' && (
                         <MoleculeOrbitalList orbitals={meta.orbitals} selectedIndex={surface.index}
                             onSelect={index => onSurfaceChange({ kind: 'mo', index })}
                             method={meta.method.density} symmetry={meta.symmetry} />

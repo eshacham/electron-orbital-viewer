@@ -1104,19 +1104,33 @@ html, body, #root {
    defeat it for any class it is joined with. */
 .molecule-legend-stack {
   position: absolute;
-  /* At the free area's right edge, as .density-key (2·centre − left being
-     that edge): centred, the readout's chip ran under the scale readout
-     at the free area's bottom left (found live, Task 16, water at 1440 px). */
-  left: calc(2 * var(--free-center-x, 50%) - var(--free-left, 0px) - 20px);
-  bottom: 20px;
-  transform: translateX(-100%);
+  /* The bottom-centre slot (ruling T16-d), stacked above the scale readout
+     rather than beside it: centred at its level, the readout chip ran under
+     the scale (found live, Task 16, water at 1440 px). 76 px is the scale
+     readout's 20 px offset, its 48 px height and an 8 px gap. The molecule
+     is framed above the stack (useViewInsets counts it as the bottom). */
+  left: var(--free-center-x, 50%);
+  bottom: 76px;
+  transform: translateX(-50%);
   z-index: 10;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 6px;
   pointer-events: none;
-  max-width: min(420px, calc(100vw - 24px));
+  max-width: min(520px, calc(100vw - 24px));
+}
+/* A fixed height on a desktop, centred, so the stack's top -- the bottom of
+   the area the molecule is framed in -- does not move as the pointer goes
+   from atom to atom (a moving frame would move the atom under the pointer).
+   Five lines of pick and a line of note; a rarer longer pick scrolls. */
+.molecule-legend-stack .molecule-readout {
+  height: 104px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .esp-legend {
   padding: 6px 12px;
@@ -1141,6 +1155,37 @@ html, body, #root {
 }
 .esp-legend-note {
   opacity: 0.85;
+}
+/* Ruling T16-c: the sideways phone's compact key -- a thinner, shorter bar
+   and its scale, the notes behind the ⓘ toggle at its right. */
+.esp-legend.compact {
+  position: relative;
+  padding-right: 28px;
+}
+.esp-legend.compact .esp-legend-bar {
+  height: 6px;
+  width: 180px;
+}
+.esp-legend.compact .esp-legend-ticks {
+  width: 180px;
+}
+.esp-legend-info {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.esp-legend.compact .esp-legend-info[aria-expanded="true"] {
+  top: 4px;
+  transform: none;
 }
 
 /* Task 13: the molecule picker, inline in the navigation column and full
@@ -1231,6 +1276,20 @@ html, body, #root {
 .molecule-orbital-degeneracy {
   opacity: 0.7;
 }
+/* Ruling T16-b: where the virtuals end and the occupied orbitals begin. */
+.molecule-orbital-gap {
+  margin: 2px 0;
+  padding: 2px 6px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.35);
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.35);
+  color: rgba(0, 0, 0, 0.62);
+  font-size: 11px;
+  text-align: center;
+}
+/* Ruling T16-a: the drawn orbital's name in the navigation card. */
+.molecule-nav-orbital {
+  color: rgba(0, 0, 0, 0.87);
+}
 
 /* Dark chip over the canvas, like `.esp-legend` (same background/alpha so
    both read together in `.molecule-legend-stack`); this component does not
@@ -1302,9 +1361,24 @@ html, body, #root {
     padding: 4px 8px;
     font-size: 11px;
   }
+  /* Room for the ⓘ toggle, which the padding above would otherwise put
+     over the scale's last tick (found live, fix round 1). */
+  .molecule-legend-stack .esp-legend.compact {
+    padding-right: 30px;
+  }
   .molecule-legend-stack .molecule-readout {
+    height: auto;
     padding: 4px 8px;
     font-size: 11px;
+  }
+  /* Fix round 1 (review Minor 3): a failed surface's alert heads the stack
+     here, under the header, instead of .atom-error's top: 80px over the
+     readout chip. MUI's standard error colours, stated so they are tested. */
+  .molecule-error {
+    color: rgb(95, 33, 32);
+    background-color: rgb(253, 237, 237);
+    padding: 2px 10px;
+    font-size: 12px;
   }
   .molecule-legend-stack .phase-legend {
     padding: 4px 8px;

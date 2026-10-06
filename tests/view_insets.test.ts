@@ -32,6 +32,17 @@ describe('measureViewInsets', () => {
         expect(measureViewInsets(root, false)).toEqual({ top: 70, right: 340, bottom: 0, left: 360 });
     });
 
+    // Ruling T16-d: Molecules' key stack sits bottom-centre on a desktop;
+    // the molecule is framed above it rather than under it.
+    it('on a desktop, keeps the molecule clear of the legend stack along the bottom', () => {
+        const root = layout({ width: 1440, height: 900 }, {
+            '.side-panel': { left: 20, right: 360, top: 20, bottom: 300, width: 340, height: 280 },
+            '.view-panel': { left: 1100, right: 1420, top: 20, bottom: 760, width: 320, height: 740 },
+            '.molecule-legend-stack': { left: 500, right: 960, top: 640, bottom: 820, width: 460, height: 180 },
+        });
+        expect(measureViewInsets(root, false)).toEqual({ top: 0, right: 340, bottom: 260, left: 360 });
+    });
+
     it('on a phone held upright, counts the header as the top and the sheet as the bottom', () => {
         const root = layout({ width: 390, height: 844 }, {
             '.phone-header': { left: 8, right: 382, top: 8, bottom: 52, width: 374, height: 44 },

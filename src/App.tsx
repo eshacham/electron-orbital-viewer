@@ -65,7 +65,7 @@ import { CombinationSelection, fieldRequestFor, combinationCurves, overlayLegend
 import { basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
-import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT } from './useMediaQuery';
+import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT, PHONE_LANDSCAPE } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
 import { buildComparisonCurves, radialPlotRange } from './atom/comparison_curves';
 import { useUrlStateSync } from './useUrlStateSync';
@@ -379,6 +379,8 @@ function App() {
     // On a phone the panel would cover most of the screen, so it starts out of
     // the way and is opened deliberately. On a desktop it is just always there.
     const isNarrow = useMediaQuery(NARROW_VIEWPORT);
+    // A phone turned sideways: under 500 px of height (ruling T16-c).
+    const isPhoneLandscape = useMediaQuery(PHONE_LANDSCAPE) && isNarrow;
     // The phone sheet's open tab, or null with the atom given the screen.
     const [phoneTab, setPhoneTab] = useState<string | null>(null);
     // Between a phone and a wide desktop the right-hand panel starts folded
@@ -515,11 +517,17 @@ function App() {
     const [moleculePickerOpen, setMoleculePickerOpen] = useState(false);
     const showMoleculeBusy = useDelayedFlag(
         isMoleculeMode && (molecule.renderLabel !== null || molecule.isLoadingMeta), BUSY_INDICATOR_DELAY_MS);
-    // The structure has to show through the density, so entering the mode
-    // lowers an untouched full opacity, once. A user's own choice -- any
-    // other value -- is theirs and stays.
+    // The structure has to show through the density, so switching into the
+    // mode lowers an untouched full opacity. Only a real switch: a shared
+    // link is applied before the first render, so opening one already in
+    // Molecules mode is not "entering" it, and its op=1 is the link's
+    // choice (fix round 1, review Important). Any other value is the
+    // user's and stays.
+    const wasMoleculeModeRef = useRef(isMoleculeMode);
     useEffect(() => {
-        if (isMoleculeMode && surfaceStyle.opacity === 1) dispatch(setSurfaceStyle({ opacity: 0.6 }));
+        const entered = isMoleculeMode && !wasMoleculeModeRef.current;
+        wasMoleculeModeRef.current = isMoleculeMode;
+        if (entered && surfaceStyle.opacity === 1) dispatch(setSurfaceStyle({ opacity: 0.6 }));
         // surfaceStyle is read, not watched: only the change of mode matters.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isMoleculeMode]);
@@ -1028,6 +1036,17 @@ function App() {
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ];
 
+    // A molecule that did not load, or a surface that did not draw (spec
+    // §3.5). Said once -- not as a Snackbar too (Bonds' ruling C9) -- and a
+    // failed surface is cleared rather than left standing beside its own
+    // error. On a phone it heads the key stack: at .atom-error's top: 80px
+    // it sat over the readout chip (fix round 1, review Minor 3).
+    const moleculeAlert = isMoleculeMode && (molecule.error || molecule.renderError) ? (
+        <Alert severity="error" className={isNarrow && molecule.meta ? 'molecule-error' : 'atom-error'}>
+            {molecule.error ?? `Could not draw ${SURFACE_NAME[molecule.surface.kind]}: ${molecule.renderError}`}
+        </Alert>
+    ) : null;
+
     const phaseLegend = (
         <div className="phase-legend" aria-label="surface colour key">
             <span className="phase-legend-item">
@@ -1085,25 +1104,23 @@ function App() {
                 {/* Molecules: the pick readout, the ESP key and an orbital's
                     ψ key share the bottom-centre slot, stacked (spec §3.8:
                     no new floating panel). */}
-                {isMoleculeMode && molecule.meta && (molecule.showStructure || (moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend) && (
+                {isMoleculeMode && molecule.meta && (molecule.showStructure || (moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend || (isNarrow && moleculeAlert)) && (
                     <div className="molecule-legend-stack">
+                        {isNarrow && moleculeAlert}
                         {molecule.showStructure && (
                             <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}
                                 geometrySource={molecule.meta.geometrySource} touch={isNarrow} />
                         )}
-                        {moleculeKeysShown && molecule.surface.kind === 'esp' && <EspLegend range={molecule.espRange} method={molecule.meta.method.density} />}
+                        {moleculeKeysShown && molecule.surface.kind === 'esp' && (
+                            <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact={isPhoneLandscape} />
+                        )}
                         {showPhaseLegend && phaseLegend}
                     </div>
                 )}
-                {/* A molecule that did not load, or a surface that did not
-                    draw (spec §3.5). Said once, here -- not as a Snackbar too
-                    (Bonds' ruling C9) -- and a failed surface is cleared
-                    rather than left standing beside its own error. */}
-                {isMoleculeMode && (molecule.error || molecule.renderError) && (
-                    <Alert severity="error" className="atom-error">
-                        {molecule.error ?? `Could not draw ${SURFACE_NAME[molecule.surface.kind]}: ${molecule.renderError}`}
-                    </Alert>
-                )}
+                {/* Over the canvas on a desktop; on a phone it heads the key
+                    stack instead (with no molecule loaded there is no stack,
+                    and nothing for it to cover). */}
+                {moleculeAlert && !(isNarrow && molecule.meta) && moleculeAlert}
                 {isBondsDensity && (
                     <div className="phase-legend density-key" aria-label="surface colour key">
                         <span className="phase-legend-item">

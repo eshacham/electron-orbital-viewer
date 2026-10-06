@@ -44,6 +44,33 @@ describe('MoleculeOrbitalList', () => {
         expect(onSelect).toHaveBeenCalledWith(3);
         expect(container.textContent).toMatch(/Kohn–Sham orbital energies, B3LYP\/def2-TZVP\. Not ionisation energies\./);
     });
+    // Ruling T16-b: descending order stays (it reads like an MO diagram), so
+    // the gap between the last virtual and the HOMO is marked, and labelled.
+    it('marks the HOMO–LUMO gap with a labelled divider between the virtuals and the occupied orbitals', () => {
+        render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
+            method="B3LYP/def2-TZVP" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+        const divider = screen.getByRole('separator', { name: 'HOMO–LUMO gap 0.320 Ha (8.71 eV)' });
+        expect(divider).toHaveTextContent('HOMO–LUMO gap 0.320 Ha (8.71 eV)');
+        const [lumo, homo] = screen.getAllByRole('button');
+        expect(lumo.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(divider.compareDocumentPosition(homo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+    // Ruling T16-b: the list opens scrolled so the HOMO is in view -- by
+    // scrolling the list itself, so a desktop's right-hand column does not
+    // jump to it as scrollIntoView would.
+    it('opens scrolled so the HOMO is centred in the list', () => {
+        const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            const at = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 100, width: 100, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+            if (this.classList.contains('molecule-orbital-list')) return at(100, 200);
+            if (this.textContent?.includes('HOMO') && this.tagName === 'BUTTON') return at(520, 30);
+            return at(0, 0);
+        });
+        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
+            method="B3LYP/def2-TZVP" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+        // The row's top sits 420 px below the list's; centring a 30 px row in 200 px leaves 85 px above it.
+        expect((container.querySelector('.molecule-orbital-list') as HTMLElement).scrollTop).toBe(335);
+        rects.mockRestore();
+    });
     // D34: the linear-molecule caption names D∞h/C∞v, never PySCF's raw Dooh/Coov.
     it('shows the conventional symbol for a linear molecule\'s point group (D34)', () => {
         const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
@@ -79,6 +106,17 @@ describe('MoleculeNav', () => {
         expect(onSurfaceChange).toHaveBeenLastCalledWith({ kind: 'esp' });
         fireEvent.click(screen.getByRole('button', { name: 'Orbitals' }));
         expect(onSurfaceChange).toHaveBeenLastCalledWith({ kind: 'mo', index: 4 });
+    });
+    // Ruling T16-a: on a desktop the orbital list is the right-hand
+    // column's (the plot slot); the card names the orbital drawn and says
+    // where the list is. A phone's Explore tab keeps it, the Plot tab being
+    // out of sight there.
+    it('names the orbital drawn rather than repeating the list (desktop), and keeps the list on a phone', () => {
+        const { container, rerender } = render(<MoleculeNav {...navProps} surface={{ kind: 'mo', index: 4 }} />);
+        expect(container.querySelector('.molecule-orbital-list')).toBeNull();
+        expect(container.querySelector('.molecule-nav-orbital')).toHaveTextContent('Showing 1b1 (HOMO), −0.310 Ha (−8.44 eV)');
+        rerender(<MoleculeNav {...navProps} variant="body" surface={{ kind: 'mo', index: 4 }} />);
+        expect(container.querySelector('.molecule-orbital-list')).not.toBeNull();
     });
     it('states where the geometry and the density come from', () => {
         const { container } = render(<MoleculeNav {...navProps} />);
