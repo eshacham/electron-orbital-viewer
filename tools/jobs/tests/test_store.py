@@ -358,3 +358,28 @@ def test_the_meter_is_the_sum_of_the_records(store):
         reserved = sum(r['reservedMicros'] for r in records if not r['settled'] and r['month'] == month)
         assert store.meter(month) == {'spent': spent, 'reserved': reserved, 'committed': spent + reserved,
                                       'cap': 10_000}
+        assert sum(c['micros'] for c in store.month_charges(month)) == spent
+
+
+def test_month_charges_follow_the_charge_not_the_record(store):
+    """Review fix 2: a job failed and settled in October, then retried in
+    November, is a November record, but its first charge is October's spend:
+    the month's charges come from every record, chosen by charge month."""
+    store.create_job(record('a' * 64))
+    store.update_job('a' * 64, {'status': 'FAILED', 'endedAt': '2026-10-09T08:00:00Z'})
+    store.settle('a' * 64, 300)
+    store.create_job(record('b' * 64, 2_000))
+    store.update_job('b' * 64, {'status': 'DONE', 'endedAt': '2026-10-12T10:00:00Z'})
+    store.settle('b' * 64, 700)
+    november = datetime(2026, 11, 2, 9, 0, tzinfo=timezone.utc)
+    store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, november)
+    store.update_job('a' * 64, {'status': 'DONE', 'endedAt': '2026-11-02T09:30:00Z'})
+    store.settle('a' * 64, 40)
+    assert [r['key'] for r in store.list_jobs('2026-10')] == ['b' * 64]          # the record moved on
+    assert sorted(store.month_charges('2026-10'), key=lambda c: c['at']) == [
+        {'month': '2026-10', 'micros': 300, 'at': '2026-10-09T08:00:00Z'},
+        {'month': '2026-10', 'micros': 700, 'at': '2026-10-12T10:00:00Z'}]
+    assert store.month_charges('2026-11') == [{'month': '2026-11', 'micros': 40, 'at': '2026-11-02T09:30:00Z'}]
+    assert store.month_charges('2026-12') == []
+    for month in ('2026-10', '2026-11'):
+        assert sum(c['micros'] for c in store.month_charges(month)) == store.meter(month)['spent']

@@ -4,12 +4,22 @@ tools/molecules/out/jobs/, which the dev server already serves at
 from pathlib import Path
 from typing import Protocol
 
+# D7 (preflight): the fixed set of root result names a finished job writes --
+# worker.RESULT_FILES ('meta.json', 'basis.json', 'density.bin.gz',
+# 'esp.bin.gz') plus the provenance and attempt-copy files worker.run_job
+# also puts at the root ('job.json', 'input.py', 'output.log',
+# 'geometry.xyz', 'timings.json', 'trajectory.xyz'). Duplicated here rather
+# than imported from jobs.worker, which imports jobs.sink, not the reverse.
+ROOT_RESULT_NAMES = ('meta.json', 'basis.json', 'density.bin.gz', 'esp.bin.gz',
+                     'job.json', 'input.py', 'output.log', 'geometry.xyz', 'timings.json', 'trajectory.xyz')
+
 
 class Sink(Protocol):
     def put_attempt(self, key: str, attempt: int, name: str, data: bytes) -> None: ...
     def get_attempt(self, key: str, attempt: int, name: str) -> bytes | None: ...
     def put_result(self, key: str, name: str, data: bytes) -> None: ...
     def put_done(self, key: str, data: bytes) -> None: ...
+    def clear_partial(self, key: str) -> None: ...
 
 
 class LocalSink:
@@ -35,3 +45,13 @@ class LocalSink:
 
     def put_done(self, key, data):
         self.put_result(key, 'done.json', data)
+
+    def clear_partial(self, key):
+        # D7: a reclaimed or killed attempt can leave the root half-written
+        # (no done.json), which makes every retry fail "already in the
+        # result folder". done.json's presence is what says the set is
+        # complete, so its absence is the only signal needed to clear.
+        if (self.root / key / 'done.json').exists():
+            return
+        for name in ROOT_RESULT_NAMES:
+            (self.root / key / name).unlink(missing_ok=True)

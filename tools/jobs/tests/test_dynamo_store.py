@@ -49,6 +49,18 @@ class Conflicts:
         return getattr(self.client, name)
 
 
+class Recording(Conflicts):
+    """Keeps every TransactWriteItems request, conflicted ones included."""
+
+    def __init__(self, client, n=0):
+        super().__init__(client, n)
+        self.calls = []
+
+    def transact_write_items(self, **kwargs):
+        self.calls.append(kwargs)
+        return super().transact_write_items(**kwargs)
+
+
 def test_a_transaction_conflict_on_the_meter_is_retried(client):
     store = DynamoStore('jobs-test', client=Conflicts(client), cap_micros=10_000)
     assert store.create_job(record())[0]
@@ -87,6 +99,60 @@ def test_two_reconcilers_settle_once(client):
     assert [a.settle('a' * 64, 300), b.settle('a' * 64, 300)] == [True, False]
     assert a.meter('2026-10') == {'spent': 300, 'reserved': 0, 'committed': 300, 'cap': 10_000}
     assert len(a.get_job('a' * 64)['charges']) == 1
+
+
+def test_two_reconcilers_with_the_same_read_settle_once(client):
+    """Both read the record unsettled; the second's transaction, not its
+    read, is what refuses it, and nothing moves on the meter."""
+    a = DynamoStore('jobs-test', client=client, cap_micros=10_000)
+    b = DynamoStore('jobs-test', client=client, cap_micros=10_000)
+    a.create_job(record())
+    stale = b.get_job('a' * 64)
+    b.get_job = lambda key: stale
+    assert a.settle('a' * 64, 300)
+    assert not b.settle('a' * 64, 300)
+    assert a.meter('2026-10') == {'spent': 300, 'reserved': 0, 'committed': 300, 'cap': 10_000}
+    assert len(a.get_job('a' * 64)['charges']) == 1
+
+
+def test_a_settle_from_a_read_before_a_retry_is_refused(client):
+    """Review fix 1: reconciler B reads attempt 1 (October, 1000 reserved);
+    A settles it; the owner retries in November with the same reservation.
+    B's settle must not pass on `settled = false AND reservedMicros = 1000`:
+    it would release October's reservation a second time and charge the
+    retry to October, leaving November's 1000 reserved for ever."""
+    a = DynamoStore('jobs-test', client=client, cap_micros=10_000)
+    b = DynamoStore('jobs-test', client=client, cap_micros=10_000)
+    a.create_job(record())
+    stale = b.get_job('a' * 64)
+    a.update_job('a' * 64, {'status': 'FAILED', 'endedAt': '2026-10-05T12:30:00Z'})
+    assert a.settle('a' * 64, 100)
+    a.requeue_failed('a' * 64, DECISION, datetime(2026, 11, 2, 9, 0, tzinfo=timezone.utc))
+    b.get_job = lambda key: stale
+    assert not b.settle('a' * 64, 300)
+    assert a.meter('2026-10') == {'spent': 100, 'reserved': 0, 'committed': 100, 'cap': 10_000}
+    assert a.meter('2026-11') == {'spent': 0, 'reserved': 1_000, 'committed': 1_000, 'cap': 10_000}
+    rec = a.get_job('a' * 64)
+    assert rec['status'] == 'QUEUED' and rec['attempt'] == 2 and not rec['settled']
+    assert rec['actualMicros'] == 100 and len(rec['charges']) == 1
+
+
+def test_every_transaction_carries_its_own_request_token(client, monkeypatch):
+    """Review fix 5: a token per request, so a retry of a request whose
+    commit answer was lost is a no-op, not a false 409 or created=False.
+    One per request, not per job: the same token on a second, identical
+    submission would make DynamoDB answer it with success and nothing
+    written, and the runner would be started twice."""
+    monkeypatch.setattr(dynamo_store.time, 'sleep', lambda s: None)
+    recording = Recording(client, n=1)
+    store = DynamoStore('jobs-test', client=recording, cap_micros=10_000)
+    assert store.create_job(record())[0]                     # one conflict, then through
+    store.update_job('a' * 64, {'status': 'FAILED'})
+    assert store.settle('a' * 64, 100)
+    store.requeue_failed('a' * 64, DECISION, NOW)
+    tokens = [c['ClientRequestToken'] for c in recording.calls]
+    assert len(tokens) == 4 and len(set(tokens)) == 4 and all(1 <= len(t) <= 36 for t in tokens)
+    assert store.create_job(record())[0] is False            # still a dedupe, not an idempotent "success"
 
 
 def test_jobs_with_backend_pages_through_the_scan(client, monkeypatch):

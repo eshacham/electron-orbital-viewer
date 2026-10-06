@@ -65,6 +65,9 @@ class Store(Protocol):
     # reconcile makes it unnecessary there, returns [].
     def jobs_with_backend(self, backend: str) -> list[dict]: ...
     def meter(self, month: str) -> dict: ...
+    # Every charge billed to a month, from every record, whatever month the
+    # record has since moved to (a retry): the dashboard's daily spend.
+    def month_charges(self, month: str) -> list[dict]: ...
     def get_resolution(self, query: str) -> dict | None: ...
     def put_resolution(self, query: str, value: dict) -> None: ...
     def generation_enabled(self) -> bool: ...
@@ -224,6 +227,17 @@ class FileStore:
 
     def meter(self, month):
         return self._meter(month)
+
+    def month_charges(self, month):
+        # Chosen by the charge's month, not the record's: a job failed in
+        # October and retried in November is a November record still carrying
+        # October's charge. Only local data settled before charges were dated
+        # (D16) lacks `at`; it falls back to the record's end time, which is a
+        # guess: a retry clears `endedAt` while attempt 2 runs (the charge is
+        # then undated, and the dashboard leaves it out of the daily bars) and
+        # attempt 2's end later stands in for attempt 1's.
+        return [{**c, 'at': c.get('at') or r['endedAt']} for r in self._all_records()
+                for c in r.get('charges', ()) if c['month'] == month]
 
     def _resolve_path(self, query):
         return self.root / 'resolve' / f'{hashlib.sha256(query.encode()).hexdigest()}.json'

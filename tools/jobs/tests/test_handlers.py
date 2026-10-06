@@ -237,6 +237,24 @@ def test_costs_daily_matches_spent_after_a_retry_in_a_later_month(api):
     status, costs = api.handle('GET', '/api/v1/costs', {'month': '2026-11'}, None)
     assert status == 200 and costs['spentUsd'] == 0.05
     assert costs['daily'] == [{'date': '2026-11-02', 'usd': 0.05}]
+    # October keeps its own charge although the record is November's now (review fix 2).
+    status, costs = api.handle('GET', '/api/v1/costs', {'month': '2026-10'}, None)
+    assert status == 200 and costs['spentUsd'] == 0.1
+    assert costs['daily'] == [{'date': '2026-10-10', 'usd': 0.1}]
+
+
+def test_a_charge_dated_after_its_month_lands_on_the_months_last_day(api):
+    """Review fix 3: a September job that ends just after midnight on
+    1 October is September's spend; its bar belongs at the end of September,
+    not on a "day 1" the chart would read as 1 September."""
+    api.now = lambda: datetime(2026, 9, 30, 23, 59, tzinfo=timezone.utc)
+    call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    api.store.update_job(WATER_KEY, {'status': 'DONE', 'endedAt': '2026-10-01T00:10:00Z'})
+    api.store.settle(WATER_KEY, 100_000)
+    api.now = lambda: NOW
+    status, costs = api.handle('GET', '/api/v1/costs', {'month': '2026-09'}, None)
+    assert status == 200 and costs['spentUsd'] == 0.1
+    assert costs['daily'] == [{'date': '2026-09-30', 'usd': 0.1}]
 
 
 # --- final-review fix wave (I2) --------------------------------------------------

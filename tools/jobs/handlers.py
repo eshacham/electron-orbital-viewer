@@ -229,19 +229,23 @@ class Api:
         month = self._month(query)
         records = self.store.list_jobs(month)
         meter = self.store.meter(month)
-        # The month's own charges, by the day each was dated (D16): a record
-        # retried into this month also carries last month's charge, which
-        # belongs to last month's spend. Ledgers written before charges were
-        # dated fall back to the record's end time.
-        daily = {}
-        for r in records:
-            for c in r.get('charges', ()):
-                at = c.get('at') or r['endedAt']
-                if c['month'] == month and c['micros'] and at:
-                    daily[at[:10]] = daily.get(at[:10], 0) + c['micros']
-        now = self.now()
         year, mon = map(int, month.split('-'))
         days = calendar.monthrange(year, mon)[1]
+        # The month's own charges, chosen by charge month from every record
+        # (D16), so daily sums to spentUsd: a record retried into a later
+        # month still carries this month's charge. A charge is dated when its
+        # attempt ended, which can be just past the month it is billed to (a
+        # job submitted on the 30th that ends on the 1st); its bar goes on the
+        # month's last day, as the chart reads a date as a day of this month.
+        # Undated charges (local data from before D16; see FileStore) are left out.
+        daily = {}
+        for c in self.store.month_charges(month):
+            at = c['at']
+            if not (c['micros'] and at):
+                continue
+            day = at[:10] if at[:7] == month else f'{month}-{1 if at[:7] < month else days:02d}'
+            daily[day] = daily.get(day, 0) + c['micros']
+        now = self.now()
         elapsed = days if month < month_of(now) else max(now.day, 1)
         queued = sum(r['sizing']['predictedCostMicros'] for r in records if r['status'] in ACTIVE)
         return {**self._meter(month), 'projectionUsd': usd(round(meter['spent'] * days / elapsed) + queued),

@@ -25,6 +25,7 @@ clients cannot tell the difference.
 import hashlib
 import json
 import time
+import uuid
 from decimal import Decimal
 
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
@@ -114,10 +115,20 @@ class DynamoStore:
     def _transact(self, items):
         """Runs one transaction; returns None, or the cancellation codes when a
         condition failed. A TransactionConflict (another transaction on the
-        meter at that instant: a settlement, a second submission) is retried."""
+        meter at that instant: a settlement, a second submission) is retried.
+
+        Each request carries its own ClientRequestToken: botocore resends a
+        request whose answer was lost with the same token, and DynamoDB then
+        answers success without applying it twice (instead of a false 409 or
+        `created=False` from our own condition). It is per request, never
+        derived from the job: an identical second submission within the
+        10-minute token window would otherwise be answered "success" with
+        nothing written, and the caller would start the runner twice. (botocore
+        also injects one when absent; setting it here keeps the guarantee
+        explicit and tested.)"""
         for i in range(TRANSACTION_TRIES):
             try:
-                self.db.transact_write_items(TransactItems=items)
+                self.db.transact_write_items(TransactItems=items, ClientRequestToken=str(uuid.uuid4()))
                 return None
             except ClientError as e:
                 if e.response['Error']['Code'] != 'TransactionCanceledException':
@@ -249,11 +260,18 @@ class DynamoStore:
             {'Update': {'TableName': self.table, 'Key': {'pk': {'S': key}},
                         'UpdateExpression': 'SET #se = :true, #am = #am + :a, '
                                             '#ch = list_append(if_not_exists(#ch, :none), :charge)',
-                        'ConditionExpression': '#se = :false AND #rm = :w',
+                        # The meter key and the charge come from the read
+                        # above, so the condition pins everything they were
+                        # derived from: a reconciler whose read predates a
+                        # settle-and-retry (same reservation, a new attempt,
+                        # perhaps a new month) must not settle the retry
+                        # against the old month's meter (review fix 1).
+                        'ConditionExpression': '#se = :false AND #rm = :w AND #ag = :attempt AND #mo = :month',
                         'ExpressionAttributeNames': {'#se': 'settled', '#am': 'actualMicros', '#rm': 'reservedMicros',
-                                                     '#ch': 'charges'},
+                                                     '#ch': 'charges', '#ag': 'attempt', '#mo': 'month'},
                         'ExpressionAttributeValues': {':true': {'BOOL': True}, ':false': {'BOOL': False},
                                                       ':a': _n(actual_micros), ':w': _n(w), ':none': {'L': []},
+                                                      ':attempt': _n(rec['attempt']), ':month': {'S': rec['month']},
                                                       ':charge': to_attr([charge(rec, actual_micros)])}}},
             {'Update': {'TableName': self.table, 'Key': {'pk': {'S': f'METER#{rec["month"]}'}},
                         'UpdateExpression': 'ADD #s :a, #r :minus_w, #c :delta',
@@ -267,6 +285,10 @@ class DynamoStore:
         raise RuntimeError(f'settle transaction cancelled: {codes}')
 
     def list_jobs(self, month, status=None):
+        # The byMonth index is eventually consistent (a GSI has no consistent
+        # read): a job submitted a moment ago may be missing from the list
+        # for a second or so. get_job, which every money decision uses, reads
+        # the table itself, consistently.
         records, start = [], None
         while True:
             kwargs = {'TableName': self.table, 'IndexName': 'byMonth', 'KeyConditionExpression': '#m = :m',
@@ -296,6 +318,22 @@ class DynamoStore:
             start = page.get('LastEvaluatedKey')
             if not start:
                 return records
+
+    def month_charges(self, month):
+        # Chosen by charge month, so a Scan, not the byMonth index (which keys
+        # on the record's current month); only `charges` is read back. Every
+        # charge written here is dated.
+        found, start = [], None
+        while True:
+            kwargs = {'TableName': self.table, 'FilterExpression': 'attribute_exists(#ch)', 'ConsistentRead': True,
+                      'ProjectionExpression': '#ch', 'ExpressionAttributeNames': {'#ch': 'charges'}}
+            if start:
+                kwargs['ExclusiveStartKey'] = start
+            page = self.db.scan(**kwargs)
+            found += [c for item in page['Items'] for c in from_attr(item['charges']) if c['month'] == month]
+            start = page.get('LastEvaluatedKey')
+            if not start:
+                return found
 
     def meter(self, month):
         m = self._get(f'METER#{month}') or {}
