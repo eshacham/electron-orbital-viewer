@@ -25,6 +25,9 @@ describe('request bodies', () => {
         expect(noComment[0].message).toMatch(/^Line 2 must be a comment line/);
         const withComment = formProblems({ ...EMPTY_FORM, kind: 'xyz', text: '3\nwater\nO 0 0 0.11779\nH 0 0.75545 -0.47116\nH 0 -0.75545 -0.47116\n' });
         expect(withComment).toEqual([]);
+        // R7: canonical.parse_xyz takes an atomic number as readily as a symbol.
+        const numbered = formProblems({ ...EMPTY_FORM, kind: 'xyz', text: '3\n8 0 0 0.11779\n1 0 0.75545 -0.47116\n1 0 -0.75545 -0.47116\n' });
+        expect(numbered[0].message).toMatch(/^Line 2 must be a comment line/);
     });
 });
 

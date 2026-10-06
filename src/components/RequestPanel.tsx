@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert, Button, FormControlLabel, Radio, RadioGroup, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
@@ -22,6 +22,8 @@ export interface RequestPanelProps {
     sessionExpired: boolean;
     onSignIn(): void;
 }
+
+const KIND_LABEL: Record<InputKind, string> = { name: 'Name', smiles: 'SMILES', xyz: 'XYZ' };
 
 /** Spec §8.2's recipes and their caveats, as the owner chooses between them. */
 const RECIPES: Array<{ value: Recipe; label: string; detail: string }> = [
@@ -70,8 +72,23 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
     const { state, run, clear } = usePreview(preview);
     const problems = formProblems(form);
     const problem = (field: FormProblem['field']) => problems.find(p => p.field === field)?.message;
-    // A preview belongs to the exact request it was asked for; anything typed since makes it stale.
-    const current = state.phase !== 'idle' && state.signature === formSignature(form) ? state : null;
+    // A preview belongs to the exact request it was asked for, and to where it
+    // would run: anything typed since, or a switch from This Mac to AWS, makes
+    // it stale -- else a $0 This Mac preview would offer Submit to AWS at a
+    // price never shown (final review I1).
+    const signature = `${target}|${formSignature(form)}`;
+    const current = state.phase !== 'idle' && state.signature === signature ? state : null;
+
+    // R4: the session ending disables the field the owner is in; focus goes to the way back rather than staying on it.
+    const panel = useRef<HTMLElement>(null);
+    const signInButton = useRef<HTMLButtonElement>(null);
+    const focusedWithin = useRef(false);
+    useEffect(() => {
+        if (!sessionExpired) return;
+        const active = document.activeElement;
+        const lost = active === null || active === document.body;
+        if ((active && panel.current?.contains(active)) || (lost && focusedWithin.current)) signInButton.current?.focus();
+    }, [sessionExpired]);
 
     const edit = (change: Partial<RequestForm>) => {
         onFormChange(change);
@@ -84,6 +101,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
         setSubmitError(null);
         try {
             const { job } = await submit(body);
+            clear();                                     // R5: what was sent is not offered again
             if (job.status === 'DONE') onOpen(job.key);
             else onFollow(job);
         } catch (error) {
@@ -94,9 +112,15 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
     };
 
     return (
-        <section className="request-panel" aria-label="request a molecule">
+        <section className="request-panel" aria-label="request a molecule" ref={panel}
+            onFocus={() => { focusedWithin.current = true; }}
+            onBlur={event => {
+                const next = event.relatedTarget as Node | null;
+                if (next && !event.currentTarget.contains(next)) focusedWithin.current = false;
+            }}>
             {sessionExpired && (
-                <Alert severity="warning" role="alert" action={<Button size="small" color="inherit" onClick={onSignIn}>Sign in</Button>}>
+                <Alert severity="warning" role="alert"
+                    action={<Button ref={signInButton} size="small" color="inherit" onClick={onSignIn}>Sign in</Button>}>
                     {SESSION_ENDED}
                 </Alert>
             )}
@@ -108,12 +132,13 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
             </ToggleButtonGroup>
             <TextField
                 size="small" fullWidth multiline={form.kind === 'xyz'} minRows={form.kind === 'xyz' ? 4 : undefined}
-                label={form.kind === 'name' ? 'Name' : form.kind === 'smiles' ? 'SMILES' : 'XYZ (Å)'}
+                label={form.kind === 'xyz' ? 'XYZ (Å)' : KIND_LABEL[form.kind]}
                 value={form.text} disabled={sessionExpired}
                 onChange={event => edit({ text: event.target.value })}
                 error={Boolean(form.text) && Boolean(problem('text'))}
                 helperText={form.text ? problem('text') : undefined}
-                slotProps={{ htmlInput: { 'aria-label': 'molecule', spellCheck: false, className: form.kind === 'xyz' ? 'mono' : undefined } }}
+                // R4: the accessible name carries the visible label (WCAG 2.5.3), e.g. "molecule (SMILES)".
+                slotProps={{ htmlInput: { 'aria-label': `molecule (${KIND_LABEL[form.kind]})`, spellCheck: false, className: form.kind === 'xyz' ? 'mono' : undefined } }}
             />
             <RadioGroup value={form.recipe} aria-label="recipe" onChange={event => edit({ recipe: event.target.value as Recipe })}>
                 {RECIPES.map(recipe => (
@@ -125,7 +150,8 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
                 <TextField size="small" label="Charge" placeholder="0" value={form.charge} disabled={sessionExpired}
                     onChange={event => edit({ charge: event.target.value })}
                     error={Boolean(problem('charge'))} helperText={problem('charge') ?? 'optional'}
-                    slotProps={{ htmlInput: { 'aria-label': 'charge', inputMode: 'numeric' } }} />
+                    // R2: no numeric keypad -- iOS's has no minus sign, and a charge can be negative.
+                    slotProps={{ htmlInput: { 'aria-label': 'charge' } }} />
                 <TextField size="small" label="Multiplicity" placeholder="lowest" value={form.multiplicity} disabled={sessionExpired}
                     onChange={event => edit({ multiplicity: event.target.value })}
                     error={Boolean(problem('multiplicity'))} helperText={problem('multiplicity') ?? 'optional'}
@@ -134,18 +160,23 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
             <Typography variant="caption" className="molecule-caption">
                 {target === 'local' ? 'Runs on This Mac: $0, timings tagged local.' : 'Runs on AWS, against this month’s compute cap.'}
             </Typography>
-            <Button variant="outlined" disabled={sessionExpired || problems.length > 0 || state.phase === 'loading'} onClick={() => run(form)}>
+            <Button variant="outlined" disabled={sessionExpired || problems.length > 0 || state.phase === 'loading'} onClick={() => run(form, signature)}>
                 {state.phase === 'loading' ? 'Previewing…' : 'Preview'}
             </Button>
-            {current?.phase === 'failed' && <Alert severity="error" role="alert">{current.error.message}</Alert>}
-            {current?.phase === 'ready' && (
-                <>
-                    <PreviewDetails preview={current.preview} />
-                    <SubmitArea preview={current.preview} busy={submitting || sessionExpired} onOpen={onOpen} onFollow={onFollow}
-                        onSubmit={() => { void send(requestBody(form)); }} onRetry={job => { void send(retryBody(job)); }} />
-                </>
-            )}
-            {submitError && <Alert severity="error" role="alert">{submitError}</Alert>}
+            {/* R4: the answer is announced when it lands, and the region says it is busy until then.
+                R3: after the session ends, its own alert is the one that says what to do; the
+                failures that led to it would only repeat it. */}
+            <div className="preview-live" aria-live="polite" aria-busy={state.phase === 'loading'}>
+                {current?.phase === 'failed' && !sessionExpired && <Alert severity="error" role="alert">{current.error.message}</Alert>}
+                {current?.phase === 'ready' && (
+                    <>
+                        <PreviewDetails preview={current.preview} />
+                        <SubmitArea preview={current.preview} busy={submitting || sessionExpired} onOpen={onOpen} onFollow={onFollow}
+                            onSubmit={() => { void send(requestBody(form)); }} onRetry={job => { void send(retryBody(job)); }} />
+                    </>
+                )}
+                {submitError && !sessionExpired && <Alert severity="error" role="alert">{submitError}</Alert>}
+            </div>
         </section>
     );
 };

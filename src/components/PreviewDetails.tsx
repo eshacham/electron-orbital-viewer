@@ -9,9 +9,18 @@ import type { GeometrySource, PreviewResponse, Sizing } from '../jobs/api_types'
 const SPIN = ['', 'singlet', 'doublet', 'triplet', 'quartet', 'quintet', 'sextet'];
 const signed = (charge: number) => (charge > 0 ? `+${charge}` : charge < 0 ? `−${-charge}` : '0');
 
-/** D8: what it takes to tell one geometry source from another, for the "on record" comparison. */
-const describeSource = (s: GeometrySource): string =>
-    s.kind === 'pubchem' ? `PubChem CID ${s.cid} (${s.title}), asked as "${s.query}", retrieved ${s.retrievedAt}` : 'pasted XYZ';
+/**
+ * D8: the geometry already on record beside the one just resolved. The same
+ * PubChem record is the same source however it was asked for and whenever
+ * it was fetched (R1); how it was asked for is said as an aside.
+ */
+function describeOnRecord(record: GeometrySource, asked: GeometrySource): string {
+    if (record.kind !== 'pubchem') return asked.kind === 'pubchem' ? 'pasted XYZ — a different source for the same atoms' : 'pasted XYZ (same source)';
+    const name = `PubChem CID ${record.cid} (${record.title})`;
+    const how = `asked as "${record.query}", retrieved ${record.retrievedAt}`;
+    if (asked.kind !== 'pubchem' || asked.cid !== record.cid) return `${name}, ${how} — a different source for the same atoms`;
+    return asked.query === record.query && asked.retrievedAt === record.retrievedAt ? `${name} (same source)` : `${name} (same source; ${how})`;
+}
 
 function SizingFacts({ sizing, reservedUsd }: { sizing: Sizing; reservedUsd: number }) {
     const note = predictionNote(sizing.version);
@@ -26,7 +35,14 @@ function SizingFacts({ sizing, reservedUsd }: { sizing: Sizing; reservedUsd: num
             <dt>Worker</dt><dd>{sizing.size} · {sizing.vcpu} vCPU · {sizing.memoryGB} GB · {capacity}</dd>
             <dt>{predictedLabel}</dt><dd>{formatDuration(sizing.predictedSeconds)}, {formatGB(sizing.predictedMemoryGB)} ({note}){predictedNote}</dd>
             <dt>Time limit</dt><dd>{sizing.capacity === 'local' ? 'none on This Mac' : formatDuration(sizing.timeoutSeconds)}</dd>
-            <dt>Cost</dt><dd>{money('reserved', reservedUsd)} if submitted; {money('projected', microsToUsd(sizing.predictedCostMicros))} ({note})</dd>
+            {/* R6: This Mac costs nothing; the projection is the AWS worker's, and says so. */}
+            <dt>Cost</dt>
+            <dd>
+                {money('reserved', reservedUsd)} if submitted;{' '}
+                {sizing.capacity === 'local'
+                    ? `projected on AWS ${formatUsd(microsToUsd(sizing.predictedCostMicros))}`
+                    : money('projected', microsToUsd(sizing.predictedCostMicros))} ({note})
+            </dd>
         </dl>
     );
 }
@@ -56,10 +72,7 @@ const PreviewDetails: React.FC<{ preview: PreviewResponse }> = ({ preview }) => 
                 {existing && (
                     <>
                         <dt>On record</dt>
-                        <dd>
-                            {describeSource(existing.geometrySource)}
-                            {JSON.stringify(existing.geometrySource) === JSON.stringify(source) ? ' (same source)' : ' — a different source for the same atoms'}
-                        </dd>
+                        <dd>{describeOnRecord(existing.geometrySource, source)}</dd>
                     </>
                 )}
             </dl>

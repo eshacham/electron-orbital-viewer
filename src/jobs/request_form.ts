@@ -9,7 +9,8 @@ export interface FormProblem { field: 'text' | 'charge' | 'multiplicity'; messag
 const MAX_NAME = 200;          // tools/jobs/handlers.MAX_NAME
 const MAX_XYZ_BYTES = 65536;   // tools/jobs/canonical.MAX_XYZ_BYTES
 const INTEGER = /^[+-]?\d{1,3}$/;
-const ATOM_LINE = /^[A-Za-z]{1,2}(\s+[-+]?[\d.]+(?:[eE][-+]?\d+)?){3}$/;
+// An element symbol or, as canonical.parse_xyz also takes, an atomic number (R7); then x, y, z.
+const ATOM_LINE = /^(?:[A-Za-z]{1,2}|\d{1,3})(\s+[-+]?[\d.]+(?:[eE][-+]?\d+)?){3}$/;
 
 /** The checks the server makes anyway, made here so a typo costs no round trip; the server stays the authority. */
 export function formProblems(form: RequestForm): FormProblem[] {

@@ -22,12 +22,12 @@ export function usePreview(previewFn: PreviewFn) {
     const latest = useRef(0);
     const controller = useRef<AbortController | null>(null);
 
-    const run = useCallback((form: RequestForm) => {
+    /** `signature` names what the answer is for; the caller adds anything beyond the form that changes it (the target, I1). */
+    const run = useCallback((form: RequestForm, signature: string = formSignature(form)) => {
         const id = ++latest.current;
         controller.current?.abort();
         const abort = new AbortController();
         controller.current = abort;
-        const signature = formSignature(form);
         setState({ phase: 'loading', signature });
         previewFn(requestBody(form), abort.signal).then(
             preview => { if (latest.current === id) setState({ phase: 'ready', signature, preview }); },
