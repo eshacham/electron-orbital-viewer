@@ -1,4 +1,4 @@
-import type { CombinationLegendItem } from './png';
+import type { ColourBarLegend, CombinationLegendItem } from './png';
 import type { ExportSurface } from './surfaces';
 import type { CameraAngles } from '../camera_angles';
 
@@ -8,6 +8,8 @@ export interface PngOverlayInput {
     phaseLegend: boolean;
     /** Ruling C5: App's combination colour key, when one is on screen instead of the plain ψ-sign key. */
     combinationLegend?: CombinationLegendItem[] | null;
+    /** Task 16b: Molecules' ESP colour key, when that is the key on screen. */
+    colourBar?: ColourBarLegend | null;
 }
 
 export interface ViewerExportHandle {

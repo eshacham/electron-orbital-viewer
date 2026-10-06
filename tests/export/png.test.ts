@@ -170,3 +170,34 @@ describe('PNG export', () => {
             .rejects.toThrow('The browser could not encode the image.');
     });
 });
+
+// Task 16b: the ESP map's key (red/white/blue bar, its scale and notes) is DOM
+// on screen, so the PNG redraws it, as it does the ψ-sign and combination keys.
+describe('drawOverlays: a colour-bar key (Molecules ESP view)', () => {
+    it('draws every bar segment in its own colour, left to right, with the ticks and notes, in the bottom-right corner', () => {
+        const fills: Array<{ style: string; x: number; y: number; w: number; h: number }> = [];
+        const texts: Array<{ text: string; x: number; y: number }> = [];
+        const painter = {
+            fillStyle: '' as string, font: '', textBaseline: 'top' as CanvasTextBaseline,
+            fillRect(x: number, y: number, w: number, h: number) { fills.push({ style: this.fillStyle, x, y, w, h }); },
+            fillText(text: string, x: number, y: number) { texts.push({ text, x, y }); },
+            measureText: (text: string) => ({ width: text.length * 7 }),
+        };
+        const colours = ['rgb(178, 24, 43)', 'rgb(247, 247, 247)', 'rgb(33, 102, 172)'];
+        drawOverlays(painter, 1600, 1000, 2, {
+            caption: ['Water'], scaleBar: null, phaseLegend: false,
+            colourBar: { colours, ticks: ['−0.05', '0', '+0.05 Ha/e'], notes: ['red: negative', 'fixed at ρ = 0.001'] },
+        });
+        const segments = fills.filter(f => colours.includes(f.style));
+        expect(segments.map(f => f.style)).toEqual(colours);
+        expect(segments[0].x).toBeLessThan(segments[1].x);
+        expect(segments[1].x).toBeLessThan(segments[2].x);
+        // In the right half, near the bottom, clear of the caption band.
+        expect(segments[0].x).toBeGreaterThan(800);
+        expect(segments[0].y).toBeGreaterThan(500);
+        expect(texts.map(t => t.text)).toEqual(expect.arrayContaining(['−0.05', '0', '+0.05 Ha/e', 'red: negative', 'fixed at ρ = 0.001']));
+        // The notes sit under the bar, as on screen.
+        const note = texts.find(t => t.text === 'red: negative')!;
+        expect(note.y).toBeGreaterThan(segments[0].y);
+    });
+});

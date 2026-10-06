@@ -1,7 +1,7 @@
 import { AnalyticFieldSource } from '../field_source';
 import type { MoleculeBasis } from '../molecules/types';
 import { registerMoleculeBasis } from '../molecules/basis_registry';
-import { CubeAtom, RadialCurveOnGrid, encodeCube, fieldCubeGrid, radialDensityCubeGrid } from './cube';
+import { CubeAtom, CubeGrid, RadialCurveOnGrid, encodeCube, fieldCubeGrid, radialDensityCubeGrid } from './cube';
 
 /**
  * Worker-safe: this module (and only what `cube.ts` already imports) is
@@ -16,7 +16,13 @@ interface CubeMeta { atoms: CubeAtom[]; title: string; description: string; requ
 export type CubeRequest =
     /** `bases`: a 'gaussianMO'/'gaussianDensity' recipe needs its basis registered before it can be evaluated (ruling C5, Task 13b) -- the worker has no registry of its own, so the request carries it. */
     | ({ type: 'fieldCube'; source: AnalyticFieldSource; resolution: number; bases?: MoleculeBasis[] } & CubeMeta)
-    | ({ type: 'radialCube'; curve: RadialCurveOnGrid; resolution: number } & CubeMeta);
+    | ({ type: 'radialCube'; curve: RadialCurveOnGrid; resolution: number } & CubeMeta)
+    /**
+     * A grid shipped as data (Task 16b: a library molecule's density or ESP),
+     * written exactly as it is -- nothing to sample, only to encode, which is
+     * still worth a worker: 96³ values are ~11 MB of text.
+     */
+    | ({ type: 'gridCube'; grid: CubeGrid } & CubeMeta);
 export type CubeResponse =
     | { type: 'success'; blob: Blob; requestId: number }
     | { type: 'error'; message: string; requestId: number };
@@ -28,9 +34,9 @@ export function buildCubeBlob(request: CubeRequest): Blob {
     if (request.type === 'fieldCube') {
         for (const basis of request.bases ?? []) registerMoleculeBasis(basis);
     }
-    const grid = request.type === 'fieldCube'
-        ? fieldCubeGrid(request.source, request.resolution)
-        : radialDensityCubeGrid(request.curve, request.resolution);
+    const grid = request.type === 'gridCube' ? request.grid
+        : request.type === 'fieldCube' ? fieldCubeGrid(request.source, request.resolution)
+            : radialDensityCubeGrid(request.curve, request.resolution);
     return new Blob(encodeCube(grid, request.atoms, request.title, request.description), { type: 'chemical/x-cube' });
 }
 

@@ -74,3 +74,29 @@ export function espLegendGradient(): string {
 export function formatEsp(v: number): string {
     return `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(3)}`;
 }
+
+/**
+ * The key's notes, worded once for both the on-screen key (EspLegend) and the
+ * PNG export (Task 16b), so a photographed map says exactly what the screen
+ * said: the colour meaning and scale, the fixed surface and the method, and
+ * -- once a surface has landed -- this molecule's own range.
+ */
+export const ESP_SIGN_NOTE = `red: negative, electron-rich · blue: positive, electron-poor · ±${Math.round(ESP_LIMIT_HARTREE * HARTREE_TO_KCAL_PER_MOL)} kcal/mol`;
+export const espSurfaceNote = (method: string) => `fixed at ρ = ${ESP_SURFACE_DENSITY} e/a₀³ (not an enclosed fraction) · ${method}`;
+export function espRangeNote(range: [number, number]): string {
+    const saturated = range[0] < -ESP_LIMIT_HARTREE || range[1] > ESP_LIMIT_HARTREE;
+    return `this molecule: ${formatEsp(range[0])} to ${formatEsp(range[1])} Ha/e${saturated ? ', saturated beyond the scale' : ''}`;
+}
+export const ESP_TICKS: [string, string, string] = [`−${ESP_LIMIT_HARTREE}`, '0', `+${ESP_LIMIT_HARTREE} Ha/e`];
+
+/**
+ * The bar as `segments` flat CSS colours, left (−limit) to right (+limit),
+ * each sampled at its segment's centre: the PNG draws it as rectangles, which
+ * any 2D painter can do, rather than a canvas gradient it would have to build.
+ */
+export function espColourBar(segments = 64): string[] {
+    return Array.from({ length: segments }, (_, i) => {
+        const [r, g, b] = espColorSrgb((-1 + (2 * (i + 0.5)) / segments) * ESP_LIMIT_HARTREE, ESP_LIMIT_HARTREE);
+        return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+    });
+}

@@ -7,12 +7,12 @@ import { subshellSpokenLabel } from '../atom/configurations';
 import { buildComparisonCurves } from '../atom/comparison_curves';
 import type { SerialisedAtomProfile } from '../workers/atomWorker';
 import { profileRelativity, pictureLanded } from '../store/atomSlice';
-import { CsvCurve, formatNumber, radialCurvesToCsv } from './csv';
+import { CsvCurve, formatNumber, quote, radialCurvesToCsv } from './csv';
 import {
     exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment, jLevelShapeCaption,
-    bondsDrawnPicture,
+    bondsDrawnPicture, moleculeDrawnPicture, moleculeCaveatCaption, moleculeTableFileStem, moleculeTitle,
 } from './caption';
-import { CombinationLegendItem } from './png';
+import { ColourBarLegend, CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
 import { encodeGlb } from './gltf';
@@ -28,6 +28,12 @@ import { H_PLUS_H_PLUS_HARTREE } from '../bonds/curve';
 import type { H2PlusCurve } from '../bonds/useH2PlusCurve';
 import { BOHR_TO_ANGSTROM, DiatomicId, HARTREE_TO_EV, pointId, systemFormula } from '../bonds/systems';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../molecules/types';
+import type { LibraryMoleculeMeta } from '../molecules/library_types';
+import { getDensityGrid, getEspGrid } from '../molecules/grid_cache';
+import { loadBasis } from '../molecules/loader';
+import { MOLECULE_MO_RESOLUTION, moleculeOrbitalSource } from '../molecules/render_plan';
+import { HARTREE_TO_EV as ORBITAL_HARTREE_TO_EV } from '../molecules/orbital_display';
+import { ESP_LIMIT_HARTREE, ESP_SIGN_NOTE, ESP_SURFACE_DENSITY, ESP_TICKS, espColourBar, espRangeNote, espSurfaceNote } from '../molecules/esp_color';
 
 export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb' | 'cube';
 
@@ -49,9 +55,20 @@ export const EXPORT_ITEMS: ExportItem[] = [
  * atom/Basic Orbitals wording. Every other kind's label is mode-independent.
  */
 export function exportItemsFor(mode: ViewMode): ExportItem[] {
+    if (mode === 'molecule') return MOLECULE_EXPORT_ITEMS;
     if (mode !== 'bonds') return EXPORT_ITEMS;
     return EXPORT_ITEMS.map(item => (item.kind === 'csv' ? { ...item, label: 'Potential curve (CSV)' } : item));
 }
+
+/** Task 16b: the structure is a view aid drawn beside the surface, not part of it, so the solids leave it out -- said where the item is chosen. */
+const MOLECULE_SURFACE_ONLY = 'surface only (ball-and-stick and dipole arrow not included)';
+const MOLECULE_ITEM_CHANGES: Partial<Record<ExportKind, Partial<ExportItem>>> = {
+    csv: { label: 'Orbital table (CSV)', detail: 'every orbital: label, role, occupation, energy in Ha and eV' },
+    glb: { detail: `colours kept — ${MOLECULE_SURFACE_ONLY}` },
+    stl: { detail: `each solid watertight, in millimetres — ${MOLECULE_SURFACE_ONLY}` },
+    cube: { detail: 'the drawn ρ, ψ or ESP grid, in bohr — for VMD, VESTA, Avogadro' },
+};
+const MOLECULE_EXPORT_ITEMS: ExportItem[] = EXPORT_ITEMS.map(item => ({ ...item, ...MOLECULE_ITEM_CHANGES[item.kind] }));
 
 export interface ExportOptions { longestSideMm?: number; }
 
@@ -131,6 +148,52 @@ export const RENDER_FAILED_REASON = 'The last picture failed to compute; nothing
 export const BONDS_LOADING_REASON = 'Wait for the molecule to load.';
 /** Fix round 1 (I2): the H2+ CSV needs the live plot's cached curve (ExportContext.h2plusCurve), never a main-thread re-solve. */
 export const H2PLUS_CURVE_NOT_READY_REASON = 'The potential curve is still computing.';
+
+/** Task 16b (ruling D5): Molecules mode's own refusals, in the order `moleculePictureReason` checks them. */
+export const MOLECULE_NONE_REASON = 'Choose a molecule first.';
+export const MOLECULE_LOADING_REASON = BONDS_LOADING_REASON;
+export const moleculeRenderFailedReason = (error: string) => `The surface failed to draw (${error}), so there is nothing to export.`;
+
+/**
+ * Whether there is a molecule to export anything of at all: a load error is
+ * a verdict, in the store's own words (metaFailed's, linkRejected's -- ruling
+ * T12-a), checked first, as `bondsBlockReason` checks useBondsData's; then
+ * nothing chosen (or the index itself failing, which leaves nothing to
+ * choose from), then the meta still on its way. The orbital table needs
+ * only this; every picture export also needs `moleculePictureReason`.
+ */
+function moleculeBlockReason(state: RootState): string | null {
+    const molecule = state.molecule;
+    if (molecule.error) return molecule.error;
+    if (!molecule.selectedId) return molecule.indexError ?? MOLECULE_NONE_REASON;
+    if (molecule.isLoadingMeta || !molecule.meta) return MOLECULE_LOADING_REASON;
+    return null;
+}
+
+const sameSurface = (a: { kind: string; index?: number }, b: { kind: string; index?: number }) => a.kind === b.kind && a.index === b.index;
+
+/**
+ * A picture export photographs, or re-samples, what is on the canvas, so it
+ * refuses unless that is exactly the surface the selection -- and so the view
+ * link every file carries -- names. A failed render is checked before a busy
+ * one (Task 15's minor: a failed surface switch must never export the
+ * surface it was switching away from; the view clears it, and says why).
+ * The selection running ahead of the picture -- before the view's effect has
+ * even raised its busy label -- reads as busy too, as a Bonds selection
+ * ahead of its picture does (`bondsBlockReason`).
+ */
+function moleculePictureReason(state: RootState): string | null {
+    const block = moleculeBlockReason(state);
+    if (block) return block;
+    const molecule = state.molecule;
+    if (molecule.renderError) return moleculeRenderFailedReason(molecule.renderError);
+    if (molecule.renderLabel !== null) return PICTURE_BUSY_REASON;
+    const drawn = molecule.drawn;
+    if (!drawn) return NOTHING_DRAWN_REASON;
+    const fractionMoved = molecule.surface.kind !== 'esp' && drawn.enclosedFraction !== state.orbital.enclosedFraction;
+    if (drawn.id !== molecule.meta!.id || !sameSurface(drawn.surface, molecule.surface) || fractionMoved) return PICTURE_BUSY_REASON;
+    return moleculeDrawnPicture(state) ? null : NOTHING_DRAWN_REASON;
+}
 
 /** Final review I2: a shell view whose lobes failed is not the picture its caption names. */
 export const COMPOSITION_FAILED_REASON = 'This shell\'s orbital lobes failed to compute, so the picture is incomplete.';
@@ -432,6 +495,13 @@ function bondsBlockReason(state: RootState, bondsLoad?: { loading: boolean; erro
 // mode gets. `bondsLoad` is Bonds' own extra context (`useBondsData`'s
 // loading/error, not in Redux); every other mode ignores it.
 export function exportAvailability(state: RootState, bondsLoad?: { loading: boolean; error: string | null }): ExportAvailability {
+    // Task 16b (ruling D5): Molecules draws outside the orbital slice (its
+    // MOs never reach `currentField`), so none of the generic reasons below
+    // can see its picture -- it has its own, and never falls through to them.
+    if (state.atom.mode === 'molecule') {
+        const picture = moleculePictureReason(state);
+        return { png: picture, 'png-plain': picture, csv: moleculeBlockReason(state), stl: picture, glb: picture, cube: picture };
+    }
     if (state.atom.mode === 'bonds') {
         const reason = bondsBlockReason(state, bondsLoad);
         if (reason) return { png: reason, 'png-plain': reason, csv: reason, stl: reason, glb: reason, cube: reason };
@@ -575,6 +645,118 @@ function csvFor(context: ExportContext): string {
     return radialCurvesToCsv(curves, comments);
 }
 
+/** The loaded meta, which every Molecules export below has already been checked to have (moleculeBlockReason). */
+function loadedMeta(state: RootState): LibraryMoleculeMeta {
+    const meta = state.molecule.meta;
+    if (!meta) throw new Error(moleculeBlockReason(state) ?? MOLECULE_LOADING_REASON);
+    return meta;
+}
+
+/** '; caveat' for a molecule that carries one (ozone), '' otherwise -- appended to a file's method line. */
+function caveatSuffix(state: RootState): string {
+    const caveat = moleculeCaveatCaption(state);
+    return caveat ? `; ${caveat}` : '';
+}
+
+/**
+ * The drawn Molecules surface as a cube job (brief, requirement 5), with one
+ * atom record per nucleus (Z and position in bohr, from meta.json):
+ *
+ * - density: the shipped voxel-averaged grid itself, exactly as meshed --
+ *   the same cached copy the view drew from (grid_cache.ts);
+ * - ESP: the shipped ESP grid, in Ha/e -- what a cube reader needs to colour
+ *   a ρ = 0.001 isosurface itself, which is how the app draws the map (the
+ *   report gives the reasoning; the description states the grid's limits);
+ * - MO: ψ re-sampled through the cube worker's field path, the basis carried
+ *   with the job (`bases`), as the MO render carries it to the orbital worker.
+ *
+ * Async because the grids and the basis live outside Redux; each is a cache
+ * hit by the time anything has been drawn.
+ */
+export async function moleculeCubeJob(state: RootState): Promise<CubeJob> {
+    const drawn = moleculeDrawnPicture(state);
+    if (!drawn) throw new Error(moleculePictureReason(state) ?? NOTHING_DRAWN_REASON);
+    const meta = loadedMeta(state);
+    const atoms: CubeAtom[] = meta.atoms.map(a => ({ Z: a.Z, position: a.position }));
+    const title = `electron-orbital-viewer: ${viewDescription(state)}`;
+    const method = `${methodStatement(state)}${caveatSuffix(state)}`;
+    const { surface } = drawn;
+    if (surface === 'density') {
+        const grid = await getDensityGrid(meta);
+        return {
+            type: 'gridCube', atoms, title,
+            grid: { shape: grid.shape, origin: grid.origin, spacing: grid.spacing, values: grid.values },
+            description: `rho(x,y,z), total electron density, electrons/bohr^3, the shipped ${grid.shape.join('x')} grid as drawn `
+                + `(each value the mean over its voxel, rounded to 10 mantissa bits, below 1e-7 written as 0); ${method}; lengths in bohr`,
+        };
+    }
+    if (surface === 'esp') {
+        const grid = await getEspGrid(meta);
+        return {
+            type: 'gridCube', atoms, title,
+            grid: { shape: grid.shape, origin: grid.origin, spacing: grid.spacing, values: grid.values },
+            description: `electrostatic potential V(x,y,z), Ha/e (atomic units), the shipped ${grid.shape.join('x')} grid `
+                + `(nuclear term capped within 0.05 bohr of a nucleus; rounded to 10 mantissa bits); the app colours the rho = ${ESP_SURFACE_DENSITY} `
+                + `e/bohr^3 isosurface of the density by it, on a fixed +/-${ESP_LIMIT_HARTREE} Ha/e scale; ${method}; lengths in bohr`,
+        };
+    }
+    const basis = await loadBasis(meta.id);
+    return {
+        type: 'fieldCube', source: moleculeOrbitalSource(meta, surface.mo), resolution: MOLECULE_MO_RESOLUTION, atoms, bases: [basis], title,
+        description: `psi(x,y,z), real, bohr^-3/2, ${surface.label}${surface.role ? ` (${surface.role})` : ''} molecular orbital, `
+            + `on the grid as drawn; ${method}; lengths in bohr`,
+    };
+}
+
+/**
+ * The orbital table (brief, requirement 6): every orbital meta.json lists
+ * (index = the basis' MO index, as a 'gaussianMO' recipe reads it), with
+ * energies in Ha and eV -- eV with the same factor the on-screen list uses
+ * (orbital_display.ts), so an exported number equals the shown one.
+ */
+function moleculeCsv(state: RootState, shareUrl: string): string {
+    const meta = loadedMeta(state);
+    const comments = [
+        `${moleculeTitle(meta)}: molecular orbitals`,
+        `method: ${methodStatement(state)}`,
+        ...(moleculeCaveatCaption(state) ? [moleculeCaveatCaption(state)!] : []),
+        `energies in hartree (Ha) and electronvolts (eV), 1 Ha = ${ORBITAL_HARTREE_TO_EV} eV`,
+        `view: ${shareUrl}`,
+    ];
+    const lines = comments.map(line => `# ${line}`);
+    lines.push('index,label,role,occupation,energy_Ha,energy_eV');
+    for (const orbital of [...meta.orbitals].sort((a, b) => a.index - b.index)) {
+        const at = orbital.index;
+        lines.push([
+            String(orbital.index), quote(orbital.label), orbital.role ?? '',
+            formatNumber(orbital.occupation, 'occupation', at),
+            formatNumber(orbital.energyHartree, 'energy_Ha', at),
+            formatNumber(orbital.energyHartree * ORBITAL_HARTREE_TO_EV, 'energy_eV', at),
+        ].join(','));
+    }
+    return `${lines.join('\n')}\n`;
+}
+
+/**
+ * Molecules' on-screen keys, from the drawn surface (App's own key follows
+ * the selection; `exportAvailability` has already refused any mismatch, but
+ * the picture is the honest source): the ESP map's colour bar, or the ψ-sign
+ * key over an orbital; the density has none.
+ */
+function moleculeKeys(state: RootState): { phaseLegend: boolean; colourBar: ColourBarLegend | null } {
+    const drawn = moleculeDrawnPicture(state);
+    if (!drawn || drawn.surface === 'density') return { phaseLegend: false, colourBar: null };
+    if (drawn.surface !== 'esp') return { phaseLegend: true, colourBar: null };
+    const range = state.molecule.espRange;
+    return {
+        phaseLegend: false,
+        colourBar: {
+            colours: espColourBar(), ticks: ESP_TICKS,
+            notes: [ESP_SIGN_NOTE, espSurfaceNote(drawn.method), ...(range ? [espRangeNote(range)] : [])],
+        },
+    };
+}
+
 export async function runExport(kind: ExportKind, context: ExportContext): Promise<ExportResult> {
     // Fix round 1 (I1): the same mismatch/loading/error gate the live menu
     // uses (App.tsx), repeated here so a direct runExport call -- a menu
@@ -585,6 +767,7 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
         : undefined;
     const reason = exportAvailability(context.state, bondsLoad)[kind];
     if (reason) throw new Error(reason);
+    const molecule = context.state.atom.mode === 'molecule';
     const stem = exportFileStem(context.state);
     switch (kind) {
         case 'png':
@@ -601,14 +784,18 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             // line does not state -- null, and so omitted, without them.
             const shape = jLevelShapeCaption(context.state);
             if (shape) caption.push(shape);
-            const overlays = kind === 'png'
-                ? {
-                    caption,
-                    phaseLegend: Boolean(context.phaseLegend),
-                    // Ruling C5: describe the combination key too, when App has one on screen.
-                    combinationLegend: context.combinationLegend,
-                }
-                : null;
+            // Task 16b: a molecule's own caveat (ozone's) -- null, and so omitted, without one.
+            const caveat = moleculeCaveatCaption(context.state);
+            if (caveat) caption.push(caveat);
+            // Molecules' keys come from the drawn surface, not App's flags.
+            const overlays = kind !== 'png' ? null
+                : molecule ? { caption, ...moleculeKeys(context.state) }
+                    : {
+                        caption,
+                        phaseLegend: Boolean(context.phaseLegend),
+                        // Ruling C5: describe the combination key too, when App has one on screen.
+                        combinationLegend: context.combinationLegend,
+                    };
             return { blob: await context.handle.capturePng(overlays), filename: kind === 'png' ? `${stem}.png` : `${stem}_view.png` };
         }
         case 'csv': {
@@ -616,8 +803,11 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             // type, so Excel -- which otherwise guesses the system codepage
             // -- reads the em dashes, superscripts and fractions in a
             // caption (—, ², ½) correctly instead of mangling them.
-            const blob = new Blob(['﻿', csvFor(context)], { type: 'text/csv;charset=utf-8' });
-            return { blob, filename: `${stem}.csv` };
+            // Task 16b: Molecules' CSV is the orbital table, the molecule's
+            // rather than the drawn surface's, and named so.
+            const text = molecule ? moleculeCsv(context.state, context.shareUrl) : csvFor(context);
+            const blob = new Blob(['﻿', text], { type: 'text/csv;charset=utf-8' });
+            return { blob, filename: `${molecule ? moleculeTableFileStem(context.state) : stem}.csv` };
         }
         case 'stl': {
             if (!context.handle) throw new Error(VIEW_NOT_READY_REASON);
@@ -626,13 +816,18 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
         }
         case 'glb': {
             if (!context.handle) throw new Error(VIEW_NOT_READY_REASON);
-            const description = `${viewDescription(context.state)}; ${methodStatement(context.state, context.bondsScan)}`;
+            // Task 16b: a molecule's model is its surface alone -- the structure
+            // overlay is not in the export group -- and the file says so.
+            const description = `${viewDescription(context.state)}; ${methodStatement(context.state, context.bondsScan)}`
+                + (molecule ? `${caveatSuffix(context.state)}; surface only, ball-and-stick structure and dipole arrow not included` : '');
             const buffer = await encodeGlb(context.handle.collectSurfaces(), description);
             return { blob: new Blob([buffer], { type: 'model/gltf-binary' }), filename: `${stem}.glb` };
         }
         case 'cube': {
             if (!context.createCubeWorker) throw new Error('The cube worker is not available.');
-            const job = cubeJobFor(context.state, { scan: context.bondsScan, meta: context.bondsMeta });
+            const job = molecule
+                ? await moleculeCubeJob(context.state)
+                : cubeJobFor(context.state, { scan: context.bondsScan, meta: context.bondsMeta });
             return { blob: await requestCube(job, context.createCubeWorker), filename: `${stem}.cube` };
         }
     }

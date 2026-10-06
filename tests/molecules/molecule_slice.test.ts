@@ -2,6 +2,7 @@ import reducer, {
     selectMolecule, metaLoaded, metaFailed, setSurface, renderStarted, renderFinished, renderFailed, renderCancelled, indexLoaded,
     linkRejected,
 } from '../../src/store/moleculeSlice';
+import { setMode } from '../../src/store/atomSlice';
 import { encodeMoleculeUrl, decodeMoleculeUrl } from '../../src/molecules/url_keys';
 import { waterMeta } from './fixtures';
 
@@ -88,6 +89,28 @@ describe('moleculeSlice', () => {
         s = reducer(s, renderStarted('Computing 1b1…'));
         s = reducer(s, renderCancelled());
         expect([s.renderLabel, s.isoLevel, s.renderError]).toEqual([null, 0.02, null]);
+    });
+    // Task 16b (ruling D5): exports describe what was drawn, never what is
+    // merely selected -- so the slice records the surface that landed, and
+    // forgets it whenever the canvas stops showing it.
+    it('records the surface that landed, and forgets it when another starts, fails or is cancelled', () => {
+        const drawn = { id: 'h2o', surface: { kind: 'mo' as const, index: 4 }, enclosedFraction: 0.9 };
+        let s = reducer(init(), selectMolecule({ id: 'h2o' }));
+        s = reducer(s, metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        expect(s.drawn).toBeNull();
+        s = reducer(s, renderStarted('Computing 1b1…'));
+        s = reducer(s, renderFinished({ isoLevel: 0.02, drawn }));
+        expect(s.drawn).toEqual(drawn);
+        expect(reducer(s, renderStarted('Loading Water…')).drawn).toBeNull();
+        expect(reducer(s, renderFailed('No isosurface')).drawn).toBeNull();
+        expect(reducer(s, renderCancelled()).drawn).toBeNull();
+        expect(reducer(s, selectMolecule({ id: 'nh3' })).drawn).toBeNull();
+        expect(reducer(s, linkRejected('bad!')).drawn).toBeNull();
+        // Leaving the mode: re-entering draws afresh (useMoleculeView's
+        // effect re-runs on `active`), so nothing drawn carries over.
+        expect(reducer(s, setMode('atom')).drawn).toBeNull();
+        // A landing that does not say what it drew records nothing.
+        expect(reducer(s, renderFinished({ isoLevel: 0.02 })).drawn).toBeNull();
     });
 });
 

@@ -75,7 +75,7 @@ describe('planMoleculeRender', () => {
         const mo = planMoleculeRender(meta, { kind: 'mo', index: 4 }, 0.8, waterBasis);
         expect(mo).toEqual({ kind: 'mo', label: 'Computing 1b1…', request: {
             sources: [{ kind: 'analytic', id: 'gaussianMO:h2o:4', recipe: { type: 'gaussianMO', moleculeId: 'h2o', index: 4 }, rMax: 6.43 }],
-            colors: ['#ffffff'], memberLabels: ['Computing 1b1…'], resolution: 95, enclosedFraction: 0.8, label: 'Computing 1b1…',
+            colors: ['#ffffff'], memberLabels: ['1b1'], resolution: 95, enclosedFraction: 0.8, label: 'Computing 1b1…',
             bases: [waterBasis] } });
     });
 });
@@ -209,8 +209,11 @@ describe('useMoleculeView', () => {
         const request = (updateFieldInScene as jest.Mock).mock.calls.at(-1)[1];
         expect(request.sources[0].recipe).toEqual({ type: 'gaussianMO', moleculeId: 'h2o', index: 4 });
         expect(request.bases).toEqual([waterBasis]);
-        expect(request.memberLabels).toEqual(['Computing 1b1…']);
+        // Carry from Task 15 (Task 16b): the orbital's own name, never the
+        // busy text, so "Computing…" cannot reach a key or an exported solid.
+        expect(request.memberLabels).toEqual(['1b1']);
         expect(store.getState().molecule.isoLevel).toBe(0.02);
+        expect(store.getState().molecule.drawn).toEqual({ id: 'h2o', surface: { kind: 'mo', index: 4 }, enclosedFraction: 0.9 });
         expect((setMoleculeOverlay as jest.Mock).mock.calls.some(call => call[1] !== null)).toBe(true);
         rerender(<Provider store={store}><Harness active={false} context={context} /></Provider>);
         expect((setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1]).toBeNull();
@@ -243,6 +246,8 @@ describe('useMoleculeView', () => {
         await flush();
         expect(store.getState().molecule.isoLevel).toBe(0.03);
         expect(store.getState().molecule.renderLabel).toBeNull();
+        // The density landed, not the orbital that was cancelled under it.
+        expect(store.getState().molecule.drawn).toEqual({ id: 'h2o', surface: { kind: 'density' }, enclosedFraction: 0.9 });
     });
     // Ruling D38: a terminated worker never replies, so cleanup itself must take the busy label down.
     it('leaving the mode mid-mesh cancels the worker and never leaves the busy label up', async () => {

@@ -29,13 +29,15 @@ export function formatCubeValue(value: number): string {
  * NFKD decomposes the superscript minus into U+2212 (a *second* non-ASCII
  * character, produced only by normalising), so it must be replaced *after*
  * normalising, not before. Spelled out the same way ψ/ρ already were.
+ * Task 16b, found live: an ESP title's "±0.05 Ha/e" lost its '±' the same
+ * way, reading as a one-sided scale.
  */
 export function asciiLine(text: string): string {
     return text.normalize('NFKD')
         .replace(/ψ/g, 'psi').replace(/ρ/g, 'rho')
         .replace(/σ/g, 'sigma').replace(/π/g, 'pi').replace(/δ/g, 'delta').replace(/φ/g, 'phi')
         .replace(/α/g, 'alpha').replace(/β/g, 'beta')
-        .replace(/[−–—]/g, '-')
+        .replace(/[−–—]/g, '-').replace(/±/g, '+/-')
         .replace(/[\r\n]+/g, ' ').replace(/[^\x20-\x7E]/g, '').trim();
 }
 

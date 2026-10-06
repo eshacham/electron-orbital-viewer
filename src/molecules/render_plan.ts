@@ -35,11 +35,15 @@ export function planMoleculeRender(
 ): MoleculeRenderPlan {
     if (surface.kind === 'mo') {
         const orbital = meta.orbitals.find(o => o.index === surface.index);
-        const label = `Computing ${orbital?.label ?? `orbital ${surface.index}`}…`;
+        const name = orbital?.label ?? `orbital ${surface.index}`;
+        const label = `Computing ${name}…`;
         return {
             kind: 'mo', label,
             request: {
-                sources: [moleculeOrbitalSource(meta, surface.index)], colors: ['#ffffff'], memberLabels: [label],
+                // The member is named for what it is, as Bonds names its
+                // orbitals (bonds_request.ts), never the busy text: an
+                // exported solid or a colour key must not read "Computing…".
+                sources: [moleculeOrbitalSource(meta, surface.index)], colors: ['#ffffff'], memberLabels: [name],
                 resolution: MOLECULE_MO_RESOLUTION, enclosedFraction, label,
                 ...(basis ? { bases: [basis] } : {}),
             },

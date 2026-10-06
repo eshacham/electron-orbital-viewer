@@ -63,6 +63,8 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
         const requestId = ++requestRef.current;
         const current = () => requestRef.current === requestId && !context.isDisposed;
         let landed = false;
+        // What this request draws, reported with its landing (exports read it, Task 16b).
+        const drawn = { id: meta.id, surface, enclosedFraction };
         let cancelMesh: (() => void) | null = null;
         dispatch(renderStarted(plan.label));
         // An orbital still computing for an earlier request must not land over this surface.
@@ -77,7 +79,7 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
                     const outcome = await updateFieldInScene(context, withBasis.request, false);
                     if (outcome.status !== 'rendered' || !current()) return;
                     landed = true;
-                    dispatch(renderFinished({ isoLevel: outcome.isoLevel }));
+                    dispatch(renderFinished({ isoLevel: outcome.isoLevel, drawn }));
                     return;
                 }
                 const grid = await getDensityGrid(meta);
@@ -97,7 +99,7 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
                 }
                 presentFieldMesh(context, meshData, { vertexColors: esp?.colors, boxRMax: gridHalfWidth(meta) });
                 landed = true;
-                dispatch(renderFinished({ isoLevel: meshData.isoLevel, espRange: esp ? [esp.min, esp.max] : undefined }));
+                dispatch(renderFinished({ isoLevel: meshData.isoLevel, espRange: esp ? [esp.min, esp.max] : undefined, drawn }));
             } catch (error) {
                 if (isSuperseded(error) || !current()) return;
                 landed = true;

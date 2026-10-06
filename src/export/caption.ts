@@ -16,6 +16,10 @@ import { H2PLUS_CAPTIONS, lengths, multireferenceCaption } from '../bonds/captio
 import { H2PLUS_LABELS, H2PlusState } from '../bonds/h2plus';
 import { SPIN_SUFFIX } from '../bonds/bonds_request';
 import type { BasisOrbital, MoleculeBasis, MoleculeScan } from '../molecules/types';
+import type { LibraryMoleculeMeta } from '../molecules/library_types';
+import { formatFormula } from '../molecules/catalogue';
+import { formatOrbitalEnergy } from '../molecules/orbital_display';
+import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY } from '../molecules/esp_color';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
 export const ATOM_METHOD = 'central-field SCF, LDA exchange + VWN5 correlation, non-relativistic, spherically averaged';
@@ -72,6 +76,7 @@ function bondsMethodStatement(state: RootState, scan: MoleculeScan | null | unde
  */
 export function methodStatement(state: RootState, bondsScan?: MoleculeScan | null): string {
     if (state.atom.mode === 'bonds') return bondsMethodStatement(state, bondsScan);
+    if (state.atom.mode === 'molecule') return moleculeMethodStatement(state);
     if (state.atom.mode === 'atom') {
         // Task 12b (ruling C7): the *drawn* profile's mode (ruling C9), not
         // the switch's -- off keeps ATOM_METHOD's own wording byte-identical
@@ -98,6 +103,147 @@ export function methodStatement(state: RootState, bondsScan?: MoleculeScan | nul
             : `hydrogen n = 2 Stark states (2s +/- 2p_z)/sqrt 2, first-order degenerate perturbation theory; valid for F well below the n = 2 over-the-barrier field, 1/256 a.u. (≈ ${N2_MAX_FIELD_AU}); tunnelling ignored`;
     }
     return BASIC_METHOD;
+}
+
+/**
+ * Task 16b (ruling D5): one library molecule's method. The method is the
+ * molecule's, not the surface's -- density, orbitals and ESP all come from
+ * one SCF -- so this reads the loaded meta even before anything has landed
+ * (a CSV of the orbital table needs it then). Never Basic Orbitals' wording:
+ * Molecules mode has its own sentence even with nothing loaded.
+ */
+function moleculeMethodText(meta: LibraryMoleculeMeta): string {
+    const { density, energies } = meta.method;
+    return density === energies ? density : `${density} (density, orbitals, ESP); orbital energies ${energies}`;
+}
+
+function moleculeMethodStatement(state: RootState): string {
+    const meta = state.molecule.meta;
+    if (!meta) return 'molecule library: no molecule loaded';
+    return `${moleculeMethodText(meta)} (PySCF); geometry: ${meta.geometrySource}`;
+}
+
+export type MoleculeDrawnSurface = 'density' | 'esp' | { mo: number; label: string; role?: string; energyHartree: number };
+
+export interface MoleculeDrawnPicture {
+    id: string;
+    name: string;
+    /** As meta.json writes it, ASCII ('H2O'); captions subscript it (formatFormula). */
+    formula: string;
+    surface: MoleculeDrawnSurface;
+    /** The enclosed fraction the density or orbital was contoured at; absent for the ESP map, drawn at a fixed ρ. */
+    enclosedFraction?: number;
+    /** The contour value the render produced: ρ for the density, |ψ|² for an orbital, ρ = 0.001 for the ESP surface. */
+    isoLevel?: number;
+    method: string;
+    geometrySource: string;
+    /** A documented exception the molecule carries (ozone's multireference dipole, ruling T7-O3). */
+    caveat?: string;
+}
+
+/**
+ * What the canvas shows in Molecules mode -- the surface that *landed*
+ * (`state.molecule.drawn`, reported by the render itself), never the
+ * selection (`state.molecule.surface`), which runs ahead of the picture
+ * while the next render computes: the same rule as `bondsDrawnPicture` and
+ * atom mode's drawn profile (ruling C9). Null unless the meta is loaded, no
+ * render is in flight or has failed, and the landed surface belongs to it.
+ */
+export function moleculeDrawnPicture(state: RootState): MoleculeDrawnPicture | null {
+    const { meta, drawn, renderLabel, renderError, isoLevel } = state.molecule;
+    if (state.atom.mode !== 'molecule' || !meta || !drawn || renderLabel !== null || renderError !== null) return null;
+    if (drawn.id !== meta.id) return null;
+    let surface: MoleculeDrawnSurface;
+    if (drawn.surface.kind === 'mo') {
+        const index = drawn.surface.index;
+        const orbital = meta.orbitals.find(o => o.index === index);
+        if (!orbital) return null;
+        surface = { mo: index, label: orbital.label, ...(orbital.role ? { role: orbital.role } : {}), energyHartree: orbital.energyHartree };
+    } else {
+        surface = drawn.surface.kind;
+    }
+    return {
+        id: meta.id, name: meta.name, formula: meta.formula, surface,
+        ...(surface === 'esp' ? {} : { enclosedFraction: drawn.enclosedFraction }),
+        ...(isoLevel !== null ? { isoLevel } : {}),
+        method: moleculeMethodText(meta), geometrySource: meta.geometrySource,
+        ...(meta.caveat ? { caveat: meta.caveat } : {}),
+    };
+}
+
+/** 'Water (H₂O)' -- the loaded molecule, drawn or not. */
+export function moleculeTitle(meta: LibraryMoleculeMeta): string {
+    return `${meta.name} (${formatFormula(meta.formula)})`;
+}
+
+/** "90 % enclosed": the brief's own wording, spaced as SI writes a percentage. */
+const enclosedText = (fraction: number) => `${Math.round(fraction * 100)} % enclosed`;
+
+function moleculeViewDescription(state: RootState): string {
+    const meta = state.molecule.meta;
+    if (!meta) return 'Molecules: no molecule loaded';
+    const drawn = moleculeDrawnPicture(state);
+    if (!drawn) return moleculeTitle(meta);
+    const { surface } = drawn;
+    const fraction = drawn.enclosedFraction ?? 0;
+    if (surface === 'esp') {
+        return `${moleculeTitle(meta)}, ESP on ρ = ${ESP_SURFACE_DENSITY} e/a₀³ surface, ±${ESP_LIMIT_HARTREE} Ha/e`;
+    }
+    if (surface === 'density') {
+        // The ρ the fraction produced, written as the view settings write it (App's moleculeIsoNote).
+        const rho = drawn.isoLevel !== undefined ? ` (ρ = ${drawn.isoLevel.toExponential(2)} e/a₀³)` : '';
+        return `${moleculeTitle(meta)}, density, ${enclosedText(fraction)}${rho}`;
+    }
+    const role = surface.role ? ` (${surface.role})` : '';
+    return `${moleculeTitle(meta)}, MO ${surface.label}${role}, ${formatOrbitalEnergy(surface.energyHartree)}, ${enclosedText(fraction)}`;
+}
+
+/**
+ * The caption line a molecule's own caveat adds (ozone's, ruling T7-O3) --
+ * null, and so omitted, for every molecule without one. Read off the loaded
+ * meta: the caveat is the molecule's, whichever surface is drawn.
+ */
+export function moleculeCaveatCaption(state: RootState): string | null {
+    return state.atom.mode === 'molecule' ? state.molecule.meta?.caveat ?? null : null;
+}
+
+/**
+ * ASCII Mulliken labels: a prime is 'p' and a double prime 'pp' ("10a'" ->
+ * '10ap', '2a"' -> '2app') -- spelled out rather than dropped, since 10a'
+ * and 10a" are different orbitals.
+ */
+function asciiMullikenLabel(label: string): string {
+    return label.replace(/"/g, 'pp').replace(/'/g, 'p').replace(/[^A-Za-z0-9-]/g, '');
+}
+
+/** 'H2O' as shipped; a formula with brackets ('(CH3)2CO') reads worse stripped than the id does ('acetone'). */
+function moleculeFileName(meta: LibraryMoleculeMeta): string {
+    return /^[A-Za-z0-9]+$/.test(meta.formula) ? meta.formula : meta.id;
+}
+
+/**
+ * 'orbital-viewer_H2O_density-90', 'orbital-viewer_H2O_esp',
+ * 'orbital-viewer_H2O_mo4-1b1' (brief, requirement 2): the molecule and the
+ * drawn surface. An MO's index is part of the stem because a degenerate set
+ * shares one label (benzene's two 1e1g HOMOs), as Bonds' stems number
+ * the halves of a degenerate pair.
+ */
+function moleculeFileStem(state: RootState): string {
+    const meta = state.molecule.meta;
+    if (!meta) return 'orbital-viewer_molecule';
+    const base = `orbital-viewer_${moleculeFileName(meta)}`;
+    const drawn = moleculeDrawnPicture(state);
+    if (!drawn) return base;
+    const { surface } = drawn;
+    if (surface === 'esp') return `${base}_esp`;
+    if (surface === 'density') return `${base}_density-${Math.round((drawn.enclosedFraction ?? 0) * 100)}`;
+    return `${base}_mo${surface.mo}-${asciiMullikenLabel(surface.label)}`;
+}
+
+/** The orbital table is the molecule's, whatever surface is drawn: 'orbital-viewer_H2O_orbitals'. */
+export function moleculeTableFileStem(state: RootState): string {
+    const meta = state.molecule.meta;
+    return meta ? `orbital-viewer_${moleculeFileName(meta)}_orbitals` : 'orbital-viewer_molecule_orbitals';
 }
 
 /** "n = 2 shell" -- shared by viewDescription and cubeJobFor's own labelling of a shell's radial curve. */
@@ -206,6 +352,7 @@ function bondsViewDescription(state: RootState): string {
 
 export function viewDescription(state: RootState): string {
     if (state.atom.mode === 'bonds') return bondsViewDescription(state);
+    if (state.atom.mode === 'molecule') return moleculeViewDescription(state);
     const percent = `${Math.round(selectShownEnclosedFraction(state) * 100)}% contour`;
     if (state.atom.mode === 'hydrogenic') {
         const combination = state.orbital.combination;
@@ -328,6 +475,7 @@ function bondsFileStem(state: RootState): string {
 /** ASCII only: file names travel through systems that mangle "²". */
 export function exportFileStem(state: RootState): string {
     if (state.atom.mode === 'bonds') return bondsFileStem(state);
+    if (state.atom.mode === 'molecule') return moleculeFileStem(state);
     if (state.atom.mode === 'hydrogenic') {
         const combination = state.orbital.combination;
         if (combination.kind === 'hybrid') {

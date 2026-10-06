@@ -43,11 +43,19 @@ export function freeAreaCrop(width: number, height: number, insets?: ViewInsets)
  */
 export interface CombinationLegendItem { label: string; color: string; }
 
+/**
+ * Task 16b: a continuous colour key -- Molecules' ESP map (EspLegend on
+ * screen): the bar as flat colour segments, left to right, its three ticks
+ * (left end, centre, right end) and the notes printed beneath it.
+ */
+export interface ColourBarLegend { colours: string[]; ticks: [string, string, string]; notes: string[]; }
+
 export interface OverlaySpec {
     caption: string[];
     scaleBar: ScaleBar | null;
     phaseLegend: boolean;
     combinationLegend?: CombinationLegendItem[] | null;
+    colourBar?: ColourBarLegend | null;
 }
 
 export interface OverlayPainter {
@@ -120,6 +128,41 @@ function wrapText(painter: OverlayPainter, text: string, maxWidth: number): stri
     return lines;
 }
 
+/**
+ * The colour-bar key in the bottom-right corner, on its own dark backing (an
+ * ESP map is mostly pale, and white text needs something to sit on). Notes
+ * wrap to half the frame, so on a phone-width export they cannot run into
+ * the scale bar on the left.
+ */
+function drawColourBar(painter: OverlayPainter, width: number, height: number, scale: number, pad: number, key: ColourBarLegend): void {
+    const line = 16 * scale;
+    const barWidth = 200 * scale;
+    const barHeight = 10 * scale;
+    const gap = 4 * scale;
+    const notes = key.notes.flatMap(note => wrapText(painter, note, Math.max(barWidth, width / 2 - 2 * pad)));
+    const blockWidth = Math.max(barWidth, ...notes.map(note => painter.measureText(note).width));
+    const blockHeight = barHeight + gap + line * (1 + notes.length);
+    const left = width - pad - blockWidth;
+    const top = height - pad - blockHeight;
+    const margin = 8 * scale;
+    painter.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    painter.fillRect(left - margin, top - margin, blockWidth + 2 * margin, blockHeight + 2 * margin);
+    const segment = barWidth / key.colours.length;
+    key.colours.forEach((colour, i) => {
+        painter.fillStyle = colour;
+        // A hair wider than the step, so no background shows between segments.
+        painter.fillRect(left + i * segment, top, i === key.colours.length - 1 ? segment : segment + scale, barHeight);
+    });
+    painter.textBaseline = 'top';
+    painter.fillStyle = '#ffffff';
+    const tickY = top + barHeight + gap;
+    const [start, middle, end] = key.ticks;
+    painter.fillText(start, left, tickY);
+    painter.fillText(middle, left + barWidth / 2 - painter.measureText(middle).width / 2, tickY);
+    painter.fillText(end, left + barWidth - painter.measureText(end).width, tickY);
+    notes.forEach((note, i) => painter.fillText(note, left, tickY + line * (i + 1)));
+}
+
 /** The on-screen overlays, redrawn at export scale (they are DOM, not canvas). */
 export function drawOverlays(painter: OverlayPainter, width: number, height: number, scale: number, spec: OverlaySpec): void {
     const pad = 14 * scale;
@@ -147,7 +190,11 @@ export function drawOverlays(painter: OverlayPainter, width: number, height: num
     // Ruling C5: the combination key, when App is showing one, takes the
     // place of the plain ψ-sign key -- the two are mutually exclusive on
     // screen (App.tsx's combinationLegend / showPhaseLegend).
-    if (spec.combinationLegend && spec.combinationLegend.length > 0) {
+    // Task 16b: the ESP map's key stands where the ψ-sign key would; the
+    // screen never shows both (an ESP surface has no phase).
+    if (spec.colourBar) {
+        drawColourBar(painter, width, height, scale, pad, spec.colourBar);
+    } else if (spec.combinationLegend && spec.combinationLegend.length > 0) {
         const items: Array<[string, string | null]> = [
             ...spec.combinationLegend.map(item => [item.label, item.color] as [string, string | null]),
             ['darker: ψ < 0', null],

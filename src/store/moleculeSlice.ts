@@ -1,9 +1,21 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { MoleculeIndexEntry } from '../molecules/types';
 import type { LibraryMoleculeMeta, MoleculePick } from '../molecules/library_types';
+import { setMode } from './atomSlice';
 
 export type { MoleculePick };
 export type MoleculeSurface = { kind: 'density' } | { kind: 'esp' } | { kind: 'mo'; index: number };
+
+/**
+ * The surface on the canvas now, as the render that drew it asked for it
+ * (Task 16b, ruling D5). `surface` and the orbital slice's enclosed fraction
+ * are the *selection*, which runs ahead of the picture from the moment it
+ * changes until the next render lands; an export must describe the picture,
+ * so the render reports what it drew rather than the slice guessing from the
+ * selection at landing time (a slow result can land after the selection has
+ * already moved on, before the view's effect has superseded it).
+ */
+export interface MoleculeDrawn { id: string; surface: MoleculeSurface; enclosedFraction: number; }
 
 /**
  * Molecules mode. Only JSON lives here -- the density and ESP grids are
@@ -27,12 +39,14 @@ export interface MoleculeState {
     renderError: string | null;
     isoLevel: number | null;
     espRange: [number, number] | null;
+    /** Null whenever the canvas is not showing a landed surface: before the first render, while one is in flight, after a failure or a cancel. */
+    drawn: MoleculeDrawn | null;
 }
 
 const initialState: MoleculeState = {
     index: null, indexError: null, selectedId: null, meta: null, isLoadingMeta: false, error: null,
     surface: { kind: 'density' }, showStructure: true, showDipole: true, pick: null, loadNonce: 0,
-    renderLabel: null, renderError: null, isoLevel: null, espRange: null,
+    renderLabel: null, renderError: null, isoLevel: null, espRange: null, drawn: null,
 };
 
 const hasOrbital = (meta: LibraryMoleculeMeta | null, index: number) => !!meta && meta.orbitals.some(o => o.index === index);
@@ -54,6 +68,7 @@ const moleculeSlice = createSlice({
             state.renderError = null;
             state.pick = null;
             state.espRange = null;
+            state.drawn = null;
             // The contour drawn belonged to the molecule being left (and the
             // view clears its surface until the new meta lands).
             state.isoLevel = null;
@@ -78,6 +93,7 @@ const moleculeSlice = createSlice({
             state.selectedId = null;
             state.meta = null;
             state.isLoadingMeta = false;
+            state.drawn = null;
             state.error = `This link names no molecule in the library (“${truncateId(action.payload)}”)`;
         },
         metaFailed: (state, action: PayloadAction<{ id: string; message: string }>) => {
@@ -94,19 +110,26 @@ const moleculeSlice = createSlice({
         setShowStructure: (state, action: PayloadAction<boolean>) => { state.showStructure = action.payload; if (!action.payload) state.pick = null; },
         setShowDipole: (state, action: PayloadAction<boolean>) => { state.showDipole = action.payload; },
         setPick: (state, action: PayloadAction<MoleculePick | null>) => { state.pick = action.payload; },
-        renderStarted: (state, action: PayloadAction<string>) => { state.renderLabel = action.payload; state.renderError = null; },
-        renderFinished: (state, action: PayloadAction<{ isoLevel: number; espRange?: [number, number] }>) => {
+        renderStarted: (state, action: PayloadAction<string>) => { state.renderLabel = action.payload; state.renderError = null; state.drawn = null; },
+        /** `drawn` is what the landing render was asked for; a landing that does not say records nothing, so nothing can be exported off it. */
+        renderFinished: (state, action: PayloadAction<{ isoLevel: number; espRange?: [number, number]; drawn?: MoleculeDrawn }>) => {
             state.renderLabel = null;
             state.isoLevel = action.payload.isoLevel;
             state.espRange = action.payload.espRange ?? null;
+            state.drawn = action.payload.drawn ?? null;
         },
-        renderFailed: (state, action: PayloadAction<string>) => { state.renderLabel = null; state.renderError = action.payload; },
+        renderFailed: (state, action: PayloadAction<string>) => { state.renderLabel = null; state.renderError = action.payload; state.drawn = null; },
         /**
          * A render abandoned before it landed (the mode left mid-mesh, ruling
          * D38): nothing is computing any more, so the busy label comes down;
          * the last result and any error stay as they were.
          */
-        renderCancelled: (state) => { state.renderLabel = null; },
+        renderCancelled: (state) => { state.renderLabel = null; state.drawn = null; },
+    },
+    extraReducers: builder => {
+        // Another mode takes the canvas; re-entering draws afresh (the view's
+        // effect re-runs on `active`), so nothing drawn carries over.
+        builder.addCase(setMode, state => { state.drawn = null; });
     },
 });
 
