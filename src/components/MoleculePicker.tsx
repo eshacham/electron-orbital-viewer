@@ -3,6 +3,7 @@ import { Alert, Chip, List, ListItemButton, TextField, Typography } from '@mui/m
 import { LIBRARY_CATEGORIES } from '../molecules/library_types';
 import { filterMolecules, formatFormula } from '../molecules/catalogue';
 import type { MoleculeIndexEntry } from '../molecules/types';
+import { COMPUTED_CATEGORY } from '../jobs/computed';
 
 interface MoleculePickerProps {
     entries: MoleculeIndexEntry[] | null;
@@ -17,6 +18,12 @@ const MoleculePicker: React.FC<MoleculePickerProps> = ({ entries, error, selecte
     const [query, setQuery] = useState('');
     const [category, setCategory] = useState<string | null>(null);
     const matches = useMemo(() => (entries ? filterMolecules(entries, query, category) : []), [entries, query, category]);
+    // The owner's computed molecules join as one more category, present only
+    // when there are some: nobody else is ever given computed entries.
+    const categories = useMemo(
+        () => (entries?.some(entry => entry.category === COMPUTED_CATEGORY.key) ? [...LIBRARY_CATEGORIES, COMPUTED_CATEGORY] : LIBRARY_CATEGORIES),
+        [entries],
+    );
 
     if (error) return <Alert severity="error" role="alert">Could not load the molecule library: {error}. Reload the page to try again.</Alert>;
     if (!entries) return <Typography variant="body2" className="molecule-picker-status">Loading the molecule library…</Typography>;
@@ -36,7 +43,7 @@ const MoleculePicker: React.FC<MoleculePickerProps> = ({ entries, error, selecte
             />
             <div className="molecule-category-chips" role="group" aria-label="molecule categories">
                 <Chip label="All" size="small" clickable color={category === null ? 'primary' : 'default'} aria-pressed={category === null} onClick={() => setCategory(null)} />
-                {LIBRARY_CATEGORIES.map(c => (
+                {categories.map(c => (
                     <Chip key={c.key} label={c.label} size="small" clickable color={category === c.key ? 'primary' : 'default'}
                         aria-pressed={category === c.key} onClick={() => setCategory(category === c.key ? null : c.key)} />
                 ))}

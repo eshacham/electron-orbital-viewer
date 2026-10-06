@@ -6,6 +6,7 @@ import App from './App';
 import { applyState, bindUrlStateStore, registerBuiltInUrlKeys } from './url_state';
 import { registerBondsUrlKeys } from './bonds/bonds_url';
 import { registerMoleculeUrlKeys } from './molecules/url_keys';
+import { registerComputedUrlKeys } from './jobs/url_keys';
 import './style.css';
 
 // Restore a shared view before the first render, so the app never draws a
@@ -14,6 +15,7 @@ bindUrlStateStore(store);
 registerBuiltInUrlKeys();
 registerBondsUrlKeys();
 registerMoleculeUrlKeys();
+registerComputedUrlKeys();
 applyState(window.location.hash);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

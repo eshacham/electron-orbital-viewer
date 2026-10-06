@@ -3,6 +3,7 @@ import orbitalReducer from './orbitalSlice';
 import atomReducer from './atomSlice';
 import bondsReducer from './bondsSlice';
 import moleculeReducer from './moleculeSlice';
+import jobsReducer from './jobsSlice';
 
 /**
  * Builds a store with production's middleware config. Exported (rather than
@@ -24,6 +25,7 @@ export function createAppStore() {
       atom: atomReducer,
       bonds: bondsReducer,
       molecule: moleculeReducer,
+      jobs: jobsReducer,
     },
     // Ruling R16: an atom profile's D(r)/R(r) curves are deliberately kept as
     // typed arrays all the way into the store -- converting them to plain

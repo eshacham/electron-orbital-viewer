@@ -2,6 +2,7 @@ import { registerUrlKeys } from '../url_state';
 import type { RootState, AppDispatch } from '../store';
 import { setMode } from '../store/atomSlice';
 import { MoleculeState, MoleculeSurface, linkRejected, selectMolecule, setShowDipole, setShowStructure } from '../store/moleculeSlice';
+import { isJobKey } from './job_paths';
 
 /**
  * Molecules mode in the URL (spec §4.3), e.g.
@@ -16,7 +17,7 @@ function surfaceKey(surface: MoleculeSurface): string {
     return surface.kind === 'mo' ? `mo:${surface.index}` : surface.kind;
 }
 
-function parseSurface(value: string | undefined): MoleculeSurface | undefined {
+export function parseSurface(value: string | undefined): MoleculeSurface | undefined {
     if (value === 'density' || value === 'esp') return { kind: value };
     const match = value?.match(/^mo:(\d{1,4})$/);
     return match ? { kind: 'mo', index: Number(match[1]) } : undefined;
@@ -28,7 +29,9 @@ function parseFlag(value: string | undefined): boolean | undefined {
 
 export function encodeMoleculeUrl(state: MoleculeState): Record<string, string> {
     if (!state.selectedId) return {};
-    const out: Record<string, string> = { id: state.selectedId, show: surfaceKey(state.surface) };
+    // A computed molecule is linked by its job key under `job` (src/jobs/url_keys.ts), never as an id.
+    const out: Record<string, string> = isJobKey(state.selectedId) ? {} : { id: state.selectedId };
+    out.show = surfaceKey(state.surface);
     if (!state.showStructure) out.struct = '0';
     if (!state.showDipole) out.dipole = '0';
     return out;
