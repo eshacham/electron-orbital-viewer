@@ -73,3 +73,14 @@ def test_cloudfront_serves_molecules_from_the_data_bucket():
 def test_data_bucket_name_is_an_output_for_the_publish_script():
     template = _template()
     template.has_output("MoleculeDataBucketName", {})
+
+
+def test_a_403_is_passed_through_and_never_cached():
+    # A job's done.json is missing (S3 via OAC answers 403) until the worker
+    # writes it; a cached 403 would hide a finished result for CloudFront's
+    # default 10 s. Distribution-wide, which is harmless: nothing benefits from
+    # a cached 403. No page or status rewrite, so the 403 reaches the client.
+    (distribution,) = _template().find_resources("AWS::CloudFront::Distribution").values()
+    responses = distribution["Properties"]["DistributionConfig"]["CustomErrorResponses"]
+    assert {"ErrorCode": 403, "ErrorCachingMinTTL": 0} in responses
+    assert {"ErrorCode": 404, "ResponseCode": 200, "ResponsePagePath": "/index.html"} in responses

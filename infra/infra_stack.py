@@ -1,5 +1,6 @@
 from aws_cdk import (
     Stack,
+    Duration,
     RemovalPolicy,
     aws_s3 as s3,
     aws_s3_deployment as s3deploy,
@@ -50,7 +51,11 @@ class InfraStack(Stack):
                     http_status=404,
                     response_http_status=200,
                     response_page_path="/index.html",
-                )
+                ),
+                # A job's done.json answers 403 (OAC, no ListBucket) until the
+                # worker writes it; never cache that, or a finished result stays
+                # hidden for CloudFront's default 10 s. No page or status rewrite.
+                cloudfront.ErrorResponse(http_status=403, ttl=Duration.seconds(0)),
             ]
         )
         
