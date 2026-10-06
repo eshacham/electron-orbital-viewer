@@ -7,10 +7,12 @@
 import argparse
 import json
 import sys
+import traceback
 from pathlib import Path
 
 from jobs.handlers import Api
 from jobs.local_server import OUT_ROOT, STATE_ROOT
+from jobs.model import iso, utc_now
 from jobs.runner import NullRunner
 from jobs.store import FileStore
 from jobs.worker import run_job
@@ -50,13 +52,30 @@ def main(argv=None):
     if status >= 400:
         print(json.dumps(view), file=sys.stderr)
         return 1
-    print(view['key'])
+    key = view['key']
+    print(key)
     if args.command == 'submit' and view['status'] in ('QUEUED', 'STARTING'):
-        result = run_job(view['key'], store, LocalSink(OUT_ROOT))
-        store.settle(view['key'], 0)
+        try:
+            result = run_job(key, store, LocalSink(OUT_ROOT))
+        except Exception as e:
+            # Something the worker's own safety net does not cover (it raised
+            # before its try, e.g. in render_input): the job must still end
+            # FAILED and settled, not sit RUNNING with its reservation held.
+            message = (traceback.format_exception_only(e)[-1].strip().splitlines() or [type(e).__name__])[-1][:300]
+            store.update_job(key, {'status': 'FAILED', 'endedAt': iso(utc_now()), 'stage': None,
+                                   'error': {'code': 'worker-error', 'message': message}},
+                             expect_status={'QUEUED', 'STARTING', 'RUNNING'})
+            store.settle(key, 0)
+            print(f'FAILED worker-error: {message}', file=sys.stderr)
+            return 1
+        store.settle(key, 0)
         print(result)
         return 0 if result in ('DONE', 'duplicate') else 1
     print(view['status'])
+    if args.command == 'submit' and view['status'] == 'FAILED':
+        error = view.get('error') or {}
+        print(f"FAILED {error.get('code')}: {error.get('message')}", file=sys.stderr)
+        return 1
     return 0
 
 

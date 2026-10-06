@@ -31,7 +31,11 @@ def make_server(api, host='127.0.0.1', port=8787):
 
         def _dispatch(self, method):
             url = urlparse(self.path)
-            length = int(self.headers.get('Content-Length') or 0)
+            try:
+                # Negative is read as 0: rfile.read(-1) would wait for EOF on a kept-alive connection.
+                length = max(0, int(self.headers.get('Content-Length') or 0))
+            except ValueError:
+                return self._answer(400, {'error': {'code': 'invalid-request', 'message': 'bad Content-Length'}})
             if length > MAX_BODY:
                 return self._answer(413, {'error': {'code': 'body-too-large', 'message': f'over {MAX_BODY} bytes'}})
             body = self.rfile.read(length) if length else None

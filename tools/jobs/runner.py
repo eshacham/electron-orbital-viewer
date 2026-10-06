@@ -52,15 +52,45 @@ class LocalRunner:
                 '--state', str(self.state_root), '--attempt', str(attempt)]
 
     def _loop(self):
+        # Fix round 1: this thread is the only thing that ever runs a local
+        # job, so nothing may end it. Anything one job throws (a bad
+        # interpreter, a failed store write, a record gone missing) fails
+        # that job and settles it; the loop goes on to the next.
         while True:
             key = self.queue.get()
-            self.store.update_job(key, {'status': 'STARTING'}, expect_status={'QUEUED'})
-            env = {**os.environ, 'PYTHONPATH': f'{TOOLS}:{TOOLS / "molecules"}'}
-            result = subprocess.run(self._command(key), cwd=TOOLS, env=env, capture_output=True, text=True)
-            rec = self.store.get_job(key)
-            if rec['status'] not in ('DONE', 'FAILED'):
-                last = (result.stderr.strip().splitlines() or [''])[-1][:300]
-                self.store.update_job(key, {'status': 'FAILED', 'endedAt': iso(utc_now()), 'stage': None,
-                                            'error': {'code': 'worker-crashed',
-                                                      'message': f'worker exited with {result.returncode}: {last}'}})
+            try:
+                self._run_one(key)
+            except Exception as e:
+                self._runner_failed(key, e)
+
+    def _run_one(self, key):
+        if self.store.get_job(key) is None:
+            print(f'jobs: local runner: job {key[:12]} has no record; skipped', file=sys.stderr)
+            return
+        self.store.update_job(key, {'status': 'STARTING'}, expect_status={'QUEUED'})
+        env = {**os.environ, 'PYTHONPATH': f'{TOOLS}:{TOOLS / "molecules"}'}
+        result = subprocess.run(self._command(key), cwd=TOOLS, env=env, capture_output=True, text=True)
+        rec = self.store.get_job(key)
+        if rec is None:
+            print(f'jobs: local runner: job {key[:12]} lost its record while running', file=sys.stderr)
+            return
+        if rec['status'] not in ('DONE', 'FAILED'):
+            last = (result.stderr.strip().splitlines() or [''])[-1][:300]
+            self._fail(key, 'worker-crashed', f'worker exited with {result.returncode}: {last}')
+        self.store.settle(key, 0)
+
+    def _fail(self, key, code, message):
+        # Guarded: a record the worker already finished is never overwritten.
+        self.store.update_job(key, {'status': 'FAILED', 'endedAt': iso(utc_now()), 'stage': None,
+                                    'error': {'code': code, 'message': message}},
+                              expect_status={'QUEUED', 'STARTING', 'RUNNING'})
+
+    def _runner_failed(self, key, e):
+        what = f'{type(e).__name__}: {e}'[:300]
+        print(f'jobs: local runner: job {key[:12]} failed in the runner ({what}); continuing', file=sys.stderr)
+        try:
+            self._fail(key, 'worker-crashed', f'local runner error: {what}')
             self.store.settle(key, 0)
+        except Exception as e2:      # the store itself is failing: say so, and keep the loop alive
+            print(f'jobs: local runner: could not record that failure ({type(e2).__name__}: {e2})',
+                  file=sys.stderr)
