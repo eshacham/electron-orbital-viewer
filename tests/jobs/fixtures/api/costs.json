@@ -1,0 +1,14 @@
+{
+ "status": 200,
+ "body": {
+  "month": "2026-10",
+  "capUsd": 8.8,
+  "spentUsd": 0.0,
+  "reservedUsd": 0.0,
+  "remainingUsd": 8.8,
+  "projectionUsd": 0.0,
+  "daily": [],
+  "billing": null,
+  "pricesRetrieved": "2026-10-04"
+ }
+}

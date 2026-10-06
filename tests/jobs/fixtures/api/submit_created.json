@@ -1,0 +1,82 @@
+{
+ "status": 201,
+ "body": {
+  "key": "e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa",
+  "status": "QUEUED",
+  "attempt": 1,
+  "recipe": "single",
+  "job": {
+   "computeVersion": 1,
+   "recipe": "single",
+   "method": {
+    "xc": "B3LYP",
+    "basis": "def2-TZVPD",
+    "optimiseBasis": null
+   },
+   "molecule": {
+    "atoms": [
+     [
+      1,
+      0.0,
+      -0.75545,
+      -0.47116
+     ],
+     [
+      1,
+      0.0,
+      0.75545,
+      -0.47116
+     ],
+     [
+      8,
+      0.0,
+      0.0,
+      0.11779
+     ]
+    ],
+    "charge": 0,
+    "multiplicity": 1
+   }
+  },
+  "name": "Water",
+  "formula": "H2O",
+  "electronCount": 10,
+  "basisFunctions": 58,
+  "geometrySource": {
+   "kind": "pubchem",
+   "cid": 962,
+   "title": "Water",
+   "query": "water",
+   "retrievedAt": "2026-10-10"
+  },
+  "sizing": {
+   "version": 1,
+   "estimateFor": "fargate",
+   "size": "S",
+   "vcpu": 2,
+   "memoryGB": 8,
+   "capacity": "local",
+   "attempts": 1,
+   "basisFunctions": 58,
+   "predictedSeconds": 11.7,
+   "predictedMemoryGB": 0.42,
+   "timeoutSeconds": 600,
+   "predictedCostMicros": 0
+  },
+  "month": "2026-10",
+  "submittedAt": "2026-10-10T12:00:00Z",
+  "startedAt": null,
+  "endedAt": null,
+  "heartbeatAt": null,
+  "stage": null,
+  "latestEnergyHartree": null,
+  "logTail": [],
+  "peakMemoryGB": null,
+  "actual": null,
+  "error": null,
+  "backend": "local",
+  "reservedUsd": 0.0,
+  "actualUsd": null,
+  "resultUrl": "/molecules/jobs/e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa/"
+ }
+}

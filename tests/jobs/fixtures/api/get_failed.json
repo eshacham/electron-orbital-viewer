@@ -1,0 +1,81 @@
+{
+ "status": 200,
+ "body": {
+  "key": "03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129",
+  "status": "FAILED",
+  "attempt": 1,
+  "recipe": "optimise",
+  "job": {
+   "computeVersion": 1,
+   "recipe": "optimise",
+   "method": {
+    "xc": "B3LYP",
+    "basis": "def2-TZVPD",
+    "optimiseBasis": "def2-SVP"
+   },
+   "molecule": {
+    "atoms": [
+     [
+      1,
+      0.0,
+      -0.75545,
+      -0.47116
+     ],
+     [
+      1,
+      0.0,
+      0.75545,
+      -0.47116
+     ],
+     [
+      8,
+      0.0,
+      0.0,
+      0.11779
+     ]
+    ],
+    "charge": 0,
+    "multiplicity": 1
+   }
+  },
+  "name": "H2O",
+  "formula": "H2O",
+  "electronCount": 10,
+  "basisFunctions": 58,
+  "geometrySource": {
+   "kind": "xyz"
+  },
+  "sizing": {
+   "version": 1,
+   "estimateFor": "fargate",
+   "size": "S",
+   "vcpu": 2,
+   "memoryGB": 8,
+   "capacity": "local",
+   "attempts": 1,
+   "basisFunctions": 58,
+   "predictedSeconds": 127.6,
+   "predictedMemoryGB": 0.42,
+   "timeoutSeconds": 600,
+   "predictedCostMicros": 0
+  },
+  "month": "2026-10",
+  "submittedAt": "2026-10-10T12:00:00Z",
+  "startedAt": null,
+  "endedAt": "2026-10-10T12:03:00Z",
+  "heartbeatAt": null,
+  "stage": null,
+  "latestEnergyHartree": null,
+  "logTail": [],
+  "peakMemoryGB": null,
+  "actual": null,
+  "error": {
+   "code": "scf-not-converged",
+   "message": "SCF did not converge (DIIS, level shift 0.3 Ha, second-order)"
+  },
+  "backend": "local",
+  "reservedUsd": 0.0,
+  "actualUsd": 0.0,
+  "resultUrl": "/molecules/jobs/03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129/"
+ }
+}

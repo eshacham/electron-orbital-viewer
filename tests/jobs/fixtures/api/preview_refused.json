@@ -1,0 +1,88 @@
+{
+ "status": 200,
+ "body": {
+  "key": "e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa",
+  "job": {
+   "computeVersion": 1,
+   "recipe": "single",
+   "method": {
+    "xc": "B3LYP",
+    "basis": "def2-TZVPD",
+    "optimiseBasis": null
+   },
+   "molecule": {
+    "atoms": [
+     [
+      1,
+      0.0,
+      -0.75545,
+      -0.47116
+     ],
+     [
+      1,
+      0.0,
+      0.75545,
+      -0.47116
+     ],
+     [
+      8,
+      0.0,
+      0.0,
+      0.11779
+     ]
+    ],
+    "charge": 0,
+    "multiplicity": 1
+   }
+  },
+  "name": "Water",
+  "formula": "H2O",
+  "electronCount": 10,
+  "basisFunctions": 58,
+  "atoms": [
+   [
+    1,
+    0.0,
+    -0.75545,
+    -0.47116
+   ],
+   [
+    1,
+    0.0,
+    0.75545,
+    -0.47116
+   ],
+   [
+    8,
+    0.0,
+    0.0,
+    0.11779
+   ]
+  ],
+  "charge": 0,
+  "multiplicity": 1,
+  "geometrySource": {
+   "kind": "pubchem",
+   "cid": 962,
+   "title": "Water",
+   "query": "water",
+   "retrievedAt": "2026-10-10"
+  },
+  "decision": {
+   "ok": false,
+   "error": {
+    "code": "budget",
+    "message": "Monthly budget reached: $0.00 spent, $0.00 reserved of $0.00"
+   }
+  },
+  "existing": null,
+  "meter": {
+   "month": "2026-10",
+   "capUsd": 1e-06,
+   "spentUsd": 0.0,
+   "reservedUsd": 0.0,
+   "remainingUsd": 1e-06
+  },
+  "generationEnabled": true
+ }
+}

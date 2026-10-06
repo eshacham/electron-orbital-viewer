@@ -1,0 +1,9 @@
+{
+ "status": 422,
+ "body": {
+  "error": {
+   "code": "unknown-compound",
+   "message": "PubChem does not know \"unobtainium\""
+  }
+ }
+}
