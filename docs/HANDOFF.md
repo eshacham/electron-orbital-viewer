@@ -1648,7 +1648,11 @@ speedup the local fit never could.
   `check_box` itself raises. No margin change.
 - **T5-a** (Critical) — `FileStore`'s meter is *derived*: each job record
   carries its own unsettled reservation and a per-month list of settled
-  charges, and `meter(month)` sums them under the lock. Create/requeue/settle
+  charges, and the meter sums them. The public `meter(month)` is lock-free
+  by design (every record is replaced whole by `os.replace`, so a reader
+  sees each one before or after a write, never half); the cap check inside
+  `create_job`/`requeue_failed` computes the same sum *under* the lock, so
+  two writers can never both fit under the cap. Create/requeue/settle
   are each one atomic record write, so a crash between two writes can never
   double-apply or half-apply money. 6B-3's `DynamoStore` keeps its own
   transactional meter item but must pass the same contract tests.
@@ -1703,6 +1707,74 @@ speedup the local fit never could.
 - **`/api/aws` is a path prefix, not a header** (spec §12) — the same route
   table serves both backends, distinguished by URL rather than by a header
   a proxy or cache could drop.
+
+### Response shapes (Task 6), as finally shipped
+
+Task 6's brief fixed the shapes 6B-2 and 6B-3 consume (preview, submit,
+get, list, costs, Meter, `geometrySource`, the error envelope); they are
+unchanged except for two additions from the final review:
+
+- **`Decision.estimateFor`** — always `"fargate"`. It is part of every
+  `decision.sizing` in a preview and every record's `sizing`: the size,
+  `predictedSeconds` and `timeoutSeconds` are Fargate figures even for a
+  local job, which this Mac runs single-threaded and with no time limit.
+- **`internal-error` (HTTP 500)** — `Api.handle`'s last resort for an
+  exception no route expected: `{"error": {"code": "internal-error",
+  "message": "<ExceptionType>: <last line of its message>"}}`, with the
+  traceback on the server's stderr. Before, the local server dropped the
+  connection.
+
+Also new on the public view: `peakMemoryGB` is present from the start
+(`null` until the first heartbeat) and reset by a retry; a resumed
+optimisation's `meta.json` `geometryOptimisation` carries `resumedFrom: n`
+(the attempt whose last trajectory frame it started from).
+
+### Final-review fix wave
+
+- **I1, never stuck locally** — `LocalRunner` sweeps every `backend ==
+  'local'` record (all months, via the new `Store.jobs_with_backend`) once
+  at start: `QUEUED` re-queued; `STARTING`, or `RUNNING` with a heartbeat
+  older than 90 s, → `FAILED worker-crashed` ("the local server stopped
+  before this job finished") and settled at $0; terminal-but-unsettled →
+  settled. A worker interrupted by Ctrl-C marks its own attempt `FAILED`
+  (guarded) and re-raises; `cli submit --wait` catches `BaseException`
+  around `run_job`, fails (guarded) and settles, then re-raises. SIGTERM is
+  deliberately not caught: on AWS it is a Spot reclaim, and the retry must
+  still find the job claimable.
+- **I2** — PubChem bodies this phase cannot read (HTML sent with 200, a
+  truncated read, reshaped JSON) are `pubchem-unavailable` 503, not an
+  exception; anything else unexpected is the 500 `internal-error` above.
+- **I3** — `FileStore._write` uses a unique temp file per write (same
+  directory, then `os.replace`); concurrent `put_resolution` calls used to
+  collide on one `<name>.tmp`.
+- **I4, one runner per key** — `LocalRunner` runs nothing (and settles
+  nothing) when its `QUEUED → STARTING` guarded update fails, nor fails a
+  job its worker reports as a `duplicate`; `claim` refuses an attempt older
+  than the record's; `cli --wait` runs as the record's current attempt.
+- **M5** — `LocalRunner(grid_points=…)` forwards `--grid-points`; a
+  `JOBS_SLOW=1` test runs the real `python -m jobs.worker` command on H₂.
+- **M6** — `cli` gained `--charge`, `--multiplicity` and `--retry`.
+
+### For 6B-2
+
+- Show the preview's `geometrySource` and `existing.geometrySource` side by
+  side: a name that now resolves to a different PubChem record, or an XYZ
+  for a key first submitted by name, otherwise looks identical.
+- The XYZ paste error for a count line with no comment line after it should
+  say that is what is wrong: today the first atom is taken as the comment,
+  and the error reads "the header says 3 atoms but 2 follow".
+- Label the sizing "Fargate estimate" from `decision.sizing.estimateFor`.
+- Handle the new `internal-error` (500) code like any other refusal: show
+  its message.
+- Widen the `geometryOptimisation` type (Ruling D13) with `resumedFrom?`.
+
+### For 6B-3
+
+- Reserve `cost(timeout + an image-pull allowance)` per attempt: spec §6.4
+  bills from `pullStartedAt`, so today's `attempts × cost(timeout)`
+  under-reserves by the pull time.
+- `DynamoStore` implements `jobs_with_backend(backend)` or no-ops it
+  (returns `[]`) if reconcile makes a start-up sweep unnecessary there.
 
 ### What 6B-3 must add behind these interfaces
 
