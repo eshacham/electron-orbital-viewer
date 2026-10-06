@@ -251,9 +251,11 @@ class DynamoStore:
             raise
         return True
 
-    def settle(self, key, actual_micros):
+    def settle(self, key, actual_micros, attempt=None):
         rec = self.get_job(key)
-        if rec is None or rec['settled']:
+        # The condition below pins the attempt read here, so checking it
+        # against the caller's is enough to keep the two the same.
+        if rec is None or rec['settled'] or (attempt is not None and rec['attempt'] != attempt):
             return False
         w = rec['reservedMicros']
         codes = self._transact([

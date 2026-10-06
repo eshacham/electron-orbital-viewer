@@ -58,7 +58,9 @@ class Store(Protocol):
     def claim(self, key: str, attempt: int, now) -> bool: ...
     def update_job(self, key: str, changes: dict, expect_status: set | None = None,
                     attempt: int | None = None) -> bool: ...
-    def settle(self, key: str, actual_micros: int) -> bool: ...
+    # `attempt`, when given, settles only that attempt: a reconciler's cost
+    # is for one attempt's Batch job, never for a retry that replaced it.
+    def settle(self, key: str, actual_micros: int, attempt: int | None = None) -> bool: ...
     def list_jobs(self, month: str, status: str | None = None) -> list[dict]: ...
     # Every record a backend owns, across all months: what LocalRunner's
     # start-up sweep reads (I1). 6B-3's DynamoStore implements it or, if
@@ -202,10 +204,10 @@ class FileStore:
             self._write(self._job_path(key), rec)
             return True
 
-    def settle(self, key, actual_micros):
+    def settle(self, key, actual_micros, attempt=None):
         with self._locked():
             rec = self.get_job(key)
-            if rec is None or rec['settled']:
+            if rec is None or rec['settled'] or (attempt is not None and rec['attempt'] != attempt):
                 return False
             # Settling is appending one charge and flipping `settled`, in the
             # same write as the reservation it closes out: the meter can

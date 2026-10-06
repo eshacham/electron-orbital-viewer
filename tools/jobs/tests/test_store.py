@@ -71,6 +71,19 @@ def test_settle_exactly_once(store):
     assert store.get_job('a' * 64)['actualMicros'] == 300
 
 
+def test_settle_for_an_attempt_a_retry_has_replaced_is_refused(store):
+    # A reconciler costs one attempt's Batch job; once the owner has retried,
+    # that figure must not close out the new attempt's reservation.
+    store.create_job(record())
+    store.update_job('a' * 64, {'status': 'FAILED'})
+    assert store.settle('a' * 64, 300, attempt=1)
+    store.requeue_failed('a' * 64, {**DECISION, 'reservationMicros': 500}, NOW)
+    assert not store.settle('a' * 64, 300, attempt=1)
+    assert store.meter('2026-10') == {'spent': 300, 'reserved': 500, 'committed': 800, 'cap': 10_000}
+    assert store.settle('a' * 64, 200, attempt=2)
+    assert store.get_job('a' * 64)['actualMicros'] == 500
+
+
 def test_claim_rules(store):
     store.create_job(record())
     assert store.claim('a' * 64, 1, NOW)
