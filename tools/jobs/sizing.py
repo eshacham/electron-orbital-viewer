@@ -28,9 +28,13 @@ class Size:
 
 
 SIZES = (Size('S', 2, 8), Size('M', 4, 16), Size('L', 16, 64), Size('XL', 32, 244))
-SIZING_VERSION = 0
-# f2 seed: water 11.6 s @ N 58, benzene 204 s @ N 276 (single-threaded Mac measurement).
-CONSTANTS = {'m0': 0.5, 'm2': 2.0, 't0': 5.0, 't3': 2400.0, 'g': 1.5, 'f2': 3000.0}
+SIZING_VERSION = 1
+# Fitted 2026-10-06 on an Apple M2 Pro (single-threaded PySCF on this Mac;
+# threads == 1 in every timing) from three local jobs: water (N 58), benzene
+# (N 276) and caffeine (N 614), all B3LYP/def2-TZVPD single points
+# (tools/jobs/calibrate.py; Phase 6B-1 Task 11). m0, m2 and f2 came out
+# positive, so no clamp applied; t0 and g keep their seeds for 6B-3's AWS fit.
+CONSTANTS = {'m0': 0.412, 'm2': 3.73, 't0': 5.0, 't3': 19400.0, 'g': 1.5, 'f2': 2480.0}
 HEADROOM = 2.0
 TIMEOUT_FACTOR = 3.0
 MIN_TIMEOUT_SECONDS = 600

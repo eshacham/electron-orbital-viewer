@@ -29,6 +29,10 @@ def test_water_single_is_small_spot_with_the_floor_timeout():
     assert d['version'] == sizing.SIZING_VERSION
 
 
+def test_version_1_is_calibrated():
+    assert sizing.SIZING_VERSION == 1 and sizing.CONSTANTS['t0'] == 5.0 and sizing.CONSTANTS['g'] == 1.5
+
+
 def test_local_backend_reserves_nothing_but_still_sizes():
     d = sizing.decide(canonical_job('single', WATER, 0, 1), local=True)
     assert d['capacity'] == 'local' and d['attempts'] == 1 and d['reservationMicros'] == 0 and d['size'] == 'S'
