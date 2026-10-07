@@ -35,6 +35,21 @@ describe('jobs table logic', () => {
             expect(jobLinks({ ...failed, error: { code, message: 'no worker ran' } })).toEqual([]);
         }
     });
+    it('links no attempt files for a worker Batch stopped before it could copy them out', () => {
+        // Final review M7: reconcile's codes mean Batch ended the task (a
+        // timeout, an OOM kill, a reclaim), and the worker writes attempts/<n>/
+        // only once its run is over.
+        const actual = { wallSeconds: 12, peakMemoryGB: 0.3, threads: 2 };
+        for (const code of ['timed-out', 'out-of-memory', 'spot-interrupted', 'worker-lost', 'batch-lost', 'batch-failed', 'worker-crashed']) {
+            expect(jobLinks({ ...failed, actual: null, error: { code, message: 'Batch ended it' } })).toEqual([]);
+        }
+        // A worker that reported the failure itself copied its files first,
+        // whatever the code (its own MemoryError is out-of-memory too).
+        for (const code of ['out-of-memory', 'scf-not-converged', 'worker-error']) {
+            expect(jobLinks({ ...failed, actual, error: { code, message: 'the worker said so' } })).toHaveLength(2);
+        }
+        expect(jobLinks({ ...failed, actual: null, error: { code: 'optimisation-not-converged', message: 'm' } })).toHaveLength(2);
+    });
     it('names the method, and lists the last months', () => {
         expect(methodSummary(failed)).toBe('B3LYP/def2-SVP → B3LYP/def2-TZVPD');
         expect(methodSummary(done)).toBe('B3LYP/def2-TZVPD');

@@ -49,6 +49,24 @@ export interface FileLink { label: string; href: string }
  */
 const BEFORE_A_WORKER_RAN = new Set(['submit-failed', 'submit-lost', 'no-capacity']);
 
+/**
+ * Failures recorded for a worker that was stopped, not one that reported:
+ * reconcile's codes when Batch ended the task (a timeout, an OOM kill, a
+ * Spot reclaim, a lost job), and a local worker's Ctrl-C. The worker copies
+ * attempts/<n>/ out only once its run is over, so a stopped one left none
+ * (final review M7). A worker that reported the failure itself also wrote
+ * `actual`, and its files exist whatever the code (its own MemoryError is
+ * out-of-memory too).
+ */
+const WORKER_STOPPED = new Set(['timed-out', 'out-of-memory', 'spot-interrupted', 'worker-lost', 'batch-lost',
+    'batch-failed', 'worker-crashed']);
+
+function attemptFilesExist(job: JobView): boolean {
+    const code = job.error?.code ?? '';
+    if (BEFORE_A_WORKER_RAN.has(code)) return false;
+    return !WORKER_STOPPED.has(code) || job.actual !== null;
+}
+
 /** A finished job's result and files (spec §5.3); a failed one leaves only its attempt's input and log, if a worker ran. */
 export function jobLinks(job: JobView): FileLink[] {
     if (job.status === 'DONE') {
@@ -57,7 +75,7 @@ export function jobLinks(job: JobView): FileLink[] {
             ...[...computedResultFiles(job.recipe), 'timings.json'].map(name => ({ label: name, href: jobFileUrl(job.key, name) })),
         ];
     }
-    if (job.status === 'FAILED' && !BEFORE_A_WORKER_RAN.has(job.error?.code ?? '')) {
+    if (job.status === 'FAILED' && attemptFilesExist(job)) {
         return ['input.py', 'output.log'].map(name => ({ label: `attempt ${job.attempt} ${name}`, href: jobFileUrl(job.key, `attempts/${job.attempt}/${name}`) }));
     }
     return [];
