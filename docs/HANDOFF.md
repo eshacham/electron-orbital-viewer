@@ -2222,9 +2222,14 @@ them.
   instead of `--molecule` looking it up; `test_sizing.CAFFEINE` (the
   owner's calibration job's own atoms, `f4e66d73…`) is the source. A
   one-off submission on L (16 vCPU / 64 GB), overriding the worker
-  image's command exactly as the XL smoke test and Task 12's probe did:
+  image's command exactly as the XL smoke test and Task 12's probe did.
+  **Owner approval required before running** — it is a real, billable
+  Fargate job outside the meter (Spot L for ~10–20 min, ≈ $0.10–0.25);
+  it is not yet run and is listed as an open owner decision. Run it in a
+  shell with the region pinned:
 
   ```bash
+  export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1
   JD=$(aws batch describe-job-definitions --status ACTIVE --query "sort_by(jobDefinitions[?tags.app=='electron-orbital-viewer'], &revision)[-1].jobDefinitionArn" --output text)
   Q=$(aws batch describe-job-queues --query "jobQueues[?tags.app=='electron-orbital-viewer' && contains(computeEnvironmentOrder[0].computeEnvironment, 'Spot')].jobQueueArn | [0]" --output text)
   python3 - <<'PY' > /tmp/caffeine-optimise-probe-overrides.json
