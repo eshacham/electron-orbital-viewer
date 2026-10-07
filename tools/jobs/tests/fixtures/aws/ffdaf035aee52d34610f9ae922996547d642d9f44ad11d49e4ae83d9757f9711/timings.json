@@ -1,0 +1,23 @@
+{
+ "attempt": 1,
+ "backend": "aws",
+ "size": "S",
+ "vcpu": 2,
+ "memoryGB": 8,
+ "capacity": "spot",
+ "stages": [
+  {
+   "name": "SCF (DIIS)",
+   "seconds": 56.73
+  },
+  {
+   "name": "writing files",
+   "seconds": 206.01
+  }
+ ],
+ "wallSeconds": 262.75,
+ "peakMemoryGB": 6.104,
+ "threads": 2,
+ "startedAt": "2026-10-07T11:43:01Z",
+ "endedAt": "2026-10-07T11:47:24Z"
+}

@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 
 from jobs import sizing
@@ -42,14 +45,15 @@ def test_water_single_is_small_spot_with_the_floor_timeout():
     assert d['version'] == sizing.SIZING_VERSION
 
 
-V2_KEYS = {'m0', 'm2', 't0', 't3', 'g', 'f2', 'scfExponent', 'scfSaturation', 'filesExponent', 'filesSaturation'}
+KEYS = {'m0', 'm2', 't0', 't3', 'g', 'f2', 'scfExponent', 'scfSaturation', 'filesExponent', 'filesSaturation'}
 
 
-def test_version_2_is_calibrated_on_aws():
-    # Fitted from Fargate ARM64 runs (Phase 6B-3 Task 14); every constant is a measured, positive number.
-    # D5: f2 stays (predict_parts reads it), and the two speedup laws are constants too (Ruling T14-speedup).
-    assert sizing.SIZING_VERSION == 2
-    assert set(sizing.CONSTANTS) == V2_KEYS
+def test_version_3_is_calibrated_on_aws():
+    # Fitted from Fargate ARM64 runs (Phase 6B-3 Task 14, refitted with caffeine on M for version 3);
+    # every constant is a measured, positive number. D5: f2 stays (predict_parts reads it), and the two
+    # speedup laws are constants too (Ruling T14-speedup).
+    assert sizing.SIZING_VERSION == 3
+    assert set(sizing.CONSTANTS) == KEYS
     assert all(isinstance(v, float) and v > 0 for v in sizing.CONSTANTS.values())
     assert sizing.CONSTANTS['m0'] >= 0.2 and sizing.CONSTANTS['t0'] >= 1.0
 
@@ -194,37 +198,74 @@ def test_files_term_scales_with_vcpu_and_is_counted_in_decide():
     assert d['predictedSeconds'] == pytest.approx(round(small['scfSeconds'] + small['filesSeconds'], 1))
 
 
-# What AWS measured (Phase 6B-3 Tasks 12-13): the ladder's four jobs, all on
-# S (2 vCPU, Spot), and the speedup probe's benzene at 4..32 threads on XL.
+# What AWS measured (Phase 6B-3 Tasks 12-13 and the owner's caffeine): the
+# ladder's four jobs, all on S (2 vCPU, Spot), caffeine single on M (4 vCPU,
+# Spot), and the speedup probe's benzene at 4..32 threads on XL. Each job's
+# job.json (key, job, sizing) and timings.json are in fixtures/aws/, as
+# fetched from CloudFront; the probe's line is fixtures/aws/speedup-probe.json.
 # Atoms as the jobs ran them; sizing reads only the elements and the count.
-ETHANOL = [[1, -1.1291, 0.8364, 0.8099], [1, -0.0958, -1.212, 0.8819], [1, -0.0952, -1.1938, -0.8946],
-           [1, 1.2426, 0.9307, -0.8704], [1, 1.2616, 0.9052, 0.8886], [1, 2.105, -0.372, -0.0177],
-           [6, -0.0463, -0.5665, 0], [6, 1.2175, 0.2668, 0], [8, -1.1712, 0.2997, 0]]
 BENZENE = [[1, -2.1577, -1.2244, 0], [1, -2.1393, 1.2564, 0.0001], [1, -0.0184, -2.4809, -0.0001],
            [1, 0.0184, 2.4808, 0], [1, 2.1394, -1.2563, 0.0001], [1, 2.1577, 1.2245, 0],
            [6, -1.2131, -0.6884, 0], [6, -1.2028, 0.7064, 0.0001], [6, -0.0103, -1.3948, 0],
            [6, 0.0104, 1.3948, -0.0001], [6, 1.2028, -0.7063, 0], [6, 1.2131, 0.6884, 0]]
-AWS_LADDER = [('single', WATER, 15.04), ('optimise', WATER, 23.01),
-              # Ethanol's finishing attempt ran 124.9 s, resumed from the trajectory of
-              # an attempt a Spot reclaim stopped after about 4 minutes: 270 s is a floor.
-              ('optimise', ETHANOL, 270.0), ('single', BENZENE, 262.75)]
-PROBE = {'n': [32, 16, 8, 4], 'scfSeconds': [28.092, 26.6, 46.828, 92.119],
-         'filesSeconds': [51.117, 66.148, 105.935, 187.6]}
+AWS_FIXTURES = Path(__file__).parent / 'fixtures' / 'aws'
+AWS_JOBS = sorted(d for d in AWS_FIXTURES.iterdir() if d.is_dir())
+# Ethanol's finishing attempt ran 124.9 s, resumed from the trajectory of an
+# attempt a Spot reclaim stopped after about 4 minutes: 270 s is a floor.
+WALL_FLOORS = {'2233f97f7719': 270.0}
+PROBE = json.loads((AWS_FIXTURES / 'speedup-probe.json').read_text())
 
 
-@pytest.mark.parametrize('recipe,atoms,wall', AWS_LADDER)
-def test_every_aws_run_finishes_inside_the_time_headroom(recipe, atoms, wall):
+def test_the_aws_fixtures_are_the_five_jobs_sizing_v3_was_fitted_on():
+    names = {d.name[:12] for d in AWS_JOBS}
+    assert names == {'22b6b939b8af', 'ffdaf035aee5', 'df22d76f6f7a', '2233f97f7719', 'f4e66d7330ed'}
+    assert PROBE['n'] == [32, 16, 8, 4] and PROBE['basisFunctions'] == 276
+
+
+@pytest.mark.parametrize('folder', AWS_JOBS, ids=lambda d: d.name[:12])
+def test_every_aws_run_finishes_inside_the_time_headroom(folder):
     # An under-prediction past TIME_HEADROOM is the failure that costs money
     # (a timeout spends the attempt); an over-prediction only reserves more.
-    predicted = sizing.predict_seconds(canonical_job(recipe, atoms, 0, 1), sizing.SIZES[0])
-    assert wall <= sizing.TIME_HEADROOM * predicted
+    # Each job is predicted on the size it ran on (caffeine: M).
+    job = json.loads((folder / 'job.json').read_text())['job']
+    timings = json.loads((folder / 'timings.json').read_text())
+    size = next(s for s in sizing.SIZES if s.name == timings['size'])
+    wall = WALL_FLOORS.get(folder.name[:12], timings['wallSeconds'])
+    assert wall <= sizing.TIME_HEADROOM * sizing.predict_seconds(job, size)
+
+
+def test_caffeine_on_m_is_no_longer_under_predicted():
+    # Version 2 predicted 2275.5 s (SCF 1452, files 824) for a run of 3135 s
+    # (SCF 2289, files 847): its SCF term missed, not its files term. Version
+    # 3 takes t3 from this run's direct SCF (Ruling T14-speedup).
+    folder = next(d for d in AWS_JOBS if d.name.startswith('f4e66d7330ed'))
+    job = json.loads((folder / 'job.json').read_text())['job']
+    timings = json.loads((folder / 'timings.json').read_text())
+    parts = sizing.predict_parts(job, sizing.SIZES[1])
+    stages = {s['name']: s['seconds'] for s in timings['stages']}
+    assert parts['scfSeconds'] == pytest.approx(stages['SCF (DIIS)'], rel=0.05)
+    assert parts['filesSeconds'] == pytest.approx(stages['writing files'], rel=0.05)
+    assert parts['scfSeconds'] + parts['filesSeconds'] >= 0.99 * timings['wallSeconds']
+
+
+def test_the_constants_are_what_calibrate_fits_from_the_fixtures():
+    # Version 3 is reproducible: `python -m jobs.calibrate --aws --probe
+    # fixtures/aws/speedup-probe.json fixtures/aws/*/` prints these constants,
+    # with only g's guard used (fitted negative: the ladder's few steps).
+    from jobs.calibrate import aws_samples, fit_aws, guarded
+    constants, guards = guarded(fit_aws(aws_samples(AWS_JOBS), PROBE))
+    assert constants == sizing.CONSTANTS
+    assert [g.split(':')[0] for g in guards] == ['g']
 
 
 @pytest.mark.parametrize('i', range(4))
-def test_the_probe_is_predicted_within_15_percent(i):
+def test_the_probe_is_never_under_predicted_and_its_files_within_15_percent(i):
+    # Version 3's t3 is caffeine's (15 SCF cycles) where version 2's was the
+    # probe's benzene (9 cycles); per cycle the two scale as N^3.47, so the
+    # N^3.5 form stands, and benzene's SCF is over-predicted by the cycles.
     n = PROBE['n'][i]
     parts = sizing.predict_parts(canonical_job('single', BENZENE, 0, 1), sizing.Size('probe', n, 244))
-    assert parts['scfSeconds'] == pytest.approx(PROBE['scfSeconds'][i], rel=0.15)
+    assert PROBE['scfSeconds'][i] <= parts['scfSeconds'] <= 1.7 * PROBE['scfSeconds'][i]
     assert parts['filesSeconds'] == pytest.approx(PROBE['filesSeconds'][i], rel=0.15)
 
 
@@ -239,9 +280,11 @@ def test_every_decision_says_it_is_a_fargate_estimate():
 # Every AWS sample's working set (its peak less the two-electron integrals
 # PySCF held in core only because they fitted; calibrate.incore_eri_gb), as
 # Task 14 fitted memory on: the ladder on S (PYSCF_MAX_MEMORY 80 % of 8 GB),
-# and the probe's benzene at PySCF's default 4000 MB, where it ran direct.
+# the probe's benzene at PySCF's default 4000 MB, where it ran direct, and
+# caffeine on M (PYSCF_MAX_MEMORY 80 % of 16 GB), direct too.
 AWS_PEAKS = [(58, 0.326, 8, None), (58, 0.351, 8, None), (168, 1.392, 8, None), (276, 6.104, 8, None),
-             (276, 0.919, None, 4000), (276, 0.897, None, 4000), (276, 0.886, None, 4000), (276, 0.882, None, 4000)]
+             (276, 0.919, None, 4000), (276, 0.897, None, 4000), (276, 0.886, None, 4000), (276, 0.882, None, 4000),
+             (614, 1.906, 16, None)]
 
 
 @pytest.mark.parametrize('n,peak,memory_gb,max_memory_mb', AWS_PEAKS)

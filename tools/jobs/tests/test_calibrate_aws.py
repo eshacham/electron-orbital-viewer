@@ -20,9 +20,10 @@ def carbons(k):
     return [[6, 0.0, 0.0, 1.5 * i] for i in range(k)]
 
 
-def write(tmp_path, recipe, atoms, threads, backend='aws', law=SCF_LAW, files_law=FILES_LAW, size='S'):
-    """A finished job folder whose timings obey the model exactly; its peak
-    carries the in-core ERIs whenever PySCF would have held them on `size`."""
+def write(tmp_path, recipe, atoms, threads, backend='aws', law=SCF_LAW, files_law=FILES_LAW, size='S', t3=T3):
+    """A finished job folder whose timings obey the model exactly (with `t3`
+    for its final SCF); its peak carries the in-core ERIs whenever PySCF
+    would have held them on `size`."""
     from jobs.basis_counts import basis_functions
     job = canonical_job(recipe, atoms, 0, 1)
     key = job_key(job)
@@ -30,7 +31,7 @@ def write(tmp_path, recipe, atoms, threads, backend='aws', law=SCF_LAW, files_la
     stages = []
     if recipe == 'optimise':
         stages += [{'name': f'optimisation step {i}', 'seconds': (1 + G) * sp(svp, threads, law)} for i in range(1, 6)]
-    stages.append({'name': 'SCF (DIIS)', 'seconds': sp(n, threads, law)})
+    stages.append({'name': 'SCF (DIIS)', 'seconds': sp(n, threads, law, t3)})
     files = F2 * (n / 1000) ** 2 / (min(threads, files_law[1]) ** files_law[0] if files_law else 1)
     stages.append({'name': 'writing files', 'seconds': files})
     memory_gb = next(s.memory_gb for s in sizing.SIZES if s.name == size)
@@ -275,3 +276,37 @@ def test_a_missing_g_or_a_non_positive_f2_is_guarded_with_a_name(tmp_path):
     constants, guards = guarded(got)
     assert constants['g'] == 1.5 and constants['f2'] == sizing.CONSTANTS['f2']
     assert any(g.startswith('g:') for g in guards) and any(g.startswith('f2:') for g in guards)
+
+
+def test_aws_samples_say_whether_the_scf_ran_direct(tmp_path):
+    # PySCF ran direct when its ERIs did not fit the size (incore_eri_gb 0):
+    # carbons(3), N 111, holds them on S; carbons(16), N 592, cannot.
+    small, big = aws_samples([write(tmp_path, 'single', carbons(3), 2), write(tmp_path, 'single', carbons(16), 4)])
+    assert small['direct'] is False and big['direct'] is True
+
+
+def incore_ladder(tmp_path):
+    """Runs whose ERIs all fit on S (N 111, 148, 222), so the SCF ran in core."""
+    return [write(tmp_path, 'single', carbons(3), 2), write(tmp_path, 'optimise', carbons(4), 2),
+            write(tmp_path, 'optimise', carbons(6), 2)]
+
+
+def test_a_slower_direct_job_sets_t3_and_t0_comes_from_the_incore_runs_alone(tmp_path):
+    # Sizing v3 (Phase 6B-3 follow-up): caffeine on M ran direct and slower,
+    # per (N/1000)^3.5, than the probe's benzene (15 SCF cycles to 9). One
+    # line through in-core and direct runs together bends t0 negative; so the
+    # in-core runs give t0, and every direct run (job or probe) offers a t3,
+    # the slowest kept (Ruling T14-speedup).
+    dirs = incore_ladder(tmp_path) + [write(tmp_path, 'single', carbons(20), 4, size='M', t3=2 * T3)]
+    samples = aws_samples(dirs)
+    assert [s['direct'] for s in samples].count(True) == 1
+    got = fit_aws(samples, probe=model_probe())
+    assert got['t0'] == pytest.approx(T0, rel=1e-6)
+    assert got['t3'] == pytest.approx(2 * T3, rel=1e-6)
+    assert any(note.startswith('t3:') and 'direct job' in note for note in got['notes'])
+
+
+def test_a_faster_direct_job_leaves_the_slower_t3(tmp_path):
+    dirs = incore_ladder(tmp_path) + [write(tmp_path, 'single', carbons(20), 4, size='M', t3=T3 / 2)]
+    got = fit_aws(aws_samples(dirs), probe=model_probe(t3=3 * T3))
+    assert got['t0'] == pytest.approx(T0, rel=1e-6) and got['t3'] == pytest.approx(3 * T3, rel=1e-6)

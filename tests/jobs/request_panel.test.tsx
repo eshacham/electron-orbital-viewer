@@ -119,7 +119,7 @@ describe('previewing', () => {
         const sizing = screen.getByLabelText('sizing decision');
         expect(sizing).toHaveTextContent('Spot, up to 3 attempts');
         expect(sizing).toHaveTextContent('Time limit10 min 00 s');
-        expect(sizing).toHaveTextContent('reserved $0.02 if submitted; projected $0.0001220');
+        expect(sizing).toHaveTextContent('reserved $0.02 if submitted; projected $0.0001280');
         expect(sizing).not.toHaveTextContent('on AWS');
     });
     // R6: a This Mac run costs nothing; the projection is what AWS would have cost.

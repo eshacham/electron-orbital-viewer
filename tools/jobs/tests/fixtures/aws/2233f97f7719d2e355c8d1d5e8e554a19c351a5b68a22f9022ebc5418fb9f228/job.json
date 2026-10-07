@@ -1,0 +1,86 @@
+{
+ "key": "2233f97f7719d2e355c8d1d5e8e554a19c351a5b68a22f9022ebc5418fb9f228",
+ "job": {
+  "recipe": "optimise",
+  "molecule": {
+   "multiplicity": 1,
+   "atoms": [
+    [
+     1,
+     -1.1291,
+     0.8364,
+     0.8099
+    ],
+    [
+     1,
+     -0.0958,
+     -1.212,
+     0.8819
+    ],
+    [
+     1,
+     -0.0952,
+     -1.1938,
+     -0.8946
+    ],
+    [
+     1,
+     1.2426,
+     0.9307,
+     -0.8704
+    ],
+    [
+     1,
+     1.2616,
+     0.9052,
+     0.8886
+    ],
+    [
+     1,
+     2.105,
+     -0.372,
+     -0.0177
+    ],
+    [
+     6,
+     -0.0463,
+     -0.5665,
+     0
+    ],
+    [
+     6,
+     1.2175,
+     0.2668,
+     0
+    ],
+    [
+     8,
+     -1.1712,
+     0.2997,
+     0
+    ]
+   ],
+   "charge": 0
+  },
+  "computeVersion": 1,
+  "method": {
+   "basis": "def2-TZVPD",
+   "xc": "B3LYP",
+   "optimiseBasis": "def2-SVP"
+  }
+ },
+ "sizing": {
+  "predictedSeconds": 373.7,
+  "size": "S",
+  "estimateFor": "fargate",
+  "vcpu": 2,
+  "predictedMemoryGB": 0.52,
+  "timeoutSeconds": 1121,
+  "memoryGB": 8,
+  "basisFunctions": 168,
+  "version": 1,
+  "predictedCostMicros": 3094,
+  "capacity": "spot",
+  "attempts": 3
+ }
+}

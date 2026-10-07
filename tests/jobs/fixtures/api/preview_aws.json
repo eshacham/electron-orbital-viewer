@@ -71,7 +71,7 @@
   "decision": {
    "ok": true,
    "sizing": {
-    "version": 2,
+    "version": 3,
     "estimateFor": "fargate",
     "size": "S",
     "vcpu": 2,
@@ -79,10 +79,10 @@
     "capacity": "spot",
     "attempts": 3,
     "basisFunctions": 58,
-    "predictedSeconds": 14.7,
-    "predictedMemoryGB": 0.36,
+    "predictedSeconds": 15.4,
+    "predictedMemoryGB": 0.49,
     "timeoutSeconds": 600,
-    "predictedCostMicros": 122
+    "predictedCostMicros": 128
    },
    "reservedUsd": 0.01788
   },

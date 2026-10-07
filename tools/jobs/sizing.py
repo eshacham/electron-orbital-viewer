@@ -10,8 +10,10 @@ later than the SCF's. (Version 1 left it undivided: this Mac's PySCF has no
 OpenMP, so nothing local could show it.) The open-shell factor applies only
 to the SCF part: writing files does not care how many electrons were
 unpaired. Version 1 was fitted from local runs (6B-1 Task 11); version 2
-from the AWS ladder and the speedup probe (6B-3 Task 14). Every job records
-the version and the prediction so the fit can be checked.
+from the AWS ladder and the speedup probe (6B-3 Task 14); version 3 adds the
+owner's caffeine single point on M, the first real direct SCF (6B-3
+follow-up). Every job records the version and the prediction so the fit can
+be checked.
 """
 import math
 from dataclasses import dataclass
@@ -29,27 +31,39 @@ class Size:
 
 
 SIZES = (Size('S', 2, 8), Size('M', 4, 16), Size('L', 16, 64), Size('XL', 32, 244))
-SIZING_VERSION = 2
-# Version 2, fitted 2026-10-07 from 4 AWS Batch jobs on Fargate Linux/ARM64 (Graviton) with
-# `python -m jobs.calibrate --aws --probe …` (Phase 6B-3 Task 14): water and benzene single points,
-# water and ethanol optimisations, all on S (2 vCPU, Spot), plus the speedup probe (benzene's SCF and
-# file write at 4, 8, 16 and 32 threads in one XL task). One guard used: g fitted -0.18 (the ladder's
+SIZING_VERSION = 3
+# Version 3, fitted 2026-10-07 from 5 AWS Batch jobs on Fargate Linux/ARM64 (Graviton) with
+# `python -m jobs.calibrate --aws --probe tests/fixtures/aws/speedup-probe.json tests/fixtures/aws/*/`
+# (Phase 6B-3 follow-up): version 2's four ladder jobs on S (2 vCPU, Spot; water and benzene single
+# points, water and ethanol optimisations), the owner's caffeine single point on M (4 vCPU, Spot; N 614,
+# 3135 s), and the speedup probe (benzene's SCF and file write at 4, 8, 16 and 32 threads on XL).
+# The forms are version 2's; only t3, f2, m0 and m2 moved. One guard used: g fitted -0.29 (the ladder's
 # few optimisation steps ran faster than the single-point rule predicts), so it keeps 1.5.
 # How each was got (Ruling T14-speedup; the slower prediction wherever the data allow two):
 # - scfExponent, scfSaturation: the probe's SCF, min(c, 16)^0.867 to within 5.2 % at every thread count.
 #   One power law (0.596) misses by up to 30 %: 4 -> 16 threads gained 3.5x, 16 -> 32 nothing.
 # - filesExponent, filesSaturation: the probe's file write, on its own law, min(c, 32)^0.631, within
 #   10 % (a plateau at 16 fits worse and would promise L more); undivided misses by up to 2.1x.
-# - t3: the probe's direct SCF (26 600) rather than the ladder's (9 050). The ladder's SCFs held their
-#   ERIs in core, since S lets PySCF keep them up to N of about 280; caffeine and anything larger on
-#   S-L runs direct: benzene's direct SCF on the probe ran about 3x its in-core one. t0 is the ladder's intercept.
-# - f2: the ladder and the probe's runs together, each multiplied back up by files_speedup.
+# - t3: caffeine's direct SCF (42 000), the slowest of three: the probe's direct SCF gives 26 600 and
+#   the in-core ladder 9 050. Version 2 took the probe's and predicted caffeine's SCF at 1452 s on M; it
+#   took 2289 s. Caffeine needed 15 SCF cycles to benzene's 9; per cycle the two scale as N^3.47, so
+#   N^3.5 stands and the gap is cycle count, which a larger molecule is likelier to share with caffeine
+#   than with benzene. Benzene's direct SCF (the probe) is now over-predicted by 51-65 % (safe).
+# - t0: the in-core ladder's intercept alone (4.84, as version 2). One line through in-core and direct
+#   runs together fits -100.5: a direct SCF is slower per (N/1000)^3.5 at every N.
+# - f2: the ladder, the probe and caffeine, each multiplied back up by files_speedup (5240 -> 5360).
+#   Version 2's files term was right on M: 824 s predicted, 847 s measured.
 # - m0, m2: the working set, i.e. the peak less the in-core ERIs PySCF kept only because they fitted
-#   (benzene's 6.1 GB peak on S is 5.4 GB of them), with the probe's direct-SCF peaks (0.9 GB).
-# Every ladder job finishes inside TIME_HEADROOM x its v2 prediction, and v2 predicts the probe's
-# SCF and file write to within 15 % (tests/test_sizing.py).
-# Version 1 (6B-1 Task 11) came from this Mac; its numbers stay in git history.
-CONSTANTS = {'m0': 0.341, 'm2': 6.77, 't0': 4.84, 't3': 26600.0, 'g': 1.5, 'f2': 5240.0,
+#   (benzene's 6.1 GB peak on S is 5.4 GB of them), with the probe's direct-SCF peaks (0.9 GB) and
+#   caffeine's (1.906 GB at N 614, predicted 1.98): m2 6.77 -> 3.98.
+# Residuals (predicted / measured - 1): caffeine on M -0.04 % in all (SCF +0.1 %, files -0.5 %); the
+# ladder on S (wall) water single +2.3 %, benzene single +98 %, water optimise +437 %, ethanol optimise
+# +82 % against its 270 s floor; the probe's files -10.3 to +7.3 %, its SCF +51 to +65 %; working sets
+# -15 % (the probe's) to +56 % (water's), caffeine's +3.7 %. Every AWS job finishes inside TIME_HEADROOM x
+# its v3 prediction on the size it ran on, and HEADROOM x the v3 memory covers every working set
+# (tests/test_sizing.py, which also checks calibrate reproduces these constants from the fixtures).
+# Versions 1 (6B-1 Task 11, this Mac) and 2 (6B-3 Task 14) stay in git history.
+CONSTANTS = {'m0': 0.477, 'm2': 3.98, 't0': 4.84, 't3': 42000.0, 'g': 1.5, 'f2': 5360.0,
              'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631, 'filesSaturation': 32.0}
 HEADROOM = 2.0
 TIME_HEADROOM = 1.5

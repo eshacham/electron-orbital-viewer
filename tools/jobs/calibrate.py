@@ -5,11 +5,11 @@ speedup(threads) − t0 is proportional to (N/1000)^3.5. Only the SCF stages
 count toward t3; optimisation steps calibrate g. The file-writing stage is a
 separate cost (Ruling D14), fitted through the origin against (N/1000)².
 6B-1's local fit (`fit`) leaves it undivided: this Mac's PySCF has no OpenMP.
-On Fargate it is threaded, and the AWS fit (`fit_aws`, sizing version 2)
-divides it by a speedup law of its own, measured by the speedup probe.
+On Fargate it is threaded, and the AWS fit (`fit_aws`, sizing versions 2
+and 3) divides it by a speedup law of its own, measured by the speedup probe.
 
     python -m jobs.calibrate ../tools/molecules/out/jobs/<key> …   (from tools/)
-    python -m jobs.calibrate --aws [--probe probe.log] <job dir> …  (Phase 6B-3: sizing v2)
+    python -m jobs.calibrate --aws [--probe probe.log] <job dir> …  (Phase 6B-3: sizing v2, v3)
 """
 import json
 import math
@@ -82,7 +82,7 @@ def samples_from(job_dirs):
     return out
 
 
-# -- Phase 6B-3: the AWS fit (sizing version 2) --------------------------------
+# -- Phase 6B-3: the AWS fit (sizing versions 2 and 3) -------------------------
 #
 # The probe contract (Ruling D15). Task 12's speedup probe runs once, in one
 # 32 vCPU Fargate task, and prints ONE line of JSON to stdout (CloudWatch);
@@ -162,6 +162,9 @@ def aws_samples(job_dirs):
                     'threads': timings['vcpu'], 'peakMemoryGB': peak,
                     # What the job needs, not what PySCF took because it fitted (see incore_eri_gb).
                     'workingSetGB': peak - eri if peak > eri else peak,
+                    # The ERIs did not fit, so PySCF rebuilt them every cycle: the regime every
+                    # molecule past N of about 280 on S-L runs in (fit_aws's t3).
+                    'direct': eri == 0,
                     'wallSeconds': timings['wallSeconds'], 'predictedSeconds': record['sizing']['predictedSeconds'],
                     'predictedMemoryGB': record['sizing']['predictedMemoryGB'], 'size': timings['size'],
                     'capacity': timings['capacity']})
@@ -311,19 +314,23 @@ def _probe_samples(points):
 
 
 def fit_aws(samples, probe=None):
-    """Sizing version 2's constants from AWS samples, as fitted (unguarded),
-    plus how they were got. `guarded` turns this into CONSTANTS.
+    """Sizing's constants (version 2, refitted for 3) from AWS samples, as
+    fitted (unguarded), plus how they were got. `guarded` turns this into CONSTANTS.
 
     Without probe data the deployed speedup laws are kept, and the notes say
     so. With it (Ruling T14-speedup):
     - both laws come from the probe (fit_law, fit_files);
     - its runs join the f2 fit and, as direct-SCF working sets, the memory fit;
-    - t3 is the larger of the ladder's and the probe's: the ladder's SCFs
-      held their ERIs in core (S fits them up to N ≈ 280), which no larger
-      molecule on S–L can, and the probe ran direct, the regime that
-      caffeine and beyond run in. The slower prediction is the safe one: an
-      under-prediction spends a timed-out attempt; an over-prediction only
-      reserves a little more.
+    - t3 is the largest of the in-core runs', the probe's and the direct
+      jobs': the ladder's SCFs held their ERIs in core (S fits them up to
+      N ≈ 280), which no larger molecule on S–L can, and the probe and any
+      job flagged `direct` ran direct, the regime that caffeine and beyond
+      run in. The slower prediction is the safe one: an under-prediction
+      spends a timed-out attempt; an over-prediction only reserves a little
+      more.
+    - t0 (and the in-core t3) come from the in-core samples alone, when
+      they span two N (version 3): one line through both regimes bends t0
+      negative, since a direct SCF is slower per (N/1000)^3.5 at any N.
     """
     notes, extra, summary = [], [], None
     if probe is None:
@@ -345,15 +352,31 @@ def fit_aws(samples, probe=None):
         if not extra:
             notes.append('probe line has no basisFunctions: its runs inform the laws only')
     memory = fit_memory(samples + [s for s in extra if 'workingSetGB' in s], key='workingSetGB')
-    time_ = fit_time(samples, scf_law)
+    incore = [s for s in samples if not s.get('direct')]
+    if len({s['basisFunctions'] for s in incore}) >= 2:
+        time_ = fit_time(incore, scf_law)
+    else:
+        time_ = fit_time(samples, scf_law)
+        if len(incore) < len(samples):
+            notes.append('t0: fewer than 2 in-core N, so in-core and direct runs share one line')
     t0, t3 = time_['t0'], time_['t3']
+    direct = [s for s in samples if s.get('direct')]
+    if direct and len(incore) < len(samples) and len({s['basisFunctions'] for s in incore}) >= 2:
+        us = [(s['basisFunctions'] / 1000) ** 3.5 for s in direct]
+        jobs_t3 = _through_origin(us, [s['scfSeconds'] * _speedup(s['threads'], scf_law) - t0 for s in direct])
+        if jobs_t3 > t3:
+            notes.append(f't3: the direct jobs ({len(direct)}) give {jobs_t3:.4g}, the in-core runs {t3:.4g}; '
+                         f'kept the direct jobs\', the slower')
+            t3 = jobs_t3
     if extra:
         probe_t3 = sum((s['scfSeconds'] * _speedup(s['threads'], scf_law) - t0) / (s['basisFunctions'] / 1000) ** 3.5
                        for s in extra) / len(extra)
         if probe_t3 > t3:
-            notes.append(f't3: the probe\'s direct SCF gives {probe_t3:.4g}, the ladder\'s {t3:.4g} (ERIs in core); '
-                         f'kept the probe\'s, the slower')
+            notes.append(f't3: the probe\'s direct SCF gives {probe_t3:.4g}, more than {t3:.4g} (the in-core '
+                         f'runs\' or the direct jobs\'); kept the probe\'s, the slower')
             t3 = probe_t3
+        else:
+            notes.append(f't3: the probe\'s direct SCF gives {probe_t3:.4g}, less than {t3:.4g}; kept the slower')
     out = {**memory, 't0': t0, 't3': t3, 'g': fit_g(samples, t0, t3, scf_law), 'f2': fit_f2(samples + extra, files_law),
            'scfExponent': scf_law[0], 'scfSaturation': scf_law[1],
            'filesExponent': files_law[0], 'filesSaturation': files_law[1], 'speedupSource': source, 'notes': notes}
