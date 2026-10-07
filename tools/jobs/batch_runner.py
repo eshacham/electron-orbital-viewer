@@ -11,6 +11,10 @@ TAGS = {'app': 'electron-orbital-viewer', 'component': 'compute'}
 # interrupted."); Batch copies it into the attempt's statusReason. Batch
 # patterns allow letters, digits, spaces, '.', ':' and a trailing '*'.
 SPOT_INTERRUPTION = 'Your Spot Task was interrupted*'
+# Each compute environment's vCPU cap (infra/compute_stack.py imports it):
+# reconcile reads it too, to tell a job waiting behind this app's own work
+# on its queue from one AWS has no capacity for (final review I1).
+MAX_VCPUS = 32
 
 
 PYSCF_MEMORY_SHARE = 0.8     # PySCF's own cap; the rest is Python, the grids and the OS

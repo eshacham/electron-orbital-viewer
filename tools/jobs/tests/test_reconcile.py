@@ -367,3 +367,124 @@ def test_sweep_describes_batch_jobs_a_hundred_at_a_time(empty_store):
     result = Reconciler(store, batch, FakeEcs(), now=lambda: T0 + timedelta(minutes=10)).sweep()
     assert sorted(batch.sizes) == [1, 100]
     assert result['checked'] == 101 and set(result['outcome'].values()) == {'waiting'}
+
+
+# Final review I1: each compute environment is capped at MAX_VCPUS, so a job
+# can wait behind this app's own work; that wait is not AWS's want of capacity.
+
+XL = {**DECISION, 'size': 'XL', 'vcpu': 32, 'memoryGB': 244}
+
+
+def queued(store, key, job_id, decision=DECISION, now=T0):
+    rec = new_record(key=key, job={'recipe': 'single'}, decision=decision, name='m', formula='H2O',
+                     electron_count=10, geometry_source={'kind': 'xyz'}, backend='aws', now=now)
+    store.create_job(rec)
+    store.update_job(key, {'runnerJobId': job_id})
+
+
+def test_a_job_queued_behind_this_apps_own_running_job_waits_on(empty_store):
+    store, big, small = empty_store, 'b' * 64, 'c' * 64
+    queued(store, big, 'job-b', XL)
+    store.claim(big, 1, T0)
+    late = T0 + timedelta(seconds=RUNNABLE_LIMIT_SECONDS + 60)
+    store.update_job(big, {'heartbeatAt': iso(late)})
+    queued(store, small, 'job-c', now=T0 + timedelta(seconds=1))
+    jobs = [{**batch_job('RUNNING'), 'jobId': 'job-b'}, {**batch_job('RUNNABLE'), 'jobId': 'job-c'}]
+    r = Reconciler(store, FakeBatch(jobs), FakeEcs(), now=lambda: late)
+    result = r.sweep()
+    assert result['outcome'] == {big: 'running', small: 'waiting-own-jobs'} and result['stale'] == []
+    assert r.batch.terminated == [] and not store.get_job(small)['settled']
+
+
+def test_own_jobs_on_the_other_queue_do_not_excuse_the_wait(empty_store):
+    store, big, small = empty_store, 'b' * 64, 'c' * 64
+    queued(store, big, 'job-b', {**XL, 'capacity': 'on-demand'})
+    store.claim(big, 1, T0)
+    queued(store, small, 'job-c')
+    jobs = [{**batch_job('RUNNING'), 'jobId': 'job-b'}, {**batch_job('RUNNABLE'), 'jobId': 'job-c'}]
+    r = Reconciler(store, FakeBatch(jobs), FakeEcs(), now=lambda: T0 + timedelta(seconds=RUNNABLE_LIMIT_SECONDS + 60))
+    assert r.sweep()['outcome'][small] == 'failed-no-capacity'
+    message = store.get_job(small)['error']['message']
+    assert "this app's own jobs were not holding" in message and 'Fargate Spot' in message
+
+
+def test_the_wait_clock_restarts_when_an_own_job_on_the_queue_ends(empty_store):
+    store, big, small = empty_store, 'b' * 64, 'c' * 64
+    queued(store, big, 'job-b', XL)
+    store.claim(big, 1, T0)
+    store.update_job(big, {'status': 'DONE', 'endedAt': iso(T0 + timedelta(minutes=40))})
+    store.settle(big, 0)
+    queued(store, small, 'job-c', now=T0 + timedelta(seconds=1))
+    job = {**batch_job('RUNNABLE'), 'jobId': 'job-c', 'container': {'environment': [{'name': 'JOB_KEY', 'value': small}]}}
+    assert reconciler(store, [job], now=T0 + timedelta(minutes=50)).on_event(job) == 'waiting'
+    late = T0 + timedelta(minutes=40, seconds=RUNNABLE_LIMIT_SECONDS + 1)
+    assert reconciler(store, [job], now=late).on_event(job) == 'failed-no-capacity'
+
+
+def test_two_waiting_jobs_never_excuse_each_other(empty_store):
+    # Both XL, neither started (AWS really has no capacity): the one ahead is
+    # judged on AWS alone; the one behind waits for it, then for its own clock.
+    store, first, second = empty_store, 'b' * 64, 'c' * 64
+    queued(store, first, 'job-b', XL)
+    queued(store, second, 'job-c', XL, now=T0 + timedelta(seconds=1))
+    jobs = [{**batch_job('RUNNABLE'), 'jobId': 'job-b'}, {**batch_job('RUNNABLE'), 'jobId': 'job-c'}]
+    late = T0 + timedelta(seconds=RUNNABLE_LIMIT_SECONDS + 60)
+    r = Reconciler(store, FakeBatch(jobs), FakeEcs(), now=lambda: late)
+    assert r.sweep()['outcome'] == {first: 'failed-no-capacity', second: 'waiting-own-jobs'}
+    # The next sweep sees the first ended just now: the second's clock starts again from there.
+    r.now = lambda: late + timedelta(minutes=15)
+    assert r.sweep()['outcome'] == {second: 'waiting'}
+    r.now = lambda: late + timedelta(seconds=RUNNABLE_LIMIT_SECONDS + 1)
+    assert r.sweep()['outcome'] == {second: 'failed-no-capacity'}
+
+
+# Final review M1/M2: a record whose Batch job id was never written.
+
+def test_a_failed_record_whose_settle_was_lost_is_settled_at_zero(store):
+    # The api's submit-failed write landed, its settle did not: the reservation
+    # would otherwise be stranded and every owner retry refused for ever.
+    store.update_job(KEY, {'runnerJobId': None, 'status': 'FAILED',
+                           'error': {'code': 'submit-failed', 'message': 'Batch said no'}})
+    assert reconciler(store, [], now=T0 + timedelta(minutes=5)).sweep()['outcome'] == {KEY: 'no-batch-job'}
+    result = reconciler(store, [], now=T0 + timedelta(minutes=11)).sweep()
+    assert result['outcome'] == {KEY: 'settled-no-batch-job'} and len(result['stale']) == 1
+    rec = store.get_job(KEY)
+    assert rec['settled'] and rec['actualMicros'] == 0 and rec['error']['code'] == 'submit-failed'
+    assert store.meter('2026-10')['reserved'] == 0
+    store.requeue_failed(KEY, DECISION, T0 + timedelta(minutes=12))          # the owner can retry again
+
+
+def test_a_running_record_without_a_batch_job_id_is_left_to_its_worker(store):
+    # The api timed out after SubmitJob (M2): the worker claimed the job, so
+    # it is running even though the api never wrote the id down.
+    store.update_job(KEY, {'runnerJobId': None})
+    store.claim(KEY, 1, T0 + timedelta(minutes=9))
+    result = reconciler(store, [], now=T0 + timedelta(minutes=20)).sweep()
+    assert result['outcome'] == {KEY: 'no-batch-job'}
+    assert store.get_job(KEY)['status'] == 'RUNNING' and not store.get_job(KEY)['settled']
+
+
+def test_a_running_record_without_an_id_is_closed_out_after_a_day(store):
+    store.update_job(KEY, {'runnerJobId': None})
+    store.claim(KEY, 1, T0)
+    store.update_job(KEY, {'heartbeatAt': iso(T0 + timedelta(seconds=100))})
+    result = reconciler(store, [], now=T0 + timedelta(hours=25)).sweep()
+    assert result['outcome'] == {KEY: 'failed-batch-lost'}
+    rec = store.get_job(KEY)
+    assert rec['settled'] and rec['actualMicros'] == cost_micros('spot', 2, 8, 160)
+    assert 'None' not in rec['error']['message'] and 'None' not in result['stale'][0]
+
+
+# Final review recommendation 5: an unsettled record older than last month.
+
+def test_the_daily_sweep_finds_unsettled_records_from_older_months(empty_store):
+    store, august = empty_store, datetime(2026, 8, 20, 12, 0, tzinfo=timezone.utc)
+    store.create_job(water(now=august))
+    store.update_job(KEY, {'runnerJobId': 'job-1', 'status': 'DONE', 'endedAt': iso(august + timedelta(seconds=100))})
+    job = batch_job('SUCCEEDED', [attempt(august, 100)], created=august)
+    midday = datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc)
+    assert Reconciler(store, FakeBatch([job]), FakeEcs(), now=lambda: midday).sweep()['checked'] == 0
+    just_after_midnight = datetime(2026, 10, 6, 0, 7, tzinfo=timezone.utc)
+    result = Reconciler(store, FakeBatch([job]), FakeEcs(), now=lambda: just_after_midnight).sweep()
+    assert result['outcome'] == {KEY: 'settled'}
+    assert store.get_job(KEY)['settled'] and store.meter('2026-08')['spent'] == cost_micros('spot', 2, 8, 160)

@@ -26,7 +26,7 @@ from cost_guards import add_cost_guards
 from lambda_bundle import REPO, build_lambda_bundle
 
 sys.path.insert(0, str(REPO / 'tools'))
-from jobs.batch_runner import SPOT_INTERRUPTION, TAGS  # noqa: E402  (one source for the retry rule and tags)
+from jobs.batch_runner import MAX_VCPUS, SPOT_INTERRUPTION, TAGS  # noqa: E402  (one source for these and reconcile)
 
 AZS = ['us-east-1a', 'us-east-1b']   # not us-east-1e: it is use1-az3 in this account, which has no Fargate ARM64
 DEV_ORIGINS = ['http://localhost:5173', 'http://localhost:5391']
@@ -34,7 +34,6 @@ ROUTES = [('POST', '/api/v1/jobs/preview'), ('POST', '/api/v1/jobs'), ('GET', '/
           ('GET', '/api/v1/jobs/{key}'), ('GET', '/api/v1/costs')]
 DEFAULT_THROTTLE = {'ThrottlingRateLimit': 5, 'ThrottlingBurstLimit': 10}
 SUBMIT_THROTTLE = {'ThrottlingRateLimit': 1, 'ThrottlingBurstLimit': 5}
-MAX_VCPUS = 32
 LOG_RETENTION = logs.RetentionDays.ONE_MONTH
 WORKER_LOG_GROUP = '/electron-orbital-viewer/worker'
 CONTEXT_KEYS = ('dataBucketName', 'siteOrigin', 'alertEmail', 'imageTag')

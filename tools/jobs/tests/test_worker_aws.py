@@ -49,17 +49,19 @@ def test_image_digest_prefers_the_env_then_the_task_metadata():
 def test_aws_mode_builds_dynamo_and_s3_from_the_environment(monkeypatch, capsys):
     seen = {}
 
-    def fake_run_job(key, store, sink, attempt, backend, grid_points, image_digest):
-        seen.update(key=key, store=store, sink=sink, attempt=attempt, backend=backend, digest=image_digest)
+    def fake_run_job(key, store, sink, attempt, backend, grid_points, image_digest, runner_job_id):
+        seen.update(key=key, store=store, sink=sink, attempt=attempt, backend=backend, digest=image_digest,
+                    runner_job_id=runner_job_id)
         return 'DONE'
     monkeypatch.setattr(worker, 'run_job', fake_run_job)
     monkeypatch.setenv('AWS_DEFAULT_REGION', 'us-east-1')
     env = {'JOBS_TABLE': 'jobs-test', 'DATA_BUCKET': 'bucket', 'AWS_BATCH_JOB_ATTEMPT': '3',
-           'JOB_ATTEMPT_OFFSET': '0', 'JOBS_IMAGE_DIGEST': 'sha256:abc'}
+           'JOB_ATTEMPT_OFFSET': '0', 'JOBS_IMAGE_DIGEST': 'sha256:abc', 'AWS_BATCH_JOB_ID': 'batch-123'}
     assert worker.main(['run', KEY, '--aws'], environ=env) == 0
     assert isinstance(seen['store'], DynamoStore) and seen['store'].table == 'jobs-test'
     assert isinstance(seen['sink'], S3Sink) and seen['sink'].bucket == 'bucket'
     assert (seen['attempt'], seen['backend'], seen['digest']) == (3, 'aws', 'sha256:abc')
+    assert seen['runner_job_id'] == 'batch-123'
     assert json.loads(capsys.readouterr().out) == {'key': KEY, 'attempt': 3, 'status': 'DONE'}
 
 
@@ -85,6 +87,23 @@ def test_owner_retry_then_spot_retry_keeps_attempts_rising(store):
     assert store.claim(KEY, worker.aws_attempt({**offset, 'AWS_BATCH_JOB_ATTEMPT': '1'}), NOW)
     assert store.claim(KEY, worker.aws_attempt({**offset, 'AWS_BATCH_JOB_ATTEMPT': '2'}), NOW)
     assert store.get_job(KEY)['attempt'] == 3
+
+
+def test_the_claiming_worker_records_its_batch_job_id_when_the_api_did_not(store, monkeypatch):
+    # Final review M2: SubmitJob returned, then the api Lambda timed out
+    # before writing the id. Reconcile must be able to find this run.
+    monkeypatch.setattr(worker, '_run', lambda *a, **k: 'DONE')
+    assert worker.run_job(KEY, store, sink=None, attempt=1, backend='aws', runner_job_id='batch-123') == 'DONE'
+    assert store.get_job(KEY)['runnerJobId'] == 'batch-123'
+
+
+def test_a_failed_id_write_does_not_stop_the_run(store, monkeypatch):
+    monkeypatch.setattr(worker, '_run', lambda *a, **k: 'DONE')
+
+    def broken(*a, **k):
+        raise RuntimeError('throttled')
+    monkeypatch.setattr(store, 'note_runner_job_id', broken)
+    assert worker.run_job(KEY, store, sink=None, attempt=1, backend='aws', runner_job_id='batch-123') == 'DONE'
 
 
 def test_h2_end_to_end_on_dynamodb_and_s3():

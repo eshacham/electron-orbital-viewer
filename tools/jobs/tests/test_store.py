@@ -396,3 +396,16 @@ def test_month_charges_follow_the_charge_not_the_record(store):
     assert store.month_charges('2026-12') == []
     for month in ('2026-10', '2026-11'):
         assert sum(c['micros'] for c in store.month_charges(month)) == store.meter(month)['spent']
+
+
+def test_a_worker_records_its_own_batch_job_id_only_where_none_is(store):
+    # Final review M2: the api can lose the id SubmitJob returned (a timeout
+    # after the call); the worker that claimed the job writes it instead.
+    store.create_job(record())
+    store.claim('a' * 64, 1, NOW)
+    assert not store.note_runner_job_id('a' * 64, 'job-1', attempt=2)       # not this attempt's record
+    assert store.note_runner_job_id('a' * 64, 'job-1', attempt=1)
+    assert store.get_job('a' * 64)['runnerJobId'] == 'job-1'
+    assert not store.note_runner_job_id('a' * 64, 'job-2', attempt=1)       # never replaces one
+    assert store.get_job('a' * 64)['runnerJobId'] == 'job-1'
+    assert not store.note_runner_job_id('b' * 64, 'job-3', attempt=1)       # no such record

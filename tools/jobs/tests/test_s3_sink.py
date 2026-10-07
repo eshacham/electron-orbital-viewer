@@ -29,7 +29,12 @@ def test_layout_and_headers(s3):
     head = s3.head_object(Bucket=BUCKET, Key=f'molecules/jobs/{KEY}/attempts/2/output.log')
     assert head['ContentType'] == 'text/plain; charset=utf-8' and head['CacheControl'] == 'no-cache'
     meta = s3.head_object(Bucket=BUCKET, Key=f'molecules/jobs/{KEY}/meta.json')
-    assert meta['ContentType'] == 'application/json' and 'immutable' in meta['CacheControl']
+    # Final review M9: a root file may yet be deleted and rewritten (D7 clears
+    # a partial root), so it is revalidated, never pinned at the edge for a
+    # year; only done.json, which nothing ever clears, is immutable.
+    assert meta['ContentType'] == 'application/json' and meta['CacheControl'] == 'no-cache'
+    done = s3.head_object(Bucket=BUCKET, Key=f'molecules/jobs/{KEY}/done.json')
+    assert 'immutable' in done['CacheControl']
     gz = s3.head_object(Bucket=BUCKET, Key=f'molecules/jobs/{KEY}/density.bin.gz')
     assert gz['ContentType'] == 'application/octet-stream' and 'ContentEncoding' not in gz
     assert s3.get_object(Bucket=BUCKET, Key=f'molecules/jobs/{KEY}/done.json')['Body'].read() == b'{"files": {}}'

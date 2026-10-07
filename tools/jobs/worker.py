@@ -131,9 +131,20 @@ class Progress:
         return out
 
 
-def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, heartbeat_seconds=30, image_digest='local'):
+def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, heartbeat_seconds=30, image_digest='local',
+            runner_job_id=None):
     if not store.claim(key, attempt, utc_now()):
         return 'duplicate'
+    if runner_job_id:
+        # Final review M2: the api can lose the id SubmitJob returned (its
+        # Lambda timing out after the call), and reconcile finds a run by
+        # that id; written only where none is. A failure here costs that
+        # safety net, not the run.
+        try:
+            store.note_runner_job_id(key, runner_job_id, attempt)
+        except Exception as e:
+            print(f'worker: could not record Batch job {runner_job_id} for {key[:8]} ({type(e).__name__}: {e})',
+                  file=sys.stderr)
     work = Path(tempfile.mkdtemp(prefix=f'job-{key[:8]}-'))
     try:
         return _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work)
@@ -429,7 +440,7 @@ def main(argv=None, environ=None):
         # D18: a local run has no task metadata to ask; it stays labelled 'local'.
         digest = environ.get('JOBS_IMAGE_DIGEST', 'local')
     status = run_job(args.key, store, sink, attempt=attempt, backend=backend, grid_points=grid,
-                     image_digest=digest)
+                     image_digest=digest, runner_job_id=environ.get('AWS_BATCH_JOB_ID') if args.aws else None)
     # In AWS the line lands in CloudWatch: structured, with the job key (spec §11).
     print(json.dumps({'key': args.key, 'attempt': attempt, 'status': status}) if args.aws else status)
     # D3: a superseded attempt is not a failure (Ruling T5-b); on AWS a

@@ -82,6 +82,22 @@ def test_runner_failure_marks_the_job_failed_and_releases_the_money(api):
     assert api.store.meter('2026-10')['reserved'] == 0
 
 
+def test_a_failure_to_record_the_batch_job_id_is_not_a_submit_failure(api):
+    # Final review M2: SubmitJob succeeded, so the job will run (its worker
+    # records its own id); marking it submit-failed would discard that run.
+    original = api.store.update_job
+
+    def flaky(key, changes, *a, **k):
+        if 'runnerJobId' in changes:
+            raise RuntimeError('DynamoDB timed out')
+        return original(key, changes, *a, **k)
+    api.store.update_job = flaky
+    status, body = call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    assert status == 500 and body['error']['code'] == 'internal-error'
+    rec = api.store.get_job(WATER_KEY)
+    assert rec['status'] == 'QUEUED' and rec['error'] is None and not rec['settled']
+
+
 def test_paused_refuses_new_jobs_but_not_known_ones(api):
     call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
     api.store.set_generation_enabled(False)

@@ -286,6 +286,21 @@ class DynamoStore:
             return False                     # another reconcile settled it first
         raise RuntimeError(f'settle transaction cancelled: {codes}')
 
+    def note_runner_job_id(self, key, job_id, attempt):
+        # new_record stores runnerJobId as NULL, so "none yet" is either type.
+        try:
+            self.db.update_item(
+                TableName=self.table, Key={'pk': {'S': key}}, UpdateExpression='SET #rj = :id',
+                ConditionExpression='attribute_exists(pk) AND #at = :at AND '
+                                    '(attribute_not_exists(#rj) OR attribute_type(#rj, :null))',
+                ExpressionAttributeNames={'#rj': 'runnerJobId', '#at': 'attempt'},
+                ExpressionAttributeValues={':id': {'S': job_id}, ':at': _n(attempt), ':null': {'S': 'NULL'}})
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                return False
+            raise
+        return True
+
     def list_jobs(self, month, status=None):
         # The byMonth index is eventually consistent (a GSI has no consistent
         # read): a job submitted a moment ago may be missing from the list

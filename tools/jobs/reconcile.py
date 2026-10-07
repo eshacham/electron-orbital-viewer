@@ -9,14 +9,27 @@ Rules:
 - Batch job ended (SUCCEEDED/FAILED) and the worker never wrote DONE or
   FAILED → FAILED with Batch's reason. Then settle at billed seconds.
 - Batch job waiting (SUBMITTED/PENDING/RUNNABLE) for over RUNNABLE_LIMIT
-  since it was created or since its last attempt stopped → terminated,
-  FAILED `no-capacity`, settled at what its attempts cost (usually $0).
+  since it was created, since its last attempt stopped, or since this app's
+  own last job on the same queue ended → terminated, FAILED `no-capacity`,
+  settled at what its attempts cost (usually $0). Unless the wait is this
+  app's own doing: each compute environment holds MAX_VCPUS, so a job
+  queued behind the owner's own running jobs (one XL fills a queue) waits
+  on, however long (final review I1). Only jobs running or ahead of it in
+  the queue count, so two waiting jobs never excuse each other.
 - Batch waiting or starting while the record says RUNNING is a Spot retry
   in progress: the record is left alone (the worker's claim admits the next
   attempt; rewriting the status here would race that claim).
 - A record still QUEUED with no Batch job id ten minutes after submission
   (the api Lambda died between the transaction and SubmitJob) → FAILED,
-  settled at $0.
+  settled at $0. A worker that starts after all finds the record FAILED
+  and runs nothing. One that claimed it records its own Batch job id
+  (AWS_BATCH_JOB_ID), so a RUNNING record without one is a worker whose
+  write failed: left alone, like a forgotten Batch job, for a day.
+- A FAILED or DONE record with no Batch job id that was never settled (the
+  api's submit-failed write landed and its settle did not) → settled ten
+  minutes after submission at what its worker reported running (nothing,
+  for a submit Batch refused). Its reservation would otherwise be held,
+  and every owner retry refused, for ever (final review M1).
 - A record with a Batch job id that Batch no longer describes, a day after
   submission (Batch forgets a job about a week after it ends, so an event
   and every sweep since were missed) → FAILED `batch-lost`, or left DONE if
@@ -27,6 +40,11 @@ Rules:
   stoppedAt plus 60 s for the image pull. Each attempt at the job's
   capacity price, with Fargate's one-minute minimum.
 
+The sweep reads the current and the previous month; once a day (its run in
+the first quarter hour after midnight UTC) it also scans every month for an
+unsettled record, so one that a month-long reconcile outage left behind is
+still closed out (final review recommendation 5).
+
 Every decision is taken on a fresh read of the record, and only about the
 Batch job the evidence describes, for the attempt that read found: the
 sweep's list can predate an event's settlement and an owner's retry, and
@@ -36,6 +54,7 @@ reported and skipped; the rest of the sweep and its alert carry on.
 """
 from datetime import datetime, timedelta, timezone
 
+from jobs.batch_runner import MAX_VCPUS
 from jobs.model import ACTIVE, iso, month_of, utc_now
 from jobs.prices import billed_seconds, cost_micros
 
@@ -48,6 +67,9 @@ PULL_ALLOWANCE_SECONDS = 60
 BATCH_LOST_SECONDS = 24 * 3600
 WAITING = {'SUBMITTED', 'PENDING', 'RUNNABLE'}
 ENDED = {'SUCCEEDED', 'FAILED'}
+# The sweep's once-a-day look across every month runs in this UTC hour's
+# first quarter: the 15-minute schedule puts exactly one sweep there.
+DEEP_SWEEP_HOUR = 0
 
 
 def _ms(value):
@@ -95,6 +117,24 @@ def _reported_cost_micros(record: dict) -> int:
     s = record['sizing']
     seconds = max(0.0, (_parse(last) - _parse(start)).total_seconds()) + PULL_ALLOWANCE_SECONDS
     return cost_micros(s['capacity'], s['vcpu'], s['memoryGB'], billed_seconds(seconds))
+
+
+def own_queue(rec: dict, others: list) -> tuple[int, str | None]:
+    """What this app's own jobs are doing on `rec`'s queue: the vCPUs held
+    by those running there or queued ahead of it, and when the last one
+    there to end ended (None if none has). A job behind `rec` holds nothing
+    it needs, so two waiting jobs never excuse each other for ever."""
+    capacity, place = rec['sizing']['capacity'], (rec['submittedAt'], rec['key'])
+    held, freed = 0, None
+    for o in others:
+        if o['key'] == rec['key'] or o['sizing']['capacity'] != capacity:
+            continue
+        if o['status'] in ACTIVE:
+            if o['status'] == 'RUNNING' or (o['submittedAt'], o['key']) < place:
+                held += o['sizing']['vcpu']
+        elif o.get('endedAt') and (freed is None or o['endedAt'] > freed):
+            freed = o['endedAt']
+    return held, freed
 
 
 def failure(batch_job: dict) -> dict:
@@ -164,29 +204,46 @@ class Reconciler:
 
     def _no_batch_job(self, rec, now):
         age = now - _parse(rec['submittedAt'])
-        if not rec.get('runnerJobId'):
-            if rec['status'] in ACTIVE and age > timedelta(seconds=SUBMIT_GRACE_SECONDS):
-                _, over = self._fail_and_settle(rec, {'code': 'submit-lost',
-                                                      'message': 'the job was never handed to AWS Batch'}, 0)
+        job_id = rec.get('runnerJobId')
+        if not job_id and rec['status'] in ('QUEUED', 'STARTING'):
+            if age > timedelta(seconds=SUBMIT_GRACE_SECONDS):
+                _, over = self._fail_and_settle(rec, {'code': 'submit-lost', 'message':
+                                                      'no AWS Batch job was recorded for it within '
+                                                      f'{SUBMIT_GRACE_SECONDS // 60} minutes of submission'}, 0)
                 return 'failed-submit-lost', over
             return 'no-batch-job', None
+        if not job_id and rec['status'] not in ACTIVE:
+            # M1: ended but never settled, and no claim can run it now (a
+            # claim needs QUEUED or STARTING): close the money out.
+            if age > timedelta(seconds=SUBMIT_GRACE_SECONDS):
+                _, over = self._settle(rec, _reported_cost_micros(rec))
+                return 'settled-no-batch-job', over
+            return 'no-batch-job', None
+        # A Batch job id Batch no longer describes, or (M2) a RUNNING record
+        # whose worker could not write its id down: a day outlasts any
+        # job's every attempt, after which nothing of it can still run.
         if age <= timedelta(seconds=BATCH_LOST_SECONDS):
             return 'no-batch-job', None
         cost = _reported_cost_micros(rec)
         if rec['status'] in ACTIVE:
+            which = f'AWS Batch no longer knows job {job_id}' if job_id else \
+                'its AWS Batch job id was never recorded and its worker has gone quiet'
             _, over = self._fail_and_settle(rec, {'code': 'batch-lost', 'message':
-                                                  f'AWS Batch no longer knows job {rec["runnerJobId"]}, so how it '
-                                                  'ended is unknown; charged for what the worker reported running.'},
-                                            cost)
+                                                  f'{which}, so how it ended is unknown; charged for what the '
+                                                  'worker reported running.'}, cost)
             return 'failed-batch-lost', over
         # The worker wrote its result but the settlement was missed: the
         # result stands, only the money is closed out.
         _, over = self._settle(rec, cost)
         return 'settled-batch-lost', over
 
-    def _reconcile(self, record, batch_job):
+    def _months(self, now):
+        return sorted({month_of(now), month_of(now.replace(day=1) - timedelta(days=1))})
+
+    def _reconcile(self, record, batch_job, others=None):
         """Returns (outcome, the record as re-read before acting, the
-        over-reservation line or None)."""
+        over-reservation line or None). `others` is the sweep's list of this
+        and last month's records; an event lists them only if it needs them."""
         now = self.now()
         # The caller's copy may predate an event's settlement and an owner's
         # retry (the sweep lists, describes, then acts): decide on a fresh
@@ -214,16 +271,30 @@ class Reconciler:
             self.store.update_job(key, {'status': 'STARTING'}, expect_status={'QUEUED'}, attempt=rec['attempt'])
             stops = [a['stoppedAt'] for a in batch_job.get('attempts', []) if a.get('stoppedAt')]
             since = _ms(max([batch_job['createdAt'], *stops]))
-            if status in WAITING and now - since > timedelta(seconds=RUNNABLE_LIMIT_SECONDS):
-                minutes = RUNNABLE_LIMIT_SECONDS // 60
+            limit = timedelta(seconds=RUNNABLE_LIMIT_SECONDS)
+            if status in WAITING and now - since > limit:
+                if others is None:
+                    others = [r for m in self._months(now) for r in self.store.list_jobs(m)]
+                held, freed = own_queue(rec, others)
+                if held + rec['sizing']['vcpu'] > MAX_VCPUS:
+                    return 'waiting-own-jobs', rec, None     # the queue is full of our own work
+                if freed:
+                    since = max(since, _parse(freed))         # room may only just have been made
+            if status in WAITING and now - since > limit:
+                s, minutes = rec['sizing'], RUNNABLE_LIMIT_SECONDS // 60
                 self.batch.terminate_job(jobId=batch_job['jobId'],
                                          reason=f'No Fargate capacity for {minutes} minutes (reconcile)')
                 cost = job_cost_micros(rec, batch_job, self.ecs)
                 spent = ('nothing ran, so nothing was charged' if cost == 0 else
                          f'only its earlier, interrupted attempts ran, and they were charged {_usd(cost)}')
+                fargate = 'Fargate Spot' if s['capacity'] == 'spot' else 'Fargate'
                 _, over = self._fail_and_settle(rec, {'code': 'no-capacity', 'message':
-                                                      f'AWS had no Fargate capacity for this size for {minutes} '
-                                                      f'minutes; {spent}. Retry later.'}, cost)
+                                                      f'AWS Batch could not start it for {minutes} minutes: '
+                                                      f'{fargate} had no room for {s["vcpu"]} vCPU / '
+                                                      f'{s["memoryGB"]} GB (AWS capacity, or the account\'s '
+                                                      "Fargate vCPU quota; this app's own jobs were not holding "
+                                                      f'the queue\'s {MAX_VCPUS} vCPUs); {spent}. Retry later.'},
+                                                cost)
                 return 'failed-no-capacity', rec, over
             return 'waiting', rec, None
         return 'running', rec, None
@@ -253,16 +324,19 @@ class Reconciler:
         if result.startswith('error: '):
             return f'reconcile could not check it ({result[len("error: "):]}); the next sweep tries again'
         if result == 'failed-no-capacity':
-            return (f'no Fargate capacity for {RUNNABLE_LIMIT_SECONDS // 60} minutes: its Batch job was '
-                    'terminated and the job FAILED no-capacity')
+            return (f'no Fargate capacity for {RUNNABLE_LIMIT_SECONDS // 60} minutes, with none of this app\'s own '
+                    'jobs holding its queue: its Batch job was terminated and the job FAILED no-capacity')
         if result == 'failed-submit-lost':
-            return ('never handed to AWS Batch (the api stopped between its transaction and SubmitJob): '
-                    'FAILED submit-lost')
+            return ('no AWS Batch job recorded (the api stopped between its transaction and SubmitJob, or before '
+                    'writing the id down): FAILED submit-lost')
+        if result == 'settled-no-batch-job':
+            return (f'{rec["status"]} with no AWS Batch job recorded and never settled (a settle that failed): '
+                    'settled now at what its worker reported running')
+        known = f'job {rec["runnerJobId"]}' if rec.get('runnerJobId') else 'its job (its id was never recorded)'
         if result == 'failed-batch-lost':
-            return (f'AWS Batch no longer knows job {rec["runnerJobId"]}: FAILED batch-lost, charged what its '
-                    'worker reported running')
+            return f'AWS Batch no longer knows {known}: FAILED batch-lost, charged what its worker reported running'
         if result == 'settled-batch-lost':
-            return (f'AWS Batch no longer knows job {rec["runnerJobId"]} and the {rec["status"]} job was never '
+            return (f'AWS Batch no longer knows {known} and the {rec["status"]} job was never '
                     'settled: settled now at what its worker reported running')
         if result == 'settled' and rec['status'] in ACTIVE:
             return ('Batch ended it without the worker reporting, and no Batch event settled it (an event was '
@@ -277,9 +351,13 @@ class Reconciler:
 
     def sweep(self) -> dict:
         now = self.now()
-        months = sorted({month_of(now), month_of(now.replace(day=1) - timedelta(days=1))})
-        records = [r for m in months for r in self.store.list_jobs(m)
-                   if r['status'] in ACTIVE or not r['settled']]
+        months = self._months(now)
+        everything = [r for m in months for r in self.store.list_jobs(m)]
+        records = [r for r in everything if r['status'] in ACTIVE or not r['settled']]
+        if now.hour == DEEP_SWEEP_HOUR and now.minute < 15:
+            # Recommendation 5: a Scan, so once a day, not every sweep.
+            records += [r for r in self.store.jobs_with_backend('aws')
+                        if r['month'] < months[0] and (r['status'] in ACTIVE or not r['settled'])]
         errors = {}
         jobs = self._describe([r.get('runnerJobId') for r in records], errors)
         outcome, stale = {}, []
@@ -289,7 +367,7 @@ class Reconciler:
                 result = errors[r['runnerJobId']]
             else:
                 try:
-                    result, rec, over = self._reconcile(r, jobs.get(r.get('runnerJobId')))
+                    result, rec, over = self._reconcile(r, jobs.get(r.get('runnerJobId')), everything)
                 except Exception as e:
                     # One job's failure (a throttle, ECS gone with its compute
                     # environment) must not cost every later job its check

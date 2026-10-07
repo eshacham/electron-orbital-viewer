@@ -61,6 +61,9 @@ class Store(Protocol):
     # `attempt`, when given, settles only that attempt: a reconciler's cost
     # is for one attempt's Batch job, never for a retry that replaced it.
     def settle(self, key: str, actual_micros: int, attempt: int | None = None) -> bool: ...
+    # The worker's own Batch job id, written only where none is yet (the api
+    # can lose the one SubmitJob returned) and only under its own attempt.
+    def note_runner_job_id(self, key: str, job_id: str, attempt: int) -> bool: ...
     def list_jobs(self, month: str, status: str | None = None) -> list[dict]: ...
     # Every record a backend owns, across all months: what LocalRunner's
     # start-up sweep reads (I1). 6B-3's DynamoStore implements it or, if
@@ -217,6 +220,15 @@ class FileStore:
             # running total, which spans months after a retry.
             rec.update({'settled': True, 'actualMicros': rec['actualMicros'] + actual_micros,
                         'charges': rec.get('charges', []) + [charge(rec, actual_micros)]})
+            self._write(self._job_path(key), rec)
+            return True
+
+    def note_runner_job_id(self, key, job_id, attempt):
+        with self._locked():
+            rec = self.get_job(key)
+            if rec is None or rec.get('runnerJobId') or rec['attempt'] != attempt:
+                return False
+            rec['runnerJobId'] = job_id
             self._write(self._job_path(key), rec)
             return True
 

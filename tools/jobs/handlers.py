@@ -194,7 +194,7 @@ class Api:
                 return 200, public_view(record)     # lost a race with an identical submission
             status = 201
         try:
-            self.store.update_job(p['key'], {'runnerJobId': self.runner.submit(record)})
+            runner_job_id = self.runner.submit(record)
         except Exception as e:                       # the runner's own error, shown to the owner verbatim
             # Guarded: only mark FAILED (and release the reservation) if the
             # job is still the one we just queued, under this same attempt —
@@ -205,6 +205,11 @@ class Api:
                 expect_status={'QUEUED', 'STARTING'}, attempt=record['attempt'])
             if failed:
                 self.store.settle(p['key'], 0)
+        else:
+            # Outside the try (final review M2): the runner has the job now, so
+            # failing to write its id down is not a failed submit. It raises
+            # to the catch-all (500); the worker records its own id at claim.
+            self.store.update_job(p['key'], {'runnerJobId': runner_job_id})
         return status, public_view(self.store.get_job(p['key']))
 
     def get(self, key):

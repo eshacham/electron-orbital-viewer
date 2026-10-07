@@ -3,8 +3,17 @@
 
 Result files and done.json use S3's conditional write (If-None-Match: *):
 a root file, once written, is never replaced, even by a second worker
-racing the first. Content types and cache headers match publish.py's, so
-the app reads a computed molecule exactly as it reads the library.
+racing the first. Content types match publish.py's, so the app reads a
+computed molecule exactly as it reads the library.
+
+Cache headers do not (final review M9): until done.json exists, a root is
+not final, since D7's clear_partial deletes a reclaimed attempt's partial
+files and the next attempt writes them again. A file fetched in between and
+cached as immutable would stay at the edge for a year. So the root files
+are `no-cache` (CloudFront and browsers revalidate by ETag, which is cheap
+when nothing changed) and only done.json, which nothing ever deletes, is
+immutable. The app reads nothing at the root before done.json, so viewers
+saw no difference either way; this keeps "never overwritten" true at the edge.
 """
 from botocore.exceptions import ClientError
 
@@ -50,10 +59,10 @@ class S3Sink:
                 return None
             raise
 
-    def put_result(self, key, name, data):
+    def put_result(self, key, name, data, cache_control=NO_CACHE):
         try:
             self.s3.put_object(Bucket=self.bucket, Key=f'{PREFIX}/{key}/{name}', Body=data, IfNoneMatch='*',
-                               ContentType=content_type(name), CacheControl=IMMUTABLE)
+                               ContentType=content_type(name), CacheControl=cache_control)
         except ClientError as e:
             if e.response['Error']['Code'] in ('PreconditionFailed', 'ConditionalRequestConflict'):
                 raise FileExistsError(f's3://{self.bucket}/{PREFIX}/{key}/{name} already exists')
@@ -68,7 +77,7 @@ class S3Sink:
             raise
 
     def put_done(self, key, data):
-        self.put_result(key, 'done.json', data)
+        self.put_result(key, 'done.json', data, cache_control=IMMUTABLE)
 
     def _root_exists(self, key, name):
         try:
