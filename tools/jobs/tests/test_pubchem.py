@@ -83,7 +83,7 @@ def test_network_failure_is_pubchem_unavailable():
         raise OSError('timed out')
     with pytest.raises(JobRefused) as e:
         resolve('name', 'water', down)
-    assert e.value.code == 'pubchem-unavailable' and e.value.status == 503
+    assert e.value.code == 'pubchem-unavailable' and e.value.status == 424
 
 
 def test_server_error_is_pubchem_unavailable():
@@ -153,7 +153,7 @@ def test_an_unreadable_200_is_pubchem_unavailable(url, body):
     dropped the connection instead of answering."""
     with pytest.raises(JobRefused) as e:
         resolve('name', 'water', _answers_at(url, body))
-    assert e.value.code == 'pubchem-unavailable' and e.value.status == 503
+    assert e.value.code == 'pubchem-unavailable' and e.value.status == 424
     assert 'cannot read' in e.value.message
 
 
@@ -164,4 +164,12 @@ def test_a_truncated_response_is_pubchem_unavailable():
         raise http.client.IncompleteRead(b'{"Identif')
     with pytest.raises(JobRefused) as e:
         resolve('name', 'water', cut_off)
-    assert e.value.code == 'pubchem-unavailable' and e.value.status == 503
+    assert e.value.code == 'pubchem-unavailable' and e.value.status == 424
+
+
+def test_the_three_lookups_fit_inside_the_api_lambdas_timeout():
+    # Final review M3: three calls at 10 s each could outlast the api
+    # Lambda's 29 s, and the owner got API Gateway's bare 503 instead of
+    # this module's answer. Name, SDF and title: three calls at most.
+    from jobs import pubchem
+    assert 3 * pubchem.TIMEOUT_SECONDS <= 20

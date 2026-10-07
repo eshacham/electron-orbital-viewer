@@ -57,7 +57,7 @@ def test_cached_name_needs_no_pubchem(api):
 
     def down(*a, **k):
         from jobs.errors import JobRefused
-        raise JobRefused('pubchem-unavailable', 'down', 503)
+        raise JobRefused('pubchem-unavailable', 'down', 424)
     api.resolve = down
     status, body = call(api, 'POST', '/api/v1/jobs/preview', {'recipe': 'single', 'molecule': {'name': ' water '}})
     assert status == 200 and body['key'] == WATER_KEY
@@ -103,7 +103,7 @@ def test_paused_refuses_new_jobs_but_not_known_ones(api):
     api.store.set_generation_enabled(False)
     assert call(api, 'POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})[0] == 200
     status, body = call(api, 'POST', '/api/v1/jobs', {'recipe': 'optimise', 'molecule': {'xyz': WATER_XYZ}})
-    assert status == 503 and body['error']['code'] == 'paused'
+    assert status == 409 and body['error']['code'] == 'paused'          # not 5xx: the Api5xx alarm (M3)
 
 
 def test_budget_refusal(api):
@@ -275,12 +275,14 @@ def test_a_charge_dated_after_its_month_lands_on_the_months_last_day(api):
 
 # --- final-review fix wave (I2) --------------------------------------------------
 
-def test_pubchem_html_with_200_is_a_503_not_a_dropped_connection(tmp_path):
+def test_pubchem_html_with_200_is_a_424_not_a_dropped_connection(tmp_path):
     from jobs import pubchem
     api = Api(FileStore(tmp_path), NullRunner(), now=lambda: NOW, backend='local',
               resolve=lambda kind, text: pubchem.resolve(kind, text, fetch=lambda url, data=None: (200, b'<html>')))
     status, body = call(api, 'POST', '/api/v1/jobs/preview', {'recipe': 'single', 'molecule': {'name': 'water'}})
-    assert status == 503 and body['error']['code'] == 'pubchem-unavailable'
+    # 424, not 5xx (final review M3): a PubChem outage is not this API failing,
+    # and the Api5xx alarm emails the owner for every 5xx.
+    assert status == 424 and body['error']['code'] == 'pubchem-unavailable'
 
 
 def test_an_unexpected_error_is_a_500_json_answer(api, monkeypatch, capsys):

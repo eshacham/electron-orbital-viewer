@@ -16,7 +16,13 @@ from jobs.elements import atomic_number
 from jobs.errors import JobRefused
 
 BASE = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
-TIMEOUT_SECONDS = 10
+# Per call; a resolution makes at most three (name, SDF, title), and all of
+# them must finish well inside the api Lambda's 29 s, or the owner gets API
+# Gateway's bare 503 instead of this module's answer (final review M3).
+TIMEOUT_SECONDS = 6
+# 424 Failed Dependency, not 503: a PubChem outage is not this API failing,
+# and the Api5xx alarm emails the owner for every 5xx (final review M3).
+UNAVAILABLE = 424
 Fetch = Callable[[str, 'bytes | None'], 'tuple[int, bytes]']
 # What a body this phase cannot read raises on its way through json, the SDF
 # reader or the dict lookups: an HTML error page sent with HTTP 200 by a
@@ -44,11 +50,13 @@ def _get(fetch, url, data=None):
     try:
         status, body = fetch(url, data)
     except OSError as e:
-        raise JobRefused('pubchem-unavailable', f'PubChem did not answer ({e}); try again, or paste an XYZ', 503)
+        raise JobRefused('pubchem-unavailable', f'PubChem did not answer ({e}); try again, or paste an XYZ',
+                         UNAVAILABLE)
     except http.client.HTTPException as e:      # IncompleteRead, BadStatusLine: the answer broke off
-        raise JobRefused('pubchem-unavailable', f'{UNREADABLE_MESSAGE} ({type(e).__name__})', 503)
+        raise JobRefused('pubchem-unavailable', f'{UNREADABLE_MESSAGE} ({type(e).__name__})', UNAVAILABLE)
     if status >= 500 or status in (429, 503):
-        raise JobRefused('pubchem-unavailable', f'PubChem is unavailable (HTTP {status}); try again, or paste an XYZ', 503)
+        raise JobRefused('pubchem-unavailable', f'PubChem is unavailable (HTTP {status}); try again, or paste an XYZ',
+                         UNAVAILABLE)
     return status, body
 
 
@@ -85,7 +93,7 @@ def resolve(kind: str, text: str, fetch: Fetch = urllib_fetch, today: Callable[[
     try:
         return _resolve(kind, text, fetch, today)
     except UNREADABLE as e:
-        raise JobRefused('pubchem-unavailable', f'{UNREADABLE_MESSAGE} ({type(e).__name__})', 503)
+        raise JobRefused('pubchem-unavailable', f'{UNREADABLE_MESSAGE} ({type(e).__name__})', UNAVAILABLE)
 
 
 def _resolve(kind, text, fetch, today):

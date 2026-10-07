@@ -188,8 +188,11 @@ class ComputeStack(Stack):
 
         billing_role = lambda_role('BillingRole', 'billing Lambda: Cost Explorer read, one table write')
         billing_role.add_to_policy(iam.PolicyStatement(actions=['ce:GetCostAndUsage'], resources=['*']))
-        billing_role.add_to_policy(iam.PolicyStatement(actions=['dynamodb:PutItem', 'dynamodb:GetItem'],
-                                                       resources=[table.table_arn]))
+        # Its own BILLING#<month> items only (final review M4): on the whole
+        # table, PutItem could replace a meter or a job record.
+        billing_role.add_to_policy(iam.PolicyStatement(
+            actions=['dynamodb:PutItem', 'dynamodb:GetItem'], resources=[table.table_arn],
+            conditions={'ForAllValues:StringLike': {'dynamodb:LeadingKeys': ['BILLING#*']}}))
         billing_fn = function('BillingFunction', 'jobs.lambdas.billing_handler', billing_role, 30, {})
 
         queue_arns = [queues['spot'].job_queue_arn, queues['on-demand'].job_queue_arn]

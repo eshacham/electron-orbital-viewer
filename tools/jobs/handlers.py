@@ -170,7 +170,9 @@ class Api:
         if existing is not None and not (existing['status'] == 'FAILED' and p['retry']):
             return 200, public_view(existing)
         if not self.store.generation_enabled():
-            raise JobRefused('paused', 'Generation is paused by the owner (infra/jobs.sh resume)', 503)
+            # 409, not 503: an answer the owner chose, not a fault, and the
+            # Api5xx alarm emails for every 5xx (final review M3).
+            raise JobRefused('paused', 'Generation is paused by the owner (infra/jobs.sh resume)', 409)
         decision = self._decide(p['job'])
         if existing is not None:
             try:

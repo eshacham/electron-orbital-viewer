@@ -311,3 +311,59 @@ def test_api_role_may_tag_what_its_submit_names(template):
     assert all(r in tag['Resource'] for r in submit['Resource'])
     jobs = [r for r in tag['Resource'] if r not in submit['Resource']]
     assert len(jobs) == 1 and json.dumps(jobs[0]).endswith(':job/*"]]}')
+
+
+# -- Final review M3–M6 -------------------------------------------------------
+
+
+def statements_of(template, description_regexp):
+    (role_id,) = template.find_resources('AWS::IAM::Role',
+                                         {'Properties': {'Description': Match.string_like_regexp(description_regexp)}})
+    return [s for p in resources(template, 'AWS::IAM::Policy') if {'Ref': role_id} in p['Properties']['Roles']
+            for s in p['Properties']['PolicyDocument']['Statement']]
+
+
+def test_the_5xx_alarm_fires_on_one_and_expected_refusals_are_not_5xx(template, tmp_path):
+    # M3: every 5xx emails the owner, so the API's expected answers must not
+    # be one: paused (the owner's own switch) and a PubChem outage are 4xx.
+    (alarm,) = [a for a in props(template, 'AWS::CloudWatch::Alarm') if a['MetricName'] == '5xx']
+    assert alarm['Threshold'] == 1 and alarm['EvaluationPeriods'] == 1
+    from jobs import pubchem
+    from jobs.handlers import Api
+    from jobs.store import FileStore
+    assert pubchem.UNAVAILABLE < 500
+    store = FileStore(tmp_path)
+    store.set_generation_enabled(False)
+    xyz = '3\nwater\nO 0 0 0.1178\nH 0 0.7555 -0.4712\nH 0 -0.7555 -0.4712\n'
+    status, body = Api(store, runner=None).handle('POST', '/api/v1/jobs', {},
+                                                  json.dumps({'recipe': 'single', 'molecule': {'xyz': xyz}}).encode())
+    assert body['error']['code'] == 'paused' and status < 500
+
+
+def test_the_billing_role_writes_only_its_own_items(template):
+    # M4: PutItem on the whole table would let the billing Lambda replace a
+    # meter or a job record.
+    (ddb,) = [s for s in statements_of(template, '^billing Lambda') if 'dynamodb:PutItem' in s['Action']]
+    assert ddb['Condition'] == {'ForAllValues:StringLike': {'dynamodb:LeadingKeys': ['BILLING#*']}}
+
+
+def test_the_budget_counts_spend_before_credits_and_refunds(template):
+    # M5: credits net out of the default budget, so a credited account would
+    # never reach 100 % and the deny-SubmitJob action would never fire.
+    (budget,) = props(template, 'AWS::Budgets::Budget')
+    cost_types = budget['Budget']['CostTypes']
+    assert cost_types['IncludeCredit'] is False and cost_types['IncludeRefund'] is False
+
+
+def test_only_this_accounts_services_may_publish_to_the_alert_topic(template):
+    # M6: another account's rule or monitor that knew the topic's ARN could
+    # otherwise email the owner.
+    (policy,) = props(template, 'AWS::SNS::TopicPolicy')
+    statements = policy['PolicyDocument']['Statement']
+    by_service = {s['Principal']['Service']: s for s in statements}
+    assert set(by_service) == {'costalerts.amazonaws.com', 'events.amazonaws.com'} and len(statements) == 2
+    assert by_service['costalerts.amazonaws.com']['Condition'] == {'StringEquals': {'aws:SourceAccount': ACCOUNT}}
+    (failed_rule,) = [rid for rid, r in template.find_resources('AWS::Events::Rule').items()
+                      if r['Properties'].get('EventPattern', {}).get('detail', {}).get('status') == ['FAILED']]
+    assert by_service['events.amazonaws.com']['Condition'] == {
+        'ArnEquals': {'aws:SourceArn': {'Fn::GetAtt': [failed_rule, 'Arn']}}}

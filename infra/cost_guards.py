@@ -18,8 +18,9 @@ the tag has been activated.
 """
 import json
 
-from aws_cdk import Duration, aws_budgets as budgets, aws_ce as ce, aws_cloudwatch as cloudwatch, \
-    aws_cloudwatch_actions as cw_actions, aws_events as events, aws_events_targets as targets, aws_iam as iam
+import jsii
+from aws_cdk import Duration, Stack, aws_budgets as budgets, aws_ce as ce, aws_cloudwatch as cloudwatch, \
+    aws_cloudwatch_actions as cw_actions, aws_events as events, aws_iam as iam
 from constructs import Construct
 
 BUDGET_USD = 10
@@ -27,19 +28,43 @@ BUDGET_EMAIL_PERCENTAGES = (50, 80, 100)
 ANOMALY_IMPACT_USD = 1
 
 
+@jsii.implements(events.IRuleTarget)
+class _TopicTarget:
+    """EventBridge → the alert topic, without the grant aws_events_targets.SnsTopic
+    adds: that one lets any rule in any account publish (final review M6), so
+    add_cost_guards writes its own, conditioned on this rule."""
+
+    def __init__(self, topic, message):
+        self.topic, self.message = topic, message
+
+    def bind(self, rule, id=None):
+        return events.RuleTargetConfig(arn=self.topic.topic_arn, input=self.message)
+
+
 def add_cost_guards(scope: Construct, *, topic, api_role: iam.Role, alert_email: str, functions: dict, api,
                     queue_arns: list, app_tag: str) -> iam.ManagedPolicy:
+    # Each service may publish only on this account's behalf (final review M6):
+    # Cost Anomaly Detection for this account, EventBridge for this one rule.
     topic.add_to_resource_policy(iam.PolicyStatement(
         actions=['sns:Publish'], resources=[topic.topic_arn],
-        principals=[iam.ServicePrincipal('costalerts.amazonaws.com')]))
+        principals=[iam.ServicePrincipal('costalerts.amazonaws.com')],
+        conditions={'StringEquals': {'aws:SourceAccount': Stack.of(scope).account}}))
 
-    events.Rule(scope, 'BatchFailed', description='A Batch job FAILED: email the owner',
-                event_pattern=events.EventPattern(source=['aws.batch'], detail_type=['Batch Job State Change'],
-                                                  detail={'jobQueue': queue_arns, 'status': ['FAILED']}),
-                targets=[targets.SnsTopic(topic, message=events.RuleTargetInput.from_text(
-                    f'Batch job {events.EventField.from_path("$.detail.jobName")} FAILED: '
-                    f'{events.EventField.from_path("$.detail.statusReason")}'))])
+    failed = events.Rule(scope, 'BatchFailed', description='A Batch job FAILED: email the owner',
+                         event_pattern=events.EventPattern(source=['aws.batch'], detail_type=['Batch Job State Change'],
+                                                           detail={'jobQueue': queue_arns, 'status': ['FAILED']}),
+                         targets=[_TopicTarget(topic, events.RuleTargetInput.from_text(
+                             f'Batch job {events.EventField.from_path("$.detail.jobName")} FAILED: '
+                             f'{events.EventField.from_path("$.detail.statusReason")}'))])
+    topic.add_to_resource_policy(iam.PolicyStatement(
+        actions=['sns:Publish'], resources=[topic.topic_arn],
+        principals=[iam.ServicePrincipal('events.amazonaws.com')],
+        conditions={'ArnEquals': {'aws:SourceArn': failed.rule_arn}}))
 
+    # Threshold 1 on purpose (final review M3): every 5xx is a fault worth an
+    # email, because the API's expected refusals are all 4xx, including the
+    # owner's pause (409) and a PubChem outage (424). AWS's 5xx metric cannot
+    # filter by error code, and a custom metric is ruled out.
     action = cw_actions.SnsAction(topic)
     for name, fn in functions.items():
         fn.metric_errors(period=Duration.minutes(5)).create_alarm(
@@ -54,7 +79,11 @@ def add_cost_guards(scope: Construct, *, topic, api_role: iam.Role, alert_email:
     # has no other workload (its only other budget is a zero-spend alert).
     budget = budgets.CfnBudget(scope, 'MonthlyBudget', budget=budgets.CfnBudget.BudgetDataProperty(
         budget_name='electron-orbital-viewer-monthly', budget_type='COST', time_unit='MONTHLY',
-        budget_limit=budgets.CfnBudget.SpendProperty(amount=BUDGET_USD, unit='USD')),
+        budget_limit=budgets.CfnBudget.SpendProperty(amount=BUDGET_USD, unit='USD'),
+        # Spend before credits and refunds (final review M5): by default a
+        # budget nets credits out, so a credited account would never reach
+        # 100 % and the deny-SubmitJob stop would never fire.
+        cost_types=budgets.CfnBudget.CostTypesProperty(include_credit=False, include_refund=False)),
         notifications_with_subscribers=[budgets.CfnBudget.NotificationWithSubscribersProperty(
             notification=budgets.CfnBudget.NotificationProperty(
                 comparison_operator='GREATER_THAN', notification_type='ACTUAL', threshold=pct,
