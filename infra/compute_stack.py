@@ -158,8 +158,18 @@ class ComputeStack(Stack):
             resources=[queues['spot'].job_queue_arn, queues['on-demand'].job_queue_arn,
                        self.format_arn(service='batch', resource='job-definition',
                                        resource_name=f'{job_definition.job_definition_name}:*')]))
+        # SubmitJob with tags (BatchRunner tags every job, for cost allocation)
+        # is also authorised as batch:TagResource, and IAM checks that against
+        # the job definition and the queue the request names as well as the
+        # new job: with job/* alone, the first AWS submit was refused
+        # ("not authorized to perform: batch:TagResource on resource:
+        # …job-definition/WorkerJob…:1", Task 12). Still only this stack's own.
         api_role.add_to_policy(iam.PolicyStatement(
-            actions=['batch:TagResource'], resources=[self.format_arn(service='batch', resource='job', resource_name='*')]))
+            actions=['batch:TagResource'],
+            resources=[self.format_arn(service='batch', resource='job', resource_name='*'),
+                       queues['spot'].job_queue_arn, queues['on-demand'].job_queue_arn,
+                       self.format_arn(service='batch', resource='job-definition',
+                                       resource_name=f'{job_definition.job_definition_name}:*')]))
         api_fn = function('ApiFunction', 'jobs.lambdas.api_handler', api_role, 29, {
             'SPOT_QUEUE': queues['spot'].job_queue_arn, 'ON_DEMAND_QUEUE': queues['on-demand'].job_queue_arn,
             'JOB_DEFINITION': job_definition.job_definition_arn})

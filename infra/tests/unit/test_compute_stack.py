@@ -296,3 +296,18 @@ def test_cost_anomaly_monitor_watches_this_app_when_turned_on():
 
 def test_the_deny_policy_is_an_output_for_jobs_sh(template):
     template.has_output('DenySubmitPolicyArn', {})
+
+
+def test_api_role_may_tag_what_its_submit_names(template):
+    # SubmitJob with tags is also authorised as batch:TagResource, checked
+    # against the job definition and queue in the request, not only the new
+    # job: the first AWS submit (Task 12) was refused on the job definition.
+    (role_id,) = template.find_resources('AWS::IAM::Role', {'Properties': {'Description': Match.string_like_regexp('^api Lambda')}})
+    statements = [s for p in resources(template, 'AWS::IAM::Policy') if {'Ref': role_id} in p['Properties']['Roles']
+                  for s in p['Properties']['PolicyDocument']['Statement']]
+    (submit,) = [s for s in statements if s['Action'] == 'batch:SubmitJob']
+    (tag,) = [s for s in statements if s['Action'] == 'batch:TagResource']
+    assert len(submit['Resource']) == 3                          # the two queues and the job definition
+    assert all(r in tag['Resource'] for r in submit['Resource'])
+    jobs = [r for r in tag['Resource'] if r not in submit['Resource']]
+    assert len(jobs) == 1 and json.dumps(jobs[0]).endswith(':job/*"]]}')
