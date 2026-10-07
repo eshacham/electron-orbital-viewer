@@ -2016,7 +2016,11 @@ AWS"). It ran real jobs, and it refits sizing from them (version 2).
   - `acbe94cda99aac6c` (the final fix wave, commit `ff2f9b4`, under the
     new tag recipe), job definition revision 5;
   - `e6b0c6e3e4b9e81c` (sizing v3, commit `8fbb2fe`), job definition
-    revision 6.
+    revision 6;
+  - `2dd7873233c64661` (v3 review minors, commit `87001ea`), job
+    definition revision 7;
+  - `2de967effa251067` (sizing v4, commit `5763fc6`), job definition
+    revision 8.
 
 ### The verdicts
 
@@ -2278,6 +2282,154 @@ them.
   - caffeine: L, Spot, 1040.2 s, 3121 s timeout, reserve $0.643881.
 - No job was submitted.
 
+### Sizing version 4 (follow-up, 2026-10-07)
+
+```
+m0 0.477  m2 3.98  t0 4.84  t3 42000  t3Step 31000  g 1.5  f2 5360
+speedup(c)       = min(c, 16)^0.867     (SCF, unchanged)
+files_speedup(c) = min(c, 32)^0.631     (the file write, unchanged)
+```
+
+Commit `5763fc6`. **What changed:** only how an optimisation step is
+priced. v3 priced every def2-SVP step at (1 + g) × the direct-SCF single
+point (t3 42 000). That refused caffeine optimise, even though its steps
+(N 246) fit in core on every size. v4 prices each step by its regime on
+the size being tried:
+
+- **In core** (`sizing.step_in_core`): PySCF's own test
+  (`scf.hf._is_mem_enough`: N⁴/1e6 MB of ERIs plus its current RSS under
+  0.95 × max_memory). max_memory is BatchRunner's 80 % of the size. The
+  RSS is replaced by a margin: `HEADROOM` × the predicted working set,
+  1.54 GB at N 246. That puts steps in core up to N 260 on S, 320 on M,
+  465 on L and 655 on XL. Such a step costs
+  (1 + g)(t0 + t3Step·(N/1000)^3.5) / speedup(c).
+- **Otherwise:** v3's direct price, unchanged.
+
+Single points never read t3Step, so every single-point decision is
+exactly v3's (pinned in `test_sizing.py`). g (1.5) and the step count
+(`10 + 2·atoms`) are unchanged too. Three steps cannot fit either, and
+the only evidence on the step count (water: 3 run, 16 predicted) says
+it over-predicts, which is safe.
+
+**The probe** (owner-approved one-off, 2026-10-07):
+
+- Batch job `039fdeca-0478-47a6-b0e3-221fbec4ccde`: L Spot, 16 vCPU /
+  64 GB, job definition rev 7, image `2dd7873233c64661`.
+- Three caffeine def2-SVP steps (SCF + gradient): 52.85 s (14 SCF cycles,
+  cold from the minao guess), 44.53 s (11) and 42.11 s (10).
+- Its line is committed as `tools/jobs/tests/fixtures/aws/caffeine-optimise-probe.json`.
+
+t3Step is fitted to the **slowest** step, not the mean, through min(c,
+16)^0.867, g 1.5 and t0 4.84:
+(52.85 × 16^0.867 / 2.5 − 4.84) / 0.246^3.5 = 31 026, rounded to 31 000.
+Water's and ethanol's steps offer at most −8 845, because t0 dominates
+them. `python -m jobs.calibrate --aws --probe …speedup-probe.json
+--optimise-probe …caffeine-optimise-probe.json …/aws/*/` reproduces
+CONSTANTS (a test checks this), with only g's guard used, as before.
+
+**The probe's SCFs ran direct, not in core.** The submission (the command
+under v3 above) set no `PYSCF_MAX_MEMORY`, so PySCF kept its 4000 MB
+default. Caffeine def2-SVP's ERIs need 3662 MB. In the probe's own image,
+PySCF's RSS at the in-core check was 191 MB (measured locally in
+`2dd7873233c64661` under OrbStack). 3662 + 191 = 3853 MB is not under
+0.95 × 4000 = 3800 MB, so the SCFs ran direct. A real job gets 80 % of the
+size and runs these steps in core. So t3Step is a direct step's cost, an
+**upper bound** for the in-core steps it prices: safe, but probably high.
+v3's direct price for the same step on L is 71.2 s, 35 % over the probe.
+A future optimise probe should set `PYSCF_MAX_MEMORY` (BatchRunner's
+value) in its overrides to measure the regime a real job runs in.
+
+**Residuals** (predicted / measured − 1, on the size each ran on):
+
+| sample | v3 | v4 |
+|---|---|---|
+| probe steps on L (52.85 / 44.53 / 42.11 s) | +35 / +60 / +69 % | −0.08 / +18.6 / +25.4 % |
+| water's steps on S (0.95, 0.84 s) | +611 / +704 % | +608 / +701 % |
+| ethanol's step on S (5.42 s) | +129 % | +101 % |
+| water optimise, S (23.0 s) | +437 % | +435 % |
+| ethanol optimise, S (270 s floor) | +82 % | +67 % |
+| every single point | as v3 | as v3 |
+
+Every AWS job, every one of their steps, and every probe step is inside
+`TIME_HEADROOM` × its v4 prediction.
+
+**Decisions:**
+
+| | v3 | v4 |
+|---|---|---|
+| water single (A) | S spot 15.4 s, 600 s, reserve $0.01788 | unchanged |
+| water optimise (B) | S spot 123.5 s, 600 s, reserve $0.01788 | S spot 123.0 s, 600 s, reserve $0.01788 |
+| ethanol optimise (B) | S spot 492.3 s, 1477 s, reserve $0.0397 | S spot 450.0 s, 1351 s, reserve $0.0365 |
+| benzene single (A) | S spot 520.7 s, 1562 s, reserve $0.0418 | unchanged |
+| caffeine single (A) | L spot 1040.2 s, 3121 s, reserve $0.6439 | unchanged |
+| caffeine optimise (B) | refused too-long (1.4 h on XL, 2.1 h with the margin) | **L on-demand ×1, 4103 s, timeout 7200 s, reserve $1.5167, predicted bill $0.850** |
+| C₆₀-scale single (N 2220) | too-long (18.0 h on XL) | unchanged |
+| C₆₀-scale optimise | too-long (161.2 h on XL) | unchanged (its def2-SVP N 840 is direct on every size) |
+
+**Caffeine optimise in v4:**
+
+- It is priced at 1040 s for the final single point on L (689 s of SCF
+  and 351 s of file writing), plus 58 steps of 52.8 s each. That is
+  4103 s.
+- M fails the time bar. Its steps are 176 s each, about 3.5 h in all.
+- On L, 4103 × 1.5 = 6155 s, which is under the 7200 s ceiling.
+- It is over the 3600 s Spot limit, so it runs on demand with one
+  attempt.
+- The timeout is clamped to the 7200 s ceiling: 1.75× the prediction,
+  not `TIMEOUT_FACTOR`'s 3×.
+- No caffeine optimise job exists yet. A submit **would run**: it would
+  reserve $1.52 of the $8.80 meter, unlike caffeine single, which
+  dedupes to the owner's DONE job.
+
+**Residual risks:**
+
+- **t3Step rests on 3 steps of one molecule, measured direct.** If a
+  real in-core step is as slow as the probe's, the prediction is right.
+  If it is faster, the prediction is high, which is safe.
+- **Wrongly assuming in core.** That would price a direct step by
+  t3Step. At caffeine's N, that matches its measured direct step: 1.35×
+  below v3's direct price, inside `TIME_HEADROOM`. For larger N, no
+  def2-SVP step has been measured, and the worst case is 42 000 / 9 050
+  = 4.6×. The margin (1.54 GB allowed against 191 MB measured) makes this
+  unlikely below the boundaries above.
+- **The step count is unmeasured at caffeine's size.** 58 steps is
+  assumed, and only 3 were run. A caffeine optimisation needing more
+  than about 58 × 1.75 = 100 steps of the probe's cost would time out.
+  `optimisation_steps` caps at 100 and is generous for a PubChem
+  geometry, but nothing measured shows that.
+- **The timeout margin is thin.** Caffeine optimise's timeout is
+  clamped at 1.75× rather than 3×, so a step much slower than the
+  probe's first (a molecule needing far more SCF cycles) has less room.
+- **The ladder-scale optimisations still over-predict.** Water
+  optimise is +435 %, because the step count and t0 dominate. This is
+  unchanged in kind from v3.
+
+**Deployed 2026-10-07 20:32–20:34Z** (`deploy.sh image`, then
+`deploy.sh compute`, with `ANOMALY_MONITOR` unset):
+
+- The image `2de967effa251067` was pushed at 20:32:02Z, with
+  `JOBS_GENERATOR_COMMIT` `5763fc6`.
+- Compute was `UPDATE_COMPLETE` in 35.8 s (6/6): the WorkerJob job
+  definition and the Api, Reconcile and Billing Lambdas.
+- Job definition **rev 8** names the new tag and is the only active
+  revision. The api Lambda's `JOB_DEFINITION` is rev 8.
+- The anomaly monitor `electron-orbital-viewer` (CUSTOM) and its
+  IMMEDIATE subscription are unchanged.
+- ECR lists 8 images until the keep-5 rule expires the oldest.
+- `jobs.sh status` (unchanged after the previews): generation enabled;
+  meter 2026-10 spent $0.0598, reserved $0.0000, committed $0.0598 of
+  $8.80; the budget stop is not attached.
+- Previews (`jobs.sh api POST /api/v1/jobs/preview`) all answer 200,
+  `version 4`:
+  - water single: S, Spot ×3, 15.4 s, 600 s, reserve $0.01788. It
+    dedupes to the DONE `22b6b939b8af`.
+  - caffeine optimise: L, 16 vCPU / 64 GB, **on-demand ×1**, 4103.0 s,
+    1.98 GB, timeout 7200 s, reserve $1.516704. Key `09ae0fa051c6`, no
+    existing job.
+  - caffeine single: L, Spot ×3, 1040.2 s, 3121 s, reserve $0.643881. It
+    dedupes to the owner's DONE `f4e66d7330ed`.
+- No job was submitted.
+
 ### Findings
 
 - **SubmitJob with tags needs `batch:TagResource` on the job definition
@@ -2509,10 +2661,12 @@ calls, and the test's failing `aws`/`docker`/`cdk`/`npm` stand-ins.
   kept.
 - **Still unmeasured:**
   - the 2-thread probe point (budget-skipped);
-  - `g` (no optimisation long enough to fit it), and whether a
-    caffeine-scale optimisation's def2-SVP steps, which run in core
-    (N 246), cost as little as the ladder's. Under v3 caffeine optimise is
-    refused too-long;
+  - `g` (no optimisation long enough to fit it), and what a
+    caffeine-scale def2-SVP step costs **in core**. The v4 probe's steps
+    ran direct (see "Sizing version 4"), so v4's t3Step is an upper bound
+    for them. Under v4 caffeine optimise runs on L on demand;
+  - how many steps a caffeine-scale optimisation really takes (v4 still
+    assumes 58);
   - how the SCF cycle count grows past caffeine's 15 (v3's t3 assumes a
     larger molecule needs about as many);
   - the SCF's saturation for molecules much larger than benzene, which
