@@ -53,7 +53,7 @@
      "retrievedAt": "2026-10-10"
     },
     "sizing": {
-     "version": 3,
+     "version": 4,
      "estimateFor": "fargate",
      "size": "S",
      "vcpu": 2,

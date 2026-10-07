@@ -71,7 +71,7 @@
   "decision": {
    "ok": true,
    "sizing": {
-    "version": 3,
+    "version": 4,
     "estimateFor": "fargate",
     "size": "S",
     "vcpu": 2,

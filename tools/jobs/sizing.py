@@ -12,13 +12,16 @@ to the SCF part: writing files does not care how many electrons were
 unpaired. Version 1 was fitted from local runs (6B-1 Task 11); version 2
 from the AWS ladder and the speedup probe (6B-3 Task 14); version 3 adds the
 owner's caffeine single point on M, the first real direct SCF (6B-3
-follow-up). Every job records the version and the prediction so the fit can
-be checked.
+follow-up); version 4 prices an optimisation step by its regime: a step
+whose ERIs fit in core (step_in_core) by t3Step, from the caffeine
+optimise-steps probe, and otherwise by the direct t3, as before. Every job
+records the version and the prediction so the fit can be checked.
 """
 import math
 from dataclasses import dataclass
 
 from jobs.basis_counts import basis_functions
+from jobs.batch_runner import pyscf_max_memory_mb
 from jobs.errors import JobRefused
 from jobs.prices import cost_micros
 
@@ -31,7 +34,35 @@ class Size:
 
 
 SIZES = (Size('S', 2, 8), Size('M', 4, 16), Size('L', 16, 64), Size('XL', 32, 244))
-SIZING_VERSION = 3
+SIZING_VERSION = 4
+# Version 4, fitted 2026-10-07 (Phase 6B-3 follow-up): version 3's constants and forms, plus t3Step, with
+# `python -m jobs.calibrate --aws --probe tests/fixtures/aws/speedup-probe.json
+#  --optimise-probe tests/fixtures/aws/caffeine-optimise-probe.json tests/fixtures/aws/*/`.
+# Version 3 priced every optimisation step by the direct-SCF t3 (42 000) and so refused caffeine optimise
+# (1.4 h on XL, 2.1 h with the margin, over 2 h), though its def2-SVP steps (N 246) fit in core on every size.
+# - t3Step: the owner-approved caffeine optimise-steps probe (Batch job 039fdeca..., L Spot, 16 vCPU / 64 GB,
+#   job definition rev 7, image 2dd7873233c64661): three def2-SVP steps (SCF + gradient) of 52.85 s (14 SCF
+#   cycles, cold from the minao guess), 44.53 s (11) and 42.11 s (10). The slowest, through the SCF's law
+#   min(c, 16)^0.867 and the deployed g (1.5) and t0: (52.85 x 16^0.867 / 2.5 - 4.84) / 0.246^3.5 = 31 026
+#   -> 31 000. Water's and ethanol's steps on S (N 24 and 72) offer at most -8 845 (t0 dominates them).
+#   Caveat: the probe ran without PYSCF_MAX_MEMORY (PySCF's default 4000 MB), and in the worker image
+#   caffeine def2-SVP's ERIs (3662 MB) plus the RSS at the check (191 MB) miss 0.95 x 4000, so its SCFs ran
+#   DIRECT. 31 000 is therefore a direct step's cost, an upper bound for an in-core one (which a real job
+#   gets: BatchRunner gives PySCF 80 % of the size). The direct t3 for a step stays version 3's (1 + g) x
+#   42 000 form, 71.2 s on L for caffeine: 35 % over this probe, so it too is conservative here.
+# - step_in_core: PySCF's own test with HEADROOM x the predicted working set standing in for its RSS
+#   (1.54 GB at N 246 against the 191 MB measured), so in core up to N 260 on S, 320 on M, 465 on L, 655 on
+#   XL. Wrongly assuming in core prices a direct step by t3Step: at caffeine's N that matches its measured
+#   direct step (the probe), 1.35x below the direct price. The margin is for larger N, where no def2-SVP
+#   step has been measured; the worst case there is t3 / the ladder's in-core t3, 42 000 / 9 050 = 4.6x.
+# - g and the step count are unchanged: g fits -0.29 (guarded to 1.5) and water ran 3 steps of 16 predicted;
+#   nothing measured at caffeine's size contradicts either (3 steps were run, not a whole optimisation).
+# Residuals (predicted / measured - 1): the probe's steps on L -0.08 %, +18.6 %, +25.4 %; water's steps on S
+# +608 % and +701 %, ethanol's +101 %; water optimise +435 % (123.0 s against 23.0 s), ethanol optimise +67 %
+# against its 270 s floor. Every single point predicts as in version 3 (single points never read t3Step).
+# Every AWS job, every step of theirs, and every probe step finishes inside TIME_HEADROOM x its v4
+# prediction (tests/test_sizing.py, which also checks calibrate reproduces these constants).
+#
 # Version 3, fitted 2026-10-07 from 5 AWS Batch jobs on Fargate Linux/ARM64 (Graviton) with
 # `python -m jobs.calibrate --aws --probe tests/fixtures/aws/speedup-probe.json tests/fixtures/aws/*/`
 # (Phase 6B-3 follow-up): version 2's four ladder jobs on S (2 vCPU, Spot; water and benzene single
@@ -66,8 +97,9 @@ SIZING_VERSION = 3
 # -15 % (the probe's) to +56 % (water's), caffeine's +3.7 %. Every AWS job finishes inside TIME_HEADROOM x
 # its v3 prediction on the size it ran on, and HEADROOM x the v3 memory covers every working set
 # (tests/test_sizing.py, which also checks calibrate reproduces these constants from the fixtures).
-# Versions 1 (6B-1 Task 11, this Mac) and 2 (6B-3 Task 14) stay in git history.
-CONSTANTS = {'m0': 0.477, 'm2': 3.98, 't0': 4.84, 't3': 42000.0, 'g': 1.5, 'f2': 5360.0,
+# Versions 1 (6B-1 Task 11, this Mac) and 2 (6B-3 Task 14) stay in git history; version 3 is version 4
+# without t3Step (every step priced direct).
+CONSTANTS = {'m0': 0.477, 'm2': 3.98, 't0': 4.84, 't3': 42000.0, 't3Step': 31000.0, 'g': 1.5, 'f2': 5360.0,
              'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631, 'filesSaturation': 32.0}
 HEADROOM = 2.0
 TIME_HEADROOM = 1.5
@@ -111,13 +143,45 @@ def optimisation_steps(atom_count: int) -> int:
     return min(10 + 2 * atom_count, 100)
 
 
+# MB (1e6 bytes, what PySCF's lib.current_memory and N^4/1e6 count) per GiB
+# (what predicted_memory_gb and every peakMemoryGB count).
+_MB_PER_GIB = 1024 ** 3 / 1e6
+
+
+def step_in_core(n: int, size: Size) -> bool:
+    """Whether an optimisation step at N basis functions keeps its ERIs in
+    core on `size` (version 4).
+
+    PySCF's own test (scf.hf._is_mem_enough): N^4/1e6 MB of 8-fold ERIs plus
+    its current RSS under 0.95 x max_memory, which BatchRunner sets to 80 %
+    of the size (pyscf_max_memory_mb). Sizing cannot know the RSS, so it
+    stands HEADROOM x the predicted working set in for it: 1.54 GB for
+    caffeine at def2-SVP, where the worker image measured 191 MB at that
+    check. The margin errs towards "direct", the slower price: wrongly
+    assuming in core would price a direct step by t3Step, under-predicting it.
+    """
+    allowance = HEADROOM * predicted_memory_gb(n) * _MB_PER_GIB
+    return n ** 4 / 1e6 + allowance < 0.95 * pyscf_max_memory_mb(size.memory_gb)
+
+
+def step_seconds(n: int, size: Size) -> float:
+    """One optimisation step (SCF + gradient) at N basis functions on `size`:
+    (1 + g) x a single point, whose t3 is t3Step when the step's ERIs fit in
+    core (step_in_core) and the direct-SCF t3 otherwise, as version 3 priced
+    every step."""
+    c = CONSTANTS
+    if not step_in_core(n, size):
+        return (1 + c['g']) * single_point_seconds(n, size.vcpu)
+    return (1 + c['g']) * (c['t0'] + c['t3Step'] * (n / 1000) ** 3.5) / speedup(size.vcpu)
+
+
 def predict_parts(job: dict, size: Size) -> dict:
     """The SCF estimate and the file-writing estimate, kept apart (Ruling D14).
 
     `scfSeconds` is the brief's original model: the final single point at
     the property basis, plus (for `optimise`) the optimisation steps at the
-    optimisation basis, all sped up by vCPU count and then scaled by the
-    open-shell factor. `filesSeconds` is the grid the worker writes out at
+    optimisation basis (step_seconds: priced by regime since version 4), all
+    sped up by vCPU count and then scaled by the open-shell factor. `filesSeconds` is the grid the worker writes out at
     the property basis (def2-TZVPD), divided by its own files_speedup and
     not scaled by the open-shell factor, because writing files is
     indifferent to spin.
@@ -125,8 +189,7 @@ def predict_parts(job: dict, size: Size) -> dict:
     atoms, method = job['molecule']['atoms'], job['method']
     scf = single_point_seconds(basis_functions(atoms, method['basis']), size.vcpu)
     if method['optimiseBasis']:
-        step = (1 + CONSTANTS['g']) * single_point_seconds(basis_functions(atoms, method['optimiseBasis']), size.vcpu)
-        scf += optimisation_steps(len(atoms)) * step
+        scf += optimisation_steps(len(atoms)) * step_seconds(basis_functions(atoms, method['optimiseBasis']), size)
     if job['molecule']['multiplicity'] > 1:
         scf *= OPEN_SHELL_FACTOR
     n_property = basis_functions(atoms, method['basis'])

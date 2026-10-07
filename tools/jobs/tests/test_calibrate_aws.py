@@ -5,7 +5,7 @@ import pytest
 
 from jobs import sizing
 from jobs.calibrate import (aws_samples, compare, fit, fit_aws, fit_f2, fit_files, fit_law, fit_speedup, fit_time,
-                            guarded, incore_eri_gb, read_probe)
+                            guarded, incore_eri_gb, read_optimise_probe, read_probe)
 from jobs.canonical import canonical_job, job_key
 
 M0, M2, T0, T3, G, F2 = 0.6, 2.5, 8.0, 1500.0, 1.2, 2100.0
@@ -81,7 +81,7 @@ def test_fit_aws_recovers_known_constants(tmp_path):
     samples = aws_samples(dirs)
     assert len(samples) == 5
     got = fit_aws(samples)
-    for name, value in (('m0', M0), ('m2', M2), ('t0', T0), ('t3', T3), ('g', G), ('f2', F2)):
+    for name, value in (('m0', M0), ('m2', M2), ('t0', T0), ('t3', T3), ('t3Step', T3), ('g', G), ('f2', F2)):
         assert got[name] == pytest.approx(value, rel=1e-6), name
     rows = compare(samples)
     assert len(rows) == 5 and rows[0]['wallSeconds'] == 99.0
@@ -213,29 +213,31 @@ def test_two_samples_of_one_size_cannot_fit_an_intercept(tmp_path):
 
 
 def test_guarded_applies_task_14s_guards_and_names_them():
-    raw = {'m0': 0.05, 'm2': -1.0, 't0': 0.3, 't3': -5.0, 'g': None, 'f2': 0.0,
+    raw = {'m0': 0.05, 'm2': -1.0, 't0': 0.3, 't3': -5.0, 't3Step': -2.0, 'g': None, 'f2': 0.0,
            'scfExponent': 0.86731, 'scfSaturation': 16, 'filesExponent': 0.63071, 'filesSaturation': 32}
     constants, guards = guarded(raw)
     deployed = sizing.CONSTANTS
     assert constants['m0'] == 0.2 and constants['t0'] == 1.0 and constants['g'] == 1.5
     assert constants['m2'] == deployed['m2'] and constants['t3'] == deployed['t3'] and constants['f2'] == deployed['f2']
+    assert constants['t3Step'] == deployed['t3Step']
     assert constants['scfExponent'] == 0.867 and constants['filesExponent'] == 0.631
     assert constants['scfSaturation'] == 16.0 and isinstance(constants['scfSaturation'], float)
-    assert {g.split(':')[0] for g in guards} == {'m0', 'm2', 't0', 't3', 'g', 'f2'}
+    assert {g.split(':')[0] for g in guards} == {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2'}
 
 
 def test_guarded_rounds_to_three_significant_figures_and_passes_good_values():
-    raw = {'m0': 0.34083, 'm2': 6.7673, 't0': 4.8431, 't3': 26643.9, 'g': 0.3, 'f2': 5244.6,
+    raw = {'m0': 0.34083, 'm2': 6.7673, 't0': 4.8431, 't3': 26643.9, 't3Step': 31042.7, 'g': 0.3, 'f2': 5244.6,
            'scfExponent': 0.8673, 'scfSaturation': 16, 'filesExponent': 0.6307, 'filesSaturation': 32}
     constants, guards = guarded(raw)
     assert guards == []
-    assert constants == {'m0': 0.341, 'm2': 6.77, 't0': 4.84, 't3': 26600.0, 'g': 0.3, 'f2': 5240.0,
-                         'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631, 'filesSaturation': 32.0}
+    assert constants == {'m0': 0.341, 'm2': 6.77, 't0': 4.84, 't3': 26600.0, 't3Step': 31000.0, 'g': 0.3,
+                         'f2': 5240.0, 'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631,
+                         'filesSaturation': 32.0}
     assert all(isinstance(v, float) for v in constants.values())
 
 
 def test_a_negative_g_keeps_1_5():
-    raw = {'m0': 0.5, 'm2': 3.0, 't0': 5.0, 't3': 2e4, 'g': -0.2, 'f2': 3e3,
+    raw = {'m0': 0.5, 'm2': 3.0, 't0': 5.0, 't3': 2e4, 't3Step': 1.5e4, 'g': -0.2, 'f2': 3e3,
            'scfExponent': 0.9, 'scfSaturation': 16, 'filesExponent': 0.6, 'filesSaturation': 32}
     constants, guards = guarded(raw)
     assert constants['g'] == 1.5 and [g.split(':')[0] for g in guards] == ['g']
@@ -256,7 +258,7 @@ def test_fit_aws_output_has_every_constant_sizing_reads(tmp_path, monkeypatch):
     job = canonical_job('optimise', carbons(4), 0, 2)          # optimise + open shell: every branch
     sizing.predict_parts(job, sizing.SIZES[0])
     sizing.decide(job)
-    assert {'m0', 'm2', 't0', 't3', 'g', 'f2', 'scfExponent', 'scfSaturation', 'filesExponent',
+    assert {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'scfExponent', 'scfSaturation', 'filesExponent',
             'filesSaturation'} <= read
 
     constants, _ = guarded(fit_aws(aws_samples(ladder(tmp_path)), probe=model_probe()))
@@ -364,3 +366,72 @@ def test_t0_falls_back_to_every_sample_when_fewer_than_two_incore_n(tmp_path):
     assert any(note.startswith('t0: fewer than 2 in-core N') for note in got['notes'])
     expected = fit_time(samples, (got['scfExponent'], got['scfSaturation']))
     assert got['t0'] == pytest.approx(expected['t0'], rel=1e-9)
+
+
+# -- Version 4: t3Step, an optimisation step's t3 when its ERIs fit in core --
+
+
+def optimise_probe(t3_step, n=246, vcpu=16, g=G, slow=1.0, law=SCF_LAW):
+    """A caffeine-like optimise-steps probe line whose first (cold) step obeys
+    (1 + g)(t0 + t3_step (N/1000)^3.5) / speedup(vcpu) x `slow`, and whose two
+    warm steps run 20 % faster."""
+    step = (1 + g) * (T0 + t3_step * (n / 1000) ** 3.5) / min(vcpu, law[1]) ** law[0]
+    return {'probe': 'optimise-steps', 'molecule': 'caffeine', 'basis': 'def2-SVP', 'vcpu': vcpu,
+            'basisFunctions': n, 'steps': [{'seconds': step * slow, 'cycles': 14}, {'seconds': 0.8 * step, 'cycles': 11},
+                                           {'seconds': 0.8 * step, 'cycles': 10}]}
+
+
+def test_read_optimise_probe_finds_its_line_among_geometric_output(tmp_path):
+    line = optimise_probe(3 * T3)
+    path = tmp_path / 'caffeine-optimise-probe.log'
+    path.write_text('Step    1 : Displace = 7.865e-02/1.361e-01 (rms/max)\n'
+                    'Hessian Eigenvalues: 2.30000e-02 2.30000e-02\n' + json.dumps(line) + '\n')
+    assert read_optimise_probe(path) == line
+    speedup_only = tmp_path / 'speedup-probe.json'
+    speedup_only.write_text(json.dumps(model_probe()) + '\n')
+    with pytest.raises(ValueError):
+        read_optimise_probe(speedup_only)
+
+
+def test_the_optimise_probes_slowest_step_sets_t3step(tmp_path):
+    # Its first step is the slowest (cold, from the minao guess): t3Step is
+    # fitted to it alone, not to the mean of the three (Ruling T14-speedup).
+    law, files_law = deployed_laws()
+    samples = aws_samples(ladder(tmp_path, law=law, files_law=files_law))
+    got = fit_aws(samples, optimise_probe=optimise_probe(3 * T3, law=law))
+    assert got['t3Step'] == pytest.approx(3 * T3, rel=1e-6)
+    assert got['t3'] == pytest.approx(T3, rel=1e-6)                 # single points untouched
+    assert any(note.startswith('t3Step:') and 'optimise probe' in note for note in got['notes'])
+
+
+def test_a_faster_optimise_probe_does_not_lower_t3step_below_the_jobs_steps(tmp_path):
+    law, files_law = deployed_laws()
+    samples = aws_samples(ladder(tmp_path, law=law, files_law=files_law))
+    got = fit_aws(samples, optimise_probe=optimise_probe(T3 / 3, law=law))
+    assert got['t3Step'] == pytest.approx(T3, rel=1e-6)
+
+
+def test_t3step_is_fitted_with_the_g_sizing_will_use(tmp_path):
+    # The fixtures' g fits negative and is guarded to 1.5: t3Step must be
+    # fitted through the g sizing then multiplies by, or the probe's step is
+    # not reproduced. Here the jobs' steps run 4x faster than (1 + G) x their
+    # single point, so g fits negative.
+    law, files_law = deployed_laws()
+    dirs = ladder(tmp_path, law=law, files_law=files_law)
+    for d in dirs:
+        timings = json.loads((d / 'timings.json').read_text())
+        for stage in timings['stages']:
+            if stage['name'].startswith('optimisation step'):
+                stage['seconds'] /= 4 * (1 + G)
+        (d / 'timings.json').write_text(json.dumps(timings))
+    got = fit_aws(aws_samples(dirs), optimise_probe=optimise_probe(3 * T3, g=1.5, law=law))
+    assert got['g'] < 0
+    assert got['t3Step'] == pytest.approx(3 * T3, rel=1e-6)
+
+
+def test_without_any_optimisation_step_t3step_is_none_and_guarded(tmp_path):
+    dirs = [write(tmp_path, 'single', carbons(k), t) for k, t in ((3, 2), (8, 2), (16, 4))]
+    got = fit_aws(aws_samples(dirs))
+    assert got['t3Step'] is None
+    constants, guards = guarded(got)
+    assert constants['t3Step'] == sizing.CONSTANTS['t3Step'] and any(g.startswith('t3Step:') for g in guards)

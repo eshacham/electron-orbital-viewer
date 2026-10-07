@@ -1,0 +1,1 @@
+{"probe": "optimise-steps", "molecule": "caffeine", "basis": "def2-SVP", "vcpu": 16, "basisFunctions": 246, "steps": [{"seconds": 52.85, "cycles": 14}, {"seconds": 44.534, "cycles": 11}, {"seconds": 42.111, "cycles": 10}]}

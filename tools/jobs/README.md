@@ -29,7 +29,7 @@ so the same viewer renders both.
 | `sink.py` | `Sink` contract + `LocalSink`, writing to `tools/molecules/out/jobs/`; `S3Sink` is 6B-3 |
 | `worker.py` | Runs one job end to end: claim, execute, write Phase 6's files, record the outcome. Never settles — the runner or `cli --wait` does (Ruling T5-b). Imports PySCF |
 | `make_basis_counts.py` | Regenerates `basis_counts.json` from PySCF after a PySCF upgrade |
-| `calibrate.py` | Fits `sizing.CONSTANTS` from finished jobs' `timings.json`/`job.json`: local (version 1), or `--aws` with the speedup probe (version 2) |
+| `calibrate.py` | Fits `sizing.CONSTANTS` from finished jobs' `timings.json`/`job.json`: local (version 1), or `--aws` with the speedup probe (versions 2–3) and the optimise-steps probe (version 4) |
 | `cli.py` | `enqueue`/`submit`/`generation`, see below |
 
 ## Running locally
@@ -197,11 +197,16 @@ figures, bump `SIZING_VERSION`, update `CONSTANTS` in `sizing.py`, and date
 the comment with the machine the samples came from. Version 1 was fitted
 from water, benzene and caffeine on an Apple M2 Pro (see `docs/HANDOFF.md`'s
 "Phase 6B-1" section). Version 2 came from AWS runs and the speedup probe,
-and divides the files term by a speedup of its own. Version 3, the current
-one, keeps version 2's forms and adds the owner's caffeine run on M. It
-takes t0 from the in-core runs alone, and t3 from the slowest direct SCF
-(caffeine's, 42 000). See "In AWS" below and HANDOFF's "Phase 6B-3". A
-local refit can no longer
+and divides the files term by a speedup of its own. Version 3 keeps
+version 2's forms and adds the owner's caffeine run on M. It takes t0 from
+the in-core runs alone, and t3 from the slowest direct SCF (caffeine's,
+42 000). Version 4, the current one, keeps version 3's constants and adds
+`t3Step` (31 000): an optimisation step whose def2-SVP ERIs fit in core on
+the size (`sizing.step_in_core`, PySCF's own test with HEADROOM × the
+predicted working set for its RSS) is priced by it, from the slowest step
+of the caffeine optimise-steps probe; any other step keeps the direct t3.
+Single points do not change. See "In AWS" below and HANDOFF's "Phase 6B-3".
+A local refit can no longer
 replace it: this Mac's PySCF has no OpenMP, so its runs say nothing about
 how a Fargate worker's vCPUs speed a job up.
 
@@ -233,7 +238,7 @@ The same handlers run in the `api` Lambda behind API Gateway and Cognito, with A
 - Root result files are written `no-cache` and only `done.json` `immutable`: until `done.json` exists a root may still be cleared and rewritten (D7), so nothing there may sit at the edge for a year.
 - `reconcile.py` fails a job that has waited 30 minutes in Batch's queue as `no-capacity`, unless the wait is the app's own doing. Each compute environment holds 32 vCPU (`batch_runner.MAX_VCPUS`, which the stack imports), so a job queued behind the owner's own running jobs, or behind jobs ahead of it on the same queue, waits on. Its clock restarts when one of them ends. It settles a record left `FAILED` or `DONE` without a Batch job id and never settled (a settle that failed) at what its worker reported. Once a day (the sweep in 00:00–00:15 UTC) it also scans every month for unsettled records, not only this month and last.
 - Expected refusals are 4xx (`paused` 409, `pubchem-unavailable` 424), so the API's 5xx alarm means a fault. PubChem calls time out at 6 s each, so a resolution's three calls fit in the api Lambda's 29 s.
-- `python -m jobs.worker probe …` is the speedup probe (`probe.py`): benzene's SCF and file write timed at 32, 16, 8, 4 and 2 threads in one task, printed as one JSON line.
-- Recalibrating from AWS: fetch the jobs' `job.json` and `timings.json` from CloudFront into one folder each, then run `python -m jobs.calibrate --aws [--probe probe.log] <folders>` (from `tools/`). It prints `compare` (each job's recorded prediction against its run), `fit` (unguarded, with notes), and `constants` and `guards`, which are ready for `sizing.CONSTANTS`. Each sample is marked `direct` when its ERIs did not fit its size. t0 comes from the in-core samples, and t3 is the slowest of the in-core fit, the probe's and the direct jobs'. The samples the current version was fitted on are in `tests/fixtures/aws/` (minimal `job.json` and `timings.json`, plus the probe line), and `test_sizing.py` checks that they reproduce `CONSTANTS`. Add new job folders there when refitting. Commit a new `SIZING_VERSION` and redeploy (`infra/deploy.sh all`, or `image` then `compute`).
+- `python -m jobs.worker probe …` is the speedup probe (`probe.py`): benzene's SCF and file write timed at 32, 16, 8, 4 and 2 threads in one task, printed as one JSON line. With `--optimise-steps N` it times N optimisation steps instead (sizing v4's t3Step). A probe submitted by hand gets no `PYSCF_MAX_MEMORY` (only BatchRunner sets it), so PySCF keeps its 4000 MB default: set it in the overrides to measure the regime a real job runs in.
+- Recalibrating from AWS: fetch the jobs' `job.json` and `timings.json` from CloudFront into one folder each, then run `python -m jobs.calibrate --aws [--probe probe.log] [--optimise-probe steps.log] <folders>` (from `tools/`). It prints `compare` (each job's recorded prediction against its run), `fit` (unguarded, with notes), and `constants` and `guards`, which are ready for `sizing.CONSTANTS`. Each sample is marked `direct` when its ERIs did not fit its size. t0 comes from the in-core samples, and t3 is the slowest of the in-core fit, the probe's and the direct jobs'. t3Step is the slowest of the optimise probe's steps and the jobs' median steps, fitted through the g and t0 sizing holds. The samples the current version was fitted on are in `tests/fixtures/aws/` (minimal `job.json` and `timings.json`, plus `speedup-probe.json` and `caffeine-optimise-probe.json`), and `test_sizing.py` checks that they reproduce `CONSTANTS`. Add new job folders there when refitting. Commit a new `SIZING_VERSION` and redeploy (`infra/deploy.sh all`, or `image` then `compute`).
 - On AWS a job's `peakMemoryGB` is not what it needs. `PYSCF_MAX_MEMORY` is 80 % of the worker's memory, so PySCF keeps the two-electron integrals in memory whenever they fit (benzene on S: 5.4 of its 6.1 GB). `calibrate` fits memory on the working set (`workingSetGB`), which leaves those integrals out.
 - Deploying, the owner's controls and the owner actions are in `infra/README.md`.

@@ -6,10 +6,15 @@ count toward t3; optimisation steps calibrate g. The file-writing stage is a
 separate cost (Ruling D14), fitted through the origin against (N/1000)².
 6B-1's local fit (`fit`) leaves it undivided: this Mac's PySCF has no OpenMP.
 On Fargate it is threaded, and the AWS fit (`fit_aws`, sizing versions 2
-and 3) divides it by a speedup law of its own, measured by the speedup probe.
+to 4) divides it by a speedup law of its own, measured by the speedup probe.
 
     python -m jobs.calibrate ../tools/molecules/out/jobs/<key> …   (from tools/)
-    python -m jobs.calibrate --aws [--probe probe.log] <job dir> …  (Phase 6B-3: sizing v2, v3)
+    python -m jobs.calibrate --aws [--probe probe.log] [--optimise-probe steps.log] <job dir> …
+                                                         (Phase 6B-3: sizing v2, v3, v4)
+
+Version 4 adds t3Step, the t3 an optimisation step is priced by when its
+ERIs fit in core (sizing.step_in_core), from the optimise-steps probe
+(probe.py --optimise-steps) and the jobs' own steps: the slowest of them.
 """
 import json
 import math
@@ -24,6 +29,13 @@ TOO_FEW = 'need at least 2 AWS samples to fit'
 # PySCF's own max_memory when PYSCF_MAX_MEMORY is unset, as in the speedup
 # probe (its job definition sets none; only BatchRunner's submissions do).
 PYSCF_DEFAULT_MAX_MEMORY_MB = 4000
+# g's guard (Task 14): a missing or negative fit keeps this. t3Step is fitted
+# through the g sizing will multiply by, so it needs the guard's answer too.
+G_FALLBACK = 1.5
+
+
+def _3sf(value):
+    return float(f'{value:.3g}')
 
 
 def _need_two(samples, distinct=False):
@@ -82,7 +94,7 @@ def samples_from(job_dirs):
     return out
 
 
-# -- Phase 6B-3: the AWS fit (sizing versions 2 and 3) -------------------------
+# -- Phase 6B-3: the AWS fit (sizing versions 2, 3 and 4) ----------------------
 #
 # The probe contract (Ruling D15). Task 12's speedup probe runs once, in one
 # 32 vCPU Fargate task, and prints ONE line of JSON to stdout (CloudWatch);
@@ -302,6 +314,49 @@ def read_probe(path):
     raise ValueError(f'{path}: no probe JSON line (an object with "n", "scfSeconds" and "filesSeconds")')
 
 
+def read_optimise_probe(path):
+    """The optimise-steps probe's JSON line (probe.measure_optimise) from a
+    saved log: the last line that parses as an object with probe
+    'optimise-steps'. geomeTRIC's own lines around it are fine."""
+    for line in reversed(Path(path).read_text().splitlines()):
+        line = line.strip()
+        if line.startswith('{'):
+            try:
+                found = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(found, dict) and found.get('probe') == 'optimise-steps' and found.get('steps'):
+                return found
+    raise ValueError(f'{path}: no optimise-steps probe line (an object with "probe": "optimise-steps" and "steps")')
+
+
+def fit_step_t3(samples, optimise_probe, t0, g, law):
+    """t3Step (sizing version 4): one step = (1 + g)(t0 + t3Step (N/1000)^3.5)
+    / speedup(c) when its ERIs fit in core. Each measured step offers
+    (seconds x speedup(c) / (1 + g) - t0) / (N/1000)^3.5 and the slowest is
+    kept (Ruling T14-speedup): the probe's every step (its first, cold from
+    the minao guess, is the slowest) and each job's median step. t0, g and
+    the law must be what sizing will hold (3 significant figures, g guarded),
+    or the step is not reproduced. Returns (t3Step or None, notes)."""
+    def per_step(seconds, n, threads):
+        return (seconds * _speedup(threads, law) / (1 + g) - t0) / (n / 1000) ** 3.5
+
+    jobs = [per_step(s['stepSeconds'], s['svpBasisFunctions'], s['threads']) for s in samples
+            if s.get('stepSeconds') and s.get('svpBasisFunctions')]
+    probe = [] if optimise_probe is None else [
+        per_step(step['seconds'], optimise_probe['basisFunctions'], optimise_probe['vcpu'])
+        for step in optimise_probe['steps']]
+    notes = []
+    if probe:
+        notes.append(f't3Step: the optimise probe\'s slowest step gives {max(probe):.4g} (N '
+                     f'{optimise_probe["basisFunctions"]}, {optimise_probe["vcpu"]} vCPU)'
+                     + (f', the jobs\' steps at most {max(jobs):.4g}' if jobs else '') + '; kept the slower')
+    elif jobs:
+        notes.append(f't3Step: no optimise probe; the jobs\' steps give {max(jobs):.4g} (the slowest)')
+    candidates = jobs + probe
+    return (max(candidates) if candidates else None), notes
+
+
 def _probe_samples(points):
     """The probe's runs as samples, when its line says which N it ran."""
     n = points.get('basisFunctions')
@@ -318,7 +373,7 @@ def _probe_samples(points):
     return out
 
 
-def fit_aws(samples, probe=None):
+def fit_aws(samples, probe=None, optimise_probe=None):
     """Sizing's constants (version 2, refitted for 3) from AWS samples, as
     fitted (unguarded), plus how they were got. `guarded` turns this into CONSTANTS.
 
@@ -395,7 +450,13 @@ def fit_aws(samples, probe=None):
             t3 = probe_t3
         else:
             notes.append(f't3: the probe\'s direct SCF gives {probe_t3:.4g}, less than {t3:.4g}; kept the slower')
-    out = {**memory, 't0': t0, 't3': t3, 'g': fit_g(samples, t0, t3, scf_law), 'f2': fit_f2(samples + extra, files_law),
+    g = fit_g(samples, t0, t3, scf_law)
+    # t3Step through the values sizing will hold: 3 s.f., and g and t0 as guarded() will leave them.
+    step_g = G_FALLBACK if g is None or g < 0 else _3sf(g)
+    step_t0 = 1.0 if t0 < 1.0 else _3sf(t0)
+    t3_step, step_notes = fit_step_t3(samples, optimise_probe, step_t0, step_g, (_3sf(scf_law[0]), scf_law[1]))
+    notes += step_notes
+    out = {**memory, 't0': t0, 't3': t3, 't3Step': t3_step, 'g': g, 'f2': fit_f2(samples + extra, files_law),
            'scfExponent': scf_law[0], 'scfSaturation': scf_law[1],
            'filesExponent': files_law[0], 'filesSaturation': files_law[1], 'speedupSource': source, 'notes': notes}
     if summary is not None:
@@ -407,20 +468,22 @@ def guarded(fitted):
     """CONSTANTS from fit_aws's output: Task 14's guards, then 3 significant
     figures, every value a float. Returns (constants, the guards used)."""
     deployed, guards = sizing.CONSTANTS, []
-    c = {k: fitted[k] for k in ('m0', 'm2', 't0', 't3', 'g', 'f2', 'scfExponent', 'scfSaturation',
+    c = {k: fitted[k] for k in ('m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'scfExponent', 'scfSaturation',
                                 'filesExponent', 'filesSaturation')}
     rules = (('m0', lambda v: v < 0.2, lambda v: 0.2, 'below 0.2: set to 0.2'),
              ('m2', lambda v: v <= 0, lambda v: deployed['m2'], 'not positive: kept the deployed value'),
              ('t0', lambda v: v < 1.0, lambda v: 1.0, 'below 1.0: set to 1.0'),
              ('t3', lambda v: v <= 0, lambda v: deployed['t3'], 'not positive: kept the deployed value'),
-             ('g', lambda v: v is None or v < 0, lambda v: 1.5, 'missing or negative: kept 1.5'),
+             ('t3Step', lambda v: v is None or v <= 0, lambda v: deployed['t3Step'],
+              'missing or not positive: kept the deployed value'),
+             ('g', lambda v: v is None or v < 0, lambda v: G_FALLBACK, f'missing or negative: kept {G_FALLBACK:g}'),
              ('f2', lambda v: v <= 0, lambda v: deployed['f2'], 'not positive: kept the deployed value (D5)'))
     for name, bad, fix, why in rules:
         if bad(c[name]):
             fitted_text = 'none' if c[name] is None else f'{c[name]:.4g}'
             c[name] = fix(c[name])
             guards.append(f'{name}: fitted {fitted_text}, {why} ({c[name]:g})')
-    return {k: float(f'{v:.3g}') for k, v in c.items()}, guards
+    return {k: _3sf(v) for k, v in c.items()}, guards
 
 
 def compare(samples):
@@ -432,11 +495,15 @@ def compare(samples):
 
 if __name__ == '__main__':
     if sys.argv[1:2] == ['--aws']:
-        args, probe = sys.argv[2:], None
-        if args[:1] == ['--probe']:
-            probe, args = read_probe(args[1]), args[2:]
+        args, probe, optimise_probe = sys.argv[2:], None, None
+        while args[:1] in (['--probe'], ['--optimise-probe']):
+            if args[0] == '--probe':
+                probe = read_probe(args[1])
+            else:
+                optimise_probe = read_optimise_probe(args[1])
+            args = args[2:]
         samples = aws_samples(args)
-        fitted = fit_aws(samples, probe)
+        fitted = fit_aws(samples, probe, optimise_probe)
         constants, guards = guarded(fitted)
         print(json.dumps({'compare': compare(samples), 'fit': fitted, 'constants': constants, 'guards': guards},
                          indent=1))
