@@ -31,6 +31,9 @@ describe('jobs table logic', () => {
             { label: 'attempt 1 output.log', href: `/molecules/jobs/${failed.key}/attempts/1/output.log` },
         ]);
         expect(jobLinks(running)).toEqual([]);
+        for (const code of ['submit-failed', 'submit-lost', 'no-capacity']) {
+            expect(jobLinks({ ...failed, error: { code, message: 'no worker ran' } })).toEqual([]);
+        }
     });
     it('names the method, and lists the last months', () => {
         expect(methodSummary(failed)).toBe('B3LYP/def2-SVP → B3LYP/def2-TZVPD');

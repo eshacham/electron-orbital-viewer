@@ -42,7 +42,14 @@ export function sortJobs(jobs: JobView[], column: SortColumn, direction: SortDir
 
 export interface FileLink { label: string; href: string }
 
-/** A finished job's result and files (spec §5.3); a failed one leaves only its attempt's input and log. */
+/**
+ * Failures that happen before any worker runs: Batch refused or lost the
+ * submit, or no capacity ever came. No attempt folder exists for them, and
+ * CloudFront answers a missing key with S3's AccessDenied page.
+ */
+const BEFORE_A_WORKER_RAN = new Set(['submit-failed', 'submit-lost', 'no-capacity']);
+
+/** A finished job's result and files (spec §5.3); a failed one leaves only its attempt's input and log, if a worker ran. */
 export function jobLinks(job: JobView): FileLink[] {
     if (job.status === 'DONE') {
         return [
@@ -50,7 +57,7 @@ export function jobLinks(job: JobView): FileLink[] {
             ...[...computedResultFiles(job.recipe), 'timings.json'].map(name => ({ label: name, href: jobFileUrl(job.key, name) })),
         ];
     }
-    if (job.status === 'FAILED') {
+    if (job.status === 'FAILED' && !BEFORE_A_WORKER_RAN.has(job.error?.code ?? '')) {
         return ['input.py', 'output.log'].map(name => ({ label: `attempt ${job.attempt} ${name}`, href: jobFileUrl(job.key, `attempts/${job.attempt}/${name}`) }));
     }
     return [];
