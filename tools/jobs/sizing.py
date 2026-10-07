@@ -53,8 +53,10 @@ SIZING_VERSION = 4
 # - step_in_core: PySCF's own test with HEADROOM x the predicted working set standing in for its RSS
 #   (1.54 GB at N 246 against the 191 MB measured), so in core up to N 260 on S, 320 on M, 465 on L, 655 on
 #   XL. Wrongly assuming in core prices a direct step by t3Step: at caffeine's N that matches its measured
-#   direct step (the probe), 1.35x below the direct price. The margin is for larger N, where no def2-SVP
-#   step has been measured; the worst case there is t3 / the ladder's in-core t3, 42 000 / 9 050 = 4.6x.
+#   direct step (the probe), 1.35x below the direct price, and that ~1.35x (42 000 / 31 000) is the worst
+#   case while t3Step stays a direct-step figure. It becomes ~4.6x (42 000 / 9 050) only if t3Step is
+#   refitted from a true in-core probe (PYSCF_MAX_MEMORY set) near 9 000; then this margin is what
+#   protects the timeout.
 # - g and the step count are unchanged: g fits -0.29 (guarded to 1.5) and water ran 3 steps of 16 predicted;
 #   nothing measured at caffeine's size contradicts either (3 steps were run, not a whole optimisation).
 # Residuals (predicted / measured - 1): the probe's steps on L -0.08 %, +18.6 %, +25.4 %; water's steps on S

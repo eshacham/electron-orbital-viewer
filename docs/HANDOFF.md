@@ -2388,18 +2388,27 @@ Every AWS job, every one of their steps, and every probe step is inside
   If it is faster, the prediction is high, which is safe.
 - **Wrongly assuming in core.** That would price a direct step by
   t3Step. At caffeine's N, that matches its measured direct step: 1.35×
-  below v3's direct price, inside `TIME_HEADROOM`. For larger N, no
-  def2-SVP step has been measured, and the worst case is 42 000 / 9 050
-  = 4.6×. The margin (1.54 GB allowed against 191 MB measured) makes this
-  unlikely below the boundaries above.
+  below v3's direct price, inside `TIME_HEADROOM`. While t3Step is a
+  direct-step figure, that ~1.35× (42 000 / 31 000, measured 1.349–1.355
+  at every size's in-core limit) is the worst case at any N. It becomes
+  ~4.6× (42 000 / 9 050) only if t3Step is refitted from a true in-core
+  probe (`PYSCF_MAX_MEMORY` set) near 9 000; the in-core margin (1.54 GB
+  allowed against 191 MB measured) is then what protects the timeout.
 - **The step count is unmeasured at caffeine's size.** 58 steps is
-  assumed, and only 3 were run. A caffeine optimisation needing more
-  than about 58 × 1.75 = 100 steps of the probe's cost would time out.
-  `optimisation_steps` caps at 100 and is generous for a PubChem
-  geometry, but nothing measured shows that.
+  assumed, and only 3 were run. The worker stops geomeTRIC at
+  `MAX_STEPS = 100` (`input_template.py`), and 100 steps at the probe's
+  slowest 52.85 s plus the 1 040 s final single point is 6 325 s, under
+  the 7 200 s timeout: the step count alone cannot time it out. The
+  worst plausible outcome is "not converged" at ~6 300 s (~$1.31,
+  inside the reservation).
 - **The timeout margin is thin.** Caffeine optimise's timeout is
   clamped at 1.75× rather than 3×, so a step much slower than the
   probe's first (a molecule needing far more SCF cycles) has less room.
+- **Image tag after this docs fix:** commit "docs: v4's worst cases"
+  edits a comment in `tools/jobs/sizing.py`, so HEAD's image tag differs
+  from the deployed `2de967effa251067` (code identical). `deploy.sh
+  compute` refuses until `deploy.sh image` pushes it; run `image` then
+  `compute` (or `all`) at the next deploy.
 - **The ladder-scale optimisations still over-predict.** Water
   optimise is +435 %, because the step count and t0 dominate. This is
   unchanged in kind from v3.
