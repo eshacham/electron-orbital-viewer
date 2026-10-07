@@ -29,7 +29,7 @@ def test_a_canned_probe_line_goes_through_both_fits(tmp_path):
     p = fit_speedup(points)
     assert 0.7 < p < 0.8
     files = fit_files(points)
-    assert files['form'] == 'undivided' and files['exponent'] == p
+    assert files['form'] == 'undivided' and files['exponent'] == 0.0      # nothing divided
     assert files['residualUndivided'] < files['residualDivided']
 
 

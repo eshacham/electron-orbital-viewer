@@ -46,7 +46,7 @@
    "kind": "xyz"
   },
   "sizing": {
-   "version": 1,
+   "version": 2,
    "estimateFor": "fargate",
    "size": "S",
    "vcpu": 2,
@@ -54,8 +54,8 @@
    "capacity": "local",
    "attempts": 1,
    "basisFunctions": 58,
-   "predictedSeconds": 127.6,
-   "predictedMemoryGB": 0.42,
+   "predictedSeconds": 122.1,
+   "predictedMemoryGB": 0.36,
    "timeoutSeconds": 600,
    "predictedCostMicros": 0
   },

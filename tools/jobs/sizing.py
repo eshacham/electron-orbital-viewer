@@ -1,16 +1,17 @@
 """The app chooses the worker, deterministically (spec §7).
 
 Memory ~ N² (matrices, DIIS history, the integration grid); one DFT single
-point ~ N^3.5 on one vCPU, sped up by c^0.8 on c vCPUs (PySCF's threading is
-good, not perfect). Writing the grid files is a second, separate cost: it
-scales with N² like memory, but it is single-threaded regardless of vCPU
-count (Phase 6's grid-writing code has no threading), so it is added after
-speedup rather than divided by it (Ruling D14). The open-shell factor
-applies only to the SCF part: writing files does not care how many
-electrons were unpaired. Version 0 carries seed constants; Task 11 fits
-version 1 from local runs (water, benzene) and Phase 6B-3 refits version 2
-from the AWS ladder. Every job records the version and the prediction so
-the fit can be checked.
+point ~ N^3.5 on one vCPU, sped up on c vCPUs by speedup(c) = min(c, C)^a:
+PySCF's threading gains nearly linearly to C threads and nothing beyond
+(the speedup probe, Phase 6B-3). Writing the grid files is a second,
+separate cost (Ruling D14): it scales with N² like memory, and on Linux it
+is threaded too, by a law of its own, files_speedup(c), which levels off
+later than the SCF's. (Version 1 left it undivided: this Mac's PySCF has no
+OpenMP, so nothing local could show it.) The open-shell factor applies only
+to the SCF part: writing files does not care how many electrons were
+unpaired. Version 1 was fitted from local runs (6B-1 Task 11); version 2
+from the AWS ladder and the speedup probe (6B-3 Task 14). Every job records
+the version and the prediction so the fit can be checked.
 """
 import math
 from dataclasses import dataclass
@@ -28,13 +29,28 @@ class Size:
 
 
 SIZES = (Size('S', 2, 8), Size('M', 4, 16), Size('L', 16, 64), Size('XL', 32, 244))
-SIZING_VERSION = 1
-# Fitted 2026-10-06 on an Apple M2 Pro (single-threaded PySCF on this Mac;
-# threads == 1 in every timing) from three local jobs: water (N 58), benzene
-# (N 276) and caffeine (N 614), all B3LYP/def2-TZVPD single points
-# (tools/jobs/calibrate.py; Phase 6B-1 Task 11). m0, m2 and f2 came out
-# positive, so no clamp applied; t0 and g keep their seeds for 6B-3's AWS fit.
-CONSTANTS = {'m0': 0.412, 'm2': 3.73, 't0': 5.0, 't3': 19400.0, 'g': 1.5, 'f2': 2480.0}
+SIZING_VERSION = 2
+# Version 2, fitted 2026-10-07 from 4 AWS Batch jobs on Fargate Linux/ARM64 (Graviton) with
+# `python -m jobs.calibrate --aws --probe …` (Phase 6B-3 Task 14): water and benzene single points,
+# water and ethanol optimisations, all on S (2 vCPU, Spot), plus the speedup probe (benzene's SCF and
+# file write at 4, 8, 16 and 32 threads in one XL task). One guard used: g fitted -0.18 (the ladder's
+# few optimisation steps ran faster than the single-point rule predicts), so it keeps 1.5.
+# How each was got (Ruling T14-speedup; the slower prediction wherever the data allow two):
+# - scfExponent, scfSaturation: the probe's SCF, min(c, 16)^0.867 to within 5.2 % at every thread count.
+#   One power law (0.596) misses by up to 30 %: 4 -> 16 threads gained 3.5x, 16 -> 32 nothing.
+# - filesExponent, filesSaturation: the probe's file write, on its own law, min(c, 32)^0.631, within
+#   10 % (a plateau at 16 fits worse and would promise L more); undivided misses by up to 2.1x.
+# - t3: the probe's direct SCF (26 600) rather than the ladder's (9 050). The ladder's SCFs held their
+#   ERIs in core, since S lets PySCF keep them up to N of about 280; caffeine and anything larger on
+#   S-L runs direct: benzene's direct SCF on the probe ran about 3x its in-core one. t0 is the ladder's intercept.
+# - f2: the ladder and the probe's runs together, each multiplied back up by files_speedup.
+# - m0, m2: the working set, i.e. the peak less the in-core ERIs PySCF kept only because they fitted
+#   (benzene's 6.1 GB peak on S is 5.4 GB of them), with the probe's direct-SCF peaks (0.9 GB).
+# Every ladder job finishes inside TIME_HEADROOM x its v2 prediction, and v2 predicts the probe's
+# SCF and file write to within 15 % (tests/test_sizing.py).
+# Version 1 (6B-1 Task 11) came from this Mac; its numbers stay in git history.
+CONSTANTS = {'m0': 0.341, 'm2': 6.77, 't0': 4.84, 't3': 26600.0, 'g': 1.5, 'f2': 5240.0,
+             'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631, 'filesSaturation': 32.0}
 HEADROOM = 2.0
 TIME_HEADROOM = 1.5
 TIMEOUT_FACTOR = 3.0
@@ -55,7 +71,13 @@ BILLING_ALLOWANCE_SECONDS = 120
 
 
 def speedup(vcpu: int) -> float:
-    return vcpu ** 0.8
+    """How much faster the SCF runs on vcpu threads than on one."""
+    return min(vcpu, CONSTANTS['scfSaturation']) ** CONSTANTS['scfExponent']
+
+
+def files_speedup(vcpu: int) -> float:
+    """How much faster the file write runs on vcpu threads than on one."""
+    return min(vcpu, CONSTANTS['filesSaturation']) ** CONSTANTS['filesExponent']
 
 
 def single_point_seconds(n: int, vcpu: int) -> float:
@@ -78,9 +100,9 @@ def predict_parts(job: dict, size: Size) -> dict:
     the property basis, plus (for `optimise`) the optimisation steps at the
     optimisation basis, all sped up by vCPU count and then scaled by the
     open-shell factor. `filesSeconds` is the grid the worker writes out at
-    the property basis (def2-TZVPD); it is neither divided by speedup nor
-    scaled by the open-shell factor, because writing files is single-threaded
-    and indifferent to spin.
+    the property basis (def2-TZVPD), divided by its own files_speedup and
+    not scaled by the open-shell factor, because writing files is
+    indifferent to spin.
     """
     atoms, method = job['molecule']['atoms'], job['method']
     scf = single_point_seconds(basis_functions(atoms, method['basis']), size.vcpu)
@@ -90,7 +112,7 @@ def predict_parts(job: dict, size: Size) -> dict:
     if job['molecule']['multiplicity'] > 1:
         scf *= OPEN_SHELL_FACTOR
     n_property = basis_functions(atoms, method['basis'])
-    files = CONSTANTS['f2'] * (n_property / 1000) ** 2
+    files = CONSTANTS['f2'] * (n_property / 1000) ** 2 / files_speedup(size.vcpu)
     return {'scfSeconds': scf, 'filesSeconds': files}
 
 
@@ -105,7 +127,7 @@ def decide(job: dict, local: bool = False) -> dict:
     A worker must clear two independent bars: memory ≥ HEADROOM × predicted,
     and predicted time × TIME_HEADROOM ≤ the recipe's ceiling. The second bar
     exists because a bigger worker is also a faster one (more vCPUs speed up
-    the SCF part, Ruling D14's file-writing term aside), so a job too slow
+    both the SCF and the file write), so a job too slow
     for a small worker's ceiling may still fit on a larger one. Sizes are
     tried smallest first; predicted seconds is non-increasing in vCPU count,
     so the first one to clear both bars is the cheapest that works. If none
@@ -142,8 +164,9 @@ def decide(job: dict, local: bool = False) -> dict:
     # bare timeout (cost_micros('local', ...) is 0 regardless).
     reservation_seconds = timeout if local else timeout + BILLING_ALLOWANCE_SECONDS
     # estimateFor (M1): size, time and timeout are Fargate figures even for a
-    # local run, which this Mac runs single-threaded and with no time limit;
-    # the field lets 6B-2 label them "Fargate estimate" rather than a promise.
+    # local run, which this Mac runs single-threaded (macOS PySCF has no
+    # OpenMP) and with no time limit; the field lets 6B-2 label them
+    # "Fargate estimate" rather than a promise.
     return {'version': SIZING_VERSION, 'estimateFor': 'fargate', 'size': size.name, 'vcpu': size.vcpu,
             'memoryGB': size.memory_gb, 'capacity': capacity, 'attempts': attempts, 'basisFunctions': n,
             'predictedSeconds': round(seconds, 1), 'predictedMemoryGB': round(memory, 2),
