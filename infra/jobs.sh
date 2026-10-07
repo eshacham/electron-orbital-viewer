@@ -1,7 +1,7 @@
 #!/bin/bash
 # The owner's controls for on-demand generation in AWS (spec 2026-10-05 §10.2).
 #
-#   infra/jobs.sh pause                  refuse new jobs (POST /api/v1/jobs answers 503 "paused")
+#   infra/jobs.sh pause                  refuse new jobs (POST /api/v1/jobs answers 409 "paused")
 #   infra/jobs.sh resume                 accept them again
 #   infra/jobs.sh status                 kill switch, this month's meter, and whether the budget stop is attached
 #   infra/jobs.sh api METHOD PATH [JSON] call the job API through its Lambda with your AWS credentials

@@ -2150,7 +2150,8 @@ From the plan:
 - A `RUNNING` record whose Batch job is waiting again is a Spot retry in
   progress, not stale.
 - After 30 min in `RUNNABLE`, a job is terminated as `FAILED no-capacity`
-  and settled at what ran.
+  and settled at what ran, unless the wait is the app's own: see the
+  final-review fix wave below (I1).
 - The stale-jobs alert is reconcile publishing to SNS (no log metric
   filter).
 - The budget is account-wide, and the anomaly monitor is a tag (`app`)
@@ -2225,12 +2226,95 @@ From the ledger:
 - Reconcile's outcome label can describe a refused write (the
   no-capacity/ENDED race). The money is still right.
 - `handlers.py`'s `runnerJobId` write after submit is unguarded. A submit
-  slower than 600 s would leave that run uncharged.
+  slower than 600 s would have left that run uncharged; since the final
+  fix wave (M2) the worker records its own Batch job id at claim, so only
+  a run whose worker also failed that write waits a day for `batch-lost`.
 - `billing_handler` builds its store per invocation (daily, negligible).
 - The `costalerts.amazonaws.com` publish grant on the topic sits outside
-  the D14 gate. It is moot now that the monitor is on.
+  the D14 gate. It is moot now that the monitor is on, and since the final
+  fix wave (M6) it requires `aws:SourceAccount` = this account.
 - The probe's budget does not re-double `last` after a skip. That only
   matters for custom thread lists.
+
+### Final-review fix wave (2026-10-07)
+
+The whole-branch review (`.superpowers/sdd/2026-10-05-phase-6b-3-aws/final-review.md`,
+"With fixes": 2 Important, 9 Minor) and the Task 14 review's three minors were
+fixed together. Behaviour that changed:
+
+- **I1, no-capacity counts our own queue.** Each compute environment holds
+  32 vCPU (`batch_runner.MAX_VCPUS`, which `compute_stack.py` now imports),
+  so one XL fills a queue. Before failing a job that has waited 30 min,
+  reconcile sums the vCPUs of this app's own jobs on the same capacity that
+  are `RUNNING` or queued ahead of it. If that plus the job's own vCPUs
+  passes the cap, the job waits on (outcome `waiting-own-jobs`, no alert).
+  Its clock restarts when one of our jobs on that queue ends. Jobs behind it
+  never count, so two waiting XLs cannot excuse each other for ever: the one
+  ahead is judged on AWS alone. The no-capacity message now names AWS
+  capacity or the account's Fargate quota, and says our own jobs were not
+  holding the queue.
+- **I2, the worker's image tag leaves out documentation.** `image_tag` and
+  `.dockerignore` both exclude `tools/jobs/**/*.md`. That is a recipe
+  change, so HEAD's tag differs from every earlier one. `deploy.sh compute`
+  now **refuses** when ECR lacks the tag it would name; `all`, or `image`
+  then `compute`, is the way. `image_tag` also refuses when git cannot list
+  the inputs, and `push_image` reads the commit before building (see the
+  incident below). Sourcing `deploy.sh` only defines its functions.
+- **M1, M2, a record without a Batch job id.** The worker writes
+  `AWS_BATCH_JOB_ID` as `runnerJobId` at claim where none is
+  (`Store.note_runner_job_id`, both stores). The api's id write is outside
+  the submit's `except`, so failing to write it is a 500, not
+  `submit-failed`. Reconcile settles a `FAILED`/`DONE` record with no id
+  that was never settled (after the 10-minute grace, at what its worker
+  reported), and leaves a `RUNNING` record without one for a day.
+  `submit-lost` now says "no AWS Batch job was recorded", which is what it
+  knows.
+- **M3, expected refusals are 4xx.** `paused` is 409 (was 503) and
+  `pubchem-unavailable` 424 (was 503), so the `Api5xx` alarm keeps
+  threshold 1 and means a fault. PubChem's per-call timeout is 6 s (was
+  10), so a resolution's three calls fit in the api Lambda's 29 s.
+- **M4–M6, infra hardening.** The billing role's `PutItem`/`GetItem` carry
+  `LeadingKeys BILLING#*`. The budget counts spend before credits and
+  refunds. The alert topic lets `costalerts` publish only with
+  `aws:SourceAccount` = this account, and EventBridge only for the
+  `BatchFailed` rule (`aws:SourceArn`); that rule now uses its own target,
+  since `SnsTopic`'s grant had no condition.
+- **M7, admin links.** A failure recorded for a worker that was stopped
+  (reconcile's `timed-out`, `out-of-memory`, `spot-interrupted`,
+  `worker-lost`, `batch-lost`, `batch-failed`, and a local
+  `worker-crashed`) shows no attempt links unless the worker reported it
+  itself (`actual` set).
+- **M8:** the root README's deploy section points to `infra/README.md`.
+- **M9, cache headers.** Root result files are `no-cache`; only `done.json`
+  is `immutable`. A partial root may be cleared and rewritten (D7), and a
+  file fetched in between would otherwise sit at the edge for a year.
+  CloudFront and browsers now revalidate root files by ETag.
+- **Recommendation 5:** once a day (the sweep in 00:00–00:15 UTC) reconcile
+  also scans every month for unsettled records.
+- **Task 14 minors:** `test_sizing.py` checks that `HEADROOM` × predicted
+  memory covers every AWS sample's working set. The caffeine and XL lines
+  under "What 6B-4 inherits" are corrected.
+
+**Incident during this wave (2026-10-07 12:55–13:00Z).** The first draft of
+`test_deploy_script.py` sourced `deploy.sh`, whose phases then ran as `all`
+with the real AWS credentials. It ran from the infra venv's x86_64 Python,
+under which `/usr/bin/git` fails on Apple silicon, so:
+
+- `image_tag` hashed an empty listing, and an image tagged
+  `e3b0c44298fc1c14` (the empty string's hash, with an empty
+  `GENERATOR_COMMIT`) was built from the working tree (`37435e9`'s worker)
+  and pushed at 12:57:43Z.
+- `deploy compute` updated the compute stack at 12:58:56–12:59:30Z: job
+  definition rev 4 on that image, and `37435e9`'s Lambdas and infra. The
+  anomaly monitor stayed on.
+- A site deploy had started when the processes were killed at about
+  13:00Z. The site stack did not change (still `UPDATE_COMPLETE` from
+  11:36Z).
+- The owner's caffeine job (started 12:54Z on rev 3) was not touched.
+
+The fixes above make this impossible to repeat: the guard, the checked git
+calls, and the test's failing `aws`/`docker`/`cdk`/`npm` stand-ins. The
+wave's own `deploy.sh all` replaced rev 4 (below).
 
 ### What 6B-4 inherits
 
@@ -2246,8 +2330,15 @@ From the ledger:
   - `g` (no optimisation long enough to fit it);
   - the SCF's saturation for molecules much larger than benzene, which
     may scale further than 16;
-  - L and XL holding caffeine-scale integrals in core, so running faster
-    than predicted (safe).
+  - XL holding caffeine-scale integrals in core, so running faster than
+    predicted (safe). Only XL can: caffeine's N is 614 at def2-TZVPD, and
+    its 133 GB of integrals fit under PySCF's 80 % share of XL's 244 GB
+    but not L's 64 GB (`calibrate.incore_eri_gb`).
+- **The thinnest timeout margin is caffeine single on M:** predicted
+  2275.5 s, with its timeout clamped to the recipe's 3600 s ceiling, so
+  1.58× rather than `TIMEOUT_FACTOR`'s 3×. It is the first owner job
+  worth running (below), and the one most likely to time out if v2
+  under-predicts direct SCF on M.
 - **The expensive molecules** (C₆₀ and larger drugs) stay the owner's to
   start, from the UI. C₆₀ is refused too-long under both versions at this
   phase's 1 h / 2 h ceilings, so raising the ceilings is a 6B-4 ruling,

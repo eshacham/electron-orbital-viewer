@@ -21,7 +21,7 @@ infra/deploy.sh image      # build and push the worker image (no-op if ECR alrea
 infra/deploy.sh destroy-compute   # empty ECR, destroy the compute stack (the jobs table is retained)
 ```
 
-The order matters: the compute stack needs the site's CloudFront origin (CORS and sign-in redirects), and the site's build needs the compute stack's API URL and Cognito settings (`VITE_JOBS_API_URL`, `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN`). `all` handles it. The worker image's tag is a hash of its committed inputs, so commit before deploying. `compute` on its own does not push the image; if the worker's inputs changed, run `image` too (or use `all`). The script warns when the job definition is about to name a tag ECR does not have.
+The order matters: the compute stack needs the site's CloudFront origin (CORS and sign-in redirects), and the site's build needs the compute stack's API URL and Cognito settings (`VITE_JOBS_API_URL`, `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN`). `all` handles it. The worker image's tag is a hash of its committed inputs (`tools/jobs` less its tests and its `*.md`, the generator's `tools/molecules/*.py`, the lock and `.dockerignore`), so commit before deploying; documentation is left out of both the tag and the image, so a README edit is not a new worker. `compute` on its own does not push the image, and it **refuses** (exit 1) when the repository exists but ECR lacks the tag it would name, since every new job would then fail to pull its image: run `image` first, or `all`. Sourcing `deploy.sh` only defines its functions (its tests do that); executing it runs a phase.
 
 Every site build is followed by two checks that refuse the deploy:
 
@@ -67,13 +67,15 @@ After `destroy-compute`:
 ## Controls
 
 ```
-infra/jobs.sh pause | resume        # the kill switch: POST /api/v1/jobs answers 503 "paused" while paused
+infra/jobs.sh pause | resume        # the kill switch: POST /api/v1/jobs answers 409 "paused" while paused
 infra/jobs.sh status                # kill switch, this month's meter, whether the budget stop is attached
 infra/jobs.sh api GET /api/v1/costs # the job API through its Lambda, with your AWS credentials
 infra/jobs.sh wait <key>            # follow a job (stops after 8 minutes; run again to keep following)
 ```
 
 `jobs.sh api` prints the HTTP status on its first line, then the JSON body. It invokes the api Lambda directly with an HTTP API payload, so it skips Cognito (your IAM credentials are the authority) and API Gateway's throttles.
+
+The `Api5xx` alarm emails on a single 5xx, because every answer the API expects to give is a 4xx: `paused` is 409, a PubChem outage 424, the budget 422. A 5xx is therefore a fault (an unhandled error, a Lambda timeout). The $10 budget counts spend before credits and refunds, so a credited account still reaches its 100 % stop. Only this account's Cost Anomaly Detection and the stack's own Batch-FAILED rule may publish to the alert topic.
 
 If the budget action fires, it attaches the deny-SubmitJob policy to the api role. Running jobs finish; new ones fail with `submit-failed`. Once you have looked at the cause, undo it with `aws budgets execute-budget-action --execution-type REVERSE_BUDGET_ACTION …` (the ids are under Budgets → electron-orbital-viewer-monthly → Actions), and check with `jobs.sh status`.
 

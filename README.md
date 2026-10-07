@@ -451,9 +451,9 @@ XYZ coordinates for a computed one) and what to be wary of. For a computed
 molecule it also links the files that produced it — `input.py` (the exact
 PySCF script; open it and run it again), `output.log`, `geometry.xyz` and
 `job.json`, plus `trajectory.xyz` for an optimisation. The dev server
-serves them as plain text, to read in the browser rather than download;
-in production that depends on the S3 content types Phase 6B-3 sets
-(`docs/HANDOFF.md`). The owner, signed in or on This Mac, sees one more
+serves them as plain text, to read in the browser rather than download,
+and so does production: the AWS worker writes them to S3 as `text/plain`
+(`.py`, `.log`, `.xyz`) or `application/json` (Phase 6B-3). The owner, signed in or on This Mac, sees one more
 line: the job's own wall time and cost, read from the job record itself,
 never from the published molecule.
 
@@ -1064,16 +1064,24 @@ as its own data version, **v2** (483 data files plus the manifest; manifest
 identical to v1 apart from `meta.json`'s provenance (commit, dataVersion) —
 so `publish.py` never ships a version mixing two commits' provenance.
 
-Deployment is an AWS CDK stack (S3 + CloudFront) under `infra/`:
+Deployment is two AWS CDK stacks under `infra/`: the site (S3 + CloudFront)
+and, since Phase 6B-3, the on-demand compute stack (Batch on Fargate, the jobs
+API behind Cognito, DynamoDB, and the cost guards). `infra/README.md` is the
+guide: its phases, what each needs, and the owner's controls.
 
 ```bash
-./infra/deploy.sh                     # builds, then cdk deploy
+./infra/deploy.sh                     # all: compute stack, worker image, then the site built against it
+./infra/deploy.sh site                # the site only
 ```
 
-It needs the AWS CDK CLI (`npm i -g aws-cdk`) and credentials for the target
-account. The Python side pins its own dependencies in `infra/requirements.txt`.
-Before it deploys, it refuses to ship a build that reads a molecule data
-version which was never published — it checks `tools/molecules/version.py`'s
+With no argument it runs `all`, which deploys the compute stack and builds
+and pushes the ARM64 worker image, so it needs `infra/owner.env` (one line,
+`ALERT_EMAIL=…`, gitignored), OrbStack's `docker`, the AWS CDK CLI
+(`npm i -g aws-cdk`) and credentials for the account; it pins us-east-1.
+`site` alone needs only the CDK CLI and credentials. Before any site deploy
+it refuses to ship a bundle whose owner dashboard leaks into the viewer
+(`tools/check_admin_split.mjs`), or one that reads a molecule data version
+which was never published — it checks `tools/molecules/version.py`'s
 `DATA_VERSION` against `src/molecules/data_version.ts`'s
 `MOLECULE_DATA_VERSION`, and both against a live HTTP 200 on that version's
 `index.json` through CloudFront — rather than deploy an app that can load

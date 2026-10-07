@@ -234,3 +234,20 @@ def test_every_decision_says_it_is_a_fargate_estimate():
     job = canonical_job('single', WATER, 0, 1)
     assert sizing.decide(job)['estimateFor'] == 'fargate'
     assert sizing.decide(job, local=True)['estimateFor'] == 'fargate'
+
+
+# Every AWS sample's working set (its peak less the two-electron integrals
+# PySCF held in core only because they fitted; calibrate.incore_eri_gb), as
+# Task 14 fitted memory on: the ladder on S (PYSCF_MAX_MEMORY 80 % of 8 GB),
+# and the probe's benzene at PySCF's default 4000 MB, where it ran direct.
+AWS_PEAKS = [(58, 0.326, 8, None), (58, 0.351, 8, None), (168, 1.392, 8, None), (276, 6.104, 8, None),
+             (276, 0.919, None, 4000), (276, 0.897, None, 4000), (276, 0.886, None, 4000), (276, 0.882, None, 4000)]
+
+
+@pytest.mark.parametrize('n,peak,memory_gb,max_memory_mb', AWS_PEAKS)
+def test_the_memory_headroom_covers_every_aws_working_set(n, peak, memory_gb, max_memory_mb):
+    # A size is chosen at HEADROOM × predicted memory, so that is what a job
+    # may use before it is out of memory (Task 14 review minor).
+    from jobs.calibrate import incore_eri_gb
+    working_set = peak - incore_eri_gb(n, memory_gb, max_memory_mb)
+    assert 0 < working_set <= sizing.HEADROOM * sizing.predicted_memory_gb(n)
