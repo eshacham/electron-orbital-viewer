@@ -2010,8 +2010,11 @@ AWS"). It ran real jobs, and it refits sizing from them (version 2).
 - **Worker images** pushed so far:
   - `74f9efa349cf30b4` (Task 11);
   - `06ef13d73af5ac33` (Task 12: the probe and the IAM fix);
-  - `cd138f4426a4e172` (this task: sizing v2). It is in job definition
-    revision 3.
+  - `cd138f4426a4e172` (this task: sizing v2), job definition revision 3;
+  - `e3b0c44298fc1c14` (a stray, from the fix wave's incident below; no
+    job definition names it, and ECR's keep-5 rule will expire it);
+  - `acbe94cda99aac6c` (the final fix wave, commit `ff2f9b4`, under the
+    new tag recipe), job definition revision 5.
 
 ### The verdicts
 
@@ -2313,8 +2316,32 @@ under which `/usr/bin/git` fails on Apple silicon, so:
 - The owner's caffeine job (started 12:54Z on rev 3) was not touched.
 
 The fixes above make this impossible to repeat: the guard, the checked git
-calls, and the test's failing `aws`/`docker`/`cdk`/`npm` stand-ins. The
-wave's own `deploy.sh all` replaced rev 4 (below).
+calls, and the test's failing `aws`/`docker`/`cdk`/`npm` stand-ins.
+
+**Deployed 2026-10-07 13:10–13:16Z** with `infra/deploy.sh all`
+(`ANOMALY_MONITOR` unset, so it stayed on):
+
+- The image `acbe94cda99aac6c` was pushed, with `GENERATOR_COMMIT` `ff2f9b4`.
+- Compute was `UPDATE_COMPLETE`: job definition rev 5 on that tag, and the
+  api Lambda's `JOB_DEFINITION` names rev 5.
+- The site was `UPDATE_COMPLETE`. The live `index.html`, `admin.html` and
+  admin bundle hash the same as `dist/`.
+- Checks:
+  - 401 without a token, with a POST, and with a forged token.
+  - The site's CORS preflight answers 204 with its origin. A foreign
+    origin gets no allow-origin. Managed login answers 200.
+  - No NAT gateways, and the four alarms are `OK`.
+  - `jobs.sh status`: generation enabled; meter spent $0.0068, reserved
+    $0.1848 (the owner's caffeine job).
+  - A water preview answers sizing version 2: S, Spot, 14.7 s, 600 s,
+    $0.01788.
+  - The budget's CostTypes have IncludeCredit and IncludeRefund false.
+  - The topic policy carries both conditions.
+  - The anomaly monitor and its subscription are present.
+- The owner's caffeine job (`f4e66d73…`, M, Spot, rev 3) was `RUNNING` in
+  `SCF (DIIS)` throughout, with heartbeats fresh at 13:17Z. Nothing
+  touched it.
+- No job was submitted.
 
 ### What 6B-4 inherits
 
