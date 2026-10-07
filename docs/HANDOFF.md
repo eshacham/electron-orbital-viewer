@@ -2014,7 +2014,9 @@ AWS"). It ran real jobs, and it refits sizing from them (version 2).
   - `e3b0c44298fc1c14` (a stray, from the fix wave's incident below; no
     job definition names it, and ECR's keep-5 rule will expire it);
   - `acbe94cda99aac6c` (the final fix wave, commit `ff2f9b4`, under the
-    new tag recipe), job definition revision 5.
+    new tag recipe), job definition revision 5;
+  - `e6b0c6e3e4b9e81c` (sizing v3, commit `8fbb2fe`), job definition
+    revision 6.
 
 ### The verdicts
 
@@ -2122,6 +2124,104 @@ under-prediction spends a timed-out attempt.
 - `aws ce get-anomaly-monitors` lists `electron-orbital-viewer` (CUSTOM,
   tag `app`) with an IMMEDIATE subscription, beside the account's own
   `Default-Services-Monitor`.
+- No job was submitted.
+
+### Sizing version 3 (follow-up, 2026-10-07)
+
+```
+m0 0.477  m2 3.98  t0 4.84  t3 42000  g 1.5  f2 5360
+speedup(c)       = min(c, 16)^0.867     (SCF, unchanged)
+files_speedup(c) = min(c, 32)^0.631     (the file write, unchanged)
+```
+
+Refitted from v2's four ladder jobs, the probe, and the owner's caffeine
+single point (`f4e66d73…`, M Spot, one attempt, 3135 s). Commit `8fbb2fe`.
+The five jobs' `job.json`/`timings.json` and the probe line are now test
+fixtures (`tools/jobs/tests/fixtures/aws/`), and `test_sizing.py` checks
+that `python -m jobs.calibrate --aws --probe …` reproduces `CONSTANTS` from
+them.
+
+- **v2's SCF term missed, not its files term.** v2 predicted 2275.5 s:
+  1452 s of SCF and 824 s of file writing. The run took 2289 s and 847 s.
+  The files term was right on M (−2.7 %). The SCF ran 1.58× v2's
+  prediction.
+- **The forms stand.** Caffeine needed 15 SCF cycles where benzene needed
+  9. Per cycle, the two direct SCFs (both at 4 threads) scale as N^3.47,
+  so N^3.5 holds and the gap is the cycle count. The same M host matched
+  the probe's file-write law, so the host was not slow.
+- **t3 is the slowest direct SCF: caffeine's 42 000.** The probe's
+  benzene gives 26 600 and the in-core ladder 9 050. Ruling T14-speedup
+  takes the slower. A larger molecule is likelier to need caffeine's
+  cycles than benzene's. The cost is that benzene's direct SCF is now
+  over-predicted by 51–65 %.
+- **t0 comes from the in-core runs alone** (4.84, as in v2).
+  `calibrate.fit_aws` marks each AWS sample `direct` when its ERIs did
+  not fit the size. One line through both regimes fits t0 = −100.5,
+  because a direct SCF is slower per (N/1000)^3.5 at every N. The direct
+  jobs now offer a t3 beside the probe's.
+- **f2** 5240 → 5360, **m0/m2** 0.341/6.77 → 0.477/3.98. Caffeine's
+  working set is 1.906 GB at N 614, predicted 1.98. **Guards:** only `g`
+  (fitted −0.29, kept 1.5).
+- **Residuals** (predicted / measured − 1, on the size each ran on):
+
+  | sample | v2 | v3 |
+  |---|---|---|
+  | caffeine single, M (wall 3135 s) | −27.4 % (SCF −36.6 %, files −2.7 %) | −0.04 % (SCF +0.1 %, files −0.5 %) |
+  | water single, S (15.0 s) | −2.1 % | +2.3 % |
+  | benzene single, S (262.8 s) | +60 % | +98 % |
+  | water optimise, S (23.0 s) | +431 % | +437 % |
+  | ethanol optimise, S (270 s floor) | +54 % | +82 % |
+  | probe SCF, 32/16/8/4 threads | −3.9/+1.5/+5.1/−2.5 % | +51/+59/+65/+53 % |
+  | probe files, 32/16/8/4 threads | −12.3/+4.9/+1.5/−11.3 % | −10.3/+7.3/+3.8/−9.2 % |
+
+  Every AWS run is inside `TIME_HEADROOM` (1.5) × its v3 prediction, and
+  `HEADROOM` (2) × v3 memory covers every working set. The worst memory
+  case is the probe's benzene, at −15 %.
+
+| | v2 | v3 |
+|---|---|---|
+| water single (A) | S spot 14.7 s, 600 s, 0.36 GB, reserve $0.01788 | S spot 15.4 s, 600 s, 0.49 GB, reserve $0.01788 |
+| benzene single (A) | S spot 421.5 s, 1265 s, reserve $0.0344 | S spot 520.7 s, 1562 s, reserve $0.0418 |
+| water optimise (B) | S spot 122.1 s, 600 s | S spot 123.5 s, 600 s |
+| ethanol optimise (B) | S spot 414.5 s, 1244 s, reserve $0.0339 | S spot 492.3 s, 1477 s, reserve $0.0397 |
+| caffeine single (A) | M spot 2275.5 s, 3600 s, 2.89 GB, reserve $0.1848 | **L** spot 1040.2 s, 3121 s, 1.98 GB, reserve $0.6439 |
+| caffeine optimise (B) | L spot 3417 s, 7200 s, reserve $1.45 | **refused too-long** (1.4 h on XL, with the 1.5× margin over 2 h) |
+| C₆₀-scale single (N 2220) | too-long (11.7 h on XL) | too-long (18.0 h on XL) |
+| C₆₀-scale optimise | too-long (102 h) | too-long (161 h) |
+
+- **Caffeine single moves from M to L.** On M, v3 predicts 3134 s, and
+  3134 × 1.5 = 4701 s is over the 3600 s ceiling, so M fails the time
+  bar. On L it is 1040 s, with a 3121 s timeout, 3× the prediction and
+  no longer clamped. The reservation rises to $0.64 from $0.18. The
+  predicted bill is $0.069, against M's measured $0.053. A caffeine
+  single submit dedupes to the owner's DONE job.
+- **Caffeine optimise is now refused.** v3 predicts 1.4 h on XL, where
+  L and XL are equally fast for the SCF. With the margin, that is just
+  over the 2 h ceiling. Two things drive it: the larger t3 also prices
+  the 58 def2-SVP steps, and the step count and `g` were already known
+  to over-predict (water's optimisation ran 3 steps, not 16). Those
+  steps (N 246 at def2-SVP) fit in core on every size, where the
+  ladder's t3 is 4.6× smaller. A
+  measured caffeine optimisation, or step costs that follow the in-core
+  regime, would be a v4 question. This is not a ceiling change.
+
+**Deployed 2026-10-07 18:12–18:14Z** (`deploy.sh image`, then
+`deploy.sh compute`, with `ANOMALY_MONITOR` unset):
+
+- The image `e6b0c6e3e4b9e81c` was pushed, with `JOBS_GENERATOR_COMMIT`
+  `8fbb2fe`.
+- Compute was `UPDATE_COMPLETE` in 36 s. Job definition rev 6 names that
+  tag, and the api Lambda's `JOB_DEFINITION` is rev 6. The reconcile and
+  billing Lambdas were updated too.
+- The anomaly monitor (`electron-orbital-viewer`, CUSTOM) and its
+  IMMEDIATE subscription are unchanged.
+- ECR lists 6 images until the keep-5 rule expires the oldest
+  (`74f9efa349cf30b4`).
+- `jobs.sh status`: generation enabled; meter spent $0.0598, reserved $0
+  of $8.80; the budget stop is not attached.
+- Previews answer `version 3`:
+  - water: S, Spot, 15.4 s, 600 s timeout, reserve $0.01788;
+  - caffeine: L, Spot, 1040.2 s, 3121 s timeout, reserve $0.643881.
 - No job was submitted.
 
 ### Findings
@@ -2347,21 +2447,27 @@ calls, and the test's failing `aws`/`docker`/`cdk`/`npm` stand-ins.
 
 - **Recipe C** (spec §4) is 6B-4's. The handlers, sizing and worker
   extend to it as they did for A and B.
-- **Caffeine single on M is the first owner job worth running.** It is
-  predicted at 38 min Spot, reserving $0.18. It would give the first
-  direct-SCF point from a real job, and the first M (4 vCPU) timing,
-  which the ladder never reached. Refit (version 3) once a few such jobs
-  exist. Pass the probe again (`--probe`), or the deployed laws are kept.
+- **Caffeine single has run** (the owner's job on M, 2026-10-07). It
+  gave the first direct-SCF point from a real job and the first M timing.
+  It is now fitted into version 3 (above). Refit again as more direct
+  jobs finish, from `tools/jobs/tests/fixtures/aws/` plus the new
+  folders, passing the probe again (`--probe`), or the deployed laws are
+  kept.
 - **Still unmeasured:**
   - the 2-thread probe point (budget-skipped);
-  - `g` (no optimisation long enough to fit it);
+  - `g` (no optimisation long enough to fit it), and whether a
+    caffeine-scale optimisation's def2-SVP steps, which run in core
+    (N 246), cost as little as the ladder's. Under v3 caffeine optimise is
+    refused too-long;
+  - how the SCF cycle count grows past caffeine's 15 (v3's t3 assumes a
+    larger molecule needs about as many);
   - the SCF's saturation for molecules much larger than benzene, which
     may scale further than 16;
   - XL holding caffeine-scale integrals in core, so running faster than
     predicted (safe). Only XL can: caffeine's N is 614 at def2-TZVPD, and
     its 133 GB of integrals fit under PySCF's 80 % share of XL's 244 GB
     but not L's 64 GB (`calibrate.incore_eri_gb`).
-- **The thinnest timeout margin is caffeine single on M:** predicted
+- **The thinnest timeout margin was caffeine single on M (v2):** predicted
   2275.5 s, with its timeout clamped to the recipe's 3600 s ceiling, so
   1.58× rather than `TIMEOUT_FACTOR`'s 3×. It is the first owner job
   worth running (below), and the one most likely to time out if v2
@@ -2370,10 +2476,13 @@ calls, and the test's failing `aws`/`docker`/`cdk`/`npm` stand-ins.
   attempt): DONE in 3135 s, 87 % of the timeout. The SCF took 2289 s
   (v2's whole-job prediction was 2276 s, so the SCF alone was on the
   mark) and writing files 847 s, which v2 under-predicts on M. Peak
-  memory 1.9 GB of 16. Cost $0.052962 against $0.184761 reserved. A
-  sizing v3 refit that adds this sample (it raises the files term) is the
-  first follow-up; until then, caffeine-scale single points on M sit
-  close to the 1 h ceiling.
+  memory 1.9 GB of 16. Cost $0.052962 against $0.184761 reserved.
+  **v3 covers it** (above). v2's miss was the SCF term (1452 s predicted,
+  2289 s measured), not the files term (824 s, 847 s). v3 predicts this
+  run at 3134.1 s on M (−0.04 %). That is too close to the 1 h ceiling
+  with the 1.5× margin (4701 s), so v3 sends caffeine single to L:
+  1040.2 s, with a 3121 s timeout (3×, not clamped), Spot, reserving
+  $0.64.
 - **The expensive molecules** (C₆₀ and larger drugs) stay the owner's to
   start, from the UI. C₆₀ is refused too-long under both versions at this
   phase's 1 h / 2 h ceilings, so raising the ceilings is a 6B-4 ruling,
