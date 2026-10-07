@@ -395,6 +395,13 @@ def aws_attempt(environ) -> int:
 
 def main(argv=None, environ=None):
     environ = os.environ if environ is None else environ
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ['probe']:
+        # Ruling D15: the speedup probe rides in the worker's image, whose
+        # entry point is this module, so a Batch command override of
+        # ["probe", …] reaches it. It needs no table, bucket or job key.
+        from jobs.probe import main as probe_main
+        return probe_main(argv[1:])
     parser = argparse.ArgumentParser(prog='python -m jobs.worker')
     sub = parser.add_subparsers(dest='command', required=True)
     run = sub.add_parser('run')
