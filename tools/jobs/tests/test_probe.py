@@ -111,3 +111,39 @@ def test_a_real_two_point_probe_feeds_calibrate(tmp_path, capsys):
     assert points['basisFunctions'] == 24 and points['gridShape'] == [32, 32, 32]
     assert math.isfinite(fit_speedup(points))
     assert fit_files(points)['form'] in ('divided', 'undivided')
+
+
+def test_optimise_steps_times_exactly_that_many_steps_and_stops(capsys):
+    # Phase 6B-3 follow-up (Task 7): the route past a recipe decide()
+    # refuses too-long for (caffeine optimise, under v3). Tiny on purpose
+    # (water, def2-SVP, a library id): the shape and the stop-after-N
+    # behaviour are what is tested here; caffeine on L is the real
+    # measurement, not run here.
+    assert probe.main(['--molecule', 'h2o', '--basis', 'def2-SVP', '--optimise-steps', '2']) == 0
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert line['probe'] == 'optimise-steps' and line['molecule'] == 'h2o' and line['basis'] == 'def2-SVP'
+    assert line['basisFunctions'] == 24
+    assert len(line['steps']) == 2
+    assert all(s['seconds'] > 0 and isinstance(s['cycles'], int) and s['cycles'] >= 1 for s in line['steps'])
+
+
+def test_optimise_steps_takes_explicit_atoms_for_a_molecule_outside_the_library(capsys):
+    # Caffeine (and any owner molecule) is never in tools/molecules' library,
+    # only ever resolved through PubChem, which this probe does not call:
+    # --atoms-json is the route documented in HANDOFF for the real caffeine
+    # measurement. Water's own atoms stand in here, tiny on purpose.
+    water = json.dumps([[8, 0.0, 0.0, 0.11779], [1, 0.0, 0.75545, -0.47116], [1, 0.0, -0.75545, -0.47116]])
+    assert probe.main(['--molecule', 'water-custom', '--basis', 'def2-SVP', '--optimise-steps', '1',
+                       '--atoms-json', water]) == 0
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert line['probe'] == 'optimise-steps' and line['molecule'] == 'water-custom'
+    assert line['basisFunctions'] == 24
+    assert len(line['steps']) == 1 and line['steps'][0]['cycles'] >= 1
+
+
+def test_the_worker_entry_point_hands_optimise_steps_on(monkeypatch):
+    seen = []
+    monkeypatch.setattr(probe, 'main', lambda argv: seen.append(argv) or 0)
+    assert worker.main(['probe', '--molecule', 'caffeine', '--basis', 'def2-SVP', '--optimise-steps', '3'],
+                       environ={}) == 0
+    assert seen == [['--molecule', 'caffeine', '--basis', 'def2-SVP', '--optimise-steps', '3']]

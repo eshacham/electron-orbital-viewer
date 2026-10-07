@@ -285,6 +285,26 @@ def test_aws_samples_say_whether_the_scf_ran_direct(tmp_path):
     assert small['direct'] is False and big['direct'] is True
 
 
+def test_aws_samples_reads_old_timings_without_a_cycles_field(tmp_path):
+    # v4 prep (Task 6): a timings.json from before worker.py recorded the
+    # SCF's cycle count (every fixture `write()` makes is this shape) must
+    # still read -- backward compatibility, not an error.
+    small, big = aws_samples([write(tmp_path, 'single', carbons(3), 2), write(tmp_path, 'single', carbons(16), 4)])
+    assert small['scfCycles'] is None and big['scfCycles'] is None
+
+
+def test_aws_samples_reads_the_cycles_field_when_present(tmp_path):
+    d = write(tmp_path, 'single', carbons(3), 2)
+    timings_path = d / 'timings.json'
+    timings = json.loads(timings_path.read_text())
+    for stage in timings['stages']:
+        if stage['name'].startswith('SCF'):
+            stage['cycles'] = 11
+    timings_path.write_text(json.dumps(timings))
+    [sample] = aws_samples([d])
+    assert sample['scfCycles'] == 11
+
+
 def incore_ladder(tmp_path):
     """Runs whose ERIs all fit on S (N 111, 148, 222), so the SCF ran in core."""
     return [write(tmp_path, 'single', carbons(3), 2), write(tmp_path, 'optimise', carbons(4), 2),
@@ -293,7 +313,7 @@ def incore_ladder(tmp_path):
 
 def test_a_slower_direct_job_sets_t3_and_t0_comes_from_the_incore_runs_alone(tmp_path):
     # Sizing v3 (Phase 6B-3 follow-up): caffeine on M ran direct and slower,
-    # per (N/1000)^3.5, than the probe's benzene (15 SCF cycles to 9). One
+    # per (N/1000)^3.5, than the probe's benzene (15 SCF cycles to 7). One
     # line through in-core and direct runs together bends t0 negative; so the
     # in-core runs give t0, and every direct run (job or probe) offers a t3,
     # the slowest kept (Ruling T14-speedup).
@@ -310,3 +330,37 @@ def test_a_faster_direct_job_leaves_the_slower_t3(tmp_path):
     dirs = incore_ladder(tmp_path) + [write(tmp_path, 'single', carbons(20), 4, size='M', t3=T3 / 2)]
     got = fit_aws(aws_samples(dirs), probe=model_probe(t3=3 * T3))
     assert got['t0'] == pytest.approx(T0, rel=1e-6) and got['t3'] == pytest.approx(3 * T3, rel=1e-6)
+
+
+def test_a_fast_large_direct_job_does_not_lower_t3(tmp_path):
+    # Task 3 (Phase 6B-3 follow-up): the direct jobs' t3 is the max of each
+    # job's own t3, not a weighted least squares through the origin. That
+    # average weights each job's point by its (N/1000)^3.5 squared, so a
+    # fast job at a much larger N can outvote a slow job at a smaller one --
+    # exactly backwards from "keep the slowest" (Ruling T14-speedup).
+    a, b = tmp_path / 'a', tmp_path / 'b'
+    a.mkdir(), b.mkdir()
+    slow = write(a, 'single', carbons(20), 4, size='M', t3=2 * T3)
+    without_fast = fit_aws(aws_samples(incore_ladder(a) + [slow]), probe=model_probe())
+    slow = write(b, 'single', carbons(20), 4, size='M', t3=2 * T3)
+    fast_and_large = write(b, 'single', carbons(50), 4, size='XL', t3=T3 / 4)
+    with_fast = fit_aws(aws_samples(incore_ladder(b) + [slow, fast_and_large]), probe=model_probe())
+    assert with_fast['t3'] >= without_fast['t3']
+    assert with_fast['t3'] == pytest.approx(2 * T3, rel=1e-6)
+
+
+def test_t0_falls_back_to_every_sample_when_fewer_than_two_incore_n(tmp_path):
+    # fit_time needs two distinct N among the samples it fits on: fit_aws
+    # normally takes those from the in-core runs alone, but two in-core runs
+    # at the very same N (the same atoms, 'single' and 'optimise' both run
+    # their final SCF at the same basis) cannot separate t0 from t3 alone.
+    # fit_aws then falls back to every sample, in-core and direct together,
+    # and the notes say so (calibrate.py's 'fewer than 2 in-core N' branch).
+    same_n = [write(tmp_path, 'single', carbons(3), 2), write(tmp_path, 'optimise', carbons(3), 2)]
+    direct = write(tmp_path, 'single', carbons(20), 4, size='M', t3=2 * T3)
+    samples = aws_samples(same_n + [direct])
+    assert len({s['basisFunctions'] for s in samples if not s['direct']}) == 1
+    got = fit_aws(samples, probe=model_probe())
+    assert any(note.startswith('t0: fewer than 2 in-core N') for note in got['notes'])
+    expected = fit_time(samples, (got['scfExponent'], got['scfSaturation']))
+    assert got['t0'] == pytest.approx(expected['t0'], rel=1e-9)

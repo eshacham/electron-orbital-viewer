@@ -78,6 +78,22 @@ def test_h2_end_to_end(env):
     assert (root / 'attempts' / '1' / 'input.py').exists()
 
 
+def test_timings_record_the_converged_scfs_cycle_count(env):
+    # v4 prep (Phase 6B-3 follow-up, Task 6): the SCF stage that converged
+    # carries PySCF's own mf.cycles, the same figure probe.py's measure()
+    # and sizing's t3 fit already use. Stages before it (a failed rung, or
+    # 'writing files') carry no 'cycles' key.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    assert run_job(key, store, sink, grid_points=(32,)) == 'DONE'
+    timings = json.loads((jobs / key / 'timings.json').read_text())
+    scf_stages = [s for s in timings['stages'] if s['name'].startswith('SCF')]
+    assert scf_stages and 'cycles' in scf_stages[-1]
+    assert isinstance(scf_stages[-1]['cycles'], int) and scf_stages[-1]['cycles'] >= 1
+    assert all('cycles' not in s for s in timings['stages'] if not s['name'].startswith('SCF'))
+    assert all('cycles' not in s for s in scf_stages[:-1])
+
+
 def test_meta_records_method_commit_and_a_flushed_log(env, monkeypatch):
     store, sink, jobs = env
     monkeypatch.setenv('JOBS_GENERATOR_COMMIT', 'abc123')    # D2: the container has no git

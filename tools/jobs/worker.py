@@ -123,11 +123,23 @@ class Progress:
             if energy is not None:
                 self.energy = float(energy)
 
-    def durations(self, end):
+    def durations(self, end, scf_cycles=None):
+        """Each stage's name and seconds. For v4 (Phase 6B-3 follow-up,
+        Task 6): the SCF stage that converged also carries its cycle count
+        (PySCF's own mf.cycles, the figure sizing's t3 is fitted on and
+        probe.py's measure() already reports), when the caller has one.
+        Old timings.json files, and any stage before the final SCF (a
+        failed DIIS rung, say), simply lack the key: calibrate.aws_samples
+        must keep reading those."""
         out = []
         for i, s in enumerate(self.stages):
             stop = self.stages[i + 1]['start'] if i + 1 < len(self.stages) else end
             out.append({'name': s['name'], 'seconds': round(stop - s['start'], 2)})
+        if scf_cycles is not None:
+            for entry in reversed(out):
+                if entry['name'].startswith('SCF'):
+                    entry['cycles'] = scf_cycles
+                    break
         return out
 
 
@@ -208,7 +220,7 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     heart = threading.Thread(target=beat, daemon=True)
     heart.start()
     began, cwd = time.monotonic(), os.getcwd()
-    error, ns, final_atoms, devnull = None, {}, None, None
+    error, ns, final_atoms, devnull, mf = None, {}, None, None, None
     try:
         os.chdir(work)                              # geomeTRIC writes its scratch files to the working directory
         ns = runpy.run_path(str(work / 'input.py'), run_name='jobs_input')
@@ -262,9 +274,12 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
 
     ended = time.monotonic()
     actual = {'wallSeconds': round(ended - began, 2), 'peakMemoryGB': _peak_memory_gb(), 'threads': _threads()}
+    # v4 prep (Task 6): mf is the SCF that converged (None if the run failed
+    # before one did), and its .cycles is the count sizing's t3 is fitted on.
+    scf_cycles = int(getattr(mf, 'cycles', -1)) if mf is not None else None
     timings = {'attempt': attempt, 'backend': backend, 'size': sizing['size'], 'vcpu': sizing['vcpu'],
                'memoryGB': sizing['memoryGB'], 'capacity': sizing['capacity'],
-               'stages': progress.durations(ended), **actual,
+               'stages': progress.durations(ended, scf_cycles), **actual,
                'startedAt': record['startedAt'], 'endedAt': iso(utc_now())}
     # D17: copying the files out is protected too. A result file the worker
     # cannot write (FileExistsError) must end the job FAILED saying so, not

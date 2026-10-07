@@ -248,6 +248,37 @@ def test_caffeine_on_m_is_no_longer_under_predicted():
     assert parts['scfSeconds'] + parts['filesSeconds'] >= 0.99 * timings['wallSeconds']
 
 
+def _caffeine_job(recipe):
+    """The committed caffeine fixture's own molecule (f4e66d7330ed…, the
+    owner's calibration job), re-wrapped for `recipe` by canonical_job --
+    not CAFFEINE above, so this is pinned on the fixture itself."""
+    folder = next(d for d in AWS_JOBS if d.name.startswith('f4e66d7330ed'))
+    molecule = json.loads((folder / 'job.json').read_text())['job']['molecule']
+    return canonical_job(recipe, molecule['atoms'], molecule['charge'], molecule['multiplicity'])
+
+
+def test_caffeine_single_runs_on_l_spot_under_the_live_v3_constants():
+    # Review minor 4: pinned on the committed caffeine fixture and the live
+    # sizing.CONSTANTS (not a monkeypatch), so a future constants change that
+    # moves this must touch this test, not pass silently.
+    d = sizing.decide(_caffeine_job('single'))
+    assert (d['size'], d['vcpu'], d['capacity']) == ('L', 16, 'spot')
+    assert d['predictedSeconds'] == pytest.approx(1040.2, rel=0.01)
+    assert d['version'] == 3
+
+
+def test_caffeine_optimise_is_refused_too_long_under_the_live_v3_constants():
+    # Review minor 4, with minor 5's reworded message: the numbers it quotes
+    # must be internally consistent (the margined figure is TIME_HEADROOM
+    # times the bare one).
+    with pytest.raises(JobRefused) as e:
+        sizing.decide(_caffeine_job('optimise'))
+    assert e.value.code == 'too-long'
+    assert 'predicted 1.4 h on XL' in e.value.message
+    assert 'with the 1.5× margin that is 2.1 h' in e.value.message
+    assert 'longer than the 2 h limit for optimise' in e.value.message
+
+
 def test_the_constants_are_what_calibrate_fits_from_the_fixtures():
     # Version 3 is reproducible: `python -m jobs.calibrate --aws --probe
     # fixtures/aws/speedup-probe.json fixtures/aws/*/` prints these constants,
@@ -261,8 +292,10 @@ def test_the_constants_are_what_calibrate_fits_from_the_fixtures():
 @pytest.mark.parametrize('i', range(4))
 def test_the_probe_is_never_under_predicted_and_its_files_within_15_percent(i):
     # Version 3's t3 is caffeine's (15 SCF cycles) where version 2's was the
-    # probe's benzene (9 cycles); per cycle the two scale as N^3.47, so the
-    # N^3.5 form stands, and benzene's SCF is over-predicted by the cycles.
+    # probe's benzene (7 cycles; a different in-core benzene in the ladder on
+    # S ran 9). Per Fock build the two direct SCFs scale as N^3.22, so the
+    # N^3.5 form is conservative per cycle, and benzene's SCF is
+    # over-predicted by the cycles.
     n = PROBE['n'][i]
     parts = sizing.predict_parts(canonical_job('single', BENZENE, 0, 1), sizing.Size('probe', n, 244))
     assert PROBE['scfSeconds'][i] <= parts['scfSeconds'] <= 1.7 * PROBE['scfSeconds'][i]

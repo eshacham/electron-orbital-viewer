@@ -10,6 +10,11 @@ fit_speedup and fit_files read it; nothing here touches AWS.
 
     python -m jobs.worker probe [--budget-seconds 1080]          (the image's entry point)
     python -m jobs.probe --molecule h2o --basis def2-SVP --threads 2,1 --grid-points 32   (a quick local check)
+    python -m jobs.worker probe --molecule caffeine --basis def2-SVP --optimise-steps 3 \
+        --atoms-json '[[1,-2.9346,2.1021,-0.8849], ...]'   (Phase 6B-3 follow-up: times a few optimisation
+        steps directly, bypassing decide() and the jobs table, for a recipe decide() refuses too-long --
+        caffeine is not in the library (only ever resolved through PubChem), hence --atoms-json; see
+        measure_optimise and HANDOFF's "Caffeine optimise is now refused")
 
 Each thread count runs in a fresh child process with OMP_NUM_THREADS and
 OPENBLAS_NUM_THREADS set to n, as BatchRunner sets OMP_NUM_THREADS to the
@@ -92,6 +97,39 @@ def measure(molecule, basis, n, grid_points):
             'basisFunctions': int(mol.nao), 'gridShape': meta['grid']['shape'], 'peakMemoryGB': _peak_memory_gb()}
 
 
+def measure_optimise(atoms, basis, steps, spin=0, label=None):
+    """A few optimisation steps (SCF + gradient), timed directly (Phase 6B-3
+    follow-up, Task 7): the measurement route for a recipe decide() refuses
+    too-long for, since that refusal means no job record and no Batch
+    submission ever exists to time. `atoms` is an explicit [[Z,x,y,z],...]
+    list, not a library id: caffeine (and any owner molecule) is never in
+    tools/molecules' library, only ever resolved through PubChem, which this
+    probe does not call (Ruling D15, extended -- see main's --atoms-json).
+    geomeTRIC's own maxsteps stops the optimisation after `steps` real
+    (SCF + gradient) evaluations, raising NotConvergedError on the next one,
+    which `kernel` already catches; the geometry answer is thrown away; only
+    each step's wall time and the SCF's cycle count (the gradient scanner's
+    `.base`, the mf object that step's SCF converged, the same `.cycles`
+    probe's own measure() and input_template's SCFNotConverged check read)
+    matter."""
+    from pyscf import gto
+    from pyscf.geomopt.geometric_solver import kernel as geometric_kernel
+    from optimise import make_dft
+
+    mol = gto.M(atom=atoms, unit='Angstrom', basis=basis, spin=spin, symmetry=True, verbose=0)
+    began, out = [time.monotonic()], []
+
+    def callback(envs):
+        now = time.monotonic()
+        base = getattr(envs['g_scanner'], 'base', None)
+        out.append({'seconds': round(now - began[0], 3), 'cycles': int(getattr(base, 'cycles', -1))})
+        began[0] = now
+
+    geometric_kernel(make_dft(mol), maxsteps=steps, callback=callback)
+    return {'probe': 'optimise-steps', 'molecule': label, 'basis': basis, 'vcpu': _vcpu(),
+            'basisFunctions': int(mol.nao), 'steps': out}
+
+
 def run_child(n, molecule, basis, grid_points):
     """measure() in a fresh Python, its thread pools fixed at n from the start."""
     env = dict(os.environ, OMP_NUM_THREADS=str(n), OPENBLAS_NUM_THREADS=str(n), MKL_NUM_THREADS=str(n),
@@ -150,8 +188,26 @@ def main(argv=None):
     parser.add_argument('--budget-seconds', type=float, default=None,
                         help='skip a run that would end past this many seconds (keep it under the task timeout)')
     parser.add_argument('--child', type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument('--optimise-steps', type=int, default=None,
+                        help='time this many optimisation steps (SCF + gradient) instead of the thread sweep '
+                             '-- the route past a recipe decide() refuses too-long (Phase 6B-3 follow-up)')
+    parser.add_argument('--atoms-json', default=None,
+                        help='[[Z,x,y,z],...] in Angstrom, for --optimise-steps on a molecule outside the '
+                             'library (e.g. caffeine, which the app only ever resolves through PubChem)')
+    parser.add_argument('--spin', type=int, default=0, help='2S (multiplicity - 1), for --atoms-json')
     args = parser.parse_args(argv)
     grid = tuple(int(v) for v in args.grid_points.split(',')) if args.grid_points else None
+    if args.optimise_steps is not None:
+        if args.atoms_json:
+            atoms, spin = json.loads(args.atoms_json), args.spin
+        else:
+            from library import by_id
+            from optimise import geometry_for
+            entry = by_id(args.molecule)
+            atoms, spin = geometry_for(entry)[0], entry.spin
+        line = measure_optimise(atoms, args.basis, args.optimise_steps, spin=spin, label=args.molecule)
+        print(json.dumps(line), flush=True)
+        return 0
     if args.child is not None:
         from build_library import GRID_POINTS_TRIES
         print(json.dumps(measure(args.molecule, args.basis, args.child, grid or GRID_POINTS_TRIES)), flush=True)

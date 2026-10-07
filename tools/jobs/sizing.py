@@ -44,11 +44,15 @@ SIZING_VERSION = 3
 #   One power law (0.596) misses by up to 30 %: 4 -> 16 threads gained 3.5x, 16 -> 32 nothing.
 # - filesExponent, filesSaturation: the probe's file write, on its own law, min(c, 32)^0.631, within
 #   10 % (a plateau at 16 fits worse and would promise L more); undivided misses by up to 2.1x.
-# - t3: caffeine's direct SCF (42 000), the slowest of three: the probe's direct SCF gives 26 600 and
-#   the in-core ladder 9 050. Version 2 took the probe's and predicted caffeine's SCF at 1452 s on M; it
-#   took 2289 s. Caffeine needed 15 SCF cycles to benzene's 9; per cycle the two scale as N^3.47, so
-#   N^3.5 stands and the gap is cycle count, which a larger molecule is likelier to share with caffeine
-#   than with benzene. Benzene's direct SCF (the probe) is now over-predicted by 51-65 % (safe).
+# - t3: caffeine's direct SCF (42 000), the slowest of three: the probe's direct SCF gives 27 700 (the
+#   slowest of its four points, not their mean -- a weighted average would let a fast large sample
+#   outvote a slow one) and the in-core ladder 9 050. Version 2 took the probe's and predicted caffeine's
+#   SCF at 1452 s on M; it took 2289 s. Caffeine needed 15 SCF cycles to the probe's own benzene's 7 (a
+#   different in-core benzene, in the ladder on S, ran 9 cycles; the ladder's benzene and the probe's are
+#   two different runs). Per Fock build (cycles + init + extra: 17 vs 9), the two direct SCFs scale as
+#   N^3.22, so N^3.5 is conservative per cycle, and the gap is cycle count, which a larger molecule is
+#   likelier to share with caffeine than with benzene. Benzene's direct SCF (the probe) is now
+#   over-predicted by 51-65 % (safe).
 # - t0: the in-core ladder's intercept alone (4.84, as version 2). One line through in-core and direct
 #   runs together fits -100.5: a direct SCF is slower per (N/1000)^3.5 at every N.
 # - f2: the ladder, the probe and caffeine, each multiplied back up by files_speedup (5240 -> 5360).
@@ -163,9 +167,10 @@ def decide(job: dict, local: bool = False) -> dict:
     if size is None:
         best = memory_fitting[-1]
         best_seconds = predict_seconds(job, best)
+        margined_hours = best_seconds * TIME_HEADROOM / 3600
         raise JobRefused('too-long', f'predicted {best_seconds / 3600:.1f} h on {best.name} (the fastest size with '
-                                     f'enough memory), {TIME_HEADROOM:g}× margin included: longer than this phase '
-                                     f'allows for {job["recipe"]} ({ceiling / 3600:g} h)')
+                                     f'enough memory); with the {TIME_HEADROOM:g}× margin that is {margined_hours:.1f} h, '
+                                     f'longer than the {ceiling / 3600:g} h limit for {job["recipe"]}')
     timeout = int(min(max(math.ceil(TIMEOUT_FACTOR * seconds), MIN_TIMEOUT_SECONDS), ceiling))
     if local:
         capacity, attempts = 'local', 1

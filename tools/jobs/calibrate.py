@@ -157,6 +157,11 @@ def aws_samples(job_dirs):
                     # The last step's stage runs on into the final SCF's setup, so it is left out.
                     'stepSeconds': _median(steps[:-1]) if len(steps) >= 2 else None,
                     'scfSeconds': sum(s['seconds'] for s in stages if s['name'].startswith('SCF')),
+                    # v4 prep (Task 6): the SCF stage that converged carries its own cycle count from
+                    # worker.py, when it was run recently enough to record one. None for an older
+                    # timings.json (no 'cycles' key on any stage) -- not read by this version's fit.
+                    'scfCycles': next((s['cycles'] for s in reversed(stages)
+                                       if s['name'].startswith('SCF') and 'cycles' in s), None),
                     # D4: the files term (Ruling D14) is refitted too, from the same stage 6B-1's fit reads.
                     'filesSeconds': sum(s['seconds'] for s in stages if s['name'] == 'writing files'),
                     'threads': timings['vcpu'], 'peakMemoryGB': peak,
@@ -327,7 +332,14 @@ def fit_aws(samples, probe=None):
       job flagged `direct` ran direct, the regime that caffeine and beyond
       run in. The slower prediction is the safe one: an under-prediction
       spends a timed-out attempt; an over-prediction only reserves a little
-      more.
+      more. Both the direct jobs' and the probe's own t3 are each the max of
+      their per-point (seconds × speedup − t0) / (N/1000)^3.5, not a mean or
+      a weighted least squares through the origin: a weighted average lets a
+      fast large sample outvote a slow one (its (N/1000)^3.5 weight is
+      larger), quietly lowering t3 below what "keep the slowest" (Ruling
+      T14-speedup) means to guarantee. A future refit with more direct jobs
+      or a noisier probe must keep following the max, even where today's one
+      direct job and near-flat probe values make max and mean coincide.
     - t0 (and the in-core t3) come from the in-core samples alone, when
       they span two N (version 3): one line through both regimes bends t0
       negative, since a direct SCF is slower per (N/1000)^3.5 at any N.
@@ -362,15 +374,21 @@ def fit_aws(samples, probe=None):
     t0, t3 = time_['t0'], time_['t3']
     direct = [s for s in samples if s.get('direct')]
     if direct and len(incore) < len(samples) and len({s['basisFunctions'] for s in incore}) >= 2:
-        us = [(s['basisFunctions'] / 1000) ** 3.5 for s in direct]
-        jobs_t3 = _through_origin(us, [s['scfSeconds'] * _speedup(s['threads'], scf_law) - t0 for s in direct])
+        # The max of each direct job's own t3, not a weighted least squares
+        # through the origin: that average lets a fast large sample outvote
+        # a slow one (its (N/1000)^3.5 weight is the larger), against "keep
+        # the slowest" (Ruling T14-speedup, extended).
+        per_job = [(s['scfSeconds'] * _speedup(s['threads'], scf_law) - t0) / (s['basisFunctions'] / 1000) ** 3.5
+                  for s in direct]
+        jobs_t3 = max(per_job)
         if jobs_t3 > t3:
-            notes.append(f't3: the direct jobs ({len(direct)}) give {jobs_t3:.4g}, the in-core runs {t3:.4g}; '
-                         f'kept the direct jobs\', the slower')
+            notes.append(f't3: the direct jobs ({len(direct)}) give {jobs_t3:.4g} (the slowest of them), '
+                         f'the in-core runs {t3:.4g}; kept the direct jobs\', the slower')
             t3 = jobs_t3
     if extra:
-        probe_t3 = sum((s['scfSeconds'] * _speedup(s['threads'], scf_law) - t0) / (s['basisFunctions'] / 1000) ** 3.5
-                       for s in extra) / len(extra)
+        # The max of the probe's own per-point t3, for the same reason.
+        probe_t3 = max((s['scfSeconds'] * _speedup(s['threads'], scf_law) - t0) / (s['basisFunctions'] / 1000) ** 3.5
+                       for s in extra)
         if probe_t3 > t3:
             notes.append(f't3: the probe\'s direct SCF gives {probe_t3:.4g}, more than {t3:.4g} (the in-core '
                          f'runs\' or the direct jobs\'); kept the probe\'s, the slower')
