@@ -29,7 +29,7 @@ so the same viewer renders both.
 | `sink.py` | `Sink` contract + `LocalSink`, writing to `tools/molecules/out/jobs/`; `S3Sink` is 6B-3 |
 | `worker.py` | Runs one job end to end: claim, execute, write Phase 6's files, record the outcome. Never settles — the runner or `cli --wait` does (Ruling T5-b). Imports PySCF |
 | `make_basis_counts.py` | Regenerates `basis_counts.json` from PySCF after a PySCF upgrade |
-| `calibrate.py` | Fits `sizing.CONSTANTS` from finished jobs' `timings.json`/`job.json` |
+| `calibrate.py` | Fits `sizing.CONSTANTS` from finished jobs' `timings.json`/`job.json`: local (version 1), or `--aws` with the speedup probe (version 2) |
 | `cli.py` | `enqueue`/`submit`/`generation`, see below |
 
 ## Running locally
@@ -194,10 +194,13 @@ in `(N/1000)²`; `SCF seconds × speedup(threads) − t0` is proportional to
 the `writing files` stage alone, with no `speedup` divided out — Phase 6's
 grid-writing code is not threaded, Ruling D14). Round to three significant
 figures, bump `SIZING_VERSION`, update `CONSTANTS` in `sizing.py`, and date
-the comment with the machine the samples came from. Version 1 (current) was
-fitted from water, benzene and caffeine on an Apple M2 Pro — see
-`docs/HANDOFF.md`'s "Phase 6B-1" section for the constants and their
-measured-vs-predicted table.
+the comment with the machine the samples came from. Version 1 was fitted
+from water, benzene and caffeine on an Apple M2 Pro (see `docs/HANDOFF.md`'s
+"Phase 6B-1" section). Version 2, the current one, comes from AWS runs and
+the speedup probe, and divides the files term by a speedup of its own (see
+"In AWS" below and HANDOFF's "Phase 6B-3"). A local refit can no longer
+replace it: this Mac's PySCF has no OpenMP, so its runs say nothing about
+how a Fargate worker's vCPUs speed a job up.
 
 ## Keys are pinned
 
@@ -210,3 +213,21 @@ history across two keys or colliding two different ones. Any such change
 must bump `computeVersion`, which is itself part of the canonical document,
 so a version bump always produces new keys rather than reinterpreting old
 ones.
+
+## In AWS (Phase 6B-3)
+
+The same handlers run in the `api` Lambda behind API Gateway and Cognito, with AWS adapters behind the same interfaces:
+
+| Interface | Local (6B-1) | AWS (6B-3) |
+|---|---|---|
+| `Store` | `FileStore` (`tools/jobs/.state/`) | `DynamoStore`: one table; meter `METER#YYYY-MM`, resolutions `RESOLVE#…`, `CONFIG`, `BILLING#YYYY-MM`; GSI `byMonth` |
+| `Runner` | `LocalRunner` (a subprocess) | `BatchRunner`: Fargate Spot or on-demand, size and timeout per job, retries only on a Spot interruption |
+| `Sink` | `LocalSink` (`tools/molecules/out/jobs/`) | `S3Sink`: `molecules/jobs/<key>/` in the data bucket, result files written once (`If-None-Match: *`) |
+| settlement | `LocalRunner`, at $0 | `reconcile.py`: Batch events plus a 15-minute sweep, billed seconds from ECS, exactly once |
+
+- `tests/test_store.py` is the `Store` contract and runs against both backends (DynamoDB on moto). Run all with `tools/molecules/.venv/bin/python -m pytest tools/jobs -q`.
+- `python -m jobs.worker run <key> --aws` is what Batch runs. It reads `JOBS_TABLE` and `DATA_BUCKET`, and the attempt is `JOB_ATTEMPT_OFFSET + AWS_BATCH_JOB_ATTEMPT`.
+- `python -m jobs.worker probe …` is the speedup probe (`probe.py`): benzene's SCF and file write timed at 32, 16, 8, 4 and 2 threads in one task, printed as one JSON line.
+- Recalibrating from AWS: fetch the jobs' `job.json` and `timings.json` from CloudFront into one folder each, then run `python -m jobs.calibrate --aws [--probe probe.log] <folders>` (from `tools/`). It prints `compare` (each job's recorded prediction against its run), `fit` (unguarded, with notes), and `constants` and `guards`, which are ready for `sizing.CONSTANTS`. Commit a new `SIZING_VERSION` and redeploy (`infra/deploy.sh image && infra/deploy.sh compute`).
+- On AWS a job's `peakMemoryGB` is not what it needs. `PYSCF_MAX_MEMORY` is 80 % of the worker's memory, so PySCF keeps the two-electron integrals in memory whenever they fit (benzene on S: 5.4 of its 6.1 GB). `calibrate` fits memory on the working set (`workingSetGB`), which leaves those integrals out.
+- Deploying, the owner's controls and the owner actions are in `infra/README.md`.

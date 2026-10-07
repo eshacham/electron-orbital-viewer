@@ -1970,6 +1970,292 @@ Cognito, the HTTP API) is 6B-3.
   question unless the system is a Bonds one — a molecule's own drawn
   picture can never reach it.
 
+## Phase 6B-3 — AWS (2026-10-07)
+
+Plan: `docs/superpowers/plans/2026-10-05-phase-6b-3-aws.md`. Spec:
+`docs/superpowers/specs/2026-10-05-on-demand-generation-design.md` §6–§12.
+This phase puts 6B-1's jobs core behind AWS: the same handlers in a Lambda,
+with AWS adapters behind 6B-1's interfaces (`tools/jobs/README.md`, "In
+AWS"). It ran real jobs, and it refits sizing from them (version 2).
+
+### What shipped
+
+- **`ElectronOrbitalViewerComputeStack`** (`infra/compute_stack.py`,
+  `infra/cost_guards.py`; 78 resources, first deployed 2026-10-06 23:03Z in
+  139 s). It holds:
+  - Batch on Fargate and Fargate Spot (Linux/ARM64): one job definition,
+    with size and timeout set per job.
+  - The jobs table (DynamoDB, **retained** on destroy).
+  - A stack-owned ECR repository that keeps the last 5 images.
+  - The `api`, `reconcile` and `billing` Lambdas.
+  - An HTTP API behind Cognito (Essentials plan, TOTP MFA, token
+    revocation on).
+  - Cost guards: the $10/month Budget with its deny-SubmitJob action on
+    the api role, four alarms, and the cost-anomaly monitor (on since this
+    task).
+  - Its outputs: `JobsApiUrl`, `CognitoAuthority`, `CognitoDomain`,
+    `UserPoolId`, `UserPoolClientId`, `JobsTableName`, `ApiFunctionName`,
+    `ApiRoleName`, `DenySubmitPolicyArn`, `WorkerLogGroup`,
+    `WorkerRepositoryUri`.
+- **The site stack** is unchanged except one additive `ErrorResponse(403,
+  ttl 0)` (Ruling D13). The site build now carries the `VITE_*` sign-in
+  settings, and sign-out revokes the refresh token (Task 10b, D11).
+- **Controls:**
+  - `infra/deploy.sh [all|site|compute|image|destroy-compute]`, with
+    `ANOMALY_MONITOR=on|off` for the compute phases (unset keeps the
+    deployed value).
+  - `infra/jobs.sh pause|resume|status|api|wait`.
+  - Both pin us-east-1. `infra/README.md` documents them, and the owner
+    actions.
+- **Worker images** pushed so far:
+  - `74f9efa349cf30b4` (Task 11);
+  - `06ef13d73af5ac33` (Task 12: the probe and the IAM fix);
+  - `cd138f4426a4e172` (this task: sizing v2). It is in job definition
+    revision 3.
+
+### The verdicts
+
+- **XL (32 vCPU / 244 GB, ARM64) exists:**
+  - 2026-10-05 (Task 1): ECS registered a 32768/249856 ARM64 task
+    definition, and Batch accepted a Fargate job definition of that size.
+    Both probes were then removed.
+  - 2026-10-07 (Task 12 Step 10): the speedup probe **ran** as
+    `32768 249856 FARGATE_SPOT arm64` (ECS `describe-tasks`). Branch X-A:
+    `SIZES` is unchanged.
+- **Fargate Spot runs ARM64 Batch jobs:** proven on 2026-10-07 by the probe
+  and by the first water job, both on `FARGATE_SPOT`. Branch S-A:
+  `SPOT_AVAILABLE = True`. A real Spot interruption (ethanol, below) was
+  retried by Batch and finished. This is Review Focus 1, seen live.
+
+### The first job and the ladder (Tasks 12–13, all on S = 2 vCPU / 8 GB, Spot)
+
+| key (first 12) | molecule, recipe | v1 predicted | actual | cost |
+|---|---|---|---|---|
+| `22b6b939b8af` | water, single (A) | 11.7 s, 0.42 GB | 15.04 s, 0.326 GB | $0.000497 (60 s minimum) |
+| `ffdaf035aee5` | benzene, single (A) | 314.9 s, 0.70 GB | 262.75 s, 6.104 GB | $0.002575 |
+| — | caffeine, single (A) | 2097.4 s on M | not run: ≥ 10 min, the gate's skip | $0 |
+| `df22d76f6f7a` | water, optimise (B) | 127.6 s, 0.42 GB | 23.01 s, 0.351 GB | $0.000505 |
+| `2233f97f7719` | ethanol, optimise (B) | 373.7 s, 0.52 GB | 124.92 s (attempt 2, after a Spot reclaim of attempt 1 at ~4 min), 1.392 GB | $0.00323 |
+
+- **The ladder:** $0.0068 of its $1 cap, settled to billed seconds on the
+  2026-10 meter.
+- **The speedup probe:** ≈ $0.109 (645 s at XL on Spot), outside the meter.
+- **Water's first submit** failed `submit-failed` and was settled at $0
+  (the IAM finding below). The retry ran as attempt 2.
+- Every result file matched `done.json` through CloudFront, and dedupe
+  returned the same record.
+
+### Sizing version 2 (Task 14)
+
+```
+m0 0.341  m2 6.77  t0 4.84  t3 26600  g 1.5  f2 5240
+speedup(c)       = min(c, 16)^0.867     (SCF)
+files_speedup(c) = min(c, 32)^0.631     (the file write)
+```
+
+Fitted with `python -m jobs.calibrate --aws --probe …`. The reasoning is in
+`sizing.py`'s comment and commit `13ad2f4`. Ruling T14-speedup: where the
+data allow two answers, take the slower prediction, because an
+under-prediction spends a timed-out attempt.
+
+- **The SCF levels off at 16 threads.** Benzene took 92.1, 46.8, 26.6 and
+  28.1 s at 4, 8, 16 and 32 threads. A plain power law (0.596) misses by up
+  to 30 %. `min(c, 16)^0.867` fits within 5.2 %: −3.9 %, +1.5 %, +5.2 % and
+  −2.5 % at 32, 16, 8 and 4. Under v2, L and XL are equally fast for the
+  SCF, so a time-bound job takes the cheaper L unless the file write
+  needs XL.
+- **The file write is threaded on Linux.** It took 187.6, 105.9, 66.1 and
+  51.1 s and kept improving to 32. It gets its own law: −8.1/+10.0/+6.3/
+  −7.0 %. The undivided form misses by up to 2.1×. 6B-1's "single-threaded"
+  premise came from macOS, whose PySCF has **no OpenMP**
+  (`lib.num_threads(n)` warns and stays 1). Every local run was
+  single-threaded in PySCF's own code, so a local refit cannot replace v2.
+- **t3 comes from the probe, not the ladder.** S gives PySCF 6.5 GB
+  (`PYSCF_MAX_MEMORY` = 80 %), so every ladder SCF ran with its
+  two-electron integrals **in core**. That holds up to N ≈ 280. Caffeine
+  and anything larger on S–L runs **direct**, as the probe did at PySCF's
+  default 4000 MB. Its benzene SCF ran ~3× slower than the ladder's, so its
+  t3 (26 600) beats the ladder's (9 050), as the slower prediction. t0 is
+  the ladder's intercept.
+- **Memory is fitted on the working set.** Benzene's 6.1 GB peak on S is
+  5.4 GB of in-core integrals that PySCF took only because they fitted.
+  Fitting raw peaks gave `m2` 79, which would have refused C₆₀-scale
+  molecules as too large. `calibrate` subtracts the integrals
+  (`incore_eri_gb`) and adds the probe's direct-mode peaks (0.9 GB).
+  **Admin view caveat:** a small molecule's peak on AWS will read well
+  above its prediction. That is opportunistic, not a misfit.
+- **Guards** (Task 14's list): only `g` fired. It was fitted at −0.175 (the
+  ladder's few optimisation steps ran faster than the rule predicts), so it
+  stays at 1.5. Nothing else needed a guard.
+- **Checks** (`tools/jobs/tests/test_sizing.py`):
+  - every ladder job's wall time is at most `TIME_HEADROOM` × its v2
+    prediction. On S, water single is 1.02× and the others are 0.19–0.65×
+    (ethanol is checked against a 270 s floor for an uninterrupted run);
+  - the probe's SCF and file write are predicted within 15 % at every
+    thread count. The worst is the files term at 32 and 4: −12.3 % and
+    −11.3 %.
+
+| | v1 | v2 |
+|---|---|---|
+| water single | S spot 11.7 s, 0.42 GB | S spot 14.7 s, 0.36 GB |
+| water optimise | S spot 127.6 s | S spot 122.1 s |
+| ethanol optimise | S spot 373.7 s, timeout 1121 s | S spot 414.5 s, timeout 1244 s |
+| benzene single | S spot 314.9 s, 0.70 GB | S spot 421.5 s, 0.86 GB |
+| caffeine single | M spot 2097 s, 1.82 GB, reserve $0.1848 | M spot 2276 s, 2.89 GB, reserve $0.1848 |
+| caffeine optimise | L on-demand 3658 s, reserve $1.52 | L spot 3417 s, reserve $1.45 |
+| C₆₀ single | too-long (8.9 h on XL) | too-long (11.7 h on XL) |
+| C₆₀ optimise | too-long (54.6 h) | too-long (102 h) |
+
+**Redeployed 2026-10-07:**
+
+- `deploy.sh image` pushed `cd138f4426a4e172`. `ANOMALY_MONITOR=on
+  deploy.sh compute` then finished UPDATE_COMPLETE in 30 s: job definition
+  rev 3, the three Lambdas, and the monitor and its subscription created.
+- The user pool is unchanged, so no owner re-enrolment is needed.
+- Previews through `jobs.sh api` answer `version 2`:
+  - water: S, Spot, 14.7 s, 600 s timeout, reserve $0.01788;
+  - caffeine: M, Spot, 2275.5 s, 3600 s timeout, reserve $0.184761.
+- ECR holds 3 images.
+- `aws ce get-anomaly-monitors` lists `electron-orbital-viewer` (CUSTOM,
+  tag `app`) with an IMMEDIATE subscription, beside the account's own
+  `Default-Services-Monitor`.
+- No job was submitted.
+
+### Findings
+
+- **SubmitJob with tags needs `batch:TagResource` on the job definition
+  (and the queues), not only on `job/*`** (Task 12). The first real submit
+  was refused `AccessDeniedException … batch:TagResource on …
+  job-definition/…`. moto does not evaluate IAM, so no unit test could
+  catch it. Commit `6cd136b` grants it on this stack's own job definition
+  and queues, with a synth test. Any future action that tags on create
+  needs the same check against real AWS.
+- **D11 verified live:** after the owner's sign-out, CloudTrail shows
+  `Revoke_POST` then `Logout` (2026-10-07 11:28Z), and Cognito's discovery
+  lists `revocation_endpoint`.
+- **Per-host speed varies.** Benzene's file write took 206 s at 2 threads
+  on S, but 187.6 s at 4 threads on the XL host. So a 2→4 vCPU step across
+  hosts can gain far less than the probe's own 4→8. v2 anchors t3 and f2 on
+  the slower (probe) host, and over-predicts on S as a result.
+- **The optimisation step count over-predicts.** `10 + 2·atoms` gives 16
+  for water, which converged in 3. This is safe, but optimise
+  reservations run ~3–5× high.
+
+### The rulings
+
+From the plan:
+- ECR is stack-owned (keep the last 5), pushed by `deploy.sh`, and not a
+  CDK asset.
+- Attempt numbers rise across owner retries (`JOB_ATTEMPT_OFFSET`).
+- A `RUNNING` record whose Batch job is waiting again is a Spot retry in
+  progress, not stale.
+- After 30 min in `RUNNABLE`, a job is terminated as `FAILED no-capacity`
+  and settled at what ran.
+- The stale-jobs alert is reconcile publishing to SNS (no log metric
+  filter).
+- The budget is account-wide, and the anomaly monitor is a tag (`app`)
+  monitor.
+- The `billing` figure is month-to-date `UnblendedCost` by both tags.
+- `PYSCF_MAX_MEMORY` is 80 % of the size's memory.
+- Cognito uses the Essentials plan with managed login.
+- The jobs table is retained on destroy.
+- `jobs.sh api` invokes the Lambda with the owner's IAM credentials.
+
+From the ledger:
+- **D:** every preflight D-row's fix is adopted unless overruled.
+- **D13:** one additive site-stack 403 ErrorResponse with TTL 0.
+- **D14:** the anomaly monitor is gated behind `-c anomalyMonitor=on`, off
+  until the tags are active.
+- **D15:** a speedup probe replaces the XL `--help` smoke.
+- **D16:** the charges ledger is fixed now; `costs.daily` is by charge
+  date.
+- **D11:** the refresh token is revoked on sign-out (Task 10b).
+- **AWS-auth:** the owner's "do both" authorises the plan's AWS writes
+  within its caps.
+- **no-parallel-implementers:** never two implementers in one worktree.
+- **T5-D28:** a batch-lost run is charged what the worker reported.
+- **D8-IAM:** the worker's prefix-conditioned `s3:ListBucket` was dropped,
+  since S3Sink maps 403 to missing.
+- **T10-anomaly:** an unset `ANOMALY_MONITOR` keeps the deployed value.
+- **T4-trailer:** commit trailers name the model that wrote the commit.
+- **T14-speedup:** saturating SCF law; the files term divided by its own
+  law; f2 refitted; the slower prediction where the data are ambiguous.
+
+### Owner actions
+
+- **Done 2026-10-07:**
+  1. SNS subscription confirmed.
+  2. Sign-in created; password and TOTP enrolled.
+  3. Cost-allocation tags `app`/`component` Active (by CLI, on the
+     owner's go-ahead), and the anomaly monitor turned on at this task's
+     redeploy.
+- **Open:** Task 12 Step 8's browser check (the `/admin.html` row and the
+  water share link in a private window). It was asked on 2026-10-07; its
+  outcome is not in the ledger.
+- **After any `destroy-compute` and redeploy, repeat actions 1–2:** the
+  user pool and SNS subscription are new, and the old authenticator entry
+  stops working. Turn the monitor on again with `ANOMALY_MONITOR=on`.
+  Also run `deploy.sh site`, since the live site keeps the deleted
+  stack's sign-in settings until it is rebuilt.
+- **The retained jobs table:** `destroy-compute` keeps the old table, with
+  its history and meters. It is auto-named, so a redeploy creates a new,
+  empty table. A redeploy in the same month starts the meter at $0 again,
+  so it does not count what the month has already spent. The $10 Budget,
+  with its deny-SubmitJob action, is then the only stop on a second
+  $8.80.
+
+### Spec and 6B-1 corrections found here
+
+- Spec §6.6's literal stale rule ("heartbeat older than 5 minutes while
+  Batch says it is not running") would fail every Spot retry. Settled as
+  in the rulings.
+- 6B-1's `requeue_failed` kept the original `month`. The controller
+  corrected both plans so a retry is charged to the month it is made in.
+- `cdk.context.json` is ignored, because the repo is public.
+- 6B-1's "the files term is single-threaded" was a macOS artefact (no
+  OpenMP). On Linux it divides by a speedup (above).
+
+### Residual minors (deferred, recorded in the ledger)
+
+- `s3_sink.content_type`, for a name without a `.`, slices the last
+  character. The result is a harmless default.
+- The worker's accept-existing DONE records the checking attempt's
+  `wallSeconds`. `_check_complete`'s listed-check covers `RESULT_FILES`
+  only, though the hash loop covers everything listed.
+- Reconcile's outcome label can describe a refused write (the
+  no-capacity/ENDED race). The money is still right.
+- `handlers.py`'s `runnerJobId` write after submit is unguarded. A submit
+  slower than 600 s would leave that run uncharged.
+- `billing_handler` builds its store per invocation (daily, negligible).
+- The `costalerts.amazonaws.com` publish grant on the topic sits outside
+  the D14 gate. It is moot now that the monitor is on.
+- The probe's budget does not re-double `last` after a skip. That only
+  matters for custom thread lists.
+
+### What 6B-4 inherits
+
+- **Recipe C** (spec §4) is 6B-4's. The handlers, sizing and worker
+  extend to it as they did for A and B.
+- **Caffeine single on M is the first owner job worth running.** It is
+  predicted at 38 min Spot, reserving $0.18. It would give the first
+  direct-SCF point from a real job, and the first M (4 vCPU) timing,
+  which the ladder never reached. Refit (version 3) once a few such jobs
+  exist. Pass the probe again (`--probe`), or the deployed laws are kept.
+- **Still unmeasured:**
+  - the 2-thread probe point (budget-skipped);
+  - `g` (no optimisation long enough to fit it);
+  - the SCF's saturation for molecules much larger than benzene, which
+    may scale further than 16;
+  - L and XL holding caffeine-scale integrals in core, so running faster
+    than predicted (safe).
+- **The expensive molecules** (C₆₀ and larger drugs) stay the owner's to
+  start, from the UI. C₆₀ is refused too-long under both versions at this
+  phase's 1 h / 2 h ceilings, so raising the ceilings is a 6B-4 ruling,
+  not a sizing fix.
+- **The meter after a same-month destroy and redeploy** (above). A
+  persistent table name, or carrying the month's meter forward, would
+  close the gap if it matters.
+
 ## Judgment calls made without asking
 
 Recorded for review, per the session's standing authority.
