@@ -2366,6 +2366,14 @@ calls, and the test's failing `aws`/`docker`/`cdk`/`npm` stand-ins.
   1.58× rather than `TIMEOUT_FACTOR`'s 3×. It is the first owner job
   worth running (below), and the one most likely to time out if v2
   under-predicts direct SCF on M.
+  **Measured 2026-10-07** (the owner's run, `f4e66d73…`, M Spot, one
+  attempt): DONE in 3135 s, 87 % of the timeout. The SCF took 2289 s
+  (v2's whole-job prediction was 2276 s, so the SCF alone was on the
+  mark) and writing files 847 s, which v2 under-predicts on M. Peak
+  memory 1.9 GB of 16. Cost $0.052962 against $0.184761 reserved. A
+  sizing v3 refit that adds this sample (it raises the files term) is the
+  first follow-up; until then, caffeine-scale single points on M sit
+  close to the 1 h ceiling.
 - **The expensive molecules** (C₆₀ and larger drugs) stay the owner's to
   start, from the UI. C₆₀ is refused too-long under both versions at this
   phase's 1 h / 2 h ceilings, so raising the ceilings is a 6B-4 ruling,
