@@ -3,7 +3,7 @@
 #
 #   infra/deploy.sh [all]          compute stack, worker image, then the site built against it (the usual run)
 #   infra/deploy.sh site           build the frontend (with the compute stack's settings if it exists) and deploy the site
-#   infra/deploy.sh compute        the compute stack only (needs the site stack and infra/owner.env)
+#   infra/deploy.sh compute        the compute stack only (needs the site stack, infra/owner.env and the image in ECR)
 #   infra/deploy.sh image          build the ARM64 worker image with OrbStack's docker and push it (no-op if ECR has it)
 #   infra/deploy.sh destroy-compute  empty the worker repository, then destroy the compute stack (site and results stay)
 #
@@ -23,6 +23,8 @@
 # off, CloudFormation carries on, and running the same phase again resumes.
 #
 # Kept to macOS /bin/bash 3.2: no associative arrays, no ${var,,}, no mapfile.
+# Sourcing it (as infra/tests/unit/test_deploy_script.py does) only defines
+# the functions: the phases below run when it is executed.
 
 # Exit on error
 set -e
@@ -177,13 +179,28 @@ image_tag() {
   # .dockerignore allow-list), so an unchanged worker is never rebuilt or
   # pushed twice, and a changed one always gets a new tag. Committed content
   # only: the tag is the worker's identity in every job's provenance.
-  local paths=(tools/jobs ':(exclude)tools/jobs/tests' ':(glob)tools/molecules/*.py'
-               tools/molecules/requirements.lock .dockerignore)
-  if [ -n "$(git -C "$PROJECT_ROOT" status --porcelain -- "${paths[@]}")" ]; then
+  # Documentation is left out, here and from the image (.dockerignore), so
+  # a README edit is not a new worker (final review I2: it was, and the next
+  # `compute` named a tag ECR did not have).
+  # Every git call is checked: a git that cannot run (an x86_64 process on
+  # Apple silicon, where /usr/bin/git's shim fails) used to hash nothing,
+  # and the empty listing's hash became a real tag.
+  local paths=(tools/jobs ':(exclude)tools/jobs/tests' ':(exclude,glob)tools/jobs/**/*.md'
+               ':(glob)tools/molecules/*.py' tools/molecules/requirements.lock .dockerignore)
+  local changes listing
+  if ! changes=$(git -C "$PROJECT_ROOT" status --porcelain -- "${paths[@]}"); then
+    echo "git could not read the worker image's inputs in $PROJECT_ROOT; refusing to guess its tag." >&2
+    return 1
+  fi
+  if [ -n "$changes" ]; then
     echo "Uncommitted changes in the worker image's inputs (${paths[*]}); commit them first." >&2
     return 1
   fi
-  git -C "$PROJECT_ROOT" ls-files -s -- "${paths[@]}" | shasum -a 256 | cut -c1-16
+  if ! listing=$(git -C "$PROJECT_ROOT" ls-files -s -- "${paths[@]}") || [ -z "$listing" ]; then
+    echo "git listed none of the worker image's inputs in $PROJECT_ROOT; refusing to guess its tag." >&2
+    return 1
+  fi
+  printf '%s\n' "$listing" | shasum -a 256 | cut -c1-16
 }
 
 image_in_ecr() {
@@ -238,8 +255,13 @@ deploy_compute() {
   [ -n "$ALERT_EMAIL" ] || { echo "infra/owner.env sets no ALERT_EMAIL." >&2; exit 1; }
   tag=$(image_tag)
   monitor=$(anomaly_monitor)
+  # Refused, not warned (final review I2): the job definition would name an
+  # image ECR does not have, and every new job would fail to pull it. Only
+  # a first deploy, which creates the repository, goes ahead without it
+  # (`all` pushes the image straight after).
   if [ -n "$(output "$COMPUTE_STACK" WorkerRepositoryUri)" ] && ! image_in_ecr "$tag"; then
-    echo "Warning: worker image $tag is not in ECR yet; jobs cannot start until '$0 image' (or '$0 all') pushes it." >&2
+    echo "Worker image $tag is not in ECR. Refusing to deploy a job definition that names it: every new job would fail to pull its image. Run '$0 image' first (or '$0 all')." >&2
+    exit 1
   fi
   # cdk synthesises the whole app, and the site stack's asset is dist/.
   [ -d "$PROJECT_ROOT/dist" ] || build_site
@@ -252,7 +274,7 @@ deploy_compute() {
 }
 
 push_image() {
-  local repo tag registry
+  local repo tag registry commit
   repo=$(output "$COMPUTE_STACK" WorkerRepositoryUri)
   if [ -z "$repo" ]; then
     echo "No worker repository yet (the compute stack is not deployed); skipping the image."
@@ -264,6 +286,9 @@ push_image() {
     return 0
   fi
   registry="${repo%%/*}"
+  # Read before the build, so a git that cannot run stops here rather than
+  # baking an empty commit into every job's provenance.
+  commit=$(git -C "$PROJECT_ROOT" rev-parse HEAD)
   aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
   cd "$PROJECT_ROOT"
   # OrbStack's docker; a plain manifest (no provenance/SBOM index) so ECR's
@@ -271,7 +296,7 @@ push_image() {
   # content hash above; GENERATOR_COMMIT is the commit the image was built at,
   # which every AWS job's provenance (meta.json, job.json) reports (D10).
   docker buildx build --platform linux/arm64 -f tools/jobs/Dockerfile --provenance=false --sbom=false \
-    --build-arg GENERATOR_COMMIT="$(git -C "$PROJECT_ROOT" rev-parse HEAD)" \
+    --build-arg GENERATOR_COMMIT="$commit" \
     -t "$repo:$tag" --push .
   echo "Pushed $repo:$tag"
 }
@@ -325,26 +350,28 @@ destroy_compute() {
   echo "The live site still points at the deleted API and sign-in: run '$0 site' to rebuild it without them."
 }
 
-case "$PHASE" in
-  all|site|compute|image|destroy-compute) check_credentials ;;
-  -h|--help|help) usage; exit 0 ;;
-  *) usage; exit 2 ;;
-esac
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  case "$PHASE" in
+    all|site|compute|image|destroy-compute) check_credentials ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) usage; exit 2 ;;
+  esac
 
-case "$PHASE" in
-  all)
-    if [ -z "$(output "$SITE_STACK" CloudFrontURL)" ]; then
-      deploy_site            # first ever run: the compute stack needs the site's origin
-    fi
-    push_image               # an existing repository gets the image before the job definition names it
-    deploy_compute
-    push_image               # a repository created just now gets it here
-    deploy_site
-    ;;
-  site) deploy_site ;;
-  compute) deploy_compute ;;
-  image) push_image ;;
-  destroy-compute) destroy_compute ;;
-esac
+  case "$PHASE" in
+    all)
+      if [ -z "$(output "$SITE_STACK" CloudFrontURL)" ]; then
+        deploy_site            # first ever run: the compute stack needs the site's origin
+      fi
+      push_image               # an existing repository gets the image before the job definition names it
+      deploy_compute
+      push_image               # a repository created just now gets it here
+      deploy_site
+      ;;
+    site) deploy_site ;;
+    compute) deploy_compute ;;
+    image) push_image ;;
+    destroy-compute) destroy_compute ;;
+  esac
 
-echo "Deployment complete!"
+  echo "Deployment complete!"
+fi

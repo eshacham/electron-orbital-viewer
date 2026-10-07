@@ -7,4 +7,7 @@
 !tools/jobs/
 tools/jobs/.state/
 tools/jobs/tests/
+# Documentation is not the worker (final review I2); deploy.sh's image_tag
+# leaves out the same files, so a README edit is not a new image.
+tools/jobs/**/*.md
 **/__pycache__/
