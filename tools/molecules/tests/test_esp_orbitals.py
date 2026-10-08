@@ -42,7 +42,7 @@ def test_esp_signs_on_water():
 
 def test_water_homo_is_the_out_of_plane_lone_pair_and_dipole_points_to_the_hydrogens():
     mol, mf = scf('h2o')
-    table = orbital_table(mol, mf)
+    table = orbital_table(mol, mf).rows
     homo = next(r for r in table if r.get('role') == 'HOMO')
     lumo = next(r for r in table if r.get('role') == 'LUMO')
     assert homo['energyHartree'] < lumo['energyHartree'] and homo['label'][1:] in ('b1', 'b2')
@@ -61,12 +61,12 @@ def test_water_homo_is_the_out_of_plane_lone_pair_and_dipole_points_to_the_hydro
 
 def test_all_three_ch4_homos_are_marked():
     mol, mf = scf('ch4')
-    assert sum(1 for r in orbital_table(mol, mf) if r.get('role') == 'HOMO') == 3
+    assert sum(1 for r in orbital_table(mol, mf).rows if r.get('role') == 'HOMO') == 3
 
 
 def test_no2_has_one_somo_below_the_lumo():
     mol, mf = scf('no2')
-    table = orbital_table(mol, mf)
+    table = orbital_table(mol, mf).rows
     somo = [r for r in table if r.get('role') == 'SOMO']
     lumo = next(r for r in table if r.get('role') == 'LUMO')
     assert len(somo) == 1 and somo[0]['occupation'] == 1.0 and somo[0]['energyHartree'] < lumo['energyHartree']
@@ -74,8 +74,8 @@ def test_no2_has_one_somo_below_the_lumo():
 
 def test_table_keeps_occupied_plus_five_virtuals_and_completes_a_degenerate_set():
     mol, mf = scf('ch4')
-    table = orbital_table(mol, mf)
-    virtual = [r for r in table if r['occupation'] == 0]
+    table = orbital_table(mol, mf).rows
+    virtual = [r for r in table if r['occupation'] == 0 and 'kind' not in r]
     assert len([r for r in table if r['occupation'] > 0]) == 5 and len(virtual) >= 5
     groups = degeneracy_groups(mf.mo_energy)
     last = virtual[-1]['index']
@@ -88,7 +88,7 @@ def test_table_rows_address_basis_json_positions():
     # aufbau occupation, so position == PySCF index). Task 6 writes basis.json
     # from these rows; this pins the precondition that makes that valid.
     mol, mf = scf('ch4')
-    table = orbital_table(mol, mf)
+    table = orbital_table(mol, mf).rows
     assert [r['index'] for r in table] == list(range(len(table)))
 
 

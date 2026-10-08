@@ -99,3 +99,27 @@ def test_build_molecule_refuses_a_negative_density(monkeypatch, tmp_path):
     monkeypatch.setattr(build_library, 'voxel_averaged_density', lambda *a, **k: bad)
     with pytest.raises(ValueError):
         build_library.build_molecule(by_id('h2o'), out_root=tmp_path, basis='def2-SVP', grid_points=(40,))
+
+
+def test_meta_carries_the_symmetry_and_classes_basis_json_the_same_rows(water):
+    out, _, meta = water
+    assert meta['symmetry'] == {'pointGroup': 'C2v', 'labelGroup': 'C2v', 'labels': 'full-group'}
+    virtuals = [o for o in meta['orbitals'] if o['occupation'] == 0]
+    assert virtuals and all(o['class'] in ('valence', 'diffuse') and 0 <= o['valenceCharacter'] <= 1 for o in virtuals)
+    basis = json.loads((out / 'h2o' / 'basis.json').read_text())
+    assert len(basis['orbitals']) == len(meta['orbitals'])
+
+
+def test_a_valence_virtual_orbital_ships_its_own_coefficients(tmp_path):
+    # Water at def2-TZVPD: the LVMO is not a canonical MO, so basis.json carries its coefficients and no pyscfIndex,
+    # and both files carry Ruling D4's flag and caption wherever the row is read.
+    from orbitals import CONSTRUCTED_NOTE
+    build_molecule(by_id('h2o'), out_root=tmp_path, basis='def2-TZVPD', grid_points=(40,), budget=10_000_000)
+    meta = json.loads((tmp_path / 'h2o' / 'meta.json').read_text())
+    basis = json.loads((tmp_path / 'h2o' / 'basis.json').read_text())
+    lvmo = basis['orbitals'][-1]
+    assert lvmo['role'] == 'LVMO' and lvmo['kind'] == 'valence-virtual' and 'pyscfIndex' not in lvmo
+    assert lvmo['index'] == len(meta['orbitals']) - 1 and len(lvmo['coefficients']) == basis['nao']
+    assert all(o['pyscfIndex'] == o['index'] for o in basis['orbitals'][:-1])
+    for row in (lvmo, meta['orbitals'][-1]):
+        assert row['constructed'] is True and row['energyApproximate'] is True and row['note'] == CONSTRUCTED_NOTE

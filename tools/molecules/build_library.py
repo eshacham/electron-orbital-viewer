@@ -91,18 +91,22 @@ def _reference_json(ref):
     return out
 
 
-def library_basis_json(mol, mf, rows):
-    """basis.json's payload, built from Phase 6's own orbital rows (D1:
-    preflight controller correction) rather than generate.basis_json, whose
-    MINAO-selected virtuals are a different set addressed by a different
-    position. orbitals.orbital_table pins position == PySCF MO index, which
-    is what makes `coefficients: mf.mo_coeff[:, r['index']]` the orbital at
-    that position in this very list."""
+def library_basis_json(mol, mf, table):
+    """basis.json's payload from Phase 6's own orbital table (D1: preflight controller correction) rather
+    than generate.basis_json, whose MINAO-selected virtuals are a different set addressed by a different
+    position. The orbital at position k is the table's row k and coefficient column k: a canonical MO
+    (pyscfIndex is its PySCF index, which orbitals.orbital_table pins equal to k) or, since Phase 6D, an
+    appended valence virtual orbital, which has no PySCF index."""
     shells = export_shells(mol)
     check_against_pyscf(mol, shells)
+    orbitals = []
+    for k, row in enumerate(table.rows):
+        entry = {**row, 'spin': 'restricted', 'coefficients': [float(c) for c in table.coefficients[:, k]]}
+        if row.get('kind') != 'valence-virtual':
+            entry['pyscfIndex'] = row['index']
+        orbitals.append(entry)
     return {'spherical': True, 'convention': CONVENTION, 'atoms': atoms_of(mol), 'nao': int(mol.nao), 'shells': shells,
-            'orbitals': [{**r, 'spin': 'restricted', 'pyscfIndex': r['index'],
-                          'coefficients': [float(c) for c in mf.mo_coeff[:, r['index']]]} for r in rows]}
+            'orbitals': orbitals}
 
 
 _FIELD_KEYS = ('id', 'name', 'formula', 'geometrySource', 'references', 'multiplicity', 'method')
@@ -120,8 +124,8 @@ def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, bu
     out.mkdir(parents=True, exist_ok=True)
     dm = total_dm(mf)
     coords = mol.atom_coords()
-    orbitals = orbital_table(mol, mf)
-    (out / 'basis.json').write_text(json.dumps(library_basis_json(mol, mf, orbitals), separators=(',', ':')))
+    table = orbital_table(mol, mf)
+    (out / 'basis.json').write_text(json.dumps(library_basis_json(mol, mf, table), separators=(',', ':')))
     dipole = np.asarray(mf.dip_moment(unit='Debye', verbose=0), dtype=float)
     extra = {k: v for k, v in fields.items() if k not in _FIELD_KEYS}
     for points in grid_points:
@@ -146,14 +150,14 @@ def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, bu
             'totalEnergyHartree': float(mf.e_tot),
             'dipoleDebye': float(np.linalg.norm(dipole)),
             'dipoleVectorDebye': [float(v) for v in dipole],
-            'orbitals': orbitals,
+            'orbitals': table.rows,
             'grid': grid.as_meta(),
             'espGrid': esp_grid.as_meta(),
             'espRangeOnSurface': list(esp_surface_range(esp, eval_density(mol, dm, esp_coords))),
             'electronCount': int(mol.nelectron),
             'densityIntegral': float(density.astype(np.float64).sum() * grid.spacing ** 3),
             'multiplicity': fields['multiplicity'],
-            'symmetry': {'pointGroup': mol.topgroup, 'labelGroup': mol.groupname},
+            'symmetry': table.symmetry,
             'references': fields['references'],
             # D2 (preflight controller correction): generate.provenance gives
             # everything that decides the numbers (pyscf/numpy/scipy/python
