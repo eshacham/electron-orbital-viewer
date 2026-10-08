@@ -2407,8 +2407,10 @@ Every AWS job, every one of their steps, and every probe step is inside
 - **Measured 2026-10-08 — the owner's caffeine optimise** (`09ae0fa0…`,
   L on-demand, v4, one attempt): DONE in 1 022 s against 4 103 s
   predicted (25 %); 11 optimisation steps (58 predicted), 344 s in all,
-  slowest 39.1 s (priced 52.8 s); final def2-TZVPD SCF 441 s (≈1 040 s
-  predicted on L, so it ran in core); writing files 192 s; peak 5.7 GB.
+  slowest 39.1 s (priced 52.8 s); final def2-TZVPD SCF 441 s (689 s
+  predicted for the SCF, 1 040 s with the files; it ran **direct**, not in
+  core, as version 5's section below shows); writing files 192 s; peak
+  5.7 GB.
   Charged $0.219011 against $1.516704 reserved. v4 is safe but ~4×
   high for optimise: the step count (58 vs 11) and the final SCF on L
   are the over-predictions. A v5 refit with this sample (and timings'
@@ -2418,7 +2420,7 @@ Every AWS job, every one of their steps, and every probe step is inside
   edits a comment in `tools/jobs/sizing.py`, so HEAD's image tag differs
   from the deployed `2de967effa251067` (code identical). `deploy.sh
   compute` refuses until `deploy.sh image` pushes it; run `image` then
-  `compute` (or `all`) at the next deploy.
+  `compute` (or `all`) at the next deploy. (Done with version 5's deploy.)
 - **The ladder-scale optimisations still over-predict.** Water
   optimise is +435 %, because the step count and t0 dominate. This is
   unchanged in kind from v3.
@@ -2447,6 +2449,200 @@ Every AWS job, every one of their steps, and every probe step is inside
     existing job.
   - caffeine single: L, Spot ×3, 1040.2 s, 3121 s, reserve $0.643881. It
     dedupes to the owner's DONE `f4e66d7330ed`.
+- No job was submitted.
+
+### Sizing version 5 (follow-up, 2026-10-08)
+
+```
+m0 0.459  m2 4.35  t0 4.84  t3 42000  t3Step 31000  g 1.5  f2 5410  stepScale 0.375
+speedup(c)       = min(c, 16)^0.867     (SCF, unchanged)
+files_speedup(c) = min(c, 32)^0.631     (the file write, unchanged)
+steps(atoms)     = min(ceil(0.375 × (10 + 2·atoms)), 100)
+```
+
+Commit `f4d8567`. **The new sample** is the owner's caffeine optimise
+(`09ae0fa051c6…`, recipe B, sized by v4: L on-demand, 16 vCPU / 64 GB,
+one attempt). It was DONE in 1 022 s against 4 103 s predicted, and
+charged $0.219 against $1.517 reserved. Its `job.json` and
+`timings.json` are now a fixture.
+
+**What changed:**
+
+- **The worker records each optimisation step's SCF cycles.** Before,
+  stage `optimisation step k` ran from the end of step k to the end of
+  step k + 1. So step 1 (cold, the slowest) fell in no stage, and the
+  last stage was geomeTRIC's wrap-up. Now `input.py` opens
+  `optimisation step 1` when the optimisation starts. At each geomeTRIC
+  callback it puts that step's `g_scanner.base.cycles` on the stage
+  (`on_stage`'s new third argument), then opens the next stage. The
+  stage after the last step (the wrap-up) has no `cycles`, so the steps
+  are exactly the stages that have them. `calibrate` reads both layouts.
+  The heartbeat's stage now names the step that is running.
+- **The step count is fitted** (`stepScale`, a new constant):
+  `ceil(stepScale × (10 + 2·atoms))`, at most `MAX_STEPS` (100). It was
+  `10 + 2·atoms`. Measured step counts (every attempt's):
+
+  | job | atoms | v4 predicted | measured | ratio | v5 predicted |
+  |---|---|---|---|---|---|
+  | water optimise | 3 | 16 | 3 | 0.19 | 6 |
+  | ethanol optimise | 9 | 28 | 7 (5 in reclaimed attempt 1, 2 in attempt 2) | **0.25** | 11 |
+  | caffeine optimise | 24 | 58 | 11 | 0.19 | 22 |
+
+  stepScale = `TIME_HEADROOM` × the largest ratio = 1.5 × 0.25 = 0.375.
+  So every sample is predicted at 1.5× its count or more. A molecule that
+  needs up to 1.5× ethanol's rate still has no more steps than predicted,
+  and one up to 2.25× its rate is still inside `TIME_HEADROOM`. Ethanol's
+  attempt-1 count comes from that attempt's `trajectory.xyz` (5 frames).
+  It is committed as the fixture's `attempts/1/trajectory.xyz`, and
+  `calibrate` adds earlier attempts' frames wherever a folder has them.
+  7 counts the resumed attempt's re-evaluated first frame, so it is
+  one more than an uninterrupted run would need: conservative.
+- **f2 5 360 → 5 410.** Only the slowest one-vCPU file write at each N
+  now joins the least squares. Caffeine's write ran 4.4× faster on L than
+  on M, where the probe's law promises 2.4×. With both in the fit, f2
+  would fall to 4 260 and under-predict the M run by 21 %. Applying the
+  same rule at N 58 (two runs) and N 276 (the ladder's benzene and the
+  probe's four) moves f2 up by 0.9 %.
+- **m0, m2 0.477, 3.98 → 0.459, 4.35.** Caffeine optimise's working set
+  is its peak less the steps' in-core def2-SVP ERIs (3.4 GiB). The log
+  shows about 4.1 GB in use at each step's gradient. That leaves 2.23 GB
+  at N 614, against caffeine single's 1.91 GB on M.
+- **Unchanged:** t3 42 000, t3Step 31 000, t0 4.84, g 1.5 (still fits
+  negative, −0.12), the laws, `step_in_core`, and how single points are
+  priced.
+- `python -m jobs.calibrate --aws --probe …speedup-probe.json
+  --optimise-probe …caffeine-optimise-probe.json …/aws/*/` reproduces
+  CONSTANTS (a test checks this). Only g's guard is used.
+
+**Decisions on the brief's three questions:**
+
+- **(a) The step count:** refitted as above. No sample is under-predicted,
+  and each has `TIME_HEADROOM` of margin (tested per sample).
+- **(b) In-core pricing for the final single point: not adopted. The
+  premise was wrong.** Caffeine optimise's final def2-TZVPD SCF did
+  **not** run in core on L. Its ERIs need 614⁴/1e6 = 142 GB, and PySCF's
+  limit there is 0.95 × 52 428 MB (the log's `max_memory`); the peak was
+  5.7 GB. It ran **direct**: 441 s with 15 cycles, the same count as
+  caffeine single on M. That is t3 ≈ 26 900 at 16 vCPU, against 41 950
+  on M at 4 vCPU: M → L gained 5.2×, where min(c, 16)^0.867 promises
+  3.3×. That is a speedup-law question (perhaps different hosts), not a
+  regime one, and v5 keeps the slower t3. **v5's rule:** every
+  def2-TZVPD SCF (recipe A, and recipe B's final one) stays priced by
+  the direct t3, wherever it runs.
+  - The only in-core def2-TZVPD SCFs measured are the ladder's, on S at
+    N ≤ 276. Pricing them by the in-core t3 (9 050) would put water
+    single at 14.6 s against its measured 15.04 s. It would put ethanol's
+    final SCF at 12.3 s against its 16.4 s (that SCF's own t3 is 12 900).
+  - Beyond N 276 nothing in-core was measured. An in-core SCF's ERI
+    contraction grows as N⁴, so stretching N^3.5 from N 276 would
+    under-predict.
+  - So no recipe A decision moves, apart from f2's +0.9 %.
+- **(c) t3Step stays 31 000**, the probe's cold, direct 52.85 s on L.
+  Caffeine's slowest timed step was 39.1 s. Its cold first step (14
+  cycles) was not timed: the old stage layout. The log's per-step cycles
+  (14, 11, 10, 10, 9, 9, 8, 8, 7, 6, 6) against the ten timed steps fit
+  about 1.8 s per cycle plus 19 s, which puts step 1 near 45 s: in core,
+  and faster than the probe. The jobs' median steps offer 20 040. v5
+  keeps the slower.
+
+**Residuals** (predicted / measured − 1, on the size each ran on):
+
+| sample | v4 | v5 |
+|---|---|---|
+| caffeine optimise, L (1 021.6 s) | +302 % | +116 % (2 205 s) |
+| its timed steps on L (39.1 / 37.3 / 37.4 s …) | +35 to +76 % | same |
+| water optimise, S (23.0 s) | +435 % | +143 % |
+| ethanol optimise, S (270 s floor) | +67 % | −1.6 % (see below) |
+| water single, S | +2.3 % | +3.0 % |
+| benzene single, S | +98 % | +99 % |
+| caffeine single, M | −0.04 % | +0.2 % |
+| optimise probe's steps, L | −0.1 / +18.6 / +25.4 % | same |
+| speedup probe: SCF / files | +51 to +65 % / −10 to +8 % | same / −9.5 to +8.3 % |
+| working sets | | −9 % (ethanol) to +50 % (water); caffeine optimise −6 % |
+
+Every AWS job, every one of their steps and every probe step is inside
+`TIME_HEADROOM` × its v5 prediction. `HEADROOM` × the v5 memory covers
+every working set. All of this is tested.
+
+Ethanol's 270 s "floor" counts its reclaimed attempt. Attempt 1 ran 5
+steps in about 4 minutes, and was probably reclaimed during its final SCF
+or file write. Attempt 2 ran 2 steps, the SCF and the files in 124.9 s.
+An uninterrupted run would be about 150 s, so v5's 265.8 s is about 1.8×
+over it.
+
+**Decisions:**
+
+| | v4 | v5 |
+|---|---|---|
+| water single (A) | S spot ×3, 15.4 s, 0.49 GB, 600 s, reserve $0.01788 | S spot ×3, 15.5 s, 0.47 GB, 600 s, reserve $0.01788 |
+| water optimise (B) | S spot ×3, 123.0 s (16 steps), 600 s, reserve $0.01788 | S spot ×3, 55.8 s (6 steps), 600 s, reserve $0.01788 |
+| ethanol optimise (B) | S spot ×3, 450.0 s (28), 1351 s, reserve $0.03653 | S spot ×3, 265.8 s (11), 798 s, reserve $0.02280 |
+| benzene single (A) | S spot ×3, 520.7 s, 1562 s, reserve $0.04177 | S spot ×3, 523.1 s, 1570 s, reserve $0.04197 |
+| caffeine single (A) | L spot ×3, 1040.2 s, 1.98 GB, 3121 s, reserve $0.643881 | L spot ×3, 1043.5 s, 2.10 GB, 3131 s, reserve $0.645867 |
+| caffeine optimise (B) | L on-demand ×1, 4103.0 s (58), 7200 s, reserve $1.516704, bill $0.850 | **L spot ×3, 2205.2 s (22), 6616 s, reserve $1.338219, bill $0.146** |
+| C₆₀-scale single (N 2220) | too-long, 18.0 h on XL | unchanged |
+| C₆₀-scale optimise | too-long, 161.2 h on XL (100 steps) | too-long, 88.2 h on XL (49 steps; its def2-SVP N 840 is direct everywhere) |
+
+No single point's size, capacity, attempts, prediction, timeout or
+reservation is below v4's (tested). Water's predicted memory falls from
+0.49 to 0.47 GB, covered by its measured 0.32–0.34 GB working sets. Its
+size does not change.
+
+**Caffeine optimise in v5:**
+
+- It is priced at 1 043.5 s for the final single point on L (689 s of SCF
+  and 355 s of file writing), plus 22 steps of 52.8 s. That is 2 205 s.
+- M still fails the time bar (176 s steps).
+- It is now under the 3 600 s Spot limit, so it runs on Spot with three
+  attempts and a 3× timeout (6 616 s).
+- The reservation falls only 12 %, because Spot reserves three attempts.
+  The predicted bill falls from $0.85 to $0.146.
+- A submit dedupes to the owner's DONE job.
+
+**Residual risks:**
+
+- **Three optimisations fit the step count**, all small and from PubChem
+  conformers. A floppy molecule, or a poor pasted geometry, can need
+  many more steps. v5 has 1.5× margin over the worst rate seen, and
+  2.25× before `TIME_HEADROOM` runs out. Past that, the timeout (3× the
+  prediction, at most 2 h) is the backstop, and geomeTRIC stops at 100
+  steps regardless.
+- **Spot for optimise is new at caffeine's size.** A reclaim resumes from
+  the last trajectory frame (M4), so it costs the steps since that frame,
+  plus another attempt's start-up.
+- **The SCF and files laws under-promise L for caffeine** (5.2× and 4.4×
+  from M, against 3.3× and 2.4×). v5 keeps the slower figures, so L is
+  over-predicted (SCF +56 %, files +85 % for caffeine), which is safe.
+  If the M run was on a slower host, then M is the size at risk of
+  being under-predicted, but it was the run t3 was fitted on.
+- **t3Step is still a direct-step figure** (see v4's risks). Caffeine's
+  timed in-core steps ran 26–43 % under it (39.1 s down to 30.0 s, against 52.8 s).
+- **The worker's new step timings** will first appear in the next
+  optimise job's `timings.json`. Old files stay readable.
+
+**Deployed 2026-10-08 12:17–12:20Z** (`deploy.sh image`, then
+`deploy.sh compute`, with `ANOMALY_MONITOR` unset):
+
+- The image `5da00e6b81c9cf7d` was pushed, with `JOBS_GENERATOR_COMMIT`
+  `f4d8567`.
+- Compute was `UPDATE_COMPLETE` in 36.0 s (6/6): the WorkerJob job
+  definition and the Api, Reconcile and Billing Lambdas.
+- Job definition **rev 9** names the new tag and is the only active
+  revision. The api Lambda's `JOB_DEFINITION` is rev 9.
+- The anomaly monitor `electron-orbital-viewer` (CUSTOM) and its
+  IMMEDIATE subscription are unchanged. ECR lists 6 images.
+- `jobs.sh status` (unchanged after the previews): generation enabled;
+  meter 2026-10 spent $0.2788, reserved $0.0000, committed $0.2788 of
+  $8.80; the budget stop is not attached.
+- Previews (`jobs.sh api POST /api/v1/jobs/preview`) all answer 200,
+  `version 5`:
+  - water single: S, Spot ×3, 15.5 s, 0.47 GB, 600 s, reserve $0.01788.
+    It dedupes to the DONE `22b6b939b8af`.
+  - caffeine single: L, Spot ×3, 1043.5 s, 2.1 GB, 3131 s, reserve
+    $0.645867. It dedupes to the DONE `f4e66d7330ed`.
+  - caffeine optimise: L, 16 vCPU / 64 GB, **Spot ×3**, 2205.2 s,
+    2.1 GB, 6616 s, reserve $1.338219, predicted cost $0.146035. It
+    dedupes to the DONE `09ae0fa051c6`.
 - No job was submitted.
 
 ### Findings
