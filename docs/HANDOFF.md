@@ -2606,7 +2606,19 @@ size does not change.
   many more steps. v5 has 1.5× margin over the worst rate seen, and
   2.25× before `TIME_HEADROOM` runs out. Past that, the timeout (3× the
   prediction, at most 2 h) is the backstop, and geomeTRIC stops at 100
-  steps regardless.
+  steps. **But once the 2 h cap binds** (predictions between about
+  2 400 s and 4 800 s), the timeout no longer covers 100 steps: an
+  ibuprofen-sized optimisation (L on-demand, 4 747 s, timeout 7 200 s)
+  covers ~52 steps against 29 predicted, a C12 alkane ~57 against 33. A
+  geometry needing more would time out after 2 h and end FAILED, billed
+  within its reservation. The fix is a worker time budget (stop stepping
+  in time to run the final single point on the last geometry and mark
+  the result "optimisation not converged"), planned with the properties
+  work; until then, treat optimisations predicted above ~2 400 s as at
+  risk.
+- **Resume looks one attempt back** (`worker.py:85`): if attempt 2 is
+  reclaimed before its first step, attempt 3 restarts from the submitted
+  geometry. Rare; it costs steps, not correctness.
 - **Spot for optimise is new at caffeine's size.** A reclaim resumes from
   the last trajectory frame (M4), so it costs the steps since that frame,
   plus another attempt's start-up.
