@@ -24,7 +24,9 @@ def test_writes_the_four_spec_files(water):
 def test_meta_carries_grids_method_and_the_additions(water):
     _, _, meta = water
     assert meta['grid']['shape'] == [40, 40, 40] and meta['espGrid']['shape'] == [20, 20, 20]
-    assert meta['method'] == {'density': 'B3LYP/def2-SVP', 'energies': 'B3LYP/def2-SVP'}
+    assert meta['method'] == {'density': 'B3LYP-D3(BJ)/def2-SVP', 'energies': 'B3LYP-D3(BJ)/def2-SVP'}
+    assert meta['dispersion']['model'] == 'D3(BJ)' and -0.001 < meta['dispersion']['energyHartree'] < 0
+    assert meta['dispersion']['backend'].startswith(('pyscf-dispersion ', 'dftd3 '))
     assert meta['geometrySource'] == 'experiment (CCCBDB)' and meta['electronCount'] == 10 and meta['multiplicity'] == 1
     assert len(meta['dipoleVectorDebye']) == 3 and 1.7 < meta['dipoleDebye'] < 2.3
     assert meta['espRangeOnSurface'][0] < 0 < meta['espRangeOnSurface'][1]
@@ -65,8 +67,12 @@ def test_merge_index_keeps_other_entries_and_orders_the_library(tmp_path):
 def test_validation_rows_have_the_phase1_shape(water):
     _, _, meta = water
     rows = validation_rows(by_id('h2o'), meta)
-    keys = {'phase', 'quantity', 'system', 'app', 'reference', 'unit', 'tolerancePercent', 'referenceSource', 'method'}
-    assert all(set(r) == keys and r['phase'] == 6 for r in rows)
+    keys = {'phase', 'quantity', 'system', 'app', 'reference', 'unit', 'tolerancePercent', 'referenceSource', 'method',
+            'geometrySource'}
+    geometry_rows = {'bond length O–H', 'angle H–O–H'}
+    assert all(r['phase'] == 6 and set(r) == (keys | {'notATest'} if r['quantity'] in geometry_rows else keys) for r in rows)
+    assert all(r['geometrySource'] == 'experiment (CCCBDB)' for r in rows)
+    assert {r['notATest'] for r in rows if 'notATest' in r} == {'geometry from experiment (not a test of the method)'}
     by_quantity = {r['quantity']: r for r in rows}
     assert set(by_quantity) == {'bond length O–H', 'angle H–O–H', 'dipole moment', 'electrons in shipped density grid'}
     assert by_quantity['bond length O–H']['app'] == pytest.approx(0.958, abs=2e-3)
@@ -74,6 +80,21 @@ def test_validation_rows_have_the_phase1_shape(water):
     # D28 (ruling, W/progress.md): the dipole floor (10 % or 0.05 D, whichever
     # is larger) must be visible in the row's own method, not just in code.
     assert by_quantity['dipole moment']['method'].endswith('tolerance 10 % or 0.05 D, whichever is larger')
+
+
+def test_an_optimised_molecules_geometry_rows_count_as_validation():
+    entry = by_id('ethanol')
+    meta = {'atoms': [{'position': [0.0, 0.0, 0.0]}] * 9, 'geometrySource': entry.geometry_source,
+            'dipoleDebye': 1.5, 'method': {'density': 'B3LYP-D3(BJ)/def2-TZVPD'}, 'densityIntegral': 26.0,
+            'electronCount': 26, 'grid': {'shape': [96, 96, 96]}}
+    rows = validation_rows(entry, meta)
+    assert all('notATest' not in r and r['geometrySource'] == entry.geometry_source for r in rows)
+
+
+def test_the_generator_commit_can_be_supplied(monkeypatch):
+    import generate
+    monkeypatch.setenv('MOLECULES_GENERATOR_COMMIT', 'abc123-dirty')
+    assert generate.git_commit() == 'abc123-dirty'
 
 
 # D1 (preflight controller correction): basis.json must be built from Phase

@@ -19,18 +19,26 @@ def test_experimental_geometry_is_the_catalogue_one():
     assert atoms == list(by_id('h2o').atoms) and info == {}
 
 
-def test_refuses_missing_unconverged_or_wrong_basis(tmp_path, monkeypatch):
+def test_refuses_missing_unconverged_or_wrong_method(tmp_path, monkeypatch):
     monkeypatch.setattr(optimise, 'GEOMETRY_DIR', tmp_path)
     entry = by_id('glycine')
     with pytest.raises(FileNotFoundError, match='optimise.py glycine'):
         optimise.geometry_for(entry)
     atoms = [('N', (0.0, 0.0, 0.0))]
-    optimise.write_xyz(tmp_path / 'glycine.xyz', atoms, 'converged=false maxGradient=3.000e-03 method=B3LYP/def2-TZVP')
+    optimise.write_xyz(tmp_path / 'glycine.xyz', atoms, 'converged=false maxGradient=3.000e-03 method=B3LYP-D3(BJ)/def2-TZVP')
     with pytest.raises(RuntimeError, match='not converged'):
         optimise.geometry_for(entry)
-    optimise.write_xyz(tmp_path / 'glycine.xyz', atoms, 'converged=true maxGradient=1.000e-05 method=B3LYP/def2-SVP')
-    with pytest.raises(RuntimeError, match='def2-TZVP'):
-        optimise.geometry_for(entry)
+    for stale in ('B3LYP-D3(BJ)/def2-SVP', 'B3LYP/def2-TZVP'):      # Phase 6D: v2's geometries are B3LYP without D3
+        optimise.write_xyz(tmp_path / 'glycine.xyz', atoms, f'converged=true maxGradient=1.000e-05 method={stale}')
+        with pytest.raises(RuntimeError, match=r'not B3LYP-D3\(BJ\)/def2-TZVP'):
+            optimise.geometry_for(entry)
+    optimise.write_xyz(tmp_path / 'glycine.xyz', atoms, 'converged=true maxGradient=1.000e-05 method=B3LYP-D3(BJ)/def2-TZVP')
+    assert optimise.geometry_for(entry) == (atoms, {'converged': True, 'maxGradient': 1e-05})
+
+
+def test_the_library_method_is_d3bj():
+    assert optimise.FINAL_METHOD == 'B3LYP-D3(BJ)/def2-TZVP' and optimise.XC == 'B3LYP-D3BJ'
+    assert OPTIMISED == 'B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)'
 
 
 @pytest.mark.skipif(not os.environ.get('MOLECULES_SLOW'), reason='runs a real optimisation (~1 min)')
@@ -39,6 +47,7 @@ def test_optimises_a_distorted_water(tmp_path, monkeypatch):
     entry = LibraryMolecule('w', 'w', 'H2O', 'polarity', (), OPTIMISED, bent('O', 'H', 1.02, 112.0))
     result = optimise.optimise_steps(entry, maxsteps=40, basis='def2-SVP')
     assert result['converged'] and result['maxGradient'] < optimise.GRADIENT_TOLERANCE
+    assert optimise.read_xyz(tmp_path / 'w.xyz')[1].endswith('method=B3LYP-D3(BJ)/def2-SVP')
     coords = [xyz for _, xyz in optimise.read_xyz(tmp_path / 'w.xyz')[0]]
     assert 0.955 < distance(coords[0], coords[1]) < 0.975
     assert 100.0 < angle(coords[1], coords[0], coords[2]) < 106.0

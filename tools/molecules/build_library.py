@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
+import dispersion
 from basis_export import CONVENTION, check_against_pyscf, export_shells
 from compact import compact_float32, write_float32_gz
 from density import check_density, eval_density, total_dm, voxel_averaged_density
@@ -41,6 +42,12 @@ ROWS = REPO / 'src' / 'validation' / 'generated' / 'phase6_library.json'
 # Geometry is unaffected: optimise.FINAL_BASIS stays def2-TZVP, and
 # geometry_for keeps checking against it.
 PROPERTY_BASIS = 'def2-TZVPD'
+# Phase 6D (spec §6): B3LYP-D3(BJ). D3 moves energies and forces only; density, ESP and orbitals at a given
+# geometry are B3LYP's own, so the method string names both and meta.dispersion says how much it added.
+XC = dispersion.XC
+# Spec §5: a bond or angle of a geometry taken from experiment, compared with that same experiment, is a
+# transcription check, not a test of the method; such rows say so and no summary may count them.
+NOT_A_TEST = 'geometry from experiment (not a test of the method)'
 BUDGET_BYTES = 3_000_000
 GRID_POINTS_TRIES = (96, 88, 80)
 FACE_DENSITY_LIMIT = 1e-5
@@ -109,6 +116,14 @@ def library_basis_json(mol, mf, table):
             'orbitals': orbitals}
 
 
+def dispersion_meta(mf):
+    """meta.dispersion for an SCF whose xc carried D3(BJ) (PySCF puts the term in scf_summary), else None."""
+    energy = getattr(mf, 'scf_summary', {}).get('dispersion')
+    if energy is None:
+        return None
+    return {'model': dispersion.MODEL, 'energyHartree': float(energy), 'backend': dispersion.backend()}
+
+
 _FIELD_KEYS = ('id', 'name', 'formula', 'geometrySource', 'references', 'multiplicity', 'method')
 
 
@@ -128,6 +143,7 @@ def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, bu
     (out / 'basis.json').write_text(json.dumps(library_basis_json(mol, mf, table), separators=(',', ':')))
     dipole = np.asarray(mf.dip_moment(unit='Debye', verbose=0), dtype=float)
     extra = {k: v for k, v in fields.items() if k not in _FIELD_KEYS}
+    dispersed = dispersion_meta(mf)
     for points in grid_points:
         grid, esp_grid = grid_for(coords, points), grid_for(coords, points // 2)
         raw_density = voxel_averaged_density(mol, dm, grid)
@@ -148,6 +164,7 @@ def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, bu
             'geometrySource': fields['geometrySource'],
             'method': {'density': fields['method'], 'energies': fields['method']},
             'totalEnergyHartree': float(mf.e_tot),
+            **({'dispersion': dispersed} if dispersed else {}),
             'dipoleDebye': float(np.linalg.norm(dipole)),
             'dipoleVectorDebye': [float(v) for v in dipole],
             'orbitals': table.rows,
@@ -164,7 +181,10 @@ def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, bu
             # versions, xc variant, dataVersion); the commit is the one
             # shared with the diatomics unless the caller supplies its own
             # (the worker's container has no git -- Task 9 passes it in).
-            'generator': {**provenance(_commit() if commit is None else commit), 'script': 'tools/molecules/build_library.py'},
+            # D14 (preflight controller correction): provenance.xc must name D3(BJ) too, not just
+            # Phase 5's bare B3LYP -- the generator record would otherwise contradict meta.method.
+            'generator': {**provenance(_commit() if commit is None else commit, dispersion.method_label(XC)),
+                          'script': 'tools/molecules/build_library.py'},
             **extra,
         }
         (out / 'meta.json').write_text(json.dumps(meta, indent=1, ensure_ascii=False) + '\n')
@@ -173,12 +193,12 @@ def write_molecule_files(out, mol, mf, fields, grid_points=GRID_POINTS_TRIES, bu
     raise BudgetExceeded(f'{fields["id"]}: {_size(out)} bytes at {grid_points[-1]}³ exceeds {budget}')
 
 
-def build_molecule(entry, out_root=OUT_ROOT, basis=PROPERTY_BASIS, xc='B3LYP', grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES):
+def build_molecule(entry, out_root=OUT_ROOT, basis=PROPERTY_BASIS, xc=XC, grid_points=GRID_POINTS_TRIES, budget=BUDGET_BYTES):
     atoms, optimisation = geometry_for(entry)
     mol, mf = run_dft(atoms, entry.spin, basis, xc)
     fields = {'id': entry.id, 'name': entry.name, 'formula': entry.formula, 'geometrySource': entry.geometry_source,
               'references': [_reference_json(r) for r in entry.references], 'multiplicity': entry.spin + 1,
-              'method': f'{xc}/{basis}'}
+              'method': f'{dispersion.method_label(xc)}/{basis}'}
     if optimisation:
         fields['geometryOptimisation'] = optimisation
     if entry.caveat:
@@ -221,7 +241,9 @@ def validation_rows(entry, meta):
         row = {'phase': 6, 'quantity': quantity, 'system': entry.formula, 'app': round(float(app), 4),
                'reference': ref.value, 'unit': UNITS.get(ref.unit, ref.unit),
                'tolerancePercent': round(100 * ref.tolerance / abs(ref.value), 3),
-               'referenceSource': ref.source, 'method': method}
+               'referenceSource': ref.source, 'method': method, 'geometrySource': meta['geometrySource']}
+        if ref.quantity in ('bond', 'angle') and not entry.optimised:
+            row['notATest'] = NOT_A_TEST
         if ref.known_miss:
             # Ruling T7-O3: a row known to fall outside its tolerance carries
             # the reason beside it, rather than passing silently or being
@@ -231,7 +253,8 @@ def validation_rows(entry, meta):
     rows.append({'phase': 6, 'quantity': 'electrons in shipped density grid', 'system': entry.formula,
                  'app': round(meta['densityIntegral'], 4), 'reference': meta['electronCount'], 'unit': 'e',
                  'tolerancePercent': 0.5, 'referenceSource': 'electron count',
-                 'method': f'{meta["method"]["density"]}, voxel-averaged {meta["grid"]["shape"][0]}³ grid'})
+                 'method': f'{meta["method"]["density"]}, voxel-averaged {meta["grid"]["shape"][0]}³ grid',
+                 'geometrySource': meta['geometrySource']})
     return rows
 
 

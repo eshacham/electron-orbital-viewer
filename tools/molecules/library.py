@@ -15,7 +15,8 @@ from dataclasses import dataclass
 
 CATEGORIES = ('first-examples', 'hybridisation', 'polarity', 'aromatic', 'biomolecule-fragments')
 EXPERIMENT = 'experiment (CCCBDB)'
-OPTIMISED = 'B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)'
+# Phase 6D (spec §6): the seven are re-optimised with Grimme's D3(BJ) dispersion correction.
+OPTIMISED = 'B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)'
 CRC = 'CRC Handbook, via CCCBDB'
 PLAUSIBLE = 'experiment (CCCBDB); plausibility check of the optimised geometry'
 # Ruling T7-O3: ozone ships as a documented known exception rather than a

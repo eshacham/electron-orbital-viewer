@@ -1,5 +1,5 @@
 """
-B3LYP/def2-TZVP geometries for the library's seven optimised molecules.
+B3LYP-D3(BJ)/def2-TZVP geometries for the library's seven optimised molecules (Phase 6D).
 
 Resumable by design: each run takes at most `maxsteps` geomeTRIC steps from
 wherever the last run stopped, and writes what it reached to
@@ -18,11 +18,13 @@ from pathlib import Path
 
 import numpy as np
 
+from dispersion import XC, ensure_d3, method_label
 from library import LibraryMolecule, by_id
 
 GEOMETRY_DIR = Path(__file__).parent / 'geometries'
 GRADIENT_TOLERANCE = 4.5e-4   # Ha/bohr, geomeTRIC's default gmax
 FINAL_BASIS = 'def2-TZVP'
+FINAL_METHOD = f'{method_label(XC)}/{FINAL_BASIS}'
 
 
 def write_xyz(path, atoms, comment):
@@ -44,8 +46,10 @@ def _comment_fields(comment):
     return dict(part.split('=', 1) for part in comment.split())
 
 
-def make_dft(mol, xc='B3LYP'):
+def make_dft(mol, xc=XC):
     from pyscf import dft
+    if 'D3' in xc.upper():
+        ensure_d3()
     mf = dft.RKS(mol) if mol.spin == 0 else dft.ROKS(mol)
     mf.xc = xc
     mf.grids.level = 4
@@ -53,7 +57,7 @@ def make_dft(mol, xc='B3LYP'):
     return mf
 
 
-def optimise_steps(entry: LibraryMolecule, maxsteps=4, basis=FINAL_BASIS, xc='B3LYP'):
+def optimise_steps(entry: LibraryMolecule, maxsteps=4, basis=FINAL_BASIS, xc=XC):
     from pyscf import gto
     from pyscf.geomopt.geometric_solver import kernel as geometric_kernel
 
@@ -68,7 +72,7 @@ def optimise_steps(entry: LibraryMolecule, maxsteps=4, basis=FINAL_BASIS, xc='B3
     coords = mol_eq.atom_coords(unit='Angstrom')
     atoms = [(mol_eq.atom_pure_symbol(i), tuple(float(c) for c in coords[i])) for i in range(mol_eq.natm)]
     done = bool(converged) and gmax < GRADIENT_TOLERANCE
-    write_xyz(path, atoms, f'converged={str(done).lower()} maxGradient={gmax:.3e} method={xc}/{basis}')
+    write_xyz(path, atoms, f'converged={str(done).lower()} maxGradient={gmax:.3e} method={method_label(xc)}/{basis}')
     return {'converged': done, 'maxGradient': gmax, 'basis': basis}
 
 
@@ -82,8 +86,9 @@ def geometry_for(entry: LibraryMolecule):
     fields = _comment_fields(comment)
     if fields.get('converged') != 'true':
         raise RuntimeError(f'{entry.id}: optimisation not converged yet (max gradient {fields.get("maxGradient")}); run optimise.py again')
-    if not fields.get('method', '').endswith(FINAL_BASIS):
-        raise RuntimeError(f'{entry.id}: geometry is at {fields.get("method")}, not {FINAL_BASIS}; continue at {FINAL_BASIS}')
+    if fields.get('method') != FINAL_METHOD:
+        raise RuntimeError(f'{entry.id}: geometry is at {fields.get("method")}, not {FINAL_METHOD}; '
+                           f'run `tools/molecules/in_image.sh tools/molecules/optimise.py {entry.id}` until converged')
     return atoms, {'converged': True, 'maxGradient': float(fields['maxGradient'])}
 
 

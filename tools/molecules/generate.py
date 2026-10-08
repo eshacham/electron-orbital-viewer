@@ -13,6 +13,7 @@ then copies n2, o2 and hf (generated first) into the committed TS test
 fixtures under tests/fixtures/molecules/, with a reduced density grid.
 """
 import argparse
+import os
 import platform
 import subprocess
 
@@ -38,16 +39,22 @@ META_ORBITAL_KEYS = ('index', 'label', 'energyHartree', 'occupation', 'spin', 'r
 
 
 def git_commit():
+    # Phase 6D: the library is generated inside the worker image, which has no git; tools/molecules/in_image.sh
+    # works out the same answer on the host (HEAD, '-dirty' when tools/molecules is dirty) and passes it in.
+    supplied = os.environ.get('MOLECULES_GENERATOR_COMMIT')
+    if supplied:
+        return supplied
     sha = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=REPO_ROOT, capture_output=True, text=True).stdout.strip()
     dirty = subprocess.run(['git', 'status', '--porcelain', 'tools/molecules'], cwd=REPO_ROOT,
                            capture_output=True, text=True).stdout.strip()
     return sha + ('-dirty' if dirty else '')
 
 
-def provenance(commit):
-    """Everything that decides the numbers, recorded in every meta.json."""
+def provenance(commit, xc=XC):
+    """Everything that decides the numbers, recorded in every meta.json. `xc` defaults to the diatomics'
+    own method; Phase 6D's library (build_library.py) passes its own xc so provenance names D3(BJ) too."""
     return {'pyscf': pyscf.__version__, 'numpy': np.__version__, 'scipy': scipy.__version__,
-            'python': platform.python_version(), 'xc': f'{XC} (PySCF >= 2.3: VWN-RPA)',
+            'python': platform.python_version(), 'xc': f'{xc} (PySCF >= 2.3: VWN-RPA)',
             'script': 'tools/molecules/generate.py', 'commit': commit, 'dataVersion': DATA_VERSION}
 
 
