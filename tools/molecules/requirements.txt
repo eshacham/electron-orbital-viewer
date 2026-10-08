@@ -5,7 +5,9 @@
 # (`uv pip freeze`); regenerate it whenever this file changes. Task 4/15's
 # README documents how to rebuild the venv from it.
 pyscf==2.8.0
-numpy>=1.26,<3
+# Phase 6D: NumPy 2.4 changed einsum_path's tuples and broke PySCF 2.8.0's density-fitted gradients
+# (docs/research/2026-10-08-scans.md §4.2); 2.3.5 keeps every energy bit-identical.
+numpy>=1.26,<2.4
 scipy>=1.11
 pytest>=8.0
 geometric==1.1.1
@@ -17,3 +19,8 @@ rfc8785==0.1.4
 # moto is test-only, but the lock is this venv's freeze, as pytest already is.
 boto3==1.43.108
 moto[dynamodb,s3]==5.2.3
+
+# Phase 6D: B3LYP-D3(BJ). pyscf-dispersion is what PySCF 2.8 calls, but it has no build that runs on
+# Apple-silicon macOS; there, tools/molecules/dispersion.py stands in with the dftd3 package (same model).
+pyscf-dispersion==1.5.0; sys_platform == "linux"
+dftd3==1.6.0; sys_platform == "darwin"
