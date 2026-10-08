@@ -310,7 +310,9 @@ above L.
   past that, the cheapest size within 1.5× of the fastest). The timeout is
   3 × predicted (at least 10 min), never clamped: the owner's approved
   maximum, computed from it, caps the job. Refusals are memory (no size
-  fits) and a 48 h sanity ceiling on the fastest size. Spot (≤ 60 min
+  fits), result files that cannot fit the 3 MB limit (`output-too-large`,
+  fix round 1), and a 48 h sanity ceiling on the size that would run (the
+  time limit is therefore at most 6 days). Spot (≤ 60 min
   predicted) is an availability rule for the Spot option, not a refusal.
 
 ### 7.5 Prices

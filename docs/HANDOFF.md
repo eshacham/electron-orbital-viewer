@@ -1174,6 +1174,83 @@ PubChem has no 3D conformer for C60 (CID 123591): a name or SMILES answers
   a root an earlier attempt completed. Both are rare and small; the
   maximum's 2× covers them.
 
+### Fix round 1 (2026-10-08, review: Needs fixes)
+
+Commits `a9ca0c7` (jobs) and `dafced9` (UI).
+
+**C1, live and fixed.** Jobs from about N 1000 up were quotable and
+approvable under the cap. They would run 1.5–3.3 h and then fail
+`output-too-large` on the 3 MB result limit.
+
+- `sizing.decide` now refuses them up front with `output-too-large`. The
+  check runs straight after the memory refusal, so preview, submit and
+  This Mac all refuse.
+- The message: "this molecule's result files would exceed the app's file
+  limit (…), so it would run and then fail; larger molecules arrive with
+  Phase 6D's smaller-basis option".
+- The prediction:
+  - `basis.json` = 24 B × (⌈electrons/2⌉ + 10 rows) × N. The four measured
+    `basis.json` files are 74–90 % of it.
+  - Grid files and meta at 80³ are taken as 0.9 MB.
+  - The budget is pinned equal to `build_library.BUDGET_BYTES`.
+- The 3 MB limit is not raised.
+- C30 (N 1110, about 3.6 MB predicted) is refused; C24 (N 888) passes; all
+  six DONE AWS jobs pass. The superseded C60 quote above is now refused.
+
+**I1.** A refused retry approval (`quote-changed`, `option-unavailable`,
+the cap) now drops the stale quote. The status panel offers Retry for a
+fresh one.
+
+**I2.** Every settlement appends its own ledger entry: quote id, option,
+approved maximum, cost, charge, absorbed amount, lines, month and time. A
+retry never overwrites an earlier approval's entry. The view gains
+`ledger`, which the status panel and the admin table list per approval.
+Old entries still read, with their cost alone.
+
+**Minors:**
+
+1. The quote id binds its issue minute (`issuedAt`), and a submit is
+   accepted for 60 minutes, so a replayed old approval is refused.
+   Before end users are billed, the id must become an HMAC under a server
+   secret over payer, terms and `issuedAt`. That is recorded in
+   `quotes.py`, not built.
+2. The 48 h ceiling now applies to the size that would run, and the time
+   limit is bounded at 6 days (`MAX_TIMEOUT_SECONDS` = 3 × 48 h). The
+   review's 72 h example would refuse every prediction over 24 h: that is
+   an owner decision.
+3. Reconcile terminates a RUNNING job whose worker has been silent for 30
+   minutes, measured from both its heartbeat and its Batch attempt's
+   start. It is FAILED `worker-silent`, and Batch's event settles what
+   ran.
+4. Spot's card says its maximum assumes all 3 attempts run to the limit.
+5. The worker now counts:
+   - a root that an earlier attempt completed;
+   - the files of this Batch job's earlier attempts (`first_attempt`).
+   An owner's retry does not count the earlier approval's files.
+6. The absorbed alert names the lines over their maximum. Its subject is
+   "a job was billed past its approved maximum".
+7. The monthly cap is no longer called a "compute cap".
+8. The retention policy is stated in `quotes.py`. There is no lifecycle
+   rule, so results are kept past 12 months at the app's cost until the
+   owner decides between delete and re-charge.
+9. Each radio is described by its times, notes, unavailable reason and
+   over-the-cap line (`aria-describedby`).
+
+**Deployed 2026-10-08 15:14–15:22Z** (`infra/deploy.sh all`,
+`ANOMALY_MONITOR` unset, so it stayed on):
+
+- The image `7b91ac0e13ad8b06` was pushed. Job definition **rev 11** names
+  it, and the api Lambda's `JOB_DEFINITION` is rev 11.
+- The live `index.html`, `admin.html` and bundles hash the same as `dist/`.
+- Checks:
+  - a 30-carbon cluster from XYZ (N 1110) is refused `output-too-large`;
+  - water and caffeine-optimise previews answer as before, now with
+    `issuedAt`;
+  - a tampered quote on the DONE water key answers 409 `quote-changed`;
+  - `jobs.sh status` reads spent $0.2788, reserved $0, of $8.80;
+  - 401 and CORS behave as before.
+- No job was submitted.
+
 ## Judgment calls made without asking (this phase)
 
 1. **RK4 over Numerov for the relativistic radial equations**
