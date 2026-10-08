@@ -187,9 +187,37 @@ def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, hear
         shutil.rmtree(work, ignore_errors=True)
 
 
+class _Counted:
+    """The sink, counting what this attempt stores in it (Phase 6C): the
+    job's storage and delivery are charged on the bytes really written. An
+    object written twice (the trajectory, step by step) counts once, at its
+    last size. A root an earlier attempt already completed is not rewritten,
+    so not counted: the quote's estimate covers that rare case."""
+
+    def __init__(self, sink):
+        self.sink, self.sizes = sink, {}
+
+    def put_attempt(self, key, attempt, name, data):
+        self.sink.put_attempt(key, attempt, name, data)
+        self.sizes[f'attempts/{attempt}/{name}'] = len(data)
+
+    def put_result(self, key, name, data):
+        self.sink.put_result(key, name, data)
+        self.sizes[name] = len(data)
+
+    def put_done(self, key, data):
+        self.sink.put_done(key, data)
+        self.sizes['done.json'] = len(data)
+
+    def __getattr__(self, name):
+        return getattr(self.sink, name)
+
+
 def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work):
     import pyscf
     from build_library import GRID_POINTS_TRIES, write_molecule_files
+
+    sink = _Counted(sink)
 
     record = store.get_job(key)
     job, recipe, sizing = record['job'], record['recipe'], record['sizing']
@@ -337,6 +365,7 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     except Exception as e:
         error = error or _classify(e)               # the run's own failure is the more useful reason
 
+    actual.update({'resultBytes': sum(sink.sizes.values()), 'resultObjects': len(sink.sizes)})
     written = store.update_job(key, {'status': 'FAILED' if error else 'DONE', 'endedAt': iso(utc_now()),
                                      'stage': None, 'actual': actual, 'error': error, 'logTail': _tail(log)},
                                expect_status={'RUNNING'}, attempt=attempt)

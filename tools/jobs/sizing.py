@@ -142,7 +142,14 @@ HEADROOM = 2.0
 TIME_HEADROOM = 1.5
 TIMEOUT_FACTOR = 3.0
 MIN_TIMEOUT_SECONDS = 600
-CEILING_SECONDS = {'single': 3600, 'optimise': 7200}
+# Phase 6C quotes (owner decision 2026-10-08): the recipe's time no longer refuses a job; the price the owner
+# approves caps it. TARGET_SECONDS (what CEILING_SECONDS was: single 1 h, optimise 2 h) now only chooses the
+# size: the smallest whose margined prediction fits the target. SANITY_CEILING_SECONDS refuses the absurd: a
+# prediction longer than 48 h even on the fastest size with enough memory.
+TARGET_SECONDS = {'single': 3600, 'optimise': 7200}
+SANITY_CEILING_SECONDS = 48 * 3600
+# Spot is offered only for a run predicted at this or less (an availability rule for the Spot option since
+# Phase 6C, no longer a refusal): a reclaim late in a long run would waste most of it, and every attempt bills.
 SPOT_LIMIT_SECONDS = 3600
 SPOT_ATTEMPTS = 3
 OPEN_SHELL_FACTOR = 1.5
@@ -252,17 +259,55 @@ def predict_seconds(job: dict, size: Size) -> float:
     return parts['scfSeconds'] + parts['filesSeconds']
 
 
-def decide(job: dict, local: bool = False) -> dict:
-    """Pick the smallest worker with enough memory and enough time (Ruling T11-a).
+def _choose(job: dict, memory_fitting: list) -> tuple[Size, float]:
+    """The size a job runs on (Ruling T11-a, Phase 6C): the smallest whose
+    margined prediction fits the recipe's target -- predicted seconds are
+    non-increasing in vCPU count, so that is the cheapest that finishes in
+    good time. A job no size can finish within its target (a recipe ceiling
+    refused these until Phase 6C) runs on the cheapest size (by Fargate's
+    on-demand price for its predicted time) among those within TIME_HEADROOM
+    of the fastest: the SCF's speedup levels off at scfSaturation vCPUs, so
+    XL is barely faster than L and costs about 2.5x as much an hour, while a
+    much smaller size would run for many times longer."""
+    target = TARGET_SECONDS[job['recipe']]
+    times = [(s, predict_seconds(job, s)) for s in memory_fitting]
+    for size, seconds in times:
+        if seconds * TIME_HEADROOM <= target:
+            return size, seconds
+    fastest = min(seconds for _, seconds in times)
+    eligible = [(s, seconds) for s, seconds in times if seconds <= TIME_HEADROOM * fastest]
+    return min(eligible, key=lambda pair: (cost_micros('on-demand', pair[0].vcpu, pair[0].memory_gb, pair[1]),
+                                           pair[1]))
 
-    A worker must clear two independent bars: memory ≥ HEADROOM × predicted,
-    and predicted time × TIME_HEADROOM ≤ the recipe's ceiling. The second bar
-    exists because a bigger worker is also a faster one (more vCPUs speed up
-    both the SCF and the file write), so a job too slow
-    for a small worker's ceiling may still fit on a larger one. Sizes are
-    tried smallest first; predicted seconds is non-increasing in vCPU count,
-    so the first one to clear both bars is the cheapest that works. If none
-    does, even the fastest memory-qualifying size is reported as too-long.
+
+def spot_unavailable(seconds: float) -> str | None:
+    """Why the Spot option is not offered for a run predicted at `seconds`, or None if it is."""
+    if not SPOT_AVAILABLE:
+        return 'Fargate Spot is switched off for this app (sizing.SPOT_AVAILABLE).'
+    if seconds > SPOT_LIMIT_SECONDS:
+        return (f'Spot is offered only for runs predicted at {SPOT_LIMIT_SECONDS // 60} min or less; this one is '
+                f'predicted at {_hours(seconds)}, and an interruption late in a long run would waste most of it.')
+    return None
+
+
+def _hours(seconds: float) -> str:
+    return f'{seconds / 60:.0f} min' if seconds < 3600 else f'{seconds / 3600:.1f} h'
+
+
+def decide(job: dict, local: bool = False, capacity: str | None = None) -> dict:
+    """Pick the worker and price it (Ruling T11-a; Phase 6C quotes).
+
+    A worker must have memory >= HEADROOM x predicted (none: refused
+    too-large); a job predicted at over SANITY_CEILING_SECONDS even on the
+    fastest such size is refused too-long. The size is _choose's. The
+    timeout is TIMEOUT_FACTOR x the prediction (at least
+    MIN_TIMEOUT_SECONDS), never clamped since Phase 6C: the owner's approved
+    price, computed from it, is what caps the job.
+
+    `capacity` names the option being priced: 'spot' (SPOT_ATTEMPTS
+    attempts, refused if spot_unavailable) or 'on-demand' (one). None takes
+    the default, Spot when it is offered. A local run is 'local', one
+    attempt, whatever is asked.
     """
     n = basis_functions(job['molecule']['atoms'], job['method']['basis'])
     memory = predicted_memory_gb(n)
@@ -270,27 +315,28 @@ def decide(job: dict, local: bool = False) -> dict:
     if not memory_fitting:
         raise JobRefused('too-large', f'predicted {memory:.0f} GB of memory (N = {n}): beyond the largest Fargate '
                                       f'worker ({SIZES[-1].memory_gb} GB with {HEADROOM:g}× headroom)')
-    ceiling = CEILING_SECONDS[job['recipe']]
-    size = seconds = None
-    for candidate in memory_fitting:
-        candidate_seconds = predict_seconds(job, candidate)
-        if candidate_seconds * TIME_HEADROOM <= ceiling:
-            size, seconds = candidate, candidate_seconds
-            break
-    if size is None:
-        best = memory_fitting[-1]
-        best_seconds = predict_seconds(job, best)
-        margined_hours = best_seconds * TIME_HEADROOM / 3600
-        raise JobRefused('too-long', f'predicted {best_seconds / 3600:.1f} h on {best.name} (the fastest size with '
-                                     f'enough memory); with the {TIME_HEADROOM:g}× margin that is {margined_hours:.1f} h, '
-                                     f'longer than the {ceiling / 3600:g} h limit for {job["recipe"]}')
-    timeout = int(min(max(math.ceil(TIMEOUT_FACTOR * seconds), MIN_TIMEOUT_SECONDS), ceiling))
+    best = min(memory_fitting, key=lambda s: predict_seconds(job, s))
+    best_seconds = predict_seconds(job, best)
+    if best_seconds > SANITY_CEILING_SECONDS:
+        raise JobRefused('too-long', f'predicted {best_seconds / 3600:.1f} h even on {best.name} (the fastest size with '
+                                     f'enough memory): longer than the {SANITY_CEILING_SECONDS // 3600} h this app '
+                                     f'accepts for one job')
+    size, seconds = _choose(job, memory_fitting)
+    timeout = int(max(math.ceil(TIMEOUT_FACTOR * seconds), MIN_TIMEOUT_SECONDS))
     if local:
         capacity, attempts = 'local', 1
-    elif SPOT_AVAILABLE and seconds <= SPOT_LIMIT_SECONDS:
-        capacity, attempts = 'spot', SPOT_ATTEMPTS
     else:
-        capacity, attempts = 'on-demand', 1
+        if capacity is None:
+            capacity = 'spot' if spot_unavailable(seconds) is None else 'on-demand'
+        if capacity == 'spot':
+            reason = spot_unavailable(seconds)
+            if reason:
+                raise JobRefused('option-unavailable', reason, 409)
+            attempts = SPOT_ATTEMPTS
+        elif capacity == 'on-demand':
+            attempts = 1
+        else:
+            raise JobRefused('invalid-request', f'no such option: {capacity}', 400)
     # D6: reserve against the bill, not just the timeout -- see
     # BILLING_ALLOWANCE_SECONDS. A local run bills nothing, so it keeps the
     # bare timeout (cost_micros('local', ...) is 0 regardless).

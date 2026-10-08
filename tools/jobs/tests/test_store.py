@@ -409,3 +409,94 @@ def test_a_worker_records_its_own_batch_job_id_only_where_none_is(store):
     assert not store.note_runner_job_id('a' * 64, 'job-2', attempt=1)       # never replaces one
     assert store.get_job('a' * 64)['runnerJobId'] == 'job-1'
     assert not store.note_runner_job_id('b' * 64, 'job-3', attempt=1)       # no such record
+
+
+# --- Phase 6C quotes: a record keeps the quote the owner approved, reserves its maximum, ---
+# --- and settles line by line, never charging a line above its approved maximum. ---
+
+def quoted_record(key='a' * 64, option='spot', now=NOW):
+    from jobs import quotes
+    from jobs.canonical import canonical_job
+    job = canonical_job('single', [[8, 0, 0, 0.11779], [1, 0, 0.75545, -0.47116], [1, 0, -0.75545, -0.47116]], 0, 1)
+    chosen = quotes.find(quotes.quote(job, key, 'aws'), option)
+    return new_record(key=key, job=job, decision=quotes.decision(chosen), name='water', formula='H2O',
+                      electron_count=10, geometry_source={'kind': 'xyz'}, backend='aws', now=now,
+                      quote=quotes.approved(chosen, '2026-10-05T12:00:00Z'))
+
+
+@pytest.fixture
+def roomy(request, tmp_path):
+    with make_store(request.param, tmp_path, cap_micros=8_800_000) as s:
+        yield s
+
+
+@pytest.mark.parametrize('roomy', ['file', 'dynamo'], indirect=True)
+def test_a_quoted_record_reserves_its_approved_maximum(roomy):
+    rec = quoted_record()
+    roomy.create_job(rec)
+    assert rec['reservedMicros'] == rec['quote']['maximumMicros'] > rec['sizing']['predictedCostMicros']
+    assert roomy.meter('2026-10')['reserved'] == rec['quote']['maximumMicros']
+    view = public_view(roomy.get_job('a' * 64))
+    assert view['approvedQuote']['maximumUsd'] == view['reservedUsd'] and view['charged'] is None
+    assert 'quote' not in view and 'settlement' not in view
+
+
+@pytest.mark.parametrize('roomy', ['file', 'dynamo'], indirect=True)
+def test_a_quoted_record_settles_line_by_line_and_books_what_it_cost(roomy):
+    roomy.create_job(quoted_record())
+    roomy.update_job('a' * 64, {'status': 'DONE', 'actual': {'wallSeconds': 15.0, 'peakMemoryGB': 0.3, 'threads': 2,
+                                                              'resultBytes': 1_450_955, 'resultObjects': 13}})
+    assert roomy.settle('a' * 64, 497)
+    rec = roomy.get_job('a' * 64)
+    s = rec['settlement']
+    assert s['lines'][0] == {'item': 'compute', 'costMicros': 497, 'chargedMicros': 497} and s['absorbedMicros'] == 0
+    assert rec['actualMicros'] == s['costMicros'] > 497
+    assert roomy.meter('2026-10') == {'spent': s['costMicros'], 'reserved': 0, 'committed': s['costMicros'],
+                                      'cap': 8_800_000}
+    view = public_view(rec)
+    assert view['charged']['chargedUsd'] == view['actualUsd'] and view['charged']['lines'][0]['chargedUsd'] == 0.000497
+
+
+@pytest.mark.parametrize('roomy', ['file', 'dynamo'], indirect=True)
+def test_a_line_billed_above_its_maximum_is_absorbed_not_charged(roomy):
+    rec = quoted_record()
+    roomy.create_job(rec)
+    roomy.update_job('a' * 64, {'status': 'DONE', 'actual': {'resultBytes': 1_000_000, 'resultObjects': 13}})
+    compute_max = rec['quote']['lines'][0]['maximumMicros']
+    roomy.settle('a' * 64, compute_max + 10_000)
+    s = roomy.get_job('a' * 64)['settlement']
+    assert s['lines'][0]['chargedMicros'] == compute_max and s['absorbedMicros'] == 10_000
+    assert s['chargedMicros'] <= rec['quote']['maximumMicros']
+    # The meter books what the app paid: the cap protects the AWS bill, absorbed or not.
+    assert roomy.meter('2026-10')['spent'] == s['costMicros']
+
+
+@pytest.mark.parametrize('roomy', ['file', 'dynamo'], indirect=True)
+def test_a_retry_carries_its_own_fresh_quote_and_clears_the_last_settlement(roomy):
+    from jobs import quotes
+    first = quoted_record()
+    roomy.create_job(first)
+    roomy.update_job('a' * 64, {'status': 'FAILED', 'error': {'code': 'x', 'message': 'y'}})
+    roomy.settle('a' * 64, 100)
+    assert roomy.get_job('a' * 64)['settlement'] is not None
+    fresh = quoted_record(option='on-demand')
+    rec = roomy.requeue_failed('a' * 64, quotes.decision(quotes.find(
+        quotes.quote(fresh['job'], 'a' * 64, 'aws'), 'on-demand')), NOW, quote=fresh['quote'])
+    assert rec['quote']['option'] == 'on-demand' and rec['settlement'] is None
+    stored = roomy.get_job('a' * 64)
+    assert stored['quote'] == fresh['quote'] and stored['settlement'] is None
+    assert stored['reservedMicros'] == fresh['quote']['maximumMicros'] and stored['sizing']['capacity'] == 'on-demand'
+
+
+@pytest.mark.parametrize('roomy', ['file', 'dynamo'], indirect=True)
+def test_a_record_from_before_quotes_still_reads_settles_and_shows(roomy):
+    # Records already in DynamoDB have no quote and no settlement: legacy, shown by reservation and actual.
+    legacy = record(reservation=1_000)
+    for field in ('quote', 'settlement'):
+        legacy.pop(field, None)
+    roomy.create_job(legacy)
+    assert roomy.settle('a' * 64, 300)
+    rec = roomy.get_job('a' * 64)
+    assert rec['actualMicros'] == 300 and rec.get('settlement') is None
+    view = public_view(rec)
+    assert view['approvedQuote'] is None and view['charged'] is None and view['actualUsd'] == 0.0003

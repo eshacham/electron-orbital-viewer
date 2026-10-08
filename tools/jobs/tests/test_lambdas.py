@@ -19,6 +19,14 @@ def event(method, path, body=None, query=None, b64=False):
             'requestContext': {'http': {'method': method}, 'requestId': 'r1'}}
 
 
+def approved(api, body):
+    """Phase 6C: the body with the preview's recommended option and its quote id."""
+    preview = json.loads(handle_http(api, event('POST', '/api/v1/jobs/preview', body))['body'])
+    quote = preview['decision']['quote']
+    option = next(o for o in quote['options'] if o['option'] == quote['recommended'])
+    return {**body, 'option': option['option'], 'quoteId': option['quoteId']}
+
+
 @pytest.fixture
 def api(tmp_path):
     with make_store('dynamo', tmp_path, cap_micros=8_800_000) as store:
@@ -27,7 +35,8 @@ def api(tmp_path):
 
 @pytest.mark.parametrize('b64', [False, True])
 def test_submit_through_the_http_api_payload(api, b64):
-    out = handle_http(api, event('POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}}, b64=b64))
+    body = approved(api, {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})
+    out = handle_http(api, event('POST', '/api/v1/jobs', body, b64=b64))
     assert out['statusCode'] == 201 and out['headers']['content-type'] == 'application/json'
     view = json.loads(out['body'])
     assert view['status'] == 'QUEUED' and view['sizing']['capacity'] in ('spot', 'on-demand')
@@ -58,7 +67,7 @@ def test_budget_action_deny_fails_the_job_and_releases_the_reservation(api):
     def denied(record):
         raise RuntimeError('AccessDeniedException: explicit deny (budget action)')
     api.runner.submit = denied
-    out = handle_http(api, event('POST', '/api/v1/jobs', {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}}))
+    out = handle_http(api, event('POST', '/api/v1/jobs', approved(api, {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}})))
     view = json.loads(out['body'])
     assert view['status'] == 'FAILED' and view['error']['code'] == 'submit-failed'
     assert api.store.meter(view['month'])['reserved'] == 0

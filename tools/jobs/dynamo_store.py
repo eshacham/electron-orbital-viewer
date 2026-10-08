@@ -31,6 +31,7 @@ from decimal import Decimal
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from botocore.exceptions import ClientError
 
+from jobs import quotes
 from jobs.errors import JobRefused
 from jobs.model import iso, month_of
 from jobs.prices import CAP_MICROS
@@ -163,7 +164,7 @@ class DynamoStore:
             raise BudgetExhausted(self.meter(record['month']))
         raise RuntimeError(f'create_job transaction cancelled: {codes}')
 
-    def requeue_failed(self, key, decision, now):
+    def requeue_failed(self, key, decision, now, quote=None):
         rec = self.get_job(key)
         if rec is None or rec['status'] != 'FAILED':
             raise JobRefused('invalid-request', 'only a failed job can be retried', 409)
@@ -177,7 +178,8 @@ class DynamoStore:
                    'peakMemoryGB': None, 'reservedMicros': decision['reservationMicros'],
                    'sizing': {k: v for k, v in decision.items() if k != 'reservationMicros'},
                    'submittedAt': iso(now), 'startedAt': None, 'endedAt': None, 'heartbeatAt': None,
-                   'stage': None, 'latestEnergyHartree': None, 'logTail': [], 'actual': None, 'runnerJobId': None}
+                   'stage': None, 'latestEnergyHartree': None, 'logTail': [], 'actual': None, 'runnerJobId': None,
+                   'quote': quote, 'settlement': None}
         names, values = {'#st': 'status', '#se': 'settled', '#at': 'attempt'}, {
             ':failed': {'S': 'FAILED'}, ':true': {'BOOL': True}, ':attempt': _n(rec['attempt'])}
         update = _set(changes, names, values)
@@ -258,10 +260,22 @@ class DynamoStore:
         if rec is None or rec['settled'] or (attempt is not None and rec['attempt'] != attempt):
             return False
         w = rec['reservedMicros']
+        # Phase 6C: a quoted record books its whole cost and keeps its line-by-line charge, computed from
+        # the read the condition below pins (its quote and `actual` cannot change once it has ended).
+        lines = quotes.settlement(rec, actual_micros)
+        booked = lines['costMicros'] if lines else actual_micros
+        update = 'SET #se = :true, #am = #am + :a, #ch = list_append(if_not_exists(#ch, :none), :charge)'
+        names = {'#se': 'settled', '#am': 'actualMicros', '#rm': 'reservedMicros', '#ch': 'charges', '#ag': 'attempt',
+                 '#mo': 'month'}
+        values = {':true': {'BOOL': True}, ':false': {'BOOL': False}, ':a': _n(booked), ':w': _n(w),
+                  ':none': {'L': []}, ':attempt': _n(rec['attempt']), ':month': {'S': rec['month']},
+                  ':charge': to_attr([charge(rec, booked)])}
+        if lines:
+            update += ', #sl = :settlement'
+            names['#sl'], values[':settlement'] = 'settlement', to_attr(lines)
         codes = self._transact([
             {'Update': {'TableName': self.table, 'Key': {'pk': {'S': key}},
-                        'UpdateExpression': 'SET #se = :true, #am = #am + :a, '
-                                            '#ch = list_append(if_not_exists(#ch, :none), :charge)',
+                        'UpdateExpression': update,
                         # The meter key and the charge come from the read
                         # above, so the condition pins everything they were
                         # derived from: a reconciler whose read predates a
@@ -269,17 +283,12 @@ class DynamoStore:
                         # perhaps a new month) must not settle the retry
                         # against the old month's meter (review fix 1).
                         'ConditionExpression': '#se = :false AND #rm = :w AND #ag = :attempt AND #mo = :month',
-                        'ExpressionAttributeNames': {'#se': 'settled', '#am': 'actualMicros', '#rm': 'reservedMicros',
-                                                     '#ch': 'charges', '#ag': 'attempt', '#mo': 'month'},
-                        'ExpressionAttributeValues': {':true': {'BOOL': True}, ':false': {'BOOL': False},
-                                                      ':a': _n(actual_micros), ':w': _n(w), ':none': {'L': []},
-                                                      ':attempt': _n(rec['attempt']), ':month': {'S': rec['month']},
-                                                      ':charge': to_attr([charge(rec, actual_micros)])}}},
+                        'ExpressionAttributeNames': names, 'ExpressionAttributeValues': values}},
             {'Update': {'TableName': self.table, 'Key': {'pk': {'S': f'METER#{rec["month"]}'}},
                         'UpdateExpression': 'ADD #s :a, #r :minus_w, #c :delta',
                         'ExpressionAttributeNames': {'#s': 'spent', '#r': 'reserved', '#c': 'committed'},
-                        'ExpressionAttributeValues': {':a': _n(actual_micros), ':minus_w': _n(-w),
-                                                      ':delta': _n(actual_micros - w)}}}])
+                        'ExpressionAttributeValues': {':a': _n(booked), ':minus_w': _n(-w),
+                                                      ':delta': _n(booked - w)}}}])
         if codes is None:
             return True
         if codes[0] == 'ConditionalCheckFailed':

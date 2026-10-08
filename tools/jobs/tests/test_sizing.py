@@ -1,3 +1,4 @@
+import math
 import json
 from pathlib import Path
 
@@ -78,14 +79,63 @@ def test_caffeine_needs_a_bigger_worker_than_its_ceiling_timeout_would_allow(mon
     assert d['timeoutSeconds'] >= sizing.TIME_HEADROOM * d['predictedSeconds']
 
 
-def test_too_slow_for_every_size_within_the_ceiling_is_too_long(monkeypatch):
-    # Even the fastest memory-qualifying size (XL) cannot clear
-    # TIME_HEADROOM × predicted ≤ ceiling: refuse too-long rather than ever
-    # handing out a timeout shorter than the job needs.
+def test_too_slow_for_the_sanity_ceiling_even_on_the_fastest_size_is_too_long(monkeypatch):
+    # Phase 6C: the recipe ceilings no longer refuse; only a prediction over
+    # SANITY_CEILING_SECONDS (48 h) on the fastest memory-qualifying size does.
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't3': 1e9})
     with pytest.raises(JobRefused) as e:
         sizing.decide(canonical_job('single', carbons(10), 0, 1))
-    assert e.value.code == 'too-long' and 'XL' in e.value.message
+    assert e.value.code == 'too-long' and 'even on XL' in e.value.message and '48 h' in e.value.message
+
+
+def test_a_job_past_its_recipes_target_is_no_longer_refused(monkeypatch):
+    # Owner decision 2026-10-08 (Phase 6C): 1 h single / 2 h optimise were
+    # refusals; now a job over its target is sized and priced, and its timeout
+    # is TIMEOUT_FACTOR x the prediction, unclamped.
+    monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't0': 0.0, 'f2': 0.0})
+    job = canonical_job('single', carbons(10), 0, 1)
+    scale = 20 * 3600 / sizing.predict_seconds(job, sizing.SIZES[-1])        # 20 h on the fastest size
+    monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't3': sizing.CONSTANTS['t3'] * scale})
+    d = sizing.decide(job)
+    assert d['predictedSeconds'] == pytest.approx(20 * 3600, rel=1e-3)
+    size = next(s for s in sizing.SIZES if s.name == d['size'])
+    assert d['timeoutSeconds'] == math.ceil(sizing.TIMEOUT_FACTOR * sizing.predict_seconds(job, size)) > 2 * 24 * 3600
+    assert d['capacity'] == 'on-demand' and d['attempts'] == 1
+
+
+def test_past_the_target_the_cheapest_size_near_the_fastest_is_chosen(monkeypatch):
+    # The SCF's speedup levels off at 16 vCPUs, so L and XL run a pure-SCF job
+    # equally fast; XL costs ~2.5x as much an hour, so L is chosen. S and M,
+    # cheaper still, are more than TIME_HEADROOM slower and are passed over.
+    monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't0': 0.0, 'f2': 0.0})
+    job = canonical_job('single', carbons(10), 0, 1)
+    scale = 10 * 3600 / sizing.predict_seconds(job, sizing.SIZES[-1])
+    monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't3': sizing.CONSTANTS['t3'] * scale})
+    assert sizing.decide(job)['size'] == 'L'
+
+
+def test_spot_is_an_option_only_up_to_the_spot_limit():
+    assert sizing.spot_unavailable(sizing.SPOT_LIMIT_SECONDS) is None
+    reason = sizing.spot_unavailable(sizing.SPOT_LIMIT_SECONDS + 1)
+    assert reason.startswith('Spot is offered only for runs predicted at 60 min or less')
+
+
+def test_each_option_is_priced_on_the_same_size_and_timeout():
+    job = canonical_job('single', WATER, 0, 1)
+    spot, on_demand = sizing.decide(job, capacity='spot'), sizing.decide(job, capacity='on-demand')
+    assert (spot['capacity'], spot['attempts'], on_demand['capacity'], on_demand['attempts']) == ('spot', 3, 'on-demand', 1)
+    assert spot['size'] == on_demand['size'] and spot['timeoutSeconds'] == on_demand['timeoutSeconds'] == 600
+    assert on_demand['reservationMicros'] == cost_micros('on-demand', 2, 8, 720)
+    with pytest.raises(JobRefused) as e:
+        sizing.decide(job, capacity='reserved')
+    assert e.value.status == 400
+
+
+def test_spot_is_refused_for_a_run_past_the_spot_limit(monkeypatch):
+    monkeypatch.setattr(sizing, 'SPOT_LIMIT_SECONDS', 1)
+    with pytest.raises(JobRefused) as e:
+        sizing.decide(canonical_job('single', WATER, 0, 1), capacity='spot')
+    assert e.value.code == 'option-unavailable' and e.value.status == 409
 
 
 def test_local_backend_reserves_nothing_but_still_sizes():
@@ -111,7 +161,7 @@ def test_too_large_for_xl(monkeypatch):
     assert e.value.code == 'too-large' and 'largest Fargate worker' in e.value.message
 
 
-def test_too_long_for_the_recipe_ceiling(monkeypatch):
+def test_too_long_for_the_sanity_ceiling(monkeypatch):
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't3': 1e7})
     with pytest.raises(JobRefused) as e:
         sizing.decide(canonical_job('single', carbons(40), 0, 1))
@@ -129,14 +179,15 @@ def test_long_jobs_run_on_demand_with_one_attempt(monkeypatch):
                                               'f2': 0.0})
     job = canonical_job('optimise', carbons(10), 0, 1)
     seconds = sizing.predict_seconds(job, sizing.SIZES[-1])
-    scale = 4500 / seconds   # between the 3600 s spot limit and ceiling / TIME_HEADROOM = 4800 s
+    scale = 4500 / seconds   # between the 3600 s spot limit and target / TIME_HEADROOM = 4800 s
     # v4: carbons(10)'s def2-SVP steps fit in core, so they are priced by t3Step; scale both.
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't0': 0.0, 't3': scale, 't3Step': scale,
                                               'g': 0.0, 'f2': 0.0})
     d = sizing.decide(job)
     fastest = [s.name for s in sizing.SIZES if sizing.predict_seconds(job, s) == pytest.approx(4500)]
     assert d['size'] == fastest[0] and d['predictedSeconds'] == pytest.approx(4500)
-    assert d['capacity'] == 'on-demand' and d['attempts'] == 1 and d['timeoutSeconds'] == 7200
+    # Phase 6C: the timeout is 3x the prediction, no longer clamped at the 2 h optimise ceiling (7200 s).
+    assert d['capacity'] == 'on-demand' and d['attempts'] == 1 and d['timeoutSeconds'] == 13500
 
 
 def test_open_shell_takes_longer(monkeypatch):
@@ -472,11 +523,14 @@ def test_no_single_point_decision_is_less_conservative_than_version_4s(atoms, v4
         assert d[k] >= v4[k], k
 
 
-def test_a_c60_scale_single_point_is_still_refused_as_version_3_refused_it():
-    with pytest.raises(JobRefused) as e:
-        sizing.decide(canonical_job('single', carbons(60), 0, 1))
-    assert e.value.message == ('predicted 18.0 h on XL (the fastest size with enough memory); with the 1.5× margin '
-                               'that is 27.0 h, longer than the 1 h limit for single')
+def test_a_c60_scale_single_point_is_priced_on_demand_since_phase_6c():
+    # Versions 3-5 refused it (18.0 h on XL, 27.0 h with the margin, over the 1 h single ceiling). Phase 6C
+    # removes that refusal: 18 h is under the 48 h sanity ceiling, so it is sized (L: as fast as XL for the
+    # SCF, at ~40 % of the price), Spot is not offered, and the timeout is 3x the prediction.
+    d = sizing.decide(canonical_job('single', carbons(60), 0, 1))
+    assert d['size'] == 'L' and d['capacity'] == 'on-demand' and d['attempts'] == 1
+    assert d['timeoutSeconds'] >= sizing.TIMEOUT_FACTOR * d['predictedSeconds']
+    assert sizing.spot_unavailable(d['predictedSeconds']) is not None
 
 
 @pytest.mark.parametrize('i', range(4))

@@ -26,13 +26,24 @@ def _body(args):
         molecule = {'xyz': Path(args.xyz).read_text()}
     else:
         molecule = {'name': args.name} if args.name else {'smiles': args.smiles}
-    body = {'recipe': args.recipe, 'molecule': molecule, 'retry': args.retry}
+    body = {'recipe': args.recipe, 'molecule': molecule}
     # Only when given: the API's own defaults (PubChem's formal charge, the
     # lowest multiplicity the electron count allows) apply otherwise.
     for field in ('charge', 'multiplicity'):
         if getattr(args, field) is not None:
             body[field] = getattr(args, field)
-    return json.dumps(body).encode()
+    return body
+
+
+def _approve_local(api, body):
+    """The submit body with the This Mac quote approved (Phase 6C): a local
+    run is free, so the CLI takes the preview's one $0 option itself. A
+    preview that refuses the job is answered as the API answers it."""
+    status, preview = api.handle('POST', '/api/v1/jobs/preview', {}, json.dumps(body).encode())
+    if status != 200 or not preview['decision']['ok']:
+        return None, (status if status != 200 else 422, preview if status != 200 else {'error': preview['decision']['error']})
+    local = preview['decision']['quote']['options'][0]
+    return {**body, 'option': local['option'], 'quoteId': local['quoteId']}, None
 
 
 def _fail_and_settle(store, key, attempt, code, message):
@@ -68,7 +79,12 @@ def main(argv=None):
         store.set_generation_enabled(args.state == 'on')
         print(f'generation {args.state}')
         return 0
-    status, view = Api(store, NullRunner(), backend='local').handle('POST', '/api/v1/jobs', {}, _body(args))
+    api = Api(store, NullRunner(), backend='local')
+    body, refused = _approve_local(api, _body(args))
+    if refused:
+        status, view = refused
+    else:
+        status, view = api.handle('POST', '/api/v1/jobs', {}, json.dumps({**body, 'retry': args.retry}).encode())
     if status >= 400:
         print(json.dumps(view), file=sys.stderr)
         return 1

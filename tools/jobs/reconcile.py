@@ -54,6 +54,7 @@ reported and skipped; the rest of the sweep and its alert carry on.
 """
 from datetime import datetime, timedelta, timezone
 
+from jobs import quotes
 from jobs.batch_runner import MAX_VCPUS
 from jobs.model import ACTIVE, iso, month_of, utc_now
 from jobs.prices import billed_seconds, cost_micros
@@ -187,9 +188,19 @@ class Reconciler:
     def _settle(self, rec, cost):
         """Settles the attempt `rec` was read at, and no other; returns
         (settled, a line for the alert when the charge passed the reservation)."""
+        # The store charges a quoted record line by line (quotes.settlement);
+        # the same figures, from the same read, say whether any was absorbed.
+        lines = quotes.settlement(rec, cost)
         if not self.store.settle(rec['key'], cost, attempt=rec['attempt']):
             return False, None
-        if cost > rec['reservedMicros']:
+        if lines and lines['absorbedMicros'] > 0:
+            # Phase 6C: the owner approved a maximum; the charge stops there
+            # and the app pays the rest. The meter books the whole cost, so
+            # the month's cap may still have been passed.
+            return True, (f'AWS billed {_usd(lines["costMicros"])} against an approved maximum of '
+                          f'{_usd(rec["quote"]["maximumMicros"])}; charged {_usd(lines["chargedMicros"])}, and the '
+                          f"app absorbs {_usd(lines['absorbedMicros'])}; the month's cap may have been passed")
+        if lines is None and cost > rec['reservedMicros']:
             # The cap admits a job by its reservation, so a charge above it
             # is spending the cap never agreed to (a timeout's stop grace, a
             # slow pull): the month's meter may now be over its cap.

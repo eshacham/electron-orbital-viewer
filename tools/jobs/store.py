@@ -33,6 +33,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Protocol
 
+from jobs import quotes
 from jobs.errors import JobRefused
 from jobs.model import iso, month_of, utc_now
 from jobs.prices import CAP_MICROS
@@ -54,12 +55,15 @@ def charge(record: dict, micros: int) -> dict:
 class Store(Protocol):
     def get_job(self, key: str) -> dict | None: ...
     def create_job(self, record: dict) -> tuple[bool, dict]: ...
-    def requeue_failed(self, key: str, decision: dict, now) -> dict: ...
+    # `quote`: the fresh quote the owner approved for this retry (Phase 6C).
+    def requeue_failed(self, key: str, decision: dict, now, quote: dict | None = None) -> dict: ...
     def claim(self, key: str, attempt: int, now) -> bool: ...
     def update_job(self, key: str, changes: dict, expect_status: set | None = None,
                     attempt: int | None = None) -> bool: ...
     # `attempt`, when given, settles only that attempt: a reconciler's cost
     # is for one attempt's Batch job, never for a retry that replaced it.
+    # A quoted record (Phase 6C) books its whole cost (compute plus storage
+    # and delivery, quotes.settlement) and keeps the line-by-line charge.
     def settle(self, key: str, actual_micros: int, attempt: int | None = None) -> bool: ...
     # The worker's own Batch job id, written only where none is yet (the api
     # can lose the one SubmitJob returned) and only under its own attempt.
@@ -155,7 +159,7 @@ class FileStore:
             self._write(self._job_path(record['key']), record)      # the one write: job and reservation together
             return True, record
 
-    def requeue_failed(self, key, decision, now):
+    def requeue_failed(self, key, decision, now, quote=None):
         with self._locked():
             rec = self.get_job(key)
             if rec is None or rec['status'] != 'FAILED':
@@ -173,7 +177,7 @@ class FileStore:
                         'sizing': {k: v for k, v in decision.items() if k != 'reservationMicros'},
                         'submittedAt': iso(now), 'startedAt': None, 'endedAt': None, 'heartbeatAt': None,
                         'stage': None, 'latestEnergyHartree': None, 'logTail': [], 'actual': None,
-                        'runnerJobId': None})
+                        'runnerJobId': None, 'quote': quote, 'settlement': None})
             self._write(self._job_path(key), rec)                   # the one write: job and reservation together
             return rec
 
@@ -218,8 +222,12 @@ class FileStore:
             # the other way round. The charge carries its own date (D16) so
             # the dashboard's daily spend adds charges, not a record's
             # running total, which spans months after a retry.
-            rec.update({'settled': True, 'actualMicros': rec['actualMicros'] + actual_micros,
-                        'charges': rec.get('charges', []) + [charge(rec, actual_micros)]})
+            lines = quotes.settlement(rec, actual_micros)
+            booked = lines['costMicros'] if lines else actual_micros
+            rec.update({'settled': True, 'actualMicros': rec['actualMicros'] + booked,
+                        'charges': rec.get('charges', []) + [charge(rec, booked)]})
+            if lines:
+                rec['settlement'] = lines
             self._write(self._job_path(key), rec)
             return True
 

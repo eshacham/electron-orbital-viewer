@@ -18,8 +18,9 @@ so the same viewer renders both.
 | `canonical.py` | The job's identity: `canonical_job`, `job_key` (SHA-256 of `rfc8785.dumps`) |
 | `pubchem.py` | Name/SMILES → PubChem CID → 3D conformer, stdlib only |
 | `basis_counts.py` | Loads `basis_counts.json`, the committed PySCF-free basis-function table |
-| `sizing.py` | `decide()`: size, timeout, capacity, attempts, reservation — deterministic, no PySCF |
-| `prices.py` | Fargate us-east-1 Linux/ARM prices, retrieved 2026-10-04 |
+| `sizing.py` | `decide()`: size, timeout, capacity, attempts, reservation — deterministic, no PySCF. Since Phase 6C the recipe's 1 h / 2 h only choose the size (`TARGET_SECONDS`); refusals are memory (no size fits) and the 48 h sanity ceiling; `decide(capacity=…)` prices one option |
+| `prices.py` | Fargate us-east-1 Linux/ARM prices (retrieved 2026-10-04), S3 Standard and CloudFront list prices (2026-10-08, AWS Price List API), `PRICES_VERSION` |
+| `quotes.py` | Phase 6C binding quotes: the Spot and on-demand options, their line items (compute, storage, delivery, platform), the quote id, the approved quote a record keeps, and settlement capped by the approved maximum |
 | `model.py` | Job record shape, statuses, `public_view` (hides store bookkeeping) |
 | `store.py` | `Store` contract + `FileStore`: create/claim/update/settle, the meter (derived from the records), `jobs_with_backend` for the runner's start-up sweep |
 | `input_template.py` | Renders `input.py`, the exact PySCF script a job runs |
@@ -82,6 +83,7 @@ python -m jobs.cli enqueue --xyz path/to/molecule.xyz # queue a pasted geometry
 python -m jobs.cli submit --name benzene --wait       # run to completion in the foreground
 python -m jobs.cli submit --xyz no2.xyz --multiplicity 2 --wait   # --charge N / --multiplicity M, as the API takes them
 python -m jobs.cli submit --name water --retry --wait # run a FAILED job again, as a new attempt
+# (the CLI runs on This Mac, whose quote is one free option: it approves that itself)
 python -m jobs.cli generation off|on                  # the local kill switch (spec §10)
 ```
 

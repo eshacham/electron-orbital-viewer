@@ -78,6 +78,32 @@ def test_h2_end_to_end(env):
     assert (root / 'attempts' / '1' / 'input.py').exists()
 
 
+def test_the_worker_reports_the_bytes_and_objects_it_stored(env):
+    # Phase 6C: storage and delivery are charged on what was really written, every attempt file and result.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    assert run_job(key, store, sink, grid_points=(32,), heartbeat_seconds=0.2) == 'DONE'
+    stored = [p for p in (jobs / key).rglob('*') if p.is_file()]
+    actual = store.get_job(key)['actual']
+    assert actual['resultObjects'] == len(stored) == 13
+    assert actual['resultBytes'] == sum(p.stat().st_size for p in stored)
+
+
+def test_a_failed_run_reports_only_its_attempt_files(env, monkeypatch):
+    store, sink, jobs = env
+    key = queue(store, H2)
+    import build_library
+
+    def broken(*a, **k):
+        raise RuntimeError('no files today')
+    monkeypatch.setattr(build_library, 'write_molecule_files', broken)
+    assert run_job(key, store, sink, grid_points=(32,), heartbeat_seconds=0.2) == 'FAILED'
+    stored = [p for p in (jobs / key).rglob('*') if p.is_file()]
+    actual = store.get_job(key)['actual']
+    assert actual['resultObjects'] == len(stored) == 3
+    assert actual['resultBytes'] == sum(p.stat().st_size for p in stored)
+
+
 def test_timings_record_the_converged_scfs_cycle_count(env):
     # v4 prep (Phase 6B-3 follow-up, Task 6): the SCF stage that converged
     # carries PySCF's own mf.cycles, the same figure probe.py's measure()

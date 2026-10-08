@@ -9,7 +9,7 @@ import re
 import sys
 import traceback
 
-from jobs import pubchem, sizing
+from jobs import pubchem, quotes
 from jobs.basis_counts import basis_functions
 from jobs.canonical import (RECIPES, canonical_job, check_atoms, electron_count, formula, job_key,
                              multiplicity_for, parse_xyz)
@@ -22,7 +22,16 @@ KEY = re.compile(r'^[0-9a-f]{64}$')
 JOB_PATH = re.compile(r'^/api/v1/jobs/([^/]+)$')
 MONTH = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
 MAX_NAME = 200
-_FIELDS = {'recipe', 'molecule', 'charge', 'multiplicity', 'retry'}
+_FIELDS = {'recipe', 'molecule', 'charge', 'multiplicity', 'retry', 'option', 'quoteId'}
+OPTIONS = ('spot', 'on-demand', 'local')
+NEEDS_QUOTE = ('a submit must name the option the owner approved and its quoteId: preview the job and approve one '
+               'of its options')
+
+
+def dollars(micros: int) -> str:
+    """As the UI writes money (src/jobs/format.ts): cents from a cent up, micro-dollars below."""
+    value = micros / 1_000_000
+    return f'${value:.2f}' if value == 0 or value >= 0.01 else f'${value:.6f}'.rstrip('0')
 
 
 def _bad(message):
@@ -94,6 +103,10 @@ class Api:
                 raise _bad(f'{field} must be an integer')
         if not isinstance(body.get('retry', False), bool):
             raise _bad('retry must be true or false')
+        if body.get('option') is not None and body['option'] not in OPTIONS:
+            raise _bad(f'option must be one of {", ".join(OPTIONS)}')
+        if body.get('quoteId') is not None and not isinstance(body['quoteId'], str):
+            raise _bad('quoteId must be a string')
         return recipe, kind, text, body.get('charge'), body.get('multiplicity'), body.get('retry', False)
 
     def _geometry(self, kind, text):
@@ -127,10 +140,10 @@ class Api:
         job = canonical_job(recipe, atoms, charge, multiplicity)
         f = formula(atoms)
         return {'job': job, 'key': job_key(job), 'formula': f, 'name': title or f, 'electrons': electrons,
-                'source': source, 'retry': retry}
+                'source': source, 'retry': retry, 'option': body.get('option'), 'quoteId': body.get('quoteId')}
 
-    def _decide(self, job):
-        return sizing.decide(job, local=self.backend == 'local')
+    def _quote(self, p):
+        return quotes.quote(p['job'], p['key'], self.backend)
 
     def _meter(self, month):
         m = self.store.meter(month)
@@ -143,18 +156,25 @@ class Api:
         month = month_of(self.now())
         existing = self.store.get_job(p['key'])
         try:
-            d = self._decide(p['job'])
-            # A known job that is already active or finished costs nothing
-            # new to submit (dedupe, not a fresh reservation), so a tight
-            # budget must not make its preview look refused.
-            if existing is None or existing['status'] == 'FAILED':
-                meter = self.store.meter(month)
-                if meter['committed'] + d['reservationMicros'] > meter['cap']:
-                    raise BudgetExhausted(meter)
-            decision = {'ok': True, 'sizing': {k: v for k, v in d.items() if k != 'reservationMicros'},
-                        'reservedUsd': usd(d['reservationMicros'])}
+            q = quotes.public_quote(self._quote(p))
         except JobRefused as e:
             decision = {'ok': False, 'error': {'code': e.code, 'message': e.message}}
+        else:
+            # Phase 6C: every option is shown; one whose maximum does not fit
+            # what is left of the month's cap cannot be approved. A known job
+            # that is already active or finished costs nothing new to submit
+            # (dedupe, not a fresh reservation), so the cap does not block it.
+            meter = self.store.meter(month)
+            fresh = existing is None or existing['status'] == 'FAILED'
+            room = max(meter['cap'] - meter['committed'], 0)
+            for option in q['options']:
+                option['approvable'], option['blockedReason'] = option['available'], None
+                if option['available'] and fresh and round(option['maximumUsd'] * 1e6) > room:
+                    option['approvable'] = False
+                    option['blockedReason'] = (f'Up to {dollars(round(option["maximumUsd"] * 1e6))} is more than '
+                                               f"the {dollars(room)} left of this month's {dollars(meter['cap'])} "
+                                               'compute cap: the monthly cap would need raising to approve it.')
+            decision = {'ok': True, 'quote': q}
         mol = p['job']['molecule']
         return {'key': p['key'], 'job': p['job'], 'name': p['name'], 'formula': p['formula'],
                 'electronCount': p['electrons'],
@@ -164,8 +184,26 @@ class Api:
                 'existing': public_view(existing) if existing else None,
                 'meter': self._meter(month), 'generationEnabled': self.store.generation_enabled()}
 
+    def _approved_option(self, p):
+        """The option the owner approved, recomputed now (Phase 6C): refused
+        unless the quote id the preview showed for it is the one recomputed,
+        so nothing the owner did not see can be submitted."""
+        if p['option'] is None or p['quoteId'] is None:
+            raise _bad(NEEDS_QUOTE)
+        option = quotes.find(self._quote(p), p['option'])
+        if option is None:
+            raise _bad(f'option {p["option"]} is not offered here ({self.backend})')
+        if not option['available']:
+            raise JobRefused('option-unavailable', option['unavailableReason'], 409)
+        if option['quoteId'] != p['quoteId']:
+            raise JobRefused('quote-changed', 'The quote changed since it was shown (its price, size, time limit or '
+                                              'terms are not what was approved): preview again and approve the new '
+                                              'quote.', 409)
+        return option
+
     def submit(self, body):
         p = self._prepare(body)
+        option = self._approved_option(p)
         existing = self.store.get_job(p['key'])
         if existing is not None and not (existing['status'] == 'FAILED' and p['retry']):
             return 200, public_view(existing)
@@ -173,10 +211,10 @@ class Api:
             # 409, not 503: an answer the owner chose, not a fault, and the
             # Api5xx alarm emails for every 5xx (final review M3).
             raise JobRefused('paused', 'Generation is paused by the owner (infra/jobs.sh resume)', 409)
-        decision = self._decide(p['job'])
+        decision, approved = quotes.decision(option), quotes.approved(option, iso(self.now()))
         if existing is not None:
             try:
-                record, status = self.store.requeue_failed(p['key'], decision, self.now()), 200
+                record, status = self.store.requeue_failed(p['key'], decision, self.now(), quote=approved), 200
             except JobRefused:
                 # Another caller's retry (or the worker settling the old
                 # attempt) may have already moved the job on by the time
@@ -191,7 +229,8 @@ class Api:
         else:
             created, record = self.store.create_job(new_record(
                 key=p['key'], job=p['job'], decision=decision, name=p['name'], formula=p['formula'],
-                electron_count=p['electrons'], geometry_source=p['source'], backend=self.backend, now=self.now()))
+                electron_count=p['electrons'], geometry_source=p['source'], backend=self.backend, now=self.now(),
+                quote=approved))
             if not created:
                 return 200, public_view(record)     # lost a race with an identical submission
             status = 201

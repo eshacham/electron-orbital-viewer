@@ -50,8 +50,14 @@ def test_server_round_trip(tmp_path):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_address[1]}'
     try:
+        water = {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}}
+        req = urllib.request.Request(f'{base}/api/v1/jobs/preview', method='POST',
+                                     headers={'Content-Type': 'application/json'}, data=json.dumps(water).encode())
+        with urllib.request.urlopen(req) as r:
+            local = json.loads(r.read())['decision']['quote']['options'][0]     # Phase 6C: one free option
+        approved = {**water, 'option': local['option'], 'quoteId': local['quoteId']}
         req = urllib.request.Request(f'{base}/api/v1/jobs', method='POST', headers={'Content-Type': 'application/json'},
-                                     data=json.dumps({'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}}).encode())
+                                     data=json.dumps(approved).encode())
         with urllib.request.urlopen(req) as r:
             assert r.status == 201 and json.loads(r.read())['status'] == 'QUEUED'
         with urllib.request.urlopen(f'{base}/api/v1/costs?month=2026-10') as r:

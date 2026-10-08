@@ -335,9 +335,17 @@ def test_the_5xx_alarm_fires_on_one_and_expected_refusals_are_not_5xx(template, 
     store = FileStore(tmp_path)
     store.set_generation_enabled(False)
     xyz = '3\nwater\nO 0 0 0.1178\nH 0 0.7555 -0.4712\nH 0 -0.7555 -0.4712\n'
-    status, body = Api(store, runner=None).handle('POST', '/api/v1/jobs', {},
-                                                  json.dumps({'recipe': 'single', 'molecule': {'xyz': xyz}}).encode())
+    api, water = Api(store, runner=None), {'recipe': 'single', 'molecule': {'xyz': xyz}}
+    # Phase 6C: a submit names an approved option and its quote id, so it gets as far as the pause.
+    _, preview = api.handle('POST', '/api/v1/jobs/preview', {}, json.dumps(water).encode())
+    option = preview['decision']['quote']['options'][0]
+    status, body = api.handle('POST', '/api/v1/jobs', {}, json.dumps(
+        {**water, 'option': option['option'], 'quoteId': option['quoteId']}).encode())
     assert body['error']['code'] == 'paused' and status < 500
+    # So do the quote's own refusals: a changed quote is 409, never a 5xx.
+    status, body = api.handle('POST', '/api/v1/jobs', {}, json.dumps(
+        {**water, 'option': option['option'], 'quoteId': '0' * 64}).encode())
+    assert body['error']['code'] == 'quote-changed' and status == 409
 
 
 def test_the_billing_role_writes_only_its_own_items(template):

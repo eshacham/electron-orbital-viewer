@@ -488,3 +488,54 @@ def test_the_daily_sweep_finds_unsettled_records_from_older_months(empty_store):
     result = Reconciler(store, FakeBatch([job]), FakeEcs(), now=lambda: just_after_midnight).sweep()
     assert result['outcome'] == {KEY: 'settled'}
     assert store.get_job(KEY)['settled'] and store.meter('2026-08')['spent'] == cost_micros('spot', 2, 8, 160)
+
+
+# --- Phase 6C quotes: a quoted job is charged line by line, never above its approved maximum; ---
+# --- what AWS bills beyond it is absorbed by the app and reported. ---
+
+def quoted_store(store_, option='spot'):
+    from jobs import quotes
+    from jobs.canonical import canonical_job
+    job = canonical_job('single', [[8, 0, 0, 0.11779], [1, 0, 0.75545, -0.47116], [1, 0, -0.75545, -0.47116]], 0, 1)
+    chosen = quotes.find(quotes.quote(job, KEY, 'aws'), option)
+    store_.create_job(new_record(key=KEY, job=job, decision=quotes.decision(chosen), name='water', formula='H2O',
+                                 electron_count=10, geometry_source={'kind': 'xyz'}, backend='aws', now=T0,
+                                 quote=quotes.approved(chosen, iso(T0))))
+    store_.update_job(KEY, {'runnerJobId': 'job-1'})
+    return chosen
+
+
+def test_a_quoted_job_settles_at_billed_compute_plus_its_measured_storage_and_delivery(empty_store):
+    from jobs.prices import delivery_micros, storage_micros
+    quoted_store(empty_store)
+    empty_store.update_job(KEY, {'status': 'DONE', 'actual': {'wallSeconds': 15.0, 'resultBytes': 1_450_955,
+                                                              'resultObjects': 13}})
+    job = batch_job('SUCCEEDED', [attempt(T0, 170)])
+    notes = []
+    assert reconciler(empty_store, [job], {TASK: {'pullStartedAt': T0, 'stoppedAt': T0 + timedelta(seconds=200)}},
+                      notes=notes).on_event(job) == 'settled'
+    rec = empty_store.get_job(KEY)
+    compute = cost_micros('spot', 2, 8, 200)
+    expected = compute + storage_micros(1_450_955, 12, 13) + delivery_micros(14_509_550, 130)
+    assert rec['settlement']['costMicros'] == rec['settlement']['chargedMicros'] == expected == rec['actualMicros']
+    assert notes == []
+
+
+def test_a_quoted_job_billed_past_its_maximum_is_charged_the_maximum_and_reported(empty_store):
+    chosen = quoted_store(empty_store, option='on-demand')
+    empty_store.update_job(KEY, {'status': 'DONE', 'actual': {'resultBytes': 1_000_000, 'resultObjects': 13}})
+    job = batch_job('SUCCEEDED', [attempt(T0, 3 * 3600)])
+    notes = []
+    assert reconciler(empty_store, [job], notes=notes).on_event(job) == 'settled'
+    s = empty_store.get_job(KEY)['settlement']
+    compute_max = chosen['lines'][0]['maximumMicros']
+    assert s['lines'][0]['chargedMicros'] == compute_max and s['absorbedMicros'] > 0
+    assert s['chargedMicros'] <= chosen['maximumMicros']
+    assert len(notes) == 1 and 'approved maximum' in notes[0][1] and 'absorbs' in notes[0][1]
+
+
+def test_the_sweep_reports_an_absorbed_charge_too(empty_store):
+    quoted_store(empty_store, option='on-demand')
+    empty_store.update_job(KEY, {'status': 'DONE', 'actual': {'resultBytes': 1_000_000, 'resultObjects': 13}})
+    result = reconciler(empty_store, [batch_job('SUCCEEDED', [attempt(T0, 3 * 3600)])]).sweep()
+    assert result['outcome'] == {KEY: 'settled'} and len(result['stale']) == 1 and 'absorbs' in result['stale'][0]
