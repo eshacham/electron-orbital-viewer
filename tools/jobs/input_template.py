@@ -339,7 +339,9 @@ def on_axis(atoms):
     """A linear molecule laid exactly along z, and the axes it was laid along (rows: the molecule's own line,
     then two perpendiculars); anything else unchanged, with None. PySCF's harmonic analysis recognises a
     linear rotor only by an exactly zero moment of inertia, which an optimised geometry's numerical noise
-    denies it: it would then project out six modes, not five, and lose a vibration."""
+    denies it: it would then project out six modes, not five, and lose a vibration. Still needed after
+    symmetrised() (Task 7 review M1 asked whether it was): a molecule exactly on a line that is not an axis
+    gives a smallest moment of about -1e-17 from rounding, not zero, which PySCF also reads as non-linear."""
     xyz = numpy.array([c for _, c in atoms], dtype=float)
     centre = xyz.mean(axis=0)
     _, spread, axes = numpy.linalg.svd(xyz - centre)
@@ -356,8 +358,12 @@ def _rounded(values, name):
 
 def frequency_check(atoms, on_stage, stage='frequency check'):
     """Harmonic frequencies at the optimisation level (spec §7): PySCF's analytic Hessian (the D3 part by
-    finite differences of its gradient), translations and rotations projected out. Normal modes come back
-    in the frame of `atoms`."""
+    finite differences of its gradient), translations and rotations projected out, in the frame of `atoms`.
+    Masses are standard atomic weights (PySCF's atom_mass_list(isotope_avg=True), harmonic_analysis's
+    default). Each normal mode is Cartesian displacements, not mass-weighted, scaled so that its squared
+    length is 1/mu (mu its reduced mass, amu): PySCF's norm_mode. build() symmetrises the geometry first
+    (Task 7 review M1), so the frequencies belong to the geometry the final SCF reports, and a near-linear
+    one lies exactly on its line; on_axis then lays that line along z for PySCF."""
     from pyscf.hessian import thermo
     on_stage(stage, None)
     placed, axes = on_axis(atoms)
@@ -371,17 +377,24 @@ def frequency_check(atoms, on_stage, stage='frequency check'):
     spin = {'spinSquared': float(mf.spin_square()[0])} if _uks(mf) else {}
     return {'atoms': atoms, 'energyHartree': float(mf.e_tot), **spin, 'wavenumbers': wavenumbers,
             'reducedMasses': _rounded(modes['reduced_mass'], 'reducedMasses'),
+            'massesAmu': _rounded(mol.atom_mass_list(isotope_avg=True), 'reducedMasses'),
             'normalModes': _rounded(normal, 'normalModes'),
             'imaginary': [v for v in wavenumbers if v < NOISE_WAVENUMBER],
             'noise': [v for v in wavenumbers if NOISE_WAVENUMBER <= v < 0],
             'zeroPointEnergyHartree': 0.5 * sum(v for v in wavenumbers if v > 0) / WAVENUMBERS_PER_HARTREE}
 
 
-def summarise(check, displaced_from=None):
+ZPE_AT_SADDLE = ('at a saddle point: the imaginary modes are left out of the sum, so this is not the zero-point '
+                 'energy of a minimum')
+
+
+def summarise(check, displaced_from=None, displaced=True):
+    """The check's verdict. `displaced=False`: a saddle point the run had no time to displace from (M2)."""
     n = len(check['imaginary'])
     if n:
         result = 'saddle-point'
-        summary = f'saddle point ({n} imaginary frequenc{"y" if n == 1 else "ies"}), not a minimum'
+        tail = 'not a minimum' if displaced else 'not displaced (time limit)'
+        summary = f'saddle point ({n} imaginary frequenc{"y" if n == 1 else "ies"}), {tail}'
     else:
         result = 'minimum' if displaced_from is None else 'minimum-after-displacement'
         summary = 'true minimum (no imaginary frequencies)'
@@ -394,7 +407,8 @@ def summarise(check, displaced_from=None):
     return {'result': result, 'summary': summary, 'imaginaryCount': n, 'imaginaryWavenumbers': check['imaginary'],
             'noiseWavenumbers': check['noise'],
             'lowestWavenumber': min(check['wavenumbers']) if check['wavenumbers'] else None,
-            'zeroPointEnergyHartree': check['zeroPointEnergyHartree']}
+            'zeroPointEnergyHartree': check['zeroPointEnergyHartree'],
+            **({'zeroPointEnergyNote': ZPE_AT_SADDLE} if n else {})}
 
 
 def _displaced(atoms, mode, sign):
@@ -404,11 +418,20 @@ def _displaced(atoms, mode, sign):
 
 
 def _lower(candidates, stage):
-    best = None
+    """The candidate of lowest energy. One whose SCF will not converge is passed over (Task 7 review M6): the
+    other sign is as good a way off the saddle point, and the job has been paid for. Only when none
+    converges does the job fail."""
+    best, failure = None, None
     for atoms in candidates:
-        mf = _scf_for_check(molecule(atoms, OPTIMISE_BASIS, symmetry=False), stage)
+        try:
+            mf = _scf_for_check(molecule(atoms, OPTIMISE_BASIS, symmetry=False), stage)
+        except SCFNotConverged as e:
+            failure = e
+            continue
         if best is None or mf.e_tot < best[0]:
             best = (mf.e_tot, atoms)
+    if best is None:
+        raise failure
     return best[1]
 
 
@@ -426,10 +449,17 @@ def trajectory_comment(step, energy):
 def _recheck(atoms, info, on_stage, may_start):
     """The check after the one displacement spec §7 allows: a minimum, or a saddle point labelled as one."""
     n = info['displacedFrom']
-    if not info['converged'] or not may_start('frequency check'):
-        return atoms, {**info, 'frequencyCheck': {
-            'result': 'not-rechecked', 'imaginaryCount': n,
-            'summary': f'displaced from a saddle point ({n} imaginary) and re-optimised; not checked again (time limit)'}}
+    # Task 7 review M4: a re-optimisation the time limit stopped is not called "re-optimised".
+    if not info['converged']:
+        summary = (f'displaced from a saddle point ({n} imaginary); the re-optimisation stopped at its time limit, '
+                   'not converged, and was not checked again')
+    elif not may_start('frequency check'):
+        summary = (f'displaced from a saddle point ({n} imaginary) and re-optimised; not checked again (no time '
+                   'was left for the frequency check)')
+    else:
+        summary = None
+    if summary:
+        return atoms, {**info, 'frequencyCheck': {'result': 'not-rechecked', 'imaginaryCount': n, 'summary': summary}}
     recheck = frequency_check(atoms, on_stage, stage='frequency check (after displacement)')
     return atoms, {**info, 'frequencyCheck': summarise(recheck, displaced_from=n), 'frequencies': recheck}
 
@@ -448,20 +478,42 @@ def check_structure(atoms, info, on_stage, on_step, may_start):
     if not may_start('frequency check'):
         return atoms, {**info, 'frequencyCheck': {'result': 'not-run',
                                                   'summary': 'not checked: no time was left for the frequency check'}}
+    if SPIN and (_electrons(atoms) - SPIN) // 2 == 0:
+        # PySCF 2.8's UKS Hessian fails on an empty beta set (H2+: "cannot reshape array of size 0"); the
+        # optimisation stands, and the job is not failed for a check that cannot run.
+        return atoms, {**info, 'frequencyCheck': {
+            'result': 'not-run', 'summary': "not checked: PySCF's UKS Hessian cannot treat a molecule with no beta "
+                                            'electrons'}}
     check = frequency_check(atoms, on_stage)
     if not check['imaginary']:
         return atoms, {**info, 'frequencyCheck': summarise(check), 'frequencies': check}
+    if not may_start('step'):
+        # Task 7 review M2: displacing costs two SCFs, a re-optimisation and a recheck; with no time for even
+        # a step, the structure is reported as the saddle point it is.
+        return atoms, {**info, 'frequencyCheck': summarise(check, displaced=False), 'frequencies': check}
     n = len(check['imaginary'])
     _displacement = {'displacedFrom': n, 'checkHistory': [summarise(check)]}
     on_stage('displacing from a saddle point', None)
     mode = check['normalModes'][0]       # harmonic_analysis sorts ascending: the first mode is the most negative
     start = _lower([_displaced(atoms, mode, 1), _displaced(atoms, mode, -1)], 'displacement')
     final, again = optimise(start, on_stage, on_step, may_start, label='re-optimisation step', first=info['steps'] + 1)
-    info = {**info, **again, 'steps': info['steps'] + again['steps'], **_displacement}
+    final, symmetry = _symmetrise(final)
+    info = {**info, **again, 'steps': info['steps'] + again['steps'], **_displacement, 'finalGeometry': symmetry}
     final, info = _recheck(final, info, on_stage, may_start)
     if info['frequencyCheck']['result'] == 'not-rechecked':
         info['frequencies'] = check      # the analysis that found the saddle point: the only one this run has
     return final, info
+
+
+def _electrons(atoms):
+    return sum(gto.charge(s) for s, _ in atoms) - CHARGE
+
+
+def _symmetrise(atoms):
+    # An optimised geometry carries the optimiser's noise; the final SCF's symmetry needs it gone, and so does
+    # the frequency check (Task 7 review M1), which must analyse the geometry the final SCF reports.
+    placed, order, moved = symmetrised(atoms)
+    return placed, {'symmetrised': True, 'groupOrder': order, 'maxDisplacementAngstrom': moved}
 
 
 def build(on_stage=_quiet, on_step=lambda step, energy, atoms: None, start=None, may_start=_always):
@@ -471,15 +523,14 @@ def build(on_stage=_quiet, on_step=lambda step, energy, atoms: None, start=None,
     if OPTIMISE_BASIS:
         label = 're-optimisation step' if _displacement else 'optimisation step'
         atoms, info = optimise(atoms, on_stage, on_step, may_start, label=label)
+        atoms, info['finalGeometry'] = _symmetrise(atoms)
         if FREQUENCY_CHECK:
             atoms, info = check_structure(atoms, info, on_stage, on_step, may_start)
         geometry_spin = info.pop('spinSquared', None)
         if geometry_spin is not None:
             checked = info.get('frequencies', {}).get('spinSquared')
             info['openShell'] = spin_record(SPIN, geometry_spin, checked)
-        # An optimised geometry carries the optimiser's noise; the final SCF's symmetry needs it gone.
-        atoms, order, moved = symmetrised(atoms)
-        final = {'symmetrised': True, 'groupOrder': order, 'maxDisplacementAngstrom': moved}
+        final = info.pop('finalGeometry')       # the last symmetrisation's (after any re-optimisation)
     try:
         mol = molecule(atoms, BASIS)
         if final:
@@ -491,8 +542,9 @@ def build(on_stage=_quiet, on_step=lambda step, energy, atoms: None, start=None,
         mol = molecule(atoms, BASIS, symmetry=False)
         final = {**final, 'pointGroup': None, 'symmetry': 'off',
                  'note': (f'PySCF could not build symmetry-adapted orbitals at this geometry ({type(e).__name__}: '
-                          f'{e}), so the final SCF ran without point-group symmetry and its orbitals carry no '
-                          'symmetry labels')}
+                          f'{e}), so the final SCF ran without point-group symmetry; its orbitals are labelled '
+                          "from the geometry's own point group by character projection, where the labeller "
+                          "supports that group (meta.json's symmetry says how)")}
     if final:
         info['finalGeometry'] = final
     mf = converge(mol, on_stage)
@@ -516,10 +568,11 @@ def _description(job: dict, frequency_check: bool) -> str:
 
 def predicted_frequencies_bytes(atom_count: int) -> int:
     """An upper estimate of frequencies.json's size (preflight D10): 3N-5 modes at most (a linear molecule),
-    each N x 3 components, a wavenumber and a reduced mass, plus the geometry's 3N coordinates. About 0.24 MB
+    each N x 3 components, a wavenumber and a reduced mass, plus the geometry's 3N coordinates and the N
+    masses. About 0.24 MB
     at 50 atoms and 0.9 MB at 100: the 3 MB result budget and the quote's storage must count it."""
     modes = max(3 * atom_count - 5, 0)
-    numbers = modes * (3 * atom_count + 2) + 3 * atom_count
+    numbers = modes * (3 * atom_count + 2) + 4 * atom_count          # + the geometry and the masses
     return FREQUENCIES_FIXED_BYTES + FREQUENCIES_BYTES_PER_NUMBER * numbers
 
 

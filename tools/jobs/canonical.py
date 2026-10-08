@@ -15,10 +15,13 @@ import rfc8785
 from jobs.elements import SYMBOLS, atomic_number
 from jobs.errors import JobRefused
 
-COMPUTE_VERSION = 1
+COMPUTE_VERSION = 2
+# Phase 6D (spec §6, §7): both recipes run B3LYP-D3(BJ) (PySCF's xc 'B3LYP-D3BJ'), and recipe B checks its
+# structure for imaginary frequencies. A new method is a new calculation: version 2 gives new keys, so a
+# version-1 result (B3LYP without dispersion) is never served as one of these.
 RECIPES = {
-    'single': {'xc': 'B3LYP', 'basis': 'def2-TZVPD', 'optimiseBasis': None},
-    'optimise': {'xc': 'B3LYP', 'basis': 'def2-TZVPD', 'optimiseBasis': 'def2-SVP'},
+    'single': {'xc': 'B3LYP-D3BJ', 'basis': 'def2-TZVPD', 'optimiseBasis': None},
+    'optimise': {'xc': 'B3LYP-D3BJ', 'basis': 'def2-TZVPD', 'optimiseBasis': 'def2-SVP'},
 }
 MAX_XYZ_BYTES = 65536
 MAX_ATOMS = 200

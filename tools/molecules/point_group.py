@@ -24,6 +24,13 @@ label_orbitals works in one of three regimes:
   operations cannot be built at this geometry, keeps PySCF's subgroup labels
   and says so (symmetry.labelNote) -- never silently.
 
+An SCF run without symmetry (the job worker's final SCF falls back to it when
+PySCF cannot build symmetry-adapted orbitals at the geometry) is labelled from
+the geometry's own point group, found as PySCF finds it (detect_symm), by the
+same projection: TABLES's groups, and D2h and its subgroups through PySCF's own
+character tables. Other groups need PySCF's symmetry-adapted orbitals and are
+left unlabelled, with a note (Task 8 controller ruling).
+
 Mulliken's notation, lower case for orbitals (a1, t2, e1g, a2"), with the core
 counted, as textbooks number them. D6h follows Herzberg: C2' through atoms
 (benzene's C and H), σv containing them; under it benzene's C 1s combination
@@ -256,9 +263,40 @@ def characters(mol, grids, mo, ops, centre):
     return orbital_characters(mol, grids, mo, ops, centre).sum(axis=1)
 
 
+def _abelian(group):
+    """PySCF's own character table for D2h or one of its subgroups (C1 included), in TABLES's shape: every
+    class is one operation, named as PySCF names it ('C2z', 'sx': the mirror perpendicular to x …)."""
+    from pyscf.symm import param
+    return ([(name, 1, ('pyscf', name)) for name in param.OPERATOR_TABLE[group]],
+            {row[0]: list(row[1:]) for row in param.CHARACTER_TABLE[group]})
+
+
+def _table(group):
+    return TABLES[group] if group in TABLES else _abelian(group)
+
+
+def abelian_operations(group, axes, x, z):
+    """One operation per class of D2h or a subgroup, about PySCF's axes for it (rows: x, y, z), each checked
+    against the nuclei."""
+    ops = []
+    for name, _, (_, op) in _abelian(group)[0]:
+        if op == 'E':
+            matrix = np.eye(3)
+        elif op == 'i':
+            matrix = -np.eye(3)
+        elif op.startswith('C2'):
+            matrix = rotation(axes['xyz'.index(op[-1])], np.pi)
+        else:
+            matrix = reflection(axes['xyz'.index(op[-1])])
+        if not is_symmetry(matrix, x, z):
+            raise SymmetryNotFound(f'{op} is not a symmetry of this geometry')
+        ops.append(matrix)
+    return ops
+
+
 def match_irrep(group, chi, size):
     """The irrep of `group` of dimension `size` whose every character is within CHI_TOL of `chi`, or None."""
-    for name, row in TABLES[group][1].items():
+    for name, row in _table(group)[1].items():
         if row[0] == size and np.all(np.abs(np.asarray(row, dtype=float) - chi) < CHI_TOL):
             return name
     return None
@@ -269,7 +307,7 @@ def reduce_characters(group, chi, size):
     -- every multiplicity from the reduction formula within CHI_TOL of a non-negative integer, and the
     rebuilt characters within CHI_TOL of `chi` -- else None. A set of near-degenerate orbitals that mixes
     two irreps (BF3's F 1s a1' and e') carries no single irrep, but as a whole still carries their sum."""
-    classes, irreps = TABLES[group]
+    classes, irreps = _table(group)
     sizes = np.array([s for _, s, _ in classes], dtype=float)
     rebuilt, counts = np.zeros(len(classes)), {}
     for name, row in irreps.items():
@@ -378,9 +416,10 @@ def _and(names):
     return names[0] if len(names) == 1 else f'{", ".join(names[:-1])} and {names[-1]}'
 
 
-def _projected_labels(mol, mf, indices, group):
+def _projected_labels(mol, mf, indices, group, ops=None):
     x, z, centre = _frame(mol)
-    ops = class_operations(group, x, z, _pyscf_axes(mol))
+    if ops is None:
+        ops = class_operations(group, x, z, _pyscf_axes(mol))
     energies = np.asarray(mf.mo_energy, dtype=float)
     diagonal = orbital_characters(mol, _grids(mf), mf.mo_coeff[:, indices], ops, centre)
     column = {i: k for k, i in enumerate(indices)}
@@ -388,7 +427,7 @@ def _projected_labels(mol, mf, indices, group):
     def chi_of(members):
         return diagonal[:, [column[i] for i in members]].sum(axis=1)
 
-    order = list(TABLES[group][1])
+    order = list(_table(group)[1])
     counts, labels, notes = {}, {}, {}
     for members in degenerate_sets(energies, indices):
         pieces = _pieces(group, energies, members, chi_of)
@@ -418,13 +457,44 @@ def _projected_labels(mol, mf, indices, group):
     return labels, {'pointGroup': group, 'labelGroup': group, 'labels': 'full-group'}, notes
 
 
+NO_SYMMETRY = 'the SCF ran without point-group symmetry (PySCF could not use it at this geometry)'
+GEOMETRY_NOTE = f"{NO_SYMMETRY}: labelled from the geometry's own point group, by character projection"
+
+
+def geometry_operations(mol):
+    """(the geometry's own point group, one operation per class for the projection) for a molecule built
+    without symmetry: the group and axes PySCF's Mole.build would have found (detect_symm, as_subgroup).
+    Raises SymmetryNotFound for a group the projection cannot cover without symmetry-adapted orbitals."""
+    from pyscf.symm import geom
+    top, _, axes = geom.detect_symm(mol._atom, mol._basis)
+    sub, axes = geom.as_subgroup(top, axes)
+    x, z, _ = _frame(mol)
+    axes = np.asarray(axes, dtype=float)
+    if top in TABLES:
+        return top, class_operations(top, x, z, list(axes) + list(axes.T))
+    if top == sub:                                  # D2h or one of its subgroups: no degenerate irreps
+        return top, abelian_operations(top, axes, x, z)
+    raise SymmetryNotFound(f'{top} orbitals cannot be labelled without it')
+
+
+def _geometry_labels(mol, mf, indices):
+    try:
+        group, ops = geometry_operations(mol)
+    except SymmetryNotFound as e:
+        from pyscf.symm import geom
+        top = geom.detect_symm(mol._atom, mol._basis)[0]
+        return ({i: f'ψ{i + 1}' for i in indices},
+                {'pointGroup': top, 'labelGroup': None, 'labels': 'none', 'labelNote': f'{NO_SYMMETRY}, and {e}'}, {})
+    labels, symmetry, notes = _projected_labels(mol, mf, indices, group, ops)
+    return labels, {**symmetry, 'labelNote': GEOMETRY_NOTE}, notes
+
+
 def label_orbitals(mol, mf, indices):
     """(labels by MO index, meta.json's `symmetry`, notes by MO index) for the MOs `indices` -- every
     occupied one and a run of virtuals from the LUMO, so numbering starts at the core."""
     indices = list(indices)
     if not mol.symmetry:
-        return ({i: f'ψ{i + 1}' for i in indices},
-                {'pointGroup': mol.topgroup, 'labelGroup': mol.groupname, 'labels': 'none'}, {})
+        return _geometry_labels(mol, mf, indices)
     top, sub = mol.topgroup, mol.groupname
     if top in TABLES:
         try:
@@ -442,7 +512,12 @@ def irrep_of(mol, mf, coeff):
     """The irrep, lower case and unnumbered, of one set of orthonormal orbitals (the columns of `coeff`) in
     the group label_orbitals would use; UNLABELLED if they do not carry a single one."""
     if not mol.symmetry:
-        return UNLABELLED
+        try:
+            group, ops = geometry_operations(mol)
+        except SymmetryNotFound:
+            return UNLABELLED
+        irrep = match_irrep(group, characters(mol, _grids(mf), coeff, ops, _frame(mol)[2]), coeff.shape[1])
+        return irrep.lower() if irrep else UNLABELLED
     if mol.topgroup in TABLES:
         try:
             x, z, centre = _frame(mol)

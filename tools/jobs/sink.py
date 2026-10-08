@@ -11,7 +11,8 @@ from typing import Protocol
 # 'geometry.xyz', 'timings.json', 'trajectory.xyz'). Duplicated here rather
 # than imported from jobs.worker, which imports jobs.sink, not the reverse.
 ROOT_RESULT_NAMES = ('meta.json', 'basis.json', 'density.bin.gz', 'esp.bin.gz',
-                     'job.json', 'input.py', 'output.log', 'geometry.xyz', 'timings.json', 'trajectory.xyz')
+                     'job.json', 'input.py', 'output.log', 'geometry.xyz', 'timings.json', 'trajectory.xyz',
+                     'frequencies.json')      # Phase 6D: recipe B's frequency check (worker.OPTIONAL_RESULT_FILES)
 
 
 class Sink(Protocol):

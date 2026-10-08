@@ -64,8 +64,9 @@ DOWNLOADS = 10
 RESULT_FIXED_BYTES = 1_500_000
 BASIS_BYTES_PER_N2 = 2.3
 RESULT_BYTES_HEADROOM = 2.0
-# Objects per job: 13 for a single point (10 at the root, 3 under attempts/), 15-16 for an optimisation.
-STORED_OBJECTS = 16
+# Objects per job: 13 for a single point (10 at the root, 3 under attempts/), 15-16 for an optimisation;
+# Phase 6D's frequencies.json (recipe B's frequency check, compute version 2) makes that 16-17.
+STORED_OBJECTS = 17
 QUOTE_TTL_MINUTES = 60
 ESTIMATE_OVERHEAD_SECONDS = 60      # image pull and stop: caffeine optimise billed 1057 s for 1022 s of run
 ITEMS = ('compute', 'storage', 'delivery', 'platform')

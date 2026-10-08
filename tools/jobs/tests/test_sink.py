@@ -41,3 +41,8 @@ def test_get_result_reads_a_root_file_or_says_none(tmp_path):
     assert sink.get_result(KEY, 'done.json') is None
     sink.put_done(KEY, b'{"files": {}}')
     assert sink.get_result(KEY, 'done.json') == b'{"files": {}}'
+
+
+def test_frequencies_json_is_a_root_result_name():
+    # Phase 6D: a partial root may hold it, so clear_partial must know it.
+    assert 'frequencies.json' in ROOT_RESULT_NAMES

@@ -298,8 +298,9 @@ def test_a_final_scf_whose_symmetry_cannot_be_built_runs_without_it_and_says_so(
     assert info['finalGeometry']['symmetry'] == 'off'
     assert info['finalGeometry']['note'] == (
         'PySCF could not build symmetry-adapted orbitals at this geometry (IndexError: index 2 is out of bounds '
-        'for axis 0 with size 2), so the final SCF ran without point-group symmetry and its orbitals carry no '
-        'symmetry labels')
+        'for axis 0 with size 2), so the final SCF ran without point-group symmetry; its orbitals are labelled '
+        "from the geometry's own point group by character projection, where the labeller supports that group "
+        "(meta.json's symmetry says how)")
 
 
 def test_a_stopped_optimisation_keeps_its_lowest_energy_frame(tmp_path, monkeypatch):

@@ -103,21 +103,24 @@ def test_an_open_shell_is_checked_with_uks(tmp_path, monkeypatch):
     assert type(mf).__name__.endswith('ROKS')
 
 
-def test_a_linear_molecule_is_laid_on_an_exact_axis_and_keeps_its_3n_minus_5_modes(tmp_path, monkeypatch):
-    # An optimised CO2 is linear only to numerical noise; PySCF would then take it for a non-linear rotor.
+def test_a_noisy_linear_molecule_is_symmetrised_onto_its_line_and_keeps_its_3n_minus_5_modes(tmp_path, monkeypatch):
+    # Task 7 review M1: an optimised CO2 is linear only to numerical noise. symmetrised() lays it exactly on
+    # its line before the check, so PySCF's harmonic analysis takes it for the linear rotor it is.
     ns = namespace(tmp_path, monkeypatch, WATER)
-    noisy = [('O', (0.0, 1e-7, -1.16)), ('C', (2e-8, 0.0, 0.0)), ('O', (0.0, -1e-7, 1.16))]
-    placed, axes = ns['on_axis'](noisy)
-    assert axes is not None and all(x == y == 0.0 for _, (x, y, _) in placed)
-    assert [round(abs(z), 6) for _, (_, _, z) in placed] == [1.16, 0.0, 1.16]
-    assert ns['on_axis']([('O', (0.0, 0.0, 0.0)), ('H', (0.0, 0.76, 0.59)), ('H', (0.0, -0.76, 0.59))])[1] is None
-    check = ns['frequency_check'](noisy, lambda *a: None)
+    noisy = [('O', (0.0, 4e-4, -1.16)), ('C', (2e-4, 0.0, 0.0)), ('O', (0.0, -4e-4, 1.16))]
+    placed, order, moved = ns['symmetrised'](noisy)
+    assert order is None and moved < 1e-3
+    check = ns['frequency_check'](placed, lambda *a: None)
     assert len(check['wavenumbers']) == 4 and len(check['normalModes'][0]) == 3
+    # on_axis stays: exactly on a line that is not an axis, the smallest moment rounds to about -1e-17, not 0,
+    # and PySCF reads that as a non-linear rotor too.
+    placed, axes = ns['on_axis'](placed)
+    assert axes is not None and all(x == y == 0.0 for _, (x, y, _) in placed)
+    assert ns['on_axis']([('O', (0.0, 0.0, 0.0)), ('H', (0.0, 0.76, 0.59)), ('H', (0.0, -0.76, 0.59))])[1] is None
 
 
-def test_a_linear_molecule_off_the_z_axis_gets_its_modes_back_in_its_own_frame(tmp_path, monkeypatch):
-    # on_axis lays CO2 along z for PySCF; the modes must come back along the molecule's own line. The
-    # asymmetric stretch moves every atom along that line; the bends move them across it.
+def test_a_linear_molecule_off_the_z_axis_gets_its_modes_in_its_own_frame(tmp_path, monkeypatch):
+    # The asymmetric stretch moves every atom along the molecule's own line; the bends move them across it.
     ns = namespace(tmp_path, monkeypatch, WATER)
     line = np.array([1.0, 1.0, 0.0]) / np.sqrt(2)
     tilted = [(s, tuple(float(v) for v in t * line)) for s, t in (('O', -1.16), ('C', 0.0), ('O', 1.16))]
@@ -129,6 +132,93 @@ def test_a_linear_molecule_off_the_z_axis_gets_its_modes_back_in_its_own_frame(t
     assert along[0] < 1e-3 * total[0] and along[1] < 1e-3 * total[1]            # the degenerate bend: across it
 
 
+def test_the_check_analyses_the_geometry_the_final_scf_uses(tmp_path, monkeypatch):
+    # Task 7 review M1: symmetrised before the check, so the frequencies belong to the reported geometry.
+    ns = namespace(tmp_path, monkeypatch, WATER)
+    live = ns['check_structure'].__globals__
+    real, seen = live['frequency_check'], []
+    live['frequency_check'] = lambda atoms, on_stage, stage='frequency check': seen.append(atoms) or real(atoms, on_stage, stage)
+    mol, _, info = ns['build']()
+    assert len(seen) == 1 and info['finalGeometry']['symmetrised']
+    analysed = np.array([xyz for _, xyz in seen[0]])
+    assert np.abs(analysed - mol.atom_coords(unit='Angstrom')).max() < 1e-12
+    assert info['frequencies']['massesAmu'] == pytest.approx([1.008, 1.008, 15.999], abs=1e-3)   # H, H, O (canonical)
+
+
+def test_no_time_to_displace_off_a_saddle_point_says_so(tmp_path, monkeypatch):
+    # Task 7 review M2: the displacement, its re-optimisation and the recheck are asked for as a step.
+    ns = namespace(tmp_path, monkeypatch, WATER)
+    live = ns['check_structure'].__globals__
+    real = live['frequency_check']
+    live['frequency_check'] = lambda atoms, on_stage, stage='frequency check': {
+        **real(atoms, on_stage, stage), 'imaginary': [-400.0]}
+    calls = []
+
+    def budget(stage):
+        # Yes to every optimisation step and to the check; no to anything asked after the check.
+        calls.append(stage)
+        return 'frequency check' not in calls[:-1]
+    stages = []
+    _, mf, info = ns['build'](on_stage=lambda s, e=None, c=None: stages.append(s), may_start=budget)
+    check = info['frequencyCheck']
+    assert check['result'] == 'saddle-point'
+    assert check['summary'] == 'saddle point (1 imaginary frequency), not displaced (time limit)'
+    assert 'displacedFrom' not in info and 'displacing from a saddle point' not in stages and mf.converged
+    assert calls[-1] == 'step' and 'zeroPointEnergyNote' in check
+
+
+def test_a_reoptimisation_stopped_by_the_time_limit_is_not_called_finished(tmp_path, monkeypatch):
+    # Task 7 review M4: the summary must not say "re-optimised" as if it had finished.
+    ns = namespace(tmp_path, monkeypatch, PLANAR_NH3)
+    asked = []
+
+    def budget(stage):
+        # After the first check: yes to the displacement (M2's 'step'), no to the re-optimisation's next step.
+        asked.append(stage)
+        if 'frequency check' not in asked:
+            return True
+        return not (stage == 'step' and asked[asked.index('frequency check') + 1:].count('step') == 2)
+    _, _, info = ns['build'](may_start=budget)
+    check = info['frequencyCheck']
+    assert check['result'] == 'not-rechecked' and info['stoppedBy'] == 'time-limit' and info['displacedFrom'] == 1
+    assert check['summary'] == ('displaced from a saddle point (1 imaginary); the re-optimisation stopped at its '
+                                'time limit, not converged, and was not checked again')
+    assert 're-optimised' not in check['summary']
+
+
+def test_one_displaced_scf_that_does_not_converge_leaves_the_other_sign(tmp_path, monkeypatch):
+    # Task 7 review M6: a paid job does not fail because one of the two trial displacements will not converge.
+    ns = namespace(tmp_path, monkeypatch, WATER)
+    live = ns['_lower'].__globals__
+    real, tried = live['_scf_for_check'], []
+
+    def flaky(mol, stage):
+        tried.append(stage)
+        if len(tried) == 1:
+            raise live['SCFNotConverged']('the displacement SCF did not converge')
+        return real(mol, stage)
+    live['_scf_for_check'] = flaky
+    a = [('O', (0.0, 0.0, 0.12)), ('H', (0.0, 0.76, -0.47)), ('H', (0.0, -0.76, -0.47))]
+    b = [('O', (0.0, 0.0, 0.11)), ('H', (0.0, 0.75, -0.47)), ('H', (0.0, -0.75, -0.47))]
+    assert ns['_lower']([a, b], 'displacement') == b
+    live['_scf_for_check'] = lambda mol, stage: (_ for _ in ()).throw(live['SCFNotConverged']('no'))
+    with pytest.raises(Exception, match='no'):
+        ns['_lower']([a, b], 'displacement')
+
+
+def test_a_one_electron_open_shell_is_not_checked_rather_than_failing(tmp_path, monkeypatch):
+    # PySCF 2.8's UKS Hessian cannot treat a molecule with no beta electrons (H2+); the paid job must not
+    # fail on it.
+    monkeypatch.chdir(tmp_path)
+    h2plus = [[1, 0.0, 0.0, 0.0], [1, 0.0, 0.0, 1.06]]
+    job = {**canonical_job('optimise', h2plus, 1, 2, method={'xc': 'B3LYP-D3BJ', 'basis': 'sto-3g',
+                                                              'optimiseBasis': 'sto-3g'}), 'computeVersion': 2}
+    (tmp_path / 'input.py').write_text(render_input(job, 'k' * 64))
+    _, mf, info = runpy.run_path('input.py', run_name='jobs_input')['build']()
+    assert info['frequencyCheck']['result'] == 'not-run' and mf.converged
+    assert 'no beta electrons' in info['frequencyCheck']['summary']
+
+
 def test_the_numbers_are_rounded_so_frequencies_json_stays_small(tmp_path, monkeypatch):
     # Preflight D10: normal modes are (3N-6) x N x 3 numbers; at full float precision frequencies.json would
     # reach megabytes at 100 atoms. Rounded at source, and its predicted size (the hook for the 3 MB result
@@ -138,7 +228,7 @@ def test_the_numbers_are_rounded_so_frequencies_json_stays_small(tmp_path, monke
     numbers = check['wavenumbers'] + check['reducedMasses'] + [v for m in check['normalModes'] for a in m for v in a]
     assert all(len(repr(v)) <= 10 for v in numbers)
     assert all(v == round(v, 6) for v in numbers) and all(v == round(v, 2) for v in check['wavenumbers'])
-    payload = {**check, 'atoms': [[s, *xyz] for s, xyz in check['atoms']], 'summary': 'x' * 200, 'notes': ['x' * 400]}
+    payload = {**check, 'atoms': [[s, *xyz] for s, xyz in check['atoms']], 'summary': 'x' * 200, 'notes': ['x' * 1500]}
     assert len(json.dumps(payload, separators=(',', ':'))) < predicted_frequencies_bytes(3)
 
 

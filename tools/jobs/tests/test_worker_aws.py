@@ -49,15 +49,17 @@ def test_image_digest_prefers_the_env_then_the_task_metadata():
 def test_aws_mode_builds_dynamo_and_s3_from_the_environment(monkeypatch, capsys):
     seen = {}
 
-    def fake_run_job(key, store, sink, attempt, backend, grid_points, image_digest, runner_job_id, first_attempt):
+    def fake_run_job(key, store, sink, attempt, backend, grid_points, image_digest, runner_job_id, first_attempt,
+                     time_limit_seconds):
         seen.update(key=key, store=store, sink=sink, attempt=attempt, backend=backend, digest=image_digest,
-                    runner_job_id=runner_job_id, first_attempt=first_attempt)
+                    runner_job_id=runner_job_id, first_attempt=first_attempt, time_limit=time_limit_seconds)
         return 'DONE'
     monkeypatch.setattr(worker, 'run_job', fake_run_job)
     monkeypatch.setenv('AWS_DEFAULT_REGION', 'us-east-1')
     env = {'JOBS_TABLE': 'jobs-test', 'DATA_BUCKET': 'bucket', 'AWS_BATCH_JOB_ATTEMPT': '3',
            'JOB_ATTEMPT_OFFSET': '0', 'JOBS_IMAGE_DIGEST': 'sha256:abc', 'AWS_BATCH_JOB_ID': 'batch-123'}
     assert worker.main(['run', KEY, '--aws'], environ=env) == 0
+    assert seen['time_limit'] is None
     assert isinstance(seen['store'], DynamoStore) and seen['store'].table == 'jobs-test'
     assert isinstance(seen['sink'], S3Sink) and seen['sink'].bucket == 'bucket'
     assert (seen['attempt'], seen['backend'], seen['digest']) == (3, 'aws', 'sha256:abc')

@@ -10,7 +10,7 @@ from jobs.tests.stores import make_store
 
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=timezone.utc)
 WATER_XYZ = '3\nwater\nO 0 0 0.11779\nH 0 0.75545 -0.47116\nH 0 -0.75545 -0.47116\n'
-WATER_KEY = 'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa'
+WATER_KEY = '4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216'
 
 
 def fake_resolve(kind, text, *a, **k):

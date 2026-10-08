@@ -157,12 +157,55 @@ def test_operations_not_found_fall_back_to_the_subgroup_with_a_note(monkeypatch)
     assert labels[:2] == ['1a', '2a']
 
 
-def test_no_symmetry_means_psi_labels():
-    mol = gto.M(atom=list(by_id('h2o').atoms), unit='Angstrom', basis='sto-3g', verbose=0)
+def unsymmetric_scf(atoms, basis='def2-SVP'):
+    mol = gto.M(atom=atoms, unit='Angstrom', basis=basis, symmetry=False, verbose=0)
     mf = dft.RKS(mol)
+    mf.xc, mf.grids.level, mf.conv_tol = 'B3LYP', 4, 1e-10
     mf.kernel()
+    return mol, mf
+
+
+GEOMETRY_NOTE = ('the SCF ran without point-group symmetry (PySCF could not use it at this geometry): labelled '
+                 "from the geometry's own point group, by character projection")
+
+
+@pytest.mark.parametrize('molecule_id', ['h2o', 'ch4'])
+def test_an_scf_without_symmetry_is_labelled_from_the_geometrys_own_point_group(molecule_id):
+    # Controller ruling (Task 8): input.py's final SCF falls back to symmetry=False when PySCF cannot build
+    # symmetry-adapted orbitals; the labels must not be lost with it. The group and its operations come from
+    # the nuclei, as they do for the projection already.
+    group, expected = TEXTBOOK[molecule_id]
+    mol, mf = unsymmetric_scf(list(by_id(molecule_id).atoms))
+    kept = [i for i in range(len(mf.mo_occ)) if mf.mo_occ[i] > 0]
+    labels, symmetry, notes = label_orbitals(mol, mf, kept)
+    assert [labels[i] for i in kept] == expected and notes == {}
+    assert symmetry == {'pointGroup': group, 'labelGroup': group, 'labels': 'full-group', 'labelNote': GEOMETRY_NOTE}
+
+
+def test_without_symmetry_a_valence_virtual_set_still_gets_its_irrep():
+    mol, mf = unsymmetric_scf(list(by_id('h2o').atoms))
+    homo = int(np.flatnonzero(mf.mo_occ > 0)[-1])
+    assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, [homo]]) == 'b1'
+
+
+def test_without_symmetry_a_c1_geometry_reads_as_c1():
+    mol, mf = unsymmetric_scf('H 0 0 0; H 0 0 0.74; H 0.9 0.3 1.4; H 1.1 1.2 0.2', basis='sto-3g')
     labels, symmetry, _ = label_orbitals(mol, mf, [0, 1])
-    assert labels == {0: 'ψ1', 1: 'ψ2'} and symmetry['labels'] == 'none'
+    assert labels == {0: '1a', 1: '2a'} and symmetry['pointGroup'] == 'C1' and symmetry['labels'] == 'full-group'
+
+
+def test_without_symmetry_a_group_the_projection_does_not_cover_keeps_psi_labels_and_says_so():
+    # Allene is D2d: PySCF labels it in D2 through its symmetry-adapted orbitals, which this SCF does not
+    # have, and projecting onto D2 would split each e pair into a b2+b3 sum. Unlabelled, and said.
+    allene = [('C', (0, 0, 0)), ('C', (0, 0, 1.31)), ('C', (0, 0, -1.31)), ('H', (0.93, 0, 1.87)),
+              ('H', (-0.93, 0, 1.87)), ('H', (0, 0.93, -1.87)), ('H', (0, -0.93, -1.87))]
+    mol, mf = unsymmetric_scf(allene, basis='sto-3g')
+    labels, symmetry, _ = label_orbitals(mol, mf, [0, 1])
+    assert labels == {0: 'ψ1', 1: 'ψ2'}
+    assert symmetry == {'pointGroup': 'D2d', 'labelGroup': None, 'labels': 'none',
+                        'labelNote': 'the SCF ran without point-group symmetry (PySCF could not use it at this '
+                                     'geometry), and D2d orbitals cannot be labelled without it'}
+    assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, [0]]) == UNLABELLED
 
 
 @pytest.mark.parametrize('group', sorted(TABLES))

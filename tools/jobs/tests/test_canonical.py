@@ -8,10 +8,22 @@ WATER = [[1, 0.0, -0.75545, -0.47116], [1, 0.0, 0.75545, -0.47116], [8, 0.0, 0.0
 
 
 def test_pinned_keys():
-    # Pinned 2026-10-06 (def2-TZVPD) with rfc8785 0.1.4; a change here silently orphans every stored result.
-    assert job_key(canonical_job('single', WATER, 0, 1)) == 'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa'
-    assert job_key(canonical_job('optimise', WATER, 0, 1)) == '03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129'
-    assert job_key(canonical_job('single', WATER, 1, 2)) == '7ccc1f468a6ecd3449b16bcb0dd483d36509971f523d770cdf3717f570753a5a'
+    # Pinned 2026-10-08 (compute version 2, B3LYP-D3BJ) with rfc8785 0.1.4; a change here silently orphans
+    # every stored result.
+    assert job_key(canonical_job('single', WATER, 0, 1)) == '4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216'
+    assert job_key(canonical_job('optimise', WATER, 0, 1)) == '6cb4e4a0f6ee78aeb1bc87d759e4a676b56353e045c4e9b50188ba2b7be3bb66'
+    assert job_key(canonical_job('single', WATER, 1, 2)) == 'd5c67842c574236f5b2a28aec0f33325642488fb785a06ff3c5b520e705d0789'
+
+
+def test_version_1_documents_keep_their_keys():
+    # Phase 6D: the records and results of version-1 jobs stay addressable by the keys they were stored under.
+    v1 = {'single': {'xc': 'B3LYP', 'basis': 'def2-TZVPD', 'optimiseBasis': None},
+          'optimise': {'xc': 'B3LYP', 'basis': 'def2-TZVPD', 'optimiseBasis': 'def2-SVP'}}
+    old = lambda recipe, charge, mult: job_key({**canonical_job(recipe, WATER, charge, mult, method=v1[recipe]),
+                                                'computeVersion': 1})
+    assert old('single', 0, 1) == 'e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa'
+    assert old('optimise', 0, 1) == '03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129'
+    assert old('single', 1, 2) == '7ccc1f468a6ecd3449b16bcb0dd483d36509971f523d770cdf3717f570753a5a'
 
 
 def test_key_ignores_order_sign_of_zero_and_digits_past_1e5():
@@ -21,8 +33,8 @@ def test_key_ignores_order_sign_of_zero_and_digits_past_1e5():
 
 def test_canonical_document_shape():
     job = canonical_job('optimise', WATER, 0, 1)
-    assert job == {'computeVersion': 1, 'recipe': 'optimise',
-                   'method': {'xc': 'B3LYP', 'basis': 'def2-TZVPD', 'optimiseBasis': 'def2-SVP'},
+    assert job == {'computeVersion': 2, 'recipe': 'optimise',
+                   'method': {'xc': 'B3LYP-D3BJ', 'basis': 'def2-TZVPD', 'optimiseBasis': 'def2-SVP'},
                    'molecule': {'atoms': canonical_atoms(WATER), 'charge': 0, 'multiplicity': 1}}
     assert RECIPES['single']['optimiseBasis'] is None
 

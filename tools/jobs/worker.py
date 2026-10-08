@@ -26,19 +26,40 @@ _MOLECULES = str(Path(__file__).resolve().parents[1] / 'molecules')
 if _MOLECULES not in sys.path:
     sys.path.append(_MOLECULES)
 
-from jobs.input_template import render_input  # noqa: E402
+from jobs.input_template import render_input, resumed_check  # noqa: E402
 from jobs.model import iso, utc_now  # noqa: E402
 from jobs.sink import LocalSink  # noqa: E402
 from jobs.store import FileStore  # noqa: E402
+from dispersion import method_label  # noqa: E402  (tools/molecules, on sys.path above)
 
 LOG_TAIL_LINES = 20
 LOG_TAIL_BYTES = 4096
 RESULT_FILES = ('meta.json', 'basis.json', 'density.bin.gz', 'esp.bin.gz')
 CAVEATS = {
     'single': ['The geometry is not optimised: it is PubChem\'s computed 3D conformer or as pasted.'],
-    'optimise': ['B3LYP/def2-SVP optimisation without a dispersion correction.',
-                 'No frequency check: the structure is not confirmed to be a minimum.'],
+    # Phase 6D: dispersion and the frequency check are part of recipe B now; what stays true is that it finds
+    # the minimum nearest its start (a conformer search is a later phase, spec §2).
+    'optimise': ['The optimisation finds the minimum nearest its starting geometry: one conformer, '
+                 'not a conformer search.'],
 }
+# What recipe B said before compute version 2, still true of an owner's retry of such a job. Since Ruling D6 a
+# retry through the API is rebuilt at the current version (a new job), so this serves only a version-1 record
+# run directly (cli, or a Spot reclaim's later attempt of a job queued before the deploy).
+LEGACY_OPTIMISE_CAVEATS = ['B3LYP/def2-SVP optimisation without a dispersion correction.',
+                           'No frequency check: the structure is not confirmed to be a minimum.']
+# Written when recipe B's frequency check ran (Phase 6D spec §7); done.json lists it then.
+OPTIONAL_RESULT_FILES = ('frequencies.json',)
+# Phase 6D spec §9: stop stepping while the time left still covers the rest of the job, with this to spare.
+TIME_BUDGET_MARGIN = 1.2
+# Between the Batch attempt's start (its timeout's clock) and the worker's own: container start-up and imports.
+STARTUP_ALLOWANCE_SECONDS = 30
+# Ruling D7: labelling the orbitals (point_group's character projection) runs inside write_molecule_files,
+# after the budget's last decision, so the budget must leave room for it. Sizing prices it as its own term
+# from version 6 (Task 9: parts['labellingSeconds']); a record without that figure gets this share of the
+# final SCF instead. Conservative on purpose: benzene at def2-TZVPD measured 47.7 s of labels against a
+# 130.8 s SCF (36 %) before Task 3 evaluated the AOs once for every orbital, 3.3 s (2.5 %) after; a quarter
+# is ten times the measured cost, and well under the D6h worst case before that change.
+LABELLING_SHARE_OF_FINAL_SCF = 0.25
 BOX_TOO_SMALL = ('the electron density reaches the edge of the sampling box (a diffuse anion); '
                  'this phase cannot draw it')
 INTERRUPTED = 'the worker was interrupted (KeyboardInterrupt) before this job finished'
@@ -62,10 +83,41 @@ def _xyz(atoms, comment):
     return '\n'.join([str(len(atoms)), comment] + [f'{s} {x:.6f} {y:.6f} {z:.6f}' for s, (x, y, z) in atoms]) + '\n'
 
 
-def _geometry_source_text(source, recipe):
+def caveats_for(recipe, compute_version):
+    return LEGACY_OPTIMISE_CAVEATS if recipe == 'optimise' and compute_version < 2 else CAVEATS[recipe]
+
+
+def _geometry_source_text(source, recipe, method=None, info=None):
+    """Where the geometry came from and, for recipe B, how it was optimised and checked -- the text the
+    viewer's readout, the provenance panel and every export caption show (spec §7, §9)."""
     origin = f'PubChem CID {source["cid"]} 3D conformer (retrieved {source["retrievedAt"]})' \
         if source['kind'] == 'pubchem' else 'pasted XYZ'
-    return f'B3LYP/def2-SVP optimised from {origin}' if recipe == 'optimise' else origin
+    if recipe != 'optimise':
+        return origin
+    level = f"{method_label(method['xc'])}/{method['optimiseBasis']}" if method else 'B3LYP/def2-SVP'
+    text, info = f'{level} optimised from {origin}', info or {}
+    if info.get('stoppedBy') == 'time-limit':
+        # Task 6 review: maxGradient is the largest absolute Cartesian gradient component (as the library's
+        # optimise.py and Gaussian's "maximum force" mean it), not geomeTRIC's per-atom norm; the text says so.
+        text += ('; optimisation stopped by its time limit, not converged (max force, the largest Cartesian '
+                 f"gradient component: {info['maxGradient']:.1e} Ha/bohr)")
+    if info.get('frequencyCheck'):
+        text += f"; {info['frequencyCheck']['summary']}"
+    return text
+
+
+def _final_geometry(final):
+    """input.py's record of what happened to the geometry before the final SCF (Task 7), with a sentence for
+    the provenance panel: the symmetrisation and its largest move, and the note when PySCF's symmetry could
+    not be used."""
+    parts = []
+    if final.get('symmetrised'):
+        group = f" to {final['pointGroup']}" if final.get('pointGroup') else ''
+        parts.append(f"symmetrised{group} before the final SCF (largest move "
+                     f"{final['maxDisplacementAngstrom']:.1e} Å)")
+    if final.get('note'):
+        parts.append(final['note'])
+    return {**final, 'summary': '; '.join(parts)}
 
 
 def _commit():
@@ -76,25 +128,33 @@ def _commit():
         return 'unknown'
 
 
-def _resume_atoms(sink, key, attempt):
-    """The last geometry a reclaimed optimise attempt reached, so a Spot
-    reclaim costs the steps since the last frame rather than the whole run.
-    A trajectory cut off mid-write (the reclaim can land during put_attempt)
-    or otherwise unreadable means starting again from the submitted
-    geometry: slower, never wrong."""
+def _resume_frame(sink, key, attempt):
+    """The last geometry a reclaimed optimise attempt reached, and that
+    frame's comment, so a Spot reclaim costs the steps since the last frame
+    rather than the whole run. The comment carries, after a displacement off
+    a saddle point, the displacement and the check that called for it
+    (preflight D16: input.trajectory_comment). A trajectory cut off
+    mid-write (the reclaim can land during put_attempt) or otherwise
+    unreadable means starting again from the submitted geometry: slower,
+    never wrong."""
     previous = sink.get_attempt(key, attempt - 1, 'trajectory.xyz')
     if not previous:
-        return None
+        return None, None
     try:
         lines = previous.decode().strip().splitlines()
         count = int(lines[0])
         frame = [line.split() for line in lines[-count:]]
         if count < 1 or len(lines) < count + 2 or any(len(p) != 4 for p in frame):
-            return None
+            return None, None
         # + 0.0: the %.6f text can carry -0.000000, which input.py would show as -0.0
-        return [(p[0], (float(p[1]) + 0.0, float(p[2]) + 0.0, float(p[3]) + 0.0)) for p in frame]
+        return ([(p[0], (float(p[1]) + 0.0, float(p[2]) + 0.0, float(p[3]) + 0.0)) for p in frame],
+                lines[-count - 1])
     except (ValueError, IndexError, UnicodeDecodeError):
-        return None
+        return None, None
+
+
+def _resume_atoms(sink, key, attempt):
+    return _resume_frame(sink, key, attempt)[0]
 
 
 def _patch_wall_seconds(meta_path: Path, wall):
@@ -106,6 +166,75 @@ def _patch_wall_seconds(meta_path: Path, wall):
     meta = json.loads(meta_path.read_text())
     meta['provenance']['wallSeconds'] = wall
     meta_path.write_text(json.dumps(meta, indent=1, ensure_ascii=False) + '\n')
+
+
+class TimeBudget:
+    """input.py's may_start (Phase 6D spec §9): whether the time left before the job's limit covers, with
+    TIME_BUDGET_MARGIN to spare, what the stage asked about and everything after it are predicted to take,
+    from the job's own sizing figures (sizing.budget_parts, version 6). 'step' counts the step itself as well
+    as the frequency check, the final SCF, labelling the orbitals (Ruling D7) and the files; 'frequency check'
+    the last four. Always yes with no limit (This Mac) or no figures (a record sized before version 6)."""
+
+    def __init__(self, limit_seconds, parts, clock=time.monotonic):
+        self.limit, self.parts, self.clock = limit_seconds, parts, clock
+        self.began = clock()
+
+    def remaining(self, stage):
+        p = self.parts
+        labelling = p.get('labellingSeconds')
+        if labelling is None:
+            labelling = LABELLING_SHARE_OF_FINAL_SCF * p['finalScfSeconds']
+        tail = p['frequencySeconds'] + p['finalScfSeconds'] + labelling + p['filesSeconds']
+        return tail + p['stepSeconds'] if stage == 'step' else tail
+
+    def __call__(self, stage):
+        if self.limit is None or not self.parts:
+            return True
+        left = self.limit - STARTUP_ALLOWANCE_SECONDS - (self.clock() - self.began)
+        return left >= TIME_BUDGET_MARGIN * self.remaining(stage)
+
+
+def time_limit(backend, sizing, given=None):
+    """The limit the budget works to: `given` (tests; JOBS_TIME_LIMIT_SECONDS on This Mac), else the Batch
+    attempt's own timeout on AWS. This Mac's runs are free and have none."""
+    if given is not None:
+        return float(given)
+    return float(sizing['timeoutSeconds']) if backend == 'aws' else None
+
+
+FREQUENCY_MASSES = 'standard atomic weights, isotope-averaged (PySCF atom_mass_list(isotope_avg=True))'
+# input.py's summarise says the same of the check's own figure (input.py runs alone, so it cannot import this).
+ZPE_AT_SADDLE = ('at a saddle point: the imaginary modes are left out of the sum, so this is not the zero-point '
+                 'energy of a minimum')
+
+
+def frequencies_payload(check, summary, method):
+    """frequencies.json (Phase 6D spec §7; Phase 6E's input): the harmonic analysis behind the check, the
+    geometry it belongs to (Task 7 review M4: after a displacement the time limit kept from being rechecked,
+    that is the saddle point's, not the final geometry), and the conventions of its modes and masses (M5).
+    input.py has rounded the modes, wavenumbers and masses already (its DECIMALS, preflight D10); the geometry
+    and the zero-point energy are rounded here, and the file is written without whitespace."""
+    at_saddle = bool(check.get('imaginary'))
+    if summary['result'] == 'not-rechecked':
+        analysed = 'the saddle point the run displaced from, not the final geometry (which was not checked again)'
+    else:
+        analysed = 'the final geometry, a saddle point' if at_saddle else 'the final geometry'
+    notes = ['wavenumbers in cm-1, ascending; an imaginary frequency is written as a negative number',
+             'translations and rotations projected out (PySCF hessian.thermo.harmonic_analysis)',
+             "normalModes: for each mode, one Cartesian displacement vector per atom, in geometryAngstrom's frame "
+             'and order; not mass-weighted; scaled so that the sum of its squared components is 1/mu, mu the '
+             "mode's reduced mass in amu (PySCF norm_mode)",
+             f'masses (massesAmu): {FREQUENCY_MASSES}']
+    return {'method': method, 'result': summary['result'], 'summary': summary['summary'],
+            'analysedGeometry': analysed, 'atSaddlePoint': at_saddle,
+            'geometryAngstrom': [[s, *(round(float(c), 6) + 0.0 for c in xyz)] for s, xyz in check['atoms']],
+            'massesAmu': check.get('massesAmu'),
+            'wavenumbers': check['wavenumbers'], 'reducedMassesAmu': check['reducedMasses'],
+            'normalModes': check['normalModes'],
+            'zeroPointEnergyHartree': round(float(check['zeroPointEnergyHartree']), 8),
+            **({'zeroPointEnergyNote': ZPE_AT_SADDLE} if at_saddle else {}),
+            **({'spinSquaredUKS': round(float(check['spinSquared']), 4)} if 'spinSquared' in check else {}),
+            'imaginaryThresholdWavenumber': -50.0, 'notes': notes}
 
 
 class Progress:
@@ -152,10 +281,12 @@ class Progress:
 
 
 def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, heartbeat_seconds=30, image_digest='local',
-            runner_job_id=None, first_attempt=None):
+            runner_job_id=None, first_attempt=None, time_limit_seconds=None):
     """`first_attempt`: the first attempt of this Batch job (its earlier
     attempts are Spot reclaims, whose files this approval pays for too);
-    an owner's retry starts a new Batch job and a new approval."""
+    an owner's retry starts a new Batch job and a new approval.
+    `time_limit_seconds`: the limit the time budget works to, in place of
+    the Batch timeout (tests; This Mac's JOBS_TIME_LIMIT_SECONDS)."""
     if not store.claim(key, attempt, utc_now()):
         return 'duplicate'
     if runner_job_id:
@@ -171,7 +302,7 @@ def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, hear
     work = Path(tempfile.mkdtemp(prefix=f'job-{key[:8]}-'))
     try:
         return _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work,
-                    attempt if first_attempt is None else first_attempt)
+                    attempt if first_attempt is None else first_attempt, time_limit_seconds)
     except KeyboardInterrupt:
         # I1: Ctrl-C, or the local server stopping (its worker subprocess
         # shares the terminal's SIGINT), skips `_run`'s `except Exception`
@@ -221,7 +352,8 @@ class _Counted:
         return getattr(self.sink, name)
 
 
-def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work, first_attempt):
+def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work, first_attempt,
+         time_limit_seconds=None):
     import pyscf
     from build_library import GRID_POINTS_TRIES, write_molecule_files
 
@@ -236,8 +368,11 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     log = work / 'output.log'
     frames = []
 
-    start = _resume_atoms(sink, key, attempt) if recipe == 'optimise' and attempt > 1 else None
-    input_text = render_input(job, key, start=start, resumed_from=attempt - 1 if start else None)
+    start, comment = _resume_frame(sink, key, attempt) if recipe == 'optimise' and attempt > 1 else (None, None)
+    # Preflight D16: a frame reached after displacing off a saddle point says so in its comment; the resumed
+    # attempt then re-optimises and rechecks, and reports the displacement, rather than a plain minimum.
+    input_text = render_input(job, key, start=start, resumed_from=attempt - 1 if start else None,
+                              resumed_check=resumed_check(comment) if start and comment else None)
     (work / 'input.py').write_text(input_text)
 
     def beat():
@@ -258,7 +393,10 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
                       file=sys.stderr)
 
     def on_step(step, energy, atoms):
-        frames.append(_xyz(atoms, f'step {step} E={energy:.10f}'))
+        # input.py writes the comment (D16): 'step N E=…', plus the displacement record once it has displaced.
+        write = ns.get('trajectory_comment') or (lambda n, e: f'step {n} E={e:.10f}')
+        comment = write(step, energy)
+        frames.append(_xyz(atoms, comment))
         sink.put_attempt(key, attempt, 'trajectory.xyz', ''.join(frames).encode())
 
     heart = threading.Thread(target=beat, daemon=True)
@@ -268,8 +406,9 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     try:
         os.chdir(work)                              # geomeTRIC writes its scratch files to the working directory
         ns = runpy.run_path(str(work / 'input.py'), run_name='jobs_input')
+        budget = TimeBudget(time_limit(backend, sizing, time_limit_seconds), sizing.get('parts'))
         try:
-            mol, mf, info = ns['build'](on_stage=progress.on_stage, on_step=on_step)
+            mol, mf, info = ns['build'](on_stage=progress.on_stage, on_step=on_step, may_start=budget)
         finally:
             # Task 8 carry: input.py holds output.log open across every
             # molecule it builds; closing it flushes the log before the
@@ -285,26 +424,56 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
         source = record['geometrySource']
         coords = mol.atom_coords(unit='Angstrom')
         final_atoms = [(mol.atom_pure_symbol(i), tuple(float(c) for c in coords[i])) for i in range(mol.natm)]
+        method = job['method']
+        label = method_label(method['xc'])
+        geometry_method = f"{label}/{method['optimiseBasis']}" if method['optimiseBasis'] else None
+        check = {**info['frequencyCheck'], 'method': geometry_method} if info.get('frequencyCheck') else None
+        if check and info.get('checkHistory'):
+            check['history'] = info['checkHistory']     # the saddle point's check, before the displacement
+        # Task 7: the check, its analysis, the final geometry's symmetrisation and an open shell's spin record
+        # are not optimisation fields; each has its own place below.
+        optimisation = {k: v for k, v in info.items()
+                        if k not in ('frequencyCheck', 'frequencies', 'checkHistory', 'finalGeometry', 'openShell')}
+        provenance = {'jobKey': key, 'computeVersion': job['computeVersion'], 'recipe': recipe,
+                      'geometrySource': source, 'caveats': caveats_for(recipe, job['computeVersion']),
+                      'generatorCommit': commit, 'imageDigest': image_digest, 'pyscfVersion': pyscf.__version__,
+                      'sizingVersion': sizing['version'], 'size': sizing['size'],
+                      'capacity': sizing['capacity'], 'geometryMethod': geometry_method,
+                      'frequencyCheck': check['summary'] if check else None,
+                      'timeLimitSeconds': budget.limit,
+                      # provisional, so the budget check sees a number of
+                      # about the final width; replaced below (D14)
+                      'wallSeconds': round(time.monotonic() - began, 2),
+                      'costUsd': None}
+        if info.get('openShell'):
+            # Task 6 review: geometry and frequencies UKS (PySCF 2.8 has no ROKS Hessian), properties ROKS,
+            # with UKS's <S^2> against S(S+1) and a note when it is contaminated.
+            provenance['openShell'] = info['openShell']
+        if info.get('finalGeometry'):
+            provenance['finalGeometry'] = _final_geometry(info['finalGeometry'])
+        if info.get('frequencies'):
+            provenance['frequencyMasses'] = FREQUENCY_MASSES          # Task 7 review M5
         fields = {
             'id': key, 'name': record['name'], 'formula': record['formula'],
-            'geometrySource': _geometry_source_text(source, recipe), 'references': [],
-            'method': f"{job['method']['xc']}/{job['method']['basis']}",
+            'geometrySource': _geometry_source_text(source, recipe, method, info), 'references': [],
+            'method': f"{label}/{method['basis']}",
             'multiplicity': job['molecule']['multiplicity'], 'tier': 'computed',
-            'provenance': {'jobKey': key, 'computeVersion': job['computeVersion'], 'recipe': recipe,
-                           'geometrySource': source, 'caveats': CAVEATS[recipe], 'generatorCommit': commit,
-                           'imageDigest': image_digest, 'pyscfVersion': pyscf.__version__,
-                           'sizingVersion': sizing['version'], 'size': sizing['size'],
-                           'capacity': sizing['capacity'],
-                           # provisional, so the budget check sees a number of
-                           # about the final width; replaced below (D14)
-                           'wallSeconds': round(time.monotonic() - began, 2),
-                           'costUsd': None},
+            'provenance': provenance,
         }
-        if info:
-            # Ruling D13: {steps, converged}; 6B-2 widens the TS type. A
-            # resumed run (M4) also names the attempt whose last frame it
-            # started from: its `steps` count only this attempt's.
-            fields['geometryOptimisation'] = {**info, 'resumedFrom': attempt - 1} if start else info
+        if optimisation:
+            # Ruling D13: {steps, converged}, plus Phase 6D's stoppedBy/maxGradient/stoppedAt/displacedFrom. A
+            # resumed run (M4) also names the attempt whose last frame it started from: its `steps` count only
+            # this attempt's.
+            fields['geometryOptimisation'] = {**optimisation, 'resumedFrom': attempt - 1} if start else optimisation
+        if check:
+            fields['frequencyCheck'] = check
+        if info.get('frequencies'):
+            # Before the grids (Task 7 carry, preflight D10): write_molecule_files's 3 MB budget sums every
+            # file in the folder, and must count this one.
+            (work / 'result').mkdir(parents=True, exist_ok=True)
+            (work / 'result' / 'frequencies.json').write_text(
+                json.dumps(frequencies_payload(info['frequencies'], check, geometry_method), separators=(',', ':'),
+                           ensure_ascii=False))
         write_molecule_files(work / 'result', mol, mf, fields, grid_points or GRID_POINTS_TRIES, commit=commit)
         _patch_wall_seconds(work / 'result' / 'meta.json', round(time.monotonic() - began, 2))
     except Exception as e:
@@ -353,6 +522,8 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
                     _count_root(sink, key, existing)
             else:
                 files = {name: (work / 'result' / name).read_bytes() for name in RESULT_FILES}
+                files.update({name: (work / 'result' / name).read_bytes() for name in OPTIONAL_RESULT_FILES
+                              if (work / 'result' / name).exists()})
                 files.update({'job.json': json.dumps({'key': key, 'job': job,
                                                       'geometrySource': record['geometrySource'],
                                                       'sizing': sizing, 'imageDigest': image_digest,
@@ -528,9 +699,10 @@ def main(argv=None, environ=None):
         digest = environ.get('JOBS_IMAGE_DIGEST', 'local')
     # This Batch job's first attempt: JOB_ATTEMPT_OFFSET + 1 (AWS); a local run is one attempt.
     first = int(environ.get('JOB_ATTEMPT_OFFSET', '0')) + 1 if args.aws else attempt
+    given = environ.get('JOBS_TIME_LIMIT_SECONDS')
     status = run_job(args.key, store, sink, attempt=attempt, backend=backend, grid_points=grid,
                      image_digest=digest, runner_job_id=environ.get('AWS_BATCH_JOB_ID') if args.aws else None,
-                     first_attempt=min(first, attempt))
+                     first_attempt=min(first, attempt), time_limit_seconds=float(given) if given else None)
     # In AWS the line lands in CloudWatch: structured, with the job key (spec §11).
     print(json.dumps({'key': args.key, 'attempt': attempt, 'status': status}) if args.aws else status)
     # D3: a superseded attempt is not a failure (Ruling T5-b); on AWS a

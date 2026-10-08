@@ -12,7 +12,7 @@ from jobs.canonical import canonical_job, job_key
 from jobs.model import new_record
 from jobs.sink import LocalSink
 from jobs.store import FileStore
-from jobs import worker
+from jobs import quotes, worker
 from jobs.worker import _classify, _resume_atoms, run_job
 
 NOW = datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc)
@@ -24,10 +24,12 @@ H2 = [[1, 0, 0, 0], [1, 0, 0, 0.74]]
 TOOLS = Path(__file__).resolve().parents[2]
 
 
-def queue(store, atoms, charge=0, mult=1, method=SVP, recipe='single'):
+def queue(store, atoms, charge=0, mult=1, method=SVP, recipe='single', decision=DECISION, compute_version=None):
     job = canonical_job(recipe, atoms, charge, mult, method=method)
+    if compute_version is not None:
+        job = {**job, 'computeVersion': compute_version}
     key = job_key(job)
-    store.create_job(new_record(key=key, job=job, decision=DECISION, name='hydrogen', formula='H2', electron_count=2,
+    store.create_job(new_record(key=key, job=job, decision=decision, name='hydrogen', formula='H2', electron_count=2,
                                 geometry_source={'kind': 'xyz'}, backend='local', now=NOW))
     return key
 
@@ -533,3 +535,232 @@ def test_an_interrupted_worker_marks_its_attempt_failed(env, monkeypatch):
     rec = store.get_job(key)
     assert rec['status'] == 'FAILED' and rec['error']['code'] == 'worker-crashed'
     assert 'interrupted' in rec['error']['message'] and not rec['settled']
+
+
+# --- Phase 6D: compute version 2 -------------------------------------------------
+
+DECISION_V6 = {**DECISION, 'version': 6,
+               'parts': {'stepSeconds': 1.0, 'frequencySeconds': 1.0, 'finalScfSeconds': 1.0, 'filesSeconds': 1.0}}
+STRETCHED_H2 = [[1, 0, 0, 0], [1, 0, 0, 0.80]]
+
+
+def test_an_optimise_job_checks_its_structure_and_writes_frequencies(env):
+    store, sink, jobs = env
+    key = queue(store, STRETCHED_H2, method=None, recipe='optimise')
+    assert run_job(key, store, sink, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    root = jobs / key
+    assert 'frequencies.json' in json.loads((root / 'done.json').read_text())['files']
+    meta = json.loads((root / 'meta.json').read_text())
+    assert meta['method'] == {'density': 'B3LYP-D3(BJ)/def2-TZVPD', 'energies': 'B3LYP-D3(BJ)/def2-TZVPD'}
+    assert meta['dispersion']['model'] == 'D3(BJ)'
+    assert meta['frequencyCheck']['result'] == 'minimum' and meta['frequencyCheck']['method'] == 'B3LYP-D3(BJ)/def2-SVP'
+    assert meta['geometrySource'] == ('B3LYP-D3(BJ)/def2-SVP optimised from pasted XYZ; '
+                                      'true minimum (no imaginary frequencies)')
+    assert set(meta['geometryOptimisation']) == {'steps', 'converged'} and meta['geometryOptimisation']['converged']
+    provenance = meta['provenance']
+    assert provenance['computeVersion'] == 2 and provenance['geometryMethod'] == 'B3LYP-D3(BJ)/def2-SVP'
+    assert provenance['frequencyCheck'] == 'true minimum (no imaginary frequencies)'
+    assert provenance['timeLimitSeconds'] is None and provenance['caveats'] == worker.CAVEATS['optimise']
+    frequencies = json.loads((root / 'frequencies.json').read_text())
+    assert frequencies['method'] == 'B3LYP-D3(BJ)/def2-SVP' and len(frequencies['wavenumbers']) == 1
+    assert frequencies['geometryAngstrom'][0][0] == 'H' and frequencies['zeroPointEnergyHartree'] > 0
+    assert len(frequencies['normalModes'][0]) == 2 and frequencies['result'] == 'minimum'
+    # Preflight D10: written compactly, every number rounded.
+    text = (root / 'frequencies.json').read_text()
+    assert text == json.dumps(frequencies, separators=(',', ':'), ensure_ascii=False)
+    assert all(len(repr(v).split('.')[-1]) <= 6 for v in frequencies['geometryAngstrom'][1][1:])
+    # Task 7 review M4/M5: which geometry the analysis belongs to, and the conventions of modes and masses.
+    assert frequencies['analysedGeometry'] == 'the final geometry' and frequencies['atSaddlePoint'] is False
+    assert frequencies['massesAmu'] == [1.008, 1.008] and 'zeroPointEnergyNote' not in frequencies
+    assert any('isotope_avg=True' in n for n in frequencies['notes'])
+    assert any('not mass-weighted' in n and '1/mu' in n for n in frequencies['notes'])
+    assert provenance['frequencyMasses'].startswith('standard atomic weights')
+    # The optimised geometry is symmetrised before the final SCF (Task 7); provenance says so, and by how much.
+    final = provenance['finalGeometry']
+    assert final['symmetrised'] and final['pointGroup'] == 'Dooh' and final['maxDisplacementAngstrom'] < 1e-3
+    assert final['summary'].startswith('symmetrised to Dooh before the final SCF (largest move ')
+    assert 'openShell' not in provenance
+    # Every object this optimisation stored is within the quote's object count (Phase 6C; 16 -> 17).
+    actual = store.get_job(key)['actual']
+    assert actual['resultObjects'] == 16 <= quotes.STORED_OBJECTS == 17
+
+
+def test_frequencies_json_is_written_before_the_files_so_the_result_budget_counts_it(env, monkeypatch):
+    # Task 7 carry (preflight D10): write_molecule_files's 3 MB budget sums every file in its folder.
+    store, sink, jobs = env
+    seen = []
+    slow_writes(monkeypatch, 0, before=lambda out, *rest: seen.append((Path(out) / 'frequencies.json').exists()))
+    key = queue(store, STRETCHED_H2, method=None, recipe='optimise')
+    assert run_job(key, store, sink, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    assert seen == [True]
+
+
+def test_a_forced_short_time_limit_ends_done_not_converged_with_files(env):
+    # Spec §12 / Review Focus 4: the budget refuses the next step; the job still ends DONE, with every file.
+    store, sink, jobs = env
+    key = queue(store, STRETCHED_H2, method=None, recipe='optimise', decision=DECISION_V6)
+    assert run_job(key, store, sink, grid_points=(32,), time_limit_seconds=1.0) == 'DONE', store.get_job(key)['error']
+    meta = json.loads((jobs / key / 'meta.json').read_text())
+    optimisation = meta['geometryOptimisation']
+    assert optimisation['converged'] is False and optimisation['stoppedBy'] == 'time-limit' and optimisation['steps'] == 1
+    assert meta['frequencyCheck']['result'] == 'not-run'
+    assert 'optimisation stopped by its time limit, not converged (max force' in meta['geometrySource']
+    # Task 6 review: maxGradient is the largest Cartesian component, not geomeTRIC's per-atom norm; say which.
+    assert 'the largest Cartesian gradient component: ' in meta['geometrySource']
+    assert meta['provenance']['timeLimitSeconds'] == 1.0
+    names = set(json.loads((jobs / key / 'done.json').read_text())['files'])
+    assert {'meta.json', 'basis.json', 'density.bin.gz', 'esp.bin.gz', 'trajectory.xyz'} <= names
+    assert 'frequencies.json' not in names and store.get_job(key)['status'] == 'DONE'
+
+
+def test_a_record_sized_before_version_6_has_no_time_budget():
+    assert worker.TimeBudget(1.0, None)('step') and worker.TimeBudget(1.0, None)('frequency check')
+    assert worker.TimeBudget(None, DECISION_V6['parts'])('step')
+
+
+def test_the_budget_counts_the_step_the_check_the_final_scf_the_labels_and_the_files():
+    now = [0.0]
+    parts = {'stepSeconds': 10.0, 'frequencySeconds': 20.0, 'finalScfSeconds': 30.0, 'filesSeconds': 40.0,
+             'labellingSeconds': 5.0}
+    budget = worker.TimeBudget(1000.0, parts, clock=lambda: now[0])
+    # Left = 1000 - 30 (start-up) - elapsed; a step needs 1.2 x (10 + 20 + 30 + 5 + 40) = 126, the check 1.2 x 95 = 114.
+    now[0] = 1000 - 30 - 126
+    assert budget('step')
+    now[0] += 0.01
+    assert not budget('step') and budget('frequency check')
+    now[0] = 1000 - 30 - 114 + 0.01
+    assert not budget('frequency check')
+
+
+def test_without_a_sized_labelling_term_the_budget_allows_a_conservative_share_of_the_final_scf():
+    # Ruling D7: labelling runs inside the files stage, after the budget's last decision. Until sizing
+    # prices it (Task 9's labellingSeconds), a stated share of the final SCF stands in for it.
+    parts = {'stepSeconds': 10.0, 'frequencySeconds': 20.0, 'finalScfSeconds': 30.0, 'filesSeconds': 40.0}
+    budget = worker.TimeBudget(1000.0, parts)
+    labelling = worker.LABELLING_SHARE_OF_FINAL_SCF * 30.0
+    assert labelling > 0 and budget.remaining('frequency check') == 20.0 + 30.0 + 40.0 + labelling
+    assert budget.remaining('step') == budget.remaining('frequency check') + 10.0
+
+
+def test_the_time_limit_is_the_batch_timeout_on_aws_and_none_on_this_mac():
+    assert worker.time_limit('aws', {'timeoutSeconds': 600}) == 600.0
+    assert worker.time_limit('local', {'timeoutSeconds': 600}) is None
+    assert worker.time_limit('local', {'timeoutSeconds': 600}, 5) == 5.0
+
+
+def test_the_cli_reads_a_time_limit_from_the_environment(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(worker, 'run_job', lambda *a, **k: seen.update(k) or 'DONE')
+    args = ['run', 'k' * 64, '--local', str(tmp_path / 'o'), '--state', str(tmp_path / 's')]
+    assert worker.main(args, environ={'JOBS_TIME_LIMIT_SECONDS': '90'}) == 0 and seen['time_limit_seconds'] == 90.0
+    assert worker.main(args, environ={}) == 0 and seen['time_limit_seconds'] is None
+
+
+def test_a_compute_version_1_job_keeps_its_recipe(env):
+    # An owner's retry of a job approved before Phase 6D: its own method, no check, its old caveats.
+    store, sink, jobs = env
+    key = queue(store, STRETCHED_H2, method={'xc': 'B3LYP', 'basis': 'def2-SVP', 'optimiseBasis': 'def2-SVP'},
+                recipe='optimise', compute_version=1)
+    assert run_job(key, store, sink, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    meta = json.loads((jobs / key / 'meta.json').read_text())
+    assert 'frequencyCheck' not in meta and 'FREQUENCY_CHECK = False' in (jobs / key / 'input.py').read_text()
+    assert meta['provenance']['caveats'] == worker.LEGACY_OPTIMISE_CAVEATS
+    assert meta['geometrySource'] == 'B3LYP/def2-SVP optimised from pasted XYZ'
+    assert not (jobs / key / 'frequencies.json').exists()
+
+
+def test_the_geometry_source_says_how_the_structure_was_checked():
+    method = {'xc': 'B3LYP-D3BJ', 'basis': 'def2-TZVPD', 'optimiseBasis': 'def2-SVP'}
+    saddle = {'frequencyCheck': {'summary': 'saddle point (2 imaginary frequencies), not a minimum'}}
+    assert worker._geometry_source_text({'kind': 'xyz'}, 'optimise', method, saddle) == (
+        'B3LYP-D3(BJ)/def2-SVP optimised from pasted XYZ; saddle point (2 imaginary frequencies), not a minimum')
+    assert worker._geometry_source_text({'kind': 'xyz'}, 'single', method, {}) == 'pasted XYZ'
+
+
+def test_an_open_shell_says_which_parts_ran_uks_and_which_roks(env):
+    # Task 6 review: PySCF 2.8 has no ROKS Hessian, so geometry and frequencies run UKS, properties ROKS.
+    store, sink, jobs = env
+    # NH2 (2B1): OH's degenerate pi3 does not converge in ROKS with symmetry on at def2-TZVPD (a separate,
+    # older matter, in the Task 8 report).
+    nh2 = [[7, 0.0, 0.0, 0.14], [1, 0.0, 0.80, -0.42], [1, 0.0, -0.80, -0.42]]
+    key = queue(store, nh2, charge=0, mult=2, method=None, recipe='optimise')
+    assert run_job(key, store, sink, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    meta = json.loads((jobs / key / 'meta.json').read_text())
+    shell = meta['provenance']['openShell']
+    assert shell['methods'] == 'geometry and frequencies: UKS; properties: ROKS'
+    assert shell['expectedS2'] == 0.75 and abs(shell['geometryS2'] - 0.75) < 0.01 and not shell['contaminated']
+    assert set(meta['geometryOptimisation']) == {'steps', 'converged'}
+    assert json.loads((jobs / key / 'frequencies.json').read_text())['spinSquaredUKS'] == pytest.approx(0.75, abs=0.01)
+
+
+def test_frequencies_at_a_saddle_point_say_so_and_caveat_the_zero_point_energy():
+    # Task 7 review M4: the analysis behind a not-rechecked displacement is the saddle point's, not the final
+    # geometry's; a zero-point energy summed without the imaginary modes is not a minimum's.
+    check = {'atoms': [('H', (0.0, 0.0, 0.0)), ('H', (0.0, 0.0, 0.74))], 'wavenumbers': [-300.0, 4000.0],
+             'reducedMasses': [1.0, 0.5], 'normalModes': [[[0, 0, 1], [0, 0, -1]]] * 2, 'imaginary': [-300.0],
+             'zeroPointEnergyHartree': 0.0091, 'massesAmu': [1.008, 1.008]}
+    summary = {'result': 'not-rechecked', 'summary': 'displaced from a saddle point (1 imaginary); …'}
+    out = worker.frequencies_payload(check, summary, 'B3LYP-D3(BJ)/def2-SVP')
+    assert out['atSaddlePoint'] is True and out['analysedGeometry'].startswith('the saddle point the run displaced from')
+    assert 'not the zero-point energy of a minimum' in out['zeroPointEnergyNote']
+    saddle = worker.frequencies_payload(check, {'result': 'saddle-point', 'summary': 's'}, 'm')
+    assert saddle['analysedGeometry'] == 'the final geometry, a saddle point'
+
+
+RESUMED_SADDLE = ('step 4 E=-1.1000000000 check={"displacedFrom":1,"checkHistory":[{"result":"saddle-point",'
+                  '"summary":"saddle point (1 imaginary frequency), not a minimum","imaginaryCount":1}]}')
+
+
+def test_a_spot_resume_after_a_displacement_keeps_the_displacement_and_the_check_history(env):
+    # Preflight D16: attempt 1 had displaced off a saddle point when Spot reclaimed it. Its last frame's
+    # comment says so; attempt 2 re-optimises from that frame, rechecks, and reports the displacement.
+    store, sink, jobs = env
+    key = queue(store, STRETCHED_H2, method=None, recipe='optimise')
+    sink.put_attempt(key, 1, 'trajectory.xyz',
+                     f'2\n{RESUMED_SADDLE}\nH 0.0 0.0 0.0\nH 0.0 0.0 0.76\n'.encode())
+    store.update_job(key, {'attempt': 2})
+    assert run_job(key, store, sink, attempt=2, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    meta = json.loads((jobs / key / 'meta.json').read_text())
+    assert 'RESUMED_CHECK = {' in (jobs / key / 'input.py').read_text()
+    assert meta['geometryOptimisation']['displacedFrom'] == 1 and meta['geometryOptimisation']['resumedFrom'] == 1
+    assert meta['frequencyCheck']['result'] == 'minimum-after-displacement'
+    assert meta['frequencyCheck']['history'][0]['result'] == 'saddle-point'
+    assert 'reached by displacing a saddle point (1 imaginary)' in meta['geometrySource']
+    # This attempt's own frames carry the record on, for a second reclaim.
+    frames = (jobs / key / 'attempts' / '2' / 'trajectory.xyz').read_text().splitlines()
+    assert ' check={"displacedFrom":1,' in frames[1]
+
+
+def test_a_frame_before_any_displacement_resumes_as_a_plain_optimisation(env):
+    store, sink, jobs = env
+    key = queue(store, STRETCHED_H2, method=None, recipe='optimise')
+    sink.put_attempt(key, 1, 'trajectory.xyz', b'2\nstep 1 E=-1.1\nH 0.0 0.0 0.0\nH 0.0 0.0 0.76\n')
+    store.update_job(key, {'attempt': 2})
+    assert run_job(key, store, sink, attempt=2, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    assert 'RESUMED_CHECK = None' in (jobs / key / 'input.py').read_text()
+    assert json.loads((jobs / key / 'meta.json').read_text())['frequencyCheck']['result'] == 'minimum'
+    frames = (jobs / key / 'attempts' / '2' / 'trajectory.xyz').read_text().splitlines()
+    assert frames[1].startswith('step 1 E=') and 'check=' not in frames[1]
+
+
+WATER = [[8, 0.0, 0.0, 0.11779], [1, 0.0, 0.75545, -0.47116], [1, 0.0, -0.75545, -0.47116]]
+
+
+def test_a_final_scf_without_symmetry_keeps_its_orbital_labels(env, monkeypatch):
+    # Controller ruling (Task 8): when PySCF cannot build symmetry-adapted orbitals and the final SCF runs
+    # without symmetry, the labels come from the geometry's own point group, and provenance carries the note.
+    store, sink, jobs = env
+    import jobs.input_template as template
+    broken = template.TEMPLATE.replace("        mol = molecule(atoms, BASIS)\n",
+                                       "        raise IndexError('index 2 is out of bounds for axis 0 with size 2')\n")
+    assert broken != template.TEMPLATE
+    monkeypatch.setattr(template, 'TEMPLATE', broken)
+    key = queue(store, WATER)
+    assert run_job(key, store, sink, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    meta = json.loads((jobs / key / 'meta.json').read_text())
+    occupied = [row['label'] for row in meta['orbitals'] if row['occupation'] > 0]
+    assert occupied == ['1a1', '2a1', '1b2', '3a1', '1b1']
+    assert meta['symmetry']['pointGroup'] == 'C2v' and meta['symmetry']['labels'] == 'full-group'
+    assert "labelled from the geometry's own point group" in meta['symmetry']['labelNote']
+    final = meta['provenance']['finalGeometry']
+    assert final['symmetry'] == 'off' and final['summary'] == final['note']
