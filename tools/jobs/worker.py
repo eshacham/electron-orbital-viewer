@@ -115,26 +115,34 @@ class Progress:
         self.lock = threading.Lock()
         self.stage, self.energy, self.stages = None, None, []
 
-    def on_stage(self, stage, energy=None):
+    def on_stage(self, stage, energy=None, cycles=None):
+        """`cycles`, when input.py has one, is the SCF cycle count of the
+        stage it names (v5: each optimisation step reports its own)."""
         with self.lock:
             if stage != self.stage:
                 self.stages.append({'name': stage, 'start': time.monotonic()})
                 self.stage = stage
             if energy is not None:
                 self.energy = float(energy)
+            if cycles is not None:
+                self.stages[-1]['cycles'] = int(cycles)
 
     def durations(self, end, scf_cycles=None):
         """Each stage's name and seconds. For v4 (Phase 6B-3 follow-up,
         Task 6): the SCF stage that converged also carries its cycle count
         (PySCF's own mf.cycles, the figure sizing's t3 is fitted on and
         probe.py's measure() already reports), when the caller has one.
-        Old timings.json files, and any stage before the final SCF (a
-        failed DIIS rung, say), simply lack the key: calibrate.aws_samples
-        must keep reading those."""
+        Since v5 each optimisation step's stage carries its own SCF's count
+        too (reported by input.py through on_stage). Old timings.json files,
+        any stage before the final SCF (a failed DIIS rung, say) and the
+        stage after an optimisation's last step simply lack the key:
+        calibrate.aws_samples must keep reading those."""
         out = []
         for i, s in enumerate(self.stages):
             stop = self.stages[i + 1]['start'] if i + 1 < len(self.stages) else end
             out.append({'name': s['name'], 'seconds': round(stop - s['start'], 2)})
+            if 'cycles' in s:
+                out[-1]['cycles'] = s['cycles']
         if scf_cycles is not None:
             for entry in reversed(out):
                 if entry['name'].startswith('SCF'):

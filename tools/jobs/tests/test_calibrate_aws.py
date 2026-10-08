@@ -5,7 +5,7 @@ import pytest
 
 from jobs import sizing
 from jobs.calibrate import (aws_samples, compare, fit, fit_aws, fit_f2, fit_files, fit_law, fit_speedup, fit_time,
-                            guarded, incore_eri_gb, read_optimise_probe, read_probe)
+                            guarded, incore_eri_gb, read_optimise_probe, read_probe, working_set_gb)
 from jobs.canonical import canonical_job, job_key
 
 M0, M2, T0, T3, G, F2 = 0.6, 2.5, 8.0, 1500.0, 1.2, 2100.0
@@ -213,31 +213,31 @@ def test_two_samples_of_one_size_cannot_fit_an_intercept(tmp_path):
 
 
 def test_guarded_applies_task_14s_guards_and_names_them():
-    raw = {'m0': 0.05, 'm2': -1.0, 't0': 0.3, 't3': -5.0, 't3Step': -2.0, 'g': None, 'f2': 0.0,
+    raw = {'m0': 0.05, 'm2': -1.0, 't0': 0.3, 't3': -5.0, 't3Step': -2.0, 'g': None, 'f2': 0.0, 'stepScale': None,
            'scfExponent': 0.86731, 'scfSaturation': 16, 'filesExponent': 0.63071, 'filesSaturation': 32}
     constants, guards = guarded(raw)
     deployed = sizing.CONSTANTS
     assert constants['m0'] == 0.2 and constants['t0'] == 1.0 and constants['g'] == 1.5
     assert constants['m2'] == deployed['m2'] and constants['t3'] == deployed['t3'] and constants['f2'] == deployed['f2']
-    assert constants['t3Step'] == deployed['t3Step']
+    assert constants['t3Step'] == deployed['t3Step'] and constants['stepScale'] == deployed['stepScale']
     assert constants['scfExponent'] == 0.867 and constants['filesExponent'] == 0.631
     assert constants['scfSaturation'] == 16.0 and isinstance(constants['scfSaturation'], float)
-    assert {g.split(':')[0] for g in guards} == {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2'}
+    assert {g.split(':')[0] for g in guards} == {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale'}
 
 
 def test_guarded_rounds_to_three_significant_figures_and_passes_good_values():
     raw = {'m0': 0.34083, 'm2': 6.7673, 't0': 4.8431, 't3': 26643.9, 't3Step': 31042.7, 'g': 0.3, 'f2': 5244.6,
-           'scfExponent': 0.8673, 'scfSaturation': 16, 'filesExponent': 0.6307, 'filesSaturation': 32}
+           'stepScale': 0.37512, 'scfExponent': 0.8673, 'scfSaturation': 16, 'filesExponent': 0.6307, 'filesSaturation': 32}
     constants, guards = guarded(raw)
     assert guards == []
     assert constants == {'m0': 0.341, 'm2': 6.77, 't0': 4.84, 't3': 26600.0, 't3Step': 31000.0, 'g': 0.3,
-                         'f2': 5240.0, 'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631,
+                         'f2': 5240.0, 'stepScale': 0.375, 'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631,
                          'filesSaturation': 32.0}
     assert all(isinstance(v, float) for v in constants.values())
 
 
 def test_a_negative_g_keeps_1_5():
-    raw = {'m0': 0.5, 'm2': 3.0, 't0': 5.0, 't3': 2e4, 't3Step': 1.5e4, 'g': -0.2, 'f2': 3e3,
+    raw = {'m0': 0.5, 'm2': 3.0, 't0': 5.0, 't3': 2e4, 't3Step': 1.5e4, 'g': -0.2, 'f2': 3e3, 'stepScale': 0.5,
            'scfExponent': 0.9, 'scfSaturation': 16, 'filesExponent': 0.6, 'filesSaturation': 32}
     constants, guards = guarded(raw)
     assert constants['g'] == 1.5 and [g.split(':')[0] for g in guards] == ['g']
@@ -258,8 +258,8 @@ def test_fit_aws_output_has_every_constant_sizing_reads(tmp_path, monkeypatch):
     job = canonical_job('optimise', carbons(4), 0, 2)          # optimise + open shell: every branch
     sizing.predict_parts(job, sizing.SIZES[0])
     sizing.decide(job)
-    assert {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'scfExponent', 'scfSaturation', 'filesExponent',
-            'filesSaturation'} <= read
+    assert {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'scfExponent', 'scfSaturation',
+            'filesExponent', 'filesSaturation'} <= read
 
     constants, _ = guarded(fit_aws(aws_samples(ladder(tmp_path)), probe=model_probe()))
     assert read <= set(constants), read - set(constants)
@@ -435,3 +435,99 @@ def test_without_any_optimisation_step_t3step_is_none_and_guarded(tmp_path):
     assert got['t3Step'] is None
     constants, guards = guarded(got)
     assert constants['t3Step'] == sizing.CONSTANTS['t3Step'] and any(g.startswith('t3Step:') for g in guards)
+
+
+# -- Version 5: the step count, each step's cycles, and the slowest files run at each N --
+
+
+def v5_steps(d, cycles):
+    """Rewrite an optimise folder's step stages as v5's worker writes them:
+    one stage per step, from its start, carrying its SCF's cycles, then
+    geomeTRIC's wrap-up (no cycles)."""
+    timings = json.loads((d / 'timings.json').read_text())
+    rest = [s for s in timings['stages'] if not s['name'].startswith('optimisation step')]
+    steps = [{'name': f'optimisation step {i}', 'seconds': 10.0 + c, 'cycles': c} for i, c in enumerate(cycles, 1)]
+    timings['stages'] = steps + [{'name': f'optimisation step {len(cycles) + 1}', 'seconds': 0.05}] + rest
+    (d / 'timings.json').write_text(json.dumps(timings))
+    return d
+
+
+def test_old_timings_count_every_step_stage_and_leave_out_the_last_ones_seconds(tmp_path):
+    # Before v5, stage 'optimisation step k' ran from the end of step k to
+    # the end of step k + 1 (step 1 fell in no stage; the last stage is
+    # geomeTRIC's wrap-up): as many stages as steps, the last not a step.
+    [sample] = aws_samples([write(tmp_path, 'optimise', carbons(4), 2)])
+    assert sample['optimisationSteps'] == 5 and sample['stepCycles'] is None
+    assert sample['stepSeconds'] == pytest.approx((1 + G) * sp(sample['svpBasisFunctions'], 2))
+
+
+def test_v5_timings_count_the_steps_with_cycles_and_read_their_cycles(tmp_path):
+    d = v5_steps(write(tmp_path, 'optimise', carbons(4), 2), [14, 11, 10, 9])
+    [sample] = aws_samples([d])
+    assert sample['optimisationSteps'] == 4 and sample['stepCycles'] == [14, 11, 10, 9]
+    assert sample['stepSeconds'] == pytest.approx(20.5)          # the median of 24, 21, 20 and 19 s
+    assert sample['scfCycles'] is None                            # write() records none on its final SCF
+
+
+def test_a_resumed_job_adds_the_steps_of_the_attempts_before_it(tmp_path):
+    # Ethanol (2233f97f7719) finished in attempt 2 after a Spot reclaim: its
+    # timings count attempt 2's steps only, and attempt 1's trajectory (as
+    # the sink keeps it, attempts/1/trajectory.xyz) holds the rest.
+    d = write(tmp_path, 'optimise', carbons(4), 2)
+    timings = json.loads((d / 'timings.json').read_text())
+    timings['attempt'] = 2
+    (d / 'timings.json').write_text(json.dumps(timings))
+    (d / 'attempts' / '1').mkdir(parents=True)
+    frame = '4\n{}\n' + ''.join(f'C 0.000000 0.000000 {1.5 * i:.6f}\n' for i in range(4))
+    (d / 'attempts' / '1' / 'trajectory.xyz').write_text(''.join(frame.format(f'step {k} E=-1.0') for k in (1, 2, 3)))
+    [sample] = aws_samples([d])
+    assert sample['optimisationSteps'] == 3 + 5
+
+
+def test_the_step_scale_keeps_the_largest_observed_ratio_inside_time_headroom(tmp_path):
+    # v5: optimisation_steps = ceil(stepScale x (10 + 2 x atoms)), capped at
+    # MAX_STEPS; stepScale = TIME_HEADROOM x the largest measured / (10 + 2
+    # x atoms), so every sample's step count is predicted at TIME_HEADROOM x
+    # or more, the worst one exactly.
+    four = v5_steps(write(tmp_path, 'optimise', carbons(4), 2), [9] * 6)      # 6 of 18
+    six = v5_steps(write(tmp_path, 'optimise', carbons(6), 2), [9] * 4)       # 4 of 22
+    dirs = [write(tmp_path, 'single', carbons(k), t) for k, t in ((3, 2), (8, 2))] + [four, six]
+    got = fit_aws(aws_samples(dirs))
+    assert got['stepScale'] == pytest.approx(sizing.TIME_HEADROOM * 6 / 18, rel=1e-9)
+    assert any(note.startswith('stepScale:') for note in got['notes'])
+
+
+def test_without_an_optimisation_the_step_scale_is_none_and_guarded(tmp_path):
+    dirs = [write(tmp_path, 'single', carbons(k), t) for k, t in ((3, 2), (8, 2), (16, 4))]
+    got = fit_aws(aws_samples(dirs))
+    assert got['stepScale'] is None
+    constants, guards = guarded(got)
+    assert constants['stepScale'] == sizing.CONSTANTS['stepScale'] and any(g.startswith('stepScale:') for g in guards)
+
+
+def test_an_optimise_jobs_working_set_leaves_out_its_steps_incore_eris(tmp_path):
+    # Caffeine optimise on L (09ae0fa051c6): its def2-SVP steps (N 246) held
+    # 3.4 GiB of ERIs in core, its def2-TZVPD SCF (N 614) none; the peak
+    # (5.67 GB) is the steps' working set plus those ERIs, not a need.
+    assert working_set_gb(5.672, 614, 64, svp_n=246) == pytest.approx(5.672 - incore_eri_gb(246, 64))
+    assert incore_eri_gb(246, 64) == pytest.approx(3.44, abs=0.01) and incore_eri_gb(614, 64) == 0
+    # Where the final SCF's ERIs are the larger (ethanol on S), they are what is left out, as before v5.
+    assert working_set_gb(1.392, 168, 8, svp_n=72) == pytest.approx(1.392 - incore_eri_gb(168, 8))
+    d = write(tmp_path, 'optimise', carbons(16), 16, size='L')
+    timings = json.loads((d / 'timings.json').read_text())
+    timings['peakMemoryGB'] += incore_eri_gb(224, 64)
+    (d / 'timings.json').write_text(json.dumps(timings))
+    [sample] = aws_samples([d])
+    assert sample['svpBasisFunctions'] == 224 and sample['direct']
+    assert sample['workingSetGB'] == pytest.approx(M0 + M2 * (sample['basisFunctions'] / 1000) ** 2)
+
+
+def test_a_faster_files_run_at_an_n_already_measured_does_not_lower_f2(tmp_path):
+    # v5: where two runs share an N (caffeine's file write on M, then 4.4x
+    # faster on L where the law promised 2.4x), the slower stands for that N
+    # in the least squares: the faster one would lower f2 for every size.
+    law, files_law = deployed_laws()
+    slow = aws_samples(ladder(tmp_path, law=law, files_law=files_law))
+    fast = dict(slow[0], filesSeconds=slow[0]['filesSeconds'] / 2)
+    assert fit_f2(slow + [fast], files_law) == pytest.approx(F2, rel=1e-9)
+    assert fit_f2(slow, files_law) == pytest.approx(F2, rel=1e-9)

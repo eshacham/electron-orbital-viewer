@@ -50,7 +50,7 @@
    "retrievedAt": "2026-10-10"
   },
   "sizing": {
-   "version": 4,
+   "version": 5,
    "estimateFor": "fargate",
    "size": "S",
    "vcpu": 2,
@@ -58,8 +58,8 @@
    "capacity": "local",
    "attempts": 1,
    "basisFunctions": 58,
-   "predictedSeconds": 15.4,
-   "predictedMemoryGB": 0.49,
+   "predictedSeconds": 15.5,
+   "predictedMemoryGB": 0.47,
    "timeoutSeconds": 600,
    "predictedCostMicros": 0
   },

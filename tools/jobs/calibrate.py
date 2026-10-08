@@ -6,15 +6,19 @@ count toward t3; optimisation steps calibrate g. The file-writing stage is a
 separate cost (Ruling D14), fitted through the origin against (N/1000)².
 6B-1's local fit (`fit`) leaves it undivided: this Mac's PySCF has no OpenMP.
 On Fargate it is threaded, and the AWS fit (`fit_aws`, sizing versions 2
-to 4) divides it by a speedup law of its own, measured by the speedup probe.
+to 5) divides it by a speedup law of its own, measured by the speedup probe.
 
     python -m jobs.calibrate ../tools/molecules/out/jobs/<key> …   (from tools/)
     python -m jobs.calibrate --aws [--probe probe.log] [--optimise-probe steps.log] <job dir> …
-                                                         (Phase 6B-3: sizing v2, v3, v4)
+                                                         (Phase 6B-3: sizing v2 to v5)
 
 Version 4 adds t3Step, the t3 an optimisation step is priced by when its
 ERIs fit in core (sizing.step_in_core), from the optimise-steps probe
 (probe.py --optimise-steps) and the jobs' own steps: the slowest of them.
+Version 5 adds stepScale, the step count's (fit_step_scale), reads each
+step's SCF cycles where the worker recorded them, leaves an optimisation's
+in-core def2-SVP ERIs out of its working set, and lets only the slowest
+file write at each N into f2.
 """
 import json
 import math
@@ -94,7 +98,7 @@ def samples_from(job_dirs):
     return out
 
 
-# -- Phase 6B-3: the AWS fit (sizing versions 2, 3 and 4) ----------------------
+# -- Phase 6B-3: the AWS fit (sizing versions 2 to 5) ---------------------------
 #
 # The probe contract (Ruling D15). Task 12's speedup probe runs once, in one
 # 32 vCPU Fargate task, and prints ONE line of JSON to stdout (CloudWatch);
@@ -138,6 +142,62 @@ def incore_eri_gb(n, memory_gb=None, max_memory_mb=None):
     return pairs * (pairs + 1) // 2 * 8 / 1024 ** 3
 
 
+def working_set_gb(peak, n, memory_gb, svp_n=None):
+    """What a job needed, not what PySCF took because it fitted: its peak
+    less the ERIs PySCF held in core. For an optimisation (svp_n, sizing
+    version 5) that is the larger of its final SCF's and its def2-SVP
+    steps': caffeine optimise on L kept the steps' 3.4 GiB in core (its
+    log shows ~4.1 GB in use at each step's gradient) and ran its
+    def2-TZVPD SCF direct, so its 5.67 GB peak is the steps' ERIs plus a
+    2.2 GB working set."""
+    eri = max(incore_eri_gb(n, memory_gb), incore_eri_gb(svp_n, memory_gb) if svp_n else 0.0)
+    return peak - eri if peak > eri else peak
+
+
+def _trajectory_frames(text):
+    """How many frames an xyz trajectory holds (worker._xyz's format)."""
+    lines, frames, i = text.strip().splitlines(), 0, 0
+    while i < len(lines):
+        try:
+            count = int(lines[i])
+        except ValueError:
+            break
+        frames, i = frames + 1, i + count + 2
+    return frames
+
+
+def _optimisation_steps(stages):
+    """(each step's seconds, each step's SCF cycles or None, the step count)
+    from one attempt's stages.
+
+    Since sizing version 5 the worker times stage 'optimisation step k' from
+    the start of step k to its end and puts that step's SCF cycles on it;
+    the one stage after the last step (geomeTRIC's wrap-up) has none, so
+    the steps are exactly the stages with cycles. Before, stage k ran from
+    the end of step k to the end of step k + 1: step 1 fell in no stage and
+    the last stage was the wrap-up, so the count is the number of stages
+    and every stage but the last is one step's seconds."""
+    steps = [s for s in stages if s['name'].startswith('optimisation step')]
+    counted = [s for s in steps if 'cycles' in s]
+    if counted:
+        return [s['seconds'] for s in counted], [s['cycles'] for s in counted], len(counted)
+    return [s['seconds'] for s in steps[:-1]], None, len(steps)
+
+
+def _earlier_attempts_steps(folder, attempt):
+    """Steps a reclaimed earlier attempt ran, from its trajectory as the sink
+    keeps it (attempts/<n>/trajectory.xyz), where the folder has it: a
+    resumed attempt's timings count only its own. A resumed attempt's first
+    step re-evaluates the frame it started from, so the sum counts every
+    step paid for, one more than an uninterrupted run would need."""
+    total = 0
+    for previous in range(1, attempt):
+        path = folder / 'attempts' / str(previous) / 'trajectory.xyz'
+        if path.exists():
+            total += _trajectory_frames(path.read_text())
+    return total
+
+
 def _median(values):
     values = sorted(values)
     n = len(values)
@@ -157,17 +217,22 @@ def aws_samples(job_dirs):
         record = json.loads((d / 'job.json').read_text())
         job = record['job']
         stages = timings['stages']
-        steps = [s['seconds'] for s in stages if s['name'].startswith('optimisation step')]
+        steps, step_cycles, step_count = _optimisation_steps(stages)
         n = basis_functions(job['molecule']['atoms'], job['method']['basis'])
+        svp = basis_functions(job['molecule']['atoms'], job['method']['optimiseBasis']) \
+            if job['method']['optimiseBasis'] else None
         memory_gb = next(s.memory_gb for s in sizing.SIZES if s.name == timings['size'])
         peak = timings['peakMemoryGB']
         eri = incore_eri_gb(n, memory_gb)
+        optimised = job['recipe'] == 'optimise'
         out.append({'key': record['key'], 'recipe': job['recipe'], 'atoms': len(job['molecule']['atoms']),
-                    'basisFunctions': n,
-                    'svpBasisFunctions': basis_functions(job['molecule']['atoms'], job['method']['optimiseBasis'])
-                    if job['method']['optimiseBasis'] else None,
-                    # The last step's stage runs on into the final SCF's setup, so it is left out.
-                    'stepSeconds': _median(steps[:-1]) if len(steps) >= 2 else None,
+                    'basisFunctions': n, 'svpBasisFunctions': svp,
+                    'stepSeconds': _median(steps) if steps else None,
+                    # v5: every step this job paid for, earlier attempts' too, and each step's SCF cycles
+                    # (None before the worker recorded them).
+                    'optimisationSteps': step_count + _earlier_attempts_steps(d, timings.get('attempt', 1))
+                    if optimised else None,
+                    'stepCycles': step_cycles,
                     'scfSeconds': sum(s['seconds'] for s in stages if s['name'].startswith('SCF')),
                     # v4 prep (Task 6): the SCF stage that converged carries its own cycle count from
                     # worker.py, when it was run recently enough to record one. None for an older
@@ -178,7 +243,7 @@ def aws_samples(job_dirs):
                     'filesSeconds': sum(s['seconds'] for s in stages if s['name'] == 'writing files'),
                     'threads': timings['vcpu'], 'peakMemoryGB': peak,
                     # What the job needs, not what PySCF took because it fitted (see incore_eri_gb).
-                    'workingSetGB': peak - eri if peak > eri else peak,
+                    'workingSetGB': working_set_gb(peak, n, memory_gb, svp),
                     # The ERIs did not fit, so PySCF rebuilt them every cycle: the regime every
                     # molecule past N of about 280 on S-L runs in (fit_aws's t3).
                     'direct': eri == 0,
@@ -215,11 +280,39 @@ def fit_g(samples, t0, t3, law=None):
 def fit_f2(samples, law=None):
     """f2 through the origin against (N/1000)², as 6B-1's fit does, after
     multiplying each sample's seconds back up by the files speedup, so f2
-    is a one-vCPU figure like t3. law (0, 1) is the undivided form."""
+    is a one-vCPU figure like t3. law (0, 1) is the undivided form.
+
+    Since sizing version 5, where several runs share an N only the slowest
+    (one-vCPU) of them stands for it (Ruling T14-speedup, extended): a
+    faster run at an N already measured would otherwise pull f2 down for
+    every size. Caffeine's file write ran 4.4x faster on L (16 vCPU) than
+    on M (4 vCPU), where the probe's law promises 2.4x; with both in the
+    least squares f2 would fall from 5 360 to 4 260 and under-predict the
+    run on M by a fifth."""
     law = _deployed_laws()[1] if law is None else law
     _need_two(samples)
-    return _through_origin([(s['basisFunctions'] / 1000) ** 2 for s in samples],
-                           [s['filesSeconds'] * _speedup(s['threads'], law) for s in samples])
+    slowest = {}
+    for s in samples:
+        n = s['basisFunctions']
+        slowest[n] = max(slowest.get(n, 0.0), s['filesSeconds'] * _speedup(s['threads'], law))
+    return _through_origin([(n / 1000) ** 2 for n in slowest], list(slowest.values()))
+
+
+def fit_step_scale(samples):
+    """stepScale (sizing version 5): optimisation_steps(atoms) is
+    ceil(stepScale x (10 + 2 x atoms)), capped at MAX_STEPS. It is
+    TIME_HEADROOM x the largest measured / (10 + 2 x atoms) over the
+    optimisations, so no sample is under-predicted and the worst of them
+    is predicted at TIME_HEADROOM x its count: a molecule needing up to
+    TIME_HEADROOM x that worst rate still has no more steps than predicted.
+    Returns (stepScale or None, notes)."""
+    counted = [(s['optimisationSteps'], s['atoms'], s['key'][:12]) for s in samples if s.get('optimisationSteps')]
+    if not counted:
+        return None, []
+    steps, atoms, key = max(counted, key=lambda c: c[0] / sizing.step_form(c[1]))
+    scale = sizing.TIME_HEADROOM * steps / sizing.step_form(atoms)
+    return scale, [f'stepScale: the largest measured / (10 + 2 x atoms) is {steps} of {sizing.step_form(atoms)} '
+                   f'({key}); x TIME_HEADROOM {sizing.TIME_HEADROOM:g} = {scale:.4g}']
 
 
 def _probe_series(points, name):
@@ -456,7 +549,10 @@ def fit_aws(samples, probe=None, optimise_probe=None):
     step_t0 = 1.0 if t0 < 1.0 else _3sf(t0)
     t3_step, step_notes = fit_step_t3(samples, optimise_probe, step_t0, step_g, (_3sf(scf_law[0]), scf_law[1]))
     notes += step_notes
+    step_scale, scale_notes = fit_step_scale(samples)
+    notes += scale_notes
     out = {**memory, 't0': t0, 't3': t3, 't3Step': t3_step, 'g': g, 'f2': fit_f2(samples + extra, files_law),
+           'stepScale': step_scale,
            'scfExponent': scf_law[0], 'scfSaturation': scf_law[1],
            'filesExponent': files_law[0], 'filesSaturation': files_law[1], 'speedupSource': source, 'notes': notes}
     if summary is not None:
@@ -468,8 +564,8 @@ def guarded(fitted):
     """CONSTANTS from fit_aws's output: Task 14's guards, then 3 significant
     figures, every value a float. Returns (constants, the guards used)."""
     deployed, guards = sizing.CONSTANTS, []
-    c = {k: fitted[k] for k in ('m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'scfExponent', 'scfSaturation',
-                                'filesExponent', 'filesSaturation')}
+    c = {k: fitted[k] for k in ('m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'scfExponent',
+                                'scfSaturation', 'filesExponent', 'filesSaturation')}
     rules = (('m0', lambda v: v < 0.2, lambda v: 0.2, 'below 0.2: set to 0.2'),
              ('m2', lambda v: v <= 0, lambda v: deployed['m2'], 'not positive: kept the deployed value'),
              ('t0', lambda v: v < 1.0, lambda v: 1.0, 'below 1.0: set to 1.0'),
@@ -477,7 +573,9 @@ def guarded(fitted):
              ('t3Step', lambda v: v is None or v <= 0, lambda v: deployed['t3Step'],
               'missing or not positive: kept the deployed value'),
              ('g', lambda v: v is None or v < 0, lambda v: G_FALLBACK, f'missing or negative: kept {G_FALLBACK:g}'),
-             ('f2', lambda v: v <= 0, lambda v: deployed['f2'], 'not positive: kept the deployed value (D5)'))
+             ('f2', lambda v: v <= 0, lambda v: deployed['f2'], 'not positive: kept the deployed value (D5)'),
+             ('stepScale', lambda v: v is None or v <= 0, lambda v: deployed['stepScale'],
+              'missing or not positive: kept the deployed value'))
     for name, bad, fix, why in rules:
         if bad(c[name]):
             fitted_text = 'none' if c[name] is None else f'{c[name]:.4g}'

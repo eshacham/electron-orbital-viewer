@@ -14,8 +14,10 @@ from the AWS ladder and the speedup probe (6B-3 Task 14); version 3 adds the
 owner's caffeine single point on M, the first real direct SCF (6B-3
 follow-up); version 4 prices an optimisation step by its regime: a step
 whose ERIs fit in core (step_in_core) by t3Step, from the caffeine
-optimise-steps probe, and otherwise by the direct t3, as before. Every job
-records the version and the prediction so the fit can be checked.
+optimise-steps probe, and otherwise by the direct t3, as before; version 5
+scales the step count by stepScale, fitted from the AWS optimisations'
+measured step counts (the owner's caffeine optimise ran 11 of 58). Every
+job records the version and the prediction so the fit can be checked.
 """
 import math
 from dataclasses import dataclass
@@ -34,7 +36,39 @@ class Size:
 
 
 SIZES = (Size('S', 2, 8), Size('M', 4, 16), Size('L', 16, 64), Size('XL', 32, 244))
-SIZING_VERSION = 4
+SIZING_VERSION = 5
+# Version 5, fitted 2026-10-08 (Phase 6B-3 follow-up) with the same command as version 4 (below), from 6 AWS
+# jobs: version 4's five plus the owner's caffeine optimise (09ae0fa051c6..., L on-demand, 16 vCPU / 64 GB,
+# sized by v4: DONE in 1022 s of 4103 predicted; 11 steps of 58; final SCF 441 s, files 192 s, peak 5.67 GB).
+# - stepScale (new, 0.375): optimisation_steps = ceil(stepScale x (10 + 2 x atoms)), at most MAX_STEPS.
+#   Measured / (10 + 2 x atoms): water 3 of 16, ethanol 7 of 28 (5 in its reclaimed attempt 1, from that
+#   attempt's trajectory, and 2 in attempt 2), caffeine 11 of 58. stepScale = TIME_HEADROOM x the largest
+#   (ethanol's 0.25), so every sample is predicted at 1.5x its count or more (water 6, ethanol 11,
+#   caffeine 22), and a molecule stepping up to 1.5x worse than ethanol still has no more steps than predicted.
+# - t3Step stays 31 000 (the probe's cold direct step, 52.85 s on L). Caffeine's slowest timed step was 39.1 s
+#   (11 SCF cycles); its first, cold one (14 cycles) fell in no stage before version 5's worker, and the log's
+#   cycles (14, 11, 10, ... 6) against the timed steps (~1.8 s a cycle plus ~19 s) put it near 45 s: in core,
+#   faster than the probe. The jobs' median steps offer 20 040; the slower is kept.
+# - t3 stays 42 000. The final def2-TZVPD SCF ran DIRECT on L (its ERIs need 614^4/1e6 = 142 GB against
+#   0.95 x 52 428 MB; peak 5.7 GB), 441 s against 689 s predicted: t3 26 900 at 16 vCPU against caffeine on
+#   M's 41 950 at 4. M -> L gained 5.2x where min(c, 16)^0.867 promises 3.3x; the slower is kept.
+#   Single points stay priced direct everywhere (no in-core t3 for a def2-TZVPD SCF): the only in-core
+#   ones measured are the ladder's (N <= 276, on S), and 9 050 would put water single and ethanol's final
+#   SCF under their measured times. No recipe A decision moves but by f2's +0.9 %.
+# - f2 5 360 -> 5 410: only the slowest one-vCPU file write at each N joins the least squares now. Caffeine's
+#   ran 4.4x faster on L than on M (the law promises 2.4x) and would pull f2 to 4 260, under the M run by 21 %;
+#   N 58 (two runs) and N 276 (the ladder's benzene and the probe's four) move it the other way.
+# - m0, m2 0.477, 3.98 -> 0.459, 4.35: caffeine optimise's working set is its peak less the steps' in-core
+#   def2-SVP ERIs (3.4 GiB; the log shows ~4.1 GB in use at each gradient): 2.23 GB at N 614.
+# - g still fits negative (-0.12) and keeps 1.5.
+# Residuals (predicted / measured - 1, on the size each ran on; wall): caffeine optimise +116 % (v4 +302 %),
+# its steps +35 to +42 %; water optimise +143 % (v4 +435 %); ethanol optimise -1.6 % against its 270 s floor
+# (which counts the reclaimed attempt; v4 +67 %); water single +3.0 %, benzene single +99 %, caffeine single on
+# M +0.2 %; the optimise probe's steps -0.1 to +25 %; working sets -9 % (ethanol's) to +50 % (water's).
+# Every AWS job, step and probe step is inside TIME_HEADROOM x its v5 prediction, HEADROOM x the v5 memory
+# covers every working set, and no single point's size, capacity, attempts, prediction, timeout or reservation
+# is below version 4's (tests/test_sizing.py, which also checks calibrate reproduces these constants).
+#
 # Version 4, fitted 2026-10-07 (Phase 6B-3 follow-up): version 3's constants and forms, plus t3Step, with
 # `python -m jobs.calibrate --aws --probe tests/fixtures/aws/speedup-probe.json
 #  --optimise-probe tests/fixtures/aws/caffeine-optimise-probe.json tests/fixtures/aws/*/`.
@@ -101,8 +135,9 @@ SIZING_VERSION = 4
 # (tests/test_sizing.py, which also checks calibrate reproduces these constants from the fixtures).
 # Versions 1 (6B-1 Task 11, this Mac) and 2 (6B-3 Task 14) stay in git history; version 3 is version 4
 # without t3Step (every step priced direct).
-CONSTANTS = {'m0': 0.477, 'm2': 3.98, 't0': 4.84, 't3': 42000.0, 't3Step': 31000.0, 'g': 1.5, 'f2': 5360.0,
-             'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631, 'filesSaturation': 32.0}
+CONSTANTS = {'m0': 0.459, 'm2': 4.35, 't0': 4.84, 't3': 42000.0, 't3Step': 31000.0, 'g': 1.5, 'f2': 5410.0,
+             'stepScale': 0.375, 'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631,
+             'filesSaturation': 32.0}
 HEADROOM = 2.0
 TIME_HEADROOM = 1.5
 TIMEOUT_FACTOR = 3.0
@@ -141,8 +176,21 @@ def predicted_memory_gb(n: int) -> float:
     return CONSTANTS['m0'] + CONSTANTS['m2'] * (n / 1000) ** 2
 
 
+# geomeTRIC's step limit in input.py (input_template.MAX_STEPS): no job runs more steps than this.
+MAX_STEPS = 100
+
+
+def step_form(atom_count: int) -> int:
+    """Versions 1-4's step count, 10 + 2 x atoms, which version 5 scales by stepScale."""
+    return 10 + 2 * atom_count
+
+
 def optimisation_steps(atom_count: int) -> int:
-    return min(10 + 2 * atom_count, 100)
+    """The steps an optimisation is priced for (version 5): stepScale x
+    (10 + 2 x atoms), rounded up, at most MAX_STEPS. stepScale is fitted
+    (calibrate.fit_step_scale) so every AWS optimisation's measured count
+    is at most 1 / TIME_HEADROOM of its prediction."""
+    return min(math.ceil(round(CONSTANTS['stepScale'] * step_form(atom_count), 6)), MAX_STEPS)
 
 
 # MB (1e6 bytes, what PySCF's lib.current_memory and N^4/1e6 count) per GiB

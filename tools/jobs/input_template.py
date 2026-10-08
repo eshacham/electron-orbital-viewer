@@ -35,7 +35,7 @@ class OptimisationNotConverged(RuntimeError):
     pass
 
 
-def _quiet(stage, energy=None):
+def _quiet(stage, energy=None, cycles=None):
     pass
 
 
@@ -89,14 +89,19 @@ def optimise(atoms, on_stage, on_step):
     from pyscf.geomopt.geometric_solver import NotConvergedError
     mol = molecule(atoms, OPTIMISE_BASIS)
     steps = []
+    # Each stage 'optimisation step k' runs from the start of step k (SCF + gradient) to its end, when
+    # geomeTRIC calls back; it is told that step's SCF cycle count. The last one is geomeTRIC's wrap-up.
+    on_stage('optimisation step 1', None)
 
     def callback(envs):
         m = envs['mol']
         coords = m.atom_coords(unit='Angstrom')
         frame = [(m.atom_pure_symbol(i), tuple(float(c) for c in coords[i])) for i in range(m.natm)]
         steps.append(frame)
-        on_stage(f'optimisation step {{len(steps)}}', float(envs['energy']))
+        cycles = getattr(getattr(envs.get('g_scanner'), 'base', None), 'cycles', None)
+        on_stage(f'optimisation step {{len(steps)}}', float(envs['energy']), cycles)
         on_step(len(steps), float(envs['energy']), frame)
+        on_stage(f'optimisation step {{len(steps) + 1}}', None)
 
     try:
         converged, mol_eq = geometric_kernel(make_dft(mol), maxsteps=MAX_STEPS, callback=callback)
@@ -119,7 +124,7 @@ def build(on_stage=_quiet, on_step=lambda step, energy, atoms: None, start=None)
 
 
 if __name__ == '__main__':
-    mol, mf, info = build(on_stage=lambda stage, energy=None: print(stage, '' if energy is None else energy))
+    mol, mf, info = build(on_stage=lambda stage, energy=None, cycles=None: print(stage, '' if energy is None else energy))
     print('E =', mf.e_tot, 'Ha', info)
     close_log()
 '''

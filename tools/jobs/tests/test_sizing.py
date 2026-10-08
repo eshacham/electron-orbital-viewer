@@ -46,16 +46,16 @@ def test_water_single_is_small_spot_with_the_floor_timeout():
     assert d['version'] == sizing.SIZING_VERSION
 
 
-KEYS = {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'scfExponent', 'scfSaturation', 'filesExponent',
+KEYS = {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'scfExponent', 'scfSaturation', 'filesExponent',
         'filesSaturation'}
 
 
-def test_version_4_is_calibrated_on_aws():
-    # Fitted from Fargate ARM64 runs (Phase 6B-3 Task 14, refitted with caffeine on M for version 3, and
-    # the caffeine optimise-steps probe for version 4's t3Step); every constant is a measured, positive
-    # number. D5: f2 stays (predict_parts reads it), and the two speedup laws are constants too (Ruling
-    # T14-speedup).
-    assert sizing.SIZING_VERSION == 4
+def test_version_5_is_calibrated_on_aws():
+    # Fitted from Fargate ARM64 runs (Phase 6B-3 Task 14, refitted with caffeine on M for version 3, the
+    # caffeine optimise-steps probe for version 4's t3Step, and the owner's caffeine optimise on L for
+    # version 5's stepScale); every constant is a measured, positive number. D5: f2 stays (predict_parts
+    # reads it), and the two speedup laws are constants too (Ruling T14-speedup).
+    assert sizing.SIZING_VERSION == 5
     assert set(sizing.CONSTANTS) == KEYS
     assert all(isinstance(v, float) and v > 0 for v in sizing.CONSTANTS.values())
     assert sizing.CONSTANTS['m0'] >= 0.2 and sizing.CONSTANTS['t0'] >= 1.0
@@ -152,7 +152,8 @@ def test_optimise_costs_more_than_single_and_steps_are_capped():
     single = sizing.predict_seconds(canonical_job('single', WATER, 0, 1), sizing.SIZES[0])
     optimise = sizing.predict_seconds(canonical_job('optimise', WATER, 0, 1), sizing.SIZES[0])
     assert optimise > single
-    assert sizing.optimisation_steps(3) == 16 and sizing.optimisation_steps(200) == 100
+    # Version 5: ceil(0.375 x (10 + 2 x atoms)), at most MAX_STEPS (geomeTRIC's limit in input.py).
+    assert sizing.optimisation_steps(3) == 6 and sizing.optimisation_steps(200) == 100
 
 
 def test_more_vcpus_are_faster_but_not_linearly(monkeypatch):
@@ -220,15 +221,17 @@ AWS_JOBS = sorted(d for d in AWS_FIXTURES.iterdir() if d.is_dir())
 # attempt a Spot reclaim stopped after about 4 minutes: 270 s is a floor.
 WALL_FLOORS = {'2233f97f7719': 270.0}
 PROBE = json.loads((AWS_FIXTURES / 'speedup-probe.json').read_text())
+# Version 5: the owner's caffeine optimise (09ae0fa051c6..., 2026-10-08, L on-demand, sized by v4): 11 steps.
+CAFFEINE_OPTIMISE = '09ae0fa051c6'
 # Version 4: the owner-approved caffeine optimise-steps probe (2026-10-07, Batch job 039fdeca…, L Spot,
 # 16 vCPU / 64 GB, job definition rev 7, image 2dd7873233c64661): three def2-SVP steps, SCF + gradient each.
 OPTIMISE_PROBE = json.loads((AWS_FIXTURES / 'caffeine-optimise-probe.json').read_text())
 LARGE = sizing.SIZES[2]
 
 
-def test_the_aws_fixtures_are_the_five_jobs_and_two_probes_sizing_v4_was_fitted_on():
+def test_the_aws_fixtures_are_the_six_jobs_and_two_probes_sizing_v5_was_fitted_on():
     names = {d.name[:12] for d in AWS_JOBS}
-    assert names == {'22b6b939b8af', 'ffdaf035aee5', 'df22d76f6f7a', '2233f97f7719', 'f4e66d7330ed'}
+    assert names == {'22b6b939b8af', 'ffdaf035aee5', 'df22d76f6f7a', '2233f97f7719', 'f4e66d7330ed', CAFFEINE_OPTIMISE}
     assert PROBE['n'] == [32, 16, 8, 4] and PROBE['basisFunctions'] == 276
     assert OPTIMISE_PROBE['probe'] == 'optimise-steps' and OPTIMISE_PROBE['vcpu'] == LARGE.vcpu == 16
     assert OPTIMISE_PROBE['basisFunctions'] == basis_functions(CAFFEINE, 'def2-SVP') == 246
@@ -273,32 +276,70 @@ def _caffeine_job(recipe):
 def test_caffeine_single_runs_on_l_spot_under_the_live_constants():
     # Review minor 4: pinned on the committed caffeine fixture and the live
     # sizing.CONSTANTS (not a monkeypatch), so a future constants change that
-    # moves this must touch this test, not pass silently. Version 4 leaves
-    # every single point as version 3 decided it.
+    # moves this must touch this test, not pass silently. Version 5 decides
+    # it as versions 3 and 4 did, 3.3 s slower (f2 5 360 -> 5 410).
     d = sizing.decide(_caffeine_job('single'))
     assert (d['size'], d['vcpu'], d['capacity']) == ('L', 16, 'spot')
-    assert d['predictedSeconds'] == pytest.approx(1040.2, rel=0.01)
-    assert d['version'] == 4
+    assert d['predictedSeconds'] == pytest.approx(1043.5, rel=0.001)
+    assert d['version'] == 5
 
 
-def test_caffeine_optimise_runs_on_l_on_demand_under_the_live_v4_constants():
-    # Version 3 refused it too-long (1.4 h on XL, 2.1 h with the margin): it
-    # priced the 58 def2-SVP steps by the direct-SCF t3. Version 4 prices a
-    # step whose ERIs fit in core by t3Step, the caffeine probe's slowest
-    # step: 1040 s for the final single point plus 58 steps of ~52.9 s on L.
-    # Over the 3600 s Spot limit, so on-demand, one attempt; the timeout is
-    # the 2 h ceiling (1.75x the prediction, more than TIME_HEADROOM).
+def test_caffeine_optimise_runs_on_l_spot_under_the_live_v5_constants():
+    # Version 4 priced it at 4103 s (58 steps), on demand; it ran 1022 s (11
+    # steps). Version 5 prices 22 steps (ceil(0.375 x 58)) of the probe's
+    # ~52.9 s on L plus the final single point (1043.5 s on L): 2205 s, under
+    # the 3600 s Spot limit, so Spot with three attempts and a 3x timeout.
+    # M still fails the time bar (its steps take 176 s).
     d = sizing.decide(_caffeine_job('optimise'))
     assert (d['size'], d['vcpu'], d['memoryGB']) == ('L', 16, 64)
-    assert (d['capacity'], d['attempts']) == ('on-demand', 1)
-    assert d['predictedSeconds'] == pytest.approx(1040.2 + 58 * 52.85, rel=0.005)
-    assert d['timeoutSeconds'] == 7200 >= sizing.TIME_HEADROOM * d['predictedSeconds']
-    assert d['reservationMicros'] == cost_micros('on-demand', 16, 64, 7200 + sizing.BILLING_ALLOWANCE_SECONDS)
-    assert d['version'] == 4
+    assert (d['capacity'], d['attempts']) == ('spot', 3)
+    assert sizing.optimisation_steps(24) == 22
+    assert d['predictedSeconds'] == pytest.approx(1043.5 + 22 * 52.85, rel=0.002)
+    assert d['timeoutSeconds'] == 6616 >= sizing.TIME_HEADROOM * d['predictedSeconds']
+    assert d['reservationMicros'] == 3 * cost_micros('spot', 16, 64, 6616 + sizing.BILLING_ALLOWANCE_SECONDS)
+    assert sizing.predict_seconds(_caffeine_job('optimise'), sizing.SIZES[1]) * sizing.TIME_HEADROOM > 7200
+    assert d['version'] == 5
+
+
+def _folder(prefix):
+    return next(d for d in AWS_JOBS if d.name.startswith(prefix))
+
+
+def test_caffeine_optimises_final_scf_ran_direct_on_l_and_is_not_under_predicted():
+    # The final def2-TZVPD SCF (N 614) took 441 s on L against 689 s
+    # predicted. It did not run in core: its ERIs need 614^4/1e6 = 142 GB
+    # against PySCF's 0.95 x 52 428 MB there (the log's max_memory), and
+    # the peak was 5.7 GB. It ran direct, 1.6x faster than the M-fitted t3
+    # (42 000) says at 16 vCPU (26 900): version 5 keeps the slower.
+    from jobs.calibrate import incore_eri_gb
+    folder = _folder(CAFFEINE_OPTIMISE)
+    job = json.loads((folder / 'job.json').read_text())['job']
+    timings = json.loads((folder / 'timings.json').read_text())
+    stages = {s['name']: s for s in timings['stages']}
+    assert incore_eri_gb(614, LARGE.memory_gb) == 0 and not sizing.step_in_core(614, LARGE)
+    assert stages['SCF (DIIS)']['cycles'] == 15
+    parts = sizing.predict_parts(job, LARGE)
+    final_scf = sizing.single_point_seconds(614, LARGE.vcpu)
+    assert stages['SCF (DIIS)']['seconds'] <= final_scf
+    assert stages['writing files']['seconds'] <= parts['filesSeconds']
+
+
+def test_single_points_are_still_priced_direct_where_their_eris_would_fit(monkeypatch):
+    # Version 5's rule for the final single point (recipe A, and recipe B's
+    # last SCF): priced by the direct t3 wherever it runs, as in versions 3
+    # and 4, even where step_in_core says its ERIs fit. No measured
+    # def2-TZVPD SCF beyond the ladder's (N <= 276, on S) ran in core, and the
+    # in-core t3 (9 050) would put water single (15.04 s) and ethanol's final
+    # SCF (16.4 s) under their measured times.
+    assert sizing.step_in_core(58, sizing.SIZES[0])
+    job = canonical_job('single', WATER, 0, 1)
+    assert sizing.predict_parts(job, sizing.SIZES[0])['scfSeconds'] == sizing.single_point_seconds(58, 2)
+    monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't3Step': 1e9})
+    assert sizing.predict_parts(job, sizing.SIZES[0])['scfSeconds'] == sizing.single_point_seconds(58, 2)
 
 
 def test_the_constants_are_what_calibrate_fits_from_the_fixtures():
-    # Version 4 is reproducible: `python -m jobs.calibrate --aws --probe
+    # Version 5 is reproducible: `python -m jobs.calibrate --aws --probe
     # fixtures/aws/speedup-probe.json --optimise-probe
     # fixtures/aws/caffeine-optimise-probe.json fixtures/aws/*/` prints these
     # constants, with only g's guard used (fitted negative: the ladder's few steps).
@@ -325,19 +366,47 @@ def test_every_caffeine_probe_step_finishes_inside_the_time_headroom(step):
     assert seconds <= sizing.TIME_HEADROOM * sizing.step_seconds(OPTIMISE_PROBE['basisFunctions'], LARGE)
 
 
-@pytest.mark.parametrize('folder', [d for d in AWS_JOBS if d.name[:12] in ('df22d76f6f7a', '2233f97f7719')],
-                         ids=lambda d: d.name[:12])
+OPTIMISATIONS = [d for d in AWS_JOBS if d.name[:12] in ('df22d76f6f7a', '2233f97f7719', CAFFEINE_OPTIMISE)]
+
+
+@pytest.mark.parametrize('folder', OPTIMISATIONS, ids=lambda d: d.name[:12])
 def test_every_aws_optimisation_step_finishes_inside_the_time_headroom(folder):
-    # Water's and ethanol's def2-SVP steps on S, in core (N 24 and 72): each
-    # step stage (the last runs on into the final SCF's setup, so it is left
-    # out, as calibrate does) against v4's step on the size it ran on.
+    # Water's and ethanol's def2-SVP steps on S and caffeine's on L, all in
+    # core (N 24, 72 and 246): each step (as calibrate reads them: before
+    # version 5's worker the last step stage was geomeTRIC's wrap-up) against
+    # the step price on the size it ran on. Caffeine's slowest timed step was
+    # 39.1 s against 52.85 s.
+    from jobs.calibrate import _optimisation_steps
     job = json.loads((folder / 'job.json').read_text())['job']
     timings = json.loads((folder / 'timings.json').read_text())
     size = next(s for s in sizing.SIZES if s.name == timings['size'])
     n = basis_functions(job['molecule']['atoms'], job['method']['optimiseBasis'])
-    steps = [s['seconds'] for s in timings['stages'] if s['name'].startswith('optimisation step')][:-1]
+    steps = _optimisation_steps(timings['stages'])[0]
     assert steps and sizing.step_in_core(n, size)
     assert all(seconds <= sizing.TIME_HEADROOM * sizing.step_seconds(n, size) for seconds in steps)
+    assert max(steps) <= sizing.step_seconds(n, size)
+
+
+# Each AWS optimisation's step count, every attempt's: water 3 (16 predicted by version 4), ethanol 5 in
+# its reclaimed attempt 1 (fixtures' attempts/1/trajectory.xyz) and 2 in attempt 2, caffeine 11 (58).
+MEASURED_STEPS = {'df22d76f6f7a': 3, '2233f97f7719': 7, CAFFEINE_OPTIMISE: 11}
+
+
+@pytest.mark.parametrize('folder', OPTIMISATIONS, ids=lambda d: d.name[:12])
+def test_no_optimisations_step_count_is_under_predicted_and_the_worst_has_time_headroom(folder):
+    # Version 5's step count: ceil(stepScale x (10 + 2 x atoms)), stepScale
+    # = TIME_HEADROOM x the largest measured / (10 + 2 x atoms) (ethanol's 7
+    # of 28): every sample is predicted at TIME_HEADROOM x its count or more.
+    from jobs.calibrate import aws_samples
+    [sample] = aws_samples([folder])
+    assert sample['optimisationSteps'] == MEASURED_STEPS[folder.name[:12]]
+    assert sizing.TIME_HEADROOM * sample['optimisationSteps'] <= sizing.optimisation_steps(sample['atoms'])
+    assert sizing.optimisation_steps(sample['atoms']) < sizing.step_form(sample['atoms'])
+
+
+def test_the_step_count_is_the_scaled_form_capped_at_max_steps():
+    assert [sizing.optimisation_steps(a) for a in (3, 9, 24, 60, 129, 200)] == [6, 11, 22, 49, 100, 100]
+    assert sizing.MAX_STEPS == 100
 
 
 def test_a_step_is_in_core_only_if_pyscfs_test_passes_with_a_margin():
@@ -365,16 +434,17 @@ def test_a_direct_step_keeps_version_3s_price():
 
 
 def test_single_points_do_not_read_t3step(monkeypatch):
-    # Version 4 changes how optimisation steps are priced, nothing else.
+    # Since version 4 t3Step prices optimisation steps and nothing else.
     jobs = [canonical_job('single', atoms, 0, 1) for atoms in (WATER, BENZENE, CAFFEINE, carbons(60))]
     before = [sizing.predict_parts(job, s) for job in jobs for s in sizing.SIZES]
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't3Step': 1e9})
     assert [sizing.predict_parts(job, s) for job in jobs for s in sizing.SIZES] == before
 
 
-# Version 3's decisions for every single point the reports track, recorded
-# before version 4 was made: version 4 must not move any of them.
-V3_SINGLE_POINTS = [
+# Version 4's decisions (versions 3's too) for every single point the reports track, and version 5's,
+# recorded when version 5 was made. A single point may not get less conservative without a measured
+# sample to say so: the same size, capacity and attempts, and no shorter prediction, timeout or reservation.
+V4_SINGLE_POINTS = [
     (WATER, {'size': 'S', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 15.4, 'timeoutSeconds': 600,
              'predictedMemoryGB': 0.49, 'reservationMicros': 17880, 'predictedCostMicros': 128}),
     (BENZENE, {'size': 'S', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 520.7, 'timeoutSeconds': 1562,
@@ -382,12 +452,24 @@ V3_SINGLE_POINTS = [
     (CAFFEINE, {'size': 'L', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 1040.2, 'timeoutSeconds': 3121,
                 'predictedMemoryGB': 1.98, 'reservationMicros': 643881, 'predictedCostMicros': 68885}),
 ]
+V5_SINGLE_POINTS = [
+    {'size': 'S', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 15.5, 'timeoutSeconds': 600,
+     'predictedMemoryGB': 0.47, 'reservationMicros': 17880, 'predictedCostMicros': 129},
+    {'size': 'S', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 523.1, 'timeoutSeconds': 1570,
+     'predictedMemoryGB': 0.79, 'reservationMicros': 41970, 'predictedCostMicros': 4331},
+    {'size': 'L', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 1043.5, 'timeoutSeconds': 3131,
+     'predictedMemoryGB': 2.1, 'reservationMicros': 645867, 'predictedCostMicros': 69102},
+]
 
 
-@pytest.mark.parametrize('atoms,v3', V3_SINGLE_POINTS, ids=['water', 'benzene', 'caffeine'])
-def test_every_v3_single_point_decision_is_unchanged(atoms, v3):
+@pytest.mark.parametrize('atoms,v4,v5', [(a, v4, v5) for (a, v4), v5 in zip(V4_SINGLE_POINTS, V5_SINGLE_POINTS)],
+                         ids=['water', 'benzene', 'caffeine'])
+def test_no_single_point_decision_is_less_conservative_than_version_4s(atoms, v4, v5):
     d = sizing.decide(canonical_job('single', atoms, 0, 1))
-    assert {k: d[k] for k in v3} == v3
+    assert {k: d[k] for k in v5} == v5
+    assert (d['size'], d['capacity'], d['attempts']) == (v4['size'], v4['capacity'], v4['attempts'])
+    for k in ('predictedSeconds', 'timeoutSeconds', 'reservationMicros'):
+        assert d[k] >= v4[k], k
 
 
 def test_a_c60_scale_single_point_is_still_refused_as_version_3_refused_it():
@@ -423,15 +505,21 @@ def test_every_decision_says_it_is_a_fargate_estimate():
 # Task 14 fitted memory on: the ladder on S (PYSCF_MAX_MEMORY 80 % of 8 GB),
 # the probe's benzene at PySCF's default 4000 MB, where it ran direct, and
 # caffeine on M (PYSCF_MAX_MEMORY 80 % of 16 GB), direct too.
-AWS_PEAKS = [(58, 0.326, 8, None), (58, 0.351, 8, None), (168, 1.392, 8, None), (276, 6.104, 8, None),
-             (276, 0.919, None, 4000), (276, 0.897, None, 4000), (276, 0.886, None, 4000), (276, 0.882, None, 4000),
-             (614, 1.906, 16, None)]
+# Version 5 adds caffeine optimise on L (PYSCF_MAX_MEMORY 80 % of 64 GB): its def2-SVP steps (N 246)
+# held their ERIs in core, its def2-TZVPD SCF ran direct, so its 5.67 GB peak less the steps' 3.4 GiB.
+AWS_PEAKS = [(58, 0.326, 8, None, None), (58, 0.351, 8, None, 24), (168, 1.392, 8, None, 72),
+             (276, 6.104, 8, None, None), (276, 0.919, None, 4000, None), (276, 0.897, None, 4000, None),
+             (276, 0.886, None, 4000, None), (276, 0.882, None, 4000, None), (614, 1.906, 16, None, None),
+             (614, 5.672, 64, None, 246)]
 
 
-@pytest.mark.parametrize('n,peak,memory_gb,max_memory_mb', AWS_PEAKS)
-def test_the_memory_headroom_covers_every_aws_working_set(n, peak, memory_gb, max_memory_mb):
+@pytest.mark.parametrize('n,peak,memory_gb,max_memory_mb,svp_n', AWS_PEAKS)
+def test_the_memory_headroom_covers_every_aws_working_set(n, peak, memory_gb, max_memory_mb, svp_n):
     # A size is chosen at HEADROOM × predicted memory, so that is what a job
     # may use before it is out of memory (Task 14 review minor).
-    from jobs.calibrate import incore_eri_gb
-    working_set = peak - incore_eri_gb(n, memory_gb, max_memory_mb)
+    from jobs.calibrate import incore_eri_gb, working_set_gb
+    if max_memory_mb is None:
+        working_set = working_set_gb(peak, n, memory_gb, svp_n)
+    else:
+        working_set = peak - incore_eri_gb(n, memory_gb, max_memory_mb)
     assert 0 < working_set <= sizing.HEADROOM * sizing.predicted_memory_gb(n)

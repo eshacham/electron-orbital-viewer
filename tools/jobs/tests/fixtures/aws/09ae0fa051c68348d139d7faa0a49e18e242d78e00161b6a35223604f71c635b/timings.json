@@ -1,0 +1,68 @@
+{
+ "attempt": 1,
+ "backend": "aws",
+ "size": "L",
+ "vcpu": 16,
+ "memoryGB": 64,
+ "capacity": "on-demand",
+ "stages": [
+  {
+   "name": "optimisation step 1",
+   "seconds": 39.1
+  },
+  {
+   "name": "optimisation step 2",
+   "seconds": 37.28
+  },
+  {
+   "name": "optimisation step 3",
+   "seconds": 37.35
+  },
+  {
+   "name": "optimisation step 4",
+   "seconds": 35.57
+  },
+  {
+   "name": "optimisation step 5",
+   "seconds": 35.49
+  },
+  {
+   "name": "optimisation step 6",
+   "seconds": 33.44
+  },
+  {
+   "name": "optimisation step 7",
+   "seconds": 33.57
+  },
+  {
+   "name": "optimisation step 8",
+   "seconds": 31.87
+  },
+  {
+   "name": "optimisation step 9",
+   "seconds": 30.15
+  },
+  {
+   "name": "optimisation step 10",
+   "seconds": 30.03
+  },
+  {
+   "name": "optimisation step 11",
+   "seconds": 0.09
+  },
+  {
+   "name": "SCF (DIIS)",
+   "seconds": 440.83,
+   "cycles": 15
+  },
+  {
+   "name": "writing files",
+   "seconds": 191.67
+  }
+ ],
+ "wallSeconds": 1021.58,
+ "peakMemoryGB": 5.672,
+ "threads": 16,
+ "startedAt": "2026-10-08T10:32:01Z",
+ "endedAt": "2026-10-08T10:49:03Z"
+}

@@ -94,6 +94,43 @@ def test_timings_record_the_converged_scfs_cycle_count(env):
     assert all('cycles' not in s for s in scf_stages[:-1])
 
 
+def test_progress_puts_a_reported_cycle_count_on_the_stage_it_names():
+    # v5 (Phase 6B-3 follow-up): input.py reports each optimisation step's
+    # SCF cycles through on_stage's third argument, on the stage it names.
+    progress = worker.Progress()
+    progress.on_stage('optimisation step 1')
+    progress.on_stage('optimisation step 1', -1.0, 14)
+    progress.on_stage('optimisation step 2', -1.1)
+    progress.on_stage('optimisation step 2', -1.2, 11)
+    progress.on_stage('optimisation step 3', -1.2)
+    progress.on_stage('SCF (DIIS)')
+    out = progress.durations(time.monotonic(), scf_cycles=15)
+    assert [(s['name'], s.get('cycles')) for s in out] == [
+        ('optimisation step 1', 14), ('optimisation step 2', 11), ('optimisation step 3', None), ('SCF (DIIS)', 15)]
+    assert progress.energy == -1.2
+
+
+def test_timings_record_each_optimisation_steps_scf_cycles(env):
+    # v5 (Phase 6B-3 follow-up): every 'optimisation step k' stage now times
+    # step k itself (from the optimisation's start, so step 1's cold SCF is
+    # counted) and carries its SCF's cycle count, as the final SCF stage
+    # does. The one stage after the last step (geomeTRIC's wrap-up) carries
+    # none, so the steps are exactly the stages with cycles.
+    store, sink, jobs = env
+    key = queue(store, [[1, 0, 0, 0], [1, 0, 0, 0.80]], method=None, recipe='optimise')
+    assert run_job(key, store, sink, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    timings = json.loads((jobs / key / 'timings.json').read_text())
+    meta = json.loads((jobs / key / 'meta.json').read_text())
+    steps = [s for s in timings['stages'] if s['name'].startswith('optimisation step')]
+    counted = [s for s in steps if 'cycles' in s]
+    assert timings['stages'][0]['name'] == 'optimisation step 1'
+    assert len(counted) == meta['geometryOptimisation']['steps'] >= 1
+    assert steps[:-1] == counted and 'cycles' not in steps[-1]
+    assert [s['name'] for s in steps] == [f'optimisation step {i}' for i in range(1, len(steps) + 1)]
+    assert all(isinstance(s['cycles'], int) and s['cycles'] >= 1 for s in counted)
+    assert 'cycles' in [s for s in timings['stages'] if s['name'].startswith('SCF')][-1]
+
+
 def test_meta_records_method_commit_and_a_flushed_log(env, monkeypatch):
     store, sink, jobs = env
     monkeypatch.setenv('JOBS_GENERATOR_COMMIT', 'abc123')    # D2: the container has no git
