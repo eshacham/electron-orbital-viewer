@@ -91,6 +91,23 @@ fields rejected:
 `charge` and `multiplicity` are optional (defaults in §5.1). Method and basis
 are fixed per recipe this phase (§8), so the client never chooses them.
 
+**Phase 6C amendment (owner decision 2026-10-08): binding quotes.** The
+preview's `decision` is `{ok: true, quote}` or `{ok: false, error}`. A quote
+has `options` (on AWS: `spot` and `on-demand`, same size and time limit; on
+This Mac one free `local` option, with the AWS options as `reference`) and a
+`recommended` option. Each available option carries its line items
+(`compute`, `storage`, `delivery`, `platform`), each with `estimateUsd` and
+`maximumUsd`, the totals, the time limit, attempts, Spot's interruption
+note, a `quoteId`, and (on the preview's own options) `approvable` and
+`blockedReason` (the cap). An unavailable option says why. A submit adds
+`"option": "spot" | "on-demand" | "local"` and `"quoteId"`; the server
+recomputes the quote and answers **409 `quote-changed`** unless the id
+matches (checked before dedupe), 409 `option-unavailable` for an option not
+offered, 400 when either is missing. A `retry` needs a fresh quote too. The
+job record keeps the approved quote (`approvedQuote` in the view) and, once
+settled, the per-line charge (`charged`). Formulas: `tools/jobs/quotes.py`;
+prices and sources: `tools/jobs/prices.py`.
+
 **Protections:** default route throttle 5 req/s (burst 10); `POST /jobs`
 1 req/s (burst 5); API access logs; input validated before any record
 exists; least-privilege IAM per Lambda and for the worker (writes only under
@@ -206,6 +223,12 @@ cannot add attributes, so the sum is stored).
   attempt's `startedAt` → `stoppedAt` + 60 s. Actual cost = Σ attempts of
   billed seconds × that attempt's capacity price (§7.5).
 - A job is charged to the month it was submitted in.
+- **Phase 6C:** the reservation is the approved quote's maximum (compute,
+  storage and delivery). At settlement each line is charged its actual cost
+  (storage and delivery on the bytes the worker reports writing), never
+  more than its approved maximum; any excess is absorbed by the app,
+  recorded (`absorbedUsd`) and reported by reconcile's alert. The meter
+  books the whole cost, so the cap still tracks what AWS is paid.
 
 ### 6.5 Running
 
@@ -282,6 +305,13 @@ above L.
   **on-demand**. Spot jobs retry up to 2 times on a Spot interruption only.
 - **Reservation (worst case)** = Σ over the allowed attempts of
   timeout × that size's price — 3 attempts on Spot, 1 on-demand.
+- **Phase 6C amendment:** the recipe ceilings no longer refuse. They only
+  choose the size (the smallest whose margined prediction fits 1 h / 2 h;
+  past that, the cheapest size within 1.5× of the fastest). The timeout is
+  3 × predicted (at least 10 min), never clamped: the owner's approved
+  maximum, computed from it, caps the job. Refusals are memory (no size
+  fits) and a 48 h sanity ceiling on the fastest size. Spot (≤ 60 min
+  predicted) is an availability rule for the Spot option, not a refusal.
 
 ### 7.5 Prices
 
@@ -354,6 +384,14 @@ formula, charge, multiplicity, electron count, N, and the sizing decision
 remains of the month). Refusals show their reason here. **Submit**; a known
 key turns the button into "Already computed — open it" or "Already running —
 follow it".
+
+**Phase 6C:** the two options sit side by side as a radio group (estimate,
+"up to" maximum, predicted time and time limit, Spot's interruption note,
+an unavailable or over-the-cap reason), the chosen one's line items behind
+"What makes up the price", and the button reads "Approve up to $X and run".
+This Mac shows "Run on This Mac (free)" and the AWS prices for reference.
+The status panel, provenance line and admin table show the approved
+maximum against the charge.
 
 ### 9.3 Live status and provenance
 

@@ -1040,7 +1040,141 @@ the heavy SCF suites leave large memoised solutions behind, and a full run
 has lost a worker to SIGSEGV mid-suite three times (never yet reproduced in
 isolation; see "Process notes").
 
-### Judgment calls made without asking (this phase)
+### Phase 6C — binding quotes (2026-10-08)
+
+Owner decision 2026-10-08. Every on-demand job gets a binding,
+owner-approved price quote with two options, and the approved price, not a
+fixed recipe ceiling, caps the job. Commits `a795128` (jobs core), `a38e4b6`
+(UI), this one (docs). Code: `tools/jobs/quotes.py`, `prices.py`,
+`sizing.py`; `src/components/QuoteChooser.tsx`.
+
+### What changed
+
+- **Two options per preview.** On AWS: **Spot** (3 attempts, offered only
+  when predicted ≤ 60 min, else shown unavailable with its reason) and
+  **on-demand** (1 attempt). Both use the same size and time limit. On This
+  Mac: one free `local` option, with the AWS options as `reference`.
+- **Line items**, each with an estimate and a maximum:
+  - compute: estimate = one run of the prediction + 60 s start-up, at
+    Fargate's 60 s minimum; maximum = attempts × (timeout + 120 s billing
+    allowance) — the old reservation.
+  - storage: S3 Standard **$0.023 / GB-month × 12 months** + $0.005 per
+    1 000 PUTs (16 objects).
+  - delivery: CloudFront **$0.085 / GB out × 10 full downloads** + $0.0100
+    per 10 000 HTTPS requests.
+  - platform: $0 (kept for the business model).
+  - Prices from the AWS Price List API, 2026-10-08 (`prices.py`, with
+    `PRICES_VERSION` 2). CloudFront's free tier is not subtracted.
+- **Result size** = 1.5 MB + 2.3 × N² bytes (estimate), 2× that (maximum).
+  Fitted on the six DONE AWS jobs' objects (1.14–1.92 MB, every attempt
+  file included). The grids are a fixed 96³ / 48³, so only `basis.json`
+  grows with N.
+- **The time limit is the price.** The timeout is 3 × predicted (at least
+  600 s), never clamped. The quote's maximum is computed from it, and
+  `quotes.timeout_from_maximum` converts the maximum back to that same
+  timeout (tested). The Batch timeout is the approved option's.
+- **The ceilings no longer refuse.** 1 h single / 2 h optimise only choose
+  the size. A job no size finishes within its target runs on the cheapest
+  size within 1.5× of the fastest (L rather than XL for C60: the SCF
+  saturates at 16 vCPU). Refusals: memory (no size fits), and over 48 h
+  predicted even on the fastest size.
+- **The monthly cap is unchanged** ($8.80; the $10 Budget too). A quote
+  over what is left is shown, but cannot be approved: "the monthly cap
+  would need raising to approve it".
+- **Binding approval.** `quoteId` is a SHA-256 over the key, option, size,
+  timeout, attempts, every line, the result-size assumptions, and the
+  sizing and prices versions. The submit names `option` and `quoteId`. The
+  server recomputes the quote and refuses with 409 `quote-changed` on any
+  difference, checked before dedupe. It is not a keyed MAC: the server
+  never trusts it, only compares it.
+- **The record keeps the approved quote** (`quote`, in micro-dollars;
+  `approvedQuote` in the view, with `approvedAt`). It reserves the quote's
+  maximum. A retry needs a fresh quote and approval.
+- **Settlement is per line.** Each line is charged its actual cost, but
+  never more than its approved maximum:
+  - storage and delivery are charged on `actual.resultBytes` and
+    `resultObjects`, which the worker now reports;
+  - a DONE job without them is charged its estimate;
+  - only a DONE job pays delivery.
+  - The rest is absorbed (`charged.absorbedUsd`). Reconcile's alert says
+    so, and the admin table flags it in amber.
+  - The meter books the whole cost, so the cap still tracks the AWS bill.
+    It now includes storage and delivery, which Cost Explorer's compute
+    figure leaves out; the cost panel says so.
+- **Legacy records** (every job before 6C) have no `quote` or `settlement`.
+  They read, list, settle and display as before, by reservation and actual
+  cost, labelled "legacy: no approved quote" in the admin table.
+- **UI:**
+  - The request panel shows a radio group `price options`: estimate, "up
+    to", predicted time and time limit, and Spot's interruption note (a
+    single point restarts from scratch; an optimisation resumes from its
+    last step).
+  - "What makes up the price" holds the line items.
+  - The button reads "Approve up to $X and run"; on This Mac, "Run on This
+    Mac (free)".
+  - The status panel's Retry fetches a fresh quote, announced in an
+    `aria-live` region.
+  - The status panel, provenance line and admin table show the approved
+    maximum against what was charged, with the per-line split.
+- **Contract:** `api_types.ts` and the recorded fixtures follow it (20
+  now). The CLI approves the free local quote itself.
+
+### Deployed 2026-10-08 14:08–14:18Z (`infra/deploy.sh all`, `ANOMALY_MONITOR` unset)
+
+- The image `e4856579a9b5801c` was pushed. Job definition **rev 10** names
+  it, and the api Lambda's `JOB_DEFINITION` is rev 10.
+- Compute was `UPDATE_COMPLETE` in 36.7 s (6/6). The anomaly monitor
+  stayed on. The site was `UPDATE_COMPLETE` in 90.4 s. The live
+  `index.html`, `admin.html` and main bundles hash the same as `dist/`.
+- `jobs.sh status`: generation enabled; meter 2026-10 spent $0.2788,
+  reserved $0.0000, of $8.80; the budget stop is not attached.
+- Previews:
+  - water single: Spot S ×3, 15.5 s, limit 600 s, est $0.002452, up to
+    $0.021284; on-demand est $0.003791, up to $0.022052. It dedupes to the
+    DONE `22b6b939b8af`.
+  - caffeine optimise: L, 2205.2 s, limit 6616 s. Spot est $0.152783, up
+    to $1.343424; on-demand est $0.472239, up to $1.400905.
+- A submit of water with a tampered quote id answered **409
+  quote-changed**; the meter was unchanged.
+- 401 without a token, with a POST, and with a forged token. The site's
+  CORS preflight answers 204 with its origin; a foreign origin gets no
+  allow-origin.
+- No job was submitted.
+
+### C60 (single point, by XYZ)
+
+PubChem has no 3D conformer for C60 (CID 123591): a name or SMILES answers
+422 `no-3d-structure`. Previewed instead as the truncated icosahedron with
+1.40 Å bonds (N 2220; predicted memory 21.9 GB):
+
+- **Spot unavailable** (predicted 18.5 h, over the 60 min Spot limit).
+- **On-demand on L** (16 vCPU / 64 GB): predicted 66 511 s (18.5 h), time
+  limit 199 532 s (55.4 h). Estimated **$13.81**, up to **$41.40**:
+  - compute $13.79 / $41.37;
+  - storage $0.0034 / $0.0067;
+  - delivery $0.0103 / $0.0205.
+- **Not approvable**: up to $41.40 against $8.52 left of the $8.80 cap.
+
+### Risks and open points
+
+- **C60 would fail after its whole SCF.** `write_molecule_files` refuses a
+  result over `BUDGET_BYTES` (3 MB for meta, basis, density and ESP). At
+  N 2220, `basis.json` alone is about 11 MB (2.3 × N²). So any molecule
+  above roughly N 1 100 ends `FAILED` (BudgetExceeded) after the SCF has
+  been paid for. Nothing refuses this up front yet. Either raise the budget
+  for computed molecules, or refuse such a quote, before anyone approves
+  one (an owner decision).
+- **Spot's maximum is 3 attempts' worth.** For a long Spot run it is
+  close to on-demand's single attempt (caffeine optimise: $1.34 against
+  $1.40), though its estimate is a third.
+- **The meter books storage and delivery for the whole retention** in the
+  month the job settles. That is conservative: S3 and CloudFront bill them
+  over the year.
+- **A reclaimed attempt's own files are not in `resultBytes`**, and nor is
+  a root an earlier attempt completed. Both are rare and small; the
+  maximum's 2× covers them.
+
+## Judgment calls made without asking (this phase)
 
 1. **RK4 over Numerov for the relativistic radial equations**
    (`coupled_rk4.ts`, Task 3). Numerov needs a single second-order ODE; the
