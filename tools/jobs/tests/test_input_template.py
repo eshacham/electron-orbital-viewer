@@ -3,6 +3,7 @@ import runpy
 import subprocess
 import sys
 
+import numpy as np
 import pytest
 
 from jobs.canonical import canonical_job
@@ -15,9 +16,24 @@ LADDER = {'xc': 'B3LYP', 'basis': '6-31g', 'optimiseBasis': None}   # D5: STO-3G
 
 def test_rendered_script_is_self_describing():
     text = render_input(canonical_job('single', H2, 0, 1), 'k' * 64)
-    assert "BASIS = 'def2-TZVPD'" in text and "XC = 'B3LYP'" in text and 'OPTIMISE_BASIS = None' in text
+    assert "BASIS = 'def2-TZVPD'" in text and 'OPTIMISE_BASIS = None' in text
+    assert f"XC = {canonical_job('single', H2, 0, 1)['method']['xc']!r}" in text
+    assert 'FREQUENCY_CHECK = False' in text
     assert "('H', (0.0, 0.0, 0.74))" in text and 'kkkk' in text
     compile(text, 'input.py', 'exec')
+
+
+def test_recipe_b_checks_its_structure_only_from_compute_version_2():
+    job = canonical_job('optimise', H2, 0, 1)
+    assert 'FREQUENCY_CHECK = True' in render_input({**job, 'computeVersion': 2}, 'k' * 64)
+    assert 'FREQUENCY_CHECK = False' in render_input({**job, 'computeVersion': 1}, 'k' * 64)
+
+
+def test_the_script_says_how_to_rerun_it_on_linux_and_on_an_apple_silicon_mac():
+    # Preflight D17: pyscf-dispersion has no build that runs on Apple silicon; there input.py's D3 comes from
+    # tools/molecules/dispersion.py's stand-in, which must be importable.
+    text = render_input(canonical_job('single', H2, 0, 1), 'k' * 64)
+    assert 'pyscf-dispersion' in text and 'PYTHONPATH=<repository>/tools/molecules python input.py' in text
 
 
 def test_build_returns_a_converged_scf_and_logs(tmp_path, monkeypatch):
@@ -129,3 +145,95 @@ def test_a_resumed_optimisation_says_where_it_started():
     assert "# Resumed from attempt 1's last trajectory frame" in resumed
     assert "('H', (0.0, 0.0, 0.77))" in resumed
     compile(resumed, 'input.py', 'exec')
+
+
+OPT = {'xc': 'B3LYP', 'basis': 'sto-3g', 'optimiseBasis': 'sto-3g'}
+H2O2 = [[8, 0.0, 0.0, 0.0], [8, 1.45, 0.0, 0.0], [1, -0.32, 0.92, 0.0], [1, 1.77, -0.92, 0.0]]   # trans, C2h
+
+
+def _namespace(tmp_path, monkeypatch, job):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'input.py').write_text(render_input(job, 'k' * 64))
+    return runpy.run_path('input.py', run_name='jobs_input')
+
+
+def test_the_optimisation_builds_its_molecule_without_symmetry(tmp_path, monkeypatch):
+    # Phase 6D spec §8: PySCF's geomeTRIC engine holds every geometry to the starting point group.
+    # (Compute version 1 here: no frequency check follows, so the build stops at the optimisation.)
+    ns = _namespace(tmp_path, monkeypatch, {**canonical_job('optimise', H2, 0, 1, method=OPT), 'computeVersion': 1})
+    import pyscf.geomopt.geometric_solver as gs
+    seen = []
+
+    def record(mf, **kwargs):
+        seen.append(mf.mol.symmetry)
+        return True, mf.mol
+    monkeypatch.setattr(gs, 'kernel', record)
+    mol, mf, info = ns['build']()
+    assert seen == [False] and mol.symmetry and info == {'steps': 0, 'converged': True}
+
+
+def dihedral(p0, p1, p2, p3):
+    b0, b1, b2 = p0 - p1, p2 - p1, p3 - p2
+    b1 = b1 / np.linalg.norm(b1)
+    v, w = b0 - (b0 @ b1) * b1, b2 - (b2 @ b1) * b1
+    return abs(np.degrees(np.arctan2(np.cross(b1, v) @ w, v @ w)))
+
+
+def test_a_dihedral_constraint_moves_in_the_geometry_molecule(tmp_path, monkeypatch):
+    # Spec §12's regression (scans research §4.2, pitfall 1): with symmetry on, trans-H2O2 driven to a
+    # 120° H-O-O-H dihedral "converged" at 180°. The geometry molecule must let it move.
+    ns = _namespace(tmp_path, monkeypatch, canonical_job('optimise', H2O2, 0, 1, method=OPT))
+    from pyscf.geomopt.geometric_solver import kernel as geometric_kernel
+    (tmp_path / 'constraints.txt').write_text('$set\ndihedral 3 1 2 4 120.0\n')
+    atoms = [(s, xyz) for s, xyz in ns['ATOMS']]
+    mol = ns['molecule'](atoms, 'sto-3g', symmetry=False)
+    converged, final = geometric_kernel(ns['geometry_dft'](mol), constraints='constraints.txt', maxsteps=50)
+    c = final.atom_coords(unit='Angstrom')
+    assert converged and dihedral(c[2], c[0], c[1], c[3]) == pytest.approx(120.0, abs=0.5)
+
+
+def test_b3lyp_d3bj_adds_its_dispersion_energy(tmp_path, monkeypatch):
+    ns = _namespace(tmp_path, monkeypatch, canonical_job('single', H2O2, 0, 1,
+                                                           method={'xc': 'B3LYP-D3BJ', 'basis': 'sto-3g', 'optimiseBasis': None}))
+    mol, mf, _ = ns['build']()
+    assert mf.converged and -0.01 < mf.scf_summary['dispersion'] < 0
+
+
+def test_an_open_shell_runs_its_geometry_work_uks_only_when_it_will_be_checked(tmp_path, monkeypatch):
+    oh = [[8, 0.0, 0.0, 0.0], [1, 0.0, 0.0, 0.98]]
+    job = canonical_job('optimise', oh, 0, 2, method=OPT)
+    ns = _namespace(tmp_path, monkeypatch, {**job, 'computeVersion': 2})
+    mol = ns['molecule']([('O', (0.0, 0.0, 0.0)), ('H', (0.0, 0.0, 0.98))], 'sto-3g', symmetry=False)
+    assert type(ns['geometry_dft'](mol)).__name__.endswith('UKS')
+    assert type(ns['make_dft'](mol)).__name__.endswith('ROKS')
+    ns = _namespace(tmp_path, monkeypatch, {**job, 'computeVersion': 1})
+    assert type(ns['geometry_dft'](mol)).__name__.endswith('ROKS')
+
+
+def test_a_refused_step_ends_the_optimisation_with_its_last_geometry(tmp_path, monkeypatch):
+    # Spec §9: the budget is asked after every step; a no keeps that step's geometry, marked not converged.
+    ns = _namespace(tmp_path, monkeypatch, canonical_job('optimise', [[1, 0.0, 0.0, 0.0], [1, 0.0, 0.0, 0.9]], 0, 1, method=OPT))
+    asked, steps = [], []
+    mol, mf, info = ns['build'](on_step=lambda n, e, a: steps.append(a),
+                                may_start=lambda stage: asked.append(stage) or False)
+    assert asked == ['step'] and len(steps) == 1
+    assert info['steps'] == 1 and info['converged'] is False and info['stoppedBy'] == 'time-limit'
+    assert info['maxGradient'] > 1e-3
+    assert mf.converged and abs(mol.atom_coord(1)[2] - mol.atom_coord(0)[2]) * 0.529177 == pytest.approx(
+        abs(steps[0][1][1][2] - steps[0][0][1][2]), abs=1e-6)
+
+
+def test_the_budget_is_never_asked_at_the_step_that_converges(tmp_path, monkeypatch):
+    # Preflight D12: geomeTRIC tests convergence only after its callback returns. A budget asked at the
+    # converged step could refuse it, and a converged geometry would be reported "stopped by its time limit,
+    # not converged". So the step whose geometry, gradient and energy change meet geomeTRIC's own criteria
+    # asks nothing: no further step follows it.
+    stretched = [[1, 0.0, 0.0, 0.0], [1, 0.0, 0.0, 0.9]]
+    ns = _namespace(tmp_path, monkeypatch, {**canonical_job('optimise', stretched, 0, 1, method=OPT), 'computeVersion': 1})
+    asked = []
+    _, _, info = ns['build'](may_start=lambda stage: asked.append(stage) or True)
+    assert info['converged'] and info['steps'] >= 2 and asked == ['step'] * (info['steps'] - 1)
+    # The same run under a budget that would refuse anything past the last unconverged step: it converges.
+    n, asked = info['steps'] - 1, []
+    _, _, again = ns['build'](may_start=lambda stage: asked.append(stage) or len(asked) <= n)
+    assert again == info and len(asked) == n
