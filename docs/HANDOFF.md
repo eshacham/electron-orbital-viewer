@@ -2404,6 +2404,16 @@ Every AWS job, every one of their steps, and every probe step is inside
 - **The timeout margin is thin.** Caffeine optimise's timeout is
   clamped at 1.75× rather than 3×, so a step much slower than the
   probe's first (a molecule needing far more SCF cycles) has less room.
+- **Measured 2026-10-08 — the owner's caffeine optimise** (`09ae0fa0…`,
+  L on-demand, v4, one attempt): DONE in 1 022 s against 4 103 s
+  predicted (25 %); 11 optimisation steps (58 predicted), 344 s in all,
+  slowest 39.1 s (priced 52.8 s); final def2-TZVPD SCF 441 s (≈1 040 s
+  predicted on L, so it ran in core); writing files 192 s; peak 5.7 GB.
+  Charged $0.219011 against $1.516704 reserved. v4 is safe but ~4×
+  high for optimise: the step count (58 vs 11) and the final SCF on L
+  are the over-predictions. A v5 refit with this sample (and timings'
+  per-step cycle counts, which optimisation steps do not record yet)
+  would cut the reservation; nothing here risks a timeout.
 - **Image tag after this docs fix:** commit "docs: v4's worst cases"
   edits a comment in `tools/jobs/sizing.py`, so HEAD's image tag differs
   from the deployed `2de967effa251067` (code identical). `deploy.sh
