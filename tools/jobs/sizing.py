@@ -269,7 +269,9 @@ def predict_seconds(job: dict, size: Size) -> float:
 # build_library.write_molecule_files raises BudgetExceeded when meta.json, basis.json, density.bin.gz and
 # esp.bin.gz pass BUDGET_BYTES at its last grid try (80^3), after the whole SCF has been paid for.
 # - basis.json holds one row of N coefficients for every occupied orbital and orbital_table's 5 virtuals
-#   (plus any virtual degenerate with the fifth): VIRTUAL_ROWS 10 covers icosahedral 5-fold degeneracy.
+#   (plus any virtual degenerate with the fifth: 10 covers icosahedral 5-fold degeneracy), and since Phase 6D
+#   the constructed LVMO rows orbital_table may append, a whole degenerate set of them (VALENCE_VIRTUAL_ROWS,
+#   silane's t2; preflight D15).
 #   Each coefficient takes ~23 bytes as JSON (caffeine: 796 428 B for 56 rows x 614); COEFF_BYTES 24.
 #   Water, ethanol, benzene and caffeine's written basis.json are 74-90 % of this prediction.
 # - GRID_FILES_BYTES: density, ESP and meta at 80^3. The six DONE jobs wrote 0.91-1.42 MB of them at 96^3;
@@ -278,7 +280,8 @@ def predict_seconds(job: dict, size: Size) -> float:
 # limit; with the ceiling gone, C28-C36-sized molecules (N 1000-1350) were quotable, approvable under the
 # cap, and certain to fail after 1.5-3.3 h.
 OUTPUT_BUDGET_BYTES = 3_000_000          # build_library.BUDGET_BYTES (pinned by tests/test_sizing.py)
-VIRTUAL_ROWS = 10
+VALENCE_VIRTUAL_ROWS = 3
+VIRTUAL_ROWS = 10 + VALENCE_VIRTUAL_ROWS
 COEFF_BYTES = 24
 GRID_FILES_BYTES = 900_000
 OUTPUT_REFUSAL = ("this molecule's result files would exceed the app's file limit (about {mb:.1f} MB predicted "

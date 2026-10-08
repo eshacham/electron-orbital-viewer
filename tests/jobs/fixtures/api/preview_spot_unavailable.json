@@ -1,7 +1,7 @@
 {
  "status": 200,
  "body": {
-  "key": "4a0a8566425e202206f233fda7d72a3fdf20f11c4386ee3764fdf3216c2f4cd2",
+  "key": "28941c43ec405ed5f060ca8ce7ed0be36ea1012948423da10256025141d1888c",
   "job": {
    "computeVersion": 1,
    "recipe": "single",
@@ -161,22 +161,16 @@
       0.0,
       0.0,
       36.0
-     ],
-     [
-      6,
-      0.0,
-      0.0,
-      37.5
      ]
     ],
     "charge": 0,
     "multiplicity": 1
    }
   },
-  "name": "C26",
-  "formula": "C26",
-  "electronCount": 156,
-  "basisFunctions": 962,
+  "name": "C25",
+  "formula": "C25",
+  "electronCount": 150,
+  "basisFunctions": 925,
   "atoms": [
    [
     6,
@@ -327,12 +321,6 @@
     0.0,
     0.0,
     36.0
-   ],
-   [
-    6,
-    0.0,
-    0.0,
-    37.5
    ]
   ],
   "charge": 0,
@@ -348,7 +336,7 @@
       "option": "spot",
       "capacity": "spot",
       "available": false,
-      "unavailableReason": "Spot is offered only for runs predicted at 60 min or less; this one is predicted at 1.2 h, and an interruption late in a long run would waste most of it.",
+      "unavailableReason": "Spot is offered only for runs predicted at 60 min or less; this one is predicted at 1.0 h, and an interruption late in a long run would waste most of it.",
       "quoteId": null,
       "approvable": false,
       "blockedReason": null
@@ -358,42 +346,42 @@
       "capacity": "on-demand",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "10b1af3af5f107d0c746a096099f618230f53fa91845fdff9ac8553a4670e6b8",
+      "quoteId": "6f9c33adee13e4a7c4acaeaf5a041670193b0dd1094c923d45ea1f5dffc2a33a",
       "size": "L",
       "vcpu": 16,
       "memoryGB": 64,
       "attempts": 1,
-      "timeoutSeconds": 12556,
-      "predictedSeconds": 4185.2,
+      "timeoutSeconds": 11084,
+      "predictedSeconds": 3694.4,
       "sizingVersion": 5,
       "pricesVersion": 2,
-      "resultBytes": 3628521,
-      "resultBytesMax": 7257042,
+      "resultBytes": 3467938,
+      "resultBytesMax": 6935876,
       "retentionMonths": 12,
       "downloads": 10,
       "issuedAt": "2026-10-10T12:00Z",
-      "estimateUsd": 0.883818,
-      "maximumUsd": 2.634319,
+      "estimateUsd": 0.781914,
+      "maximumUsd": 2.328983,
       "lines": [
        {
         "item": "compute",
         "label": "Compute (AWS Fargate)",
-        "estimateUsd": 0.879772,
-        "maximumUsd": 2.626468,
-        "note": "Estimate: one run of the predicted 4185.2 s plus a minute to start. Maximum: 12556 s time limit + 120 s to start and stop, at on-demand prices for L (16 vCPU, 64 GB)."
+        "estimateUsd": 0.778036,
+        "maximumUsd": 2.321469,
+        "note": "Estimate: one run of the predicted 3694.4 s plus a minute to start. Maximum: 11084 s time limit + 120 s to start and stop, at on-demand prices for L (16 vCPU, 64 GB)."
        },
        {
         "item": "storage",
         "label": "Result storage (S3, 12 months)",
-        "estimateUsd": 0.001013,
-        "maximumUsd": 0.001946,
-        "note": "About 3.6 MB of results (at most 7.3 MB) kept 12 months in S3 Standard at $0.023 per GB-month, plus $0.005 per 1,000 writes."
+        "estimateUsd": 0.000972,
+        "maximumUsd": 0.001863,
+        "note": "About 3.5 MB of results (at most 6.9 MB) kept 12 months in S3 Standard at $0.023 per GB-month, plus $0.005 per 1,000 writes."
        },
        {
         "item": "delivery",
         "label": "Delivery (CloudFront, 10 full downloads)",
-        "estimateUsd": 0.003033,
-        "maximumUsd": 0.005905,
+        "estimateUsd": 0.002906,
+        "maximumUsd": 0.005651,
         "note": "10 full downloads through CloudFront at $0.085 per GB, plus $0.01 per 10,000 requests."
        },
        {
@@ -413,11 +401,11 @@
        "memoryGB": 64,
        "capacity": "on-demand",
        "attempts": 1,
-       "basisFunctions": 962,
-       "predictedSeconds": 4185.2,
-       "predictedMemoryGB": 4.48,
-       "timeoutSeconds": 12556,
-       "predictedCostMicros": 867170
+       "basisFunctions": 925,
+       "predictedSeconds": 3694.4,
+       "predictedMemoryGB": 4.18,
+       "timeoutSeconds": 11084,
+       "predictedCostMicros": 765479
       },
       "approvable": true,
       "blockedReason": null

@@ -153,7 +153,9 @@ def test_a_c60_scale_quote_is_refused_before_anything_is_priced():
 
 
 def test_a_run_past_the_spot_limit_is_quoted_on_demand_only():
-    q = quotes.quote(canonical_job('single', carbons(26), 0, 1), 'a' * 64, 'aws')     # 70 min on L
+    # 62 min on L. C26 (70 min) is now refused output-too-large: since Phase 6D the basis.json prediction allows
+    # for three appended valence virtual orbital rows (preflight D15), and it lands 1 kB over the limit.
+    q = quotes.quote(canonical_job('single', carbons(25), 0, 1), 'a' * 64, 'aws')
     spot, on_demand = by_option(q)['spot'], by_option(q)['on-demand']
     assert not spot['available'] and on_demand['available'] and q['recommended'] == 'on-demand'
 

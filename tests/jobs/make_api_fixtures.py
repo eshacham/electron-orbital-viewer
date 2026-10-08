@@ -92,9 +92,10 @@ def record_all(root: Path) -> dict:
     # A quote over what is left of the month's cap: shown, but no option can be approved (cap one micro-dollar).
     out['preview_capped'] = call(Api(FileStore(root / 'capped', cap_micros=1), NullRunner(), resolve=resolve,
                                      now=lambda: NOW, backend='aws'), 'POST', '/api/v1/jobs/preview', water)
-    # A run predicted past the Spot limit (a 26-carbon chain, ~70 min on L): on-demand only.
+    # A run predicted past the Spot limit (a 25-carbon chain, ~62 min on L): on-demand only. (26 carbons, ~70 min,
+    # is refused output-too-large since Phase 6D counts the appended valence virtual orbital rows, D15.)
     out['preview_spot_unavailable'] = call(aws, 'POST', '/api/v1/jobs/preview',
-                                           {'recipe': 'single', 'molecule': {'xyz': chain_xyz(26)}})
+                                           {'recipe': 'single', 'molecule': {'xyz': chain_xyz(25)}})
     # Refused outright (a 60-carbon chain, C60's N: its result files cannot fit the 3 MB limit, fix round 1):
     # what it resolved is still drawn, with the reason.
     out['preview_refused'] = call(aws, 'POST', '/api/v1/jobs/preview',

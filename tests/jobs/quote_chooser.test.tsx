@@ -56,7 +56,7 @@ describe('QuoteChooser', () => {
         render(<QuoteChooser quote={quoteOf('preview_spot_unavailable')} verb="run" disabled={false} onApprove={jest.fn()} />);
         const spot = screen.getByRole('radio', { name: 'Spot (unavailable)' });
         expect(spot).toBeDisabled();
-        expect(screen.getByTestId('quote-option-spot')).toHaveTextContent(/Unavailable: Spot is offered only for runs predicted at 60 min or less; this one is predicted at 1\.2 h/);
+        expect(screen.getByTestId('quote-option-spot')).toHaveTextContent(/Unavailable: Spot is offered only for runs predicted at 60 min or less; this one is predicted at 1\.0 h/);
         expect(screen.getByRole('radio', { name: /^On-demand/ })).toBeChecked();
         // Review minor 9: the reason is tied to its radio, so a screen reader hears it with the name.
         expect(spot).toHaveAccessibleDescription(/^Unavailable: Spot is offered only/);

@@ -581,7 +581,15 @@ MEASURED_BASIS_JSON = [(58, 10, 15_649), (168, 26, 75_171), (276, 42, 173_378), 
 
 @pytest.mark.parametrize('n,electrons,measured', MEASURED_BASIS_JSON, ids=['water', 'ethanol', 'benzene', 'caffeine'])
 def test_the_basis_json_prediction_is_never_below_what_was_written(n, electrons, measured):
-    assert measured <= sizing.predicted_basis_json_bytes(n, electrons) <= 1.4 * measured
+    # These files predate Phase 6D, so they hold none of the constructed LVMO rows the prediction now allows for.
+    appended = sizing.COEFF_BYTES * sizing.VALENCE_VIRTUAL_ROWS * n
+    assert measured <= sizing.predicted_basis_json_bytes(n, electrons) <= 1.4 * measured + appended
+
+
+def test_the_prediction_counts_the_appended_valence_virtual_rows():
+    # D15: orbital_table appends a constructed LVMO -- a whole degenerate set, three rows for silane's t2 -- after
+    # its 5 virtuals (up to 10 with a degenerate set completed), and basis.json carries a row for each.
+    assert sizing.VALENCE_VIRTUAL_ROWS == 3 and sizing.VIRTUAL_ROWS == 13
 
 
 @pytest.mark.parametrize('folder', sorted(p.name for p in AWS_FIXTURES.iterdir() if p.is_dir()))
