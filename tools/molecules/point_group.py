@@ -1,0 +1,462 @@
+"""Orbital labels in the molecule's full point group (Phase 6D spec §3).
+
+PySCF labels orbitals only in D2h and its subgroups, so the library showed
+methane's HOMO as b1/b2/b3 (D2) rather than t2 (Td), ammonia's lone pair as
+4a' (Cs) rather than 3a1 (C3v), and benzene in D2h rather than D6h.
+label_orbitals works in one of three regimes:
+
+- full group PySCF already labels (D2h and its subgroups, C∞v, D∞h): PySCF's
+  irreps, numbered per irrep in energy order. The linear groups read σ/π/δ
+  through Bonds mode's own mapping (labels.irrep_to_lambda), a degenerate π
+  pair sharing one number.
+- projection (TABLES: C3v, D3h, D3d, D6h, Td, Oh): every MO, or set of MOs
+  degenerate within SET_TOL, is labelled from its characters
+  χ(R) = Σᵢ ⟨ψᵢ|R ψᵢ⟩ -- one operation R per class, integrated on the SCF's
+  own DFT grid -- matched against the group's character table. A set that
+  matches no irrep is cut at its internal energy gaps (SET_TOL chains core
+  combinations 1e-6 Ha apart, as SF6's F 1s at def2-TZVPD) and each piece
+  matched; a piece whose characters are still no single irrep's but are a
+  sum of whole irreps (BF3's mixed F 1s a1' and e') reads as that sum,
+  "1a1'+1e'", with a note, so every later number stays the textbook's
+  (Ruling D1). Anything else is left UNLABELLED, with a note: an accidental
+  degeneracy, or numerical trouble, never a guess.
+- subgroup: any other group (D2d, C3, Ih …), or a supported one whose
+  operations cannot be built at this geometry, keeps PySCF's subgroup labels
+  and says so (symmetry.labelNote) -- never silently.
+
+Mulliken's notation, lower case for orbitals (a1, t2, e1g, a2"), with the core
+counted, as textbooks number them. D6h follows Herzberg: C2' through atoms
+(benzene's C and H), σv containing them; under it benzene's C 1s combination
+that alternates round the ring is b1u.
+"""
+from __future__ import annotations
+
+import numpy as np
+
+SET_TOL = 1e-5            # Ha: MOs closer in energy than this form one degenerate set (spec §3)
+CHI_TOL = 0.05            # a character further than this from the table's is no match (spec §3)
+OP_TOL = 1e-3             # bohr: an operation must carry every nucleus onto one of the same element
+BLOCK = 20000             # grid points per AO evaluation: bounds memory (SF6 at def2-TZVPD)
+UNLABELLED = '?'
+LINEAR = ('Dooh', 'Coov')
+
+
+class SymmetryNotFound(RuntimeError):
+    """A supported group's operations could not be built from this geometry."""
+
+
+# Each group: its classes in table order -- (name, size, operation) -- and each irrep's characters in that
+# order. An operation is ('E',), ('i',), ('C', n, k, axis) for C_n^k, ('S', n, k, axis) for S_n^k, or
+# ('s', normal) for a mirror plane; the axes are named roles that _roles finds in the geometry.
+TABLES = {
+    'C3v': ([('E', 1, ('E',)), ('2C3', 2, ('C', 3, 1, 'z')), ('3σv', 3, ('s', 'v'))],
+            {'A1': [1, 1, 1], 'A2': [1, 1, -1], 'E': [2, -1, 0]}),
+    'D3h': ([('E', 1, ('E',)), ('2C3', 2, ('C', 3, 1, 'z')), ('3C2', 3, ('C', 2, 1, 'p')), ('σh', 1, ('s', 'z')),
+             ('2S3', 2, ('S', 3, 1, 'z')), ('3σv', 3, ('s', 'v'))],
+            {"A1'": [1, 1, 1, 1, 1, 1], "A2'": [1, 1, -1, 1, 1, -1], "E'": [2, -1, 0, 2, -1, 0],
+             'A1"': [1, 1, 1, -1, -1, -1], 'A2"': [1, 1, -1, -1, -1, 1], 'E"': [2, -1, 0, -2, 1, 0]}),
+    'D3d': ([('E', 1, ('E',)), ('2C3', 2, ('C', 3, 1, 'z')), ('3C2', 3, ('C', 2, 1, 'p')), ('i', 1, ('i',)),
+             ('2S6', 2, ('S', 6, 1, 'z')), ('3σd', 3, ('s', 'v'))],
+            {'A1g': [1, 1, 1, 1, 1, 1], 'A2g': [1, 1, -1, 1, 1, -1], 'Eg': [2, -1, 0, 2, -1, 0],
+             'A1u': [1, 1, 1, -1, -1, -1], 'A2u': [1, 1, -1, -1, -1, 1], 'Eu': [2, -1, 0, -2, 1, 0]}),
+    'D6h': ([('E', 1, ('E',)), ('2C6', 2, ('C', 6, 1, 'z')), ('2C3', 2, ('C', 3, 1, 'z')), ('C2', 1, ('C', 2, 1, 'z')),
+             ("3C2'", 3, ('C', 2, 1, 'p')), ('3C2"', 3, ('C', 2, 1, 'q')), ('i', 1, ('i',)),
+             ('2S3', 2, ('S', 3, 1, 'z')), ('2S6', 2, ('S', 6, 1, 'z')), ('σh', 1, ('s', 'z')),
+             ('3σd', 3, ('s', 'dq')), ('3σv', 3, ('s', 'vp'))],
+            {'A1g': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 'A2g': [1, 1, 1, 1, -1, -1, 1, 1, 1, 1, -1, -1],
+             'B1g': [1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1], 'B2g': [1, -1, 1, -1, -1, 1, 1, -1, 1, -1, -1, 1],
+             'E1g': [2, 1, -1, -2, 0, 0, 2, 1, -1, -2, 0, 0], 'E2g': [2, -1, -1, 2, 0, 0, 2, -1, -1, 2, 0, 0],
+             'A1u': [1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1], 'A2u': [1, 1, 1, 1, -1, -1, -1, -1, -1, -1, 1, 1],
+             'B1u': [1, -1, 1, -1, 1, -1, -1, 1, -1, 1, -1, 1], 'B2u': [1, -1, 1, -1, -1, 1, -1, 1, -1, 1, 1, -1],
+             'E1u': [2, 1, -1, -2, 0, 0, -2, -1, 1, 2, 0, 0], 'E2u': [2, -1, -1, 2, 0, 0, -2, 1, 1, -2, 0, 0]}),
+    'Td': ([('E', 1, ('E',)), ('8C3', 8, ('C', 3, 1, 'c3')), ('3C2', 3, ('C', 2, 1, 'a')),
+            ('6S4', 6, ('S', 4, 1, 'a')), ('6σd', 6, ('s', 'd'))],
+           {'A1': [1, 1, 1, 1, 1], 'A2': [1, 1, 1, -1, -1], 'E': [2, -1, 2, 0, 0],
+            'T1': [3, 0, -1, 1, -1], 'T2': [3, 0, -1, -1, 1]}),
+    'Oh': ([('E', 1, ('E',)), ('8C3', 8, ('C', 3, 1, 'c3')), ('6C2', 6, ('C', 2, 1, 'd')), ('6C4', 6, ('C', 4, 1, 'a')),
+            ('3C2', 3, ('C', 2, 1, 'a')), ('i', 1, ('i',)), ('6S4', 6, ('S', 4, 1, 'a')), ('8S6', 8, ('S', 6, 1, 'c3')),
+            ('3σh', 3, ('s', 'a')), ('6σd', 6, ('s', 'd'))],
+           {'A1g': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 'A2g': [1, 1, -1, -1, 1, 1, -1, 1, 1, -1],
+            'Eg': [2, -1, 0, 0, 2, 2, 0, -1, 2, 0], 'T1g': [3, 0, -1, 1, -1, 3, 1, 0, -1, -1],
+            'T2g': [3, 0, 1, -1, -1, 3, -1, 0, -1, 1], 'A1u': [1, 1, 1, 1, 1, -1, -1, -1, -1, -1],
+            'A2u': [1, 1, -1, -1, 1, -1, 1, -1, -1, 1], 'Eu': [2, -1, 0, 0, 2, -2, 0, 1, -2, 0],
+            'T1u': [3, 0, -1, 1, -1, -3, -1, 0, 1, 1], 'T2u': [3, 0, 1, -1, -1, -3, 1, 0, 1, -1]}),
+}
+
+
+def number_labels(irreps):
+    """'1a1', '2a1', '1b2' …: each irrep counted in the order given (energy order). A degenerate pair's
+    components (E1ux, E1uy) share one label but are counted separately, so either may come first."""
+    counts, labels = {}, []
+    for irrep in irreps:
+        name = irrep.lower()
+        if name.startswith('e') and name[-1] in 'xy':
+            key, component = name[:-1], name[-1]
+        else:
+            key, component = name, ''
+        counts[(key, component)] = counts.get((key, component), 0) + 1
+        labels.append(f'{counts[(key, component)]}{key}')
+    return labels
+
+
+def degenerate_sets(energies, indices, tol=SET_TOL):
+    """`indices` (ascending, so in energy order for aufbau occupations) cut into runs whose neighbours lie
+    within `tol` of each other."""
+    sets = []
+    for i in indices:
+        if sets and abs(energies[i] - energies[sets[-1][-1]]) < tol:
+            sets[-1].append(i)
+        else:
+            sets.append([i])
+    return sets
+
+
+def rotation(axis, angle):
+    a = np.asarray(axis, dtype=float) / np.linalg.norm(axis)
+    k = np.array([[0, -a[2], a[1]], [a[2], 0, -a[0]], [-a[1], a[0], 0]])
+    return np.eye(3) + np.sin(angle) * k + (1 - np.cos(angle)) * k @ k
+
+
+def reflection(normal):
+    n = np.asarray(normal, dtype=float) / np.linalg.norm(normal)
+    return np.eye(3) - 2 * np.outer(n, n)
+
+
+def improper(axis, angle):
+    return reflection(axis) @ rotation(axis, angle)
+
+
+def is_symmetry(op, x, z, tol=OP_TOL):
+    """Whether `op` carries every nucleus (rows of x, about the charge centre) onto one of the same charge."""
+    moved = x @ op.T
+    distance = np.linalg.norm(moved[:, None, :] - x[None, :, :], axis=2)
+    distance[z[:, None] != z[None, :]] = np.inf
+    return bool((distance.min(axis=1) < tol).all())
+
+
+def _unit(v):
+    return np.asarray(v, dtype=float) / np.linalg.norm(v)
+
+
+def _distinct(vectors):
+    out = []
+    for v in vectors:
+        if np.linalg.norm(v) < 1e-3:
+            continue
+        u = _unit(v)
+        if all(abs(abs(u @ w) - 1) > 1e-6 for w in out):
+            out.append(u)
+    return out
+
+
+def _principal_axis(x, z, n, extra):
+    """A C_n axis: one of the charge-weighted second moment's eigenvectors (a symmetric top's unique one is
+    its Cn axis) or of PySCF's own symmetry axes."""
+    _, vectors = np.linalg.eigh(np.einsum('i,ij,ik->jk', z, x, x))
+    for axis in _distinct(list(vectors.T) + list(extra)):
+        if is_symmetry(rotation(axis, 2 * np.pi / n), x, z):
+            return axis
+    raise SymmetryNotFound(f'no C{n} axis')
+
+
+def _in_plane(x, axis):
+    """Directions perpendicular to `axis`: through each nucleus's projection, and halfway between two. The
+    projections are not merged with their opposites before halving: staggered ethane's C2 axes bisect a top
+    hydrogen's projection and a bottom one's, which point 60° apart, not 120°."""
+    p = [_unit(v) for v in x - np.outer(x @ axis, axis) if np.linalg.norm(v) > 1e-3]
+    return _distinct(p + [a + b for i, a in enumerate(p) for b in p[i + 1:]])
+
+
+def _cubic_roles(group, x, z):
+    """Td: its three C2 (S4) axes; Oh: its three C4 axes. Then a C3 axis, and Td's σd normal or Oh's C2'."""
+    vectors = [v for v in x if np.linalg.norm(v) > 1e-3]
+    pairs = [a + b for i, a in enumerate(vectors) for b in vectors[i + 1:]]
+    pairs += [a - b for i, a in enumerate(vectors) for b in vectors[i + 1:]]
+    found = []
+    for axis in _distinct(vectors + pairs):
+        op = improper(axis, np.pi / 2) if group == 'Td' else rotation(axis, np.pi / 2)
+        if is_symmetry(op, x, z) and all(abs(axis @ f) < 1e-6 for f in found):
+            found.append(axis)
+            if len(found) == 3:
+                a1, a2, a3 = found
+                return {'a': a1, 'c3': _unit(a1 + a2 + a3), 'd': _unit(a1 + a2) if group == 'Oh' else _unit(a1 - a2)}
+    raise SymmetryNotFound('three perpendicular S4 axes' if group == 'Td' else 'three perpendicular C4 axes')
+
+
+def _roles(group, x, z, extra):
+    if group in ('Td', 'Oh'):
+        return _cubic_roles(group, x, z)
+    axis = _principal_axis(x, z, 6 if group == 'D6h' else 3, extra)
+    candidates = _in_plane(x, axis)
+    plane = next((c for c in candidates if is_symmetry(reflection(np.cross(axis, c)), x, z)), None)
+    if group == 'C3v':
+        if plane is None:
+            raise SymmetryNotFound('no vertical mirror plane')
+        return {'z': axis, 'v': np.cross(axis, plane)}
+    twofold = [c for c in candidates if is_symmetry(rotation(c, np.pi), x, z)]
+    if not twofold:
+        raise SymmetryNotFound('no C2 axis perpendicular to the principal axis')
+    if group == 'D6h':
+        def through(c):
+            return sum(1 for v in x if np.linalg.norm(v) > 1e-3 and np.linalg.norm(np.cross(v, c)) < OP_TOL)
+        p = max(twofold, key=through)                 # Herzberg: C2' passes through the most atoms
+        q = rotation(axis, np.pi / 6) @ p
+        return {'z': axis, 'p': p, 'q': q, 'vp': np.cross(axis, p), 'dq': np.cross(axis, q)}
+    if plane is None:
+        raise SymmetryNotFound('no vertical mirror plane')
+    return {'z': axis, 'p': twofold[0], 'v': np.cross(axis, plane)}
+
+
+def _operation(spec, roles):
+    kind = spec[0]
+    if kind == 'E':
+        return np.eye(3)
+    if kind == 'i':
+        return -np.eye(3)
+    if kind == 'C':
+        return rotation(roles[spec[3]], 2 * np.pi * spec[2] / spec[1])
+    if kind == 'S':
+        return improper(roles[spec[3]], 2 * np.pi * spec[2] / spec[1])
+    return reflection(roles[spec[1]])
+
+
+def class_operations(group, x, z, extra_axes=()):
+    """One operation per class of `group`, in TABLES order, each checked against the nuclei."""
+    roles = _roles(group, x, z, list(extra_axes))
+    ops = []
+    for name, _, spec in TABLES[group][0]:
+        op = _operation(spec, roles)
+        if not is_symmetry(op, x, z):
+            raise SymmetryNotFound(f'{name} is not a symmetry of this geometry')
+        ops.append(op)
+    return ops
+
+
+def orbital_characters(mol, grids, mo, ops, centre):
+    """⟨ψᵢ|R ψᵢ⟩ = ∫ ψᵢ(r) ψᵢ(R⁻¹r) dr for every column of `mo` and every operation, by the grid's
+    quadrature: shape (operations, columns). A set's character is the sum over its members (a trace, so
+    independent of how the set is rotated within itself); computing every kept MO's at once evaluates
+    the AOs on each rotated grid once, not once per set -- most of the labelling cost (Ruling D7) -- and
+    makes the characters of any split of a set free."""
+    kind = 'GTOval_cart' if mol.cart else 'GTOval_sph'
+    coords, weights = np.asarray(grids.coords), np.asarray(grids.weights)
+    mo = np.asarray(mo)
+    diagonal = np.zeros((len(ops), mo.shape[1]))
+    for start in range(0, len(weights), BLOCK):
+        r, w = coords[start:start + BLOCK], weights[start:start + BLOCK]
+        weighted = (mol.eval_gto(kind, r) @ mo) * w[:, None]
+        for k, op in enumerate(ops):
+            moved = centre + (r - centre) @ op              # R⁻¹ r for an orthogonal R, as rows
+            diagonal[k] += np.einsum('gi,gi->i', weighted, mol.eval_gto(kind, moved) @ mo)
+    return diagonal
+
+
+def characters(mol, grids, mo, ops, centre):
+    """χ(R) = Σᵢ ∫ ψᵢ(r) ψᵢ(R⁻¹r) dr for the set's columns `mo`, by the grid's quadrature."""
+    return orbital_characters(mol, grids, mo, ops, centre).sum(axis=1)
+
+
+def match_irrep(group, chi, size):
+    """The irrep of `group` of dimension `size` whose every character is within CHI_TOL of `chi`, or None."""
+    for name, row in TABLES[group][1].items():
+        if row[0] == size and np.all(np.abs(np.asarray(row, dtype=float) - chi) < CHI_TOL):
+            return name
+    return None
+
+
+def reduce_characters(group, chi, size):
+    """{irrep: multiplicity} when `chi` is the character of a sum of whole irreps of total dimension `size`
+    -- every multiplicity from the reduction formula within CHI_TOL of a non-negative integer, and the
+    rebuilt characters within CHI_TOL of `chi` -- else None. A set of near-degenerate orbitals that mixes
+    two irreps (BF3's F 1s a1' and e') carries no single irrep, but as a whole still carries their sum."""
+    classes, irreps = TABLES[group]
+    sizes = np.array([s for _, s, _ in classes], dtype=float)
+    rebuilt, counts = np.zeros(len(classes)), {}
+    for name, row in irreps.items():
+        row = np.asarray(row, dtype=float)
+        n = float((sizes * row * chi).sum() / sizes.sum())
+        m = round(n)
+        if abs(n - m) >= CHI_TOL or m < 0:
+            return None
+        if m:
+            counts[name] = m
+            rebuilt += m * row
+    if sum(m * irreps[name][0] for name, m in counts.items()) != size or np.any(np.abs(rebuilt - chi) >= CHI_TOL):
+        return None
+    return counts
+
+
+def split_set(energies, members, cuts):
+    """`members` (energy order) cut at their `cuts` largest internal energy gaps. Chained by SET_TOL, a set
+    can hold several irreps whose orbitals lie only 1e-6 Ha apart (SF6's six F 1s combinations at
+    def2-TZVPD: t1u, eg, a1g), while a true degeneracy's members agree far more closely, so the largest
+    gaps fall between irreps first."""
+    if cuts <= 0:
+        return [list(members)]
+    gaps = np.abs(np.diff([energies[i] for i in members]))
+    at = sorted(np.argsort(-gaps, kind='stable')[:cuts] + 1)
+    return [list(members[a:b]) for a, b in zip([0] + at, at + [len(members)])]
+
+
+def _frame(mol):
+    """Nuclear positions about the charge centre (bohr), the charges, and the centre."""
+    coords, charges = mol.atom_coords(), mol.atom_charges().astype(float)
+    centre = (charges[:, None] * coords).sum(axis=0) / charges.sum()
+    return coords - centre, charges, centre
+
+
+def _pyscf_axes(mol):
+    axes = np.asarray(getattr(mol, '_symm_axes', np.eye(3)), dtype=float)
+    return list(axes) + list(axes.T)
+
+
+def _grids(mf):
+    grids = getattr(mf, 'grids', None)
+    if grids is None:
+        from pyscf.dft import gen_grid
+        grids = gen_grid.Grids(mf.mol)
+        grids.level = 4
+    if grids.coords is None:
+        grids.build()
+    return grids
+
+
+def _linear_labels(group, irreps, energies):
+    from labels import irrep_to_lambda
+    counts, last, out = {}, {}, []
+    for irrep, energy in zip(irreps, energies):
+        key = irrep_to_lambda(group, irrep)
+        previous = last.get(key)
+        if key[0] != 'σ' and previous is not None and abs(energy - previous[1]) < SET_TOL:
+            number = previous[0]                      # the other half of a π (δ) pair shares its number
+        else:
+            number = counts.get(key, 0) + 1
+            counts[key] = number
+        last[key] = (number, energy)
+        out.append(f'{number}{key[0]}{key[1]}')
+    return out
+
+
+def _pyscf_labels(mol, mf, indices, note):
+    from pyscf import symm
+    irreps = list(symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mf.mo_coeff[:, indices]))
+    if mol.groupname in LINEAR:
+        names = _linear_labels(mol.groupname, irreps, [float(mf.mo_energy[i]) for i in indices])
+    else:
+        names = number_labels(irreps)
+    symmetry = {'pointGroup': mol.topgroup, 'labelGroup': mol.groupname, 'labels': 'subgroup' if note else 'full-group'}
+    if note:
+        symmetry['labelNote'] = note
+    return dict(zip(indices, names)), symmetry, {}
+
+
+def _pieces(group, energies, members, chi_of):
+    """The labelling of one degenerate set (Ruling D1): [(piece, {irrep: multiplicity}, exact)], or None.
+    The whole set first; failing that, the set cut at its 1, 2 … largest internal gaps, taking the first
+    cut whose every piece matches one irrep. Failing that, the cut that labels the most orbitals exactly
+    while every other piece is still a sum of whole irreps (fewest cuts on a tie): BF3's three F 1s
+    combinations at def2-TZVPD mix a1' and e', so no piece of them carries one irrep, but together they
+    carry a1' + e'. None when no cut does either."""
+    best, best_exact = None, -1
+    for cuts in range(len(members)):
+        pieces, valid = [], True
+        for piece in split_set(energies, members, cuts):
+            chi = chi_of(piece)
+            irrep = match_irrep(group, chi, len(piece))
+            parts = {irrep: 1} if irrep else reduce_characters(group, chi, len(piece))
+            valid = valid and parts is not None
+            pieces.append((piece, parts, irrep is not None))
+        if all(exact for _, _, exact in pieces):
+            return pieces
+        exact = sum(len(piece) for piece, _, ok in pieces if ok)
+        if valid and exact > best_exact:
+            best, best_exact = pieces, exact
+    return best
+
+
+def _and(names):
+    return names[0] if len(names) == 1 else f'{", ".join(names[:-1])} and {names[-1]}'
+
+
+def _projected_labels(mol, mf, indices, group):
+    x, z, centre = _frame(mol)
+    ops = class_operations(group, x, z, _pyscf_axes(mol))
+    energies = np.asarray(mf.mo_energy, dtype=float)
+    diagonal = orbital_characters(mol, _grids(mf), mf.mo_coeff[:, indices], ops, centre)
+    column = {i: k for k, i in enumerate(indices)}
+
+    def chi_of(members):
+        return diagonal[:, [column[i] for i in members]].sum(axis=1)
+
+    order = list(TABLES[group][1])
+    counts, labels, notes = {}, {}, {}
+    for members in degenerate_sets(energies, indices):
+        pieces = _pieces(group, energies, members, chi_of)
+        if pieces is None:
+            chi = chi_of(members)
+            note = (f'characters ({", ".join(f"{c:.2f}" for c in chi)}) match no single irrep of {group}, '
+                    'nor do they split into pieces that do or sum to whole irreps: an accidental degeneracy '
+                    'or numerical noise, so left unlabelled')
+            for i in members:
+                labels[i], notes[i] = UNLABELLED, note
+            continue
+        for piece, parts, exact in pieces:
+            names = []
+            for irrep in sorted(parts, key=order.index):             # character-table order: a1' before e'
+                name = irrep.lower()
+                for _ in range(parts[irrep]):
+                    counts[name] = counts.get(name, 0) + 1
+                    names.append(f'{counts[name]}{name}')
+            for i in piece:
+                labels[i] = '+'.join(names)
+            if not exact:
+                tol = f'{SET_TOL:.0e}'.replace('e-0', 'e-')
+                note = (f'near-degenerate combinations of {_and([p.lower() for p in sorted(parts, key=order.index)])} '
+                        f'(ΔE < {tol} Ha), mixed in these orbitals: the label names their sum and counts each')
+                for i in piece:
+                    notes[i] = note
+    return labels, {'pointGroup': group, 'labelGroup': group, 'labels': 'full-group'}, notes
+
+
+def label_orbitals(mol, mf, indices):
+    """(labels by MO index, meta.json's `symmetry`, notes by MO index) for the MOs `indices` -- every
+    occupied one and a run of virtuals from the LUMO, so numbering starts at the core."""
+    indices = list(indices)
+    if not mol.symmetry:
+        return ({i: f'ψ{i + 1}' for i in indices},
+                {'pointGroup': mol.topgroup, 'labelGroup': mol.groupname, 'labels': 'none'}, {})
+    top, sub = mol.topgroup, mol.groupname
+    if top in TABLES:
+        try:
+            return _projected_labels(mol, mf, indices, top)
+        except SymmetryNotFound as e:
+            return _pyscf_labels(mol, mf, indices, f'irreducible representations of {sub}, a subgroup of {top}: '
+                                                   f'the {top} symmetry operations were not found at this geometry ({e})')
+    if top == sub:
+        return _pyscf_labels(mol, mf, indices, None)
+    return _pyscf_labels(mol, mf, indices, f'irreducible representations of {sub}, a subgroup of {top}: '
+                                           f'full-group labels are not available for {top}')
+
+
+def irrep_of(mol, mf, coeff):
+    """The irrep, lower case and unnumbered, of one set of orthonormal orbitals (the columns of `coeff`) in
+    the group label_orbitals would use; UNLABELLED if they do not carry a single one."""
+    if not mol.symmetry:
+        return UNLABELLED
+    if mol.topgroup in TABLES:
+        try:
+            x, z, centre = _frame(mol)
+            ops = class_operations(mol.topgroup, x, z, _pyscf_axes(mol))
+            irrep = match_irrep(mol.topgroup, characters(mol, _grids(mf), coeff, ops, centre), coeff.shape[1])
+            return irrep.lower() if irrep else UNLABELLED
+        except SymmetryNotFound:
+            pass
+    from pyscf import symm
+    try:
+        names = set(symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, coeff))
+    except ValueError:                                # orbitals mixed across irreps
+        return UNLABELLED
+    if mol.groupname in LINEAR:
+        from labels import irrep_to_lambda
+        names = {''.join(irrep_to_lambda(mol.groupname, n)) for n in names}
+    return names.pop().lower() if len(names) == 1 else UNLABELLED
