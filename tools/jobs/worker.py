@@ -152,7 +152,10 @@ class Progress:
 
 
 def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, heartbeat_seconds=30, image_digest='local',
-            runner_job_id=None):
+            runner_job_id=None, first_attempt=None):
+    """`first_attempt`: the first attempt of this Batch job (its earlier
+    attempts are Spot reclaims, whose files this approval pays for too);
+    an owner's retry starts a new Batch job and a new approval."""
     if not store.claim(key, attempt, utc_now()):
         return 'duplicate'
     if runner_job_id:
@@ -167,7 +170,8 @@ def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, hear
                   file=sys.stderr)
     work = Path(tempfile.mkdtemp(prefix=f'job-{key[:8]}-'))
     try:
-        return _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work)
+        return _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work,
+                    attempt if first_attempt is None else first_attempt)
     except KeyboardInterrupt:
         # I1: Ctrl-C, or the local server stopping (its worker subprocess
         # shares the terminal's SIGINT), skips `_run`'s `except Exception`
@@ -187,12 +191,16 @@ def run_job(key, store, sink, attempt=1, backend='local', grid_points=None, hear
         shutil.rmtree(work, ignore_errors=True)
 
 
+ATTEMPT_FILES = ('input.py', 'output.log', 'timings.json', 'trajectory.xyz')
+
+
 class _Counted:
-    """The sink, counting what this attempt stores in it (Phase 6C): the
-    job's storage and delivery are charged on the bytes really written. An
-    object written twice (the trajectory, step by step) counts once, at its
-    last size. A root an earlier attempt already completed is not rewritten,
-    so not counted: the quote's estimate covers that rare case."""
+    """The sink, counting what this approval's run stores in it (Phase 6C):
+    the job's storage and delivery are charged on the bytes really written.
+    An object written twice (the trajectory, step by step) counts once, at
+    its last size. Fix round 1 (review minor 5): a root an earlier attempt
+    of this Batch job completed is counted from its done.json, and the
+    earlier attempts' own files (a Spot reclaim's) are added at the end."""
 
     def __init__(self, sink):
         self.sink, self.sizes = sink, {}
@@ -213,7 +221,7 @@ class _Counted:
         return getattr(self.sink, name)
 
 
-def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work):
+def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, image_digest, work, first_attempt):
     import pyscf
     from build_library import GRID_POINTS_TRIES, write_molecule_files
 
@@ -341,6 +349,8 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
                 # files still match done.json; clear_partial never clears it,
                 # so failing here would fail the key for ever.
                 error = _check_complete(sink, key, existing)
+                if error is None:
+                    _count_root(sink, key, existing)
             else:
                 files = {name: (work / 'result' / name).read_bytes() for name in RESULT_FILES}
                 files.update({'job.json': json.dumps({'key': key, 'job': job,
@@ -365,6 +375,7 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     except Exception as e:
         error = error or _classify(e)               # the run's own failure is the more useful reason
 
+    _count_earlier_attempts(sink, key, first_attempt, attempt)
     actual.update({'resultBytes': sum(sink.sizes.values()), 'resultObjects': len(sink.sizes)})
     written = store.update_job(key, {'status': 'FAILED' if error else 'DONE', 'endedAt': iso(utc_now()),
                                      'stage': None, 'actual': actual, 'error': error, 'logTail': _tail(log)},
@@ -374,6 +385,30 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
         # this one's, is the job's. Like a duplicate, this is not a failure.
         return 'superseded'
     return 'FAILED' if error else 'DONE'
+
+
+def _count_root(sink, key, done_bytes):
+    """A complete root an earlier attempt wrote: every file its done.json lists, and done.json."""
+    try:
+        for name in json.loads(done_bytes)['files']:
+            data = sink.get_result(key, name)
+            if data is not None:
+                sink.sizes[name] = len(data)
+        sink.sizes['done.json'] = len(done_bytes)
+    except Exception as e:                          # a count that fails costs the charge, never the result
+        print(f'worker: could not count {key[:8]}\'s root ({type(e).__name__}: {e})', file=sys.stderr)
+
+
+def _count_earlier_attempts(sink, key, first_attempt, attempt):
+    """The files earlier attempts of this Batch job left (a Spot reclaim's)."""
+    try:
+        for n in range(first_attempt, attempt):
+            for name in ATTEMPT_FILES:
+                data = sink.get_attempt(key, n, name)
+                if data is not None:
+                    sink.sizes[f'attempts/{n}/{name}'] = len(data)
+    except Exception as e:
+        print(f'worker: could not count {key[:8]}\'s earlier attempts ({type(e).__name__}: {e})', file=sys.stderr)
 
 
 def _check_complete(sink, key, done_bytes):
@@ -491,8 +526,11 @@ def main(argv=None, environ=None):
         attempt = args.attempt or 1
         # D18: a local run has no task metadata to ask; it stays labelled 'local'.
         digest = environ.get('JOBS_IMAGE_DIGEST', 'local')
+    # This Batch job's first attempt: JOB_ATTEMPT_OFFSET + 1 (AWS); a local run is one attempt.
+    first = int(environ.get('JOB_ATTEMPT_OFFSET', '0')) + 1 if args.aws else attempt
     status = run_job(args.key, store, sink, attempt=attempt, backend=backend, grid_points=grid,
-                     image_digest=digest, runner_job_id=environ.get('AWS_BATCH_JOB_ID') if args.aws else None)
+                     image_digest=digest, runner_job_id=environ.get('AWS_BATCH_JOB_ID') if args.aws else None,
+                     first_attempt=min(first, attempt))
     # In AWS the line lands in CloudWatch: structured, with the job key (spec §11).
     print(json.dumps({'key': args.key, 'attempt': attempt, 'status': status}) if args.aws else status)
     # D3: a superseded attempt is not a failure (Ruling T5-b); on AWS a

@@ -61,6 +61,11 @@ from jobs.prices import billed_seconds, cost_micros
 
 RUNNABLE_LIMIT_SECONDS = 1800
 STALE_HEARTBEAT_SECONDS = 300
+# Review minor 3 (fix round 1): since Phase 6C a time limit can be days, and a hung worker would bill all of
+# it. A RUNNING job whose worker has been silent this long (the heartbeat is every 30 s, from its own thread,
+# whatever PySCF is doing), on a Batch attempt that has itself run this long, is terminated and FAILED
+# worker-silent; Batch's own FAILED event then settles it at what really ran.
+HUNG_HEARTBEAT_SECONDS = 1800
 SUBMIT_GRACE_SECONDS = 600
 PULL_ALLOWANCE_SECONDS = 60
 # Batch keeps an ended job describable for at least a day (about a week in
@@ -194,10 +199,16 @@ class Reconciler:
         if not self.store.settle(rec['key'], cost, attempt=rec['attempt']):
             return False, None
         if lines and lines['absorbedMicros'] > 0:
-            # Phase 6C: the owner approved a maximum; the charge stops there
-            # and the app pays the rest. The meter books the whole cost, so
-            # the month's cap may still have been passed.
-            return True, (f'AWS billed {_usd(lines["costMicros"])} against an approved maximum of '
+            # Phase 6C: the owner approved a maximum per line; each charge
+            # stops at its line's and the app pays the rest. A line can pass
+            # its own maximum while the total stays under the total one, so
+            # the alert names the lines (review minor 6). The meter books the
+            # whole cost, so the month's cap may still have been passed.
+            maxima = {l['item']: l['maximumMicros'] for l in rec['quote']['lines']}
+            over = '; '.join(f'{quotes.LABELS[l["item"]]} billed {_usd(l["costMicros"])}, over its approved '
+                             f'{_usd(maxima.get(l["item"], 0))}' for l in lines['lines']
+                             if l['costMicros'] > l['chargedMicros'])
+            return True, (f'{over}. AWS billed {_usd(lines["costMicros"])} in all against an approved maximum of '
                           f'{_usd(rec["quote"]["maximumMicros"])}; charged {_usd(lines["chargedMicros"])}, and the '
                           f"app absorbs {_usd(lines['absorbedMicros'])}; the month's cap may have been passed")
         if lines is None and cost > rec['reservedMicros']:
@@ -308,7 +319,25 @@ class Reconciler:
                                                 cost)
                 return 'failed-no-capacity', rec, over
             return 'waiting', rec, None
+        if status == 'RUNNING' and rec['status'] == 'RUNNING' and self._silent(rec, batch_job, now):
+            self.batch.terminate_job(jobId=batch_job['jobId'],
+                                     reason=f'Worker silent for {HUNG_HEARTBEAT_SECONDS // 60} minutes (reconcile)')
+            self.store.update_job(key, {'status': 'FAILED', 'endedAt': iso(now), 'stage': None, 'error': {
+                'code': 'worker-silent', 'message': f'the worker sent no heartbeat for {HUNG_HEARTBEAT_SECONDS // 60} '
+                                                    'minutes, so it was stopped rather than left to run to its time '
+                                                    'limit; charged for what ran.'}},
+                                  expect_status={'RUNNING'}, attempt=rec['attempt'])
+            return 'terminated-silent', rec, None
         return 'running', rec, None
+
+    @staticmethod
+    def _silent(rec, batch_job, now):
+        """Silent since both its last heartbeat and its Batch attempt's start
+        (a Spot retry that has only just started has not claimed yet)."""
+        last = [_parse(rec['heartbeatAt'])] if rec.get('heartbeatAt') else []
+        if batch_job.get('startedAt'):
+            last.append(_ms(batch_job['startedAt']))
+        return bool(last) and now - max(last) > timedelta(seconds=HUNG_HEARTBEAT_SECONDS)
 
     def reconcile(self, record: dict, batch_job: dict | None) -> str:
         """One job; returns what it did (tests and logs read this)."""
@@ -326,7 +355,9 @@ class Reconciler:
         outcome, rec, over = self._reconcile(record, self._describe([detail['jobId']]).get(detail['jobId']))
         if over:
             # The sweep never sees a job the event settled, so the event says it.
-            self.notify('Orbital viewer: a job cost more than it reserved', f'{key} {rec["formula"]}: {over}')
+            subject = ('Orbital viewer: a job was billed past its approved maximum' if rec.get('quote')
+                       else 'Orbital viewer: a job cost more than it reserved')
+            self.notify(subject, f'{key} {rec["formula"]}: {over}')
         return outcome
 
     @staticmethod
@@ -352,6 +383,9 @@ class Reconciler:
         if result == 'settled' and rec['status'] in ACTIVE:
             return ('Batch ended it without the worker reporting, and no Batch event settled it (an event was '
                     'missed): FAILED and settled now')
+        if result == 'terminated-silent':
+            return (f'its worker was silent for {HUNG_HEARTBEAT_SECONDS // 60} minutes: its Batch job was terminated '
+                    'and the job FAILED worker-silent; Batch\'s event settles what ran')
         if result == 'running' and rec.get('heartbeatAt') and \
                 now - _parse(rec['heartbeatAt']) > timedelta(seconds=STALE_HEARTBEAT_SECONDS):
             # Not de-duplicated (that needs state the sweep does not keep):

@@ -45,11 +45,23 @@ class BudgetExhausted(JobRefused):
                                    f'${meter["reserved"] / 1e6:.2f} reserved of ${meter["cap"] / 1e6:.2f}')
 
 
-def charge(record: dict, micros: int) -> dict:
+def charge(record: dict, micros: int, lines: dict | None = None) -> dict:
     """One entry of a record's ledger: billed to the month the attempt was
     submitted in, dated when the attempt ended (or, failing that, when it
-    was settled), as both backends append it."""
-    return {'month': record['month'], 'micros': micros, 'at': record.get('endedAt') or iso(utc_now())}
+    was settled), as both backends append it. `micros` is what AWS was paid
+    (what the meter books). For a quoted record (fix round 1, review I2) the
+    entry is also the approval's own bill: the quote it was charged against,
+    its option and approved maximum, the cost, the charge and what was
+    absorbed, line by line. A retry appends its own entry, so every approval
+    a job ever had stays auditable; `settlement` is only the latest's copy."""
+    entry = {'month': record['month'], 'micros': micros, 'at': record.get('endedAt') or iso(utc_now())}
+    quote = record.get('quote')
+    if quote and lines:
+        entry.update({'quoteId': quote['quoteId'], 'option': quote['option'],
+                      'approvedMaximumMicros': quote['maximumMicros'], 'costMicros': lines['costMicros'],
+                      'chargedMicros': lines['chargedMicros'], 'absorbedMicros': lines['absorbedMicros'],
+                      'lines': lines['lines']})
+    return entry
 
 
 class Store(Protocol):
@@ -225,7 +237,7 @@ class FileStore:
             lines = quotes.settlement(rec, actual_micros)
             booked = lines['costMicros'] if lines else actual_micros
             rec.update({'settled': True, 'actualMicros': rec['actualMicros'] + booked,
-                        'charges': rec.get('charges', []) + [charge(rec, booked)]})
+                        'charges': rec.get('charges', []) + [charge(rec, booked, lines)]})
             if lines:
                 rec['settlement'] = lines
             self._write(self._job_path(key), rec)

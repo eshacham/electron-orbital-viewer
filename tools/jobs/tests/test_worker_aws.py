@@ -49,9 +49,9 @@ def test_image_digest_prefers_the_env_then_the_task_metadata():
 def test_aws_mode_builds_dynamo_and_s3_from_the_environment(monkeypatch, capsys):
     seen = {}
 
-    def fake_run_job(key, store, sink, attempt, backend, grid_points, image_digest, runner_job_id):
+    def fake_run_job(key, store, sink, attempt, backend, grid_points, image_digest, runner_job_id, first_attempt):
         seen.update(key=key, store=store, sink=sink, attempt=attempt, backend=backend, digest=image_digest,
-                    runner_job_id=runner_job_id)
+                    runner_job_id=runner_job_id, first_attempt=first_attempt)
         return 'DONE'
     monkeypatch.setattr(worker, 'run_job', fake_run_job)
     monkeypatch.setenv('AWS_DEFAULT_REGION', 'us-east-1')
@@ -62,6 +62,8 @@ def test_aws_mode_builds_dynamo_and_s3_from_the_environment(monkeypatch, capsys)
     assert isinstance(seen['sink'], S3Sink) and seen['sink'].bucket == 'bucket'
     assert (seen['attempt'], seen['backend'], seen['digest']) == (3, 'aws', 'sha256:abc')
     assert seen['runner_job_id'] == 'batch-123'
+    # Fix round 1 (review minor 5): attempts 1-2 of this Batch job were Spot reclaims, whose files it counts.
+    assert seen['first_attempt'] == 1
     assert json.loads(capsys.readouterr().out) == {'key': KEY, 'attempt': 3, 'status': 'DONE'}
 
 

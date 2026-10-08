@@ -13,7 +13,11 @@ maximum:
   conservative timeout, and the timeout is what the maximum buys
   (timeout_from_maximum): the job can never run, and so never bill, past it.
 - storage: the result files in S3 Standard for RETENTION_MONTHS, plus a
-  PUT request per object;
+  PUT request per object. Policy (review minor 8): the data bucket has no
+  lifecycle rule, so a result outlives its 12 paid months and the app pays
+  for it from month 13 (about $0.0004 a year for a typical 1.5 MB job).
+  Whether results are then deleted or re-charged is the owner's decision
+  before end users are billed; until then they are kept, at the app's cost;
 - delivery: DOWNLOADS full downloads of the result through CloudFront,
   plus an HTTPS request per object per download;
 - platform: a placeholder for a fee the business model may add; $0 now.
@@ -25,10 +29,18 @@ basis.json (the MO coefficients) grows with N^2.
 
 The quote id is a SHA-256 over every term the owner approves (the key, the
 option, size, time limit, attempts, every line item, the sizing and prices
-versions). It is not a secret-keyed MAC and needs not be: the server never
-trusts it, it recomputes the quote at submit and refuses (409
-quote-changed) unless the id matches, so an id binds exactly the terms the
-owner was shown.
+versions) and the minute the server issued it (`issuedAt`). It is not a
+secret-keyed MAC: the server never trusts it, it recomputes the quote at
+submit, for each minute of the last QUOTE_TTL_MINUTES, and refuses (409
+quote-changed) unless the id matches one, so an id binds exactly the terms
+the owner was shown, and only for an hour (fix round 1, review minor 1: a
+replayed old approval no longer re-authorises a submit or a retry). Each
+approval is kept on the job's ledger (store.charge: quote id, option,
+approved maximum, cost, charge, line items). Before end users are billed,
+the id must also become an HMAC under a server secret over the payer, the
+terms and issuedAt, so a dispute can prove what was shown, to whom and
+when; with one owner and no secret store, that is recorded as a
+requirement, not built.
 
 Settlement (settlement): each line is charged its actual cost, but never
 more than its approved maximum; whatever AWS bills beyond that is absorbed
@@ -54,6 +66,7 @@ BASIS_BYTES_PER_N2 = 2.3
 RESULT_BYTES_HEADROOM = 2.0
 # Objects per job: 13 for a single point (10 at the root, 3 under attempts/), 15-16 for an optimisation.
 STORED_OBJECTS = 16
+QUOTE_TTL_MINUTES = 60
 ESTIMATE_OVERHEAD_SECONDS = 60      # image pull and stop: caffeine optimise billed 1057 s for 1022 s of run
 ITEMS = ('compute', 'storage', 'delivery', 'platform')
 LABELS = {'compute': 'Compute (AWS Fargate)', 'storage': f'Result storage (S3, {RETENTION_MONTHS} months)',
@@ -65,7 +78,7 @@ INTERRUPTION = {
 }
 # The terms a quote id binds, in this order.
 _BOUND = ('key', 'option', 'size', 'vcpu', 'memoryGB', 'capacity', 'attempts', 'timeoutSeconds', 'sizingVersion',
-          'pricesVersion', 'resultBytes', 'resultBytesMax', 'retentionMonths', 'downloads', 'lines')
+          'pricesVersion', 'resultBytes', 'resultBytesMax', 'retentionMonths', 'downloads', 'lines', 'issuedAt')
 
 
 def result_bytes(n: int) -> int:
@@ -91,7 +104,13 @@ def quote_id(option: dict) -> str:
     return hashlib.sha256(json.dumps(terms, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
-def _option(job: dict, key: str, capacity: str, local: bool) -> dict:
+def issued_minute(dt) -> str:
+    """The minute a quote is issued in, as its id binds it (UTC)."""
+    from datetime import timezone
+    return dt.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%MZ')
+
+
+def _option(job: dict, key: str, capacity: str, local: bool, issued_at: str | None) -> dict:
     d = sizing.decide(job, local=local, capacity=None if local else capacity)
     n = d['basisFunctions']
     estimate_bytes, max_bytes = result_bytes(n), result_bytes_max(n)
@@ -109,7 +128,7 @@ def _option(job: dict, key: str, capacity: str, local: bool) -> dict:
               'attempts': d['attempts'], 'timeoutSeconds': d['timeoutSeconds'],
               'predictedSeconds': d['predictedSeconds'], 'sizingVersion': d['version'],
               'pricesVersion': PRICES_VERSION, 'resultBytes': estimate_bytes, 'resultBytesMax': max_bytes,
-              'retentionMonths': RETENTION_MONTHS, 'downloads': DOWNLOADS, 'lines': lines,
+              'retentionMonths': RETENTION_MONTHS, 'downloads': DOWNLOADS, 'lines': lines, 'issuedAt': issued_at,
               'estimateMicros': sum(l['estimateMicros'] for l in lines),
               'maximumMicros': sum(l['maximumMicros'] for l in lines),
               'interruption': INTERRUPTION[job['recipe']].format(n=d['attempts']) if d['capacity'] == 'spot' else None,
@@ -119,11 +138,11 @@ def _option(job: dict, key: str, capacity: str, local: bool) -> dict:
     return option
 
 
-def _aws_options(job: dict, key: str) -> list:
+def _aws_options(job: dict, key: str, issued_at: str | None) -> list:
     options = []
     for capacity in ('spot', 'on-demand'):
         try:
-            options.append(_option(job, key, capacity, local=False))
+            options.append(_option(job, key, capacity, local=False, issued_at=issued_at))
         except JobRefused as e:
             if e.code != 'option-unavailable':
                 raise
@@ -132,20 +151,32 @@ def _aws_options(job: dict, key: str) -> list:
     return options
 
 
-def quote(job: dict, key: str, backend: str) -> dict:
+def quote(job: dict, key: str, backend: str, issued_at: str | None = None) -> dict:
     """The options a job can run under, as sizing.decide refuses or prices
     them. On AWS: Spot (unavailable, with its reason, past the Spot limit)
     and on-demand. On This Mac: one free 'local' option, with the AWS
     options alongside as `reference` ("on AWS this would cost ...")."""
     if backend == 'local':
-        return {'options': [_option(job, key, 'local', local=True)], 'recommended': 'local',
-                'reference': _aws_options(job, key)}
-    options = _aws_options(job, key)
+        return {'options': [_option(job, key, 'local', local=True, issued_at=issued_at)], 'recommended': 'local',
+                'reference': _aws_options(job, key, issued_at)}
+    options = _aws_options(job, key, issued_at)
     return {'options': options, 'recommended': 'spot' if options[0]['available'] else 'on-demand', 'reference': None}
 
 
 def find(q: dict, option: str) -> dict | None:
     return next((o for o in q['options'] if o['option'] == option), None)
+
+
+def reissued(option: dict, given_id: str, now) -> dict | None:
+    """The option as it was issued in one of the last QUOTE_TTL_MINUTES
+    minutes under the id `given_id`, or None: the terms are recomputed now,
+    only the issue minute is searched."""
+    from datetime import timedelta
+    for back in range(QUOTE_TTL_MINUTES + 1):
+        candidate = {**option, 'issuedAt': issued_minute(now - timedelta(minutes=back))}
+        if quote_id(candidate) == given_id:
+            return {**candidate, 'quoteId': given_id}
+    return None
 
 
 def decision(option: dict) -> dict:
@@ -168,7 +199,7 @@ def approved(option: dict, approved_at: str) -> dict:
     """The quote a record keeps once the owner approved it (micro-dollars)."""
     keep = ('option', 'quoteId', 'capacity', 'size', 'vcpu', 'memoryGB', 'attempts', 'timeoutSeconds',
             'sizingVersion', 'pricesVersion', 'resultBytes', 'resultBytesMax', 'retentionMonths', 'downloads',
-            'estimateMicros', 'maximumMicros')
+            'estimateMicros', 'maximumMicros', 'issuedAt')
     return {**{k: option[k] for k in keep}, 'lines': [dict(l) for l in option['lines']], 'approvedAt': approved_at}
 
 
@@ -237,7 +268,7 @@ def public_option(o: dict) -> dict:
             'attempts': o['attempts'], 'timeoutSeconds': o['timeoutSeconds'], 'predictedSeconds': o['predictedSeconds'],
             'sizingVersion': o['sizingVersion'], 'pricesVersion': o['pricesVersion'],
             'resultBytes': o['resultBytes'], 'resultBytesMax': o['resultBytesMax'],
-            'retentionMonths': o['retentionMonths'], 'downloads': o['downloads'],
+            'retentionMonths': o['retentionMonths'], 'downloads': o['downloads'], 'issuedAt': o['issuedAt'],
             'estimateUsd': _usd(o['estimateMicros']), 'maximumUsd': _usd(o['maximumMicros']),
             'lines': [{'item': l['item'], 'label': LABELS[l['item']], 'estimateUsd': _usd(l['estimateMicros']),
                        'maximumUsd': _usd(l['maximumMicros']), 'note': _note(l['item'], o)} for l in o['lines']],
@@ -254,7 +285,7 @@ def public_approved(q: dict | None) -> dict | None:
         return None
     return {'option': q['option'], 'quoteId': q['quoteId'], 'attempts': q['attempts'],
             'timeoutSeconds': q['timeoutSeconds'], 'sizingVersion': q['sizingVersion'],
-            'pricesVersion': q['pricesVersion'], 'approvedAt': q['approvedAt'],
+            'pricesVersion': q['pricesVersion'], 'approvedAt': q['approvedAt'], 'issuedAt': q.get('issuedAt'),
             'estimateUsd': _usd(q['estimateMicros']), 'maximumUsd': _usd(q['maximumMicros']),
             'lines': [{'item': l['item'], 'label': LABELS[l['item']], 'estimateUsd': _usd(l['estimateMicros']),
                        'maximumUsd': _usd(l['maximumMicros'])} for l in q['lines']]}
@@ -267,3 +298,17 @@ def public_settlement(s: dict | None) -> dict | None:
             'absorbedUsd': _usd(s['absorbedMicros']), 'resultBytes': s['resultBytes'],
             'lines': [{'item': l['item'], 'label': LABELS[l['item']], 'costUsd': _usd(l['costMicros']),
                        'chargedUsd': _usd(l['chargedMicros'])} for l in s['lines']]}
+
+
+def public_ledger(charges: list) -> list:
+    """A job's ledger, one entry per settled attempt, in USD (fix round 1, review I2). Entries from before
+    quotes (and from This Mac's free runs alike, when unquoted) carry their cost alone."""
+    def usd(value):
+        return None if value is None else _usd(value)
+    return [{'quoteId': c.get('quoteId'), 'option': c.get('option'),
+             'approvedMaximumUsd': usd(c.get('approvedMaximumMicros')), 'costUsd': _usd(c['micros']),
+             'chargedUsd': usd(c.get('chargedMicros')), 'absorbedUsd': usd(c.get('absorbedMicros')),
+             'lines': None if c.get('lines') is None else [
+                 {'item': l['item'], 'label': LABELS[l['item']], 'costUsd': _usd(l['costMicros']),
+                  'chargedUsd': _usd(l['chargedMicros'])} for l in c['lines']],
+             'month': c['month'], 'at': c.get('at')} for c in charges]

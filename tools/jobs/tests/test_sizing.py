@@ -85,7 +85,31 @@ def test_too_slow_for_the_sanity_ceiling_even_on_the_fastest_size_is_too_long(mo
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't3': 1e9})
     with pytest.raises(JobRefused) as e:
         sizing.decide(canonical_job('single', carbons(10), 0, 1))
-    assert e.value.code == 'too-long' and 'even on XL' in e.value.message and '48 h' in e.value.message
+    assert e.value.code == 'too-long' and 'on L' in e.value.message and '48 h' in e.value.message
+
+
+def test_the_sanity_ceiling_applies_to_the_size_that_would_run(monkeypatch):
+    # Review minor 2: a job whose fastest size is under 48 h but whose chosen (cheaper, up to 1.5x slower)
+    # size is over it used to pass. L and XL run the SCF alike and XL writes files ~1.55x faster: with
+    # 21.7 h of SCF and 28.3 h of files on L (50 h), XL takes ~40 h. L is within 1.5x and cheaper, so it is
+    # chosen -- and refused, naming L, though the fastest size is under the ceiling.
+    monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't0': 0.0})
+    job, large = canonical_job('single', carbons(10), 0, 1), sizing.SIZES[2]
+    parts = sizing.predict_parts(job, large)
+    monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS,
+                                              't3': sizing.CONSTANTS['t3'] * 21.7 * 3600 / parts['scfSeconds'],
+                                              'f2': sizing.CONSTANTS['f2'] * 28.3 * 3600 / parts['filesSeconds']})
+    assert sizing.predict_seconds(job, large) == pytest.approx(50 * 3600)
+    assert sizing.predict_seconds(job, sizing.SIZES[3]) < sizing.SANITY_CEILING_SECONDS
+    with pytest.raises(JobRefused) as e:
+        sizing.decide(job)
+    assert e.value.code == 'too-long' and 'on L' in e.value.message
+
+
+def test_no_time_limit_passes_the_absolute_bound():
+    # Review minor 2: the time limit (3x the prediction) is bounded absolutely; at the 48 h ceiling it is
+    # exactly MAX_TIMEOUT_SECONDS (6 days), and nothing longer is ever handed to Batch.
+    assert sizing.MAX_TIMEOUT_SECONDS == sizing.TIMEOUT_FACTOR * sizing.SANITY_CEILING_SECONDS == 144 * 3600
 
 
 def test_a_job_past_its_recipes_target_is_no_longer_refused(monkeypatch):
@@ -148,6 +172,9 @@ def test_memory_picks_the_smallest_size_with_headroom(monkeypatch):
     # 1 h "single" ceiling regardless of t3, long before the memory check can be
     # observed in isolation (Ruling D14).
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 'm0': 0.0, 'm2': 4.0, 't3': 1.0, 'f2': 0.0})
+    # Fix round 1: these chains' result files would pass the file limit (refused output-too-large first);
+    # lifted here, so the memory rule is observed on its own.
+    monkeypatch.setattr(sizing, 'OUTPUT_BUDGET_BYTES', 10 ** 12)
     # 120 carbons → N = 4440 (def2-TZVPD) → 4·4.44² = 78.9 GB predicted → needs 157.7 GB → XL
     assert sizing.decide(canonical_job('single', carbons(120), 0, 1))['size'] == 'XL'
     # 30 carbons → N = 1110 → 4.93 GB → 9.86 GB → M
@@ -162,9 +189,10 @@ def test_too_large_for_xl(monkeypatch):
 
 
 def test_too_long_for_the_sanity_ceiling(monkeypatch):
-    monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't3': 1e7})
+    # carbons(10), not 40: a 40-carbon chain's result files are refused output-too-large first (fix round 1).
+    monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't3': 1e9})
     with pytest.raises(JobRefused) as e:
-        sizing.decide(canonical_job('single', carbons(40), 0, 1))
+        sizing.decide(canonical_job('single', carbons(10), 0, 1))
     assert e.value.code == 'too-long'
 
 
@@ -523,14 +551,50 @@ def test_no_single_point_decision_is_less_conservative_than_version_4s(atoms, v4
         assert d[k] >= v4[k], k
 
 
-def test_a_c60_scale_single_point_is_priced_on_demand_since_phase_6c():
-    # Versions 3-5 refused it (18.0 h on XL, 27.0 h with the margin, over the 1 h single ceiling). Phase 6C
-    # removes that refusal: 18 h is under the 48 h sanity ceiling, so it is sized (L: as fast as XL for the
-    # SCF, at ~40 % of the price), Spot is not offered, and the timeout is 3x the prediction.
-    d = sizing.decide(canonical_job('single', carbons(60), 0, 1))
-    assert d['size'] == 'L' and d['capacity'] == 'on-demand' and d['attempts'] == 1
-    assert d['timeoutSeconds'] >= sizing.TIMEOUT_FACTOR * d['predictedSeconds']
-    assert sizing.spot_unavailable(d['predictedSeconds']) is not None
+def test_a_c60_scale_single_point_is_refused_because_its_result_files_cannot_fit():
+    # Fix round 1 (C1): versions 3-5 refused it as too long; Phase 6C's first cut priced it on demand, though
+    # its basis.json alone (~11 MB) is far over the 3 MB result limit, so it would have run ~18 h and failed.
+    with pytest.raises(JobRefused) as e:
+        sizing.decide(canonical_job('single', carbons(60), 0, 1))
+    assert e.value.code == 'output-too-large'
+    assert e.value.message.startswith("this molecule's result files would exceed the app's file limit")
+    assert "larger molecules arrive with Phase 6D's smaller-basis option" in e.value.message
+
+
+@pytest.mark.parametrize('atoms,refused', [(24, False), (30, True), (36, True)], ids=['C24', 'C30', 'C36'])
+def test_a_job_is_refused_only_when_its_result_would_pass_the_file_limit(atoms, refused):
+    # The review's window: C28-C36 (N 1036-1332) were approvable under the cap and certain to fail
+    # output-too-large after 1.5-3.3 h; C24 (N 888, basis.json ~1.6 MB) fits.
+    job = canonical_job('single', carbons(atoms), 0, 1)
+    if refused:
+        with pytest.raises(JobRefused) as e:
+            sizing.decide(job)
+        assert e.value.code == 'output-too-large'
+    else:
+        assert sizing.decide(job)['size']
+    assert (sizing.predicted_output_bytes(job) > sizing.OUTPUT_BUDGET_BYTES) is refused
+
+
+# basis.json as the AWS jobs wrote it (aws s3 ls, 2026-10-08): N, electrons, bytes.
+MEASURED_BASIS_JSON = [(58, 10, 15_649), (168, 26, 75_171), (276, 42, 173_378), (614, 102, 796_428)]
+
+
+@pytest.mark.parametrize('n,electrons,measured', MEASURED_BASIS_JSON, ids=['water', 'ethanol', 'benzene', 'caffeine'])
+def test_the_basis_json_prediction_is_never_below_what_was_written(n, electrons, measured):
+    assert measured <= sizing.predicted_basis_json_bytes(n, electrons) <= 1.4 * measured
+
+
+@pytest.mark.parametrize('folder', sorted(p.name for p in AWS_FIXTURES.iterdir() if p.is_dir()))
+def test_every_done_aws_job_passes_the_file_limit_check(folder):
+    job = json.loads((AWS_FIXTURES / folder / 'job.json').read_text())['job']
+    assert sizing.predicted_output_bytes(job) <= sizing.OUTPUT_BUDGET_BYTES
+    sizing.decide(job)                                             # and is not refused
+
+
+def test_the_output_budget_is_the_libraries_own():
+    # tools/jobs cannot import build_library (the api Lambda has no PySCF); the two must not drift.
+    import build_library
+    assert sizing.OUTPUT_BUDGET_BYTES == build_library.BUDGET_BYTES
 
 
 @pytest.mark.parametrize('i', range(4))

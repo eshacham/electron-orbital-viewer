@@ -500,3 +500,40 @@ def test_a_record_from_before_quotes_still_reads_settles_and_shows(roomy):
     assert rec['actualMicros'] == 300 and rec.get('settlement') is None
     view = public_view(rec)
     assert view['approvedQuote'] is None and view['charged'] is None and view['actualUsd'] == 0.0003
+
+
+@pytest.mark.parametrize('roomy', ['file', 'dynamo'], indirect=True)
+def test_every_approval_keeps_its_own_ledger_entry_across_retries(roomy):
+    # Review I2: a retry used to overwrite the earlier approval's settlement, and the ledger kept only AWS cost.
+    # Each charge now names the quote it was charged against, so a job's bill is auditable per approval.
+    from jobs import quotes
+    first = quoted_record()
+    roomy.create_job(first)
+    roomy.update_job('a' * 64, {'status': 'FAILED', 'error': {'code': 'x', 'message': 'y'}})
+    roomy.settle('a' * 64, 600)
+    fresh = quoted_record(option='on-demand')
+    roomy.requeue_failed('a' * 64, quotes.decision(quotes.find(quotes.quote(fresh['job'], 'a' * 64, 'aws'),
+                                                               'on-demand')), NOW, quote=fresh['quote'])
+    roomy.update_job('a' * 64, {'status': 'DONE', 'actual': {'resultBytes': 1_000_000, 'resultObjects': 13}})
+    roomy.settle('a' * 64, 500)
+    rec = roomy.get_job('a' * 64)
+    one, two = rec['charges']
+    assert (one['quoteId'], one['option'], two['quoteId'], two['option']) == (
+        first['quote']['quoteId'], 'spot', fresh['quote']['quoteId'], 'on-demand')
+    assert one['approvedMaximumMicros'] == first['quote']['maximumMicros']
+    assert one['costMicros'] == one['micros'] == 600 == one['chargedMicros'] and one['absorbedMicros'] == 0
+    assert [l['item'] for l in one['lines']] == ['compute', 'storage', 'delivery', 'platform']
+    assert two['chargedMicros'] == rec['settlement']['chargedMicros'] and two['at']
+    ledger = public_view(rec)['ledger']
+    assert [e['option'] for e in ledger] == ['spot', 'on-demand']
+    assert ledger[0]['chargedUsd'] == 0.0006 and ledger[0]['approvedMaximumUsd'] == round(first['quote']['maximumMicros'] / 1e6, 6)
+    assert ledger[1]['lines'][0]['item'] == 'compute'
+
+
+@pytest.mark.parametrize('roomy', ['file', 'dynamo'], indirect=True)
+def test_a_legacy_ledger_entry_still_reads(roomy):
+    roomy.create_job(record(reservation=1_000))
+    roomy.settle('a' * 64, 300)
+    (entry,) = public_view(roomy.get_job('a' * 64))['ledger']
+    assert entry == {'quoteId': None, 'option': None, 'approvedMaximumUsd': None, 'costUsd': 0.0003,
+                     'chargedUsd': None, 'absorbedUsd': None, 'lines': None, 'month': '2026-10', 'at': entry['at']}

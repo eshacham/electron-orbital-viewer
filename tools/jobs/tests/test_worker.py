@@ -294,6 +294,44 @@ def test_a_complete_root_left_by_a_reclaimed_attempt_ends_done(env, monkeypatch)
     assert (jobs / key / 'done.json').read_bytes() == done
 
 
+def test_a_root_an_earlier_attempt_completed_is_counted_with_every_attempt_of_the_batch_job(env, monkeypatch):
+    # Review minor 5: the attempt that finds a complete root used to report only its own attempt files (a few
+    # kB), and a Spot job's earlier attempts' files went uncounted: both undercharged storage and delivery.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    real = store.update_job
+
+    def reclaimed(k, changes, **kwargs):
+        if changes.get('status') == 'DONE':
+            raise Reclaimed
+        return real(k, changes, **kwargs)
+    monkeypatch.setattr(store, 'update_job', reclaimed)
+    with pytest.raises(Reclaimed):
+        run_job(key, store, sink, grid_points=(32,))
+    monkeypatch.setattr(store, 'update_job', real)
+    assert run_job(key, store, sink, attempt=2, first_attempt=1, grid_points=(32,)) == 'DONE'
+    stored = [p for p in (jobs / key).rglob('*') if p.is_file()]
+    actual = store.get_job(key)['actual']
+    assert actual['resultObjects'] == len(stored) and actual['resultBytes'] == sum(p.stat().st_size for p in stored)
+
+
+def test_an_owner_retry_does_not_count_the_earlier_approvals_attempt_files(env, monkeypatch):
+    # Attempt 1 belongs to an earlier approval, whose own settlement charged its files.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    import build_library
+
+    def broken(*a, **k):
+        raise RuntimeError('no files today')
+    monkeypatch.setattr(build_library, 'write_molecule_files', broken)
+    assert run_job(key, store, sink, grid_points=(32,), heartbeat_seconds=0.2) == 'FAILED'
+    monkeypatch.undo()
+    store.update_job(key, {'status': 'QUEUED', 'attempt': 2})
+    assert run_job(key, store, sink, attempt=2, first_attempt=2, grid_points=(32,)) == 'DONE'
+    mine = [p for p in (jobs / key).rglob('*') if p.is_file() and 'attempts/1/' not in p.as_posix()]
+    assert store.get_job(key)['actual']['resultBytes'] == sum(p.stat().st_size for p in mine)
+
+
 @pytest.mark.parametrize('moved', [{'attempt': 2}, {'status': 'FAILED'}], ids=['retried', 'failed'])
 def test_an_attempt_that_no_longer_owns_the_job_writes_no_root(env, monkeypatch, moved):
     # Task 4 follow-up: ownership is checked again right before the root

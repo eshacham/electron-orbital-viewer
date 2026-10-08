@@ -51,4 +51,6 @@ def public_view(record: dict) -> dict:
     # A record from before Phase 6C has neither: legacy, shown by its reservation and actual cost.
     view['approvedQuote'] = quotes.public_approved(record.get('quote'))
     view['charged'] = quotes.public_settlement(record.get('settlement')) if record['settled'] else None
+    # Every settled attempt's own charge, against the quote it was approved under (fix round 1, I2).
+    view['ledger'] = quotes.public_ledger(record.get('charges', []))
     return view

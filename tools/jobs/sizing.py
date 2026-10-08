@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 from jobs.basis_counts import basis_functions
 from jobs.batch_runner import pyscf_max_memory_mb
+from jobs.canonical import electron_count
 from jobs.errors import JobRefused
 from jobs.prices import cost_micros
 
@@ -148,6 +149,11 @@ MIN_TIMEOUT_SECONDS = 600
 # prediction longer than 48 h even on the fastest size with enough memory.
 TARGET_SECONDS = {'single': 3600, 'optimise': 7200}
 SANITY_CEILING_SECONDS = 48 * 3600
+# Fix round 1 (review minor 2): the ceiling is applied to the size that would run (which _choose may take up
+# to TIME_HEADROOM slower than the fastest), and the time limit it implies is bounded absolutely: at most 6 days
+# of Fargate wall time for any job. A shorter bound (the review's example, 72 h) would refuse every prediction
+# over 24 h, half the owner's 48 h example: an owner decision, not made here.
+MAX_TIMEOUT_SECONDS = 3 * SANITY_CEILING_SECONDS
 # Spot is offered only for a run predicted at this or less (an availability rule for the Spot option since
 # Phase 6C, no longer a refusal): a reclaim late in a long run would waste most of it, and every attempt bills.
 SPOT_LIMIT_SECONDS = 3600
@@ -259,6 +265,38 @@ def predict_seconds(job: dict, size: Size) -> float:
     return parts['scfSeconds'] + parts['filesSeconds']
 
 
+# Fix round 1 (C1): a job whose result files cannot fit the app's file limit is refused before it runs.
+# build_library.write_molecule_files raises BudgetExceeded when meta.json, basis.json, density.bin.gz and
+# esp.bin.gz pass BUDGET_BYTES at its last grid try (80^3), after the whole SCF has been paid for.
+# - basis.json holds one row of N coefficients for every occupied orbital and orbital_table's 5 virtuals
+#   (plus any virtual degenerate with the fifth): VIRTUAL_ROWS 10 covers icosahedral 5-fold degeneracy.
+#   Each coefficient takes ~23 bytes as JSON (caffeine: 796 428 B for 56 rows x 614); COEFF_BYTES 24.
+#   Water, ethanol, benzene and caffeine's written basis.json are 74-90 % of this prediction.
+# - GRID_FILES_BYTES: density, ESP and meta at 80^3. The six DONE jobs wrote 0.91-1.42 MB of them at 96^3;
+#   at 80^3 (0.58x the points) the largest is ~0.82 MB, rounded up.
+# Before Phase 6C the 1 h single-point ceiling refused everything above about N 800, so nothing reached the
+# limit; with the ceiling gone, C28-C36-sized molecules (N 1000-1350) were quotable, approvable under the
+# cap, and certain to fail after 1.5-3.3 h.
+OUTPUT_BUDGET_BYTES = 3_000_000          # build_library.BUDGET_BYTES (pinned by tests/test_sizing.py)
+VIRTUAL_ROWS = 10
+COEFF_BYTES = 24
+GRID_FILES_BYTES = 900_000
+OUTPUT_REFUSAL = ("this molecule's result files would exceed the app's file limit (about {mb:.1f} MB predicted "
+                  "against {limit:.0f} MB), so it would run and then fail; larger molecules arrive with Phase 6D's "
+                  'smaller-basis option')
+
+
+def predicted_basis_json_bytes(n: int, electrons: int) -> int:
+    return COEFF_BYTES * (math.ceil(electrons / 2) + VIRTUAL_ROWS) * n
+
+
+def predicted_output_bytes(job: dict) -> int:
+    """The budgeted result files at the last grid try: basis.json plus the grids and meta."""
+    mol = job['molecule']
+    n = basis_functions(mol['atoms'], job['method']['basis'])
+    return predicted_basis_json_bytes(n, electron_count(mol['atoms'], mol['charge'])) + GRID_FILES_BYTES
+
+
 def _choose(job: dict, memory_fitting: list) -> tuple[Size, float]:
     """The size a job runs on (Ruling T11-a, Phase 6C): the smallest whose
     margined prediction fits the recipe's target -- predicted seconds are
@@ -315,14 +353,15 @@ def decide(job: dict, local: bool = False, capacity: str | None = None) -> dict:
     if not memory_fitting:
         raise JobRefused('too-large', f'predicted {memory:.0f} GB of memory (N = {n}): beyond the largest Fargate '
                                       f'worker ({SIZES[-1].memory_gb} GB with {HEADROOM:g}× headroom)')
-    best = min(memory_fitting, key=lambda s: predict_seconds(job, s))
-    best_seconds = predict_seconds(job, best)
-    if best_seconds > SANITY_CEILING_SECONDS:
-        raise JobRefused('too-long', f'predicted {best_seconds / 3600:.1f} h even on {best.name} (the fastest size with '
-                                     f'enough memory): longer than the {SANITY_CEILING_SECONDS // 3600} h this app '
-                                     f'accepts for one job')
+    output = predicted_output_bytes(job)
+    if output > OUTPUT_BUDGET_BYTES:
+        raise JobRefused('output-too-large', OUTPUT_REFUSAL.format(mb=output / 1e6, limit=OUTPUT_BUDGET_BYTES / 1e6))
     size, seconds = _choose(job, memory_fitting)
     timeout = int(max(math.ceil(TIMEOUT_FACTOR * seconds), MIN_TIMEOUT_SECONDS))
+    if seconds > SANITY_CEILING_SECONDS or timeout > MAX_TIMEOUT_SECONDS:
+        raise JobRefused('too-long', f'predicted {seconds / 3600:.1f} h on {size.name} (the size it would run on): '
+                                     f'longer than the {SANITY_CEILING_SECONDS // 3600} h this app accepts for one '
+                                     f'job')
     if local:
         capacity, attempts = 'local', 1
     else:

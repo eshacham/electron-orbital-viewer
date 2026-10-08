@@ -269,7 +269,7 @@ class DynamoStore:
                  '#mo': 'month'}
         values = {':true': {'BOOL': True}, ':false': {'BOOL': False}, ':a': _n(booked), ':w': _n(w),
                   ':none': {'L': []}, ':attempt': _n(rec['attempt']), ':month': {'S': rec['month']},
-                  ':charge': to_attr([charge(rec, booked)])}
+                  ':charge': to_attr([charge(rec, booked, lines)])}
         if lines:
             update += ', #sl = :settlement'
             names['#sl'], values[':settlement'] = 'settlement', to_attr(lines)

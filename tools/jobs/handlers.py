@@ -143,7 +143,7 @@ class Api:
                 'source': source, 'retry': retry, 'option': body.get('option'), 'quoteId': body.get('quoteId')}
 
     def _quote(self, p):
-        return quotes.quote(p['job'], p['key'], self.backend)
+        return quotes.quote(p['job'], p['key'], self.backend, issued_at=quotes.issued_minute(self.now()))
 
     def _meter(self, month):
         m = self.store.meter(month)
@@ -173,7 +173,8 @@ class Api:
                     option['approvable'] = False
                     option['blockedReason'] = (f'Up to {dollars(round(option["maximumUsd"] * 1e6))} is more than '
                                                f"the {dollars(room)} left of this month's {dollars(meter['cap'])} "
-                                               'compute cap: the monthly cap would need raising to approve it.')
+                                               'cap (compute, storage and delivery): the monthly cap would need '
+                                               'raising to approve it.')
             decision = {'ok': True, 'quote': q}
         mol = p['job']['molecule']
         return {'key': p['key'], 'job': p['job'], 'name': p['name'], 'formula': p['formula'],
@@ -195,11 +196,13 @@ class Api:
             raise _bad(f'option {p["option"]} is not offered here ({self.backend})')
         if not option['available']:
             raise JobRefused('option-unavailable', option['unavailableReason'], 409)
-        if option['quoteId'] != p['quoteId']:
-            raise JobRefused('quote-changed', 'The quote changed since it was shown (its price, size, time limit or '
-                                              'terms are not what was approved): preview again and approve the new '
-                                              'quote.', 409)
-        return option
+        shown = quotes.reissued(option, p['quoteId'], self.now())
+        if shown is None:
+            raise JobRefused('quote-changed', 'The quote changed or expired since it was shown (its price, size, time '
+                                              'limit or terms are not what was approved, or it is over '
+                                              f'{quotes.QUOTE_TTL_MINUTES} minutes old): preview again and approve '
+                                              'the new quote.', 409)
+        return shown
 
     def submit(self, body):
         p = self._prepare(body)

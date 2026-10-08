@@ -350,6 +350,8 @@ def test_each_stale_line_names_its_own_cause(empty_store):
         store.create_job(water(key=key))
         store.update_job(key, {'runnerJobId': job_id})
     store.claim(silent, 1, T0)
+    # Silent 10 minutes: reported (over STALE_HEARTBEAT_SECONDS), not yet stopped (HUNG_HEARTBEAT_SECONDS, fix round 1).
+    store.update_job(silent, {'heartbeatAt': iso(T0 + timedelta(seconds=RUNNABLE_LIMIT_SECONDS + 1 - 600))})
     jobs = [{**batch_job('RUNNABLE'), 'jobId': 'job-b'}, {**batch_job('RUNNING'), 'jobId': 'job-c'}]
     result = Reconciler(store, FakeBatch(jobs), FakeEcs(),
                         now=lambda: T0 + timedelta(seconds=RUNNABLE_LIMIT_SECONDS + 1)).sweep()
@@ -532,6 +534,10 @@ def test_a_quoted_job_billed_past_its_maximum_is_charged_the_maximum_and_reporte
     assert s['lines'][0]['chargedMicros'] == compute_max and s['absorbedMicros'] > 0
     assert s['chargedMicros'] <= chosen['maximumMicros']
     assert len(notes) == 1 and 'approved maximum' in notes[0][1] and 'absorbs' in notes[0][1]
+    # Review minor 6: the alert names the line that went over (per-line capping can absorb while the total is
+    # under the total maximum), and its subject says what happened rather than "cost more than it reserved".
+    assert notes[0][0] == 'Orbital viewer: a job was billed past its approved maximum'
+    assert 'Compute (AWS Fargate) billed' in notes[0][1] and 'over its approved' in notes[0][1]
 
 
 def test_the_sweep_reports_an_absorbed_charge_too(empty_store):
@@ -539,3 +545,48 @@ def test_the_sweep_reports_an_absorbed_charge_too(empty_store):
     empty_store.update_job(KEY, {'status': 'DONE', 'actual': {'resultBytes': 1_000_000, 'resultObjects': 13}})
     result = reconciler(empty_store, [batch_job('SUCCEEDED', [attempt(T0, 3 * 3600)])]).sweep()
     assert result['outcome'] == {KEY: 'settled'} and len(result['stale']) == 1 and 'absorbs' in result['stale'][0]
+
+
+def test_the_sweep_says_a_silent_worker_was_stopped(store):
+    from jobs.reconcile import HUNG_HEARTBEAT_SECONDS
+    running(store, T0)
+    result = reconciler(store, [{**batch_job('RUNNING'), 'startedAt': ms(T0)}],
+                        now=T0 + timedelta(seconds=HUNG_HEARTBEAT_SECONDS + 60)).sweep()
+    assert result['outcome'] == {KEY: 'terminated-silent'} and 'worker-silent' in result['stale'][0]
+
+
+# --- review minor 3: a worker silent for HUNG_HEARTBEAT_SECONDS is stopped, not billed to its whole maximum ---
+
+def running(store_, heartbeat):
+    store_.claim(KEY, 1, T0)
+    store_.update_job(KEY, {'heartbeatAt': iso(heartbeat)})
+
+
+def test_a_worker_silent_for_half_an_hour_is_terminated_and_failed(store):
+    from jobs.reconcile import HUNG_HEARTBEAT_SECONDS
+    running(store, T0)
+    job = {**batch_job('RUNNING'), 'startedAt': ms(T0)}
+    r = reconciler(store, [job], now=T0 + timedelta(seconds=HUNG_HEARTBEAT_SECONDS + 60))
+    assert r.reconcile(store.get_job(KEY), job) == 'terminated-silent'
+    assert r.batch.terminated and 'silent' in r.batch.terminated[0][1]
+    rec = store.get_job(KEY)
+    assert rec['status'] == 'FAILED' and rec['error']['code'] == 'worker-silent' and not rec['settled']
+    # Batch's own FAILED event then settles it at what really ran.
+    ended = batch_job('FAILED', [attempt(T0, 1900)])
+    assert reconciler(store, [ended]).on_event(ended) == 'settled'
+    assert store.get_job(KEY)['actualMicros'] == cost_micros('spot', 2, 8, 1960)
+
+
+def test_a_worker_heard_from_within_half_an_hour_is_left_running(store):
+    running(store, T0 + timedelta(minutes=10))
+    job = {**batch_job('RUNNING'), 'startedAt': ms(T0)}
+    r = reconciler(store, [job], now=T0 + timedelta(minutes=35))
+    assert r.reconcile(store.get_job(KEY), job) == 'running' and not r.batch.terminated
+
+
+def test_a_spot_retry_that_has_only_just_started_is_not_taken_for_silent(store):
+    # The record's heartbeat is the reclaimed attempt's; the new attempt has not claimed yet.
+    running(store, T0)
+    job = {**batch_job('RUNNING'), 'startedAt': ms(T0 + timedelta(minutes=40))}
+    r = reconciler(store, [job], now=T0 + timedelta(minutes=45))
+    assert r.reconcile(store.get_job(KEY), job) == 'running' and not r.batch.terminated

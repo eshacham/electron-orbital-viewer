@@ -120,7 +120,7 @@ def test_the_quote_id_binds_every_term():
     assert by_option(again)['spot']['quoteId'] == o['quoteId']                   # deterministic
     assert by_option(q)['on-demand']['quoteId'] != o['quoteId']
     for change in ({'timeoutSeconds': 601}, {'attempts': 2}, {'size': 'M'}, {'sizingVersion': 4},
-                   {'pricesVersion': 1}, {'key': 'b' * 64},
+                   {'pricesVersion': 1}, {'key': 'b' * 64}, {'issuedAt': '2026-10-10T12:01Z'},
                    {'lines': [{**o['lines'][0], 'maximumMicros': o['lines'][0]['maximumMicros'] + 1}, *o['lines'][1:]]}):
         assert quotes.quote_id({**o, **change}) != o['quoteId'], change
 
@@ -141,11 +141,21 @@ def test_a_too_large_job_is_refused_by_the_quote():
     assert e.value.code == 'too-large'
 
 
-def test_a_c60_scale_quote_is_on_demand_only():
-    q = quotes.quote(canonical_job('single', carbons(60), 0, 1), 'a' * 64, 'aws')
+def test_a_c60_scale_quote_is_refused_before_anything_is_priced():
+    # Fix round 1 (C1): its result files (~11 MB) cannot fit the 3 MB limit, so it is refused rather than
+    # quoted on demand (where only the monthly cap stood between it and a certain, paid-for failure).
+    from jobs.errors import JobRefused
+    with pytest.raises(JobRefused) as e:
+        quotes.quote(canonical_job('single', carbons(60), 0, 1), 'a' * 64, 'aws')
+    assert e.value.code == 'output-too-large'
+    with pytest.raises(JobRefused):
+        quotes.quote(canonical_job('single', carbons(60), 0, 1), 'a' * 64, 'local')       # This Mac too
+
+
+def test_a_run_past_the_spot_limit_is_quoted_on_demand_only():
+    q = quotes.quote(canonical_job('single', carbons(26), 0, 1), 'a' * 64, 'aws')     # 70 min on L
     spot, on_demand = by_option(q)['spot'], by_option(q)['on-demand']
     assert not spot['available'] and on_demand['available'] and q['recommended'] == 'on-demand'
-    assert on_demand['maximumMicros'] > 8_800_000            # more than the whole monthly cap
 
 
 # -- the approved quote and settlement ----------------------------------------------------------------------
@@ -233,3 +243,13 @@ def test_public_views_are_in_usd_with_labels():
     assert charged['lines'][0] == {'item': 'compute', 'label': 'Compute (AWS Fargate)', 'costUsd': 0.000497,
                                    'chargedUsd': 0.000497}
     assert quotes.public_approved(None) is None and quotes.public_settlement(None) is None
+
+
+def test_a_quote_carries_the_minute_it_was_issued_and_the_id_binds_it():
+    # Review minor 1: an id now names when the server showed it, so a submit can be held to a fresh one.
+    job = canonical_job('single', WATER, 0, 1)
+    a = quotes.quote(job, job_key(job), 'aws', issued_at='2026-10-10T12:00Z')
+    b = quotes.quote(job, job_key(job), 'aws', issued_at='2026-10-10T12:01Z')
+    assert by_option(a)['spot']['issuedAt'] == '2026-10-10T12:00Z'
+    assert by_option(a)['spot']['quoteId'] != by_option(b)['spot']['quoteId']
+    assert quotes.public_quote(a)['options'][0]['issuedAt'] == '2026-10-10T12:00Z'

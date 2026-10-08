@@ -137,7 +137,7 @@ def test_budget_refusal(api):
     for option in body['decision']['quote']['options']:
         assert option['approvable'] is False
         assert option['blockedReason'] == (f'Up to ${option["maximumUsd"]:.2f} is more than the $0.000001 left of '
-                                           "this month's $0.000001 compute cap: the monthly cap would need raising "
+                                           "this month's $0.000001 cap (compute, storage and delivery): the monthly cap would need raising "
                                            'to approve it.')
 
 
@@ -471,3 +471,19 @@ def test_a_local_preview_is_one_free_option_with_the_aws_price_for_reference(tmp
     assert quote['reference'][0]['maximumUsd'] > 0
     status, view = submit(api, WATER)
     assert status == 201 and view['approvedQuote']['option'] == 'local' and view['reservedUsd'] == 0
+
+
+def test_a_quote_holds_for_an_hour_then_must_be_shown_again(api):
+    # Review minor 1: a replayed old approval no longer re-authorises a submit or a retry for as long as the
+    # prices and sizing stand; the owner must be shown the quote again (preview) after QUOTE_TTL_MINUTES.
+    from datetime import timedelta
+    from jobs import quotes
+    spot = quote_of(api)['spot']
+    body = {**WATER, 'option': 'spot', 'quoteId': spot['quoteId']}
+    api.now = lambda: NOW + timedelta(minutes=quotes.QUOTE_TTL_MINUTES + 1)
+    status, refused = call(api, 'POST', '/api/v1/jobs', body)
+    assert status == 409 and refused['error']['code'] == 'quote-changed' and 'expired' in refused['error']['message']
+    api.now = lambda: NOW + timedelta(minutes=quotes.QUOTE_TTL_MINUTES - 1)
+    status, view = call(api, 'POST', '/api/v1/jobs', body)
+    assert status == 201 and view['approvedQuote']['quoteId'] == spot['quoteId']
+    assert view['approvedQuote']['issuedAt'] == '2026-10-10T12:00Z'
