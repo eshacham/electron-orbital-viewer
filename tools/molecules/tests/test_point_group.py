@@ -71,11 +71,16 @@ def test_bf3_at_def2_tzvpd_keeps_textbook_numbering():
     # mixed in them, carry no single irrep. They read as one combined label counting both, so the B 1s is
     # still 2a1' and every later number matches def2-SVP's.
     labels, symmetry, notes = occupied_labels(list(by_id('bf3').atoms), basis='def2-TZVPD')
-    assert labels[:3] == ["1a1'+1e'"] * 3
+    # How much a1' and e' mix inside that near-degenerate set swings with conv_tol and the BLAS build
+    # (about 7 % at 1e-10 here, about 1 % at 1e-9), so the Linux image may split it cleanly instead.
+    # Either outcome is honest; what must hold is the numbering from the B 1s on.
     assert labels[3:] == TEXTBOOK['bf3'][1][3:]
     assert symmetry == {'pointGroup': 'D3h', 'labelGroup': 'D3h', 'labels': 'full-group'}
-    assert set(notes) == {0, 1, 2} and notes[0] == notes[1] == notes[2]
-    assert "near-degenerate combinations of a1' and e'" in notes[0] and 'mixed in these orbitals' in notes[0]
+    if labels[:3] == ["1a1'+1e'"] * 3:
+        assert set(notes) == {0, 1, 2} and notes[0] == notes[1] == notes[2]
+        assert "near-degenerate combinations of a1' and e'" in notes[0] and 'mixed in these orbitals' in notes[0]
+    else:
+        assert sorted(labels[:3]) == sorted(["1a1'", "1e'", "1e'"])
 
 
 SF6_TZVPD = (['1a1g'] + ['1t1u'] * 3 + ['1eg'] * 2 + ['2a1g', '3a1g'] + ['2t1u'] * 3 + ['4a1g'] + ['3t1u'] * 3
