@@ -169,7 +169,9 @@ def test_the_optimisation_builds_its_molecule_without_symmetry(tmp_path, monkeyp
         return True, mf.mol
     monkeypatch.setattr(gs, 'kernel', record)
     mol, mf, info = ns['build']()
-    assert seen == [False] and mol.symmetry and info == {'steps': 0, 'converged': True}
+    assert seen == [False] and mol.symmetry and {k: info[k] for k in ('steps', 'converged')} == {'steps': 0, 'converged': True}
+    assert info['finalGeometry'] == {'symmetrised': True, 'groupOrder': None, 'maxDisplacementAngstrom': 0.0,
+                                     'pointGroup': 'Dooh'}
 
 
 def dihedral(p0, p1, p2, p3):
@@ -237,3 +239,86 @@ def test_the_budget_is_never_asked_at_the_step_that_converges(tmp_path, monkeypa
     n, asked = info['steps'] - 1, []
     _, _, again = ns['build'](may_start=lambda stage: asked.append(stage) or len(asked) <= n)
     assert again == info and len(asked) == n
+
+
+# Task 6 review, folded into Task 7: the final SCF's symmetry, an exact time check, the best frame.
+TWISTED_ETHYLENE = [[6, 0, 0, 0], [6, 1.34, 0, 0], [1, -0.55, 0.93, 0.2], [1, -0.55, -0.93, -0.2],
+                    [1, 1.89, 0.5, 0.8], [1, 1.89, -0.5, -0.8]]
+D3_SMALL = {'xc': 'B3LYP-D3BJ', 'basis': 'sto-3g', 'optimiseBasis': 'sto-3g'}
+
+
+def test_a_geometry_symmetric_to_within_the_optimisers_noise_is_symmetrised_for_the_final_scf(tmp_path, monkeypatch):
+    # The optimisation ends within ~2e-5 Å of D2h; PySCF then finds D2h but cannot build its symmetry-adapted
+    # basis at that geometry (IndexError in symm_adapted_basis), and a paid job failed after its optimisation.
+    ns = _namespace(tmp_path, monkeypatch, {**canonical_job('optimise', TWISTED_ETHYLENE, 0, 1, method=D3_SMALL),
+                                            'computeVersion': 1})
+    mol, mf, info = ns['build']()
+    assert mf.converged and mol.symmetry and mol.topgroup == 'D2h'
+    record = info['finalGeometry']
+    assert record['symmetrised'] and record['pointGroup'] == 'D2h' and record['groupOrder'] == 8
+    assert 0 < record['maxDisplacementAngstrom'] < 1e-3
+
+
+def _noisy(atoms, scale, seed=7):
+    rng = np.random.default_rng(seed)
+    return [(s, tuple(float(c) for c in np.asarray(xyz) + scale * rng.standard_normal(3))) for s, xyz in atoms]
+
+
+def test_symmetrising_finds_the_full_group_and_moves_nothing_further_than_the_noise(tmp_path, monkeypatch):
+    ns = _namespace(tmp_path, monkeypatch, canonical_job('single', H2, 0, 1, method=SMALL))
+    from pyscf import gto
+    a = 0.629
+    methane = [('C', (0.0, 0.0, 0.0)), ('H', (a, a, a)), ('H', (-a, -a, a)), ('H', (-a, a, -a)), ('H', (a, -a, -a))]
+    noisy = _noisy(methane, 3e-5)
+    assert gto.M(atom=noisy, symmetry=True, verbose=0).topgroup != 'Td'          # noise above PySCF's tolerance
+    placed, order, moved = ns['symmetrised'](noisy)
+    assert order == 24 and moved < 2e-4
+    assert gto.M(atom=placed, symmetry=True, verbose=0).topgroup == 'Td'
+    # A real asymmetry, ten times the tolerance, is kept: water with O-H bonds 0.96 and 0.97 Å stays Cs.
+    water = [('O', (0.0, 0.0, 0.0)), ('H', (0.0, 0.757, 0.587)), ('H', (0.0, -0.765, 0.593))]
+    placed, order, moved = ns['symmetrised'](water)
+    assert order == 2 and moved < 1e-12
+    # A linear molecule: laid exactly on its line and, here, exactly centrosymmetric.
+    placed, order, moved = ns['symmetrised'](_noisy([('O', (0.0, 0.0, -1.16)), ('C', (0.0, 0.0, 0.0)), ('O', (0.0, 0.0, 1.16))], 2e-5))
+    assert gto.M(atom=placed, symmetry=True, verbose=0).topgroup == 'Dooh' and moved < 1e-4
+
+
+def test_a_final_scf_whose_symmetry_cannot_be_built_runs_without_it_and_says_so(tmp_path, monkeypatch):
+    ns = _namespace(tmp_path, monkeypatch, canonical_job('single', H2, 0, 1, method=SMALL))
+    live = ns['build'].__globals__
+    real = live['molecule']
+
+    def broken(atoms, basis, symmetry=True):
+        if symmetry:
+            raise IndexError('index 2 is out of bounds for axis 0 with size 2')
+        return real(atoms, basis, symmetry=False)
+    live['molecule'] = broken
+    mol, mf, info = ns['build']()
+    assert mf.converged and not mol.symmetry
+    assert info['finalGeometry']['symmetry'] == 'off'
+    assert info['finalGeometry']['note'] == (
+        'PySCF could not build symmetry-adapted orbitals at this geometry (IndexError: index 2 is out of bounds '
+        'for axis 0 with size 2), so the final SCF ran without point-group symmetry and its orbitals carry no '
+        'symmetry labels')
+
+
+def test_a_stopped_optimisation_keeps_its_lowest_energy_frame(tmp_path, monkeypatch):
+    # geomeTRIC can take a step that raises the energy (and then reject it); a stop just after one must not
+    # hand on that worse geometry.
+    ns = _namespace(tmp_path, monkeypatch, {**canonical_job('optimise', H2, 0, 1, method=OPT), 'computeVersion': 1})
+    import pyscf.geomopt.geometric_solver as gs
+    frames = [[('H', (0.0, 0.0, 0.0)), ('H', (0.0, 0.0, z))] for z in (0.80, 0.74, 0.70)]
+    energies, gradients = (-1.10, -1.20, -1.15), (0.03, 0.001, 0.02)
+
+    def fake(scanner, maxsteps, callback, **kwargs):
+        for frame, energy, gmax in zip(frames + frames[:1], energies + (0.0,), gradients + (0.0,)):
+            mol = ns['molecule'](frame, 'sto-3g', symmetry=False)
+            scanner(mol)                                   # the budget refuses the fourth
+            callback({'mol': mol, 'energy': energy, 'gradients': np.array([[0, 0, gmax], [0, 0, -gmax]]),
+                      'g_scanner': scanner})
+        return True, mol
+    monkeypatch.setattr(gs, 'kernel', fake)
+    asked = []
+    _, _, info = ns['build'](may_start=lambda stage: asked.append(stage) or len(asked) < 3)
+    assert asked == ['step'] * 3 and info['steps'] == 3 and info['stoppedBy'] == 'time-limit'
+    assert info['maxGradient'] == pytest.approx(0.001) and info['stoppedAt'] == 2
