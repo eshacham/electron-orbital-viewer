@@ -37,11 +37,16 @@ export function formatEnergy(hartree: number, method: string): string {
     return `${hartree < 0 ? '−' : ''}${Math.abs(hartree).toFixed(6)} Ha (${method})`;
 }
 
-/** Recipe B's optimisation steps run in the smaller basis; everything else is the job's own. */
+/** PySCF's 'B3LYP-D3BJ' as the literature writes it, 'B3LYP-D3(BJ)' (Phase 6D); any other xc unchanged. */
+export const xcLabel = (xc: string): string => (/-D3BJ$/i.test(xc) ? `${xc.slice(0, -5)}-D3(BJ)` : xc);
+
+/** Recipe B's geometry work -- its optimisation steps, its frequency check and any re-optimisation -- runs in
+ * the smaller basis; everything else is the job's own. */
+const GEOMETRY_STAGE = /^(optimisation|re-optimisation|frequency check|displacing)/i;
 export function methodOf(job: CanonicalJob, stage: string | null = null): string {
     const { xc, basis, optimiseBasis } = job.method;
-    if (optimiseBasis && stage !== null && /^optimisation/i.test(stage)) return `${xc}/${optimiseBasis}`;
-    return `${xc}/${basis}`;
+    if (optimiseBasis && stage !== null && GEOMETRY_STAGE.test(stage)) return `${xcLabel(xc)}/${optimiseBasis}`;
+    return `${xcLabel(xc)}/${basis}`;
 }
 
 export const predictionNote = (version: number): string => `sizing v${version} prediction`;

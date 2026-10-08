@@ -1,12 +1,12 @@
 {
  "status": 200,
  "body": {
-  "key": "e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa",
+  "key": "4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216",
   "job": {
-   "computeVersion": 1,
+   "computeVersion": 2,
    "recipe": "single",
    "method": {
-    "xc": "B3LYP",
+    "xc": "B3LYP-D3BJ",
     "basis": "def2-TZVPD",
     "optimiseBasis": null
    },
@@ -77,7 +77,7 @@
       "capacity": "spot",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "89c1bedbd349b6c394411e02814a70ef4036814f6bf5ab8d26e2aa694938211b",
+      "quoteId": "52f823106e1f027ed6e0e96eb2fafd8c1f97bed6d8ba4fd72296453a35aa9782",
       "size": "S",
       "vcpu": 2,
       "memoryGB": 8,
@@ -91,8 +91,8 @@
       "retentionMonths": 12,
       "downloads": 10,
       "issuedAt": "2026-10-10T12:00Z",
-      "estimateUsd": 0.002452,
-      "maximumUsd": 0.021284,
+      "estimateUsd": 0.002467,
+      "maximumUsd": 0.021299,
       "lines": [
        {
         "item": "compute",
@@ -104,15 +104,15 @@
        {
         "item": "storage",
         "label": "Result storage (S3, 12 months)",
-        "estimateUsd": 0.000468,
-        "maximumUsd": 0.000856,
+        "estimateUsd": 0.000473,
+        "maximumUsd": 0.000861,
         "note": "About 1.5 MB of results (at most 3.0 MB) kept 12 months in S3 Standard at $0.023 per GB-month, plus $0.005 per 1,000 writes."
        },
        {
         "item": "delivery",
         "label": "Delivery (CloudFront, 10 full downloads)",
-        "estimateUsd": 0.001354,
-        "maximumUsd": 0.002548,
+        "estimateUsd": 0.001364,
+        "maximumUsd": 0.002558,
         "note": "10 full downloads through CloudFront at $0.085 per GB, plus $0.01 per 10,000 requests."
        },
        {
@@ -146,7 +146,7 @@
       "capacity": "on-demand",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "30acc059ccfaa51a469e24b25113acc5d5f12891e6529f50157abaff1405e3e8",
+      "quoteId": "f0062dbf933feb5495eab35c87e0b912082af7c206abd5b7edf29c1f21e87cb6",
       "size": "S",
       "vcpu": 2,
       "memoryGB": 8,
@@ -160,8 +160,8 @@
       "retentionMonths": 12,
       "downloads": 10,
       "issuedAt": "2026-10-10T12:00Z",
-      "estimateUsd": 0.003791,
-      "maximumUsd": 0.022052,
+      "estimateUsd": 0.003806,
+      "maximumUsd": 0.022067,
       "lines": [
        {
         "item": "compute",
@@ -173,15 +173,15 @@
        {
         "item": "storage",
         "label": "Result storage (S3, 12 months)",
-        "estimateUsd": 0.000468,
-        "maximumUsd": 0.000856,
+        "estimateUsd": 0.000473,
+        "maximumUsd": 0.000861,
         "note": "About 1.5 MB of results (at most 3.0 MB) kept 12 months in S3 Standard at $0.023 per GB-month, plus $0.005 per 1,000 writes."
        },
        {
         "item": "delivery",
         "label": "Delivery (CloudFront, 10 full downloads)",
-        "estimateUsd": 0.001354,
-        "maximumUsd": 0.002548,
+        "estimateUsd": 0.001364,
+        "maximumUsd": 0.002558,
         "note": "10 full downloads through CloudFront at $0.085 per GB, plus $0.01 per 10,000 requests."
        },
        {

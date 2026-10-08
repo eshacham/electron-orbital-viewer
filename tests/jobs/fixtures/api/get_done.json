@@ -1,15 +1,15 @@
 {
  "status": 200,
  "body": {
-  "key": "e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa",
+  "key": "4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216",
   "status": "DONE",
   "attempt": 1,
   "recipe": "single",
   "job": {
-   "computeVersion": 1,
+   "computeVersion": 2,
    "recipe": "single",
    "method": {
-    "xc": "B3LYP",
+    "xc": "B3LYP-D3BJ",
     "basis": "def2-TZVPD",
     "optimiseBasis": null
    },
@@ -86,10 +86,10 @@
   "backend": "local",
   "reservedUsd": 0.0,
   "actualUsd": 0.0,
-  "resultUrl": "/molecules/jobs/e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa/",
+  "resultUrl": "/molecules/jobs/4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216/",
   "approvedQuote": {
    "option": "local",
-   "quoteId": "39627ac4ad9faeae81b554175f1c05f844098a3d3b8d5684e20a9fd10f3dc761",
+   "quoteId": "7ae8bfb5aff5ab29337bfc71f894a46da0d004fcaf90466debb9a751c25694d7",
    "attempts": 1,
    "timeoutSeconds": 600,
    "sizingVersion": 5,
@@ -159,7 +159,7 @@
   },
   "ledger": [
    {
-    "quoteId": "39627ac4ad9faeae81b554175f1c05f844098a3d3b8d5684e20a9fd10f3dc761",
+    "quoteId": "7ae8bfb5aff5ab29337bfc71f894a46da0d004fcaf90466debb9a751c25694d7",
     "option": "local",
     "approvedMaximumUsd": 0.0,
     "costUsd": 0.0,

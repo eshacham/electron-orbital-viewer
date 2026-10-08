@@ -51,8 +51,8 @@ describe('jobs table logic', () => {
         expect(jobLinks({ ...failed, actual: null, error: { code: 'optimisation-not-converged', message: 'm' } })).toHaveLength(2);
     });
     it('names the method, and lists the last months', () => {
-        expect(methodSummary(failed)).toBe('B3LYP/def2-SVP → B3LYP/def2-TZVPD');
-        expect(methodSummary(done)).toBe('B3LYP/def2-TZVPD');
+        expect(methodSummary(failed)).toBe('B3LYP-D3(BJ)/def2-SVP → B3LYP-D3(BJ)/def2-TZVPD');
+        expect(methodSummary(done)).toBe('B3LYP-D3(BJ)/def2-TZVPD');
         expect(recentMonths(new Date('2026-01-15T00:00:00Z'), 3)).toEqual(['2026-01', '2025-12', '2025-11']);
     });
 });
@@ -74,8 +74,8 @@ describe('<JobsTable>', () => {
     it('keeps each method whole, so the cell can break only at the arrow', () => {
         render(<JobsTable jobs={[failed]} />);
         const cell = within(dataRows()[0]).getAllByRole('cell')[2];
-        expect(cell).toHaveTextContent('B3LYP/def2-SVP → B3LYP/def2-TZVPD');
-        expect([...cell.querySelectorAll('.admin-nowrap')].map(span => span.textContent)).toEqual(['B3LYP/def2-SVP →', 'B3LYP/def2-TZVPD']);
+        expect(cell).toHaveTextContent('B3LYP-D3(BJ)/def2-SVP → B3LYP-D3(BJ)/def2-TZVPD');
+        expect([...cell.querySelectorAll('.admin-nowrap')].map(span => span.textContent)).toEqual(['B3LYP-D3(BJ)/def2-SVP →', 'B3LYP-D3(BJ)/def2-TZVPD']);
     });
     it('filters by status, and says why a job failed', () => {
         render(<JobsTable jobs={JOBS} />);

@@ -1,15 +1,15 @@
 {
  "status": 200,
  "body": {
-  "key": "03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129",
+  "key": "6cb4e4a0f6ee78aeb1bc87d759e4a676b56353e045c4e9b50188ba2b7be3bb66",
   "status": "DONE",
   "attempt": 1,
   "recipe": "optimise",
   "job": {
-   "computeVersion": 1,
+   "computeVersion": 2,
    "recipe": "optimise",
    "method": {
-    "xc": "B3LYP",
+    "xc": "B3LYP-D3BJ",
     "basis": "def2-TZVPD",
     "optimiseBasis": "def2-SVP"
    },
@@ -77,20 +77,20 @@
   },
   "error": null,
   "backend": "aws",
-  "reservedUsd": 0.022052,
+  "reservedUsd": 0.022067,
   "actualUsd": 0.022921,
-  "resultUrl": "/molecules/jobs/03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129/",
+  "resultUrl": "/molecules/jobs/6cb4e4a0f6ee78aeb1bc87d759e4a676b56353e045c4e9b50188ba2b7be3bb66/",
   "approvedQuote": {
    "option": "on-demand",
-   "quoteId": "2aa90ae9669b436146b65652e8d23804bfb0594fa3fa38490a2b8d1caf004c57",
+   "quoteId": "797fa63e8e67368902c3576bf06902dd2d7d6d04e94c47bd7e5e317cd9c20e18",
    "attempts": 1,
    "timeoutSeconds": 600,
    "sizingVersion": 5,
    "pricesVersion": 2,
    "approvedAt": "2026-10-10T12:00:00Z",
    "issuedAt": "2026-10-10T12:00Z",
-   "estimateUsd": 0.004827,
-   "maximumUsd": 0.022052,
+   "estimateUsd": 0.004842,
+   "maximumUsd": 0.022067,
    "lines": [
     {
      "item": "compute",
@@ -101,14 +101,14 @@
     {
      "item": "storage",
      "label": "Result storage (S3, 12 months)",
-     "estimateUsd": 0.000468,
-     "maximumUsd": 0.000856
+     "estimateUsd": 0.000473,
+     "maximumUsd": 0.000861
     },
     {
      "item": "delivery",
      "label": "Delivery (CloudFront, 10 full downloads)",
-     "estimateUsd": 0.001354,
-     "maximumUsd": 0.002548
+     "estimateUsd": 0.001364,
+     "maximumUsd": 0.002558
     },
     {
      "item": "platform",
@@ -152,9 +152,9 @@
   },
   "ledger": [
    {
-    "quoteId": "2aa90ae9669b436146b65652e8d23804bfb0594fa3fa38490a2b8d1caf004c57",
+    "quoteId": "797fa63e8e67368902c3576bf06902dd2d7d6d04e94c47bd7e5e317cd9c20e18",
     "option": "on-demand",
-    "approvedMaximumUsd": 0.022052,
+    "approvedMaximumUsd": 0.022067,
     "costUsd": 0.022921,
     "chargedUsd": 0.020421,
     "absorbedUsd": 0.0025,

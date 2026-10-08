@@ -1,4 +1,5 @@
 import type { JobStatus, JobView, Recipe, WorkerSize } from '../jobs/api_types';
+import { xcLabel } from '../jobs/format';
 import { computedResultFiles, jobFileUrl } from '../molecules/job_paths';
 
 export type SortColumn = 'molecule' | 'recipe' | 'size' | 'capacity' | 'status' | 'submittedAt' | 'time' | 'memory' | 'cost';
@@ -83,7 +84,8 @@ export function jobLinks(job: JobView): FileLink[] {
 
 export function methodSummary(job: JobView): string {
     const { xc, basis, optimiseBasis } = job.job.method;
-    return optimiseBasis ? `${xc}/${optimiseBasis} → ${xc}/${basis}` : `${xc}/${basis}`;
+    const label = xcLabel(xc);
+    return optimiseBasis ? `${label}/${optimiseBasis} → ${label}/${basis}` : `${label}/${basis}`;
 }
 
 /** The month filter's choices, newest first, in UTC like the meter. */

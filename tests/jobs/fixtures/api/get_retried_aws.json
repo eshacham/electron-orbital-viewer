@@ -1,15 +1,15 @@
 {
  "status": 200,
  "body": {
-  "key": "15d8d714cc7510467a3ba611b0828934a9595eb20cf2bee57ec3517fd4bb3594",
+  "key": "662edc314fb6b0d3b3ce045b7da96c0e4875ce207539a8ee6e4bd9433245d6e9",
   "status": "DONE",
   "attempt": 2,
   "recipe": "single",
   "job": {
-   "computeVersion": 1,
+   "computeVersion": 2,
    "recipe": "single",
    "method": {
-    "xc": "B3LYP",
+    "xc": "B3LYP-D3BJ",
     "basis": "def2-TZVPD",
     "optimiseBasis": null
    },
@@ -83,20 +83,20 @@
   },
   "error": null,
   "backend": "aws",
-  "reservedUsd": 0.022054,
+  "reservedUsd": 0.022069,
   "actualUsd": 0.004834,
-  "resultUrl": "/molecules/jobs/15d8d714cc7510467a3ba611b0828934a9595eb20cf2bee57ec3517fd4bb3594/",
+  "resultUrl": "/molecules/jobs/662edc314fb6b0d3b3ce045b7da96c0e4875ce207539a8ee6e4bd9433245d6e9/",
   "approvedQuote": {
    "option": "on-demand",
-   "quoteId": "da1fa76750da4bb4f0f087ff30dab20c46ad9fa4f3b737dd17554d10907de4a8",
+   "quoteId": "dc153376bb619454bea60bbc855b336ef41bb851e198277034c4296775fad983",
    "attempts": 1,
    "timeoutSeconds": 600,
    "sizingVersion": 5,
    "pricesVersion": 2,
    "approvedAt": "2026-10-10T12:00:00Z",
    "issuedAt": "2026-10-10T12:00Z",
-   "estimateUsd": 0.00387,
-   "maximumUsd": 0.022054,
+   "estimateUsd": 0.003885,
+   "maximumUsd": 0.022069,
    "lines": [
     {
      "item": "compute",
@@ -107,14 +107,14 @@
     {
      "item": "storage",
      "label": "Result storage (S3, 12 months)",
-     "estimateUsd": 0.000468,
-     "maximumUsd": 0.000856
+     "estimateUsd": 0.000473,
+     "maximumUsd": 0.000861
     },
     {
      "item": "delivery",
      "label": "Delivery (CloudFront, 10 full downloads)",
-     "estimateUsd": 0.001355,
-     "maximumUsd": 0.00255
+     "estimateUsd": 0.001365,
+     "maximumUsd": 0.00256
     },
     {
      "item": "platform",
@@ -158,9 +158,9 @@
   },
   "ledger": [
    {
-    "quoteId": "2ef5e904633d665dab1d01a8715eb9b5b2a75a0918fff691acfcfb4a201ade34",
+    "quoteId": "4cc8917c2b41caa7141f42b768508a2af45c6cedfe3d1d9ffa02eb05917987c5",
     "option": "spot",
-    "approvedMaximumUsd": 0.021286,
+    "approvedMaximumUsd": 0.021301,
     "costUsd": 0.001508,
     "chargedUsd": 0.001508,
     "absorbedUsd": 0.0,
@@ -194,9 +194,9 @@
     "at": "2026-10-10T12:30:00Z"
    },
    {
-    "quoteId": "da1fa76750da4bb4f0f087ff30dab20c46ad9fa4f3b737dd17554d10907de4a8",
+    "quoteId": "dc153376bb619454bea60bbc855b336ef41bb851e198277034c4296775fad983",
     "option": "on-demand",
-    "approvedMaximumUsd": 0.022054,
+    "approvedMaximumUsd": 0.022069,
     "costUsd": 0.003326,
     "chargedUsd": 0.003326,
     "absorbedUsd": 0.0,

@@ -49,11 +49,15 @@ describe('times and sizes', () => {
 describe('every number states its method', () => {
     it('labels an energy with the method that produced it', () => {
         const single = jobFixture('get_running').job;
-        expect(formatEnergy(-76.4612, methodOf(single, 'SCF (DIIS)'))).toBe('−76.461200 Ha (B3LYP/def2-TZVPD)');
+        expect(formatEnergy(-76.4612, methodOf(single, 'SCF (DIIS)'))).toBe('−76.461200 Ha (B3LYP-D3(BJ)/def2-TZVPD)');
         const optimise = jobFixture('get_failed').job;
-        expect(methodOf(optimise, 'optimisation step 4')).toBe('B3LYP/def2-SVP');
-        expect(methodOf(optimise, 'SCF (DIIS)')).toBe('B3LYP/def2-TZVPD');
-        expect(methodOf(optimise)).toBe('B3LYP/def2-TZVPD');
+        expect(methodOf(optimise, 'optimisation step 4')).toBe('B3LYP-D3(BJ)/def2-SVP');
+        expect(methodOf(optimise, 'frequency check')).toBe('B3LYP-D3(BJ)/def2-SVP');
+        expect(methodOf(optimise, 're-optimisation step 9')).toBe('B3LYP-D3(BJ)/def2-SVP');
+        expect(methodOf(optimise, 'SCF (DIIS)')).toBe('B3LYP-D3(BJ)/def2-TZVPD');
+        expect(methodOf(optimise)).toBe('B3LYP-D3(BJ)/def2-TZVPD');
+        // A job approved before Phase 6D keeps its own method string.
+        expect(methodOf({ ...optimise, method: { ...optimise.method, xc: 'B3LYP' } }, 'optimisation step 1')).toBe('B3LYP/def2-SVP');
         expect(predictionNote(1)).toBe('sizing v1 prediction');
     });
 });

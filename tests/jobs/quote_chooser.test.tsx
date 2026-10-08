@@ -15,12 +15,12 @@ describe('QuoteChooser', () => {
     it('shows Spot and on-demand side by side as a named radio group, each with its estimate, maximum and times', () => {
         render(<QuoteChooser quote={quoteOf('preview_aws')} verb="run" disabled={false} onApprove={jest.fn()} />);
         const group = screen.getByRole('radiogroup', { name: 'price options' });
-        const spot = within(group).getByRole('radio', { name: /^Spot: estimated \$0\.002452, up to \$0\.02$/ });
-        const onDemand = within(group).getByRole('radio', { name: /^On-demand: estimated \$0\.003791, up to \$0\.02$/ });
+        const spot = within(group).getByRole('radio', { name: /^Spot: estimated \$0\.002467, up to \$0\.02$/ });
+        const onDemand = within(group).getByRole('radio', { name: /^On-demand: estimated \$0\.003806, up to \$0\.02$/ });
         expect(spot).toBeChecked();
         expect(onDemand).not.toBeChecked();
         const card = screen.getByTestId('quote-option-spot');
-        for (const text of ['estimated $0.002452', 'up to $0.02', 'predicted 16 s', 'time limit 10 min 00 s', 'up to 3 attempts',
+        for (const text of ['estimated $0.002467', 'up to $0.02', 'predicted 16 s', 'time limit 10 min 00 s', 'up to 3 attempts',
             'A Spot interruption restarts the job from scratch']) {
             expect(card).toHaveTextContent(text);
         }
@@ -47,8 +47,8 @@ describe('QuoteChooser', () => {
         expect(within(table).getAllByRole('row').map(row => row.textContent)).toEqual([
             'ItemEstimatedUp toHow',
             expect.stringMatching(/^Compute \(AWS Fargate\)\$0\.0006300\$0\.02Estimate: one run/),
-            expect.stringMatching(/^Result storage \(S3, 12 months\)\$0\.0004680\$0\.0008560About 1\.5 MB/),
-            expect.stringMatching(/^Delivery \(CloudFront, 10 full downloads\)\$0\.001354\$0\.002548/),
+            expect.stringMatching(/^Result storage \(S3, 12 months\)\$0\.0004730\$0\.0008610About 1\.5 MB/),
+            expect.stringMatching(/^Delivery \(CloudFront, 10 full downloads\)\$0\.001364\$0\.002558/),
             'Platform fee$0.00$0.00No platform fee yet.',
         ]);
     });
@@ -86,7 +86,7 @@ describe('QuoteChooser', () => {
         expect(screen.getByRole('radio', { name: 'This Mac: free' })).toBeChecked();
         expect(screen.getByTestId('quote-option-local')).toHaveTextContent('Fargate estimate 16 s; no time limit on This Mac');
         expect(screen.getByText(/^On AWS this would cost/)).toHaveTextContent(
-            'On AWS this would cost: Spot estimated $0.002452, up to $0.02; On-demand estimated $0.003791, up to $0.02.');
+            'On AWS this would cost: Spot estimated $0.002467, up to $0.02; On-demand estimated $0.003806, up to $0.02.');
         fireEvent.click(screen.getByRole('button', { name: 'Run on This Mac (free)' }));
         expect(onApprove).toHaveBeenCalledWith(expect.objectContaining({ option: 'local' }));
     });

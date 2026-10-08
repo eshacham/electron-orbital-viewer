@@ -26,7 +26,7 @@ describe('JobStatusView', () => {
         const panel = screen.getByRole('region', { name: 'job status' });
         expect(panel).toHaveTextContent('Running');
         expect(panel).toHaveTextContent('StageSCF (DIIS)');
-        expect(panel).toHaveTextContent('Latest energy−76.461200 Ha (B3LYP/def2-TZVPD)');
+        expect(panel).toHaveTextContent('Latest energy−76.461200 Ha (B3LYP-D3(BJ)/def2-TZVPD)');
         expect(panel).toHaveTextContent('Elapsed1 min 00 s');
         expect(panel).toHaveTextContent(/Fargate estimate\d.+\(sizing v\d+ prediction\)/);
         expect(panel).toHaveTextContent('CostThis Mac — spent $0.00');

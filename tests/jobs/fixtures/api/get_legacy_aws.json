@@ -6,10 +6,10 @@
   "attempt": 1,
   "recipe": "single",
   "job": {
-   "computeVersion": 1,
+   "computeVersion": 2,
    "recipe": "single",
    "method": {
-    "xc": "B3LYP",
+    "xc": "B3LYP-D3BJ",
     "basis": "def2-TZVPD",
     "optimiseBasis": null
    },

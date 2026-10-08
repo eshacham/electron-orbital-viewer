@@ -1,15 +1,15 @@
 {
  "status": 200,
  "body": {
-  "key": "03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129",
+  "key": "6cb4e4a0f6ee78aeb1bc87d759e4a676b56353e045c4e9b50188ba2b7be3bb66",
   "status": "FAILED",
   "attempt": 1,
   "recipe": "optimise",
   "job": {
-   "computeVersion": 1,
+   "computeVersion": 2,
    "recipe": "optimise",
    "method": {
-    "xc": "B3LYP",
+    "xc": "B3LYP-D3BJ",
     "basis": "def2-TZVPD",
     "optimiseBasis": "def2-SVP"
    },
@@ -76,10 +76,10 @@
   "backend": "local",
   "reservedUsd": 0.0,
   "actualUsd": 0.0,
-  "resultUrl": "/molecules/jobs/03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129/",
+  "resultUrl": "/molecules/jobs/6cb4e4a0f6ee78aeb1bc87d759e4a676b56353e045c4e9b50188ba2b7be3bb66/",
   "approvedQuote": {
    "option": "local",
-   "quoteId": "27a69cb9bac35fc4ac98d3c02fd2a15aed055510a56564536658d85b039ad5ff",
+   "quoteId": "03a7586497aa9b902e57f002e3114ad9715aa6f4762161a91eddcef63206489e",
    "attempts": 1,
    "timeoutSeconds": 600,
    "sizingVersion": 5,
@@ -149,7 +149,7 @@
   },
   "ledger": [
    {
-    "quoteId": "27a69cb9bac35fc4ac98d3c02fd2a15aed055510a56564536658d85b039ad5ff",
+    "quoteId": "03a7586497aa9b902e57f002e3114ad9715aa6f4762161a91eddcef63206489e",
     "option": "local",
     "approvedMaximumUsd": 0.0,
     "costUsd": 0.0,

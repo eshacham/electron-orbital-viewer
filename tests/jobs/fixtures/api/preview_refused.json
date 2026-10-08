@@ -1,12 +1,12 @@
 {
  "status": 200,
  "body": {
-  "key": "42ff7d8752fb7f4eafd59547a924f575f65451a921c1d25e6c8a500151bd7ca9",
+  "key": "cf07223058f932cb2b6eb2d44f5847c79e21424520761b4f819929fe940eab0b",
   "job": {
-   "computeVersion": 1,
+   "computeVersion": 2,
    "recipe": "single",
    "method": {
-    "xc": "B3LYP",
+    "xc": "B3LYP-D3BJ",
     "basis": "def2-TZVPD",
     "optimiseBasis": null
    },
