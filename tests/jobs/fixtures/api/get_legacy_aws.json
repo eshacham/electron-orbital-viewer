@@ -1,0 +1,84 @@
+{
+ "status": 200,
+ "body": {
+  "key": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "status": "DONE",
+  "attempt": 1,
+  "recipe": "single",
+  "job": {
+   "computeVersion": 1,
+   "recipe": "single",
+   "method": {
+    "xc": "B3LYP",
+    "basis": "def2-TZVPD",
+    "optimiseBasis": null
+   },
+   "molecule": {
+    "atoms": [
+     [
+      1,
+      0.0,
+      -0.8,
+      -0.5
+     ],
+     [
+      1,
+      0.0,
+      0.75545,
+      -0.47116
+     ],
+     [
+      8,
+      0.0,
+      0.0,
+      0.11779
+     ]
+    ],
+    "charge": 0,
+    "multiplicity": 1
+   }
+  },
+  "name": "Water",
+  "formula": "H2O",
+  "electronCount": 10,
+  "basisFunctions": 58,
+  "geometrySource": {
+   "kind": "xyz"
+  },
+  "sizing": {
+   "version": 5,
+   "estimateFor": "fargate",
+   "size": "S",
+   "vcpu": 2,
+   "memoryGB": 8,
+   "capacity": "spot",
+   "attempts": 3,
+   "basisFunctions": 58,
+   "predictedSeconds": 15.5,
+   "predictedMemoryGB": 0.47,
+   "timeoutSeconds": 600,
+   "predictedCostMicros": 129
+  },
+  "month": "2026-10",
+  "submittedAt": "2026-10-10T12:00:00Z",
+  "startedAt": null,
+  "endedAt": "2026-10-10T12:20:00Z",
+  "heartbeatAt": null,
+  "stage": null,
+  "latestEnergyHartree": null,
+  "logTail": [],
+  "peakMemoryGB": null,
+  "actual": {
+   "wallSeconds": 15.0,
+   "peakMemoryGB": 0.33,
+   "threads": 2
+  },
+  "error": null,
+  "backend": "aws",
+  "reservedUsd": 0.01788,
+  "actualUsd": 0.000497,
+  "resultUrl": "/molecules/jobs/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/",
+  "approvedQuote": null,
+  "charged": null
+ }
+}

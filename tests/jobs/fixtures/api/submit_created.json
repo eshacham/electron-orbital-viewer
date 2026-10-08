@@ -77,6 +77,44 @@
   "backend": "local",
   "reservedUsd": 0.0,
   "actualUsd": null,
-  "resultUrl": "/molecules/jobs/e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa/"
+  "resultUrl": "/molecules/jobs/e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa/",
+  "approvedQuote": {
+   "option": "local",
+   "quoteId": "45dac8d3086ceec7821fcaf5534aa21eade67779a6d5854f73ece2fae13ebb4d",
+   "attempts": 1,
+   "timeoutSeconds": 600,
+   "sizingVersion": 5,
+   "pricesVersion": 2,
+   "approvedAt": "2026-10-10T12:00:00Z",
+   "estimateUsd": 0.0,
+   "maximumUsd": 0.0,
+   "lines": [
+    {
+     "item": "compute",
+     "label": "Compute (AWS Fargate)",
+     "estimateUsd": 0.0,
+     "maximumUsd": 0.0
+    },
+    {
+     "item": "storage",
+     "label": "Result storage (S3, 12 months)",
+     "estimateUsd": 0.0,
+     "maximumUsd": 0.0
+    },
+    {
+     "item": "delivery",
+     "label": "Delivery (CloudFront, 10 full downloads)",
+     "estimateUsd": 0.0,
+     "maximumUsd": 0.0
+    },
+    {
+     "item": "platform",
+     "label": "Platform fee",
+     "estimateUsd": 0.0,
+     "maximumUsd": 0.0
+    }
+   ]
+  },
+  "charged": null
  }
 }

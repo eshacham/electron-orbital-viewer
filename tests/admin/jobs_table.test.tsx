@@ -93,3 +93,33 @@ describe('<JobsTable>', () => {
         expect(screen.getByText('No jobs match.')).toBeInTheDocument();
     });
 });
+
+describe('<JobsTable> money (Phase 6C)', () => {
+    const cell = (job: JobView) => {
+        render(<JobsTable jobs={[job]} />);
+        const row = screen.getAllByRole('row')[1];
+        return within(row).getAllByRole('cell')[9];
+    };
+    it('sets the approved maximum against what was charged, with each line in the details', () => {
+        const cost = cell(jobFixture('get_done_aws'));
+        expect(cost).toHaveTextContent(/^up to \$0\.02 \(Spot\)charged \$0\.00\d+/);
+        expect(within(cost).getByRole('list', { name: 'Water price, line by line' })).toHaveTextContent(
+            'Compute (AWS Fargate): up to $0.02, charged $0.0004970');
+        expect(cost.querySelector('.admin-absorbed')).toBeNull();
+    });
+    it('flags a charge AWS billed past the approved maximum, which the app absorbed', () => {
+        const flag = cell(jobFixture('get_absorbed_aws')).querySelector('.admin-absorbed');
+        expect(flag).toHaveTextContent('billed $0.02 by AWS: absorbed $0.002500 by the app');
+    });
+    it('shows a This Mac job as free', () => {
+        expect(cell(jobFixture('get_done'))).toHaveTextContent('This Mac (free)spent $0.00');
+    });
+    it('still shows a record from before quotes, by reservation and actual cost', () => {
+        expect(cell(jobFixture('get_legacy_aws'))).toHaveTextContent('reserved $0.02spent $0.0004970legacy: no approved quote');
+    });
+    it('sorts cost by what was charged, or a legacy record by its actual cost', () => {
+        const legacy = jobFixture('get_legacy_aws');
+        const absorbed = jobFixture('get_absorbed_aws');
+        expect(sortJobs([absorbed, legacy], 'cost', 'asc').map(j => j.key)).toEqual([legacy.key, absorbed.key]);
+    });
+});

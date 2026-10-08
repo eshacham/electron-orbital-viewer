@@ -8,8 +8,8 @@ import {
 import { tierOf } from '../molecules/types';
 import { isJobKey } from '../molecules/job_paths';
 import { jobsApi, jobsPoller } from '../jobs/client';
-import { retryBody } from '../jobs/request_form';
-import type { JobRequest, JobView } from '../jobs/api_types';
+import { approvedBody, retryBody } from '../jobs/request_form';
+import type { AvailableQuoteOption, JobRequest, JobView, Quote } from '../jobs/api_types';
 import type { RequestForm } from '../jobs/request_form';
 import { signInHere } from './OwnerBar';
 import ProvenancePanel from './ProvenancePanel';
@@ -54,9 +54,17 @@ const MoleculeJobsSection: React.FC = () => {
         dispatch(followJob(job.key));
         jobsPoller().restart(job.key);
     }, [dispatch]);
+    // Phase 6C: a retry is priced afresh (a preview of the same molecule) and approved like any run.
+    const quote = useCallback(async (view: JobView): Promise<Quote> => {
+        const body = retryBody(view);
+        delete body.retry;                               // a preview takes the molecule, not the retry
+        const preview = await jobsApi().preview(body);
+        if (!preview.decision.ok) throw new Error(preview.decision.error.message);
+        return preview.decision.quote;
+    }, []);
     // A refusal propagates to the status panel, which says it as a refused retry (m6).
-    const retry = useCallback(async (view: JobView) => {
-        follow((await jobsApi().submit(retryBody(view))).job);
+    const retry = useCallback(async (view: JobView, option: AvailableQuoteOption) => {
+        follow((await jobsApi().submit(approvedBody(retryBody(view), option))).job);
     }, [follow]);
     // This section lives on the viewer only (/admin.html has its own panels).
     const signIn = useCallback(() => signInHere('/', text => { dispatch(sessionFailed(text)); }), [dispatch]);
@@ -84,7 +92,7 @@ const MoleculeJobsSection: React.FC = () => {
                 </Accordion>
             )}
             {isOwner && jobs.followedKey && (
-                <JobStatusPanel jobKey={jobs.followedKey} onOpen={open} onRetry={retry} onClose={() => dispatch(followJob(null))} />
+                <JobStatusPanel jobKey={jobs.followedKey} onOpen={open} onQuote={quote} onRetry={retry} onClose={() => dispatch(followJob(null))} />
             )}
         </div>
     );

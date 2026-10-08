@@ -1,0 +1,9 @@
+{
+ "status": 409,
+ "body": {
+  "error": {
+   "code": "quote-changed",
+   "message": "The quote changed since it was shown (its price, size, time limit or terms are not what was approved): preview again and approve the new quote."
+  }
+ }
+}

@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Table
 import { filterJobs, jobLinks, JobFilters, methodSummary, NO_FILTERS, SortColumn, SortDirection, sortJobs } from './jobs_table';
 import { STATUS_TEXT } from '../components/JobStatusPanel';
 import { formatFormula } from '../molecules/catalogue';
-import { capacityLabel, formatDuration, formatGB, money, predictionNote, shortKey } from '../jobs/format';
+import { capacityLabel, formatDuration, formatGB, money, optionLabel, predictionNote, shortKey } from '../jobs/format';
 import type { JobView } from '../jobs/api_types';
 
 /** Spec §9.4's columns, in its order. */
@@ -17,7 +17,7 @@ const COLUMNS: Array<{ id: string; label: string; sort?: SortColumn }> = [
     { id: 'times', label: 'Queued / started / ended (UTC)', sort: 'submittedAt' },
     { id: 'time', label: 'Time: predicted / actual', sort: 'time' },
     { id: 'memory', label: 'Memory: predicted / actual', sort: 'memory' },
-    { id: 'cost', label: 'Cost: reserved / actual', sort: 'cost' },
+    { id: 'cost', label: 'Cost: approved / charged', sort: 'cost' },
     { id: 'files', label: 'Result and files' },
 ];
 
@@ -29,6 +29,45 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
             slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}>
             {options.map(option => <option key={option} value={option}>{option === 'all' ? 'All' : option}</option>)}
         </TextField>
+    );
+}
+
+/**
+ * Phase 6C: a quoted job's approved maximum against what it was charged,
+ * flagged when AWS billed past the maximum (the app absorbs that), with the
+ * per-line split behind a disclosure. A record from before quotes keeps its
+ * reservation against its actual cost, and says it is legacy.
+ */
+function CostCell({ job }: { job: JobView }) {
+    const quote = job.approvedQuote;
+    if (job.backend === 'local') return <>This Mac (free)<br />{job.actualUsd === null ? 'not settled' : money('spent', job.actualUsd)}</>;
+    if (!quote) {
+        return (
+            <>
+                {money('reserved', job.reservedUsd)}<br />{job.actualUsd === null ? 'not settled' : money('spent', job.actualUsd)}
+                <br /><span className="admin-note">legacy: no approved quote</span>
+            </>
+        );
+    }
+    const charged = job.charged;
+    const lines = new Map((charged?.lines ?? []).map(line => [line.item, line]));
+    return (
+        <>
+            {money('up to', quote.maximumUsd)} ({optionLabel(quote.option)})<br />
+            {charged ? money('charged', charged.chargedUsd) : 'not settled'}
+            {charged && charged.absorbedUsd > 0 && (
+                <><br /><span className="admin-absorbed">{money('billed', charged.costUsd)} by AWS: {money('absorbed', charged.absorbedUsd)} by the app</span></>
+            )}
+            <details className="admin-lines">
+                <summary>lines</summary>
+                <ul aria-label={`${job.name} price, line by line`}>
+                    {quote.lines.map(line => {
+                        const settled = lines.get(line.item);
+                        return <li key={line.item}>{line.label}: {money('up to', line.maximumUsd)}{settled ? `, ${money('charged', settled.chargedUsd)}` : ''}</li>;
+                    })}
+                </ul>
+            </details>
+        </>
     );
 }
 
@@ -61,7 +100,7 @@ function JobRow({ job }: { job: JobView }) {
                 <br /><span className="admin-note">Fargate estimate, {predictionNote(sizing.version)}</span>
             </TableCell>
             <TableCell>{formatGB(sizing.predictedMemoryGB)} / {actual ? formatGB(actual.peakMemoryGB) : '—'}</TableCell>
-            <TableCell>{money('reserved', job.reservedUsd)}<br />{job.actualUsd === null ? 'not settled' : money('spent', job.actualUsd)}</TableCell>
+            <TableCell><CostCell job={job} /></TableCell>
             <TableCell>
                 {links.length === 0 ? '—' : links.map(link => (
                     <div key={link.href}><a href={link.href} target="_blank" rel="noopener noreferrer">{link.label}</a></div>

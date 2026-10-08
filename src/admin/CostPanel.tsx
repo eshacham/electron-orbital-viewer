@@ -29,6 +29,11 @@ const CostPanel: React.FC<{ costs: CostsResponse; width?: number }> = ({ costs, 
                     ? `AWS billed (Cost Explorer, a day behind${costs.billing.through ? `, as of ${costs.billing.through}` : ''}): ${money('billed', costs.billing.usd)}; our meter: ${money('spent', costs.spentUsd)}.`
                     : 'AWS’s billed figure appears here once the AWS stack’s billing job has run (Phase 6B-3); until then only our meter is shown.'}
             </Typography>
+            {/* Phase 6C: a quoted job books its storage (12 months) and delivery (10 downloads) when it settles. */}
+            <Typography variant="body2" className="cost-billed">
+                Since quotes (Phase 6C), the meter also books each settled AWS job’s result storage and delivery, which Cost
+                Explorer’s compute figure leaves out; a job’s charge never passes the maximum its owner approved.
+            </Typography>
             <Typography variant="caption">Prices retrieved {costs.pricesRetrieved} (Fargate, us-east-1, Linux/ARM).</Typography>
         </section>
     );

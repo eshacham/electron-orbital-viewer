@@ -15,7 +15,7 @@ export function filterJobs(jobs: JobView[], filters: JobFilters): JobView[] {
         && (filters.size === 'all' || job.sizing.size === filters.size));
 }
 
-/** Time, memory and cost sort by the actual figure: what the dashboard is for is setting it against the prediction beside it. */
+/** Time, memory and cost sort by the actual figure (cost: what was charged, or a legacy record's actual cost): what the dashboard is for is setting it against the prediction beside it. */
 export function sortValue(job: JobView, column: SortColumn): string | number | null {
     switch (column) {
         case 'molecule': return job.name.toLowerCase();
@@ -26,7 +26,7 @@ export function sortValue(job: JobView, column: SortColumn): string | number | n
         case 'submittedAt': return job.submittedAt;
         case 'time': return job.actual?.wallSeconds ?? null;
         case 'memory': return job.actual?.peakMemoryGB ?? null;
-        case 'cost': return job.actualUsd;
+        case 'cost': return job.charged?.chargedUsd ?? job.actualUsd;
     }
 }
 

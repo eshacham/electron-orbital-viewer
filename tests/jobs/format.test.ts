@@ -1,6 +1,6 @@
 import {
     formatUsd, money, microsToUsd, formatDuration, formatGB, formatEnergy, methodOf, predictionNote, capacityLabel,
-    currentMonth, elapsedSeconds, shortKey,
+    currentMonth, elapsedSeconds, shortKey, quotedCost, optionLabel,
 } from '../../src/jobs/format';
 import { isActive } from '../../src/jobs/api_types';
 import { tierOf } from '../../src/molecules/types';
@@ -71,5 +71,19 @@ describe('jobs and tiers', () => {
     it('treats a file without a tier as validated (v1/v2 predate it)', () => {
         expect(tierOf({})).toBe('validated');
         expect(tierOf({ tier: 'computed' })).toBe('computed');
+    });
+});
+
+describe('quoted cost (Phase 6C)', () => {
+    it('labels every figure: approved, charged, billed and absorbed', () => {
+        expect(money('up to', 0.0213)).toBe('up to $0.02');
+        expect(quotedCost(jobFixture('submit_aws'))).toBe('up to $0.02 approved (Spot)');
+        expect(quotedCost(jobFixture('get_done_aws'))).toMatch(/^charged \$0\.00\d+ of up to \$0\.02 approved \(Spot\)$/);
+        expect(quotedCost(jobFixture('get_absorbed_aws'))).toBe(
+            'charged $0.02 of up to $0.02 approved (On-demand); billed $0.02 by AWS, absorbed $0.002500 by the app');
+        expect(optionLabel('local')).toBe('This Mac');
+    });
+    it('says nothing for a record from before quotes', () => {
+        expect(quotedCost(jobFixture('get_legacy_aws'))).toBeNull();
     });
 });

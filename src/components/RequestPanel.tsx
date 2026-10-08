@@ -3,10 +3,13 @@ import {
     Alert, Button, FormControlLabel, Radio, RadioGroup, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import PreviewDetails from './PreviewDetails';
-import { FormProblem, formProblems, formSignature, InputKind, requestBody, RequestForm, retryBody } from '../jobs/request_form';
+import QuoteChooser from './QuoteChooser';
+import {
+    approvedBody, FormProblem, formProblems, formSignature, InputKind, requestBody, RequestForm, retryBody,
+} from '../jobs/request_form';
 import { PreviewFn, usePreview } from '../jobs/usePreview';
 import { SESSION_ENDED } from '../jobs/api';
-import { isActive, JobRequest, JobView, PreviewResponse, Recipe } from '../jobs/api_types';
+import { AvailableQuoteOption, isActive, JobRequest, JobView, PreviewResponse, Recipe } from '../jobs/api_types';
 import type { JobsTarget } from '../store/jobsSlice';
 
 export interface RequestPanelProps {
@@ -36,27 +39,32 @@ interface SubmitAreaProps {
     busy: boolean;
     onOpen(key: string): void;
     onFollow(job: JobView): void;
-    onSubmit(): void;
-    onRetry(job: JobView): void;
+    onSubmit(option: AvailableQuoteOption): void;
+    onRetry(job: JobView, option: AvailableQuoteOption): void;
 }
 
-/** Spec §6.3 / §9.2: a known key is never resubmitted -- the button says what will happen instead. */
+/**
+ * Spec §6.3 / §9.2: a known key is never resubmitted -- the button says what
+ * will happen instead. Anything new (or a failed job's retry) is approved
+ * from its quote (Phase 6C): one of its priced options, up to its maximum.
+ */
 function SubmitArea({ preview, busy, onOpen, onFollow, onSubmit, onRetry }: SubmitAreaProps) {
     const existing = preview.existing;
-    const allowed = preview.decision.ok && preview.generationEnabled;
     if (existing?.status === 'DONE') return <Button variant="contained" onClick={() => onOpen(existing.key)}>Already computed — open it</Button>;
     if (existing && isActive(existing.status)) return <Button variant="contained" onClick={() => onFollow(existing)}>Already running — follow it</Button>;
+    const failed = existing?.status === 'FAILED' ? existing : null;
     return (
         <>
-            {existing?.status === 'FAILED' && (
-                <Alert severity="error" role="alert">This molecule failed before: {existing.error?.message ?? 'no reason was recorded'}</Alert>
+            {failed && (
+                <Alert severity="error" role="alert">This molecule failed before: {failed.error?.message ?? 'no reason was recorded'}</Alert>
             )}
             {!preview.generationEnabled && (
                 <Alert severity="info">Generation is paused: nothing new can be submitted until it is resumed.</Alert>
             )}
-            {existing?.status === 'FAILED'
-                ? <Button variant="contained" disabled={busy || !allowed} onClick={() => onRetry(existing)}>Retry</Button>
-                : <Button variant="contained" disabled={busy || !allowed} onClick={onSubmit}>Submit</Button>}
+            {preview.decision.ok && (
+                <QuoteChooser quote={preview.decision.quote} verb={failed ? 'retry' : 'run'} disabled={busy || !preview.generationEnabled}
+                    onApprove={option => (failed ? onRetry(failed, option) : onSubmit(option))} />
+            )}
         </>
     );
 }
@@ -172,7 +180,8 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
                     <>
                         <PreviewDetails preview={current.preview} />
                         <SubmitArea preview={current.preview} busy={submitting || sessionExpired} onOpen={onOpen} onFollow={onFollow}
-                            onSubmit={() => { void send(requestBody(form)); }} onRetry={job => { void send(retryBody(job)); }} />
+                            onSubmit={option => { void send(approvedBody(requestBody(form), option)); }}
+                            onRetry={(job, option) => { void send(approvedBody(retryBody(job), option)); }} />
                     </>
                 )}
                 {submitError && !sessionExpired && <Alert severity="error" role="alert">{submitError}</Alert>}

@@ -101,10 +101,16 @@ describe('ProvenancePanel', () => {
         expect(screen.getByText(/Owner only: 1 min 10 s of wall time, peak memory 0\.52 GB \(predicted .+ sizing v\d+ prediction\)\./)).toBeInTheDocument();
         expect(screen.getByText(/Cost: spent \$0\.00 \(This Mac\)\./)).toBeInTheDocument();
     });
-    it('shows a cost not settled yet as reserved', () => {
-        render(<ProvenancePanel meta={computed()} ownerJob={{ ...jobFixture('get_done'), backend: 'aws', actualUsd: null, reservedUsd: 0.0894 }} />);
+    it('shows a cost not settled yet as reserved, for a record from before quotes', () => {
+        render(<ProvenancePanel meta={computed()} ownerJob={{ ...jobFixture('get_done'), backend: 'aws', actualUsd: null, reservedUsd: 0.0894, approvedQuote: null, charged: null }} />);
         open();
         expect(screen.getByText(/Cost: reserved \$0\.09, not settled yet\./)).toBeInTheDocument();
+    });
+    // Phase 6C: an AWS job approved from a quote shows its maximum and what it was charged.
+    it('shows what a quoted job was charged against its approved maximum', () => {
+        render(<ProvenancePanel meta={computed()} ownerJob={jobFixture('get_done_aws')} />);
+        open();
+        expect(screen.getByText(/Cost: charged \$0\.00\d+ of up to \$0\.02 approved \(Spot\)\./)).toBeInTheDocument();
     });
     it('says when the owner’s job record could not be read', () => {
         render(<ProvenancePanel meta={computed()} ownerJob={null} ownerJobError="offline" />);

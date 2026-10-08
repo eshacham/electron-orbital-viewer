@@ -137,8 +137,8 @@
        "timeoutSeconds": 600,
        "predictedCostMicros": 129
       },
-      "approvable": true,
-      "blockedReason": null
+      "approvable": false,
+      "blockedReason": "Up to $0.02 is more than the $0.000001 left of this month's $0.000001 compute cap: the monthly cap would need raising to approve it."
      },
      {
       "option": "on-demand",
@@ -205,8 +205,8 @@
        "timeoutSeconds": 600,
        "predictedCostMicros": 402
       },
-      "approvable": true,
-      "blockedReason": null
+      "approvable": false,
+      "blockedReason": "Up to $0.02 is more than the $0.000001 left of this month's $0.000001 compute cap: the monthly cap would need raising to approve it."
      }
     ],
     "recommended": "spot",
@@ -216,10 +216,10 @@
   "existing": null,
   "meter": {
    "month": "2026-10",
-   "capUsd": 8.8,
+   "capUsd": 1e-06,
    "spentUsd": 0.0,
    "reservedUsd": 0.0,
-   "remainingUsd": 8.8
+   "remainingUsd": 1e-06
   },
   "generationEnabled": true
  }

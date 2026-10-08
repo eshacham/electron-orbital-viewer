@@ -3,8 +3,8 @@ import { Alert, Link, Typography } from '@mui/material';
 import StructurePreview from './StructurePreview';
 import { PUBCHEM_COMPOUND_URL } from './ProvenancePanel';
 import { formatFormula } from '../molecules/catalogue';
-import { formatDuration, formatGB, formatUsd, microsToUsd, money, predictionNote } from '../jobs/format';
-import type { GeometrySource, PreviewResponse, Sizing } from '../jobs/api_types';
+import { formatDuration, formatGB, formatUsd, money, predictionNote } from '../jobs/format';
+import type { AvailableQuoteOption, GeometrySource, PreviewResponse, Quote, Sizing } from '../jobs/api_types';
 
 const SPIN = ['', 'singlet', 'doublet', 'triplet', 'quartet', 'quintet', 'sextet'];
 const signed = (charge: number) => (charge > 0 ? `+${charge}` : charge < 0 ? `−${-charge}` : '0');
@@ -22,35 +22,37 @@ function describeOnRecord(record: GeometrySource, asked: GeometrySource): string
     return asked.query === record.query && asked.retrievedAt === record.retrievedAt ? `${name} (same source)` : `${name} (same source; ${how})`;
 }
 
-function SizingFacts({ sizing, reservedUsd }: { sizing: Sizing; reservedUsd: number }) {
+/**
+ * The worker the sizing rule chose, which every option shares (Phase 6C:
+ * each option's price, time limit and attempts are in the quote below).
+ */
+function SizingFacts({ sizing }: { sizing: Sizing }) {
     const note = predictionNote(sizing.version);
-    const capacity = sizing.capacity === 'local' ? 'This Mac (the size is the AWS worker it would need)'
-        : sizing.capacity === 'spot' ? `Spot, up to ${sizing.attempts} attempts` : 'on-demand';
+    const local = sizing.capacity === 'local';
     // D7: the sizing rule always predicts the Fargate worker, even for a local run, which runs
     // single-threaded and has no timeout of its own -- so the labels say what the figure really is.
     const predictedLabel = sizing.estimateFor === 'fargate' ? 'Fargate estimate' : 'Predicted';
-    const predictedNote = sizing.capacity === 'local' ? '; This Mac runs it single-threaded, usually slower' : '';
     return (
         <dl className="preview-facts" aria-label="sizing decision">
-            <dt>Worker</dt><dd>{sizing.size} · {sizing.vcpu} vCPU · {sizing.memoryGB} GB · {capacity}</dd>
-            <dt>{predictedLabel}</dt><dd>{formatDuration(sizing.predictedSeconds)}, {formatGB(sizing.predictedMemoryGB)} ({note}){predictedNote}</dd>
-            <dt>Time limit</dt><dd>{sizing.capacity === 'local' ? 'none on This Mac' : formatDuration(sizing.timeoutSeconds)}</dd>
-            {/* R6: This Mac costs nothing; the projection is the AWS worker's, and says so. */}
-            <dt>Cost</dt>
-            <dd>
-                {money('reserved', reservedUsd)} if submitted;{' '}
-                {sizing.capacity === 'local'
-                    ? `projected on AWS ${formatUsd(microsToUsd(sizing.predictedCostMicros))}`
-                    : money('projected', microsToUsd(sizing.predictedCostMicros))} ({note})
-            </dd>
+            <dt>Worker</dt>
+            <dd>{sizing.size} · {sizing.vcpu} vCPU · {sizing.memoryGB} GB{local ? ' (This Mac runs it; the size is the AWS worker it would need)' : ''}</dd>
+            <dt>{predictedLabel}</dt>
+            <dd>{formatDuration(sizing.predictedSeconds)}, {formatGB(sizing.predictedMemoryGB)} ({note}){local ? '; This Mac runs it single-threaded, usually slower' : ''}</dd>
         </dl>
     );
+}
+
+/** Every option is sized alike; the first one offered (or, on This Mac, the free one) says how. */
+export function sizingOf(quote: Quote): Sizing | null {
+    const offered = quote.options.find((o): o is AvailableQuoteOption => o.available);
+    return offered?.sizing ?? null;
 }
 
 /**
  * What a preview resolved -- drawn even when the sizing refuses the job,
  * because "is this the molecule I meant?" comes before "can I afford it?"
- * -- and then the sizing decision or the refusal's own reason (spec §9.2).
+ * -- and then the worker chosen or the refusal's own reason (spec §9.2).
+ * The price options themselves are the request panel's QuoteChooser.
  */
 const PreviewDetails: React.FC<{ preview: PreviewResponse }> = ({ preview }) => {
     const { geometrySource: source, decision, meter, existing } = preview;
@@ -77,7 +79,7 @@ const PreviewDetails: React.FC<{ preview: PreviewResponse }> = ({ preview }) => 
                 )}
             </dl>
             {decision.ok
-                ? <SizingFacts sizing={decision.sizing} reservedUsd={decision.reservedUsd} />
+                ? (() => { const sizing = sizingOf(decision.quote); return sizing && <SizingFacts sizing={sizing} />; })()
                 : <Alert severity="warning" role="alert">{decision.error.message}</Alert>}
             <Typography variant="body2" className="preview-meter">
                 This month: {money('remaining', meter.remainingUsd)} of the {formatUsd(meter.capUsd)} compute cap

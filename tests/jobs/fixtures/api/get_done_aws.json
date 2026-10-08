@@ -2,7 +2,7 @@
  "status": 200,
  "body": {
   "key": "e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa",
-  "status": "RUNNING",
+  "status": "DONE",
   "attempt": 1,
   "recipe": "single",
   "job": {
@@ -55,60 +55,63 @@
    "size": "S",
    "vcpu": 2,
    "memoryGB": 8,
-   "capacity": "local",
-   "attempts": 1,
+   "capacity": "spot",
+   "attempts": 3,
    "basisFunctions": 58,
    "predictedSeconds": 15.5,
    "predictedMemoryGB": 0.47,
    "timeoutSeconds": 600,
-   "predictedCostMicros": 0
+   "predictedCostMicros": 129
   },
   "month": "2026-10",
   "submittedAt": "2026-10-10T12:00:00Z",
-  "startedAt": "2026-10-10T12:00:05Z",
-  "endedAt": null,
-  "heartbeatAt": "2026-10-10T12:00:35Z",
-  "stage": "SCF (DIIS)",
-  "latestEnergyHartree": -76.4612,
-  "logTail": [
-   "cycle= 7 E= -76.4611982",
-   "cycle= 8 E= -76.4612007"
-  ],
-  "peakMemoryGB": 0.41,
-  "actual": null,
+  "startedAt": "2026-10-10T12:00:40Z",
+  "endedAt": "2026-10-10T12:00:56Z",
+  "heartbeatAt": null,
+  "stage": null,
+  "latestEnergyHartree": null,
+  "logTail": [],
+  "peakMemoryGB": null,
+  "actual": {
+   "wallSeconds": 15.04,
+   "peakMemoryGB": 0.326,
+   "threads": 2,
+   "resultBytes": 1450955,
+   "resultObjects": 13
+  },
   "error": null,
-  "backend": "local",
-  "reservedUsd": 0.0,
-  "actualUsd": null,
+  "backend": "aws",
+  "reservedUsd": 0.021284,
+  "actualUsd": 0.002214,
   "resultUrl": "/molecules/jobs/e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa/",
   "approvedQuote": {
-   "option": "local",
-   "quoteId": "45dac8d3086ceec7821fcaf5534aa21eade67779a6d5854f73ece2fae13ebb4d",
-   "attempts": 1,
+   "option": "spot",
+   "quoteId": "f995c059b5748208e17a2addf18827d0f33d14d847f4c42f1a266284fc4ebf8b",
+   "attempts": 3,
    "timeoutSeconds": 600,
    "sizingVersion": 5,
    "pricesVersion": 2,
    "approvedAt": "2026-10-10T12:00:00Z",
-   "estimateUsd": 0.0,
-   "maximumUsd": 0.0,
+   "estimateUsd": 0.002452,
+   "maximumUsd": 0.021284,
    "lines": [
     {
      "item": "compute",
      "label": "Compute (AWS Fargate)",
-     "estimateUsd": 0.0,
-     "maximumUsd": 0.0
+     "estimateUsd": 0.00063,
+     "maximumUsd": 0.01788
     },
     {
      "item": "storage",
      "label": "Result storage (S3, 12 months)",
-     "estimateUsd": 0.0,
-     "maximumUsd": 0.0
+     "estimateUsd": 0.000468,
+     "maximumUsd": 0.000856
     },
     {
      "item": "delivery",
      "label": "Delivery (CloudFront, 10 full downloads)",
-     "estimateUsd": 0.0,
-     "maximumUsd": 0.0
+     "estimateUsd": 0.001354,
+     "maximumUsd": 0.002548
     },
     {
      "item": "platform",
@@ -118,6 +121,37 @@
     }
    ]
   },
-  "charged": null
+  "charged": {
+   "costUsd": 0.002214,
+   "chargedUsd": 0.002214,
+   "absorbedUsd": 0.0,
+   "resultBytes": 1450955,
+   "lines": [
+    {
+     "item": "compute",
+     "label": "Compute (AWS Fargate)",
+     "costUsd": 0.000497,
+     "chargedUsd": 0.000497
+    },
+    {
+     "item": "storage",
+     "label": "Result storage (S3, 12 months)",
+     "costUsd": 0.000438,
+     "chargedUsd": 0.000438
+    },
+    {
+     "item": "delivery",
+     "label": "Delivery (CloudFront, 10 full downloads)",
+     "costUsd": 0.001279,
+     "chargedUsd": 0.001279
+    },
+    {
+     "item": "platform",
+     "label": "Platform fee",
+     "costUsd": 0.0,
+     "chargedUsd": 0.0
+    }
+   ]
+  }
  }
 }

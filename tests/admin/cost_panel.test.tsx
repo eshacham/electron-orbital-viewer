@@ -39,4 +39,8 @@ describe('CostPanel', () => {
     it('knows the length of each month', () => {
         expect([daysIn('2026-10'), daysIn('2026-02'), daysIn('2028-02')]).toEqual([31, 28, 29]);
     });
+    it('says the meter books storage and delivery, which Cost Explorer’s compute figure leaves out (Phase 6C)', () => {
+        render(<CostPanel costs={costsFixture()} />);
+        expect(screen.getByRole('region', { name: 'costs' })).toHaveTextContent(/books each settled AWS job’s result storage and delivery/);
+    });
 });

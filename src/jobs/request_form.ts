@@ -1,5 +1,5 @@
 import { elementFor } from '../elements';
-import type { CanonicalJob, JobRequest, JobView, Recipe } from './api_types';
+import type { AvailableQuoteOption, CanonicalJob, JobRequest, JobView, Recipe } from './api_types';
 
 export type InputKind = 'name' | 'smiles' | 'xyz';
 export interface RequestForm { kind: InputKind; text: string; recipe: Recipe; charge: string; multiplicity: string }
@@ -69,4 +69,9 @@ export function retryBody(view: JobView): JobRequest {
         multiplicity: view.job.molecule.multiplicity,
         retry: true,
     };
+}
+
+/** Phase 6C: a submit names the option the owner approved and the quote id it was shown with. */
+export function approvedBody(body: JobRequest, option: AvailableQuoteOption): JobRequest {
+    return { ...body, option: option.option, quoteId: option.quoteId };
 }

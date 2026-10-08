@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Chip, Typography } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { formatFormula } from '../molecules/catalogue';
-import { elapsedSeconds, formatDuration, formatEnergy, methodOf, money, predictionNote } from '../jobs/format';
-import { isActive, JobStatus, JobView } from '../jobs/api_types';
+import QuoteChooser from './QuoteChooser';
+import { elapsedSeconds, formatDuration, formatEnergy, formatUsd, methodOf, money, predictionNote, quotedCost } from '../jobs/format';
+import { AvailableQuoteOption, isActive, JobStatus, JobView, Quote } from '../jobs/api_types';
 import type { JobsState } from '../store/jobsSlice';
 import { useNow } from '../jobs/useNow';
 
@@ -19,21 +20,58 @@ export interface JobStatusViewProps {
     error: string | null;
     nowMs: number;
     onOpen(key: string): void;
+    /** Retry asks for a fresh quote first (Phase 6C): a retry is a new run, approved like one. */
     onRetry(view: JobView): void;
     onClose(): void;
     busy?: boolean;
     /** A retry the API refused: said as a retry's failure, not as a status that could not be refreshed (m6). */
     retryError?: string | null;
+    /** The fresh quote for a retry, once it has come; approving one of its options retries the job. */
+    retryQuote?: Quote | null;
+    onApproveRetry?(view: JobView, option: AvailableQuoteOption): void;
 }
 
+/**
+ * What the job costs. A quoted job (Phase 6C) shows its approved maximum
+ * and, once settled, what it was charged; a record from before quotes shows
+ * its reservation and actual cost, as it always did.
+ */
 function costText(view: JobView): string {
     if (view.backend === 'local') return `This Mac — ${money('spent', view.actualUsd ?? 0)}`;
+    const quoted = quotedCost(view);
+    if (quoted) return quoted;
     if (view.actualUsd === null) return money('reserved', view.reservedUsd);
     return `${money('spent', view.actualUsd)} (${money('reserved', view.reservedUsd)} released)`;
 }
 
+/** The approved quote's lines, and once settled what each was charged. */
+function CostLines({ view }: { view: JobView }) {
+    const quote = view.approvedQuote;
+    if (!quote || view.backend === 'local') return null;
+    const charged = new Map((view.charged?.lines ?? []).map(line => [line.item, line]));
+    return (
+        <details className="quote-details">
+            <summary>Price, line by line</summary>
+            <ul className="job-cost-lines">
+                {quote.lines.map(line => {
+                    const settled = charged.get(line.item);
+                    return (
+                        <li key={line.item}>
+                            {line.label}: {money('estimated', line.estimateUsd)}, {money('up to', line.maximumUsd)}
+                            {settled ? `; ${money('charged', settled.chargedUsd)}${settled.costUsd > settled.chargedUsd ? ` (${money('billed', settled.costUsd)} by AWS)` : ''}` : ''}
+                        </li>
+                    );
+                })}
+            </ul>
+            <span className="quote-option-note">Approved {quote.approvedAt.replace('T', ' ').replace('Z', ' UTC')}; time limit {formatDuration(quote.timeoutSeconds)}{quote.attempts > 1 ? `, up to ${quote.attempts} attempts` : ''}; total {formatUsd(quote.estimateUsd)} estimated.</span>
+        </details>
+    );
+}
+
 /** Spec §9.3: state, stage, latest energy, log tail, elapsed time and cost, for one job. */
-export const JobStatusView: React.FC<JobStatusViewProps> = ({ view, error, nowMs, onOpen, onRetry, onClose, busy = false, retryError = null }) => {
+export const JobStatusView: React.FC<JobStatusViewProps> = ({
+    view, error, nowMs, onOpen, onRetry, onClose, busy = false, retryError = null, retryQuote = null, onApproveRetry,
+}) => {
     const logRef = useRef<HTMLPreElement>(null);
     const tail = view?.logTail.join('\n') ?? '';
     // The newest line is the one that matters: keep the tail scrolled to the bottom as it grows.
@@ -68,12 +106,23 @@ export const JobStatusView: React.FC<JobStatusViewProps> = ({ view, error, nowMs
                 <dd>{formatDuration(view.sizing.predictedSeconds)} ({predictionNote(view.sizing.version)})</dd>
                 <dt>Cost</dt><dd>{costText(view)}</dd>
             </dl>
+            <CostLines view={view} />
             {/* role log announces every line as it arrives -- every 5 s while running -- so it is read on request only. */}
             {view.logTail.length > 0 && <pre ref={logRef} className="job-log-tail" role="log" aria-live="off" aria-label="log tail">{tail}</pre>}
             {view.status === 'FAILED' && (
                 <>
                     <Alert severity="error" role="alert">{view.error?.message ?? 'The job failed without a recorded reason.'}</Alert>
-                    <Button variant="contained" disabled={busy} onClick={() => onRetry(view)}>Retry</Button>
+                    {!retryQuote && <Button variant="contained" disabled={busy} onClick={() => onRetry(view)}>Retry</Button>}
+                    {/* Phase 6C: a retry is a new run, so it is priced afresh and approved; the quote is announced as it lands. */}
+                    <div aria-live="polite">
+                        {retryQuote && (
+                            <>
+                                <Typography variant="body2">A retry is a new run: approve one of these to run it again.</Typography>
+                                <QuoteChooser quote={retryQuote} verb="retry" disabled={busy}
+                                    onApprove={option => onApproveRetry?.(view, option)} />
+                            </>
+                        )}
+                    </div>
                 </>
             )}
             {retryError && <Alert severity="error" role="alert">Retry was refused: {retryError}</Alert>}
@@ -87,7 +136,9 @@ export const JobStatusView: React.FC<JobStatusViewProps> = ({ view, error, nowMs
 interface JobStatusPanelProps {
     jobKey: string;
     onOpen(key: string): void;
-    onRetry(view: JobView): Promise<void>;
+    /** A fresh quote for retrying a failed job (Phase 6C: a retry needs its own approval). */
+    onQuote(view: JobView): Promise<Quote>;
+    onRetry(view: JobView, option: AvailableQuoteOption): Promise<void>;
     onClose(): void;
 }
 
@@ -96,26 +147,38 @@ interface JobStatusPanelProps {
  * not poll and does not open the result itself: on a phone it unmounts
  * whenever the sheet folds or another tab opens (final review I2).
  */
-const JobStatusPanel: React.FC<JobStatusPanelProps> = ({ jobKey, onOpen, onRetry, onClose }) => {
+const JobStatusPanel: React.FC<JobStatusPanelProps> = ({ jobKey, onOpen, onQuote, onRetry, onClose }) => {
     const view = useSelector((state: { jobs: JobsState }) => state.jobs.records[jobKey] ?? null);
     const error = useSelector((state: { jobs: JobsState }) => state.jobs.recordErrors[jobKey] ?? null);
     const nowMs = useNow(view !== null && isActive(view.status));
     const [busy, setBusy] = useState(false);
     const [retryError, setRetryError] = useState<string | null>(null);
-    const retry = async (target: JobView) => {
+    const [retryQuote, setRetryQuote] = useState<{ key: string; attempt: number; quote: Quote } | null>(null);
+    const attempt = async (work: () => Promise<void>) => {
         setBusy(true);
         setRetryError(null);
         try {
-            await onRetry(target);
+            await work();
         } catch (failure) {
             setRetryError(failure instanceof Error ? failure.message : String(failure));
         } finally {
             setBusy(false);
         }
     };
+    const quote = (target: JobView) => attempt(async () => {
+        setRetryQuote({ key: target.key, attempt: target.attempt, quote: await onQuote(target) });
+    });
+    const approve = (target: JobView, option: AvailableQuoteOption) => attempt(async () => {
+        await onRetry(target, option);
+        setRetryQuote(null);
+    });
+    // A quote belongs to the failed attempt it was asked for: once the job has moved on, it is dropped.
+    const current = retryQuote && view && retryQuote.key === view.key && retryQuote.attempt === view.attempt && view.status === 'FAILED'
+        ? retryQuote.quote : null;
     return (
-        <JobStatusView view={view} error={error} nowMs={nowMs} onOpen={onOpen} onRetry={target => { void retry(target); }}
-            onClose={onClose} busy={busy} retryError={retryError} />
+        <JobStatusView view={view} error={error} nowMs={nowMs} onOpen={onOpen} onRetry={target => { void quote(target); }}
+            onClose={onClose} busy={busy} retryError={retryError} retryQuote={current}
+            onApproveRetry={(target, option) => { void approve(target, option); }} />
     );
 };
 

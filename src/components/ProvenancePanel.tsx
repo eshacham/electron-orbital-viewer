@@ -3,7 +3,7 @@ import { Accordion, AccordionDetails, AccordionSummary, Link, Typography } from 
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { tierOf, MoleculeProvenance } from '../molecules/types';
 import { computedResultFiles, jobFileUrl } from '../molecules/job_paths';
-import { capacityLabel, formatDuration, formatGB, money, predictionNote } from '../jobs/format';
+import { capacityLabel, formatDuration, formatGB, money, predictionNote, quotedCost } from '../jobs/format';
 import type { JobView } from '../jobs/api_types';
 
 export const PUBCHEM_COMPOUND_URL = 'https://pubchem.ncbi.nlm.nih.gov/compound/';
@@ -41,7 +41,10 @@ function Geometry({ provenance, steps, resumedFrom }: { provenance: MoleculeProv
 /** Time against its prediction, and the money -- the owner's numbers, read from the job record (meta's costUsd is always null). */
 function OwnerFacts({ job }: { job: JobView }) {
     const { sizing, actual } = job;
-    const cost = job.actualUsd === null ? `${money('reserved', job.reservedUsd)}, not settled yet` : money('spent', job.actualUsd);
+    // Phase 6C: an AWS job approved from a quote says its maximum and what it was charged; This Mac's
+    // runs are free, and a record from before quotes keeps its reservation and actual cost.
+    const quoted = job.backend === 'local' ? null : quotedCost(job);
+    const cost = quoted ?? (job.actualUsd === null ? `${money('reserved', job.reservedUsd)}, not settled yet` : money('spent', job.actualUsd));
     return (
         <Typography variant="body2" className="provenance-owner">
             Owner only: {actual ? `${formatDuration(actual.wallSeconds)} of wall time, peak memory ${formatGB(actual.peakMemoryGB)}` : 'no timings recorded'}

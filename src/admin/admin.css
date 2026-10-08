@@ -30,6 +30,10 @@ html, body, #root { margin: 0; min-height: 100%; font-family: 'Roboto', sans-ser
 .admin-nowrap { white-space: nowrap; }
 .admin-note { font-size: 0.75rem; color: #5f6368; white-space: normal; }
 .admin-error { color: #b71c1c; white-space: normal; }
+/* Phase 6C: what AWS billed past a job's approved maximum (the app absorbs it) is flagged in amber. */
+.admin-absorbed { color: #8a4100; font-weight: 600; white-space: normal; }
+.admin-lines summary { cursor: pointer; font-size: 0.75rem; }
+.admin-lines ul { margin: 2px 0; padding-left: 16px; font-size: 0.75rem; }
 .cost-figures { margin: 8px 0; padding-left: 18px; }
 .cost-billed { margin: 8px 0; color: rgba(0, 0, 0, 0.87); }
 .daily-spend { margin: 8px 0; }

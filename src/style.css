@@ -1441,6 +1441,23 @@ html, body, #root {
 .preview-facts dd { margin: 0; font-variant-numeric: tabular-nums; }
 .mono, .job-log-tail { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
+/* Phase 6C: the price quote -- two options side by side (one column when
+   the panel is too narrow for two), the chosen one outlined, and its line
+   items behind a disclosure. Secondary text declares its own colour (not
+   opacity) so tests/a11y/panel_contrast.test.ts checks what is painted. */
+.quote-chooser { display: flex; flex-direction: column; gap: 8px; }
+.quote-options.MuiFormGroup-root { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.quote-option { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px 8px; border: 1px solid rgba(0, 0, 0, 0.3); border-radius: 8px; font-variant-numeric: tabular-nums; }
+.quote-option.chosen { border: 2px solid #0d47a1; padding: 5px 9px 7px; }
+.quote-option .MuiFormControlLabel-root { margin-left: -6px; }
+.quote-option-note { color: rgba(0, 0, 0, 0.7); font-size: 0.75rem; }
+.quote-option-unavailable { color: #8a4100; font-size: 0.75rem; }
+.quote-details summary { cursor: pointer; font-weight: 600; }
+.quote-lines { border-collapse: collapse; margin-top: 4px; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.quote-lines th, .quote-lines td { text-align: left; vertical-align: top; padding: 2px 6px 2px 0; }
+.quote-reference { margin: 0; }
+.job-cost-lines { margin: 4px 0; padding-left: 18px; font-size: 0.75rem; }
+
 /* Phase 6B-2 Task 11: the live status panel's header and scrolling log tail. */
 .job-status-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .job-log-tail { margin: 0; max-height: 160px; overflow: auto; padding: 6px 8px; background: #111; color: #e6e6e6; border-radius: 6px; font-size: 0.75rem; white-space: pre; }

@@ -70,21 +70,213 @@
   },
   "decision": {
    "ok": true,
-   "sizing": {
-    "version": 5,
-    "estimateFor": "fargate",
-    "size": "S",
-    "vcpu": 2,
-    "memoryGB": 8,
-    "capacity": "local",
-    "attempts": 1,
-    "basisFunctions": 58,
-    "predictedSeconds": 15.5,
-    "predictedMemoryGB": 0.47,
-    "timeoutSeconds": 600,
-    "predictedCostMicros": 0
-   },
-   "reservedUsd": 0.0
+   "quote": {
+    "options": [
+     {
+      "option": "local",
+      "capacity": "local",
+      "available": true,
+      "unavailableReason": null,
+      "quoteId": "45dac8d3086ceec7821fcaf5534aa21eade67779a6d5854f73ece2fae13ebb4d",
+      "size": "S",
+      "vcpu": 2,
+      "memoryGB": 8,
+      "attempts": 1,
+      "timeoutSeconds": 600,
+      "predictedSeconds": 15.5,
+      "sizingVersion": 5,
+      "pricesVersion": 2,
+      "resultBytes": 1507737,
+      "resultBytesMax": 3015474,
+      "retentionMonths": 12,
+      "downloads": 10,
+      "estimateUsd": 0.0,
+      "maximumUsd": 0.0,
+      "lines": [
+       {
+        "item": "compute",
+        "label": "Compute (AWS Fargate)",
+        "estimateUsd": 0.0,
+        "maximumUsd": 0.0,
+        "note": "This Mac: nothing is billed."
+       },
+       {
+        "item": "storage",
+        "label": "Result storage (S3, 12 months)",
+        "estimateUsd": 0.0,
+        "maximumUsd": 0.0,
+        "note": "This Mac: nothing is billed."
+       },
+       {
+        "item": "delivery",
+        "label": "Delivery (CloudFront, 10 full downloads)",
+        "estimateUsd": 0.0,
+        "maximumUsd": 0.0,
+        "note": "This Mac: nothing is billed."
+       },
+       {
+        "item": "platform",
+        "label": "Platform fee",
+        "estimateUsd": 0.0,
+        "maximumUsd": 0.0,
+        "note": "This Mac: nothing is billed."
+       }
+      ],
+      "interruption": null,
+      "sizing": {
+       "version": 5,
+       "estimateFor": "fargate",
+       "size": "S",
+       "vcpu": 2,
+       "memoryGB": 8,
+       "capacity": "local",
+       "attempts": 1,
+       "basisFunctions": 58,
+       "predictedSeconds": 15.5,
+       "predictedMemoryGB": 0.47,
+       "timeoutSeconds": 600,
+       "predictedCostMicros": 0
+      },
+      "approvable": true,
+      "blockedReason": null
+     }
+    ],
+    "recommended": "local",
+    "reference": [
+     {
+      "option": "spot",
+      "capacity": "spot",
+      "available": true,
+      "unavailableReason": null,
+      "quoteId": "f995c059b5748208e17a2addf18827d0f33d14d847f4c42f1a266284fc4ebf8b",
+      "size": "S",
+      "vcpu": 2,
+      "memoryGB": 8,
+      "attempts": 3,
+      "timeoutSeconds": 600,
+      "predictedSeconds": 15.5,
+      "sizingVersion": 5,
+      "pricesVersion": 2,
+      "resultBytes": 1507737,
+      "resultBytesMax": 3015474,
+      "retentionMonths": 12,
+      "downloads": 10,
+      "estimateUsd": 0.002452,
+      "maximumUsd": 0.021284,
+      "lines": [
+       {
+        "item": "compute",
+        "label": "Compute (AWS Fargate)",
+        "estimateUsd": 0.00063,
+        "maximumUsd": 0.01788,
+        "note": "Estimate: one run of the predicted 15.5 s plus a minute to start. Maximum: 3 attempts × (600 s time limit + 120 s to start and stop), at Spot prices for S (2 vCPU, 8 GB)."
+       },
+       {
+        "item": "storage",
+        "label": "Result storage (S3, 12 months)",
+        "estimateUsd": 0.000468,
+        "maximumUsd": 0.000856,
+        "note": "About 1.5 MB of results (at most 3.0 MB) kept 12 months in S3 Standard at $0.023 per GB-month, plus $0.005 per 1,000 writes."
+       },
+       {
+        "item": "delivery",
+        "label": "Delivery (CloudFront, 10 full downloads)",
+        "estimateUsd": 0.001354,
+        "maximumUsd": 0.002548,
+        "note": "10 full downloads through CloudFront at $0.085 per GB, plus $0.01 per 10,000 requests."
+       },
+       {
+        "item": "platform",
+        "label": "Platform fee",
+        "estimateUsd": 0.0,
+        "maximumUsd": 0.0,
+        "note": "No platform fee yet."
+       }
+      ],
+      "interruption": "A Spot interruption restarts the job from scratch; up to 3 attempts, each billed.",
+      "sizing": {
+       "version": 5,
+       "estimateFor": "fargate",
+       "size": "S",
+       "vcpu": 2,
+       "memoryGB": 8,
+       "capacity": "spot",
+       "attempts": 3,
+       "basisFunctions": 58,
+       "predictedSeconds": 15.5,
+       "predictedMemoryGB": 0.47,
+       "timeoutSeconds": 600,
+       "predictedCostMicros": 129
+      }
+     },
+     {
+      "option": "on-demand",
+      "capacity": "on-demand",
+      "available": true,
+      "unavailableReason": null,
+      "quoteId": "9a617f8b929bd040af71f032bd4e6fa1b8ab5340f33c93dd010a1b2c6cf32b81",
+      "size": "S",
+      "vcpu": 2,
+      "memoryGB": 8,
+      "attempts": 1,
+      "timeoutSeconds": 600,
+      "predictedSeconds": 15.5,
+      "sizingVersion": 5,
+      "pricesVersion": 2,
+      "resultBytes": 1507737,
+      "resultBytesMax": 3015474,
+      "retentionMonths": 12,
+      "downloads": 10,
+      "estimateUsd": 0.003791,
+      "maximumUsd": 0.022052,
+      "lines": [
+       {
+        "item": "compute",
+        "label": "Compute (AWS Fargate)",
+        "estimateUsd": 0.001969,
+        "maximumUsd": 0.018648,
+        "note": "Estimate: one run of the predicted 15.5 s plus a minute to start. Maximum: 600 s time limit + 120 s to start and stop, at on-demand prices for S (2 vCPU, 8 GB)."
+       },
+       {
+        "item": "storage",
+        "label": "Result storage (S3, 12 months)",
+        "estimateUsd": 0.000468,
+        "maximumUsd": 0.000856,
+        "note": "About 1.5 MB of results (at most 3.0 MB) kept 12 months in S3 Standard at $0.023 per GB-month, plus $0.005 per 1,000 writes."
+       },
+       {
+        "item": "delivery",
+        "label": "Delivery (CloudFront, 10 full downloads)",
+        "estimateUsd": 0.001354,
+        "maximumUsd": 0.002548,
+        "note": "10 full downloads through CloudFront at $0.085 per GB, plus $0.01 per 10,000 requests."
+       },
+       {
+        "item": "platform",
+        "label": "Platform fee",
+        "estimateUsd": 0.0,
+        "maximumUsd": 0.0,
+        "note": "No platform fee yet."
+       }
+      ],
+      "interruption": null,
+      "sizing": {
+       "version": 5,
+       "estimateFor": "fargate",
+       "size": "S",
+       "vcpu": 2,
+       "memoryGB": 8,
+       "capacity": "on-demand",
+       "attempts": 1,
+       "basisFunctions": 58,
+       "predictedSeconds": 15.5,
+       "predictedMemoryGB": 0.47,
+       "timeoutSeconds": 600,
+       "predictedCostMicros": 402
+      }
+     }
+    ]
+   }
   },
   "existing": {
    "key": "e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa",
@@ -166,7 +358,45 @@
    "backend": "local",
    "reservedUsd": 0.0,
    "actualUsd": null,
-   "resultUrl": "/molecules/jobs/e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa/"
+   "resultUrl": "/molecules/jobs/e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa/",
+   "approvedQuote": {
+    "option": "local",
+    "quoteId": "45dac8d3086ceec7821fcaf5534aa21eade67779a6d5854f73ece2fae13ebb4d",
+    "attempts": 1,
+    "timeoutSeconds": 600,
+    "sizingVersion": 5,
+    "pricesVersion": 2,
+    "approvedAt": "2026-10-10T12:00:00Z",
+    "estimateUsd": 0.0,
+    "maximumUsd": 0.0,
+    "lines": [
+     {
+      "item": "compute",
+      "label": "Compute (AWS Fargate)",
+      "estimateUsd": 0.0,
+      "maximumUsd": 0.0
+     },
+     {
+      "item": "storage",
+      "label": "Result storage (S3, 12 months)",
+      "estimateUsd": 0.0,
+      "maximumUsd": 0.0
+     },
+     {
+      "item": "delivery",
+      "label": "Delivery (CloudFront, 10 full downloads)",
+      "estimateUsd": 0.0,
+      "maximumUsd": 0.0
+     },
+     {
+      "item": "platform",
+      "label": "Platform fee",
+      "estimateUsd": 0.0,
+      "maximumUsd": 0.0
+     }
+    ]
+   },
+   "charged": null
   },
   "meter": {
    "month": "2026-10",

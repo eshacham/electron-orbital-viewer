@@ -45,21 +45,34 @@ describe('previewing', () => {
         const preview = screen.getByLabelText('preview');
         // D7: a local run's "Predicted" figure is really a Fargate estimate, and there is no
         // local time limit -- the labels say so rather than implying a Mac-specific prediction.
-        for (const text of ['H₂O', 'Electrons10', 'Basis functions58 (def2-TZVPD)', 'This Mac', 'remaining $8.80', 'Fargate estimate', 'none on This Mac']) {
-            expect(preview).toHaveTextContent(text);
+        for (const text of ['H₂O', 'Electrons10', 'Basis functions58 (def2-TZVPD)', 'This Mac', 'remaining $8.80', 'Fargate estimate',
+            'no time limit on This Mac']) {
+            expect(screen.getByLabelText('preview').parentElement).toHaveTextContent(text);
         }
         expect(preview).toHaveTextContent(/sizing v\d+ prediction/);
         expect(screen.getByRole('link', { name: '962' })).toHaveAttribute('href', 'https://pubchem.ncbi.nlm.nih.gov/compound/962');
-        expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+        // Phase 6C: a This Mac run is free, so it needs no approval of a price -- only the run.
+        expect(screen.getByRole('button', { name: 'Run on This Mac (free)' })).toBeEnabled();
     });
     it('still shows what a refused molecule resolved to, with the reason, and cannot submit it', async () => {
-        setup({ preview: jest.fn(async () => previewFixture('preview_refused')) });
+        setup({ target: 'aws', preview: jest.fn(async () => previewFixture('preview_refused')) });
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        expect(screen.getByRole('img', { name: /3 atoms/ })).toBeInTheDocument();
-        expect(screen.getByRole('alert')).toHaveTextContent(/^Monthly budget reached/);
-        expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
+        expect(screen.getByRole('img', { name: /90 atoms/ })).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent(/longer than the 48 h this app accepts for one job/);
+        expect(screen.queryByRole('radiogroup', { name: 'price options' })).toBeNull();
+        expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
+    });
+    // Phase 6C: over what is left of the cap, the quote is still shown; it just cannot be approved.
+    it('shows a quote over the monthly cap, says the cap would need raising, and cannot approve it', async () => {
+        setup({ target: 'aws', preview: jest.fn(async () => previewFixture('preview_capped')) });
+        type('molecule (Name)', 'water');
+        press('Preview');
+        await flush();
+        expect(screen.getByRole('radiogroup', { name: 'price options' })).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent('the monthly cap would need raising to approve it');
+        expect(screen.getByRole('button', { name: 'Approve up to $0.02 and run' })).toBeDisabled();
     });
     it("shows the server's own message when nothing could be resolved", async () => {
         setup({ preview: jest.fn(async () => { throw new JobsApiError(422, 'unknown-compound', 'PubChem does not know "unobtainium"'); }) });
@@ -92,7 +105,7 @@ describe('previewing', () => {
         await flush();
         fireEvent.click(screen.getByRole('radio', { name: /B · optimise first/ }));
         expect(screen.queryByLabelText('preview')).toBeNull();
-        expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Run on This Mac (free)' })).toBeNull();
         press('Preview');
         type('molecule (Name)', 'ethanol');
         await act(async () => { pending.resolve(previewFixture('preview_ok')); });
@@ -104,31 +117,32 @@ describe('previewing', () => {
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Run on This Mac (free)' })).toBeEnabled();
         rerender(<Harness {...props} target="aws" />);
         expect(screen.queryByLabelText('preview')).toBeNull();
-        expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Run on This Mac (free)' })).toBeNull();
         expect(props.submit).not.toHaveBeenCalled();
         expect(screen.getByLabelText('molecule (Name)')).toHaveValue('water');
     });
-    it('on AWS, shows the Spot worker, its attempts, its time limit and what it would reserve', async () => {
+    it('on AWS, shows the worker, then Spot and on-demand side by side with their prices and time limits', async () => {
         setup({ target: 'aws', preview: jest.fn(async () => previewFixture('preview_aws')) });
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        const sizing = screen.getByLabelText('sizing decision');
-        expect(sizing).toHaveTextContent('Spot, up to 3 attempts');
-        expect(sizing).toHaveTextContent('Time limit10 min 00 s');
-        expect(sizing).toHaveTextContent('reserved $0.02 if submitted; projected $0.0001290');
-        expect(sizing).not.toHaveTextContent('on AWS');
+        expect(screen.getByLabelText('sizing decision')).toHaveTextContent('WorkerS · 2 vCPU · 8 GB');
+        const group = screen.getByRole('radiogroup', { name: 'price options' });
+        expect(within(group).getByRole('radio', { name: /^Spot: estimated \$0\.002452, up to \$0\.02$/ })).toBeChecked();
+        expect(screen.getByTestId('quote-option-spot')).toHaveTextContent('time limit 10 min 00 s, up to 3 attempts');
+        expect(screen.getByTestId('quote-option-on-demand')).toHaveTextContent('up to $0.02');
+        expect(screen.getByRole('button', { name: 'Approve up to $0.02 and run' })).toBeEnabled();
     });
-    // R6: a This Mac run costs nothing; the projection is what AWS would have cost.
-    it('says a local projection is what it would cost on AWS', async () => {
+    // R6: a This Mac run costs nothing; what AWS would cost is said, for reference.
+    it('says what a local run would cost on AWS', async () => {
         setup();
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        expect(screen.getByLabelText('sizing decision')).toHaveTextContent('projected on AWS $0.00');
+        expect(screen.getByText(/^On AWS this would cost/)).toHaveTextContent('Spot estimated $0.002452, up to $0.02');
     });
     it('says generation is paused, and offers no Submit that works', async () => {
         setup({ preview: jest.fn(async () => ({ ...previewFixture('preview_ok'), generationEnabled: false })) });
@@ -136,7 +150,7 @@ describe('previewing', () => {
         press('Preview');
         await flush();
         expect(screen.getByText(/Generation is paused/)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Run on This Mac (free)' })).toBeDisabled();
     });
     // R1: the same PubChem record asked for by another name or on another day is the same source.
     it('calls the same PubChem record the same source, and says how it was asked for before', async () => {
@@ -184,15 +198,37 @@ describe('previewing', () => {
 });
 
 describe('submitting', () => {
-    it('sends exactly what was previewed, and follows the new job', async () => {
+    it('sends exactly what was previewed, with the option approved and its quote id, and follows the new job', async () => {
         const { props } = setup();
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        press('Submit');
+        press('Run on This Mac (free)');
         await flush();
-        expect(props.submit).toHaveBeenCalledWith({ recipe: 'single', molecule: { name: 'water' } });
+        const decision = previewFixture('preview_ok').decision;
+        const local = decision.ok ? decision.quote.options[0] : null;
+        expect(props.submit).toHaveBeenCalledWith({ recipe: 'single', molecule: { name: 'water' }, option: 'local', quoteId: local?.quoteId });
         expect(props.onFollow).toHaveBeenCalledWith(jobFixture('submit_created'));
+    });
+    it('on AWS, sends the option the owner chose', async () => {
+        const { props } = setup({ target: 'aws', preview: jest.fn(async () => previewFixture('preview_aws')) });
+        type('molecule (Name)', 'water');
+        press('Preview');
+        await flush();
+        fireEvent.click(screen.getByRole('radio', { name: /^On-demand/ }));
+        press('Approve up to $0.02 and run');
+        await flush();
+        expect(props.submit).toHaveBeenCalledWith(expect.objectContaining({ option: 'on-demand', quoteId: expect.stringMatching(/^[0-9a-f]{64}$/) }));
+    });
+    it('says the quote changed when the server refuses it as changed', async () => {
+        setup({ target: 'aws', preview: jest.fn(async () => previewFixture('preview_aws')),
+            submit: jest.fn(async () => { throw new JobsApiError(409, 'quote-changed', 'The quote changed since it was shown (its price, size, time limit or terms are not what was approved): preview again and approve the new quote.'); }) });
+        type('molecule (Name)', 'water');
+        press('Preview');
+        await flush();
+        press('Approve up to $0.02 and run');
+        await flush();
+        expect(screen.getByRole('alert')).toHaveTextContent('preview again and approve the new quote');
     });
     it('a known molecule: computed opens it, running follows it', async () => {
         const done = jobFixture('get_done');
@@ -221,10 +257,11 @@ describe('submitting', () => {
         press('Preview');
         await flush();
         expect(screen.getByRole('alert')).toHaveTextContent('SCF did not converge');
-        press('Retry');
+        // Phase 6C: a retry is approved from this fresh preview's quote, like any new run.
+        press('Retry on This Mac (free)');
         await flush();
         expect(props.submit).toHaveBeenCalledWith(expect.objectContaining({
-            retry: true, recipe: 'optimise', charge: 0, multiplicity: 1,
+            retry: true, recipe: 'optimise', charge: 0, multiplicity: 1, option: 'local', quoteId: expect.any(String),
             molecule: { xyz: expect.stringMatching(/^3\nretry\nH 0\.00000 -0\.75545 -0\.47116\n/) },
         }));
     });
@@ -234,9 +271,9 @@ describe('submitting', () => {
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        press('Submit');
+        press('Run on This Mac (free)');
         await flush();
-        expect(screen.queryByRole('button', { name: 'Submit' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Run on This Mac (free)' })).toBeNull();
         expect(screen.getByLabelText('molecule (Name)')).toHaveValue('water');
     });
     it('says why a submit failed, and keeps the preview to try again', async () => {
@@ -244,10 +281,10 @@ describe('submitting', () => {
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        press('Submit');
+        press('Run on This Mac (free)');
         await flush();
         expect(screen.getByRole('alert')).toHaveTextContent('Monthly budget reached');
-        expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Run on This Mac (free)' })).toBeEnabled();
         expect(props.onFollow).not.toHaveBeenCalled();
     });
     // R3 and R4: one alert, the one that says what to do; and focus does not stay on a field just disabled.
@@ -256,7 +293,7 @@ describe('submitting', () => {
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        press('Submit');
+        press('Run on This Mac (free)');
         await flush();
         screen.getByLabelText('molecule (Name)').focus();
         rerender(<Harness {...props} sessionExpired />);

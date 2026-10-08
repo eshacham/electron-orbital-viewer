@@ -1,6 +1,7 @@
-import type { Capacity, CanonicalJob, JobView } from './api_types';
+import type { Capacity, CanonicalJob, JobView, QuoteOptionName } from './api_types';
 
-export type MoneyLabel = 'spent' | 'reserved' | 'projected' | 'remaining' | 'billed';
+/** Phase 6C adds a quote's words: estimated, up to (its maximum), charged, and absorbed (what the app paid past it). */
+export type MoneyLabel = 'spent' | 'reserved' | 'projected' | 'remaining' | 'billed' | 'estimated' | 'up to' | 'charged' | 'absorbed';
 
 /**
  * USD at the precision the meter has (whole micro-dollars): cents from a
@@ -47,6 +48,26 @@ export const predictionNote = (version: number): string => `sizing v${version} p
 
 const CAPACITY: Record<Capacity, string> = { spot: 'Spot', 'on-demand': 'on-demand', local: 'This Mac' };
 export const capacityLabel = (capacity: Capacity): string => CAPACITY[capacity];
+
+const OPTION: Record<QuoteOptionName, string> = { spot: 'Spot', 'on-demand': 'On-demand', local: 'This Mac' };
+/** A quote option's name, as a heading: "Spot", "On-demand", "This Mac". */
+export const optionLabel = (option: QuoteOptionName): string => OPTION[option];
+
+/**
+ * A quoted job's money in one line (Phase 6C): what was approved and, once
+ * settled, what was charged -- and, if AWS billed more than the approved
+ * maximum, what the app absorbed. null for a record from before quotes.
+ */
+export function quotedCost(view: JobView): string | null {
+    const quote = view.approvedQuote;
+    if (!quote) return null;
+    const approved = `${money('up to', quote.maximumUsd)} approved (${OPTION[quote.option]})`;
+    if (!view.charged) return approved;
+    const absorbed = view.charged.absorbedUsd > 0
+        ? `; ${money('billed', view.charged.costUsd)} by AWS, ${money('absorbed', view.charged.absorbedUsd)} by the app`
+        : '';
+    return `${money('charged', view.charged.chargedUsd)} of ${approved}${absorbed}`;
+}
 
 /** Jobs are charged to the UTC month they were submitted in (spec §6.4). */
 export function currentMonth(now: Date = new Date()): string {

@@ -100,6 +100,12 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     { selector: '.molecule-jobs .job-status', declared: `background-color: ${LIGHT_96}`, fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
     // Final fix wave (V1): MUI's warning orange under white text was 3.1:1; the Computed chip declares a darker amber.
     { selector: '.tier-badge .tier-chip-computed', declared: 'background-color: #a84300', fg: '#ffffff', bg: '#a84300' },
+    // Phase 6C: the quote's secondary text and its unavailable/over-cap lines, on the request accordion's
+    // card (0.94) and the status panel's (LIGHT_96); the lighter 0.94 card is the worse case.
+    { selector: '.quote-option-note', declared: 'color: rgba(0, 0, 0, 0.7)', fg: 'rgba(0, 0, 0, 0.7)', bg: 'rgba(240, 240, 240, 0.94)' },
+    { selector: '.quote-option-unavailable', declared: 'color: #8a4100', fg: '#8a4100', bg: 'rgba(240, 240, 240, 0.94)' },
+    // The chosen card's outline: a border needs only 3:1 (WCAG 1.4.11), held here to the text bar anyway.
+    { selector: '.quote-option.chosen', declared: 'border: 2px solid #0d47a1', fg: '#0d47a1', bg: 'rgba(240, 240, 240, 0.94)' },
     // Final fix wave (I3): the failed-sign-in alert over any mode, on its own opaque pink.
     { selector: '.sign-in-error', declared: 'background-color: rgb(253, 237, 237)', fg: 'rgb(95, 33, 32)', bg: 'rgb(253, 237, 237)' },
 ];
@@ -109,6 +115,8 @@ const ADMIN_PAIRS: Array<{ selector: string; declared: string; fg: string }> = [
     { selector: '.eov-admin-dashboard', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)' },
     { selector: '.admin-note', declared: 'color: #5f6368', fg: '#5f6368' },
     { selector: '.admin-error', declared: 'color: #b71c1c', fg: '#b71c1c' },
+    // Phase 6C: a charge AWS billed past the approved maximum, which the app absorbed.
+    { selector: '.admin-absorbed', declared: 'color: #8a4100', fg: '#8a4100' },
     { selector: '.cost-billed', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)' },
     { selector: '.daily-spend-title', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)' },
     // SVG text is painted by fill, not color.

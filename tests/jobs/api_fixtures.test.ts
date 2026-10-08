@@ -7,7 +7,11 @@ const read = (name: string) => JSON.parse(readFileSync(path.join(DIR, `${name}.j
 
 const JOB_VIEW_FIELDS = ['key', 'status', 'attempt', 'recipe', 'job', 'name', 'formula', 'electronCount', 'basisFunctions',
     'geometrySource', 'sizing', 'month', 'submittedAt', 'startedAt', 'endedAt', 'heartbeatAt', 'stage', 'latestEnergyHartree',
-    'logTail', 'actual', 'error', 'backend', 'peakMemoryGB', 'reservedUsd', 'actualUsd', 'resultUrl'];
+    'logTail', 'actual', 'error', 'backend', 'peakMemoryGB', 'reservedUsd', 'actualUsd', 'resultUrl', 'approvedQuote', 'charged'];
+// Phase 6C: a priced option, as tools/jobs/quotes.public_option writes it (plus the preview's cap check).
+const OPTION_FIELDS = ['option', 'capacity', 'available', 'unavailableReason', 'quoteId', 'size', 'vcpu', 'memoryGB', 'attempts',
+    'timeoutSeconds', 'predictedSeconds', 'sizingVersion', 'pricesVersion', 'resultBytes', 'resultBytesMax', 'retentionMonths',
+    'downloads', 'estimateUsd', 'maximumUsd', 'lines', 'interruption', 'sizing', 'approvable', 'blockedReason'];
 // D1: tools/jobs/sizing.py:134 adds `estimateFor: 'fargate'` to decide()'s
 // return -- real for both decision.sizing and the record's own `sizing`
 // (6B-1 ships it, it is not optional).
@@ -15,44 +19,59 @@ const SIZING_FIELDS = ['version', 'estimateFor', 'size', 'vcpu', 'memoryGB', 'ca
     'predictedSeconds', 'predictedMemoryGB', 'timeoutSeconds', 'predictedCostMicros'];
 const METER_FIELDS = ['month', 'capUsd', 'spentUsd', 'reservedUsd', 'remainingUsd'];
 
-describe('6B-1 responses, as its handlers write them', () => {
-    it('records all thirteen', () => {
-        expect(readdirSync(DIR).filter(f => f.endsWith('.json'))).toHaveLength(13);
+describe('the API responses, as its handlers write them (6B-1, with 6C quotes)', () => {
+    it('records all twenty', () => {
+        expect(readdirSync(DIR).filter(f => f.endsWith('.json'))).toHaveLength(20);
     });
 
-    it('a preview carries what was resolved, the decision, the meter and any existing job', () => {
+    it('a preview carries what was resolved, the quote, the meter and any existing job', () => {
         const { status, body } = read('preview_ok');
         expect(status).toBe(200);
         expect(Object.keys(body).sort()).toEqual(['atoms', 'basisFunctions', 'charge', 'decision', 'electronCount', 'existing',
             'formula', 'generationEnabled', 'geometrySource', 'job', 'key', 'meter', 'multiplicity', 'name'].sort());
-        const decision = body.decision as { ok: boolean; sizing: Record<string, unknown>; reservedUsd: number };
+        const decision = body.decision as { ok: boolean; quote: { options: Array<Record<string, unknown>>; recommended: string; reference: unknown[] } };
         expect(decision.ok).toBe(true);
-        expect(Object.keys(decision.sizing).sort()).toEqual([...SIZING_FIELDS].sort());
+        expect(decision.quote.recommended).toBe('local');
+        expect(Object.keys(decision.quote.options[0]).sort()).toEqual([...OPTION_FIELDS].sort());
+        expect(Object.keys(decision.quote.options[0].sizing as object).sort()).toEqual([...SIZING_FIELDS].sort());
+        expect(decision.quote.reference).toHaveLength(2);
         expect(Object.keys(body.meter as object).sort()).toEqual([...METER_FIELDS].sort());
         expect(body.geometrySource).toEqual({ kind: 'pubchem', cid: 962, title: 'Water', query: 'water', retrievedAt: '2026-10-10' });
         expect(read('preview_known').body.existing).toEqual(expect.objectContaining({ status: 'RUNNING' }));
-        expect((read('preview_aws').body.decision as { sizing: { capacity: string } }).sizing.capacity).toBe('spot');
+    });
+
+    it('an AWS preview prices Spot and on-demand, each line by line with its own quote id', () => {
+        const quote = (read('preview_aws').body.decision as { quote: { options: Array<{ option: string; quoteId: string; lines: Array<{ item: string }> }> } }).quote;
+        expect(quote.options.map(o => o.option)).toEqual(['spot', 'on-demand']);
+        expect(quote.options[0].lines.map(l => l.item)).toEqual(['compute', 'storage', 'delivery', 'platform']);
+        expect(quote.options[0].quoteId).toMatch(/^[0-9a-f]{64}$/);
+        expect(quote.options[0].quoteId).not.toBe(quote.options[1].quoteId);
+        const unavailable = (read('preview_spot_unavailable').body.decision as { quote: { options: Array<Record<string, unknown>> } }).quote.options[0];
+        expect(unavailable).toEqual({ option: 'spot', capacity: 'spot', available: false, unavailableReason: expect.stringMatching(/^Spot is offered only/),
+            quoteId: null, approvable: false, blockedReason: null });
     });
 
     it('a refused decision still carries the resolved structure', () => {
         const { status, body } = read('preview_refused');
         expect(status).toBe(200);
-        expect(body.decision).toEqual({ ok: false, error: { code: 'budget', message: expect.stringMatching(/^Monthly budget reached/) } });
-        expect(body.atoms as unknown[]).toHaveLength(3);
+        expect(body.decision).toEqual({ ok: false, error: { code: 'too-long', message: expect.stringMatching(/longer than the 48 h this app accepts/) } });
+        expect(body.atoms as unknown[]).toHaveLength(90);
     });
 
     it('every job view has the public fields and none of the internal ones', () => {
-        for (const name of ['submit_created', 'get_running', 'get_done', 'get_failed']) {
+        for (const name of ['submit_created', 'get_running', 'get_done', 'get_failed', 'submit_aws', 'get_done_aws', 'get_absorbed_aws', 'get_legacy_aws']) {
             const view = read(name).body;
             expect(Object.keys(view)).toEqual(expect.arrayContaining(JOB_VIEW_FIELDS));
-            for (const hidden of ['settled', 'runnerJobId', 'reservedMicros', 'actualMicros']) expect(view).not.toHaveProperty(hidden);
+            for (const hidden of ['settled', 'runnerJobId', 'reservedMicros', 'actualMicros', 'quote', 'settlement']) expect(view).not.toHaveProperty(hidden);
         }
         expect(read('submit_created').body.peakMemoryGB).toBeNull();
         expect(read('get_running').body.peakMemoryGB).toBe(0.41);
         expect(read('get_running').body.actualUsd).toBeNull();
-        expect(read('get_done').body.actual).toEqual({ wallSeconds: 70.2, peakMemoryGB: 0.52, threads: 8 });
+        expect(read('get_done').body.actual).toEqual({ wallSeconds: 70.2, peakMemoryGB: 0.52, threads: 8, resultBytes: 1450955, resultObjects: 13 });
         expect(read('get_done').body.actualUsd).toBe(0);
         expect(read('get_failed').body.error).toEqual({ code: 'scf-not-converged', message: expect.any(String) });
+        expect(read('get_legacy_aws').body).toEqual(expect.objectContaining({ approvedQuote: null, charged: null, actualUsd: 0.000497 }));
+        expect((read('get_absorbed_aws').body.charged as { absorbedUsd: number }).absorbedUsd).toBe(0.0025);
     });
 
     it('lists, costs and errors', () => {
@@ -60,6 +79,7 @@ describe('6B-1 responses, as its handlers write them', () => {
         expect(read('list_all').body.jobs as unknown[]).toHaveLength(2);
         expect(Object.keys(read('costs').body)).toEqual(expect.arrayContaining([...METER_FIELDS, 'projectionUsd', 'daily', 'billing', 'pricesRetrieved']));
         expect(read('error_unknown_compound')).toEqual({ status: 422, body: { error: { code: 'unknown-compound', message: 'PubChem does not know "unobtainium"' } } });
-        expect([read('submit_created').status, read('submit_known').status]).toEqual([201, 200]);
+        expect(read('error_quote_changed')).toEqual({ status: 409, body: { error: { code: 'quote-changed', message: expect.stringMatching(/preview again/) } } });
+        expect([read('submit_created').status, read('submit_known').status, read('submit_aws').status]).toEqual([201, 200, 201]);
     });
 });
