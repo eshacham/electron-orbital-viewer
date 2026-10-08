@@ -7,11 +7,12 @@ const read = (name: string) => JSON.parse(readFileSync(path.join(DIR, `${name}.j
 
 const JOB_VIEW_FIELDS = ['key', 'status', 'attempt', 'recipe', 'job', 'name', 'formula', 'electronCount', 'basisFunctions',
     'geometrySource', 'sizing', 'month', 'submittedAt', 'startedAt', 'endedAt', 'heartbeatAt', 'stage', 'latestEnergyHartree',
-    'logTail', 'actual', 'error', 'backend', 'peakMemoryGB', 'reservedUsd', 'actualUsd', 'resultUrl', 'approvedQuote', 'charged'];
+    'logTail', 'actual', 'error', 'backend', 'peakMemoryGB', 'reservedUsd', 'actualUsd', 'resultUrl', 'approvedQuote', 'charged',
+    'ledger'];
 // Phase 6C: a priced option, as tools/jobs/quotes.public_option writes it (plus the preview's cap check).
 const OPTION_FIELDS = ['option', 'capacity', 'available', 'unavailableReason', 'quoteId', 'size', 'vcpu', 'memoryGB', 'attempts',
     'timeoutSeconds', 'predictedSeconds', 'sizingVersion', 'pricesVersion', 'resultBytes', 'resultBytesMax', 'retentionMonths',
-    'downloads', 'estimateUsd', 'maximumUsd', 'lines', 'interruption', 'sizing', 'approvable', 'blockedReason'];
+    'downloads', 'estimateUsd', 'maximumUsd', 'lines', 'interruption', 'sizing', 'approvable', 'blockedReason', 'issuedAt'];
 // D1: tools/jobs/sizing.py:134 adds `estimateFor: 'fargate'` to decide()'s
 // return -- real for both decision.sizing and the record's own `sizing`
 // (6B-1 ships it, it is not optional).
@@ -20,8 +21,8 @@ const SIZING_FIELDS = ['version', 'estimateFor', 'size', 'vcpu', 'memoryGB', 'ca
 const METER_FIELDS = ['month', 'capUsd', 'spentUsd', 'reservedUsd', 'remainingUsd'];
 
 describe('the API responses, as its handlers write them (6B-1, with 6C quotes)', () => {
-    it('records all twenty', () => {
-        expect(readdirSync(DIR).filter(f => f.endsWith('.json'))).toHaveLength(20);
+    it('records all twenty-one', () => {
+        expect(readdirSync(DIR).filter(f => f.endsWith('.json'))).toHaveLength(21);
     });
 
     it('a preview carries what was resolved, the quote, the meter and any existing job', () => {
@@ -54,12 +55,12 @@ describe('the API responses, as its handlers write them (6B-1, with 6C quotes)',
     it('a refused decision still carries the resolved structure', () => {
         const { status, body } = read('preview_refused');
         expect(status).toBe(200);
-        expect(body.decision).toEqual({ ok: false, error: { code: 'too-long', message: expect.stringMatching(/longer than the 48 h this app accepts/) } });
-        expect(body.atoms as unknown[]).toHaveLength(90);
+        expect(body.decision).toEqual({ ok: false, error: { code: 'output-too-large', message: expect.stringMatching(/^this molecule's result files would exceed the app's file limit/) } });
+        expect(body.atoms as unknown[]).toHaveLength(60);
     });
 
     it('every job view has the public fields and none of the internal ones', () => {
-        for (const name of ['submit_created', 'get_running', 'get_done', 'get_failed', 'submit_aws', 'get_done_aws', 'get_absorbed_aws', 'get_legacy_aws']) {
+        for (const name of ['submit_created', 'get_running', 'get_done', 'get_failed', 'submit_aws', 'get_done_aws', 'get_absorbed_aws', 'get_legacy_aws', 'get_retried_aws']) {
             const view = read(name).body;
             expect(Object.keys(view)).toEqual(expect.arrayContaining(JOB_VIEW_FIELDS));
             for (const hidden of ['settled', 'runnerJobId', 'reservedMicros', 'actualMicros', 'quote', 'settlement']) expect(view).not.toHaveProperty(hidden);
@@ -72,6 +73,9 @@ describe('the API responses, as its handlers write them (6B-1, with 6C quotes)',
         expect(read('get_failed').body.error).toEqual({ code: 'scf-not-converged', message: expect.any(String) });
         expect(read('get_legacy_aws').body).toEqual(expect.objectContaining({ approvedQuote: null, charged: null, actualUsd: 0.000497 }));
         expect((read('get_absorbed_aws').body.charged as { absorbedUsd: number }).absorbedUsd).toBe(0.0025);
+        // Fix round 1 (I2): one ledger entry per approval, the legacy record's with its cost alone.
+        expect((read('get_retried_aws').body.ledger as Array<{ option: string }>).map(e => e.option)).toEqual(['spot', 'on-demand']);
+        expect(read('get_legacy_aws').body.ledger).toEqual([expect.objectContaining({ quoteId: null, costUsd: 0.000497, chargedUsd: null })]);
     });
 
     it('lists, costs and errors', () => {

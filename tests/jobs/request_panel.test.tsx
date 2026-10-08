@@ -59,8 +59,8 @@ describe('previewing', () => {
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        expect(screen.getByRole('img', { name: /90 atoms/ })).toBeInTheDocument();
-        expect(screen.getByRole('alert')).toHaveTextContent(/longer than the 48 h this app accepts for one job/);
+        expect(screen.getByRole('img', { name: /60 atoms/ })).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent(/result files would exceed the app's file limit.*Phase 6D's smaller-basis option/);
         expect(screen.queryByRole('radiogroup', { name: 'price options' })).toBeNull();
         expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
     });

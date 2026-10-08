@@ -54,15 +54,27 @@ describe('QuoteChooser', () => {
     });
     it('shows Spot as unavailable, with its reason, when the run is predicted past the Spot limit', () => {
         render(<QuoteChooser quote={quoteOf('preview_spot_unavailable')} verb="run" disabled={false} onApprove={jest.fn()} />);
-        expect(screen.getByRole('radio', { name: 'Spot (unavailable)' })).toBeDisabled();
-        expect(screen.getByTestId('quote-option-spot')).toHaveTextContent(/Unavailable: Spot is offered only for runs predicted at 60 min or less; this one is predicted at 18\.5 h/);
+        const spot = screen.getByRole('radio', { name: 'Spot (unavailable)' });
+        expect(spot).toBeDisabled();
+        expect(screen.getByTestId('quote-option-spot')).toHaveTextContent(/Unavailable: Spot is offered only for runs predicted at 60 min or less; this one is predicted at 1\.2 h/);
         expect(screen.getByRole('radio', { name: /^On-demand/ })).toBeChecked();
+        // Review minor 9: the reason is tied to its radio, so a screen reader hears it with the name.
+        expect(spot).toHaveAccessibleDescription(/^Unavailable: Spot is offered only/);
     });
     it('shows a quote past the monthly cap, but will not approve it, and says the cap would need raising', () => {
-        render(<QuoteChooser quote={quoteOf('preview_spot_unavailable')} verb="run" disabled={false} onApprove={jest.fn()} />);
-        expect(screen.getByTestId('quote-option-on-demand')).toHaveTextContent('up to $41.40');
-        expect(screen.getByRole('button', { name: 'Approve up to $41.40 and run' })).toBeDisabled();
+        render(<QuoteChooser quote={quoteOf('preview_capped')} verb="run" disabled={false} onApprove={jest.fn()} />);
+        expect(screen.getByTestId('quote-option-spot')).toHaveTextContent('up to $0.02');
+        expect(screen.getByRole('button', { name: 'Approve up to $0.02 and run' })).toBeDisabled();
         expect(screen.getByRole('alert')).toHaveTextContent(/the monthly cap would need raising to approve it/);
+        // Review minor 9: "over this month's cap" is part of each radio's description, not only a visual line.
+        expect(screen.getByRole('radio', { name: /^Spot/ })).toHaveAccessibleDescription(/Over this month’s cap/);
+    });
+    // Review minor 4: Spot's maximum is near on-demand's because it allows for 3 attempts; say so plainly.
+    it('says why Spot’s maximum is near on-demand’s', () => {
+        render(<QuoteChooser quote={quoteOf('preview_aws')} verb="run" disabled={false} onApprove={jest.fn()} />);
+        expect(screen.getByTestId('quote-option-spot')).toHaveTextContent(
+            'Spot’s maximum assumes all 3 attempts run to the time limit; most Spot runs finish in one, near the estimate.');
+        expect(screen.getByRole('radio', { name: /^Spot/ })).toHaveAccessibleDescription(/most Spot runs finish in one/);
     });
     it('cannot approve while disabled (paused, busy or signed out)', () => {
         render(<QuoteChooser quote={quoteOf('preview_aws')} verb="run" disabled onApprove={jest.fn()} />);

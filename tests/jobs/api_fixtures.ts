@@ -4,7 +4,7 @@ import type { CostsResponse, JobListResponse, JobView, PreviewResponse } from '.
 
 export type PreviewFixtureName = 'preview_ok' | 'preview_aws' | 'preview_known' | 'preview_refused' | 'preview_capped' | 'preview_spot_unavailable';
 export type JobFixtureName = 'submit_created' | 'submit_known' | 'get_running' | 'get_done' | 'get_failed'
-    | 'submit_aws' | 'get_done_aws' | 'get_absorbed_aws' | 'get_legacy_aws';
+    | 'submit_aws' | 'get_done_aws' | 'get_absorbed_aws' | 'get_legacy_aws' | 'get_retried_aws';
 export type FixtureName = PreviewFixtureName | JobFixtureName | 'error_unknown_compound' | 'error_quote_changed'
     | 'list_done' | 'list_all' | 'costs';
 

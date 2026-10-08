@@ -3,7 +3,9 @@ import { Alert, Button, Chip, Typography } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { formatFormula } from '../molecules/catalogue';
 import QuoteChooser from './QuoteChooser';
-import { elapsedSeconds, formatDuration, formatEnergy, formatUsd, methodOf, money, predictionNote, quotedCost } from '../jobs/format';
+import { elapsedSeconds, formatDuration, formatEnergy, formatUsd, methodOf, money, optionLabel, predictionNote, quotedCost } from '../jobs/format';
+
+const utc = (iso: string) => iso.replace('T', ' ').replace('Z', ' UTC');
 import { AvailableQuoteOption, isActive, JobStatus, JobView, Quote } from '../jobs/api_types';
 import type { JobsState } from '../store/jobsSlice';
 import { useNow } from '../jobs/useNow';
@@ -49,6 +51,7 @@ function CostLines({ view }: { view: JobView }) {
     const quote = view.approvedQuote;
     if (!quote || view.backend === 'local') return null;
     const charged = new Map((view.charged?.lines ?? []).map(line => [line.item, line]));
+    const approvals = (view.ledger ?? []).filter(entry => entry.quoteId !== null && entry.option !== null);
     return (
         <details className="quote-details">
             <summary>Price, line by line</summary>
@@ -63,7 +66,18 @@ function CostLines({ view }: { view: JobView }) {
                     );
                 })}
             </ul>
-            <span className="quote-option-note">Approved {quote.approvedAt.replace('T', ' ').replace('Z', ' UTC')}; time limit {formatDuration(quote.timeoutSeconds)}{quote.attempts > 1 ? `, up to ${quote.attempts} attempts` : ''}; total {formatUsd(quote.estimateUsd)} estimated.</span>
+            <span className="quote-option-note">Approved {utc(quote.approvedAt)}; time limit {formatDuration(quote.timeoutSeconds)}{quote.attempts > 1 ? `, up to ${quote.attempts} attempts` : ''}; total {formatUsd(quote.estimateUsd)} estimated.</span>
+            {/* Review I2: every approval keeps its own charge; a retry never overwrites an earlier one. */}
+            {approvals.length > 0 && (
+                <ul className="job-cost-lines" aria-label="charges by approval">
+                    {approvals.map((entry, i) => (
+                        <li key={`${entry.quoteId}-${i}`}>
+                            {optionLabel(entry.option!)}, settled {entry.at ? utc(entry.at) : 'undated'}: {money('charged', entry.chargedUsd ?? 0)} of {money('up to', entry.approvedMaximumUsd ?? 0)}
+                            {(entry.absorbedUsd ?? 0) > 0 ? ` (${money('absorbed', entry.absorbedUsd ?? 0)} by the app)` : ''}
+                        </li>
+                    ))}
+                </ul>
+            )}
         </details>
     );
 }
@@ -168,9 +182,14 @@ const JobStatusPanel: React.FC<JobStatusPanelProps> = ({ jobKey, onOpen, onQuote
     const quote = (target: JobView) => attempt(async () => {
         setRetryQuote({ key: target.key, attempt: target.attempt, quote: await onQuote(target) });
     });
+    // Review I1: approved or refused, the quote is spent. A refusal (409 quote-changed, option-unavailable,
+    // the cap) drops it, so the panel offers Retry -- a fresh quote -- instead of the stale one again.
     const approve = (target: JobView, option: AvailableQuoteOption) => attempt(async () => {
-        await onRetry(target, option);
-        setRetryQuote(null);
+        try {
+            await onRetry(target, option);
+        } finally {
+            setRetryQuote(null);
+        }
     });
     // A quote belongs to the failed attempt it was asked for: once the job has moved on, it is dropped.
     const current = retryQuote && view && retryQuote.key === view.key && retryQuote.attempt === view.attempt && view.status === 'FAILED'

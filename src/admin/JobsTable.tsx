@@ -51,12 +51,24 @@ function CostCell({ job }: { job: JobView }) {
     }
     const charged = job.charged;
     const lines = new Map((charged?.lines ?? []).map(line => [line.item, line]));
+    const approvals = (job.ledger ?? []).filter(entry => entry.quoteId !== null && entry.option !== null);
     return (
         <>
             {money('up to', quote.maximumUsd)} ({optionLabel(quote.option)})<br />
             {charged ? money('charged', charged.chargedUsd) : 'not settled'}
             {charged && charged.absorbedUsd > 0 && (
                 <><br /><span className="admin-absorbed">{money('billed', charged.costUsd)} by AWS: {money('absorbed', charged.absorbedUsd)} by the app</span></>
+            )}
+            {approvals.length > 1 && (
+                // Review I2: a retried job keeps each approval's own charge.
+                <ul className="admin-approvals" aria-label={`${job.name} charges by approval`}>
+                    {approvals.map((entry, i) => (
+                        <li key={`${entry.quoteId}-${i}`}>
+                            {optionLabel(entry.option!)}: {money('charged', entry.chargedUsd ?? 0)} of {money('up to', entry.approvedMaximumUsd ?? 0)}
+                            {(entry.absorbedUsd ?? 0) > 0 && <span className="admin-absorbed"> ({money('absorbed', entry.absorbedUsd ?? 0)} by the app)</span>}
+                        </li>
+                    ))}
+                </ul>
             )}
             <details className="admin-lines">
                 <summary>lines</summary>

@@ -166,7 +166,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
                     slotProps={{ htmlInput: { 'aria-label': 'multiplicity', inputMode: 'numeric' } }} />
             </div>
             <Typography variant="caption" className="molecule-caption">
-                {target === 'local' ? 'Runs on This Mac: $0, timings tagged local.' : 'Runs on AWS, against this month’s compute cap.'}
+                {target === 'local' ? 'Runs on This Mac: $0, timings tagged local.' : 'Runs on AWS, against this month’s cap (compute, storage and delivery).'}
             </Typography>
             <Button variant="outlined" disabled={sessionExpired || problems.length > 0 || state.phase === 'loading'} onClick={() => run(form, signature)}>
                 {state.phase === 'loading' ? 'Previewing…' : 'Preview'}

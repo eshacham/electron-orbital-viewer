@@ -92,13 +92,13 @@ def record_all(root: Path) -> dict:
     # A quote over what is left of the month's cap: shown, but no option can be approved (cap one micro-dollar).
     out['preview_capped'] = call(Api(FileStore(root / 'capped', cap_micros=1), NullRunner(), resolve=resolve,
                                      now=lambda: NOW, backend='aws'), 'POST', '/api/v1/jobs/preview', water)
-    # A run predicted past the Spot limit (a 60-carbon chain: C60's basis-function count): on-demand only.
+    # A run predicted past the Spot limit (a 26-carbon chain, ~70 min on L): on-demand only.
     out['preview_spot_unavailable'] = call(aws, 'POST', '/api/v1/jobs/preview',
-                                           {'recipe': 'single', 'molecule': {'xyz': chain_xyz(60)}})
-    # Refused outright (over the 48 h sanity ceiling even on the fastest size): what it resolved is still drawn,
-    # with the reason.
+                                           {'recipe': 'single', 'molecule': {'xyz': chain_xyz(26)}})
+    # Refused outright (a 60-carbon chain, C60's N: its result files cannot fit the 3 MB limit, fix round 1):
+    # what it resolved is still drawn, with the reason.
     out['preview_refused'] = call(aws, 'POST', '/api/v1/jobs/preview',
-                                  {'recipe': 'single', 'molecule': {'xyz': chain_xyz(90)}})
+                                  {'recipe': 'single', 'molecule': {'xyz': chain_xyz(60)}})
     approved = approve(aws, water)
     out['error_quote_changed'] = call(aws, 'POST', '/api/v1/jobs', {**approved, 'quoteId': '0' * 64})
     out['submit_aws'] = call(aws, 'POST', '/api/v1/jobs', approved)
@@ -118,6 +118,21 @@ def record_all(root: Path) -> dict:
     compute_max = aws.store.get_job(absorbed_key)['quote']['lines'][0]['maximumMicros']
     aws.store.settle(absorbed_key, compute_max + 2500)
     out['get_absorbed_aws'] = call(aws, 'GET', f'/api/v1/jobs/{absorbed_key}')
+    # A retried job: attempt 1 (Spot) failed and was charged; attempt 2 (on-demand, a fresh approval) is DONE.
+    # Its ledger keeps one entry per approval (fix round 1, review I2).
+    ammonia = {'recipe': 'single', 'molecule': {'xyz': '4\nammonia\nN 0 0 0.1\nH 0 0.94 -0.27\nH 0.81 -0.47 -0.27\nH -0.81 -0.47 -0.27\n'}}
+    retried_key = call(aws, 'POST', '/api/v1/jobs', approve(aws, ammonia))[1]['key']
+    aws.store.update_job(retried_key, {'status': 'FAILED', 'endedAt': '2026-10-10T12:30:00Z', 'stage': None,
+                                       'error': {'code': 'spot-interrupted', 'message': 'Your Spot Task was interrupted.'},
+                                       'actual': {'wallSeconds': 40.0, 'peakMemoryGB': 0.3, 'threads': 2,
+                                                  'resultBytes': 7000, 'resultObjects': 3}})
+    aws.store.settle(retried_key, 1491)
+    call(aws, 'POST', '/api/v1/jobs', approve(aws, {**ammonia, 'retry': True}, 'on-demand'))
+    aws.store.update_job(retried_key, {'status': 'DONE', 'endedAt': '2026-10-10T12:40:00Z', 'stage': None,
+                                       'actual': {'wallSeconds': 20.0, 'peakMemoryGB': 0.33, 'threads': 2,
+                                                  'resultBytes': 1460000, 'resultObjects': 16}})
+    aws.store.settle(retried_key, 1554)
+    out['get_retried_aws'] = call(aws, 'GET', f'/api/v1/jobs/{retried_key}')
     # A record from before Phase 6C (as 6B-3 wrote it, no quote): legacy, shown by reservation and actual.
     legacy_job = canonical_job('single', WATER[:2] + [[1, 0.0, -0.8, -0.5]], 0, 1)
     legacy = new_record(key='c' * 64, job=legacy_job, decision={

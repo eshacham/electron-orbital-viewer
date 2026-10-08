@@ -69,6 +69,8 @@ interface QuoteTerms {
     resultBytesMax: number;
     retentionMonths: number;
     downloads: number;
+    /** The minute the server issued it (UTC, bound into quoteId): a quote holds for an hour. */
+    issuedAt: string | null;
     estimateUsd: number;
     maximumUsd: number;
     lines: QuoteLine[];
@@ -98,9 +100,26 @@ export interface ApprovedQuote {
     sizingVersion: number;
     pricesVersion: number;
     approvedAt: string;
+    issuedAt: string | null;
     estimateUsd: number;
     maximumUsd: number;
     lines: Array<{ item: LineItem; label: string; estimateUsd: number; maximumUsd: number }>;
+}
+
+/**
+ * One settled attempt's entry in the job's ledger (fix round 1, review I2): the approval it was charged
+ * against, what AWS was paid and what was charged. Entries from before quotes carry their cost alone.
+ */
+export interface LedgerEntry {
+    quoteId: string | null;
+    option: QuoteOptionName | null;
+    approvedMaximumUsd: number | null;
+    costUsd: number;
+    chargedUsd: number | null;
+    absorbedUsd: number | null;
+    lines: Array<{ item: LineItem; label: string; costUsd: number; chargedUsd: number }> | null;
+    month: string;
+    at: string | null;
 }
 
 /** What a settled, quoted job was charged: each line its cost, capped at its approved maximum; the rest absorbed. */
@@ -145,6 +164,8 @@ export interface JobView {
     approvedQuote: ApprovedQuote | null;
     /** null until a quoted job is settled, and for every legacy record. */
     charged: Charged | null;
+    /** Every settled attempt, oldest first: one entry per approval, never overwritten by a retry. */
+    ledger: LedgerEntry[];
 }
 
 export interface Meter { month: string; capUsd: number; spentUsd: number; reservedUsd: number; remainingUsd: number }

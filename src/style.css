@@ -1450,6 +1450,7 @@ html, body, #root {
 .quote-option { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px 8px; border: 1px solid rgba(0, 0, 0, 0.3); border-radius: 8px; font-variant-numeric: tabular-nums; }
 .quote-option.chosen { border: 2px solid #0d47a1; padding: 5px 9px 7px; }
 .quote-option .MuiFormControlLabel-root { margin-left: -6px; }
+.quote-option-details { display: flex; flex-direction: column; gap: 2px; }
 .quote-option-note { color: rgba(0, 0, 0, 0.7); font-size: 0.75rem; }
 .quote-option-unavailable { color: #8a4100; font-size: 0.75rem; }
 .quote-details summary { cursor: pointer; font-weight: 600; }

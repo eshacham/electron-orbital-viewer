@@ -111,6 +111,16 @@ describe('<JobsTable> money (Phase 6C)', () => {
         const flag = cell(jobFixture('get_absorbed_aws')).querySelector('.admin-absorbed');
         expect(flag).toHaveTextContent('billed $0.02 by AWS: absorbed $0.002500 by the app');
     });
+    it('keeps each approval’s own charge for a retried job (review I2)', () => {
+        const ledger = within(cell(jobFixture('get_retried_aws'))).getByRole('list', { name: /charges by approval$/ });
+        expect(within(ledger).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+            expect.stringMatching(/^Spot: charged \$0\.001508 of up to \$0\.02/),
+            expect.stringMatching(/^On-demand: charged \$0\.003326 of up to \$0\.02/),
+        ]);
+    });
+    it('links no attempt files for a worker reconcile stopped for silence', () => {
+        expect(jobLinks({ ...jobFixture('get_failed'), actual: null, error: { code: 'worker-silent', message: 'silent' } })).toEqual([]);
+    });
     it('shows a This Mac job as free', () => {
         expect(cell(jobFixture('get_done'))).toHaveTextContent('This Mac (free)spent $0.00');
     });

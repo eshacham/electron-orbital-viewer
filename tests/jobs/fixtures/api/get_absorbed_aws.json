@@ -82,12 +82,13 @@
   "resultUrl": "/molecules/jobs/03e7648c54cbaf4888bb69434e8fb27b5a6091792ac0179f64981300902ab129/",
   "approvedQuote": {
    "option": "on-demand",
-   "quoteId": "e7c05fdcbb28ffb26c015fdc00dbeb31d28d65883037f2a5470b3aca551ff198",
+   "quoteId": "2aa90ae9669b436146b65652e8d23804bfb0594fa3fa38490a2b8d1caf004c57",
    "attempts": 1,
    "timeoutSeconds": 600,
    "sizingVersion": 5,
    "pricesVersion": 2,
    "approvedAt": "2026-10-10T12:00:00Z",
+   "issuedAt": "2026-10-10T12:00Z",
    "estimateUsd": 0.004827,
    "maximumUsd": 0.022052,
    "lines": [
@@ -148,6 +149,44 @@
      "chargedUsd": 0.0
     }
    ]
-  }
+  },
+  "ledger": [
+   {
+    "quoteId": "2aa90ae9669b436146b65652e8d23804bfb0594fa3fa38490a2b8d1caf004c57",
+    "option": "on-demand",
+    "approvedMaximumUsd": 0.022052,
+    "costUsd": 0.022921,
+    "chargedUsd": 0.020421,
+    "absorbedUsd": 0.0025,
+    "lines": [
+     {
+      "item": "compute",
+      "label": "Compute (AWS Fargate)",
+      "costUsd": 0.021148,
+      "chargedUsd": 0.018648
+     },
+     {
+      "item": "storage",
+      "label": "Result storage (S3, 12 months)",
+      "costUsd": 0.000455,
+      "chargedUsd": 0.000455
+     },
+     {
+      "item": "delivery",
+      "label": "Delivery (CloudFront, 10 full downloads)",
+      "costUsd": 0.001318,
+      "chargedUsd": 0.001318
+     },
+     {
+      "item": "platform",
+      "label": "Platform fee",
+      "costUsd": 0.0,
+      "chargedUsd": 0.0
+     }
+    ],
+    "month": "2026-10",
+    "at": "2026-10-10T12:14:00Z"
+   }
+  ]
  }
 }

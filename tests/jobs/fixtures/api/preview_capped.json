@@ -77,7 +77,7 @@
       "capacity": "spot",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "f995c059b5748208e17a2addf18827d0f33d14d847f4c42f1a266284fc4ebf8b",
+      "quoteId": "89c1bedbd349b6c394411e02814a70ef4036814f6bf5ab8d26e2aa694938211b",
       "size": "S",
       "vcpu": 2,
       "memoryGB": 8,
@@ -90,6 +90,7 @@
       "resultBytesMax": 3015474,
       "retentionMonths": 12,
       "downloads": 10,
+      "issuedAt": "2026-10-10T12:00Z",
       "estimateUsd": 0.002452,
       "maximumUsd": 0.021284,
       "lines": [
@@ -138,14 +139,14 @@
        "predictedCostMicros": 129
       },
       "approvable": false,
-      "blockedReason": "Up to $0.02 is more than the $0.000001 left of this month's $0.000001 compute cap: the monthly cap would need raising to approve it."
+      "blockedReason": "Up to $0.02 is more than the $0.000001 left of this month's $0.000001 cap (compute, storage and delivery): the monthly cap would need raising to approve it."
      },
      {
       "option": "on-demand",
       "capacity": "on-demand",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "9a617f8b929bd040af71f032bd4e6fa1b8ab5340f33c93dd010a1b2c6cf32b81",
+      "quoteId": "30acc059ccfaa51a469e24b25113acc5d5f12891e6529f50157abaff1405e3e8",
       "size": "S",
       "vcpu": 2,
       "memoryGB": 8,
@@ -158,6 +159,7 @@
       "resultBytesMax": 3015474,
       "retentionMonths": 12,
       "downloads": 10,
+      "issuedAt": "2026-10-10T12:00Z",
       "estimateUsd": 0.003791,
       "maximumUsd": 0.022052,
       "lines": [
@@ -206,7 +208,7 @@
        "predictedCostMicros": 402
       },
       "approvable": false,
-      "blockedReason": "Up to $0.02 is more than the $0.000001 left of this month's $0.000001 compute cap: the monthly cap would need raising to approve it."
+      "blockedReason": "Up to $0.02 is more than the $0.000001 left of this month's $0.000001 cap (compute, storage and delivery): the monthly cap would need raising to approve it."
      }
     ],
     "recommended": "spot",

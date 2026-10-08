@@ -80,12 +80,13 @@
   "resultUrl": "/molecules/jobs/e2698ba0c292e5dcd20c9784005299a4371340b60074c863ce086df7c2097caa/",
   "approvedQuote": {
    "option": "spot",
-   "quoteId": "f995c059b5748208e17a2addf18827d0f33d14d847f4c42f1a266284fc4ebf8b",
+   "quoteId": "89c1bedbd349b6c394411e02814a70ef4036814f6bf5ab8d26e2aa694938211b",
    "attempts": 3,
    "timeoutSeconds": 600,
    "sizingVersion": 5,
    "pricesVersion": 2,
    "approvedAt": "2026-10-10T12:00:00Z",
+   "issuedAt": "2026-10-10T12:00Z",
    "estimateUsd": 0.002452,
    "maximumUsd": 0.021284,
    "lines": [
@@ -115,6 +116,7 @@
     }
    ]
   },
-  "charged": null
+  "charged": null,
+  "ledger": []
  }
 }

@@ -82,7 +82,7 @@ const PreviewDetails: React.FC<{ preview: PreviewResponse }> = ({ preview }) => 
                 ? (() => { const sizing = sizingOf(decision.quote); return sizing && <SizingFacts sizing={sizing} />; })()
                 : <Alert severity="warning" role="alert">{decision.error.message}</Alert>}
             <Typography variant="body2" className="preview-meter">
-                This month: {money('remaining', meter.remainingUsd)} of the {formatUsd(meter.capUsd)} compute cap
+                This month: {money('remaining', meter.remainingUsd)} of the {formatUsd(meter.capUsd)} monthly cap
                 {' '}({money('spent', meter.spentUsd)}, {money('reserved', meter.reservedUsd)}).
             </Typography>
         </div>

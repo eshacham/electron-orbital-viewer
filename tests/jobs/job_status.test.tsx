@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import JobStatusPanel, { JobStatusView } from '../../src/components/JobStatusPanel';
@@ -49,6 +49,13 @@ describe('JobStatusView', () => {
         const lines = screen.getByText('Price, line by line').closest('details') as HTMLElement;
         expect(lines).toHaveTextContent('Compute (AWS Fargate): estimated $0.0006300, up to $0.02; charged $0.0004970');
         expect(lines).toHaveTextContent('Platform fee: estimated $0.00, up to $0.00; charged $0.00');
+    });
+    // Review I2: every approval a job had keeps its own charge.
+    it('lists what each earlier approval was charged, for a retried job', () => {
+        render(<JobStatusView view={jobFixture('get_retried_aws')} error={null} nowMs={NOW} onOpen={noop} onRetry={noop} onClose={noop} />);
+        const lines = screen.getByText('Price, line by line').closest('details') as HTMLElement;
+        expect(within(lines).getByRole('list', { name: 'charges by approval' })).toHaveTextContent(
+            /^Spot, settled 2026-10-10 12:30:00 UTC: charged \$0\.001508 of up to \$0\.02On-demand, settled 2026-10-10 12:40:00 UTC: charged \$0\.003326 of up to \$0\.02$/);
     });
     it('says when AWS billed past the approved maximum and the app absorbed the rest', () => {
         render(<JobStatusView view={jobFixture('get_absorbed_aws')} error={null} nowMs={NOW} onOpen={noop} onRetry={noop} onClose={noop} />);
@@ -140,6 +147,23 @@ describe('JobStatusPanel', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Approve up to $0.02 and retry' }));
         await act(async () => { await Promise.resolve(); });
         expect(onRetry).toHaveBeenCalledWith(failed, expect.objectContaining({ option: 'on-demand' }));
+    });
+    // Review I1: a refused approval (409 quote-changed, option-unavailable, the cap) must not dead-end on the
+    // stale quote: it is dropped, and Retry fetches a fresh one.
+    it('after a refused approval, drops the stale quote and offers Retry for a fresh one', async () => {
+        const onQuote = jest.fn(async () => awsQuote());
+        const { store } = renderPanel(jest.fn(async () => { throw new Error('The quote changed or expired since it was shown'); }), onQuote);
+        act(() => { store.dispatch(jobUpdated({ ...jobFixture('get_failed'), key: KEY })); });
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        await act(async () => { await Promise.resolve(); });
+        fireEvent.click(screen.getByRole('button', { name: 'Approve up to $0.02 and retry' }));
+        await act(async () => { await Promise.resolve(); });
+        expect(screen.getByText(/Retry was refused: The quote changed/)).toBeInTheDocument();
+        expect(screen.queryByRole('radiogroup', { name: 'price options' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        await act(async () => { await Promise.resolve(); });
+        expect(onQuote).toHaveBeenCalledTimes(2);
+        expect(screen.getByRole('button', { name: 'Approve up to $0.02 and retry' })).toBeEnabled();
     });
     // m6: a refused retry is the retry's failure, not a polling one.
     it('says a refused retry as a refused retry', async () => {

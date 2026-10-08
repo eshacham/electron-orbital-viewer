@@ -79,6 +79,19 @@
   "actualUsd": 0.000497,
   "resultUrl": "/molecules/jobs/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/",
   "approvedQuote": null,
-  "charged": null
+  "charged": null,
+  "ledger": [
+   {
+    "quoteId": null,
+    "option": null,
+    "approvedMaximumUsd": null,
+    "costUsd": 0.000497,
+    "chargedUsd": null,
+    "absorbedUsd": null,
+    "lines": null,
+    "month": "2026-10",
+    "at": "2026-10-10T12:20:00Z"
+   }
+  ]
  }
 }

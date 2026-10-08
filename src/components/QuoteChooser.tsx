@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { Alert, Button, FormControlLabel, Radio, RadioGroup } from '@mui/material';
 import { formatDuration, formatUsd, money, optionLabel } from '../jobs/format';
 import type { AvailableQuoteOption, Quote, QuoteOption, QuoteOptionName } from '../jobs/api_types';
@@ -30,30 +30,40 @@ function radioName(option: QuoteOption): string {
     return `${optionLabel(option.option)}: ${money('estimated', option.estimateUsd)}, ${money('up to', option.maximumUsd)}`;
 }
 
+/** Review minor 4: why Spot's "up to" sits near on-demand's, in one plain sentence. */
+const spotMaximumNote = (attempts: number) =>
+    `Spot’s maximum assumes all ${attempts} attempts run to the time limit; most Spot runs finish in one, near the estimate.`;
+
 function OptionCard({ option, chosen }: { option: QuoteOption; chosen: boolean }) {
     const local = option.option === 'local';
+    // Review minor 9: everything the card says beyond the name -- the times, Spot's notes, why it is
+    // unavailable or over the cap -- is the radio's description, so a screen reader hears it too.
+    const describedBy = useId();
     return (
         <div className={`quote-option${chosen ? ' chosen' : ''}`} data-testid={`quote-option-${option.option}`}>
             <FormControlLabel value={option.option} disabled={!option.available}
-                control={<Radio size="small" slotProps={{ input: { 'aria-label': radioName(option) } }} />}
+                control={<Radio size="small" slotProps={{ input: { 'aria-label': radioName(option), 'aria-describedby': describedBy } }} />}
                 label={<strong>{optionLabel(option.option)}</strong>} />
             {!available(option) ? (
-                <span className="quote-option-unavailable">Unavailable: {option.unavailableReason}</span>
+                <span id={describedBy} className="quote-option-unavailable">Unavailable: {option.unavailableReason}</span>
             ) : local ? (
                 <>
                     <span>Free: nothing is billed</span>
-                    <span className="quote-option-note">Fargate estimate {formatDuration(option.predictedSeconds)}; no time limit on This Mac</span>
+                    <span id={describedBy} className="quote-option-note">Fargate estimate {formatDuration(option.predictedSeconds)}; no time limit on This Mac</span>
                 </>
             ) : (
                 <>
                     <span>{money('estimated', option.estimateUsd)}</span>
                     <strong>{money('up to', option.maximumUsd)}</strong>
-                    <span className="quote-option-note">
-                        predicted {formatDuration(option.predictedSeconds)}; time limit {formatDuration(option.timeoutSeconds)}
-                        {option.attempts > 1 ? `, up to ${option.attempts} attempts` : ''}
+                    <span id={describedBy} className="quote-option-details">
+                        <span className="quote-option-note">
+                            predicted {formatDuration(option.predictedSeconds)}; time limit {formatDuration(option.timeoutSeconds)}
+                            {option.attempts > 1 ? `, up to ${option.attempts} attempts` : ''}
+                        </span>
+                        {option.interruption && <span className="quote-option-note"> {option.interruption}</span>}
+                        {option.capacity === 'spot' && option.attempts > 1 && <span className="quote-option-note"> {spotMaximumNote(option.attempts)}</span>}
+                        {option.approvable === false && <span className="quote-option-unavailable"> Over this month’s cap</span>}
                     </span>
-                    {option.interruption && <span className="quote-option-note">{option.interruption}</span>}
-                    {option.approvable === false && <span className="quote-option-unavailable">Over this month’s cap</span>}
                 </>
             )}
         </div>

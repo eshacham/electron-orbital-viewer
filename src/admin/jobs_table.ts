@@ -59,7 +59,7 @@ const BEFORE_A_WORKER_RAN = new Set(['submit-failed', 'submit-lost', 'no-capacit
  * out-of-memory too).
  */
 const WORKER_STOPPED = new Set(['timed-out', 'out-of-memory', 'spot-interrupted', 'worker-lost', 'batch-lost',
-    'batch-failed', 'worker-crashed']);
+    'batch-failed', 'worker-crashed', 'worker-silent']);
 
 function attemptFilesExist(job: JobView): boolean {
     const code = job.error?.code ?? '';
