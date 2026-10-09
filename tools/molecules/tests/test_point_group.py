@@ -157,9 +157,9 @@ def test_operations_not_found_fall_back_to_the_subgroup_with_a_note(monkeypatch)
     assert labels[:2] == ['1a', '2a']
 
 
-def unsymmetric_scf(atoms, basis='def2-SVP'):
-    mol = gto.M(atom=atoms, unit='Angstrom', basis=basis, symmetry=False, verbose=0)
-    mf = dft.RKS(mol)
+def unsymmetric_scf(atoms, basis='def2-SVP', spin=0, symmetry=False):
+    mol = gto.M(atom=atoms, unit='Angstrom', basis=basis, spin=spin, symmetry=symmetry, verbose=0)
+    mf = dft.RKS(mol) if spin == 0 else dft.ROKS(mol)
     mf.xc, mf.grids.level, mf.conv_tol = 'B3LYP', 4, 1e-10
     mf.kernel()
     return mol, mf
@@ -230,3 +230,69 @@ def test_match_irrep_needs_every_character_within_tolerance_and_the_right_size()
 def test_number_labels_counts_per_irrep_and_pairs_components():
     assert number_labels(['A1', 'A1', 'B2', 'A1', 'B1']) == ['1a1', '2a1', '1b2', '3a1', '1b1']
     assert number_labels(['A1g', 'E1uy', 'E1ux', 'A1g']) == ['1a1g', '1e1u', '1e1u', '2a1g']
+
+
+# --- Task 8 fix round 1: linear molecules and atoms without PySCF symmetry ---------------------------
+
+N2 = 'N 0 0 -0.5488; N 0 0 0.5488'
+
+
+def both_labels(atoms, kept, basis='def2-SVP', spin=0):
+    """The labels of the same molecule with PySCF's symmetry and without it."""
+    out = []
+    for symmetry in (True, False):
+        mol, mf = unsymmetric_scf(atoms, basis, spin, symmetry)
+        assert mf.converged
+        labels, info, notes = label_orbitals(mol, mf, kept)
+        out.append(([labels[i] for i in kept], info, notes))
+    return out
+
+
+def test_n2_without_symmetry_reads_sigma_pi_as_with_it():
+    (on, _, _), (off, symmetry, notes) = both_labels(N2, list(range(9)))
+    assert off == on and off[:7] == ['1σg', '1σu', '2σg', '2σu', '1πu', '1πu', '3σg'] and notes == {}
+    assert symmetry == {'pointGroup': 'Dooh', 'labelGroup': 'Dooh', 'labels': 'full-group', 'labelNote': GEOMETRY_NOTE}
+
+
+def test_co2_off_its_axis_without_symmetry_has_its_1pig_homo():
+    # Laid along a tilted line, so nothing depends on PySCF's z-axis convention.
+    line = np.array([1.0, 2.0, 2.0]) / 3.0
+    co2 = [(s, tuple(float(v) for v in t * line)) for s, t in (('O', -1.16), ('C', 0.0), ('O', 1.16))]
+    (on, _, _), (off, symmetry, _) = both_labels(co2, list(range(11)))
+    assert off == on and off[-2:] == ['1πg', '1πg'] and symmetry['pointGroup'] == 'Dooh'
+
+
+def test_oh_without_symmetry_reads_sigma_and_pi():
+    # ROKS splits OH's 1π pair (one component doubly, one singly occupied) once symmetry no longer holds them
+    # together; both components are still 1π, as with symmetry. (ROKS with symmetry on does not converge at
+    # def2-SVP, so the comparison runs at STO-3G.)
+    (on, _, _), (off, symmetry, notes) = both_labels('O 0 0 0; H 0 0 0.975', list(range(6)), basis='sto-3g', spin=1)
+    assert off == on == ['1σ', '2σ', '3σ', '1π', '1π', '4σ'] and notes == {}
+    assert symmetry['pointGroup'] == symmetry['labelGroup'] == 'Coov'
+    mol, mf = unsymmetric_scf('O 0 0 0; H 0 0 0.975', spin=1)
+    labels, _, _ = label_orbitals(mol, mf, list(range(7)))
+    assert [labels[i] for i in range(5)] == ['1σ', '2σ', '3σ', '1π', '1π']
+
+
+def test_a_linear_set_without_symmetry_gets_its_irrep():
+    mol, mf = unsymmetric_scf(N2)
+    assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, [4, 5]]) == 'πu'
+    assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, [6]]) == 'σg'
+    assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, [5, 6]]) == UNLABELLED
+
+
+def test_an_atom_without_symmetry_keeps_psi_labels_and_names_its_group():
+    mol, mf = unsymmetric_scf('Ne 0 0 0', basis='sto-3g')
+    labels, symmetry, _ = label_orbitals(mol, mf, [0, 1])
+    assert labels == {0: 'ψ1', 1: 'ψ2'} and symmetry['pointGroup'] == 'SO3' and symmetry['labels'] == 'none'
+    assert symmetry['labelNote'] == ('the SCF ran without point-group symmetry (PySCF could not use it at this '
+                                     'geometry), and SO3 orbitals cannot be labelled without it')
+    assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, [0]]) == UNLABELLED
+
+
+@pytest.mark.parametrize('atoms, spin', [(N2, 0), ('Ne 0 0 0', 0), ('O 0 0 0; H 0 0 0.975', 1)])
+def test_geometry_operations_raises_symmetry_not_found_for_groups_it_cannot_project(atoms, spin):
+    # Review (Task 8): as_subgroup hands back Coov, Dooh and SO3 unchanged, which PySCF's Abelian tables lack.
+    mol = gto.M(atom=atoms, basis='sto-3g', spin=spin, symmetry=False, verbose=0)
+    with pytest.raises(point_group.SymmetryNotFound):
+        point_group.geometry_operations(mol)

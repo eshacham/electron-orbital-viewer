@@ -28,8 +28,10 @@ An SCF run without symmetry (the job worker's final SCF falls back to it when
 PySCF cannot build symmetry-adapted orbitals at the geometry) is labelled from
 the geometry's own point group, found as PySCF finds it (detect_symm), by the
 same projection: TABLES's groups, and D2h and its subgroups through PySCF's own
-character tables. Other groups need PySCF's symmetry-adapted orbitals and are
-left unlabelled, with a note (Task 8 controller ruling).
+character tables. A linear molecule reads σ/π/δ/φ (g/u in D∞h) from each MO's
+character under rotations about its axis and under inversion. Other groups
+(atoms, D2d, Ih …) need PySCF's symmetry-adapted orbitals and are left
+unlabelled, with a note (Task 8 controller ruling and its fix round).
 
 Mulliken's notation, lower case for orbitals (a1, t2, e1g, a2"), with the core
 counted, as textbooks number them. D6h follows Herzberg: C2' through atoms
@@ -470,19 +472,81 @@ def geometry_operations(mol):
     sub, axes = geom.as_subgroup(top, axes)
     x, z, _ = _frame(mol)
     axes = np.asarray(axes, dtype=float)
+    from pyscf.symm import param
     if top in TABLES:
         return top, class_operations(top, x, z, list(axes) + list(axes.T))
-    if top == sub:                                  # D2h or one of its subgroups: no degenerate irreps
+    if top == sub and top in param.OPERATOR_TABLE:  # D2h or one of its subgroups: no degenerate irreps
         return top, abelian_operations(top, axes, x, z)
+    # Coov, Dooh and SO3 come back from as_subgroup unchanged (fix round 1): linear molecules have their own
+    # path (linear_components), atoms none.
     raise SymmetryNotFound(f'{top} orbitals cannot be labelled without it')
 
 
+# A linear molecule's MOs, without PySCF's symmetry: a real orbital with angular momentum m about the axis has
+# <psi|C(theta) psi> = cos(m theta) under a rotation by theta, whichever real combination of its pair it is.
+# Two rotations, C5 and C7, tell sigma, pi, delta and phi apart (under C5 alone delta and phi coincide:
+# cos 144° = cos 216°); inversion gives g/u in D∞h.
+LINEAR_ROTATIONS = (5, 7)
+LAMBDAS = ('σ', 'π', 'δ', 'φ')
+
+
+def _linear_axis(mol):
+    x, z, centre = _frame(mol)
+    _, _, vectors = np.linalg.svd(x)
+    return vectors[0], centre
+
+
+def linear_components(mol, mf, coeff, group):
+    """For each column of `coeff`, its (λ, 'g'/'u'/'') as a (σ, '')-style key, or None when its characters
+    are no single component's (an accidental degeneracy mixing two, or numerical trouble)."""
+    axis, centre = _linear_axis(mol)
+    ops = [rotation(axis, 2 * np.pi / n) for n in LINEAR_ROTATIONS]
+    if group == 'Dooh':
+        ops.append(-np.eye(3))
+    diagonal = orbital_characters(mol, _grids(mf), coeff, ops, centre)
+    keys = []
+    for chi in diagonal.T:
+        rotations = chi[:len(LINEAR_ROTATIONS)]
+        m = next((m for m in range(len(LAMBDAS))
+                  if np.all(np.abs(rotations - [np.cos(2 * np.pi * m / n) for n in LINEAR_ROTATIONS]) < CHI_TOL)),
+                 None)
+        parity = ''
+        if group == 'Dooh':
+            parity = 'g' if abs(chi[-1] - 1) < CHI_TOL else 'u' if abs(chi[-1] + 1) < CHI_TOL else None
+        keys.append(None if m is None or parity is None else (LAMBDAS[m], parity))
+    return keys
+
+
+def _linear_geometry_labels(mol, mf, indices, group):
+    """σ/π/δ labels numbered per irrep in energy order, as textbooks (and the symmetry path) number them. A π
+    (δ, φ) shell has two components, counted in turn, so a pair shares its number even when an open shell's
+    ROKS splits it (OH's 1π: one component doubly occupied, one singly)."""
+    keys = linear_components(mol, mf, np.asarray(mf.mo_coeff)[:, indices], group)
+    counts, labels, notes = {}, {}, {}
+    for i, key in zip(indices, keys):
+        if key is None:
+            labels[i] = UNLABELLED
+            notes[i] = (f'characters match no σ, π, δ or φ orbital of {group}: an accidental degeneracy mixing two, '
+                        'or numerical noise, so left unlabelled')
+            continue
+        counts[key] = counts.get(key, 0) + 1
+        number = counts[key] if key[0] == 'σ' else (counts[key] + 1) // 2
+        labels[i] = f'{number}{key[0]}{key[1]}'
+    return labels, {'pointGroup': group, 'labelGroup': group, 'labels': 'full-group', 'labelNote': GEOMETRY_NOTE}, notes
+
+
+def _detected_group(mol):
+    from pyscf.symm import geom
+    return geom.detect_symm(mol._atom, mol._basis)[0]
+
+
 def _geometry_labels(mol, mf, indices):
+    top = _detected_group(mol)
+    if top in LINEAR:
+        return _linear_geometry_labels(mol, mf, indices, top)
     try:
         group, ops = geometry_operations(mol)
     except SymmetryNotFound as e:
-        from pyscf.symm import geom
-        top = geom.detect_symm(mol._atom, mol._basis)[0]
         return ({i: f'ψ{i + 1}' for i in indices},
                 {'pointGroup': top, 'labelGroup': None, 'labels': 'none', 'labelNote': f'{NO_SYMMETRY}, and {e}'}, {})
     labels, symmetry, notes = _projected_labels(mol, mf, indices, group, ops)
@@ -512,6 +576,11 @@ def irrep_of(mol, mf, coeff):
     """The irrep, lower case and unnumbered, of one set of orthonormal orbitals (the columns of `coeff`) in
     the group label_orbitals would use; UNLABELLED if they do not carry a single one."""
     if not mol.symmetry:
+        top = _detected_group(mol)
+        if top in LINEAR:
+            keys = set(linear_components(mol, mf, coeff, top))
+            key = keys.pop() if len(keys) == 1 else None
+            return f'{key[0]}{key[1]}' if key else UNLABELLED
         try:
             group, ops = geometry_operations(mol)
         except SymmetryNotFound:
