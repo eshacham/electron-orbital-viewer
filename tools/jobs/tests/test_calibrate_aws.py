@@ -549,6 +549,12 @@ def test_fit_hessian_keeps_the_slowest_run_against_sizings_own_step():
     assert h == pytest.approx(max(water, caffeine)) and 'caffeine' in notes[0]
 
 
+def test_fit_hessian_refuses_a_probe_with_no_runs():
+    # Task 10 review minor: max() over no runs would raise a bare "max() arg is an empty sequence".
+    with pytest.raises(ValueError, match='no runs'):
+        fit_hessian({**HESSIAN_PROBE, 'runs': []})
+
+
 def test_the_hessian_probe_sets_h_and_its_guard_goes_quiet(tmp_path):
     from pathlib import Path
     log = tmp_path / 'hessian.log'

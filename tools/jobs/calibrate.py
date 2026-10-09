@@ -441,6 +441,9 @@ def fit_hessian(probe):
     """h (sizing version 6): each run's Hessian seconds over sizing's own price for one def2-SVP step on the
     size the probe ran on, per atom; the slowest kept (Ruling T14-speedup). The step is priced with the live
     CONSTANTS, which a refit of h alone leaves as they are. Returns (h, notes)."""
+    if not probe.get('runs'):
+        # Task 10 review minor: say what is wrong rather than max()'s "empty sequence".
+        raise ValueError('the Hessian probe has no runs: nothing to fit h from')
     size = next(s for s in sizing.SIZES if s.vcpu == probe['vcpu'])
     per_run = {r['molecule']: r['hessianSeconds'] / (sizing.step_seconds(r['basisFunctions'], size) * r['atoms'])
                for r in probe['runs']}
