@@ -34,7 +34,7 @@
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -46,7 +46,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -84,7 +84,7 @@
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -96,7 +96,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -134,7 +134,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -172,7 +172,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -210,7 +210,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -261,7 +261,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -312,7 +312,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -350,7 +350,7 @@
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -362,7 +362,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -413,7 +413,7 @@
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -425,7 +425,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -463,7 +463,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -488,7 +488,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -526,7 +526,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -564,7 +564,7 @@
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
   "geometrySource": "experiment (CCCBDB)",
   "knownMiss": "Ozone has strong multireference character: single-reference B3LYP overestimates its dipole moment."
  },
@@ -577,7 +577,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -615,7 +615,7 @@
   "unit": "D",
   "tolerancePercent": 15.823,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -627,7 +627,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -665,7 +665,7 @@
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -677,7 +677,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -715,7 +715,7 @@
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -727,7 +727,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -765,7 +765,7 @@
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -777,7 +777,7 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
@@ -815,44 +815,44 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
   "geometrySource": "experiment (CCCBDB)"
  },
  {
   "phase": 6,
   "quantity": "bond length C–O",
   "system": "CH3OH",
-  "app": 1.4208,
+  "app": 1.4207,
   "reference": 1.427,
   "unit": "Å",
   "tolerancePercent": 2.102,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length O–H",
   "system": "CH3OH",
-  "app": 0.9622,
+  "app": 0.9621,
   "reference": 0.956,
   "unit": "Å",
   "tolerancePercent": 3.138,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "dipole moment",
   "system": "CH3OH",
-  "app": 1.6554,
+  "app": 1.6557,
   "reference": 1.7,
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
@@ -863,307 +863,307 @@
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C=O",
   "system": "HCOOH",
-  "app": 1.1968,
+  "app": 1.1967,
   "reference": 1.202,
   "unit": "Å",
   "tolerancePercent": 2.496,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C–O",
   "system": "HCOOH",
-  "app": 1.344,
+  "app": 1.3439,
   "reference": 1.343,
   "unit": "Å",
   "tolerancePercent": 2.234,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "dipole moment",
   "system": "HCOOH",
-  "app": 1.5431,
+  "app": 1.5411,
   "reference": 1.425,
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "electrons in shipped density grid",
   "system": "HCOOH",
-  "app": 23.9999,
+  "app": 24.0004,
   "reference": 24,
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C–C",
   "system": "C2H5OH",
-  "app": 1.5139,
+  "app": 1.513,
   "reference": 1.512,
   "unit": "Å",
   "tolerancePercent": 1.984,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C–O",
   "system": "C2H5OH",
-  "app": 1.4273,
+  "app": 1.427,
   "reference": 1.431,
   "unit": "Å",
   "tolerancePercent": 2.096,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "dipole moment",
   "system": "C2H5OH",
-  "app": 1.5795,
+  "app": 1.5792,
   "reference": 1.44,
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "microwave, anti conformer",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "electrons in shipped density grid",
   "system": "C2H5OH",
-  "app": 26.0,
+  "app": 25.9998,
   "reference": 26,
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C=O",
   "system": "(CH3)2CO",
-  "app": 1.2089,
+  "app": 1.2088,
   "reference": 1.213,
   "unit": "Å",
   "tolerancePercent": 2.473,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C–C",
   "system": "(CH3)2CO",
-  "app": 1.5142,
+  "app": 1.5128,
   "reference": 1.52,
   "unit": "Å",
   "tolerancePercent": 1.974,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "dipole moment",
   "system": "(CH3)2CO",
-  "app": 3.0693,
+  "app": 3.0732,
   "reference": 2.88,
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "electrons in shipped density grid",
   "system": "(CH3)2CO",
-  "app": 32.0003,
+  "app": 32.0007,
   "reference": 32,
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length N–C2",
   "system": "C5H5N",
-  "app": 1.3332,
+  "app": 1.3329,
   "reference": 1.338,
   "unit": "Å",
   "tolerancePercent": 2.242,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C2–C3",
   "system": "C5H5N",
-  "app": 1.3906,
+  "app": 1.3902,
   "reference": 1.394,
   "unit": "Å",
   "tolerancePercent": 2.152,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "dipole moment",
   "system": "C5H5N",
-  "app": 2.2582,
+  "app": 2.2585,
   "reference": 2.215,
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "electrons in shipped density grid",
   "system": "C5H5N",
-  "app": 42.0,
+  "app": 42.0006,
   "reference": 42,
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C=O",
   "system": "HCONH2",
-  "app": 1.2094,
+  "app": 1.2093,
   "reference": 1.212,
   "unit": "Å",
   "tolerancePercent": 2.475,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C–N",
   "system": "HCONH2",
-  "app": 1.3566,
+  "app": 1.3564,
   "reference": 1.368,
   "unit": "Å",
   "tolerancePercent": 2.193,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "dipole moment",
   "system": "HCONH2",
-  "app": 3.9468,
+  "app": 3.9448,
   "reference": 3.73,
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "CRC Handbook, via CCCBDB",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "electrons in shipped density grid",
   "system": "HCONH2",
-  "app": 24.0002,
+  "app": 24.0001,
   "reference": 24,
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C–N",
   "system": "NH2CH2COOH",
-  "app": 1.446,
+  "app": 1.4453,
   "reference": 1.467,
   "unit": "Å",
   "tolerancePercent": 2.045,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C–C",
   "system": "NH2CH2COOH",
-  "app": 1.5214,
+  "app": 1.5198,
   "reference": 1.526,
   "unit": "Å",
   "tolerancePercent": 1.966,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "bond length C=O",
   "system": "NH2CH2COOH",
-  "app": 1.2026,
+  "app": 1.2025,
   "reference": 1.205,
   "unit": "Å",
   "tolerancePercent": 2.49,
   "referenceSource": "experiment (CCCBDB); plausibility check of the optimised geometry",
-  "method": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "dipole moment",
   "system": "NH2CH2COOH",
-  "app": 1.1698,
+  "app": 1.1837,
   "reference": 1.1,
   "unit": "D",
   "tolerancePercent": 10.0,
   "referenceSource": "microwave, conformer I (Lovas et al. 1995)",
-  "method": "B3LYP/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD; tolerance 10 % or 0.05 D, whichever is larger",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  },
  {
   "phase": 6,
   "quantity": "electrons in shipped density grid",
   "system": "NH2CH2COOH",
-  "app": 40.0005,
+  "app": 40.0009,
   "reference": 40,
   "unit": "e",
   "tolerancePercent": 0.5,
   "referenceSource": "electron count",
-  "method": "B3LYP/def2-TZVPD, voxel-averaged 96³ grid",
-  "geometrySource": "B3LYP/def2-TZVP optimised (PySCF + geomeTRIC)"
+  "method": "B3LYP-D3(BJ)/def2-TZVPD, voxel-averaged 96³ grid",
+  "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)"
  }
 ]
