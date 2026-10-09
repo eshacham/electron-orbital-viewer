@@ -1,4 +1,6 @@
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import MoleculeNav from '../../src/components/MoleculeNav';
 import MoleculeOrbitalList from '../../src/components/MoleculeOrbitalList';
@@ -6,7 +8,7 @@ import MoleculeReadout from '../../src/components/MoleculeReadout';
 import MoleculeViewOptions from '../../src/components/MoleculeViewOptions';
 import {
     formatOrbitalEnergy, degeneracyCounts, formatPointGroup, orbitalGaps, orbitalTag, orbitalEnergyText, isConstructed, textbookLumo,
-    labelsSentence, GAP_CAVEAT, CONSTRUCTED_NOTE, UNCLASSIFIED_NOTE, VALENCE_VIRTUAL_NOTE,
+    labelsSentence, GAP_CAVEAT, CONSTRUCTED_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, UNLABELLED_NOTE, VALENCE_VIRTUAL_NOTE,
 } from '../../src/molecules/orbital_display';
 import { LIBRARY_INDEX, waterMeta, waterAtoms } from './fixtures';
 
@@ -59,8 +61,11 @@ describe('MoleculeOrbitalList', () => {
     it('marks the HOMO–LUMO gap with a labelled divider between the virtuals and the occupied orbitals', () => {
         render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
             method="B3LYP/def2-TZVP" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
-        const divider = screen.getByRole('separator', { name: `HOMO–LUMO gap 0.320 Ha (8.71 eV). ${GAP_CAVEAT}` });
-        expect(divider).toHaveTextContent('HOMO–LUMO gap 0.320 Ha (8.71 eV)');
+        // Fix round 1: a note, not a separator -- screen readers skip a separator's children, so the gap and its
+        // caveat would go unannounced.
+        const divider = screen.getByRole('note');
+        expect(divider.textContent).toBe(`HOMO–LUMO gap 0.320 Ha (8.71 eV). ${GAP_CAVEAT}.`);
+        expect(screen.queryByRole('separator')).toBeNull();
         const [lumo, homo] = screen.getAllByRole('button');
         expect(lumo.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(divider.compareDocumentPosition(homo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -75,7 +80,7 @@ describe('MoleculeOrbitalList', () => {
         ] as ReturnType<typeof waterMeta>['orbitals'];
         render(<MoleculeOrbitalList orbitals={orbitals} selectedIndex={null} onSelect={() => {}}
             method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
-        expect(screen.getByRole('separator', { name: `SOMO–LUMO gap 0.200 Ha (5.44 eV). ${GAP_CAVEAT}` })).toHaveTextContent('SOMO–LUMO gap');
+        expect(screen.getByRole('note').textContent).toBe(`SOMO–LUMO gap 0.200 Ha (5.44 eV). ${GAP_CAVEAT}.`);
         expect(screen.queryByText(/HOMO–LUMO gap/)).toBeNull();
     });
     // Ruling T16-b: the list opens scrolled so the HOMO is in view -- by
@@ -197,26 +202,29 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         const { container } = list();
         const lvmo = screen.getByRole('button', { name: /LVMO/ });
         expect(lvmo).toHaveTextContent('0.190 Ha (5.17 eV)');
-        expect(lvmo).toHaveTextContent('upper estimate');
+        // Fix round 1: the row shows the short "upper est." (the legend explains it); the accessible name has it in full.
+        expect(within(lvmo).getByText('upper est.')).toHaveAttribute('aria-hidden', 'true');
+        expect(screen.getByRole('button', { name: /0\.190 Ha \(5\.17 eV\) upper estimate LVMO/ })).toBe(lvmo);
         expect(within(lvmo).getByRole('img', { name: 'constructed: not an orbital of this calculation' })).toHaveTextContent('◇');
         expect(container.textContent).not.toContain('≈');
         expect(container.textContent).toContain(`◇ LVMO ${CONSTRUCTED_NOTE}.`);
-        expect(container.textContent).toContain('LVMO: the lowest valence virtual orbital, the antibonding orbital textbooks draw.');
+        // Ruling LVMO-wording: not every LVMO is antibonding (BF3's is boron's empty 2p).
+        expect(container.textContent).toContain(
+            "LVMO: the lowest empty valence orbital — the one textbooks draw (antibonding, or an empty valence orbital such as boron's 2p in BF3).");
+        expect(container.textContent).not.toMatch(/antibonding orbital textbooks draw/);
         expect(container.textContent).toContain('Labels: irreducible representations of C2v, numbered in energy order within each, core included.');
     });
     it('gives only the Kohn–Sham HOMO–LUMO gap, with its caveat, when the LVMO is constructed', () => {
         const { container } = list();
-        const divider = screen.getByRole('separator', { name: `HOMO–LUMO gap 0.300 Ha (8.16 eV). ${GAP_CAVEAT}` });
-        expect(divider).toHaveTextContent(GAP_CAVEAT);
+        expect(screen.getByRole('note').textContent).toBe(`HOMO–LUMO gap 0.300 Ha (8.16 eV). ${GAP_CAVEAT}.`);
         expect(container.textContent).not.toMatch(/HOMO–LVMO/);
     });
     it('gives both gaps, labelled, when the LVMO is one of the calculation\'s own orbitals', () => {
         const { container } = list(COMPUTED_LVMO, { pointGroup: 'Dooh', labelGroup: 'Dooh', labels: 'full-group' });
-        const divider = screen.getByRole('separator', {
-            name: `HOMO–LUMO gap 0.290 Ha (7.89 eV) · HOMO–LVMO gap 0.500 Ha (13.61 eV). ${GAP_CAVEAT}` });
-        expect(divider).toHaveTextContent(GAP_CAVEAT);
+        expect(screen.getByRole('note').textContent).toBe(
+            `HOMO–LUMO gap 0.290 Ha (7.89 eV) · HOMO–LVMO gap 0.500 Ha (13.61 eV). ${GAP_CAVEAT}.`);
         const lvmo = screen.getByRole('button', { name: /LVMO/ });
-        expect(lvmo).not.toHaveTextContent('upper estimate');
+        expect(lvmo).not.toHaveTextContent(/upper est/);
         expect(within(lvmo).queryByRole('img')).toBeNull();
         expect(container.textContent).not.toContain('◇');
         expect(container.textContent).toContain('Labels: irreducible representations of D∞h, numbered in energy order within each, core included.');
@@ -247,7 +255,8 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
     it('tags orbitals, reads the flags rather than the note, finds the gaps and the textbook LUMO', () => {
         expect(orbitalTag(WATER_V3[5])).toBe('partly diffuse (55 % valence): its shape depends on the basis');
         expect(orbitalTag(WATER_V3[7])).toBe(VALENCE_VIRTUAL_NOTE);
-        expect(orbitalTag(COMPUTED_LVMO[2])).toBe('the antibonding orbital textbooks draw');
+        expect(orbitalTag(COMPUTED_LVMO[2])).toBe(LVMO_NOTE);
+        expect(LVMO_NOTE).toBe("the lowest empty valence orbital — the one textbooks draw (antibonding, or an empty valence orbital such as boron's 2p in BF3)");
         expect(orbitalTag(WATER_V3[4])).toBeNull();
         expect(orbitalTag(waterMeta().orbitals[5])).toBeNull();          // v2: no class, no claim
         expect(isConstructed({ kind: 'valence-virtual' })).toBe(true);
@@ -261,21 +270,98 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(orbitalGaps(waterMeta().orbitals).map(g => g.name)).toEqual(['HOMO–LUMO']);
         expect(textbookLumo(COMPUTED_LVMO)?.orbital.index).toBe(2);
         expect(textbookLumo(COMPUTED_LVMO)?.note).toBe(
-            'the LVMO, the antibonding orbital textbooks draw: the LUMO itself is partly diffuse (40 % valence): its shape depends on the basis');
+            `the LVMO, ${LVMO_NOTE}: the LUMO itself is partly diffuse (40 % valence): its shape depends on the basis`);
         expect(textbookLumo(WATER_V3)?.orbital.index).toBe(7);
-        expect(textbookLumo(WATER_V3)?.note).toMatch(/^the LVMO, the antibonding orbital textbooks draw, constructed from the valence part/);
+        expect(textbookLumo(WATER_V3)?.note?.startsWith(`the LVMO, ${LVMO_NOTE}, constructed from the valence part`)).toBe(true);
         expect(textbookLumo(waterMeta().orbitals)).toEqual({ orbital: waterMeta().orbitals[5], note: null });
     });
-    it('says what the drawn orbital is where it names it, with an upper estimate as one', () => {
-        const meta = waterMeta({ orbitals: WATER_V3, symmetry: V3_SYMMETRY });
+    it('says what the drawn orbital is where it names it, with an upper estimate as one, and no nested brackets', () => {
+        const meta = waterMeta({ orbitals: [...WATER_V3, { ...COMPUTED_LVMO[2], index: 8 }], symmetry: V3_SYMMETRY });
         const { container, rerender } = render(<MoleculeNav {...navProps} meta={meta} surface={{ kind: 'mo', index: 5 }} />);
-        expect(container.querySelector('.molecule-nav-orbital')).toHaveTextContent(
-            'Showing 4a1 (LUMO; partly diffuse (55 % valence): its shape depends on the basis), −0.010 Ha (−0.27 eV)');
+        const showing = () => container.querySelector('.molecule-nav-orbital')!.textContent!;
+        expect(showing()).toBe('Showing 4a1 (LUMO), −0.010 Ha (−0.27 eV) — pick another in the orbital list on the right. '
+            + '4a1 is partly diffuse (55 % valence): its shape depends on the basis.');
         rerender(<MoleculeNav {...navProps} meta={meta} surface={{ kind: 'mo', index: 7 }} />);
-        expect(container.querySelector('.molecule-nav-orbital')).toHaveTextContent(
-            `Showing a1 (LVMO; ${VALENCE_VIRTUAL_NOTE}), 0.190 Ha (5.17 eV), upper estimate`);
+        expect(showing()).toBe('Showing a1 (LVMO), 0.190 Ha (5.17 eV), upper estimate — pick another in the orbital list on the right. '
+            + `a1 is ${VALENCE_VIRTUAL_NOTE}.`);
+        rerender(<MoleculeNav {...navProps} meta={meta} surface={{ kind: 'mo', index: 8 }} />);
+        expect(showing()).toContain(`2πu is ${LVMO_NOTE}.`);
+        for (const index of [5, 6, 7, 8]) {
+            rerender(<MoleculeNav {...navProps} meta={meta} surface={{ kind: 'mo', index }} />);
+            expect(maxBracketDepth(showing())).toBe(1);
+        }
+    });
+    // Fix round 1 (review Important): every distinct label note, under its own label -- a combined label such as
+    // BF3's 1a1′+1e′ carries one too, and a "?" with no note still gets a sentence.
+    it('lists each label note under its own label, once per degenerate set', () => {
+        const combined = 'near-degenerate combinations of a1′ and e′ (ΔE < 1e-5 Ha), mixed in these orbitals';
+        const unknown = 'characters (2.00, -1.00) match no single irrep of D3h, so left unlabelled';
+        const bf3 = [
+            ...[0, 1, 2].map(index => ({ index, label: '1a1′+1e′', energyHartree: -24.7, occupation: 2, labelNote: combined })),
+            { index: 3, label: '2a1′', energyHartree: -7.0, occupation: 2 },
+            { index: 4, label: '1a2″', energyHartree: -0.33, occupation: 2, role: 'HOMO' },
+            { index: 5, label: '2a2″', energyHartree: -0.05, occupation: 0, role: 'LUMO', valenceCharacter: 0.9, class: 'valence' },
+        ] as Orbitals;
+        const { container, unmount } = list(bf3, { pointGroup: 'D3h', labelGroup: 'D3h', labels: 'full-group' });
+        expect(container.textContent).toContain(`1a1′+1e′: ${combined}.`);
+        expect(container.textContent!.split(combined).length - 1).toBe(1);
+        expect(container.textContent).not.toContain('?:');
+        unmount();
+        const both = [...bf3, ...[6, 7].map(index => ({ index, label: '?', energyHartree: 0.3, occupation: 0, labelNote: unknown }))] as Orbitals;
+        const second = list(both, { pointGroup: 'D3h', labelGroup: 'D3h', labels: 'full-group' });
+        expect(second.container.textContent).toContain(`1a1′+1e′: ${combined}.`);
+        expect(second.container.textContent).toContain(`?: ${unknown}.`);
+        second.unmount();
+        const silent = [...bf3.slice(3), { index: 6, label: '?', energyHartree: 0.3, occupation: 0, role: 'LVMO', kind: 'valence-virtual',
+            constructed: true, valenceCharacter: 1, class: 'valence' }] as Orbitals;
+        const third = list(silent, { pointGroup: 'D3h', labelGroup: 'D3h', labels: 'full-group' });
+        expect(third.container.textContent).toContain(`?: ${UNLABELLED_NOTE}.`);
+    });
+    // Fix round 1: the marks are explained before the first row that carries one, in a key that stays at the top of the
+    // list as it scrolls, not only in the caption under the last row.
+    it('keys the marks at the top of the list, ahead of every row', () => {
+        const { container } = list();
+        const key = container.querySelector('.molecule-orbital-legend')!;
+        expect(key.textContent).toBe('◌ partly diffuse virtual (under 75 % valence) · '
+            + '◇ constructed LVMO, not an orbital of this calculation · upper est.: its energy is an upper estimate');
+        expect(key.compareDocumentPosition(screen.getAllByRole('button')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        const { container: legacy } = list(waterMeta().orbitals, { pointGroup: 'C2v', labelGroup: 'C2v' });
+        expect(legacy.querySelector('.molecule-orbital-legend')).toBeNull();
+    });
+    // Fix round 1: at the card's 300 px a row with ×3, the LVMO chip and the estimate (silane's constructed t2) overflowed.
+    // jsdom has no layout, so this pins the rules that let it fit: the energy column may shrink below its content and
+    // wraps between the Ha and eV parts, and the short estimate takes its own line. (A live check at 300 px is the proof.)
+    it('lets a crowded row wrap rather than overflow the 300 px card', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+        const rule = (selector: string) => {
+            const start = css.search(new RegExp(`^${selector.replace(/[.]/g, '\\.')} \\{`, 'm'));
+            return css.slice(start, css.indexOf('}', start));
+        };
+        expect(rule('.molecule-orbital-row')).toMatch(/grid-template-columns: [^;]*minmax\(0, 1fr\)/);
+        expect(rule('.molecule-orbital-energy-part')).toMatch(/white-space: nowrap/);
+        expect(rule('.molecule-orbital-estimate')).toMatch(/display: block/);
+        const silane = [
+            { index: 0, label: '1t2', energyHartree: -0.34, occupation: 2, role: 'HOMO' },
+            ...[1, 2, 3].map(index => ({ index, label: 't2', energyHartree: 0.163, occupation: 0, role: 'LVMO', valenceCharacter: 0.93,
+                class: 'valence', kind: 'valence-virtual', constructed: true, energyApproximate: true })),
+        ] as Orbitals;
+        list(silane, { pointGroup: 'Td', labelGroup: 'Td', labels: 'full-group' });
+        const row = screen.getAllByRole('button', { name: /LVMO/ })[0];
+        const parts = row.querySelectorAll('.molecule-orbital-energy-part');
+        expect([...parts].map(p => p.textContent)).toEqual(['0.163 Ha', '(4.44 eV)']);
+        expect(row).toHaveTextContent('×3');
     });
 });
+
+/** The deepest bracket nesting in `text`: 1 means brackets, but none inside another. */
+function maxBracketDepth(text: string): number {
+    let depth = 0, max = 0;
+    for (const c of text) {
+        if (c === '(') max = Math.max(max, ++depth);
+        else if (c === ')') depth--;
+    }
+    return max;
+}
 
 describe('readout and view options', () => {
     it('reads out a pick, or says how to get one', () => {

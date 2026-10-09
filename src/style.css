@@ -1277,8 +1277,10 @@ html, body, #root {
 }
 .molecule-orbital-row {
   display: grid;
-  /* Phase 6D: 58 px, not 48, so a label keeps its ◌/◇ mark beside it (10a1′◌). */
-  grid-template-columns: 58px 28px 1fr auto auto;
+  /* Phase 6D: 58 px, not 48, so a label keeps its ◌/◇ mark beside it (10a1′◌). The energy column may shrink
+     below its content (minmax(0, …)), so a row with ×3 and the LVMO chip wraps its energy inside the 300 px card
+     rather than overflowing it (fix round 1: silane's constructed t2). */
+  grid-template-columns: 58px 28px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 6px;
   padding: 4px 6px;
@@ -1321,9 +1323,26 @@ html, body, #root {
 .molecule-orbital-mark {
   margin-left: 3px;
 }
-/* Ruling D4-energy: ", upper estimate" after a constructed LVMO's energy, wrapping as one piece. */
-.molecule-orbital-estimate {
+/* Fix round 1: "0.190 Ha" and "(5.17 eV)" each stay whole, so a narrow row wraps between them. */
+.molecule-orbital-energy-part {
   white-space: nowrap;
+}
+/* Ruling D4-energy: "upper est." under a constructed LVMO's energy, on its own line (the key explains it). */
+.molecule-orbital-estimate {
+  display: block;
+  font-size: 11px;
+}
+/* Fix round 1: the key to the ◌/◇ marks and "upper est.", held at the top of the list as it scrolls; opaque so
+   rows passing under it do not show through. */
+.molecule-orbital-legend {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 2px 6px;
+  background-color: rgb(240, 240, 240);
+  color: rgba(0, 0, 0, 0.7);
+  font-size: 11px;
 }
 /* Ruling T16-a: the drawn orbital's name in the navigation card. */
 .molecule-nav-orbital {

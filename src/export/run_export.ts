@@ -738,7 +738,7 @@ function moleculeCsv(state: RootState, shareUrl: string): string {
         // Ruling D4-energy: a constructed LVMO's "kind valence-virtual" clause is the full CONSTRUCTED_NOTE
         // caption (not the brief's original VALENCE_VIRTUAL_NOTE) -- the upper-estimate wording must carry
         // wherever the orbital is named, including here.
-        ...(lvmo ? [`LVMO: the lowest valence virtual orbital, ${LVMO_NOTE}`
+        ...(lvmo ? [`LVMO: ${LVMO_NOTE}`
             + (valenceVirtual ? `; kind valence-virtual: ${CONSTRUCTED_NOTE}` : '')] : []),
         `view: ${shareUrl}`,
     ];

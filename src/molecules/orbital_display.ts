@@ -41,7 +41,8 @@ export const GAP_CAVEAT = 'Kohn–Sham orbital gap — neither the optical gap (
 export const DIFFUSE_NOTE = 'its shape depends on the basis';
 /** Ruling D4: said of a diffuse virtual only when its energy is above zero. */
 export const UNBOUND_NOTE = 'positive energy: an unbound state, not a bound orbital';
-export const LVMO_NOTE = 'the antibonding orbital textbooks draw';
+/** Ruling LVMO-wording: not every LVMO is antibonding -- BF3's is boron's empty 2p. */
+export const LVMO_NOTE = "the lowest empty valence orbital — the one textbooks draw (antibonding, or an empty valence orbital such as boron's 2p in BF3)";
 /** What a constructed LVMO row is, short enough to follow its role where it is named. */
 export const VALENCE_VIRTUAL_NOTE = 'constructed from the valence part of the virtual space — not an orbital of this calculation';
 /** Ruling D4-energy, the caption for a constructed LVMO: orbitals.py's CONSTRUCTED_NOTE, word for word
@@ -51,6 +52,9 @@ export const CONSTRUCTED_NOTE = `${VALENCE_VIRTUAL_NOTE}; its energy is an upper
 /** Ruling no-jargon: user-facing text never names an internal phase. */
 export const UNCLASSIFIED_NOTE = 'Virtual orbitals are not classified in this data (computed before the app classified empty (virtual) '
     + 'orbitals as valence or diffuse): the LUMO may be a diffuse, basis-dependent state rather than an antibonding orbital.';
+/** point_group.UNLABELLED, and what the caption says of it where the generator gave no labelNote. */
+export const UNLABELLED = '?';
+export const UNLABELLED_NOTE = 'no symmetry label could be assigned to this orbital, so it is left unlabelled';
 export const DIFFUSE_MARK = '◌';
 export const CONSTRUCTED_MARK = '◇';
 /** The constructed mark's accessible name. */
@@ -137,4 +141,16 @@ export function labelsSentence(symmetry: { pointGroup: string; labelGroup: strin
     }
     const labelGroup = formatPointGroup(symmetry.labelGroup);
     return `Labels: irreducible representations of ${labelGroup}${symmetry.labelGroup !== symmetry.pointGroup ? `, the subgroup of ${pointGroup} the calculation uses` : ''}.`;
+}
+
+/** The caption's label notes: one per distinct (label, note) -- a degenerate set's members share both -- under the
+ * label it explains, which may be '?' or a combined label such as BF3's 1a1′+1e′. A '?' with no note of its own
+ * gets UNLABELLED_NOTE rather than silence. */
+export function labelNotes(orbitals: Array<Pick<MoleculeOrbitalInfo, 'label' | 'labelNote'>>): string[] {
+    const seen = new Set<string>();
+    for (const o of orbitals) {
+        const note = o.labelNote ?? (o.label === UNLABELLED ? UNLABELLED_NOTE : null);
+        if (note) seen.add(`${o.label}: ${note}.`);
+    }
+    return [...seen];
 }

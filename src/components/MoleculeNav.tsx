@@ -8,11 +8,6 @@ import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeIndexEntry } from '../molecules/types';
 import type { MoleculeSurface } from '../store/moleculeSlice';
 
-/** " (LUMO; partly diffuse (55 % valence): its shape depends on the basis)": the role and what Phase 6D knows about the orbital. */
-const showingTags = (orbital: LibraryMoleculeMeta['orbitals'][number]): string => {
-    const tags = [orbital.role, orbitalTag(orbital)].filter(Boolean).join('; ');
-    return tags ? ` (${tags})` : '';
-};
 
 interface MoleculeNavProps {
     /** 'full': the desktop card. A phone splits it like LevelNav: 'header' (always on screen) and 'body' (Explore tab). */
@@ -79,8 +74,11 @@ const MoleculeNav: React.FC<MoleculeNavProps> = ({
                         Explore tab keeps the list: its Plot tab is out of sight. */}
                     {surface.kind === 'mo' && variant === 'full' && drawnOrbital && (
                         <Typography variant="body2" className="molecule-nav-orbital">
-                            Showing {drawnOrbital.label}{showingTags(drawnOrbital)}, {orbitalEnergyText(drawnOrbital)}
+                            Showing {drawnOrbital.label}{drawnOrbital.role ? ` (${drawnOrbital.role})` : ''}, {orbitalEnergyText(drawnOrbital)}
                             {' '}— pick another in the orbital list on the right.
+                            {/* Fix round 1: what Phase 6D knows of the orbital, as its own sentence -- inside the role's
+                                brackets it nested a second pair ("(LUMO; partly diffuse (55 % valence) …)"). */}
+                            {orbitalTag(drawnOrbital) && ` ${drawnOrbital.label} is ${orbitalTag(drawnOrbital)}.`}
                         </Typography>
                     )}
                     {surface.kind === 'mo' && variant === 'body' && (

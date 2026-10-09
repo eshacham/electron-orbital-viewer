@@ -93,6 +93,8 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     // Phase 6D: the divider's Kohn–Sham caveat line, on the same LIGHT_96 card. (The ◌/◇ marks and ", upper
     // estimate" declare no colour: they read in the row's own text colour.)
     { selector: '.molecule-orbital-gap-caveat', declared: 'color: rgba(0, 0, 0, 0.62)', fg: 'rgba(0, 0, 0, 0.62)', bg: LIGHT_96 },
+    // Fix round 1: the marks' key, sticky at the top of the orbital list on its own opaque background.
+    { selector: '.molecule-orbital-legend', declared: 'color: rgba(0, 0, 0, 0.7)', fg: 'rgba(0, 0, 0, 0.7)', bg: 'rgb(240, 240, 240)' },
     { selector: '.molecule-nav-orbital', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
     { selector: '.molecule-error', declared: 'background-color: rgb(253, 237, 237)', fg: 'rgb(95, 33, 32)', bg: 'rgb(253, 237, 237)' },
     // Phase 6B-2 Task 12: the tier badge's line over the canvas, and the

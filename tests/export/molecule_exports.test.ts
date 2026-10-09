@@ -26,7 +26,7 @@ import type { LibraryMoleculeMeta } from '../../src/molecules/library_types';
 import type { MoleculeBasis } from '../../src/molecules/types';
 import { makeStore, baseContext, readText, exportHandle, octahedron } from './fixtures';
 import { waterMeta } from '../molecules/fixtures';
-import { DIFFUSE_NOTE } from '../../src/molecules/orbital_display';
+import { DIFFUSE_NOTE, LVMO_NOTE } from '../../src/molecules/orbital_display';
 
 const OZONE_CAVEAT = 'Ozone has strong multireference character: single-reference B3LYP overestimates its dipole moment.';
 const water = (overrides: Record<string, unknown> = {}) => waterMeta({
@@ -330,7 +330,8 @@ describe('CSV: the orbital table', () => {
         const text = await readText((await runExport('csv', baseContext(drawnStore({ kind: 'density' }, meta).getState()))).blob);
         const lines = text.replace(/^﻿/, '').split('\n');
         expect(lines).toContain(`# class: a virtual's share inside the intrinsic minimal basis (valence_character); diffuse under 75 %: ${DIFFUSE_NOTE}`);
-        expect(lines.some(l => l.startsWith('# LVMO: the lowest valence virtual orbital, the antibonding orbital textbooks draw; kind valence-virtual: '))).toBe(true);
+        // Ruling LVMO-wording: LVMO_NOTE is the whole description now (not every LVMO is antibonding).
+        expect(lines.some(l => l.startsWith(`# LVMO: ${LVMO_NOTE}; kind valence-virtual: `))).toBe(true);
         expect(lines).toContain('5,4a1,LUMO,0,-0.01,-0.27211386,diffuse,0.55,');
         expect(lines).toContain('6,a1,LVMO,0,0.19,5.1701633,valence,1,valence-virtual');
     });
