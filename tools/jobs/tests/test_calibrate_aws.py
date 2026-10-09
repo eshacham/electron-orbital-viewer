@@ -4,9 +4,9 @@ import math
 import pytest
 
 from jobs import sizing
-from jobs.calibrate import (aws_samples, compare, fit, fit_aws, fit_f2, fit_files, fit_hessian, fit_law, fit_speedup,
-                            fit_time, guarded, incore_eri_gb, read_hessian_probe, read_optimise_probe, read_probe,
-                            working_set_gb)
+from jobs.calibrate import (HESSIAN_MIN_BASIS_FUNCTIONS, aws_samples, compare, fit, fit_aws, fit_f2, fit_files,
+                            fit_hessian, fit_law, fit_speedup, fit_time, guarded, incore_eri_gb, read_hessian_probe,
+                            read_optimise_probe, read_probe, working_set_gb)
 from jobs.canonical import canonical_job, job_key
 
 M0, M2, T0, T3, G, F2 = 0.6, 2.5, 8.0, 1500.0, 1.2, 2100.0
@@ -541,12 +541,52 @@ HESSIAN_PROBE = {'probe': 'hessian', 'vcpu': 16, 'basis': 'def2-SVP', 'runs': [
     {'molecule': 'caffeine', 'basisFunctions': 246, 'atoms': 24, 'hessianSeconds': 900.0}]}
 
 
-def test_fit_hessian_keeps_the_slowest_run_against_sizings_own_step():
+def test_fit_hessian_keeps_the_slowest_large_run_against_sizings_own_step_floored_at_1():
+    # Ruling h=1.00: only caffeine (N 246) is large enough to count; its 0.71 is floored at 1.00 while it is
+    # the only large molecule measured.
     large = sizing.SIZES[2]
-    water = 2.0 / (sizing.step_seconds(24, large) * 3)
     caffeine = 900.0 / (sizing.step_seconds(246, large) * 24)
+    assert caffeine < 1.0
     h, notes = fit_hessian(HESSIAN_PROBE)
-    assert h == pytest.approx(max(water, caffeine)) and 'caffeine' in notes[0]
+    assert h == 1.0 and 'caffeine' in notes[0] and 'floor' in notes[0]
+
+
+def test_fit_hessian_excludes_water_and_ethanol_whose_step_on_l_is_mostly_overhead():
+    # The measured probe (Task 17): ethanol gives 1.52 and water 0.204, caffeine 0.695. Below N 200 sizing's
+    # step price is mostly its fixed t0, not the threaded N^3.5 work, so the ratio measures that model's gap
+    # at small N on 16 vCPU (ethanol's step ran 3.67 s against 1.80 s priced), not the Hessian. Such
+    # molecules run on S. Caffeine's N^3.5 term is over 20x t0: L is its real regime.
+    from pathlib import Path
+    probe = read_hessian_probe(Path(__file__).parent / 'fixtures' / 'aws' / 'hessian-probe.json')
+    c = sizing.CONSTANTS
+    for run in probe['runs']:
+        work = c['t3Step'] * (run['basisFunctions'] / 1000) ** 3.5
+        if run['molecule'] in ('water', 'ethanol'):
+            assert run['basisFunctions'] < HESSIAN_MIN_BASIS_FUNCTIONS and work < c['t0']
+        else:
+            assert run['basisFunctions'] >= HESSIAN_MIN_BASIS_FUNCTIONS and work > 20 * c['t0']
+    assert c['t3Step'] * (HESSIAN_MIN_BASIS_FUNCTIONS / 1000) ** 3.5 > 20 * c['t0']
+    h, notes = fit_hessian(probe)
+    assert h == 1.0
+    assert 'water 0.204' in notes[0] and 'ethanol 1.52' in notes[0] and 'caffeine 0.695' in notes[0]
+    assert 'excluded water, ethanol' in notes[0]
+
+
+def test_fit_hessian_lifts_the_floor_once_two_large_molecules_are_measured():
+    large = sizing.SIZES[2]
+    second = {'molecule': 'big', 'basisFunctions': 300, 'atoms': 30, 'hessianSeconds': 1000.0}
+    probe = {**HESSIAN_PROBE, 'runs': HESSIAN_PROBE['runs'] + [second]}
+    big = 1000.0 / (sizing.step_seconds(300, large) * 30)
+    caffeine = 900.0 / (sizing.step_seconds(246, large) * 24)
+    assert max(big, caffeine) < 1.0
+    h, _ = fit_hessian(probe)
+    assert h == pytest.approx(max(big, caffeine))
+
+
+def test_fit_hessian_refuses_a_probe_with_no_large_molecule():
+    small = {**HESSIAN_PROBE, 'runs': HESSIAN_PROBE['runs'][:1]}
+    with pytest.raises(ValueError, match='no run with at least 200 basis functions'):
+        fit_hessian(small)
 
 
 def test_fit_hessian_refuses_a_probe_with_no_runs():

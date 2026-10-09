@@ -260,13 +260,13 @@
      "capacity": "local",
      "attempts": 1,
      "basisFunctions": 58,
-     "predictedSeconds": 87.3,
+     "predictedSeconds": 76.8,
      "predictedMemoryGB": 0.47,
      "timeoutSeconds": 600,
      "predictedCostMicros": 0,
      "parts": {
       "stepSeconds": 6.7,
-      "frequencySeconds": 30.7,
+      "frequencySeconds": 20.2,
       "finalScfSeconds": 3.7,
       "labellingSeconds": 0.8,
       "filesSeconds": 11.8

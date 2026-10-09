@@ -54,13 +54,13 @@
    "capacity": "on-demand",
    "attempts": 1,
    "basisFunctions": 58,
-   "predictedSeconds": 87.3,
+   "predictedSeconds": 76.8,
    "predictedMemoryGB": 0.47,
    "timeoutSeconds": 600,
-   "predictedCostMicros": 2262,
+   "predictedCostMicros": 1990,
    "parts": {
     "stepSeconds": 6.7,
-    "frequencySeconds": 30.7,
+    "frequencySeconds": 20.2,
     "finalScfSeconds": 3.7,
     "labellingSeconds": 0.8,
     "filesSeconds": 11.8
@@ -89,20 +89,20 @@
   "resultUrl": "/molecules/jobs/6cb4e4a0f6ee78aeb1bc87d759e4a676b56353e045c4e9b50188ba2b7be3bb66/",
   "approvedQuote": {
    "option": "on-demand",
-   "quoteId": "17be3f4fa24f7fb525b296fef63e42c39360482db22a609b84774b8da6f13382",
+   "quoteId": "928ff5a0e9cbb3eaaa432e8db1dfb146ea15099ce73e37e8ddf3870fe72fdada",
    "attempts": 1,
    "timeoutSeconds": 600,
    "sizingVersion": 6,
    "pricesVersion": 2,
    "approvedAt": "2026-10-10T12:00:00Z",
    "issuedAt": "2026-10-10T12:00Z",
-   "estimateUsd": 0.005676,
+   "estimateUsd": 0.005391,
    "maximumUsd": 0.022076,
    "lines": [
     {
      "item": "compute",
      "label": "Compute (AWS Fargate)",
-     "estimateUsd": 0.003834,
+     "estimateUsd": 0.003549,
      "maximumUsd": 0.018648
     },
     {
@@ -159,7 +159,7 @@
   },
   "ledger": [
    {
-    "quoteId": "17be3f4fa24f7fb525b296fef63e42c39360482db22a609b84774b8da6f13382",
+    "quoteId": "928ff5a0e9cbb3eaaa432e8db1dfb146ea15099ce73e37e8ddf3870fe72fdada",
     "option": "on-demand",
     "approvedMaximumUsd": 0.022076,
     "costUsd": 0.022921,

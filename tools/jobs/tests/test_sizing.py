@@ -62,11 +62,12 @@ KEYS = {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'scfExponent',
 def test_version_6_prices_the_frequency_check_and_states_its_h():
     # Versions 2-5 were fitted from Fargate ARM64 runs (Phase 6B-3); version 6 (Phase 6D spec §10) adds h, the
     # analytic Hessian's cost in optimisation steps per atom, measured by the Hessian probe on L (Task 17,
-    # fixtures/aws/hessian-probe.json): water 0.204, ethanol 1.52, caffeine 0.695; the slowest kept.
+    # fixtures/aws/hessian-probe.json): water 0.204, ethanol 1.52, caffeine 0.695. Ruling h=1.00: only
+    # caffeine (N >= 200) counts, floored at 1.00 until a second large molecule is measured.
     assert sizing.SIZING_VERSION == 6
     assert set(sizing.CONSTANTS) == KEYS
     assert all(isinstance(v, float) and v > 0 for v in sizing.CONSTANTS.values())
-    assert sizing.CONSTANTS['m0'] >= 0.2 and sizing.CONSTANTS['t0'] >= 1.0 and sizing.CONSTANTS['h'] == 1.52
+    assert sizing.CONSTANTS['m0'] >= 0.2 and sizing.CONSTANTS['t0'] >= 1.0 and sizing.CONSTANTS['h'] == 1.0
 
 
 def test_caffeine_needs_a_bigger_worker_than_its_ceiling_timeout_would_allow(monkeypatch, no_labelling):
@@ -378,14 +379,14 @@ def test_caffeine_single_runs_on_l_spot_under_the_live_constants():
 
 def test_caffeine_optimise_pays_for_its_frequency_check_on_l():
     # Version 6: version 5's 22 steps of about 52.8 s and the final single point on L, plus the check,
-    # h x one step x 24 atoms = 1.52 x 52.8 x 24 ≈ 1926 s (the measured h, ethanol's; caffeine's own Hessian
-    # took 881 s on L), and labelling the orbitals: 4156 s, past the 3600 s Spot limit, so L on demand, one
-    # attempt.
+    # h x one step x 24 atoms = 1.00 x 52.8 x 24 ≈ 1267 s (Ruling h=1.00: caffeine's own Hessian took 881 s
+    # on L, h 0.695, floored at 1.00), and labelling the orbitals: 3497 s, under the 3600 s Spot limit, so
+    # L Spot, three attempts.
     job = _caffeine_job('optimise')
     d = sizing.decide(job)
     step = sizing.step_seconds(basis_functions(CAFFEINE, 'def2-SVP'), LARGE)
     check = sizing.CONSTANTS['h'] * step * 24
-    assert (d['size'], d['capacity'], d['attempts']) == ('L', 'on-demand', 1)
+    assert (d['size'], d['capacity'], d['attempts']) == ('L', 'spot', 3)
     assert sizing.frequency_seconds(job, LARGE) == pytest.approx(check)
     single = sizing.predict_seconds(_caffeine_job('single'), LARGE)
     assert d['predictedSeconds'] == pytest.approx(single + sizing.optimisation_steps(24) * step + check, abs=0.1)

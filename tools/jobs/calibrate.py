@@ -437,19 +437,46 @@ def read_hessian_probe(path):
     raise ValueError(f'{path}: no Hessian probe line (an object with "probe": "hessian" and "runs")')
 
 
+# Ruling h=1.00 (Task 17): which probe runs h is fitted from. Sizing prices a def2-SVP step as
+# (1 + g)(t0 + t3Step (N/1000)^3.5) / speedup(c); below N 200 the fixed t0 is most of that price on L, so a
+# small molecule's Hessian over it measures how far the step law misses at small N on 16 vCPU (ethanol's step
+# ran 3.67 s against 1.80 s priced: 16 threads gained 1.7x over one), not the Hessian. Such molecules run on
+# S. From N 200 the N^3.5 term is over 20x t0, the regime L is chosen for. A threshold on N is read from the
+# probe line itself; "the size sizing.decide would choose" needs the geometry, which the line does not carry,
+# and is circular (decide reads h: caffeine optimise is on L partly because of its check's price).
+HESSIAN_MIN_BASIS_FUNCTIONS = 200
+# Until a second large molecule is measured, one molecule's ratio (caffeine's 0.695) is not trusted for every
+# large molecule: h is at least 1.00, about 44 % over caffeine's.
+HESSIAN_FLOOR = 1.0
+HESSIAN_FLOOR_UNTIL_RUNS = 2
+
+
 def fit_hessian(probe):
     """h (sizing version 6): each run's Hessian seconds over sizing's own price for one def2-SVP step on the
-    size the probe ran on, per atom; the slowest kept (Ruling T14-speedup). The step is priced with the live
-    CONSTANTS, which a refit of h alone leaves as they are. Returns (h, notes)."""
+    size the probe ran on, per atom. Only runs of at least HESSIAN_MIN_BASIS_FUNCTIONS count (Ruling h=1.00);
+    the slowest of those is kept (Ruling T14-speedup), floored at HESSIAN_FLOOR while fewer than
+    HESSIAN_FLOOR_UNTIL_RUNS of them are measured. The step is priced with the live CONSTANTS, which a refit
+    of h alone leaves as they are. Returns (h, notes)."""
     if not probe.get('runs'):
         # Task 10 review minor: say what is wrong rather than max()'s "empty sequence".
         raise ValueError('the Hessian probe has no runs: nothing to fit h from')
     size = next(s for s in sizing.SIZES if s.vcpu == probe['vcpu'])
     per_run = {r['molecule']: r['hessianSeconds'] / (sizing.step_seconds(r['basisFunctions'], size) * r['atoms'])
                for r in probe['runs']}
-    worst = max(per_run, key=per_run.get)
-    return per_run[worst], [f'h: the Hessian probe on {size.name} gives '
-                            + ', '.join(f'{k} {v:.3g}' for k, v in per_run.items()) + f"; kept {worst}'s, the slowest"]
+    large = [r['molecule'] for r in probe['runs'] if r['basisFunctions'] >= HESSIAN_MIN_BASIS_FUNCTIONS]
+    if not large:
+        raise ValueError(f'the Hessian probe has no run with at least {HESSIAN_MIN_BASIS_FUNCTIONS} basis '
+                         f'functions: nothing large enough for {size.name} to fit h from')
+    worst = max(large, key=per_run.get)
+    excluded = [k for k in per_run if k not in large]
+    note = (f'h: the Hessian probe on {size.name} gives ' + ', '.join(f'{k} {v:.3g}' for k, v in per_run.items())
+            + (f'; excluded {", ".join(excluded)} (N < {HESSIAN_MIN_BASIS_FUNCTIONS}: the step price is mostly '
+               f't0 there)' if excluded else '') + f"; kept {worst}'s, the slowest large run")
+    h = per_run[worst]
+    if len(large) < HESSIAN_FLOOR_UNTIL_RUNS and h < HESSIAN_FLOOR:
+        h = HESSIAN_FLOOR
+        note += f'; raised to the floor {HESSIAN_FLOOR:g} until {HESSIAN_FLOOR_UNTIL_RUNS} large molecules are measured'
+    return h, [note]
 
 
 def fit_step_t3(samples, optimise_probe, t0, g, law):
