@@ -4,8 +4,9 @@ import math
 import pytest
 
 from jobs import sizing
-from jobs.calibrate import (aws_samples, compare, fit, fit_aws, fit_f2, fit_files, fit_law, fit_speedup, fit_time,
-                            guarded, incore_eri_gb, read_optimise_probe, read_probe, working_set_gb)
+from jobs.calibrate import (aws_samples, compare, fit, fit_aws, fit_f2, fit_files, fit_hessian, fit_law, fit_speedup,
+                            fit_time, guarded, incore_eri_gb, read_hessian_probe, read_optimise_probe, read_probe,
+                            working_set_gb)
 from jobs.canonical import canonical_job, job_key
 
 M0, M2, T0, T3, G, F2 = 0.6, 2.5, 8.0, 1500.0, 1.2, 2100.0
@@ -533,3 +534,33 @@ def test_a_faster_files_run_at_an_n_already_measured_does_not_lower_f2(tmp_path)
     fast = dict(slow[0], filesSeconds=slow[0]['filesSeconds'] / 2)
     assert fit_f2(slow + [fast], files_law) == pytest.approx(F2, rel=1e-9)
     assert fit_f2(slow, files_law) == pytest.approx(F2, rel=1e-9)
+
+
+HESSIAN_PROBE = {'probe': 'hessian', 'vcpu': 16, 'basis': 'def2-SVP', 'runs': [
+    {'molecule': 'water', 'basisFunctions': 24, 'atoms': 3, 'hessianSeconds': 2.0},
+    {'molecule': 'caffeine', 'basisFunctions': 246, 'atoms': 24, 'hessianSeconds': 900.0}]}
+
+
+def test_fit_hessian_keeps_the_slowest_run_against_sizings_own_step():
+    large = sizing.SIZES[2]
+    water = 2.0 / (sizing.step_seconds(24, large) * 3)
+    caffeine = 900.0 / (sizing.step_seconds(246, large) * 24)
+    h, notes = fit_hessian(HESSIAN_PROBE)
+    assert h == pytest.approx(max(water, caffeine)) and 'caffeine' in notes[0]
+
+
+def test_the_hessian_probe_sets_h_and_its_guard_goes_quiet(tmp_path):
+    from pathlib import Path
+    log = tmp_path / 'hessian.log'
+    log.write_text('geomeTRIC chatter\n{"hessianRun": "water"}\n' + json.dumps(HESSIAN_PROBE) + '\n')
+    assert read_hessian_probe(log) == HESSIAN_PROBE
+    aws = Path(__file__).parent / 'fixtures' / 'aws'
+    fitted = fit_aws(aws_samples(sorted(d for d in aws.iterdir() if d.is_dir())), read_probe(aws / 'speedup-probe.json'),
+                     read_optimise_probe(aws / 'caffeine-optimise-probe.json'), HESSIAN_PROBE)
+    assert fitted['h'] == pytest.approx(fit_hessian(HESSIAN_PROBE)[0])
+    constants, guards = guarded(fitted)
+    assert [g.split(':')[0] for g in guards] == ['g'] and constants['h'] == float(f"{fitted['h']:.3g}")
+    empty = tmp_path / 'empty.log'
+    empty.write_text('')
+    with pytest.raises(ValueError, match='no Hessian probe line'):
+        read_hessian_probe(empty)

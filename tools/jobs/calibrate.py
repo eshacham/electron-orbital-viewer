@@ -9,8 +9,8 @@ On Fargate it is threaded, and the AWS fit (`fit_aws`, sizing versions 2
 to 5) divides it by a speedup law of its own, measured by the speedup probe.
 
     python -m jobs.calibrate ../tools/molecules/out/jobs/<key> …   (from tools/)
-    python -m jobs.calibrate --aws [--probe probe.log] [--optimise-probe steps.log] <job dir> …
-                                                         (Phase 6B-3: sizing v2 to v5)
+    python -m jobs.calibrate --aws [--probe probe.log] [--optimise-probe steps.log] [--hessian-probe hessian.log] \
+        <job dir> …                                     (Phase 6B-3: sizing v2 to v5; Phase 6D: v6's h)
 
 Version 4 adds t3Step, the t3 an optimisation step is priced by when its
 ERIs fit in core (sizing.step_in_core), from the optimise-steps probe
@@ -423,6 +423,32 @@ def read_optimise_probe(path):
     raise ValueError(f'{path}: no optimise-steps probe line (an object with "probe": "optimise-steps" and "steps")')
 
 
+def read_hessian_probe(path):
+    """The Hessian probe's line (probe.probe_hessians) from a saved log: the last object with probe 'hessian'."""
+    for line in reversed(Path(path).read_text().splitlines()):
+        line = line.strip()
+        if line.startswith('{'):
+            try:
+                found = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(found, dict) and found.get('probe') == 'hessian' and found.get('runs'):
+                return found
+    raise ValueError(f'{path}: no Hessian probe line (an object with "probe": "hessian" and "runs")')
+
+
+def fit_hessian(probe):
+    """h (sizing version 6): each run's Hessian seconds over sizing's own price for one def2-SVP step on the
+    size the probe ran on, per atom; the slowest kept (Ruling T14-speedup). The step is priced with the live
+    CONSTANTS, which a refit of h alone leaves as they are. Returns (h, notes)."""
+    size = next(s for s in sizing.SIZES if s.vcpu == probe['vcpu'])
+    per_run = {r['molecule']: r['hessianSeconds'] / (sizing.step_seconds(r['basisFunctions'], size) * r['atoms'])
+               for r in probe['runs']}
+    worst = max(per_run, key=per_run.get)
+    return per_run[worst], [f'h: the Hessian probe on {size.name} gives '
+                            + ', '.join(f'{k} {v:.3g}' for k, v in per_run.items()) + f"; kept {worst}'s, the slowest"]
+
+
 def fit_step_t3(samples, optimise_probe, t0, g, law):
     """t3Step (sizing version 4): one step = (1 + g)(t0 + t3Step (N/1000)^3.5)
     / speedup(c) when its ERIs fit in core. Each measured step offers
@@ -466,7 +492,7 @@ def _probe_samples(points):
     return out
 
 
-def fit_aws(samples, probe=None, optimise_probe=None):
+def fit_aws(samples, probe=None, optimise_probe=None, hessian_probe=None):
     """Sizing's constants (version 2, refitted for 3) from AWS samples, as
     fitted (unguarded), plus how they were got. `guarded` turns this into CONSTANTS.
 
@@ -551,10 +577,14 @@ def fit_aws(samples, probe=None, optimise_probe=None):
     notes += step_notes
     step_scale, scale_notes = fit_step_scale(samples)
     notes += scale_notes
+    h = None
+    if hessian_probe is not None:
+        h, h_notes = fit_hessian(hessian_probe)
+        notes += h_notes
     out = {**memory, 't0': t0, 't3': t3, 't3Step': t3_step, 'g': g, 'f2': fit_f2(samples + extra, files_law),
            'stepScale': step_scale,
            # The Hessian probe (Task 17) is to fit it; until then the guard keeps sizing's stated value.
-           'h': None,
+           'h': h,
            'scfExponent': scf_law[0], 'scfSaturation': scf_law[1],
            'filesExponent': files_law[0], 'filesSaturation': files_law[1], 'speedupSource': source, 'notes': notes}
     if summary is not None:
@@ -597,15 +627,17 @@ def compare(samples):
 
 if __name__ == '__main__':
     if sys.argv[1:2] == ['--aws']:
-        args, probe, optimise_probe = sys.argv[2:], None, None
-        while args[:1] in (['--probe'], ['--optimise-probe']):
+        args, probe, optimise_probe, hessian_probe = sys.argv[2:], None, None, None
+        while args[:1] in (['--probe'], ['--optimise-probe'], ['--hessian-probe']):
             if args[0] == '--probe':
                 probe = read_probe(args[1])
-            else:
+            elif args[0] == '--optimise-probe':
                 optimise_probe = read_optimise_probe(args[1])
+            else:
+                hessian_probe = read_hessian_probe(args[1])
             args = args[2:]
         samples = aws_samples(args)
-        fitted = fit_aws(samples, probe, optimise_probe)
+        fitted = fit_aws(samples, probe, optimise_probe, hessian_probe)
         constants, guards = guarded(fitted)
         print(json.dumps({'compare': compare(samples), 'fit': fitted, 'constants': constants, 'guards': guards},
                          indent=1))

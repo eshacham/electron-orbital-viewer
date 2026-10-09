@@ -147,3 +147,34 @@ def test_the_worker_entry_point_hands_optimise_steps_on(monkeypatch):
     assert worker.main(['probe', '--molecule', 'caffeine', '--basis', 'def2-SVP', '--optimise-steps', '3'],
                        environ={}) == 0
     assert seen == [['--molecule', 'caffeine', '--basis', 'def2-SVP', '--optimise-steps', '3']]
+
+
+WATER_ATOMS = [[8, 0.0, 0.0, 0.11779], [1, 0.0, 0.75545, -0.47116], [1, 0.0, -0.75545, -0.47116]]
+
+
+def test_measure_hessian_times_a_step_and_the_hessian():
+    # Phase 6D: sizing version 6's h is the Hessian's cost in optimisation steps per atom. Water, tiny on
+    # purpose; caffeine on L is Task 17's real measurement.
+    run = probe.measure_hessian(WATER_ATOMS, label='water')
+    assert run['molecule'] == 'water' and run['basis'] == 'def2-SVP' and run['basisFunctions'] == 24 and run['atoms'] == 3
+    assert run['stepSeconds'] == pytest.approx(run['scfSeconds'] + run['gradientSeconds'], abs=0.002)
+    assert run['hessianSeconds'] > 0 and run['scfCycles'] >= 1
+
+
+def test_probe_hessians_prints_a_line_per_run_and_the_contract_line_last():
+    lines = []
+    fake = lambda atoms, basis, spin, label: {'molecule': label, 'atoms': len(atoms), 'basisFunctions': 24,
+                                              'hessianSeconds': 1.0}
+    out = probe.probe_hessians([{'label': 'a', 'atoms': WATER_ATOMS}, {'label': 'b', 'atoms': WATER_ATOMS}],
+                               emit=lambda text, **kwargs: lines.append(json.loads(text)), measure=fake)
+    assert [line.get('hessianRun') for line in lines[:2]] == ['a', 'b']
+    assert lines[-1] == out and out['probe'] == 'hessian' and [r['molecule'] for r in out['runs']] == ['a', 'b']
+    assert out['basis'] == 'def2-SVP' and 'vcpu' in out and 'pyscfMaxMemoryMB' in out
+
+
+def test_the_hessian_probe_takes_its_molecules_as_json(monkeypatch, capsys):
+    monkeypatch.setattr(probe, 'measure_hessian', lambda atoms, basis, spin, label: {
+        'molecule': label, 'atoms': len(atoms), 'basisFunctions': 24, 'hessianSeconds': 1.0})
+    assert probe.main(['--hessian-json', json.dumps([{'label': 'water', 'atoms': WATER_ATOMS}])]) == 0
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert line['probe'] == 'hessian' and line['runs'][0]['molecule'] == 'water'

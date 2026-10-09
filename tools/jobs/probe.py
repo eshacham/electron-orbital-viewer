@@ -15,6 +15,9 @@ fit_speedup and fit_files read it; nothing here touches AWS.
         steps directly, bypassing decide() and the jobs table, for a recipe decide() refuses too-long --
         caffeine is not in the library (only ever resolved through PubChem), hence --atoms-json; see
         measure_optimise and HANDOFF's "Caffeine optimise is now refused")
+    python -m jobs.worker probe --hessian-json '[{"label": "water", "atoms": [[8, 0, 0, 0.118], ...]}, ...]'
+        (Phase 6D: times one optimisation step and the analytic Hessian at B3LYP-D3(BJ)/def2-SVP per
+        molecule -- sizing version 6's h -- run with PYSCF_MAX_MEMORY set as BatchRunner sets it)
 
 Each thread count runs in a fresh child process with OMP_NUM_THREADS and
 OPENBLAS_NUM_THREADS set to n, as BatchRunner sets OMP_NUM_THREADS to the
@@ -68,6 +71,7 @@ def measure(molecule, basis, n, grid_points):
     (no molecule build), then the worker's 'writing files' stage for it."""
     from pyscf import gto, lib
     from build_library import write_molecule_files
+    from dispersion import LABEL
     from library import by_id
     from optimise import geometry_for, make_dft
 
@@ -87,7 +91,7 @@ def measure(molecule, basis, n, grid_points):
     mf.verbose = 0
     fields = {'id': f'probe-{molecule}', 'name': entry.name, 'formula': entry.formula,
               'geometrySource': 'speedup probe', 'references': [], 'multiplicity': entry.spin + 1,
-              'method': f'B3LYP/{basis}'}
+              'method': f'{LABEL}/{basis}'}
     with tempfile.TemporaryDirectory(prefix='probe-') as out:
         began = time.monotonic()
         meta = write_molecule_files(out, mol, mf, fields, grid_points, commit='probe')
@@ -128,6 +132,46 @@ def measure_optimise(atoms, basis, steps, spin=0, label=None):
     geometric_kernel(make_dft(mol), maxsteps=steps, callback=callback)
     return {'probe': 'optimise-steps', 'molecule': label, 'basis': basis, 'vcpu': _vcpu(),
             'basisFunctions': int(mol.nao), 'steps': out}
+
+
+def measure_hessian(atoms, basis='def2-SVP', spin=0, label=None):
+    """One optimisation step (SCF + gradient) and the analytic Hessian, timed, as recipe B's frequency check
+    runs them (Phase 6D): B3LYP-D3(BJ), symmetry off, UKS for an open shell. `atoms` is [[Z, x, y, z], …] in
+    Angstrom (the image carries no library geometries)."""
+    from pyscf import dft, gto
+    from dispersion import XC, ensure_d3
+    ensure_d3()
+    mol = gto.M(atom=atoms, unit='Angstrom', basis=basis, spin=spin, symmetry=False, verbose=0)
+    mf = dft.RKS(mol) if spin == 0 else dft.UKS(mol)
+    mf.xc, mf.grids.level, mf.conv_tol = XC, 4, 1e-10
+    began = time.monotonic()
+    mf.kernel()
+    scf = time.monotonic() - began
+    began = time.monotonic()
+    mf.nuc_grad_method().kernel()
+    gradient = time.monotonic() - began
+    began = time.monotonic()
+    mf.Hessian().kernel()
+    hessian = time.monotonic() - began
+    return {'molecule': label, 'basis': basis, 'basisFunctions': int(mol.nao), 'atoms': mol.natm,
+            'scfSeconds': round(scf, 3), 'gradientSeconds': round(gradient, 3), 'stepSeconds': round(scf + gradient, 3),
+            'hessianSeconds': round(hessian, 3), 'scfCycles': int(getattr(mf, 'cycles', -1)),
+            'peakMemoryGB': _peak_memory_gb()}
+
+
+def probe_hessians(runs, basis='def2-SVP', emit=print, measure=None):
+    """measure_hessian for each {'label', 'atoms', 'spin'?}: a progress line per run (keyed 'hessianRun'),
+    then the one line calibrate.read_hessian_probe reads."""
+    measure = measure or measure_hessian
+    out = []
+    for run in runs:
+        result = measure(run['atoms'], basis, run.get('spin', 0), run['label'])
+        emit(json.dumps({'hessianRun': run['label'], **result}), flush=True)
+        out.append(result)
+    line = {'probe': 'hessian', 'vcpu': _vcpu(), 'pyscfMaxMemoryMB': os.environ.get('PYSCF_MAX_MEMORY'),
+            'basis': basis, 'runs': out}
+    emit(json.dumps(line), flush=True)
+    return line
 
 
 def run_child(n, molecule, basis, grid_points):
@@ -195,8 +239,14 @@ def main(argv=None):
                         help='[[Z,x,y,z],...] in Angstrom, for --optimise-steps on a molecule outside the '
                              'library (e.g. caffeine, which the app only ever resolves through PubChem)')
     parser.add_argument('--spin', type=int, default=0, help='2S (multiplicity - 1), for --atoms-json')
+    parser.add_argument('--hessian-json', default=None,
+                        help='[{"label", "atoms": [[Z,x,y,z],...], "spin"?}, ...]: time a step and the Hessian of '
+                             'each at def2-SVP (Phase 6D, sizing version 6\'s h) instead of the thread sweep')
     args = parser.parse_args(argv)
     grid = tuple(int(v) for v in args.grid_points.split(',')) if args.grid_points else None
+    if args.hessian_json:
+        probe_hessians(json.loads(args.hessian_json))
+        return 0
     if args.optimise_steps is not None:
         if args.atoms_json:
             atoms, spin = json.loads(args.atoms_json), args.spin
