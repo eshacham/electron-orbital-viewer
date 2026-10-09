@@ -30,8 +30,8 @@ const KIND_LABEL: Record<InputKind, string> = { name: 'Name', smiles: 'SMILES', 
 
 /** Spec §8.2's recipes and their caveats, as the owner chooses between them. */
 const RECIPES: Array<{ value: Recipe; label: string; detail: string }> = [
-    { value: 'single', label: 'A · single point', detail: 'B3LYP/def2-TZVPD at the geometry given. Geometry is PubChem’s force-field conformer (or as pasted), not optimised.' },
-    { value: 'optimise', label: 'B · optimise first', detail: 'B3LYP/def2-SVP optimisation (geomeTRIC), then B3LYP/def2-TZVPD. No dispersion correction and no frequency check: not confirmed to be a minimum.' },
+    { value: 'single', label: 'A · single point', detail: 'B3LYP-D3(BJ)/def2-TZVPD at the geometry given. Geometry is PubChem’s force-field conformer (or as pasted), not optimised.' },
+    { value: 'optimise', label: 'B · optimise first', detail: 'B3LYP-D3(BJ)/def2-SVP optimisation (geomeTRIC), a frequency check that confirms a minimum (a saddle point is displaced and re-optimised once), then B3LYP-D3(BJ)/def2-TZVPD. One conformer: the minimum nearest the start.' },
 ];
 
 interface SubmitAreaProps {

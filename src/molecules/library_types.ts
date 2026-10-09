@@ -1,4 +1,4 @@
-import type { MoleculeMeta, MoleculeAtom, GridSpec } from './types';
+import type { FrequencyCheck, MoleculeMeta, MoleculeAtom, GridSpec } from './types';
 
 /**
  * What the molecule library adds to a spec §4.2 meta.json. The §4.2 fields
@@ -40,9 +40,17 @@ export interface LibraryExtras {
         steps?: number;
         /** The attempt whose last frame this run resumed from (6B-1 M4); `steps` then counts this attempt only. */
         resumedFrom?: number;
+        /** Phase 6D: 'time-limit' when the worker's time budget stopped the optimisation (spec §9); then `converged` is false. */
+        stoppedBy?: 'time-limit';
+        /** Phase 6D: the imaginary-frequency count of the saddle point it was displaced from and re-optimised (spec §7). */
+        displacedFrom?: number;
     };
     /** A documented exception to the usual "number states its method" claim (ozone's multireference dipole; ruling T7-O3). */
     caveat?: string;
+    /** Phase 6D: recipe B's frequency check. */
+    frequencyCheck?: FrequencyCheck;
+    /** Phase 6D: the D3(BJ) term inside totalEnergyHartree, and what computed it. */
+    dispersion?: { model: string; energyHartree: number; backend: string };
 }
 export type LibraryMoleculeMeta = MoleculeMeta & LibraryExtras;
 

@@ -17,7 +17,9 @@ export function isJobKey(id: string | null | undefined): id is string {
 export const jobBaseUrl = (key: string): string => `${JOBS_BASE_URL}/${key}`;
 export const jobFileUrl = (key: string, name: string): string => `${jobBaseUrl(key)}/${name}`;
 
-/** The files a finished job leaves beside Phase 6's (spec §5.3), in the order the provenance panel lists them. */
-export function computedResultFiles(recipe: 'single' | 'optimise'): string[] {
-    return ['input.py', 'output.log', 'geometry.xyz', 'job.json', ...(recipe === 'optimise' ? ['trajectory.xyz'] : [])];
+/** The files a finished job leaves beside Phase 6's (spec §5.3), in the order the provenance panel lists them;
+ * `frequencies` adds recipe B's frequencies.json (Phase 6D), written when its frequency check ran. */
+export function computedResultFiles(recipe: 'single' | 'optimise', extras: { frequencies?: boolean } = {}): string[] {
+    return ['input.py', 'output.log', 'geometry.xyz', 'job.json', ...(recipe === 'optimise' ? ['trajectory.xyz'] : []),
+        ...(extras.frequencies ? ['frequencies.json'] : [])];
 }

@@ -20,6 +20,7 @@ import { ION_VALIDATION_ROWS } from './ion_rows';
 import { RELATIVITY_VALIDATION_ROWS } from './relativity_rows';
 import { PHASE_5_ROWS } from './phase5';
 import { PHASE_6_ROWS } from './phase6';
+import { countsAsValidation } from './geometry_honesty';
 
 export interface ValidationRow {
     phase: number;
@@ -47,6 +48,10 @@ export interface ValidationRow {
      * directions, so a known miss that starts passing fails the test too.
      */
     knownMiss?: string;
+    /** Phase 6D: where the geometry behind this row came from (the library's rows; meta.json's geometrySource). */
+    geometrySource?: string;
+    /** Phase 6D: set (geometry_honesty.NOT_A_TEST) on a bond or angle of a geometry taken from experiment. */
+    notATest?: string;
 }
 
 const NIST_LDA = 'NIST Atomic Reference Data (LDA)';
@@ -61,6 +66,9 @@ const PHASE_0_ROWS: ValidationRow[] = [
 ];
 
 export const VALIDATION: ValidationRow[] = [...PHASE_0_ROWS, ...PHASE_1_ROWS, ...ION_VALIDATION_ROWS, ...RELATIVITY_VALIDATION_ROWS, ...PHASE_5_ROWS, ...PHASE_6_ROWS];
+
+/** The rows that test the method (Phase 6D spec §5): every row but an experimental geometry's own bonds and angles. */
+export const METHOD_VALIDATION: ValidationRow[] = VALIDATION.filter(countsAsValidation);
 
 export function relativeErrorPercent(row: ValidationRow): number {
     return (Math.abs(row.app - row.reference) / Math.abs(row.reference)) * 100;

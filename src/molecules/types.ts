@@ -171,6 +171,35 @@ export interface MoleculeScan {
 /** Spec §9.1: the curated library is validated; a molecule computed on request is not benchmarked. Absent means validated. */
 export type MoleculeTier = 'validated' | 'computed';
 
+/** The compute version that added D3(BJ) and recipe B's frequency check (Phase 6D); jobs below it predate both. */
+export const DISPERSION_COMPUTE_VERSION = 2;
+
+/** Recipe B's frequency check (Phase 6D spec §7), as meta.json's `frequencyCheck` carries it. */
+export interface FrequencyCheck {
+    result: 'minimum' | 'minimum-after-displacement' | 'saddle-point' | 'not-run' | 'not-rechecked';
+    summary: string;
+    imaginaryCount?: number;
+    imaginaryWavenumbers?: number[];
+    noiseWavenumbers?: number[];
+    lowestWavenumber?: number | null;
+    zeroPointEnergyHartree?: number;
+    /** Set when the zero-point energy was taken at a saddle point: it leaves the imaginary modes out. */
+    zeroPointEnergyNote?: string;
+    method?: string | null;
+    /** The check that found a saddle point, before the run displaced from it and re-optimised. */
+    history?: Array<Omit<FrequencyCheck, 'history' | 'method'>>;
+}
+
+/** An open shell's mixed treatment (Phase 6D): PySCF has no ROKS Hessian, so geometry and frequencies run UKS. */
+export interface OpenShellRecord {
+    methods: string;
+    expectedS2: number;
+    geometryS2: number | null;
+    frequenciesS2: number | null;
+    contaminated: boolean;
+    note?: string;
+}
+
 /** meta.provenance, written by the 6B-1 worker for computed molecules (spec §9.3). */
 export interface MoleculeProvenance {
     jobKey: string;
@@ -185,6 +214,18 @@ export interface MoleculeProvenance {
     size: string;
     capacity: 'spot' | 'on-demand' | 'local';
     wallSeconds: number;
+    /** Phase 6D (compute version 2): the optimisation's level, the frequency check's summary, the time limit the budget worked to. */
+    geometryMethod?: string | null;
+    frequencyCheck?: string | null;
+    timeLimitSeconds?: number | null;
+    /** Phase 6D: an open shell's UKS/ROKS split and UKS's <S^2>. */
+    openShell?: OpenShellRecord;
+    /** Phase 6D: what happened to the geometry before the final SCF (symmetrised; or symmetry off, with a note). */
+    finalGeometry?: { summary: string; symmetrised?: boolean; pointGroup?: string | null; note?: string; [key: string]: unknown };
+    /** Phase 6D: a final SCF that converged only when rerun without point-group symmetry. */
+    finalScf?: { symmetry: 'off'; retried: boolean; summary: string };
+    /** Phase 6D: the atomic masses the frequencies used. */
+    frequencyMasses?: string;
     /** Always null (6B-1): settlement comes after the immutable files; the owner reads the cost from the job record. */
     costUsd: number | null;
 }

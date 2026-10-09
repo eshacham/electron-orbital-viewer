@@ -3,7 +3,7 @@ import { Chip } from '@mui/material';
 import type { MoleculeTier } from '../molecules/types';
 
 export const TIER_TEXT: Record<MoleculeTier, { label: string; line: string }> = {
-    validated: { label: 'Validated', line: 'Curated, and checked against published values.' },
+    validated: { label: 'Validated', line: 'Curated; its dipole, and an optimised geometry, checked against published values.' },
     computed: { label: 'Computed', line: 'Computed on request by the same method; not benchmarked against experiment.' },
 };
 

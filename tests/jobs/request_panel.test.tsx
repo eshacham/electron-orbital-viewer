@@ -97,6 +97,15 @@ describe('previewing', () => {
         expect(screen.getByLabelText('preview')).not.toHaveTextContent('H₂O');
         expect((preview.mock.calls[0][1] as AbortSignal).aborted).toBe(true);
     });
+    // Phase 6D: each recipe says its method, D3(BJ) included, and recipe B its frequency check.
+    it('describes both recipes as they now run', () => {
+        setup();
+        expect(screen.getByRole('radio', { name: /A · single point/ }).closest('label'))
+            .toHaveTextContent('B3LYP-D3(BJ)/def2-TZVPD at the geometry given. Geometry is PubChem’s force-field conformer (or as pasted), not optimised.');
+        expect(screen.getByRole('radio', { name: /B · optimise first/ }).closest('label'))
+            .toHaveTextContent('B3LYP-D3(BJ)/def2-SVP optimisation (geomeTRIC), a frequency check that confirms a minimum (a saddle point is displaced and re-optimised once), then B3LYP-D3(BJ)/def2-TZVPD. One conformer: the minimum nearest the start.');
+        expect(screen.queryByText(/No dispersion correction/)).toBeNull();
+    });
     it('drops a preview as soon as the form changes, so Submit needs a new one', async () => {
         const pending = deferred<PreviewResponse>();
         setup({ preview: jest.fn().mockResolvedValueOnce(previewFixture('preview_ok')).mockReturnValueOnce(pending.promise) });

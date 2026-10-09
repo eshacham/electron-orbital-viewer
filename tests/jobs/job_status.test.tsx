@@ -93,6 +93,18 @@ describe('JobStatusView', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
         expect(onRetry).toHaveBeenCalledWith(jobFixture('get_failed'));
     });
+    // Ruling D6: a job submitted before dispersion was added is retried at the current method, under a new key.
+    it('says a retry of a job from before dispersion runs with the current method, as a new job', () => {
+        const legacy = jobFixture('get_failed');
+        const view = { ...legacy, job: { ...legacy.job, computeVersion: 1, method: { ...legacy.job.method, xc: 'B3LYP' } } };
+        render(<JobStatusView view={view} error={null} nowMs={NOW} onOpen={noop} onRetry={noop} onClose={noop} />);
+        expect(screen.getByText('Submitted before dispersion was added: a retry runs with the current method (dispersion-corrected) as a new job.'))
+            .toBeInTheDocument();
+    });
+    it('says nothing of the method when a current job is retried', () => {
+        render(<JobStatusView view={jobFixture('get_failed')} error={null} nowMs={NOW} onOpen={noop} onRetry={noop} onClose={noop} />);
+        expect(screen.queryByText(/before dispersion was added/)).toBeNull();
+    });
     // Phase 6C: a retry is a new run: it is priced afresh, and only an approval of that price runs it.
     it('shows the fresh quote for a retry, and retries only on its approval', () => {
         const onApproveRetry = jest.fn();

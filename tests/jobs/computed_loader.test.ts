@@ -46,6 +46,8 @@ describe('job keys and paths', () => {
         expect(jobFileUrl(KEY, 'input.py')).toBe(`${JOBS_BASE_URL}/${KEY}/input.py`);
         expect(computedResultFiles('single')).toEqual(['input.py', 'output.log', 'geometry.xyz', 'job.json']);
         expect(computedResultFiles('optimise')).toContain('trajectory.xyz');
+        expect(computedResultFiles('optimise', { frequencies: true })).toEqual(
+            ['input.py', 'output.log', 'geometry.xyz', 'job.json', 'trajectory.xyz', 'frequencies.json']);
     });
 });
 

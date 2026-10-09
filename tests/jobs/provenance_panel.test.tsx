@@ -26,7 +26,7 @@ const open = () => fireEvent.click(screen.getByRole('button', { name: 'How this 
 describe('TierBadge', () => {
     it('names the tier and says what it means', () => {
         const { rerender } = render(<TierBadge tier="validated" />);
-        expect(screen.getByRole('note', { name: 'data tier' })).toHaveTextContent('ValidatedCurated, and checked against published values.');
+        expect(screen.getByRole('note', { name: 'data tier' })).toHaveTextContent('ValidatedCurated; its dipole, and an optimised geometry, checked against published values.');
         rerender(<TierBadge tier="computed" />);
         expect(screen.getByRole('note', { name: 'data tier' }))
             .toHaveTextContent('ComputedComputed on request by the same method; not benchmarked against experiment.');
@@ -116,5 +116,101 @@ describe('ProvenancePanel', () => {
         render(<ProvenancePanel meta={computed()} ownerJob={null} ownerJobError="offline" />);
         open();
         expect(screen.getByRole('alert')).toHaveTextContent('The job record could not be read: offline');
+    });
+
+    // Phase 6D: what compute version 2 writes.
+    const D3 = { density: 'B3LYP-D3(BJ)/def2-TZVPD', energies: 'B3LYP-D3(BJ)/def2-TZVPD' };
+    const checked = (extra: Record<string, unknown> = {}, over: Partial<MoleculeProvenance> = {}) => computed(
+        { computeVersion: 2, recipe: 'optimise', geometrySource: { kind: 'xyz' }, geometryMethod: 'B3LYP-D3(BJ)/def2-SVP',
+          frequencyCheck: 'true minimum (no imaginary frequencies)', timeLimitSeconds: 600, ...over },
+        { method: D3, totalEnergyHartree: -76.358723, dispersion: { model: 'D3(BJ)', energyHartree: -0.000574, backend: 'pyscf-dispersion 1.5.0' },
+          geometryOptimisation: { steps: 4, converged: true },
+          frequencyCheck: { result: 'minimum', summary: 'true minimum (no imaginary frequencies)', imaginaryCount: 0,
+                            zeroPointEnergyHartree: 0.021134, method: 'B3LYP-D3(BJ)/def2-SVP' }, ...extra });
+
+    it('states the dispersion correction and that the total energy includes it', () => {
+        render(<ProvenancePanel meta={checked()} ownerJob={null} />);
+        open();
+        expect(screen.getByText('Dispersion: Grimme D3(BJ) (Becke–Johnson damping), computed with pyscf-dispersion 1.5.0. '
+            + 'It changes energies and forces only, not the orbitals, density or potential. '
+            + 'Total energy −76.358723 Ha, including −0.000574 Ha of D3(BJ).')).toBeInTheDocument();
+        expect(screen.getByText(/optimised at B3LYP-D3\(BJ\)\/def2-SVP with geomeTRIC in 4 steps/)).toBeInTheDocument();
+        expect(screen.queryByText(/before dispersion was added/)).toBeNull();
+    });
+    it('states the frequency check and links frequencies.json', () => {
+        render(<ProvenancePanel meta={checked()} ownerJob={null} />);
+        open();
+        expect(screen.getByText('Frequency check (B3LYP-D3(BJ)/def2-SVP): true minimum (no imaginary frequencies); '
+            + 'zero-point energy 0.021134 Ha.')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'frequencies.json' })).toHaveAttribute('href', `/molecules/jobs/${KEY}/frequencies.json`);
+    });
+    it('says a saddle point is a saddle point, and a time-limited optimisation is not converged', () => {
+        render(<ProvenancePanel meta={checked({
+            geometryOptimisation: { steps: 30, converged: false, stoppedBy: 'time-limit', maxGradient: 0.0021 },
+            frequencyCheck: { result: 'not-run', summary: 'not checked: the optimisation stopped at its time limit',
+                              method: 'B3LYP-D3(BJ)/def2-SVP' } })} ownerJob={null} />);
+        open();
+        expect(screen.getByText('The optimisation stopped at its time limit, not converged (max force 2.1e-3 Ha/bohr).')).toBeInTheDocument();
+        expect(screen.getByText(/Frequency check \(B3LYP-D3\(BJ\)\/def2-SVP\): not checked: the optimisation stopped at its time limit\./)).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'frequencies.json' })).toBeNull();
+    });
+    it('a legacy job says it was computed before dispersion (Review Focus 5)', () => {
+        render(<ProvenancePanel meta={computed({ recipe: 'optimise', geometrySource: { kind: 'xyz' } }, { geometryOptimisation: { steps: 7, converged: true } })} ownerJob={null} />);
+        open();
+        expect(screen.getByText('Computed before dispersion was added (compute version 1): B3LYP/def2-TZVPD without D3(BJ), '
+            + 'and its optimised structure was not checked for imaginary frequencies.')).toBeInTheDocument();
+        expect(screen.queryByText(/^Frequency check/)).toBeNull();
+        expect(screen.queryByText(/^Dispersion:/)).toBeNull();
+    });
+    it('says an experimental geometry\'s bond and angle are not a test of the method', () => {
+        render(<ProvenancePanel meta={waterMeta({ method: TZVPD, references: [
+            { quantity: 'bond', value: 0.958, unit: 'Å', source: 'experiment (CCCBDB)', tolerance: 0.01 },
+            { quantity: 'dipole', value: 1.855, unit: 'D', source: 'CRC Handbook, via CCCBDB', tolerance: 0.1855 }] })} ownerJob={null} />);
+        open();
+        expect(screen.getByText('bond: 0.958 Å — experiment (CCCBDB); geometry from experiment (not a test of the method)')).toBeInTheDocument();
+        expect(screen.getByText('dipole: 1.855 D — CRC Handbook, via CCCBDB')).toBeInTheDocument();
+    });
+
+    // Beyond the brief: the rest of what compute version 2 records, said where the method is.
+    it('a legacy single point says only that it has no D3(BJ)', () => {
+        render(<ProvenancePanel meta={computed()} ownerJob={null} />);
+        open();
+        expect(screen.getByText('Computed before dispersion was added (compute version 1): B3LYP/def2-TZVPD without D3(BJ).')).toBeInTheDocument();
+        expect(screen.queryByText(/time limit/)).toBeNull();
+    });
+    it('gives a saddle point\'s zero-point energy with its caveat, and still links its frequencies', () => {
+        render(<ProvenancePanel meta={checked({
+            geometryOptimisation: { steps: 9, converged: true },
+            frequencyCheck: { result: 'saddle-point', summary: 'saddle point (1 imaginary frequency), not a minimum', imaginaryCount: 1,
+                              imaginaryWavenumbers: [-830.05], zeroPointEnergyHartree: 0.0331,
+                              zeroPointEnergyNote: 'at a saddle point: the imaginary modes are left out of the sum, so this is not the zero-point energy of a minimum',
+                              method: 'B3LYP-D3(BJ)/def2-SVP' } })} ownerJob={null} />);
+        open();
+        expect(screen.getByText('Frequency check (B3LYP-D3(BJ)/def2-SVP): saddle point (1 imaginary frequency), not a minimum; '
+            + 'zero-point energy 0.033100 Ha (at a saddle point: the imaginary modes are left out of the sum, so this is not the zero-point energy of a minimum).'))
+            .toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'frequencies.json' })).toBeInTheDocument();
+    });
+    it('states an open shell\'s mixed method, the final geometry and SCF, and the time limit', () => {
+        const provenance = {
+            openShell: { methods: 'geometry and frequencies: UKS; properties: ROKS', expectedS2: 0.75, geometryS2: 0.7518, frequenciesS2: 0.7519, contaminated: false },
+            finalGeometry: { symmetrised: true, groupOrder: null, maxDisplacementAngstrom: 0, pointGroup: 'Coov',
+                             summary: 'symmetrised to Coov before the final SCF (largest move 0.0e+00 Å)' },
+            finalScf: { symmetry: 'off', retried: true, summary: 'the final SCF did not converge with point-group symmetry, so it was run again without it, and converged' },
+        } as Partial<MoleculeProvenance>;
+        render(<ProvenancePanel meta={checked({}, provenance)} ownerJob={null} />);
+        open();
+        expect(screen.getByText('Open shell: geometry and frequencies: UKS; properties: ROKS. '
+            + 'UKS ⟨S²⟩ 0.752 at the last geometry step and 0.752 at the frequency check, against S(S+1) = 0.750.')).toBeInTheDocument();
+        expect(screen.getByText('Final geometry: symmetrised to Coov before the final SCF (largest move 0.0e+00 Å).')).toBeInTheDocument();
+        expect(screen.getByText('Final SCF: the final SCF did not converge with point-group symmetry, so it was run again without it, and converged.')).toBeInTheDocument();
+        expect(screen.getByText(/sized by sizing rule v1; time limit 10 min 00 s\.$/)).toBeInTheDocument();
+    });
+    it('says when an open shell\'s UKS steps were spin-contaminated', () => {
+        const note = 'UKS spin contamination: <S^2> 0.900 at the last geometry step, against S(S+1) = 0.750 (more than 10 % off)';
+        render(<ProvenancePanel meta={checked({}, { openShell: { methods: 'geometry and frequencies: UKS; properties: ROKS', expectedS2: 0.75,
+            geometryS2: 0.9, frequenciesS2: null, contaminated: true, note } } as Partial<MoleculeProvenance>)} ownerJob={null} />);
+        open();
+        expect(screen.getByText(`Open shell: geometry and frequencies: UKS; properties: ROKS. ${note}.`)).toBeInTheDocument();
     });
 });

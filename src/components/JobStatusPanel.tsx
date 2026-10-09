@@ -9,6 +9,10 @@ const utc = (iso: string) => iso.replace('T', ' ').replace('Z', ' UTC');
 import { AvailableQuoteOption, isActive, JobStatus, JobView, Quote } from '../jobs/api_types';
 import type { JobsState } from '../store/jobsSlice';
 import { useNow } from '../jobs/useNow';
+import { DISPERSION_COMPUTE_VERSION } from '../molecules/types';
+
+/** Ruling D6: a retry is rebuilt at the current compute version, so an older job's retry is a new job by the new method. */
+export const LEGACY_RETRY_NOTE = 'Submitted before dispersion was added: a retry runs with the current method (dispersion-corrected) as a new job.';
 
 export const STATUS_TEXT: Record<JobStatus, string> = {
     QUEUED: 'Queued', STARTING: 'Starting a worker', RUNNING: 'Running', DONE: 'Done', FAILED: 'Failed',
@@ -126,6 +130,7 @@ export const JobStatusView: React.FC<JobStatusViewProps> = ({
             {view.status === 'FAILED' && (
                 <>
                     <Alert severity="error" role="alert">{view.error?.message ?? 'The job failed without a recorded reason.'}</Alert>
+                    {view.job.computeVersion < DISPERSION_COMPUTE_VERSION && <Typography variant="body2">{LEGACY_RETRY_NOTE}</Typography>}
                     {!retryQuote && <Button variant="contained" disabled={busy} onClick={() => onRetry(view)}>Retry</Button>}
                     {/* Phase 6C: a retry is a new run, so it is priced afresh and approved; the quote is announced as it lands. */}
                     <div aria-live="polite">
