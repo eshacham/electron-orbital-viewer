@@ -75,7 +75,7 @@ function StructureChecks({ meta, provenance }: { meta: LibraryMoleculeMeta; prov
         <>
             {optimisation?.stoppedBy === 'time-limit' && (
                 <Typography variant="body2">
-                    The optimisation stopped at its time limit, not converged (max force {optimisation.maxGradient?.toExponential(1)} Ha/bohr).
+                    The optimisation stopped at its time limit, not converged (max force, the largest Cartesian gradient component: {optimisation.maxGradient?.toExponential(1)} Ha/bohr).
                 </Typography>
             )}
             {check && (

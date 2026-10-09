@@ -150,7 +150,7 @@ describe('ProvenancePanel', () => {
             frequencyCheck: { result: 'not-run', summary: 'not checked: the optimisation stopped at its time limit',
                               method: 'B3LYP-D3(BJ)/def2-SVP' } })} ownerJob={null} />);
         open();
-        expect(screen.getByText('The optimisation stopped at its time limit, not converged (max force 2.1e-3 Ha/bohr).')).toBeInTheDocument();
+        expect(screen.getByText('The optimisation stopped at its time limit, not converged (max force, the largest Cartesian gradient component: 2.1e-3 Ha/bohr).')).toBeInTheDocument();
         expect(screen.getByText(/Frequency check \(B3LYP-D3\(BJ\)\/def2-SVP\): not checked: the optimisation stopped at its time limit\./)).toBeInTheDocument();
         expect(screen.queryByRole('link', { name: 'frequencies.json' })).toBeNull();
     });
