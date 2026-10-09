@@ -73,13 +73,13 @@
       "capacity": "spot",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "e3c7da1f4af83a9230347f9ab792c6af7470af6315e7bb2d76d8367214e9bebd",
+      "quoteId": "93f665bc73d2d71ba32309ae290e5c030913472c05002c048e6e344e6b41e9bb",
       "size": "S",
       "vcpu": 2,
       "memoryGB": 8,
       "attempts": 3,
       "timeoutSeconds": 600,
-      "predictedSeconds": 86.9,
+      "predictedSeconds": 87.3,
       "sizingVersion": 6,
       "pricesVersion": 2,
       "resultBytes": 1512297,
@@ -87,15 +87,15 @@
       "retentionMonths": 12,
       "downloads": 10,
       "issuedAt": "2026-10-10T12:00Z",
-      "estimateUsd": 0.003059,
+      "estimateUsd": 0.003068,
       "maximumUsd": 0.021308,
       "lines": [
        {
         "item": "compute",
         "label": "Compute (AWS Fargate)",
-        "estimateUsd": 0.001217,
+        "estimateUsd": 0.001226,
         "maximumUsd": 0.01788,
-        "note": "Estimate: one run of the predicted 86.9 s plus a minute to start. Maximum: 3 attempts × (600 s time limit + 120 s to start and stop), at Spot prices for S (2 vCPU, 8 GB). The prediction includes the frequency check (confirms a minimum): 30.3 s."
+        "note": "Estimate: one run of the predicted 87.3 s plus a minute to start. Maximum: 3 attempts × (600 s time limit + 120 s to start and stop), at Spot prices for S (2 vCPU, 8 GB). The prediction includes the frequency check (confirms a minimum): 30.7 s."
        },
        {
         "item": "storage",
@@ -129,13 +129,13 @@
        "capacity": "spot",
        "attempts": 3,
        "basisFunctions": 58,
-       "predictedSeconds": 86.9,
+       "predictedSeconds": 87.3,
        "predictedMemoryGB": 0.47,
        "timeoutSeconds": 600,
-       "predictedCostMicros": 720,
+       "predictedCostMicros": 723,
        "parts": {
         "stepSeconds": 6.7,
-        "frequencySeconds": 30.3,
+        "frequencySeconds": 30.7,
         "finalScfSeconds": 3.7,
         "labellingSeconds": 0.8,
         "filesSeconds": 11.8
@@ -149,13 +149,13 @@
       "capacity": "on-demand",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "cd2870a7174d446db2f236afaba3ffdee01adb266ed983ab2a03504f47d736ca",
+      "quoteId": "17be3f4fa24f7fb525b296fef63e42c39360482db22a609b84774b8da6f13382",
       "size": "S",
       "vcpu": 2,
       "memoryGB": 8,
       "attempts": 1,
       "timeoutSeconds": 600,
-      "predictedSeconds": 86.9,
+      "predictedSeconds": 87.3,
       "sizingVersion": 6,
       "pricesVersion": 2,
       "resultBytes": 1512297,
@@ -163,15 +163,15 @@
       "retentionMonths": 12,
       "downloads": 10,
       "issuedAt": "2026-10-10T12:00Z",
-      "estimateUsd": 0.00565,
+      "estimateUsd": 0.005676,
       "maximumUsd": 0.022076,
       "lines": [
        {
         "item": "compute",
         "label": "Compute (AWS Fargate)",
-        "estimateUsd": 0.003808,
+        "estimateUsd": 0.003834,
         "maximumUsd": 0.018648,
-        "note": "Estimate: one run of the predicted 86.9 s plus a minute to start. Maximum: 600 s time limit + 120 s to start and stop, at on-demand prices for S (2 vCPU, 8 GB). The prediction includes the frequency check (confirms a minimum): 30.3 s."
+        "note": "Estimate: one run of the predicted 87.3 s plus a minute to start. Maximum: 600 s time limit + 120 s to start and stop, at on-demand prices for S (2 vCPU, 8 GB). The prediction includes the frequency check (confirms a minimum): 30.7 s."
        },
        {
         "item": "storage",
@@ -205,13 +205,13 @@
        "capacity": "on-demand",
        "attempts": 1,
        "basisFunctions": 58,
-       "predictedSeconds": 86.9,
+       "predictedSeconds": 87.3,
        "predictedMemoryGB": 0.47,
        "timeoutSeconds": 600,
-       "predictedCostMicros": 2251,
+       "predictedCostMicros": 2262,
        "parts": {
         "stepSeconds": 6.7,
-        "frequencySeconds": 30.3,
+        "frequencySeconds": 30.7,
         "finalScfSeconds": 3.7,
         "labellingSeconds": 0.8,
         "filesSeconds": 11.8

@@ -61,12 +61,12 @@ KEYS = {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'scfExponent',
 
 def test_version_6_prices_the_frequency_check_and_states_its_h():
     # Versions 2-5 were fitted from Fargate ARM64 runs (Phase 6B-3); version 6 (Phase 6D spec §10) adds h, the
-    # analytic Hessian's cost in optimisation steps per atom. Until the Hessian probe measures it (Task 17),
-    # h is 1.5: 0.84-1.06 measured on this Mac (one thread, def2-SVP), with room for poorer threading.
+    # analytic Hessian's cost in optimisation steps per atom, measured by the Hessian probe on L (Task 17,
+    # fixtures/aws/hessian-probe.json): water 0.204, ethanol 1.52, caffeine 0.695; the slowest kept.
     assert sizing.SIZING_VERSION == 6
     assert set(sizing.CONSTANTS) == KEYS
     assert all(isinstance(v, float) and v > 0 for v in sizing.CONSTANTS.values())
-    assert sizing.CONSTANTS['m0'] >= 0.2 and sizing.CONSTANTS['t0'] >= 1.0 and sizing.CONSTANTS['h'] == 1.5
+    assert sizing.CONSTANTS['m0'] >= 0.2 and sizing.CONSTANTS['t0'] >= 1.0 and sizing.CONSTANTS['h'] == 1.52
 
 
 def test_caffeine_needs_a_bigger_worker_than_its_ceiling_timeout_would_allow(monkeypatch, no_labelling):
@@ -378,8 +378,9 @@ def test_caffeine_single_runs_on_l_spot_under_the_live_constants():
 
 def test_caffeine_optimise_pays_for_its_frequency_check_on_l():
     # Version 6: version 5's 22 steps of about 52.8 s and the final single point on L, plus the check,
-    # h x one step x 24 atoms = 1.5 x 52.8 x 24 ≈ 1901 s, and labelling the orbitals: past the 3600 s Spot
-    # limit, so L on demand, one attempt. The measured h (Task 17) may bring it back under.
+    # h x one step x 24 atoms = 1.52 x 52.8 x 24 ≈ 1926 s (the measured h, ethanol's; caffeine's own Hessian
+    # took 881 s on L), and labelling the orbitals: 4156 s, past the 3600 s Spot limit, so L on demand, one
+    # attempt.
     job = _caffeine_job('optimise')
     d = sizing.decide(job)
     step = sizing.step_seconds(basis_functions(CAFFEINE, 'def2-SVP'), LARGE)
@@ -433,15 +434,16 @@ def test_single_points_are_still_priced_direct_where_their_eris_would_fit(monkey
 
 
 def test_the_constants_are_what_calibrate_fits_from_the_fixtures():
-    # Version 5 is reproducible: `python -m jobs.calibrate --aws --probe
+    # Version 6 is reproducible: `python -m jobs.calibrate --aws --probe
     # fixtures/aws/speedup-probe.json --optimise-probe
-    # fixtures/aws/caffeine-optimise-probe.json fixtures/aws/*/` prints these
+    # fixtures/aws/caffeine-optimise-probe.json --hessian-probe
+    # fixtures/aws/hessian-probe.json fixtures/aws/*/` prints these
     # constants, with g's guard used (fitted negative: the ladder's few steps).
-    from jobs.calibrate import aws_samples, fit_aws, guarded
-    constants, guards = guarded(fit_aws(aws_samples(AWS_JOBS), PROBE, OPTIMISE_PROBE))
+    from jobs.calibrate import aws_samples, fit_aws, guarded, read_hessian_probe
+    hessian = read_hessian_probe(AWS_FIXTURES / 'hessian-probe.json')
+    constants, guards = guarded(fit_aws(aws_samples(AWS_JOBS), PROBE, OPTIMISE_PROBE, hessian))
     assert constants == sizing.CONSTANTS
-    # h has no measurement yet (Task 17's Hessian probe): its guard keeps the stated 1.5.
-    assert [g.split(':')[0] for g in guards] == ['g', 'h']
+    assert [g.split(':')[0] for g in guards] == ['g']
 
 
 def test_the_caffeine_probes_slowest_step_is_reproduced_on_l():

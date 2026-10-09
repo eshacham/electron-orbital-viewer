@@ -46,15 +46,23 @@ SIZING_VERSION = 6
 # Version 6, 2026-10-09 (Phase 6D spec §10, Ruling D7): version 5's constants and forms, plus two terms.
 # - h, the frequency check's price. Recipe B (compute version 2 on) checks its optimised structure with an
 #   analytic Hessian at def2-SVP: frequency_seconds = h x step_seconds(N_SVP) x atoms, x OPEN_SHELL_FACTOR for an
-#   open shell. Until the owner-approved Hessian probe on L measures it (Task 17), h = 1.5: PySCF 2.8's RKS
-#   Hessian cost 0.84 (ethanol) to 1.06 (water) SCF+gradient steps per atom on this Mac (def2-SVP, one thread,
-#   2026-10-08) -- the textbook cost of an analytic Hessian, 3N CPHF perturbations, about a gradient's work per
-#   atom -- and 1.5 of it allows for threading poorer than the SCF's, which nothing has measured on Fargate yet.
-#   The D3 terms are not priced (spec §10: negligible).
+#   open shell. Before it was measured h was 1.5: PySCF 2.8's RKS Hessian cost 0.84 (ethanol) to 1.06 (water)
+#   SCF+gradient steps per atom on this Mac (def2-SVP, one thread, 2026-10-08) -- the textbook cost of an analytic
+#   Hessian, 3N CPHF perturbations, about a gradient's work per atom -- with room for poorer threading.
+#   Measured 2026-10-09 by the owner-approved Hessian probe (Batch job 3a9f334b-495a-4e8e-9af2-fc3969d7278b, L
+#   on demand, 16 vCPU / 64 GB, PYSCF_MAX_MEMORY 52 428 as BatchRunner sets it, job definition rev 12, image
+#   ef20a86beec20439; tests/fixtures/aws/hessian-probe.json), each Hessian over sizing's own price for one
+#   def2-SVP step on L, per atom: water (N 24) step 0.386 s, Hessian 0.678 s, h 0.204; ethanol (N 72) step
+#   3.67 s, Hessian 24.6 s, h 1.52; caffeine (N 246) step 38.7 s, Hessian 881 s, h 0.695. The slowest,
+#   ethanol's, is kept (Ruling T14-speedup): h = 1.52, with `--hessian-probe` added to version 5's command.
+#   Ethanol's ratio is high partly because sizing prices its step on L at 1.80 s against the 3.67 s measured
+#   (16 threads ran it only 1.7x faster than this Mac's one); caffeine's check is over-predicted 2.2x (1926 s
+#   against 881 s), the price of keeping the slowest. The D3 terms are not priced (spec §10: negligible).
 # - labelling the orbitals (labelling_seconds; LABEL_* below), which runs after the time budget's last decision
 #   and is in no measured file write (every AWS sample predates it). It moves single points too, by 1-5 %.
-# Caffeine optimise moves from 2205 s (L, Spot) to 4130 s: past the Spot limit, so L on demand until h is
-# measured. Caffeine single moves from 1043.5 s to 1067.5 s on L (labelling 24.0 s), water single 15.5 -> 16.3 s.
+# Caffeine optimise moves from 2205 s (L, Spot) under version 5 to 4155.6 s (check 1926.4 s): still past the
+# 3600 s Spot limit with the measured h, so L on demand, one attempt. Caffeine single moves from 1043.5 s to
+# 1067.5 s on L (labelling 24.0 s), water single 15.5 -> 16.3 s.
 #
 # Version 5, fitted 2026-10-08 (Phase 6B-3 follow-up) with the same command as version 4 (below), from 6 AWS
 # jobs: version 4's five plus the owner's caffeine optimise (09ae0fa051c6..., L on-demand, 16 vCPU / 64 GB,
@@ -155,7 +163,7 @@ SIZING_VERSION = 6
 # Versions 1 (6B-1 Task 11, this Mac) and 2 (6B-3 Task 14) stay in git history; version 3 is version 4
 # without t3Step (every step priced direct).
 CONSTANTS = {'m0': 0.459, 'm2': 4.35, 't0': 4.84, 't3': 42000.0, 't3Step': 31000.0, 'g': 1.5, 'f2': 5410.0,
-             'stepScale': 0.375, 'h': 1.5, 'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631,
+             'stepScale': 0.375, 'h': 1.52, 'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631,
              'filesSaturation': 32.0}
 HEADROOM = 2.0
 TIME_HEADROOM = 1.5
