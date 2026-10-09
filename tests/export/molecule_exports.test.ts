@@ -26,6 +26,7 @@ import type { LibraryMoleculeMeta } from '../../src/molecules/library_types';
 import type { MoleculeBasis } from '../../src/molecules/types';
 import { makeStore, baseContext, readText, exportHandle, octahedron } from './fixtures';
 import { waterMeta } from '../molecules/fixtures';
+import { DIFFUSE_NOTE } from '../../src/molecules/orbital_display';
 
 const OZONE_CAVEAT = 'Ozone has strong multireference character: single-reference B3LYP overestimates its dipole moment.';
 const water = (overrides: Record<string, unknown> = {}) => waterMeta({
@@ -130,6 +131,34 @@ describe('captions and file stems', () => {
         const state = drawnStore({ kind: 'mo', index: 4 }).getState();
         expect(viewDescription(state)).toBe('Water (H₂O), MO 1b1 (HOMO), −0.310 Ha (−8.44 eV), 90 % enclosed');
         expect(exportFileStem(state)).toBe('orbital-viewer_H2O_mo4-1b1');
+    });
+
+    // Phase 6D: water at def2-TZVPD as library v3 ships it -- a diffuse LUMO and a valence virtual LVMO.
+    const V3 = () => water({ symmetry: { pointGroup: 'C2v', labelGroup: 'C2v', labels: 'full-group' }, orbitals: [
+        { index: 4, label: '1b1', energyHartree: -0.31, occupation: 2, role: 'HOMO' },
+        { index: 5, label: '4a1', energyHartree: -0.01, occupation: 0, role: 'LUMO', valenceCharacter: 0.55, class: 'diffuse' },
+        { index: 6, label: 'a1', energyHartree: 0.19, occupation: 0, role: 'LVMO', valenceCharacter: 1, class: 'valence', kind: 'valence-virtual' },
+    ] });
+
+    // Ruling D4: a diffuse virtual's tag is diffuseDescription's own wording, not the brief's original
+    // "diffuse, basis-dependent, NN % valence". Ruling D4-energy: a constructed LVMO never shows "≈" -- its
+    // tag is the short VALENCE_VIRTUAL_NOTE (no "antibonding orbital textbooks draw"), and its energy reads
+    // "upper estimate", carried into the caption via orbitalEnergyText (not bare formatOrbitalEnergy).
+    it('a diffuse LUMO and a valence virtual LVMO say what they are', () => {
+        expect(viewDescription(drawnStore({ kind: 'mo', index: 5 }, V3()).getState()))
+            .toBe('Water (H₂O), MO 4a1 (LUMO; partly diffuse (55 % valence): its shape depends on the basis), −0.010 Ha (−0.27 eV), 90 % enclosed');
+        expect(viewDescription(drawnStore({ kind: 'mo', index: 6 }, V3()).getState())).toBe('Water (H₂O), MO a1 (LVMO; constructed from the '
+            + 'valence part of the virtual space — not an orbital of this calculation), 0.190 Ha (5.17 eV), upper estimate, 90 % enclosed');
+        expect(exportFileStem(drawnStore({ kind: 'mo', index: 6 }, V3()).getState())).toBe('orbital-viewer_H2O_mo6-a1');
+    });
+
+    // Controller ruling: combined labels (e.g. BF3/SF6's near-degenerate cores, Ruling D1) must survive into
+    // captions exactly; the filename sanitiser only needs to stay readable once '+' is in the mix.
+    it('keeps a combined label exact in the caption and readable in the file stem', () => {
+        const meta = water({ orbitals: [{ index: 0, label: "1a1'+1e'", energyHartree: -0.5, occupation: 2, role: 'HOMO' }] });
+        const state = drawnStore({ kind: 'mo', index: 0 }, meta).getState();
+        expect(viewDescription(state)).toBe('Water (H₂O), MO 1a1\'+1e\' (HOMO), −0.500 Ha (−13.61 eV), 90 % enclosed');
+        expect(exportFileStem(state)).toBe('orbital-viewer_H2O_mo0-1a1p-plus-1ep');
     });
 
     it('keeps stems ASCII: primes spelled out, a bracketed formula replaced by the id', () => {
@@ -274,10 +303,10 @@ describe('CSV: the orbital table', () => {
             '# energies in hartree (Ha) and electronvolts (eV), 1 Ha = 27.211386 eV',
             '# view: http://x/#mode=molecule&id=o3',
         ]);
-        expect(lines[5]).toBe('index,label,role,occupation,energy_Ha,energy_eV');
-        expect(lines[6]).toBe('0,1a1,,2,-19.13,-520.55381');
-        expect(lines[10]).toBe('4,1b1,HOMO,2,-0.31,-8.4355297');
-        expect(lines[11]).toBe('5,4a1,LUMO,0,0.01,0.27211386');
+        expect(lines[5]).toBe('index,label,role,occupation,energy_Ha,energy_eV,class,valence_character,kind');
+        expect(lines[6]).toBe('0,1a1,,2,-19.13,-520.55381,,,');
+        expect(lines[10]).toBe('4,1b1,HOMO,2,-0.31,-8.4355297,,,');
+        expect(lines[11]).toBe('5,4a1,LUMO,0,0.01,0.27211386,,,');
         expect(lines).toHaveLength(13);
         expect(lines[12]).toBe('');
     });
@@ -286,6 +315,24 @@ describe('CSV: the orbital table', () => {
         const meta = water({ orbitals: [{ index: 0, label: '2a"', energyHartree: -0.3, occupation: 2, role: 'HOMO' }] });
         const text = await readText((await runExport('csv', baseContext(drawnStore({ kind: 'density' }, meta).getState()))).blob);
         expect(text).toContain('\n0,"2a""",HOMO,2,-0.3,');
+    });
+
+    // Phase 6D: what a class/kind means travels with the numbers (spec §4). Ruling D4: DIFFUSE_NOTE's current
+    // wording, read off the constant rather than pinned verbatim, since Task 11 changed it once already.
+    // Ruling D4-energy: the LVMO comment's "kind valence-virtual" clause is CONSTRUCTED_NOTE (the full caption,
+    // upper-estimate wording and all), not the brief's original VALENCE_VIRTUAL_NOTE.
+    it('carries each virtual\'s class, valence share and kind, and says what they mean (Phase 6D)', async () => {
+        const meta = water({ orbitals: [
+            { index: 4, label: '1b1', energyHartree: -0.31, occupation: 2, role: 'HOMO' },
+            { index: 5, label: '4a1', energyHartree: -0.01, occupation: 0, role: 'LUMO', valenceCharacter: 0.55, class: 'diffuse' },
+            { index: 6, label: 'a1', energyHartree: 0.19, occupation: 0, role: 'LVMO', valenceCharacter: 1, class: 'valence', kind: 'valence-virtual' },
+        ] });
+        const text = await readText((await runExport('csv', baseContext(drawnStore({ kind: 'density' }, meta).getState()))).blob);
+        const lines = text.replace(/^﻿/, '').split('\n');
+        expect(lines).toContain(`# class: a virtual's share inside the intrinsic minimal basis (valence_character); diffuse under 75 %: ${DIFFUSE_NOTE}`);
+        expect(lines.some(l => l.startsWith('# LVMO: the lowest valence virtual orbital, the antibonding orbital textbooks draw; kind valence-virtual: '))).toBe(true);
+        expect(lines).toContain('5,4a1,LUMO,0,-0.01,-0.27211386,diffuse,0.55,');
+        expect(lines).toContain('6,a1,LVMO,0,0.19,5.1701633,valence,1,valence-virtual');
     });
 
     it('is labelled "Orbital table (CSV)" in Molecules mode; STL/glTF say the structure is left out', () => {
@@ -339,6 +386,19 @@ describe('cube', () => {
         expect(job.resolution).toBe(95);
         expect(job.atoms).toHaveLength(3);
         expect(job.title).toContain('MO 1b1 (HOMO)');
+    });
+
+    // D11: the cube description named only the role, never the tag -- a constructed LVMO's exported grid read
+    // "a1 (LVMO) molecular orbital", as if it were an orbital of the calculation.
+    it('D11: the description carries the constructed tag, not just the role', async () => {
+        const meta = water({ orbitals: [
+            { index: 4, label: '1b1', energyHartree: -0.31, occupation: 2, role: 'HOMO' },
+            { index: 6, label: 'a1', energyHartree: 0.19, occupation: 0, role: 'LVMO', valenceCharacter: 1, class: 'valence', kind: 'valence-virtual' },
+        ] });
+        const job = await moleculeCubeJob(drawnStore({ kind: 'mo', index: 6 }, meta).getState());
+        if (job.type !== 'fieldCube') throw new Error('expected a field cube');
+        expect(job.description).toContain('a1 (LVMO; constructed from the valence part of the virtual space '
+            + '— not an orbital of this calculation) molecular orbital');
     });
 
     it('goes through runExport to the worker, named after the drawn surface; ozone\'s caveat in the header', async () => {

@@ -32,7 +32,9 @@ import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { getDensityGrid, getEspGrid } from '../molecules/grid_cache';
 import { loadBasis } from '../molecules/loader';
 import { MOLECULE_MO_RESOLUTION, moleculeOrbitalSource } from '../molecules/render_plan';
-import { HARTREE_TO_EV as ORBITAL_HARTREE_TO_EV } from '../molecules/orbital_display';
+import {
+    CONSTRUCTED_NOTE, DIFFUSE_NOTE, HARTREE_TO_EV as ORBITAL_HARTREE_TO_EV, LVMO_NOTE, VALENCE_THRESHOLD,
+} from '../molecules/orbital_display';
 import { ESP_LIMIT_HARTREE, ESP_SIGN_NOTE, ESP_SURFACE_DENSITY, ESP_TICKS, espColourBar, espRangeNote, espSurfaceNote } from '../molecules/esp_color';
 
 export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb' | 'cube';
@@ -704,9 +706,12 @@ export async function moleculeCubeJob(state: RootState): Promise<CubeJob> {
         };
     }
     const basis = await loadBasis(meta.id);
+    // D11: a constructed LVMO's cube description named only the role, as if it were an orbital of the
+    // calculation -- the tag (diffuse or constructed, orbitalTag's own wording) travels here too.
+    const notes = [surface.role, surface.tag].filter(Boolean).join('; ');
     return {
         type: 'fieldCube', source: moleculeOrbitalSource(meta, surface.mo), resolution: MOLECULE_MO_RESOLUTION, atoms, bases: [basis], title,
-        description: `psi(x,y,z), real, bohr^-3/2, ${surface.label}${surface.role ? ` (${surface.role})` : ''} molecular orbital, `
+        description: `psi(x,y,z), real, bohr^-3/2, ${surface.label}${notes ? ` (${notes})` : ''} molecular orbital, `
             + `on the grid as drawn; ${method}; lengths in bohr`,
     };
 }
@@ -719,15 +724,26 @@ export async function moleculeCubeJob(state: RootState): Promise<CubeJob> {
  */
 function moleculeCsv(state: RootState, shareUrl: string): string {
     const meta = loadedMeta(state);
+    const classified = meta.orbitals.some(o => o.class !== undefined);
+    const lvmo = meta.orbitals.some(o => o.role === 'LVMO');
+    const valenceVirtual = meta.orbitals.some(o => o.kind === 'valence-virtual');
     const comments = [
         `${moleculeTitle(meta)}: molecular orbitals`,
         `method: ${methodStatement(state)}`,
         ...(moleculeCaveatCaption(state) ? [moleculeCaveatCaption(state)!] : []),
         `energies in hartree (Ha) and electronvolts (eV), 1 Ha = ${ORBITAL_HARTREE_TO_EV} eV`,
+        // Phase 6D (spec §4): what a class means travels with the numbers.
+        ...(classified ? [`class: a virtual's share inside the intrinsic minimal basis (valence_character); `
+            + `diffuse under ${Math.round(VALENCE_THRESHOLD * 100)} %: ${DIFFUSE_NOTE}`] : []),
+        // Ruling D4-energy: a constructed LVMO's "kind valence-virtual" clause is the full CONSTRUCTED_NOTE
+        // caption (not the brief's original VALENCE_VIRTUAL_NOTE) -- the upper-estimate wording must carry
+        // wherever the orbital is named, including here.
+        ...(lvmo ? [`LVMO: the lowest valence virtual orbital, ${LVMO_NOTE}`
+            + (valenceVirtual ? `; kind valence-virtual: ${CONSTRUCTED_NOTE}` : '')] : []),
         `view: ${shareUrl}`,
     ];
     const lines = comments.map(line => `# ${line}`);
-    lines.push('index,label,role,occupation,energy_Ha,energy_eV');
+    lines.push('index,label,role,occupation,energy_Ha,energy_eV,class,valence_character,kind');
     for (const orbital of [...meta.orbitals].sort((a, b) => a.index - b.index)) {
         const at = orbital.index;
         lines.push([
@@ -735,6 +751,9 @@ function moleculeCsv(state: RootState, shareUrl: string): string {
             formatNumber(orbital.occupation, 'occupation', at),
             formatNumber(orbital.energyHartree, 'energy_Ha', at),
             formatNumber(orbital.energyHartree * ORBITAL_HARTREE_TO_EV, 'energy_eV', at),
+            orbital.class ?? '',
+            orbital.valenceCharacter === undefined ? '' : formatNumber(orbital.valenceCharacter, 'valence_character', at),
+            orbital.kind ?? '',
         ].join(','));
     }
     return `${lines.join('\n')}\n`;

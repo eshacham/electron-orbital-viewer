@@ -18,7 +18,7 @@ import { SPIN_SUFFIX } from '../bonds/bonds_request';
 import { tierOf, BasisOrbital, MoleculeBasis, MoleculeScan } from '../molecules/types';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { formatFormula } from '../molecules/catalogue';
-import { formatOrbitalEnergy } from '../molecules/orbital_display';
+import { orbitalEnergyText, orbitalTag } from '../molecules/orbital_display';
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY } from '../molecules/esp_color';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
@@ -127,7 +127,12 @@ function moleculeMethodStatement(state: RootState): string {
     return `${moleculeMethodText(meta)} (PySCF); geometry: ${meta.geometrySource}${tier}`;
 }
 
-export type MoleculeDrawnSurface = 'density' | 'esp' | { mo: number; label: string; role?: string; energyHartree: number };
+export type MoleculeDrawnSurface = 'density' | 'esp' | {
+    mo: number; label: string; role?: string; tag?: string; energyHartree: number;
+    /** Phase 6D: carried through from the orbital so orbitalEnergyText can read "upper estimate" off a
+     * constructed row wherever a picture's energy is named (title, PNG caption, share link text). */
+    kind?: 'valence-virtual'; constructed?: boolean; energyApproximate?: boolean;
+};
 
 export interface MoleculeDrawnPicture {
     id: string;
@@ -162,7 +167,15 @@ export function moleculeDrawnPicture(state: RootState): MoleculeDrawnPicture | n
         const index = drawn.surface.index;
         const orbital = meta.orbitals.find(o => o.index === index);
         if (!orbital) return null;
-        surface = { mo: index, label: orbital.label, ...(orbital.role ? { role: orbital.role } : {}), energyHartree: orbital.energyHartree };
+        // Phase 6D: a diffuse virtual or the LVMO says so wherever the picture travels (spec §4); the
+        // constructed/kind/energyApproximate flags travel too, so orbitalEnergyText reads "upper estimate" here.
+        const tag = orbitalTag(orbital);
+        surface = {
+            mo: index, label: orbital.label, ...(orbital.role ? { role: orbital.role } : {}), ...(tag ? { tag } : {}),
+            ...(orbital.kind ? { kind: orbital.kind } : {}), ...(orbital.constructed ? { constructed: orbital.constructed } : {}),
+            ...(orbital.energyApproximate ? { energyApproximate: orbital.energyApproximate } : {}),
+            energyHartree: orbital.energyHartree,
+        };
     } else {
         surface = drawn.surface.kind;
     }
@@ -198,8 +211,9 @@ function moleculeViewDescription(state: RootState): string {
         const rho = drawn.isoLevel !== undefined ? ` (ρ = ${drawn.isoLevel.toExponential(2)} e/a₀³)` : '';
         return `${moleculeTitle(meta)}, density, ${enclosedText(fraction)}${rho}`;
     }
-    const role = surface.role ? ` (${surface.role})` : '';
-    return `${moleculeTitle(meta)}, MO ${surface.label}${role}, ${formatOrbitalEnergy(surface.energyHartree)}, ${enclosedText(fraction)}`;
+    const notes = [surface.role, surface.tag].filter(Boolean).join('; ');
+    const role = notes ? ` (${notes})` : '';
+    return `${moleculeTitle(meta)}, MO ${surface.label}${role}, ${orbitalEnergyText(surface)}, ${enclosedText(fraction)}`;
 }
 
 /**
@@ -214,10 +228,13 @@ export function moleculeCaveatCaption(state: RootState): string | null {
 /**
  * ASCII Mulliken labels: a prime is 'p' and a double prime 'pp' ("10a'" ->
  * '10ap', '2a"' -> '2app') -- spelled out rather than dropped, since 10a'
- * and 10a" are different orbitals.
+ * and 10a" are different orbitals. Ruling D1's combined label for a
+ * near-degenerate core (e.g. "1a1'+1e'") spells the '+' out too ("1a1p-plus-1ep")
+ * rather than dropping it, which would otherwise silently merge two distinct
+ * labels into one filename; the caption itself keeps the label exact.
  */
 function asciiMullikenLabel(label: string): string {
-    return label.replace(/"/g, 'pp').replace(/'/g, 'p').replace(/[^A-Za-z0-9-]/g, '');
+    return label.replace(/"/g, 'pp').replace(/'/g, 'p').replace(/\+/g, '-plus-').replace(/[^A-Za-z0-9-]/g, '');
 }
 
 /** 'H2O' as shipped; a formula with brackets ('(CH3)2CO') reads worse stripped than the id does ('acetone'). */

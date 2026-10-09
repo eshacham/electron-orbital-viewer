@@ -48,7 +48,9 @@ export const VALENCE_VIRTUAL_NOTE = 'constructed from the valence part of the vi
  * (tests/molecules/valence_threshold.test.ts compares them). */
 export const CONSTRUCTED_NOTE = `${VALENCE_VIRTUAL_NOTE}; its energy is an upper estimate (its value within the valence space), `
     + "typically several eV above this calculation's orbital energies";
-export const UNCLASSIFIED_NOTE = 'Virtual orbitals are not classified in this data (computed before Phase 6D): the LUMO may be a diffuse, basis-dependent state rather than an antibonding orbital.';
+/** Ruling no-jargon: user-facing text never names an internal phase. */
+export const UNCLASSIFIED_NOTE = 'Virtual orbitals are not classified in this data (computed before the app classified empty (virtual) '
+    + 'orbitals as valence or diffuse): the LUMO may be a diffuse, basis-dependent state rather than an antibonding orbital.';
 export const DIFFUSE_MARK = '◌';
 export const CONSTRUCTED_MARK = '◇';
 /** The constructed mark's accessible name. */

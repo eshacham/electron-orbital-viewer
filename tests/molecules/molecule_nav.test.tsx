@@ -30,6 +30,13 @@ describe('orbital display', () => {
         expect(formatPointGroup('Coov')).toBe('C∞v');
         expect(formatPointGroup('C2v')).toBe('C2v');
     });
+    // Ruling no-jargon: user-facing text never names an internal phase.
+    it('never names an internal phase in the unclassified note', () => {
+        expect(UNCLASSIFIED_NOTE).toBe('Virtual orbitals are not classified in this data (computed before the app '
+            + 'classified empty (virtual) orbitals as valence or diffuse): the LUMO may be a diffuse, basis-dependent '
+            + 'state rather than an antibonding orbital.');
+        expect(UNCLASSIFIED_NOTE).not.toMatch(/Phase/);
+    });
 });
 
 describe('MoleculeOrbitalList', () => {
