@@ -60,7 +60,7 @@ describe('previewing', () => {
         press('Preview');
         await flush();
         expect(screen.getByRole('img', { name: /60 atoms/ })).toBeInTheDocument();
-        expect(screen.getByRole('alert')).toHaveTextContent(/result files would exceed the app's file limit.*Phase 6D's smaller-basis option/);
+        expect(screen.getByRole('alert')).toHaveTextContent(/result files would exceed the app's file limit.*larger molecules need a smaller basis, which a later phase is to offer/);
         expect(screen.queryByRole('radiogroup', { name: 'price options' })).toBeNull();
         expect(screen.queryByRole('button', { name: /^Approve/ })).toBeNull();
     });
@@ -131,7 +131,7 @@ describe('previewing', () => {
         await flush();
         expect(screen.getByLabelText('sizing decision')).toHaveTextContent('WorkerS · 2 vCPU · 8 GB');
         const group = screen.getByRole('radiogroup', { name: 'price options' });
-        expect(within(group).getByRole('radio', { name: /^Spot: estimated \$0\.002467, up to \$0\.02$/ })).toBeChecked();
+        expect(within(group).getByRole('radio', { name: /^Spot: estimated \$0\.002475, up to \$0\.02$/ })).toBeChecked();
         expect(screen.getByTestId('quote-option-spot')).toHaveTextContent('time limit 10 min 00 s, up to 3 attempts');
         expect(screen.getByTestId('quote-option-on-demand')).toHaveTextContent('up to $0.02');
         expect(screen.getByRole('button', { name: 'Approve up to $0.02 and run' })).toBeEnabled();
@@ -142,7 +142,7 @@ describe('previewing', () => {
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        expect(screen.getByText(/^On AWS this would cost/)).toHaveTextContent('Spot estimated $0.002467, up to $0.02');
+        expect(screen.getByText(/^On AWS this would cost/)).toHaveTextContent('Spot estimated $0.002475, up to $0.02');
     });
     it('says generation is paused, and offers no Submit that works', async () => {
         setup({ preview: jest.fn(async () => ({ ...previewFixture('preview_ok'), generationEnabled: false })) });

@@ -53,13 +53,6 @@ OPTIONAL_RESULT_FILES = ('frequencies.json',)
 TIME_BUDGET_MARGIN = 1.2
 # Between the Batch attempt's start (its timeout's clock) and the worker's own: container start-up and imports.
 STARTUP_ALLOWANCE_SECONDS = 30
-# Ruling D7: labelling the orbitals (point_group's character projection) runs inside write_molecule_files,
-# after the budget's last decision, so the budget must leave room for it. Sizing prices it as its own term
-# from version 6 (Task 9: parts['labellingSeconds']); a record without that figure gets this share of the
-# final SCF instead. Conservative on purpose: benzene at def2-TZVPD measured 47.7 s of labels against a
-# 130.8 s SCF (36 %) before Task 3 evaluated the AOs once for every orbital, 3.3 s (2.5 %) after; a quarter
-# is ten times the measured cost, and well under the D6h worst case before that change.
-LABELLING_SHARE_OF_FINAL_SCF = 0.25
 BOX_TOO_SMALL = ('the electron density reaches the edge of the sampling box (a diffuse anion); '
                  'this phase cannot draw it')
 INTERRUPTED = 'the worker was interrupted (KeyboardInterrupt) before this job finished'
@@ -180,11 +173,11 @@ class TimeBudget:
         self.began = clock()
 
     def remaining(self, stage):
+        # Ruling D7: labelling the orbitals (point_group's character projection) runs inside
+        # write_molecule_files, after the budget's last decision, so the budget leaves room for it: sizing
+        # version 6 prices it as its own figure (sizing.labelling_seconds).
         p = self.parts
-        labelling = p.get('labellingSeconds')
-        if labelling is None:
-            labelling = LABELLING_SHARE_OF_FINAL_SCF * p['finalScfSeconds']
-        tail = p['frequencySeconds'] + p['finalScfSeconds'] + labelling + p['filesSeconds']
+        tail = p['frequencySeconds'] + p['finalScfSeconds'] + p['labellingSeconds'] + p['filesSeconds']
         return tail + p['stepSeconds'] if stage == 'step' else tail
 
     def __call__(self, stage):
@@ -433,7 +426,8 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
         # Task 7: the check, its analysis, the final geometry's symmetrisation and an open shell's spin record
         # are not optimisation fields; each has its own place below.
         optimisation = {k: v for k, v in info.items()
-                        if k not in ('frequencyCheck', 'frequencies', 'checkHistory', 'finalGeometry', 'openShell')}
+                        if k not in ('frequencyCheck', 'frequencies', 'checkHistory', 'finalGeometry', 'openShell',
+                                     'finalScf')}
         provenance = {'jobKey': key, 'computeVersion': job['computeVersion'], 'recipe': recipe,
                       'geometrySource': source, 'caveats': caveats_for(recipe, job['computeVersion']),
                       'generatorCommit': commit, 'imageDigest': image_digest, 'pyscfVersion': pyscf.__version__,
@@ -453,6 +447,8 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
             provenance['finalGeometry'] = _final_geometry(info['finalGeometry'])
         if info.get('frequencies'):
             provenance['frequencyMasses'] = FREQUENCY_MASSES          # Task 7 review M5
+        if info.get('finalScf'):
+            provenance['finalScf'] = info['finalScf']                 # Ruling OH-retry: rerun without symmetry
         fields = {
             'id': key, 'name': record['name'], 'formula': record['formula'],
             'geometrySource': _geometry_source_text(source, recipe, method, info), 'references': [],

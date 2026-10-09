@@ -540,7 +540,8 @@ def test_an_interrupted_worker_marks_its_attempt_failed(env, monkeypatch):
 # --- Phase 6D: compute version 2 -------------------------------------------------
 
 DECISION_V6 = {**DECISION, 'version': 6,
-               'parts': {'stepSeconds': 1.0, 'frequencySeconds': 1.0, 'finalScfSeconds': 1.0, 'filesSeconds': 1.0}}
+               'parts': {'stepSeconds': 1.0, 'frequencySeconds': 1.0, 'finalScfSeconds': 1.0, 'labellingSeconds': 1.0,
+                         'filesSeconds': 1.0}}
 STRETCHED_H2 = [[1, 0, 0, 0], [1, 0, 0, 0.80]]
 
 
@@ -632,14 +633,17 @@ def test_the_budget_counts_the_step_the_check_the_final_scf_the_labels_and_the_f
     assert not budget('frequency check')
 
 
-def test_without_a_sized_labelling_term_the_budget_allows_a_conservative_share_of_the_final_scf():
-    # Ruling D7: labelling runs inside the files stage, after the budget's last decision. Until sizing
-    # prices it (Task 9's labellingSeconds), a stated share of the final SCF stands in for it.
-    parts = {'stepSeconds': 10.0, 'frequencySeconds': 20.0, 'finalScfSeconds': 30.0, 'filesSeconds': 40.0}
+def test_the_budget_reads_the_labelling_term_sizing_prices():
+    # Ruling D7: labelling runs inside the files stage, after the budget's last decision; sizing version 6
+    # prices it as its own figure (sizing.labelling_seconds), which replaced Task 8's stand-in share of the
+    # final SCF.
+    from jobs import sizing
+    parts = sizing.decide(canonical_job('optimise', STRETCHED_H2, 0, 1))['parts']
     budget = worker.TimeBudget(1000.0, parts)
-    labelling = worker.LABELLING_SHARE_OF_FINAL_SCF * 30.0
-    assert labelling > 0 and budget.remaining('frequency check') == 20.0 + 30.0 + 40.0 + labelling
-    assert budget.remaining('step') == budget.remaining('frequency check') + 10.0
+    assert parts['labellingSeconds'] > 0
+    assert budget.remaining('frequency check') == pytest.approx(
+        parts['frequencySeconds'] + parts['finalScfSeconds'] + parts['labellingSeconds'] + parts['filesSeconds'])
+    assert budget.remaining('step') == pytest.approx(budget.remaining('frequency check') + parts['stepSeconds'])
 
 
 def test_the_time_limit_is_the_batch_timeout_on_aws_and_none_on_this_mac():
@@ -764,3 +768,23 @@ def test_a_final_scf_without_symmetry_keeps_its_orbital_labels(env, monkeypatch)
     assert "labelled from the geometry's own point group" in meta['symmetry']['labelNote']
     final = meta['provenance']['finalGeometry']
     assert final['symmetry'] == 'off' and final['summary'] == final['note']
+
+
+OH = [[8, 0.0, 0.0, 0.0], [1, 0.0, 0.0, 0.97]]
+
+
+def test_a_final_scf_retried_without_symmetry_finishes_done_and_says_so(env):
+    # Ruling OH-retry: OH's ROKS SCF does not converge with symmetry on (at 6-31G as at def2-TZVPD); the
+    # retry without it converges, the orbitals are labelled from the geometry's own point group (C∞v), and the
+    # provenance says what happened.
+    store, sink, jobs = env
+    key = queue(store, OH, mult=2, method={'xc': 'B3LYP', 'basis': '6-31g', 'optimiseBasis': None})
+    assert run_job(key, store, sink, grid_points=(32,)) == 'DONE', store.get_job(key)['error']
+    meta = json.loads((jobs / key / 'meta.json').read_text())
+    retry = meta['provenance']['finalScf']
+    assert retry['symmetry'] == 'off' and retry['retried'] is True
+    assert retry['summary'].startswith('the final SCF did not converge with point-group symmetry')
+    assert 'geometryOptimisation' not in meta
+    # 96da650: point_group labels a linear molecule's orbitals without symmetry too (σ/π by character).
+    assert meta['symmetry']['pointGroup'] == 'Coov' and meta['symmetry']['labels'] == 'full-group'
+    assert [o['label'] for o in meta['orbitals'][:5]] == ['1σ', '2σ', '3σ', '1π', '1π']

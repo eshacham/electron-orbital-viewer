@@ -17,12 +17,12 @@ const OPTION_FIELDS = ['option', 'capacity', 'available', 'unavailableReason', '
 // return -- real for both decision.sizing and the record's own `sizing`
 // (6B-1 ships it, it is not optional).
 const SIZING_FIELDS = ['version', 'estimateFor', 'size', 'vcpu', 'memoryGB', 'capacity', 'attempts', 'basisFunctions',
-    'predictedSeconds', 'predictedMemoryGB', 'timeoutSeconds', 'predictedCostMicros'];
+    'predictedSeconds', 'predictedMemoryGB', 'timeoutSeconds', 'predictedCostMicros', 'parts'];
 const METER_FIELDS = ['month', 'capUsd', 'spentUsd', 'reservedUsd', 'remainingUsd'];
 
 describe('the API responses, as its handlers write them (6B-1, with 6C quotes)', () => {
     it('records all twenty-one', () => {
-        expect(readdirSync(DIR).filter(f => f.endsWith('.json'))).toHaveLength(21);
+        expect(readdirSync(DIR).filter(f => f.endsWith('.json'))).toHaveLength(22);
     });
 
     it('a preview carries what was resolved, the quote, the meter and any existing job', () => {

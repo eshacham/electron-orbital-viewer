@@ -53,7 +53,7 @@
      "retrievedAt": "2026-10-10"
     },
     "sizing": {
-     "version": 5,
+     "version": 6,
      "estimateFor": "fargate",
      "size": "S",
      "vcpu": 2,
@@ -61,10 +61,17 @@
      "capacity": "local",
      "attempts": 1,
      "basisFunctions": 58,
-     "predictedSeconds": 15.5,
+     "predictedSeconds": 16.3,
      "predictedMemoryGB": 0.47,
      "timeoutSeconds": 600,
-     "predictedCostMicros": 0
+     "predictedCostMicros": 0,
+     "parts": {
+      "stepSeconds": 0.0,
+      "frequencySeconds": 0.0,
+      "finalScfSeconds": 3.7,
+      "labellingSeconds": 0.8,
+      "filesSeconds": 11.8
+     }
     },
     "month": "2026-10",
     "submittedAt": "2026-10-10T12:00:00Z",
@@ -92,10 +99,10 @@
     "resultUrl": "/molecules/jobs/4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216/",
     "approvedQuote": {
      "option": "local",
-     "quoteId": "7ae8bfb5aff5ab29337bfc71f894a46da0d004fcaf90466debb9a751c25694d7",
+     "quoteId": "f896cd4acdb1eaa353f27f53399a6f8d7572a26c180de5a544354a2ac9088b18",
      "attempts": 1,
      "timeoutSeconds": 600,
-     "sizingVersion": 5,
+     "sizingVersion": 6,
      "pricesVersion": 2,
      "approvedAt": "2026-10-10T12:00:00Z",
      "issuedAt": "2026-10-10T12:00Z",
@@ -162,7 +169,7 @@
     },
     "ledger": [
      {
-      "quoteId": "7ae8bfb5aff5ab29337bfc71f894a46da0d004fcaf90466debb9a751c25694d7",
+      "quoteId": "f896cd4acdb1eaa353f27f53399a6f8d7572a26c180de5a544354a2ac9088b18",
       "option": "local",
       "approvedMaximumUsd": 0.0,
       "costUsd": 0.0,
@@ -245,7 +252,7 @@
      "kind": "xyz"
     },
     "sizing": {
-     "version": 5,
+     "version": 6,
      "estimateFor": "fargate",
      "size": "S",
      "vcpu": 2,
@@ -253,10 +260,17 @@
      "capacity": "local",
      "attempts": 1,
      "basisFunctions": 58,
-     "predictedSeconds": 55.8,
+     "predictedSeconds": 86.9,
      "predictedMemoryGB": 0.47,
      "timeoutSeconds": 600,
-     "predictedCostMicros": 0
+     "predictedCostMicros": 0,
+     "parts": {
+      "stepSeconds": 6.7,
+      "frequencySeconds": 30.3,
+      "finalScfSeconds": 3.7,
+      "labellingSeconds": 0.8,
+      "filesSeconds": 11.8
+     }
     },
     "month": "2026-10",
     "submittedAt": "2026-10-10T12:00:00Z",
@@ -278,10 +292,10 @@
     "resultUrl": "/molecules/jobs/6cb4e4a0f6ee78aeb1bc87d759e4a676b56353e045c4e9b50188ba2b7be3bb66/",
     "approvedQuote": {
      "option": "local",
-     "quoteId": "03a7586497aa9b902e57f002e3114ad9715aa6f4762161a91eddcef63206489e",
+     "quoteId": "24777aebbfe316644350d18bf939356d85679003af8a290f9ec0c50ad5569e8b",
      "attempts": 1,
      "timeoutSeconds": 600,
-     "sizingVersion": 5,
+     "sizingVersion": 6,
      "pricesVersion": 2,
      "approvedAt": "2026-10-10T12:00:00Z",
      "issuedAt": "2026-10-10T12:00Z",
@@ -348,7 +362,7 @@
     },
     "ledger": [
      {
-      "quoteId": "03a7586497aa9b902e57f002e3114ad9715aa6f4762161a91eddcef63206489e",
+      "quoteId": "24777aebbfe316644350d18bf939356d85679003af8a290f9ec0c50ad5569e8b",
       "option": "local",
       "approvedMaximumUsd": 0.0,
       "costUsd": 0.0,

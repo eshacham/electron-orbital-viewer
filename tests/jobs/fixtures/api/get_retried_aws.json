@@ -52,7 +52,7 @@
    "kind": "xyz"
   },
   "sizing": {
-   "version": 5,
+   "version": 6,
    "estimateFor": "fargate",
    "size": "S",
    "vcpu": 2,
@@ -60,10 +60,17 @@
    "capacity": "on-demand",
    "attempts": 1,
    "basisFunctions": 64,
-   "predictedSeconds": 18.5,
+   "predictedSeconds": 19.6,
    "predictedMemoryGB": 0.48,
    "timeoutSeconds": 600,
-   "predictedCostMicros": 479
+   "predictedCostMicros": 508,
+   "parts": {
+    "stepSeconds": 0.0,
+    "frequencySeconds": 0.0,
+    "finalScfSeconds": 4.2,
+    "labellingSeconds": 1.1,
+    "filesSeconds": 14.3
+   }
   },
   "month": "2026-10",
   "submittedAt": "2026-10-10T12:00:00Z",
@@ -88,20 +95,20 @@
   "resultUrl": "/molecules/jobs/662edc314fb6b0d3b3ce045b7da96c0e4875ce207539a8ee6e4bd9433245d6e9/",
   "approvedQuote": {
    "option": "on-demand",
-   "quoteId": "dc153376bb619454bea60bbc855b336ef41bb851e198277034c4296775fad983",
+   "quoteId": "acbd95094ed5b4c2f42d55a1587a2e8a87ab30b1cb52842ec3b738f22d14c399",
    "attempts": 1,
    "timeoutSeconds": 600,
-   "sizingVersion": 5,
+   "sizingVersion": 6,
    "pricesVersion": 2,
    "approvedAt": "2026-10-10T12:00:00Z",
    "issuedAt": "2026-10-10T12:00Z",
-   "estimateUsd": 0.003885,
+   "estimateUsd": 0.00391,
    "maximumUsd": 0.022069,
    "lines": [
     {
      "item": "compute",
      "label": "Compute (AWS Fargate)",
-     "estimateUsd": 0.002047,
+     "estimateUsd": 0.002072,
      "maximumUsd": 0.018648
     },
     {
@@ -158,7 +165,7 @@
   },
   "ledger": [
    {
-    "quoteId": "4cc8917c2b41caa7141f42b768508a2af45c6cedfe3d1d9ffa02eb05917987c5",
+    "quoteId": "dd6f23dd6de1ecc80292a29e94c3e8dfdbaa2474512f7a0961d2bc0fd487662b",
     "option": "spot",
     "approvedMaximumUsd": 0.021301,
     "costUsd": 0.001508,
@@ -194,7 +201,7 @@
     "at": "2026-10-10T12:30:00Z"
    },
    {
-    "quoteId": "dc153376bb619454bea60bbc855b336ef41bb851e198277034c4296775fad983",
+    "quoteId": "acbd95094ed5b4c2f42d55a1587a2e8a87ab30b1cb52842ec3b738f22d14c399",
     "option": "on-demand",
     "approvedMaximumUsd": 0.022069,
     "costUsd": 0.003326,

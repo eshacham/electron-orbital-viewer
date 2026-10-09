@@ -752,7 +752,7 @@
    "ok": false,
    "error": {
     "code": "output-too-large",
-    "message": "this molecule's result files would exceed the app's file limit (about 11.2 MB predicted against 3 MB), so it would run and then fail; larger molecules arrive with Phase 6D's smaller-basis option"
+    "message": "this molecule's result files would exceed the app's file limit (about 11.2 MB predicted against 3 MB), so it would run and then fail; larger molecules need a smaller basis, which a later phase is to offer"
    }
   },
   "existing": null,

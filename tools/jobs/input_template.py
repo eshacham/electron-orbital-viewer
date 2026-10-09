@@ -58,6 +58,10 @@ DECIMALS = {'wavenumbers': 2, 'reducedMasses': 4, 'normalModes': 6}
 # geomeTRIC's default ('GAU') convergence set, passed to it explicitly so the script states what it ran.
 CONVERGENCE = {'energy': 1e-6, 'grms': 3e-4, 'gmax': 4.5e-4, 'drms': 1.2e-3, 'dmax': 1.8e-3}   # Ha, Ha/bohr, Å
 LOG = 'output.log'
+# Ruling OH-retry: what the record says when the final SCF converged only on its retry without symmetry.
+SYMMETRY_RETRY = ('the final SCF did not converge with point-group symmetry (DIIS, level shift, second order), so '
+                  "it was run again without it, and converged; its orbitals are labelled from the geometry's own "
+                  "point group where the labeller supports that group (meta.json's symmetry says how)")
 _log = None
 _displacement = None   # set once this run, or the attempt it resumes, has displaced off a saddle point
 
@@ -144,11 +148,11 @@ def geometry_dft(mol):
     return _settings(dft.UKS(mol))
 
 
-def converge(mol, on_stage):
+def converge(mol, on_stage, title='SCF'):
     rungs = (('DIIS', {}), ('level shift 0.3 Ha', {'level_shift': 0.3}), ('second-order', None))
     dm = None
     for (label, options), cycles in zip(rungs, MAX_CYCLES):
-        stage = f'SCF ({label})'
+        stage = f'{title} ({label})'
         on_stage(stage, None)
         mf = make_dft(mol)
         if options is None:
@@ -547,7 +551,22 @@ def build(on_stage=_quiet, on_step=lambda step, energy, atoms: None, start=None,
                           "supports that group (meta.json's symmetry says how)")}
     if final:
         info['finalGeometry'] = final
-    mf = converge(mol, on_stage)
+    try:
+        mf = converge(mol, on_stage)
+    except SCFNotConverged:
+        if not mol.symmetry:
+            raise
+        # Ruling OH-retry (Phase 6D): a symmetry-adapted SCF can fail where a plain one does not -- OH's ROKS,
+        # its two pi orbitals held to C2v irreps, fails on every rung at def2-TZVPD and converges at once without
+        # them. A paid job is not failed for that: the final SCF is retried once with symmetry off (the orbitals
+        # are labelled from the geometry's own point group, point_group's geometry detection), and says so.
+        mol = molecule(atoms, BASIS, symmetry=False)
+        try:
+            mf = converge(mol, on_stage, 'SCF without symmetry')
+        except SCFNotConverged:
+            raise SCFNotConverged('SCF did not converge with point-group symmetry or without it (DIIS, level shift '
+                                  '0.3 Ha, second-order)') from None
+        info['finalScf'] = {'symmetry': 'off', 'retried': True, 'summary': SYMMETRY_RETRY}
     return mol, mf, info
 
 

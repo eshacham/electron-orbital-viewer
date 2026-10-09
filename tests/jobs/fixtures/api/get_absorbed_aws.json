@@ -46,7 +46,7 @@
    "kind": "xyz"
   },
   "sizing": {
-   "version": 5,
+   "version": 6,
    "estimateFor": "fargate",
    "size": "S",
    "vcpu": 2,
@@ -54,10 +54,17 @@
    "capacity": "on-demand",
    "attempts": 1,
    "basisFunctions": 58,
-   "predictedSeconds": 55.8,
+   "predictedSeconds": 86.9,
    "predictedMemoryGB": 0.47,
    "timeoutSeconds": 600,
-   "predictedCostMicros": 1447
+   "predictedCostMicros": 2251,
+   "parts": {
+    "stepSeconds": 6.7,
+    "frequencySeconds": 30.3,
+    "finalScfSeconds": 3.7,
+    "labellingSeconds": 0.8,
+    "filesSeconds": 11.8
+   }
   },
   "month": "2026-10",
   "submittedAt": "2026-10-10T12:00:00Z",
@@ -77,38 +84,38 @@
   },
   "error": null,
   "backend": "aws",
-  "reservedUsd": 0.022067,
+  "reservedUsd": 0.022076,
   "actualUsd": 0.022921,
   "resultUrl": "/molecules/jobs/6cb4e4a0f6ee78aeb1bc87d759e4a676b56353e045c4e9b50188ba2b7be3bb66/",
   "approvedQuote": {
    "option": "on-demand",
-   "quoteId": "797fa63e8e67368902c3576bf06902dd2d7d6d04e94c47bd7e5e317cd9c20e18",
+   "quoteId": "cd2870a7174d446db2f236afaba3ffdee01adb266ed983ab2a03504f47d736ca",
    "attempts": 1,
    "timeoutSeconds": 600,
-   "sizingVersion": 5,
+   "sizingVersion": 6,
    "pricesVersion": 2,
    "approvedAt": "2026-10-10T12:00:00Z",
    "issuedAt": "2026-10-10T12:00Z",
-   "estimateUsd": 0.004842,
-   "maximumUsd": 0.022067,
+   "estimateUsd": 0.00565,
+   "maximumUsd": 0.022076,
    "lines": [
     {
      "item": "compute",
      "label": "Compute (AWS Fargate)",
-     "estimateUsd": 0.003005,
+     "estimateUsd": 0.003808,
      "maximumUsd": 0.018648
     },
     {
      "item": "storage",
      "label": "Result storage (S3, 12 months)",
-     "estimateUsd": 0.000473,
-     "maximumUsd": 0.000861
+     "estimateUsd": 0.000474,
+     "maximumUsd": 0.000863
     },
     {
      "item": "delivery",
      "label": "Delivery (CloudFront, 10 full downloads)",
-     "estimateUsd": 0.001364,
-     "maximumUsd": 0.002558
+     "estimateUsd": 0.001368,
+     "maximumUsd": 0.002565
     },
     {
      "item": "platform",
@@ -152,9 +159,9 @@
   },
   "ledger": [
    {
-    "quoteId": "797fa63e8e67368902c3576bf06902dd2d7d6d04e94c47bd7e5e317cd9c20e18",
+    "quoteId": "cd2870a7174d446db2f236afaba3ffdee01adb266ed983ab2a03504f47d736ca",
     "option": "on-demand",
-    "approvedMaximumUsd": 0.022067,
+    "approvedMaximumUsd": 0.022076,
     "costUsd": 0.022921,
     "chargedUsd": 0.020421,
     "absorbedUsd": 0.0025,

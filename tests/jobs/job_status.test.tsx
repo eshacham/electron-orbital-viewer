@@ -47,7 +47,7 @@ describe('JobStatusView', () => {
         const panel = screen.getByRole('region', { name: 'job status' });
         expect(panel).toHaveTextContent(/Costcharged \$0\.00\d+ of up to \$0\.02 approved \(Spot\)/);
         const lines = screen.getByText('Price, line by line').closest('details') as HTMLElement;
-        expect(lines).toHaveTextContent('Compute (AWS Fargate): estimated $0.0006300, up to $0.02; charged $0.0004970');
+        expect(lines).toHaveTextContent('Compute (AWS Fargate): estimated $0.0006380, up to $0.02; charged $0.0004970');
         expect(lines).toHaveTextContent('Platform fee: estimated $0.00, up to $0.00; charged $0.00');
     });
     // Review I2: every approval a job had keeps its own charge.

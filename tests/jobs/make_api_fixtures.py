@@ -89,6 +89,8 @@ def record_all(root: Path) -> dict:
     # AWS prices: Spot and on-demand, each with its line items, maximum and quote id.
     aws = Api(FileStore(root / 'aws'), NullRunner(), resolve=resolve, now=lambda: NOW, backend='aws')
     out['preview_aws'] = call(aws, 'POST', '/api/v1/jobs/preview', water)
+    # Recipe B (Phase 6D, sizing version 6): its compute line names the frequency check it pays for.
+    out['preview_aws_optimise'] = call(aws, 'POST', '/api/v1/jobs/preview', optimise)
     # A quote over what is left of the month's cap: shown, but no option can be approved (cap one micro-dollar).
     out['preview_capped'] = call(Api(FileStore(root / 'capped', cap_micros=1), NullRunner(), resolve=resolve,
                                      now=lambda: NOW, backend='aws'), 'POST', '/api/v1/jobs/preview', water)

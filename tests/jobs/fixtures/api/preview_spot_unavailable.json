@@ -336,7 +336,7 @@
       "option": "spot",
       "capacity": "spot",
       "available": false,
-      "unavailableReason": "Spot is offered only for runs predicted at 60 min or less; this one is predicted at 1.0 h, and an interruption late in a long run would waste most of it.",
+      "unavailableReason": "Spot is offered only for runs predicted at 60 min or less; this one is predicted at 62 min, and an interruption late in a long run would waste most of it.",
       "quoteId": null,
       "approvable": false,
       "blockedReason": null
@@ -346,29 +346,29 @@
       "capacity": "on-demand",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "a8860e96c83f8ce2780721d57fbf1f718c7d8d8c2227ceb5eb716bd950cc6aa0",
+      "quoteId": "c454bce654749ad756e7b09906c8bfc98d06042b7f34e1444ea411ebaf940dc6",
       "size": "L",
       "vcpu": 16,
       "memoryGB": 64,
       "attempts": 1,
-      "timeoutSeconds": 11084,
-      "predictedSeconds": 3694.4,
-      "sizingVersion": 5,
+      "timeoutSeconds": 11233,
+      "predictedSeconds": 3744.0,
+      "sizingVersion": 6,
       "pricesVersion": 2,
       "resultBytes": 3467938,
       "resultBytesMax": 6935876,
       "retentionMonths": 12,
       "downloads": 10,
       "issuedAt": "2026-10-10T12:00Z",
-      "estimateUsd": 0.781929,
-      "maximumUsd": 2.328998,
+      "estimateUsd": 0.792082,
+      "maximumUsd": 2.359871,
       "lines": [
        {
         "item": "compute",
         "label": "Compute (AWS Fargate)",
-        "estimateUsd": 0.778036,
-        "maximumUsd": 2.321469,
-        "note": "Estimate: one run of the predicted 3694.4 s plus a minute to start. Maximum: 11084 s time limit + 120 s to start and stop, at on-demand prices for L (16 vCPU, 64 GB)."
+        "estimateUsd": 0.788189,
+        "maximumUsd": 2.352342,
+        "note": "Estimate: one run of the predicted 3744 s plus a minute to start. Maximum: 11233 s time limit + 120 s to start and stop, at on-demand prices for L (16 vCPU, 64 GB)."
        },
        {
         "item": "storage",
@@ -394,7 +394,7 @@
       ],
       "interruption": null,
       "sizing": {
-       "version": 5,
+       "version": 6,
        "estimateFor": "fargate",
        "size": "L",
        "vcpu": 16,
@@ -402,10 +402,17 @@
        "capacity": "on-demand",
        "attempts": 1,
        "basisFunctions": 925,
-       "predictedSeconds": 3694.4,
+       "predictedSeconds": 3744.0,
        "predictedMemoryGB": 4.18,
-       "timeoutSeconds": 11084,
-       "predictedCostMicros": 765479
+       "timeoutSeconds": 11233,
+       "predictedCostMicros": 775763,
+       "parts": {
+        "stepSeconds": 0.0,
+        "frequencySeconds": 0.0,
+        "finalScfSeconds": 2889.6,
+        "labellingSeconds": 49.6,
+        "filesSeconds": 804.8
+       }
       },
       "approvable": true,
       "blockedReason": null

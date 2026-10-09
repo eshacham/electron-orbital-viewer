@@ -323,3 +323,34 @@ def test_a_stopped_optimisation_keeps_its_lowest_energy_frame(tmp_path, monkeypa
     _, _, info = ns['build'](may_start=lambda stage: asked.append(stage) or len(asked) < 3)
     assert asked == ['step'] * 3 and info['steps'] == 3 and info['stoppedBy'] == 'time-limit'
     assert info['maxGradient'] == pytest.approx(0.001) and info['stoppedAt'] == 2
+
+
+OH = [[8, 0.0, 0.0, 0.0], [1, 0.0, 0.0, 0.97]]
+
+
+def test_a_final_scf_that_does_not_converge_with_symmetry_is_retried_once_without(tmp_path, monkeypatch):
+    # Ruling OH-retry: OH (2Π) does not converge in ROKS with symmetry on at def2-TZVPD -- nor at 6-31G, which
+    # shows it in a quarter of the time -- on any rung (DIIS, level shift, second order), and converges at
+    # once without it. A paid job must not fail on that: the final SCF is retried once with symmetry off, and
+    # the record says so.
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'input.py').write_text(render_input(canonical_job('single', OH, 0, 2, method=LADDER), 'k' * 64))
+    stages = []
+    mol, mf, info = runpy.run_path('input.py', run_name='jobs_input')['build'](
+        on_stage=lambda s, e=None, c=None: stages.append(s))
+    assert mf.converged and not mol.symmetry and type(mf).__name__.endswith('ROKS')
+    assert 'SCF (second-order)' in stages and stages[-1].startswith('SCF without symmetry (')
+    assert info['finalScf']['symmetry'] == 'off' and info['finalScf']['retried'] is True
+    assert info['finalScf']['summary'].startswith('the final SCF did not converge with point-group symmetry')
+
+
+def test_a_final_scf_that_converges_neither_way_fails_saying_both(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'input.py').write_text(render_input(canonical_job('single', H2, 0, 1, method=LADDER), 'k' * 64))
+    ns = runpy.run_path('input.py', run_name='jobs_input')
+    ns['converge'].__globals__['MAX_CYCLES'] = (1, 1, 1)
+    with pytest.raises(ns['SCFNotConverged']) as e:
+        ns['build']()
+    assert str(e.value) == ('SCF did not converge with point-group symmetry or without it (DIIS, level shift '
+                            '0.3 Ha, second-order)')
+

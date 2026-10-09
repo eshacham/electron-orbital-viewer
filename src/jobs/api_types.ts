@@ -22,6 +22,16 @@ export interface CanonicalJob {
     molecule: { atoms: CanonicalAtom[]; charge: number; multiplicity: number };
 }
 
+/** Sizing version 6 (Phase 6D): what the worker's time budget reads, on the chosen size. Absent before it. */
+export interface SizingParts {
+    stepSeconds: number;
+    frequencySeconds: number;
+    finalScfSeconds: number;
+    /** Labelling the orbitals (Ruling D7): runs after the budget's last decision, so the budget leaves room. */
+    labellingSeconds: number;
+    filesSeconds: number;
+}
+
 export interface Sizing {
     version: number;
     /** Always 'fargate': size, time and timeout are Fargate figures even for a local run (6B-1 M1). */
@@ -36,6 +46,7 @@ export interface Sizing {
     predictedMemoryGB: number;
     timeoutSeconds: number;
     predictedCostMicros: number;
+    parts?: SizingParts;
 }
 
 export type GeometrySource =

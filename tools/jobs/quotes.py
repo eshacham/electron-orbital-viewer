@@ -25,7 +25,9 @@ maximum:
 Prices and their sources are in prices.py. The result's size is estimated
 from N (result_bytes): the grids are a fixed 96^3 / 48^3 (build_library's
 first GRID_POINTS_TRIES), so the density and ESP files do not grow with N;
-basis.json (the MO coefficients) grows with N^2.
+basis.json (the MO coefficients) grows with N^2. Since Phase 6D a job that
+runs the frequency check adds frequencies.json, counted at input_template's
+upper estimate (preflight D10; the storage note says so).
 
 The quote id is a SHA-256 over every term the owner approves (the key, the
 option, size, time limit, attempts, every line item, the sizing and prices
@@ -82,12 +84,15 @@ _BOUND = ('key', 'option', 'size', 'vcpu', 'memoryGB', 'capacity', 'attempts', '
           'pricesVersion', 'resultBytes', 'resultBytesMax', 'retentionMonths', 'downloads', 'lines', 'issuedAt')
 
 
-def result_bytes(n: int) -> int:
-    return RESULT_FIXED_BYTES + round(BASIS_BYTES_PER_N2 * n * n)
+def result_bytes(n: int, frequencies_bytes: int = 0) -> int:
+    """`frequencies_bytes`: sizing.frequencies_bytes(job), frequencies.json's upper estimate (Phase 6D, preflight
+    D10) for a job that runs the frequency check. It is an upper estimate already, but it is counted in the
+    estimate as well as the maximum: the six measured jobs that fitted the rest predate it."""
+    return RESULT_FIXED_BYTES + round(BASIS_BYTES_PER_N2 * n * n) + frequencies_bytes
 
 
-def result_bytes_max(n: int) -> int:
-    return math.ceil(RESULT_BYTES_HEADROOM * result_bytes(n))
+def result_bytes_max(n: int, frequencies_bytes: int = 0) -> int:
+    return math.ceil(RESULT_BYTES_HEADROOM * result_bytes(n, frequencies_bytes))
 
 
 def _storage(nbytes: int, objects: int) -> int:
@@ -113,8 +118,8 @@ def issued_minute(dt) -> str:
 
 def _option(job: dict, key: str, capacity: str, local: bool, issued_at: str | None) -> dict:
     d = sizing.decide(job, local=local, capacity=None if local else capacity)
-    n = d['basisFunctions']
-    estimate_bytes, max_bytes = result_bytes(n), result_bytes_max(n)
+    n, frequencies = d['basisFunctions'], sizing.frequencies_bytes(job)
+    estimate_bytes, max_bytes = result_bytes(n, frequencies), result_bytes_max(n, frequencies)
     if local:
         costs = {item: (0, 0) for item in ITEMS}
     else:
@@ -242,6 +247,12 @@ def _mb(nbytes: int) -> str:
     return f'{nbytes / 1e6:.1f} MB'
 
 
+def _frequency_check_seconds(o: dict) -> float:
+    """The frequency check's share of the prediction (sizing version 6's parts); 0 for a single point and for
+    an option sized before version 6."""
+    return (o['sizing'].get('parts') or {}).get('frequencySeconds') or 0
+
+
 def _note(item: str, o: dict) -> str:
     if o['option'] == 'local':
         return 'This Mac: nothing is billed.'
@@ -249,11 +260,19 @@ def _note(item: str, o: dict) -> str:
         run = f'{o["timeoutSeconds"]} s time limit + {sizing.BILLING_ALLOWANCE_SECONDS} s to start and stop'
         bound = f'{o["attempts"]} attempts × ({run})' if o['attempts'] > 1 else run
         capacity = 'Spot' if o['capacity'] == 'spot' else 'on-demand'
-        return (f'Estimate: one run of the predicted {o["predictedSeconds"]:g} s plus a minute to start. '
+        text = (f'Estimate: one run of the predicted {o["predictedSeconds"]:g} s plus a minute to start. '
                 f'Maximum: {bound}, at {capacity} prices for {o["size"]} ({o["vcpu"]} vCPU, {o["memoryGB"]} GB).')
+        check = _frequency_check_seconds(o)
+        if check:
+            # Phase 6D spec §10: recipe B's price includes the check, and the details say so.
+            text += f' The prediction includes the frequency check (confirms a minimum): {check:g} s.'
+        return text
     if item == 'storage':
-        return (f'About {_mb(o["resultBytes"])} of results (at most {_mb(o["resultBytesMax"])}) kept '
+        text = (f'About {_mb(o["resultBytes"])} of results (at most {_mb(o["resultBytesMax"])}) kept '
                 f'{o["retentionMonths"]} months in S3 Standard at $0.023 per GB-month, plus $0.005 per 1,000 writes.')
+        if _frequency_check_seconds(o):
+            text += " The results include the frequency check's frequencies.json."      # preflight D10
+        return text
     if item == 'delivery':
         return (f'{o["downloads"]} full downloads through CloudFront at $0.085 per GB, plus $0.01 per 10,000 '
                 'requests.')

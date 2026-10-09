@@ -77,29 +77,29 @@
       "capacity": "spot",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "52f823106e1f027ed6e0e96eb2fafd8c1f97bed6d8ba4fd72296453a35aa9782",
+      "quoteId": "dadfb29efba79deaf8a635c97cd1abec4994adfce7a03a2d49ae12a8f55b252f",
       "size": "S",
       "vcpu": 2,
       "memoryGB": 8,
       "attempts": 3,
       "timeoutSeconds": 600,
-      "predictedSeconds": 15.5,
-      "sizingVersion": 5,
+      "predictedSeconds": 16.3,
+      "sizingVersion": 6,
       "pricesVersion": 2,
       "resultBytes": 1507737,
       "resultBytesMax": 3015474,
       "retentionMonths": 12,
       "downloads": 10,
       "issuedAt": "2026-10-10T12:00Z",
-      "estimateUsd": 0.002467,
+      "estimateUsd": 0.002475,
       "maximumUsd": 0.021299,
       "lines": [
        {
         "item": "compute",
         "label": "Compute (AWS Fargate)",
-        "estimateUsd": 0.00063,
+        "estimateUsd": 0.000638,
         "maximumUsd": 0.01788,
-        "note": "Estimate: one run of the predicted 15.5 s plus a minute to start. Maximum: 3 attempts × (600 s time limit + 120 s to start and stop), at Spot prices for S (2 vCPU, 8 GB)."
+        "note": "Estimate: one run of the predicted 16.3 s plus a minute to start. Maximum: 3 attempts × (600 s time limit + 120 s to start and stop), at Spot prices for S (2 vCPU, 8 GB)."
        },
        {
         "item": "storage",
@@ -125,7 +125,7 @@
       ],
       "interruption": "A Spot interruption restarts the job from scratch; up to 3 attempts, each billed.",
       "sizing": {
-       "version": 5,
+       "version": 6,
        "estimateFor": "fargate",
        "size": "S",
        "vcpu": 2,
@@ -133,10 +133,17 @@
        "capacity": "spot",
        "attempts": 3,
        "basisFunctions": 58,
-       "predictedSeconds": 15.5,
+       "predictedSeconds": 16.3,
        "predictedMemoryGB": 0.47,
        "timeoutSeconds": 600,
-       "predictedCostMicros": 129
+       "predictedCostMicros": 135,
+       "parts": {
+        "stepSeconds": 0.0,
+        "frequencySeconds": 0.0,
+        "finalScfSeconds": 3.7,
+        "labellingSeconds": 0.8,
+        "filesSeconds": 11.8
+       }
       },
       "approvable": true,
       "blockedReason": null
@@ -146,29 +153,29 @@
       "capacity": "on-demand",
       "available": true,
       "unavailableReason": null,
-      "quoteId": "f0062dbf933feb5495eab35c87e0b912082af7c206abd5b7edf29c1f21e87cb6",
+      "quoteId": "6f981ddc38bc4019f851ed465491a51a2a2eb0f41ab7aa1b01aec7f05c4c6745",
       "size": "S",
       "vcpu": 2,
       "memoryGB": 8,
       "attempts": 1,
       "timeoutSeconds": 600,
-      "predictedSeconds": 15.5,
-      "sizingVersion": 5,
+      "predictedSeconds": 16.3,
+      "sizingVersion": 6,
       "pricesVersion": 2,
       "resultBytes": 1507737,
       "resultBytesMax": 3015474,
       "retentionMonths": 12,
       "downloads": 10,
       "issuedAt": "2026-10-10T12:00Z",
-      "estimateUsd": 0.003806,
+      "estimateUsd": 0.003832,
       "maximumUsd": 0.022067,
       "lines": [
        {
         "item": "compute",
         "label": "Compute (AWS Fargate)",
-        "estimateUsd": 0.001969,
+        "estimateUsd": 0.001995,
         "maximumUsd": 0.018648,
-        "note": "Estimate: one run of the predicted 15.5 s plus a minute to start. Maximum: 600 s time limit + 120 s to start and stop, at on-demand prices for S (2 vCPU, 8 GB)."
+        "note": "Estimate: one run of the predicted 16.3 s plus a minute to start. Maximum: 600 s time limit + 120 s to start and stop, at on-demand prices for S (2 vCPU, 8 GB)."
        },
        {
         "item": "storage",
@@ -194,7 +201,7 @@
       ],
       "interruption": null,
       "sizing": {
-       "version": 5,
+       "version": 6,
        "estimateFor": "fargate",
        "size": "S",
        "vcpu": 2,
@@ -202,10 +209,17 @@
        "capacity": "on-demand",
        "attempts": 1,
        "basisFunctions": 58,
-       "predictedSeconds": 15.5,
+       "predictedSeconds": 16.3,
        "predictedMemoryGB": 0.47,
        "timeoutSeconds": 600,
-       "predictedCostMicros": 402
+       "predictedCostMicros": 422,
+       "parts": {
+        "stepSeconds": 0.0,
+        "frequencySeconds": 0.0,
+        "finalScfSeconds": 3.7,
+        "labellingSeconds": 0.8,
+        "filesSeconds": 11.8
+       }
       },
       "approvable": true,
       "blockedReason": null

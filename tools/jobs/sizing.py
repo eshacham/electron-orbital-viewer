@@ -18,6 +18,10 @@ optimise-steps probe, and otherwise by the direct t3, as before; version 5
 scales the step count by stepScale, fitted from the AWS optimisations'
 measured step counts (the owner's caffeine optimise ran 11 of 58). Every
 job records the version and the prediction so the fit can be checked.
+Version 6 (Phase 6D) prices recipe B's frequency check -- an analytic
+Hessian, h x one optimisation step x atoms -- and labelling the orbitals
+(Ruling D7), and hands the worker the figures its time budget reads
+(budget_parts).
 """
 import math
 from dataclasses import dataclass
@@ -26,6 +30,7 @@ from jobs.basis_counts import basis_functions
 from jobs.batch_runner import pyscf_max_memory_mb
 from jobs.canonical import electron_count
 from jobs.errors import JobRefused
+from jobs.input_template import predicted_frequencies_bytes
 from jobs.prices import cost_micros
 
 
@@ -37,7 +42,20 @@ class Size:
 
 
 SIZES = (Size('S', 2, 8), Size('M', 4, 16), Size('L', 16, 64), Size('XL', 32, 244))
-SIZING_VERSION = 5
+SIZING_VERSION = 6
+# Version 6, 2026-10-09 (Phase 6D spec §10, Ruling D7): version 5's constants and forms, plus two terms.
+# - h, the frequency check's price. Recipe B (compute version 2 on) checks its optimised structure with an
+#   analytic Hessian at def2-SVP: frequency_seconds = h x step_seconds(N_SVP) x atoms, x OPEN_SHELL_FACTOR for an
+#   open shell. Until the owner-approved Hessian probe on L measures it (Task 17), h = 1.5: PySCF 2.8's RKS
+#   Hessian cost 0.84 (ethanol) to 1.06 (water) SCF+gradient steps per atom on this Mac (def2-SVP, one thread,
+#   2026-10-08) -- the textbook cost of an analytic Hessian, 3N CPHF perturbations, about a gradient's work per
+#   atom -- and 1.5 of it allows for threading poorer than the SCF's, which nothing has measured on Fargate yet.
+#   The D3 terms are not priced (spec §10: negligible).
+# - labelling the orbitals (labelling_seconds; LABEL_* below), which runs after the time budget's last decision
+#   and is in no measured file write (every AWS sample predates it). It moves single points too, by 1-5 %.
+# Caffeine optimise moves from 2205 s (L, Spot) to 4130 s: past the Spot limit, so L on demand until h is
+# measured. Caffeine single moves from 1043.5 s to 1067.5 s on L (labelling 24.0 s), water single 15.5 -> 16.3 s.
+#
 # Version 5, fitted 2026-10-08 (Phase 6B-3 follow-up) with the same command as version 4 (below), from 6 AWS
 # jobs: version 4's five plus the owner's caffeine optimise (09ae0fa051c6..., L on-demand, 16 vCPU / 64 GB,
 # sized by v4: DONE in 1022 s of 4103 predicted; 11 steps of 58; final SCF 441 s, files 192 s, peak 5.67 GB).
@@ -137,7 +155,7 @@ SIZING_VERSION = 5
 # Versions 1 (6B-1 Task 11, this Mac) and 2 (6B-3 Task 14) stay in git history; version 3 is version 4
 # without t3Step (every step priced direct).
 CONSTANTS = {'m0': 0.459, 'm2': 4.35, 't0': 4.84, 't3': 42000.0, 't3Step': 31000.0, 'g': 1.5, 'f2': 5410.0,
-             'stepScale': 0.375, 'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631,
+             'stepScale': 0.375, 'h': 1.5, 'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631,
              'filesSaturation': 32.0}
 HEADROOM = 2.0
 TIME_HEADROOM = 1.5
@@ -238,6 +256,68 @@ def step_seconds(n: int, size: Size) -> float:
     return (1 + c['g']) * (c['t0'] + c['t3Step'] * (n / 1000) ** 3.5) / speedup(size.vcpu)
 
 
+def runs_frequency_check(job: dict) -> bool:
+    """Recipe B checks its structure from compute version 2 (input_template.render_input's rule); a single
+    point, and a compute-version-1 job (an owner's retry of one), do not."""
+    return bool(job['method']['optimiseBasis']) and job.get('computeVersion', 1) >= 2
+
+
+def frequency_seconds(job: dict, size: Size) -> float:
+    """Recipe B's frequency check (version 6, Phase 6D spec §10): the analytic Hessian at the optimisation
+    basis, h x one step there x atoms, an open shell scaled as its SCF is. Zero for a single point, and for a
+    compute-version-1 job (an owner's retry of one), which runs no check."""
+    if not runs_frequency_check(job):
+        return 0.0
+    atoms = job['molecule']['atoms']
+    seconds = CONSTANTS['h'] * step_seconds(basis_functions(atoms, job['method']['optimiseBasis']), size) * len(atoms)
+    return seconds * (OPEN_SHELL_FACTOR if job['molecule']['multiplicity'] > 1 else 1)
+
+
+# Ruling D7 (version 6): labelling the orbitals. point_group.orbital_characters (Task 3) evaluates the AOs on
+# the SCF's whole DFT grid once unrotated and once per class operation, for every kept orbital at once, then
+# multiplies them into the orbitals; orbitals.orbital_table does that once for the table and, when it constructs
+# an LVMO, once more for its irrep (irrep_of). So the cost is evaluations x grid points x N x (a + b x orbitals).
+# - LABEL_EVALUATIONS: sizing runs where PySCF does not (the API Lambda) and cannot find the point group, so
+#   every job is priced for the largest projection: D6h's 12 classes plus the unrotated grid, twice. A C1, D2h
+#   or linear molecule (PySCF's own labels, no projection) pays for labels it gets free: ~1-2 % of its price.
+# - LABEL_SECONDS (a) and LABEL_SECONDS_PER_ORBITAL (b), per grid point x basis function x evaluation on one
+#   Fargate vCPU: this Mac's slowest measured run (ammonia C3v, 0.1 s: 5.65e-9 per point-AO evaluation; benzene
+#   D6h 3.98e-9, SF6 Oh 3.8e-9, methane Td 5.5e-9), and a caffeine-sized molecule (N 614, 553 968 points, two
+#   operations) with 1 to 250 random orbitals, 3.85e-9 + 1.43e-11 per orbital; each x MAC_TO_FARGATE.
+#   Before Task 3 the projection re-ran per degenerate set (benzene 47.7-52 s, the preflight's figure); it no
+#   longer scales with the sets, only, through b, with the orbitals kept, of which the sets are a partition.
+# - MAC_TO_FARGATE: the file write, the same kind of grid work, fitted 2 480 on this Mac (version 1) and 5 410
+#   per Fargate vCPU (version 5): 2.18, rounded up. Nothing has timed labelling on Fargate yet.
+# - It threads as the file write does (eval_gto through PySCF's OpenMP, the products through BLAS), so it is
+#   divided by files_speedup, the slower of the two laws, and, like the files, not by spin.
+# Benzene (D6h) is priced at 26.5 s on one vCPU against 3.3 s measured on this Mac (~7.3 s on Fargate), caffeine
+# at 134 s (23 s on L); a coronene-sized D6h job (C24H12, N ~1000) at ~5 min, not the preflight's 30.
+LABEL_EVALUATIONS = 2 * (12 + 1)
+MAC_TO_FARGATE = 2.2
+LABEL_SECONDS = 1.25e-8
+LABEL_SECONDS_PER_ORBITAL = 3.2e-11
+# PySCF's level-4 grid (input.py and the library), per atom: a lone atom's count, which Becke partitioning only
+# prunes in a molecule -- at most 15 712 for H and He and 30 768 for anything else to Kr (PySCF 2.8).
+LIGHT_ATOM_GRID_POINTS = 16_000
+ATOM_GRID_POINTS = 31_000
+
+
+def grid_points(atoms) -> int:
+    """An upper estimate of the SCF's DFT grid (version 6): within 7 % above PySCF's own for water, benzene
+    and caffeine."""
+    return sum(LIGHT_ATOM_GRID_POINTS if int(a[0]) <= 2 else ATOM_GRID_POINTS for a in atoms)
+
+
+def labelling_seconds(job: dict, size: Size) -> float:
+    """Labelling the orbitals (version 6, Ruling D7) at the property basis on `size`: every orbital basis.json
+    keeps (as predicted_basis_json_bytes counts them), projected for the largest group the labeller supports."""
+    mol = job['molecule']
+    n = basis_functions(mol['atoms'], job['method']['basis'])
+    orbitals = math.ceil(electron_count(mol['atoms'], mol['charge']) / 2) + VIRTUAL_ROWS
+    rate = LABEL_SECONDS + LABEL_SECONDS_PER_ORBITAL * orbitals
+    return LABEL_EVALUATIONS * grid_points(mol['atoms']) * n * rate / files_speedup(size.vcpu)
+
+
 def predict_parts(job: dict, size: Size) -> dict:
     """The SCF estimate and the file-writing estimate, kept apart (Ruling D14).
 
@@ -247,7 +327,9 @@ def predict_parts(job: dict, size: Size) -> dict:
     sped up by vCPU count and then scaled by the open-shell factor. `filesSeconds` is the grid the worker writes out at
     the property basis (def2-TZVPD), divided by its own files_speedup and
     not scaled by the open-shell factor, because writing files is
-    indifferent to spin.
+    indifferent to spin. `frequencySeconds` (version 6) is the frequency
+    check, its own term; `labellingSeconds` (version 6, Ruling D7) labelling
+    the orbitals, grid work like the files.
     """
     atoms, method = job['molecule']['atoms'], job['method']
     scf = single_point_seconds(basis_functions(atoms, method['basis']), size.vcpu)
@@ -257,12 +339,26 @@ def predict_parts(job: dict, size: Size) -> dict:
         scf *= OPEN_SHELL_FACTOR
     n_property = basis_functions(atoms, method['basis'])
     files = CONSTANTS['f2'] * (n_property / 1000) ** 2 / files_speedup(size.vcpu)
-    return {'scfSeconds': scf, 'filesSeconds': files}
+    return {'scfSeconds': scf, 'filesSeconds': files, 'frequencySeconds': frequency_seconds(job, size),
+            'labellingSeconds': labelling_seconds(job, size)}
 
 
 def predict_seconds(job: dict, size: Size) -> float:
     parts = predict_parts(job, size)
-    return parts['scfSeconds'] + parts['filesSeconds']
+    return parts['scfSeconds'] + parts['filesSeconds'] + parts['frequencySeconds'] + parts['labellingSeconds']
+
+
+def budget_parts(job: dict, size: Size) -> dict:
+    """What the worker's time budget reads (version 6, Phase 6D spec §9), on `size`: one optimisation step,
+    the frequency check, the final SCF, labelling the orbitals and the file write, each as predict_parts prices
+    it."""
+    atoms, method = job['molecule']['atoms'], job['method']
+    shell = OPEN_SHELL_FACTOR if job['molecule']['multiplicity'] > 1 else 1
+    step = step_seconds(basis_functions(atoms, method['optimiseBasis']), size) * shell if method['optimiseBasis'] else 0.0
+    parts = predict_parts(job, size)
+    return {'stepSeconds': round(step, 1), 'frequencySeconds': round(parts['frequencySeconds'], 1),
+            'finalScfSeconds': round(single_point_seconds(basis_functions(atoms, method['basis']), size.vcpu) * shell, 1),
+            'labellingSeconds': round(parts['labellingSeconds'], 1), 'filesSeconds': round(parts['filesSeconds'], 1)}
 
 
 # Fix round 1 (C1): a job whose result files cannot fit the app's file limit is refused before it runs.
@@ -274,6 +370,8 @@ def predict_seconds(job: dict, size: Size) -> float:
 #   silane's t2; preflight D15).
 #   Each coefficient takes ~23 bytes as JSON (caffeine: 796 428 B for 56 rows x 614); COEFF_BYTES 24.
 #   Water, ethanol, benzene and caffeine's written basis.json are 74-90 % of this prediction.
+# - frequencies.json (version 6, preflight D10): recipe B's frequency check writes it before the grids, inside
+#   the same budget (worker.run_job), so a check job's prediction counts input_template's upper estimate of it.
 # - GRID_FILES_BYTES: density, ESP and meta at 80^3. The six DONE jobs wrote 0.91-1.42 MB of them at 96^3;
 #   at 80^3 (0.58x the points) the largest is ~0.82 MB, rounded up.
 # Before Phase 6C the 1 h single-point ceiling refused everything above about N 800, so nothing reached the
@@ -284,20 +382,29 @@ VALENCE_VIRTUAL_ROWS = 3
 VIRTUAL_ROWS = 10 + VALENCE_VIRTUAL_ROWS
 COEFF_BYTES = 24
 GRID_FILES_BYTES = 900_000
+# Preflight D13: this said larger molecules "arrive with Phase 6D's smaller-basis option"; the roadmap moved that
+# option to a later phase (6B-4), so the message promises no date.
 OUTPUT_REFUSAL = ("this molecule's result files would exceed the app's file limit (about {mb:.1f} MB predicted "
-                  "against {limit:.0f} MB), so it would run and then fail; larger molecules arrive with Phase 6D's "
-                  'smaller-basis option')
+                  "against {limit:.0f} MB), so it would run and then fail; larger molecules need a smaller basis, "
+                  'which a later phase is to offer')
 
 
 def predicted_basis_json_bytes(n: int, electrons: int) -> int:
     return COEFF_BYTES * (math.ceil(electrons / 2) + VIRTUAL_ROWS) * n
 
 
+def frequencies_bytes(job: dict) -> int:
+    """frequencies.json's predicted size for a job that runs the frequency check (version 6); 0 otherwise."""
+    return predicted_frequencies_bytes(len(job['molecule']['atoms'])) if runs_frequency_check(job) else 0
+
+
 def predicted_output_bytes(job: dict) -> int:
-    """The budgeted result files at the last grid try: basis.json plus the grids and meta."""
+    """The budgeted result files at the last grid try: basis.json plus the grids and meta, and a check job's
+    frequencies.json."""
     mol = job['molecule']
     n = basis_functions(mol['atoms'], job['method']['basis'])
-    return predicted_basis_json_bytes(n, electron_count(mol['atoms'], mol['charge'])) + GRID_FILES_BYTES
+    return (predicted_basis_json_bytes(n, electron_count(mol['atoms'], mol['charge'])) + GRID_FILES_BYTES
+            + frequencies_bytes(job))
 
 
 def _choose(job: dict, memory_fitting: list) -> tuple[Size, float]:
@@ -332,7 +439,8 @@ def spot_unavailable(seconds: float) -> str | None:
 
 
 def _hours(seconds: float) -> str:
-    return f'{seconds / 60:.0f} min' if seconds < 3600 else f'{seconds / 3600:.1f} h'
+    # Task 4 minor: minutes below 2 h, so a run just past the 60 min Spot limit reads "62 min", not "1.0 h".
+    return f'{seconds / 60:.0f} min' if seconds < 7200 else f'{seconds / 3600:.1f} h'
 
 
 def decide(job: dict, local: bool = False, capacity: str | None = None) -> dict:
@@ -392,4 +500,5 @@ def decide(job: dict, local: bool = False, capacity: str | None = None) -> dict:
             'predictedSeconds': round(seconds, 1), 'predictedMemoryGB': round(memory, 2),
             'timeoutSeconds': timeout,
             'reservationMicros': attempts * cost_micros(capacity, size.vcpu, size.memory_gb, reservation_seconds),
-            'predictedCostMicros': cost_micros(capacity, size.vcpu, size.memory_gb, seconds)}
+            'predictedCostMicros': cost_micros(capacity, size.vcpu, size.memory_gb, seconds),
+            'parts': budget_parts(job, size)}

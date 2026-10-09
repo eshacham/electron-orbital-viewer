@@ -50,7 +50,7 @@
    "retrievedAt": "2026-10-10"
   },
   "sizing": {
-   "version": 5,
+   "version": 6,
    "estimateFor": "fargate",
    "size": "S",
    "vcpu": 2,
@@ -58,10 +58,17 @@
    "capacity": "spot",
    "attempts": 3,
    "basisFunctions": 58,
-   "predictedSeconds": 15.5,
+   "predictedSeconds": 16.3,
    "predictedMemoryGB": 0.47,
    "timeoutSeconds": 600,
-   "predictedCostMicros": 129
+   "predictedCostMicros": 135,
+   "parts": {
+    "stepSeconds": 0.0,
+    "frequencySeconds": 0.0,
+    "finalScfSeconds": 3.7,
+    "labellingSeconds": 0.8,
+    "filesSeconds": 11.8
+   }
   },
   "month": "2026-10",
   "submittedAt": "2026-10-10T12:00:00Z",
@@ -80,20 +87,20 @@
   "resultUrl": "/molecules/jobs/4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216/",
   "approvedQuote": {
    "option": "spot",
-   "quoteId": "52f823106e1f027ed6e0e96eb2fafd8c1f97bed6d8ba4fd72296453a35aa9782",
+   "quoteId": "dadfb29efba79deaf8a635c97cd1abec4994adfce7a03a2d49ae12a8f55b252f",
    "attempts": 3,
    "timeoutSeconds": 600,
-   "sizingVersion": 5,
+   "sizingVersion": 6,
    "pricesVersion": 2,
    "approvedAt": "2026-10-10T12:00:00Z",
    "issuedAt": "2026-10-10T12:00Z",
-   "estimateUsd": 0.002467,
+   "estimateUsd": 0.002475,
    "maximumUsd": 0.021299,
    "lines": [
     {
      "item": "compute",
      "label": "Compute (AWS Fargate)",
-     "estimateUsd": 0.00063,
+     "estimateUsd": 0.000638,
      "maximumUsd": 0.01788
     },
     {

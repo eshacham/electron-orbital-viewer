@@ -207,7 +207,13 @@ the in-core runs alone, and t3 from the slowest direct SCF (caffeine's,
 the size (`sizing.step_in_core`, PySCF's own test with HEADROOM × the
 predicted working set for its RSS) is priced by it, from the slowest step
 of the caffeine optimise-steps probe; any other step keeps the direct t3.
-Version 5, the current one, adds the owner's caffeine optimise on L and
+Version 6, the current one (Phase 6D), keeps version 5's constants and adds
+two terms: recipe B's frequency check, `h × one def2-SVP step × atoms`
+with `h` = 1.5 until the Hessian probe measures it, and labelling the
+orbitals (`sizing.labelling_seconds`, Ruling D7), priced for the largest
+point group the labeller projects in. `decide` also returns `parts`, the
+figures the worker's time budget reads.
+Version 5 adds the owner's caffeine optimise on L and
 `stepScale` (0.375): an optimisation is priced for
 `ceil(stepScale × (10 + 2 × atoms))` steps, at most `MAX_STEPS` (100),
 where versions 1–4 priced `10 + 2 × atoms`. stepScale is `TIME_HEADROOM`

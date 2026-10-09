@@ -553,6 +553,8 @@ def fit_aws(samples, probe=None, optimise_probe=None):
     notes += scale_notes
     out = {**memory, 't0': t0, 't3': t3, 't3Step': t3_step, 'g': g, 'f2': fit_f2(samples + extra, files_law),
            'stepScale': step_scale,
+           # The Hessian probe (Task 17) is to fit it; until then the guard keeps sizing's stated value.
+           'h': None,
            'scfExponent': scf_law[0], 'scfSaturation': scf_law[1],
            'filesExponent': files_law[0], 'filesSaturation': files_law[1], 'speedupSource': source, 'notes': notes}
     if summary is not None:
@@ -564,7 +566,7 @@ def guarded(fitted):
     """CONSTANTS from fit_aws's output: Task 14's guards, then 3 significant
     figures, every value a float. Returns (constants, the guards used)."""
     deployed, guards = sizing.CONSTANTS, []
-    c = {k: fitted[k] for k in ('m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'scfExponent',
+    c = {k: fitted[k] for k in ('m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'h', 'scfExponent',
                                 'scfSaturation', 'filesExponent', 'filesSaturation')}
     rules = (('m0', lambda v: v < 0.2, lambda v: 0.2, 'below 0.2: set to 0.2'),
              ('m2', lambda v: v <= 0, lambda v: deployed['m2'], 'not positive: kept the deployed value'),
@@ -575,7 +577,9 @@ def guarded(fitted):
              ('g', lambda v: v is None or v < 0, lambda v: G_FALLBACK, f'missing or negative: kept {G_FALLBACK:g}'),
              ('f2', lambda v: v <= 0, lambda v: deployed['f2'], 'not positive: kept the deployed value (D5)'),
              ('stepScale', lambda v: v is None or v <= 0, lambda v: deployed['stepScale'],
-              'missing or not positive: kept the deployed value'))
+              'missing or not positive: kept the deployed value'),
+             ('h', lambda v: v is None or v <= 0, lambda v: deployed['h'],
+              'missing or not positive: kept the deployed value (Phase 6D: no Hessian probe yet)'))
     for name, bad, fix, why in rules:
         if bad(c[name]):
             fitted_text = 'none' if c[name] is None else f'{c[name]:.4g}'

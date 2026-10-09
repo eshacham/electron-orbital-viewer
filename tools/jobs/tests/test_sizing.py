@@ -27,6 +27,14 @@ def carbons(n):
     return [[6, 0.0, 0.0, 1.5 * i] for i in range(n)]
 
 
+@pytest.fixture
+def no_labelling(monkeypatch):
+    """Version 6's labelling term (Ruling D7) is grid work, like the file write: a test that scales the SCF
+    alone (f2 = 0) sets it aside too."""
+    monkeypatch.setattr(sizing, 'LABEL_SECONDS', 0.0)
+    monkeypatch.setattr(sizing, 'LABEL_SECONDS_PER_ORBITAL', 0.0)
+
+
 def test_prices():
     assert cost_micros('on-demand', 2, 8, 3600) == 93_240         # 2·0.03238 + 8·0.00356 = $0.09324
     assert cost_micros('spot', 2, 8, 3600) == 29_800              # 2·0.01034 + 8·0.00114 = $0.02980
@@ -48,21 +56,20 @@ def test_water_single_is_small_spot_with_the_floor_timeout():
 
 
 KEYS = {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'scfExponent', 'scfSaturation', 'filesExponent',
-        'filesSaturation'}
+        'filesSaturation', 'h'}
 
 
-def test_version_5_is_calibrated_on_aws():
-    # Fitted from Fargate ARM64 runs (Phase 6B-3 Task 14, refitted with caffeine on M for version 3, the
-    # caffeine optimise-steps probe for version 4's t3Step, and the owner's caffeine optimise on L for
-    # version 5's stepScale); every constant is a measured, positive number. D5: f2 stays (predict_parts
-    # reads it), and the two speedup laws are constants too (Ruling T14-speedup).
-    assert sizing.SIZING_VERSION == 5
+def test_version_6_prices_the_frequency_check_and_states_its_h():
+    # Versions 2-5 were fitted from Fargate ARM64 runs (Phase 6B-3); version 6 (Phase 6D spec §10) adds h, the
+    # analytic Hessian's cost in optimisation steps per atom. Until the Hessian probe measures it (Task 17),
+    # h is 1.5: 0.84-1.06 measured on this Mac (one thread, def2-SVP), with room for poorer threading.
+    assert sizing.SIZING_VERSION == 6
     assert set(sizing.CONSTANTS) == KEYS
     assert all(isinstance(v, float) and v > 0 for v in sizing.CONSTANTS.values())
-    assert sizing.CONSTANTS['m0'] >= 0.2 and sizing.CONSTANTS['t0'] >= 1.0
+    assert sizing.CONSTANTS['m0'] >= 0.2 and sizing.CONSTANTS['t0'] >= 1.0 and sizing.CONSTANTS['h'] == 1.5
 
 
-def test_caffeine_needs_a_bigger_worker_than_its_ceiling_timeout_would_allow(monkeypatch):
+def test_caffeine_needs_a_bigger_worker_than_its_ceiling_timeout_would_allow(monkeypatch, no_labelling):
     # Ruling T11-a, pinned on the decision logic rather than on whichever
     # constants are live (D24): scale t3 so that S predicts caffeine between
     # the ceiling / TIME_HEADROOM and the 3600 s 'single' ceiling itself. S
@@ -88,7 +95,7 @@ def test_too_slow_for_the_sanity_ceiling_even_on_the_fastest_size_is_too_long(mo
     assert e.value.code == 'too-long' and 'on L' in e.value.message and '48 h' in e.value.message
 
 
-def test_the_sanity_ceiling_applies_to_the_size_that_would_run(monkeypatch):
+def test_the_sanity_ceiling_applies_to_the_size_that_would_run(monkeypatch, no_labelling):
     # Review minor 2: a job whose fastest size is under 48 h but whose chosen (cheaper, up to 1.5x slower)
     # size is over it used to pass. L and XL run the SCF alike and XL writes files ~1.55x faster: with
     # 21.7 h of SCF and 28.3 h of files on L (50 h), XL takes ~40 h. L is within 1.5x and cheaper, so it is
@@ -112,7 +119,7 @@ def test_no_time_limit_passes_the_absolute_bound():
     assert sizing.MAX_TIMEOUT_SECONDS == sizing.TIMEOUT_FACTOR * sizing.SANITY_CEILING_SECONDS == 144 * 3600
 
 
-def test_a_job_past_its_recipes_target_is_no_longer_refused(monkeypatch):
+def test_a_job_past_its_recipes_target_is_no_longer_refused(monkeypatch, no_labelling):
     # Owner decision 2026-10-08 (Phase 6C): 1 h single / 2 h optimise were
     # refusals; now a job over its target is sized and priced, and its timeout
     # is TIMEOUT_FACTOR x the prediction, unclamped.
@@ -196,11 +203,13 @@ def test_too_long_for_the_sanity_ceiling(monkeypatch):
     assert e.value.code == 'too-long'
 
 
-def test_long_jobs_run_on_demand_with_one_attempt(monkeypatch):
+def test_long_jobs_run_on_demand_with_one_attempt(monkeypatch, no_labelling):
     # Pick t3 so that only the fastest sizes clear TIME_HEADROOM × predicted
     # ≤ the 2 h optimise ceiling (Ruling T11-a), landing the predicted
     # seconds just above the spot limit so the job still goes on-demand.
-    # f2 = 0: this scaling argument assumes pure SCF scaling (Ruling D14).
+    # f2 = 0: this scaling argument assumes pure SCF scaling (Ruling D14), and
+    # no_labelling sets version 6's labelling term aside with it. The frequency
+    # check is h x a step, so it scales with t3Step like the steps.
     # With the SCF's speedup levelling off at scfSaturation, every size at or
     # past it is equally fast, and the cheapest of them is the one chosen.
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 't0': 0.0, 't3': 1.0, 't3Step': 1.0, 'g': 0.0,
@@ -218,9 +227,9 @@ def test_long_jobs_run_on_demand_with_one_attempt(monkeypatch):
     assert d['capacity'] == 'on-demand' and d['attempts'] == 1 and d['timeoutSeconds'] == 13500
 
 
-def test_open_shell_takes_longer(monkeypatch):
+def test_open_shell_takes_longer(monkeypatch, no_labelling):
     # f2 = 0: the files term does not scale with the open-shell factor (Ruling D14),
-    # so comparing the raw 1.5× ratio needs it isolated out.
+    # so comparing the raw 1.5× ratio needs it isolated out; nor does labelling the orbitals (no_labelling).
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 'f2': 0.0})
     closed = sizing.predict_seconds(canonical_job('single', WATER, 0, 1), sizing.SIZES[0])
     opened = sizing.predict_seconds(canonical_job('single', WATER, 1, 2), sizing.SIZES[0])
@@ -235,7 +244,7 @@ def test_optimise_costs_more_than_single_and_steps_are_capped():
     assert sizing.optimisation_steps(3) == 6 and sizing.optimisation_steps(200) == 100
 
 
-def test_more_vcpus_are_faster_but_not_linearly(monkeypatch):
+def test_more_vcpus_are_faster_but_not_linearly(monkeypatch, no_labelling):
     # f2 = 0: the file-writing term has its own speedup (Ruling T14-speedup),
     # so it is isolated out before comparing the SCF speedup ratio.
     monkeypatch.setattr(sizing, 'CONSTANTS', {**sizing.CONSTANTS, 'f2': 0.0})
@@ -281,7 +290,8 @@ def test_files_term_scales_with_vcpu_and_is_counted_in_decide():
         sizing.speedup(sizing.SIZES[-1].vcpu) / sizing.speedup(sizing.SIZES[0].vcpu))
 
     d = sizing.decide(job)
-    assert d['predictedSeconds'] == pytest.approx(round(small['scfSeconds'] + small['filesSeconds'], 1))
+    assert d['predictedSeconds'] == pytest.approx(round(small['scfSeconds'] + small['filesSeconds']
+                                                        + small['labellingSeconds'], 1))
 
 
 # What AWS measured (Phase 6B-3 Tasks 12-13 and the owner's caffeine): the
@@ -355,29 +365,34 @@ def _caffeine_job(recipe):
 def test_caffeine_single_runs_on_l_spot_under_the_live_constants():
     # Review minor 4: pinned on the committed caffeine fixture and the live
     # sizing.CONSTANTS (not a monkeypatch), so a future constants change that
-    # moves this must touch this test, not pass silently. Version 5 decides
-    # it as versions 3 and 4 did, 3.3 s slower (f2 5 360 -> 5 410).
+    # moves this must touch this test, not pass silently. Version 5 decided
+    # it as versions 3 and 4 did, 3.3 s slower (f2 5 360 -> 5 410); version 6
+    # adds labelling the orbitals (Ruling D7), 24.0 s on L.
     d = sizing.decide(_caffeine_job('single'))
     assert (d['size'], d['vcpu'], d['capacity']) == ('L', 16, 'spot')
-    assert d['predictedSeconds'] == pytest.approx(1043.5, rel=0.001)
-    assert d['version'] == 5
+    labelling = sizing.labelling_seconds(_caffeine_job('single'), LARGE)
+    assert labelling == pytest.approx(24.0, abs=0.05)
+    assert d['predictedSeconds'] == pytest.approx(1043.5 + labelling, abs=0.1)
+    assert d['version'] == 6
 
 
-def test_caffeine_optimise_runs_on_l_spot_under_the_live_v5_constants():
-    # Version 4 priced it at 4103 s (58 steps), on demand; it ran 1022 s (11
-    # steps). Version 5 prices 22 steps (ceil(0.375 x 58)) of the probe's
-    # ~52.9 s on L plus the final single point (1043.5 s on L): 2205 s, under
-    # the 3600 s Spot limit, so Spot with three attempts and a 3x timeout.
-    # M still fails the time bar (its steps take 176 s).
-    d = sizing.decide(_caffeine_job('optimise'))
-    assert (d['size'], d['vcpu'], d['memoryGB']) == ('L', 16, 64)
-    assert (d['capacity'], d['attempts']) == ('spot', 3)
-    assert sizing.optimisation_steps(24) == 22
-    assert d['predictedSeconds'] == pytest.approx(1043.5 + 22 * 52.85, rel=0.002)
-    assert d['timeoutSeconds'] == 6616 >= sizing.TIME_HEADROOM * d['predictedSeconds']
-    assert d['reservationMicros'] == 3 * cost_micros('spot', 16, 64, 6616 + sizing.BILLING_ALLOWANCE_SECONDS)
-    assert sizing.predict_seconds(_caffeine_job('optimise'), sizing.SIZES[1]) * sizing.TIME_HEADROOM > 7200
-    assert d['version'] == 5
+def test_caffeine_optimise_pays_for_its_frequency_check_on_l():
+    # Version 6: version 5's 22 steps of about 52.8 s and the final single point on L, plus the check,
+    # h x one step x 24 atoms = 1.5 x 52.8 x 24 ≈ 1901 s, and labelling the orbitals: past the 3600 s Spot
+    # limit, so L on demand, one attempt. The measured h (Task 17) may bring it back under.
+    job = _caffeine_job('optimise')
+    d = sizing.decide(job)
+    step = sizing.step_seconds(basis_functions(CAFFEINE, 'def2-SVP'), LARGE)
+    check = sizing.CONSTANTS['h'] * step * 24
+    assert (d['size'], d['capacity'], d['attempts']) == ('L', 'on-demand', 1)
+    assert sizing.frequency_seconds(job, LARGE) == pytest.approx(check)
+    single = sizing.predict_seconds(_caffeine_job('single'), LARGE)
+    assert d['predictedSeconds'] == pytest.approx(single + sizing.optimisation_steps(24) * step + check, abs=0.1)
+    assert d['parts'] == {'stepSeconds': round(step, 1), 'frequencySeconds': round(check, 1),
+                          'finalScfSeconds': round(sizing.single_point_seconds(614, 16), 1),
+                          'labellingSeconds': round(sizing.labelling_seconds(job, LARGE), 1),
+                          'filesSeconds': round(sizing.predict_parts(job, LARGE)['filesSeconds'], 1)}
+    assert d['version'] == 6
 
 
 def _folder(prefix):
@@ -421,11 +436,12 @@ def test_the_constants_are_what_calibrate_fits_from_the_fixtures():
     # Version 5 is reproducible: `python -m jobs.calibrate --aws --probe
     # fixtures/aws/speedup-probe.json --optimise-probe
     # fixtures/aws/caffeine-optimise-probe.json fixtures/aws/*/` prints these
-    # constants, with only g's guard used (fitted negative: the ladder's few steps).
+    # constants, with g's guard used (fitted negative: the ladder's few steps).
     from jobs.calibrate import aws_samples, fit_aws, guarded
     constants, guards = guarded(fit_aws(aws_samples(AWS_JOBS), PROBE, OPTIMISE_PROBE))
     assert constants == sizing.CONSTANTS
-    assert [g.split(':')[0] for g in guards] == ['g']
+    # h has no measurement yet (Task 17's Hessian probe): its guard keeps the stated 1.5.
+    assert [g.split(':')[0] for g in guards] == ['g', 'h']
 
 
 def test_the_caffeine_probes_slowest_step_is_reproduced_on_l():
@@ -520,8 +536,8 @@ def test_single_points_do_not_read_t3step(monkeypatch):
     assert [sizing.predict_parts(job, s) for job in jobs for s in sizing.SIZES] == before
 
 
-# Version 4's decisions (versions 3's too) for every single point the reports track, and version 5's,
-# recorded when version 5 was made. A single point may not get less conservative without a measured
+# Version 4's decisions (versions 3's too) for every single point the reports track, and version 5's and 6's,
+# recorded when each was made. A single point may not get less conservative without a measured
 # sample to say so: the same size, capacity and attempts, and no shorter prediction, timeout or reservation.
 V4_SINGLE_POINTS = [
     (WATER, {'size': 'S', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 15.4, 'timeoutSeconds': 600,
@@ -539,16 +555,26 @@ V5_SINGLE_POINTS = [
     {'size': 'L', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 1043.5, 'timeoutSeconds': 3131,
      'predictedMemoryGB': 2.1, 'reservationMicros': 645867, 'predictedCostMicros': 69102},
 ]
+# Version 6 adds labelling the orbitals (Ruling D7): 0.8 s (water), 17.8 s (benzene) and 24.0 s (caffeine, on L).
+V6_SINGLE_POINTS = [
+    {'size': 'S', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 16.3, 'timeoutSeconds': 600,
+     'predictedMemoryGB': 0.47, 'reservationMicros': 17880, 'predictedCostMicros': 135},
+    {'size': 'S', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 540.9, 'timeoutSeconds': 1623,
+     'predictedMemoryGB': 0.79, 'reservationMicros': 43287, 'predictedCostMicros': 4478},
+    {'size': 'L', 'capacity': 'spot', 'attempts': 3, 'predictedSeconds': 1067.5, 'timeoutSeconds': 3203,
+     'predictedMemoryGB': 2.1, 'reservationMicros': 660171, 'predictedCostMicros': 70690},
+]
 
 
-@pytest.mark.parametrize('atoms,v4,v5', [(a, v4, v5) for (a, v4), v5 in zip(V4_SINGLE_POINTS, V5_SINGLE_POINTS)],
+@pytest.mark.parametrize('atoms,v4,v5,v6', [(a, v4, v5, v6) for (a, v4), v5, v6
+                                            in zip(V4_SINGLE_POINTS, V5_SINGLE_POINTS, V6_SINGLE_POINTS)],
                          ids=['water', 'benzene', 'caffeine'])
-def test_no_single_point_decision_is_less_conservative_than_version_4s(atoms, v4, v5):
+def test_no_single_point_decision_is_less_conservative_than_version_4s(atoms, v4, v5, v6):
     d = sizing.decide(canonical_job('single', atoms, 0, 1))
-    assert {k: d[k] for k in v5} == v5
+    assert {k: d[k] for k in v6} == v6
     assert (d['size'], d['capacity'], d['attempts']) == (v4['size'], v4['capacity'], v4['attempts'])
     for k in ('predictedSeconds', 'timeoutSeconds', 'reservationMicros'):
-        assert d[k] >= v4[k], k
+        assert d[k] >= v5[k] >= v4[k], k
 
 
 def test_a_c60_scale_single_point_is_refused_because_its_result_files_cannot_fit():
@@ -558,7 +584,8 @@ def test_a_c60_scale_single_point_is_refused_because_its_result_files_cannot_fit
         sizing.decide(canonical_job('single', carbons(60), 0, 1))
     assert e.value.code == 'output-too-large'
     assert e.value.message.startswith("this molecule's result files would exceed the app's file limit")
-    assert "larger molecules arrive with Phase 6D's smaller-basis option" in e.value.message
+    # Preflight D13: no phase it names has the smaller-basis option yet; the message promises none it cannot keep.
+    assert 'Phase 6D' not in e.value.message and 'a smaller basis' in e.value.message
 
 
 @pytest.mark.parametrize('atoms,refused', [(24, False), (30, True), (36, True)], ids=['C24', 'C30', 'C36'])
@@ -649,3 +676,103 @@ def test_the_memory_headroom_covers_every_aws_working_set(n, peak, memory_gb, ma
     else:
         working_set = peak - incore_eri_gb(n, memory_gb, max_memory_mb)
     assert 0 < working_set <= sizing.HEADROOM * sizing.predicted_memory_gb(n)
+
+
+def test_the_frequency_check_is_priced_for_recipe_b_from_compute_version_2_only():
+    job = canonical_job('optimise', WATER, 0, 1)
+    small = sizing.SIZES[0]
+    step = sizing.step_seconds(basis_functions(WATER, 'def2-SVP'), small)
+    assert sizing.frequency_seconds(job, small) == pytest.approx(sizing.CONSTANTS['h'] * step * 3)
+    assert sizing.frequency_seconds(canonical_job('single', WATER, 0, 1), small) == 0.0
+    assert sizing.frequency_seconds({**job, 'computeVersion': 1}, small) == 0.0
+    assert sizing.predict_seconds(job, small) == pytest.approx(sum(sizing.predict_parts(job, small).values()))
+
+
+def test_an_open_shells_frequency_check_is_scaled_like_its_scf():
+    closed = sizing.frequency_seconds(canonical_job('optimise', WATER, 0, 1), sizing.SIZES[0])
+    opened = sizing.frequency_seconds(canonical_job('optimise', WATER, 1, 2), sizing.SIZES[0])
+    assert opened == pytest.approx(sizing.OPEN_SHELL_FACTOR * closed)
+
+
+def test_decide_hands_the_worker_its_budget_figures():
+    d = sizing.decide(canonical_job('optimise', WATER, 0, 1))
+    size = next(s for s in sizing.SIZES if s.name == d['size'])
+    # Ruling D7: labelling the orbitals is its own figure, which worker.TimeBudget reads.
+    assert set(d['parts']) == {'stepSeconds', 'frequencySeconds', 'finalScfSeconds', 'labellingSeconds',
+                               'filesSeconds'}
+    assert d['parts']['finalScfSeconds'] == round(sizing.single_point_seconds(58, size.vcpu), 1)
+    assert d['parts']['frequencySeconds'] > 0 and d['parts']['labellingSeconds'] > 0
+    assert sizing.decide(canonical_job('single', WATER, 0, 1))['parts']['stepSeconds'] == 0.0
+
+
+def test_the_hessians_own_arrays_fit_inside_the_property_basis_memory():
+    # PySCF's RKS Hessian holds 3 x atoms first-order AO matrices at def2-SVP (h1ao). Version 6 adds no memory
+    # term: they stay far inside what the def2-TZVPD SCF already reserves, with HEADROOM.
+    for atoms in (WATER, CAFFEINE, carbons(60)):
+        n_svp, n_property = basis_functions(atoms, 'def2-SVP'), basis_functions(atoms, 'def2-TZVPD')
+        assert 3 * len(atoms) * n_svp ** 2 * 8 / 1024 ** 3 < sizing.HEADROOM * sizing.predicted_memory_gb(n_property)
+
+
+# Ruling D7: labelling the orbitals, as Task 3's point_group.orbital_characters does it, timed on this Mac
+# (B3LYP/def2-TZVPD, grid level 4, one thread; Task 3's table, SF6 re-run by Task 9, and Task 9's
+# caffeine-sized molecule with 1 and 250 random orbitals and two operations): id, the AO evaluations on the
+# grid (one per class operation, plus the unrotated grid), the grid points, N, the orbitals kept, seconds.
+MEASURED_LABELLING = [('benzene D6h', 13, 231_296, 276, 26, 3.3), ('SF6 Oh', 11, 185_824, 286, 40, 2.23),
+                      ('BF3 D3h', 7, 106_512, 157, 21, 0.4), ('ethane D3d', 7, 134_648, 128, 14, 0.5),
+                      ('silane Td', 6, 85_480, 79, 14, 0.2), ('methane Td', 6, 83_376, 73, 10, 0.2),
+                      ('phosphine C3v', 4, 71_120, 70, 14, 0.1), ('ammonia C3v', 4, 69_184, 64, 10, 0.1),
+                      ('N 614, 1 orbital', 3, 553_968, 614, 1, 3.99), ('N 614, 250 orbitals', 3, 553_968, 614, 250, 7.31)]
+
+
+@pytest.mark.parametrize('name,evaluations,grid,n,kept,seconds', MEASURED_LABELLING,
+                         ids=[m[0] for m in MEASURED_LABELLING])
+def test_every_measured_labelling_is_inside_its_rate_on_one_fargate_vcpu(name, evaluations, grid, n, kept, seconds):
+    # Each run's own operations, grid and orbitals at version 6's rates, on one vCPU, cover the Mac's time
+    # scaled by MAC_TO_FARGATE (the file write's: f2 was 2 480 on this Mac and 5 410 on Fargate).
+    rate = sizing.LABEL_SECONDS + sizing.LABEL_SECONDS_PER_ORBITAL * kept
+    assert evaluations * grid * n * rate >= sizing.MAC_TO_FARGATE * seconds
+
+
+def test_labelling_is_priced_for_the_largest_projection_whatever_the_molecule():
+    # Sizing runs where PySCF does not (the API Lambda), so it cannot find the point group: every job is
+    # priced at D6h's 12 classes, the most the projection uses, plus the unrotated grid, twice over (the
+    # orbitals, then a constructed LVMO's irrep_of).
+    assert sizing.LABEL_EVALUATIONS == 2 * (12 + 1)
+    job, small = canonical_job('single', WATER, 0, 1), sizing.SIZES[0]
+    kept = math.ceil(10 / 2) + sizing.VIRTUAL_ROWS
+    expected = (sizing.LABEL_EVALUATIONS * sizing.grid_points(WATER) * 58
+                * (sizing.LABEL_SECONDS + sizing.LABEL_SECONDS_PER_ORBITAL * kept) / sizing.files_speedup(2))
+    assert sizing.labelling_seconds(job, small) == pytest.approx(expected)
+    # Grid work, threaded as the file write is, and indifferent to spin.
+    assert sizing.labelling_seconds(canonical_job('single', WATER, 1, 2), small) == pytest.approx(expected)
+    assert sizing.labelling_seconds(job, LARGE) == pytest.approx(expected * sizing.files_speedup(2)
+                                                                 / sizing.files_speedup(16))
+
+
+def test_the_grid_estimate_is_never_below_pyscfs_own():
+    # PySCF's level-4 grid, as input.py and the library build it: per atom at most 16 000 points for H and
+    # He and 31 000 for anything to Kr (a lone atom's, which Becke partitioning only prunes in a molecule).
+    from pyscf import gto
+    from pyscf.dft import gen_grid
+    for atoms in (WATER, BENZENE, CAFFEINE):
+        mol = gto.M(atom=[(int(a[0]), a[1:]) for a in atoms], basis='def2-SVP', verbose=0)
+        grids = gen_grid.Grids(mol)
+        grids.level = 4
+        grids.build()
+        assert len(grids.weights) <= sizing.grid_points(atoms) <= 1.2 * len(grids.weights)
+
+
+def test_a_check_jobs_result_budget_counts_its_frequencies_json():
+    # Task 8 carry (preflight D10): frequencies.json is written before the grids, inside the same 3 MB budget.
+    from jobs.input_template import predicted_frequencies_bytes
+    optimise, single = canonical_job('optimise', CAFFEINE, 0, 1), canonical_job('single', CAFFEINE, 0, 1)
+    assert sizing.frequencies_bytes(optimise) == predicted_frequencies_bytes(24)
+    assert sizing.frequencies_bytes(single) == sizing.frequencies_bytes({**optimise, 'computeVersion': 1}) == 0
+    assert sizing.predicted_output_bytes(optimise) == sizing.predicted_output_bytes(single) + predicted_frequencies_bytes(24)
+
+
+def test_a_spot_refusal_names_minutes_below_two_hours():
+    # Task 4 minor: a 61.6-min run read "predicted at 1.0 h" against the 60 min limit.
+    assert 'predicted at 62 min' in sizing.spot_unavailable(61.6 * 60)
+    assert 'predicted at 119 min' in sizing.spot_unavailable(119 * 60)
+    assert 'predicted at 2.0 h' in sizing.spot_unavailable(7200)

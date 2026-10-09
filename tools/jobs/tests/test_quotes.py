@@ -46,8 +46,9 @@ def test_compute_maximum_is_attempts_times_the_timeout_plus_the_billing_allowanc
     allowance = sizing.BILLING_ALLOWANCE_SECONDS
     assert line['spot']['compute']['maximumMicros'] == 3 * cost_micros('spot', 2, 8, 600 + allowance)
     assert line['on-demand']['compute']['maximumMicros'] == cost_micros('on-demand', 2, 8, 600 + allowance)
-    # The estimate is one attempt: the prediction plus a start-up minute, at Fargate's one-minute minimum.
-    assert line['spot']['compute']['estimateMicros'] == cost_micros('spot', 2, 8, 76)
+    # The estimate is one attempt: the prediction plus a start-up minute, at Fargate's one-minute minimum
+    # (sizing version 6: 16.3 s with labelling the orbitals, + 60 s, billed as 77).
+    assert line['spot']['compute']['estimateMicros'] == cost_micros('spot', 2, 8, 77)
     assert spot['estimateMicros'] == sum(l['estimateMicros'] for l in spot['lines'])
     assert spot['maximumMicros'] == sum(l['maximumMicros'] for l in spot['lines'])
     assert line['spot']['platform'] == {'item': 'platform', 'estimateMicros': 0, 'maximumMicros': 0}
@@ -255,3 +256,26 @@ def test_a_quote_carries_the_minute_it_was_issued_and_the_id_binds_it():
     assert by_option(a)['spot']['issuedAt'] == '2026-10-10T12:00Z'
     assert by_option(a)['spot']['quoteId'] != by_option(b)['spot']['quoteId']
     assert quotes.public_quote(a)['options'][0]['issuedAt'] == '2026-10-10T12:00Z'
+
+
+def test_recipe_bs_compute_line_names_the_frequency_check():
+    water = [[8, 0.0, 0.0, 0.11779], [1, 0.0, 0.75545, -0.47116], [1, 0.0, -0.75545, -0.47116]]
+    optimise = quotes.public_quote(quotes.quote(canonical_job('optimise', water, 0, 1), 'k' * 64, 'aws'))
+    compute = next(l for l in optimise['options'][0]['lines'] if l['item'] == 'compute')
+    assert 'The prediction includes the frequency check (confirms a minimum): ' in compute['note']
+    single = quotes.public_quote(quotes.quote(canonical_job('single', water, 0, 1), 'k' * 64, 'aws'))
+    assert all('frequency check' not in l['note'] for l in single['options'][0]['lines'])
+
+
+def test_a_check_jobs_result_size_counts_its_frequencies_json():
+    # Task 8 carry (preflight D10): recipe B's frequencies.json is stored and delivered with the rest, so the
+    # storage and delivery lines are priced on it too (as STORED_OBJECTS already counts it).
+    from jobs.input_template import predicted_frequencies_bytes
+    single, q_single = water_quote(recipe='single')
+    optimise, q_optimise = water_quote(recipe='optimise')
+    s, o = by_option(q_single)['spot'], by_option(q_optimise)['spot']
+    assert o['resultBytes'] == s['resultBytes'] + predicted_frequencies_bytes(3) == quotes.result_bytes(58, predicted_frequencies_bytes(3))
+    assert o['resultBytesMax'] == quotes.result_bytes_max(58, predicted_frequencies_bytes(3)) > s['resultBytesMax']
+    storage = next(l for l in quotes.public_option(o)['lines'] if l['item'] == 'storage')
+    assert 'frequencies.json' in storage['note']
+    assert quotes.STORED_OBJECTS == 17

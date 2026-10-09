@@ -214,7 +214,7 @@ def test_two_samples_of_one_size_cannot_fit_an_intercept(tmp_path):
 
 def test_guarded_applies_task_14s_guards_and_names_them():
     raw = {'m0': 0.05, 'm2': -1.0, 't0': 0.3, 't3': -5.0, 't3Step': -2.0, 'g': None, 'f2': 0.0, 'stepScale': None,
-           'scfExponent': 0.86731, 'scfSaturation': 16, 'filesExponent': 0.63071, 'filesSaturation': 32}
+           'scfExponent': 0.86731, 'scfSaturation': 16, 'filesExponent': 0.63071, 'filesSaturation': 32, 'h': None}
     constants, guards = guarded(raw)
     deployed = sizing.CONSTANTS
     assert constants['m0'] == 0.2 and constants['t0'] == 1.0 and constants['g'] == 1.5
@@ -222,23 +222,25 @@ def test_guarded_applies_task_14s_guards_and_names_them():
     assert constants['t3Step'] == deployed['t3Step'] and constants['stepScale'] == deployed['stepScale']
     assert constants['scfExponent'] == 0.867 and constants['filesExponent'] == 0.631
     assert constants['scfSaturation'] == 16.0 and isinstance(constants['scfSaturation'], float)
-    assert {g.split(':')[0] for g in guards} == {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale'}
+    assert {g.split(':')[0] for g in guards} == {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'h'}
+    assert constants['h'] == deployed['h']
 
 
 def test_guarded_rounds_to_three_significant_figures_and_passes_good_values():
     raw = {'m0': 0.34083, 'm2': 6.7673, 't0': 4.8431, 't3': 26643.9, 't3Step': 31042.7, 'g': 0.3, 'f2': 5244.6,
-           'stepScale': 0.37512, 'scfExponent': 0.8673, 'scfSaturation': 16, 'filesExponent': 0.6307, 'filesSaturation': 32}
+           'stepScale': 0.37512, 'scfExponent': 0.8673, 'scfSaturation': 16, 'filesExponent': 0.6307, 'filesSaturation': 32,
+           'h': 1.4637}
     constants, guards = guarded(raw)
     assert guards == []
     assert constants == {'m0': 0.341, 'm2': 6.77, 't0': 4.84, 't3': 26600.0, 't3Step': 31000.0, 'g': 0.3,
                          'f2': 5240.0, 'stepScale': 0.375, 'scfExponent': 0.867, 'scfSaturation': 16.0, 'filesExponent': 0.631,
-                         'filesSaturation': 32.0}
+                         'filesSaturation': 32.0, 'h': 1.46}
     assert all(isinstance(v, float) for v in constants.values())
 
 
 def test_a_negative_g_keeps_1_5():
     raw = {'m0': 0.5, 'm2': 3.0, 't0': 5.0, 't3': 2e4, 't3Step': 1.5e4, 'g': -0.2, 'f2': 3e3, 'stepScale': 0.5,
-           'scfExponent': 0.9, 'scfSaturation': 16, 'filesExponent': 0.6, 'filesSaturation': 32}
+           'scfExponent': 0.9, 'scfSaturation': 16, 'filesExponent': 0.6, 'filesSaturation': 32, 'h': 1.2}
     constants, guards = guarded(raw)
     assert constants['g'] == 1.5 and [g.split(':')[0] for g in guards] == ['g']
 
@@ -259,7 +261,7 @@ def test_fit_aws_output_has_every_constant_sizing_reads(tmp_path, monkeypatch):
     sizing.predict_parts(job, sizing.SIZES[0])
     sizing.decide(job)
     assert {'m0', 'm2', 't0', 't3', 't3Step', 'g', 'f2', 'stepScale', 'scfExponent', 'scfSaturation',
-            'filesExponent', 'filesSaturation'} <= read
+            'filesExponent', 'filesSaturation', 'h'} <= read
 
     constants, _ = guarded(fit_aws(aws_samples(ladder(tmp_path)), probe=model_probe()))
     assert read <= set(constants), read - set(constants)
