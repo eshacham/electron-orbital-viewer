@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 
 from compact import read_float32_gz
-from library import LIBRARY, by_id
+from library import LIBRARY, OPTIMISED, by_id
 from measure import BOHR_TO_ANGSTROM, angular_difference, measure
-from version import OUT_ROOT
+from version import DATA_VERSION, OUT_ROOT
 
 REPO = Path(__file__).resolve().parents[3]
 EACH = pytest.mark.parametrize('entry', LIBRARY, ids=lambda m: m.id)
@@ -127,3 +127,55 @@ def test_ch4_and_benzene_homo_sets_have_the_expected_size():
 
     for molecule_id in ('ch4', 'co2', 'bf3', 'sf6', 'c2h2', 'c2h4', 'c2h6', 'benzene', 'sih4'):
         assert meta(by_id(molecule_id))['dipoleDebye'] < 0.05
+
+
+# Phase 6D, from data version v3: full-group labels, honest virtuals, D3(BJ), honest validation rows.
+V3 = pytest.mark.skipif(int(DATA_VERSION[1:]) < 3, reason='Phase 6D assertions apply from data version v3')
+TEXTBOOK_HOMO = {'ch4': '1t2', 'sih4': '2t2', 'nh3': '3a1', 'ph3': '5a1', 'c2h6': '1eg', 'bf3': "1a2'", 'sf6': '1t1g',
+                 'benzene': '1e1g', 'h2o': '1b1', 'co2': '1πg', 'c2h2': '1πu', 'hcn': '1π'}
+
+
+@V3
+@pytest.mark.parametrize('molecule_id', sorted(TEXTBOOK_HOMO))
+def test_v3_homos_carry_their_full_group_labels(molecule_id):
+    m = meta(by_id(molecule_id))
+    assert {o['label'] for o in m['orbitals'] if o.get('role') == 'HOMO'} == {TEXTBOOK_HOMO[molecule_id]}
+    assert m['symmetry']['labels'] == 'full-group' and m['symmetry']['labelGroup'] == m['symmetry']['pointGroup']
+
+
+@V3
+@pytest.mark.parametrize('molecule_id', ['h2o', 'nh3', 'ch4'])
+def test_v3_diffuse_lumo_and_a_valence_lvmo(molecule_id):
+    orbitals = meta(by_id(molecule_id))['orbitals']
+    assert all(o['class'] == 'diffuse' for o in orbitals if o.get('role') == 'LUMO')
+    lvmo = [o for o in orbitals if o.get('role') == 'LVMO']
+    assert lvmo and all(o['class'] == 'valence' for o in lvmo)
+
+
+@V3
+def test_v3_benzenes_lumo_is_its_valence_pi_star_with_no_separate_lvmo():
+    orbitals = meta(by_id('benzene'))['orbitals']
+    assert [(o['label'], o['class']) for o in orbitals if o.get('role') == 'LUMO'] == [('1e2u', 'valence')] * 2
+    assert not [o for o in orbitals if o.get('role') == 'LVMO']
+
+
+@V3
+@EACH
+def test_v3_method_dispersion_and_classes(entry):
+    m = meta(entry)
+    assert m['method'] == {'density': 'B3LYP-D3(BJ)/def2-TZVPD', 'energies': 'B3LYP-D3(BJ)/def2-TZVPD'}
+    assert m['dispersion']['model'] == 'D3(BJ)' and m['dispersion']['energyHartree'] < 0
+    assert m['dispersion']['backend'] == 'pyscf-dispersion 1.5.0'          # generated inside the worker image
+    assert all(o['class'] in ('valence', 'diffuse') for o in m['orbitals'] if o['occupation'] == 0)
+    assert all(o['label'] != '?' for o in m['orbitals']), [o.get('labelNote') for o in m['orbitals'] if o['label'] == '?']
+    assert m['generator']['dataVersion'] == 'v3'
+    if entry.optimised:
+        assert m['geometrySource'] == OPTIMISED
+
+
+@V3
+def test_v3_rows_say_which_geometry_checks_test_the_method():
+    rows = json.loads((REPO / 'src' / 'validation' / 'generated' / 'phase6_library.json').read_text())
+    for row in rows:
+        geometry = row['quantity'].startswith(('bond length', 'angle'))
+        assert ('notATest' in row) == (geometry and row['geometrySource'].startswith('experiment')), row
