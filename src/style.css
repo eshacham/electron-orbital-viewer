@@ -1277,7 +1277,8 @@ html, body, #root {
 }
 .molecule-orbital-row {
   display: grid;
-  grid-template-columns: 48px 28px 1fr auto auto;
+  /* Phase 6D: 58 px, not 48, so a label keeps its ◌/◇ mark beside it (10a1′◌). */
+  grid-template-columns: 58px 28px 1fr auto auto;
   align-items: center;
   gap: 6px;
   padding: 4px 6px;
@@ -1308,6 +1309,21 @@ html, body, #root {
   color: rgba(0, 0, 0, 0.62);
   font-size: 11px;
   text-align: center;
+}
+/* Phase 6D: the gap divider's Kohn–Sham caveat, on its own line in the divider's own colour. */
+.molecule-orbital-gap-caveat {
+  display: block;
+  color: rgba(0, 0, 0, 0.62);
+  font-size: 10px;
+}
+/* Phase 6D: the mark beside a diffuse virtual's (◌) or a constructed LVMO's (◇) label, in the row's own colour;
+   its role="img" and accessible name carry the meaning, and the caption is its legend. */
+.molecule-orbital-mark {
+  margin-left: 3px;
+}
+/* Ruling D4-energy: ", upper estimate" after a constructed LVMO's energy, wrapping as one piece. */
+.molecule-orbital-estimate {
+  white-space: nowrap;
 }
 /* Ruling T16-a: the drawn orbital's name in the navigation card. */
 .molecule-nav-orbital {

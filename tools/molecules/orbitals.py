@@ -20,8 +20,9 @@ diagonalised in the virtual part of the IAO span -- appended as one more row
 own coefficients in the table, its energy an expectation value (water's σ*
 +5.0 eV). Seven library molecules get one (Ruling D4: H2O, NH3, CH4, C2H6,
 SiH4, CH3OH, ethanol). It is not an orbital of this calculation, so the row
-says so itself -- `constructed`, `energyApproximate` and CONSTRUCTED_NOTE --
-for every reader of meta.json and basis.json, not only the viewer.
+says so itself -- `constructed`, `energyApproximate` (read: the energy is an
+upper estimate, Ruling D4-energy) and CONSTRUCTED_NOTE -- for every reader of
+meta.json and basis.json, not only the viewer.
 """
 from dataclasses import dataclass
 
@@ -31,8 +32,11 @@ from point_group import irrep_of, label_orbitals, number_labels
 
 DEGENERACY_TOL = 1e-4
 VALENCE_THRESHOLD = 0.75
+# Ruling D4-energy: the energy is the orbital's Fock expectation value within the valence space -- an upper
+# estimate, several eV above the canonical virtuals it stands for, so never shown as approximate (≈).
 CONSTRUCTED_NOTE = ('constructed from the valence part of the virtual space — not an orbital of this calculation; '
-                    'energy approximate (≈)')
+                    'its energy is an upper estimate (its value within the valence space), '
+                    "typically several eV above this calculation's orbital energies")
 orbital_labels = number_labels      # Phase 6's name for the per-irrep numbering, kept for its callers
 
 

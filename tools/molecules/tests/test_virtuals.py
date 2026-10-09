@@ -73,6 +73,16 @@ def test_the_other_library_molecules_with_a_constructed_lvmo(molecule_id, label,
     assert_no_partial_sets(table, mf)
 
 
+def test_the_constructed_note_calls_its_energy_an_upper_estimate():
+    # Ruling D4-energy: the constructed LVMO's energy is its Fock expectation value within the valence space, an
+    # upper estimate several eV above the calculation's own orbital energies (water +5.0 eV against the canonical
+    # σ* at +0.4-1.3 eV). Calling it approximate (≈) would overstate a HOMO-LVMO gap by about 4 eV.
+    assert CONSTRUCTED_NOTE == ('constructed from the valence part of the virtual space — not an orbital of this '
+                                'calculation; its energy is an upper estimate (its value within the valence space), '
+                                "typically several eV above this calculation's orbital energies")
+    assert '≈' not in CONSTRUCTED_NOTE and 'approximate' not in CONSTRUCTED_NOTE
+
+
 def test_the_constructed_rows_valence_character_is_measured_not_assumed():
     # D18: computed from the orbital itself (the singular values of the virtual-IAO overlap), not written as 1.0.
     mol, mf = scf('h2o', 'def2-TZVPD')

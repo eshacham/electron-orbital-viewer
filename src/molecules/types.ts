@@ -39,6 +39,11 @@ export interface NearTie {
     runnerUpEnergyHartree: number;
 }
 
+/** Phase 6D adds LVMO: the lowest valence virtual, where the LUMO is a diffuse state of the basis. */
+export type OrbitalRole = 'HOMO' | 'LUMO' | 'SOMO' | 'LVMO';
+/** A virtual's class (Phase 6D): 'diffuse' under 75 % valence character (orbitals.py's VALENCE_THRESHOLD). */
+export type VirtualClass = 'valence' | 'diffuse';
+
 export interface MoleculeOrbitalInfo {
     /** Position in basis.json's `orbitals`; what a 'gaussianMO' recipe's `index` means. */
     index: number;
@@ -47,7 +52,21 @@ export interface MoleculeOrbitalInfo {
     energyHartree: number;
     occupation: number;
     spin?: OrbitalSpin;
-    role?: 'HOMO' | 'LUMO' | 'SOMO';
+    role?: OrbitalRole;
+    /** Phase 6D (library v3, jobs from compute version 2): a virtual's share inside the intrinsic minimal basis, 0-1. */
+    valenceCharacter?: number;
+    class?: VirtualClass;
+    /** Not a canonical MO: the lowest valence virtual orbital, built from the IAO span (orbitals.py appends it). */
+    kind?: 'valence-virtual';
+    /** Set with `kind` on a constructed row; either flag marks it, and the viewer reads the flags, not `note`. */
+    constructed?: boolean;
+    /** The generator's name; read it as "the energy is an upper estimate" (Ruling D4-energy): a constructed row's
+     * energy is its value within the valence space, several eV above the calculation's own orbital energies. */
+    energyApproximate?: boolean;
+    /** orbitals.CONSTRUCTED_NOTE as the generator wrote it -- for other readers of meta.json; the list renders its own. */
+    note?: string;
+    /** Why a degenerate set was left unlabelled ('?'). */
+    labelNote?: string;
     nearTie?: NearTie;
 }
 

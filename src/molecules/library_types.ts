@@ -31,7 +31,9 @@ export interface LibraryExtras {
     electronCount: number;
     densityIntegral: number;
     multiplicity: number;
-    symmetry: { pointGroup: string; labelGroup: string };
+    /** Phase 6D: `labels` says whether the labels are the full group's, a named subgroup's (labelNote says why), or none
+     * (no symmetry: labelGroup null); older data has neither, and was labelled in PySCF's subgroup. */
+    symmetry: { pointGroup: string; labelGroup: string | null; labels?: 'full-group' | 'subgroup' | 'none'; labelNote?: string };
     geometryOptimisation?: {
         converged: boolean;
         maxGradient?: number;

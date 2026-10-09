@@ -90,6 +90,9 @@ const PAIRS: Array<{ selector: string; declared: string; fg: string; bg: string 
     // orbital list and the drawn orbital's name both sit on LIGHT_96 cards;
     // the phone's in-stack error alert on its own opaque pink.
     { selector: '.molecule-orbital-gap', declared: 'color: rgba(0, 0, 0, 0.62)', fg: 'rgba(0, 0, 0, 0.62)', bg: LIGHT_96 },
+    // Phase 6D: the divider's Kohn–Sham caveat line, on the same LIGHT_96 card. (The ◌/◇ marks and ", upper
+    // estimate" declare no colour: they read in the row's own text colour.)
+    { selector: '.molecule-orbital-gap-caveat', declared: 'color: rgba(0, 0, 0, 0.62)', fg: 'rgba(0, 0, 0, 0.62)', bg: LIGHT_96 },
     { selector: '.molecule-nav-orbital', declared: 'color: rgba(0, 0, 0, 0.87)', fg: 'rgba(0, 0, 0, 0.87)', bg: LIGHT_96 },
     { selector: '.molecule-error', declared: 'background-color: rgb(253, 237, 237)', fg: 'rgb(95, 33, 32)', bg: 'rgb(253, 237, 237)' },
     // Phase 6B-2 Task 12: the tier badge's line over the canvas, and the
