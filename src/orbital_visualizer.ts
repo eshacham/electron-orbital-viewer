@@ -48,7 +48,7 @@ import {
 } from './atom/reference_ring';
 import { CPK_COLORS, disposeOverlay } from './molecules/ball_and_stick';
 import { CLASSIC_APPEARANCE, type Appearance } from './design/appearance';
-import { axesStyle, curvePalette, densitySurfaceHex, displayRgb, linearRgb, phaseColours } from './design/science';
+import { axesStyle, curvePalette, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb, phaseColours } from './design/science';
 
 /** One colour for a total density (spec §4.1): ψ's red and blue would claim a phase it does not have. */
 export const DENSITY_SURFACE_COLOUR = new THREE.Color(DENSITY_SURFACE_HEX);
@@ -1338,9 +1338,9 @@ export function setMoleculeOverlay(context: VisualizerContext | null, overlay: T
     }
 }
 
-/** Ruling R12: hydrogen's CPK white would vanish on Light Clean's page, so it is #F2F2F2 there (non-Classic). */
+/** Ruling R12: hydrogen's CPK white would vanish on Light Clean's page, so it takes science.ts's LIGHT_HYDROGEN there (non-Classic). */
 function applyOverlayAppearance(overlay: THREE.Object3D, appearance: Appearance): void {
-    const hydrogen = appearance.theme === 'light' && appearance.scheme !== 'classic' ? '#F2F2F2' : CPK_COLORS[1];
+    const hydrogen = appearance.theme === 'light' && appearance.scheme !== 'classic' ? LIGHT_HYDROGEN : CPK_COLORS[1];
     overlay.traverse(child => {
         const material = (child as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
         if (material?.userData?.Z === 1) material.color.set(hydrogen);
@@ -1911,8 +1911,8 @@ function updateSceneWithMeshData(
                 setCapsPhaseColours(caps, displayRgb(phase.capPositive), displayRgb(phase.capNegative));
                 setCapsDensityRamp(caps, appearance.scheme === 'density');
             } else {
-                // THREE.Color, as before, for the cap's uniform.
-                setCapsPositiveColour(caps, new THREE.Color(densitySurfaceHex(appearance.theme, appearance.scheme)));
+                // Display space, as the cap shader ramps (ruling DC2b): the cut face matches the surface and the key.
+                setCapsPositiveColour(caps, displayRgb(densitySurfaceHex(appearance.theme, appearance.scheme)));
             }
         };
         paint(appearanceOf(context));

@@ -25,6 +25,9 @@ export const CLASSIC = {
     axisLabels: { x: '#ff9f40', y: '#a0ff40', z: '#40a8ff' },
 } as const;
 
+/** Ruling R12: a hydrogen ball in Light Clean (non-Classic) -- CPK white would vanish on the page. */
+export const LIGHT_HYDROGEN = '#F2F2F2';
+
 export const PHASE_COLOURS: Record<ThemeMode, { positive: string; negative: string; rimPositive: string; rimNegative: string }> = {
     dark: { positive: '#FF7A2F', negative: '#2F6BFF', rimPositive: '#FFC59A', rimNegative: '#9CC2FF' },
     light: { positive: '#E8590C', negative: '#1F5FE0', rimPositive: '#9A3412', rimNegative: '#1E3A8A' },

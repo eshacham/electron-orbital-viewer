@@ -8,6 +8,7 @@ import { VisualizerContext, updateFieldInScene, DENSITY_SURFACE_COLOUR } from '.
 import { defaultSurfaceStyle, MeshData } from '../../src/types/orbital';
 import { FieldRenderRequest } from '../../src/field_source';
 import { h2plusSource } from '../../src/bonds/h2plus';
+import { CLASSIC, displayRgb } from '../../src/design/science';
 
 function buildContext(): VisualizerContext {
     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
@@ -59,8 +60,9 @@ describe('density colour', () => {
             if (material?.uniforms?.positivePhase) capColours.push(material.uniforms.positivePhase.value);
         });
         expect(capColours.length).toBeGreaterThan(0);
-        // Ruling DC2: the uniform is a Vector3, so compare x/y/z with r/g/b -- Vector3.equals(Color) compared undefined with undefined and hid a NaN uniform.
-        expect(capColours.map(v => [v.x, v.y, v.z])).toEqual(capColours.map(() => [c.r, c.g, c.b]));
+        // Ruling DC2: compare the Vector3's own components -- Vector3.equals(Color) compared undefined with undefined and hid a NaN uniform.
+        // Ruling DC2b: in display space (the cap shader's), so the cut face shows the same colour as the surface.
+        expect(capColours.map(v => v.toArray())).toEqual(capColours.map(() => displayRgb(CLASSIC.densitySurface)));
     });
 
     it('keeps phase colours for an orbital', async () => {

@@ -1,7 +1,7 @@
 import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 import { deltaE76, hexToLab } from '../../src/design/colour_math';
 import {
-    axesStyle, CLASSIC, CURVE_COLORS_LIGHT, curvePalette, DENSITY_RAMP, densitySurfaceHex, displayRgb, linearRgb,
+    axesStyle, CLASSIC, CURVE_COLORS_LIGHT, LIGHT_HYDROGEN, curvePalette, DENSITY_RAMP, densitySurfaceHex, displayRgb, linearRgb,
     phaseColours, themeCurveColour,
 } from '../../src/design/science';
 import { THEME_MODES } from '../../src/design/tokens';
@@ -24,6 +24,11 @@ describe('science colours (spec §4.2, §11)', () => {
         expect(linearRgb(CLASSIC.positive)).toEqual([1, 0, 0]);
         expect(linearRgb(CLASSIC.negative)).toEqual([0, 0, 1]);
         expect(displayRgb(CLASSIC.capPositive).map(c => Math.round(c * 255))).toEqual([0xd4, 0x20, 0x20]);
+    });
+
+    it('holds Light Clean\'s hydrogen (ruling R12), off CPK white so it does not vanish on the page', () => {
+        expect(LIGHT_HYDROGEN).toBe('#F2F2F2');
+        expect(LIGHT_HYDROGEN.toLowerCase()).not.toBe('#ffffff');
     });
 
     it('the phase scheme\'s key, PNG legend and surface are one colour pair (one source)', () => {

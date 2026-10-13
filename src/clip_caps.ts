@@ -226,13 +226,18 @@ export function setCapsOpacity(caps: THREE.Object3D | null, opacity: number): vo
     });
 }
 
-/** Recolours the cut face's "positive" shade; a density has no phase, so it takes the surface's own colour. */
-export function setCapsPositiveColour(caps: THREE.Group, colour: THREE.Color): void {
+/**
+ * Recolours the cut face's "positive" shade; a density has no phase, so it
+ * takes the surface's own colour. Display-space 0–1 (science.ts displayRgb),
+ * like the ramp it feeds -- a THREE.Color's linear components would draw the
+ * cut face darker than the surface it belongs to (ruling DC2b).
+ */
+export function setCapsPositiveColour(caps: THREE.Object3D, colour: [number, number, number]): void {
     caps.traverse(object => {
         const material = (object as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
-        // Ruling DC2: set from r/g/b. The uniform is a Vector3, and Vector3.copy(Color)
-        // read x/y/z, which a Color does not have -- the cut face got NaN.
-        if (material?.uniforms?.positivePhase) material.uniforms.positivePhase.value.set(colour.r, colour.g, colour.b);
+        // Ruling DC2: set component by component. The uniform is a Vector3, and the old
+        // Vector3.copy(Color) read x/y/z, which a Color does not have -- the cut face got NaN.
+        if (material?.uniforms?.positivePhase) material.uniforms.positivePhase.value.set(...colour);
     });
 }
 

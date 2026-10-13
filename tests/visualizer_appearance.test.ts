@@ -5,12 +5,13 @@ jest.mock('../src/orbital_controls_factory', () => ({ createOrbitalControls: jes
 
 import { createOrbitalWorker } from '../src/workers/createOrbitalWorker';
 import {
-    VisualizerContext, setAppearance, updateAtomViewInScene, updateOrbitalInScene, presentFieldMesh, DENSITY_SURFACE_COLOUR,
+    VisualizerContext, setAppearance, setMoleculeOverlay, updateAtomViewInScene, updateOrbitalInScene, presentFieldMesh,
 } from '../src/orbital_visualizer';
 import { defaultSurfaceStyle, MeshData } from '../src/types/orbital';
 import { CLASSIC_APPEARANCE, type Appearance } from '../src/design/appearance';
 import { CURVE_COLORS } from '../src/curve_colors';
-import { CLASSIC, CURVE_COLORS_LIGHT, DENSITY_RAMP, densitySurfaceHex, displayRgb, linearRgb } from '../src/design/science';
+import { CLASSIC, CURVE_COLORS_LIGHT, DENSITY_RAMP, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb } from '../src/design/science';
+import { CPK_COLORS } from '../src/molecules/ball_and_stick';
 
 /** A VisualizerContext without a WebGLRenderer (jsdom has no WebGL) -- tests/atom/visualizer_dispatch.test.ts's recipe. */
 function buildContext(): VisualizerContext {
@@ -160,13 +161,32 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
         const cap = capOf(context);
         const positive = () => (cap.material as THREE.ShaderMaterial).uniforms.positivePhase.value as THREE.Vector3;
         expect(cap.parent!.visible).toBe(true);
-        const c = DENSITY_SURFACE_COLOUR;
-        expect([positive().x, positive().y, positive().z]).toEqual([c.r, c.g, c.b]);
+        // Ruling DC2b: display space, the space the cap shader ramps in, so the cut face matches the surface and the key.
+        expect(positive().toArray()).toEqual(displayRgb(CLASSIC.densitySurface));
         const look: Appearance = { theme: 'light', scheme: 'phase', finish: 'solid', showAxes: true, lowPower: false };
         setAppearance(context, look);
-        const themed = new THREE.Color(densitySurfaceHex(look.theme, look.scheme));
-        expect([positive().x, positive().y, positive().z]).toEqual([themed.r, themed.g, themed.b]);
+        expect(positive().toArray()).toEqual(displayRgb(densitySurfaceHex(look.theme, look.scheme)));
         // The ESP's own colouring is left alone by a theme change.
         expect(Array.from(surface.geometry.getAttribute('color').array)).toEqual(Array.from(esp));
+    });
+
+    // Ruling R12, from science.ts: CPK white would vanish on Light Clean's page.
+    it('greys hydrogen in Light Clean, and gives it back its CPK white in Classic and in Deep Space', () => {
+        const context = buildContext();
+        const hydrogen = new THREE.MeshStandardMaterial({ color: CPK_COLORS[1] });
+        hydrogen.userData.Z = 1;
+        const oxygen = new THREE.MeshStandardMaterial({ color: CPK_COLORS[8] });
+        oxygen.userData.Z = 8;
+        const overlay = new THREE.Group();
+        overlay.add(new THREE.Mesh(new THREE.SphereGeometry(1), hydrogen), new THREE.Mesh(new THREE.SphereGeometry(1), oxygen));
+        setMoleculeOverlay(context, overlay);
+        expect(hydrogen.color.getHexString()).toBe(CPK_COLORS[1].slice(1));
+        setAppearance(context, { theme: 'light', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
+        expect(`#${hydrogen.color.getHexString().toUpperCase()}`).toBe(LIGHT_HYDROGEN);
+        expect(oxygen.color.getHexString()).toBe(CPK_COLORS[8].slice(1));
+        setAppearance(context, { theme: 'light', scheme: 'classic', finish: 'glow', showAxes: true, lowPower: false });
+        expect(hydrogen.color.getHexString()).toBe(CPK_COLORS[1].slice(1));
+        setAppearance(context, { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
+        expect(hydrogen.color.getHexString()).toBe(CPK_COLORS[1].slice(1));
     });
 });
