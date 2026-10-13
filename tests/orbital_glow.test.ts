@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { applyGlow, attachGlowExtras, fadeGlowExtras, glowSettingsFor, updateFrameGuard } from '../src/orbital_glow';
+import { applyGlow, attachGlowExtras, fadeGlowExtras, GLOW_LIGHTS, GLOW_TUNING, glowSettingsFor, updateFrameGuard } from '../src/orbital_glow';
 import { CLASSIC_APPEARANCE } from '../src/design/appearance';
 import { marchingCubes } from '../src/marching_cubes';
 
@@ -32,18 +32,23 @@ describe('Glow (spec §11.2)', () => {
         expect(glowSettingsFor(glowDark)!.rimPositive.getHexString()).toBe(new THREE.Color('#FFC59A').getHexString());
     });
 
-    it('injects a same-phase Fresnel rim and a 0.18 emissive term, and updates them without recompiling', () => {
+    // Ruling R20a-3: the emissive and the rim's strength and width are tuned values (GLOW_TUNING, pinned below).
+    it('injects a same-phase Fresnel rim and the tuned emissive term, and updates them without recompiling', () => {
         const material = new THREE.MeshStandardMaterial({ vertexColors: true });
         applyGlow(material, glowSettingsFor(glowDark));
         const shader = shaderOf(material);
         expect(shader.vertexShader).toContain('vQlPhase = phaseSign;');
         expect(shader.fragmentShader).toMatch(/qlRim[\s\S]*#include <opaque_fragment>/);
         expect(shader.fragmentShader).toContain('totalEmissiveRadiance += diffuseColor.rgb * qlEmissive;');
-        expect(shader.uniforms.qlEmissive.value).toBeCloseTo(0.18);
+        expect(shader.uniforms.qlEmissive.value).toBeCloseTo(GLOW_TUNING.dark.emissive);
+        expect(shader.uniforms.qlRimPower.value).toBeCloseTo(GLOW_TUNING.dark.rimPower);
+        expect(shader.fragmentShader).toContain('normalize(vViewPosition))), qlRimPower);');
         const version = material.version;
         applyGlow(material, glowSettingsFor({ ...glowDark, theme: 'light' }));
         expect(material.version).toBe(version);
         expect(shader.uniforms.qlInk.value).toBe(1);
+        expect(shader.uniforms.qlEmissive.value).toBeCloseTo(GLOW_TUNING.light.emissive);
+        expect(shader.uniforms.qlRimStrength.value).toBeCloseTo(GLOW_TUNING.light.rimStrength);
         applyGlow(material, null);
         expect(material.version).toBeGreaterThan(version);
     });
@@ -73,8 +78,10 @@ describe('Glow (spec §11.2)', () => {
         expect(extras().map(child => child.userData.isGlowExtra).sort()).toEqual(['halo', 'lines']);
         expect(extras().every(child => (child as THREE.Mesh).geometry === geometry)).toBe(true);
         const halo = extras().find(child => child.userData.isGlowExtra === 'halo') as THREE.Mesh;
-        expect((halo.material as THREE.ShaderMaterial).uniforms.qlHaloOffset.value).toBeCloseTo(0.03);
-        expect((halo.material as THREE.ShaderMaterial).uniforms.qlHaloOpacity.value).toBeCloseTo(0.12);
+        // Ruling R20a-3: the halo's push, peak and falloff are the tuned values (radius 2 here).
+        expect((halo.material as THREE.ShaderMaterial).uniforms.qlHaloOffset.value).toBeCloseTo(GLOW_TUNING.dark.halo.offset * 2);
+        expect((halo.material as THREE.ShaderMaterial).uniforms.qlHaloOpacity.value).toBeCloseTo(GLOW_TUNING.dark.halo.opacity);
+        expect((halo.material as THREE.ShaderMaterial).uniforms.qlHaloPower.value).toBeCloseTo(GLOW_TUNING.dark.halo.power);
 
         attachGlowExtras(group, surface, { ...glowDark, theme: 'light' }, options);
         expect(extras().map(child => child.userData.isGlowExtra)).toEqual(['lines']);
@@ -173,18 +180,61 @@ describe('Glow (spec §11.2)', () => {
         // Light Clean: lines only.
         attachGlowExtras(group, surface, { ...glowDark, theme: 'light' }, options);
         const haloOpacity = () => ((group.children.find(c => c.userData.isGlowExtra === 'halo') as THREE.Mesh).material as THREE.ShaderMaterial).uniforms.qlHaloOpacity.value;
-        const linesOpacity = () => ((group.children.find(c => c.userData.isGlowExtra === 'lines') as THREE.Mesh).material as THREE.Material).opacity;
+        // Ruling R20a-3: the lines are a shader material now; their alpha is a uniform.
+        const linesOpacity = () => ((group.children.find(c => c.userData.isGlowExtra === 'lines') as THREE.Mesh).material as THREE.ShaderMaterial).uniforms.qlLinesOpacity.value;
         fadeGlowExtras(group, 0);
         expect(linesOpacity()).toBe(0);
         // Deep Space mid-fade: the halo joins at the fade, not at full strength.
         attachGlowExtras(group, surface, glowDark, options);
         expect(haloOpacity()).toBe(0);
+        // Ruling R20a-3: half and full of the tuned strengths; the lines kept from Light Clean now wear Deep Space's.
         fadeGlowExtras(group, 0.5);
-        expect(haloOpacity()).toBeCloseTo(0.06);
-        expect(linesOpacity()).toBeCloseTo(0.03);
+        expect(haloOpacity()).toBeCloseTo(GLOW_TUNING.dark.halo.opacity / 2);
+        expect(linesOpacity()).toBeCloseTo(GLOW_TUNING.dark.lines.opacity / 2);
         fadeGlowExtras(group, 1);
-        expect(haloOpacity()).toBeCloseTo(0.12);
-        expect(linesOpacity()).toBeCloseTo(0.06);
+        expect(haloOpacity()).toBeCloseTo(GLOW_TUNING.dark.halo.opacity);
+        expect(linesOpacity()).toBeCloseTo(GLOW_TUNING.dark.lines.opacity);
+    });
+
+    // Ruling R20a-3: the concept look, tuned live (Task 20a) -- pinned so a change is deliberate.
+    it('pins the tuned Glow values', () => {
+        expect(GLOW_TUNING).toEqual({
+            dark: {
+                emissive: 0.1, rimStrength: 1.0, rimPower: 1.8,
+                lines: { opacity: 0.05, whiten: 0.3, additive: true },
+                halo: { opacity: 0.6, offset: 0.08, power: 1 },
+            },
+            light: {
+                emissive: 0.6, rimStrength: 0.8, rimPower: 2.2,
+                lines: { opacity: 0.16, whiten: 0.85, additive: false },
+            },
+        });
+        expect(GLOW_LIGHTS).toEqual({ ambient: 0.15, key: 0.35, fill: 0.15 });
+    });
+
+    // Ruling R20a-3: lines lighter than their lobe in its own hue (never the other phase's),
+    // added as light in Deep Space and painted over on white; a kept extra follows a theme switch.
+    it('draws the mesh lines in their own phase, whitened, additive in Deep Space and painted in Light Clean', () => {
+        const group = new THREE.Group();
+        const surface = surfaceIn(group);
+        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        attachGlowExtras(group, surface, glowDark, options);
+        const lines = group.children.find(c => c.userData.isGlowExtra === 'lines') as THREE.Mesh;
+        const material = lines.material as THREE.ShaderMaterial;
+        expect(material.wireframe).toBe(true);
+        expect(material.vertexShader).toContain('mix(color, vec3(1.0), qlLinesWhiten)');
+        expect(material.blending).toBe(THREE.AdditiveBlending);
+        expect(material.uniforms.qlLinesWhiten.value).toBeCloseTo(GLOW_TUNING.dark.lines.whiten);
+        attachGlowExtras(group, surface, { ...glowDark, theme: 'light' }, options);
+        expect(group.children.find(c => c.userData.isGlowExtra === 'lines')).toBe(lines);
+        expect(material.blending).toBe(THREE.NormalBlending);
+        expect(material.uniforms.qlLinesOpacity.value).toBeCloseTo(GLOW_TUNING.light.lines.opacity);
+        expect(material.uniforms.qlLinesWhiten.value).toBeCloseTo(GLOW_TUNING.light.lines.whiten);
+        // Edge-on the lines fade, leaving the outline to the rim; the halo is soft at both edges.
+        expect(material.fragmentShader).toContain('qlLinesOpacity * facing');
+        attachGlowExtras(group, surface, glowDark, options);
+        const halo = group.children.find(c => c.userData.isGlowExtra === 'halo') as THREE.Mesh;
+        expect((halo.material as THREE.ShaderMaterial).fragmentShader).toContain('pow(facing, qlHaloPower) * (1.0 - facing)');
     });
 
     it('turns the lines off once frames average over 20 ms (ruling R10)', () => {

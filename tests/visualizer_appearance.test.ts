@@ -15,6 +15,7 @@ import { CLASSIC_APPEARANCE, type Appearance } from '../src/design/appearance';
 import { CURVE_COLORS } from '../src/curve_colors';
 import { CLASSIC, CURVE_COLORS_LIGHT, DENSITY_RAMP, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb } from '../src/design/science';
 import { CPK_COLORS } from '../src/molecules/ball_and_stick';
+import { GLOW_LIGHTS, GLOW_TUNING } from '../src/orbital_glow';
 
 /** A VisualizerContext without a WebGLRenderer (jsdom has no WebGL) -- tests/atom/visualizer_dispatch.test.ts's recipe. */
 function buildContext(): VisualizerContext {
@@ -84,8 +85,9 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
         expect(surfaceOf(context)).toBe(surface);
         expect(surface.geometry).toBe(geometry);
         expect(geometry.getAttribute('position').array).toBe(positions);
-        linearRgb('#E8590C').forEach((v, k) => expect(colourAt(surface, 0)[k]).toBeCloseTo(v, 6));
-        linearRgb('#1F5FE0').forEach((v, k) => expect(colourAt(surface, 1)[k]).toBeCloseTo(v, 6));
+        // Ruling R20a-1: Light Clean now paints Deep Space's phase pair (was #E8590C / #1F5FE0).
+        linearRgb('#FF7A2F').forEach((v, k) => expect(colourAt(surface, 0)[k]).toBeCloseTo(v, 6));
+        linearRgb('#2F6BFF').forEach((v, k) => expect(colourAt(surface, 1)[k]).toBeCloseTo(v, 6));
         setAppearance(context, CLASSIC_APPEARANCE);
         expect(colourAt(surface, 0)).toEqual([1, 0, 0]);
         expect(colourAt(surface, 1)).toEqual([0, 0, 1]);
@@ -100,7 +102,8 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
         await drawOrbital(context);
         setAppearance(context, { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
         // The Glow step really changed the lights and the surface, so the Classic checks below can fail.
-        expect(lights.map(light => light.intensity)).toEqual([0.35, 0.6, 0.25]);
+        // Ruling R20a-3: the Glow lights are tuned values now (GLOW_LIGHTS), not literals here.
+        expect(lights.map(light => light.intensity)).toEqual([GLOW_LIGHTS.ambient, GLOW_LIGHTS.key, GLOW_LIGHTS.fill]);
         expect(context.currentOrbitalGroup!.children.some(child => child.userData.isGlowExtra)).toBe(true);
         setAppearance(context, { theme: 'light', scheme: 'classic', finish: 'glow', showAxes: true, lowPower: false });
         const surface = surfaceOf(context);
@@ -229,7 +232,8 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         expect(context.lights.ambient.intensity).toBe(0.5);
         setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'solid' });
         expect(extras(context)).toHaveLength(2);
-        expect(context.lights.ambient.intensity).toBe(0.35);
+        // Ruling R20a-3: the tuned Glow ambient (was the literal 0.35).
+        expect(context.lights.ambient.intensity).toBe(GLOW_LIGHTS.ambient);
     });
 
     // Ruling T15-glowcover: the lights dim only while a drawn surface glows, so the orbital is drawn first.
@@ -238,7 +242,8 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         context.lights = { ambient: new THREE.AmbientLight(0xffffff, 0.5), key: new THREE.DirectionalLight(0xffffff, 0.8), fill: new THREE.DirectionalLight(0xffffff, 0.35) };
         await drawOrbital(context);
         setAppearance(context, glow);
-        expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([0.35, 0.6, 0.25]);
+        // Ruling R20a-3: the tuned Glow lights (were the literals 0.35, 0.6, 0.25).
+        expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([GLOW_LIGHTS.ambient, GLOW_LIGHTS.key, GLOW_LIGHTS.fill]);
         setAppearance(context, { ...glow, finish: 'solid' });
         expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([0.5, 0.8, 0.35]);
     });
@@ -274,7 +279,8 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         await pending;
         expect(context.transition?.kind).toBe('cross-fade');
         expect(((extra(context, 'halo')!.material) as THREE.ShaderMaterial).uniforms.qlHaloOpacity.value).toBe(0);
-        expect((extra(context, 'lines')!.material as THREE.Material).opacity).toBe(0);
+        // Ruling R20a-3: the lines are a shader material now; their alpha is a uniform.
+        expect(((extra(context, 'lines')!.material) as THREE.ShaderMaterial).uniforms.qlLinesOpacity.value).toBe(0);
     });
 
     // Ruling R10: the guard latches the lines off, and only a new appearance brings them back.
@@ -331,9 +337,10 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         expect(context.currentOrbitalGroup!.userData.isFieldOverlay).toBe(true);
         const overlay = surfaceOf(context);
         expect(glowOf(overlay).glow).toBe(true);
-        expect(glowOf(overlay).glowUniforms.qlEmissive.value).toBeCloseTo(0.18);
+        // Ruling R20a-3: the tuned emissive and lights (were the literals 0.18 and 0.35).
+        expect(glowOf(overlay).glowUniforms.qlEmissive.value).toBeCloseTo(GLOW_TUNING[glow.theme].emissive);
         expect(shaderOf(overlay).vertexShader).toContain('vQlPhase = 0.0;');
-        expect(context.lights.ambient.intensity).toBe(0.35);
+        expect(context.lights.ambient.intensity).toBe(GLOW_LIGHTS.ambient);
         setAppearance(context, { ...glow, finish: 'solid' });
         expect(glowOf(overlay).glow).toBe(false);
         expect(context.lights.ambient.intensity).toBe(0.5);
@@ -359,9 +366,10 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         expect(lobes).toHaveLength(2);
         lobes.forEach(mesh => {
             expect(glowOf(mesh).glow).toBe(true);
-            expect(glowOf(mesh).glowUniforms.qlEmissive.value).toBeCloseTo(0.18);
+            // Ruling R20a-3: the tuned emissive and lights (were the literals 0.18 and 0.35).
+            expect(glowOf(mesh).glowUniforms.qlEmissive.value).toBeCloseTo(GLOW_TUNING[glow.theme].emissive);
         });
-        expect(context.lights.ambient.intensity).toBe(0.35);
+        expect(context.lights.ambient.intensity).toBe(GLOW_LIGHTS.ambient);
         setAppearance(context, { ...glow, finish: 'solid' });
         lobes.forEach(mesh => expect(glowOf(mesh).glow).toBe(false));
         expect(context.lights.ambient.intensity).toBe(0.5);

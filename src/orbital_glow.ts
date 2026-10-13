@@ -6,12 +6,12 @@ import { phaseColours } from './design/science';
  * The Glow finish (spec §11.2): the concept's glowing translucent look with
  * the science intact. A Fresnel rim tinted with the SAME phase's colour
  * (never the other's -- that would read as a sign change), an emissive term
- * of 0.18 × the surface colour, and in Deep Space a faint additive halo
- * drawn from the same geometry pushed out 1.5 % along its normals; fine
- * mesh lines at 6 % alpha show the real marching-cubes edges. Light Clean
- * mixes towards a darker "ink" rim, since added light is invisible on white.
- * No bloom (§11.4). Geometry, vertices, cut planes, caps, stencil passes and
- * opacity are never touched: Glow is presentation only.
+ * of a fraction of the surface colour, and in Deep Space a soft additive
+ * halo drawn from the same geometry pushed out along its normals; fine mesh
+ * lines show the real marching-cubes edges. Light Clean mixes towards a
+ * darker "ink" rim, since added light is invisible on white. No bloom
+ * (§11.4). Geometry, vertices, cut planes, caps, stencil passes and opacity
+ * are never touched: Glow is presentation only.
  */
 export interface GlowSettings {
     mode: 'additive' | 'ink';
@@ -19,26 +19,54 @@ export interface GlowSettings {
     rimNegative: THREE.Color;
     emissive: number;
     rimStrength: number;
+    /** The Fresnel exponent: lower is a wider rim. */
+    rimPower: number;
 }
 
 /** §11.1 "Lights": Glow's emissive term carries part of the light; Solid (and Classic) keep today's levels. */
-export const GLOW_LIGHTS = { ambient: 0.35, key: 0.6, fill: 0.25 } as const;
+export const GLOW_LIGHTS = { ambient: 0.15, key: 0.35, fill: 0.15 } as const;
 export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
 
-const HALO_OPACITY = 0.12;
-/** The halo's push along the normals, as a fraction of the mesh radius. */
-const HALO_OFFSET = 0.015;
-const LINES_OPACITY = 0.06;
+/**
+ * Ruling R20a-3: every tuned Glow value, in one place (a test pins them).
+ * Tuned live against the concept (original-concepts.png Options 1 and 2):
+ * translucent lobes with a visible fine mesh-line network, a bright
+ * same-phase rim and, in Deep Space, a soft halo.
+ * - `lines.opacity`: the mesh lines' alpha; `lines.whiten`: how far each
+ *   line's own phase colour is mixed towards white (the concept's lines are
+ *   lighter than the lobe in both themes); `lines.additive`: added light
+ *   (Deep Space) or painted over (Light Clean, where added light vanishes).
+ * - `halo.offset`: the push along the normals, as a fraction of the mesh
+ *   radius; `halo.opacity`: its peak alpha; `halo.power`: how fast it fades
+ *   towards its own outer edge (higher is softer).
+ */
+export const GLOW_TUNING = {
+    dark: {
+        emissive: 0.1,
+        rimStrength: 1.0,
+        rimPower: 1.8,
+        lines: { opacity: 0.05, whiten: 0.3, additive: true },
+        halo: { opacity: 0.6, offset: 0.08, power: 1 },
+    },
+    light: {
+        emissive: 0.6,
+        rimStrength: 0.8,
+        rimPower: 2.2,
+        lines: { opacity: 0.16, whiten: 0.85, additive: false },
+    },
+} as const;
 
 export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
     if (appearance.finish !== 'glow' || appearance.scheme === 'classic') return null;
     const phase = phaseColours(appearance.theme, appearance.scheme);
+    const tuning = GLOW_TUNING[appearance.theme];
     return {
         mode: appearance.theme === 'dark' ? 'additive' : 'ink',
         rimPositive: new THREE.Color(phase.rimPositive!),
         rimNegative: new THREE.Color(phase.rimNegative!),
-        emissive: 0.18,
-        rimStrength: 0.9,
+        emissive: tuning.emissive,
+        rimStrength: tuning.rimStrength,
+        rimPower: tuning.rimPower,
     };
 }
 
@@ -50,7 +78,7 @@ export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
  */
 export function atomRimFor(appearance: Appearance): GlowSettings | null {
     if (appearance.theme !== 'dark' || appearance.scheme === 'classic') return null;
-    return { mode: 'additive', rimPositive: new THREE.Color(1, 1, 1), rimNegative: new THREE.Color(1, 1, 1), emissive: 0, rimStrength: 0.15 };
+    return { mode: 'additive', rimPositive: new THREE.Color(1, 1, 1), rimNegative: new THREE.Color(1, 1, 1), emissive: 0, rimStrength: 0.15, rimPower: 2.5 };
 }
 
 interface GlowUniforms {
@@ -59,6 +87,7 @@ interface GlowUniforms {
     qlInk: THREE.IUniform<number>;
     qlEmissive: THREE.IUniform<number>;
     qlRimStrength: THREE.IUniform<number>;
+    qlRimPower: THREE.IUniform<number>;
 }
 
 /**
@@ -71,13 +100,13 @@ interface GlowUniforms {
  */
 const VERTEX_HEAD_PHASED = 'attribute float phaseSign;\nvarying float vQlPhase;\n';
 const VERTEX_HEAD_PLAIN = 'varying float vQlPhase;\n';
-const FRAGMENT_HEAD = 'uniform vec3 qlRimPositive;\nuniform vec3 qlRimNegative;\nuniform float qlInk;\nuniform float qlEmissive;\nuniform float qlRimStrength;\nvarying float vQlPhase;\n';
+const FRAGMENT_HEAD = 'uniform vec3 qlRimPositive;\nuniform vec3 qlRimNegative;\nuniform float qlInk;\nuniform float qlEmissive;\nuniform float qlRimStrength;\nuniform float qlRimPower;\nvarying float vQlPhase;\n';
 const RIM = /* glsl */`
     // Fresnel rim, in the surface's own phase (vQlPhase: +1, -1, or 0 where
     // the mesh has no phase -- a density, an ESP map, an atom, a lobe -- which
     // takes a tint of its own colour: lighter where the rim adds light (Deep
     // Space), darker where it is ink (Light Clean, §11.2 "darker rim colour").
-    float qlRim = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 2.5);
+    float qlRim = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), qlRimPower);
     vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : mix(diffuseColor.rgb, vec3(1.0), 0.5);
     vec3 qlRimColour = vQlPhase > 0.5 ? qlRimPositive : (vQlPhase < -0.5 ? qlRimNegative : qlOwnTint);
     outgoingLight = qlInk > 0.5
@@ -113,12 +142,14 @@ export function applyGlow(material: THREE.MeshStandardMaterial, settings: GlowSe
         qlInk: { value: 0 },
         qlEmissive: { value: 0 },
         qlRimStrength: { value: 0 },
+        qlRimPower: { value: 2.5 },
     };
     uniforms.qlRimPositive.value.copy(settings.rimPositive);
     uniforms.qlRimNegative.value.copy(settings.rimNegative);
     uniforms.qlInk.value = settings.mode === 'ink' ? 1 : 0;
     uniforms.qlEmissive.value = settings.emissive;
     uniforms.qlRimStrength.value = settings.rimStrength;
+    uniforms.qlRimPower.value = settings.rimPower;
     material.userData.glowUniforms = uniforms;
     if (material.userData.glow) return;
     material.onBeforeCompile = shader => {
@@ -139,26 +170,76 @@ export function applyGlow(material: THREE.MeshStandardMaterial, settings: GlowSe
  * triangles that way; computeVertexNormals follows the winding, and a test
  * pins it), so "out" is minus the normal. By the same winding the lobe's far
  * wall faces the camera as a front face: drawing front faces of the pushed
- * shell draws its far wall, which shows only as a band past the silhouette.
+ * shell draws its far wall -- a band past the silhouette, and, through a
+ * translucent lobe (which writes no depth), a glow behind it. Its alpha
+ * falls off towards the shell's own outline (|n·v|^power is 0 there), so
+ * the halo's outer edge is soft rather than a hard second outline.
  */
 const HALO_VERTEX = /* glsl */`
     uniform float qlHaloOffset;
     varying vec3 vQlColour;
+    varying vec3 vQlNormal;
+    varying vec3 vQlView;
     #include <clipping_planes_pars_vertex>
     void main() {
         vQlColour = color;
         vec4 mvPosition = modelViewMatrix * vec4(position - normal * qlHaloOffset, 1.0);
+        vQlNormal = normalMatrix * normal;
+        vQlView = -mvPosition.xyz;
         #include <clipping_planes_vertex>
         gl_Position = projectionMatrix * mvPosition;
     }
 `;
 const HALO_FRAGMENT = /* glsl */`
     uniform float qlHaloOpacity;
+    uniform float qlHaloPower;
     varying vec3 vQlColour;
+    varying vec3 vQlNormal;
+    varying vec3 vQlView;
     #include <clipping_planes_pars_fragment>
     void main() {
         #include <clipping_planes_fragment>
-        gl_FragColor = vec4(vQlColour, qlHaloOpacity);
+        // 0 at the shell's own outline (facing 0) and straight through the
+        // middle of the lobe (facing 1); brightest in between -- a band
+        // around the lobe's silhouette, soft on both sides.
+        float facing = abs(dot(normalize(vQlNormal), normalize(vQlView)));
+        gl_FragColor = vec4(vQlColour, qlHaloOpacity * pow(facing, qlHaloPower) * (1.0 - facing));
+        #include <colorspace_fragment>
+    }
+`;
+
+/**
+ * The mesh lines: the surface's own triangles as 1 px lines, each in its
+ * own phase's colour mixed `whiten` of the way to white -- never the other
+ * phase's hue -- added as light in Deep Space, painted over in Light Clean.
+ */
+const LINES_VERTEX = /* glsl */`
+    uniform float qlLinesWhiten;
+    varying vec3 vQlColour;
+    varying vec3 vQlNormal;
+    varying vec3 vQlView;
+    #include <clipping_planes_pars_vertex>
+    void main() {
+        vQlColour = mix(color, vec3(1.0), qlLinesWhiten);
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vQlNormal = normalMatrix * normal;
+        vQlView = -mvPosition.xyz;
+        #include <clipping_planes_vertex>
+        gl_Position = projectionMatrix * mvPosition;
+    }
+`;
+const LINES_FRAGMENT = /* glsl */`
+    uniform float qlLinesOpacity;
+    varying vec3 vQlColour;
+    varying vec3 vQlNormal;
+    varying vec3 vQlView;
+    #include <clipping_planes_pars_fragment>
+    void main() {
+        #include <clipping_planes_fragment>
+        // Edge-on, the triangles crowd into a solid band; fading the lines
+        // there leaves the outline to the rim.
+        float facing = abs(dot(normalize(vQlNormal), normalize(vQlView)));
+        gl_FragColor = vec4(vQlColour, qlLinesOpacity * facing);
         #include <colorspace_fragment>
     }
 `;
@@ -171,12 +252,35 @@ function removeExtra(group: THREE.Object3D, child: THREE.Object3D): void {
     ((child as THREE.Mesh).material as THREE.Material).dispose();
 }
 
-function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: number, clippingPlanes: THREE.Plane[], fade: number): THREE.Mesh {
+/** An extra's full-strength alpha in this theme (GLOW_TUNING); the fade scales it. */
+function fullOpacity(kind: GlowExtra, theme: Appearance['theme']): number {
+    return kind === 'halo' ? GLOW_TUNING.dark.halo.opacity : GLOW_TUNING[theme].lines.opacity;
+}
+
+/**
+ * Brings an extra's theme-dependent uniforms and blending to `theme` in
+ * place: no recompile (blending is render state), so an extra that is kept
+ * across a theme switch (ruling DC3) still looks right.
+ */
+function tuneExtra(material: THREE.ShaderMaterial, kind: GlowExtra, theme: Appearance['theme'], fade: number): void {
+    material.userData.qlTheme = theme;
+    if (kind === 'halo') {
+        material.uniforms.qlHaloOpacity.value = fullOpacity(kind, theme) * fade;
+        return;
+    }
+    const lines = GLOW_TUNING[theme].lines;
+    material.uniforms.qlLinesOpacity.value = lines.opacity * fade;
+    material.uniforms.qlLinesWhiten.value = lines.whiten;
+    material.blending = lines.additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+}
+
+function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: number, clippingPlanes: THREE.Plane[], theme: Appearance['theme'], fade: number): THREE.Mesh {
+    const halo = GLOW_TUNING.dark.halo;
     const material = kind === 'halo'
         ? new THREE.ShaderMaterial({
             vertexShader: HALO_VERTEX,
             fragmentShader: HALO_FRAGMENT,
-            uniforms: { qlHaloOffset: { value: HALO_OFFSET * radius }, qlHaloOpacity: { value: HALO_OPACITY * fade } },
+            uniforms: { qlHaloOffset: { value: halo.offset * radius }, qlHaloOpacity: { value: 0 }, qlHaloPower: { value: halo.power } },
             vertexColors: true,
             side: THREE.FrontSide,
             blending: THREE.AdditiveBlending,
@@ -185,10 +289,18 @@ function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: nu
             clipping: true,
             clippingPlanes,
         })
-        : new THREE.MeshBasicMaterial({
-            wireframe: true, vertexColors: true, transparent: true, opacity: LINES_OPACITY * fade, depthWrite: false,
+        : new THREE.ShaderMaterial({
+            vertexShader: LINES_VERTEX,
+            fragmentShader: LINES_FRAGMENT,
+            uniforms: { qlLinesOpacity: { value: 0 }, qlLinesWhiten: { value: 0 } },
+            wireframe: true,
+            vertexColors: true,
+            transparent: true,
+            depthWrite: false,
+            clipping: true,
             clippingPlanes,
         });
+    tuneExtra(material, kind, theme, fade);
     const mesh = new THREE.Mesh(geometry, material);
     // Unmarked for export (export/surfaces.ts collects marked meshes only); this marks it as Glow's.
     mesh.userData.isGlowExtra = kind;
@@ -204,8 +316,8 @@ function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: nu
  * 20 ms"). Extras share the surface's geometry.
  *
  * Idempotent (ruling DC3): an extra that is already there and still wanted
- * is kept as it is -- no material disposed, no shader rebuilt -- so calling
- * this again costs nothing.
+ * is kept as it is -- no material disposed, no shader rebuilt; only its
+ * theme's uniforms are set -- so calling this again costs nothing.
  */
 export function attachGlowExtras(
     group: THREE.Group,
@@ -220,14 +332,17 @@ export function attachGlowExtras(
         if (appearance.theme === 'dark') wanted.add('halo');
         wanted.add('lines');
     }
+    const fade = (group.userData.glowFade as number | undefined) ?? 1;
     for (const child of [...group.children]) {
         const kind = child.userData.isGlowExtra as GlowExtra | undefined;
         if (!kind) continue;
-        if (wanted.has(kind)) wanted.delete(kind);
-        else removeExtra(group, child);
+        if (wanted.has(kind)) {
+            wanted.delete(kind);
+            const material = (child as THREE.Mesh).material as THREE.ShaderMaterial;
+            if (material.userData.qlTheme !== appearance.theme) tuneExtra(material, kind, appearance.theme, fade);
+        } else removeExtra(group, child);
     }
-    const fade = (group.userData.glowFade as number | undefined) ?? 1;
-    for (const kind of wanted) group.add(createExtra(kind, surface.geometry, options.radius, options.clippingPlanes, fade));
+    for (const kind of wanted) group.add(createExtra(kind, surface.geometry, options.radius, options.clippingPlanes, appearance.theme, fade));
 }
 
 /**
@@ -240,9 +355,11 @@ export function fadeGlowExtras(group: THREE.Object3D | null, fraction: number): 
     if (!group) return;
     group.userData.glowFade = fraction;
     for (const child of group.children) {
-        const material = (child as THREE.Mesh).material;
-        if (child.userData.isGlowExtra === 'halo') (material as THREE.ShaderMaterial).uniforms.qlHaloOpacity.value = HALO_OPACITY * fraction;
-        else if (child.userData.isGlowExtra === 'lines') (material as THREE.Material).opacity = LINES_OPACITY * fraction;
+        const kind = child.userData.isGlowExtra as GlowExtra | undefined;
+        if (!kind) continue;
+        const material = (child as THREE.Mesh).material as THREE.ShaderMaterial;
+        const full = fullOpacity(kind, material.userData.qlTheme as Appearance['theme']);
+        material.uniforms[kind === 'halo' ? 'qlHaloOpacity' : 'qlLinesOpacity'].value = full * fraction;
     }
 }
 
