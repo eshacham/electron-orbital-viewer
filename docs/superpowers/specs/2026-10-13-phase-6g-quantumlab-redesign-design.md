@@ -536,7 +536,7 @@ One index, built on the client from data the app already has:
   and "H₂O" work.
 - **Bonds systems.** The 10 diatomics in `BONDS_SYSTEMS`.
 - **Basic orbitals.** Names via `orbital_names` ("3dz2", "4f xyz").
-- **Owner extras.** The owner's computed molecules.
+- **Computed molecules.** Every finished computed molecule, for everyone, from the public index (§9.5).
 - **Lessons**, once they exist.
 
 Results show in a combobox popover (`role="combobox"` + `listbox`), grouped
@@ -828,7 +828,7 @@ A `screen` key is registered with url_state. The viewer is the default, and
 │    │ Collection         │ ┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐ │
 │    │ ◉ Molecules (25)   │ │ thumb  ││ thumb  ││ thumb  ││ thumb  ││ thumb  │ │
 │    │ ○ Diatomics (10)   │ │Water   ││Ammonia ││Methane ││CO₂     ││Acetyl. │ │
-│    │ ○ Computed (owner) │ │H₂O     ││NH₃     ││CH₄     ││CO₂     ││C₂H₂    │ │
+│    │ ○ Computed (N)     │ │H₂O     ││NH₃     ││CH₄     ││CO₂     ││C₂H₂    │ │
 │    │ Category chips     │ │1st ex. ││1st ex. ││hybrid. ││polarity││sp      │ │
 │    │ Tags: sp sp² …     │ └────────┘└────────┘└────────┘└────────┘└────────┘ │
 │    │ Sort: Name ▾       │ … (auto-fill, min 184 px)                          │
@@ -839,8 +839,25 @@ A `screen` key is registered with url_state. The viewer is the default, and
 - **Collections.**
   - **Molecules**: the 25 library entries from `index.json` (water…glycine).
   - **Diatomics**: the 10 `BONDS_SYSTEMS`; these open Bonds mode.
-  - **Computed**: the owner's finished jobs, from `useComputedList`; owner
-    only, as in today's picker.
+  - **Computed**: every finished (DONE) computed molecule, **public to
+    everyone** (owner decision 2026-10-13: the owner paid for them, past and
+    future, and wants them shared). FAILED, running and cancelled jobs are
+    never listed. Visitors cannot call the owner-only jobs API, so the
+    listing comes from a **public static index**: `molecules/jobs/index.json`
+    on the data bucket, served by CloudFront, holding for each DONE job its
+    key, name, formula, recipe, method, compute version, finished date and
+    thumbnail path — no prices, no owner data, no failure details. It is
+    rewritten (conditional write, so two writers cannot lose an entry) when a
+    job settles DONE — by the reconcile settlement path, which already runs
+    once per job — and backfilled once for the jobs already DONE. A computed
+    card opens `#mode=molecule&job=<key>` (the link that already opens for
+    anyone), shows the Computed badge, its recipe and its date, and gets a
+    build-time-style thumbnail rendered when the job finishes (or a generic
+    tile until one exists). The owner still sees the extra job details
+    (cost, status) in the jobs panels; the Gallery shows only the public
+    fields. When paying users arrive (Phase 8), each job gets a public /
+    private choice and only public ones enter the index; the owner's jobs
+    stay public.
   - **Atoms** are not 118 cards. The periodic table *is* the atom gallery, so
     one link card, "All 118 elements → Periodic table", opens Atoms with the
     table.
@@ -853,7 +870,7 @@ A `screen` key is registered with url_state. The viewer is the default, and
     with the selected-edge glow.
   - 132 px thumbnail area on `canvas`.
   - Name 14/600, formula 13, category tag (`sm` radius, `surface-2`).
-  - A computed card adds its status and date.
+  - A computed card adds its recipe and finished date.
 - **One-click open.** The whole card is one link (`<a href="#mode=molecule&id=h2o">`),
   so middle-click and "open in new tab" work, and Enter opens it. There is no
   secondary action.
