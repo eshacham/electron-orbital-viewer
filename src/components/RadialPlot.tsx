@@ -94,6 +94,18 @@ interface RadialPlotProps {
     collapsible?: boolean;
     /** The single curve's colour (Basic Orbitals): CURVE_COLORS[0] in its theme's palette. */
     lineColour?: string;
+    /** The plot tab's exact axis title (spec §9.1); the computed title when absent. */
+    title?: string;
+    /** A note under the title, e.g. "radial factor of |ψ|²". */
+    caption?: string | null;
+    /** R(r) changes sign: zero line in the middle, scaled by the largest |value|. */
+    signed?: boolean;
+    /**
+     * The spoken names of the plot and its image (ruling DC8), so a tab that
+     * plots another function is not announced as the radial distribution.
+     * Absent: "radial distribution" and "probability against radius", as today.
+     */
+    ariaLabel?: { plot: string; image: string };
 }
 
 /** Axis label for a radius: two decimals below 10 a₀, where rounding would mislead. */
@@ -146,7 +158,10 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
     n, l, Z, rMax, compact = false,
     curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear', cutFaceNote = false, comparisonNote = null,
     width, collapsible = false, lineColour = CURVE_COLORS[0],
+    title: titleOverride, caption = null, signed = false, ariaLabel,
 }) => {
+    const plotLabel = ariaLabel?.plot ?? 'radial distribution';
+    const imageLabel = ariaLabel?.image ?? 'probability against radius';
     // On a phone, or a window too narrow for both side panels, the plot sits
     // over the atom, so it starts folded to its title and opens on a tap.
     const foldable = compact || collapsible;
@@ -198,23 +213,30 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
         if (!isMultiCurve || !curves) return [];
 
         let globalMax = 0;
+        let largestMagnitude = 0;
         for (const curve of curves) {
             for (const point of curve.points) {
                 if (point.value > globalMax) globalMax = point.value;
+                if (Math.abs(point.value) > largestMagnitude) largestMagnitude = Math.abs(point.value);
             }
         }
-        if (!(globalMax > 0)) return [];
+        // A signed curve (R(r)) is scaled by its largest |value| about a zero
+        // line in the middle; every other curve keeps today's scale exactly.
+        const extent = signed ? largestMagnitude : globalMax;
+        if (!(extent > 0)) return [];
 
         return curves.map(curve => {
             const points = curve.points.map(point => {
                 const x = xForRadius(point.r);
-                const y = PADDING.top + plotHeight * (1 - point.value / globalMax);
+                const y = signed
+                    ? PADDING.top + plotHeight * (0.5 - point.value / (2 * extent))
+                    : PADDING.top + plotHeight * (1 - point.value / extent);
                 return `${x.toFixed(2)},${y.toFixed(2)}`;
             });
             return { label: curve.label, color: curve.color, dashed: Boolean(curve.dashed), line: `M ${points.join(' L ')}` };
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isMultiCurve, curves, rMax, scale, plotWidth, plotHeight]);
+    }, [isMultiCurve, curves, rMax, scale, plotWidth, plotHeight, signed]);
 
     const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
         if (!onHoverRadius) return;
@@ -239,11 +261,11 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
     // The middle of the axis, labelled: 0 and the maximum alone left the
     // scale unreadable, and on a √ axis the midpoint is a quarter of rMax.
     const midRadius = scale === 'sqrt' ? rMax / 4 : rMax / 2;
-    const title = isMultiCurve ? 'Radial distribution D(r) = 4πr²ρ(r)' : 'Radial distribution — r²R(r)²';
+    const title = titleOverride ?? (isMultiCurve ? 'Radial distribution D(r) = 4πr²ρ(r)' : 'Radial distribution — r²R(r)²');
 
     if (foldable && !expanded) {
         return (
-            <div className={`radial-plot collapsed${compact ? ' compact' : ''}`} aria-label="radial distribution">
+            <div className={`radial-plot collapsed${compact ? ' compact' : ''}`} aria-label={plotLabel}>
                 <button
                     type="button"
                     className="radial-plot-toggle"
@@ -259,7 +281,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
     return (
         <div
             className={`radial-plot${compact ? ' compact' : ''}${isMultiCurve ? ' interactive' : ''}`}
-            aria-label="radial distribution"
+            aria-label={plotLabel}
             // As wide as the plot, so a long title wraps rather than
             // stretching the panel past the curves.
             style={{ maxWidth: WIDTH + 22 }}
@@ -276,6 +298,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                     </button>
                 ) : title}
             </div>
+            {caption && <div className="radial-plot-note">{caption}</div>}
             {/* The 3D cut face this plot is linked to colours the *same* D(r)
                 but scaled to local structure so shells stay visible across
                 the atom's full range -- said so that scaling is never
@@ -287,7 +310,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                 width={WIDTH}
                 height={HEIGHT}
                 role="img"
-                aria-label="probability against radius"
+                aria-label={imageLabel}
                 onPointerMove={isMultiCurve ? handlePointerMove : undefined}
                 onPointerLeave={isMultiCurve ? handlePointerLeave : undefined}
             >
@@ -316,6 +339,15 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                         fill="none"
                     />
                 ))}
+                {isMultiCurve && signed && (
+                    <line
+                        className="radial-plot-zero"
+                        x1={PADDING.left}
+                        x2={WIDTH - PADDING.right}
+                        y1={PADDING.top + plotHeight / 2}
+                        y2={PADDING.top + plotHeight / 2}
+                    />
+                )}
                 {isMultiCurve && (peaks ?? []).map((r, index) => (
                     <line
                         key={`${r}-${index}`}

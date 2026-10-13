@@ -17,7 +17,7 @@ import { basicOrbitalParams } from '../../src/orbital_presets';
 import { selectionProblem } from '../../src/combinations';
 import { NOTHING_TO_EXPORT_REASON } from '../../src/export/surfaces';
 import {
-    makeStore, neonStore, sodiumIonStore, chlorideUnboundStore, readText, baseContext, octahedron, exportHandle, goldStore, goldProfile,
+    makeStore, neonStore, sodiumIonStore, chlorideUnboundStore, readText, readBlob, baseContext, octahedron, exportHandle, goldStore, goldProfile,
     bondsMoleculeStore, bondsH2PlusStore, bondsO2Store, bondsMismatchStore, N2_BASIS, N2_META, N2_SCAN, O2_META, FAKE_H2PLUS_CURVE,
 } from './fixtures';
 import { h2plusCurveSpec } from '../../src/bonds/curve';
@@ -260,6 +260,16 @@ describe('runExport: CSV', () => {
             store.dispatch(setMode('hydrogenic'));
             expect(exportAvailability(store.getState()).csv).toBe(NOTHING_DRAWN_REASON);
         });
+    });
+
+    it('a plot tab\'s CSV states that tab\'s quantity and leaves out the D(r)-only notes (ruling C6)', async () => {
+        const state = neonStore().getState();
+        const result = await runExport('csv', { ...baseContext(state), csvCurves: [{ label: '1s · R(r)', points: [{ r: 1, value: 0.5 }] }],
+            csvQuantity: 'R(r), the radial wave function, bohr^-3/2' });
+        const text = new TextDecoder().decode(await readBlob(result.blob));
+        expect(text).toContain('# quantity: R(r), the radial wave function, bohr^-3/2');
+        expect(text).not.toContain('D(r) = 4*pi*r^2*rho(r)');
+        expect(text).toContain('1s · R(r)');
     });
 
     // Fix round 1, M5: the orbital level's curve is still the whole

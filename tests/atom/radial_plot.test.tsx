@@ -248,3 +248,26 @@ describe('RadialPlot', () => {
         });
     });
 });
+
+describe('RadialPlot: tab titles and signed curves (spec §9.1)', () => {
+    it('titles the plot as told and draws a signed curve about a zero line', () => {
+        const curves = [{ label: '2s · R(r)', color: '#4da3ff', points: [{ r: 0, value: 1 }, { r: 1, value: -0.5 }, { r: 2, value: 0 }] }];
+        const { container } = render(<RadialPlot n={1} l={0} Z={1} rMax={2} curves={curves} title="Wave function R(r) (a₀⁻³ᐟ²)" caption="large component" signed />);
+        expect(container.querySelector('.radial-plot-title')).toHaveTextContent('Wave function R(r) (a₀⁻³ᐟ²)');
+        expect(container.querySelector('.radial-plot-zero')).not.toBeNull();
+        expect(screen.getByText('large component')).toBeInTheDocument();
+    });
+
+    // Ruling DC8: a tab other than the radial distribution is named for its own curve, not for D(r).
+    it('speaks each tab\'s own names, and keeps the radial distribution\'s when none are given', () => {
+        const curves = [{ label: '1s · R(r)', color: '#4da3ff', points: [{ r: 0, value: 1 }, { r: 1, value: 0.5 }] }];
+        const { rerender } = render(<RadialPlot n={1} l={0} Z={1} rMax={1} curves={curves}
+            ariaLabel={{ plot: 'wave function plot', image: 'Wave function R(r) (a₀⁻³ᐟ²) against radius' }} />);
+        expect(screen.getByLabelText('wave function plot')).toHaveClass('radial-plot');
+        expect(screen.getByRole('img', { name: 'Wave function R(r) (a₀⁻³ᐟ²) against radius' })).toBeInTheDocument();
+        expect(screen.queryByLabelText('radial distribution')).toBeNull();
+        rerender(<RadialPlot n={1} l={0} Z={1} rMax={1} curves={curves} />);
+        expect(screen.getByLabelText('radial distribution')).toHaveClass('radial-plot');
+        expect(screen.getByRole('img', { name: 'probability against radius' })).toBeInTheDocument();
+    });
+});

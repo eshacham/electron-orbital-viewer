@@ -24,6 +24,8 @@ import { loadScan, loadMoleculeMeta, loadBasis } from './molecules/loader';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from './molecules/types';
 import { brandPref } from './design/brands';
 import { MEDIUM_VIEWPORT } from './useMediaQuery';
+import * as downloadModule from './export/download';
+import { readBlob } from '../tests/export/fixtures';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -1249,6 +1251,61 @@ describe('App: shell', () => {
         expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('open');
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('folded');
+    });
+
+    it('exports the curves of the plot tab on screen (ruling C6)', async () => {
+        const download = jest.spyOn(downloadModule, 'downloadBlob').mockImplementation(() => {});
+        try {
+            renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile(), level: 'shell', selectedShell: 1, selectedSubshell: { n: 1, l: 0 } });
+            fireEvent.click(screen.getByRole('tab', { name: 'Wave function' }));
+            fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Export CSV of this plot' }));
+            await waitFor(() => expect(download).toHaveBeenCalled());
+            const text = new TextDecoder().decode(await readBlob(download.mock.calls[0][0] as Blob));
+            expect(text).toContain('1s · R(r)');
+            expect(text).toContain('# quantity: R(r)');
+        } finally {
+            download.mockRestore();
+            window.localStorage.clear();
+        }
+    });
+
+    // Ruling DX1/DC1: the inspector column holds its place while the atom solves (§8.6), then gains its tabs.
+    it('keeps the Atom inspector landmark before the profile arrives, and gives it Plot and Data once it does', () => {
+        const { store } = renderWithProvider(<App />);
+        expect(screen.getByRole('complementary', { name: 'Inspector' })).toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: 'Data' })).toBeNull();
+        act(() => { store.dispatch(solveSucceeded(hydrogenProfile())); });
+        const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+        expect(within(inspector).getByRole('tab', { name: 'Plot' })).toHaveAttribute('aria-selected', 'true');
+        expect(within(inspector).getByRole('tab', { name: 'Radial distribution' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    // Ruling DX1/DC1: at medium width the atom's drawer opens from its "Plot panel" button.
+    it('at medium width, with an atom solved, the drawer opens on Plot from its Plot panel button', () => {
+        window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
+            addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+        const { container } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('folded');
+        fireEvent.click(screen.getByRole('button', { name: 'Plot panel' }));
+        expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('open');
+        expect(screen.getByRole('tab', { name: 'Density' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Radial distribution' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    // Ruling R7: on a phone the sheet's Plot tab stacks the plot and the data, with no inner Plot/Data tabs.
+    it('on a phone the Plot tab holds the plot and then the data, stacked', () => {
+        installMatchMedia(true);
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        fireEvent.click(screen.getByRole('tab', { name: 'Plot' }));
+        // The sheet's own panel; the plot's function tabs have their own tabpanel inside it.
+        const panel = document.getElementById('phone-sheet-body')!;
+        expect(panel).toHaveAttribute('role', 'tabpanel');
+        const sections = within(panel).getAllByRole('region').filter(region => ['Plot', 'Data'].includes(region.getAttribute('aria-label') ?? ''));
+        expect(sections.map(section => section.getAttribute('aria-label'))).toEqual(['Plot', 'Data']);
+        expect(within(sections[0]).getByRole('tab', { name: 'Radial distribution' })).toHaveAttribute('aria-selected', 'true');
+        expect(within(sections[1]).getByRole('region', { name: 'orbital facts' })).toHaveTextContent('Whole atom');
+        expect(within(panel).queryByRole('tab', { name: 'Data' })).toBeNull();
     });
 });
 

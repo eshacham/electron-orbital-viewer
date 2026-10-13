@@ -44,8 +44,8 @@ import {
     profileRelativity,
     ViewMode,
 } from './store/atomSlice';
-import { RelativityMode, defaultRelativityFor } from './atom/relativity';
-import { subshellLabel, subshellSpokenLabel } from './atom/configurations';
+import { RelativityMode, defaultRelativityFor, shortMethodLabel } from './atom/relativity';
+import { subshellLabel, subshellSpokenLabel, configurationLabelOf, valenceConfigurationLabelOf } from './atom/configurations';
 import { useAtomSolver } from './atom/useAtomSolver';
 import { useDeltaScfEnergies } from './atom/useDeltaScfEnergies';
 import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidExcitation, isNeutralGround } from './atom/species';
@@ -113,11 +113,14 @@ import ExplorePanel from './shell/ExplorePanel';
 import AtomExplore from './atom_ui/AtomExplore';
 import ElementTile from './atom_ui/ElementTile';
 import OrbitalEnergyList from './atom_ui/OrbitalEnergyList';
+import AtomInspector from './atom_ui/AtomInspector';
+import { plotAriaLabel, plotTabsFor, resolvePlotTab, tabCurves } from './atom/plot_tabs';
+import { atomFacts, orbitalFacts, subshellFacts } from './orbital_facts';
 import Inspector from './shell/Inspector';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
 import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
-import { viewTitle } from './shell/view_title';
+import { shellName, viewTitle } from './shell/view_title';
 import { useDocumentTitle } from './shell/useDocumentTitle';
 import { useFullscreen } from './shell/useFullscreen';
 import ThemeSwitch from './design/ThemeSwitch';
@@ -126,7 +129,7 @@ import { useBrand } from './design/useBrand';
 import { brandPref } from './design/brands';
 import { LAYOUT } from './design/tokens';
 import { usePref } from './design/usePref';
-import { renderPref } from './design/presentation';
+import { displayPref, renderPref, type PlotTabId } from './design/presentation';
 import { curvePalette, densitySurfaceHex, phaseColours, themeCurveColour } from './design/science';
 import { BUILD_ENV } from './jobs/build_env';
 import { SESSION_ENDED } from './jobs/api';
@@ -802,6 +805,43 @@ function App() {
         [atomProfile, atomLevel, atomSelectedShell, atomSelectedSubshell, atomRGrid]
     );
 
+    // The inspector's plot tabs (spec §9.1, ruling R2): which functions this
+    // level can plot, the one on screen (stored in eov.display, never in a
+    // link), and its curves -- the same ones the CSV exports (ruling C6).
+    const display = usePref(displayPref);
+    const atomPlotTabs = useMemo(
+        () => (atomProfile ? plotTabsFor(atomLevel, atomSelectedSubshell !== null, pictureRelativity !== 'off') : []),
+        [atomProfile, atomLevel, atomSelectedSubshell, pictureRelativity],
+    );
+    const activePlotTab = atomPlotTabs.length > 0 ? resolvePlotTab(atomPlotTabs, display.plotTab) : null;
+    const handlePlotTab = useCallback((id: PlotTabId) => displayPref.set({ ...displayPref.get(), plotTab: id }), []);
+    const atomTabCurves = useMemo(
+        () => (atomProfile && activePlotTab
+            ? tabCurves(activePlotTab.id, { profile: atomProfile, selectedSubshell: atomSelectedSubshell, rGrid: atomRGrid, distribution: atomCurves })
+            : []),
+        [atomProfile, activePlotTab, atomSelectedSubshell, atomRGrid, atomCurves],
+    );
+    // The Data card (spec §9.1): what is selected, computed from the drawn profile.
+    const atomFactsNow = useMemo(() => {
+        if (!atomProfile) return null;
+        const method = shortMethodLabel(pictureRelativity);
+        const find = (s: { n: number; l: number; j?: number }) => atomProfile.subshells.find(x => x.n === s.n && x.l === s.l && x.j === s.j);
+        if (atomLevel === 'orbital' && atomSelectedOrbital) {
+            return orbitalFacts(atomSelectedOrbital, { enclosedFraction, isoLevel, energy: find(atomSelectedOrbital)?.energy ?? null, method });
+        }
+        if (atomSelectedSubshell) {
+            const sub = find(atomSelectedSubshell);
+            return sub ? subshellFacts(sub, { enclosedFraction, energy: sub.energy, method }) : null;
+        }
+        const configuration = speciesConfiguration(species);
+        const shell = atomSelectedShell !== null ? atomProfile.shells.find(s => s.n === atomSelectedShell) : undefined;
+        return atomFacts({
+            title: shell ? shellName(shell.n) : 'Whole atom',
+            configuration: configurationLabelOf(configuration), valence: valenceConfigurationLabelOf(configuration),
+            shellCount: atomProfile.shells.length, drawnRadius: shell ? shell.contourRadius : atomProfile.displayRadius, method,
+        });
+    }, [atomProfile, pictureRelativity, atomLevel, atomSelectedOrbital, atomSelectedSubshell, atomSelectedShell, enclosedFraction, isoLevel, species]);
+
     // Phone: the element is chosen from a full-screen list opened from the
     // element name, since the periodic table does not fit.
     const [elementPickerOpen, setElementPickerOpen] = useState(false);
@@ -928,7 +968,8 @@ function App() {
     // already computed for the radial plot (atomCurves, selectionPlot), not
     // a fresh sample: ruling C6, an exported number equals the plotted one.
     const csvCurvesNow = useCallback((): CsvCurve[] => {
-        if (isAtomMode) return atomCurves;
+        // The plot tab on screen (spec §9.1): its curves, exactly as plotted.
+        if (isAtomMode) return activePlotTab && activePlotTab.id !== 'distribution' ? atomTabCurves : atomCurves;
         // Bonds' CSV is the potential curve, built from bondsScan/h2plus's
         // own data (run_export.ts's bondsCsvFor, ruling C5), not a radial curve.
         if (!isBasicMode) return [];
@@ -936,7 +977,7 @@ function App() {
         if (!renderedParams) return [];
         const { n: pn, l: pl, Z: pZ, rMax } = renderedParams;
         return [{ label: 'P(r)', points: radialProfile(pn, pl, pZ, rMax, PLOT_SAMPLE_COUNT).map(p => ({ r: p.r, value: p.probability })) }];
-    }, [isAtomMode, isBasicMode, atomCurves, renderedField, selectionPlot, renderedParams]);
+    }, [isAtomMode, isBasicMode, atomCurves, activePlotTab, atomTabCurves, renderedField, selectionPlot, renderedParams]);
     const handleExport = useCallback(async (kind: ExportKind, options: ExportOptions) => {
         // The file's "view:" link names the angle on screen, as Share's does.
         const state = stateNow();
@@ -955,12 +996,14 @@ function App() {
             // re-solve it on the main thread.
             bondsScan: bondsData.scan, bondsMeta: bondsData.meta, bondsLoading: bondsData.loading, bondsError: bondsData.error,
             h2plusCurve: h2plusCurve.curve,
+            // The plot tab's own quantity line; the radial distribution's is null, keeping today's (ruling R2).
+            csvQuantity: isAtomMode ? activePlotTab?.csvQuantity ?? undefined : undefined,
             ...options,
         });
         downloadBlob(result.blob, result.filename);
     }, [
         stateNow, csvCurvesNow, showPhaseLegend, combinationLegend, phase,
-        bondsData.scan, bondsData.meta, bondsData.loading, bondsData.error, h2plusCurve.curve,
+        bondsData.scan, bondsData.meta, bondsData.loading, bondsData.error, h2plusCurve.curve, isAtomMode, activePlotTab,
     ]);
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
@@ -1108,7 +1151,10 @@ function App() {
                 />
             );
         }
-        return atomProfile && (
+        // The plot tab on screen (spec §9.1). Ruling R2: the radial
+        // distribution keeps today's curves, comparisons, peaks and names.
+        const distributionTab = activePlotTab?.id === 'distribution';
+        return atomProfile && activePlotTab && (
             <RadialPlot
                 // n/l are unused in multi-curve mode (see RadialPlot); Z is
                 // real, since the hover readout's shell label logic has no
@@ -1120,15 +1166,32 @@ function App() {
                 scale={atomLevel === 'atom' ? 'sqrt' : 'linear'}
                 width={width}
                 collapsible={collapsible}
-                curves={themed([...atomCurves, ...comparisonCurves])}
-                comparisonNote={comparisonNote}
-                peaks={Array.from(atomProfile.shellPeaks)}
+                curves={themed(distributionTab ? [...atomCurves, ...comparisonCurves] : atomTabCurves)}
+                title={activePlotTab.title}
+                caption={activePlotTab.caption}
+                signed={activePlotTab.signed}
+                ariaLabel={plotAriaLabel(activePlotTab)}
+                comparisonNote={distributionTab ? comparisonNote : null}
+                peaks={distributionTab ? Array.from(atomProfile.shellPeaks) : undefined}
                 cutFaceNote={atomLevel !== 'orbital'}
                 hoverRadius={atomHoverRadius}
                 onHoverRadius={handleAtomHoverRadius}
             />
         );
     };
+
+    // The Atom screen's inspector (spec §9.1): docked on a desktop, a drawer
+    // at medium width, stacked in the phone's Plot tab (ruling R7). Ruling
+    // DX1: before a profile it is the plain inspector, so its column and the
+    // drawer's bar hold their place while the atom solves (§8.6).
+    const atomInspector = (variant: 'docked' | 'drawer' | 'stacked') => (activePlotTab ? (
+        <AtomInspector variant={variant} open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
+            plotTabs={atomPlotTabs} plotTab={activePlotTab} onPlotTab={handlePlotTab}
+            plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
+            facts={atomFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} />
+    ) : (
+        <Inspector variant={variant} body={null} open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
+    ));
 
     // A phone has no viewport toolbar (ruling R6): Reset view, Share and Export end the View tab, as before.
     const phoneViewActions = (
@@ -1170,7 +1233,8 @@ function App() {
                 content: <><LevelNav {...levelNavProps} variant="body">{subshellPanel}</LevelNav>{relativityControl}</>,
             },
             { key: 'view', label: 'View', content: <>{controls}<AxesSwitch />{phoneViewActions}</> },
-            { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
+            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
+            { key: 'plot', label: 'Plot', content: atomInspector('stacked') },
         ]
         : [
             { key: 'view', label: 'Orbital & view', content: <>{controls}{phoneViewActions}</> },
@@ -1231,10 +1295,10 @@ function App() {
         : isMoleculeMode ? <><MoleculeNav {...moleculeNavProps} /><MoleculeJobsSection /></>
         // Basic Orbitals had no left column: its n/l/mₗ, combination and view settings go here until 6G-2.
         : controls;
+    // Basic Orbitals, Bonds and Molecules (the atom has its own: atomInspector above).
     const inspectorBody = (
         <>
-            {/* The atom's view controls are Explore › Display (spec §9.1); the inspector keeps the plot. */}
-            {!isBasicMode && !isAtomMode && controls}
+            {!isBasicMode && controls}
             {renderRadialPlot(PLOT_WIDTH, false)}
         </>
     );
@@ -1412,10 +1476,10 @@ function App() {
                 <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} onClose={closeTable} />
             )}
             {phoneChrome}
-            {isMedium && (
+            {isMedium && (isAtomMode ? atomInspector('drawer') : (
                 <Inspector variant="drawer" body={inspectorBody} open={viewPanelOpen}
                     onOpenChange={open => setViewPanelOpen(() => open)} />
-            )}
+            ))}
                 {isMoleculeMode && isNarrow && (
                 <MoleculePickerDialog
                     open={moleculePickerOpen}
@@ -1479,7 +1543,7 @@ function App() {
                 topBar={topBar}
                 rail={<Rail mode={atomMode} onModeChange={selectMode} isOwner={isOwner} wide={isWide} />}
                 explore={isAtomMode ? atomExplore : <ExplorePanel body={exploreContent} />}
-                inspector={<Inspector variant="docked" body={inspectorBody} />}
+                inspector={isAtomMode ? atomInspector('docked') : <Inspector variant="docked" body={inspectorBody} />}
                 viewport={viewport}
                 shellRef={shellRef}
                 fullscreen={fullscreen.active}

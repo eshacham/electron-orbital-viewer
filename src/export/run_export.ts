@@ -115,6 +115,8 @@ export interface ExportContext extends ExportOptions {
      */
     bondsLoading?: boolean;
     bondsError?: string | null;
+    /** A plot tab's own quantity line (spec §9.1, ruling C6); absent keeps today's D(r) statement. */
+    csvQuantity?: string;
 }
 
 export interface ExportResult { blob: Blob; filename: string; }
@@ -607,9 +609,9 @@ function bondsCsvFor({ state, shareUrl, bondsScan, h2plusCurve }: ExportContext)
 function csvFor(context: ExportContext): string {
     if (context.state.atom.mode === 'bonds') return bondsCsvFor(context);
     const { state, shareUrl, csvCurves } = context;
-    const quantity = state.atom.mode === 'atom'
+    const quantity = context.csvQuantity ?? (state.atom.mode === 'atom'
         ? 'D(r) = 4*pi*r^2*rho(r), electrons per bohr (the radial distribution, not the density)'
-        : 'P(r) = r^2*R(r)^2, probability per bohr';
+        : 'P(r) = r^2*R(r)^2, probability per bohr');
     const comments = [
         viewDescription(state), `quantity: ${quantity}`, `method: ${methodStatement(state)}`, 'r in bohr (a0)', `view: ${shareUrl}`,
     ];
@@ -626,7 +628,7 @@ function csvFor(context: ExportContext): string {
     // not per orbital -- see App.tsx's atomCurves) -- worth saying, since a
     // file named after one m_l could otherwise read as if it were specific
     // to that orbital.
-    if (state.atom.mode === 'atom' && state.atom.level === 'orbital') {
+    if (state.atom.mode === 'atom' && state.atom.level === 'orbital' && !context.csvQuantity) {
         comments.push('note: D(r) is the subshell\'s, independent of m_l -- every orbital in this subshell shares the same curve');
     }
     // Task 12b (ruling C7): the same dashed non-relativistic curves the
@@ -634,9 +636,11 @@ function csvFor(context: ExportContext): string {
     // this and RadialPlot share one matching/scaling/colour rule) --
     // appended as extra columns, headed with their own "... non-relativistic"
     // label, or (when there is none) the reason said as a comment instead.
+    // Only on the radial distribution tab: the dashed comparisons belong to
+    // it alone (spec §9.1), so another tab's CSV (csvQuantity) has none.
     let curves = csvCurves;
     const profile = state.atom.mode === 'atom' ? state.atom.profile : null;
-    if (profile) {
+    if (profile && !context.csvQuantity) {
         const { curves: comparison, note } = buildComparisonCurves({
             profile, level: state.atom.level, selectedShell: state.atom.selectedShell, selectedSubshell: state.atom.selectedSubshell,
             rGrid: profileRGrid(profile),

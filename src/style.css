@@ -251,7 +251,8 @@ html, body, #root {
   transform: translateX(-50%);
 }
 .radial-plot-note {
-  font-size: 10px;
+  /* Caption size: §4.3's floor is 11 px (ruling T10-sub11). */
+  font-size: var(--ql-type-caption-size);
   line-height: 1.25;
   color: var(--ql-color-text-3);
   margin-bottom: 2px;
@@ -384,6 +385,8 @@ html, body, #root {
   stroke: var(--ql-color-text-3);
   stroke-width: 1.4;
 }
+/* A signed curve's zero line (R(r), spec §9.1). */
+.radial-plot-zero { stroke: var(--ql-color-plot-axis); stroke-width: 1; stroke-dasharray: 2 2; }
 .radial-plot-hover-rule {
   stroke: var(--ql-color-text-2);
   stroke-width: 1;
