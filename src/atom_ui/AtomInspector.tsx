@@ -29,7 +29,7 @@ const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, open, onOpenChan
     const id = useId();
     const plotContent = (
         <>
-            <TabRow idPrefix={`${id}-plot`} label="plot" tabs={plotTabs.map(t => ({ key: t.id, label: t.label }))} active={plotTab.id}
+            <TabRow idPrefix={`${id}-plot`} label="plot" tabs={plotTabs.map(t => ({ key: t.id, label: t.label, name: t.name }))} active={plotTab.id}
                 onChange={key => onPlotTab(key as PlotTabId)} />
             <div role="tabpanel" id={`${id}-plot-panel-${plotTab.id}`} aria-labelledby={`${id}-plot-tab-${plotTab.id}`} className="plot-tab-panel">
                 {plot}

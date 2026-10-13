@@ -28,6 +28,26 @@ describe('the inspector\'s plot tabs (spec §9.1, ruling R2)', () => {
         expect(plotTabsFor('atom', false, false)[0].title).toBe('Density ρ(r) = D(r)/4πr² (e/a₀³)');
     });
 
+    // Ruling T13-relR2: under relativity |R|² is the large component's square too, not the radial factor of |ψ|².
+    it('says "large component" on the |R|² tab under relativity, in its title, caption and CSV quantity', () => {
+        const density = plotTabsFor('orbital', true, true)[1];
+        expect(density.id).toBe('density');
+        expect(density.title).toBe('Probability density |R(r)|², large component (a₀⁻³)');
+        expect(density.caption).toBe('large component only, not the whole |ψ|²');
+        expect(density.caption).not.toContain('radial factor');
+        expect(density.csvQuantity).toContain('large component');
+        expect(plotTabsFor('orbital', true, false)[1].caption).toBe('radial factor of |ψ|²');
+    });
+
+    // Ruling T13-tablabels: symbols on the tabs so the row fits one line; each name contains its label (WCAG 2.5.3).
+    it('labels the tabs with the curve symbols and names them in words', () => {
+        expect(plotTabsFor('orbital', true, false).map(t => [t.label, t.name])).toEqual([
+            ['R(r)', 'Wave function R(r)'], ['|R|²', 'Probability density |R|²'], ['D(r)', 'Radial distribution D(r)'],
+        ]);
+        expect(plotTabsFor('atom', false, false).map(t => [t.label, t.name])).toEqual([['ρ(r)', 'Density ρ(r)'], ['D(r)', 'Radial distribution D(r)']]);
+        for (const tab of [...plotTabsFor('orbital', true, true), ...plotTabsFor('shell', false, false)]) expect(tab.name).toContain(tab.label);
+    });
+
     it('falls back to the radial distribution when the stored tab is not offered here', () => {
         expect(resolvePlotTab(plotTabsFor('atom', false, false), 'wave').id).toBe('distribution');
         expect(resolvePlotTab(plotTabsFor('orbital', true, false), 'density').id).toBe('density');

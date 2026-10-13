@@ -1,12 +1,9 @@
 /* src/atom_ui/inspector_atom.css -- the Atom inspector's plot tabs and facts card (spec §9.1). */
 .plot-tab-panel { padding-top: 12px; }
-/* The plot's function tabs at caption size, docked, in the drawer and stacked in the phone sheet. At
-   258 px the three labels cannot share one line above the 11 px floor (§4.3), so each wraps inside its
-   own tab, centred, at the caption line height; the phone sheet is wide enough for one line. */
-.inspector-body .ql-tabs, .inspector-stacked .ql-tabs { padding: 0; gap: 12px; }
-.inspector-body .ql-tab, .inspector-stacked .ql-tab {
-  font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); text-align: center;
-}
+/* The plot's function tabs at caption size, docked, in the drawer and stacked in the phone sheet: their
+   labels are the curve symbols, so the row is one line at 256 px (ruling T13-tablabels). */
+.inspector-body .ql-tabs, .inspector-stacked .ql-tabs { padding: 0; gap: 20px; }
+.inspector-body .ql-tab, .inspector-stacked .ql-tab { font-size: var(--ql-type-caption-size); white-space: nowrap; }
 .facts-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--ql-radius-lg);
   background: var(--ql-color-surface-2); border: 1px solid var(--ql-color-border-subtle); }
 .facts-list { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: var(--ql-type-body-size); }

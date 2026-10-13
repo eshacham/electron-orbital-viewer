@@ -194,7 +194,9 @@ html, body, #root {
   pointer-events: none;
 }
 .radial-plot-title {
-  font-size: 11px;
+  /* Caption size, semibold: never smaller than the note under it (ruling T13-plottitle). */
+  font-size: var(--ql-type-caption-size);
+  font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--ql-color-text-2);
   margin-bottom: 2px;

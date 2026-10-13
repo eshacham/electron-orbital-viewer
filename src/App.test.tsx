@@ -10,7 +10,7 @@ import moleculeReducer from './store/moleculeSlice';
 import jobsReducer from './store/jobsSlice';
 import bondsReducer, { setDensityIso, setH2PlusR, setBondsView, setScanPoint, selectBondsSystem } from './store/bondsSlice';
 import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView, setElement } from './store/atomSlice';
-import { setSurfaceStyle, setBasicSelection, requestCut } from './store/orbitalSlice';
+import { setSurfaceStyle, setBasicSelection, requestCut, finishOrbitalCalculation } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
 import { computeSamplingRadius, SHELL_VIEW_CUT_AXIS, DEFAULT_ENCLOSED_FRACTION } from './orbital_presets';
@@ -1257,7 +1257,8 @@ describe('App: shell', () => {
         const download = jest.spyOn(downloadModule, 'downloadBlob').mockImplementation(() => {});
         try {
             renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile(), level: 'shell', selectedShell: 1, selectedSubshell: { n: 1, l: 0 } });
-            fireEvent.click(screen.getByRole('tab', { name: 'Wave function' }));
+            // Ruling T13-tablabels: tabs show the curve symbol; the name is the words plus that symbol.
+            fireEvent.click(screen.getByRole('tab', { name: 'Wave function R(r)' }));
             fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
             fireEvent.click(screen.getByRole('button', { name: 'Export CSV of this plot' }));
             await waitFor(() => expect(download).toHaveBeenCalled());
@@ -1278,7 +1279,8 @@ describe('App: shell', () => {
         act(() => { store.dispatch(solveSucceeded(hydrogenProfile())); });
         const inspector = screen.getByRole('complementary', { name: 'Inspector' });
         expect(within(inspector).getByRole('tab', { name: 'Plot' })).toHaveAttribute('aria-selected', 'true');
-        expect(within(inspector).getByRole('tab', { name: 'Radial distribution' })).toHaveAttribute('aria-selected', 'true');
+        // Ruling T13-tablabels: tabs show the curve symbol; the name is the words plus that symbol.
+        expect(within(inspector).getByRole('tab', { name: 'Radial distribution D(r)' })).toHaveAttribute('aria-selected', 'true');
     });
 
     // Ruling DX1/DC1: at medium width the atom's drawer opens from its "Plot panel" button.
@@ -1289,8 +1291,36 @@ describe('App: shell', () => {
         expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('folded');
         fireEvent.click(screen.getByRole('button', { name: 'Plot panel' }));
         expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('open');
-        expect(screen.getByRole('tab', { name: 'Density' })).toBeInTheDocument();
-        expect(screen.getByRole('tab', { name: 'Radial distribution' })).toHaveAttribute('aria-selected', 'true');
+        // Ruling T13-tablabels: tabs show the curve symbol; the name is the words plus that symbol.
+        expect(screen.getByRole('tab', { name: 'Density ρ(r)' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Radial distribution D(r)' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    // Ruling T13-shellcard: under a shell's name the card states that shell's facts, not the whole atom's.
+    it('gives a shell its own facts card: occupancy, electrons and drawn radius', () => {
+        renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile(), level: 'shell', selectedShell: 2 });
+        fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
+        const card = screen.getByRole('region', { name: 'orbital facts' });
+        expect(within(card).getByRole('heading', { name: 'L shell' })).toBeInTheDocument();
+        expect(card).toHaveTextContent('Occupancy2s² 2p⁶');
+        expect(card).toHaveTextContent('Electrons8');
+        expect(card).toHaveTextContent('Drawn radius0.500 a₀ (non-relativistic LDA)');
+        expect(card).not.toHaveTextContent('Configuration');
+        expect(card).not.toHaveTextContent('Shells');
+    });
+
+    // Ruling T13-isostale: while the orbital computes, the card does not show the previous orbital's iso value.
+    it('shows the iso value as pending until the orbital has rendered', () => {
+        const { store } = renderWithProvider(<App />, {
+            Z: 1, profile: hydrogenProfile(), level: 'orbital', selectedShell: 1, selectedSubshell: { n: 1, l: 0 }, selectedOrbital: { n: 1, l: 0, ml: 0 },
+        });
+        expect(store.getState().orbital.isLoading).toBe(true);
+        fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
+        const card = screen.getByRole('region', { name: 'orbital facts' });
+        expect(card).toHaveTextContent('Iso value…computing');
+        act(() => { store.dispatch(finishOrbitalCalculation({ isoLevel: 1.234e-3 })); });
+        expect(card).toHaveTextContent('Iso value|ψ|² = 1.23e-3');
+        expect(card).not.toHaveTextContent('computing');
     });
 
     // Ruling R7: on a phone the sheet's Plot tab stacks the plot and the data, with no inner Plot/Data tabs.
@@ -1303,7 +1333,8 @@ describe('App: shell', () => {
         expect(panel).toHaveAttribute('role', 'tabpanel');
         const sections = within(panel).getAllByRole('region').filter(region => ['Plot', 'Data'].includes(region.getAttribute('aria-label') ?? ''));
         expect(sections.map(section => section.getAttribute('aria-label'))).toEqual(['Plot', 'Data']);
-        expect(within(sections[0]).getByRole('tab', { name: 'Radial distribution' })).toHaveAttribute('aria-selected', 'true');
+        // Ruling T13-tablabels: tabs show the curve symbol; the name is the words plus that symbol.
+        expect(within(sections[0]).getByRole('tab', { name: 'Radial distribution D(r)' })).toHaveAttribute('aria-selected', 'true');
         expect(within(sections[1]).getByRole('region', { name: 'orbital facts' })).toHaveTextContent('Whole atom');
         expect(within(panel).queryByRole('tab', { name: 'Data' })).toBeNull();
     });

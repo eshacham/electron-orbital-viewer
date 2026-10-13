@@ -1,4 +1,4 @@
-import { angularNodeSurfaces, atomFacts, orbitalFacts, shapeWord, subshellFacts } from '../src/orbital_facts';
+import { angularNodeSurfaces, atomFacts, orbitalFacts, shapeWord, shellFacts, subshellFacts } from '../src/orbital_facts';
 
 const extras = { enclosedFraction: 0.9, isoLevel: 1.234e-3, energy: -0.433, method: 'non-relativistic LDA' };
 const value = (facts: ReturnType<typeof orbitalFacts>, term: string) => facts.rows.find(row => row.term === term)?.value;
@@ -45,5 +45,26 @@ describe('orbital facts (spec §9.1 "Data")', () => {
         const atom = atomFacts({ title: 'Whole atom', configuration: '1s² 2s² 2p²', valence: '2s² 2p²', shellCount: 2, drawnRadius: 2.346, method: 'non-relativistic LDA' });
         expect(atom.rows.map(r => r.term)).toEqual(['Configuration', 'Valence', 'Shells', 'Drawn radius']);
         expect(atom.rows[3].value).toBe('2.35 a₀ (non-relativistic LDA)');
+    });
+
+    // Ruling T13-shellcard: a shell's card states the shell's own facts, never the whole atom's.
+    it('describes a shell by its own occupancy, electrons and drawn radius (Fe M shell)', () => {
+        const shell = shellFacts({ n: 3, occupancy: '3s² 3p⁶ 3d⁶', electrons: 14, drawnRadius: 1.6, method: 'non-relativistic LDA' });
+        expect(shell.title).toBe('M shell');
+        expect(shell.rows).toEqual([
+            { term: 'n', value: '3' },
+            { term: 'Occupancy', value: '3s² 3p⁶ 3d⁶' },
+            { term: 'Electrons', value: '14' },
+            { term: 'Drawn radius', value: '1.60 a₀ (non-relativistic LDA)' },
+        ]);
+        expect(shell.rows.map(r => r.term)).not.toContain('Configuration');
+        expect(shell.rows.map(r => r.term)).not.toContain('Shells');
+    });
+
+    // Ruling T13-isostale: the previous orbital's iso value is never shown under the new orbital's name.
+    it('marks the iso value as pending while the orbital computes', () => {
+        const facts = orbitalFacts({ n: 2, l: 1, ml: 0 }, { ...extras, isoPending: true });
+        const iso = facts.rows.find(row => row.term === 'Iso value');
+        expect(iso).toEqual({ term: 'Iso value', value: '…', spokenValue: 'computing' });
     });
 });

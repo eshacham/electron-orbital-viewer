@@ -115,12 +115,12 @@ import ElementTile from './atom_ui/ElementTile';
 import OrbitalEnergyList from './atom_ui/OrbitalEnergyList';
 import AtomInspector from './atom_ui/AtomInspector';
 import { plotAriaLabel, plotTabsFor, resolvePlotTab, tabCurves } from './atom/plot_tabs';
-import { atomFacts, orbitalFacts, subshellFacts } from './orbital_facts';
+import { atomFacts, orbitalFacts, shellFacts, subshellFacts } from './orbital_facts';
 import Inspector from './shell/Inspector';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
 import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
-import { shellName, viewTitle } from './shell/view_title';
+import { viewTitle } from './shell/view_title';
 import { useDocumentTitle } from './shell/useDocumentTitle';
 import { useFullscreen } from './shell/useFullscreen';
 import ThemeSwitch from './design/ThemeSwitch';
@@ -827,7 +827,11 @@ function App() {
         const method = shortMethodLabel(pictureRelativity);
         const find = (s: { n: number; l: number; j?: number }) => atomProfile.subshells.find(x => x.n === s.n && x.l === s.l && x.j === s.j);
         if (atomLevel === 'orbital' && atomSelectedOrbital) {
-            return orbitalFacts(atomSelectedOrbital, { enclosedFraction, isoLevel, energy: find(atomSelectedOrbital)?.energy ?? null, method });
+            // While the orbital computes, the iso value is still the previous orbital's (ruling T13-isostale).
+            return orbitalFacts(atomSelectedOrbital, {
+                enclosedFraction, isoLevel: renderFailed ? null : isoLevel, isoPending: isLoading,
+                energy: find(atomSelectedOrbital)?.energy ?? null, method,
+            });
         }
         if (atomSelectedSubshell) {
             const sub = find(atomSelectedSubshell);
@@ -835,12 +839,21 @@ function App() {
         }
         const configuration = speciesConfiguration(species);
         const shell = atomSelectedShell !== null ? atomProfile.shells.find(s => s.n === atomSelectedShell) : undefined;
+        if (shell) {
+            // The shell's own facts, not the whole atom's (ruling T13-shellcard).
+            const own = configuration.filter(s => s.n === shell.n);
+            return shellFacts({
+                n: shell.n, occupancy: configurationLabelOf(own), electrons: own.reduce((sum, s) => sum + s.electrons, 0),
+                drawnRadius: shell.contourRadius, method,
+            });
+        }
         return atomFacts({
-            title: shell ? shellName(shell.n) : 'Whole atom',
+            title: 'Whole atom',
             configuration: configurationLabelOf(configuration), valence: valenceConfigurationLabelOf(configuration),
-            shellCount: atomProfile.shells.length, drawnRadius: shell ? shell.contourRadius : atomProfile.displayRadius, method,
+            shellCount: atomProfile.shells.length, drawnRadius: atomProfile.displayRadius, method,
         });
-    }, [atomProfile, pictureRelativity, atomLevel, atomSelectedOrbital, atomSelectedSubshell, atomSelectedShell, enclosedFraction, isoLevel, species]);
+    }, [atomProfile, pictureRelativity, atomLevel, atomSelectedOrbital, atomSelectedSubshell, atomSelectedShell, enclosedFraction,
+        isoLevel, isLoading, renderFailed, species]);
 
     // Phone: the element is chosen from a full-screen list opened from the
     // element name, since the periodic table does not fit.

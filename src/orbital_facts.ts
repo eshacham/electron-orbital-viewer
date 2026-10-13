@@ -1,6 +1,7 @@
 import { orbitalName, shellLetter } from './orbital_names';
 import { subshellLabel } from './atom/configurations';
 import { formatDrawnRadius } from './atom/format_radius';
+import { shellName } from './shell/view_title';
 
 /**
  * The inspector's facts card (spec §9.1 "Data"): computed, never typed in.
@@ -8,7 +9,12 @@ import { formatDrawnRadius } from './atom/format_radius';
  * sign convention: positive mₗ takes cos, negative sin), named for l ≤ 3;
  * shape words are the textbook ones, labelled qualitative.
  */
-export interface FactRow { term: string; value: string }
+export interface FactRow {
+    term: string;
+    value: string;
+    /** What a screen reader says instead of `value`, when the visible value is a mark (e.g. "…" → "computing"). */
+    spokenValue?: string;
+}
 export interface OrbitalFacts { title: string; rows: FactRow[]; notes: string[] }
 
 const NODE_SURFACES: Record<string, string> = {
@@ -46,7 +52,19 @@ const radialNodes = (n: number, l: number) => {
 const energyText = (energy: number, method: string) =>
     `${energy < 0 ? '−' : ''}${Math.abs(energy).toFixed(3)} Ha (eigenvalue, ${method})`;
 
-interface Extras { enclosedFraction: number; isoLevel: number | null; energy: number | null; method: string }
+interface Extras {
+    enclosedFraction: number;
+    isoLevel: number | null;
+    /** The orbital is still computing, so `isoLevel` is still the previous one's (ruling T13-isostale). */
+    isoPending?: boolean;
+    energy: number | null;
+    method: string;
+}
+
+function isoRow(extras: Extras): FactRow {
+    if (extras.isoPending) return { term: 'Iso value', value: '…', spokenValue: 'computing' };
+    return { term: 'Iso value', value: extras.isoLevel === null ? '—' : `|ψ|² = ${extras.isoLevel.toExponential(2)}` };
+}
 
 export function orbitalFacts(o: { n: number; l: number; ml: number; j?: number }, extras: Extras): OrbitalFacts {
     const surfaces = angularNodeSurfaces(o.l, o.ml);
@@ -59,7 +77,7 @@ export function orbitalFacts(o: { n: number; l: number; ml: number; j?: number }
         { term: 'Radial nodes', value: radialNodes(o.n, o.l) },
         { term: 'Angular nodes', value: surfaces ? `${o.l} — ${surfaces}` : String(o.l) },
         { term: 'Enclosed', value: `${percent(extras.enclosedFraction)} of the electron` },
-        { term: 'Iso value', value: extras.isoLevel === null ? '—' : `|ψ|² = ${extras.isoLevel.toExponential(2)}` },
+        isoRow(extras),
         ...(extras.energy === null ? [] : [{ term: 'Orbital energy', value: energyText(extras.energy, extras.method) }]),
     ];
     const shape = shapeWord(o.l, o.ml);
@@ -85,6 +103,20 @@ export function subshellFacts(
             ...(extras.energy === null ? [] : [{ term: 'Orbital energy', value: energyText(extras.energy, extras.method) }]),
         ],
         notes: ['ψ changes sign across every node.'],
+    };
+}
+
+/** A shell's own facts (ruling T13-shellcard): its occupancy, electrons and drawn radius, never the whole atom's. */
+export function shellFacts(args: { n: number; occupancy: string; electrons: number; drawnRadius: number; method: string }): OrbitalFacts {
+    return {
+        title: shellName(args.n),
+        rows: [
+            { term: 'n', value: String(args.n) },
+            { term: 'Occupancy', value: args.occupancy },
+            { term: 'Electrons', value: Number.isInteger(args.electrons) ? String(args.electrons) : args.electrons.toFixed(2) },
+            { term: 'Drawn radius', value: `${formatDrawnRadius(args.drawnRadius)} a₀ (${args.method})` },
+        ],
+        notes: [],
     };
 }
 

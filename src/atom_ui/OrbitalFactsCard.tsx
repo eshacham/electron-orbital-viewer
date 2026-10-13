@@ -10,7 +10,10 @@ const OrbitalFactsCard: React.FC<{ facts: OrbitalFacts }> = ({ facts }) => (
             {facts.rows.map(row => (
                 <React.Fragment key={row.term}>
                     <dt>{row.term}</dt>
-                    <dd>{row.value}</dd>
+                    {row.spokenValue ? (
+                        // The visible mark is hidden from readers, which hear the words instead.
+                        <dd><span aria-hidden="true">{row.value}</span><span className="visually-hidden">{row.spokenValue}</span></dd>
+                    ) : <dd>{row.value}</dd>}
                 </React.Fragment>
             ))}
         </dl>
