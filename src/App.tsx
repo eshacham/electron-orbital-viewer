@@ -100,7 +100,6 @@ import { useComputedList } from './jobs/useComputedList';
 import { useFollowedJob } from './jobs/useFollowedJob';
 import { withComputed } from './jobs/computed';
 import { selectIsOwner, sessionErrorDismissed } from './store/jobsSlice';
-import { tierOf } from './molecules/types';
 
 /**
  * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
@@ -1152,7 +1151,7 @@ function App() {
                     no meta: the error, no badge. */}
                 {isMoleculeMode && molecule.meta && (
                     <div className="molecule-legend-stack">
-                        <TierBadge tier={tierOf(molecule.meta)} compact={isNarrow} />
+                        <TierBadge meta={molecule.meta} compact={isNarrow} />
                         {isNarrow && moleculeAlert}
                         {molecule.showStructure && (
                             <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}

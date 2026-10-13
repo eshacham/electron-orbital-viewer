@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ProvenancePanel from '../../src/components/ProvenancePanel';
 import TierBadge from '../../src/components/TierBadge';
+import { validatedLine } from '../../src/validation/geometry_honesty';
 import type { MoleculeProvenance } from '../../src/molecules/types';
 import type { LibraryMoleculeMeta } from '../../src/molecules/library_types';
 import { waterMeta } from '../molecules/fixtures';
@@ -24,10 +25,51 @@ const computed = (over: Partial<MoleculeProvenance> = {}, extra: Record<string, 
 const open = () => fireEvent.click(screen.getByRole('button', { name: 'How this was computed' }));
 
 describe('TierBadge', () => {
+    // Final review I2: the line says what this molecule's own references check, never a fixed claim -- after
+    // Phase 6D nine library molecules (methane among them) have neither a dipole nor an optimised geometry.
+    const EXPERIMENT = 'experiment (CCCBDB)';
+    const methane = waterMeta({
+        id: 'ch4', geometrySource: EXPERIMENT, references: [
+            { quantity: 'bond', value: 1.087, unit: 'Å', source: EXPERIMENT, tolerance: 0.01, atoms: [0, 1], label: 'C–H' },
+            { quantity: 'angle', value: 109.47, unit: 'deg', source: EXPERIMENT, tolerance: 1, atoms: [1, 0, 2], label: 'H–C–H' },
+            { quantity: 'dipole', value: 0, unit: 'D', source: 'zero by symmetry', tolerance: 0.01 }],
+    });
+    const water = waterMeta({
+        geometrySource: EXPERIMENT, references: [
+            { quantity: 'bond', value: 0.958, unit: 'Å', source: EXPERIMENT, tolerance: 0.01, atoms: [0, 1], label: 'O–H' },
+            { quantity: 'angle', value: 104.5, unit: 'deg', source: EXPERIMENT, tolerance: 1, atoms: [1, 0, 2], label: 'H–O–H' },
+            { quantity: 'dipole', value: 1.855, unit: 'D', source: 'CRC Handbook, via CCCBDB', tolerance: 0.1855 }],
+    });
+    const PLAUSIBLE = 'experiment (CCCBDB); plausibility check of the optimised geometry';
+    const methanol = waterMeta({
+        id: 'ch3oh', geometrySource: 'B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)',
+        geometryOptimisation: { converged: true, steps: 6 }, references: [
+            { quantity: 'bond', value: 1.427, unit: 'Å', source: PLAUSIBLE, tolerance: 0.02, atoms: [0, 1], label: 'C–O' },
+            { quantity: 'bond', value: 0.956, unit: 'Å', source: PLAUSIBLE, tolerance: 0.02, atoms: [1, 5], label: 'O–H' },
+            { quantity: 'dihedral', value: 180, unit: 'deg', source: 'conformer check', tolerance: 10, atoms: [2, 0, 1, 5] },
+            { quantity: 'dipole', value: 1.7, unit: 'D', source: 'CRC Handbook, via CCCBDB', tolerance: 0.17 }],
+    });
+    it('says plainly when nothing about the method is checked (methane: no dipole, geometry from experiment)', () => {
+        expect(validatedLine(methane)).toBe('Curated; geometry from experiment; no property checked against experiment yet.');
+        render(<TierBadge meta={methane} />);
+        expect(screen.getByRole('note', { name: 'data tier' }))
+            .toHaveTextContent('ValidatedCurated; geometry from experiment; no property checked against experiment yet.');
+        expect(screen.getByRole('note', { name: 'data tier' })).not.toHaveTextContent(/dipole|optimised/);
+    });
+    it('names the dipole only where one is checked (water), and the optimised geometry only where there is one', () => {
+        expect(validatedLine(water)).toBe('Curated; geometry from experiment; dipole checked against published values.');
+        expect(validatedLine(methanol)).toBe('Curated; optimised geometry; bond lengths and dipole checked against published values.');
+        expect(validatedLine(waterMeta({ id: 'n2', geometrySource: 'experimental R_e (Huber & Herzberg)', references: [
+            { quantity: 'R_e', value: 1.098, unit: 'Å', source: 'Huber & Herzberg' }] })))
+            .toBe('Curated; geometry from experiment; equilibrium bond length (from its energy curve) checked against published values.');
+        expect(validatedLine(waterMeta({ id: 'he2', geometrySource: 'no equilibrium: scan centre', references: [] })))
+            .toBe('Curated; no property checked against experiment yet.');
+    });
     it('names the tier and says what it means', () => {
-        const { rerender } = render(<TierBadge tier="validated" />);
-        expect(screen.getByRole('note', { name: 'data tier' })).toHaveTextContent('ValidatedCurated; its dipole, and an optimised geometry, checked against published values.');
-        rerender(<TierBadge tier="computed" />);
+        const { rerender } = render(<TierBadge meta={water} />);
+        expect(screen.getByRole('note', { name: 'data tier' }))
+            .toHaveTextContent('ValidatedCurated; geometry from experiment; dipole checked against published values.');
+        rerender(<TierBadge meta={computed()} />);
         expect(screen.getByRole('note', { name: 'data tier' }))
             .toHaveTextContent('ComputedComputed on request by the same method; not benchmarked against experiment.');
         // V1: the Computed chip takes the darker amber style.css declares (contrast-tested), not MUI's warning (3.1:1).
@@ -44,13 +86,19 @@ describe('TierBadge', () => {
     // stack over the molecule; compact, it is the chip alone, its line kept
     // for a pointer (title) and a screen reader (the note's description).
     it('compact, is the chip alone, with its line still told', () => {
-        render(<TierBadge tier="computed" compact />);
+        render(<TierBadge meta={computed()} compact />);
         const note = screen.getByRole('note', { name: 'data tier' });
         expect(note).toHaveClass('compact');
         expect(note).toHaveAttribute('title', 'Computed on request by the same method; not benchmarked against experiment.');
         expect(note).toHaveAccessibleDescription('Computed on request by the same method; not benchmarked against experiment.');
         expect(note.querySelector('.tier-badge-line')).toBeNull();
         expect(note.querySelector('.visually-hidden')).toHaveTextContent('Computed on request');
+    });
+    it('compact, tells a validated molecule its own line too', () => {
+        render(<TierBadge meta={methane} compact />);
+        const note = screen.getByRole('note', { name: 'data tier' });
+        expect(note).toHaveAttribute('title', validatedLine(methane));
+        expect(note).toHaveAccessibleDescription('Curated; geometry from experiment; no property checked against experiment yet.');
     });
 });
 

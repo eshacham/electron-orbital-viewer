@@ -1,11 +1,18 @@
 import React, { useId } from 'react';
 import { Chip } from '@mui/material';
-import type { MoleculeTier } from '../molecules/types';
+import { tierOf, type MoleculeTier } from '../molecules/types';
+import { validatedLine } from '../validation/geometry_honesty';
 
-export const TIER_TEXT: Record<MoleculeTier, { label: string; line: string }> = {
-    validated: { label: 'Validated', line: 'Curated; its dipole, and an optimised geometry, checked against published values.' },
-    computed: { label: 'Computed', line: 'Computed on request by the same method; not benchmarked against experiment.' },
-};
+export const TIER_LABEL: Record<MoleculeTier, string> = { validated: 'Validated', computed: 'Computed' };
+export const COMPUTED_LINE = 'Computed on request by the same method; not benchmarked against experiment.';
+
+type BadgeMeta = Parameters<typeof validatedLine>[0] & { tier?: MoleculeTier };
+
+/** The badge's second line: a computed molecule's is fixed; a library molecule's says what its own
+ * references check (final review I2), never a claim the data do not carry. */
+export function tierLine(meta: BadgeMeta): string {
+    return tierOf(meta) === 'computed' ? COMPUTED_LINE : validatedLine(meta);
+}
 
 /**
  * Spec §9.1: which tier a molecule belongs to is always on screen with it,
@@ -14,9 +21,11 @@ export const TIER_TEXT: Record<MoleculeTier, { label: string; line: string }> = 
  * stack down over the molecule on a sideways phone. The line is still there
  * for a pointer (title) and is the note's description for a screen reader.
  */
-const TierBadge: React.FC<{ tier: MoleculeTier; compact?: boolean }> = ({ tier, compact = false }) => {
+const TierBadge: React.FC<{ meta: BadgeMeta; compact?: boolean }> = ({ meta, compact = false }) => {
     const lineId = useId();
-    const { label, line } = TIER_TEXT[tier];
+    const tier = tierOf(meta);
+    const label = TIER_LABEL[tier];
+    const line = tierLine(meta);
     // V1: the computed chip's amber is declared in style.css (.tier-chip-computed), where its contrast is tested.
     const chip = tier === 'validated'
         ? <Chip size="small" label={label} color="success" />

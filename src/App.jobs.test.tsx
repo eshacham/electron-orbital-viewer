@@ -11,7 +11,6 @@ import { SESSION_ENDED } from './jobs/api';
 import { currentMonth } from './jobs/format';
 import { loadMoleculeIndex, loadMoleculeMeta, MoleculeLoadError, RESULT_NOT_FINISHED } from './molecules/loader';
 import type { MoleculeProvenance } from './molecules/types';
-import { TIER_TEXT } from './components/TierBadge';
 import { resetBuildEnv } from '../tests/jobs/build_env_stub';
 import { jobFixture, listFixture } from '../tests/jobs/api_fixtures';
 import { LIBRARY_INDEX, waterMeta } from '../tests/molecules/fixtures';
@@ -158,7 +157,8 @@ describe('Molecules mode with on-demand molecules', () => {
         await show(store, 'h2o');
         const badge = within(container.querySelector('.molecule-legend-stack') as HTMLElement).getByRole('note', { name: 'data tier' });
         expect(badge).toHaveClass('compact');
-        expect(badge).toHaveAccessibleDescription(TIER_TEXT.validated.line);
+        // Final review I2: water's own line -- its dipole is checked; its geometry is experiment's.
+        expect(badge).toHaveAccessibleDescription('Curated; geometry from experiment; dipole checked against published values.');
     });
 
     it('a link to a job that has not finished says so, and draws nothing', async () => {
