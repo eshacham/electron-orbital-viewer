@@ -1,0 +1,36 @@
+/* src/shell/top_bar.css -- the top bar (spec §8.1): 56 px, bg-bar, bottom border-subtle. */
+.app-topbar {
+  grid-area: topbar;
+  display: flex; align-items: center; gap: 24px;
+  height: var(--ql-size-top-bar); padding: 0 16px; box-sizing: border-box;
+  background: var(--ql-color-bg-bar);
+  border-bottom: 1px solid var(--ql-color-border-subtle);
+}
+.app-topbar-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+.app-topbar-tabs { display: flex; align-items: stretch; gap: 20px; height: 100%; }
+.app-topbar-tab {
+  position: relative; display: inline-flex; align-items: center;
+  color: var(--ql-color-text-2); text-decoration: none;
+  font: var(--ql-type-nav-weight) var(--ql-type-nav-size) / var(--ql-type-nav-line) var(--ql-font-sans);
+  transition: color var(--ql-motion-hover) ease-out;
+}
+.app-topbar-tab:hover { color: var(--ql-color-text-1); }
+.app-topbar-tab[aria-current="page"] { color: var(--ql-color-text-1); font-weight: 600; }
+/* A 2 px selected-edge underline 8 px below the baseline (concept A). */
+.app-topbar-tab[aria-current="page"]::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 12px;
+  height: 2px; border-radius: 1px; background: var(--ql-color-selected-edge);
+}
+.app-topbar-search { margin-left: auto; width: clamp(320px, 28vw, 400px); }
+.app-topbar-actions { display: flex; align-items: center; gap: 4px; }
+.app-topbar-note { max-width: 220px; }
+.ql-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: var(--ql-radius-pill);
+  background: var(--ql-color-avatar); color: var(--ql-color-on-fill);
+  font: 600 13px var(--ql-font-sans);
+}
+/* §7: the area tabs hide below 1100 px; the rail is enough. */
+@media (max-width: 1099px) { .app-topbar-tabs { display: none; } }
+.avatar-menu { padding: 12px 16px; min-width: 260px; display: flex; flex-direction: column; gap: 12px; }
+.avatar-menu .owner-bar { margin-top: 0; }
