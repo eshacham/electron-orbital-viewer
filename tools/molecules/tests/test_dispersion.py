@@ -75,3 +75,10 @@ def test_density_fitted_gradients_work_with_the_locked_numpy():
     mf.xc = 'B3LYP'
     mf.kernel()
     assert np.abs(mf.nuc_grad_method().kernel()).max() == pytest.approx(0.0124211, abs=1e-5)
+
+
+def test_provenance_puts_the_vwn_note_on_b3lyp_not_on_d3():
+    # Deferred minor (Task 5): 'B3LYP-D3(BJ) (PySCF >= 2.3: VWN-RPA)' read as if D3 had a VWN variant.
+    from generate import provenance
+    assert provenance('abc', 'B3LYP-D3(BJ)')['xc'] == 'B3LYP (PySCF >= 2.3: VWN-RPA) + D3(BJ)'
+    assert provenance('abc', 'B3LYP')['xc'] == 'B3LYP (PySCF >= 2.3: VWN-RPA)'

@@ -53,8 +53,11 @@ def git_commit():
 def provenance(commit, xc=XC):
     """Everything that decides the numbers, recorded in every meta.json. `xc` defaults to the diatomics'
     own method; Phase 6D's library (build_library.py) passes its own xc so provenance names D3(BJ) too."""
+    # The VWN-RPA note is B3LYP's (deferred minor, Task 5): a dispersion suffix follows it, not precedes it.
+    functional, _, dispersion = xc.partition('-D3')
+    xc_text = f'{functional} (PySCF >= 2.3: VWN-RPA)' + (f' + D3{dispersion}' if _ else '')
     return {'pyscf': pyscf.__version__, 'numpy': np.__version__, 'scipy': scipy.__version__,
-            'python': platform.python_version(), 'xc': f'{xc} (PySCF >= 2.3: VWN-RPA)',
+            'python': platform.python_version(), 'xc': xc_text,
             'script': 'tools/molecules/generate.py', 'commit': commit, 'dataVersion': DATA_VERSION}
 
 
