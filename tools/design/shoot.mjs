@@ -87,10 +87,17 @@ function collectMetrics() {
       '.viewport-title', '.viewport-toolbar', '.key-column', '.phone-topbar', '.phone-header', '.phone-sheet'].map(s => [s, box(s)])),
     fonts: { title: font('.viewport-title h1'), nav: font('.app-topbar-tab'), body: font('.explore-panel .ql-body') ?? font('.explore-panel'), caption: font('.ql-caption') },
     canvases: canvases.length,
-    // DC9: the renderer's canvas, counted by which canvases actually received a
-    // WebGL context (wrapped in the init script below), not by class name:
-    // §12 allows exactly one.
-    webglCanvases: window.__eovWebglCanvases ?? 0,
+    // DC9b: a canvas that ever received a WebGL context (wrapped in the init
+    // script below) is only "the" renderer's canvas while that context is
+    // still live -- still connected to the document, and not lost (a
+    // disposed renderer calls WEBGL_lose_context, which the browser reflects
+    // in gl.isContextLost()). §3.2 allows exactly one live one at a time;
+    // webglContextsCreated is every context ever created, for information
+    // (a React.StrictMode dev-mode double-invoke creates and disposes one
+    // before the kept one, so that number alone over-counts).
+    webglCanvases: [...(window.__eovWebglContexts?.entries() ?? [])]
+      .filter(([c, gl]) => c.isConnected && !gl.isContextLost()).length,
+    webglContextsCreated: window.__eovWebglContextsCreated ?? 0,
     insets: window.__eovInsets ?? null,
     text: {
       title: document.querySelector('.viewport-title')?.textContent ?? null,
@@ -162,18 +169,25 @@ try {
             if (prefs) window.localStorage.setItem('eov.render', prefs);
           } catch { /* storage refused: the app keeps its defaults */ }
         }, { choice: theme, prefs: renderPrefs });
-        // DC9: count WebGL contexts, not canvases by class name. Wraps
-        // getContext before any page script runs, and records each distinct
-        // canvas that receives a context whose type starts with "webgl".
+        // DC9/DC9b: count WebGL contexts, not canvases by class name. Wraps
+        // getContext before any page script runs, and keeps a canvas ->
+        // context map for every canvas that receives a context whose type
+        // starts with "webgl". collectMetrics (below) reads this map at
+        // measurement time and counts only the contexts still live then
+        // (§3.2's "one canvas" is about what's live, not what was ever
+        // created -- a disposed renderer's canvas should not count).
         await context.addInitScript(() => {
-          const webglCanvases = new Set();
-          window.__eovWebglCanvases = 0;
+          const contexts = new Map(); // canvas -> its most recent webgl* context
+          const everSeen = new Set(); // canvases that ever got one, for webglContextsCreated
+          window.__eovWebglContexts = contexts;
+          window.__eovWebglContextsCreated = 0;
           const original = HTMLCanvasElement.prototype.getContext;
           HTMLCanvasElement.prototype.getContext = function (type, ...args) {
             const context = original.call(this, type, ...args);
             if (context && typeof type === 'string' && type.startsWith('webgl')) {
-              webglCanvases.add(this);
-              window.__eovWebglCanvases = webglCanvases.size;
+              contexts.set(this, context);
+              everSeen.add(this);
+              window.__eovWebglContextsCreated = everSeen.size;
             }
             return context;
           };
@@ -193,7 +207,7 @@ try {
         await page.waitForTimeout(150);
         const off = await sampleColours(page, await page.screenshot(), size);
         results.push({ scene, theme, size, file, settled, metrics, colours: judge(on, off, theme), errors });
-        console.log(`${file}  settled=${settled}  webgl=${metrics.webglCanvases}  errors=${errors.length}`);
+        console.log(`${file}  settled=${settled}  webgl=${metrics.webglCanvases}  webglCreated=${metrics.webglContextsCreated}  errors=${errors.length}`);
         await context.close();
       }
     }
