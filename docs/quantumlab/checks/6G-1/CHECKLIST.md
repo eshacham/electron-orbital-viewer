@@ -233,3 +233,14 @@ top bar 56, rail 76, Explore 315, inspector 290, phone top bar 52, phone header 
 Inter Variable, title 20/600, nav 14/600, body 13/400. `controls card` reads `missing` on desktop
 shots for the capture-time reason in the preamble. `science_diff.mjs` against `origin/main`
 @ 15feebc (`/tmp/6g1-T19main-metrics.json`; main has not moved): **science text identical to main**.
+
+### Fix round 1 re-take (Task 20a review)
+
+Re-taken 2026-10-13 at commit `43725bd`: thumbnails follow the main view's committed opacity, and
+the Glow lights are per theme. Light Clean is now shaded by its lights, with no emissive crutch,
+and is paler toward the edge with a thin ink outline, closer to Option 2's see-through sphere.
+Deep Space is unchanged. All 14 composites were rebuilt from fresh `--gl metal` shots
+(`/tmp/6g1-20a-fix1-*` desktop, `/tmp/6g1-20a-fix1p-*` phone), with the same commands as above.
+The Deep Space and whole-atom composites came out byte-identical to the previous re-take. 12/12
+shots `settled=true`, `webglCanvases=1`, `errors=0`, tokens ΔE₀₀ 0, boxes exact.
+`science_diff.mjs` against `origin/main` @ 15feebc: **science text identical to main**.
