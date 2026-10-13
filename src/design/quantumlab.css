@@ -1,0 +1,18 @@
+/* Repository-aligned visual foundation. Import AFTER src/style.css or src/admin/admin.css. */
+:root[data-quantum-theme="dark"] { --ql-bg:#071426; --ql-panel:#12253B; --ql-text:#EDF5FF; --ql-muted:#B8CDE4; --ql-border:rgba(150,195,245,.18); --ql-accent:#66B8FF; }
+:root[data-quantum-theme="light"] { --ql-bg:#F6F9FE; --ql-panel:#FFFFFF; --ql-text:#17283E; --ql-muted:#50627B; --ql-border:rgba(35,75,125,.14); --ql-accent:#1565C0; }
+html, body, #root { background:var(--ql-bg); color:var(--ql-text); }
+#controls, .side-panel .level-nav, .molecule-nav.level-nav, .view-panel #controls, .view-panel .radial-plot {
+ background:var(--ql-panel); color:var(--ql-text); border:1px solid var(--ql-border);
+ border-radius:14px; box-shadow:0 14px 38px rgba(0,0,0,.14);
+}
+.side-panel,.view-panel { gap:12px; }
+#controls label, .level-nav, .molecule-nav, .molecule-caption { color:var(--ql-text); }
+#controls select, #controls input[type="number"] { background:var(--ql-panel); color:var(--ql-text); border:1px solid var(--ql-border); border-radius:8px; }
+.eov-admin-dashboard { background:var(--ql-bg); color:var(--ql-text); min-height:100vh; }
+.admin-header { padding:14px 0; border-bottom:1px solid var(--ql-border); }
+.admin-note,.daily-spend-title,.cost-billed { color:var(--ql-muted); }
+.admin-table-scroll { border:1px solid var(--ql-border); border-radius:12px; }
+.daily-spend-bar { fill:var(--ql-accent); }
+.daily-spend-label { fill:var(--ql-muted); }
+@media (max-width:760px) { .side-panel,.view-panel { box-shadow:none; } }
