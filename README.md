@@ -300,13 +300,17 @@ read off how big it actually is.
   length/angle, each captioned with its source), the total electron density,
   the electrostatic potential mapped onto that density, and the full list of
   molecular orbitals with HOMO and LUMO marked and a divider at the
-  HOMO–LUMO gap.
+  HOMO–LUMO gap (a Kohn–Sham orbital gap — neither the optical gap nor the
+  fundamental gap). Orbitals are labelled in the molecule's full point group
+  (methane's HOMO is 1t₂, benzene's 1e₁g); a diffuse, basis-dependent
+  virtual is marked, and where the LUMO is one, the LVMO — the antibonding
+  orbital textbooks draw — is shown beside it.
 - **Methods, stated on every number.** Geometry is experimental (CCCBDB)
-  where symmetry fixes it in a few parameters, or B3LYP/def2-TZVP optimised
-  (PySCF + geomeTRIC) for the seven molecules without a usable experimental
-  structure — `meta.geometrySource` names which, on screen, every time.
-  Density, dipole, electrostatic potential and orbitals are all
-  **B3LYP/def2-TZVPD**: the owner's call (2026-10-05) after the plain
+  where symmetry fixes it in a few parameters, or B3LYP-D3(BJ)/def2-TZVP
+  optimised (PySCF + geomeTRIC) for the seven molecules without a usable
+  experimental structure — `meta.geometrySource` names which, on screen,
+  every time. Density, dipole, electrostatic potential and orbitals are all
+  **B3LYP-D3(BJ)/def2-TZVPD**: the owner's call (2026-10-05) after the plain
   def2-TZVP basis missed five molecules' dipoles outside tolerance (water,
   ammonia, hydrogen sulfide, ethanol and ozone); adding def2-TZVPD's diffuse
   functions brought every one back within tolerance except ozone, which
@@ -446,11 +450,13 @@ screen or a stale picture left over from whatever was open before.
 
 **"How this was computed"**, on every molecule of either tier, states the
 method, where the geometry came from (CCCBDB experiment or a
-B3LYP/def2-TZVP optimisation for the library; a PubChem record or pasted
-XYZ coordinates for a computed one) and what to be wary of. For a computed
-molecule it also links the files that produced it — `input.py` (the exact
-PySCF script; open it and run it again), `output.log`, `geometry.xyz` and
-`job.json`, plus `trajectory.xyz` for an optimisation. The dev server
+B3LYP-D3(BJ)/def2-TZVP optimisation for the library; a PubChem record or
+pasted XYZ coordinates for a computed one) and what to be wary of. For a
+computed molecule it also links the files that produced it — `input.py`
+(the exact PySCF script; open it and run it again), `output.log`,
+`geometry.xyz` and `job.json`, plus `trajectory.xyz` for an optimisation,
+and `frequencies.json` for an optimisation whose frequency check ran. The
+dev server
 serves them as plain text, to read in the browser rather than download,
 and so does production: the AWS worker writes them to S3 as `text/plain`
 (`.py`, `.log`, `.xyz`) or `application/json` (Phase 6B-3). The owner, signed in or on This Mac, sees one more
@@ -997,8 +1003,8 @@ names which rule is in force next to each one.
 **Geometries are frozen, not interactive.** Unlike Bonds mode's R slider,
 there is no way to stretch, compress or rotate a bond length in Molecules
 mode — each of the 25 molecules is shown at exactly one geometry (CCCBDB
-experiment or a B3LYP/def2-TZVP optimum), and that is the only geometry its
-data file holds.
+experiment or a B3LYP-D3(BJ)/def2-TZVP optimum), and that is the only
+geometry its data file holds.
 
 **The ten diatomics behind Bonds mode are not in this library**, and their
 own grids stay point-sampled as Phase 5 shipped them — they were
@@ -1154,6 +1160,9 @@ nothing in Bonds mode.
 | `src/components/MoDiagram.tsx` | The molecular-orbital energy diagram, shared between a diatomic and H₂⁺'s own two levels |
 | `src/store/bondsSlice.ts` | Bonds mode's selection: system, R, scan index, drawn view and density iso-value |
 | `tools/molecules/` | The offline Python pipeline: `molecules.py` (the ten diatomics' geometry and methods), `quantum.py` (PySCF calculations, cached by settings hash), `fit.py` (R_e, D_e, the CCSD(T) validity range), `labels.py` (σ/π orbital labels and selection), `basis_export.py` (the AO convention exported to TS), `outputs.py` (JSON/grid writing), `generate.py` (the CLI), `publish.py` (S3 publishing), `version.py` (`DATA_VERSION`) — plus the 25-molecule library's own `library.py` (the catalogue, categories and references), `optimise.py` (the seven geomeTRIC-optimised geometries), `build_library.py` (the library's build CLI), `density.py` (voxel-averaged density, `check_density`), `esp.py` (the fixed-ρ ESP surface and its range), `grid.py` (the 6.5-bohr-margin sampling box), `orbitals.py` (the library's orbital table), `compact.py` (float32 gzip grid encoding) |
+| `tools/molecules/point_group.py` | Full point-group labels by character projection, including linear molecules and atoms with no PySCF symmetry |
+| `tools/molecules/dispersion.py` | D3(BJ) dispersion on Linux (`pyscf-dispersion`) and macOS (the `dftd3` stand-in) |
+| `src/validation/geometry_honesty.ts` | Which validation rows test the method (`countsAsValidation`) versus mark a geometry as taken from experiment, not a test of it (`isExperimentalGeometry`) |
 | `src/molecules/catalogue.ts` | The 25-molecule index: search/category filtering (`filterMolecules`) and formula formatting, read from `public/molecules/index.json` |
 | `src/molecules/library_types.ts` | `LibraryMoleculeMeta`, `LIBRARY_CATEGORIES`, and the REQUIRED-fields guard that refuses a pre-library `meta.json` rather than draw it without ESP/dipole |
 | `src/molecules/binary.ts` | Decodes a library molecule's gzip float32 grids (density, ESP) |

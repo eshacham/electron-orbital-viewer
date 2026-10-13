@@ -1251,6 +1251,307 @@ Old entries still read, with their cost alone.
   - 401 and CORS behave as before.
 - No job was submitted.
 
+## Phase 6D — scientific credibility (2026-10-08 – 2026-10-13)
+
+Plan: `docs/superpowers/plans/2026-10-08-phase-6d-scientific-credibility.md`.
+Executed as an 18-task SDD plan in worktree `nairobi` on
+`orbital-viewer-ux-review`, each task's dispatch, implementation and review
+recorded task by task in
+`.superpowers/sdd/2026-10-08-phase-6d-scientific-credibility/progress.md`
+(the ledger of record for every commit, ruling and number below) alongside
+each task's own report (`task-N-report.md`). Commits through this one are
+still local, pending the final whole-branch review before a push.
+
+### What shipped
+
+- **Full point-group labels by character projection** (`tools/molecules/
+  point_group.py`, Task 3). Orbitals are labelled in the molecule's true
+  point group rather than PySCF's own Abelian subgroup — methane's HOMO
+  reads `1t2`, benzene's `1e1g` — including linear molecules (`Coov`/
+  `Dooh`, σ/π/δ/φ from a numerical C5+C7 projection, +g/u from inversion)
+  and bare atoms (SO3, ψ labels with a note), neither of which need PySCF's
+  own symmetry machinery. A degenerate set matching no single irrep is
+  first split at its largest internal energy gaps; a split that still
+  fails but decomposes into whole irreps gets a combined label (e.g.
+  `1a1'+1e'`, BF₃'s near-degenerate fluorine core) rather than a bare `?`.
+- **Virtual classes and the LVMO** (`tools/molecules/orbitals.py`, Task 4).
+  Every virtual orbital is classified valence or diffuse by its character
+  against the basis's valence IAOs (threshold 0.75); where no canonical
+  virtual is valence, the app constructs the lowest valence virtual orbital
+  (LVMO) — the Fock operator diagonalised in the virtual IAO span — as an
+  extra, clearly captioned row (`constructed: true`, `kind:
+  'valence-virtual'`), always carrying the construction note and an
+  "upper estimate" energy, never "≈".
+- **D3(BJ) dispersion everywhere** (`tools/molecules/dispersion.py`, Task
+  1), with the library generated inside the Linux worker image (Task 2,
+  14) where `pyscf-dispersion` installs, and a `dftd3` 1.6.0 stand-in on
+  macOS for local jobs and tests, bit-identical to 1e-14 Ha for water and
+  methane.
+- **The frequency check and `frequencies.json`** (`tools/jobs/
+  input_template.py`, Tasks 6–7): every recipe-B optimisation runs an
+  analytic Hessian, checks for a true minimum against CCCBDB experimental
+  harmonics (water within 1.4 %), and displaces and re-optimises once from
+  a saddle point before re-checking. `frequencies.json` ships the modes
+  (Cartesian displacement vectors, masses, ZPE) when the check ran, is
+  counted in the 3 MB output budget, and is linked from the provenance
+  panel.
+- **Symmetry-free geometry work** (Task 6): an optimised geometry is
+  symmetrised (its own projection onto the nearest point group, up to 4
+  passes) before the final SCF, so numerical noise (methane's 3e-5 Å)
+  does not drop it a group; if PySCF still cannot build symmetry-adapted
+  orbitals, the final SCF falls back to `symmetry=False` and labels from
+  the geometry's own detected group instead of losing them.
+- **The time budget** (`tools/jobs/worker.py`'s `TimeBudget`, Tasks 6, 8–9):
+  a paid job asks before its next step, the frequency check, the final
+  single point, labelling and file-writing whether there is time left,
+  counting the step about to run, not only the tail cost; a budget-stopped
+  optimisation reports its best frame, not a bare timeout.
+- **Compute version 2** (`tools/jobs/canonical.py`, Task 8): the method
+  (`B3LYP-D3BJ`) and the frequency check are a new contract, so
+  `COMPUTE_VERSION` becomes 2 and no old job is silently re-served under
+  the new method; a retry of a pre-6D job runs fresh, at the current
+  method, as a new job (Ruling D6).
+- **Sizing version 6** (`tools/jobs/sizing.py`, Tasks 9, 17): prices the
+  frequency check (`h × step_seconds(N) × atoms`) and labelling (its own
+  grid-cost term, D7) as their own budget parts, shown in the quote.
+- **Library v3** (Task 14, below).
+- **The client** (Tasks 11–13): the orbital list shows full-group labels,
+  marks a diffuse virtual (◌) and a constructed LVMO (◇) with their
+  captions, splits the HOMO–LUMO divider from an optional HOMO–LVMO line
+  with the Kohn–Sham caveat, and the provenance panel states the dispersion
+  line, the frequency-check line (linking `frequencies.json`), the final
+  geometry's symmetrisation summary, and a legacy job's "computed before
+  dispersion was added" note.
+
+### Rulings
+
+Each ruling below is the plan's own (`docs/superpowers/plans/
+2026-10-08-phase-6d-scientific-credibility.md`, "Rulings this plan makes"),
+with its measurement, plus the corrections made once execution found the
+plan's premise wrong.
+
+- **D3(BJ) on this Mac.** `pyscf-dispersion` has no usable macOS wheel
+  (1.0.0 is x86_64-only and fails to load; 1.0.1–1.5.0 ship Linux-only).
+  Library v3 is generated inside the Linux worker image; macOS runs a
+  `dftd3` 1.6.0 stand-in, measured bit-identical to the Linux path for
+  water and methane (−0.0005738788210828446 and −0.0019136930093918568 Ha).
+- **NumPy 2.3.5, not a PySCF upgrade.** PySCF 2.8.0 needs NumPy < 2.5 for
+  density-fitted gradients; 2.3.5 reproduces water's B3LYP/def2-SVP energy
+  bit-identically to the prior venv, where a PySCF upgrade would have moved
+  it 4e-11 Ha — a provenance change this plan avoided.
+- **Valence threshold 0.75, not 0.5** (D-row, Task 3/4). Measured at
+  def2-TZVPD: water's LUMO is 55 % valence, ammonia's 50 %, methane's
+  36 %, against clean valence virtuals at 77–99 %; 0.75 cleanly separates
+  every case measured, with the percentage always shown.
+- **D4 — the LVMO may be a constructed valence virtual, not a canonical
+  MO.** Accepted for exactly 7 library molecules (H₂O, NH₃, CH₄, C₂H₆,
+  SiH₄, CH₃OH, ethanol); wording rule: "partly diffuse (NN % valence): its
+  shape depends on the basis", "unbound … not a bound orbital" only above
+  zero energy, the constructed LVMO always captioned as not an orbital of
+  this calculation.
+- **D4-energy** (correction to D3/D4's caption). A constructed LVMO's
+  energy is an upper estimate — several eV above this calculation's real
+  orbital energies (water's +5.0 eV versus a canonical σ* at +0.4–1.3 eV) —
+  not an "≈" approximation, and it is why no HOMO–LVMO gap is shown for a
+  constructed LVMO: only the Kohn–Sham HOMO–LUMO gap, with its caveat.
+- **D1 — a set matching no irrep is split, not left `?`.** Split at the
+  set's largest internal energy gaps first; a split that decomposes into
+  whole irreps gets a combined label (`1a1'+1e'`) with a note naming the
+  mixed irreps; only an irreducible remainder is left `?`. BF₃'s F 1s core
+  exercises this on the Linux image.
+- **D2 — Task 14 may create `tools/molecules/out/v3/` only**, leaving
+  `out/v1`, `out/v2`, `out/jobs` and `tools/jobs/.state` untouched.
+- **D6 — a retried pre-6D job runs fresh, at the current method,** as a
+  new job rather than reusing the old (dispersion-free) result; the UI
+  says so.
+- **D7 — labelling gets its own time-budget term**, fitted from measured
+  labelling times (benzene fell from 47.7 s single-threaded, pre-Task-3,
+  to 3.3 s once Task 3's shared-grid projection landed) and priced at the
+  worst case (D6h, since the pricing Lambda has no PySCF to detect the
+  real point group), scaled by the same Mac-to-Fargate factor (2.2×) the
+  file-write term uses.
+- **D19 — a bundle of smaller rulings, all measured and kept:** the time
+  budget counts the next step itself, not only the tail cost; linear
+  molecules get σ/π/δ (+g/u) rather than PySCF's native `a1g`/`e1u`
+  notation; the method and frequency-check change together bump
+  `COMPUTE_VERSION` to 2; the AWS Hessian probe runs only after the first
+  image carrying it is deployed (so Task 16 deployed at the provisional
+  `h`, Task 17 measured and redeployed); a refit stays sizing version 6
+  unless a job was actually sized at the provisional value first (checked
+  against the jobs table — none was, so both the 1.52 and 1.00 refits
+  below stayed version 6); labels stay plain text (`1t2`, not `1t₂`), since
+  subscript typography would move every accessible name and export file
+  stem the tests pin.
+- **OH-retry (corrected).** A final SCF that fails to converge with
+  symmetry on is retried once with symmetry off — but this only works
+  once `point_group` can label a geometry without PySCF's own symmetry.
+  The first version of this ruling shipped that premise unmet and crashed
+  linear molecules and atoms (`KeyError` in `_abelian`) the moment a
+  radical like OH actually hit the retry path; the fix round
+  (`96da650`) added a `SymmetryNotFound` guard and the numerical σ/π/δ/φ
+  projection for linear groups (and a note for atoms) before the ruling
+  could be trusted on a real paid job.
+- **no-jargon.** User-facing text never names an internal phase or task:
+  `UNCLASSIFIED_NOTE` reads "computed before the app classified empty
+  (virtual) orbitals as valence or diffuse", not "before Phase 6D".
+- **LVMO-wording.** The caption reads "the lowest empty valence orbital —
+  the one textbooks draw (antibonding, or an empty valence orbital such as
+  boron's 2p in BF3)", because BF₃'s own LVMO is boron's empty 2p, not an
+  antibonding orbital, and the first wording ("the antibonding orbital
+  textbooks draw") would have mis-described it.
+- **h = 1.00 (final; supersedes the 1.52 refit).** The AWS Hessian probe
+  (Task 17) measured `h` = 0.204 (water), 1.52 (ethanol) and 0.695
+  (caffeine) on L. Ethanol's 1.52 turned out to be an artefact — sizing's
+  step law under-prices a small molecule's step on L (16 threads sped
+  ethanol's step only 1.7×), not a real Hessian cost — so `h` is fitted
+  only from probe molecules in the step law's real regime (≥ 200 def2-SVP
+  basis functions), kept at the slowest of those (caffeine's 0.695), and
+  floored at 1.00 until a second large molecule is measured.
+- **The owner dropped the 300 px live orbital-row-width check** (carried
+  from Task 11's fix round) because a full UI overhaul — a professional
+  look, a chemistry/science theme, consistent UX — is already planned, so
+  this layout polish waits for it rather than being chased live now.
+
+### Library v3
+
+Generated inside the worker image (Task 14), two commits: `8982f62` (the
+seven re-optimised geometries at B3LYP-D3(BJ)/def2-TZVP — the commit every
+one of the 35 v3 `meta.json` files records as its generator) and `8c84bfc`
+(the full v3 generation, manifest and validation rows).
+
+- **Wall time, foreground, inside OrbStack (10 CPU, 16.8 GB):** re-optimising
+  the seven, 459 s (7.7 min), each a single ≤6-step `geomeTRIC` run that
+  converged first time; the ten diatomics, 157 s; the 25 library molecules,
+  830 s; validation rows, about 1 s. **Total generation compute ≈ 1446 s
+  (24 min)** — far under the task's 2 h 30 min estimate, since the v2
+  B3LYP minima were already close to the D3 minima. `pytest
+  tools/molecules` (93 s) and `npx jest` (68 s) both passed clean
+  afterwards.
+- **The seven re-optimised geometries**, final maximum Cartesian gradient
+  component in Ha/bohr, all below the 4.5e-4 tolerance: ch3oh 2.0e-5,
+  hcooh 1.5e-4, ethanol 2.0e-5, acetone 1.5e-5, pyridine 2.2e-4, formamide
+  2.5e-4, glycine 9.7e-5. No geometry moved notably (RMSD 0.0003–0.0040 Å
+  after Kabsch alignment to its v2 minimum) and no conformer changed;
+  D3(BJ) mostly just shortens C–C bonds by about 1 mÅ.
+- **Manifest:** `publish.py v3 --manifest-only` wrote 483 files (23.4 MB);
+  Task 15 published all 483 plus the manifest and `index.json`, 484 files
+  total, every one verified through CloudFront.
+- **Nothing surprised.** BF₃'s core came out as the expected combined
+  `1a1'+1e'` label (Ruling D1); the ozone dipole stayed the one documented,
+  pinned-both-ways known miss (0.6555 D against 0.53 D); every other
+  validation row that moved (HCOOH and acetone's dipoles, glycine's C–C
+  and dipole) stayed inside tolerance. Seven molecules carry a constructed
+  LVMO, exactly D4's list; no molecule carries a `?` label.
+
+### Sizing version 6
+
+`h` was measured by the AWS Hessian probe (Task 17): Batch job
+`3a9f334b-495a-4e8e-9af2-fc3969d7278b`, on-demand L (16 vCPU / 65536 MB,
+`OMP_NUM_THREADS=16`), on the Task 16 image (`ef20a86beec20439`, job
+definition rev 12), 973.5 s wall, ≈ $0.20, outside the meter. Per molecule,
+`h = Hessian seconds / (sizing's step price × atoms)`:
+
+| molecule | N (def2-SVP) | atoms | h |
+|---|---|---|---|
+| water | 24 | 3 | 0.204 |
+| ethanol | 72 | 9 | **1.52** |
+| caffeine | 246 | 24 | 0.695 |
+
+The first refit (`24f9fb3`, deployed as image `d7abe24ffa7386cb`, job
+definition rev 13) took the conservative slowest figure, 1.52. Ruling h=1.00
+(above) then superseded it: ethanol's regime (N < 200) prices mostly off
+sizing's fixed step overhead, not the real Hessian cost, so `h` is fitted
+only from large-regime runs and floored at 1.00 (`79a2c79`). Both refits
+stayed sizing version 6 (Ruling D19's v7-only-if-sized-in-between rule; no
+job had been sized at the provisional `h`). The decisions that moved:
+
+| job | h 1.5 (deployed) | h 1.52 | h 1.00 (final) |
+|---|---|---|---|
+| water optimise | S Spot ×3, 86.9 s | S Spot ×3, 87.3 s | S Spot ×3, 76.8 s |
+| caffeine optimise | **L on-demand ×1**, 4130.3 s | L on-demand ×1, 4155.6 s | **L Spot ×3**, 3496.6 s, est $0.238 / max $2.113 |
+
+Caffeine optimise moves onto Spot only at `h` = 1.00 — 103 s under the
+3600 s Spot limit.
+
+### Deployed
+
+- **Task 16** (first 6D deploy, `infra/deploy.sh all`): image
+  `ef20a86beec20439` pushed, job definition **rev 12**, compute
+  `UPDATE_COMPLETE` (anomaly monitor kept on). The site went live reading
+  v3 (methane's HOMO draws `1t2`, B3LYP-D3(BJ)); the API answers 401
+  without a token; previews show compute version 2, D3(BJ), sizing v6 with
+  `frequencySeconds` and `labellingSeconds`. Meter: 2026-10 spent $0.2788.
+- **Task 17** (the `h` = 1.52 refit, then the `h` = 1.00 correction):
+  redeployed twice — image `d7abe24ffa7386cb` / job definition rev 13 for
+  1.52, then image `53365fdfc89c75c6` / job definition **rev 14** for 1.00,
+  the one left live. Live previews match the local figures: water
+  optimise S Spot ×3, 76.8 s, check 20.2 s; caffeine optimise recommended
+  Spot, L ×3, 3496.6 s, timeout 10 490 s, est $0.238 / max $2.113.
+- **Task 15:** library v3 published, 484 files, every one verified through
+  CloudFront; v2 stays served (immutable versioning — a mistake needs a
+  new version, not an overwrite).
+- Commits through this phase remain local on `orbital-viewer-ux-review`,
+  not yet on `origin/main`; pushing waits for the final whole-branch
+  review, running concurrently with this documentation task.
+
+### The owner's recipe-B job
+
+The owner checked the library live in Molecules mode and ran one recipe-B
+job from the live UI (2026-10-12): **methane, optimise**, job key
+`e96c3916…`, sizing v6, Spot. DONE in 34.4 s. `meta.method` reads
+B3LYP-D3(BJ)/def2-TZVPD; `frequencyCheck.result` is `minimum` ("true
+minimum (no imaginary frequencies)"), the check stage itself taking 6.6 s
+against the quote's predicted `parts.frequencySeconds` of 34.7 s.
+`frequencies.json` is listed in `done.json` and opens through CloudFront
+with 9 modes (1314 cm⁻¹ ×3, 1532 ×2, 3021, 3155 ×3). The provenance panel
+shows HOMO `1t2`, LUMO `3a1`, LVMO `a1` (constructed). The job was charged
+$0.002473 against its approved maximum of $0.02132. Both findings are
+recorded in `progress.md`'s "Task 18 Step 1–2" line, which the owner ran
+directly rather than through the controller.
+
+### Risks and open points
+
+- **Optimised geometries carry ~1e-5 Å noise**, so a job's point group can
+  be detected lower than its true one; its labels then honestly name the
+  lower group rather than guessing the intended one.
+- **The LVMO of water, ammonia and methane is a constructed valence
+  virtual orbital, not a canonical one** — its energy is an expectation
+  value in the valence space, several eV above this calculation's real
+  orbital energies, always shown as an upper estimate.
+- **`pyscf-dispersion` on this Mac is a stand-in** (`dftd3` 1.6.0): a local
+  job's provenance names `dftd3 1.6.0`, not `pyscf-dispersion`, as its D3
+  backend.
+- **Phase 6E reads `frequencies.json`** for vibrations; its mode
+  conventions (Cartesian displacement vectors scaled so Σ components² =
+  1/μ, isotope-averaged masses, rounding to 0.01 cm⁻¹ / 1e-4 amu / 1e-6
+  per component) are fixed by this phase and documented in
+  `input_template.py`.
+- **The `h` floor rests on one large molecule** (caffeine). The floor
+  lifts once a second molecule ≥ 200 def2-SVP basis functions is measured,
+  and that refit could move caffeine optimise back off Spot (it qualifies
+  today by only 103 s) — review any such refit rather than deploying it
+  automatically.
+- **Deferred minors** (`.superpowers/sdd/2026-10-08-phase-6d-scientific-
+  credibility/deferred-minors.md`): small wording and edge-case items
+  collected across Tasks 3–11 — point_group's `?`-note wording on an
+  unreachable truncated set and its dropped `+` in export filenames; the
+  ECP/beyond-Kr classification guard and sizing's grid estimate past Kr;
+  labelling's double-counted time at the next sizing refit; several
+  comment and caption wording nits (`input_template.py:52`, the
+  post-retry `labelNote`, the repetitive `geometrySource` text, the
+  `spin_record` note when no frequencies ran, the maxGradient-metric and
+  Intel-Mac wording already closed by `ace0752`); `input_template`'s M2
+  (counting two SCFs before a displacement) and M7 (coordinate digits in
+  the size estimate); AWS-specific timing details (`JOBS_TIME_LIMIT_
+  SECONDS` clamping, the budget clock's start point); and `caption.ts`'s
+  nested brackets in export titles. None changes a number or a safety
+  property. All were open at the end of Phase 6D — see the final-wave
+  note for which, if any, it closed.
+- **The owner's planned UI overhaul** (professional look, chemistry/
+  science theme, consistent UX) is why the 300 px live orbital-row-width
+  check was dropped rather than chased now; any further layout polish on
+  the orbital list should wait for it too.
+
 ## Judgment calls made without asking (this phase)
 
 1. **RK4 over Numerov for the relativistic radial equations**
