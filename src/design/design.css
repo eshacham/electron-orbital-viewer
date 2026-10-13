@@ -23,3 +23,15 @@ html, body, #root { font-family: var(--ql-font-sans); }
   /* §4.3: on a phone body is 14 and captions 12. */
   .ql-body { font-size: 14px; }
 }
+/* §5: the wordmark, 20 px semibold; the accent part as gradient text with a solid fallback. */
+.ql-wordmark {
+  font-size: var(--ql-type-wordmark-size); line-height: var(--ql-type-wordmark-line);
+  font-weight: var(--ql-type-wordmark-weight); letter-spacing: -0.01em; white-space: nowrap;
+}
+.ql-wordmark-first { color: var(--ql-color-text-1); }
+.ql-wordmark-second { color: var(--ql-brand-solid); }
+.ql-wordmark-second.gradient {
+  background-image: var(--ql-brand-accent);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.ql-brand-mark { flex: 0 0 auto; }

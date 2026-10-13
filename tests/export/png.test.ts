@@ -110,6 +110,17 @@ describe('PNG export', () => {
         expect(swatches).toHaveLength(2);
     });
 
+    describe('drawOverlays: the brand footer (spec §5, ruling R13)', () => {
+        it('ends the caption band with the brand, right-aligned', () => {
+            const { calls, painter } = recorder();
+            drawOverlays(painter, 800, 600, 2, { caption: ['Carbon (C, Z = 6), whole atom, 90% contour'], scaleBar: null, phaseLegend: false, footer: 'QuantumLab (electron-orbital-viewer)' });
+            const footer = calls.find(c => c[0] === 'fillText' && c[1] === 'QuantumLab (electron-orbital-viewer)')!;
+            expect(footer).toBeDefined();
+            // measureText is 7 px a character in this recorder; pad is 14 × 2.
+            expect(footer[2]).toBe(800 - 28 - 'QuantumLab (electron-orbital-viewer)'.length * 7);
+        });
+    });
+
     it('renders once at the export ratio, crops, and puts the ratio back', async () => {
         const { renderer, log } = fakeRenderer(1000, 500);
         const target = { renderer, render: () => { log.push(`render ${renderer.getPixelRatio()}`); } };
@@ -137,7 +148,8 @@ describe('PNG export', () => {
         await captureViewPng(target, crop, { caption: ['Hi'], scaleBar: null, phaseLegend: false }, factory);
         // exportPixelRatio(1, 200, 100) = 2, so the output is crop × 2.
         expect(seen).toEqual([{ width: 400, height: 200 }]);
-        expect(painter.font).toBe('26px Roboto, sans-serif'); // 13 * ratio
+        // DA6: Inter Variable replaces Roboto (§4.3) -- self-hosted, Roboto is no longer loaded.
+        expect(painter.font).toBe('26px "Inter Variable", system-ui, sans-serif'); // 13 * ratio
         expect(calls).toContainEqual(['fillText', 'Hi', 28, 28]); // pad = 14 * ratio
     });
 

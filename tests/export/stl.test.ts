@@ -31,6 +31,8 @@ describe('encodeStl', () => {
         const header = String.fromCharCode(...new Uint8Array(buffer, 0, 80));
         expect(header.startsWith('solid')).toBe(false);
         expect(header).toContain('millimetres, 1 a0 = 25.00 mm');
+        // Spec §5: export metadata names the brand, keeping the repository id.
+        expect(header.startsWith('QuantumLab (electron-orbital-viewer), millimetres')).toBe(true);
     });
 
     it('states the scale to four significant figures, however small', () => {

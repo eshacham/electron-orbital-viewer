@@ -1,5 +1,6 @@
 import { ExportSurface, NOTHING_TO_EXPORT_REASON, surfaceBounds, surfaceScaleProblem } from './surfaces';
 import { analyseMesh, isWatertight, TopologyReport } from './mesh_topology';
+import { exportAppLabel } from '../design/brands';
 
 export class StlExportError extends Error {}
 
@@ -50,7 +51,7 @@ export function encodeStl(surfaces: ExportSurface[], longestSideMm: number): Arr
     const view = new DataView(buffer);
     // A binary STL's header must not start with "solid": some readers take
     // that as the ASCII format and fail on the bytes after it.
-    const header = `electron-orbital-viewer, millimetres, 1 a0 = ${mmPerBohr.toPrecision(4)} mm`.slice(0, 80);
+    const header = `${exportAppLabel()}, millimetres, 1 a0 = ${mmPerBohr.toPrecision(4)} mm`.slice(0, 80);
     for (let i = 0; i < header.length; i++) view.setUint8(i, header.charCodeAt(i) & 0x7f);
     view.setUint32(80, triangleCount, true);
 

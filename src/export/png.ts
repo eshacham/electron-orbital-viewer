@@ -4,6 +4,9 @@ import { ScaleBar, formatScaleLabel } from '../scale_bar';
 /** Long-side cap: 2× a Retina desktop would be ~83 MB of colour alone, times MSAA. */
 export const MAX_EXPORT_SIDE_PX = 4096;
 
+// §4.3: Inter Variable, self-hosted, replaces Roboto (no longer loaded).
+const PNG_FONT = '"Inter Variable", system-ui, sans-serif';
+
 /** Spec: "PNG at 2× screen resolution" — twice the drawing buffer, within the cap. */
 export function exportPixelRatio(currentRatio: number, cssWidth: number, cssHeight: number, maxSide = MAX_EXPORT_SIDE_PX): number {
     const wanted = 2 * (currentRatio > 0 ? currentRatio : 1);
@@ -56,6 +59,8 @@ export interface OverlaySpec {
     phaseLegend: boolean;
     combinationLegend?: CombinationLegendItem[] | null;
     colourBar?: ColourBarLegend | null;
+    /** Ruling R13: the brand label, the last line of the caption band, right-aligned. */
+    footer?: string;
 }
 
 export interface OverlayPainter {
@@ -167,7 +172,7 @@ function drawColourBar(painter: OverlayPainter, width: number, height: number, s
 export function drawOverlays(painter: OverlayPainter, width: number, height: number, scale: number, spec: OverlaySpec): void {
     const pad = 14 * scale;
     const line = 18 * scale;
-    painter.font = `${13 * scale}px Roboto, sans-serif`;
+    painter.font = `${13 * scale}px ${PNG_FONT}`;
     painter.textBaseline = 'top';
     // I1: each caption entry may itself be several words too many for the
     // frame (a method statement especially, on a phone-width export) -- wrap
@@ -175,10 +180,16 @@ export function drawOverlays(painter: OverlayPainter, width: number, height: num
     // band grow to fit however many lines that becomes.
     const maxTextWidth = width - 2 * pad;
     const wrappedLines = spec.caption.flatMap(text => wrapText(painter, text, maxTextWidth));
+    const bandLines = wrappedLines.length + (spec.footer ? 1 : 0);
     painter.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    painter.fillRect(0, 0, width, wrappedLines.length * line + 2 * pad - (line - 13 * scale));
+    painter.fillRect(0, 0, width, bandLines * line + 2 * pad - (line - 13 * scale));
     painter.fillStyle = '#ffffff';
     wrappedLines.forEach((text, i) => painter.fillText(text, pad, pad + i * line));
+    if (spec.footer) {
+        painter.font = `${11 * scale}px ${PNG_FONT}`;
+        painter.fillText(spec.footer, width - pad - painter.measureText(spec.footer).width, pad + wrappedLines.length * line);
+        painter.font = `${13 * scale}px ${PNG_FONT}`;
+    }
 
     painter.textBaseline = 'bottom';
     if (spec.scaleBar) {

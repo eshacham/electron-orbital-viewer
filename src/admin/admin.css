@@ -6,6 +6,7 @@
 html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans); background: var(--ql-color-bg-app); }
 .eov-admin-dashboard { max-width: 1440px; margin: 0 auto; padding: 16px; box-sizing: border-box; background: var(--ql-color-bg-app); color: var(--ql-color-text-1); }
 .admin-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; margin-bottom: 12px; }
+.admin-brand { display: inline-flex; align-items: center; gap: 8px; }
 .admin-controls, .admin-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
 /* The table needs about 1360px to show every column, so the cost panel sits
    beside it only on a screen wide enough for both; at a laptop's 1440px it

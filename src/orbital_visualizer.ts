@@ -1920,7 +1920,7 @@ function createAxisLabel(text: string, color: string): THREE.Sprite | null {
     canvas.height = 64;
     const context2d = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
     if (!context2d) return null;
-    context2d.font = 'italic 600 44px Roboto, sans-serif';
+    context2d.font = 'italic 600 44px "Inter Variable", system-ui, sans-serif';
     context2d.textAlign = 'center';
     context2d.textBaseline = 'middle';
     context2d.fillStyle = color;

@@ -358,7 +358,8 @@ describe('cube', () => {
         expect(job.description).toMatch(/^rho\(x,y,z\), total electron density, electrons\/bohr\^3/);
         const text = await readText(buildCubeBlob({ ...job, requestId: 1 }));
         const lines = text.split('\n');
-        expect(lines[0]).toBe('electron-orbital-viewer: Water (H2O), density, 90 % enclosed (rho = 2.31e-3 e/a03)');
+        // Spec §5: export metadata names the brand, keeping the repository id.
+        expect(lines[0]).toBe('QuantumLab (electron-orbital-viewer): Water (H2O), density, 90 % enclosed (rho = 2.31e-3 e/a03)');
         expect(lines[2]).toBe('    3   -1.000000   -1.000000   -1.000000');
         expect(lines[3]).toBe('    2    2.000000    0.000000    0.000000');
         expect(lines[6]).toBe('    8    8.000000    0.000000    0.000000    0.000000');
@@ -376,7 +377,8 @@ describe('cube', () => {
         // ρ = 0.001 surface, so its title names the grid (the description
         // still says how the app colours the surface by it).
         expect((await readText(buildCubeBlob({ ...job, requestId: 1 }))).split('\n')[0])
-            .toBe('electron-orbital-viewer: Water (H2O) ESP grid (Ha/e), B3LYP/def2-TZVPD');
+            // Spec §5: export metadata names the brand, keeping the repository id.
+            .toBe('QuantumLab (electron-orbital-viewer): Water (H2O) ESP grid (Ha/e), B3LYP/def2-TZVPD');
         expect(job.description).toContain('+/-0.05 Ha/e scale');
         // The on-screen / PNG description is the surface's, unchanged.
         expect(viewDescription(drawnStore({ kind: 'esp' }).getState())).toBe('Water (H₂O), ESP on ρ = 0.001 e/a₀³ surface, ±0.05 Ha/e');

@@ -129,7 +129,8 @@ describe('runExport: PNG', () => {
         const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
         const context = { ...baseContext(neonStore().getState()), handle: exportHandle({ capturePng }), phaseLegend: false };
         expect((await runExport('png', context)).filename).toBe('orbital-viewer_Ne_atom.png');
-        expect(capturePng).toHaveBeenLastCalledWith({ caption: ['Neon (Ne, Z = 10), whole atom, 90% contour', expect.stringMatching(/^central-field SCF/)], phaseLegend: false });
+        // DA5: the overlays object now also carries the brand footer (spec §5, ruling R13).
+        expect(capturePng).toHaveBeenLastCalledWith({ caption: ['Neon (Ne, Z = 10), whole atom, 90% contour', expect.stringMatching(/^central-field SCF/)], phaseLegend: false, footer: 'QuantumLab (electron-orbital-viewer)' });
         expect((await runExport('png-plain', context)).filename).toBe('orbital-viewer_Ne_atom_view.png');
         expect(capturePng).toHaveBeenLastCalledWith(null);
     });
@@ -159,7 +160,8 @@ describe('runExport: PNG', () => {
         const capturePng = jest.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
         const context = { ...baseContext(neonStore().getState()), handle: exportHandle({ capturePng }), phaseLegend: true };
         await runExport('png', context);
-        expect(capturePng).toHaveBeenLastCalledWith({ caption: expect.any(Array), phaseLegend: true });
+        // DA5: the overlays object now also carries the brand footer (spec §5, ruling R13).
+        expect(capturePng).toHaveBeenLastCalledWith({ caption: expect.any(Array), phaseLegend: true, footer: expect.any(String) });
     });
 
     // I3: a PNG photographs whatever the canvas currently shows, unlike CSV
@@ -454,7 +456,8 @@ describe('cubeJobFor: an Atom spin-orbit cube keeps its j-level fractions and th
         store.dispatch(drillToShell(6));
         store.dispatch(drillToSubshell(6, 1, 0.5));
         const [title, description] = headerOf(store);
-        expect(title).toBe('electron-orbital-viewer: Gold (Au, Z = 79), 6p1/2 subshell, with spin-orbit, 90% contour');
+        // Spec §5: export metadata names the brand, keeping the repository id.
+        expect(title).toBe('QuantumLab (electron-orbital-viewer): Gold (Au, Z = 79), 6p1/2 subshell, with spin-orbit, 90% contour');
         expect(description).toContain('j = l +/- 1/2 levels');
         store.dispatch(drillToSubshell(6, 1, 1.5));
         expect(headerOf(store)[0]).toContain('6p3/2 subshell');

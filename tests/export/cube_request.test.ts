@@ -31,7 +31,8 @@ describe('cube requests', () => {
         const job = cubeJobFor(neonStore().getState());
         expect(job.type).toBe('radialCube');
         const text = await readText(buildCubeBlob({ ...job, resolution: 8, requestId: 1 } as CubeRequest));
-        expect(text.split('\n')[0]).toBe('electron-orbital-viewer: Neon (Ne, Z = 10), whole atom, 90% contour');
+        // Spec §5: export metadata names the brand, keeping the repository id.
+        expect(text.split('\n')[0]).toBe('QuantumLab (electron-orbital-viewer): Neon (Ne, Z = 10), whole atom, 90% contour');
         expect(text.split('\n')[1]).toMatch(/^rho\(r\) = D\(r\)\/\(4 pi r\^2\), total electron density/);
         expect(text.split('\n')[6].trim().split(/\s+/)).toEqual(['10', '10.000000', '0.000000', '0.000000', '0.000000']);
         // Fix round 1 (I3): this title has none of the characters asciiLine's

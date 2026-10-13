@@ -11,6 +11,9 @@ import { selectIsOwner, JobsState } from '../store/jobsSlice';
 import type { CostsResponse, JobView } from '../jobs/api_types';
 import ThemeSwitch from '../design/ThemeSwitch';
 import { useQuantumTheme } from '../design/useQuantumTheme';
+import Wordmark from '../design/Wordmark';
+import BrandMark from '../design/BrandMark';
+import { useBrand } from '../design/useBrand';
 
 /** The root's class, and the string tools/check_admin_split.mjs looks for in the main bundle. */
 export const ADMIN_ROOT_CLASS = 'eov-admin-dashboard';
@@ -21,7 +24,8 @@ export const ADMIN_ROOT_CLASS = 'eov-admin-dashboard';
  * the viewer; a visitor gets a sign-in prompt and nothing is fetched.
  */
 const AdminApp: React.FC = () => {
-    const { theme } = useQuantumTheme();
+    const brand = useBrand();
+    const { theme, mode } = useQuantumTheme();
     const isOwner = useSelector(selectIsOwner);
     const target = useSelector((state: { jobs: JobsState }) => state.jobs.target);
     const months = useMemo(() => recentMonths(new Date()), []);
@@ -47,11 +51,14 @@ const AdminApp: React.FC = () => {
         return () => { cancelled = true; };
     }, [isOwner, month, target, reload]);
 
+    useEffect(() => { document.title = `Owner dashboard · ${brand.name}`; }, [brand.name]);
+
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <main className={ADMIN_ROOT_CLASS}>
                 <header className="admin-header">
+                    <span className="admin-brand"><BrandMark size={24} /><Wordmark brand={brand} mode={mode} /></span>
                     <Typography variant="h5" component="h1">Owner dashboard</Typography>
                     <a href="/">Back to the viewer</a>
                     <ThemeSwitch />

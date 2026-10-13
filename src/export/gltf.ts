@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ExportSurface, NOTHING_TO_EXPORT_REASON, surfaceBounds, surfaceScaleProblem } from './surfaces';
 import { exportGlb } from './gltf_exporter_factory';
+import { exportAppLabel } from '../design/brands';
 
 /** Tabletop size for AR, and irrelevant to slides, which rescale anyway. */
 export const GLTF_LONGEST_SIDE_METRES = 0.2;
@@ -21,7 +22,7 @@ export function buildGltfScene(surfaces: ExportSurface[], description: string): 
     const scene = new THREE.Scene();
     const metresPerBohr = GLTF_LONGEST_SIDE_METRES / surfaceBounds(surfaces).longestSide;
     const root = new THREE.Group();
-    root.name = 'electron-orbital-viewer';
+    root.name = exportAppLabel();
     root.scale.setScalar(metresPerBohr);
     root.userData = { description, unit: 'bohr', metresPerBohr };
     for (const surface of surfaces) {

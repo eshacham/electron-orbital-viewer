@@ -16,6 +16,7 @@ import { ColourBarLegend, CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
 import { encodeGlb } from './gltf';
+import { exportAppLabel } from '../design/brands';
 import { CubeAtom } from './cube';
 import { CubeJob, CubeWorkerHandle, requestCube } from './cube_request';
 import { H2PLUS_LABELS } from '../bonds/h2plus';
@@ -381,7 +382,7 @@ function bondsCubeJob(state: RootState, title: string, scan: MoleculeScan | null
  * `bondsScan`/`bondsMeta`, ruling C5) -- absent, every other mode ignores it.
  */
 export function cubeJobFor(state: RootState, bonds?: { scan?: MoleculeScan | null; meta?: MoleculeMeta | null }): CubeJob {
-    const title = `electron-orbital-viewer: ${viewDescription(state)}`;
+    const title = `${exportAppLabel()}: ${viewDescription(state)}`;
     const atom = state.atom;
     if (atom.mode === 'bonds') return bondsCubeJob(state, title, bonds?.scan, bonds?.meta);
     if (atom.mode === 'atom' && atom.level !== 'orbital' && atom.profile) {
@@ -680,7 +681,7 @@ export async function moleculeCubeJob(state: RootState): Promise<CubeJob> {
     if (!drawn) throw new Error(moleculePictureReason(state) ?? NOTHING_DRAWN_REASON);
     const meta = loadedMeta(state);
     const atoms: CubeAtom[] = meta.atoms.map(a => ({ Z: a.Z, position: a.position }));
-    const title = `electron-orbital-viewer: ${viewDescription(state)}`;
+    const title = `${exportAppLabel()}: ${viewDescription(state)}`;
     const method = `${methodStatement(state)}${caveatSuffix(state)}`;
     const { surface } = drawn;
     if (surface === 'density') {
@@ -698,7 +699,7 @@ export async function moleculeCubeJob(state: RootState): Promise<CubeJob> {
         // view (and the PNG caption) colours by it -- so its title names the
         // grid (final review M3); the description says how the app uses it.
         return {
-            type: 'gridCube', atoms, title: `electron-orbital-viewer: ${moleculeTitle(meta)} ESP grid (Ha/e), ${meta.method.density}`,
+            type: 'gridCube', atoms, title: `${exportAppLabel()}: ${moleculeTitle(meta)} ESP grid (Ha/e), ${meta.method.density}`,
             grid: { shape: grid.shape, origin: grid.origin, spacing: grid.spacing, values: grid.values },
             description: `electrostatic potential V(x,y,z), Ha/e (atomic units), the shipped ${grid.shape.join('x')} grid `
                 + `(nuclear term capped within 0.05 bohr of a nucleus; rounded to 10 mantissa bits); the app colours the rho = ${ESP_SURFACE_DENSITY} `
@@ -813,12 +814,14 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             if (caveat) caption.push(caveat);
             // Molecules' keys come from the drawn surface, not App's flags.
             const overlays = kind !== 'png' ? null
-                : molecule ? { caption, ...moleculeKeys(context.state) }
+                // Spec §5, ruling R13: the brand footer ends the caption band, right-aligned.
+                : molecule ? { caption, ...moleculeKeys(context.state), footer: exportAppLabel() }
                     : {
                         caption,
                         phaseLegend: Boolean(context.phaseLegend),
                         // Ruling C5: describe the combination key too, when App has one on screen.
                         combinationLegend: context.combinationLegend,
+                        footer: exportAppLabel(),
                     };
             return { blob: await context.handle.capturePng(overlays), filename: kind === 'png' ? `${stem}.png` : `${stem}_view.png` };
         }
