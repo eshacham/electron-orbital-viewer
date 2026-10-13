@@ -47,6 +47,9 @@ export const NARROW_VIEWPORT = '(max-width: 760px), (max-height: 500px), (max-wi
  */
 export const MEDIUM_VIEWPORT = '(max-width: 1289px)';
 
+/** Below 1100 px the top bar drops its area tabs and the search becomes an icon (spec §7). */
+export const TOPBAR_COMPACT = '(max-width: 1099px)';
+
 /**
  * Wide desktop (spec §7): at 1680 px and over, the rail shows icon and label
  * in a row (184 px) and the inspector widens to 320. Only meaningful when

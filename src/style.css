@@ -489,12 +489,16 @@ html, body, #root {
     flex-direction: column-reverse;
     max-height: 55dvh;
     background: var(--ql-color-surface-1);
-    border-radius: 14px 14px 0 0;
+    border-radius: var(--ql-radius-xl) var(--ql-radius-xl) 0 0;
+    border: 1px solid var(--ql-color-border-subtle);
+    border-bottom: 0;
     box-shadow: var(--ql-shadow-popover);
   }
   .phone-sheet-tabs {
     display: flex;
     flex: 0 0 auto;
+    background: var(--ql-color-bg-bar);
+    border-radius: 0;
     padding-bottom: env(safe-area-inset-bottom);
   }
   .phone-sheet.open .phone-sheet-tabs {
@@ -502,9 +506,9 @@ html, body, #root {
   }
   .phone-sheet-tab {
     flex: 1;
-    min-height: 48px;
+    min-height: var(--ql-size-touch);
     border: none;
-    border-top: 3px solid transparent;
+    border-top: 2px solid transparent;
     background: none;
     color: var(--ql-color-text-2);
     font: var(--ql-type-nav-weight) var(--ql-type-nav-size) var(--ql-font-sans);
@@ -513,6 +517,14 @@ html, body, #root {
   .phone-sheet-tab[aria-selected="true"] {
     color: var(--ql-color-accent-text);
     border-top-color: var(--ql-color-selected-edge);
+  }
+  .phone-sheet-handle {
+    width: 36px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: var(--ql-radius-pill);
+    background: var(--ql-color-border-strong);
+    flex: 0 0 auto;
   }
   .phone-sheet-body {
     flex: 1 1 auto;
@@ -542,6 +554,13 @@ html, body, #root {
     /* Opaque: its see-through dark card read as washed-out grey on the
        light sheet. */
     background: var(--ql-color-surface-2);
+  }
+  /* The strip is the Explore tab's first row here, not an overlay (spec
+     §9.8): it runs edge to edge like the rest of the sheet, not inset by
+     the body's own padding. */
+  .phone-sheet-body .thumbnail-strip.sheet {
+    margin: 0 -16px 8px;
+    padding: 0 16px;
   }
 
   /* Small overlays sit just under the header. */
@@ -630,7 +649,7 @@ html, body, #root {
     left: auto;
     width: min(46vw, 400px);
     max-height: none;
-    border-radius: 14px 0 0 0;
+    border-radius: var(--ql-radius-xl) 0 0 0;
   }
   .phone-sheet:not(.open) {
     top: auto;

@@ -46,17 +46,21 @@ const PhoneSheet: React.FC<PhoneSheetProps> = ({ tabs, active, onChange }) => {
                 ))}
             </div>
             {current && (
-                <div
-                    // Keyed by tab, so each opens at its own top rather than
-                    // at the scroll position the previous tab was left at.
-                    key={current.key}
-                    className="phone-sheet-body"
-                    id="phone-sheet-body"
-                    role="tabpanel"
-                    aria-labelledby={`phone-tab-${current.key}`}
-                >
-                    {current.content}
-                </div>
+                // Keyed by tab, so each opens at its own top rather than at
+                // the scroll position the previous tab was left at. The sheet
+                // is column-reverse (above), so this handle -- last in the
+                // DOM -- sits visually above the body (spec §9.8).
+                <React.Fragment key={current.key}>
+                    <div
+                        className="phone-sheet-body"
+                        id="phone-sheet-body"
+                        role="tabpanel"
+                        aria-labelledby={`phone-tab-${current.key}`}
+                    >
+                        {current.content}
+                    </div>
+                    <div className="phone-sheet-handle" aria-hidden="true" />
+                </React.Fragment>
             )}
         </div>
     );

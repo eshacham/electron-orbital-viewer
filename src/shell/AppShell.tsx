@@ -13,6 +13,8 @@ interface AppShellProps {
     /** The viewport cell itself: <main id="canvas-container">, the one canvas and its overlay zones. */
     viewport: React.ReactNode;
     exploreCollapsed?: boolean;
+    /** Medium width: a "Show the Explore panel" button at the workspace's left edge, while collapsed (spec §7). */
+    onExpandExplore?(): void;
     fullscreen?: boolean;
     shellRef?: React.Ref<HTMLDivElement>;
 }
@@ -29,7 +31,7 @@ function skipTo(event: React.MouseEvent<HTMLAnchorElement>, id: string): void {
  * passes these slots; the viewport cell never remounts when the layout
  * changes (spec §3.2), because it is always this element's child.
  */
-const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, rail, explore, inspector, viewport, exploreCollapsed = false, fullscreen = false, shellRef }) => {
+const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, rail, explore, inspector, viewport, exploreCollapsed = false, onExpandExplore, fullscreen = false, shellRef }) => {
     const classes = ['app-shell', layout, wide && 'wide', exploreCollapsed && 'explore-collapsed', fullscreen && 'is-fullscreen'].filter(Boolean).join(' ');
     return (
         <div ref={shellRef} className={classes}>
@@ -43,7 +45,13 @@ const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, rail,
             )}
             <div className="app-workspace">
                 {layout !== 'phone' && (
-                    <aside id="explore-panel" className="explore-panel side-panel" aria-label="Explore" tabIndex={-1}>{explore}</aside>
+                    <aside id="explore-panel" className="explore-panel side-panel" aria-label="Explore" tabIndex={-1} hidden={exploreCollapsed}>{explore}</aside>
+                )}
+                {exploreCollapsed && onExpandExplore && (
+                    <button type="button" className="explore-reveal" aria-label="Show the Explore panel" aria-expanded={false}
+                        aria-controls="explore-panel" onClick={onExpandExplore}>
+                        <span aria-hidden="true">›</span>
+                    </button>
                 )}
                 {viewport}
                 {layout === 'desktop' && inspector}

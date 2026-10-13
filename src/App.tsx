@@ -67,7 +67,7 @@ import { CombinationSelection, fieldRequestFor, combinationCurves, overlayLegend
 import { basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
-import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT, PHONE_LANDSCAPE, WIDE_VIEWPORT } from './useMediaQuery';
+import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT, PHONE_LANDSCAPE, WIDE_VIEWPORT, TOPBAR_COMPACT } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
 import { buildComparisonCurves, radialPlotRange } from './atom/comparison_curves';
 import { useUrlStateSync } from './useUrlStateSync';
@@ -444,6 +444,10 @@ function App() {
         setViewPanelChoice({ medium: isMedium, open: update(viewPanelOpen) });
     const isWide = useMediaQuery(WIDE_VIEWPORT) && !isNarrow && !isMedium;
     const layout: 'desktop' | 'medium' | 'phone' = isNarrow ? 'phone' : isMedium ? 'medium' : 'desktop';
+    // Below 1100 px the top bar's search shrinks to an icon (spec §7); a phone has its own search sheet instead.
+    const compactTopBar = useMediaQuery(TOPBAR_COMPACT) && !isNarrow;
+    // Medium width only: Explore starts open and can be folded to the rail, and back, on request.
+    const [exploreCollapsed, setExploreCollapsed] = useState(false);
     const { mode: themeMode } = useQuantumTheme();
     const render = usePref(renderPref);
     const phase = useMemo(() => phaseColours(themeMode, render.scheme), [themeMode, render.scheme]);
@@ -1259,8 +1263,18 @@ function App() {
             {
                 key: 'explore',
                 label: 'Explore',
-                // Spec §9.8: Explore holds the left panel's tabs as sections, the Relativity switch included.
-                content: <><LevelNav {...levelNavProps} variant="body">{subshellPanel}</LevelNav>{relativityControl}</>,
+                // Spec §9.8: Explore holds the left panel's tabs as sections, the
+                // Relativity switch included, with the orbital strip as its first row.
+                content: (
+                    <>
+                        {stripItems.length > 0 && (
+                            <ThumbnailStrip items={stripItems} label="orbitals in view" rGrid={atomRGrid} themeKey={stripThemeKey}
+                                onSelect={handleLevelNavigate} variant="sheet" />
+                        )}
+                        <LevelNav {...levelNavProps} variant="body">{subshellPanel}</LevelNav>
+                        {relativityControl}
+                    </>
+                ),
             },
             { key: 'view', label: 'View', content: <>{controls}<AxesSwitch />{phoneViewActions}</> },
             // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
@@ -1318,6 +1332,7 @@ function App() {
                 </>
             )}
             display={<>{controls}<AxesSwitch /></>}
+            onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined}
         />
     );
 
@@ -1366,6 +1381,7 @@ function App() {
             avatar={avatar}
             onHelp={() => setHelpOpen(true)}
             sessionNote={session.expired && !session.signedIn ? SESSION_ENDED : null}
+            compactSearch={compactTopBar}
         />
     );
     const phoneTopBar = (compact: boolean) => (
@@ -1577,10 +1593,14 @@ function App() {
                 wide={isWide}
                 topBar={topBar}
                 rail={<Rail mode={atomMode} onModeChange={selectMode} isOwner={isOwner} wide={isWide} />}
-                explore={isAtomMode ? atomExplore : <ExplorePanel body={exploreContent} />}
+                explore={isAtomMode ? atomExplore : (
+                    <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
+                )}
                 inspector={isAtomMode ? atomInspector('docked') : <Inspector variant="docked" body={inspectorBody} />}
                 viewport={viewport}
                 shellRef={shellRef}
+                exploreCollapsed={isMedium && exploreCollapsed}
+                onExpandExplore={() => setExploreCollapsed(false)}
                 fullscreen={fullscreen.active}
             />
             <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} brand={brand}

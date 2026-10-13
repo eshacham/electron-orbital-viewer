@@ -11,7 +11,7 @@
   ],
   "phone": [
     { "name": "phone top bar", "selector": ".phone-topbar", "x": 0.5, "py": 3, "token": "bg-bar" },
-    { "name": "sheet tabs", "selector": ".phone-sheet-tabs", "x": 0.5, "y": 0.5, "token": "surface-1" },
+    { "name": "sheet tabs", "selector": ".phone-sheet-tabs", "x": 0.5, "y": 0.12, "token": "bg-bar" },
     { "name": "canvas left edge", "selector": "#canvas-container", "x": 0.03, "y": 0.55, "token": "canvas" }
   ]
 }

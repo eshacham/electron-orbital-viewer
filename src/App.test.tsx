@@ -492,6 +492,15 @@ describe('App', () => {
             fireEvent.click(view);
             expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
         });
+
+        it('opens the Explore tab on the orbital strip, as its first row (spec §9.8)', () => {
+            installMatchMedia(true);
+            renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            const panel = screen.getByRole('tabpanel');
+            const strip = within(panel).getByRole('listbox', { name: 'orbitals in view' });
+            expect(panel.firstElementChild!.contains(strip)).toBe(true);
+        });
     });
 
     describe('Basic Orbitals combinations', () => {

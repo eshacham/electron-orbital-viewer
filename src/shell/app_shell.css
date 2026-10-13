@@ -16,8 +16,14 @@
 .app-shell.wide .app-workspace { grid-template-columns: var(--ql-size-explore) minmax(0, 1fr) var(--ql-size-inspector-wide); }
 .app-shell.medium .app-workspace { grid-template-columns: var(--ql-size-explore-medium) minmax(0, 1fr); }
 .app-shell.explore-collapsed .explore-panel { display: none; }
-.app-shell.explore-collapsed .app-workspace { grid-template-columns: minmax(0, 1fr); }
+/* Medium width (spec §7): a 28 px reveal button stands in for the panel. */
+.app-shell.explore-collapsed .app-workspace { grid-template-columns: 28px minmax(0, 1fr); }
 .app-shell.desktop.explore-collapsed .app-workspace { grid-template-columns: minmax(0, 1fr) var(--ql-size-inspector); }
+.explore-reveal {
+  align-self: start; width: 28px; height: 56px; border-radius: var(--ql-radius-md);
+  border: 1px solid var(--ql-color-border-subtle); background: var(--ql-color-surface-1);
+  color: var(--ql-color-text-2); cursor: pointer;
+}
 .explore-panel, .inspector {
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
   background: var(--ql-color-surface-1); color: var(--ql-color-text-1);

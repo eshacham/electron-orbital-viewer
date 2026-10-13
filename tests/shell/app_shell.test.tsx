@@ -25,4 +25,12 @@ describe('AppShell (spec §7, §13 landmarks and skip links)', () => {
         expect(container.firstElementChild).toHaveClass('phone');
         expect(screen.queryByText('explore')).toBeNull();
     });
+
+    it('folds Explore to the rail at medium width and brings it back', () => {
+        const onExpandExplore = jest.fn();
+        render(<AppShell layout="medium" exploreCollapsed onExpandExplore={onExpandExplore} explore={<p>explore</p>} viewport={viewport} />);
+        expect(screen.queryByText('explore')).not.toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Show the Explore panel' }));
+        expect(onExpandExplore).toHaveBeenCalled();
+    });
 });

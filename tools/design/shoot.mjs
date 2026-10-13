@@ -23,6 +23,9 @@ const SIZES = {
   tablet: { width: 1024, height: 768 },
   phone: { width: 390, height: 844, mobile: true },
   'phone-landscape': { width: 844, height: 390, mobile: true },
+  // Ruling R9: a desktop browser at 200% zoom is 720 CSS px wide -- the phone layout must
+  // apply there and nothing may clip. Not `mobile: true`: this is a desktop window, zoomed.
+  zoom: { width: 720, height: 450 },
 };
 
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
