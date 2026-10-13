@@ -213,3 +213,20 @@ describe('drawOverlays: a colour-bar key (Molecules ESP view)', () => {
         expect(note.y).toBeGreaterThan(segments[0].y);
     });
 });
+
+describe('drawOverlays: the ψ legend takes the scheme\'s colours (one source, spec §11.1)', () => {
+    it('paints the legend swatches in the colours it is given, and today\'s without them', () => {
+        const paint = (phaseColours?: [string, string]) => {
+            const fills: string[] = [];
+            const painter = {
+                set fillStyle(value: string) { fills.push(value); }, get fillStyle() { return ''; },
+                font: '', textBaseline: 'top' as CanvasTextBaseline,
+                fillRect: () => {}, fillText: () => {}, measureText: (text: string) => ({ width: text.length * 7 }),
+            };
+            drawOverlays(painter, 800, 600, 2, { caption: [], scaleBar: null, phaseLegend: true, phaseColours });
+            return fills;
+        };
+        expect(paint(['#FF7A2F', '#2F6BFF'])).toEqual(expect.arrayContaining(['#FF7A2F', '#2F6BFF']));
+        expect(paint()).toEqual(expect.arrayContaining(['#e02020', '#2040ff']));
+    });
+});

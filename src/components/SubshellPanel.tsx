@@ -46,6 +46,8 @@ interface SubshellPanelProps {
      * whole-atom energy diagram; 'all': both, as today.
      */
     part?: 'all' | 'chips' | 'diagram';
+    /** The theme's curve palette (science.ts curvePalette); CURVE_COLORS by default. */
+    palette?: readonly string[];
 }
 
 const DIAGRAM_WIDTH = 220;
@@ -168,7 +170,7 @@ function ruleY(energy: number, minEnergy: number, maxEnergy: number): number {
  */
 const SubshellPanel: React.FC<SubshellPanelProps> = ({
     subshells, shellN, selectedSubshell, selectedOrbital = null, onSelectSubshell, onSelectOrbital, relativity = 'off',
-    part = 'all',
+    part = 'all', palette = CURVE_COLORS,
 }) => {
     const shellSubshells = subshells.filter(s => s.n === shellN);
 
@@ -183,8 +185,8 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
     // is exactly the index App.tsx's atomCurves and shell_composition.ts's
     // colorIndex both use, so the chip, the curve and the 3D lobes agree.
     const activeSubshellColor = activeSubshell
-        ? CURVE_COLORS[shellSubshells.indexOf(activeSubshell) % CURVE_COLORS.length]
-        : CURVE_COLORS[0];
+        ? palette[shellSubshells.indexOf(activeSubshell) % palette.length]
+        : palette[0];
     // Keyed on the profile's own subshells, so it follows the drawn mode (ruling C9).
     const jNote = jLevelNote(shellSubshells, activeSubshell);
     const showChips = part !== 'diagram';
@@ -366,7 +368,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                             const isCurrent = subshell.n === shellN;
                             const y = ruleY(subshell.energy, minEnergy, maxEnergy);
                             const color = isCurrent
-                                ? CURVE_COLORS[shellSubshells.indexOf(subshell) % CURVE_COLORS.length]
+                                ? palette[shellSubshells.indexOf(subshell) % palette.length]
                                 : undefined;
                             return (
                                 <g key={subshellKey(subshell)}>

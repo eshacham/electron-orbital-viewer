@@ -1,5 +1,6 @@
 import type { ViewInsets } from '../orbital_visualizer';
 import { ScaleBar, formatScaleLabel } from '../scale_bar';
+import { CLASSIC } from '../design/science';
 
 /** Long-side cap: 2× a Retina desktop would be ~83 MB of colour alone, times MSAA. */
 export const MAX_EXPORT_SIDE_PX = 4096;
@@ -61,6 +62,8 @@ export interface OverlaySpec {
     colourBar?: ColourBarLegend | null;
     /** Ruling R13: the brand label, the last line of the caption band, right-aligned. */
     footer?: string;
+    /** The ψ key's swatches, from science.ts phaseColours (one source); today's colours when absent. */
+    phaseColours?: [string, string];
 }
 
 export interface OverlayPainter {
@@ -213,7 +216,9 @@ export function drawOverlays(painter: OverlayPainter, width: number, height: num
         drawLegendRow(painter, width, height, scale, pad, items);
     } else if (spec.phaseLegend) {
         // Left to right, matching the on-screen order (App.tsx's phase-legend div: positive then negative).
-        drawLegendRow(painter, width, height, scale, pad, [['ψ > 0', '#e02020'], ['ψ < 0', '#2040ff']]);
+        // Ruling DB9: the fallback is science.ts's own Classic legend colours, not a second literal copy of them.
+        const [positive, negative] = spec.phaseColours ?? [CLASSIC.legendPositive, CLASSIC.legendNegative];
+        drawLegendRow(painter, width, height, scale, pad, [['ψ > 0', positive], ['ψ < 0', negative]]);
     }
 }
 

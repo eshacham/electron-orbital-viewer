@@ -22,10 +22,8 @@ function rule(selector: string, sheet: string = css): string {
     return sheet.slice(match.index, sheet.indexOf('}', match.index));
 }
 
-/** Colour literals allowed to stay: science colours (Task 12 moves the first four to science.ts) and fixed badges. */
+/** Colour literals allowed to stay: fixed badges and decoration (Task 12 moved the single-curve and ψ-legend literals to science.ts, set inline). */
 const STYLE_LITERALS_ALLOWED = new Set([
-    '#4da3ff', 'rgba(77, 163, 255, 0.22)', // the single radial curve: CURVE_COLORS[0]
-    '#e02020', '#2040ff', // the ψ legend swatches (Classic legend colours)
     'rgba(91, 141, 217, 0.20)', 'rgba(217, 139, 74, 0.20)', 'rgba(74, 168, 138, 0.20)', 'rgba(157, 122, 212, 0.20)', // periodic blocks
     'rgba(0, 0, 0, 0.6)', // the structure preview's atom outlines, drawn on CPK colours
     '#a84300', '#ffffff', // the Computed tier chip and its white text (5.6:1 in both themes)

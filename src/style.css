@@ -201,11 +201,9 @@ html, body, #root {
 }
 .radial-plot-line {
   fill: none;
-  stroke: #4da3ff;
   stroke-width: 1.6;
 }
 .radial-plot-fill {
-  fill: rgba(77, 163, 255, 0.22);
   stroke: none;
 }
 .radial-plot-axis {
@@ -369,8 +367,6 @@ html, body, #root {
   height: 11px;
   border-radius: 50%;
 }
-.phase-legend-swatch.positive { background: #e02020; }
-.phase-legend-swatch.negative { background: #2040ff; }
 /* A molecule's density key is wider than the ψ key, and Bonds' side panel
    narrows the free canvas: centred, it ran under a long scale readout (found
    live, Task 13, N₂ at 1440 px). It sits at the free area's right edge

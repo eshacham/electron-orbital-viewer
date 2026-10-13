@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { radialProfile, PLOT_SAMPLE_COUNT } from '../radial_distribution';
+import { CURVE_COLORS } from '../curve_colors';
 
 /**
  * One curve to draw in multi-curve mode: a shell's or subshell's D(r),
@@ -91,6 +92,8 @@ interface RadialPlotProps {
     width?: number;
     /** Starts folded to its title, as on a phone, where room is short. */
     collapsible?: boolean;
+    /** The single curve's colour (Basic Orbitals): CURVE_COLORS[0] in its theme's palette. */
+    lineColour?: string;
 }
 
 /** Axis label for a radius: two decimals below 10 a₀, where rounding would mislead. */
@@ -142,7 +145,7 @@ function dominantCurveLabelAt(curves: RadialCurve[], r: number): string | null {
 const RadialPlot: React.FC<RadialPlotProps> = ({
     n, l, Z, rMax, compact = false,
     curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear', cutFaceNote = false, comparisonNote = null,
-    width, collapsible = false,
+    width, collapsible = false, lineColour = CURVE_COLORS[0],
 }) => {
     // On a phone, or a window too narrow for both side panels, the plot sits
     // over the atom, so it starts folded to its title and opens on a tap.
@@ -290,8 +293,8 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
             >
                 {!isMultiCurve && path && (
                     <>
-                        <path d={path.fill} className="radial-plot-fill" />
-                        <path d={path.line} className="radial-plot-line" />
+                        <path d={path.fill} className="radial-plot-fill" style={{ fill: lineColour, fillOpacity: 0.22 }} />
+                        <path d={path.line} className="radial-plot-line" style={{ stroke: lineColour }} />
                     </>
                 )}
                 {isMultiCurve && multiCurvePaths.map(curve => (

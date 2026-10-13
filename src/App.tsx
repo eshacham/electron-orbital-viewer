@@ -83,7 +83,7 @@ import BondsPanel from './components/BondsPanel';
 import BondsCurvePlot from './components/BondsCurvePlot';
 import { useBondsData } from './bonds/useBondsData';
 import { useH2PlusCurve } from './bonds/useH2PlusCurve';
-import { bondsFieldRequest, DENSITY_SURFACE_HEX } from './bonds/bonds_request';
+import { bondsFieldRequest } from './bonds/bonds_request';
 import { BondsSystemId, systemFormula } from './bonds/systems';
 import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIso, BondsView } from './store/bondsSlice';
 import { selectMolecule, setSurface, setShowStructure, setShowDipole, MoleculeSurface } from './store/moleculeSlice';
@@ -116,7 +116,7 @@ import OrbitalEnergyList from './atom_ui/OrbitalEnergyList';
 import Inspector from './shell/Inspector';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
-import KeyColumn, { PhaseKey } from './shell/KeyColumn';
+import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
 import { viewTitle } from './shell/view_title';
 import { useDocumentTitle } from './shell/useDocumentTitle';
 import { useFullscreen } from './shell/useFullscreen';
@@ -125,6 +125,9 @@ import { useQuantumTheme } from './design/useQuantumTheme';
 import { useBrand } from './design/useBrand';
 import { brandPref } from './design/brands';
 import { LAYOUT } from './design/tokens';
+import { usePref } from './design/usePref';
+import { renderPref } from './design/presentation';
+import { curvePalette, densitySurfaceHex, phaseColours, themeCurveColour } from './design/science';
 import { BUILD_ENV } from './jobs/build_env';
 import { SESSION_ENDED } from './jobs/api';
 import { NO_COMBINATION } from './combinations';
@@ -436,6 +439,12 @@ function App() {
     const isWide = useMediaQuery(WIDE_VIEWPORT) && !isNarrow && !isMedium;
     const layout: 'desktop' | 'medium' | 'phone' = isNarrow ? 'phone' : isMedium ? 'medium' : 'desktop';
     const { mode: themeMode } = useQuantumTheme();
+    const render = usePref(renderPref);
+    const phase = useMemo(() => phaseColours(themeMode, render.scheme), [themeMode, render.scheme]);
+    const palette = useMemo(() => curvePalette(themeMode, render.scheme), [themeMode, render.scheme]);
+    /** A curve, key or swatch in this theme's palette (index identity, §4.2). */
+    const themed = useCallback(<T extends { color: string }>(items: T[]): T[] =>
+        items.map(item => ({ ...item, color: themeCurveColour(item.color, palette) })), [palette]);
     const brand = useBrand();
     const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(viewTitle, shallowEqual);
     useDocumentTitle(`${viewTitleText} · ${brand.name}`);
@@ -835,7 +844,7 @@ function App() {
     // curves), so they follow the selection rather than every render.
     const selectionLegend = useMemo(() => overlayLegend(combination), [combination]);
     const selectionPlot = useMemo(() => combinationCurves(combination), [combination]);
-    const combinationLegend = isBasicMode && renderedField ? selectionLegend : null;
+    const combinationLegend = isBasicMode && renderedField && selectionLegend ? themed(selectionLegend) : null;
     // Not over an empty canvas: a refused combination draws nothing. A
     // molecule's density has no phase; it has its own key below.
     // In Molecules mode only an orbital has a sign: the density is one
@@ -858,7 +867,7 @@ function App() {
         relativity: atomProfile.relativity ?? 'off',
     } : null;
     const showSubshells = atomLevel === 'shell' || atomLevel === 'orbital';
-    const subshellPanel = showSubshells && subshellPanelProps ? <SubshellPanel {...subshellPanelProps} /> : null;
+    const subshellPanel = showSubshells && subshellPanelProps ? <SubshellPanel {...subshellPanelProps} palette={palette} /> : null;
 
     // One element for both layouts: LevelNav places it under the element
     // button on a desktop and at the top of the phone's Explore tab, and the
@@ -934,6 +943,7 @@ function App() {
         const result = await runExport(kind, {
             state, shareUrl: shareUrlFor(encodeStateOf(state)), csvCurves: csvCurvesNow(),
             handle: exportHandleRef.current, phaseLegend: showPhaseLegend, combinationLegend,
+            phaseColours: [phase.legendPositive, phase.legendNegative],
             // A DOM Worker's onmessage is typed with `this`; this states that
             // it satisfies CubeWorkerHandle's structural shape, which does not care.
             createCubeWorker: createExportWorker as unknown as () => CubeWorkerHandle,
@@ -949,7 +959,7 @@ function App() {
         });
         downloadBlob(result.blob, result.filename);
     }, [
-        stateNow, csvCurvesNow, showPhaseLegend, combinationLegend,
+        stateNow, csvCurvesNow, showPhaseLegend, combinationLegend, phase,
         bondsData.scan, bondsData.meta, bondsData.loading, bondsData.error, h2plusCurve.curve,
     ]);
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
@@ -1082,7 +1092,7 @@ function App() {
                         rMax={combinationPlot.rMax}
                         width={width}
                         collapsible={collapsible}
-                        curves={combinationPlot.curves}
+                        curves={themed(combinationPlot.curves)}
                     />
                 );
             }
@@ -1094,6 +1104,7 @@ function App() {
                     rMax={renderedParams.rMax}
                     width={width}
                     collapsible={collapsible}
+                    lineColour={palette[0]}
                 />
             );
         }
@@ -1109,7 +1120,7 @@ function App() {
                 scale={atomLevel === 'atom' ? 'sqrt' : 'linear'}
                 width={width}
                 collapsible={collapsible}
-                curves={[...atomCurves, ...comparisonCurves]}
+                curves={themed([...atomCurves, ...comparisonCurves])}
                 comparisonNote={comparisonNote}
                 peaks={Array.from(atomProfile.shellPeaks)}
                 cutFaceNote={atomLevel !== 'orbital'}
@@ -1193,7 +1204,7 @@ function App() {
             configuration={(
                 <>
                     <LevelNav {...levelNavProps} variant="configuration">
-                        {subshellPanelProps && showSubshells && <SubshellPanel {...subshellPanelProps} part="chips" />}
+                        {subshellPanelProps && showSubshells && <SubshellPanel {...subshellPanelProps} part="chips" palette={palette} />}
                     </LevelNav>
                     {speciesControls}
                     {relativityControl}
@@ -1206,7 +1217,7 @@ function App() {
                         <SubshellPanel subshells={atomProfile.subshells} shellN={atomSelectedShell}
                             selectedSubshell={atomSelectedSubshell} selectedOrbital={atomSelectedOrbital}
                             onSelectSubshell={handleSelectSubshell} onSelectOrbital={handleSelectOrbital}
-                            relativity={atomProfile.relativity ?? 'off'} part="diagram" />
+                            relativity={atomProfile.relativity ?? 'off'} part="diagram" palette={palette} />
                     )}
                     {atomProfile && <OrbitalEnergyList subshells={atomProfile.subshells} relativity={pictureRelativity} />}
                     <LevelNav {...levelNavProps} variant="about" />
@@ -1338,13 +1349,19 @@ function App() {
                 <ViewportToolbar onResetView={handleResetView} shareExport={shareExportToolbar}
                     fullscreen={fullscreen.active} onToggleFullscreen={fullscreen.toggle} />
             )}
-            {!isMoleculeMode && (showPhaseLegend || isBondsDensity || combinationLegend) && (
+            {isAtomMode && atomProfile && !atomUnbound && (
                 <KeyColumn compact={isNarrow}>
-                    {showPhaseLegend && <PhaseKey />}
+                    <AtomKeys level={atomLevel} scheme={render.scheme} cutOn={surfaceStyle.clipAxis !== 'none'} phase={phase}
+                        shellItems={themed(atomCurves).map(curve => ({ label: curve.label, colour: curve.color, spoken: curve.spokenLabel }))} />
+                </KeyColumn>
+            )}
+            {!isMoleculeMode && !isAtomMode && (showPhaseLegend || isBondsDensity || combinationLegend) && (
+                <KeyColumn compact={isNarrow}>
+                    {showPhaseLegend && <PhaseKey positive={phase.legendPositive} negative={phase.legendNegative} />}
                     {isBondsDensity && (
                         <div className="phase-legend density-key" aria-label="surface colour key">
                             <span className="phase-legend-item">
-                                <span className="phase-legend-swatch" style={{ background: DENSITY_SURFACE_HEX }} />
+                                <span className="phase-legend-swatch" style={{ background: densitySurfaceHex(themeMode, render.scheme) }} />
                                 ρ = {drawnDensityIso} e/a₀³, total electron density
                             </span>
                         </div>
@@ -1379,7 +1396,7 @@ function App() {
                     {moleculeKeysShown && molecule.surface.kind === 'esp' && (
                         <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact={isPhoneLandscape} />
                     )}
-                    {showPhaseLegend && <PhaseKey />}
+                    {showPhaseLegend && <PhaseKey positive={phase.legendPositive} negative={phase.legendNegative} />}
                 </div>
             )}
             {/* Over the canvas on a desktop; on a phone it heads the key

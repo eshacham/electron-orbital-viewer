@@ -86,6 +86,8 @@ export interface ExportContext extends ExportOptions {
     phaseLegend?: boolean;
     /** Ruling C5: App's combination colour key, when one is on screen instead. */
     combinationLegend?: CombinationLegendItem[] | null;
+    /** The ψ key's colours on screen (science.ts phaseColours), so the PNG legend matches. */
+    phaseColours?: [string, string];
     /** Builds the cube worker; absent before App has wired it up (structurally, see App.tsx). */
     createCubeWorker?: () => CubeWorkerHandle;
     /**
@@ -815,13 +817,14 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             // Molecules' keys come from the drawn surface, not App's flags.
             const overlays = kind !== 'png' ? null
                 // Spec §5, ruling R13: the brand footer ends the caption band, right-aligned.
-                : molecule ? { caption, ...moleculeKeys(context.state), footer: exportAppLabel() }
+                : molecule ? { caption, ...moleculeKeys(context.state), footer: exportAppLabel(), phaseColours: context.phaseColours }
                     : {
                         caption,
                         phaseLegend: Boolean(context.phaseLegend),
                         // Ruling C5: describe the combination key too, when App has one on screen.
                         combinationLegend: context.combinationLegend,
                         footer: exportAppLabel(),
+                        phaseColours: context.phaseColours,
                     };
             return { blob: await context.handle.capturePng(overlays), filename: kind === 'png' ? `${stem}.png` : `${stem}_view.png` };
         }
