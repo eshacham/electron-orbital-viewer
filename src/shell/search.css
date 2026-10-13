@@ -1,0 +1,38 @@
+/* src/shell/search.css -- the top bar's search (spec §8.1 item 3): 36 px, surface-3, radius md. */
+.global-search {
+  position: relative; display: flex; align-items: center; gap: 8px;
+  height: var(--ql-size-search); padding: 0 10px; box-sizing: border-box;
+  border-radius: var(--ql-radius-md); border: 1px solid var(--ql-color-border-subtle);
+  background: var(--ql-color-surface-3); color: var(--ql-color-text-2);
+}
+/* The ring sits on the whole control (§13: 2 px, 2 px offset); the bare input inside draws none of its own. */
+.global-search:focus-within { outline: 2px solid var(--ql-color-focus-ring); outline-offset: 2px; }
+.global-search-input {
+  flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--ql-color-text-1);
+  font: var(--ql-type-body-weight) var(--ql-type-body-size) / var(--ql-type-body-line) var(--ql-font-sans);
+}
+.global-search-input::placeholder { color: var(--ql-color-text-3); opacity: 1; }
+.global-search-hint {
+  padding: 1px 5px; border-radius: var(--ql-radius-xs); border: 1px solid var(--ql-color-border-subtle);
+  color: var(--ql-color-text-3); font: 500 11px / 14px var(--ql-font-sans);
+}
+.global-search-popup {
+  position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; right: 0;
+  max-height: min(480px, 70vh); overflow-y: auto; padding: 6px;
+  border-radius: var(--ql-radius-md); border: 1px solid var(--ql-color-border-subtle);
+  background: var(--ql-color-surface-1); box-shadow: var(--ql-shadow-popover);
+}
+.global-search.sheet { height: 44px; }
+.global-search.sheet .global-search-popup { position: fixed; top: 64px; left: 0; right: 0; bottom: 0; max-height: none; border-radius: 0; }
+.global-search-popup ul { list-style: none; margin: 0; padding: 0; }
+.global-search-group {
+  padding: 8px 8px 4px; color: var(--ql-color-text-3);
+  font: 600 11px / 14px var(--ql-font-sans); letter-spacing: 0.04em; text-transform: uppercase;
+}
+.global-search-option {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 8px; border-radius: var(--ql-radius-sm); color: var(--ql-color-text-1); cursor: pointer;
+}
+.global-search.sheet .global-search-option { min-height: var(--ql-size-touch); align-items: center; box-sizing: border-box; }
+.global-search-option[aria-selected="true"], .global-search-option:hover { background: var(--ql-color-surface-3); }
+.global-search-empty { margin: 8px; color: var(--ql-color-text-2); }
