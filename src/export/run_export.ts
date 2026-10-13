@@ -33,7 +33,7 @@ import { getDensityGrid, getEspGrid } from '../molecules/grid_cache';
 import { loadBasis } from '../molecules/loader';
 import { MOLECULE_MO_RESOLUTION, moleculeOrbitalSource } from '../molecules/render_plan';
 import {
-    CONSTRUCTED_NOTE, DIFFUSE_NOTE, HARTREE_TO_EV as ORBITAL_HARTREE_TO_EV, LVMO_NOTE, VALENCE_THRESHOLD,
+    CONSTRUCTED_NOTE, DIFFUSE_NOTE, HARTREE_TO_EV as ORBITAL_HARTREE_TO_EV, LVMO_NOTE, VALENCE_THRESHOLD, orbitalNoun,
 } from '../molecules/orbital_display';
 import { ESP_LIMIT_HARTREE, ESP_SIGN_NOTE, ESP_SURFACE_DENSITY, ESP_TICKS, espColourBar, espRangeNote, espSurfaceNote } from '../molecules/esp_color';
 
@@ -708,11 +708,13 @@ export async function moleculeCubeJob(state: RootState): Promise<CubeJob> {
     const basis = await loadBasis(meta.id);
     // D11: a constructed LVMO's cube description named only the role, as if it were an orbital of the
     // calculation -- the tag (diffuse or constructed, orbitalTag's own wording) travels here too.
-    const notes = [surface.role, surface.tag].filter(Boolean).join('; ');
+    // Final review M5: a constructed LVMO is not called a "molecular orbital" right after being said not to be one.
+    const role = surface.role ? ` (${surface.role})` : '';
+    const tag = surface.tag ? `${surface.label} is ${surface.tag}; ` : '';
     return {
         type: 'fieldCube', source: moleculeOrbitalSource(meta, surface.mo), resolution: MOLECULE_MO_RESOLUTION, atoms, bases: [basis], title,
-        description: `psi(x,y,z), real, bohr^-3/2, ${surface.label}${notes ? ` (${notes})` : ''} molecular orbital, `
-            + `on the grid as drawn; ${method}; lengths in bohr`,
+        description: `psi(x,y,z), real, bohr^-3/2, ${surface.label}${role} ${orbitalNoun(surface)}, `
+            + `on the grid as drawn; ${tag}${method}; lengths in bohr`,
     };
 }
 

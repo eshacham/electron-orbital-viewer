@@ -18,7 +18,7 @@ import { SPIN_SUFFIX } from '../bonds/bonds_request';
 import { tierOf, BasisOrbital, MoleculeBasis, MoleculeScan } from '../molecules/types';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { formatFormula } from '../molecules/catalogue';
-import { orbitalEnergyText, orbitalTag } from '../molecules/orbital_display';
+import { orbitalEnergyText, orbitalNoun, orbitalTag } from '../molecules/orbital_display';
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY } from '../molecules/esp_color';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
@@ -211,9 +211,12 @@ function moleculeViewDescription(state: RootState): string {
         const rho = drawn.isoLevel !== undefined ? ` (ρ = ${drawn.isoLevel.toExponential(2)} e/a₀³)` : '';
         return `${moleculeTitle(meta)}, density, ${enclosedText(fraction)}${rho}`;
     }
-    const notes = [surface.role, surface.tag].filter(Boolean).join('; ');
-    const role = notes ? ` (${notes})` : '';
-    return `${moleculeTitle(meta)}, MO ${surface.label}${role}, ${orbitalEnergyText(surface)}, ${enclosedText(fraction)}`;
+    // The tag is its own clause, as MoleculeNav's "Showing" line has it: inside the role's brackets it nested a
+    // second pair ("(LUMO; partly diffuse (55 % valence) …)", deferred minor, Task 11).
+    const role = surface.role ? ` (${surface.role})` : '';
+    const tag = surface.tag ? `; ${surface.label} is ${surface.tag}` : '';
+    return `${moleculeTitle(meta)}, ${orbitalNoun(surface, true)} ${surface.label}${role}, ${orbitalEnergyText(surface)}, `
+        + `${enclosedText(fraction)}${tag}`;
 }
 
 /**

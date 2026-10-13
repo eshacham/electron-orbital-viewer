@@ -8,7 +8,7 @@ import MoleculeReadout from '../../src/components/MoleculeReadout';
 import MoleculeViewOptions from '../../src/components/MoleculeViewOptions';
 import {
     formatOrbitalEnergy, degeneracyCounts, formatPointGroup, orbitalGaps, orbitalTag, orbitalEnergyText, isConstructed, textbookLumo,
-    labelsSentence, GAP_CAVEAT, CONSTRUCTED_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, UNLABELLED_NOTE, VALENCE_VIRTUAL_NOTE,
+    labelsSentence, AXES_NOTE, GAP_CAVEAT, CONSTRUCTED_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, UNLABELLED_NOTE, VALENCE_VIRTUAL_NOTE,
 } from '../../src/molecules/orbital_display';
 import { LIBRARY_INDEX, waterMeta, waterAtoms } from './fixtures';
 
@@ -248,9 +248,29 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(labelsSentence({ pointGroup: 'C2v', labelGroup: 'C2v', labels: 'full-group',
             labelNote: 'the SCF ran without point-group symmetry: labelled from the geometry\'s own point group, by character projection' }))
             .toBe('Labels: irreducible representations of C2v, numbered in energy order within each, core included; '
-                + 'the SCF ran without point-group symmetry: labelled from the geometry\'s own point group, by character projection.');
+                + 'the SCF ran without point-group symmetry: labelled from the geometry\'s own point group, by character projection. '
+                + AXES_NOTE);
         expect(labelsSentence({ pointGroup: 'SO3', labelGroup: null, labels: 'none', labelNote: 'the SCF ran without point-group symmetry' }))
             .toBe('Labels: ψ, numbered in energy order (no symmetry labels: the SCF ran without point-group symmetry).');
+    });
+    // Final review M1: an atom's labels are 1s, 2s, 2p … by principal quantum number, not SO3's irreps.
+    it('says an atom is labelled by principal quantum number', () => {
+        expect(labelsSentence({ pointGroup: 'SO3', labelGroup: 'SO3', labels: 'full-group' }))
+            .toBe('Labels: atomic orbitals (1s, 2s, 2p, 3d …), numbered by principal quantum number, core included.');
+    });
+    // Final review M4: B labels in C2v, D2 and D2h depend on which axes are called x, y and z (ethylene's π HOMO is
+    // 1b2u in PySCF's frame, 1b3u in Mulliken's); the sentence says whose axes these are. Other groups do not.
+    it('states the axis convention where the B labels depend on it', () => {
+        expect(AXES_NOTE).toBe("The b labels depend on which axes are called x, y and z: these follow the calculation's (PySCF's) "
+            + 'axes, which a textbook may assign differently (ethylene\'s π HOMO reads 1b2u in the library, 1b3u in Mulliken\'s convention).');
+        for (const group of ['C2v', 'D2h']) {
+            expect(labelsSentence({ pointGroup: group, labelGroup: group, labels: 'full-group' })).toMatch(new RegExp(`core included\\. ${AXES_NOTE.slice(0, 20)}`));
+        }
+        expect(labelsSentence({ pointGroup: 'D2d', labelGroup: 'D2', labels: 'subgroup', labelNote: 'irreducible representations of D2, a subgroup of D2d' }))
+            .toBe(`Labels: irreducible representations of D2, a subgroup of D2d. ${AXES_NOTE}`);
+        for (const group of ['Td', 'C3v', 'Dooh', 'Cs', 'C2h']) {
+            expect(labelsSentence({ pointGroup: group, labelGroup: group, labels: 'full-group' })).not.toContain(AXES_NOTE);
+        }
     });
     it('tags orbitals, reads the flags rather than the note, finds the gaps and the textbook LUMO', () => {
         expect(orbitalTag(WATER_V3[5])).toBe('partly diffuse (55 % valence): its shape depends on the basis');

@@ -68,6 +68,11 @@ export const percentValence = (o: { valenceCharacter?: number }): string => `${M
 export const isConstructed = (o: Flags): boolean => o.constructed === true || o.kind === 'valence-virtual';
 
 /** Ruling D4-energy: a constructed row's energy (or any the generator flags `energyApproximate`) is an upper estimate. */
+/** Final review M5: what an exported caption or cube calls the orbital -- never "MO" for one that is not an orbital
+ * of the calculation. */
+export const orbitalNoun = (o: Flags, short = false): string =>
+    isConstructed(o) ? 'constructed valence virtual orbital' : short ? 'MO' : 'molecular orbital';
+
 export const isUpperEstimate = (o: Flags): boolean => isConstructed(o) || o.energyApproximate === true;
 
 /** An orbital's energy as the list and captions show it: "…, upper estimate" for a constructed row, never "≈". */
@@ -129,9 +134,23 @@ export function textbookLumo(orbitals: MoleculeOrbitalInfo[]): { orbital: Molecu
 }
 
 /** The caption's sentence on what the labels are. Older data has no `labels`, and was labelled in PySCF's own group. */
+/** Final review M4: the groups whose B labels (b1/b2, b1u/b2u/b3u …) depend on which axes are called x, y and z. */
+const AXIS_DEPENDENT = new Set(['C2v', 'D2', 'D2h']);
+export const AXES_NOTE = "The b labels depend on which axes are called x, y and z: these follow the calculation's (PySCF's) axes, "
+    + "which a textbook may assign differently (ethylene's π HOMO reads 1b2u in the library, 1b3u in Mulliken's convention).";
+
 export function labelsSentence(symmetry: { pointGroup: string; labelGroup: string | null; labels?: string; labelNote?: string }): string {
+    const sentence = labelsSentenceAlone(symmetry);
+    return symmetry.labelGroup && AXIS_DEPENDENT.has(symmetry.labelGroup) ? `${sentence} ${AXES_NOTE}` : sentence;
+}
+
+function labelsSentenceAlone(symmetry: { pointGroup: string; labelGroup: string | null; labels?: string; labelNote?: string }): string {
     const pointGroup = formatPointGroup(symmetry.pointGroup);
     const note = symmetry.labelNote;
+    if (symmetry.labels === 'full-group' && symmetry.labelGroup === 'SO3') {
+        // Final review M1: an atom's orbitals read 1s, 2s, 2p … (point_group.atom_labels), not SO3's irreps.
+        return `Labels: atomic orbitals (1s, 2s, 2p, 3d …), numbered by principal quantum number, core included${note ? `; ${note}` : ''}.`;
+    }
     if (symmetry.labels === 'full-group') {
         return `Labels: irreducible representations of ${pointGroup}, numbered in energy order within each, core included${note ? `; ${note}` : ''}.`;
     }

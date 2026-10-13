@@ -145,10 +145,13 @@ describe('captions and file stems', () => {
     // tag is the short VALENCE_VIRTUAL_NOTE (no "antibonding orbital textbooks draw"), and its energy reads
     // "upper estimate", carried into the caption via orbitalEnergyText (not bare formatOrbitalEnergy).
     it('a diffuse LUMO and a valence virtual LVMO say what they are', () => {
+        // Deferred minor (Task 11): the tag is its own clause, as MoleculeNav's "Showing" line has it -- inside the
+        // role's brackets it nested a second pair. Final review M5: a constructed orbital is never called an "MO".
         expect(viewDescription(drawnStore({ kind: 'mo', index: 5 }, V3()).getState()))
-            .toBe('Water (H₂O), MO 4a1 (LUMO; partly diffuse (55 % valence): its shape depends on the basis), −0.010 Ha (−0.27 eV), 90 % enclosed');
-        expect(viewDescription(drawnStore({ kind: 'mo', index: 6 }, V3()).getState())).toBe('Water (H₂O), MO a1 (LVMO; constructed from the '
-            + 'valence part of the virtual space — not an orbital of this calculation), 0.190 Ha (5.17 eV), upper estimate, 90 % enclosed');
+            .toBe('Water (H₂O), MO 4a1 (LUMO), −0.010 Ha (−0.27 eV), 90 % enclosed; 4a1 is partly diffuse (55 % valence): its shape depends on the basis');
+        expect(viewDescription(drawnStore({ kind: 'mo', index: 6 }, V3()).getState())).toBe('Water (H₂O), constructed valence virtual orbital '
+            + 'a1 (LVMO), 0.190 Ha (5.17 eV), upper estimate, 90 % enclosed; a1 is constructed from the valence part of the virtual space — '
+            + 'not an orbital of this calculation');
         expect(exportFileStem(drawnStore({ kind: 'mo', index: 6 }, V3()).getState())).toBe('orbital-viewer_H2O_mo6-a1');
     });
 
@@ -398,8 +401,10 @@ describe('cube', () => {
         ] });
         const job = await moleculeCubeJob(drawnStore({ kind: 'mo', index: 6 }, meta).getState());
         if (job.type !== 'fieldCube') throw new Error('expected a field cube');
-        expect(job.description).toContain('a1 (LVMO; constructed from the valence part of the virtual space '
-            + '— not an orbital of this calculation) molecular orbital');
+        // Final review M5: not "molecular orbital" -- the tag says it is not one of the calculation's.
+        expect(job.description).toContain('a1 (LVMO) constructed valence virtual orbital, on the grid as drawn; a1 is constructed '
+            + 'from the valence part of the virtual space — not an orbital of this calculation;');
+        expect(job.description).not.toContain('molecular orbital');
     });
 
     it('goes through runExport to the worker, named after the drawn surface; ozone\'s caveat in the header', async () => {
