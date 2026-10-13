@@ -2,6 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <!-- Spec §6.2: sets the theme before any CSS loads, so the first paint is themed.
+         There is no CSP today; if one is added, this script's hash goes in it. -->
+    <script data-theme-boot>
+      (function () { var m = null; try { var s = window.localStorage, v = s.getItem('eov.theme');
+        if (v !== 'dark' && v !== 'light') { var o = s.getItem('eov.quantumlab.theme') || s.getItem('eov-color-theme'); if (o === 'dark' || o === 'light') { s.setItem('eov.theme', o); v = o; } }
+        s.removeItem('eov.quantumlab.theme'); s.removeItem('eov-color-theme'); if (v === 'dark' || v === 'light') m = v; } catch (e) {}
+        if (!m) m = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', m); document.documentElement.style.colorScheme = m; })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/electron-icon.svg" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
