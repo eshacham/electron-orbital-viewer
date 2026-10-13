@@ -31,6 +31,12 @@ describe.each(THEME_MODES)('%s tokens', mode => {
         expect(ratio(t['on-fill'], t[fill])).toBeGreaterThanOrEqual(4.5);
     });
 
+    // Ruling T2-onaccent: MUI's primary.contrastText (theme.ts) is on-accent,
+    // not on-fill -- on-fill's fixed white is only 3.6:1 against dark's accent.
+    it('on-accent is at least 4.5:1 against accent', () => {
+        expect(ratio(t['on-accent'], t.accent)).toBeGreaterThanOrEqual(4.5);
+    });
+
     it.each(['selected-edge', 'accent', 'focus-ring'] as const)('%s is at least 3:1 against surface-1, surface-2 and bg-app', role => {
         for (const bg of ['surface-1', 'surface-2', 'bg-app'] as const) expect(ratio(t[role], t[bg])).toBeGreaterThanOrEqual(3);
     });

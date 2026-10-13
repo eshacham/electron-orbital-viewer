@@ -1,25 +1,7 @@
 import { createTheme, type Theme } from '@mui/material/styles';
-import { contrastRatio, parseCssColor, type Rgb } from '../a11y/contrast';
 import { FONT_SANS, RADIUS, SHADOWS, TOKENS, TYPE, type ThemeMode } from './tokens';
 
 export type QuantumThemeMode = ThemeMode;
-
-const BLACK: Rgb = [0, 0, 0];
-const WHITE: Rgb = [255, 255, 255];
-
-/**
- * Ruling DA2: `on-fill` (white) is only 3.6:1 against dark's `accent`
- * (#2A85F8), which fails this file's own AA test. There is no single
- * "on-fill" that is AA-safe on both themes' accents, so contrastText is
- * picked per mode from the two colours WCAG itself treats as the extremes
- * -- pure black and pure white -- whichever contrasts better against the
- * accent token, rather than a third hand-picked literal.
- */
-function contrastTextFor(cssColor: string): string {
-    const [r, g, b] = parseCssColor(cssColor);
-    const accent: Rgb = [r, g, b];
-    return contrastRatio(BLACK, accent) >= contrastRatio(WHITE, accent) ? '#000000' : '#FFFFFF';
-}
 
 /**
  * The MUI theme for one mode, from the tokens alone (spec §6.3): palette,
@@ -32,7 +14,7 @@ export function quantumTheme(mode: ThemeMode): Theme {
     return createTheme({
         palette: {
             mode,
-            primary: { main: t.accent, contrastText: contrastTextFor(t.accent) },
+            primary: { main: t.accent, contrastText: t['on-accent'] },
             success: { main: t.success },
             warning: { main: t.warning },
             error: { main: t.danger },

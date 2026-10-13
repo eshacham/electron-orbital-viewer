@@ -41,6 +41,14 @@ export interface ColorTokens {
     'plot-axis': string;
     /** Text and icons on accent, selected and learn fills. */
     'on-fill': string;
+    /**
+     * Text and icons on `accent` itself (MUI's `primary.contrastText`),
+     * which is a narrower surface than `on-fill`'s: `on-fill`'s fixed white
+     * is only 3.6:1 against dark's `accent`, below AA. Each mode picks
+     * whichever of pure black/white -- WCAG's own contrast extremes --
+     * contrasts better against that mode's `accent` (ruling T2-onaccent).
+     */
+    'on-accent': string;
     'focus-ring': string;
     /** The title block's backing: canvas-solid at 72 % (§8.5). */
     scrim: string;
@@ -79,6 +87,7 @@ export const TOKENS: Record<ThemeMode, ColorTokens> = {
         'plot-grid': 'rgba(150,180,220,.12)',
         'plot-axis': '#93A6BA',
         'on-fill': '#FFFFFF',
+        'on-accent': '#000000',
         'focus-ring': '#1FB6F5',
         scrim: 'rgba(4,20,42,0.72)',
         'error-bg': '#3B1219',
@@ -114,6 +123,7 @@ export const TOKENS: Record<ThemeMode, ColorTokens> = {
         'plot-grid': '#E6ECF4',
         'plot-axis': '#5B6880',
         'on-fill': '#FFFFFF',
+        'on-accent': '#FFFFFF',
         'focus-ring': '#1662E0',
         scrim: 'rgba(247,249,252,0.72)',
         'error-bg': '#FDEDED',

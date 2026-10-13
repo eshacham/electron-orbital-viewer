@@ -105,6 +105,7 @@
   --ql-color-plot-grid: rgba(150,180,220,.12);
   --ql-color-plot-axis: #93A6BA;
   --ql-color-on-fill: #FFFFFF;
+  --ql-color-on-accent: #000000;
   --ql-color-focus-ring: #1FB6F5;
   --ql-color-scrim: rgba(4,20,42,0.72);
   --ql-color-error-bg: #3B1219;
@@ -142,6 +143,7 @@
   --ql-color-plot-grid: #E6ECF4;
   --ql-color-plot-axis: #5B6880;
   --ql-color-on-fill: #FFFFFF;
+  --ql-color-on-accent: #FFFFFF;
   --ql-color-focus-ring: #1662E0;
   --ql-color-scrim: rgba(247,249,252,0.72);
   --ql-color-error-bg: #FDEDED;
