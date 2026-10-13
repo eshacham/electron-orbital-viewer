@@ -6,14 +6,18 @@
 # image's copy.
 #
 # Review fix round 1: the checkout is read-only. Only the generator's real write targets are bind-mounted
-# read-write, each individually -- so a stray or mistaken invocation (version.py's DATA_VERSION is still
-# "v2"; Task 14 moves it to "v3") can never overwrite the published tools/molecules/out/v2 data, the job
-# store under tools/jobs/.state, or anything else in the checkout. PySCF's own scratch files go to /tmp
+# read-write, each individually -- so a stray or mistaken invocation can never overwrite published data, the
+# job store under tools/jobs/.state, or anything else in the checkout. PySCF's own scratch files go to /tmp
 # inside the container (HOME=/tmp below), which needs no mount.
+#
+# Final review M3: the version directory bound read-write is version.py's DATA_VERSION, and only while that
+# version is unpublished (no tools/molecules/manifest/<version>.json). Once published -- v3 since Task 15 --
+# its local copy is immutable like v2's and stays read-only, unless MOLECULES_WRITE_VERSION names it: an
+# explicit statement of which version is being generated. Naming any other version is refused.
 #
 #   docker buildx build --platform linux/arm64 -f tools/jobs/Dockerfile \
 #     --build-arg GENERATOR_COMMIT=$(git rev-parse HEAD) -t orbital-viewer-worker:local --load .
-#   tools/molecules/in_image.sh tools/molecules/build_library.py --only h2o
+#   MOLECULES_WRITE_VERSION=v4 tools/molecules/in_image.sh tools/molecules/build_library.py --only h2o
 #   tools/molecules/in_image.sh -m pytest tools/molecules/tests/test_dispersion.py -q -p no:cacheprovider
 #
 # The image has no git, so the commit every meta.json records is worked out here, by generate.git_commit's
@@ -26,12 +30,24 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+VERSION=$(sed -n 's/^DATA_VERSION = "\(v[0-9][0-9]*\)".*/\1/p' "$REPO/tools/molecules/version.py")
+if [ -z "$VERSION" ]; then
+  echo "tools/molecules/in_image.sh: no DATA_VERSION found in tools/molecules/version.py" >&2
+  exit 5
+fi
+WRITE="${MOLECULES_WRITE_VERSION:-}"
+if [ -n "$WRITE" ] && [ "$WRITE" != "$VERSION" ]; then
+  echo "tools/molecules/in_image.sh: MOLECULES_WRITE_VERSION=$WRITE, but version.py's DATA_VERSION is $VERSION;" \
+    "the generator writes only the version it builds" >&2
+  exit 5
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "tools/molecules/in_image.sh: docker not found on PATH -- install OrbStack (it provides the docker CLI)" >&2
   exit 3
 fi
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 IMAGE="${MOLECULES_IMAGE:-orbital-viewer-worker:local}"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
@@ -45,16 +61,23 @@ if [ -n "$(git -C "$REPO" status --porcelain -- tools/molecules)" ]; then
   commit="$commit-dirty"
 fi
 
-# The generator's only legitimate write targets (build_library.py, generate.py, optimise.py): the new
-# library version, the reference-energy cache (generate.py's CACHE_DIR), the seven committed geometries
-# (optimise.py's GEOMETRY_DIR) and the validation summary build_library.py derives from them every run
-# (write_validation_rows, unconditional). Created here so a clean checkout has them to bind; everything
+# The generator's only legitimate write targets (build_library.py, generate.py, optimise.py): the library
+# version being generated (above), the reference-energy cache (generate.py's CACHE_DIR), the seven committed
+# geometries (optimise.py's GEOMETRY_DIR) and the validation summary build_library.py derives from them every
+# run (write_validation_rows, unconditional). Created here so a clean checkout has them to bind; everything
 # else in the repo stays read-only via the :ro mount below.
-OUT_V3="$REPO/tools/molecules/out/v3"
 CACHE_DIR="$REPO/tools/molecules/.cache"
 GEOMETRY_DIR="$REPO/tools/molecules/geometries"
 VALIDATION_DIR="$REPO/src/validation/generated"
-mkdir -p "$OUT_V3" "$CACHE_DIR" "$GEOMETRY_DIR" "$VALIDATION_DIR"
+mkdir -p "$CACHE_DIR" "$GEOMETRY_DIR" "$VALIDATION_DIR"
+OUT_BIND=()
+if [ -f "$REPO/tools/molecules/manifest/$VERSION.json" ] && [ "$WRITE" != "$VERSION" ]; then
+  echo "tools/molecules/in_image.sh: out/$VERSION is published (manifest/$VERSION.json), so it stays read-only;" \
+    "set MOLECULES_WRITE_VERSION=$VERSION to generate into it" >&2
+else
+  mkdir -p "$REPO/tools/molecules/out/$VERSION"
+  OUT_BIND=(-v "$REPO/tools/molecules/out/$VERSION:/repo/tools/molecules/out/$VERSION")
+fi
 
 exec docker run --rm --platform linux/arm64 --user "$(id -u):$(id -g)" \
   -e MOLECULES_GENERATOR_COMMIT="$commit" \
@@ -63,7 +86,7 @@ exec docker run --rm --platform linux/arm64 --user "$(id -u):$(id -g)" \
   -e PYTHONPATH=/repo/tools:/repo/tools/molecules \
   -e HOME=/tmp \
   -v "$REPO":/repo:ro \
-  -v "$OUT_V3":/repo/tools/molecules/out/v3 \
+  ${OUT_BIND[@]+"${OUT_BIND[@]}"} \
   -v "$CACHE_DIR":/repo/tools/molecules/.cache \
   -v "$GEOMETRY_DIR":/repo/tools/molecules/geometries \
   -v "$VALIDATION_DIR":/repo/src/validation/generated \
