@@ -2,9 +2,9 @@ import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 import { deltaE76, hexToLab } from '../../src/design/colour_math';
 import {
     axesStyle, CLASSIC, CURVE_COLORS_LIGHT, LIGHT_HYDROGEN, curvePalette, DENSITY_RAMP, densitySurfaceHex, displayRgb, linearRgb,
-    phaseColours, themeCurveColour,
+    PHASE_HUES, phaseColours, themeCurveColour,
 } from '../../src/design/science';
-import { THEME_MODES } from '../../src/design/tokens';
+import { THEME_MODES, TOKENS } from '../../src/design/tokens';
 import { CURVE_COLORS } from '../../src/curve_colors';
 import { DENSITY_SURFACE_HEX } from '../../src/bonds/systems';
 
@@ -39,7 +39,37 @@ describe('science colours (spec §4.2, §11)', () => {
             expect(phaseColours(theme, 'density')).toEqual(p);
         }
         expect(phaseColours('dark', 'phase').positive).toBe('#FF7A2F');
-        expect(phaseColours('light', 'phase').negative).toBe('#1F5FE0');
+        // Ruling R20a-1: one phase pair in both themes (Light Clean's ψ < 0 was #1F5FE0).
+        expect(phaseColours('light', 'phase').negative).toBe('#2F6BFF');
+    });
+
+    // Ruling R20a-1 (owner): the lobes are the same hues in Deep Space and Light Clean;
+    // only the rim differs (added light on dark, a darker ink of the same phase on white).
+    it('paints ψ > 0 and ψ < 0 in the same hues in both themes, the rims apart', () => {
+        const dark = phaseColours('dark', 'phase');
+        const light = phaseColours('light', 'phase');
+        expect([light.positive, light.negative]).toEqual([dark.positive, dark.negative]);
+        expect([light.positive, light.negative]).toEqual([PHASE_HUES.positive, PHASE_HUES.negative]);
+        expect(light.rimPositive).not.toBe(dark.rimPositive);
+        // Ink: darker than the hue it rims, in L*.
+        expect(hexToLab(light.rimPositive!)[0]).toBeLessThan(hexToLab(light.positive)[0]);
+        expect(hexToLab(light.rimNegative!)[0]).toBeLessThan(hexToLab(light.negative)[0]);
+    });
+
+    // Ruling R20a-1: the key's swatch, not the hue, carries 3:1 against the key's
+    // panel (WCAG 1.4.11): the fill itself, or else the swatch-ring outline.
+    it('every ψ key swatch reaches 3:1 against its panel, by its fill or by its ring', () => {
+        for (const theme of THEME_MODES) {
+            const panel = rgb(TOKENS[theme]['surface-2']);
+            const ring = parseCssColor(TOKENS[theme]['swatch-ring']);
+            const ringPasses = ring[3] === 1 && contrastRatio([ring[0], ring[1], ring[2]], panel) >= 3;
+            const p = phaseColours(theme, 'phase');
+            for (const hex of [p.legendPositive, p.legendNegative]) {
+                expect(contrastRatio(rgb(hex), panel) >= 3 || ringPasses).toBe(true);
+            }
+        }
+        // Light Clean's orange alone is under 3:1 on its panel: that is what the ring is for.
+        expect(contrastRatio(rgb(PHASE_HUES.positive), rgb(TOKENS.light['surface-2']))).toBeLessThan(3);
     });
 
     it('separates + from − by colour and by lightness (ΔE ≥ 130; different L*)', () => {

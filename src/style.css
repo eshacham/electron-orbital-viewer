@@ -387,6 +387,8 @@ html, body, #root {
   width: 11px;
   height: 11px;
   border-radius: 50%;
+  /* Ruling R20a-1: the outline carries 3:1 where the shared hue alone does not (Light Clean). */
+  box-shadow: 0 0 0 1px var(--ql-color-swatch-ring);
 }
 /* A molecule's density key is wider than the ψ key, and Bonds' side panel
    narrows the free canvas: centred, it ran under a long scale readout (found

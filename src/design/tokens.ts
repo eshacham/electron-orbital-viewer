@@ -54,6 +54,13 @@ export interface ColorTokens {
     scrim: string;
     'error-bg': string;
     'error-text': string;
+    /**
+     * Ruling R20a-1: the ψ key swatch's outline. The phase hues are one pair
+     * in both themes; where a hue is under 3:1 against the key's panel
+     * (Light Clean's orange), this ring carries the 3:1 instead -- the hue
+     * is never darkened for it. Deep Space's hues pass on their own: none.
+     */
+    'swatch-ring': string;
 }
 export type ColorRole = keyof ColorTokens;
 
@@ -92,6 +99,7 @@ export const TOKENS: Record<ThemeMode, ColorTokens> = {
         scrim: 'rgba(4,20,42,0.72)',
         'error-bg': '#3B1219',
         'error-text': '#FECACA',
+        'swatch-ring': 'rgba(0,0,0,0)',
     },
     // Light Clean, sampled from concept B / Admin (spec §4.1).
     light: {
@@ -128,6 +136,7 @@ export const TOKENS: Record<ThemeMode, ColorTokens> = {
         scrim: 'rgba(247,249,252,0.72)',
         'error-bg': '#FDEDED',
         'error-text': '#5F2120',
+        'swatch-ring': '#5B6880',
     },
 };
 

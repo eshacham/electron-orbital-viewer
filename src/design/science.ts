@@ -28,9 +28,19 @@ export const CLASSIC = {
 /** Ruling R12: a hydrogen ball in Light Clean (non-Classic) -- CPK white would vanish on the page. */
 export const LIGHT_HYDROGEN = '#F2F2F2';
 
+/**
+ * Ruling R20a-1 (owner): ONE phase pair in both themes -- Light Clean's ψ > 0
+ * and ψ < 0 are Deep Space's hues, so a lobe is the same colour whichever
+ * theme it is shown in. Only the rims differ: added light in Deep Space,
+ * a darker "ink" of the same phase on white (§11.2). A key swatch that is
+ * under 3:1 against its panel gets the `swatch-ring` token's outline
+ * (tokens.ts) -- the hue itself is never darkened for it.
+ */
+export const PHASE_HUES = { positive: '#FF7A2F', negative: '#2F6BFF' } as const;
+
 export const PHASE_COLOURS: Record<ThemeMode, { positive: string; negative: string; rimPositive: string; rimNegative: string }> = {
-    dark: { positive: '#FF7A2F', negative: '#2F6BFF', rimPositive: '#FFC59A', rimNegative: '#9CC2FF' },
-    light: { positive: '#E8590C', negative: '#1F5FE0', rimPositive: '#9A3412', rimNegative: '#1E3A8A' },
+    dark: { ...PHASE_HUES, rimPositive: '#FFC59A', rimNegative: '#9CC2FF' },
+    light: { ...PHASE_HUES, rimPositive: '#9A3412', rimNegative: '#1E3A8A' },
 };
 
 export const DENSITY_SURFACE: Record<ThemeMode, string> = { dark: '#C9D6E8', light: '#7A8AA0' };

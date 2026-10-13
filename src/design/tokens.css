@@ -110,6 +110,7 @@
   --ql-color-scrim: rgba(4,20,42,0.72);
   --ql-color-error-bg: #3B1219;
   --ql-color-error-text: #FECACA;
+  --ql-color-swatch-ring: rgba(0,0,0,0);
   --ql-shadow-panel: inset 0 1px 0 rgba(255,255,255,.03);
   --ql-shadow-popover: 0 12px 32px rgba(0,0,0,.45);
   --ql-shadow-selected: 0 0 0 1px #1FB6F5, 0 0 12px rgba(31,182,245,.35);
@@ -148,6 +149,7 @@
   --ql-color-scrim: rgba(247,249,252,0.72);
   --ql-color-error-bg: #FDEDED;
   --ql-color-error-text: #5F2120;
+  --ql-color-swatch-ring: #5B6880;
   --ql-shadow-panel: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10);
   --ql-shadow-popover: 0 12px 24px rgba(16,24,40,.12);
   --ql-shadow-selected: 0 0 0 1px #1662E0;
