@@ -479,6 +479,21 @@ describe('LevelNav parts for the Explore panel (spec §9.1)', () => {
         expect(screen.queryByText(/Valence/)).toBeNull();
     });
 
+    // Controller ruling T10-crumb: at the whole atom the breadcrumb would be
+    // only the root, which the element tile above already names.
+    it('crumbs: nothing at the whole atom, where the tile already names the subject', () => {
+        const { container } = render(<LevelNav {...base} selectedShell={null} selectedSubshell={null} selectedOrbital={null} variant="crumbs" />);
+        expect(screen.queryByRole('navigation', { name: 'breadcrumb' })).toBeNull();
+        expect(screen.queryByRole('button', { name: /Back/ })).toBeNull();
+        expect(container.querySelector('.level-nav-crumbs')).toBeNull();
+    });
+
+    it('crumbs: a shell has its back step and the breadcrumb root', () => {
+        render(<LevelNav {...base} selectedShell={2} selectedSubshell={null} selectedOrbital={null} variant="crumbs" />);
+        expect(screen.getByRole('navigation', { name: 'breadcrumb' })).toHaveTextContent('Carbon');
+        expect(screen.getByRole('button', { name: /Back to Carbon/ })).toBeInTheDocument();
+    });
+
     it('configuration: configuration, valence and shell chips, with its children', () => {
         render(<LevelNav {...base} variant="configuration"><span>subshell chips</span></LevelNav>);
         expect(screen.getByText(/1s² 2s² 2p²/)).toBeInTheDocument();

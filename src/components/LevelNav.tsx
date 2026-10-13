@@ -446,7 +446,14 @@ const LevelNav: React.FC<LevelNavProps> = ({
     );
 
     if (variant === 'crumbs') {
-        return <Box className="level-nav level-nav-crumbs" aria-label="level navigation">{backButton}{breadcrumbs}</Box>;
+        // At the whole atom the breadcrumb would be only the root, which the
+        // element tile above already names (controller ruling T10-crumb).
+        if (crumbs.length <= 1 && !backButton) return null;
+        return (
+            <Box className="level-nav level-nav-crumbs" aria-label="level navigation">
+                {backButton}{crumbs.length > 1 && breadcrumbs}
+            </Box>
+        );
     }
     if (variant === 'configuration') {
         return <Box className="level-nav level-nav-configuration-part">{configurationLines}{children}</Box>;

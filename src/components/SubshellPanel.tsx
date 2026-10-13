@@ -13,8 +13,13 @@ interface SubshellPanelProps {
      * all of them; the chip row then filters down to `shellN` itself.
      */
     subshells: SerialisedSubshell[];
-    /** n of the currently selected shell. */
-    shellN: number;
+    /**
+     * n of the currently selected shell; null with none open (the whole
+     * atom, Explore › Orbitals), which picks nothing out: no chips, no
+     * labelled or coloured rules, no j-level note (controller ruling
+     * T10-wholeatom -- the 3D view draws shell rings, not lobes, there).
+     */
+    shellN: number | null;
     /**
      * The subshell currently drilled into, if any — shows the mₗ row when
      * set. With spin–orbit it is one j-level, and `j` says which.

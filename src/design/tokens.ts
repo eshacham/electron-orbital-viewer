@@ -201,6 +201,9 @@ export const TYPE = {
     rail: { size: 11, line: 14, weight: 500 },
 } as const;
 
+/** §4.3: on a phone body is 14; captions stay TYPE.caption's 12. */
+export const PHONE_TYPE = { body: 14 } as const;
+
 export const FONT_SANS = '"Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif';
 
 /** §4.7, in ms; zero under prefers-reduced-motion (tokens.css). */

@@ -1176,7 +1176,6 @@ function App() {
     // breadcrumb, then Configuration (the drill-down, Charge/Excite and the
     // Relativity switch), Orbitals (the whole atom's energies and About) and
     // Display (the view controls).
-    const valenceShellN = atomProfile ? atomProfile.shells[atomProfile.shells.length - 1]?.n ?? 1 : 1;
     const atomExplore = (
         <AtomExplore
             header={(
@@ -1198,7 +1197,8 @@ function App() {
             orbitals={(
                 <>
                     {atomProfile && (
-                        <SubshellPanel subshells={atomProfile.subshells} shellN={atomSelectedShell ?? valenceShellN}
+                        // At the whole atom no shell is open, so none is picked out (ruling T10-wholeatom).
+                        <SubshellPanel subshells={atomProfile.subshells} shellN={atomSelectedShell}
                             selectedSubshell={atomSelectedSubshell} selectedOrbital={atomSelectedOrbital}
                             onSelectSubshell={handleSelectSubshell} onSelectOrbital={handleSelectOrbital}
                             relativity={atomProfile.relativity ?? 'off'} part="diagram" />

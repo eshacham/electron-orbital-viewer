@@ -1300,6 +1300,20 @@ describe('App: relativity', () => {
         }
     });
 
+    // Controller ruling T10-wholeatom: at the whole atom no shell is open, so
+    // Explore › Orbitals picks none out -- no j-level note about lobes the
+    // 3D view's shell rings do not draw, no current-shell colours.
+    it('picks out no shell in Explore › Orbitals at the whole atom, even under spin–orbit', () => {
+        installMatchMedia(false);
+        const { container } = renderWithProvider(<App />, {
+            mode: 'atom', Z: 18, relativityOverride: 'spinOrbit', level: 'atom', profile: spinOrbitArgon(),
+        });
+        fireEvent.click(screen.getByRole('tab', { name: 'Orbitals' }));
+        expect(container.querySelector('.subshell-energy-diagram')).not.toBeNull();
+        expect(container.querySelector('.subshell-j-note')).toBeNull();
+        expect(container.querySelector('.subshell-energy-rule.current')).toBeNull();
+    });
+
     function spinOrbitArgon(): SerialisedAtomProfile {
         const argon = argonLikeProfile();
         const p = argon.subshells.find(s => s.n === 2 && s.l === 1)!;

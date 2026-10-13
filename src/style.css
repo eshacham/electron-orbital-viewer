@@ -665,7 +665,8 @@ html, body, #root {
 }
 .level-nav-valence-note {
   color: var(--ql-color-text-2);
-  font-size: 0.8em;
+  /* Caption size, not 0.8em of the 13 px line (10.4 px, under §4.3's 11 px floor). */
+  font-size: var(--ql-type-caption-size);
 }
 /* Core versus valence, matching the 3D view's own treatment: the valence
    chip is lit and the core chips recede. The distinction is never carried

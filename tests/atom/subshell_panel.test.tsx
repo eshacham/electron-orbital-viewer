@@ -14,6 +14,14 @@ function neonLikeSubshells(): SerialisedSubshell[] {
     ];
 }
 
+/** Lead-shaped under spin–orbit: a 5d core level, then 6s½, 6p½ and 6p³⁄₂. */
+function leadLikeSpinOrbitSubshells(): SerialisedSubshell[] {
+    const curve = (): Float64Array => new Float64Array(4);
+    const level = (n: number, l: number, j: number, electrons: number, energy: number): SerialisedSubshell => (
+        { n, l, j, electrons, energy, curve: curve(), R: curve(), samplingRadius: 5, compositeSamplingRadius: 5 });
+    return [level(5, 2, 2.5, 6, -0.8), level(6, 0, 0.5, 2, -0.45), level(6, 1, 0.5, 2 / 3, -0.15), level(6, 1, 1.5, 4 / 3, -0.12)];
+}
+
 describe('SubshellPanel', () => {
     it('renders one chip per subshell of the selected shell, with label, occupancy and orbital energy in Hartree', () => {
         const { container } = render(
@@ -406,6 +414,22 @@ describe('SubshellPanel parts (spec §9.1: chips in Configuration, the diagram i
         const { container } = render(<SubshellPanel {...props()} part="chips" />);
         expect(container.querySelector('.subshell-chip-row')).not.toBeNull();
         expect(container.querySelector('.subshell-energy-diagram')).toBeNull();
+    });
+    // Controller ruling T10-wholeatom: with no shell open (the whole atom)
+    // nothing is picked out -- no current rules, labels or j-level note,
+    // which would describe lobes the 3D view's shell rings do not draw.
+    it('diagram with no shell open: no picked-out rules, labels or j-level note, even under spin–orbit', () => {
+        const lead = leadLikeSpinOrbitSubshells();
+        const open = render(<SubshellPanel {...props()} subshells={lead} shellN={6} relativity="spinOrbit" part="diagram" />);
+        expect(open.container.querySelector('.subshell-j-note')).not.toBeNull(); // the fixture does trigger the note
+        open.unmount();
+        const { container } = render(<SubshellPanel {...props()} subshells={lead} shellN={null} relativity="spinOrbit" part="diagram" />);
+        expect(container.querySelector('.subshell-energy-diagram')).not.toBeNull();
+        expect(container.querySelectorAll('.subshell-energy-rule')).toHaveLength(lead.length);
+        expect(container.querySelector('.subshell-j-note')).toBeNull();
+        expect(container.querySelector('.subshell-energy-rule.current')).toBeNull();
+        expect(container.querySelector('.subshell-energy-label')).toBeNull();
+        expect(container.querySelector('.subshell-energy-rule[style]')).toBeNull();
     });
     it('diagram: the whole-atom energy diagram, no chips', () => {
         const { container } = render(<SubshellPanel {...props()} part="diagram" />);
