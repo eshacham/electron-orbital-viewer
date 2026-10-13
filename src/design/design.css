@@ -1,0 +1,25 @@
+/* src/design/design.css -- the design system's shared rules (spec §4, §13).
+   Imported once by each entry, after tokens.css and before its own sheet. */
+html, body, #root { font-family: var(--ql-font-sans); }
+.ql-body { font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line); color: var(--ql-color-text-1); }
+.ql-section {
+  margin: 0;
+  font-size: var(--ql-type-section-size); line-height: var(--ql-type-section-line);
+  font-weight: var(--ql-type-section-weight); color: var(--ql-color-text-1);
+}
+.ql-caption { font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); color: var(--ql-color-text-3); }
+.ql-tabular { font-variant-numeric: tabular-nums; }
+.ql-icon-button { color: var(--ql-color-text-2); }
+/* §13: a 2 px ring with a 2 px offset on every interactive element, never removed. */
+:focus-visible { outline: 2px solid var(--ql-color-focus-ring); outline-offset: 2px; }
+/* §13: "Skip to 3D view" and "Skip to controls", visible when focused. */
+.skip-link {
+  position: absolute; left: 8px; top: -48px; z-index: 100;
+  padding: 8px 12px; border-radius: var(--ql-radius-md);
+  background: var(--ql-color-surface-3); color: var(--ql-color-text-1); text-decoration: none;
+}
+.skip-link:focus { top: 8px; }
+@media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
+  /* §4.3: on a phone body is 14 and captions 12. */
+  .ql-body { font-size: 14px; }
+}

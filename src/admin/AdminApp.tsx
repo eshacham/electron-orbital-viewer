@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, CssBaseline, TextField, ThemeProvider, Typography, createTheme } from '@mui/material';
+import { Alert, Button, CssBaseline, TextField, ThemeProvider, Typography } from '@mui/material';
 import { useSelector } from 'react-redux';
 import JobsTable from './JobsTable';
 import CostPanel from './CostPanel';
@@ -9,12 +9,11 @@ import { jobsApi } from '../jobs/client';
 import { currentMonth } from '../jobs/format';
 import { selectIsOwner, JobsState } from '../store/jobsSlice';
 import type { CostsResponse, JobView } from '../jobs/api_types';
+import ThemeSwitch from '../design/ThemeSwitch';
+import { useQuantumTheme } from '../design/useQuantumTheme';
 
 /** The root's class, and the string tools/check_admin_split.mjs looks for in the main bundle. */
 export const ADMIN_ROOT_CLASS = 'eov-admin-dashboard';
-
-// A light page for reading tables, unlike the viewer's dark canvas theme.
-const adminTheme = createTheme({ palette: { primary: { main: '#1565c0' } } });
 
 /**
  * The owner's dashboard (spec §9.4): every job of a month with predicted
@@ -22,6 +21,7 @@ const adminTheme = createTheme({ palette: { primary: { main: '#1565c0' } } });
  * the viewer; a visitor gets a sign-in prompt and nothing is fetched.
  */
 const AdminApp: React.FC = () => {
+    const { theme } = useQuantumTheme();
     const isOwner = useSelector(selectIsOwner);
     const target = useSelector((state: { jobs: JobsState }) => state.jobs.target);
     const months = useMemo(() => recentMonths(new Date()), []);
@@ -48,12 +48,13 @@ const AdminApp: React.FC = () => {
     }, [isOwner, month, target, reload]);
 
     return (
-        <ThemeProvider theme={adminTheme}>
+        <ThemeProvider theme={theme}>
             <CssBaseline />
             <main className={ADMIN_ROOT_CLASS}>
                 <header className="admin-header">
                     <Typography variant="h5" component="h1">Owner dashboard</Typography>
                     <a href="/">Back to the viewer</a>
+                    <ThemeSwitch />
                     <ConnectedOwnerBar page="/admin.html" showDashboardLink={false} explainUnconfigured />
                 </header>
                 {!isOwner ? (

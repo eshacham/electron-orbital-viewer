@@ -1,6 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
+import { CssBaseline, ThemeProvider } from '@mui/material';
+import '@fontsource-variable/inter';
+import './design/tokens.css';
+import './design/design.css';
+import './style.css';
 import { store } from './store';
 import App from './App';
 import { applyState, bindUrlStateStore, registerBuiltInUrlKeys } from './url_state';
@@ -9,7 +14,23 @@ import { registerMoleculeUrlKeys } from './molecules/url_keys';
 import { registerComputedUrlKeys } from './jobs/url_keys';
 import { bindJobsClient } from './jobs/client';
 import { startOwnerSession } from './jobs/owner_session';
-import './style.css';
+import { migrateLegacyTheme } from './design/theme_storage';
+import { useQuantumTheme } from './design/useQuantumTheme';
+
+// The boot script in index.html has already migrated and applied the theme;
+// this repeats the migration for a page served before the script existed.
+try { migrateLegacyTheme(window.localStorage); } catch { /* storage refused: the pref keeps it in memory */ }
+
+/** The theme lives here, above App, so a theme change never remounts the viewer (spec §3.2). */
+function Root() {
+  const { theme } = useQuantumTheme();
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <App />
+    </ThemeProvider>
+  );
+}
 
 // Restore a shared view before the first render, so the app never draws a
 // default view on its way to the linked one.
@@ -31,7 +52,7 @@ void startOwnerSession(store.dispatch, '/').then(back => {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Provider store={store}>
-      <App />
+      <Root />
     </Provider>
   </React.StrictMode>,
 );

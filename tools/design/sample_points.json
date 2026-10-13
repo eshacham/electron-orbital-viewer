@@ -1,0 +1,17 @@
+{
+  "desktop": [
+    { "name": "top bar", "selector": ".app-topbar", "x": 0.42, "py": 4, "token": "bg-bar" },
+    { "name": "rail", "selector": ".app-rail", "x": 0.5, "y": 0.985, "token": "bg-bar" },
+    { "name": "page gutter", "selector": ".app-workspace", "px": 6, "y": 0.5, "token": "bg-app" },
+    { "name": "explore panel", "selector": ".explore-panel", "x": 0.5, "y": 0.992, "token": "surface-1" },
+    { "name": "inspector", "selector": ".inspector", "x": 0.5, "y": 0.992, "token": "surface-1" },
+    { "name": "controls card", "selector": "#controls", "x": 0.97, "y": 0.5, "token": "surface-1" },
+    { "name": "canvas left edge", "selector": "#canvas-container", "x": 0.03, "y": 0.6, "token": "canvas" },
+    { "name": "canvas upper right", "selector": "#canvas-container", "x": 0.97, "y": 0.22, "token": "canvas" }
+  ],
+  "phone": [
+    { "name": "phone top bar", "selector": ".phone-topbar", "x": 0.5, "py": 3, "token": "bg-bar" },
+    { "name": "sheet tabs", "selector": ".phone-sheet-tabs", "x": 0.5, "y": 0.5, "token": "surface-1" },
+    { "name": "canvas left edge", "selector": "#canvas-container", "x": 0.03, "y": 0.55, "token": "canvas" }
+  ]
+}

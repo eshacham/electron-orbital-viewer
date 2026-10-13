@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { shallowEqual } from 'react-redux';
 import {
-    ThemeProvider,
-    CssBaseline,
     Box,
     Alert,
     Snackbar,
@@ -52,7 +50,6 @@ import SpeciesControls from './components/SpeciesControls';
 import Controls, { RelativityReadout } from './components/Controls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
-import { appTheme } from './theme';
 import OrbitalViewer from './components/OrbitalViewer';
 import RadialPlot, { RadialCurve } from './components/RadialPlot';
 import LevelNav, { NavigationTarget } from './components/LevelNav';
@@ -142,8 +139,6 @@ const BUSY_INDICATOR_DELAY_MS = 400;
 function gridRadii(rMin: number, dx: number, size: number): number[] {
     return Array.from({ length: size }, (_, j) => rMin * Math.exp(j * dx));
 }
-
-// The theme lives in theme.ts so its contrast is testable.
 
 function App() {
     const dispatch = useAppDispatch();
@@ -1100,8 +1095,7 @@ function App() {
     );
 
     return (
-        <ThemeProvider theme={appTheme}>
-            <CssBaseline />
+        <>
             <Box
                 id="canvas-container"
                 className={canvasBusyLabel ? 'busy' : undefined}
@@ -1109,8 +1103,7 @@ function App() {
                 sx={{
                     width: '100%',
                     height: '100vh',
-                    position: 'relative',
-                    backgroundColor: '#111'
+                    position: 'relative'
                 }}
             >
                 <OrbitalViewer
@@ -1303,7 +1296,7 @@ function App() {
                     </Alert>
                 </Snackbar>
             </Box>
-        </ThemeProvider>
+        </>
     );
 }
 

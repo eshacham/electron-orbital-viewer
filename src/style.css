@@ -13,9 +13,10 @@ html, body, #root {
      the canvas under the toolbar. dvh tracks the visible area instead. */
   height: 100dvh;
   margin: 0;
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--ql-font-sans);
   /* Dark before React mounts too, so the first paint is not a white flash. */
-  background-color: #050505;
+  background-color: var(--ql-color-bg-app);
+  color: var(--ql-color-text-1);
   overflow: hidden;
 }
 #root {
@@ -35,7 +36,7 @@ html, body, #root {
   /* For non-flex layout, you might need explicit height: */
   /* height: calc(100vh - 100px); /* Example: full viewport height minus some space for controls */
   min-height: 300px; /* Ensure it has at least some height */
-  background-color: #111; /* Temporary background to see its bounds */
+  background: var(--ql-color-canvas);
   position: relative; /* Good for positioning things inside it later if needed */
 }
 /* Ensure the host for the Three.js canvas also behaves correctly */
@@ -73,10 +74,10 @@ html, body, #root {
   align-self: flex-end;
   padding: 8px 14px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(8, 8, 10, 0.72);
-  color: #fff;
-  font: 500 14px 'Roboto', sans-serif;
+  border: 1px solid var(--ql-color-border-subtle);
+  background: var(--ql-color-surface-2);
+  color: var(--ql-color-text-1);
+  font: var(--ql-type-nav-weight) var(--ql-type-nav-size) var(--ql-font-sans);
   cursor: pointer;
 }
 
@@ -125,10 +126,12 @@ html, body, #root {
   }
 }
 .side-panel .level-nav {
-  background-color: rgba(240, 240, 240, 0.96);
+  background-color: var(--ql-color-surface-1);
+  color: var(--ql-color-text-1);
+  border: 1px solid var(--ql-color-border-subtle);
   border-radius: 8px;
   padding: 10px 14px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--ql-shadow-panel);
   max-height: 40vh;
   overflow-y: auto;
 }
@@ -166,8 +169,8 @@ html, body, #root {
   transform: translateX(-50%);
   z-index: 30;
   max-width: min(420px, calc(100vw - 24px));
-  color: rgb(95, 33, 32);
-  background-color: rgb(253, 237, 237);
+  color: var(--ql-color-error-text);
+  background-color: var(--ql-color-error-bg);
 }
 
 #controls {
@@ -182,9 +185,11 @@ html, body, #root {
   padding: 15px; /* Added a bit more padding */
   /* Nearly opaque: at 85 % the text on it fell below WCAG AA over a lit
      lobe (tests/a11y/panel_contrast.test.ts). */
-  background-color: rgba(240, 240, 240, 0.96);
+  background-color: var(--ql-color-surface-1);
+  color: var(--ql-color-text-1);
+  border: 1px solid var(--ql-color-border-subtle);
   border-radius: 8px; /* Optional: add some rounded corners */
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Optional: subtle shadow */
+  box-shadow: var(--ql-shadow-panel); /* Optional: subtle shadow */
   z-index: 10; /* Ensure it's above the canvas container if they overlap */
   
   /* Use flexbox to align children to the right */
@@ -208,7 +213,7 @@ html, body, #root {
 #controls select,
 #controls input[type="number"] {
   padding: 6px 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--ql-color-border-strong);
   border-radius: 4px;
 }
 
@@ -225,7 +230,7 @@ html, body, #root {
 
 #controls button#update-orbital {
   padding: 8px 15px;
-  background-color: #3498db;
+  background-color: var(--ql-color-accent-fill);
   color: white;
   border: none;
   border-radius: 4px;
@@ -235,7 +240,7 @@ html, body, #root {
 }
 
 #controls button#update-orbital:hover {
-  background-color: #2980b9;
+  background-color: var(--ql-color-accent);
 }
 /* Scale readout: a bar of known length in Bohr radii, bottom-right of the view.
    The camera frames every orbital to fill the viewport, so this is the only
@@ -255,10 +260,10 @@ html, body, #root {
   gap: 6px;
   padding: 10px 14px 8px;
   border-radius: 8px;
-  background: rgba(8, 8, 10, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #fff;
-  font-family: 'Roboto', sans-serif;
+  background: var(--ql-color-surface-2);
+  border: 1px solid var(--ql-color-border-subtle);
+  color: var(--ql-color-text-1);
+  font-family: var(--ql-font-sans);
   font-size: 14px;
   font-weight: 500;
   line-height: 1;
@@ -268,7 +273,7 @@ html, body, #root {
 /* Ticked at both ends so the measured span is unambiguous. */
 .scale-readout-bar {
   height: 9px;
-  border: 2px solid rgba(255, 255, 255, 0.95);
+  border: 2px solid var(--ql-color-text-1);
   border-top: none;
   box-sizing: border-box;
 }
@@ -286,16 +291,16 @@ html, body, #root {
   z-index: 10;
   padding: 8px 10px 6px;
   border-radius: 8px;
-  background: rgba(8, 8, 10, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #fff;
-  font-family: 'Roboto', sans-serif;
+  background: var(--ql-color-surface-2);
+  border: 1px solid var(--ql-color-border-subtle);
+  color: var(--ql-color-text-1);
+  font-family: var(--ql-font-sans);
   pointer-events: none;
 }
 .radial-plot-title {
   font-size: 11px;
   letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--ql-color-text-2);
   margin-bottom: 2px;
 }
 .radial-plot-line {
@@ -308,7 +313,7 @@ html, body, #root {
   stroke: none;
 }
 .radial-plot-axis {
-  stroke: rgba(255, 255, 255, 0.35);
+  stroke: var(--ql-color-plot-axis);
   stroke-width: 1;
 }
 .radial-plot-scale {
@@ -316,7 +321,7 @@ html, body, #root {
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--ql-color-text-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -332,7 +337,7 @@ html, body, #root {
   gap: 6px 10px;
   margin-top: 4px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--ql-color-text-2);
 }
 .radial-plot-legend-item,
 .radial-plot-legend-key {
@@ -354,19 +359,19 @@ html, body, #root {
 .radial-plot-note {
   font-size: 10px;
   line-height: 1.25;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--ql-color-text-3);
   margin-bottom: 2px;
 }
 .radial-plot-legend-peak {
   display: inline-block;
   width: 1.5px;
   height: 7px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ql-color-text-3);
 }
 .radial-plot-legend-dash {
   display: inline-block;
   width: 14px;
-  border-top: 2px dashed rgba(255, 255, 255, 0.75);
+  border-top: 2px dashed var(--ql-color-text-2);
 }
 /* Phone: the plot folds to its title, which is a button, so the panel's
    own click-through has to make an exception for it. */
@@ -409,9 +414,9 @@ html, body, #root {
   gap: 10px;
   padding: 10px 16px;
   border-radius: 8px;
-  background: rgba(8, 8, 10, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: var(--ql-color-surface-2);
+  border: 1px solid var(--ql-color-border-subtle);
+  color: var(--ql-color-text-1);
   font-size: 14px;
   pointer-events: none;
 }
@@ -427,9 +432,9 @@ html, body, #root {
   max-width: min(360px, calc(100vw - 32px));
   padding: 10px 16px;
   border-radius: 8px;
-  background: rgba(8, 8, 10, 0.85);
-  border: 1px solid rgba(255, 183, 77, 0.6);
-  color: #fff;
+  background: var(--ql-color-surface-2);
+  border: 1px solid var(--ql-color-warning);
+  color: var(--ql-color-text-1);
   font-size: 14px;
   line-height: 1.4;
   text-align: center;
@@ -448,9 +453,9 @@ html, body, #root {
   gap: 14px;
   padding: 6px 12px;
   border-radius: 8px;
-  background: rgba(8, 8, 10, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: var(--ql-color-surface-2);
+  border: 1px solid var(--ql-color-border-subtle);
+  color: var(--ql-color-text-1);
   font-size: 13px;
   pointer-events: none;
 }
@@ -477,26 +482,26 @@ html, body, #root {
 }
 
 .radial-plot-peak {
-  stroke: rgba(255, 255, 255, 0.6);
+  stroke: var(--ql-color-text-3);
   stroke-width: 1.4;
 }
 .radial-plot-hover-rule {
-  stroke: rgba(255, 255, 255, 0.8);
+  stroke: var(--ql-color-text-2);
   stroke-width: 1;
   stroke-dasharray: 2 2;
 }
 .radial-plot-hover-readout {
   margin-top: 2px;
   font-size: 11px;
-  color: #fff;
+  color: var(--ql-color-text-1);
   font-variant-numeric: tabular-nums;
 }
 
 /* Task 10: PotentialCurvePlot, E(R) with the current R marked. */
-.potential-marker { stroke: #ffffff; stroke-width: 1; stroke-dasharray: 3 2; }
-.potential-reference { stroke: #8bc34a; stroke-width: 1; stroke-dasharray: 1 3; }
-.potential-axis-label { fill: #9aa4ad; font-size: 9px; }
-.potential-reference-note { color: #c5e1a5; }
+.potential-marker { stroke: var(--ql-color-text-1); stroke-width: 1; stroke-dasharray: 3 2; }
+.potential-reference { stroke: var(--ql-color-success); stroke-width: 1; stroke-dasharray: 1 3; }
+.potential-axis-label { fill: var(--ql-color-text-3); font-size: var(--ql-type-tick-size); }
+.potential-reference-note { color: var(--ql-color-success); }
 
 
 /* ---------------------------------------------------------------------------
@@ -524,8 +529,9 @@ html, body, #root {
     box-sizing: border-box;
     padding: 4px 8px;
     border-radius: 10px;
-    background: rgba(240, 240, 240, 0.96);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    background: var(--ql-color-surface-1);
+    color: var(--ql-color-text-1);
+    box-shadow: var(--ql-shadow-popover);
   }
   .level-nav-header .level-nav-back {
     min-width: 40px;
@@ -546,7 +552,7 @@ html, body, #root {
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.72);
+    color: var(--ql-color-text-2);
   }
 
   .phone-sheet {
@@ -560,9 +566,9 @@ html, body, #root {
     display: flex;
     flex-direction: column-reverse;
     max-height: 55dvh;
-    background: rgba(240, 240, 240, 0.97);
+    background: var(--ql-color-surface-1);
     border-radius: 14px 14px 0 0;
-    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--ql-shadow-popover);
   }
   .phone-sheet-tabs {
     display: flex;
@@ -570,7 +576,7 @@ html, body, #root {
     padding-bottom: env(safe-area-inset-bottom);
   }
   .phone-sheet.open .phone-sheet-tabs {
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    border-top: 1px solid var(--ql-color-border-subtle);
   }
   .phone-sheet-tab {
     flex: 1;
@@ -578,13 +584,13 @@ html, body, #root {
     border: none;
     border-top: 3px solid transparent;
     background: none;
-    color: rgba(0, 0, 0, 0.62);
-    font: 500 14px 'Roboto', sans-serif;
+    color: var(--ql-color-text-2);
+    font: var(--ql-type-nav-weight) var(--ql-type-nav-size) var(--ql-font-sans);
     cursor: pointer;
   }
   .phone-sheet-tab[aria-selected="true"] {
-    color: #1565c0;
-    border-top-color: #1565c0;
+    color: var(--ql-color-accent-text);
+    border-top-color: var(--ql-color-selected-edge);
   }
   .phone-sheet-body {
     flex: 1 1 auto;
@@ -613,7 +619,7 @@ html, body, #root {
     width: fit-content;
     /* Opaque: its see-through dark card read as washed-out grey on the
        light sheet. */
-    background: #111;
+    background: var(--ql-color-surface-2);
   }
 
   /* Small overlays sit just under the header. */
@@ -720,14 +726,14 @@ html, body, #root {
    --------------------------------------------------------------------------- */
 .level-nav-breadcrumbs {
   /* Was white on the light card: 1.59:1. */
-  color: rgba(0, 0, 0, 0.87);
+  color: var(--ql-color-text-1);
 }
 .level-nav-configuration {
   font-variant-numeric: tabular-nums;
   margin-top: 4px;
 }
 .level-nav-method {
-  opacity: 0.75;
+  color: var(--ql-color-text-2);
 }
 /* SpeciesControls: charge stepper, Excite menu, ΔSCF energies, size compare
    (spec §5 Phase 3). Lives in LevelNav's own stylesheet section because it
@@ -741,23 +747,23 @@ html, body, #root {
    LevelNav (panel_contrast.test.ts pins all three against that background),
    so they need dark-on-light colours, not the dark-on-dark ones a card
    floating over the black 3D view might suggest. */
-.species-method { font-size: 0.75rem; color: #1f4e9a; border-bottom: 1px dotted #1f4e9a; cursor: help; }
-.species-measured { color: rgba(0, 0, 0, 0.62); }
-.species-compare { color: rgba(0, 0, 0, 0.7); }
-.species-compare-swatch { display: inline-block; width: 18px; height: 0; border-top: 2px dashed rgba(0, 0, 0, 0.6); vertical-align: middle; margin-right: 6px; }
+.species-method { font-size: 0.75rem; color: var(--ql-color-accent-text); border-bottom: 1px dotted var(--ql-color-accent-text); cursor: help; }
+.species-measured { color: var(--ql-color-text-2); }
+.species-compare { color: var(--ql-color-text-2); }
+.species-compare-swatch { display: inline-block; width: 18px; height: 0; border-top: 2px dashed var(--ql-color-text-2); vertical-align: middle; margin-right: 6px; }
 .level-nav-valence {
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
 }
 .level-nav-valence-note {
-  opacity: 0.75;
+  color: var(--ql-color-text-2);
   font-size: 0.8em;
 }
 /* Core versus valence, matching the 3D view's own treatment: the valence
    chip is lit and the core chips recede. The distinction is never carried
    by opacity alone -- the valence chip also says "· valence". */
 .level-nav-shell-chip:not(.selected) {
-  background: rgba(255, 255, 255, 0.7) !important;
+  background: var(--ql-color-surface-2) !important;
 }
 /* Valence is carried by the label ("· valence") and a dot, never by an
    outline or fill -- those are what selection looks like. */
@@ -768,7 +774,7 @@ html, body, #root {
   height: 7px;
   margin-right: 6px;
   border-radius: 50%;
-  background: #f4b400;
+  background: var(--ql-color-warning);
   vertical-align: 1px;
 }
 .level-nav-shells {
@@ -792,17 +798,17 @@ html, body, #root {
   text-transform: none !important;
 }
 .subshell-ml-button.selected {
-  background: rgba(25, 118, 210, 0.14);
+  background: color-mix(in srgb, var(--ql-color-accent) 16%, transparent);
   font-weight: 600;
 }
 .level-nav-shell-hint {
-  opacity: 0.7;
+  color: var(--ql-color-text-3);
   margin: -2px 0 6px;
   line-height: 1.3;
 }
 .level-nav-about {
   margin-top: 6px;
-  opacity: 0.85;
+  color: var(--ql-color-text-2);
 }
 
 .subshell-chip-row,
@@ -813,7 +819,7 @@ html, body, #root {
   margin: 6px 0;
 }
 .subshell-panel-legend {
-  opacity: 0.75;
+  color: var(--ql-color-text-2);
   margin-top: 4px;
 }
 .subshell-ml-swatch {
@@ -825,13 +831,13 @@ html, body, #root {
   flex: 0 0 auto;
 }
 .subshell-isolate-hint {
-  opacity: 0.7;
+  color: var(--ql-color-text-3);
   margin: 2px 0 4px;
   line-height: 1.3;
 }
 /* With spin–orbit: which part of a j-level's picture is a basis choice. */
 .subshell-j-note {
-  opacity: 0.7;
+  color: var(--ql-color-text-3);
   margin: 0 0 4px;
   line-height: 1.3;
 }
@@ -854,20 +860,20 @@ html, body, #root {
 /* The panel is light, so the other shells' rules are dark and faint and
    this shell's are drawn thick in their own curve colours (set inline). */
 .subshell-energy-rule {
-  stroke: rgba(0, 0, 0, 0.28);
+  stroke: var(--ql-color-border-strong);
   stroke-width: 1.2;
 }
 .subshell-energy-rule.current {
   stroke-width: 3;
 }
 .subshell-energy-leader {
-  stroke: rgba(0, 0, 0, 0.35);
+  stroke: var(--ql-color-text-3);
   stroke-width: 0.8;
 }
 .subshell-energy-label {
   font-size: 11px;
   font-weight: 600;
-  fill: rgba(0, 0, 0, 0.8);
+  fill: var(--ql-color-text-2);
 }
 
 /* ---------------------------------------------------------------------------
@@ -886,13 +892,13 @@ html, body, #root {
   z-index: 25;
   max-height: calc(100vh - 40px);
   overflow: auto;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+  box-shadow: var(--ql-shadow-popover);
   padding: 8px 12px 10px;
   border-radius: 8px;
-  background: rgba(8, 8, 10, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #fff;
-  font-family: 'Roboto', sans-serif;
+  background: var(--ql-color-surface-1);
+  border: 1px solid var(--ql-color-border-subtle);
+  color: var(--ql-color-text-1);
+  font-family: var(--ql-font-sans);
   max-width: calc(100vw - 40px);
 }
 .periodic-table-header {
@@ -930,14 +936,14 @@ html, body, #root {
   cursor: pointer;
   border: 1px solid transparent;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  background: var(--ql-color-surface-2);
+  color: var(--ql-color-text-1);
   font-family: inherit;
   transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 .periodic-tile-number {
   font-size: 7px;
-  opacity: 0.65;
+  color: var(--ql-color-text-3);
 }
 .periodic-tile-symbol {
   font-size: 11px;
@@ -955,10 +961,10 @@ html, body, #root {
    them -- they share a valence configuration, which is what makes them a
    group at all (Addendum 3). */
 .periodic-tile.in-column {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px var(--ql-color-border-strong);
 }
 .periodic-tile.selected {
-  box-shadow: 0 0 0 2px #fff;
+  box-shadow: 0 0 0 2px var(--ql-color-selected-edge);
   filter: brightness(1.6);
 }
 .periodic-table-legend {
@@ -1006,7 +1012,7 @@ html, body, #root {
 /* Dark on the light card, like the helper text above it but a step
    stronger: it carries the number the switch exists to show. */
 .relativity-what-changed {
-  color: rgba(0, 0, 0, 0.78);
+  color: var(--ql-color-text-2);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1015,7 +1021,7 @@ html, body, #root {
    treatment a diagram floating over the 3D view might suggest. */
 .mo-diagram {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.87);
+  color: var(--ql-color-text-1);
 }
 .mo-levels {
   position: relative;
@@ -1032,7 +1038,7 @@ html, body, #root {
   height: 18px;
   padding: 0;
   border: 0;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.87);
+  border-bottom: 2px solid var(--ql-color-text-1);
   background: none;
   color: inherit;
   font: inherit;
@@ -1042,7 +1048,7 @@ html, body, #root {
    checks it generically); selection is never carried by this outline alone
    -- aria-pressed and the box's own accessible name say so too. */
 .mo-box.selected {
-  outline: 2px solid #1565c0;
+  outline: 2px solid var(--ql-color-selected-edge);
 }
 .mo-label {
   margin-left: 6px;
@@ -1050,15 +1056,15 @@ html, body, #root {
 .mo-break {
   position: absolute;
   left: 0;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--ql-color-text-2);
   font-size: 11px;
 }
 .mo-note {
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--ql-color-text-2);
   font-size: 11px;
 }
 .mo-footer {
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--ql-color-text-2);
   font-size: 11px;
 }
 
@@ -1070,13 +1076,14 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: rgba(0, 0, 0, 0.87);
+  color: var(--ql-color-text-1);
 }
 .side-panel .bonds-panel {
-  background-color: rgba(240, 240, 240, 0.96);
+  background-color: var(--ql-color-surface-1);
+  border: 1px solid var(--ql-color-border-subtle);
   border-radius: 8px;
   padding: 10px 14px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--ql-shadow-panel);
 }
 /* MUI upper-cases button text, and Greek does not survive it: "1σg" became
    "1ΣG" and "ρ = 0.002" became "Ρ = 0.002" (found live, Task 13) -- a
@@ -1087,19 +1094,19 @@ html, body, #root {
 .bonds-captions {
   margin: 0;
   padding-left: 16px;
-  color: rgba(0, 0, 0, 0.62);
+  color: var(--ql-color-text-2);
   font-size: 11px;
 }
 .bonds-density-label {
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--ql-color-text-2);
 }
 .bonds-frontier {
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--ql-color-text-2);
 }
 /* Why the picture differs from the selection, and orbital caveats: a
    warning colour, but dark enough to read as body text on the light card. */
 .bonds-note {
-  color: #8a4100;
+  color: var(--ql-color-warning);
 }
 /* The phone header's one line ("N₂ · R = 2.07 a₀"): its own light chip,
    the same as LevelNav's header, since nothing else sits behind it but the
@@ -1110,10 +1117,10 @@ html, body, #root {
   box-sizing: border-box;
   padding: 12px 12px;
   border-radius: 10px;
-  background: rgba(240, 240, 240, 0.96);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  background: var(--ql-color-surface-1);
+  box-shadow: var(--ql-shadow-popover);
   font-size: 14px;
-  color: rgba(0, 0, 0, 0.87);
+  color: var(--ql-color-text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1158,9 +1165,9 @@ html, body, #root {
 .esp-legend {
   padding: 6px 12px;
   border-radius: 8px;
-  background: rgba(8, 8, 10, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: var(--ql-color-surface-2);
+  border: 1px solid var(--ql-color-border-subtle);
+  color: var(--ql-color-text-1);
   font-size: 12px;
   text-align: center;
 }
@@ -1177,7 +1184,7 @@ html, body, #root {
   margin: 0 auto;
 }
 .esp-legend-note {
-  opacity: 0.85;
+  color: var(--ql-color-text-2);
 }
 /* Ruling T16-c: the sideways phone's compact key -- a thinner, shorter bar
    and its scale, the notes behind the ⓘ toggle at its right. */
@@ -1200,7 +1207,7 @@ html, body, #root {
   padding: 2px;
   border: 0;
   background: none;
-  color: #fff;
+  color: var(--ql-color-text-1);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
@@ -1237,11 +1244,11 @@ html, body, #root {
 /* D29: own rule (not combined with -status) so panel_contrast's rule()
    lookup finds it; on the LIGHT_96 panel-card, not the canvas. */
 .molecule-picker-name {
-  opacity: 0.85;
+  color: var(--ql-color-text-2);
 }
 .molecule-picker-status {
   padding: 8px 0;
-  opacity: 0.8;
+  color: var(--ql-color-text-3);
 }
 .MuiDialog-root .molecule-picker-list {
   max-height: none;
@@ -1265,7 +1272,7 @@ html, body, #root {
    under the orbital list (MoleculeOrbitalList). */
 .molecule-caption {
   display: block;
-  opacity: 0.75;
+  color: var(--ql-color-text-2);
   line-height: 1.35;
 }
 .molecule-orbital-list {
@@ -1292,30 +1299,30 @@ html, body, #root {
   cursor: pointer;
 }
 .molecule-orbital-row.selected {
-  border-color: #1976d2;
-  background: rgba(25, 118, 210, 0.08);
+  border-color: var(--ql-color-selected-edge);
+  background: color-mix(in srgb, var(--ql-color-accent) 10%, transparent);
 }
 .molecule-orbital-energy {
   font-variant-numeric: tabular-nums;
 }
 /* Panel-card text (LIGHT_96): the ×N degeneracy tag beside an orbital row. */
 .molecule-orbital-degeneracy {
-  opacity: 0.7;
+  color: var(--ql-color-text-3);
 }
 /* Ruling T16-b: where the virtuals end and the occupied orbitals begin. */
 .molecule-orbital-gap {
   margin: 2px 0;
   padding: 2px 6px;
-  border-top: 1px dashed rgba(0, 0, 0, 0.35);
-  border-bottom: 1px dashed rgba(0, 0, 0, 0.35);
-  color: rgba(0, 0, 0, 0.62);
+  border-top: 1px dashed var(--ql-color-border-strong);
+  border-bottom: 1px dashed var(--ql-color-border-strong);
+  color: var(--ql-color-text-2);
   font-size: 11px;
   text-align: center;
 }
 /* Phase 6D: the gap divider's Kohn–Sham caveat, on its own line in the divider's own colour. */
 .molecule-orbital-gap-caveat {
   display: block;
-  color: rgba(0, 0, 0, 0.62);
+  color: var(--ql-color-text-2);
   font-size: 10px;
 }
 /* Phase 6D: the mark beside a diffuse virtual's (◌) or a constructed LVMO's (◇) label, in the row's own colour;
@@ -1340,13 +1347,13 @@ html, body, #root {
   z-index: 1;
   margin: 0;
   padding: 2px 6px;
-  background-color: rgb(240, 240, 240);
-  color: rgba(0, 0, 0, 0.7);
+  background-color: var(--ql-color-surface-1);
+  color: var(--ql-color-text-2);
   font-size: 11px;
 }
 /* Ruling T16-a: the drawn orbital's name in the navigation card. */
 .molecule-nav-orbital {
-  color: rgba(0, 0, 0, 0.87);
+  color: var(--ql-color-text-1);
 }
 
 /* Dark chip over the canvas, like `.esp-legend` (same background/alpha so
@@ -1355,9 +1362,9 @@ html, body, #root {
 .molecule-readout {
   padding: 6px 12px;
   border-radius: 8px;
-  background: rgba(8, 8, 10, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: var(--ql-color-surface-2);
+  border: 1px solid var(--ql-color-border-subtle);
+  color: var(--ql-color-text-1);
   font-size: 12px;
   text-align: center;
   pointer-events: auto;
@@ -1371,11 +1378,11 @@ html, body, #root {
    the same light card as the navigation column, the width of the controls
    card above it in the right-hand column. Own rule (ruling D29). */
 .molecule-orbital-card {
-  background-color: rgba(240, 240, 240, 0.96);
-  color: rgba(0, 0, 0, 0.87);
+  background-color: var(--ql-color-surface-1);
+  color: var(--ql-color-text-1);
   border-radius: 8px;
   padding: 10px 14px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--ql-shadow-panel);
   width: 300px;
   box-sizing: border-box;
 }
@@ -1433,8 +1440,8 @@ html, body, #root {
      here, under the header, instead of .atom-error's top: 80px over the
      readout chip. MUI's standard error colours, stated so they are tested. */
   .molecule-error {
-    color: rgb(95, 33, 32);
-    background-color: rgb(253, 237, 237);
+    color: var(--ql-color-error-text);
+    background-color: var(--ql-color-error-bg);
     padding: 2px 10px;
     font-size: 12px;
   }
@@ -1454,15 +1461,15 @@ html, body, #root {
 
 /* Phase 6B-2: the request panel's structure preview (Å units in its viewBox). */
 .structure-preview { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.structure-preview svg { background: #111; border-radius: 8px; }
+.structure-preview svg { background: var(--ql-color-canvas-solid); border-radius: 8px; }
 .structure-preview-bond line { stroke-width: 0.14; stroke-linecap: round; }
 .structure-preview-atom { stroke: rgba(0, 0, 0, 0.6); stroke-width: 0.02; }
 .structure-preview-caption { display: flex; align-items: center; gap: 4px; }
 
 /* Phase 6B-2: tier badge (in .molecule-legend-stack) and the jobs panels in the side panel / Explore tab. */
-.tier-badge { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px; background: rgba(240, 240, 240, 0.94); font-size: 0.8125rem; max-width: 520px; }
+.tier-badge { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px; background: var(--ql-color-surface-2); color: var(--ql-color-text-1); font-size: 0.8125rem; max-width: 520px; }
 .molecule-jobs { display: flex; flex-direction: column; gap: 8px; }
-.molecule-jobs .MuiAccordion-root { border-radius: 10px; background: rgba(240, 240, 240, 0.94); }
+.molecule-jobs .MuiAccordion-root { border-radius: 10px; background: var(--ql-color-surface-1); }
 .provenance-body { display: flex; flex-direction: column; gap: 6px; }
 .provenance-list { margin: 0; padding-left: 18px; font-size: 0.875rem; }
 
@@ -1482,12 +1489,12 @@ html, body, #root {
    opacity) so tests/a11y/panel_contrast.test.ts checks what is painted. */
 .quote-chooser { display: flex; flex-direction: column; gap: 8px; }
 .quote-options.MuiFormGroup-root { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-.quote-option { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px 8px; border: 1px solid rgba(0, 0, 0, 0.3); border-radius: 8px; font-variant-numeric: tabular-nums; }
-.quote-option.chosen { border: 2px solid #0d47a1; padding: 5px 9px 7px; }
+.quote-option { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px 8px; border: 1px solid var(--ql-color-border-strong); border-radius: 8px; font-variant-numeric: tabular-nums; }
+.quote-option.chosen { border: 2px solid var(--ql-color-selected-edge); padding: 5px 9px 7px; }
 .quote-option .MuiFormControlLabel-root { margin-left: -6px; }
 .quote-option-details { display: flex; flex-direction: column; gap: 2px; }
-.quote-option-note { color: rgba(0, 0, 0, 0.7); font-size: 0.75rem; }
-.quote-option-unavailable { color: #8a4100; font-size: 0.75rem; }
+.quote-option-note { color: var(--ql-color-text-2); font-size: 0.75rem; }
+.quote-option-unavailable { color: var(--ql-color-warning); font-size: 0.75rem; }
 .quote-details summary { cursor: pointer; font-weight: 600; }
 .quote-lines { border-collapse: collapse; margin-top: 4px; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .quote-lines th, .quote-lines td { text-align: left; vertical-align: top; padding: 2px 6px 2px 0; }
@@ -1496,7 +1503,7 @@ html, body, #root {
 
 /* Phase 6B-2 Task 11: the live status panel's header and scrolling log tail. */
 .job-status-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.job-log-tail { margin: 0; max-height: 160px; overflow: auto; padding: 6px 8px; background: #111; color: #e6e6e6; border-radius: 6px; font-size: 0.75rem; white-space: pre; }
+.job-log-tail { margin: 0; max-height: 160px; overflow: auto; padding: 6px 8px; background: var(--ql-color-surface-3); color: var(--ql-color-text-1); border-radius: 6px; font-size: 0.75rem; white-space: pre; }
 
 /* Phase 6B-2 Task 12: the owner's corner under Share and Export. No opacity
    on the sign-in link: "discreet" is its caption size, and a faded link
@@ -1533,8 +1540,8 @@ html, body, #root {
    black scene (found live, Task 12, ammonia running). The same light card as
    the accordions, so it reads over anything behind it. */
 .molecule-jobs .job-status {
-  background-color: rgba(240, 240, 240, 0.96);
-  color: rgba(0, 0, 0, 0.87);
+  background-color: var(--ql-color-surface-1);
+  color: var(--ql-color-text-1);
   padding: 8px 16px;
   border-radius: 10px;
 }

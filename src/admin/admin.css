@@ -1,10 +1,10 @@
-/* src/admin/admin.css -- the owner's dashboard: a scrolling document on a
-   white page, unlike the viewer's fixed full-window canvas. /admin.html never
+/* src/admin/admin.css -- the owner's dashboard: a scrolling document on
+   the theme's page colour, unlike the viewer's fixed full-window canvas. /admin.html never
    loads style.css, so every class the dashboard uses is styled here. Secondary
    text declares a real colour rather than fading body text with opacity, so
    tests/a11y/panel_contrast.test.ts checks the colour actually painted. */
-html, body, #root { margin: 0; min-height: 100%; font-family: 'Roboto', sans-serif; }
-.eov-admin-dashboard { max-width: 1440px; margin: 0 auto; padding: 16px; box-sizing: border-box; background: #ffffff; color: rgba(0, 0, 0, 0.87); }
+html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans); background: var(--ql-color-bg-app); }
+.eov-admin-dashboard { max-width: 1440px; margin: 0 auto; padding: 16px; box-sizing: border-box; background: var(--ql-color-bg-app); color: var(--ql-color-text-1); }
 .admin-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; margin-bottom: 12px; }
 .admin-controls, .admin-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
 /* The table needs about 1360px to show every column, so the cost panel sits
@@ -28,21 +28,21 @@ html, body, #root { margin: 0; min-height: 100%; font-family: 'Roboto', sans-ser
 .admin-table-scroll th { white-space: normal; }
 .admin-table-scroll td.admin-method { white-space: normal; }
 .admin-nowrap { white-space: nowrap; }
-.admin-note { font-size: 0.75rem; color: #5f6368; white-space: normal; }
-.admin-error { color: #b71c1c; white-space: normal; }
+.admin-note { font-size: 0.75rem; color: var(--ql-color-text-2); white-space: normal; }
+.admin-error { color: var(--ql-color-danger); white-space: normal; }
 /* Phase 6C: what AWS billed past a job's approved maximum (the app absorbs it) is flagged in amber. */
-.admin-absorbed { color: #8a4100; font-weight: 600; white-space: normal; }
+.admin-absorbed { color: var(--ql-color-warning); font-weight: 600; white-space: normal; }
 .admin-lines summary { cursor: pointer; font-size: 0.75rem; }
 .admin-lines ul { margin: 2px 0; padding-left: 16px; font-size: 0.75rem; }
 .admin-approvals { margin: 2px 0; padding-left: 16px; font-size: 0.75rem; white-space: normal; }
 .cost-figures { margin: 8px 0; padding-left: 18px; }
-.cost-billed { margin: 8px 0; color: rgba(0, 0, 0, 0.87); }
+.cost-billed { margin: 8px 0; color: var(--ql-color-text-1); }
 .daily-spend { margin: 8px 0; }
-.daily-spend-title { font-size: 0.875rem; font-weight: 500; color: rgba(0, 0, 0, 0.87); }
+.daily-spend-title { font-size: 0.875rem; font-weight: 500; color: var(--ql-color-text-1); }
 /* The chart draws at a fixed width; its viewBox lets a phone scale it down. */
 .daily-spend svg { display: block; max-width: 100%; height: auto; }
-.daily-spend-bar { fill: #1565c0; }
-.daily-spend-axis { stroke: #757575; }
-.daily-spend-label { font-size: 10px; fill: #555555; }
+.daily-spend-bar { fill: var(--ql-color-accent); }
+.daily-spend-axis { stroke: var(--ql-color-plot-axis); }
+.daily-spend-label { font-size: 10px; fill: var(--ql-color-text-3); }
 .owner-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .owner-bar-target { display: flex; align-items: center; gap: 6px; }
