@@ -17,6 +17,10 @@ const config: Config = {
   // stand-in, which a test sets and resetBuildEnv() restores.
   moduleNameMapper: {
     '^.+/build_env$': '<rootDir>/tests/jobs/build_env_stub.ts',
+    // Components import their own stylesheet (spec §10: "CSS lives in
+    // src/design/*.css per component, imported by its component"); ts-jest
+    // cannot parse CSS, so every .css import resolves to an empty module.
+    '\\.css$': '<rootDir>/tests/style_stub.ts',
   },
   // The two exhaustive SCF sweeps (Phase 3's excitation_sweep_<k> and
   // Phase 4's relativistic_heavy_sweep_<k> shards) are hours of work and run
