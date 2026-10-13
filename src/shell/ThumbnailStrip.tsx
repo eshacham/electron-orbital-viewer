@@ -33,7 +33,9 @@ const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: s
     // Which picture the canvas holds, so a loss leaves an image already drawn in place.
     const wanted = `${themeKey}|${contentKey}`;
     const [drawn, setDrawn] = useState<string | null>(null);
-    const showGlyph = thumb.kind === 'orbital' && status !== 'ready' && drawn !== wanted;
+    // Ruling T16-failtile: a picture that will not come falls back as on a lost context.
+    const [failed, setFailed] = useState<string | null>(null);
+    const showGlyph = thumb.kind === 'orbital' && drawn !== wanted && (status !== 'ready' || failed === wanted);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -53,7 +55,7 @@ const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: s
                 context?.clearRect(0, 0, canvas.width, canvas.height);
                 context?.drawImage(image as unknown as CanvasImageSource, 0, 0, canvas.width, canvas.height);
                 setDrawn(wanted);
-            });
+            }, () => setFailed(wanted));
         };
         // Only tiles in view are requested (§12).
         const observer = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
@@ -112,11 +114,11 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({ items, label, rGrid, th
         selected?.scrollIntoView?.({ inline: 'center', block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
     }, [items, collapsed]);
 
-    const groups: Array<{ label: string | null; items: StripItem[] }> = [];
+    const groups: Array<{ label: string | null; spoken: string | null; items: StripItem[] }> = [];
     for (const item of items) {
         const last = groups[groups.length - 1];
         if (last && last.label === item.group) last.items.push(item);
-        else groups.push({ label: item.group, items: [item] });
+        else groups.push({ label: item.group, spoken: item.groupSpoken, items: [item] });
     }
     const tile = (item: StripItem) => <Tile key={item.key} item={item} px={px} rGrid={rGrid} themeKey={themeKey} onSelect={onSelect} />;
 
@@ -131,7 +133,7 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({ items, label, rGrid, th
             {!collapsed && (
                 <div id={listId} ref={listRef} className="strip-list" role="listbox" aria-label={label} aria-orientation="horizontal">
                     {groups.map((group, index) => (group.label ? (
-                        <div key={`${group.label}-${index}`} role="group" aria-label={group.label} className="strip-group">
+                        <div key={`${group.label}-${index}`} role="group" aria-label={group.spoken ?? group.label} className="strip-group">
                             <span className="strip-group-label" aria-hidden="true">{group.label}</span>
                             <div className="strip-group-tiles">{group.items.map(tile)}</div>
                         </div>

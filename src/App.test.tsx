@@ -316,6 +316,25 @@ describe('App', () => {
         expect(screen.queryByLabelText('subshells')).not.toBeInTheDocument();
     });
 
+    // Task 16 (spec §3.3, §13; rulings T16-tilekey, T16-optname): the strip's
+    // orbital tiles are ψ-coloured, so at shell level the key column keys them
+    // too -- only while the strip shows them.
+    it('keys the strip\'s orbital tiles at shell level, and only while the strip shows them', () => {
+        installMatchMedia(false);
+        const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBeInTheDocument();
+        // The whole atom's strip is ring glyphs, keyed by the shell key.
+        expect(screen.queryByLabelText('orbital tile colour key')).toBeNull();
+
+        act(() => { store.dispatch(drillToShell(1)); });
+        expect(screen.getByRole('option', { name: '1s orbital' })).toBeInTheDocument();
+        expect(screen.getByLabelText('shell colour key')).toBeInTheDocument();
+        expect(screen.getByLabelText('orbital tile colour key')).toHaveTextContent('Orbital tilesψ > 0ψ < 0');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Hide the orbital strip' }));
+        expect(screen.queryByLabelText('orbital tile colour key')).toBeNull();
+    });
+
     // A shell view is nothing but its cut face, but an orbital is a closed
     // surface: the inherited half-cut hid half of 4f_z³. Entering an orbital
     // clears the cut; stepping back out restores the shell view's own.

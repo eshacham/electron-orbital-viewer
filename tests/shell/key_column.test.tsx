@@ -47,6 +47,22 @@ describe('the Atom screen\'s keys (spec §11.5)', () => {
         expect(key).toHaveTextContent('cut face shading is scaled to local shell structure');
     });
 
+    // Ruling T16-tilekey (§3.3): at shell level the strip shows ψ-coloured orbital
+    // tiles, so a phase key headed "Orbital tiles" sits beside the ring key.
+    it('keys the strip\'s orbital tiles beside the shell rings when the strip shows them', () => {
+        const { rerender } = render(<KeyColumn><AtomKeys level="shell" scheme="phase" cutOn={false} phase={phase} shellItems={shellItems} orbitalTiles /></KeyColumn>);
+        expect(screen.getByLabelText('shell colour key')).toBeInTheDocument();
+        const tiles = screen.getByLabelText('orbital tile colour key');
+        expect(tiles).toHaveTextContent('Orbital tilesψ > 0ψ < 0');
+        const swatches = tiles.querySelectorAll<HTMLElement>('.phase-legend-swatch');
+        expect(swatches[0].style.background).toBe('rgb(255, 122, 47)');
+        expect(swatches[1].style.background).toBe('rgb(47, 107, 255)');
+        // Never mistaken for a key to the surface: the shell view has none.
+        expect(screen.queryByLabelText('surface colour key')).toBeNull();
+        rerender(<KeyColumn><AtomKeys level="shell" scheme="phase" cutOn={false} phase={phase} shellItems={shellItems} /></KeyColumn>);
+        expect(screen.queryByLabelText('orbital tile colour key')).toBeNull();
+    });
+
     it('draws the ramp from the six science stops', () => {
         const { container } = render(<DensityRampKey />);
         expect((container.querySelector('.density-ramp-bar') as HTMLElement).style.background).toMatch(/linear-gradient/);

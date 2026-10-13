@@ -1446,6 +1446,7 @@ function App() {
             {isAtomMode && atomProfile && !atomUnbound && (
                 <KeyColumn compact={isNarrow}>
                     <AtomKeys level={atomLevel} scheme={render.scheme} cutOn={surfaceStyle.clipAxis !== 'none'} phase={phase}
+                        orbitalTiles={!isNarrow && !stripCollapsed && stripItems.some(item => item.thumb.kind === 'orbital')}
                         shellItems={themed(atomCurves).map(curve => ({ label: curve.label, colour: curve.color, spoken: curve.spokenLabel }))} />
                 </KeyColumn>
             )}

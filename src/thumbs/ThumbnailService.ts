@@ -30,6 +30,9 @@ export type ThumbStatus = 'detached' | 'ready' | 'lost';
 
 type Listener = (image: ThumbImage) => void;
 
+/** Who is waiting for a picture: told when it is ready, or (ruling T16-failtile) that it will not come. */
+interface Waiter { onReady: Listener; onFailed?: () => void }
+
 /** An evicted ImageBitmap holds its pixels until closed; a canvas (the fallback) has no close. */
 function release(image: ThumbImage): void {
     (image as { close?: () => void }).close?.();
@@ -40,11 +43,18 @@ export class ThumbnailService {
     private host: ThumbHost | null = null;
     private lost = false;
     private readonly cache = new Map<string, ThumbImage>();
-    private readonly listeners = new Map<string, Set<Listener>>();
+    /** By full key (theme|scheme|finish|content): the tiles waiting for that picture. */
+    private readonly waiting = new Map<string, { contentKey: string; waiters: Set<Waiter> }>();
     private readonly statusListeners = new Set<() => void>();
-    private queue: Array<{ key: string; params: OrbitalParams }> = [];
-    private inFlight: { key: string; worker: Worker } | null = null;
-    private ready: Array<{ key: string; meshData: MeshData }> = [];
+    /**
+     * Jobs are keyed by content alone: a mesh does not depend on the theme.
+     * The theme is read when the mesh is drawn, and the picture is filed
+     * under the theme it was drawn in -- so a theme switch while a job is
+     * under way can never file one theme's picture under another's key.
+     */
+    private queue: Array<{ contentKey: string; params: OrbitalParams }> = [];
+    private inFlight: { contentKey: string; worker: Worker } | null = null;
+    private ready: Array<{ contentKey: string; meshData: MeshData }> = [];
     private rendering = false;
 
     attach(host: ThumbHost): void {
@@ -65,7 +75,7 @@ export class ThumbnailService {
 
     /**
      * Controller ruling DC12: tells a tile when the status changes. markLost()
-     * drops every image listener (cancelAll), so a tile still waiting for its
+     * drops every waiting tile (cancelAll), so a tile still waiting for its
      * image learns of the loss here and shows its glyph and label (§12).
      */
     subscribeStatus = (listener: () => void): (() => void) => {
@@ -91,8 +101,25 @@ export class ThumbnailService {
         return `${this.host?.themeKey() ?? 'detached'}|${contentKey}`;
     }
 
-    request(request: ThumbRequest, onReady: Listener): () => void {
-        const key = this.keyOf(request.contentKey);
+    private hasJob(contentKey: string): boolean {
+        return this.inFlight?.contentKey === contentKey
+            || this.queue.some(job => job.contentKey === contentKey)
+            || this.ready.some(job => job.contentKey === contentKey);
+    }
+
+    private isWanted(contentKey: string): boolean {
+        for (const entry of this.waiting.values()) if (entry.contentKey === contentKey) return true;
+        return false;
+    }
+
+    /**
+     * Asks for a picture; `onReady` hears it (at once from the cache), and
+     * `onFailed` hears that it will not come: the worker failed or the draw
+     * threw. The returned function withdraws the request.
+     */
+    request(request: ThumbRequest, onReady: Listener, onFailed?: () => void): () => void {
+        const { contentKey } = request;
+        const key = this.keyOf(contentKey);
         const cached = this.cache.get(key);
         if (cached) {
             // Refresh its place in the LRU.
@@ -101,18 +128,18 @@ export class ThumbnailService {
             onReady(cached);
             return () => {};
         }
-        const set = this.listeners.get(key) ?? new Set<Listener>();
-        set.add(onReady);
-        this.listeners.set(key, set);
-        const pending = this.queue.some(job => job.key === key) || this.inFlight?.key === key || this.ready.some(job => job.key === key);
-        if (!pending) this.queue.push({ key, params: request.params });
+        const entry = this.waiting.get(key) ?? { contentKey, waiters: new Set<Waiter>() };
+        const waiter: Waiter = { onReady, onFailed };
+        entry.waiters.add(waiter);
+        this.waiting.set(key, entry);
+        if (!this.hasJob(contentKey)) this.queue.push({ contentKey, params: request.params });
         return () => {
-            set.delete(onReady);
-            // Still wanted by another tile, or already answered or cancelled (a later request has its own set).
-            if (set.size > 0 || this.listeners.get(key) !== set) return;
-            this.listeners.delete(key);
+            entry.waiters.delete(waiter);
+            // Still wanted by another tile, or already answered or cancelled (a later request has its own entry).
+            if (entry.waiters.size > 0 || this.waiting.get(key) !== entry) return;
+            this.waiting.delete(key);
             // Only tiles still in view are worth computing (§12: IntersectionObserver).
-            this.queue = this.queue.filter(job => job.key !== key);
+            if (!this.isWanted(contentKey)) this.queue = this.queue.filter(job => job.contentKey !== contentKey);
         };
     }
 
@@ -127,9 +154,18 @@ export class ThumbnailService {
             release(this.cache.get(oldest)!);
             this.cache.delete(oldest);
         }
-        const set = this.listeners.get(key);
-        this.listeners.delete(key);
-        set?.forEach(listener => listener(image));
+        const entry = this.waiting.get(key);
+        this.waiting.delete(key);
+        entry?.waiters.forEach(waiter => waiter.onReady(image));
+    }
+
+    /** Ruling T16-failtile: every tile waiting for this content, in any theme, falls back to its glyph and label. */
+    private fail(contentKey: string): void {
+        for (const [key, entry] of [...this.waiting]) {
+            if (entry.contentKey !== contentKey) continue;
+            this.waiting.delete(key);
+            entry.waiters.forEach(waiter => waiter.onFailed?.());
+        }
     }
 
     cancelAll(): void {
@@ -137,7 +173,7 @@ export class ThumbnailService {
         this.inFlight = null;
         this.queue = [];
         this.ready = [];
-        this.listeners.clear();
+        this.waiting.clear();
     }
 
     tick(): void {
@@ -145,7 +181,9 @@ export class ThumbnailService {
         if (!host || this.lost || host.isBusy()) return;
         if (this.ready.length > 0) {
             if (this.rendering) return;
-            const { key, meshData } = this.ready.shift()!;
+            const { contentKey, meshData } = this.ready.shift()!;
+            // Read together with the appearance host.render draws in: the picture's own theme.
+            const key = this.keyOf(contentKey);
             this.rendering = true;
             host.render(meshData).then(
                 image => {
@@ -154,23 +192,29 @@ export class ThumbnailService {
                     if (this.host === host && !this.lost) this.store(key, image);
                     else release(image);
                 },
-                () => { this.rendering = false; },
+                () => {
+                    this.rendering = false;
+                    if (this.host === host && !this.lost) this.fail(contentKey);
+                },
             );
             return;
         }
         if (this.inFlight || this.queue.length === 0) return;
-        const { key, params } = this.queue.shift()!;
+        const { contentKey, params } = this.queue.shift()!;
         const worker = host.createWorker();
-        this.inFlight = { key, worker };
+        this.inFlight = { contentKey, worker };
         worker.onmessage = (event: MessageEvent) => {
             worker.terminate();
             if (this.inFlight?.worker !== worker) return; // cancelled meanwhile
             this.inFlight = null;
-            if (event.data?.type === 'success') this.ready.push({ key, meshData: event.data.meshData as MeshData });
+            if (event.data?.type === 'success') this.ready.push({ contentKey, meshData: event.data.meshData as MeshData });
+            else this.fail(contentKey);
         };
         worker.onerror = () => {
             worker.terminate();
-            if (this.inFlight?.worker === worker) this.inFlight = null;
+            if (this.inFlight?.worker !== worker) return;
+            this.inFlight = null;
+            this.fail(contentKey);
         };
         worker.postMessage({ type: 'calculate', params });
     }

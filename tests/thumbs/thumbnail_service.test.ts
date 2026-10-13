@@ -136,4 +136,79 @@ describe('ThumbnailService (spec §12)', () => {
         for (let i = 0; i < ThumbnailService.CACHE_LIMIT; i++) service.store(`dark|phase|glow|k${i}`, { width: 1, height: 1 });
         expect(first.close).toHaveBeenCalledTimes(1);
     });
+    // Review fix 1 (§12 key, §3.3): a job's mesh is drawn in whatever theme is
+    // on when it is drawn, so it must be filed under THAT theme -- never under
+    // the theme that was on when it was asked for.
+    it('files a picture under the theme it was drawn in when the theme changes mid-job', async () => {
+        const service = new ThumbnailService();
+        const drawnIn: string[] = [];
+        const { host, workers, setTheme } = fakeHost();
+        service.attach({ ...host, render: async () => { drawnIn.push(host.themeKey()); return { width: 160, height: 160 }; } });
+        service.request({ contentKey: 'a', params }, jest.fn());
+        service.tick();
+        setTheme('light|phase|glow');
+        // The tile re-asks in the new theme: no second job for the same content.
+        const light = jest.fn();
+        service.request({ contentKey: 'a', params }, light);
+        workers[0].onmessage!({ data: { type: 'success', meshData: mesh() } });
+        service.tick();
+        await flush();
+        expect(workers).toHaveLength(1);
+        expect(drawnIn).toEqual(['light|phase|glow']);
+        expect(light).toHaveBeenCalledTimes(1);
+        setTheme('dark|phase|glow');
+        const dark = jest.fn();
+        service.request({ contentKey: 'a', params }, dark);
+        expect(dark).not.toHaveBeenCalled();
+    });
+
+    // Ruling T16-failtile: a job that fails tells its tiles, which fall back to their glyph and label.
+    describe('a failed job', () => {
+        const start = () => {
+            const service = new ThumbnailService();
+            const fake = fakeHost();
+            service.attach(fake.host);
+            const ready = jest.fn();
+            const failed = jest.fn();
+            service.request({ contentKey: 'a', params }, ready, failed);
+            service.tick();
+            return { service, fake, ready, failed };
+        };
+
+        it('says so on the worker\'s error reply', () => {
+            const { fake, ready, failed } = start();
+            fake.workers[0].onmessage!({ data: { type: 'error', message: 'no mesh' } });
+            expect(failed).toHaveBeenCalledTimes(1);
+            expect(ready).not.toHaveBeenCalled();
+        });
+
+        it('says so when the worker itself errors', () => {
+            const { fake, failed } = start();
+            fake.workers[0].onerror!();
+            expect(failed).toHaveBeenCalledTimes(1);
+        });
+
+        it('says so when the draw is rejected, and moves on to the next job', async () => {
+            const service = new ThumbnailService();
+            const fake = fakeHost({ render: () => Promise.reject(new Error('draw failed')) });
+            service.attach(fake.host);
+            const failed = jest.fn();
+            service.request({ contentKey: 'a', params }, jest.fn(), failed);
+            service.request({ contentKey: 'b', params: { ...params, ml: 1 } }, jest.fn());
+            service.tick();
+            fake.workers[0].onmessage!({ data: { type: 'success', meshData: mesh() } });
+            service.tick();
+            await flush();
+            expect(failed).toHaveBeenCalledTimes(1);
+            service.tick();
+            expect(fake.workers).toHaveLength(2);
+        });
+
+        it('does not count a cancelled job as failed', () => {
+            const { service, fake, failed } = start();
+            service.cancelAll();
+            fake.workers[0].onmessage!({ data: { type: 'error', message: 'late' } });
+            expect(failed).not.toHaveBeenCalled();
+        });
+    });
 });

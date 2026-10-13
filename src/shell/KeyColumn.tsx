@@ -9,9 +9,15 @@ const KeyColumn: React.FC<{ compact?: boolean; children: React.ReactNode }> = ({
     <div className={`key-column${compact ? ' compact' : ''}`} role="group" aria-label="colour keys">{children}</div>
 );
 
-/** The ψ key: positive and negative swatches, always in the active scheme's colours (science.ts, the one source the PNG legend and the vertex colours share). */
-export const PhaseKey: React.FC<{ positive: string; negative: string }> = ({ positive, negative }) => (
-    <div className="phase-legend" aria-label="surface colour key">
+/**
+ * The ψ key: positive and negative swatches, always in the active scheme's
+ * colours (science.ts, the one source the PNG legend and the vertex colours
+ * share). `heading` and `label` say what it describes when that is not the
+ * surface on the view (ruling T16-tilekey: the strip's orbital tiles).
+ */
+export const PhaseKey: React.FC<{ positive: string; negative: string; heading?: string; label?: string }> = ({ positive, negative, heading, label = 'surface colour key' }) => (
+    <div className="phase-legend" aria-label={label}>
+        {heading && <span className="key-heading">{heading}</span>}
         <span className="phase-legend-item">
             <span className="phase-legend-swatch positive" style={{ background: positive }} />ψ &gt; 0
         </span>
@@ -55,6 +61,8 @@ interface AtomKeysProps {
     cutOn: boolean;
     phase: PhaseColours;
     shellItems: ShellRingItem[];
+    /** The strip below shows orbital pictures (shell or subshell level): their ψ colours need a key too (§3.3). */
+    orbitalTiles?: boolean;
 }
 
 /**
@@ -62,8 +70,16 @@ interface AtomKeysProps {
  * exists only where a scalar is mapped -- an orbital's cut face in the
  * Density scheme -- and never alone beside a phase-coloured surface.
  */
-export const AtomKeys: React.FC<AtomKeysProps> = ({ level, scheme, cutOn, phase, shellItems }) => {
-    if (level !== 'orbital') return <ShellRingKey items={shellItems} />;
+export const AtomKeys: React.FC<AtomKeysProps> = ({ level, scheme, cutOn, phase, shellItems, orbitalTiles = false }) => {
+    if (level !== 'orbital') {
+        return (
+            <>
+                <ShellRingKey items={shellItems} />
+                {/* Ruling T16-tilekey (§3.3): the strip's orbital tiles are phase-coloured; at orbital level the surface key covers them. */}
+                {orbitalTiles && <PhaseKey positive={phase.legendPositive} negative={phase.legendNegative} heading="Orbital tiles" label="orbital tile colour key" />}
+            </>
+        );
+    }
     return (
         <>
             <PhaseKey positive={phase.legendPositive} negative={phase.legendNegative} />
