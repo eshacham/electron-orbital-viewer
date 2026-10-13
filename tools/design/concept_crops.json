@@ -1,0 +1,15 @@
+{
+  "theme-comparison": {
+    "file": "docs/quantumlab/references/theme-comparison.png",
+    "deep-space": { "x": 9, "y": 5, "width": 562, "height": 485 },
+    "light-clean": { "x": 578, "y": 5, "width": 484, "height": 485 },
+    "molecule-builder": { "x": 9, "y": 557, "width": 624, "height": 400 },
+    "learning-center": { "x": 643, "y": 557, "width": 455, "height": 400 },
+    "admin": { "x": 1106, "y": 557, "width": 425, "height": 400 }
+  },
+  "original-concepts": {
+    "file": "docs/quantumlab/references/original-concepts.png",
+    "dark-modern": { "x": 12, "y": 5, "width": 754, "height": 463 },
+    "light-clean": { "x": 778, "y": 5, "width": 748, "height": 463 }
+  }
+}

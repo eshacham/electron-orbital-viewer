@@ -13,7 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { deltaE2000, hexToLab } from '../../src/design/colour_math.ts';
 import { TOKENS } from '../../src/design/tokens.ts';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+// --root runs another checkout's app (the `main` comparison of §14 check 5) with this tool and its scenes.
+const ROOT = resolve(process.argv.includes('--root') ? process.argv[process.argv.indexOf('--root') + 1] : DEFAULT_ROOT);
 const PLAYWRIGHT = process.env.PLAYWRIGHT_DIR ?? '/Users/eyalshacham/.npm/_npx/e41f203b7505f1fb/node_modules/';
 const { chromium } = createRequire(PLAYWRIGHT)('playwright');
 const OWNER_PORTS = new Set([5173, 5391, 8787]);
@@ -32,8 +34,8 @@ const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); r
 const task = arg('task', 'adhoc');
 const port = Number(arg('port', '5411'));
 if (OWNER_PORTS.has(port)) throw new Error(`port ${port} is the owner's; use 5411-5419`);
-const scenes = JSON.parse(readFileSync(resolve(ROOT, 'tools/design/scenes.json'), 'utf8'));
-const samplePoints = JSON.parse(readFileSync(resolve(ROOT, 'tools/design/sample_points.json'), 'utf8'));
+const scenes = JSON.parse(readFileSync(resolve(DEFAULT_ROOT, 'tools/design/scenes.json'), 'utf8'));
+const samplePoints = JSON.parse(readFileSync(resolve(DEFAULT_ROOT, 'tools/design/sample_points.json'), 'utf8'));
 const sceneNames = arg('scenes', 'c-whole').split(',');
 const themes = arg('themes', 'dark,light').split(',');
 const sizes = arg('sizes', 'desktop,phone').split(',');
@@ -106,6 +108,11 @@ function collectMetrics() {
       title: document.querySelector('.viewport-title')?.textContent ?? null,
       keys: document.querySelector('.key-column')?.textContent ?? null,
       enclosed: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.textContent ?? null,
+      phaseKey: [...document.querySelectorAll('[aria-label="surface colour key"]')].map(e => e.textContent),
+      plotLegend: [...document.querySelectorAll('.radial-plot-legend-item')].map(e => e.textContent),
+      enclosedNote: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent ?? null,
+      subshellChips: [...document.querySelectorAll('.subshell-chip')].map(e => e.textContent),
+      configuration: document.querySelector('.level-nav-configuration')?.textContent ?? null,
     },
   };
 }
@@ -202,9 +209,20 @@ try {
         await page.goto(`http://localhost:${port}/${scenes[scene]}`, { waitUntil: 'load' });
         const settled = await settle(page);
         await page.waitForTimeout(extraWait);
+        // ExplorePanel renders only its active tab (DX3/DC5): collect in two
+        // passes so neither tab's fields read empty. Display holds the
+        // Electron-enclosed helper note; Configuration holds the rest
+        // (subshell chips, the configuration line) and is what the
+        // screenshot shows.
+        await page.getByRole('tab', { name: 'Display' }).click().catch(() => {});
+        const { enclosedNote } = await page.evaluate(() => ({
+          enclosedNote: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent ?? null,
+        }));
+        await page.getByRole('tab', { name: 'Configuration' }).click().catch(() => {});
         const file = `/tmp/6g1-${task}-${scene}-${theme}-${size}.png`;
         const png = await page.screenshot({ path: file });
         const metrics = await page.evaluate(collectMetrics);
+        metrics.text.enclosedNote = enclosedNote;
         const on = await sampleColours(page, png, size);
         await page.addStyleTag({ content: '#orbital-canvas-host canvas { visibility: hidden !important; }' });
         await page.waitForTimeout(150);
