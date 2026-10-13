@@ -5,10 +5,12 @@ methane's HOMO as b1/b2/b3 (D2) rather than t2 (Td), ammonia's lone pair as
 4a' (Cs) rather than 3a1 (C3v), and benzene in D2h rather than D6h.
 label_orbitals works in one of three regimes:
 
-- full group PySCF already labels (D2h and its subgroups, C∞v, D∞h): PySCF's
-  irreps, numbered per irrep in energy order. The linear groups read σ/π/δ
-  through Bonds mode's own mapping (labels.irrep_to_lambda), a degenerate π
-  pair sharing one number.
+- full group PySCF already labels (D2h and its subgroups, C∞v, D∞h, and SO3
+  for atoms): PySCF's irreps, numbered per irrep in energy order; an atom's
+  read 1s, 2s, 2p … by principal quantum number. The linear groups read σ/π/δ
+  through Bonds mode's own mapping (labels.irrep_to_lambda), each component
+  of a π (δ, φ) pair counted in turn, so the pair shares one number even when
+  an open shell's ROKS splits it in energy (final review I1).
 - projection (TABLES: C3v, D3h, D3d, D6h, Td, Oh): every MO, or set of MOs
   degenerate within SET_TOL, is labelled from its characters
   χ(R) = Σᵢ ⟨ψᵢ|R ψᵢ⟩ -- one operation R per class, integrated on the SCF's
@@ -18,8 +20,11 @@ label_orbitals works in one of three regimes:
   matched; a piece whose characters are still no single irrep's but are a
   sum of whole irreps (BF3's mixed F 1s a1' and e') reads as that sum,
   "1a1'+1e'", with a note, so every later number stays the textbook's
-  (Ruling D1). Anything else is left UNLABELLED, with a note: an accidental
-  degeneracy, or numerical trouble, never a guess.
+  (Ruling D1). Sets that still match nothing are joined when together they
+  carry one irrep: an open shell's ROKS splits a partly filled e or t shell
+  (CH4+'s 1t2) far beyond SET_TOL; joined, it is counted once, with a note.
+  Anything else is left UNLABELLED, with a note: an accidental degeneracy, or
+  numerical trouble, never a guess.
 - subgroup: any other group (D2d, C3, Ih …), or a supported one whose
   operations cannot be built at this geometry, keeps PySCF's subgroup labels
   and says so (symmetry.labelNote) -- never silently.
@@ -361,19 +366,33 @@ def _grids(mf):
     return grids
 
 
-def _linear_labels(group, irreps, energies):
+def _linear_labels(group, irreps):
+    """σ/π/δ/φ labels numbered per λ (and g/u) in energy order. PySCF names each component of a degenerate
+    irrep (E1x/E1y, E1ux/E1uy …); each component is counted in turn, so a π (δ, φ) pair shares one number
+    by its symmetry, however far apart its energies lie -- ROKS splits a partly filled shell (CH's 1π: one
+    component singly occupied, one empty) by far more than SET_TOL (final review I1)."""
     from labels import irrep_to_lambda
-    counts, last, out = {}, {}, []
-    for irrep, energy in zip(irreps, energies):
+    counts, out = {}, []
+    for irrep in irreps:
         key = irrep_to_lambda(group, irrep)
-        previous = last.get(key)
-        if key[0] != 'σ' and previous is not None and abs(energy - previous[1]) < SET_TOL:
-            number = previous[0]                      # the other half of a π (δ) pair shares its number
-        else:
-            number = counts.get(key, 0) + 1
-            counts[key] = number
-        last[key] = (number, energy)
-        out.append(f'{number}{key[0]}{key[1]}')
+        component = str(irrep)[-1] if key[0] != 'σ' and str(irrep)[-1] in 'xy' else ''
+        counts[key, component] = counts.get((key, component), 0) + 1
+        out.append(f'{counts[key, component]}{key[0]}{key[1]}')
+    return out
+
+
+ANGULAR = 'spdfghi'
+
+
+def atom_labels(irreps):
+    """An atom's orbitals (PySCF's SO3 irreps: s+0, p-1, p+0, p+1, d-2 …) as 1s, 2s, 2p …: each component m
+    counted in turn per l, so a p (d, f) set shares one number, and the count offset by l, so it is the
+    principal quantum number (the first p is 2p, the first d 3d) -- final review M1."""
+    counts, out = {}, []
+    for irrep in irreps:
+        letter, m = str(irrep)[0], str(irrep)[1:]
+        counts[letter, m] = counts.get((letter, m), 0) + 1
+        out.append(f'{counts[letter, m] + ANGULAR.index(letter)}{letter}')
     return out
 
 
@@ -381,7 +400,9 @@ def _pyscf_labels(mol, mf, indices, note):
     from pyscf import symm
     irreps = list(symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mf.mo_coeff[:, indices]))
     if mol.groupname in LINEAR:
-        names = _linear_labels(mol.groupname, irreps, [float(mf.mo_energy[i]) for i in indices])
+        names = _linear_labels(mol.groupname, irreps)
+    elif mol.groupname == 'SO3':
+        names = atom_labels(irreps)
     else:
         names = number_labels(irreps)
     symmetry = {'pointGroup': mol.topgroup, 'labelGroup': mol.groupname, 'labels': 'subgroup' if note else 'full-group'}
@@ -414,6 +435,33 @@ def _pieces(group, energies, members, chi_of):
     return best
 
 
+def _split_shells(group, sets, labelled, chi_of, most=3):
+    """An open shell's ROKS splits a partly filled degenerate shell (CH4+'s 1t2: two components doubly
+    occupied, one singly) by far more than SET_TOL, into sets that alone carry no irrep. Sets left unlabelled
+    (`labelled[k]` None) are joined, each with the nearest later ones (up to `most` sets in all), when
+    together they carry one irrep of the summed dimension: ({first set: (irrep, members)}, {joined sets})."""
+    from itertools import combinations
+    failed = [k for k, pieces in enumerate(labelled) if pieces is None]
+    shells, absorbed = {}, set()
+    for n, k in enumerate(failed):
+        if k in absorbed:
+            continue
+        later = [j for j in failed[n + 1:] if j not in absorbed]
+        for size in range(1, most):
+            match = None
+            for partners in combinations(later, size):
+                members = sets[k] + [i for j in partners for i in sets[j]]
+                irrep = match_irrep(group, chi_of(members), len(members))
+                if irrep:
+                    match = (irrep, members, partners)
+                    break
+            if match:
+                shells[k] = match[:2]
+                absorbed.update(match[2])
+                break
+    return shells, absorbed
+
+
 def _and(names):
     return names[0] if len(names) == 1 else f'{", ".join(names[:-1])} and {names[-1]}'
 
@@ -430,9 +478,23 @@ def _projected_labels(mol, mf, indices, group, ops=None):
         return diagonal[:, [column[i] for i in members]].sum(axis=1)
 
     order = list(_table(group)[1])
+    sets = degenerate_sets(energies, indices)
+    labelled = [_pieces(group, energies, members, chi_of) for members in sets]
+    shells, absorbed = _split_shells(group, sets, labelled, chi_of)
     counts, labels, notes = {}, {}, {}
-    for members in degenerate_sets(energies, indices):
-        pieces = _pieces(group, energies, members, chi_of)
+    for k, members in enumerate(sets):
+        if k in absorbed:
+            continue                                  # labelled with the first part of its shell
+        if k in shells:
+            irrep, parts = shells[k]
+            name = irrep.lower()
+            counts[name] = counts.get(name, 0) + 1
+            note = (f'a degenerate {name} shell split in energy by its partial occupation (an open shell): '
+                    f'together these orbitals carry {name}, so they share one label')
+            for i in parts:
+                labels[i], notes[i] = f'{counts[name]}{name}', note
+            continue
+        pieces = labelled[k]
         if pieces is None:
             chi = chi_of(members)
             note = (f'characters ({", ".join(f"{c:.2f}" for c in chi)}) match no single irrep of {group}, '
@@ -459,7 +521,10 @@ def _projected_labels(mol, mf, indices, group, ops=None):
     return labels, {'pointGroup': group, 'labelGroup': group, 'labels': 'full-group'}, notes
 
 
-NO_SYMMETRY = 'the SCF ran without point-group symmetry (PySCF could not use it at this geometry)'
+# Why it ran without symmetry -- PySCF could not build symmetry-adapted orbitals, or the symmetric SCF did not
+# converge and was rerun without it (Ruling OH-retry) -- is the run's own record (input.py's finalGeometry or
+# finalScf note); the label note names neither (deferred minor, Task 9).
+NO_SYMMETRY = 'the SCF ran without point-group symmetry'
 GEOMETRY_NOTE = f"{NO_SYMMETRY}: labelled from the geometry's own point group, by character projection"
 
 
@@ -603,4 +668,6 @@ def irrep_of(mol, mf, coeff):
     if mol.groupname in LINEAR:
         from labels import irrep_to_lambda
         names = {''.join(irrep_to_lambda(mol.groupname, n)) for n in names}
+    elif mol.groupname == 'SO3':
+        names = {str(n)[0] for n in names}           # an atom's p set: p-1, p+0, p+1
     return names.pop().lower() if len(names) == 1 else UNLABELLED

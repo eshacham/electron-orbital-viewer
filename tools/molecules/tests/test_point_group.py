@@ -165,8 +165,11 @@ def unsymmetric_scf(atoms, basis='def2-SVP', spin=0, symmetry=False):
     return mol, mf
 
 
-GEOMETRY_NOTE = ('the SCF ran without point-group symmetry (PySCF could not use it at this geometry): labelled '
-                 "from the geometry's own point group, by character projection")
+# Deferred minor (Task 9): the SCF runs without symmetry for two reasons -- PySCF could not build symmetry-adapted
+# orbitals, or the symmetric SCF did not converge (Ruling OH-retry) -- so the label note names neither; the run's
+# own record (provenance finalGeometry / finalScf) says which.
+GEOMETRY_NOTE = ("the SCF ran without point-group symmetry: labelled from the geometry's own point group, by "
+                 'character projection')
 
 
 @pytest.mark.parametrize('molecule_id', ['h2o', 'ch4'])
@@ -203,8 +206,8 @@ def test_without_symmetry_a_group_the_projection_does_not_cover_keeps_psi_labels
     labels, symmetry, _ = label_orbitals(mol, mf, [0, 1])
     assert labels == {0: 'ψ1', 1: 'ψ2'}
     assert symmetry == {'pointGroup': 'D2d', 'labelGroup': None, 'labels': 'none',
-                        'labelNote': 'the SCF ran without point-group symmetry (PySCF could not use it at this '
-                                     'geometry), and D2d orbitals cannot be labelled without it'}
+                        'labelNote': 'the SCF ran without point-group symmetry, and D2d orbitals cannot be '
+                                     'labelled without it'}
     assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, [0]]) == UNLABELLED
 
 
@@ -274,6 +277,89 @@ def test_oh_without_symmetry_reads_sigma_and_pi():
     assert [labels[i] for i in range(5)] == ['1σ', '2σ', '3σ', '1π', '1π']
 
 
+def newton_roks(atoms, basis, symmetry):
+    """ROKS by second-order SCF, as the worker's last rung: with symmetry on it converges where DIIS does not,
+    and splits a partly filled π shell (one component holding the unpaired electron) by far more than SET_TOL."""
+    mol = gto.M(atom=atoms, unit='Angstrom', basis=basis, spin=1, symmetry=symmetry, verbose=0)
+    mf = dft.ROKS(mol)
+    mf.xc, mf.grids.level, mf.conv_tol = 'B3LYP', 4, 1e-10
+    mf = mf.newton()
+    mf.max_cycle = 100
+    mf.kernel()
+    assert mf.converged
+    return mol, mf
+
+
+@pytest.mark.parametrize('symmetry', [True, False])
+def test_ch_split_pi_shell_shares_one_number_with_symmetry_on_and_off(symmetry):
+    # Final review I1: CH (X²Π) with symmetry on read 1π (SOMO), 2π (its empty partner), then 3π, 4π for the
+    # textbook 2π pair, because a π pair shared a number only within SET_TOL in energy.
+    mol, mf = newton_roks('C 0 0 0; H 0 0 1.12', 'def2-SVP', symmetry)
+    kept = list(range(14))
+    labels, symmetry_info, notes = label_orbitals(mol, mf, kept)
+    assert abs(mf.mo_energy[3] - mf.mo_energy[4]) > 100 * point_group.SET_TOL     # the 1π pair is split
+    assert [labels[i] for i in kept] == ['1σ', '2σ', '3σ', '1π', '1π', '4σ', '5σ', '6σ', '2π', '2π', '7σ',
+                                         '3π', '3π', '1δ']
+    assert notes == {} and symmetry_info['labelGroup'] == 'Coov'
+
+
+@pytest.mark.parametrize('symmetry', [True, False])
+def test_oh_split_pi_shell_shares_one_number_with_symmetry_on_and_off(symmetry):
+    mol, mf = newton_roks('O 0 0 0; H 0 0 0.975', 'sto-3g', symmetry)
+    labels, _, notes = label_orbitals(mol, mf, list(range(6)))
+    assert abs(mf.mo_energy[3] - mf.mo_energy[4]) > 100 * point_group.SET_TOL
+    assert [labels[i] for i in range(6)] == ['1σ', '2σ', '3σ', '1π', '1π', '4σ'] and notes == {}
+
+
+@pytest.mark.parametrize('symmetry', [True, False])
+def test_a_t2_shell_split_by_its_partial_occupation_counts_once_and_says_why(symmetry):
+    # Final review I1 (related): CH4+ at methane's Td geometry -- ROKS splits the 1t2 shell holding the hole
+    # (two components doubly occupied, one singly) and the empty 2t2 the same way. No piece alone carries an
+    # irrep of Td; together they carry t2, so each shell reads 1t2 / 2t2, never '?' with every later t2
+    # numbered one low.
+    mol = gto.M(atom=list(by_id('ch4').atoms), unit='Angstrom', basis='def2-SVP', charge=1, spin=1,
+                symmetry=symmetry, verbose=0)
+    mf = dft.ROKS(mol)
+    mf.xc, mf.grids.level, mf.conv_tol = 'B3LYP', 4, 1e-10
+    mf.kernel()
+    assert mf.converged and abs(mf.mo_energy[3] - mf.mo_energy[4]) > 100 * point_group.SET_TOL
+    kept = list(range(9))
+    labels, info, notes = label_orbitals(mol, mf, kept)
+    assert [labels[i] for i in kept] == ['1a1', '2a1', '1t2', '1t2', '1t2', '3a1', '2t2', '2t2', '2t2']
+    assert set(notes) == {2, 3, 4, 6, 7, 8} and info['labelGroup'] == 'Td'
+    assert notes[2] == notes[4] == ('a degenerate t2 shell split in energy by its partial occupation (an open '
+                                    'shell): together these orbitals carry t2, so they share one label')
+
+
+def test_atoms_with_symmetry_read_principal_quantum_numbers():
+    # Final review M1: PySCF's SO3 irreps (s+0, p-1, p+0 …) numbered per irrep gave Ne's 2p as 1p-1/1p+0/1p+1.
+    labels, symmetry, notes = occupied_labels('Ne 0 0 0', virtuals=9)
+    assert labels == ['1s', '2s', '2p', '2p', '2p', '3s', '3p', '3p', '3p', '3d', '3d', '3d', '3d', '3d']
+    assert symmetry == {'pointGroup': 'SO3', 'labelGroup': 'SO3', 'labels': 'full-group'} and notes == {}
+    labels, _, _ = occupied_labels('Ar 0 0 0')
+    assert labels == ['1s', '2s', '2p', '2p', '2p', '3s', '3p', '3p', '3p']
+    mol, mf = scf('Ne 0 0 0')
+    assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, 2:5]) == 'p'
+    assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, 1:3]) == UNLABELLED
+
+
+def test_atom_labels_count_each_component_and_add_l():
+    irreps = ['s+0', 's+0', 'p+0', 'p+1', 'p-1', 's+0', 'p-1', 'p+0', 'p+1', 'd+0', 'd-2', 'd-1', 'd+1', 'd+2',
+              's+0', 'f+3']
+    assert point_group.atom_labels(irreps) == ['1s', '2s', '2p', '2p', '2p', '3s', '3p', '3p', '3p', '3d', '3d',
+                                               '3d', '3d', '3d', '4s', '4f']
+
+
+def test_linear_labels_pair_pi_components_by_symmetry_not_energy():
+    # PySCF names each component of a degenerate irrep of C∞v/D∞h (E1x/E1y, E1ux/E1uy …); counting each
+    # component in turn gives a pair one number however far apart their energies lie.
+    irreps = ['A1', 'E1y', 'E1x', 'A1', 'E1x', 'E1y', 'E2y', 'E2x']
+    assert point_group._linear_labels('Coov', irreps) == ['1σ', '1π', '1π', '2σ', '2π', '2π', '1δ', '1δ']
+    irreps = ['A1g', 'A1u', 'E1ux', 'E1uy', 'E1gx', 'E1gy', 'E1ux', 'E1uy']
+    assert point_group._linear_labels('Dooh', irreps) == ['1σg', '1σu', '1πu', '1πu', '1πg', '1πg',
+                                                                     '2πu', '2πu']
+
+
 def test_a_linear_set_without_symmetry_gets_its_irrep():
     mol, mf = unsymmetric_scf(N2)
     assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, [4, 5]]) == 'πu'
@@ -285,8 +371,8 @@ def test_an_atom_without_symmetry_keeps_psi_labels_and_names_its_group():
     mol, mf = unsymmetric_scf('Ne 0 0 0', basis='sto-3g')
     labels, symmetry, _ = label_orbitals(mol, mf, [0, 1])
     assert labels == {0: 'ψ1', 1: 'ψ2'} and symmetry['pointGroup'] == 'SO3' and symmetry['labels'] == 'none'
-    assert symmetry['labelNote'] == ('the SCF ran without point-group symmetry (PySCF could not use it at this '
-                                     'geometry), and SO3 orbitals cannot be labelled without it')
+    assert symmetry['labelNote'] == ('the SCF ran without point-group symmetry, and SO3 orbitals cannot be labelled '
+                                     'without it')
     assert point_group.irrep_of(mol, mf, mf.mo_coeff[:, [0]]) == UNLABELLED
 
 
