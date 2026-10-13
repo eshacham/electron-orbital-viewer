@@ -434,8 +434,10 @@ Molecules mode's 25-molecule library (above) is picked and built ahead of
 time. On top of it, the owner can request any further molecule — by name,
 SMILES or pasted XYZ — computed on demand against the same real
 quantum-chemistry pipeline the library itself comes from. Every molecule
-carries a visible tier badge: **Validated** for one of the 25 library
-molecules, checked against an experimental or published reference, or
+carries a visible tier badge: **Library** for one of the 25 library
+molecules — its line says exactly what was checked against experiment or a
+published reference for that molecule (a dipole, optimised bond lengths, or
+nothing yet when its geometry itself came from experiment) — or
 **Computed** for one requested on demand, by the same method but not
 benchmarked against anything. "Computed" is a promise about the method, not
 about accuracy — nobody has checked this particular result against
