@@ -164,7 +164,9 @@ def test_no_time_to_displace_off_a_saddle_point_says_so(tmp_path, monkeypatch):
     assert check['result'] == 'saddle-point'
     assert check['summary'] == 'saddle point (1 imaginary frequency), not displaced (time limit)'
     assert 'displacedFrom' not in info and 'displacing from a saddle point' not in stages and mf.converged
-    assert calls[-1] == 'step' and 'zeroPointEnergyNote' in check
+    # Deferred minor (Task 8): displacing costs two SCFs and the re-optimisation's first step, so the budget is
+    # asked for a 'displacement', not one 'step'.
+    assert calls[-1] == 'displacement' and 'zeroPointEnergyNote' in check
 
 
 def test_a_reoptimisation_stopped_by_the_time_limit_is_not_called_finished(tmp_path, monkeypatch):
@@ -173,11 +175,11 @@ def test_a_reoptimisation_stopped_by_the_time_limit_is_not_called_finished(tmp_p
     asked = []
 
     def budget(stage):
-        # After the first check: yes to the displacement (M2's 'step'), no to the re-optimisation's next step.
+        # After the first check: yes to the displacement, no to the re-optimisation's next step.
         asked.append(stage)
         if 'frequency check' not in asked:
             return True
-        return not (stage == 'step' and asked[asked.index('frequency check') + 1:].count('step') == 2)
+        return not (stage == 'step' and asked[asked.index('frequency check') + 1:].count('step') == 1)
     _, _, info = ns['build'](may_start=budget)
     check = info['frequencyCheck']
     assert check['result'] == 'not-rechecked' and info['stoppedBy'] == 'time-limit' and info['displacedFrom'] == 1
@@ -315,3 +317,6 @@ def test_spin_contamination_beyond_ten_percent_is_flagged(tmp_path, monkeypatch)
     assert flagged['note'] == ('UKS spin contamination: <S^2> 0.860 at the last geometry step and 0.790 at the '
                                'frequency check, against S(S+1) = 0.750 (more than 10 % off)')
     assert record(1, 0.76, None)['frequenciesS2'] is None
+    # Deferred minor (Task 8): with no frequency check run, the record names only what did run UKS.
+    assert record(1, 0.76, None)['methods'] == 'geometry: UKS; properties: ROKS'
+    assert record(1, 0.76, 0.77)['methods'] == 'geometry and frequencies: UKS; properties: ROKS'

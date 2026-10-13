@@ -633,6 +633,39 @@ def test_the_budget_counts_the_step_the_check_the_final_scf_the_labels_and_the_f
     assert not budget('frequency check')
 
 
+def test_a_displacement_asks_for_two_scfs_and_a_step_on_top_of_the_tail():
+    # Deferred minor (Task 8): leaving a saddle point runs two displaced SCFs (both signs) and the
+    # re-optimisation's first step, which no later question covers; each costs at most one step's price.
+    parts = {'stepSeconds': 10.0, 'frequencySeconds': 20.0, 'finalScfSeconds': 30.0, 'filesSeconds': 40.0,
+             'labellingSeconds': 5.0}
+    budget = worker.TimeBudget(1000.0, parts)
+    assert budget.remaining('displacement') == pytest.approx(budget.remaining('frequency check') + 3 * 10.0)
+
+
+def test_geometry_source_says_a_time_limit_stop_once():
+    # Deferred minor (Task 8): the stop and the check's "not checked: the optimisation stopped at its time limit"
+    # said the same thing twice in one sentence.
+    method = {'xc': 'B3LYP-D3BJ', 'optimiseBasis': 'def2-SVP'}
+    stopped = {'stoppedBy': 'time-limit', 'maxGradient': 0.012,
+               'frequencyCheck': {'result': 'not-run', 'summary': 'not checked: the optimisation stopped at its time limit'}}
+    text = worker._geometry_source_text({'kind': 'xyz'}, 'optimise', method, stopped)
+    assert text == ('B3LYP-D3(BJ)/def2-SVP optimised from pasted XYZ; optimisation stopped by its time limit, not '
+                    'converged (max force, the largest Cartesian gradient component: 1.2e-02 Ha/bohr); not checked '
+                    'for imaginary frequencies')
+    again = {'stoppedBy': 'time-limit', 'maxGradient': 0.012, 'displacedFrom': 1,
+             'frequencyCheck': {'result': 'not-rechecked', 'imaginaryCount': 1, 'summary': (
+                 'displaced from a saddle point (1 imaginary); the re-optimisation stopped at its time limit, '
+                 'not converged, and was not checked again')}}
+    text = worker._geometry_source_text({'kind': 'xyz'}, 'optimise', method, again)
+    assert text == ('B3LYP-D3(BJ)/def2-SVP optimised from pasted XYZ; displaced from a saddle point (1 imaginary); '
+                    're-optimisation stopped by its time limit, not converged (max force, the largest Cartesian '
+                    'gradient component: 1.2e-02 Ha/bohr); not checked again')
+    assert text.count('time limit') == 1
+    checked = {'frequencyCheck': {'result': 'minimum', 'summary': 'true minimum (no imaginary frequencies)'}}
+    assert worker._geometry_source_text({'kind': 'xyz'}, 'optimise', method, checked) == (
+        'B3LYP-D3(BJ)/def2-SVP optimised from pasted XYZ; true minimum (no imaginary frequencies)')
+
+
 def test_the_budget_reads_the_labelling_term_sizing_prices():
     # Ruling D7: labelling runs inside the files stage, after the budget's last decision; sizing version 6
     # prices it as its own figure (sizing.labelling_seconds), which replaced Task 8's stand-in share of the
@@ -650,6 +683,33 @@ def test_the_time_limit_is_the_batch_timeout_on_aws_and_none_on_this_mac():
     assert worker.time_limit('aws', {'timeoutSeconds': 600}) == 600.0
     assert worker.time_limit('local', {'timeoutSeconds': 600}) is None
     assert worker.time_limit('local', {'timeoutSeconds': 600}, 5) == 5.0
+
+
+def test_on_aws_a_given_limit_never_runs_past_the_batch_timeout():
+    # Deferred minor (Task 8): Batch ends the attempt at its timeout whatever JOBS_TIME_LIMIT_SECONDS says.
+    assert worker.time_limit('aws', {'timeoutSeconds': 600}, 900) == 600.0
+    assert worker.time_limit('aws', {'timeoutSeconds': 600}, 300) == 300.0
+
+
+def test_on_aws_the_budget_clock_starts_with_the_process(monkeypatch):
+    # Deferred minor (Task 8): Batch's timeout runs from the attempt's start; the claim, the resume frame and
+    # input.py's imports all come before the budget is built, so its clock starts with the process.
+    monkeypatch.setattr(worker, 'PROCESS_STARTED', 100.0)
+    sizing = {'timeoutSeconds': 600, 'parts': DECISION_V6['parts']}
+    aws = worker.make_budget('aws', sizing, None, clock=lambda: 400.0)
+    assert aws.began == 100.0 and aws.limit == 600.0
+    # This Mac's local server runs many jobs from one process: its clock starts with the job.
+    local = worker.make_budget('local', sizing, 5, clock=lambda: 400.0)
+    assert local.began == 400.0 and local.limit == 5.0
+
+
+def test_a_record_without_budget_figures_records_no_time_limit(env):
+    # Deferred minor (Task 8): a record sized before version 6 has no figures, so no budget runs; provenance must
+    # not show a time limit the run never worked to.
+    store, sink, jobs = env
+    key = queue(store, H2)
+    assert run_job(key, store, sink, grid_points=(32,), time_limit_seconds=600.0) == 'DONE', store.get_job(key)['error']
+    assert json.loads((jobs / key / 'meta.json').read_text())['provenance']['timeLimitSeconds'] is None
 
 
 def test_the_cli_reads_a_time_limit_from_the_environment(monkeypatch, tmp_path):

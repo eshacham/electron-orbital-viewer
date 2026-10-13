@@ -290,7 +290,7 @@ def frequency_seconds(job: dict, size: Size) -> float:
 # an LVMO, once more for its irrep (irrep_of). So the cost is evaluations x grid points x N x (a + b x orbitals).
 # - LABEL_EVALUATIONS: sizing runs where PySCF does not (the API Lambda) and cannot find the point group, so
 #   every job is priced for the largest projection: D6h's 12 classes plus the unrotated grid, twice. A C1, D2h
-#   or linear molecule (PySCF's own labels, no projection) pays for labels it gets free: ~1-2 % of its price.
+#   or linear molecule (PySCF's own labels, no projection) pays for labels it gets free: 1-5 % of its price.
 # - LABEL_SECONDS (a) and LABEL_SECONDS_PER_ORBITAL (b), per grid point x basis function x evaluation on one
 #   Fargate vCPU: this Mac's slowest measured run (ammonia C3v, 0.1 s: 5.65e-9 per point-AO evaluation; benzene
 #   D6h 3.98e-9, SF6 Oh 3.8e-9, methane Td 5.5e-9), and a caffeine-sized molecule (N 614, 553 968 points, two

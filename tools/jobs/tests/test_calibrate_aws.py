@@ -75,6 +75,18 @@ def deployed_laws():
     return (c['scfExponent'], c['scfSaturation']), (c['filesExponent'], c['filesSaturation'])
 
 
+def test_a_job_whose_final_scf_was_retried_without_symmetry_is_no_sample(tmp_path, capsys):
+    # Deferred minor (Task 9): Ruling OH-retry runs the final SCF twice; its 'SCF' stages hold both, which the
+    # t3 fit would read as one SCF twice as slow.
+    dirs = ladder(tmp_path)
+    timings = json.loads((dirs[0] / 'timings.json').read_text())
+    timings['stages'].insert(-1, {'name': 'SCF without symmetry (DIIS)', 'seconds': 5.0})
+    (dirs[0] / 'timings.json').write_text(json.dumps(timings))
+    samples = aws_samples(dirs)
+    assert len(samples) == len(dirs) - 1
+    assert 'final SCF retried without symmetry' in capsys.readouterr().err
+
+
 def test_fit_aws_recovers_known_constants(tmp_path):
     law, files_law = deployed_laws()
     dirs = ladder(tmp_path, law=law, files_law=files_law)

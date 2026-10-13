@@ -217,6 +217,10 @@ def aws_samples(job_dirs):
         record = json.loads((d / 'job.json').read_text())
         job = record['job']
         stages = timings['stages']
+        if any(s['name'].startswith('SCF without symmetry') for s in stages):
+            # Ruling OH-retry ran the final SCF twice; both sit in its 'SCF' stages (deferred minor, Task 9).
+            print(f'skipping {d.name}: final SCF retried without symmetry', file=sys.stderr)
+            continue
         steps, step_cycles, step_count = _optimisation_steps(stages)
         n = basis_functions(job['molecule']['atoms'], job['method']['basis'])
         svp = basis_functions(job['molecule']['atoms'], job['method']['optimiseBasis']) \

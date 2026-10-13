@@ -53,6 +53,9 @@ OPTIONAL_RESULT_FILES = ('frequencies.json',)
 TIME_BUDGET_MARGIN = 1.2
 # Between the Batch attempt's start (its timeout's clock) and the worker's own: container start-up and imports.
 STARTUP_ALLOWANCE_SECONDS = 30
+# When this process started (deferred minor, Task 8): on AWS one process runs one attempt, so the budget's clock
+# starts here, not after the claim, the resume frame and input.py's imports.
+PROCESS_STARTED = time.monotonic()
 BOX_TOO_SMALL = ('the electron density reaches the edge of the sampling box (a diffuse anion); '
                  'this phase cannot draw it')
 INTERRUPTED = 'the worker was interrupted (KeyboardInterrupt) before this job finished'
@@ -89,14 +92,21 @@ def _geometry_source_text(source, recipe, method=None, info=None):
         return origin
     level = f"{method_label(method['xc'])}/{method['optimiseBasis']}" if method else 'B3LYP/def2-SVP'
     text, info = f'{level} optimised from {origin}', info or {}
-    if info.get('stoppedBy') == 'time-limit':
-        # Task 6 review: maxGradient is the largest absolute Cartesian gradient component (as the library's
-        # optimise.py and Gaussian's "maximum force" mean it), not geomeTRIC's per-atom norm; the text says so.
-        text += ('; optimisation stopped by its time limit, not converged (max force, the largest Cartesian '
-                 f"gradient component: {info['maxGradient']:.1e} Ha/bohr)")
-    if info.get('frequencyCheck'):
-        text += f"; {info['frequencyCheck']['summary']}"
-    return text
+    check = info.get('frequencyCheck') or {}
+    if info.get('stoppedBy') != 'time-limit':
+        return f"{text}; {check['summary']}" if check else text
+    # A stop is said once (deferred minor, Task 8): the check's own summary ("not checked: the optimisation
+    # stopped at its time limit", or the re-optimisation's) would say it a second time, so only its outcome
+    # follows. Task 6 review: maxGradient is the largest absolute Cartesian gradient component (as the library's
+    # optimise.py and Gaussian's "maximum force" mean it), not geomeTRIC's per-atom norm; the text says so.
+    again = check.get('result') == 'not-rechecked'
+    if again:
+        text += f"; displaced from a saddle point ({check['imaginaryCount']} imaginary)"
+    text += (f"; {'re-optimisation' if again else 'optimisation'} stopped by its time limit, not converged (max "
+             f"force, the largest Cartesian gradient component: {info['maxGradient']:.1e} Ha/bohr)")
+    if again:
+        return f'{text}; not checked again'
+    return f'{text}; not checked for imaginary frequencies' if check.get('result') == 'not-run' else text
 
 
 def _final_geometry(final):
@@ -165,23 +175,29 @@ class TimeBudget:
     """input.py's may_start (Phase 6D spec §9): whether the time left before the job's limit covers, with
     TIME_BUDGET_MARGIN to spare, what the stage asked about and everything after it are predicted to take,
     from the job's own sizing figures (sizing.budget_parts, version 6). 'step' counts the step itself as well
-    as the frequency check, the final SCF, labelling the orbitals (Ruling D7) and the files; 'frequency check'
-    the last four. Always yes with no limit (This Mac) or no figures (a record sized before version 6)."""
+    as the frequency check, the final SCF, labelling the orbitals (Ruling D7) and the files; 'displacement'
+    three steps and those four; 'frequency check' the last four. Always yes with no limit (This Mac) or no figures (a record sized before version 6)."""
 
-    def __init__(self, limit_seconds, parts, clock=time.monotonic):
+    def __init__(self, limit_seconds, parts, clock=time.monotonic, began=None):
         self.limit, self.parts, self.clock = limit_seconds, parts, clock
-        self.began = clock()
+        self.began = clock() if began is None else began
+
+    @property
+    def active(self):
+        return self.limit is not None and bool(self.parts)
 
     def remaining(self, stage):
         # Ruling D7: labelling the orbitals (point_group's character projection) runs inside
         # write_molecule_files, after the budget's last decision, so the budget leaves room for it: sizing
         # version 6 prices it as its own figure (sizing.labelling_seconds).
+        # 'displacement' (deferred minor, Task 8): leaving a saddle point runs two displaced SCFs and the
+        # re-optimisation's first step, none of which a later question covers -- each at most a step's price.
         p = self.parts
         tail = p['frequencySeconds'] + p['finalScfSeconds'] + p['labellingSeconds'] + p['filesSeconds']
-        return tail + p['stepSeconds'] if stage == 'step' else tail
+        return tail + {'step': 1, 'displacement': 3}.get(stage, 0) * p['stepSeconds']
 
     def __call__(self, stage):
-        if self.limit is None or not self.parts:
+        if not self.active:
             return True
         left = self.limit - STARTUP_ALLOWANCE_SECONDS - (self.clock() - self.began)
         return left >= TIME_BUDGET_MARGIN * self.remaining(stage)
@@ -189,10 +205,19 @@ class TimeBudget:
 
 def time_limit(backend, sizing, given=None):
     """The limit the budget works to: `given` (tests; JOBS_TIME_LIMIT_SECONDS on This Mac), else the Batch
-    attempt's own timeout on AWS. This Mac's runs are free and have none."""
+    attempt's own timeout on AWS. This Mac's runs are free and have none. On AWS a given limit is never past the
+    timeout (deferred minor, Task 8): Batch ends the attempt there whatever the budget was told."""
+    timeout = float(sizing['timeoutSeconds']) if backend == 'aws' else None
     if given is not None:
-        return float(given)
-    return float(sizing['timeoutSeconds']) if backend == 'aws' else None
+        return float(given) if timeout is None else min(float(given), timeout)
+    return timeout
+
+
+def make_budget(backend, sizing, given=None, clock=time.monotonic):
+    """The job's TimeBudget; on AWS its clock starts with the process (PROCESS_STARTED), the clock Batch's
+    timeout keeps, less STARTUP_ALLOWANCE_SECONDS for the container."""
+    return TimeBudget(time_limit(backend, sizing, given), sizing.get('parts'), clock=clock,
+                      began=PROCESS_STARTED if backend == 'aws' else None)
 
 
 FREQUENCY_MASSES = 'standard atomic weights, isotope-averaged (PySCF atom_mass_list(isotope_avg=True))'
@@ -399,7 +424,7 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
     try:
         os.chdir(work)                              # geomeTRIC writes its scratch files to the working directory
         ns = runpy.run_path(str(work / 'input.py'), run_name='jobs_input')
-        budget = TimeBudget(time_limit(backend, sizing, time_limit_seconds), sizing.get('parts'))
+        budget = make_budget(backend, sizing, time_limit_seconds)
         try:
             mol, mf, info = ns['build'](on_stage=progress.on_stage, on_step=on_step, may_start=budget)
         finally:
@@ -434,7 +459,8 @@ def _run(key, store, sink, attempt, backend, grid_points, heartbeat_seconds, ima
                       'sizingVersion': sizing['version'], 'size': sizing['size'],
                       'capacity': sizing['capacity'], 'geometryMethod': geometry_method,
                       'frequencyCheck': check['summary'] if check else None,
-                      'timeLimitSeconds': budget.limit,
+                      # None when no budget ran (a record sized before version 6): no limit was worked to
+                      'timeLimitSeconds': budget.limit if budget.active else None,
                       # provisional, so the budget check sees a number of
                       # about the final width; replaced below (D14)
                       'wallSeconds': round(time.monotonic() - began, 2),
