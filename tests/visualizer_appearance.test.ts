@@ -15,7 +15,10 @@ import { CLASSIC_APPEARANCE, type Appearance } from '../src/design/appearance';
 import { CURVE_COLORS } from '../src/curve_colors';
 import { CLASSIC, CURVE_COLORS_LIGHT, DENSITY_RAMP, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb } from '../src/design/science';
 import { CPK_COLORS } from '../src/molecules/ball_and_stick';
-import { GLOW_LIGHTS, GLOW_TUNING } from '../src/orbital_glow';
+import { GLOW_TUNING } from '../src/orbital_glow';
+
+// Fix round 1 of Task 20a: the Glow lights are per theme; these tests glow in Deep Space.
+const GLOW_LIGHTS = GLOW_TUNING.dark.lights;
 
 /** A VisualizerContext without a WebGLRenderer (jsdom has no WebGL) -- tests/atom/visualizer_dispatch.test.ts's recipe. */
 function buildContext(): VisualizerContext {
@@ -246,6 +249,10 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([GLOW_LIGHTS.ambient, GLOW_LIGHTS.key, GLOW_LIGHTS.fill]);
         setAppearance(context, { ...glow, finish: 'solid' });
         expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([0.5, 0.8, 0.35]);
+        // Fix round 1 of Task 20a: per theme -- Light Clean's Glow keeps the lights up (no darker than Solid).
+        const light = GLOW_TUNING.light.lights;
+        setAppearance(context, { ...glow, theme: 'light' });
+        expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([light.ambient, light.key, light.fill]);
     });
 
     // Ruling DC3: the cut and opacity sliders restyle every tick; the halo's shader must not be rebuilt by them.

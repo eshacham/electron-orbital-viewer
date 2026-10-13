@@ -4,7 +4,7 @@ import reducer, {
     setBasicSelection, setEnclosedFraction, setCombination, requestBasicRender, selectShownBasicOrbital,
     DEFAULT_BASIC_SELECTION, cameraMoved, restoreCamera, resetView,
     requestCut, clearPendingCut, startCompositionBuild, endCompositionBuild, failCompositionBuild, setLevelTransition,
-    dismissOrbitalError,
+    dismissOrbitalError, previewOpacity, setSurfaceStyle,
 } from '../src/store/orbitalSlice';
 import { setMode, solveUnbound } from '../src/store/atomSlice';
 import { fieldRequestFor, NO_COMBINATION } from '../src/combinations';
@@ -235,5 +235,20 @@ describe('orbitalSlice: the shell-lobe build and level transitions', () => {
         const state = reducer(undefined, setLevelTransition(true));
         expect(state.levelTransition).toBe(true);
         expect(reducer(state, setLevelTransition(false)).levelTransition).toBe(false);
+    });
+});
+
+// Fix round 1 of Task 20a (R20a-4): the thumbnails' opacity is the main view's as committed.
+describe('thumbOpacity', () => {
+    it('starts at the default, ignores drag ticks, and follows every committed opacity change', () => {
+        const store = createAppStore();
+        expect(store.getState().orbital.thumbOpacity).toBe(0.7);
+        store.dispatch(previewOpacity(0.3));
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.3);
+        expect(store.getState().orbital.thumbOpacity).toBe(0.7);
+        store.dispatch(setSurfaceStyle({ opacity: 0.3 }));
+        expect(store.getState().orbital.thumbOpacity).toBe(0.3);
+        store.dispatch(setSurfaceStyle({ clipAxis: 'x' }));
+        expect(store.getState().orbital.thumbOpacity).toBe(0.3);
     });
 });

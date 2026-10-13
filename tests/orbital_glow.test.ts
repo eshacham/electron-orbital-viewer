@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { applyGlow, attachGlowExtras, fadeGlowExtras, GLOW_LIGHTS, GLOW_TUNING, glowSettingsFor, updateFrameGuard } from '../src/orbital_glow';
+import { applyGlow, attachGlowExtras, fadeGlowExtras, GLOW_TUNING, glowLightsFor, glowSettingsFor, SOLID_LIGHTS, updateFrameGuard } from '../src/orbital_glow';
 import { CLASSIC_APPEARANCE } from '../src/design/appearance';
 import { marchingCubes } from '../src/marching_cubes';
 
@@ -198,18 +198,46 @@ describe('Glow (spec §11.2)', () => {
 
     // Ruling R20a-3: the concept look, tuned live (Task 20a) -- pinned so a change is deliberate.
     it('pins the tuned Glow values', () => {
+        // Fix round 1 of Task 20a: lights per theme; Light Clean shaded by its lights (no emissive crutch),
+        // paler towards the edge (wash) with a thin ink outline, as concept Option 2.
         expect(GLOW_TUNING).toEqual({
             dark: {
                 emissive: 0.1, rimStrength: 1.0, rimPower: 1.8,
                 lines: { opacity: 0.05, whiten: 0.3, additive: true },
                 halo: { opacity: 0.6, offset: 0.08, power: 1 },
+                wash: 0,
+                lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
             },
             light: {
-                emissive: 0.6, rimStrength: 0.8, rimPower: 2.2,
-                lines: { opacity: 0.16, whiten: 0.85, additive: false },
+                emissive: 0.05, rimStrength: 1.0, rimPower: 1.5,
+                lines: { opacity: 0.1, whiten: 0.85, additive: false },
+                wash: 0.7,
+                lights: { ambient: 1.0, key: 1.0, fill: 0.4 },
             },
         });
-        expect(GLOW_LIGHTS).toEqual({ ambient: 0.15, key: 0.35, fill: 0.15 });
+        expect(glowLightsFor('dark')).toBe(GLOW_TUNING.dark.lights);
+        expect(glowLightsFor('light')).toBe(GLOW_TUNING.light.lights);
+    });
+
+    // Fix round 1 of Task 20a: a ball-and-stick takes no Glow of its own in Light Clean (atomRimFor is null),
+    // so the lights a glowing scene sets there must not leave it darker than Solid would.
+    it('never lights a glowing Light Clean scene below Solid, so its atoms are not underlit', () => {
+        const lights = glowLightsFor('light');
+        expect(lights.ambient).toBeGreaterThanOrEqual(SOLID_LIGHTS.ambient);
+        expect(lights.key).toBeGreaterThanOrEqual(SOLID_LIGHTS.key);
+        expect(lights.fill).toBeGreaterThanOrEqual(SOLID_LIGHTS.fill);
+        expect(glowSettingsFor({ ...glowDark, theme: 'light' })!.emissive).toBeLessThan(0.2);
+    });
+
+    // Fix round 1 of Task 20a: Light Clean's body washes towards white at the edge (never another hue), inked at the outline.
+    it('washes Light Clean\'s body paler towards its edge and inks a thin outline; Deep Space has no wash', () => {
+        const material = new THREE.MeshStandardMaterial({ vertexColors: true });
+        applyGlow(material, glowSettingsFor({ ...glowDark, theme: 'light' }));
+        const shader = shaderOf(material);
+        expect(shader.fragmentShader).toContain('mix(mix(outgoingLight, vec3(1.0), qlWash * qlRim), qlRimColour, qlRim * qlRim * qlRim * qlRimStrength)');
+        expect(shader.uniforms.qlWash.value).toBeCloseTo(GLOW_TUNING.light.wash);
+        applyGlow(material, glowSettingsFor(glowDark));
+        expect(shader.uniforms.qlWash.value).toBe(0);
     });
 
     // Ruling R20a-3: lines lighter than their lobe in its own hue (never the other phase's),

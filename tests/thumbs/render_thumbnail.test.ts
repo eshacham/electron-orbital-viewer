@@ -3,7 +3,7 @@ import { createThumbnailRenderer, thumbnailSize } from '../../src/thumbs/render_
 import type { MeshData } from '../../src/types/orbital';
 import { CLASSIC_APPEARANCE, type Appearance } from '../../src/design/appearance';
 import { linearRgb, phaseColours } from '../../src/design/science';
-import { GLOW_LIGHTS, SOLID_LIGHTS } from '../../src/orbital_glow';
+import { GLOW_TUNING, SOLID_LIGHTS } from '../../src/orbital_glow';
 import { DEFAULT_OPACITY } from '../../src/types/orbital';
 
 const triangle = (): MeshData => ({
@@ -62,7 +62,9 @@ describe('createThumbnailRenderer (spec §12: a target on the main renderer)', (
         expect((surface.material as THREE.MeshStandardMaterial).opacity).toBe(DEFAULT_OPACITY);
         expect((surface.material as THREE.MeshStandardMaterial).transparent).toBe(true);
         expect(seen[0].meshes.map(mesh => mesh.userData.isGlowExtra ?? 'surface')).toEqual(['surface', 'lines']);
-        expect(seen[0].lights).toEqual([GLOW_LIGHTS.ambient, GLOW_LIGHTS.key, GLOW_LIGHTS.fill]);
+        // Fix round 1 of Task 20a: the Glow lights are per theme (this is Light Clean).
+        const lights = GLOW_TUNING.light.lights;
+        expect(seen[0].lights).toEqual([lights.ambient, lights.key, lights.fill]);
 
         expect(current()).toBe(mainTarget);
         expect(renderer.setClearColor).toHaveBeenLastCalledWith(expect.objectContaining({ r: new THREE.Color(0x123456).r }), 0.25);
@@ -111,5 +113,17 @@ describe('createThumbnailRenderer (spec §12: a target on the main renderer)', (
         const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer);
         await expect(thumbs.render(triangle(), glow)).rejects.toThrow('context lost');
         expect(current()).toBe(mainTarget);
+    });
+
+    // Fix round 1 of Task 20a (R20a-4): the main view's committed opacity, not always the default.
+    it('draws the surface at the opacity it is given, opaque at 1', async () => {
+        const { renderer, seen } = stubRenderer();
+        const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer, { pixelRatio: () => 1 });
+        await thumbs.render(triangle(), glow, 0.4);
+        expect((seen[0].meshes[0].material as THREE.MeshStandardMaterial).opacity).toBe(0.4);
+        await thumbs.render(triangle(), glow, 1);
+        const opaque = seen[1].meshes[0].material as THREE.MeshStandardMaterial;
+        expect(opaque.opacity).toBe(1);
+        expect(opaque.transparent).toBe(false);
     });
 });

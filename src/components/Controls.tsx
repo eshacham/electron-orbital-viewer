@@ -70,6 +70,12 @@ interface ControlsProps {
   onUpdateOrbital: (params: OrbitalParams) => void;
   surfaceStyle: SurfaceStyle;
   onSurfaceStyleChange: (change: Partial<SurfaceStyle>) => void;
+  /**
+   * Ruling R20a fix 1: an opacity-slider tick while dragging. When given,
+   * the drag goes here and only the release (onChangeCommitted) reaches
+   * onSurfaceStyleChange; without it every tick does, as before.
+   */
+  onOpacityPreview?: (opacity: number) => void;
   /** The Atom Display tab offers Glow / Solid / Wireframe itself (ruling R1). */
   hideSurfaceStyle?: boolean;
 
@@ -331,6 +337,7 @@ const Controls: React.FC<ControlsProps> = ({
   onUpdateOrbital,
   surfaceStyle,
   onSurfaceStyleChange,
+  onOpacityPreview,
   hideSurfaceStyle = false,
   isBusy,
   open = true,
@@ -597,8 +604,13 @@ const Controls: React.FC<ControlsProps> = ({
           max={1}
           step={0.05}
           size="small"
-          onChange={(event: Event, value: number | number[]) =>
-            onSurfaceStyleChange({ opacity: Array.isArray(value) ? value[0] : value })}
+          onChange={(event: Event, value: number | number[]) => {
+            const opacity = Array.isArray(value) ? value[0] : value;
+            if (onOpacityPreview) onOpacityPreview(opacity);
+            else onSurfaceStyleChange({ opacity });
+          }}
+          onChangeCommitted={onOpacityPreview ? (event: React.SyntheticEvent | Event, value: number | number[]) =>
+            onSurfaceStyleChange({ opacity: Array.isArray(value) ? value[0] : value }) : undefined}
         />
       </FormControl>
 

@@ -21,10 +21,16 @@ export interface GlowSettings {
     rimStrength: number;
     /** The Fresnel exponent: lower is a wider rim. */
     rimPower: number;
+    /**
+     * Light Clean only (ink): how far the body is mixed towards white where
+     * it faces the viewer, fading out into the ink rim -- Option 2's pale
+     * see-through sphere with a saturated edge. A paler tint of the same
+     * phase, never another hue; the alpha (the user's opacity) is untouched.
+     */
+    wash: number;
 }
 
-/** §11.1 "Lights": Glow's emissive term carries part of the light; Solid (and Classic) keep today's levels. */
-export const GLOW_LIGHTS = { ambient: 0.15, key: 0.35, fill: 0.15 } as const;
+/** §11.1 "Lights": Solid (and Classic) keep today's levels; Glow's are per theme, in GLOW_TUNING below. */
 export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
 
 /**
@@ -39,6 +45,13 @@ export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
  * - `halo.offset`: the push along the normals, as a fraction of the mesh
  *   radius; `halo.opacity`: its peak alpha; `halo.power`: how fast it fades
  *   towards its own outer edge (higher is softer).
+ * - `wash` (Light Clean): the body mixed towards white where it faces the
+ *   viewer, fading into the ink rim (see GlowSettings.wash); 0 in Deep Space.
+ * - `lights`: the three lights while a surface glows (§11.1 "Lights"), per
+ *   theme. Deep Space dims them so the body stays a dark, see-through glass
+ *   lit by its rim; Light Clean keeps them up so the lights, not an
+ *   emissive term, shade the body -- and a ball-and-stick drawn beside a
+ *   glowing surface there is lit as in Solid (it takes no Glow of its own).
  */
 export const GLOW_TUNING = {
     dark: {
@@ -47,14 +60,23 @@ export const GLOW_TUNING = {
         rimPower: 1.8,
         lines: { opacity: 0.05, whiten: 0.3, additive: true },
         halo: { opacity: 0.6, offset: 0.08, power: 1 },
+        wash: 0,
+        lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
     },
     light: {
-        emissive: 0.6,
-        rimStrength: 0.8,
-        rimPower: 2.2,
-        lines: { opacity: 0.16, whiten: 0.85, additive: false },
+        emissive: 0.05,
+        rimStrength: 1.0,
+        rimPower: 1.5,
+        lines: { opacity: 0.1, whiten: 0.85, additive: false },
+        wash: 0.7,
+        lights: { ambient: 1.0, key: 1.0, fill: 0.4 },
     },
 } as const;
+
+/** The three lights' levels while a surface glows in `theme` (§11.1 "Lights"). */
+export function glowLightsFor(theme: Appearance['theme']): { ambient: number; key: number; fill: number } {
+    return GLOW_TUNING[theme].lights;
+}
 
 export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
     if (appearance.finish !== 'glow' || appearance.scheme === 'classic') return null;
@@ -67,6 +89,7 @@ export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
         emissive: tuning.emissive,
         rimStrength: tuning.rimStrength,
         rimPower: tuning.rimPower,
+        wash: tuning.wash,
     };
 }
 
@@ -78,7 +101,7 @@ export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
  */
 export function atomRimFor(appearance: Appearance): GlowSettings | null {
     if (appearance.theme !== 'dark' || appearance.scheme === 'classic') return null;
-    return { mode: 'additive', rimPositive: new THREE.Color(1, 1, 1), rimNegative: new THREE.Color(1, 1, 1), emissive: 0, rimStrength: 0.15, rimPower: 2.5 };
+    return { mode: 'additive', rimPositive: new THREE.Color(1, 1, 1), rimNegative: new THREE.Color(1, 1, 1), emissive: 0, rimStrength: 0.15, rimPower: 2.5, wash: 0 };
 }
 
 interface GlowUniforms {
@@ -88,6 +111,7 @@ interface GlowUniforms {
     qlEmissive: THREE.IUniform<number>;
     qlRimStrength: THREE.IUniform<number>;
     qlRimPower: THREE.IUniform<number>;
+    qlWash: THREE.IUniform<number>;
 }
 
 /**
@@ -100,7 +124,7 @@ interface GlowUniforms {
  */
 const VERTEX_HEAD_PHASED = 'attribute float phaseSign;\nvarying float vQlPhase;\n';
 const VERTEX_HEAD_PLAIN = 'varying float vQlPhase;\n';
-const FRAGMENT_HEAD = 'uniform vec3 qlRimPositive;\nuniform vec3 qlRimNegative;\nuniform float qlInk;\nuniform float qlEmissive;\nuniform float qlRimStrength;\nuniform float qlRimPower;\nvarying float vQlPhase;\n';
+const FRAGMENT_HEAD = 'uniform vec3 qlRimPositive;\nuniform vec3 qlRimNegative;\nuniform float qlInk;\nuniform float qlEmissive;\nuniform float qlRimStrength;\nuniform float qlRimPower;\nuniform float qlWash;\nvarying float vQlPhase;\n';
 const RIM = /* glsl */`
     // Fresnel rim, in the surface's own phase (vQlPhase: +1, -1, or 0 where
     // the mesh has no phase -- a density, an ESP map, an atom, a lobe -- which
@@ -110,7 +134,7 @@ const RIM = /* glsl */`
     vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : mix(diffuseColor.rgb, vec3(1.0), 0.5);
     vec3 qlRimColour = vQlPhase > 0.5 ? qlRimPositive : (vQlPhase < -0.5 ? qlRimNegative : qlOwnTint);
     outgoingLight = qlInk > 0.5
-        ? mix(outgoingLight, qlRimColour, qlRim * qlRimStrength)
+        ? mix(mix(outgoingLight, vec3(1.0), qlWash * qlRim), qlRimColour, qlRim * qlRim * qlRim * qlRimStrength)
         : outgoingLight + qlRimColour * qlRim * qlRimStrength;
 `;
 
@@ -143,6 +167,7 @@ export function applyGlow(material: THREE.MeshStandardMaterial, settings: GlowSe
         qlEmissive: { value: 0 },
         qlRimStrength: { value: 0 },
         qlRimPower: { value: 2.5 },
+        qlWash: { value: 0 },
     };
     uniforms.qlRimPositive.value.copy(settings.rimPositive);
     uniforms.qlRimNegative.value.copy(settings.rimNegative);
@@ -150,6 +175,7 @@ export function applyGlow(material: THREE.MeshStandardMaterial, settings: GlowSe
     uniforms.qlEmissive.value = settings.emissive;
     uniforms.qlRimStrength.value = settings.rimStrength;
     uniforms.qlRimPower.value = settings.rimPower;
+    uniforms.qlWash.value = settings.wash;
     material.userData.glowUniforms = uniforms;
     if (material.userData.glow) return;
     material.onBeforeCompile = shader => {

@@ -3,26 +3,13 @@ import type { MeshData } from '../types/orbital';
 import { DEFAULT_OPACITY } from '../types/orbital';
 import type { Appearance } from '../design/appearance';
 import { linearRgb, phaseColours } from '../design/science';
-import { attachGlowExtras, GLOW_LIGHTS, glowSettingsFor, SOLID_LIGHTS } from '../orbital_glow';
+import { attachGlowExtras, glowLightsFor, glowSettingsFor, SOLID_LIGHTS } from '../orbital_glow';
 import { setMaterialOpacity } from '../orbital_material';
 import { CANONICAL_CAMERA_DIRECTION } from '../camera_angles';
 import type { ThumbImage } from './ThumbnailService';
+import { thumbnailSize, thumbOpacityOf } from './thumb_key';
 
-/** The largest strip tile, in CSS px (ThumbnailStrip's overlay variant; the phone's sheet tiles are 56). */
-export const THUMB_TILE_PX = 72;
-/** The smallest picture drawn, whatever the screen: today's 160, so a 1× screen is never worse off. */
-const MIN_SIZE = 160;
-
-/**
- * Ruling R20a-4: the picture's side in device pixels -- the tile's CSS size
- * × devicePixelRatio × 2, so the tile's own canvas (CSS size × dpr) is
- * drawn from twice its resolution (supersampled, on top of the target's
- * MSAA): 288 on a 2× screen, 432 on a 3× phone.
- */
-export function thumbnailSize(devicePixelRatio: number): number {
-    const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
-    return Math.max(MIN_SIZE, Math.ceil(THUMB_TILE_PX * dpr * 2));
-}
+export { thumbnailSize };
 
 /**
  * Draws one orbital mesh into a render target on the main renderer and
@@ -34,8 +21,8 @@ export function thumbnailSize(devicePixelRatio: number): number {
  * main view's levels for the finish (§11.1 "Lights").
  *
  * Ruling R20a-4: the tile looks like the main view -- the theme's phase
- * colours, the same see-through surface (the default opacity, which is the
- * view a fresh session opens with), and the whole Glow finish: rim,
+ * colours, the main view's committed opacity (`opacity`; the default when
+ * none is given), and the whole Glow finish: rim,
  * emissive, mesh lines and (Deep Space) the halo, through the same
  * attachGlowExtras the main view uses. The frame-time guard never sees this
  * scene (afterMainFrame does not time a frame that carried a thumbnail).
@@ -43,7 +30,7 @@ export function thumbnailSize(devicePixelRatio: number): number {
 export function createThumbnailRenderer(
     renderer: THREE.WebGLRenderer,
     { pixelRatio = () => (typeof window === 'undefined' ? 1 : window.devicePixelRatio) }: { pixelRatio?: () => number } = {},
-): { render(meshData: MeshData, appearance: Appearance): Promise<ThumbImage>; size(): number; dispose(): void } {
+): { render(meshData: MeshData, appearance: Appearance, opacity?: number): Promise<ThumbImage>; size(): number; dispose(): void } {
     let target: THREE.WebGLRenderTarget | null = null;
     /** Four MSAA samples on top of the 2× supersample: lobe edges would otherwise shimmer against the tile's border. */
     function targetOf(side: number): THREE.WebGLRenderTarget {
@@ -67,7 +54,7 @@ export function createThumbnailRenderer(
     const direction = new THREE.Vector3(...CANONICAL_CAMERA_DIRECTION).normalize();
     const size = () => thumbnailSize(pixelRatio());
 
-    async function render(meshData: MeshData, appearance: Appearance): Promise<ThumbImage> {
+    async function render(meshData: MeshData, appearance: Appearance, opacity: number = DEFAULT_OPACITY): Promise<ThumbImage> {
         const SIZE = size();
         const phase = phaseColours(appearance.theme, appearance.scheme);
         const [positive, negative] = [linearRgb(phase.positive), linearRgb(phase.negative)];
@@ -79,14 +66,14 @@ export function createThumbnailRenderer(
         geometry.computeVertexNormals();
         geometry.computeBoundingSphere();
         const material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.45, metalness: 0 });
-        setMaterialOpacity(material, DEFAULT_OPACITY);
+        setMaterialOpacity(material, Math.max(0, Math.min(1, thumbOpacityOf(opacity))));
         const mesh = new THREE.Mesh(geometry, material);
         const group = new THREE.Group();
         group.add(mesh);
         const radius = geometry.boundingSphere?.radius || 1;
         // The main view's Glow, extras included: the rim and emissive on the surface, the lines and halo beside it.
         attachGlowExtras(group, mesh, appearance, { radius, clippingPlanes: [], solid: true, extrasAllowed: true });
-        const levels = glowSettingsFor(appearance) ? GLOW_LIGHTS : SOLID_LIGHTS;
+        const levels = glowSettingsFor(appearance) ? glowLightsFor(appearance.theme) : SOLID_LIGHTS;
         ambient.intensity = levels.ambient;
         key.intensity = levels.key;
         fill.intensity = levels.fill;

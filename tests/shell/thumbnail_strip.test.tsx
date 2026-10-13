@@ -6,6 +6,11 @@ import { subshellLabel } from '../../src/atom/configurations';
 import { thumbnailService, type ThumbHost } from '../../src/thumbs/ThumbnailService';
 import { goldProfile, neonProfile } from '../export/fixtures';
 import { CURVE_COLORS } from '../../src/curve_colors';
+import { Provider } from 'react-redux';
+import { createAppStore } from '../../src/store';
+import { useAppSelector } from '../../src/store/hooks';
+import { previewOpacity, setSurfaceStyle } from '../../src/store/orbitalSlice';
+import { thumbLookKey } from '../../src/thumbs/thumb_key';
 
 const profile = neonProfile();
 const rGrid = Array.from({ length: profile.size }, (_, j) => profile.rMin * Math.exp(j * profile.dx));
@@ -180,5 +185,39 @@ describe('tileBacking', () => {
         expect(tileBacking(72, 3)).toBe(216);
         expect(tileBacking(56, 3)).toBe(168);
         expect(tileBacking(56, Number.NaN)).toBe(112);
+    });
+});
+
+// Fix round 1 of Task 20a (R20a-4): the tiles follow the main view's opacity, but only as committed --
+// a slider drag (previewOpacity) re-requests nothing; its release (setSurfaceStyle) re-requests every tile.
+describe('ThumbnailStrip and the committed opacity', () => {
+    afterEach(() => { act(() => { thumbnailService.detach(); }); jest.restoreAllMocks(); });
+
+    it('re-requests the tiles once a new opacity is committed, and not on drag ticks', () => {
+        const store = createAppStore();
+        const look = { theme: 'dark' as const, scheme: 'phase' as const, finish: 'glow' as const, lowPower: false };
+        const keyNow = () => thumbLookKey({ appearance: look, opacity: store.getState().orbital.thumbOpacity, size: 288 });
+        thumbnailService.attach({
+            createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            isBusy: () => false, themeKey: keyNow, render: () => new Promise(() => {}),
+        });
+        const request = jest.spyOn(thumbnailService, 'request');
+        function Strip() {
+            const opacity = useAppSelector(state => state.orbital.thumbOpacity);
+            return <ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} onSelect={jest.fn()}
+                themeKey={thumbLookKey({ appearance: look, opacity, size: 288 })} />;
+        }
+        render(<Provider store={store}><Strip /></Provider>);
+        const orbitalTiles = items.filter(item => item.thumb.kind === 'orbital').length;
+        expect(request).toHaveBeenCalledTimes(orbitalTiles);
+        expect(keyNow()).toBe('dark|phase|glow|full|288|0.7');
+
+        act(() => { [0.65, 0.5, 0.4].forEach(value => store.dispatch(previewOpacity(value))); });
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.4);
+        expect(request).toHaveBeenCalledTimes(orbitalTiles);
+
+        act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.4 })); });
+        expect(request).toHaveBeenCalledTimes(2 * orbitalTiles);
+        expect(keyNow()).toBe('dark|phase|glow|full|288|0.4');
     });
 });

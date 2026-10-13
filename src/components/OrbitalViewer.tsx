@@ -137,6 +137,10 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // Read by the export handle, which outlives renders.
     const appearanceRef = useRef(appearance);
     appearanceRef.current = appearance;
+    // Ruling R20a-4 (fix round 1): the thumbnails' opacity -- the main view's, as last committed.
+    const thumbOpacity = useAppSelector(state => state.orbital.thumbOpacity);
+    const thumbOpacityRef = useRef(thumbOpacity);
+    thumbOpacityRef.current = thumbOpacity;
 
     // The busy flag the thumbnail service reads (spec §12: "pause while a
     // main render is in flight or a pointer drag is active"); refs, since the
@@ -167,6 +171,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             attachThumbnails(context, thumbnailService, {
                 isBusy: () => busyRef.current || draggingRef.current,
                 appearance: () => appearanceRef.current,
+                opacity: () => thumbOpacityRef.current,
             });
 
             if (exportHandleRef) {

@@ -9,6 +9,7 @@ jest.mock('../../src/thumbs/render_thumbnail', () => ({
 }));
 
 import { createOrbitalWorker } from '../../src/workers/createOrbitalWorker';
+import { createThumbnailRenderer } from '../../src/thumbs/render_thumbnail';
 import { afterMainFrame, attachThumbnails, cleanupVisualizer, VisualizerContext } from '../../src/orbital_visualizer';
 import { ThumbnailService } from '../../src/thumbs/ThumbnailService';
 import { defaultSurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
@@ -64,13 +65,15 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         afterMainFrame(context, null);
         expect(workers).toHaveLength(1);
         expect(workers[0].postMessage).toHaveBeenCalledWith({ type: 'calculate', params });
-        service.store('dark|phase|glow|full|288|cached', { width: 1, height: 1 });
+        // Fix round 1 of Task 20a: the key ends in the committed opacity (the default without an opacity option).
+        service.store('dark|phase|glow|full|288|0.7|cached', { width: 1, height: 1 });
         const hit = jest.fn();
         service.request({ contentKey: 'cached', params }, hit);
         expect(hit).toHaveBeenCalled();
         // A picture drawn for a phone (no lines, no halo) or at another size is not served here.
-        service.store('dark|phase|glow|low|288|other', { width: 1, height: 1 });
-        service.store('dark|phase|glow|full|160|other', { width: 1, height: 1 });
+        service.store('dark|phase|glow|low|288|0.7|other', { width: 1, height: 1 });
+        service.store('dark|phase|glow|full|160|0.7|other', { width: 1, height: 1 });
+        service.store('dark|phase|glow|full|288|0.4|other', { width: 1, height: 1 });
         const miss = jest.fn();
         service.request({ contentKey: 'other', params }, miss);
         expect(miss).not.toHaveBeenCalled();
@@ -102,5 +105,30 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         // Thumbnails touch neither the main view's appearance nor its camera.
         expect(context.appearance).toBeUndefined();
         expect(context.camera.position.toArray()).toEqual([0, 0, 10]);
+    });
+
+    // Fix round 1 of Task 20a (R20a-4): the picture is drawn, and filed, at the main view's committed opacity.
+    it('draws and files each thumbnail at the committed opacity it is given', async () => {
+        const context = buildContext();
+        const service = new ThumbnailService();
+        let opacity = 0.4;
+        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow, opacity: () => opacity });
+        const thumbs = (createThumbnailRenderer as jest.Mock).mock.results.at(-1)!.value as { render: jest.Mock };
+        const ready = jest.fn();
+        service.request({ contentKey: 'c', params }, ready);
+        afterMainFrame(context, null);
+        workers[0].onmessage!({ data: { type: 'success', meshData: mesh() } });
+        afterMainFrame(context, 16);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(thumbs.render).toHaveBeenCalledWith(expect.anything(), glow, 0.4);
+        expect(ready).toHaveBeenCalled();
+        const hit = jest.fn();
+        service.request({ contentKey: 'c', params }, hit);
+        expect(hit).toHaveBeenCalled();
+        opacity = 0.7;
+        const miss = jest.fn();
+        service.request({ contentKey: 'c', params }, miss);
+        expect(miss).not.toHaveBeenCalled();
     });
 });

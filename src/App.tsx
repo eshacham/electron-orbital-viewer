@@ -24,7 +24,8 @@ import {
     setEnclosedFraction,
     setCombination,
     clearPendingCut,
-    cameraMoved
+    cameraMoved,
+    previewOpacity,
 } from './store/orbitalSlice';
 import {
     setMode,
@@ -122,6 +123,7 @@ import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
 import { atomStripItems } from './thumbs/strip_items';
 import { thumbnailService } from './thumbs/ThumbnailService';
+import { thumbLookKey, thumbnailSize } from './thumbs/thumb_key';
 import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
 import { viewTitle } from './shell/view_title';
 import { useDocumentTitle } from './shell/useDocumentTitle';
@@ -180,7 +182,7 @@ function gridRadii(rMin: number, dx: number, size: number): number[] {
 
 function App() {
     const dispatch = useAppDispatch();
-    const { isLoading, error, surfaceStyle, isoLevel } = useAppSelector(state => state.orbital);
+    const { isLoading, error, surfaceStyle, isoLevel, thumbOpacity } = useAppSelector(state => state.orbital);
     // The plot describes what is on screen, so it follows the rendered orbital
     // rather than the pending selection in the panel.
     const renderedParams = useAppSelector(state => state.orbital.currentParams);
@@ -320,6 +322,8 @@ function App() {
         // "carry to Task 6").
         if ('clipAxis' in change || 'clipPosition' in change) dispatch(clearPendingCut());
     }, [dispatch]);
+    // Ruling R20a-4 (fix round 1): a drag of the opacity slider moves the view only; its release commits (above).
+    const handleOpacityPreview = useCallback((opacity: number) => { dispatch(previewOpacity(opacity)); }, [dispatch]);
 
     const handleModeChange = useCallback((newMode: ViewMode) => {
         dispatch(setMode(newMode));
@@ -752,9 +756,16 @@ function App() {
     );
     // A new species or relativity: nothing in flight belongs to the picture any more (§12).
     useEffect(() => () => thumbnailService.cancelAll(), [atomProfile?.speciesKey, atomProfile?.Z, pictureRelativity]);
-    // Everything a tile's picture depends on besides its content (ruling R20a-4): a change re-requests every tile.
-    // isNarrow is the appearance's lowPower: a phone's thumbnails, like its main view, have no mesh lines or halo.
-    const stripThemeKey = `${themeMode}|${render.scheme}|${render.finish}|${isNarrow ? 'low' : 'full'}`;
+    // Everything a tile's picture depends on besides its content (ruling R20a-4): a change re-requests every
+    // tile. The same key the thumbnail service files pictures under (thumb_key.ts): isNarrow is the
+    // appearance's lowPower (a phone's tiles, like its main view, have no lines or halo), the size follows
+    // the screen, and the opacity is the main view's as last committed (a slider drag re-renders nothing
+    // until it is released).
+    const stripThemeKey = thumbLookKey({
+        appearance: { theme: themeMode, scheme: render.scheme, finish: render.finish, lowPower: isNarrow },
+        opacity: thumbOpacity,
+        size: thumbnailSize(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
+    });
     // The radial plot's horizontal range: sized to what is actually being
     // shown, not the sampling grid's rMax (spec bugfix). The grid extent is
     // chosen to comfortably hold the outermost orbital's tail -- for argon
@@ -1110,6 +1121,7 @@ function App() {
             onUpdateOrbital={handleOrbitalParamsChange}
             surfaceStyle={surfaceStyle}
             onSurfaceStyleChange={handleSurfaceStyleChange}
+            onOpacityPreview={handleOpacityPreview}
             hideSurfaceStyle={isAtomMode}
             isBusy={isAtomMode ? showAtomBusy : showBusy}
             fractionNote={isBondsDensity ? FIXED_RHO_NOTE

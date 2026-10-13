@@ -32,6 +32,14 @@ interface OrbitalState {
   viewResetNonce: number;
   /** View-only: none of this re-runs the calculation. */
   surfaceStyle: SurfaceStyle;
+  /**
+   * Ruling R20a fix 1: the opacity the strip's thumbnails are drawn at --
+   * surfaceStyle.opacity as last committed. A drag of the opacity slider
+   * moves surfaceStyle only (previewOpacity); its release, and every other
+   * opacity change (a link, the Molecules rule), commits it here
+   * (setSurfaceStyle), so the tiles re-render once per change, not per tick.
+   */
+  thumbOpacity: number;
   /** The contour the last render settled on, derived from the enclosed fraction. */
   isoLevel: number | null;
   /** Basic Orbitals' panel choice. In the store, not App, because a shared link restores it. */
@@ -74,6 +82,7 @@ const initialState: OrbitalState = {
   renderFailed: false,
   viewResetNonce: 0,
   surfaceStyle: { ...defaultSurfaceStyle },
+  thumbOpacity: defaultSurfaceStyle.opacity,
   isoLevel: null,
   basicSelection: { ...DEFAULT_BASIC_SELECTION },
   enclosedFraction: DEFAULT_ENCLOSED_FRACTION,
@@ -125,6 +134,11 @@ const orbitalSlice = createSlice({
     },
     setSurfaceStyle: (state, action: PayloadAction<Partial<SurfaceStyle>>) => {
       state.surfaceStyle = { ...state.surfaceStyle, ...action.payload };
+      if (action.payload.opacity !== undefined) state.thumbOpacity = action.payload.opacity;
+    },
+    /** One tick of an opacity-slider drag: the view follows, the thumbnails wait for the release (setSurfaceStyle). */
+    previewOpacity: (state, action: PayloadAction<number>) => {
+      state.surfaceStyle = { ...state.surfaceStyle, opacity: action.payload };
     },
     startFieldCalculation: (state, action: PayloadAction<FieldRenderRequest>) => {
       state.isLoading = true;
@@ -268,6 +282,7 @@ export const {
   dismissOrbitalError,
   resetView,
   setSurfaceStyle,
+  previewOpacity,
   startFieldCalculation,
   clearPicture,
   setBasicSelection,

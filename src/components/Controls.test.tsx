@@ -51,6 +51,31 @@ describe('Controls', () => {
   // Omitting `mode` entirely (as every pre-existing test here does) must
   // still be the Basic Orbitals panel -- the n/l/mL selects and the explicit
   // Update Orbital step, not atom mode's drill-down.
+  // Fix round 1 of Task 20a (R20a-4): with onOpacityPreview, a drag's ticks go there and only the
+  // release reaches onSurfaceStyleChange (which commits the opacity the thumbnails follow).
+  it('sends opacity drag ticks to onOpacityPreview and commits only on release', () => {
+    const onOpacityPreview = jest.fn();
+    const onSurfaceStyleChange = jest.fn();
+    render(<Controls {...baseProps} onOpacityPreview={onOpacityPreview} onSurfaceStyleChange={onSurfaceStyleChange} />);
+    const thumb = screen.getByRole('slider', { name: 'surface opacity' });
+    const root = thumb.closest('.MuiSlider-root') as HTMLElement;
+    root.getBoundingClientRect = () => ({ left: 0, width: 100, right: 100, top: 0, bottom: 10, height: 10, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    fireEvent.mouseDown(root, { clientX: 50, clientY: 5, buttons: 1 });
+    fireEvent.mouseMove(document, { clientX: 30, clientY: 5, buttons: 1 });
+    expect(onOpacityPreview).toHaveBeenCalled();
+    expect(onSurfaceStyleChange).not.toHaveBeenCalled();
+    fireEvent.mouseUp(document, { clientX: 30, clientY: 5 });
+    expect(onSurfaceStyleChange).toHaveBeenCalledTimes(1);
+    expect(onSurfaceStyleChange.mock.calls[0][0]).toEqual({ opacity: expect.any(Number) });
+  });
+
+  it('without onOpacityPreview, sends every opacity change to onSurfaceStyleChange as before', () => {
+    const onSurfaceStyleChange = jest.fn();
+    render(<Controls {...baseProps} onSurfaceStyleChange={onSurfaceStyleChange} />);
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'surface opacity' }), { key: 'ArrowLeft' });
+    expect(onSurfaceStyleChange).toHaveBeenCalledWith({ opacity: 0.95 });
+  });
+
   it('defaults to Basic Orbitals when mode is omitted', () => {
     render(<Controls {...baseProps} />);
     expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();

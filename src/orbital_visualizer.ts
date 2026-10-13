@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ClipAxis, MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
+import { ClipAxis, DEFAULT_OPACITY, MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
 import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { createOrbitalMaterial, applySurfaceStyle, updateClipPlane, setGroupOpacity } from './orbital_material';
 import {
@@ -9,6 +9,7 @@ import {
 import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
 import { createOrbitalWorker } from './workers/createOrbitalWorker';
 import { createThumbnailRenderer } from './thumbs/render_thumbnail';
+import { thumbLookKey } from './thumbs/thumb_key';
 import type { ThumbnailService } from './thumbs/ThumbnailService';
 import { createOrbitalControls } from './orbital_controls_factory';
 import {
@@ -52,7 +53,7 @@ import { CPK_COLORS, disposeOverlay } from './molecules/ball_and_stick';
 import { CLASSIC_APPEARANCE, type Appearance } from './design/appearance';
 import { axesStyle, curvePalette, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb, phaseColours } from './design/science';
 import {
-    applyGlow, atomRimFor, attachGlowExtras, fadeGlowExtras, glowSettingsFor, GLOW_LIGHTS, hasGlowExtras, hasGlowingSurface, removeGlowExtras,
+    applyGlow, atomRimFor, attachGlowExtras, fadeGlowExtras, glowLightsFor, glowSettingsFor, hasGlowExtras, hasGlowingSurface, removeGlowExtras,
     SOLID_LIGHTS, updateFrameGuard,
 } from './orbital_glow';
 
@@ -2226,7 +2227,8 @@ export function setAppearance(context: VisualizerContext | null, appearance: App
  */
 function applyLights(context: VisualizerContext): void {
     if (!context.lights) return;
-    const levels = hasGlowingSurface(context.currentOrbitalGroup) ? GLOW_LIGHTS : SOLID_LIGHTS;
+    // Per theme (ruling R20a fix 1): Light Clean's Glow keeps the lights up, so atoms beside a glowing surface stay lit.
+    const levels = hasGlowingSurface(context.currentOrbitalGroup) ? glowLightsFor(context.appearance?.theme ?? 'dark') : SOLID_LIGHTS;
     context.lights.ambient.intensity = levels.ambient;
     context.lights.key.intensity = levels.key;
     context.lights.fill.intensity = levels.fill;
@@ -2260,22 +2262,20 @@ export function handleResize(context: VisualizerContext, width: number, height: 
 export function attachThumbnails(
     context: VisualizerContext,
     service: ThumbnailService,
-    options: { isBusy(): boolean; appearance(): Appearance },
+    options: { isBusy(): boolean; appearance(): Appearance; opacity?(): number },
 ): void {
     const thumbs = createThumbnailRenderer(context.renderer);
+    // Ruling R20a-4 (fix round 1): the main view's committed opacity; the default when the host gives none.
+    const opacity = () => options.opacity?.() ?? DEFAULT_OPACITY;
     service.attach({
         createWorker: createOrbitalWorker,
         isBusy: options.isBusy,
-        // Ruling R20a-4: everything the picture depends on besides its content -- the
-        // palette (theme, scheme), the finish, whether the extras are drawn (lowPower)
-        // and the picture's size (the screen's pixel ratio) -- so a stale image is never served.
-        themeKey: () => {
-            const a = options.appearance();
-            return `${a.theme}|${a.scheme}|${a.finish}|${a.lowPower ? 'low' : 'full'}|${thumbs.size()}`;
-        },
+        // Everything the picture depends on besides its content (thumb_key.ts, the
+        // strip's key too): palette, finish, extras (lowPower), size and opacity.
+        themeKey: () => thumbLookKey({ appearance: options.appearance(), opacity: opacity(), size: thumbs.size() }),
         render: meshData => {
             context.thumbnailRendered = true;
-            return thumbs.render(meshData, options.appearance());
+            return thumbs.render(meshData, options.appearance(), opacity());
         },
     });
     context.onAfterFrame = () => service.tick();
