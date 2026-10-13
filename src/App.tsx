@@ -110,6 +110,12 @@ import AvatarMenu from './shell/AvatarMenu';
 import PhoneTopBar from './shell/PhoneTopBar';
 import ExplorePanel from './shell/ExplorePanel';
 import Inspector from './shell/Inspector';
+import TitleBlock from './shell/TitleBlock';
+import ViewportToolbar from './shell/ViewportToolbar';
+import KeyColumn, { PhaseKey } from './shell/KeyColumn';
+import { viewTitle } from './shell/view_title';
+import { useDocumentTitle } from './shell/useDocumentTitle';
+import { useFullscreen } from './shell/useFullscreen';
 import ThemeSwitch from './design/ThemeSwitch';
 import { useQuantumTheme } from './design/useQuantumTheme';
 import { useBrand } from './design/useBrand';
@@ -427,6 +433,10 @@ function App() {
     const layout: 'desktop' | 'medium' | 'phone' = isNarrow ? 'phone' : isMedium ? 'medium' : 'desktop';
     const { mode: themeMode } = useQuantumTheme();
     const brand = useBrand();
+    const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(viewTitle, shallowEqual);
+    useDocumentTitle(`${viewTitleText} · ${brand.name}`);
+    const shellRef = useRef<HTMLDivElement>(null);
+    const fullscreen = useFullscreen(shellRef);
     const [helpOpen, setHelpOpen] = useState(false);
     const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
     // The molecule index loads when Molecules opens -- or when someone starts a search (spec §8.3).
@@ -945,7 +955,13 @@ function App() {
         ),
         [handleShare, handleExport, availability, stlSolids, atomMode]
     );
-    const controlsActions = shareExportBar;
+    const shareExportToolbar = useMemo(
+        () => (
+            <ShareExportBar variant="toolbar" onShare={handleShare} onExport={handleExport} availability={availability}
+                stlSolids={stlSolids} items={exportItemsFor(atomMode)} />
+        ),
+        [handleShare, handleExport, availability, stlSolids, atomMode]
+    );
 
     // Molecules mode's navigation (layout contract §3.8): the whole card in
     // the desktop's left column; on a phone, the name in the header and the
@@ -994,11 +1010,9 @@ function App() {
             onCombinationChange={handleCombinationChange}
             isoLevel={isoLevel}
             onUpdateOrbital={handleOrbitalParamsChange}
-            onResetView={handleResetView}
             surfaceStyle={surfaceStyle}
             onSurfaceStyleChange={handleSurfaceStyleChange}
             isBusy={isAtomMode ? showAtomBusy : showBusy}
-            actions={controlsActions}
             relativity={relativity}
             relativityIsDefault={relativityIsDefault}
             onRelativityChange={handleRelativityChange}
@@ -1097,6 +1111,14 @@ function App() {
         );
     };
 
+    // A phone has no viewport toolbar (ruling R6): Reset view, Share and Export end the View tab, as before.
+    const phoneViewActions = (
+        <div className="view-actions">
+            <Button id="reset-view" variant="outlined" onClick={handleResetView}>Reset view</Button>
+            {shareExportBar}
+        </div>
+    );
+
     // The phone sheet's tabs, one job each. Basic Orbitals has no drill-down,
     // so its orbital choice and view settings share one tab; Bonds has its
     // panel, as atom mode has its drill-down.
@@ -1111,13 +1133,13 @@ function App() {
                     </>
                 ),
             },
-            { key: 'view', label: 'View', content: controls },
+            { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ]
         : isBondsMode
         ? [
             { key: 'explore', label: 'Explore', content: bondsPanel },
-            { key: 'view', label: 'View', content: controls },
+            { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ]
         : isAtomMode
@@ -1127,11 +1149,11 @@ function App() {
                 label: 'Explore',
                 content: <LevelNav {...levelNavProps} variant="body">{subshellPanel}</LevelNav>,
             },
-            { key: 'view', label: 'View', content: controls },
+            { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ]
         : [
-            { key: 'view', label: 'Orbital & view', content: controls },
+            { key: 'view', label: 'Orbital & view', content: <>{controls}{phoneViewActions}</> },
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ];
 
@@ -1145,17 +1167,6 @@ function App() {
             {molecule.error ?? `Could not draw ${SURFACE_NAME[molecule.surface.kind]}: ${molecule.renderError}`}
         </Alert>
     ) : null;
-
-    const phaseLegend = (
-        <div className="phase-legend" aria-label="surface colour key">
-            <span className="phase-legend-item">
-                <span className="phase-legend-swatch positive" />ψ &gt; 0
-            </span>
-            <span className="phase-legend-item">
-                <span className="phase-legend-swatch negative" />ψ &lt; 0
-            </span>
-        </div>
-    );
 
     const exploreContent = isAtomMode ? <LevelNav {...levelNavProps}>{subshellPanel}</LevelNav>
         : isBondsMode ? bondsPanel
@@ -1274,7 +1285,34 @@ function App() {
             {isAtomMode && atomUnbound && !(isNarrow && phoneTab !== 'explore') && (
                 <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
             )}
-            {showPhaseLegend && !isMoleculeMode && phaseLegend}
+            {!isNarrow && <TitleBlock title={viewTitleText} subtitle={viewSubtitle} />}
+            {!isNarrow && (
+                <ViewportToolbar onResetView={handleResetView} shareExport={shareExportToolbar}
+                    fullscreen={fullscreen.active} onToggleFullscreen={fullscreen.toggle} />
+            )}
+            {!isMoleculeMode && (showPhaseLegend || isBondsDensity || combinationLegend) && (
+                <KeyColumn compact={isNarrow}>
+                    {showPhaseLegend && <PhaseKey />}
+                    {isBondsDensity && (
+                        <div className="phase-legend density-key" aria-label="surface colour key">
+                            <span className="phase-legend-item">
+                                <span className="phase-legend-swatch" style={{ background: DENSITY_SURFACE_HEX }} />
+                                ρ = {drawnDensityIso} e/a₀³, total electron density
+                            </span>
+                        </div>
+                    )}
+                    {combinationLegend && (
+                        <div className="phase-legend" aria-label="combination colour key">
+                            {combinationLegend.map(item => (
+                                <span key={item.label} className="phase-legend-item">
+                                    <span className="phase-legend-swatch" style={{ background: item.color }} />{item.label}
+                                </span>
+                            ))}
+                            <span className="phase-legend-item">darker: ψ &lt; 0</span>
+                        </div>
+                    )}
+                </KeyColumn>
+            )}
             {/* Molecules: the tier badge, the pick readout, the ESP key and
                 an orbital's ψ key share the bottom-centre slot, stacked
                 (spec §3.8: no new floating panel). The tier heads it and
@@ -1293,31 +1331,13 @@ function App() {
                     {moleculeKeysShown && molecule.surface.kind === 'esp' && (
                         <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact={isPhoneLandscape} />
                     )}
-                    {showPhaseLegend && phaseLegend}
+                    {showPhaseLegend && <PhaseKey />}
                 </div>
             )}
             {/* Over the canvas on a desktop; on a phone it heads the key
                 stack instead (with no molecule loaded there is no stack,
                 and nothing for it to cover). */}
             {moleculeAlert && !(isNarrow && molecule.meta) && moleculeAlert}
-            {isBondsDensity && (
-                <div className="phase-legend density-key" aria-label="surface colour key">
-                    <span className="phase-legend-item">
-                        <span className="phase-legend-swatch" style={{ background: DENSITY_SURFACE_HEX }} />
-                        ρ = {drawnDensityIso} e/a₀³, total electron density
-                    </span>
-                </div>
-            )}
-            {combinationLegend && (
-                <div className="phase-legend" aria-label="combination colour key">
-                    {combinationLegend.map(item => (
-                        <span key={item.label} className="phase-legend-item">
-                            <span className="phase-legend-swatch" style={{ background: item.color }} />{item.label}
-                        </span>
-                    ))}
-                    <span className="phase-legend-item">darker: ψ &lt; 0</span>
-                </div>
-            )}
             {/* Addendum 3: the element selector is a real periodic
                 table on anything wider than a phone, as a pop-over over
                 the view. A table does not survive a phone width, so
@@ -1392,6 +1412,8 @@ function App() {
                 explore={<ExplorePanel body={exploreContent} />}
                 inspector={<Inspector variant="docked" body={inspectorBody} />}
                 viewport={viewport}
+                shellRef={shellRef}
+                fullscreen={fullscreen.active}
             />
             <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} brand={brand}
                 aboutModel={isBasicMode ? <p>{BASIC_ORBITALS_ABOUT}</p> : undefined} />

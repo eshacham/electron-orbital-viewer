@@ -174,3 +174,14 @@ describe('ShareExportBar: Export', () => {
         expect(screen.getByRole('dialog')).not.toHaveTextContent(/overlapping solids/);
     });
 });
+
+describe('ShareExportBar as the viewport toolbar (spec §8.5)', () => {
+    it('names its icon buttons as the bar did, and Snapshot exports the captioned PNG directly', async () => {
+        const onExport = jest.fn().mockResolvedValue(undefined);
+        render(<ShareExportBar variant="toolbar" onShare={jest.fn()} onExport={onExport} availability={allAvailable()} />);
+        expect(screen.getByRole('button', { name: 'Share' })).toHaveAttribute('id', 'share-view');
+        expect(screen.getByRole('button', { name: 'Export' })).toHaveAttribute('id', 'export-view');
+        fireEvent.click(screen.getByRole('button', { name: 'Snapshot' }));
+        await waitFor(() => expect(onExport).toHaveBeenCalledWith('png', {}));
+    });
+});

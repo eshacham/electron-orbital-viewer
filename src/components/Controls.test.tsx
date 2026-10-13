@@ -13,7 +13,7 @@ const baseProps = {
   onEnclosedFractionChange: () => {},
   isoLevel: 1e-5,
   onUpdateOrbital: () => {},
-  onResetView: () => {},
+  // Reset View moved to the viewport toolbar (spec §8.5).
   surfaceStyle: { mode: 'solid' as const, opacity: 1, clipAxis: 'none' as const, clipPosition: 0 },
   onSurfaceStyleChange: () => {},
   isBusy: false,
@@ -34,7 +34,7 @@ describe('Controls', () => {
         onEnclosedFractionChange={() => {}}
         isoLevel={1e-5}
         onUpdateOrbital={() => {}}
-        onResetView={() => {}}
+        // Reset View moved to the viewport toolbar (spec §8.5).
         surfaceStyle={{ mode: 'solid', opacity: 1, clipAxis: 'none', clipPosition: 0 }}
         onSurfaceStyleChange={() => {}}
         isBusy={false}
@@ -93,7 +93,7 @@ describe('Controls', () => {
       // Controls that still work at every level.
       expect(screen.getByRole('combobox', { name: /Element/i })).toBeInTheDocument();
       expect(screen.getByRole('combobox', { name: /Electron enclosed/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /reset view/i })).toBeInTheDocument();
+      // Reset View moved to the viewport toolbar (spec §8.5): no longer here to assert on.
     });
 
     it('drives the element picker through onAtomElementChange', () => {

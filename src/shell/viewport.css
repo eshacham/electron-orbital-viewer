@@ -1,0 +1,44 @@
+/* src/shell/viewport.css -- the viewport frame's overlay zones (spec §8.5), each measured as a camera inset. */
+.viewport-title {
+  position: absolute; z-index: 11; top: 12px; left: 12px; max-width: calc(100% - 280px);
+  padding: 10px 14px; border-radius: var(--ql-radius-lg);
+  background: var(--ql-color-scrim); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.viewport-title h1 {
+  margin: 0; color: var(--ql-color-text-1);
+  font: var(--ql-type-title-weight) var(--ql-type-title-size) / var(--ql-type-title-line) var(--ql-font-sans);
+}
+.viewport-subtitle {
+  margin: 2px 0 0; color: var(--ql-color-text-2);
+  font: var(--ql-type-subtitle-weight) var(--ql-type-subtitle-size) / var(--ql-type-subtitle-line) var(--ql-font-sans);
+}
+.viewport-toolbar { position: absolute; z-index: 11; top: 12px; right: 12px; display: flex; gap: 6px; }
+.viewport-toolbar .MuiIconButton-root {
+  width: var(--ql-size-toolbar-button); height: var(--ql-size-toolbar-button);
+  border-radius: var(--ql-radius-md); color: var(--ql-color-text-1);
+  background: color-mix(in srgb, var(--ql-color-surface-2) 80%, transparent);
+  border: 1px solid var(--ql-color-border-subtle);
+}
+.viewport-toolbar .MuiIconButton-root:hover { background: var(--ql-color-surface-3); }
+.key-column {
+  position: absolute; z-index: 10; right: 12px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px; max-width: 220px;
+}
+/* Inside the column the keys are chips in the flow, not floating overlays of their own. */
+.key-column .phase-legend, .key-column .density-key {
+  position: static; transform: none; left: auto; right: auto; top: auto; bottom: auto;
+  flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 10px;
+  border-radius: var(--ql-radius-md); background: var(--ql-color-surface-2); color: var(--ql-color-text-1);
+}
+/* DB3: at medium width (761-1289 px) the inspector's folded 44 px bar sits
+   over the viewport's right edge; pull the toolbar and the key column in by
+   its width so neither the Full screen button nor the key's right edge sits
+   under it. useViewInsets already measures .key-column and .inspector-drawer
+   by their actual DOM rects, so the camera inset follows this automatically. */
+.app-shell.medium .viewport-toolbar, .app-shell.medium .key-column { right: calc(var(--ql-size-inspector-bar) + 12px); }
+/* DB6/DX7: the phone key column's own "under the header" top offset is
+   style.css's narrow-viewport rule (keyed on --phone-overlay-top, replacing
+   the old per-chip .phase-legend selector) -- not duplicated here, so there
+   is exactly one rule for it. Only the vertical-centring transform is undone. */
+.key-column.compact { transform: none; }
+.key-column.compact .phase-legend { flex-direction: row; padding: 4px 8px; font-size: var(--ql-type-caption-size); }

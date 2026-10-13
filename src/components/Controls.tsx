@@ -68,7 +68,6 @@ interface ControlsProps {
   /** The density contour the last render actually used, or null before one. */
   isoLevel: number | null;
   onUpdateOrbital: (params: OrbitalParams) => void;
-  onResetView: () => void;
   surfaceStyle: SurfaceStyle;
   onSurfaceStyleChange: (change: Partial<SurfaceStyle>) => void;
 
@@ -77,9 +76,6 @@ interface ControlsProps {
   open?: boolean;
   /** Phone-width layout. */
   compact?: boolean;
-
-  /** Share and Export (ShareExportBar), under Reset View. */
-  actions?: React.ReactNode;
 
   /**
    * The Relativity switch (spec §5 Phase 4; layout contract §3.8: here, in
@@ -290,13 +286,11 @@ const Controls: React.FC<ControlsProps> = ({
   initialEnclosedFraction, onEnclosedFractionChange,
   isoLevel,
   onUpdateOrbital,
-  onResetView,
   surfaceStyle,
   onSurfaceStyleChange,
   isBusy,
   open = true,
   compact = false,
-  actions,
   relativity,
   relativityIsDefault = false,
   onRelativityChange,
@@ -657,20 +651,10 @@ const Controls: React.FC<ControlsProps> = ({
         )}
       </FormControl>
 
-      <Box className="controls-actions" sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-        <Button
-          id="reset-view"
-          variant="outlined"
-          color="primary"
-          onClick={onResetView}
-        >
-          Reset View
-        </Button>
-        {/* Atom mode renders reactively as the drill-down changes (LevelNav/
-            SubshellPanel dispatch navigation directly); there is nothing
-            here to "update" the way a hydrogen-like n/l/ml choice needs an
-            explicit trigger. */}
-        {isBasicMode && !combinationActive && (
+      {/* Reset View moved to the viewport toolbar (spec §8.5); Update
+          Orbital stays here, next to the parameters it applies. */}
+      {isBasicMode && !combinationActive && (
+        <Box className="controls-actions" sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
           <Button
             id="update-orbital"
             variant="contained"
@@ -679,10 +663,8 @@ const Controls: React.FC<ControlsProps> = ({
           >
             Update Orbital
           </Button>
-        )}
-      </Box>
-
-      {actions}
+        </Box>
+      )}
 
       {/* Progress bar */}
       <Box sx={{ 

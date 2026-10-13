@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import {
-    Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, InputLabel,
-    ListItemText, Menu, MenuItem, Select, Snackbar, TextField,
+    Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, IconButton, InputLabel,
+    ListItemText, Menu, MenuItem, Select, Snackbar, TextField, Tooltip,
 } from '@mui/material';
+import CameraAltOutlined from '@mui/icons-material/CameraAltOutlined';
+import LinkOutlined from '@mui/icons-material/LinkOutlined';
+import FileDownloadOutlined from '@mui/icons-material/FileDownloadOutlined';
 import { EXPORT_ITEMS, ExportAvailability, ExportItem, ExportKind, ExportOptions } from '../export/run_export';
 
 /** The longest side of a print, offered as a choice (a desk model to a display piece). */
@@ -19,6 +22,8 @@ interface ShareExportBarProps {
     stlSolids?: () => number;
     /** Fix round 1 (M5): the menu's own items -- defaults to EXPORT_ITEMS, but Bonds' CSV reads "Potential curve", not "Radial curves" (run_export.ts's exportItemsFor). */
     items?: ExportItem[];
+    /** 'toolbar' is the viewport's icon row (spec §8.5): Snapshot, Share, Export; 'bar' is today's text buttons (the phone's View tab). */
+    variant?: 'bar' | 'toolbar';
 }
 
 /**
@@ -26,7 +31,7 @@ interface ShareExportBarProps {
  * the right-hand panel on a desktop and in the View tab on a phone: no new
  * panel over the canvas (spec §3.8).
  */
-const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, availability, stlSolids, items = EXPORT_ITEMS }) => {
+const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, availability, stlSolids, items = EXPORT_ITEMS, variant = 'bar' }) => {
     const [notice, setNotice] = useState<string | null>(null);
     // Fix round 1 (M6): MUI's Snackbar starts its auto-hide timer once, when
     // `open` first turns true, and does not notice a later change to
@@ -83,21 +88,41 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
     };
 
     return (
-        <Box className="share-export-bar" sx={{ mt: 1.5, display: 'flex', gap: 1 }}>
-            <Button id="share-view" variant="outlined" onClick={handleShare}>Share</Button>
+        <Box className={`share-export-bar ${variant}`} sx={variant === 'bar' ? { mt: 1.5, display: 'flex', gap: 1 } : { display: 'contents' }}>
+            {variant === 'toolbar' && onExport && (
+                <Tooltip title={availability?.png ?? 'Snapshot (PNG with caption)'}>
+                    {/* A span keeps the tooltip on a disabled button. */}
+                    <span>
+                        <IconButton className="viewport-tool" aria-label="Snapshot" disabled={exporting || Boolean(availability?.png)}
+                            onClick={() => { void runKind('png'); }}>
+                            <CameraAltOutlined fontSize="small" />
+                        </IconButton>
+                    </span>
+                </Tooltip>
+            )}
+            {variant === 'toolbar' ? (
+                <Tooltip title="Share link">
+                    <IconButton id="share-view" className="viewport-tool" aria-label="Share" onClick={handleShare}><LinkOutlined fontSize="small" /></IconButton>
+                </Tooltip>
+            ) : (
+                <Button id="share-view" variant="outlined" onClick={handleShare}>Share</Button>
+            )}
             {onExport && (
                 <>
-                    <Button
-                        id="export-view"
-                        variant="outlined"
-                        aria-haspopup="menu"
-                        aria-controls={menuAnchor ? 'export-menu' : undefined}
-                        aria-expanded={menuAnchor !== null}
-                        disabled={exporting}
-                        onClick={event => setMenuAnchor(event.currentTarget)}
-                    >
-                        Export
-                    </Button>
+                    {variant === 'toolbar' ? (
+                        <Tooltip title="Export">
+                            <IconButton id="export-view" className="viewport-tool" aria-label="Export" aria-haspopup="menu"
+                                aria-controls={menuAnchor ? 'export-menu' : undefined} aria-expanded={menuAnchor !== null}
+                                disabled={exporting} onClick={event => setMenuAnchor(event.currentTarget)}>
+                                <FileDownloadOutlined fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    ) : (
+                        <Button id="export-view" variant="outlined" aria-haspopup="menu" aria-controls={menuAnchor ? 'export-menu' : undefined}
+                            aria-expanded={menuAnchor !== null} disabled={exporting} onClick={event => setMenuAnchor(event.currentTarget)}>
+                            Export
+                        </Button>
+                    )}
                     {/* Final review M5: an unavailable item stays reachable by
                         arrow key, so a keyboard or screen-reader user hears its
                         reason (the secondary text) rather than having it

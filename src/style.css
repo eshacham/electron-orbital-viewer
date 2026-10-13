@@ -337,6 +337,10 @@ html, body, #root {
   pointer-events: none;
 }
 
+/* A phone has no viewport toolbar (ruling R6): Reset view, Share and Export
+   end the View tab instead, wrapped so they sit in a line and wrap if tight. */
+.view-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+
 /* Sign of ψ on a marching-cubes surface: the vertex colours are pure red
    and pure blue (orbital_visualizer.ts). */
 .phase-legend {
@@ -529,16 +533,13 @@ html, body, #root {
     padding: 6px 10px 5px;
     font-size: 12px;
   }
-  .phase-legend {
-    /* Level with the scale readout, under the header line (it moved down by the top bar, spec §9.8). */
+  /* DB6/DX7: the one rule for the phone key column's top -- level with the
+     scale readout, under the header line (it moved down by the top bar,
+     spec §9.8). The column's own chip styling (padding, gap, font-size) is
+     viewport.css's `.key-column.compact .phase-legend`; this only positions
+     the column itself, so there is exactly one rule for its top. */
+  .key-column.compact {
     top: calc(var(--phone-overlay-top) + 2px);
-    bottom: auto;
-    left: auto;
-    right: 12px;
-    transform: none;
-    padding: 4px 8px;
-    gap: 8px;
-    font-size: 12px;
   }
 }
 
@@ -615,12 +616,12 @@ html, body, #root {
   .phone-sheet:not(.open) {
     top: auto;
   }
-  /* The narrow rule above anchors the key to the viewport's right edge
-     (right: 12px), which is where the sheet docks here too (bug found live,
-     Task 11 §6.6: a Basic Orbitals or Stark key sat directly under the open
-     sheet). Pull it in by the sheet's own width so it stays over the free
-     canvas, matching how .phone-header's max-width makes the same room. */
-  .phase-legend {
+  /* The narrow rule above anchors the key column to the viewport's right
+     edge (right: 12px), which is where the sheet docks here too (bug found
+     live, Task 11 §6.6: a Basic Orbitals or Stark key sat directly under the
+     open sheet). Pull it in by the sheet's own width so it stays over the
+     free canvas, matching how .phone-header's max-width makes the same room. */
+  .key-column.compact {
     right: calc(46vw + 12px);
   }
 }
