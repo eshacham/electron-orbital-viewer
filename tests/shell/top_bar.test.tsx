@@ -47,4 +47,21 @@ describe('TopBar (spec §8.1)', () => {
         fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
         expect(screen.getByLabelText('search slot')).toBeInTheDocument();
     });
+
+    // Ruling T18-a11y-carry (a), spec §13 "arrow keys inside tab rows": the area tabs are one
+    // Tab stop (the current area) and the arrow keys, Home and End move between them.
+    it('makes the area tabs one Tab stop with the arrow keys inside', () => {
+        render(<TopBar brand={BRANDS[0]} mode="dark" tabs={[tab('atom', 'Explore', false), tab('molecule', 'Molecules', true)]}
+            search={null} avatar={null} onHelp={jest.fn()} />);
+        const explore = screen.getByRole('link', { name: 'Explore' });
+        const molecules = screen.getByRole('link', { name: 'Molecules' });
+        expect([explore.tabIndex, molecules.tabIndex]).toEqual([-1, 0]);
+        molecules.focus();
+        fireEvent.keyDown(molecules, { key: 'ArrowLeft' });
+        expect(document.activeElement).toBe(explore);
+        fireEvent.keyDown(explore, { key: 'ArrowRight' });
+        expect(document.activeElement).toBe(molecules);
+        fireEvent.keyDown(molecules, { key: 'Home' });
+        expect(document.activeElement).toBe(explore);
+    });
 });

@@ -7,6 +7,7 @@ import ThemeSwitch from '../design/ThemeSwitch';
 import Wordmark from '../design/Wordmark';
 import type { Brand } from '../design/brands';
 import type { ThemeMode } from '../design/tokens';
+import { useRovingFocus } from './useRovingFocus';
 import './top_bar.css';
 
 export interface TopBarTab {
@@ -35,6 +36,10 @@ interface TopBarProps {
 const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, avatar, onHelp, sessionNote, compactSearch }) => {
     const [searchAnchor, setSearchAnchor] = useState<HTMLElement | null>(null);
     const searchButtonRef = useRef<HTMLButtonElement | null>(null);
+    // §13 "arrow keys inside tab rows": the area tabs are one Tab stop, the
+    // current area, with the arrow keys, Home and End inside (ruling T18-a11y-carry).
+    const tabsRef = useRef<HTMLElement | null>(null);
+    useRovingFocus(tabsRef, { selector: '.app-topbar-tab', orientation: 'horizontal' }, tabs.length > 0);
 
     // Ruling DX4: the search's own ⌘K/Ctrl+K listener lives inside
     // GlobalSearch's 'bar' variant, which this popover does not mount until
@@ -69,7 +74,7 @@ const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, avatar, onHe
                 <Wordmark brand={brand} mode={mode} />
             </a>
             {tabs.length > 0 && (
-                <nav className="app-topbar-tabs" aria-label="areas">
+                <nav ref={tabsRef} className="app-topbar-tabs" aria-label="areas">
                     {tabs.map(tab => (
                         <a
                             key={tab.key}

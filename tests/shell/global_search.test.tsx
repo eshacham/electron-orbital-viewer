@@ -64,4 +64,10 @@ describe('GlobalSearch (spec §8.3)', () => {
         expect(screen.queryByRole('listbox')).toBeNull();
         expect(input).toHaveAttribute('aria-expanded', 'false');
     });
+
+    // Ruling T18-a11y-carry (e): the combobox says what kind of popup it opens.
+    it('says its popup is a listbox', () => {
+        const { input } = setup();
+        expect(input).toHaveAttribute('aria-haspopup', 'listbox');
+    });
 });

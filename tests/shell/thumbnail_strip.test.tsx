@@ -59,6 +59,37 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
         fireEvent.keyDown(selected, { key: 'ArrowRight' });
         expect(document.activeElement).toBe(screen.getByRole('option', { name: '2p_x orbital' }));
     });
+
+    // Task 18's keyboard walk: Chrome moves its sequential focus starting point to
+    // whatever scrollIntoView scrolls to, so the first Tab on a fresh page (and after
+    // every pick) skipped the top bar, rail and Explore and landed after the strip.
+    // The strip now scrolls its own list to centre the shown orbital (spec §13 order).
+    it('centres the shown orbital by scrolling its own list, never through scrollIntoView', () => {
+        const scrollIntoView = jest.fn();
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+        const scrollTo = jest.fn();
+        Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo });
+        const width = jest.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+            return this.getAttribute('role') === 'listbox' ? 300 : 0;
+        });
+        const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            const at = (left: number, width: number) => ({ left, width, right: left + width, top: 0, bottom: 72, height: 72, x: left, y: 0, toJSON: () => ({}) }) as DOMRect;
+            if (this.getAttribute('role') === 'listbox') return at(100, 300);
+            if (this.getAttribute('aria-selected') === 'true') return at(600, 72);
+            return at(0, 0);
+        });
+        try {
+            render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|phase|glow" onSelect={jest.fn()} />);
+            expect(scrollIntoView).not.toHaveBeenCalled();
+            // The tile starts 500 px into the list; centring 72 px in 300 px leaves 114 px before it.
+            expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ left: 386 }));
+        } finally {
+            rects.mockRestore();
+            width.mockRestore();
+            Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+            Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
+        }
+    });
 });
 
 // Controller ruling DC12 (spec §12: "On WebGL context loss, tiles show a

@@ -20,6 +20,16 @@ describe.each(THEME_MODES)('quantumTheme(%s)', mode => {
         expect(contrastRatio(rgb(theme.palette.primary.main), rgb(TOKENS[mode]['surface-1']))).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(rgb(theme.palette.primary.contrastText), rgb(theme.palette.primary.main))).toBeGreaterThanOrEqual(4.5);
     });
+    it('draws the focus ring on MUI controls whose own styles would hide it (spec §13)', () => {
+        const ring = { outline: `2px solid ${TOKENS[mode]['focus-ring']}`, outlineOffset: 2 };
+        const overrides = theme.components!;
+        expect((overrides.MuiButtonBase!.styleOverrides!.root as Record<string, unknown>)['&.Mui-focusVisible']).toEqual(ring);
+        expect((overrides.MuiChip!.styleOverrides!.root as Record<string, unknown>)['&.Mui-focusVisible']).toEqual(ring);
+        expect((overrides.MuiSlider!.styleOverrides!.thumb as Record<string, unknown>)['&.Mui-focusVisible']).toEqual(ring);
+        expect((overrides.MuiOutlinedInput!.styleOverrides!.root as Record<string, unknown>)['&.Mui-focused']).toEqual(ring);
+        // The keyboard walk found LevelNav's breadcrumb Links (component="button") showing the browser's `outline: auto`.
+        expect((overrides.MuiLink!.styleOverrides!.root as Record<string, unknown>)['&.Mui-focusVisible']).toEqual(ring);
+    });
 });
 
 // Controller ruling T10-11px (spec §4.3): MUI's variants used to scale off the

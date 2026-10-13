@@ -69,7 +69,12 @@ export function quantumTheme(mode: ThemeMode): Theme {
                     },
                 },
             },
-            MuiChip: { styleOverrides: { root: { borderRadius: RADIUS.sm } } },
+            // §13: these draw their own focus styles, which would otherwise win over :focus-visible.
+            MuiChip: { styleOverrides: { root: { borderRadius: RADIUS.sm, '&.Mui-focusVisible': focus } } },
+            MuiSlider: { styleOverrides: { thumb: { '&.Mui-focusVisible': focus } } },
+            MuiOutlinedInput: { styleOverrides: { root: { '&.Mui-focused': focus } } },
+            // A Link rendered as a button (LevelNav's breadcrumbs) swaps the ring for the browser's own `outline: auto`.
+            MuiLink: { styleOverrides: { root: { '&.Mui-focusVisible': focus } } },
             MuiTooltip: { styleOverrides: { tooltip: { borderRadius: RADIUS.sm, fontSize: TYPE.caption.size } } },
         },
     });

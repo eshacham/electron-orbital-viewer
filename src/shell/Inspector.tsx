@@ -1,4 +1,4 @@
-import React, { useEffect, useId } from 'react';
+import React, { useId } from 'react';
 import TabRow, { type TabItem } from './TabRow';
 import './inspector.css';
 
@@ -26,12 +26,19 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
     const id = useId();
     const active = tabs?.find(tab => tab.key === activeTab) ?? tabs?.[0];
 
-    useEffect(() => {
-        if (variant !== 'drawer' || !open) return undefined;
-        const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onOpenChange?.(false); };
-        document.addEventListener('keydown', onKey);
-        return () => document.removeEventListener('keydown', onKey);
-    }, [variant, open, onOpenChange]);
+    // §13: Esc closes the open drawer and puts focus back on the bar button
+    // that opened it. It is the drawer's own key -- heard on the drawer, not on
+    // document, and only when nothing inside it handled the Esc first -- so an
+    // Esc meant for the periodic table or the search does not close it too
+    // (ruling T18-a11y-carry).
+    const onDrawerKey = (event: React.KeyboardEvent<HTMLElement>) => {
+        if (event.key !== 'Escape' || event.defaultPrevented) return;
+        event.preventDefault();
+        const bar = event.currentTarget.querySelector<HTMLButtonElement>('.inspector-bar-button[aria-expanded="true"]')
+            ?? event.currentTarget.querySelector<HTMLButtonElement>('.inspector-bar-button');
+        onOpenChange?.(false);
+        bar?.focus();
+    };
 
     if (variant === 'stacked') {
         return (
@@ -55,7 +62,8 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
     if (variant === 'drawer') {
         const bar: TabItem[] = tabs ?? [{ key: 'view', label: 'View' }];
         return (
-            <aside className={`inspector inspector-drawer view-panel ${open ? 'open' : 'folded'}`} aria-label="Inspector">
+            <aside className={`inspector inspector-drawer view-panel ${open ? 'open' : 'folded'}`} aria-label="Inspector"
+                onKeyDown={open ? onDrawerKey : undefined}>
                 <div className="inspector-bar">
                     {bar.map(item => {
                         const expanded = open && (!tabs || active?.key === item.key);

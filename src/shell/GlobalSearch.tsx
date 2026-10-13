@@ -84,6 +84,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ sources, onPick, onWantInde
                 aria-label="Search elements, molecules and orbitals"
                 placeholder="Search elements, molecules…"
                 aria-autocomplete="list"
+                aria-haspopup="listbox"
                 aria-expanded={showList}
                 aria-controls={showList ? listId : undefined}
                 aria-activedescendant={showList && results[active] ? optionId(results[active]) : undefined}

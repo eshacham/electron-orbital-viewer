@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Box, Breadcrumbs, Link, Chip, Typography, Collapse, Button } from '@mui/material';
 import { elementFor } from '../elements';
 import {
@@ -7,6 +7,7 @@ import {
 } from '../atom/configurations';
 import { orbitalName } from '../orbital_names';
 import { methodStatement, type RelativityMode } from '../atom/relativity';
+import { useRovingFocus } from '../shell/useRovingFocus';
 
 /**
  * Where a breadcrumb segment or shell chip should take the app.
@@ -196,6 +197,10 @@ const LevelNav: React.FC<LevelNavProps> = ({
     pictureShown = true,
 }) => {
     const [aboutOpen, setAboutOpen] = useState(false);
+    // §13: the shells are one Tab stop with the arrow keys inside. Here, before
+    // any early return, so the hook order never changes.
+    const shellsRef = useRef<HTMLDivElement>(null);
+    useRovingFocus(shellsRef, { selector: '.level-nav-shell-chip', orientation: 'horizontal' });
 
     const element = elementFor(Z);
     const elementName = element ? element.name : `Z=${Z}`;
@@ -362,7 +367,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 )}
             </Typography>
 
-            <Box className="level-nav-shells" role="group" aria-label="shells">
+            <Box ref={shellsRef} className="level-nav-shells" role="group" aria-label="shells">
                 {shells.map(shell => {
                     const isSelected = selectedShell === shell.n;
                     const isValence = shell.n === valenceN;

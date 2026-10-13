@@ -1209,6 +1209,17 @@ describe('App: shell', () => {
         expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveClass('view-panel');
     });
 
+    it('reads top bar → rail → Explore → toolbar → strip → inspector, under one h1 (spec §13)', () => {
+        const { container } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        const order = ['.app-topbar', '.app-rail', '.explore-panel', '.viewport-toolbar', '.thumbnail-strip', '.inspector']
+            .map(selector => container.querySelector(selector)!);
+        order.forEach(element => expect(element).not.toBeNull());
+        for (let i = 1; i < order.length; i++) {
+            expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        }
+        expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    });
+
     it('the Explore tab returns to the last of Atoms, Basic Orbitals and Bonds; Molecules has its own', () => {
         const { store } = renderWithProvider(<App />);
         // Unanchored: the rail item's name is "Bonds (bonds mode)" (WCAG 2.5.3, label in name).
@@ -1277,8 +1288,11 @@ describe('App: shell', () => {
         expect(drawer).toHaveClass('folded');
         fireEvent.click(screen.getByRole('button', { name: 'View settings' }));
         expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('open');
-        fireEvent.keyDown(document, { key: 'Escape' });
+        // Ruling T18-a11y-carry (b): Esc is the drawer's own key -- pressed inside it (here on the
+        // bar button that opened it), not on document, so an Esc meant for the table or search is not its.
+        fireEvent.keyDown(screen.getByRole('button', { name: 'View settings' }), { key: 'Escape' });
         expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('folded');
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'View settings' }));
     });
 
     it('exports the curves of the plot tab on screen (ruling C6)', async () => {

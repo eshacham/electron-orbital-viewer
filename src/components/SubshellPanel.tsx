@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Box, Chip, Typography, Button } from '@mui/material';
 import { SerialisedSubshell } from '../workers/atomWorker';
 import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
 import { RelativityMode, methodStatement, shortMethodLabel } from '../atom/relativity';
 import { orbitalName, shellLetter } from '../orbital_names';
 import { CURVE_COLORS, orbitalShade } from '../curve_colors';
+import { useRovingFocus } from '../shell/useRovingFocus';
 
 interface SubshellPanelProps {
     /**
@@ -181,6 +182,13 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
     const activeSubshell = selectedSubshell && selectedSubshell.n === shellN
         ? shellSubshells.find(s => sameSubshell(selectedSubshell, s)) ?? null
         : null;
+    // §13: the subshell chips and the mₗ row are each one Tab stop with the
+    // arrow keys inside. The mₗ row mounts only once a subshell is picked, so
+    // its hook re-attaches on the active subshell (ruling DX2).
+    const chipRowRef = useRef<HTMLDivElement>(null);
+    const mlRowRef = useRef<HTMLDivElement>(null);
+    useRovingFocus(chipRowRef, { selector: '.subshell-chip', orientation: 'horizontal' }, part);
+    useRovingFocus(mlRowRef, { selector: '.subshell-ml-button', orientation: 'horizontal' }, activeSubshell && subshellKey(activeSubshell));
     // The subshell's own curve colour: its position within the shell, which
     // is exactly the index App.tsx's atomCurves and shell_composition.ts's
     // colorIndex both use, so the chip, the curve and the 3D lobes agree.
@@ -203,7 +211,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
             {part === 'diagram' && jNoteText}
             {showChips && (
                 <>
-                    <Box className="subshell-chip-row" role="group" aria-label="subshells in this shell">
+                    <Box ref={chipRowRef} className="subshell-chip-row" role="group" aria-label="subshells in this shell">
                         {shellSubshells.map(subshell => {
                             const isSelected = sameSubshell(selectedSubshell, subshell);
                             const electrons = formatElectrons(subshell.electrons);
@@ -282,7 +290,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                     {part === 'all' && jNoteText}
 
                     {activeSubshell && (
-                        <Box className="subshell-ml-row" role="group" aria-label="magnetic quantum number">
+                        <Box ref={mlRowRef} className="subshell-ml-row" role="group" aria-label="magnetic quantum number">
                             {Array.from({ length: 2 * activeSubshell.l + 1 }, (_, i) => i - activeSubshell.l).map(ml => (
                                 <Button
                                     key={ml}

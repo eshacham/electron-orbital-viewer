@@ -24,8 +24,38 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
         expect(onOpenChange).toHaveBeenLastCalledWith(true);
         rerender(<Inspector variant="drawer" body={<p>settings</p>} open onOpenChange={onOpenChange} />);
         expect(screen.getByText('settings')).toBeInTheDocument();
-        fireEvent.keyDown(document, { key: 'Escape' });
+        // Ruling T18-a11y-carry (b): Esc is the drawer's own key now -- pressed inside it, not on document.
+        fireEvent.keyDown(screen.getByText('settings'), { key: 'Escape' });
         expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    });
+
+    // Ruling T18-a11y-carry (b), spec §13: closing must not drop focus to the page, and an
+    // Esc meant for the periodic table or the search must not close the drawer as well.
+    it('on Esc returns focus to the bar button that opened it, and ignores an Esc meant for something else', () => {
+        const onOpenChange = jest.fn();
+        render(
+            <>
+                <input aria-label="search elsewhere" />
+                <Inspector variant="drawer" tabs={tabs} activeTab="data" open onOpenChange={onOpenChange} />
+            </>,
+        );
+        const elsewhere = screen.getByRole('textbox', { name: 'search elsewhere' });
+        elsewhere.focus();
+        fireEvent.keyDown(elsewhere, { key: 'Escape' });
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(onOpenChange).not.toHaveBeenCalled();
+
+        const tab = screen.getByRole('tab', { name: 'Data' });
+        tab.focus();
+        // Already handled by a control inside the drawer (e.g. its own popup): not the drawer's.
+        const handled = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        handled.preventDefault();
+        tab.dispatchEvent(handled);
+        expect(onOpenChange).not.toHaveBeenCalled();
+
+        fireEvent.keyDown(tab, { key: 'Escape' });
+        expect(onOpenChange).toHaveBeenLastCalledWith(false);
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Data panel' }));
     });
 
     it('stacks its tabs as sections inside the phone sheet (ruling R7)', () => {

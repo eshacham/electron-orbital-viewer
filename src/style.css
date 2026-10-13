@@ -890,7 +890,8 @@ html, body, #root {
   transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 .periodic-tile-number {
-  font-size: 7px;
+  /* §4.3: nothing under 11 px (ruling T10-sub11). */
+  font-size: var(--ql-type-tick-size);
   color: var(--ql-color-text-3);
 }
 .periodic-tile-symbol {
@@ -1271,7 +1272,8 @@ html, body, #root {
 .molecule-orbital-gap-caveat {
   display: block;
   color: var(--ql-color-text-2);
-  font-size: 10px;
+  /* §4.3: nothing under 11 px (ruling T10-sub11); a caption. */
+  font-size: var(--ql-type-caption-size);
 }
 /* Phase 6D: the mark beside a diffuse virtual's (◌) or a constructed LVMO's (◇) label, in the row's own colour;
    its role="img" and accessible name carry the meaning, and the caption is its legend. */

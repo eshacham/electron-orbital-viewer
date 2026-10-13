@@ -35,3 +35,13 @@ html, body, #root { font-family: var(--ql-font-sans); }
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 .ql-brand-mark { flex: 0 0 auto; }
+/* §4.7 under prefers-reduced-motion: hover, panels, sheet and strip move
+   instantly. Glows stay (they are static). The camera tween and the
+   shell↔orbital fade already honour reduced motion in the renderer. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

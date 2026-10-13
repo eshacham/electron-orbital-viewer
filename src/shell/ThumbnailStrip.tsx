@@ -107,11 +107,20 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({ items, label, rGrid, th
     useRovingFocus(listRef, { selector: '[role="option"]', orientation: 'horizontal' }, collapsed);
     const px = variant === 'sheet' ? 56 : 72;
 
-    // Bring the shown orbital into view (instant under reduced motion: §4.7).
+    // Bring the shown orbital into view (instant under reduced motion: §4.7)
+    // by scrolling the list itself. Not scrollIntoView: Chrome moves its
+    // sequential focus starting point to the element scrolled to, so the
+    // next Tab skipped the top bar, rail and Explore (§13 order; Task 18).
     useEffect(() => {
-        const selected = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+        const list = listRef.current;
+        const selected = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+        if (!list || !selected) return;
         const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        selected?.scrollIntoView?.({ inline: 'center', block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+        const listRect = list.getBoundingClientRect();
+        const tileRect = selected.getBoundingClientRect();
+        const left = Math.max(0, list.scrollLeft + (tileRect.left - listRect.left) - (list.clientWidth - tileRect.width) / 2);
+        if (typeof list.scrollTo === 'function') list.scrollTo({ left, behavior: reduce ? 'auto' : 'smooth' });
+        else list.scrollLeft = left;
     }, [items, collapsed]);
 
     const groups: Array<{ label: string | null; spoken: string | null; items: StripItem[] }> = [];
