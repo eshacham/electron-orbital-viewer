@@ -53,13 +53,14 @@ describe('density colour', () => {
         const context = await draw({ ...base, densityIsoValue: 0.002 });
         const c = DENSITY_SURFACE_COLOUR;
         expect(vertexColours(context)).toEqual([c.r, c.g, c.b, c.r, c.g, c.b, c.r, c.g, c.b].map(Math.fround));
-        const capColours: THREE.Color[] = [];
+        const capColours: THREE.Vector3[] = [];
         context.currentCaps!.traverse(object => {
             const material = (object as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
             if (material?.uniforms?.positivePhase) capColours.push(material.uniforms.positivePhase.value);
         });
         expect(capColours.length).toBeGreaterThan(0);
-        expect(capColours.every(colour => colour.equals(c))).toBe(true);
+        // Ruling DC2: the uniform is a Vector3, so compare x/y/z with r/g/b -- Vector3.equals(Color) compared undefined with undefined and hid a NaN uniform.
+        expect(capColours.map(v => [v.x, v.y, v.z])).toEqual(capColours.map(() => [c.r, c.g, c.b]));
     });
 
     it('keeps phase colours for an orbital', async () => {

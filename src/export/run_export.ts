@@ -17,6 +17,10 @@ import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
 import { encodeGlb } from './gltf';
 import { exportAppLabel } from '../design/brands';
+import { SCHEME_LABEL } from '../design/appearance';
+import type { ColourScheme } from '../design/presentation';
+import type { ThemeMode } from '../design/tokens';
+import { THEME_LABEL } from '../design/ThemeSwitch';
 import { CubeAtom } from './cube';
 import { CubeJob, CubeWorkerHandle, requestCube } from './cube_request';
 import { H2PLUS_LABELS } from '../bonds/h2plus';
@@ -40,6 +44,9 @@ import { ESP_LIMIT_HARTREE, ESP_SIGN_NOTE, ESP_SURFACE_DENSITY, ESP_TICKS, espCo
 
 export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb' | 'cube';
 
+/** The glTF item's opening words; exportItemsFor names the scheme and theme in their place. */
+const GLB_COLOURS_KEPT = 'colours kept';
+
 export interface ExportItem { kind: ExportKind; label: string; detail: string; }
 
 /** Menu order. Each later format adds its entry here. */
@@ -47,7 +54,7 @@ export const EXPORT_ITEMS: ExportItem[] = [
     { kind: 'png', label: 'Image (PNG, 2×)', detail: 'with caption, scale bar and colour key' },
     { kind: 'png-plain', label: 'Image (PNG, 2×), view only', detail: 'no overlays' },
     { kind: 'csv', label: 'Radial curves (CSV)', detail: 'the plotted curves, every sample' },
-    { kind: 'glb', label: '3D model (glTF .glb)', detail: 'colours kept — slides and AR' },
+    { kind: 'glb', label: '3D model (glTF .glb)', detail: `${GLB_COLOURS_KEPT} — slides and AR` },
     { kind: 'stl', label: '3D print (STL)', detail: 'each solid watertight, in millimetres' },
     { kind: 'cube', label: 'Field grid (Gaussian cube)', detail: 'the sampled ψ or ρ, in bohr — for VMD, VESTA, Avogadro' },
 ];
@@ -56,18 +63,26 @@ export const EXPORT_ITEMS: ExportItem[] = [
  * Fix round 1 (M5): Bonds' CSV is the potential curve E(R), not a radial
  * curve -- the menu item's own label should say so, not borrow the
  * atom/Basic Orbitals wording. Every other kind's label is mode-independent.
+ *
+ * Ruling DC6 (spec §11.2): given the look on screen, the glTF item says
+ * whose colours it carries -- a .glb keeps the active scheme's vertex colours.
  */
-export function exportItemsFor(mode: ViewMode): ExportItem[] {
-    if (mode === 'molecule') return MOLECULE_EXPORT_ITEMS;
-    if (mode !== 'bonds') return EXPORT_ITEMS;
-    return EXPORT_ITEMS.map(item => (item.kind === 'csv' ? { ...item, label: 'Potential curve (CSV)' } : item));
+export function exportItemsFor(mode: ViewMode, look?: { theme: ThemeMode; scheme: ColourScheme }): ExportItem[] {
+    const items = mode === 'molecule'
+        ? MOLECULE_EXPORT_ITEMS
+        : mode !== 'bonds'
+            ? EXPORT_ITEMS
+            : EXPORT_ITEMS.map(item => (item.kind === 'csv' ? { ...item, label: 'Potential curve (CSV)' } : item));
+    if (!look) return items;
+    const shown = `colours as shown (${SCHEME_LABEL[look.scheme]}, ${THEME_LABEL[look.theme]})`;
+    return items.map(item => (item.kind === 'glb' ? { ...item, detail: item.detail.replace(GLB_COLOURS_KEPT, shown) } : item));
 }
 
 /** Task 16b: the structure is a view aid drawn beside the surface, not part of it, so the solids leave it out -- said where the item is chosen. */
 const MOLECULE_SURFACE_ONLY = 'surface only (ball-and-stick and dipole arrow not included)';
 const MOLECULE_ITEM_CHANGES: Partial<Record<ExportKind, Partial<ExportItem>>> = {
     csv: { label: 'Orbital table (CSV)', detail: 'every orbital: label, role, occupation, energy in Ha and eV' },
-    glb: { detail: `colours kept — ${MOLECULE_SURFACE_ONLY}` },
+    glb: { detail: `${GLB_COLOURS_KEPT} — ${MOLECULE_SURFACE_ONLY}` },
     stl: { detail: `each solid watertight, in millimetres — ${MOLECULE_SURFACE_ONLY}` },
     cube: { detail: 'the drawn ρ, ψ or ESP grid, in bohr — for VMD, VESTA, Avogadro' },
 };

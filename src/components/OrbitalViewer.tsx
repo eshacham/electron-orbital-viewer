@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setHoverRadius as setAtomHoverRadius, drillToShell } from '../store/atomSlice';
 import {
@@ -28,7 +28,8 @@ import {
     attachShellCompositionLobes,
     setReferenceRing,
     VisualizerContext,
-    renderFrame
+    renderFrame,
+    setAppearance
 } from '../orbital_visualizer';
 import { captureViewPng, freeAreaCrop } from '../export/png';
 import { ViewerExportHandle } from '../export/handle';
@@ -41,6 +42,11 @@ import { createShellCompositionWorker } from '../workers/createShellCompositionW
 import { LobeMeshData } from '../workers/shellCompositionWorker';
 import { OrbitalParams } from '../types/orbital';
 import { useMoleculeView } from '../molecules/useMoleculeView';
+import { useQuantumTheme } from '../design/useQuantumTheme';
+import { usePref } from '../design/usePref';
+import { displayPref, renderPref } from '../design/presentation';
+import { canvasSolid } from '../design/science';
+import type { Appearance } from '../design/appearance';
 
 interface ShellCompositionSuccessMessage {
     type: 'success';
@@ -116,6 +122,20 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // valid to animate between.
     const lastAnimatedSpeciesRef = useRef<string | null>(null);
 
+    // How the scene is drawn (spec §6.6): theme, scheme, finish, axes. Never part of a link.
+    const { mode: themeMode } = useQuantumTheme();
+    const { scheme, finish } = usePref(renderPref);
+    // Only showAxes: a plot-tab change (the same pref) must not repaint the scene.
+    const { showAxes } = usePref(displayPref);
+    const isNarrow = useMediaQuery(NARROW_VIEWPORT);
+    const appearance = useMemo<Appearance>(
+        () => ({ theme: themeMode, scheme, finish, showAxes, lowPower: isNarrow }),
+        [themeMode, scheme, finish, showAxes, isNarrow]
+    );
+    // Read by the export handle, which outlives renders.
+    const appearanceRef = useRef(appearance);
+    appearanceRef.current = appearance;
+
     // Initialize visualizer - only once
     useEffect(() => {
         if (canvasHostRef.current) {
@@ -138,7 +158,10 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                         const width = host.clientWidth;
                         const height = host.clientHeight;
                         return captureViewPng(
-                            { renderer: context.renderer, render: () => renderFrame(context) },
+                            {
+                                renderer: context.renderer, render: () => renderFrame(context),
+                                background: canvasSolid(appearanceRef.current.theme),
+                            },
                             freeAreaCrop(width, height, context.viewInsets),
                             overlays && {
                                 ...overlays,
@@ -166,6 +189,11 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         };
     }, [dispatch, exportHandleRef]);
 
+    // Spec §6.6: a theme, scheme, finish or axes change restyles the scene in place.
+    useEffect(() => {
+        setAppearance(visualizerContextRef.current, appearance);
+    }, [appearance]);
+
     // The camera's direction, into the store once it settles (OrbitControls
     // fires every damped frame), so a shared link can carry it.
     useEffect(() => {
@@ -190,7 +218,6 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // Centre the scene in the part of the canvas no overlay zone covers (see
     // useViewInsets). The zones are siblings of the canvas host inside
     // #canvas-container, so that is what gets measured.
-    const isNarrow = useMediaQuery(NARROW_VIEWPORT);
     const handleInsets = useCallback((insets: ViewInsets) => {
         setViewInsets(visualizerContextRef.current, insets);
         // The live check (tools/design/shoot.mjs) compares these with the zones; dev builds only.

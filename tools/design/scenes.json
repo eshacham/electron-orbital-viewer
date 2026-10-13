@@ -3,6 +3,7 @@
   "admin": "admin.html",
   "c-whole": "#mode=atom&Z=6&level=atom",
   "c-2pz": "#mode=atom&Z=6&level=orbital&n=2&l=1&ml=0",
+  "c-2pz-cut": "#mode=atom&Z=6&level=orbital&n=2&l=1&ml=0&cut=x:0.5",
   "fe-shell": "#mode=atom&Z=26&level=shell&n=3",
   "na-ion": "#mode=atom&Z=11&charge=1&level=atom",
   "basic-3dz2": "#mode=basic&n=3&l=2&ml=0",

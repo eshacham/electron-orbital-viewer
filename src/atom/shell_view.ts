@@ -259,13 +259,15 @@ export interface ShellViewOptions {
      * `valenceEmphasis` uniform in the fragment shader).
      */
     valenceEmphasis?: Float32Array;
+    /** The theme's curve palette (science.ts); CURVE_COLORS by default. */
+    palette?: readonly string[];
 }
 
 /** How thick the sphere's rim is, as a fraction of its radius. Enough to read as an edge at any zoom without eating into the outermost ring. */
 const SHELL_EDGE_FRACTION = 0.035;
 
-/** `CURVE_COLORS`, converted once to the [0,1] triples the shader's `palette` uniform array expects. */
-const PALETTE = CURVE_COLORS.map(hex => new THREE.Vector3(...hexToRgb01(hex)));
+/** A curve palette (`CURVE_COLORS` by default), converted to the [0,1] triples the shader's `palette` uniform array expects. */
+const paletteVectors = (palette: readonly string[]) => palette.map(hex => new THREE.Vector3(...hexToRgb01(hex)));
 
 /**
  * Wraps the log-grid emphasis curve in a float texture the cap shader can
@@ -384,7 +386,7 @@ export function createShellView(options: ShellViewOptions): THREE.Group {
             // fragment shader), so its actual contents do not matter then.
             ringColorIndexMap: { value: createRingColorIndexTexture(ringColorIndex ?? new Float32Array([0])) },
             hueStrength: { value: ringColorIndex ? 1 : 0 },
-            palette: { value: PALETTE },
+            palette: { value: paletteVectors(options.palette ?? CURVE_COLORS) },
             valenceIndex: { value: valenceIndex ?? -1 },
             valenceStrength: { value: valenceIndex === undefined ? 0 : 1 },
             // A 1-texel dummy when no valence curve was given; the guard on
@@ -413,6 +415,14 @@ export function createShellView(options: ShellViewOptions): THREE.Group {
     view.add(cap);
 
     return view;
+}
+
+/** Recolours a shell view's rings in place (spec §11.1 "Shell rings"): same indices, the theme's palette. */
+export function setShellViewPalette(view: THREE.Object3D | null, palette: readonly string[]): void {
+    view?.traverse(child => {
+        const material = (child as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
+        if (material?.uniforms?.palette) material.uniforms.palette.value = paletteVectors(palette);
+    });
 }
 
 /** Drives the shell view's highlight ring from the radial plot's hover radius. */

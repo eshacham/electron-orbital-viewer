@@ -1019,22 +1019,24 @@ function App() {
         bondsData.scan, bondsData.meta, bondsData.loading, bondsData.error, h2plusCurve.curve, isAtomMode, activePlotTab,
     ]);
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
+    // Ruling DC6: the glTF item names the scheme and theme whose colours it keeps.
+    const exportLook = useMemo(() => ({ theme: themeMode, scheme: render.scheme }), [themeMode, render.scheme]);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
     const shareExportBar = useMemo(
         () => (
             <ShareExportBar
                 onShare={handleShare} onExport={handleExport} availability={availability} stlSolids={stlSolids}
-                items={exportItemsFor(atomMode)}
+                items={exportItemsFor(atomMode, exportLook)}
             />
         ),
-        [handleShare, handleExport, availability, stlSolids, atomMode]
+        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook]
     );
     const shareExportToolbar = useMemo(
         () => (
             <ShareExportBar variant="toolbar" onShare={handleShare} onExport={handleExport} availability={availability}
-                stlSolids={stlSolids} items={exportItemsFor(atomMode)} />
+                stlSolids={stlSolids} items={exportItemsFor(atomMode, exportLook)} />
         ),
-        [handleShare, handleExport, availability, stlSolids, atomMode]
+        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook]
     );
 
     // Molecules mode's navigation (layout contract §3.8): the whole card in

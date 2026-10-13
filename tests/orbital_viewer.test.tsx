@@ -34,6 +34,7 @@ jest.mock('../src/orbital_visualizer', () => ({
     clearFieldMesh: jest.fn(),
     setMoleculeOverlay: jest.fn(),
     pointerRaycaster: jest.fn(),
+    setAppearance: jest.fn(),
 }));
 // Only applyCameraAngles is mocked (as a spy to record call order); the rest
 // of the module -- isCanonicalAngles etc., which orbitalSlice's own reducers
@@ -56,7 +57,9 @@ import { clearShellMeshCacheForTests, setCachedShellMeshes, shellMeshCacheKey } 
 import { COMPOSITE_ORBITAL_RESOLUTION } from '../src/atom/shell_composition';
 import { neonProfile } from './export/fixtures';
 import { framingRadiusFor } from '../src/atom/framing';
-import { initVisualizer, attachShellCompositionLobes } from '../src/orbital_visualizer';
+import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes } from '../src/orbital_visualizer';
+import { themeChoicePref } from '../src/design/theme_storage';
+import { renderPref } from '../src/design/presentation';
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
@@ -563,5 +566,19 @@ describe('OrbitalViewer: the grid cell', () => {
             height.mockRestore();
             (globalThis as { ResizeObserver?: unknown }).ResizeObserver = original;
         }
+    });
+});
+
+// Spec §3.2, §6.6: a theme or scheme change restyles the scene; the renderer is never rebuilt.
+describe('OrbitalViewer: appearance', () => {
+    it('restyles in place on a theme or scheme change -- one renderer for the session (spec §3.2)', () => {
+        renderViewer();
+        act(() => { themeChoicePref.set('light'); });
+        act(() => { renderPref.set({ finish: 'solid', scheme: 'classic' }); });
+        expect(initVisualizer).not.toHaveBeenCalled();
+        expect(cleanupVisualizer).not.toHaveBeenCalled();
+        expect(setAppearance).toHaveBeenLastCalledWith(expect.anything(),
+            expect.objectContaining({ theme: 'light', scheme: 'classic', finish: 'solid' }));
+        window.localStorage.clear();
     });
 });

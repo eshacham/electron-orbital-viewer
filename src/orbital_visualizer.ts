@@ -3,7 +3,9 @@ import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ClipAxis, MeshData, OrbitalParams, SurfaceStyle, defaultSurfaceStyle } from './types/orbital';
 import { DEFAULT_ENCLOSED_FRACTION, computeSamplingRadius, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { createOrbitalMaterial, applySurfaceStyle, updateClipPlane, setGroupOpacity } from './orbital_material';
-import { createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCaps, setCapsPositiveColour } from './clip_caps';
+import {
+    createClipCaps, positionCaps, setCapsVisible, setCapsOpacity, disposeCaps, setCapsPositiveColour, setCapsDensityRamp, setCapsPhaseColours,
+} from './clip_caps';
 import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
 import { createOrbitalWorker } from './workers/createOrbitalWorker';
 import { createOrbitalControls } from './orbital_controls_factory';
@@ -16,6 +18,7 @@ import {
     setShellViewRadius,
     getShellViewRadius,
     disposeShellView,
+    setShellViewPalette,
     ShellViewOptions
 } from './atom/shell_view';
 import { lerp, clamp01, easeInOutCubic, interpolateCurves } from './atom/level_transition';
@@ -24,7 +27,8 @@ import { LobeMeshData } from './workers/shellCompositionWorker';
 import {
     createCompositionLobesGroup,
     setCompositionLobesOpacity,
-    disposeCompositionLobes
+    disposeCompositionLobes,
+    recolourCompositionLobes
 } from './atom/shell_composition_view';
 import { FieldRenderRequest } from './field_source';
 // Imported from systems.ts rather than bonds_request.ts (preflight T8<->T9):
@@ -32,7 +36,7 @@ import { FieldRenderRequest } from './field_source';
 // module -- the shared rendering core, not Bonds-specific -- has no other
 // reason to depend on.
 import { DENSITY_SURFACE_HEX } from './bonds/systems';
-import { createFieldOverlayGroup } from './field_overlay_view';
+import { createFieldOverlayGroup, recolourFieldOverlay } from './field_overlay_view';
 import { markExportSurface } from './export/surfaces';
 import { CANONICAL_CAMERA_DIRECTION } from './camera_angles';
 import { framingRadiusFor } from './atom/framing';
@@ -42,7 +46,9 @@ import {
     setReferenceRingWidth,
     disposeReferenceRing
 } from './atom/reference_ring';
-import { disposeOverlay } from './molecules/ball_and_stick';
+import { CPK_COLORS, disposeOverlay } from './molecules/ball_and_stick';
+import { CLASSIC_APPEARANCE, type Appearance } from './design/appearance';
+import { axesStyle, curvePalette, densitySurfaceHex, displayRgb, linearRgb, phaseColours } from './design/science';
 
 /** One colour for a total density (spec §4.1): ψ's red and blue would claim a phase it does not have. */
 export const DENSITY_SURFACE_COLOUR = new THREE.Color(DENSITY_SURFACE_HEX);
@@ -185,7 +191,11 @@ export interface VisualizerContext {
      * replaces that group, leaves the structure in place.
      */
     moleculeOverlay?: THREE.Group | null;
+    /** How to draw (spec §6.6), set by OrbitalViewer; Classic until then. Optional so test doubles need not carry it. */
+    appearance?: Appearance;
 }
+
+const appearanceOf = (context: VisualizerContext): Appearance => context.appearance ?? CLASSIC_APPEARANCE;
 
 /**
  * The atom<->shell fade (level-transition spec addendum): one already-built
@@ -304,7 +314,9 @@ function isPickable(context: VisualizerContext, r: number | null): boolean {
 
 export function initVisualizer(container: HTMLElement, initialCameraZ: number = 12): VisualizerContext {
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050505);
+    // Transparent: the viewport cell paints the theme's canvas gradient token
+    // behind the canvas (spec §6.6), so a theme change never touches the renderer.
+    scene.background = null;
 
     const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
     // z up, the chemistry convention, so 2p_z, 3d_z² and 4f_z³ stand upright
@@ -316,12 +328,13 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     // stencil defaults to false since three r163, and without the buffer every
     // stencil test passes — which would draw the cut-away caps as full quads
     // instead of only across the orbital's interior.
-    const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, alpha: true, premultipliedAlpha: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     // Without this the canvas backs at one device pixel per CSS pixel, which on
     // a phone is a third of the screen's resolution. Capped at 2 so a 3x display
     // does not pay for nine fragments per CSS pixel.
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x000000, 0);
     renderer.localClippingEnabled = true;
     container.appendChild(renderer.domElement);
 
@@ -365,7 +378,8 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
         activeWorker: null,
         requestCounter: 0,
         isShellView: false,
-        transition: null
+        transition: null,
+        appearance: CLASSIC_APPEARANCE
     };
 
     // Levels 1-2 cross-view linkage (spec §6): the plot reports a radius on
@@ -1188,6 +1202,8 @@ function showFieldOverlay(context: VisualizerContext, meshes: MeshData[], colors
     context.isShellView = false;
     context.isCompositionView = false;
     const group = createFieldOverlayGroup(meshes, colors, labels, context.surfaceStyle, context.clippingPlanes);
+    group.userData.applyAppearance = (a: Appearance) => recolourFieldOverlay(group, curvePalette(a.theme, a.scheme));
+    group.userData.applyAppearance(appearanceOf(context));
     context.scene.add(group);
     context.currentOrbitalGroup = group;
     context.currentCaps = null;
@@ -1316,7 +1332,19 @@ export function setMoleculeOverlay(context: VisualizerContext | null, overlay: T
         disposeOverlay(context.moleculeOverlay);
     }
     context.moleculeOverlay = overlay;
-    if (overlay) context.scene.add(overlay);
+    if (overlay) {
+        context.scene.add(overlay);
+        applyOverlayAppearance(overlay, appearanceOf(context));
+    }
+}
+
+/** Ruling R12: hydrogen's CPK white would vanish on Light Clean's page, so it is #F2F2F2 there (non-Classic). */
+function applyOverlayAppearance(overlay: THREE.Object3D, appearance: Appearance): void {
+    const hydrogen = appearance.theme === 'light' && appearance.scheme !== 'classic' ? '#F2F2F2' : CPK_COLORS[1];
+    overlay.traverse(child => {
+        const material = (child as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+        if (material?.userData?.Z === 1) material.color.set(hydrogen);
+    });
 }
 
 /** The shared raycaster, aimed through the pointer (the same arithmetic radiusUnderPointer uses). */
@@ -1562,7 +1590,9 @@ export function updateAtomViewInScene(
         ringColorIndex: params.ringColorIndex,
         valenceIndex: params.valenceIndex,
         valenceEmphasis: params.valenceEmphasis,
+        palette: curvePalette(appearanceOf(context).theme, appearanceOf(context).scheme),
     } satisfies ShellViewOptions);
+    view.userData.applyAppearance = (a: Appearance) => setShellViewPalette(view, curvePalette(a.theme, a.scheme));
 
     context.scene.add(view);
     // The shell view's own group *is* its caps -- there is no separate
@@ -1682,8 +1712,10 @@ export function attachShellCompositionLobes(
 
     clearShellCompositionLobes(context);
     const lobes = createCompositionLobesGroup(
-        components, meshes, context.clippingPlanes, context.surfaceStyle.opacity, distinguishOrbitals
+        components, meshes, context.clippingPlanes, context.surfaceStyle.opacity, distinguishOrbitals,
+        curvePalette(appearanceOf(context).theme, appearanceOf(context).scheme)
     );
+    lobes.userData.applyAppearance = (a: Appearance) => recolourCompositionLobes(lobes, curvePalette(a.theme, a.scheme));
     context.currentOrbitalGroup.add(lobes);
     // The lobes reach past the shell's sphere (a 4f by about 1.2x), and the
     // cut was scaled to the sphere alone: at "nothing removed" the plane sat
@@ -1779,7 +1811,12 @@ function updateSceneWithMeshData(
     context: VisualizerContext,
     meshData: MeshData,
     crossFadeFromShellView: boolean = false,
-    /** A density has no ψ sign to colour by (ruling T7-a); when set, every vertex and the cut face take this one colour instead. */
+    /**
+     * Set for a density, which has no ψ sign to colour by (ruling T7-a):
+     * every vertex and the cut face take one colour instead. The colour
+     * itself now comes from the scheme (science.ts densitySurfaceHex) --
+     * DENSITY_SURFACE_COLOUR, what callers pass, is Classic's.
+     */
     uniformColour?: THREE.Color,
     /**
      * A caller-supplied colouring (the ESP map) that overrides the per-vertex
@@ -1814,7 +1851,13 @@ function updateSceneWithMeshData(
 
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(meshData.positions.flat());
-        const colors = new Float32Array(meshData.positions.length * 3); // RGB for each vertex
+        const colors = new Float32Array(meshData.positions.length * 3); // RGB for each vertex, filled by paint below
+        // What decides the surface's colours, and -- separately -- the cut
+        // face's (ruling DC2): the ESP map supplies its own vertex colours,
+        // yet its cut face is the density's material, as before (D15).
+        const surfaceColouring: 'custom' | 'density' | 'phase' = vertexColors ? 'custom' : uniformColour ? 'density' : 'phase';
+        const capColouring: 'density' | 'phase' = uniformColour ? 'density' : 'phase';
+        const signs = Int8Array.from(meshData.psiSigns, sign => (sign === 1 ? 1 : -1));
 
         if (vertexColors) {
             // A caller-supplied colouring (the ESP map) replaces the phase colours outright.
@@ -1822,28 +1865,6 @@ function updateSceneWithMeshData(
                 throw new Error(`mesh has ${meshData.positions.length} vertices, vertex colours given for ${vertexColors.length / 3}`);
             }
             colors.set(vertexColors);
-        } else if (uniformColour) {
-            // One colour throughout: a density carries no phase to split red/blue by.
-            meshData.psiSigns.forEach((_sign, index) => {
-                const colorIndex = index * 3;
-                colors[colorIndex] = uniformColour.r;
-                colors[colorIndex + 1] = uniformColour.g;
-                colors[colorIndex + 2] = uniformColour.b;
-            });
-        } else {
-            // Assign colors based on ψ sign
-            meshData.psiSigns.forEach((sign, index) => {
-                const colorIndex = index * 3;
-                if (sign === 1) {
-                    colors[colorIndex] = 1; // Red
-                    colors[colorIndex + 1] = 0;
-                    colors[colorIndex + 2] = 0;
-                } else {
-                    colors[colorIndex] = 0; // Blue
-                    colors[colorIndex + 1] = 0;
-                    colors[colorIndex + 2] = 1;
-                }
-            });
         }
 
         const positionAttribute = new THREE.Float32BufferAttribute(positions, 3);
@@ -1866,8 +1887,36 @@ function updateSceneWithMeshData(
             densityMap: meshData.densityMap,
             opacity: context.surfaceStyle.opacity
         });
-        if (uniformColour) setCapsPositiveColour(caps, uniformColour);
         group.add(caps);
+
+        // Colours come from the appearance (spec §6.6, §11) and are repainted
+        // in place by setAppearance through this closure: the geometry, its
+        // vertices and the caps' stencil passes stay as built (§11.2).
+        const paint = (appearance: Appearance) => {
+            const attribute = geometry.getAttribute('color') as THREE.BufferAttribute;
+            if (surfaceColouring === 'phase') {
+                const phase = phaseColours(appearance.theme, appearance.scheme);
+                // linearRgb('#FF0000') is exactly [1, 0, 0]: Classic's vertex colours are today's to the bit.
+                const [positive, negative] = [linearRgb(phase.positive), linearRgb(phase.negative)];
+                for (let i = 0; i < signs.length; i++) attribute.setXYZ(i, ...(signs[i] === 1 ? positive : negative));
+                attribute.needsUpdate = true;
+            } else if (surfaceColouring === 'density') {
+                // One colour throughout: a density carries no phase (ruling T7-a).
+                const colour = new THREE.Color(densitySurfaceHex(appearance.theme, appearance.scheme));
+                for (let i = 0; i < signs.length; i++) attribute.setXYZ(i, colour.r, colour.g, colour.b);
+                attribute.needsUpdate = true;
+            }
+            if (capColouring === 'phase') {
+                const phase = phaseColours(appearance.theme, appearance.scheme);
+                setCapsPhaseColours(caps, displayRgb(phase.capPositive), displayRgb(phase.capNegative));
+                setCapsDensityRamp(caps, appearance.scheme === 'density');
+            } else {
+                // THREE.Color, as before, for the cap's uniform.
+                setCapsPositiveColour(caps, new THREE.Color(densitySurfaceHex(appearance.theme, appearance.scheme)));
+            }
+        };
+        paint(appearanceOf(context));
+        mesh.userData.applyAppearance = paint;
         context.currentCaps = caps;
         refreshCaps(context);
 
@@ -1906,11 +1955,8 @@ function meshRadius(meshData: MeshData): number {
     return Math.sqrt(max);
 }
 
-/** Label colours, matching the far end of each AxesHelper line. */
-const AXIS_LABELS: Array<{ text: string; color: string; direction: [number, number, number] }> = [
-    { text: 'x', color: '#ff9f40', direction: [1, 0, 0] },
-    { text: 'y', color: '#a0ff40', direction: [0, 1, 0] },
-    { text: 'z', color: '#40a8ff', direction: [0, 0, 1] },
+const AXIS_DIRECTIONS: Array<{ text: 'x' | 'y' | 'z'; direction: [number, number, number] }> = [
+    { text: 'x', direction: [1, 0, 0] }, { text: 'y', direction: [0, 1, 0] }, { text: 'z', direction: [0, 0, 1] },
 ];
 
 /** A camera-facing letter, or null where there is no 2D canvas (jsdom). */
@@ -1933,25 +1979,46 @@ function createAxisLabel(text: string, color: string): THREE.Sprite | null {
     return new THREE.Sprite(material);
 }
 
+/**
+ * §11.1 "Axes": Classic keeps AxesHelper's red/green/blue and today's
+ * labels; the themes draw one hue with 6 % arrowheads and labels in text-1.
+ * Each line gets its letter just past its end -- the lines alone said
+ * nothing about which was which.
+ */
 function addAxesHelper(context: VisualizerContext, size: number) {
     if (!context) return;
-
-    // Remove existing axes if any
     removeAxesHelper(context);
-
-    // The lines alone said nothing about which was which; each gets its
-    // letter just past its end.
+    const appearance = appearanceOf(context);
+    const style = axesStyle(appearance.theme, appearance.scheme);
     const group = new THREE.Group();
     group.userData.isAxes = true;
-    group.add(new THREE.AxesHelper(size));
-    for (const label of AXIS_LABELS) {
-        const sprite = createAxisLabel(label.text, label.color);
+    group.userData.size = size;
+    group.userData.styleKey = `${appearance.theme}|${appearance.scheme}`;
+    if (style.perAxis) {
+        group.add(new THREE.AxesHelper(size));
+    } else {
+        const lineMaterial = new THREE.LineBasicMaterial({ color: style.line, transparent: style.lineOpacity < 1, opacity: style.lineOpacity });
+        const points = AXIS_DIRECTIONS.flatMap(({ direction: [x, y, z] }) => [new THREE.Vector3(), new THREE.Vector3(x, y, z).multiplyScalar(size)]);
+        group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points), lineMaterial));
+        if (style.arrowheads) {
+            for (const { direction: [x, y, z] } of AXIS_DIRECTIONS) {
+                const head = new THREE.Mesh(new THREE.ConeGeometry(size * 0.022, size * 0.06, 16),
+                    new THREE.MeshBasicMaterial({ color: style.line, transparent: style.lineOpacity < 1, opacity: style.lineOpacity }));
+                // A cone points along +y; turn it onto its axis.
+                head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(x, y, z));
+                head.position.set(x, y, z).multiplyScalar(size * 0.97);
+                group.add(head);
+            }
+        }
+    }
+    for (const { text, direction: [x, y, z] } of AXIS_DIRECTIONS) {
+        const sprite = createAxisLabel(text, style.labels[text]);
         if (!sprite) continue;
-        const [x, y, z] = label.direction;
         sprite.position.set(x, y, z).multiplyScalar(size * 1.08);
         sprite.scale.setScalar(size * 0.12);
         group.add(sprite);
     }
+    group.visible = appearance.showAxes;
     context.scene.add(group);
     context.currentAxesHelper = group;
 }
@@ -1974,9 +2041,34 @@ function removeAxesHelper(context: VisualizerContext) {
         } else if (object instanceof THREE.Sprite) {
             object.material.map?.dispose();
             object.material.dispose();
+        } else if (object instanceof THREE.LineSegments || object instanceof THREE.Mesh) {
+            object.geometry.dispose();
+            (object.material as THREE.Material).dispose();
         }
     });
     context.currentAxesHelper = null;
+}
+
+/**
+ * Applies a new appearance in place (spec §6.6): vertex colours, cap and
+ * shell-view uniforms, lobe and overlay colours, the axes. No remount, no
+ * re-mesh, no camera change; each object recolours itself through the
+ * `userData.applyAppearance` its creator left on it.
+ */
+export function setAppearance(context: VisualizerContext | null, appearance: Appearance): void {
+    if (!context || context.isDisposed) return;
+    context.appearance = appearance;
+    const apply = (root: THREE.Object3D | null | undefined) => root?.traverse(object => {
+        (object.userData.applyAppearance as ((a: Appearance) => void) | undefined)?.(appearance);
+    });
+    apply(context.currentOrbitalGroup);
+    if (context.transition?.kind === 'cross-fade') apply(context.transition.outgoing);
+    if (context.moleculeOverlay) applyOverlayAppearance(context.moleculeOverlay, appearance);
+    const axes = context.currentAxesHelper;
+    if (axes) {
+        if (axes.userData.styleKey !== `${appearance.theme}|${appearance.scheme}`) addAxesHelper(context, axes.userData.size as number);
+        context.currentAxesHelper!.visible = appearance.showAxes;
+    }
 }
 
 export function handleResize(context: VisualizerContext, width: number, height: number) {

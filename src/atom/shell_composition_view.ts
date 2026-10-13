@@ -59,10 +59,13 @@ export function createCompositionLobesGroup(
      * overlapping whole-shell view, where one colour per subshell is
      * exactly the distinction that matters.
      */
-    distinguishOrbitals: boolean = false
+    distinguishOrbitals: boolean = false,
+    /** The theme's curve palette (science.ts curvePalette), index for index with CURVE_COLORS. */
+    palette: readonly string[] = CURVE_COLORS
 ): THREE.Group {
     const group = new THREE.Group();
     group.userData.isCompositionLobes = true;
+    group.userData.distinguishOrbitals = distinguishOrbitals;
 
     components.forEach((component, i) => {
         const meshData = meshes[i];
@@ -77,7 +80,7 @@ export function createCompositionLobesGroup(
         geometry.setIndex(meshData.cells.flat());
         geometry.computeVertexNormals();
 
-        const baseColor = CURVE_COLORS[component.colorIndex % CURVE_COLORS.length];
+        const baseColor = palette[component.colorIndex % palette.length];
         const material = new THREE.MeshStandardMaterial({
             color: new THREE.Color(
                 distinguishOrbitals
@@ -99,10 +102,23 @@ export function createCompositionLobesGroup(
         // opacity slider changes, so each lobe keeps its own occupancy
         // weighting instead of every lobe snapping to the same raw value.
         mesh.userData.occupancyFraction = component.occupancyFraction;
+        // What recolourCompositionLobes needs to repaint this lobe in another palette.
+        mesh.userData.lobe = { colorIndex: component.colorIndex, l: component.l, ml: component.ml };
         group.add(mesh);
     });
 
     return group;
+}
+
+/** Recolours the lobes in place with a palette, keeping each lobe's index and shade (spec §11.1 "Subshell members"). */
+export function recolourCompositionLobes(group: THREE.Object3D, palette: readonly string[]): void {
+    const distinguish = Boolean(group.userData.distinguishOrbitals);
+    group.traverse(child => {
+        const lobe = child.userData.lobe as { colorIndex: number; l: number; ml: number } | undefined;
+        if (!lobe || !(child instanceof THREE.Mesh)) return;
+        const base = palette[lobe.colorIndex % palette.length];
+        (child.material as THREE.MeshStandardMaterial).color.set(distinguish ? orbitalShade(base, lobe.l + lobe.ml, 2 * lobe.l + 1) : base);
+    });
 }
 
 /** Rescales every lobe's opacity when the shared surface-style slider changes, preserving each one's own occupancy weighting. */

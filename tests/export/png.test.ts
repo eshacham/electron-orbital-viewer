@@ -230,3 +230,15 @@ describe('drawOverlays: the ψ legend takes the scheme\'s colours (one source, s
         expect(paint()).toEqual(expect.arrayContaining(['#e02020', '#2040ff']));
     });
 });
+
+describe('captureViewPng over a transparent canvas (spec §6.6)', () => {
+    it('paints the theme\'s solid canvas colour first, so a PNG never has a transparent hole', async () => {
+        const { calls, factory } = recorder();
+        const { renderer } = fakeRenderer(400, 300);
+        await captureViewPng({ renderer, render: () => {}, background: '#04142A' }, { x: 0, y: 0, width: 400, height: 300 }, null, factory);
+        const fill = calls.findIndex(c => c[0] === 'fillRect');
+        const draw = calls.findIndex(c => c[0] === 'drawImage');
+        expect(fill).toBeGreaterThanOrEqual(0);
+        expect(fill).toBeLessThan(draw);
+    });
+});

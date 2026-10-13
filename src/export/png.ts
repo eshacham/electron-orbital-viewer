@@ -229,7 +229,12 @@ export interface CaptureRenderer {
     getContext(): { isContextLost(): boolean };
     readonly domElement: HTMLCanvasElement;
 }
-export interface CaptureTarget { renderer: CaptureRenderer; render(): void; }
+export interface CaptureTarget {
+    renderer: CaptureRenderer;
+    render(): void;
+    /** §6.6: the theme's solid canvas colour, painted first -- the canvas is transparent. */
+    background?: string;
+}
 
 const defaultCanvas = (width: number, height: number): ExportCanvas => {
     const canvas = document.createElement('canvas');
@@ -262,6 +267,10 @@ export async function captureViewPng(
     const out = createCanvas(Math.round(crop.width * ratio), Math.round(crop.height * ratio));
     const painter = out.getContext('2d');
     if (!painter) throw new Error('This browser cannot compose an image.');
+    if (target.background) {
+        painter.fillStyle = target.background;
+        painter.fillRect(0, 0, out.width, out.height);
+    }
     try {
         renderer.setPixelRatio(ratio);
         target.render();

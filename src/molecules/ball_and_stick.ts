@@ -101,7 +101,12 @@ export function buildBallAndStick(atoms: MoleculeAtom[], bonds: Bond[]): THREE.G
     group.userData.isBallAndStick = true;
     const materials = new Map<number, THREE.MeshStandardMaterial>();
     const material = (Z: number) => {
-        if (!materials.has(Z)) materials.set(Z, new THREE.MeshStandardMaterial({ color: CPK_COLORS[Z], roughness: 0.45, metalness: 0 }));
+        if (!materials.has(Z)) {
+            const created = new THREE.MeshStandardMaterial({ color: CPK_COLORS[Z], roughness: 0.45, metalness: 0 });
+            // Which element this is, so a theme can recolour one (orbital_visualizer.ts, ruling R12).
+            created.userData.Z = Z;
+            materials.set(Z, created);
+        }
         return materials.get(Z)!;
     };
     atoms.forEach((atom, index) => {
