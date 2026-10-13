@@ -58,6 +58,21 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
         expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Data panel' }));
     });
 
+    // Ruling R20b-atoms: the Atom screen's Display settings head the inspector, above Plot | Data,
+    // docked and in the open drawer, and scroll with the tabs rather than squeezing them.
+    it('puts a top section above its tabs, in one scroll area, docked and in the open drawer', () => {
+        const top = <section aria-label="Display"><p>display settings</p></section>;
+        const { container, rerender } = render(<Inspector variant="docked" top={top} tabs={tabs} activeTab="plot" />);
+        const above = (first: Element, second: Element) => Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+        expect(above(screen.getByRole('region', { name: 'Display' }), screen.getByRole('tablist', { name: 'Inspector' }))).toBe(true);
+        expect(container.querySelector('.inspector-scroll')).toContainElement(screen.getByRole('region', { name: 'Display' }));
+        expect(container.querySelector('.inspector-scroll')).toContainElement(screen.getByRole('tabpanel'));
+        rerender(<Inspector variant="drawer" top={top} tabs={tabs} activeTab="plot" open={false} />);
+        expect(screen.queryByRole('region', { name: 'Display' })).toBeNull();
+        rerender(<Inspector variant="drawer" top={top} tabs={tabs} activeTab="plot" open />);
+        expect(above(screen.getByRole('region', { name: 'Display' }), screen.getByRole('tablist', { name: 'Inspector' }))).toBe(true);
+    });
+
     it('stacks its tabs as sections inside the phone sheet (ruling R7)', () => {
         render(<Inspector variant="stacked" tabs={tabs} />);
         expect(screen.queryByRole('tab')).toBeNull();

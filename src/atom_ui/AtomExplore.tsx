@@ -5,13 +5,18 @@ interface AtomExploreProps {
     header: React.ReactNode;
     configuration: React.ReactNode;
     orbitals: React.ReactNode;
-    display: React.ReactNode;
     /** Medium width: a chevron that folds the panel to the rail (spec §7). */
     onCollapse?(): void;
 }
 
-/** The Atom screen's Explore panel (spec §9.1): the subject header, then Configuration, Orbitals and Display. */
-const AtomExplore: React.FC<AtomExploreProps> = ({ header, configuration, orbitals, display, onCollapse }) => {
+/**
+ * The Atom screen's Explore panel (spec §9.1): the subject header, then
+ * Configuration and Orbitals. Display is the top of the inspector now
+ * (ruling R20b-atoms); the tab id is local state, never stored, so nothing
+ * can ask for the old "display" tab (ExplorePanel would fall back to the
+ * first tab, Configuration, if anything did).
+ */
+const AtomExplore: React.FC<AtomExploreProps> = ({ header, configuration, orbitals, onCollapse }) => {
     const [tab, setTab] = useState('configuration');
     return (
         <ExplorePanel
@@ -22,7 +27,6 @@ const AtomExplore: React.FC<AtomExploreProps> = ({ header, configuration, orbita
             tabs={[
                 { key: 'configuration', label: 'Configuration', content: configuration },
                 { key: 'orbitals', label: 'Orbitals', content: orbitals },
-                { key: 'display', label: 'Display', content: display },
             ]}
         />
     );

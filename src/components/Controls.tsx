@@ -76,8 +76,17 @@ interface ControlsProps {
    * onSurfaceStyleChange; without it every tick does, as before.
    */
   onOpacityPreview?: (opacity: number) => void;
-  /** The Atom Display tab offers Glow / Solid / Wireframe itself (ruling R1). */
+  /** The Atom Display section offers Glow / Solid / Wireframe itself (ruling R1). */
   hideSurfaceStyle?: boolean;
+  /**
+   * Which half of the panel to draw (ruling R20b): 'selection' is what is
+   * drawn -- n/l/mₗ, the combination, the Z = 1 note, Update Orbital (and in
+   * atom mode the Relativity switch and element picker); 'view' is how it is
+   * shown -- the enclosed fraction, the children, Surface, Opacity, Cut away
+   * and the busy bar. 'all' (the default) is both, in today's order. Basic
+   * Orbitals puts its selection in Explore and its view in the inspector.
+   */
+  part?: 'all' | 'selection' | 'view';
 
   isBusy: boolean;
   /** Sheet is showing. Only meaningful on narrow screens. */
@@ -339,6 +348,7 @@ const Controls: React.FC<ControlsProps> = ({
   onSurfaceStyleChange,
   onOpacityPreview,
   hideSurfaceStyle = false,
+  part = 'all',
   isBusy,
   open = true,
   compact = false,
@@ -354,6 +364,8 @@ const Controls: React.FC<ControlsProps> = ({
   // Z = 1 note) belong to that mode alone, not to "not atom mode": Bonds is
   // a third mode with none of them.
   const isBasicMode = mode === 'hydrogenic';
+  const showSelection = part !== 'view';
+  const showView = part !== 'selection';
   // Bug fix (task 22, bug 6): levels 1-2 in atom mode render a spherical
   // shell view straight from the shader (orbital_visualizer.ts's
   // updateAtomViewInScene / shell_view.ts) rather than a marching-cubes
@@ -380,12 +392,13 @@ const Controls: React.FC<ControlsProps> = ({
   const mlOptions = React.useMemo(() => Array.from({ length: 2 * initialL + 1 }, (_, i) => i - initialL), [initialL]);
 
   // If the current l is not valid for a new n, reset it; ml follows from the l effect.
+  // The selects' own part does this, so a split panel corrects once (ruling R20b).
   useEffect(() => {
-    if (!lOptions.includes(initialL)) onLChange(lOptions[0] ?? 0);
+    if (showSelection && !lOptions.includes(initialL)) onLChange(lOptions[0] ?? 0);
   }, [lOptions, onLChange]); // initialL is intentionally not here to avoid loops if L is reset
 
   useEffect(() => {
-    if (!mlOptions.includes(initialMl)) onMlChange(mlOptions[0] ?? 0);
+    if (showSelection && !mlOptions.includes(initialMl)) onMlChange(mlOptions[0] ?? 0);
   }, [mlOptions, onMlChange]); // initialMl is intentionally not here
 
   // On a phone #controls is one horizontally scrolling strip, and it keeps
@@ -414,9 +427,10 @@ const Controls: React.FC<ControlsProps> = ({
 
   return (
     <Box
-      id="controls"
+      // One #controls on the page (tests and insets read it): the view half is .controls-view.
+      id={part === 'view' ? undefined : 'controls'}
       ref={stripRef}
-      className={[compact ? 'compact' : '', open ? 'open' : 'closed'].filter(Boolean).join(' ')}
+      className={[part === 'view' ? 'controls-view' : '', compact ? 'compact' : '', open ? 'open' : 'closed'].filter(Boolean).join(' ')}
       sx={{
         p: 2,
         position: 'relative',
@@ -431,12 +445,12 @@ const Controls: React.FC<ControlsProps> = ({
           The readout under it is a polite live region, mounted whenever
           the switch is, so a new contraction is announced when it lands
           (a region inserted together with its text often is not). */}
-      {isAtomMode && onRelativityChange && relativity && (
+      {showSelection && isAtomMode && onRelativityChange && relativity && (
         <RelativityControl relativity={relativity} relativityIsDefault={relativityIsDefault}
           onRelativityChange={onRelativityChange} relativityReadout={relativityReadout} />
       )}
 
-      {isBasicMode && (
+      {showSelection && isBasicMode && (
         <>
           <Typography id="orbital-name" variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
             {combinationActive
@@ -495,42 +509,44 @@ const Controls: React.FC<ControlsProps> = ({
       {/* A raw density threshold is not comparable between orbitals; the share
           of the electron enclosed is. The density that achieves it is derived
           per orbital and reported back below. */}
-      <FormControl fullWidth margin="normal" size="small">
-        <InputLabel id="enclosed-select-label">Electron enclosed</InputLabel>
-        <Select
-          labelId="enclosed-select-label"
-          id="enclosed-select"
-          value={initialEnclosedFraction.toString()}
-          label="Electron enclosed"
-          onChange={(e: SelectChangeEvent<string>) => onEnclosedFractionChange(parseFloat(e.target.value))}
-          disabled={Boolean(fractionNote)}
-        >
-          {ENCLOSED_FRACTIONS.map(fraction => (
-            <MenuItem key={fraction} value={fraction.toString()}>
-              {Math.round(fraction * 100)}%
-            </MenuItem>
-          ))}
-        </Select>
-        <FormHelperText>
-          {/* Levels 1-2's contour encloses a share of the electron *count*,
-              not a |ψ|² threshold -- there is no isosurface for a
-              spherically symmetric shell view (see shell_view.ts), so the
-              marching-cubes wording below would be a claim this view never
-              makes. Level 3 in atom mode *does* go through marching cubes
-              (a numerical R(r) override), so it keeps the usual wording. */}
-          {fractionNote
-            ? fractionNote
-            : isoNote
-            ? isoNote
-            : isAtomMode && atomLevel !== 'orbital'
-              ? 'contour enclosing this fraction of the electron density'
-              : isoLevel === null
-                ? 'contour of constant |ψ|²'
-                : `|ψ|² = ${isoLevel.toExponential(2)}`}
-        </FormHelperText>
-      </FormControl>
+      {showView && (
+        <FormControl fullWidth margin="normal" size="small">
+          <InputLabel id="enclosed-select-label">Electron enclosed</InputLabel>
+          <Select
+            labelId="enclosed-select-label"
+            id="enclosed-select"
+            value={initialEnclosedFraction.toString()}
+            label="Electron enclosed"
+            onChange={(e: SelectChangeEvent<string>) => onEnclosedFractionChange(parseFloat(e.target.value))}
+            disabled={Boolean(fractionNote)}
+          >
+            {ENCLOSED_FRACTIONS.map(fraction => (
+              <MenuItem key={fraction} value={fraction.toString()}>
+                {Math.round(fraction * 100)}%
+              </MenuItem>
+            ))}
+          </Select>
+          <FormHelperText>
+            {/* Levels 1-2's contour encloses a share of the electron *count*,
+                not a |ψ|² threshold -- there is no isosurface for a
+                spherically symmetric shell view (see shell_view.ts), so the
+                marching-cubes wording below would be a claim this view never
+                makes. Level 3 in atom mode *does* go through marching cubes
+                (a numerical R(r) override), so it keeps the usual wording. */}
+            {fractionNote
+              ? fractionNote
+              : isoNote
+              ? isoNote
+              : isAtomMode && atomLevel !== 'orbital'
+                ? 'contour enclosing this fraction of the electron density'
+                : isoLevel === null
+                  ? 'contour of constant |ψ|²'
+                  : `|ψ|² = ${isoLevel.toExponential(2)}`}
+          </FormHelperText>
+        </FormControl>
+      )}
 
-      {isAtomMode ? (showElementPicker && (
+      {showSelection && (isAtomMode ? (showElementPicker && (
         /* Atom mode: a real neutral element, SCF-solved -- the picker drives
            solveAtom via atomSlice.setElement. Suppressed when the
            periodic-table panel is showing, which is the same control in a
@@ -561,128 +577,132 @@ const Controls: React.FC<ControlsProps> = ({
            which is what this line does now that there is no picker to carry
            it. */
         <FormHelperText className="basic-orbitals-note">{BASIC_ORBITALS_ABOUT}</FormHelperText>
-      )}
+      ))}
 
       {/* SubshellPanel at level 2; empty at every other level (see App.tsx).
           In Molecules mode, the structure and dipole switches. */}
-      {(isAtomMode || mode === 'molecule') && children}
+      {showView && (isAtomMode || mode === 'molecule') && children}
 
-      {/* Surface, opacity and cut-away are view-only: they restyle the existing
-          mesh, so none of them re-runs the calculation. Surface (solid vs
-          wireframe) only has meaning for a marching-cubes mesh -- a shell
-          view's cap is always shown, solid (bug fix, task 22 bug 6). */}
-      {isMeshLevel && !hideSurfaceStyle && (
-        <FormControl component="fieldset" margin="normal" fullWidth>
-          <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Surface</FormLabel>
-          <ToggleButtonGroup
-            value={surfaceStyle.mode}
-            exclusive
-            onChange={(event: React.MouseEvent<HTMLElement>, newValue: RenderMode | null) => {
-              if (newValue !== null) {
-                onSurfaceStyleChange({ mode: newValue });
-              }
-            }}
-            aria-label="surface style"
-            size="small"
-            fullWidth
-          >
-            <ToggleButton value="solid" aria-label="solid surface">Solid</ToggleButton>
-            <ToggleButton value="wireframe" aria-label="wireframe surface">Wireframe</ToggleButton>
-          </ToggleButtonGroup>
-        </FormControl>
-      )}
+      {showView && (
+        <>
+          {/* Surface, opacity and cut-away are view-only: they restyle the existing
+              mesh, so none of them re-runs the calculation. Surface (solid vs
+              wireframe) only has meaning for a marching-cubes mesh -- a shell
+              view's cap is always shown, solid (bug fix, task 22 bug 6). */}
+          {isMeshLevel && !hideSurfaceStyle && (
+            <FormControl component="fieldset" margin="normal" fullWidth>
+              <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Surface</FormLabel>
+              <ToggleButtonGroup
+                value={surfaceStyle.mode}
+                exclusive
+                onChange={(event: React.MouseEvent<HTMLElement>, newValue: RenderMode | null) => {
+                  if (newValue !== null) {
+                    onSurfaceStyleChange({ mode: newValue });
+                  }
+                }}
+                aria-label="surface style"
+                size="small"
+                fullWidth
+              >
+                <ToggleButton value="solid" aria-label="solid surface">Solid</ToggleButton>
+                <ToggleButton value="wireframe" aria-label="wireframe surface">Wireframe</ToggleButton>
+              </ToggleButtonGroup>
+            </FormControl>
+          )}
 
-      <FormControl component="fieldset" margin="normal" fullWidth>
-        <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>
-          Opacity: {Math.round(surfaceStyle.opacity * 100)}%
-        </FormLabel>
-        <Slider
-          id="opacity-slider"
-          aria-label="surface opacity"
-          value={surfaceStyle.opacity}
-          min={0.05}
-          max={1}
-          step={0.05}
-          size="small"
-          onChange={(event: Event, value: number | number[]) => {
-            const opacity = Array.isArray(value) ? value[0] : value;
-            if (onOpacityPreview) onOpacityPreview(opacity);
-            else onSurfaceStyleChange({ opacity });
-          }}
-          onChangeCommitted={onOpacityPreview ? (event: React.SyntheticEvent | Event, value: number | number[]) =>
-            onSurfaceStyleChange({ opacity: Array.isArray(value) ? value[0] : value }) : undefined}
-        />
-      </FormControl>
-
-      {/* The cut: a plane across the chosen axis, removing the + side of
-          it. Depth is how far in the plane has come, from the edge of what
-          is drawn (nothing removed) through the nucleus (half) to the far
-          edge (everything) -- the whole travel spans the drawn object (see
-          clipExtent in orbital_visualizer.ts). Stored as clipPosition, the
-          plane's offset as a fraction of that radius: +1 at depth 0, 0 at
-          50 %, -1 at 100 %. */}
-      <FormControl component="fieldset" margin="normal" fullWidth className="cut-controls">
-        <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Cut away</FormLabel>
-        <ToggleButtonGroup
-          value={surfaceStyle.clipAxis}
-          exclusive
-          onChange={(event: React.MouseEvent<HTMLElement>, newValue: ClipAxis | null) => {
-            if (newValue !== null) {
-              onSurfaceStyleChange({ clipAxis: newValue });
-            }
-          }}
-          aria-label="cut-away axis"
-          size="small"
-          fullWidth
-        >
-          {/* A shell view has no separate surface to show when uncut -- its
-              cut face is the entire visible object (bug fix, task 22 bug 6;
-              see orbital_visualizer.ts's shellViewClipAxis) -- so "Off" is
-              only offered where it actually does something. */}
-          {isMeshLevel && <ToggleButton value="none" aria-label="no cut">Off</ToggleButton>}
-          <ToggleButton value="x" aria-label="cut along x">X</ToggleButton>
-          <ToggleButton value="y" aria-label="cut along y">Y</ToggleButton>
-          <ToggleButton value="z" aria-label="cut along z">Z</ToggleButton>
-        </ToggleButtonGroup>
-        <FormHelperText className="cut-help" sx={{ mx: 0 }}>
-          {surfaceStyle.clipAxis === 'none'
-            ? 'Pick an axis to slice the orbital open.'
-            : isMeshLevel
-              ? `Removes the part on the +${surfaceStyle.clipAxis} side of a plane perpendicular to the ${surfaceStyle.clipAxis} axis.`
-              : `Slices off the +${surfaceStyle.clipAxis} side to show the shells inside. The atom is round, so X, Y and Z give the same rings, facing a different way.`}
-        </FormHelperText>
-        {surfaceStyle.clipAxis !== 'none' && (
-          <>
-            <FormLabel sx={{ mt: 1.5, fontSize: '0.75rem' }} id="cut-depth-label">
-              Depth: {cutDepthLabel(surfaceStyle.clipPosition)}
+          <FormControl component="fieldset" margin="normal" fullWidth>
+            <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>
+              Opacity: {Math.round(surfaceStyle.opacity * 100)}%
             </FormLabel>
             <Slider
-              id="clip-slider"
-              aria-labelledby="cut-depth-label"
-              value={Math.round((1 - surfaceStyle.clipPosition) * 50)}
-              // The whole atom is only its slice; at the very edge the slice
-              // is a point and the atom vanishes (see shellViewClipPosition).
-              min={isSliceOnlyView ? 5 : 0}
-              max={isSliceOnlyView ? 95 : 100}
-              step={1}
+              id="opacity-slider"
+              aria-label="surface opacity"
+              value={surfaceStyle.opacity}
+              min={0.05}
+              max={1}
+              step={0.05}
               size="small"
-              marks={isSliceOnlyView ? SLICE_DEPTH_MARKS : CUT_DEPTH_MARKS}
-              // The label above already says the value, in words.
-              valueLabelDisplay="off"
-              // Room either side for the end marks' labels.
-              sx={{ mx: '18px', width: 'auto' }}
               onChange={(event: Event, value: number | number[]) => {
-                const depth = Array.isArray(value) ? value[0] : value;
-                onSurfaceStyleChange({ clipPosition: 1 - depth / 50 });
+                const opacity = Array.isArray(value) ? value[0] : value;
+                if (onOpacityPreview) onOpacityPreview(opacity);
+                else onSurfaceStyleChange({ opacity });
               }}
+              onChangeCommitted={onOpacityPreview ? (event: React.SyntheticEvent | Event, value: number | number[]) =>
+                onSurfaceStyleChange({ opacity: Array.isArray(value) ? value[0] : value }) : undefined}
             />
-          </>
-        )}
-      </FormControl>
+          </FormControl>
+
+          {/* The cut: a plane across the chosen axis, removing the + side of
+              it. Depth is how far in the plane has come, from the edge of what
+              is drawn (nothing removed) through the nucleus (half) to the far
+              edge (everything) -- the whole travel spans the drawn object (see
+              clipExtent in orbital_visualizer.ts). Stored as clipPosition, the
+              plane's offset as a fraction of that radius: +1 at depth 0, 0 at
+              50 %, -1 at 100 %. */}
+          <FormControl component="fieldset" margin="normal" fullWidth className="cut-controls">
+            <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Cut away</FormLabel>
+            <ToggleButtonGroup
+              value={surfaceStyle.clipAxis}
+              exclusive
+              onChange={(event: React.MouseEvent<HTMLElement>, newValue: ClipAxis | null) => {
+                if (newValue !== null) {
+                  onSurfaceStyleChange({ clipAxis: newValue });
+                }
+              }}
+              aria-label="cut-away axis"
+              size="small"
+              fullWidth
+            >
+              {/* A shell view has no separate surface to show when uncut -- its
+                  cut face is the entire visible object (bug fix, task 22 bug 6;
+                  see orbital_visualizer.ts's shellViewClipAxis) -- so "Off" is
+                  only offered where it actually does something. */}
+              {isMeshLevel && <ToggleButton value="none" aria-label="no cut">Off</ToggleButton>}
+              <ToggleButton value="x" aria-label="cut along x">X</ToggleButton>
+              <ToggleButton value="y" aria-label="cut along y">Y</ToggleButton>
+              <ToggleButton value="z" aria-label="cut along z">Z</ToggleButton>
+            </ToggleButtonGroup>
+            <FormHelperText className="cut-help" sx={{ mx: 0 }}>
+              {surfaceStyle.clipAxis === 'none'
+                ? 'Pick an axis to slice the orbital open.'
+                : isMeshLevel
+                  ? `Removes the part on the +${surfaceStyle.clipAxis} side of a plane perpendicular to the ${surfaceStyle.clipAxis} axis.`
+                  : `Slices off the +${surfaceStyle.clipAxis} side to show the shells inside. The atom is round, so X, Y and Z give the same rings, facing a different way.`}
+            </FormHelperText>
+            {surfaceStyle.clipAxis !== 'none' && (
+              <>
+                <FormLabel sx={{ mt: 1.5, fontSize: '0.75rem' }} id="cut-depth-label">
+                  Depth: {cutDepthLabel(surfaceStyle.clipPosition)}
+                </FormLabel>
+                <Slider
+                  id="clip-slider"
+                  aria-labelledby="cut-depth-label"
+                  value={Math.round((1 - surfaceStyle.clipPosition) * 50)}
+                  // The whole atom is only its slice; at the very edge the slice
+                  // is a point and the atom vanishes (see shellViewClipPosition).
+                  min={isSliceOnlyView ? 5 : 0}
+                  max={isSliceOnlyView ? 95 : 100}
+                  step={1}
+                  size="small"
+                  marks={isSliceOnlyView ? SLICE_DEPTH_MARKS : CUT_DEPTH_MARKS}
+                  // The label above already says the value, in words.
+                  valueLabelDisplay="off"
+                  // Room either side for the end marks' labels.
+                  sx={{ mx: '18px', width: 'auto' }}
+                  onChange={(event: Event, value: number | number[]) => {
+                    const depth = Array.isArray(value) ? value[0] : value;
+                    onSurfaceStyleChange({ clipPosition: 1 - depth / 50 });
+                  }}
+                />
+              </>
+            )}
+          </FormControl>
+        </>
+      )}
 
       {/* Reset View moved to the viewport toolbar (spec §8.5); Update
           Orbital stays here, next to the parameters it applies. */}
-      {isBasicMode && !combinationActive && (
+      {showSelection && isBasicMode && !combinationActive && (
         <Box className="controls-actions" sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
           <Button
             id="update-orbital"
@@ -695,21 +715,23 @@ const Controls: React.FC<ControlsProps> = ({
         </Box>
       )}
 
-      {/* Progress bar */}
-      <Box sx={{ 
-          width: '100%',
-          mt: 2,
-          height: 4
-      }}>
-          {isBusy && (
-              <LinearProgress 
-                  variant="indeterminate"
-                  sx={{ 
-                      borderRadius: 1
-                  }} 
-              />
-          )}
-      </Box>
+      {/* Progress bar: with the view settings, as in Bonds' and Molecules' inspector. */}
+      {showView && (
+        <Box sx={{ 
+            width: '100%',
+            mt: 2,
+            height: 4
+        }}>
+            {isBusy && (
+                <LinearProgress 
+                    variant="indeterminate"
+                    sx={{ 
+                        borderRadius: 1
+                    }} 
+                />
+            )}
+        </Box>
+      )}
     </Box>
   );
 };

@@ -114,7 +114,7 @@ import ExplorePanel from './shell/ExplorePanel';
 import AtomExplore from './atom_ui/AtomExplore';
 import ElementTile from './atom_ui/ElementTile';
 import OrbitalEnergyList from './atom_ui/OrbitalEnergyList';
-import AtomInspector from './atom_ui/AtomInspector';
+import AtomInspector, { InspectorDisplay } from './atom_ui/AtomInspector';
 import { plotAriaLabel, plotTabsFor, resolvePlotTab, tabCurves } from './atom/plot_tabs';
 import { atomFacts, orbitalFacts, shellFacts, subshellFacts } from './orbital_facts';
 import Inspector from './shell/Inspector';
@@ -1100,8 +1100,12 @@ function App() {
         : molecule.surface.kind === 'mo' ? `|ψ|² = ${molecule.isoLevel!.toExponential(2)}`
         : `ρ = ${molecule.isoLevel!.toExponential(2)} e/a₀³`;
 
-    const controls = (
+    // One Controls, drawn whole or in halves (ruling R20b): Basic Orbitals'
+    // selection goes to Explore and its view half to the inspector; every
+    // other place takes it whole. The halves share every prop and handler.
+    const renderControls = (part: 'all' | 'selection' | 'view') => (
         <Controls
+            part={part}
             mode={atomMode}
             atomLevel={atomLevel}
             atomZ={atomZ}
@@ -1134,6 +1138,7 @@ function App() {
             ) : (moleculeOptions || null)}
         </Controls>
     );
+    const controls = renderControls('all');
 
     // Bonds mode's navigation (layout contract §3.8): the desktop's left
     // column, the phone's Explore tab. The curve is not in it -- it goes
@@ -1229,17 +1234,24 @@ function App() {
         );
     };
 
+    // The Atom screen's Display settings head its inspector, docked and in
+    // the drawer (ruling R20b-atoms); on a phone the sheet's View tab holds
+    // them, so the stacked inspector has none.
+    const atomDisplay = <>{controls}<AxesSwitch /></>;
     // The Atom screen's inspector (spec §9.1): docked on a desktop, a drawer
     // at medium width, stacked in the phone's Plot tab (ruling R7). Ruling
     // DX1: before a profile it is the plain inspector, so its column and the
-    // drawer's bar hold their place while the atom solves (§8.6).
+    // drawer's bar hold their place while the atom solves (§8.6) -- with the
+    // Display settings in it, which work before a profile as they did in Explore.
     const atomInspector = (variant: 'docked' | 'drawer' | 'stacked') => (activePlotTab ? (
-        <AtomInspector variant={variant} open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
+        <AtomInspector variant={variant} display={variant === 'stacked' ? undefined : atomDisplay}
+            open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             plotTabs={atomPlotTabs} plotTab={activePlotTab} onPlotTab={handlePlotTab}
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
             facts={atomFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} />
     ) : (
-        <Inspector variant={variant} body={null} open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
+        <Inspector variant={variant} body={null} top={variant === 'stacked' ? undefined : <InspectorDisplay>{atomDisplay}</InspectorDisplay>}
+            open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
     // A phone has no viewport toolbar (ruling R6): Reset view, Share and Export end the View tab, as before.
@@ -1313,8 +1325,8 @@ function App() {
 
     // The Atom screen's Explore panel (spec §9.1): the element tile and the
     // breadcrumb, then Configuration (the drill-down, Charge/Excite and the
-    // Relativity switch), Orbitals (the whole atom's energies and About) and
-    // Display (the view controls).
+    // Relativity switch) and Orbitals (the whole atom's energies and About).
+    // The view controls are the inspector's Display section (ruling R20b-atoms).
     const atomExplore = (
         <AtomExplore
             header={(
@@ -1346,19 +1358,19 @@ function App() {
                     <LevelNav {...levelNavProps} variant="about" />
                 </>
             )}
-            display={<>{controls}<AxesSwitch /></>}
             onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined}
         />
     );
 
     const exploreContent = isBondsMode ? bondsPanel
         : isMoleculeMode ? <><MoleculeNav {...moleculeNavProps} /><MoleculeJobsSection /></>
-        // Basic Orbitals had no left column: its n/l/mₗ, combination and view settings go here until 6G-2.
-        : controls;
-    // Basic Orbitals, Bonds and Molecules (the atom has its own: atomInspector above).
+        // Basic Orbitals: its choice of orbital -- n/l/mₗ, combination, Update Orbital (ruling R20b).
+        : renderControls('selection');
+    // Basic Orbitals, Bonds and Molecules (the atom has its own: atomInspector above): the view
+    // settings above the plot -- for Basic Orbitals its view half of Controls (ruling R20b).
     const inspectorBody = (
         <>
-            {!isBasicMode && controls}
+            {isBasicMode ? renderControls('view') : controls}
             {renderRadialPlot(PLOT_WIDTH, false)}
         </>
     );

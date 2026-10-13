@@ -1071,8 +1071,9 @@ describe('App: opening a shared link', () => {
         // to be re-applied once the profile confirms the view.
         expect(store.getState().orbital.pendingCut).toEqual({ clipAxis: 'y', clipPosition: 0.5 });
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Display' })); // the view controls are Explore › Display (spec §9.1)
-        fireEvent.click(screen.getByRole('button', { name: 'cut along x' }));
+        // Ruling R20b-atoms: the view controls are the inspector's Display section now, there before the profile too.
+        const display = within(screen.getByRole('complementary', { name: 'Inspector' })).getByRole('region', { name: 'Display' });
+        fireEvent.click(within(display).getByRole('button', { name: 'cut along x' }));
         expect(store.getState().orbital.pendingCut).toBeNull();
 
         act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
@@ -1336,6 +1337,69 @@ describe('App: shell', () => {
         // Ruling T13-tablabels: tabs show the curve symbol; the name is the words plus that symbol.
         expect(screen.getByRole('tab', { name: 'Density ρ(r)' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Radial distribution D(r)' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    // Ruling R20b (owner decision): Basic Orbitals keeps its choice of orbital in Explore and puts its view
+    // settings in the inspector, above the plot -- where Bonds and Molecules have theirs.
+    it('in Basic Orbitals, puts n/l/mₗ and Update Orbital in Explore, and the view settings in the inspector', () => {
+        const { container } = renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        const explore = screen.getByRole('complementary', { name: 'Explore' });
+        const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+        for (const name of [/Principal \(n\)/i, /Angular \(l\)/i, /Magnetic/i, /combination/i]) {
+            expect(within(explore).getByRole('combobox', { name })).toBeInTheDocument();
+            expect(within(inspector).queryByRole('combobox', { name })).toBeNull();
+        }
+        expect(within(explore).getByRole('button', { name: 'Update Orbital' })).toBeInTheDocument();
+        expect(within(explore).getByText(/one electron, Z = 1/i)).toBeInTheDocument();
+        expect(within(inspector).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
+        expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
+        expect(within(inspector).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
+        expect(within(inspector).getByRole('group', { name: 'surface style' })).toBeInTheDocument();
+        expect(within(inspector).getByRole('group', { name: 'cut-away axis' })).toBeInTheDocument();
+        // The settings sit above the plot, as in Bonds' inspector.
+        const opacity = within(inspector).getByRole('slider', { name: 'surface opacity' });
+        expect(opacity.compareDocumentPosition(inspector.querySelector('.radial-plot')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(container.querySelectorAll('#controls')).toHaveLength(1);
+    });
+
+    it("in Basic Orbitals, the inspector's opacity slider commits the same setSurfaceStyle as before", () => {
+        const { store } = renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        const before = store.getState().orbital;
+        const slider = within(screen.getByRole('complementary', { name: 'Inspector' })).getByRole('slider', { name: 'surface opacity' });
+        fireEvent.keyDown(slider, { key: 'ArrowLeft' });
+        const expected = orbitalReducer(before, setSurfaceStyle({ opacity: before.surfaceStyle.opacity - 0.05 })).surfaceStyle;
+        expect(store.getState().orbital.surfaceStyle.opacity).toBeCloseTo(expected.opacity);
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({ mode: expected.mode, clipAxis: expected.clipAxis });
+    });
+
+    // Ruling R20b-atoms (owner decision): the Atom screen's Display settings leave Explore for the top of the inspector.
+    it('in Atoms, Explore has Configuration and Orbitals, and Display heads the inspector above Plot and Data', () => {
+        const { container } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        const explore = screen.getByRole('complementary', { name: 'Explore' });
+        expect(within(explore).getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Configuration', 'Orbitals']);
+        const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+        const display = within(inspector).getByRole('region', { name: 'Display' });
+        expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
+        expect(within(display).getByRole('button', { name: 'Phase ψ colours' })).toBeInTheDocument();
+        expect(within(display).getByRole('checkbox', { name: 'Show axes' })).toBeInTheDocument();
+        expect(within(display).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
+        expect(display.compareDocumentPosition(within(inspector).getByRole('tab', { name: 'Plot' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
+        expect(container.querySelectorAll('#controls')).toHaveLength(1);
+    });
+
+    it('in Atoms at medium width, the drawer holds the Display section above Plot and Data', () => {
+        window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
+            addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        expect(screen.queryByRole('region', { name: 'Display' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Plot panel' }));
+        const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+        const display = within(inspector).getByRole('region', { name: 'Display' });
+        expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
+        expect(display.compareDocumentPosition(within(inspector).getByRole('tab', { name: 'Plot' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     // Ruling T13-shellcard: under a shell's name the card states that shell's facts, not the whole atom's.

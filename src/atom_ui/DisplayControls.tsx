@@ -23,7 +23,7 @@ interface SurfaceAndSchemeProps {
     onSurfaceMode(mode: RenderMode): void;
 }
 
-/** Display tab (spec §9.1): Surface style and Colour scheme. */
+/** The inspector's Display section (spec §9.1, ruling R20b-atoms): Surface style and Colour scheme. */
 export const SurfaceAndScheme: React.FC<SurfaceAndSchemeProps> = ({ surfaceMode, meshLevel, onSurfaceMode }) => {
     const render = usePref(renderPref);
     const value: SurfaceChoice = surfaceMode === 'wireframe' ? 'wireframe' : render.finish;
@@ -63,7 +63,7 @@ export const SurfaceAndScheme: React.FC<SurfaceAndSchemeProps> = ({ surfaceMode,
     );
 };
 
-/** Display tab (spec §9.1): the Show axes preference (§2 In, item 7). */
+/** The inspector's Display section (spec §9.1, ruling R20b-atoms): the Show axes preference (§2 In, item 7). */
 export const AxesSwitch: React.FC = () => {
     const display = usePref(displayPref);
     return (

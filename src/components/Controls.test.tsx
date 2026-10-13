@@ -467,3 +467,78 @@ describe('Controls: Molecules mode', () => {
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
   });
 });
+
+// Ruling R20b (owner decision): Basic Orbitals' choice of orbital stays in Explore and its view
+// settings go to the inspector, as Bonds' and Molecules' do -- one component split by `part`.
+describe('Controls: part', () => {
+  it("'selection' holds n/l/mₗ, the combination, the Z = 1 note and Update Orbital -- no view settings", () => {
+    const { container } = render(<Controls {...baseProps} part="selection" />);
+    expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /Angular \(l\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /Magnetic/i })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
+    expect(screen.getByText(/one electron, Z = 1/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Update Orbital' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /electron enclosed/i })).toBeNull();
+    expect(screen.queryByRole('slider', { name: 'surface opacity' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'surface style' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'cut-away axis' })).toBeNull();
+    expect(container.querySelector('#controls')).not.toBeNull();
+  });
+
+  it("'view' holds the enclosed fraction, Surface, Opacity and Cut away, in Bonds' order -- no selection, and no second #controls", () => {
+    const { container } = render(
+      <Controls {...baseProps} part="view" surfaceStyle={{ mode: 'solid', opacity: 1, clipAxis: 'x', clipPosition: 0 }} />
+    );
+    expect(screen.queryByRole('combobox', { name: /Principal \(n\)/i })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
+    expect(screen.queryByText(/one electron, Z = 1/i)).toBeNull();
+    const order = [
+      screen.getByRole('combobox', { name: /electron enclosed/i }),
+      screen.getByRole('group', { name: 'surface style' }),
+      screen.getByRole('slider', { name: 'surface opacity' }),
+      screen.getByRole('group', { name: 'cut-away axis' }),
+      screen.getByRole('slider', { name: /Depth/ }),
+    ];
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(container.querySelector('#controls')).toBeNull();
+    expect(container.querySelector('.controls-view')).not.toBeNull();
+  });
+
+  it('sends the same calls from either part as the whole panel does', () => {
+    const onNChange = jest.fn();
+    const onSurfaceStyleChange = jest.fn();
+    const onEnclosedFractionChange = jest.fn();
+    render(
+      <>
+        <Controls {...baseProps} part="selection" onNChange={onNChange} />
+        <Controls {...baseProps} part="view" onSurfaceStyleChange={onSurfaceStyleChange} onEnclosedFractionChange={onEnclosedFractionChange} />
+      </>
+    );
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /Principal \(n\)/i }));
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('4'));
+    expect(onNChange).toHaveBeenCalledWith(4);
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'surface opacity' }), { key: 'ArrowLeft' });
+    expect(onSurfaceStyleChange).toHaveBeenCalledWith({ opacity: 0.95 });
+    fireEvent.click(screen.getByRole('button', { name: 'wireframe surface' }));
+    expect(onSurfaceStyleChange).toHaveBeenCalledWith({ mode: 'wireframe' });
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
+    expect(onEnclosedFractionChange).toHaveBeenCalledWith(0.75);
+  });
+
+  it("checks n/l/mₗ once, from the selection part only: the view part sends no correction of its own", () => {
+    const onLChange = jest.fn();
+    render(
+      <>
+        <Controls {...baseProps} part="selection" initialN={1} initialL={2} onLChange={onLChange} />
+        <Controls {...baseProps} part="view" initialN={1} initialL={2} onLChange={onLChange} />
+      </>
+    );
+    expect(onLChange).toHaveBeenCalledTimes(1);
+    expect(onLChange).toHaveBeenCalledWith(0);
+  });
+});

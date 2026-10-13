@@ -5,10 +5,11 @@ import OrbitalEnergyList from '../../src/atom_ui/OrbitalEnergyList';
 import { neonProfile } from '../export/fixtures';
 
 describe('AtomExplore (spec §9.1)', () => {
-    it('heads the panel with the subject and tabs Configuration, Orbitals and Display', () => {
-        render(<AtomExplore header={<p>tile</p>} configuration={<p>config</p>} orbitals={<p>orbitals</p>} display={<p>display</p>} />);
+    // Ruling R20b-atoms (owner decision): Display moved to the inspector, so Explore has two tabs.
+    it('heads the panel with the subject and tabs Configuration and Orbitals', () => {
+        render(<AtomExplore header={<p>tile</p>} configuration={<p>config</p>} orbitals={<p>orbitals</p>} />);
         expect(screen.getByText('tile')).toBeInTheDocument();
-        expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Configuration', 'Orbitals', 'Display']);
+        expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Configuration', 'Orbitals']);
         expect(screen.getByRole('tabpanel')).toHaveTextContent('config');
         fireEvent.click(screen.getByRole('tab', { name: 'Orbitals' }));
         expect(screen.getByRole('tabpanel')).toHaveTextContent('orbitals');

@@ -11,6 +11,12 @@ interface InspectorProps {
     onTab?(key: string): void;
     /** Without tabs: today's right-column content (6G-1 for Basic, Bonds and Molecules). */
     body?: React.ReactNode;
+    /**
+     * A section above the tabs (or the body) -- the Atom screen's Display
+     * settings (ruling R20b-atoms). It scrolls together with what is below
+     * it, so a tall section never squeezes the plot out of a short window.
+     */
+    top?: React.ReactNode;
     /** Drawer only. */
     open?: boolean;
     onOpenChange?(open: boolean): void;
@@ -22,7 +28,7 @@ interface InspectorProps {
  * right edge, non-modal and measured as a camera inset (§7); stacked inside
  * the phone sheet (ruling R7). `.view-panel` stays its class for the tests.
  */
-const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, body, open = false, onOpenChange }) => {
+const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, body, top, open = false, onOpenChange }) => {
     const id = useId();
     const active = tabs?.find(tab => tab.key === activeTab) ?? tabs?.[0];
 
@@ -43,12 +49,13 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
     if (variant === 'stacked') {
         return (
             <div className="inspector-stacked">
+                {top}
                 {tabs ? tabs.map(tab => <section key={tab.key} aria-label={tab.label} className="inspector-section">{tab.content}</section>) : body}
             </div>
         );
     }
 
-    const content = tabs && active ? (
+    const inner = tabs && active ? (
         <>
             <TabRow idPrefix={id} label="Inspector" tabs={tabs} active={active.key} onChange={key => onTab?.(key)} />
             <div className="inspector-body" role="tabpanel" id={`${id}-panel-${active.key}`} aria-labelledby={`${id}-tab-${active.key}`}>
@@ -58,6 +65,7 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
     ) : (
         <div className="inspector-body">{body}</div>
     );
+    const content = top ? <div className="inspector-scroll">{top}{inner}</div> : inner;
 
     if (variant === 'drawer') {
         const bar: TabItem[] = tabs ?? [{ key: 'view', label: 'View' }];

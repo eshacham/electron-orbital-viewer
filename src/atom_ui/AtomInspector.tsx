@@ -10,6 +10,13 @@ import './inspector_atom.css';
 
 interface AtomInspectorProps {
     variant: 'docked' | 'drawer' | 'stacked';
+    /**
+     * The Display settings (surface, colour scheme, enclosed fraction,
+     * opacity, cut, axes), heading the inspector above Plot | Data (ruling
+     * R20b-atoms). App leaves it out of the phone's stacked inspector: there
+     * the sheet's View tab holds them.
+     */
+    display?: React.ReactNode;
     open?: boolean;
     onOpenChange?(open: boolean): void;
     plotTabs: PlotTab[];
@@ -23,8 +30,13 @@ interface AtomInspectorProps {
     onExportCsv(): void;
 }
 
-/** The Atom screen's inspector (spec §9.1): Plot, with its function tabs, and Data. */
-const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, open, onOpenChange, plotTabs, plotTab, onPlotTab, plot, facts, csvReason, onExportCsv }) => {
+/** The Display section at the top of the Atom inspector (ruling R20b-atoms); App uses it in the plain inspector too. */
+export const InspectorDisplay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <section className="inspector-display" aria-label="Display">{children}</section>
+);
+
+/** The Atom screen's inspector (spec §9.1): Display on top (ruling R20b-atoms), then Plot, with its function tabs, and Data. */
+const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, plot, facts, csvReason, onExportCsv }) => {
     const [tab, setTab] = useState('plot');
     const id = useId();
     const plotContent = (
@@ -47,6 +59,7 @@ const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, open, onOpenChan
     return (
         <Inspector
             variant={variant}
+            top={display ? <InspectorDisplay>{display}</InspectorDisplay> : undefined}
             open={open}
             onOpenChange={onOpenChange}
             activeTab={tab}

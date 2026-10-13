@@ -35,6 +35,15 @@ describe('AtomInspector (spec §8.6, §9.1)', () => {
         expect(onExportCsv).toHaveBeenCalled();
     });
 
+    // Ruling R20b-atoms: the Display settings head the inspector, above Plot | Data.
+    it('heads the docked inspector with the Display section, above Plot and Data', () => {
+        render(<AtomInspector variant="docked" display={<p>display settings</p>} plotTabs={tabs} plotTab={tabs[0]} onPlotTab={jest.fn()}
+            plot={<p>plot</p>} facts={facts} csvReason={null} onExportCsv={jest.fn()} />);
+        const display = screen.getByRole('region', { name: 'Display' });
+        expect(display).toHaveTextContent('display settings');
+        expect(display.compareDocumentPosition(screen.getByRole('tab', { name: 'Plot' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('stacks Plot and Data in the phone sheet', () => {
         render(<AtomInspector variant="stacked" plotTabs={tabs} plotTab={tabs[0]} onPlotTab={jest.fn()}
             plot={<p>plot</p>} facts={facts} csvReason="nothing drawn" onExportCsv={jest.fn()} />);

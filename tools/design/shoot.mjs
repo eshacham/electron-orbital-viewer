@@ -3,7 +3,7 @@
 // Vite on a free port and its own headless Chromium, captures each scene in
 // each theme and size, measures boxes, fonts and colours, then stops both in
 // the same foreground run. It never touches the owner's browser or servers.
-//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--gl metal] [--dpr 2]
+//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--gl metal] [--dpr 2] [--drawer open]
 // Writes /tmp/6g1-<task>-<scene>-<theme>-<size>.png and /tmp/6g1-<task>-metrics.json.
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -55,6 +55,8 @@ const gl = arg('gl', 'swiftshader');
 if (!GL_ARGS[gl]) throw new Error(`unknown --gl ${gl} (swiftshader | metal)`);
 // Device pixel ratio for every shot; 1 by default (the composites), 2 shows what a Retina screen gets.
 const dpr = Number(arg('dpr', '1'));
+// At medium width the inspector is a folded drawer; `--drawer open` shoots it open (its Display section, ruling R20b-atoms).
+const drawerOpen = arg('drawer', 'folded') === 'open';
 
 function startVite() {
   const vite = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(port), '--strictPort', '--clearScreen', 'false'],
@@ -224,16 +226,27 @@ try {
         await page.goto(`http://localhost:${port}/${scenes[scene]}`, { waitUntil: 'load' });
         const settled = await settle(page);
         await page.waitForTimeout(extraWait);
-        // ExplorePanel renders only its active tab (DX3/DC5): collect in two
-        // passes so neither tab's fields read empty. Display holds the
-        // Electron-enclosed helper note; Configuration holds the rest
-        // (subshell chips, the configuration line) and is what the
-        // screenshot shows.
-        await page.getByRole('tab', { name: 'Display' }).click().catch(() => {});
-        const { enclosedNote } = await page.evaluate(() => ({
-          enclosedNote: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent ?? null,
-        }));
-        await page.getByRole('tab', { name: 'Configuration' }).click().catch(() => {});
+        // Ruling R20b-atoms: the Electron-enclosed note is in the inspector now
+        // (the Atom Display section, Basic's view settings), so Explore's
+        // Configuration tab stays open for the whole capture -- the old
+        // Display-tab pass (DX3/DC5) is gone. At medium width the inspector
+        // is a folded drawer: open it to read the note, then fold it again
+        // unless `--drawer open` asked to shoot it open.
+        const readNote = () => page.evaluate(() =>
+          document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent ?? null);
+        const drawerBar = page.locator('.inspector-drawer.folded .inspector-bar-button').first();
+        let enclosedNote;
+        if (await drawerBar.count()) {
+          await drawerBar.click();
+          await page.waitForTimeout(400);
+          enclosedNote = await readNote();
+          if (!drawerOpen) {
+            await page.locator('.inspector-drawer .inspector-bar-button[aria-expanded="true"]').first().click();
+            await page.waitForTimeout(400);
+          }
+        } else {
+          enclosedNote = await readNote();
+        }
         const file = `/tmp/6g1-${task}-${scene}-${theme}-${size}.png`;
         const png = await page.screenshot({ path: file });
         const metrics = await page.evaluate(collectMetrics);
