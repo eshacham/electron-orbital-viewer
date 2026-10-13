@@ -29,8 +29,10 @@ import {
     setReferenceRing,
     VisualizerContext,
     renderFrame,
-    setAppearance
+    setAppearance,
+    attachThumbnails
 } from '../orbital_visualizer';
+import { thumbnailService } from '../thumbs/ThumbnailService';
 import { captureViewPng, freeAreaCrop } from '../export/png';
 import { ViewerExportHandle } from '../export/handle';
 import { collectExportSurfaces, countExportSurfaces } from '../export/surfaces';
@@ -136,6 +138,15 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     const appearanceRef = useRef(appearance);
     appearanceRef.current = appearance;
 
+    // The busy flag the thumbnail service reads (spec §12: "pause while a
+    // main render is in flight or a pointer drag is active"); refs, since the
+    // service asks every frame, long after this render.
+    const mainBusy = useAppSelector(state => state.orbital.isLoading || state.atom.isSolving
+        || state.orbital.compositionBusy || state.orbital.levelTransition || state.molecule.renderLabel !== null);
+    const busyRef = useRef(mainBusy);
+    busyRef.current = mainBusy;
+    const draggingRef = useRef(false);
+
     // Initialize visualizer - only once
     useEffect(() => {
         if (canvasHostRef.current) {
@@ -150,6 +161,13 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             // menu waits for it (run_export's pngReason).
             context.onTransitionChange = (active) => dispatch(setLevelTransition(active));
             visualizerContextRef.current = context;
+            context.controls.addEventListener('start', () => { draggingRef.current = true; });
+            context.controls.addEventListener('end', () => { draggingRef.current = false; });
+            // Spec §12: the strips' thumbnails are drawn by this renderer -- never a second WebGL context.
+            attachThumbnails(context, thumbnailService, {
+                isBusy: () => busyRef.current || draggingRef.current,
+                appearance: () => appearanceRef.current,
+            });
 
             if (exportHandleRef) {
                 exportHandleRef.current = {
@@ -178,6 +196,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         }
 
         return () => {
+            thumbnailService.detach();
             if (visualizerContextRef.current) {
                 console.log('OrbitalViewer: Cleaning up visualizer');
                 cleanupVisualizer(visualizerContextRef.current);

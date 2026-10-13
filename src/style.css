@@ -338,6 +338,24 @@ html, body, #root {
   pointer-events: none;
 }
 
+/* Spec §8.5 "Centre-bottom above strip": on a desktop or tablet the busy
+   status and the unbound note sit above the thumbnail strip (or whatever
+   else covers the bottom edge: --free-bottom, measured by useViewInsets),
+   still centred on the free area horizontally. 140 px until the first
+   measurement; the strip with its group labels is about 158 px tall. */
+.app-shell:not(.phone) .canvas-busy,
+.app-shell:not(.phone) .canvas-unbound {
+  top: auto;
+  bottom: calc(var(--free-bottom, 140px) + 12px);
+  transform: translateX(-50%);
+}
+/* The scale readout keeps the bottom-left of the uncovered area: with the
+   strip along the bottom edge (the Atom view), it sits just above it rather
+   than under its first tiles. */
+.viewport-cell:has(> .thumbnail-strip.overlay) .scale-readout {
+  bottom: calc(var(--free-bottom, 0px) + 8px);
+}
+
 /* A phone has no viewport toolbar (ruling R6): Reset view, Share and Export
    end the View tab instead, wrapped so they sit in a line and wrap if tight. */
 .view-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }

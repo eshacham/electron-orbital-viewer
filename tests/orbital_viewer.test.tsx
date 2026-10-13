@@ -35,6 +35,7 @@ jest.mock('../src/orbital_visualizer', () => ({
     setMoleculeOverlay: jest.fn(),
     pointerRaycaster: jest.fn(),
     setAppearance: jest.fn(),
+    attachThumbnails: jest.fn(),
 }));
 // Only applyCameraAngles is mocked (as a spy to record call order); the rest
 // of the module -- isCanonicalAngles etc., which orbitalSlice's own reducers
@@ -57,9 +58,9 @@ import { clearShellMeshCacheForTests, setCachedShellMeshes, shellMeshCacheKey } 
 import { COMPOSITE_ORBITAL_RESOLUTION } from '../src/atom/shell_composition';
 import { neonProfile } from './export/fixtures';
 import { framingRadiusFor } from '../src/atom/framing';
-import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes } from '../src/orbital_visualizer';
+import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes, attachThumbnails } from '../src/orbital_visualizer';
 import { themeChoicePref } from '../src/design/theme_storage';
-import { renderPref } from '../src/design/presentation';
+import { DEFAULT_RENDER, renderPref } from '../src/design/presentation';
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
@@ -73,6 +74,16 @@ const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }
 // still print.
 beforeEach(() => { jest.spyOn(console, 'log').mockImplementation(() => {}); });
 afterEach(() => { (console.log as jest.Mock).mockRestore(); });
+// Task 14's appearance test changes the theme and render prefs and resets
+// them only on its last line; a failure there would leak into every test
+// after it, so they are reset after each test here.
+afterEach(() => {
+    act(() => {
+        themeChoicePref.set('system');
+        renderPref.set(DEFAULT_RENDER);
+    });
+    window.localStorage.clear();
+});
 
 function renderViewer() {
     const store = createAppStore();
@@ -580,5 +591,17 @@ describe('OrbitalViewer: appearance', () => {
         expect(setAppearance).toHaveBeenLastCalledWith(expect.anything(),
             expect.objectContaining({ theme: 'light', scheme: 'classic', finish: 'solid' }));
         window.localStorage.clear();
+    });
+});
+
+// Spec §12: thumbnails borrow the one renderer; there is never a second WebGL context.
+describe('OrbitalViewer: thumbnails', () => {
+    it('lends the one renderer to the thumbnail service once, on mount (spec §12)', () => {
+        // Ruling DC10: earlier describes render without clearing, so the counts start clean here.
+        jest.clearAllMocks();
+        const store = createAppStore();
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        expect(initVisualizer).toHaveBeenCalledTimes(1);
+        expect(attachThumbnails).toHaveBeenCalledTimes(1);
     });
 });

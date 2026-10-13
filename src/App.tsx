@@ -119,6 +119,9 @@ import { atomFacts, orbitalFacts, shellFacts, subshellFacts } from './orbital_fa
 import Inspector from './shell/Inspector';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
+import ThumbnailStrip from './shell/ThumbnailStrip';
+import { atomStripItems } from './thumbs/strip_items';
+import { thumbnailService } from './thumbs/ThumbnailService';
 import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
 import { viewTitle } from './shell/view_title';
 import { useDocumentTitle } from './shell/useDocumentTitle';
@@ -733,6 +736,18 @@ function App() {
         () => atomProfile ? gridRadii(atomProfile.rMin, atomProfile.dx, atomProfile.size) : [],
         [atomProfile]
     );
+
+    // The atom strip (spec §8.5 bottom zone, §9.1 "Strip", §12).
+    const [stripCollapsed, setStripCollapsed] = useState(false);
+    const stripItems = useMemo(
+        () => (atomProfile && !atomUnbound
+            ? atomStripItems({ profile: atomProfile, level: atomLevel, selectedShell: atomSelectedShell, selectedOrbital: atomSelectedOrbital, enclosedFraction, palette })
+            : []),
+        [atomProfile, atomUnbound, atomLevel, atomSelectedShell, atomSelectedOrbital, enclosedFraction, palette],
+    );
+    // A new species or relativity: nothing in flight belongs to the picture any more (§12).
+    useEffect(() => () => thumbnailService.cancelAll(), [atomProfile?.speciesKey, atomProfile?.Z, pictureRelativity]);
+    const stripThemeKey = `${themeMode}|${render.scheme}|${render.finish}`;
     // The radial plot's horizontal range: sized to what is actually being
     // shown, not the sampling grid's rMax (spec bugfix). The grid extent is
     // chosen to comfortably hold the outermost orbital's tail -- for argon
@@ -1433,6 +1448,10 @@ function App() {
                     <AtomKeys level={atomLevel} scheme={render.scheme} cutOn={surfaceStyle.clipAxis !== 'none'} phase={phase}
                         shellItems={themed(atomCurves).map(curve => ({ label: curve.label, colour: curve.color, spoken: curve.spokenLabel }))} />
                 </KeyColumn>
+            )}
+            {isAtomMode && !isNarrow && stripItems.length > 0 && (
+                <ThumbnailStrip items={stripItems} label="orbitals in view" rGrid={atomRGrid} themeKey={stripThemeKey}
+                    onSelect={handleLevelNavigate} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
             )}
             {!isMoleculeMode && !isAtomMode && (showPhaseLegend || isBondsDensity || combinationLegend) && (
                 <KeyColumn compact={isNarrow}>

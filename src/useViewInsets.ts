@@ -81,6 +81,8 @@ export function useViewInsets(
                 container.style.setProperty('--free-center-x', `${insets.left + (width - insets.left - insets.right) / 2}px`);
                 container.style.setProperty('--free-center-y', `${insets.top + (height - insets.top - insets.bottom) / 2}px`);
                 container.style.setProperty('--free-left', `${insets.left}px`);
+                // Spec §8.5 "Centre-bottom above strip": the busy and unbound chips sit on this.
+                container.style.setProperty('--free-bottom', `${insets.bottom}px`);
                 onChange(insets);
             });
         };

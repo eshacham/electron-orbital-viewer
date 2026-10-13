@@ -1,0 +1,32 @@
+/* src/shell/strip.css -- the thumbnail strip (spec §8.5 bottom zone, §4.4 tiles 72 × 72 + 16 px label). */
+.thumbnail-strip.overlay {
+  position: absolute; z-index: 10; left: 12px; right: 12px; bottom: 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;
+}
+.thumbnail-strip.overlay > * { pointer-events: auto; }
+.strip-handle {
+  height: var(--ql-size-strip-handle); min-width: 44px; padding: 0 10px; cursor: pointer;
+  border-radius: var(--ql-radius-md); border: 1px solid var(--ql-color-border-subtle);
+  background: var(--ql-color-surface-2); color: var(--ql-color-text-2);
+}
+.strip-list {
+  display: flex; align-items: flex-end; gap: 12px; max-width: 100%; overflow-x: auto; padding: 4px 2px;
+  scrollbar-width: thin;
+}
+@media (prefers-reduced-motion: no-preference) { .strip-list { scroll-behavior: smooth; } }
+.strip-group { display: flex; flex-direction: column; gap: 2px; }
+.strip-group-label { font: 500 11px / 14px var(--ql-font-sans); color: var(--ql-color-text-3); padding-left: 2px; }
+.strip-group-tiles { display: flex; gap: 8px; }
+.strip-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.strip-tile-image {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; overflow: hidden;
+  border-radius: var(--ql-radius-md); border: 1px solid var(--ql-color-border-subtle); background: var(--ql-color-surface-2);
+  transition: box-shadow var(--ql-motion-hover) ease-out, border-color var(--ql-motion-hover) ease-out;
+}
+.strip-tile-image canvas { width: 100%; height: 100%; }
+.strip-tile:hover .strip-tile-image { background: var(--ql-color-surface-3); }
+.strip-tile.selected .strip-tile-image { border-color: var(--ql-color-selected-edge); box-shadow: var(--ql-shadow-selected); }
+.strip-tile-glyph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 13px var(--ql-font-sans); color: var(--ql-color-text-2); }
+.strip-tile-label { height: var(--ql-size-thumb-label); font: 500 12px / 16px var(--ql-font-sans); color: var(--ql-color-text-2); white-space: nowrap; }
+.strip-tile.selected .strip-tile-label { color: var(--ql-color-text-1); font-weight: 600; }
+.thumbnail-strip.sheet .strip-list { justify-content: flex-start; }

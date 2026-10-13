@@ -8,6 +8,8 @@ import {
 } from './clip_caps';
 import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
 import { createOrbitalWorker } from './workers/createOrbitalWorker';
+import { createThumbnailRenderer } from './thumbs/render_thumbnail';
+import type { ThumbnailService } from './thumbs/ThumbnailService';
 import { createOrbitalControls } from './orbital_controls_factory';
 import {
     createShellView,
@@ -203,6 +205,12 @@ export interface VisualizerContext {
     extrasSuppressed?: boolean;
     /** Ruling R10's moving average of frame time (`updateFrameGuard`), fed only while the lines or halo are drawn. */
     frameGuard?: { ema: number; frames: number };
+    /** Called once after each main frame (spec §12: the thumbnail service's turn); set by attachThumbnails. */
+    onAfterFrame?: () => void;
+    /** A thumbnail was drawn on this renderer since the last frame-time sample, which therefore is not the main picture's (see afterMainFrame). */
+    thumbnailRendered?: boolean;
+    /** Frees the thumbnails' render target (attachThumbnails); called by cleanupVisualizer. */
+    disposeThumbnails?: () => void;
 }
 
 const appearanceOf = (context: VisualizerContext): Appearance => context.appearance ?? CLASSIC_APPEARANCE;
@@ -759,6 +767,9 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
             context.moleculeOverlay = null;
         }
         context.isDisposed = true;  // Set flag first
+        context.onAfterFrame = undefined;
+        context.disposeThumbnails?.();
+        context.disposeThumbnails = undefined;
         if (context.animationFrameId) {
             cancelAnimationFrame(context.animationFrameId);
             context.animationFrameId = undefined;
@@ -1871,6 +1882,21 @@ export function guardGlowExtras(context: VisualizerContext, dtMs: number): void 
     if (context.transition?.kind === 'cross-fade') removeGlowExtras(context.transition.outgoing);
 }
 
+/**
+ * What follows each main frame: ruling R10's frame-time guard, then the
+ * thumbnail service's turn (`onAfterFrame`, spec §12). The guard times the
+ * main picture only. A thumbnail drawn after frame N -- its draw and its
+ * pixel read-back -- lands in the interval between frames N and N + 1, so
+ * that interval is not fed to it: filling the strip can neither latch Glow's
+ * lines and halo off nor reset the guard's average.
+ */
+export function afterMainFrame(context: VisualizerContext, dtMs: number | null): void {
+    const carriedThumbnail = context.thumbnailRendered === true;
+    context.thumbnailRendered = false;
+    if (dtMs !== null && !carriedThumbnail) guardGlowExtras(context, dtMs);
+    context.onAfterFrame?.();
+}
+
 function startAnimationLoop(context: VisualizerContext) {
     if (!context) return;
 
@@ -1888,7 +1914,7 @@ function startAnimationLoop(context: VisualizerContext) {
         if (context.transition) tickTransition(context, timestamp);
         reportTransitionState(context);
         renderFrame(context);
-        if (previous !== null) guardGlowExtras(context, timestamp - previous);
+        afterMainFrame(context, previous === null ? null : timestamp - previous);
         previous = timestamp;
         context.animationFrameId = requestAnimationFrame(animate);
     }
@@ -2221,4 +2247,32 @@ export function handleResize(context: VisualizerContext, width: number, height: 
     renderer.setSize(width, height);
     // The view offset is expressed in canvas pixels, so it has to follow.
     applyViewOffset(context);
+}
+
+/**
+ * Lends this context's renderer to the thumbnail service (spec §12: no
+ * second WebGL context). The service ticks once per frame after the main
+ * frame; a lost context stops it, and the tiles show their labels. The
+ * thumbnails draw their own scene with their own camera and lights into
+ * their own target: the main view's scene, camera, appearance and Glow
+ * extras are never touched (see render_thumbnail.ts and afterMainFrame).
+ */
+export function attachThumbnails(
+    context: VisualizerContext,
+    service: ThumbnailService,
+    options: { isBusy(): boolean; appearance(): Appearance },
+): void {
+    const thumbs = createThumbnailRenderer(context.renderer);
+    service.attach({
+        createWorker: createOrbitalWorker,
+        isBusy: options.isBusy,
+        themeKey: () => { const a = options.appearance(); return `${a.theme}|${a.scheme}|${a.finish}`; },
+        render: meshData => {
+            context.thumbnailRendered = true;
+            return thumbs.render(meshData, options.appearance());
+        },
+    });
+    context.onAfterFrame = () => service.tick();
+    context.disposeThumbnails = thumbs.dispose;
+    context.renderer.domElement.addEventListener('webglcontextlost', () => service.markLost());
 }
