@@ -49,6 +49,9 @@ import {
 import { CPK_COLORS, disposeOverlay } from './molecules/ball_and_stick';
 import { CLASSIC_APPEARANCE, type Appearance } from './design/appearance';
 import { axesStyle, curvePalette, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb, phaseColours } from './design/science';
+import {
+    applyGlow, atomRimFor, attachGlowExtras, fadeGlowExtras, glowSettingsFor, GLOW_LIGHTS, hasGlowLines, removeGlowLines, SOLID_LIGHTS, updateFrameGuard,
+} from './orbital_glow';
 
 /** One colour for a total density (spec §4.1): ψ's red and blue would claim a phase it does not have. */
 export const DENSITY_SURFACE_COLOUR = new THREE.Color(DENSITY_SURFACE_HEX);
@@ -193,9 +196,29 @@ export interface VisualizerContext {
     moleculeOverlay?: THREE.Group | null;
     /** How to draw (spec §6.6), set by OrbitalViewer; Classic until then. Optional so test doubles need not carry it. */
     appearance?: Appearance;
+    /** The scene's three lights, which the finish sets (§11.1 "Lights"). */
+    lights?: { ambient: THREE.AmbientLight; key: THREE.DirectionalLight; fill: THREE.DirectionalLight };
+    /** Ruling R10: Glow's mesh lines latched off by the frame-time guard, until the appearance next changes. */
+    linesSuppressed?: boolean;
+    /** Ruling R10's moving average of frame time (`updateFrameGuard`), fed only while mesh lines are drawn. */
+    frameGuard?: { ema: number; frames: number };
 }
 
 const appearanceOf = (context: VisualizerContext): Appearance => context.appearance ?? CLASSIC_APPEARANCE;
+
+/**
+ * Calls the `userData[hook]` each object under `root` carries. Gathered
+ * first, then called: a hook may add or remove children (Glow's halo and
+ * lines), which a live traverse would trip over.
+ */
+function callHooks(root: THREE.Object3D | null | undefined, hook: 'applyAppearance' | 'refreshGlow', ...args: unknown[]): void {
+    const hooks: Array<(...a: unknown[]) => void> = [];
+    root?.traverse(object => {
+        const fn = object.userData[hook] as ((...a: unknown[]) => void) | undefined;
+        if (fn) hooks.push(fn);
+    });
+    hooks.forEach(fn => fn(...args));
+}
 
 /**
  * The atom<->shell fade (level-transition spec addendum): one already-built
@@ -379,7 +402,10 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
         requestCounter: 0,
         isShellView: false,
         transition: null,
-        appearance: CLASSIC_APPEARANCE
+        appearance: CLASSIC_APPEARANCE,
+        lights: { ambient: ambientLight, key: directionalLight, fill: fillLight },
+        linesSuppressed: false,
+        frameGuard: { ema: 16, frames: 0 },
     };
 
     // Levels 1-2 cross-view linkage (spec §6): the plot reports a radius on
@@ -664,6 +690,7 @@ function refreshCaps(context: VisualizerContext) {
 /** Restyles the orbital — mode, opacity, cut plane — without recalculating it. */
 export function setSurfaceStyle(context: VisualizerContext | null, style: SurfaceStyle) {
     if (!context || context.isDisposed) return;
+    const modeChanged = context.surfaceStyle.mode !== style.mode;
     context.surfaceStyle = style;
     applySurfaceStyle(context.currentOrbitalGroup, style);
     updateClipPlane(
@@ -677,6 +704,13 @@ export function setSurfaceStyle(context: VisualizerContext | null, style: Surfac
     // are not part of the caps assembly) -- see shell_composition_view.ts's
     // own opacity weighting by occupancy, which this preserves.
     setCompositionLobesOpacity(findCompositionLobes(context.currentOrbitalGroup), style.opacity);
+    // Solid <-> Wireframe adds or drops Glow (a wireframe is today's look,
+    // §11.1). Only then: this runs on every opacity and cut-slider tick, and
+    // rebuilding the halo's shader per tick would stutter (ruling DC3).
+    if (modeChanged) {
+        callHooks(context.currentOrbitalGroup, 'refreshGlow');
+        applyLights(context);
+    }
 }
 
 /** Scale bar for the current camera, or null if there is nothing to measure. */
@@ -782,6 +816,7 @@ function cancelTransition(context: VisualizerContext): void {
         // in only part-way -- it becomes the new resting view, so it must
         // read as fully there, not still translucent from an interrupted fade.
         setGroupOpacity(context.currentOrbitalGroup, context.surfaceStyle.opacity);
+        fadeGlowExtras(context.currentOrbitalGroup, 1);
     } else {
         setShellViewCurve(context.currentOrbitalGroup, transition.toCurve);
         setShellViewRadius(context.currentOrbitalGroup, transition.toRadius);
@@ -860,6 +895,9 @@ function tickCrossFade(context: VisualizerContext, transition: CrossFadeTransiti
     const resting = context.surfaceStyle.opacity;
     setGroupOpacity(transition.outgoing, resting * (1 - t));
     setGroupOpacity(context.currentOrbitalGroup, resting * t);
+    // Glow's halo and lines fade with their surface (ruling DC3).
+    fadeGlowExtras(transition.outgoing, 1 - t);
+    fadeGlowExtras(context.currentOrbitalGroup, t);
 
     if (elapsed >= CROSS_FADE_DURATION_MS) {
         context.scene.remove(transition.outgoing);
@@ -867,6 +905,7 @@ function tickCrossFade(context: VisualizerContext, transition: CrossFadeTransiti
         // Snap to the exact resting opacity for the same reason tickShellFade
         // snaps its curve/radius: easing can undershoot by a hair.
         setGroupOpacity(context.currentOrbitalGroup, resting);
+        fadeGlowExtras(context.currentOrbitalGroup, 1);
         context.transition = null;
     }
 }
@@ -1341,9 +1380,13 @@ export function setMoleculeOverlay(context: VisualizerContext | null, overlay: T
 /** Ruling R12: hydrogen's CPK white would vanish on Light Clean's page, so it takes science.ts's LIGHT_HYDROGEN there (non-Classic). */
 function applyOverlayAppearance(overlay: THREE.Object3D, appearance: Appearance): void {
     const hydrogen = appearance.theme === 'light' && appearance.scheme !== 'classic' ? LIGHT_HYDROGEN : CPK_COLORS[1];
+    // §11.1 "Ball-and-stick": Deep Space gives the atoms a 0.15 rim (R12).
+    const rim = atomRimFor(appearance);
     overlay.traverse(child => {
         const material = (child as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
-        if (material?.userData?.Z === 1) material.color.set(hydrogen);
+        if (material?.userData?.Z === undefined) return;
+        if (material.userData.Z === 1) material.color.set(hydrogen);
+        applyGlow(material, rim);
     });
 }
 
@@ -1783,9 +1826,25 @@ export function renderFrame(context: VisualizerContext): void {
     }
 }
 
+/**
+ * Ruling R10, one frame of it: while Glow's mesh lines are drawn, feeds the
+ * frame time to the moving average, and once that passes 20 ms takes the
+ * lines out and latches them off until the appearance next changes (no
+ * flicker on and off). Exported so the latch can be tested without a
+ * WebGLRenderer.
+ */
+export function guardMeshLines(context: VisualizerContext, dtMs: number): void {
+    if (!context.frameGuard || context.linesSuppressed || !hasGlowLines(context.currentOrbitalGroup)) return;
+    if (!updateFrameGuard(context.frameGuard, dtMs)) return;
+    context.linesSuppressed = true;
+    removeGlowLines(context.currentOrbitalGroup);
+    if (context.transition?.kind === 'cross-fade') removeGlowLines(context.transition.outgoing);
+}
+
 function startAnimationLoop(context: VisualizerContext) {
     if (!context) return;
 
+    let previous: number | null = null;
     function animate(timestamp: number) {
         if (!context || context.isDisposed) {
             return;
@@ -1799,6 +1858,8 @@ function startAnimationLoop(context: VisualizerContext) {
         if (context.transition) tickTransition(context, timestamp);
         reportTransitionState(context);
         renderFrame(context);
+        if (previous !== null) guardMeshLines(context, timestamp - previous);
+        previous = timestamp;
         context.animationFrameId = requestAnimationFrame(animate);
     }
 
@@ -1870,6 +1931,10 @@ function updateSceneWithMeshData(
         const positionAttribute = new THREE.Float32BufferAttribute(positions, 3);
         geometry.setAttribute('position', positionAttribute);
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        // The phase Glow's rim reads, so it tints each lobe with its own
+        // phase (§11.2); 0 where the surface has no phase (density, ESP).
+        geometry.setAttribute('phaseSign', new THREE.Float32BufferAttribute(
+            surfaceColouring === 'phase' ? Float32Array.from(signs) : new Float32Array(signs.length), 1));
         geometry.setIndex(meshData.cells.flat());
         geometry.computeVertexNormals();
 
@@ -1888,6 +1953,15 @@ function updateSceneWithMeshData(
             opacity: context.surfaceStyle.opacity
         });
         group.add(caps);
+
+        // Glow's halo offset is a fraction of this; worked out once, here,
+        // so the closures below hold a number rather than meshData.
+        const radius = meshRadius(meshData);
+        /** Glow (§11.2) to the current surface mode: extras on a solid surface only. */
+        const refreshGlow = (appearance: Appearance) => attachGlowExtras(group, mesh, appearance, {
+            radius, clippingPlanes: context.clippingPlanes,
+            solid: context.surfaceStyle.mode === 'solid', linesAllowed: !context.linesSuppressed,
+        });
 
         // Colours come from the appearance (spec §6.6, §11) and are repainted
         // in place by setAppearance through this closure: the geometry, its
@@ -1914,9 +1988,12 @@ function updateSceneWithMeshData(
                 // Display space, as the cap shader ramps (ruling DC2b): the cut face matches the surface and the key.
                 setCapsPositiveColour(caps, displayRgb(densitySurfaceHex(appearance.theme, appearance.scheme)));
             }
+            refreshGlow(appearance);
         };
         paint(appearanceOf(context));
         mesh.userData.applyAppearance = paint;
+        // setSurfaceStyle's hook for a Solid <-> Wireframe switch: Glow only, no repaint.
+        mesh.userData.refreshGlow = () => refreshGlow(appearanceOf(context));
         context.currentCaps = caps;
         refreshCaps(context);
 
@@ -1927,6 +2004,7 @@ function updateSceneWithMeshData(
             // Starts fully transparent -- tickCrossFade ramps it (and fades
             // outgoingShellView down) from here.
             setGroupOpacity(group, 0);
+            fadeGlowExtras(group, 0);
             context.transition = {
                 kind: 'cross-fade',
                 startTime: null,
@@ -2057,10 +2135,19 @@ function removeAxesHelper(context: VisualizerContext) {
  */
 export function setAppearance(context: VisualizerContext | null, appearance: Appearance): void {
     if (!context || context.isDisposed) return;
+    const previous = context.appearance;
     context.appearance = appearance;
-    const apply = (root: THREE.Object3D | null | undefined) => root?.traverse(object => {
-        (object.userData.applyAppearance as ((a: Appearance) => void) | undefined)?.(appearance);
-    });
+    // Ruling R10: a new appearance gets a fresh look at frame time -- before
+    // the objects below re-apply, so the mesh lines may come back. The same
+    // appearance again (a re-run effect) is not a change.
+    if (!previous || (Object.keys(appearance) as Array<keyof Appearance>).some(key => previous[key] !== appearance[key])) {
+        context.linesSuppressed = false;
+        if (context.frameGuard) {
+            context.frameGuard.ema = 16;
+            context.frameGuard.frames = 0;
+        }
+    }
+    const apply = (root: THREE.Object3D | null | undefined) => callHooks(root, 'applyAppearance', appearance);
     apply(context.currentOrbitalGroup);
     if (context.transition?.kind === 'cross-fade') apply(context.transition.outgoing);
     if (context.moleculeOverlay) applyOverlayAppearance(context.moleculeOverlay, appearance);
@@ -2069,6 +2156,21 @@ export function setAppearance(context: VisualizerContext | null, appearance: App
         if (axes.userData.styleKey !== `${appearance.theme}|${appearance.scheme}`) addAxesHelper(context, axes.userData.size as number);
         context.currentAxesHelper!.visible = appearance.showAxes;
     }
+    applyLights(context);
+}
+
+/**
+ * §11.1 "Lights": Glow lets its emissive term carry part of the light, so
+ * the three lights dim; Solid, Classic and a wireframe (today's material)
+ * keep today's levels.
+ */
+function applyLights(context: VisualizerContext): void {
+    if (!context.lights) return;
+    const glowing = context.surfaceStyle.mode === 'solid' && glowSettingsFor(appearanceOf(context)) !== null;
+    const levels = glowing ? GLOW_LIGHTS : SOLID_LIGHTS;
+    context.lights.ambient.intensity = levels.ambient;
+    context.lights.key.intensity = levels.key;
+    context.lights.fill.intensity = levels.fill;
 }
 
 export function handleResize(context: VisualizerContext, width: number, height: number) {

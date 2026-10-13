@@ -6,7 +6,9 @@ jest.mock('../src/orbital_controls_factory', () => ({ createOrbitalControls: jes
 import { createOrbitalWorker } from '../src/workers/createOrbitalWorker';
 import {
     VisualizerContext, setAppearance, setMoleculeOverlay, updateAtomViewInScene, updateOrbitalInScene, presentFieldMesh,
+    setSurfaceStyle, guardMeshLines,
 } from '../src/orbital_visualizer';
+import { collectExportSurfaces } from '../src/export/surfaces';
 import { defaultSurfaceStyle, MeshData } from '../src/types/orbital';
 import { CLASSIC_APPEARANCE, type Appearance } from '../src/design/appearance';
 import { CURVE_COLORS } from '../src/curve_colors';
@@ -91,11 +93,14 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
     // DC11: the Classic a user actually picks -- in Light Clean, with Glow chosen as the finish.
     it('draws Classic exactly in Light Clean with Glow chosen too: colours, caps, AxesHelper, today\'s materials and lights', async () => {
         const context = buildContext();
-        // Today's three lights at today's levels (initVisualizer's), which Classic keeps.
-        const lights = [new THREE.AmbientLight(0xffffff, 0.5), new THREE.DirectionalLight(0xffffff, 0.8), new THREE.DirectionalLight(0xffffff, 0.35)];
-        lights.forEach(light => context.scene.add(light));
+        // Ruling DC11b: the context's own lights (Task 15), at today's levels (initVisualizer's), which Classic keeps.
+        context.lights = { ambient: new THREE.AmbientLight(0xffffff, 0.5), key: new THREE.DirectionalLight(0xffffff, 0.8), fill: new THREE.DirectionalLight(0xffffff, 0.35) };
+        const lights = [context.lights.ambient, context.lights.key, context.lights.fill];
         await drawOrbital(context);
         setAppearance(context, { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
+        // The Glow step really changed the lights and the surface, so the Classic checks below can fail.
+        expect(lights.map(light => light.intensity)).toEqual([0.35, 0.6, 0.25]);
+        expect(context.currentOrbitalGroup!.children.some(child => child.userData.isGlowExtra)).toBe(true);
         setAppearance(context, { theme: 'light', scheme: 'classic', finish: 'glow', showAxes: true, lowPower: false });
         const surface = surfaceOf(context);
         expect(colourAt(surface, 0)).toEqual([1, 0, 0]);
@@ -110,6 +115,8 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
         expect(axes.children.some(child => child instanceof THREE.Mesh)).toBe(false); // no arrowheads
         // No Glow material: the surface is today's MeshStandardMaterial, and nothing else was added to the group.
         expect(surface.material).toBeInstanceOf(THREE.MeshStandardMaterial);
+        // Ruling DC11b: Glow's real marks -- the shader injection flag and the halo/lines marker -- are gone.
+        expect((surface.material as THREE.MeshStandardMaterial).userData.glow).toBeFalsy();
         expect(context.currentOrbitalGroup!.children.some(child => child.userData.isGlowExtra)).toBe(false);
         expect(lights.map(light => light.intensity)).toEqual([0.5, 0.8, 0.35]);
     });
@@ -188,5 +195,103 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
         expect(hydrogen.color.getHexString()).toBe(CPK_COLORS[1].slice(1));
         setAppearance(context, { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
         expect(hydrogen.color.getHexString()).toBe(CPK_COLORS[1].slice(1));
+    });
+});
+
+describe('Glow on the drawn orbital (spec §11.2)', () => {
+    beforeEach(() => { jest.spyOn(console, 'log').mockImplementation(() => {}); });
+    afterEach(() => { (console.log as jest.Mock).mockRestore(); });
+
+    const glow = { theme: 'dark' as const, scheme: 'phase' as const, finish: 'glow' as const, showAxes: true, lowPower: false };
+    const extras = (context: VisualizerContext) => context.currentOrbitalGroup!.children.filter(child => child.userData.isGlowExtra);
+    const extra = (context: VisualizerContext, kind: 'halo' | 'lines') => extras(context).find(child => child.userData.isGlowExtra === kind) as THREE.Mesh | undefined;
+
+    it('glows in place and never exports the halo or the lines', async () => {
+        const context = buildContext();
+        await drawOrbital(context);
+        const before = collectExportSurfaces(context.currentOrbitalGroup);
+        setAppearance(context, glow);
+        expect(extras(context)).toHaveLength(2);
+        expect(surfaceOf(context).geometry.getAttribute('phaseSign').array).toEqual(Float32Array.from([1, -1, 1]));
+        expect(collectExportSurfaces(context.currentOrbitalGroup)).toHaveLength(before.length);
+    });
+
+    it('drops the extras for a wireframe and brings them back for the solid surface', async () => {
+        const context = buildContext();
+        context.lights = { ambient: new THREE.AmbientLight(0xffffff, 0.5), key: new THREE.DirectionalLight(0xffffff, 0.8), fill: new THREE.DirectionalLight(0xffffff, 0.35) };
+        await drawOrbital(context);
+        setAppearance(context, glow);
+        setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'wireframe' });
+        expect(extras(context)).toHaveLength(0);
+        // §11.1 "Material": Wireframe = today's -- today's material, so today's lights.
+        expect((surfaceOf(context).material as THREE.MeshStandardMaterial).userData.glow).toBe(false);
+        expect(context.lights.ambient.intensity).toBe(0.5);
+        setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'solid' });
+        expect(extras(context)).toHaveLength(2);
+        expect(context.lights.ambient.intensity).toBe(0.35);
+    });
+
+    it('dims the lights for Glow, whose emissive term carries the rest, and restores them for Solid', () => {
+        const context = buildContext();
+        context.lights = { ambient: new THREE.AmbientLight(0xffffff, 0.5), key: new THREE.DirectionalLight(0xffffff, 0.8), fill: new THREE.DirectionalLight(0xffffff, 0.35) };
+        setAppearance(context, glow);
+        expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([0.35, 0.6, 0.25]);
+        setAppearance(context, { ...glow, finish: 'solid' });
+        expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([0.5, 0.8, 0.35]);
+    });
+
+    // Ruling DC3: the cut and opacity sliders restyle every tick; the halo's shader must not be rebuilt by them.
+    it('keeps the same halo and lines through opacity and cut changes', async () => {
+        const context = buildContext();
+        await drawOrbital(context);
+        setAppearance(context, glow);
+        const [halo, lines] = [extra(context, 'halo')!, extra(context, 'lines')!];
+        const disposals = [halo, lines].map(mesh => jest.spyOn(mesh.material as THREE.Material, 'dispose'));
+        const repaint = jest.spyOn(surfaceOf(context).userData, 'applyAppearance');
+        setSurfaceStyle(context, { ...context.surfaceStyle, opacity: 0.4 });
+        setSurfaceStyle(context, { ...context.surfaceStyle, clipAxis: 'x', clipPosition: 0.3 });
+        setSurfaceStyle(context, { ...context.surfaceStyle, clipPosition: 0.6 });
+        expect(extra(context, 'halo')).toBe(halo);
+        expect(extra(context, 'lines')).toBe(lines);
+        disposals.forEach(spy => expect(spy).not.toHaveBeenCalled());
+        expect(repaint).not.toHaveBeenCalled();
+    });
+
+    // Ruling DC3: a cross-fade starts the incoming orbital at opacity 0 -- its halo and lines with it.
+    it('starts a cross-fade with the halo and lines faded out too', async () => {
+        const context = buildContext();
+        setAppearance(context, glow);
+        updateAtomViewInScene(context, {
+            contourRadius: 4, shellEmphasis: new Float32Array([0.1, 0.4, 1, 0.3, 0.05]), rMin: 0.1, dx: 0.5, size: 5, rMax: 0.1 * Math.exp(2),
+        });
+        const worker = fakeWorker();
+        (createOrbitalWorker as jest.Mock).mockReturnValue(worker);
+        const pending = updateOrbitalInScene(context, { n: 2, l: 1, ml: 0, Z: 1, resolution: 4, rMax: 20, enclosedFraction: 0.9 }, true, { animate: true });
+        worker.onmessage!({ data: { type: 'success', meshData: meshData() } });
+        await pending;
+        expect(context.transition?.kind).toBe('cross-fade');
+        expect(((extra(context, 'halo')!.material) as THREE.ShaderMaterial).uniforms.qlHaloOpacity.value).toBe(0);
+        expect((extra(context, 'lines')!.material as THREE.Material).opacity).toBe(0);
+    });
+
+    // Ruling R10: the guard latches the lines off, and only a new appearance brings them back.
+    it('latches the mesh lines off on slow frames until the appearance next changes', async () => {
+        const context = buildContext();
+        context.frameGuard = { ema: 16, frames: 0 };
+        await drawOrbital(context);
+        setAppearance(context, glow);
+        for (let i = 0; i < 300; i++) guardMeshLines(context, 40);
+        expect(context.linesSuppressed).toBe(true);
+        expect(extra(context, 'lines')).toBeUndefined();
+        expect(extra(context, 'halo')).toBeDefined();
+        // Restyling is not an appearance change: still off.
+        setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'wireframe' });
+        setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'solid' });
+        setAppearance(context, glow);
+        expect(extra(context, 'lines')).toBeUndefined();
+        setAppearance(context, { ...glow, scheme: 'density' });
+        expect(context.linesSuppressed).toBe(false);
+        expect(context.frameGuard).toEqual({ ema: 16, frames: 0 });
+        expect(extra(context, 'lines')).toBeDefined();
     });
 });
