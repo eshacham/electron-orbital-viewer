@@ -1189,6 +1189,23 @@ describe('App: shell', () => {
         expect(store.getState().atom.mode).toBe('bonds');
     });
 
+    // Spec §8.2: like the old exclusive Mode toggle, re-picking the mode on screen dispatches nothing,
+    // so Bonds' picture is not cleared (its request effect would never redraw it).
+    it('re-picking the mode already shown, from the Explore tab or the rail, leaves the picture alone', () => {
+        const { store } = renderWithProvider(<App />);
+        // Unanchored: the rail item's name is "Bonds (bonds mode)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+        const field = store.getState().orbital.currentField;
+        const nonce = store.getState().orbital.basicRenderNonce;
+        expect(field).not.toBeNull();
+        fireEvent.click(screen.getByRole('link', { name: 'Explore' }));
+        expect(store.getState().orbital.currentField).toBe(field);
+        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+        expect(store.getState().orbital.currentField).toBe(field);
+        expect(store.getState().orbital.basicRenderNonce).toBe(nonce);
+        expect(store.getState().atom.mode).toBe('bonds');
+    });
+
     it('opens a search result the way the pickers do', async () => {
         const { store } = renderWithProvider(<App />);
         const search = screen.getByRole('combobox', { name: 'Search elements, molecules and orbitals' });

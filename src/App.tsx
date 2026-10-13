@@ -311,6 +311,15 @@ function App() {
         dispatch(clearPendingCut());
     }, [dispatch]);
 
+    // Every mode control in the shell -- rail, phone mode menu, top-bar tabs --
+    // dispatches exactly as the old exclusive Mode toggle did (spec §8.2): a
+    // click on the mode already shown does nothing. Re-running setMode would
+    // clear the drawn picture (Bonds' request effect would not redraw it),
+    // re-bump basicRenderNonce and drop a shared link's pending cut.
+    const selectMode = useCallback((newMode: ViewMode) => {
+        if (newMode !== atomMode) handleModeChange(newMode);
+    }, [atomMode, handleModeChange]);
+
     // Picking an element gives you that element's best default view, derived
     // from its own solved profile rather than hand-tuned per element: the
     // camera back at the canonical angle and framed on this atom's own
@@ -1181,8 +1190,8 @@ function App() {
     const urlMode = (viewMode: ViewMode) => ({ atom: 'atom', hydrogenic: 'basic', bonds: 'bonds', molecule: 'molecule' })[viewMode];
     const topBarTabs: TopBarTab[] = [
         { key: 'explore', label: 'Explore', href: `/#mode=${urlMode(lastExploreModeRef.current)}`, current: !isMoleculeMode,
-            onSelect: () => handleModeChange(lastExploreModeRef.current) },
-        { key: 'molecules', label: 'Molecules', href: '/#mode=molecule', current: isMoleculeMode, onSelect: () => handleModeChange('molecule') },
+            onSelect: () => selectMode(lastExploreModeRef.current) },
+        { key: 'molecules', label: 'Molecules', href: '/#mode=molecule', current: isMoleculeMode, onSelect: () => selectMode('molecule') },
     ];
     const topBar = (
         <TopBar
@@ -1196,7 +1205,7 @@ function App() {
         />
     );
     const phoneTopBar = (compact: boolean) => (
-        <PhoneTopBar brand={brand} themeMode={themeMode} mode={atomMode} onModeChange={handleModeChange}
+        <PhoneTopBar brand={brand} themeMode={themeMode} mode={atomMode} onModeChange={selectMode}
             onOpenSearch={() => setPhoneSearchOpen(true)} avatar={avatar} compact={compact} />
     );
     // A phone held upright: top bar, then the header line under it. Sideways: one merged 44 px line (spec §7).
@@ -1379,7 +1388,7 @@ function App() {
                 layout={layout}
                 wide={isWide}
                 topBar={topBar}
-                rail={<Rail mode={atomMode} onModeChange={handleModeChange} isOwner={isOwner} wide={isWide} />}
+                rail={<Rail mode={atomMode} onModeChange={selectMode} isOwner={isOwner} wide={isWide} />}
                 explore={<ExplorePanel body={exploreContent} />}
                 inspector={<Inspector variant="docked" body={inspectorBody} />}
                 viewport={viewport}
