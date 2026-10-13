@@ -1,0 +1,14 @@
+/* src/shell/tabs.css -- panel tab rows (spec §8.4): nav style, a 2 px selected-edge underline. */
+.ql-tabs { display: flex; gap: 20px; padding: 0 var(--ql-size-panel-padding); border-bottom: 1px solid var(--ql-color-border-subtle); }
+.ql-tab {
+  position: relative; padding: 12px 0 10px; border: 0; background: none; cursor: pointer;
+  color: var(--ql-color-text-2);
+  font: var(--ql-type-nav-weight) var(--ql-type-nav-size) / var(--ql-type-nav-line) var(--ql-font-sans);
+  transition: color var(--ql-motion-hover) ease-out;
+}
+.ql-tab:hover { color: var(--ql-color-text-1); }
+.ql-tab[aria-selected="true"] { color: var(--ql-color-text-1); font-weight: 600; }
+.ql-tab[aria-selected="true"]::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 1px;
+  background: var(--ql-color-selected-edge);
+}

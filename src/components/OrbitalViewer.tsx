@@ -8,6 +8,7 @@ import { applyCameraAngles, cameraAnglesOf } from '../camera_angles';
 import { ScaleBar, formatScaleLabel, scaleBarMaxPx } from '../scale_bar';
 import { useMediaQuery, PREFERS_REDUCED_MOTION, NARROW_VIEWPORT } from '../useMediaQuery';
 import { useViewInsets } from '../useViewInsets';
+import { BUILD_ENV } from '../jobs/build_env';
 import {
     initVisualizer,
     cleanupVisualizer,
@@ -186,12 +187,14 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         };
     }, [dispatch]);
 
-    // Centre the scene in the part of the canvas no panel covers (see
-    // useViewInsets). The panels are siblings of the canvas host inside
+    // Centre the scene in the part of the canvas no overlay zone covers (see
+    // useViewInsets). The zones are siblings of the canvas host inside
     // #canvas-container, so that is what gets measured.
     const isNarrow = useMediaQuery(NARROW_VIEWPORT);
     const handleInsets = useCallback((insets: ViewInsets) => {
         setViewInsets(visualizerContextRef.current, insets);
+        // The live check (tools/design/shoot.mjs) compares these with the zones; dev builds only.
+        if (BUILD_ENV.dev) (window as Window & { __eovInsets?: ViewInsets }).__eovInsets = insets;
     }, []);
     useViewInsets(canvasHostRef, isNarrow, handleInsets);
 
@@ -623,6 +626,21 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // The grid resizes the cell without any window resize: the medium-width
+    // drawer, Explore folding, full screen (spec §7, §8.5).
+    useEffect(() => {
+        const host = canvasHostRef.current;
+        if (!host || typeof ResizeObserver === 'undefined') return undefined;
+        const observer = new ResizeObserver(() => {
+            const context = visualizerContextRef.current;
+            if (context && host.clientWidth > 0 && host.clientHeight > 0) {
+                visualizerHandleResize(context, host.clientWidth, host.clientHeight);
+            }
+        });
+        observer.observe(host);
+        return () => observer.disconnect();
     }, []);
 
     // Molecules mode's surface, overlay and picking (Phase 6). Called last

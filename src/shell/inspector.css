@@ -1,0 +1,34 @@
+/* src/shell/inspector.css -- the inspector's inside (spec §8.6) and its medium-width drawer (§7). */
+.inspector-body {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--ql-size-section-gap);
+  padding: var(--ql-size-panel-padding);
+}
+.inspector #controls, .inspector .radial-plot, .inspector .molecule-orbital-card {
+  position: static; width: auto; max-width: none !important; max-height: none; overflow: visible;
+  margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
+}
+.inspector-drawer {
+  position: absolute; z-index: 12; top: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: row-reverse;
+  border-radius: 0 var(--ql-radius-xl) var(--ql-radius-xl) 0;
+}
+.inspector-bar {
+  flex: 0 0 var(--ql-size-inspector-bar); display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 4px; box-sizing: border-box;
+}
+.inspector-drawer.open .inspector-bar { border-left: 1px solid var(--ql-color-border-subtle); }
+.inspector-bar-button {
+  writing-mode: vertical-rl; padding: 12px 6px; cursor: pointer;
+  border: 1px solid transparent; border-radius: var(--ql-radius-md); background: none;
+  color: var(--ql-color-text-2); font: var(--ql-type-nav-weight) var(--ql-type-nav-size) var(--ql-font-sans);
+}
+.inspector-bar-button[aria-expanded="true"] {
+  background: var(--ql-color-selected-fill); border-color: var(--ql-color-selected-edge); color: var(--ql-color-on-fill);
+}
+.inspector-drawer-panel { display: flex; flex-direction: column; width: var(--ql-size-inspector); min-height: 0; }
+.inspector-stacked { display: flex; flex-direction: column; gap: var(--ql-size-section-gap); }
+@media (prefers-reduced-motion: no-preference) {
+  .inspector-drawer-panel { animation: ql-drawer-in var(--ql-motion-panel) ease-out; }
+}
+@keyframes ql-drawer-in { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }

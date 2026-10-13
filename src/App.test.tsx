@@ -22,6 +22,8 @@ import { createH2PlusCurveWorker } from './workers/createH2PlusCurveWorker';
 import { resetH2PlusCurveForTests } from './bonds/useH2PlusCurve';
 import { loadScan, loadMoleculeMeta, loadBasis } from './molecules/loader';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from './molecules/types';
+import { brandPref } from './design/brands';
+import { MEDIUM_VIEWPORT } from './useMediaQuery';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -257,7 +259,8 @@ describe('App', () => {
         // Addendum 2's mode rename: no second element control, Z fixed at 1
         // -- but the one-electron framing still stated outright (spec §7).
         expect(screen.queryByRole('combobox', { name: /Nucleus/i })).not.toBeInTheDocument();
-        expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
+        // Anchored: the top bar's search combobox is "Search elements, …" (spec §8.3); this pins the old Element select.
+        expect(screen.queryByRole('combobox', { name: /^Element/i })).not.toBeInTheDocument();
         expect(screen.getByText(/one electron, Z = 1/i)).toBeInTheDocument();
         // LevelNav is atom-mode only.
         expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).not.toBeInTheDocument();
@@ -336,7 +339,8 @@ describe('App', () => {
         fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
         expect(store.getState().orbital.surfaceStyle.clipAxis).toBe('none');
 
-        fireEvent.click(screen.getByRole('button', { name: /^atom mode/i }));
+        // Unanchored: the rail item's name is "Atoms (atom mode)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
         expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'z', clipPosition: -0.2 });
     });
 
@@ -395,7 +399,8 @@ describe('App', () => {
 
             expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
             expect(container.querySelectorAll('.periodic-tile')).toHaveLength(118);
-            expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
+            // Anchored: the top bar's search combobox is "Search elements, …" (spec §8.3); this pins the old Element select.
+            expect(screen.queryByRole('combobox', { name: /^Element/i })).not.toBeInTheDocument();
         });
 
         it('opens a searchable list from the element name on a phone, where a table does not fit', () => {
@@ -462,7 +467,7 @@ describe('App', () => {
 
             const view = screen.getByRole('tab', { name: 'View' });
             fireEvent.click(view);
-            expect(screen.getByRole('button', { name: /atom mode/i })).toBeInTheDocument();
+            expect(screen.getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument(); // the Mode toggle moved to the phone's mode menu (spec §9.8)
             fireEvent.click(view);
             expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
         });
@@ -727,7 +732,8 @@ describe('App', () => {
 
         it('draws exact H2+ and shows the Bonds panel beside the curve', () => {
             const { store, container } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'h2plus', R: 2, state: '1sigma_g' });
             expect(screen.getByText(/Exact within Born–Oppenheimer/)).toBeInTheDocument();
             expect(screen.getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
@@ -743,7 +749,8 @@ describe('App', () => {
             renderWithProvider(<App />);
             fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
             expect(createH2PlusCurveWorker).not.toHaveBeenCalled();
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             expect(createH2PlusCurveWorker).toHaveBeenCalledTimes(1);
             const worker = (createH2PlusCurveWorker as jest.Mock).mock.results[0].value;
             fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
@@ -753,7 +760,8 @@ describe('App', () => {
         // Task 9's carry: a curve that could not be computed says why, where the curve would be.
         it('shows why the H2+ curve could not be computed', async () => {
             const { container } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             const worker = (createH2PlusCurveWorker as jest.Mock).mock.results[0].value;
             await act(async () => { worker.onmessage({ data: { type: 'error', message: 'no root in the bracket' } }); });
             expect(within(container.querySelector('.view-panel') as HTMLElement).getByRole('alert'))
@@ -762,7 +770,8 @@ describe('App', () => {
 
         it('redraws only for a different picture, not for every change to the selection', () => {
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             const drawn = store.getState().orbital.currentField;
             // A ρ chosen while H₂⁺'s orbital is shown changes the selection, not the picture.
             act(() => { store.dispatch(setDensityIso(0.05)); });
@@ -774,11 +783,13 @@ describe('App', () => {
         // Review Focus 1.
         it('Bonds and back restores the Basic Orbitals request', () => {
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: 'basic orbitals mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/ }));
             const basic = store.getState().orbital.currentParams;
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             expect(store.getState().orbital.currentParams).toBeNull();
-            fireEvent.click(screen.getByRole('button', { name: 'basic orbitals mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/ }));
             expect(store.getState().orbital.currentField).toBeNull();
             expect(store.getState().orbital.currentParams).toEqual(basic);
         });
@@ -792,7 +803,8 @@ describe('App', () => {
             fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
             chooseCombination('sp³');
             fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             expect(store.getState().orbital.currentField?.sources.map(s => s.id)).toEqual(['h2plus:2.0000:1sigma_g']);
             expect(screen.queryByLabelText('combination colour key')).not.toBeInTheDocument();
 
@@ -810,7 +822,8 @@ describe('App', () => {
 
         it('draws a molecule\'s density at a fixed ρ, says so beside the fraction, and keys the grey surface', async () => {
             const { store, container } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             chooseSystem('N₂ — Nitrogen');
             await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
                 .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@07' }));
@@ -832,7 +845,8 @@ describe('App', () => {
         // The canvas says what it is waiting for.
         it('keys the drawn density, not the pending selection, while a point loads and after a load fails', async () => {
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             chooseSystem('N₂ — Nitrogen');
             await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
                 .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@07' }));
@@ -867,7 +881,8 @@ describe('App', () => {
         it('reports a molecule that fails to load in the panel only', async () => {
             (loadScan as jest.Mock).mockRejectedValue(new Error('Could not load /molecules/v1/n2/scan.json (HTTP 403)'));
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             chooseSystem('N₂ — Nitrogen');
             expect(await screen.findByText(/N₂ could not be loaded/)).toBeInTheDocument();
             expect(store.getState().orbital.error).toBeNull();
@@ -877,8 +892,9 @@ describe('App', () => {
         it('on a phone: the header names the system and R, and the sheet has Explore, View and Plot', async () => {
             installMatchMedia(true);
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('tab', { name: 'View' }));
-            fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+            fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // spec §9.8
+            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'View', 'Plot']);
             fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
             chooseSystem('N₂ — Nitrogen');
@@ -1103,7 +1119,8 @@ describe('App: Share', () => {
         const writeText = jest.fn().mockResolvedValue(undefined);
         Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
         const { store } = renderWithProvider(<App />);
-        fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
+        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
         act(() => {
             store.dispatch(setH2PlusR(3.5));
             store.dispatch(setBondsView({ kind: 'h2plus', state: '1sigma_u' }));
@@ -1136,6 +1153,84 @@ describe('App: Share', () => {
         expect((linkField as HTMLInputElement).value).toMatch(/^https?:\/\/.*#mode=atom&Z=1&level=atom&/);
 
         document.execCommand = originalExecCommand;
+    });
+});
+
+describe('App: shell', () => {
+    const originalMatchMedia = window.matchMedia;
+    // Ruling DB1: the URL keys registered as in 'App: Share', so the share link carries real state and the
+    // Review Focus 1 comparison below can fail.
+    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerBondsUrlKeys(); clearProfileCacheForTests(); });
+    afterEach(() => {
+        window.matchMedia = originalMatchMedia;
+        window.localStorage.clear();
+        resetUrlKeysForTests();
+        window.history.replaceState(null, '', '/');
+        Reflect.deleteProperty(navigator, 'clipboard');
+    });
+
+    it('lays out the workstation: banner, view-mode rail, Explore, the 3D view and the inspector', () => {
+        renderWithProvider(<App />);
+        expect(screen.getByRole('banner')).toBeInTheDocument();
+        expect(screen.getByRole('navigation', { name: 'view mode' })).toBeInTheDocument();
+        expect(screen.getByRole('complementary', { name: 'Explore' })).toBeInTheDocument();
+        expect(screen.getByRole('main', { name: '3D view' })).toHaveAttribute('id', 'canvas-container');
+        expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveClass('view-panel');
+    });
+
+    it('the Explore tab returns to the last of Atoms, Basic Orbitals and Bonds; Molecules has its own', () => {
+        const { store } = renderWithProvider(<App />);
+        // Unanchored: the rail item's name is "Bonds (bonds mode)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+        fireEvent.click(screen.getByRole('link', { name: 'Molecules' }));
+        expect(store.getState().atom.mode).toBe('molecule');
+        expect(screen.getByRole('link', { name: 'Molecules' })).toHaveAttribute('aria-current', 'page');
+        fireEvent.click(screen.getByRole('link', { name: 'Explore' }));
+        expect(store.getState().atom.mode).toBe('bonds');
+    });
+
+    it('opens a search result the way the pickers do', async () => {
+        const { store } = renderWithProvider(<App />);
+        const search = screen.getByRole('combobox', { name: 'Search elements, molecules and orbitals' });
+        fireEvent.focus(search);
+        fireEvent.change(search, { target: { value: 'fe' } });
+        fireEvent.keyDown(search, { key: 'Enter' });
+        expect(store.getState().atom.Z).toBe(26);
+        fireEvent.focus(search);
+        fireEvent.change(search, { target: { value: '2px' } });
+        fireEvent.keyDown(search, { key: 'Enter' });
+        expect(store.getState().atom.mode).toBe('hydrogenic');
+        expect(store.getState().orbital.basicSelection).toEqual({ n: 2, l: 1, ml: 1 });
+        // Focusing the search asked for the molecule index (spec §8.3); let its load settle inside the test.
+        await waitFor(() => expect(store.getState().molecule.index !== null || store.getState().molecule.indexError !== null).toBe(true));
+    });
+
+    it('a theme or brand switch leaves the share link byte-identical (Review Focus 1)', async () => {
+        const writeText = jest.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+        renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+        // Ruling DB1: the link carries the view's state, so an equal second link means something.
+        expect(writeText.mock.calls[0][0]).toMatch(/#mode=atom&/);
+        fireEvent.click(screen.getByRole('button', { name: /^Theme: / }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Light Clean' }));
+        act(() => { brandPref.set('novalab'); });
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+        expect(writeText.mock.calls[1][0]).toBe(writeText.mock.calls[0][0]);
+    });
+
+    it('at medium width the inspector is a drawer over the viewport, folded until asked, and Esc closes it', () => {
+        window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
+            addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+        const { container } = renderWithProvider(<App />);
+        const drawer = container.querySelector('#canvas-container .view-panel')!;
+        expect(drawer).toHaveClass('folded');
+        fireEvent.click(screen.getByRole('button', { name: 'View settings' }));
+        expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('open');
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('folded');
     });
 });
 

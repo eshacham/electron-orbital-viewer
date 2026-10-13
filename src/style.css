@@ -1,11 +1,11 @@
 /* public/style.css */
-/* A phone's overlays under the header: the scale readout (and anything
-   placed level with it) and the molecule legend stack. Named once, so the
-   tier badge that sits up at the readout's level from inside the stack
-   (V3) follows either if it moves. */
+/* A phone's overlays under the 52 px top bar and the header line below it
+   (spec §9.8): the scale readout (and anything placed level with it) and
+   the molecule legend stack. Named once, so the tier badge that sits up at
+   the readout's level from inside the stack (V3) follows either if it moves. */
 :root {
-  --phone-overlay-top: 60px;
-  --phone-legend-stack-top: 104px;
+  --phone-overlay-top: 112px;
+  --phone-legend-stack-top: 156px;
 }
 html, body, #root {
   height: 100%;
@@ -31,11 +31,6 @@ html, body, #root {
      sheet then scrolled the header and overlays away. Panels scroll inside
      themselves instead. */
   overflow: hidden;
-  flex-grow: 1; /* Allows it to take up available space in a flex container */
-  width: 100%;
-  /* For non-flex layout, you might need explicit height: */
-  /* height: calc(100vh - 100px); /* Example: full viewport height minus some space for controls */
-  min-height: 300px; /* Ensure it has at least some height */
   background: var(--ql-color-canvas);
   position: relative; /* Good for positioning things inside it later if needed */
 }
@@ -45,109 +40,10 @@ html, body, #root {
     height: 100%;
     position: relative;
 }
-/* Stacks LevelNav above #controls (atom mode) on desktop. On a phone this
-   unwraps to display:contents below, so #controls keeps its own sheet
-   behaviour untouched and LevelNav gets an independent fixed position --
-   reachable even while the sheet is closed, which a wrapper that stayed a
-   real box could not offer without duplicating the sheet's own toggle. */
-.side-panel {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 340px;
-  max-height: calc(100vh - 40px);
-  /* One scroll for the whole column. With the drill-down in the navigation
-     card, letting #controls scroll on its own gave two scrollbars and hid
-     the view controls in a short inner box. */
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-.side-panel > * {
-  flex-shrink: 0;
-}
-/* Folds the right-hand column to a bar on a medium-width window. */
-.view-panel-toggle {
-  align-self: flex-end;
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--ql-color-border-subtle);
-  background: var(--ql-color-surface-2);
-  color: var(--ql-color-text-1);
-  font: var(--ql-type-nav-weight) var(--ql-type-nav-size) var(--ql-font-sans);
-  cursor: pointer;
-}
-
-/* The right-hand column on a desktop: view settings, then the radial plot. */
-.view-panel {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-  max-width: 340px;
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  /* The gutter is kept whether or not the panel scrolls: otherwise a plot
-     legend wrapping to a second line (four shells: Fe, Br) toggles a
-     scrollbar, the panel widens, and the view's insets -- and so the
-     camera's fit -- shift by a couple of per cent between two species. */
-  scrollbar-gutter: stable;
-}
-.view-panel > * {
-  flex-shrink: 0;
-}
-@media (min-width: 761px) and (min-height: 501px) and (orientation: landscape), (min-width: 1101px) and (min-height: 501px) {
-  .view-panel #controls {
-    position: static;
-    max-height: none;
-    overflow: visible;
-    /* A fixed width, so the card does not change size with the level. */
-    width: 300px;
-    box-sizing: border-box;
-  }
-  /* Part of the right-hand column, the same width as the controls card
-     above it and flush to the same edge. */
-  .view-panel .radial-plot {
-    position: static;
-    width: 300px;
-    max-width: none !important;
-    box-sizing: border-box;
-  }
-  .view-panel .radial-plot.collapsed {
-    width: auto;
-  }
-}
 .side-panel .level-nav {
   background-color: var(--ql-color-surface-1);
   color: var(--ql-color-text-1);
   border: 1px solid var(--ql-color-border-subtle);
-  border-radius: 8px;
-  padding: 10px 14px;
-  box-shadow: var(--ql-shadow-panel);
-  max-height: 40vh;
-  overflow-y: auto;
-}
-/* Bug fix (task 22, bug 2): the 40vh cap above applied unconditionally, so
-   on a normal desktop viewport the panel scrolled internally -- and clipped
-   its own "About this model" link -- well before it ran out of the room
-   #controls's own max-height:none (above) already assumes is there. Sized
-   to content here instead, same treatment as #controls; placed after the
-   base rule (equal selector specificity) so it wins when this query
-   matches. The 40vh scroll stays as the fallback for the short-viewport
-   case further down, where that room genuinely is not available. */
-@media (min-width: 761px) and (min-height: 501px) and (orientation: landscape), (min-width: 1101px) and (min-height: 501px) {
-  .side-panel .level-nav {
-    max-height: none;
-    overflow-y: visible;
-  }
 }
 .atom-error {
   position: absolute;
@@ -479,6 +375,9 @@ html, body, #root {
 .density-key {
   left: calc(2 * var(--free-center-x, 50%) - var(--free-left, 0px) - 20px);
   transform: translateX(-100%);
+  /* Its own width: anchored 20 px from the cell's right edge, shrink-to-fit
+     would otherwise give it only those 20 px and wrap it into a column. */
+  width: max-content;
 }
 
 .radial-plot-peak {
@@ -516,7 +415,7 @@ html, body, #root {
 @media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
   .phone-header {
     position: absolute;
-    top: 8px;
+    top: calc(var(--ql-size-phone-top-bar) + 8px);
     left: 8px;
     right: 8px;
     z-index: 15;
@@ -631,7 +530,8 @@ html, body, #root {
     font-size: 12px;
   }
   .phase-legend {
-    top: 62px;
+    /* Level with the scale readout, under the header line (it moved down by the top bar, spec §9.8). */
+    top: calc(var(--phone-overlay-top) + 2px);
     bottom: auto;
     left: auto;
     right: 12px;
@@ -697,6 +597,13 @@ html, body, #root {
   .phone-header {
     right: auto;
     max-width: calc(54vw - 16px);
+  }
+  /* Sideways the top bar merges into the header line (spec §7, §9.8), so
+     the overlays under it sit where they did before there was a top bar. */
+  .phone-header { top: 8px; display: flex; align-items: center; gap: 4px; }
+  :root {
+    --phone-overlay-top: 60px;
+    --phone-legend-stack-top: 104px;
   }
   .phone-sheet {
     top: 8px;

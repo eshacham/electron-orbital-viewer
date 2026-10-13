@@ -1,0 +1,12 @@
+/* src/shell/explore.css -- the Explore panel's inside (spec §8.4); the frame is in app_shell.css. */
+.explore-header { display: flex; flex-direction: column; gap: 12px; padding: var(--ql-size-panel-padding) var(--ql-size-panel-padding) 0; }
+.explore-body {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--ql-size-section-gap);
+  padding: var(--ql-size-panel-padding);
+}
+/* Today's cards keep their content but drop their own card chrome inside the docked panel. */
+.explore-panel .level-nav, .explore-panel .bonds-panel, .explore-panel #controls, .explore-panel .molecule-nav {
+  position: static; width: auto; max-width: none; max-height: none; overflow: visible;
+  margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
+}

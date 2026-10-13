@@ -46,8 +46,8 @@ function deferred<T>() {
 }
 
 // Separate harnesses: with the loader running, the view tests' selections would trigger meta loads and extra renders.
-function LoaderHarness({ active }: { active: boolean }) {
-    useMoleculeLoader(active);
+function LoaderHarness({ active, indexOnly = false }: { active: boolean; indexOnly?: boolean }) {
+    useMoleculeLoader(active, { indexOnly });
     return null;
 }
 function Harness({ active, fraction = 0.9, context }: { active: boolean; fraction?: number; context: VisualizerContext }) {
@@ -149,6 +149,32 @@ describe('useMoleculeLoader', () => {
         await flush();
         expect(store.getState().molecule.error).toBeNull();
         expect(store.getState().molecule.meta?.id).toBe('h2o');
+    });
+});
+
+// Ruling DB4: the top bar's search wants the molecule index outside Molecules
+// (spec §8.3) -- the index alone, not a molecule's files or a link's refusal.
+describe('useMoleculeLoader: the index alone, for search', () => {
+    it('outside Molecules, loads the index without fetching the selected molecule or refusing a link', async () => {
+        (loadMoleculeIndex as jest.Mock).mockResolvedValue(LIBRARY_INDEX);
+        (loadMoleculeMeta as jest.Mock).mockResolvedValue(waterMeta());
+        const store = makeStore();
+        store.dispatch(selectMolecule({ id: 'h2o' }));
+        const { rerender } = render(<Provider store={store}><LoaderHarness active={false} indexOnly /></Provider>);
+        await flush();
+        expect(store.getState().molecule.index).toHaveLength(LIBRARY_INDEX.length);
+        expect(loadMoleculeMeta).not.toHaveBeenCalled();
+        act(() => { store.dispatch(selectMolecule({ id: 'zzz' })); });
+        await flush();
+        expect(store.getState().molecule.selectedId).toBe('zzz');
+        expect(store.getState().molecule.error).toBeNull();
+        expect(loadMoleculeMeta).not.toHaveBeenCalled();
+        // Entering Molecules then behaves as it always has.
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o' })); });
+        rerender(<Provider store={store}><LoaderHarness active indexOnly /></Provider>);
+        await flush();
+        expect(loadMoleculeIndex).toHaveBeenCalledTimes(1);
+        expect(loadMoleculeMeta).toHaveBeenCalledWith('h2o');
     });
 });
 

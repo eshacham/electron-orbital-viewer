@@ -39,12 +39,20 @@ export function useMediaQuery(query: string): boolean {
 export const NARROW_VIEWPORT = '(max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait)';
 
 /**
- * Wider than a phone, but not wide enough for both side panels and a usable
- * view between them: at 1024 px the two 340 px columns left the atom about
- * 300 px, and at 860 px about 160. Here the right-hand panel starts folded.
+ * Wider than a phone, but not wide enough for the rail, Explore, a usable
+ * view and the docked inspector side by side: below 1290 px the docked
+ * inspector would push the canvas under 560 px (spec §7). Here the inspector
+ * is a drawer over the view instead, folded to a 44 px bar until asked.
  * Only meaningful when NARROW_VIEWPORT does not match.
  */
-export const MEDIUM_VIEWPORT = '(max-width: 1199px)';
+export const MEDIUM_VIEWPORT = '(max-width: 1289px)';
+
+/**
+ * Wide desktop (spec §7): at 1680 px and over, the rail shows icon and label
+ * in a row (184 px) and the inspector widens to 320. Only meaningful when
+ * neither NARROW_VIEWPORT nor MEDIUM_VIEWPORT matches.
+ */
+export const WIDE_VIEWPORT = '(min-width: 1680px)';
 
 /**
  * A phone turned sideways: the height clause of NARROW_VIEWPORT on its own,

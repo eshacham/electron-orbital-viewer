@@ -61,8 +61,9 @@ async function enterMolecules(narrow: boolean) {
     installMatchMedia(narrow);
     const store = createAppStore();
     const utils = render(<Provider store={store}><App /></Provider>);
-    if (narrow) fireEvent.click(screen.getByRole('tab', { name: 'View' }));
-    fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
+    if (narrow) fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // the phone's mode menu (spec §9.8) replaced the Mode toggle in the View tab
+    // Unanchored: the rail item's name is "Molecules (molecule mode)" (WCAG 2.5.3, label in name).
+    fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
     await flush();
     return { store, ...utils };
 }
@@ -129,6 +130,7 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(container.querySelectorAll('#request-body')).toHaveLength(1);
         fireEvent.click(within(side).getByRole('button', { name: 'Computed' }));
         expect(within(within(side).getByRole('list', { name: 'molecules' })).getAllByRole('button')).toHaveLength(1);
+        fireEvent.click(screen.getByRole('button', { name: 'Owner sign-in' })); // the owner bar lives in the avatar menu now (ruling R15)
         expect(screen.getByRole('group', { name: 'where jobs run' })).toBeInTheDocument();
     });
 
@@ -235,6 +237,7 @@ describe('Molecules mode with on-demand molecules', () => {
         const side = container.querySelector('.side-panel') as HTMLElement;
         expect(within(side).getByRole('button', { name: 'Request a molecule' })).toBeInTheDocument();
         expect(within(side).getByRole('button', { name: 'Computed' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Owner menu, signed in as owner@example.com' })); // ruling R15
         expect(screen.getByText(/Signed in as owner@example.com/)).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/admin.html');
         expect(screen.queryByRole('group', { name: 'where jobs run' })).toBeNull();
@@ -255,7 +258,8 @@ describe('a sign-in that did not complete', () => {
         render(<Provider store={store}><App /></Provider>);
         expect(screen.getByRole('alert')).toHaveTextContent(SIGN_IN_FAILED);
         expect(screen.queryByText(/evil/)).toBeNull();
-        fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
+        // Unanchored: the rail item's name is "Molecules (molecule mode)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
         await flush();
         expect(screen.getAllByText(SIGN_IN_FAILED)).toHaveLength(1);
         fireEvent.click(screen.getByRole('button', { name: 'Close' }));

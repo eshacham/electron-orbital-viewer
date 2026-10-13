@@ -1,0 +1,16 @@
+/* src/shell/phone_top_bar.css -- the phone's top bar (spec §9.8), inside the viewport cell. */
+.phone-topbar {
+  position: absolute; z-index: 16; top: 0; left: 0; right: 0;
+  display: flex; align-items: center; gap: 4px;
+  height: var(--ql-size-phone-top-bar); padding: 0 8px; box-sizing: border-box;
+  background: var(--ql-color-bg-bar); border-bottom: 1px solid var(--ql-color-border-subtle);
+}
+.phone-topbar .app-topbar-brand { margin-right: auto; min-width: 0; gap: 8px; }
+.phone-topbar .ql-wordmark { font-size: 18px; line-height: 22px; }
+.phone-topbar .MuiIconButton-root { width: var(--ql-size-touch); height: var(--ql-size-touch); }
+.phone-mode-button.MuiButton-root { min-height: var(--ql-size-touch); color: var(--ql-color-text-1); font-weight: 600; }
+.phone-topbar.compact { position: static; flex: 0 0 auto; height: 44px; padding: 0; background: none; border: 0; }
+.phone-search-sheet { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--ql-color-bg-bar); }
+.phone-search-sheet .global-search { flex: 1; }
+.avatar-extra { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--ql-color-border-subtle); }
+.avatar-extra-row { display: flex; align-items: center; gap: 8px; }

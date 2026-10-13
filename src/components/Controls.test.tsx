@@ -178,18 +178,7 @@ describe('Controls', () => {
     });
   });
 
-  describe('mode toggle', () => {
-    it('offers Atom and Basic Orbitals, and reports the choice via onModeChange', () => {
-      const onModeChange = jest.fn();
-      render(<Controls {...baseProps} mode="hydrogenic" onModeChange={onModeChange} atomZ={1} onAtomElementChange={() => {}} />);
-
-      expect(screen.getByRole('button', { name: /basic orbitals mode/i })).toHaveTextContent('Basic Orbitals');
-      expect(screen.queryByText(/hydrogen-like/i)).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
-      expect(onModeChange).toHaveBeenCalledWith('atom');
-    });
-  });
+  // The Mode toggle left Controls for the rail (spec §8.2); tests/shell/rail.test.tsx pins the names and the dispatch.
 });
 
 // The cut's position used to be a bare -1..1 slider with no labels; it is a
@@ -405,12 +394,7 @@ describe('Relativity control', () => {
 // enclosed fraction does not apply -- the select says so rather than
 // offer a choice that changes nothing.
 describe('Controls: Bonds mode', () => {
-  it('offers Bonds in the mode switch', () => {
-    const onModeChange = jest.fn();
-    render(<Controls {...baseProps} mode="hydrogenic" onModeChange={onModeChange} />);
-    fireEvent.click(screen.getByRole('button', { name: 'bonds mode' }));
-    expect(onModeChange).toHaveBeenCalledWith('bonds');
-  });
+  // The Mode toggle left Controls for the rail (spec §8.2); tests/shell/rail.test.tsx pins the names and the dispatch.
 
   it('has no n/l/mL, no element, no Update Orbital, and says why the fraction is fixed', () => {
     render(<Controls {...baseProps} mode="bonds" fractionNote="the density is drawn at a fixed ρ" />);
@@ -434,12 +418,7 @@ describe('Controls: Bonds mode', () => {
 // switches), and its density keeps the fraction, with the helper stating
 // the ρ that fraction produced (ruling D22's isoNote, which never disables).
 describe('Controls: Molecules mode', () => {
-  it('offers Molecules in the mode switch', () => {
-    const onModeChange = jest.fn();
-    render(<Controls {...baseProps} mode="hydrogenic" onModeChange={onModeChange} />);
-    fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
-    expect(onModeChange).toHaveBeenCalledWith('molecule');
-  });
+  // The Mode toggle left Controls for the rail (spec §8.2); tests/shell/rail.test.tsx pins the names and the dispatch.
 
   it('has no Basic Orbitals controls, shows its children, and states ρ without disabling the fraction', () => {
     render(

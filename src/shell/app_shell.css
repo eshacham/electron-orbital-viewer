@@ -1,0 +1,42 @@
+/* src/shell/app_shell.css -- the layout grid per breakpoint (spec §7).
+   Desktop: 56 top bar; 76 rail | 315 Explore | canvas | 290 inspector, gutters and outer padding 12. */
+.app-shell {
+  position: relative; display: grid; width: 100%; height: 100dvh; overflow: hidden;
+  grid-template-columns: var(--ql-size-rail) minmax(0, 1fr);
+  grid-template-rows: var(--ql-size-top-bar) minmax(0, 1fr);
+  grid-template-areas: 'topbar topbar' 'rail workspace';
+  background: var(--ql-color-bg-app); color: var(--ql-color-text-1);
+}
+.app-shell.wide { grid-template-columns: var(--ql-size-rail-wide) minmax(0, 1fr); }
+.app-workspace {
+  grid-area: workspace; display: grid; min-width: 0; min-height: 0;
+  gap: var(--ql-size-gutter); padding: var(--ql-size-gutter);
+  grid-template-columns: var(--ql-size-explore) minmax(0, 1fr) var(--ql-size-inspector);
+}
+.app-shell.wide .app-workspace { grid-template-columns: var(--ql-size-explore) minmax(0, 1fr) var(--ql-size-inspector-wide); }
+.app-shell.medium .app-workspace { grid-template-columns: var(--ql-size-explore-medium) minmax(0, 1fr); }
+.app-shell.explore-collapsed .explore-panel { display: none; }
+.app-shell.explore-collapsed .app-workspace { grid-template-columns: minmax(0, 1fr); }
+.app-shell.desktop.explore-collapsed .app-workspace { grid-template-columns: minmax(0, 1fr) var(--ql-size-inspector); }
+.explore-panel, .inspector {
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  background: var(--ql-color-surface-1); color: var(--ql-color-text-1);
+  border: 1px solid var(--ql-color-border-subtle); border-radius: var(--ql-radius-xl);
+  box-shadow: var(--ql-shadow-panel);
+}
+#canvas-container.viewport-cell {
+  position: relative; min-width: 0; min-height: 0; overflow: hidden;
+  border-radius: var(--ql-radius-xl); background: var(--ql-color-canvas);
+}
+#canvas-container.viewport-cell:focus { outline: none; }
+#canvas-container.viewport-cell:focus-visible { outline: 2px solid var(--ql-color-focus-ring); outline-offset: -2px; }
+/* Phone: the viewport is the whole screen; its header, top bar and sheet sit inside it (spec §7). */
+.app-shell.phone { display: block; }
+.app-shell.phone .app-workspace { display: block; height: 100%; padding: 0; }
+.app-shell.phone #canvas-container.viewport-cell { height: 100%; border-radius: 0; }
+/* §8.5 Fullscreen: the rail, Explore and inspector hide; the viewport takes the screen. */
+.app-shell.is-fullscreen { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: 'workspace'; }
+.app-shell.is-fullscreen .app-topbar, .app-shell.is-fullscreen .app-rail,
+.app-shell.is-fullscreen .explore-panel, .app-shell.is-fullscreen .inspector { display: none; }
+.app-shell.is-fullscreen .app-workspace { grid-template-columns: minmax(0, 1fr); padding: 0; }
+.app-shell.is-fullscreen #canvas-container.viewport-cell { border-radius: 0; }

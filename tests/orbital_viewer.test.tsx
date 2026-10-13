@@ -60,7 +60,7 @@ import { initVisualizer, attachShellCompositionLobes } from '../src/orbital_visu
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
-import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital, updateAtomViewInScene, setReferenceRing, getScaleBar, clearFieldMesh } from '../src/orbital_visualizer';
+import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital, updateAtomViewInScene, setReferenceRing, getScaleBar, clearFieldMesh, handleResize } from '../src/orbital_visualizer';
 import { applyCameraAngles, cameraAnglesOf } from '../src/camera_angles';
 
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
@@ -539,5 +539,29 @@ describe('OrbitalViewer: framing across a relativity switch', () => {
         render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
         act(() => { store.dispatch(drillToShell(2)); });
         expect((updateAtomViewInScene as jest.Mock).mock.calls.at(-1)![1].framingFloor).toBeUndefined();
+    });
+});
+
+// Spec §7, §8.5: the viewport is a grid cell now, resized by the layout without a window resize.
+describe('OrbitalViewer: the grid cell', () => {
+    it('resizes the renderer when its grid cell changes size without a window resize', () => {
+        const callbacks: Array<() => void> = [];
+        const original = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+        (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+            constructor(callback: () => void) { callbacks.push(callback); }
+            observe() {}
+            disconnect() {}
+        };
+        const width = jest.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(700);
+        const height = jest.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(500);
+        try {
+            renderViewer();
+            act(() => callbacks.forEach(callback => callback()));
+            expect(handleResize).toHaveBeenCalledWith(expect.anything(), 700, 500);
+        } finally {
+            width.mockRestore();
+            height.mockRestore();
+            (globalThis as { ResizeObserver?: unknown }).ResizeObserver = original;
+        }
     });
 });

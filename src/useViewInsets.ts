@@ -1,60 +1,52 @@
 import { useEffect } from 'react';
 import type { ViewInsets } from './orbital_visualizer';
 
+/** The viewport frame's overlay zones (spec §8.5), each measured as a camera inset. */
+export const TOP_ZONES = ['.viewport-title', '.viewport-toolbar', '.periodic-table-panel'];
+export const RIGHT_ZONES = ['.key-column', '.inspector-drawer'];
+export const BOTTOM_ZONES = ['.thumbnail-strip', '.molecule-legend-stack'];
+/** A phone's top bar and the header line under it (spec §9.8). */
+export const PHONE_TOP_ZONES = ['.phone-topbar', '.phone-header'];
+const OBSERVED_ZONES = [...TOP_ZONES, ...RIGHT_ZONES, ...BOTTOM_ZONES, ...PHONE_TOP_ZONES, '.phone-sheet'].join(', ');
+
 /**
- * Which parts of the canvas are covered by panels, in CSS pixels per edge.
- *
- * On a desktop the side panel covers the left, the view panel the right and
- * the periodic table the top; on a phone the navigation card covers the top
- * (or the left, in landscape) and the controls sheet, when open, the bottom. The atom used to be
- * centred on the whole canvas regardless, so the table sat over its top half
- * on a desktop and the plot over it on a phone.
+ * Which parts of the viewport cell are covered, in CSS pixels per edge. The
+ * docked Explore panel and inspector sit beside the cell, not over it, so
+ * they are not counted (spec §8.5); what is counted is every overlay zone
+ * inside it: on a desktop the title block, toolbar and periodic table along
+ * the top, the key column and the medium-width inspector drawer down the
+ * right, the thumbnail strip and Molecules' key stack along the bottom; on a
+ * phone the top bar and header line, and the sheet.
  */
 export function measureViewInsets(container: HTMLElement, narrow: boolean): ViewInsets {
     const bounds = container.getBoundingClientRect();
     const insets: ViewInsets = { top: 0, right: 0, bottom: 0, left: 0 };
-    const rectOf = (selector: string) => {
-        const element = container.querySelector<HTMLElement>(selector);
-        if (!element) return null;
-        const rect = element.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 ? rect : null;
-    };
+    const rects = (selector: string) => Array.from(container.querySelectorAll<HTMLElement>(selector))
+        .map(element => element.getBoundingClientRect())
+        .filter(rect => rect.width > 0 && rect.height > 0);
+    const each = (selectors: string[], apply: (rect: DOMRect) => void) => selectors.forEach(s => rects(s).forEach(apply));
 
     if (narrow) {
-        // The header across the top, and the tabbed sheet: along the bottom
-        // of a phone held upright, down the right of one turned sideways
-        // (only its tab bar, when folded).
-        const header = rectOf('.phone-header');
-        if (header) insets.top = Math.max(0, header.bottom - bounds.top);
-        const sheet = rectOf('.phone-sheet');
+        each(PHONE_TOP_ZONES, rect => { insets.top = Math.max(insets.top, rect.bottom - bounds.top); });
+        // The tabbed sheet: along the bottom of a phone held upright, down the
+        // right of one turned sideways (only its tab bar, when folded).
+        const sheet = rects('.phone-sheet')[0];
         if (sheet) {
-            if (sheet.width > bounds.width * 0.6) {
-                insets.bottom = Math.max(0, bounds.bottom - sheet.top);
-            } else {
-                insets.right = Math.max(0, bounds.right - sheet.left);
-            }
+            if (sheet.width > bounds.width * 0.6) insets.bottom = Math.max(0, bounds.bottom - sheet.top);
+            else insets.right = Math.max(0, bounds.right - sheet.left);
         }
     } else {
-        const table = rectOf('.periodic-table-panel');
-        if (table) insets.top = Math.max(0, table.bottom - bounds.top);
-        const side = rectOf('.side-panel');
-        if (side) insets.left = Math.max(0, side.right - bounds.left);
-        const view = rectOf('.view-panel');
-        if (view) insets.right = Math.max(0, bounds.right - view.left);
-        // Molecules' key stack, bottom-centre (ruling T16-d): the molecule is
-        // framed above it, not under it. Its readout chip is a fixed height
-        // on a desktop (style.css), so hovering atom after atom does not
-        // move this edge -- and the molecule under the pointer with it.
-        const stack = rectOf('.molecule-legend-stack');
-        if (stack) insets.bottom = Math.max(0, bounds.bottom - stack.top);
+        each(TOP_ZONES, rect => { insets.top = Math.max(insets.top, rect.bottom - bounds.top); });
+        each(RIGHT_ZONES, rect => { insets.right = Math.max(insets.right, bounds.right - rect.left); });
+        each(BOTTOM_ZONES, rect => { insets.bottom = Math.max(insets.bottom, bounds.bottom - rect.top); });
     }
 
     // Round so sub-pixel layout jitter does not count as a change.
     return {
-        top: Math.round(insets.top),
-        right: Math.round(insets.right),
-        bottom: Math.round(insets.bottom),
-        left: Math.round(insets.left),
+        top: Math.max(0, Math.round(insets.top)),
+        right: Math.max(0, Math.round(insets.right)),
+        bottom: Math.max(0, Math.round(insets.bottom)),
+        left: Math.max(0, Math.round(insets.left)),
     };
 }
 
@@ -67,7 +59,7 @@ export function measureViewInsets(container: HTMLElement, narrow: boolean): View
  * frame.
  */
 export function useViewInsets(
-    /** The canvas host; its parent holds the panels that get measured. */
+    /** The canvas host; its parent, the viewport cell, holds the overlay zones that get measured. */
     hostRef: React.RefObject<HTMLElement | null>,
     narrow: boolean,
     onChange: (insets: ViewInsets) => void
@@ -99,7 +91,7 @@ export function useViewInsets(
             resizeObserver.disconnect();
             resizeObserver.observe(container);
             container
-                .querySelectorAll('.phone-header, .phone-sheet, .side-panel, .view-panel, .periodic-table-panel, .molecule-legend-stack')
+                .querySelectorAll(OBSERVED_ZONES)
                 .forEach(element => resizeObserver.observe(element));
         };
         const mutationObserver = new MutationObserver(() => {

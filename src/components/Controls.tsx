@@ -38,7 +38,6 @@ interface ControlsProps {
    * persisted in no fewer than three places.
    */
   mode?: ViewMode;
-  onModeChange?: (mode: ViewMode) => void;
   /** Which drill-down level is current, only so the enclosed-fraction helper text can stay honest (see below); irrelevant in Basic Orbitals mode. */
   atomLevel?: ViewLevel;
   /** The element driving the SCF in atom mode. Basic Orbitals mode has no element control of its own any more (Addendum 2's mode rename) -- it is fixed at BASIC_ORBITALS_Z. */
@@ -270,12 +269,15 @@ const ReadoutContent: React.FC<{ content: string | WhatChangedParts | null }> = 
   );
 };
 
+/** Spec §7's one-electron framing, said under the Basic Orbitals controls and in Help. */
+export const BASIC_ORBITALS_ABOUT = 'One electron, Z = 1 — the exact solution, and the idealised shape every multi-electron orbital '
+  + 'is a distortion of. Pick an element in Atom mode for a real, many-electron atom.';
+
 /** Phase 1's CombinationControls: MUI upper-cases button text, which "With spin–orbit" does not survive. */
 const KEEP_CASE = { '& .MuiToggleButton-root': { textTransform: 'none' } } as const;
 
 const Controls: React.FC<ControlsProps> = ({
   mode = 'hydrogenic',
-  onModeChange,
   atomLevel,
   atomZ,
   onAtomElementChange,
@@ -375,30 +377,7 @@ const Controls: React.FC<ControlsProps> = ({
         position: 'relative',
       }}
     >
-      {/* Atom (a real neutral element, SCF-solved), Basic Orbitals (the
-          exact one-electron reference at Z = 1, below), Bonds (diatomic
-          molecules, spec §5 Phase 5) and Molecules (the polyatomic library,
-          Phase 6). Always visible, at every level, since
-          it is how you get back out of atom mode's drill-down entirely. */}
-      <FormControl component="fieldset" margin="normal" fullWidth>
-        <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Mode</FormLabel>
-        <ToggleButtonGroup
-          className="mode-toggle"
-          value={mode}
-          exclusive
-          onChange={(event: React.MouseEvent<HTMLElement>, newValue: ViewMode | null) => {
-            if (newValue !== null) onModeChange?.(newValue);
-          }}
-          aria-label="view mode"
-          size="small"
-          fullWidth
-        >
-          <ToggleButton value="atom" aria-label="atom mode">Atom</ToggleButton>
-          <ToggleButton value="hydrogenic" aria-label="basic orbitals mode">Basic Orbitals</ToggleButton>
-          <ToggleButton value="bonds" aria-label="bonds mode">Bonds</ToggleButton>
-          <ToggleButton value="molecule" aria-label="molecule mode">Molecules</ToggleButton>
-        </ToggleButtonGroup>
-      </FormControl>
+      {/* The Mode toggle moved to the rail and the phone's mode menu (spec §8.2). */}
 
       {/* Relativity (spec §5 Phase 4), next to Mode: both choose the model
           rather than the view. The group is named "relativity treatment",
@@ -563,11 +542,7 @@ const Controls: React.FC<ControlsProps> = ({
            §7 still requires the one-electron framing to be stated outright,
            which is what this line does now that there is no picker to carry
            it. */
-        <FormHelperText className="basic-orbitals-note">
-          One electron, Z = 1 — the exact solution, and the idealised shape
-          every multi-electron orbital is a distortion of. Pick an element in
-          Atom mode for a real, many-electron atom.
-        </FormHelperText>
+        <FormHelperText className="basic-orbitals-note">{BASIC_ORBITALS_ABOUT}</FormHelperText>
       )}
 
       {/* SubshellPanel at level 2; empty at every other level (see App.tsx).

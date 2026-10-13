@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { shallowEqual } from 'react-redux';
 import {
-    Box,
     Alert,
+    Button,
+    CircularProgress,
+    Dialog,
+    IconButton,
     Snackbar,
-    CircularProgress
 } from '@mui/material';
+import Close from '@mui/icons-material/Close';
+import HelpOutline from '@mui/icons-material/HelpOutline';
 import { useAppDispatch, useAppSelector, useAppStore } from './store/hooks';
 import {
     startOrbitalCalculation,
@@ -47,7 +51,7 @@ import { useDeltaScfEnergies } from './atom/useDeltaScfEnergies';
 import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidExcitation, isNeutralGround } from './atom/species';
 import { allowedCharges } from './atom/ion_configurations';
 import SpeciesControls from './components/SpeciesControls';
-import Controls, { RelativityReadout } from './components/Controls';
+import Controls, { RelativityReadout, BASIC_ORBITALS_ABOUT } from './components/Controls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
 import OrbitalViewer from './components/OrbitalViewer';
@@ -62,7 +66,7 @@ import { CombinationSelection, fieldRequestFor, combinationCurves, overlayLegend
 import { basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
-import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT, PHONE_LANDSCAPE } from './useMediaQuery';
+import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT, PHONE_LANDSCAPE, WIDE_VIEWPORT } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
 import { buildComparisonCurves, radialPlotRange } from './atom/comparison_curves';
 import { useUrlStateSync } from './useUrlStateSync';
@@ -92,17 +96,32 @@ import MoleculeOrbitalList from './components/MoleculeOrbitalList';
 import EspLegend from './components/EspLegend';
 import MoleculeJobsSection from './components/MoleculeJobsSection';
 import TierBadge from './components/TierBadge';
-import { ConnectedOwnerBar } from './components/OwnerBar';
+import { ConnectedOwnerBar, signInHere } from './components/OwnerBar';
 import { useComputedList } from './jobs/useComputedList';
 import { useFollowedJob } from './jobs/useFollowedJob';
 import { withComputed } from './jobs/computed';
-import { selectIsOwner, sessionErrorDismissed } from './store/jobsSlice';
+import { selectIsOwner, sessionErrorDismissed, sessionFailed } from './store/jobsSlice';
+import AppShell from './shell/AppShell';
+import TopBar, { TopBarTab } from './shell/TopBar';
+import Rail from './shell/Rail';
+import GlobalSearch from './shell/GlobalSearch';
+import HelpDialog from './shell/HelpDialog';
+import AvatarMenu from './shell/AvatarMenu';
+import PhoneTopBar from './shell/PhoneTopBar';
+import ExplorePanel from './shell/ExplorePanel';
+import Inspector from './shell/Inspector';
+import ThemeSwitch from './design/ThemeSwitch';
+import { useQuantumTheme } from './design/useQuantumTheme';
+import { useBrand } from './design/useBrand';
+import { brandPref } from './design/brands';
+import { LAYOUT } from './design/tokens';
+import { BUILD_ENV } from './jobs/build_env';
+import { SESSION_ENDED } from './jobs/api';
+import { NO_COMBINATION } from './combinations';
+import type { SearchAction } from './search/search_index';
 
-/**
- * The radial plot's drawing width on a desktop: the right-hand panel's 300 px,
- * less the plot card's own padding and border, so the two cards line up.
- */
-const PLOT_WIDTH = 278;
+/** §8.6: the inspector's 290 px less its 16 px padding each side. */
+const PLOT_WIDTH = LAYOUT.plotWidth;
 /** The plot's width in the phone sheet, which is at most 400 px across. */
 const PHONE_PLOT_WIDTH = 300;
 
@@ -395,6 +414,18 @@ function App() {
     const viewPanelOpen = viewPanelChoice && viewPanelChoice.medium === isMedium ? viewPanelChoice.open : !isMedium;
     const setViewPanelOpen = (update: (open: boolean) => boolean) =>
         setViewPanelChoice({ medium: isMedium, open: update(viewPanelOpen) });
+    const isWide = useMediaQuery(WIDE_VIEWPORT) && !isNarrow && !isMedium;
+    const layout: 'desktop' | 'medium' | 'phone' = isNarrow ? 'phone' : isMedium ? 'medium' : 'desktop';
+    const { mode: themeMode } = useQuantumTheme();
+    const brand = useBrand();
+    const [helpOpen, setHelpOpen] = useState(false);
+    const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
+    // The molecule index loads when Molecules opens -- or when someone starts a search (spec §8.3).
+    const [searchWantsIndex, setSearchWantsIndex] = useState(false);
+    const wantIndex = useCallback(() => setSearchWantsIndex(true), []);
+    // §8.1: "Explore" returns to the last of Atoms, Basic Orbitals and Bonds used.
+    const lastExploreModeRef = useRef<ViewMode>(atomMode === 'molecule' ? 'atom' : atomMode);
+    useEffect(() => { if (atomMode !== 'molecule') lastExploreModeRef.current = atomMode; }, [atomMode]);
 
     // Only say anything if the calculation is actually taking a while; see
     // useDelayedFlag for why.
@@ -513,7 +544,8 @@ function App() {
     // useMoleculeView draws them. Nothing here starts a hydrogen render:
     // the Basic Orbitals effects above ask for that mode by name.
     const molecule = useAppSelector(state => state.molecule);
-    useMoleculeLoader(isMoleculeMode);
+    // Outside Molecules a search wants the index alone, not a molecule's files (ruling DB4).
+    useMoleculeLoader(isMoleculeMode, { indexOnly: searchWantsIndex });
     // The owner's computed molecules join the picker as a Computed category; nobody else's picker changes.
     const isOwner = useAppSelector(selectIsOwner);
     const signInError = useAppSelector(state => state.jobs.session.error);
@@ -525,6 +557,33 @@ function App() {
         () => withComputed(molecule.index, isOwner ? computedJobs : null),
         [molecule.index, isOwner, computedJobs],
     );
+    // The same entries as the picker: computed molecules for the owner only (ruling R4).
+    const searchSources = useMemo(() => ({ molecules: moleculeEntries }), [moleculeEntries]);
+    // Opening a result does what the existing pickers do (spec §8.3).
+    const handleSearchPick = useCallback((action: SearchAction) => {
+        switch (action.kind) {
+            case 'element':
+                if (atomMode !== 'atom') handleModeChange('atom');
+                handleAtomElementChange(action.Z);
+                setTableOpen(false);
+                break;
+            case 'molecule':
+                if (atomMode !== 'molecule') handleModeChange('molecule');
+                dispatch(selectMolecule({ id: action.id }));
+                break;
+            case 'bonds':
+                if (atomMode !== 'bonds') handleModeChange('bonds');
+                dispatch(selectBondsSystem(action.system));
+                break;
+            case 'basic':
+                dispatch(setCombination(NO_COMBINATION));
+                dispatch(setBasicSelection({ n: action.n, l: action.l, ml: action.ml }));
+                // Entering the mode draws the selection (setMode bumps basicRenderNonce); already in it, draw it now.
+                if (atomMode !== 'hydrogenic') handleModeChange('hydrogenic');
+                else dispatch(startOrbitalCalculation(basicOrbitalParams(action.n, action.l, action.ml, enclosedFraction)));
+                break;
+        }
+    }, [atomMode, handleModeChange, handleAtomElementChange, dispatch, enclosedFraction]);
     // Phone: the molecule is chosen from a full-screen list opened from the
     // name in the header, as an element is.
     const [moleculePickerOpen, setMoleculePickerOpen] = useState(false);
@@ -877,11 +936,7 @@ function App() {
         ),
         [handleShare, handleExport, availability, stlSolids, atomMode]
     );
-    // The discreet owner sign-in sits with Share and Export in Molecules mode: the app's one menu row (spec §9.5).
-    const controlsActions = useMemo(
-        () => (isMoleculeMode ? <>{shareExportBar}<ConnectedOwnerBar page="/" showError={false} /></> : shareExportBar),
-        [isMoleculeMode, shareExportBar],
-    );
+    const controlsActions = shareExportBar;
 
     // Molecules mode's navigation (layout contract §3.8): the whole card in
     // the desktop's left column; on a phone, the name in the header and the
@@ -914,7 +969,6 @@ function App() {
     const controls = (
         <Controls
             mode={atomMode}
-            onModeChange={handleModeChange}
             atomLevel={atomLevel}
             atomZ={atomZ}
             onAtomElementChange={handleAtomElementChange}
@@ -1094,208 +1148,253 @@ function App() {
         </div>
     );
 
+    const exploreContent = isAtomMode ? <LevelNav {...levelNavProps}>{subshellPanel}</LevelNav>
+        : isBondsMode ? bondsPanel
+        : isMoleculeMode ? <><MoleculeNav {...moleculeNavProps} /><MoleculeJobsSection /></>
+        // Basic Orbitals had no left column: its n/l/mₗ, combination and view settings go here until 6G-2.
+        : controls;
+    const inspectorBody = (
+        <>
+            {!isBasicMode && controls}
+            {renderRadialPlot(PLOT_WIDTH, false)}
+        </>
+    );
+
+    const session = useAppSelector(state => state.jobs.session);
+    const avatar = (
+        <AvatarMenu
+            session={session}
+            isOwner={isOwner}
+            dev={BUILD_ENV.dev}
+            ownerBar={<ConnectedOwnerBar page="/" showError={false} />}
+            onSignIn={() => signInHere('/', text => dispatch(sessionFailed(text)))}
+            brandId={brand.id}
+            onBrand={id => brandPref.set(id)}
+            extra={isNarrow ? (
+                <div className="avatar-extra">
+                    <div className="avatar-extra-row"><ThemeSwitch /><span>Theme</span></div>
+                    <Button size="small" startIcon={<HelpOutline fontSize="small" />} onClick={() => setHelpOpen(true)}>Help</Button>
+                </div>
+            ) : undefined}
+        />
+    );
+    const urlMode = (viewMode: ViewMode) => ({ atom: 'atom', hydrogenic: 'basic', bonds: 'bonds', molecule: 'molecule' })[viewMode];
+    const topBarTabs: TopBarTab[] = [
+        { key: 'explore', label: 'Explore', href: `/#mode=${urlMode(lastExploreModeRef.current)}`, current: !isMoleculeMode,
+            onSelect: () => handleModeChange(lastExploreModeRef.current) },
+        { key: 'molecules', label: 'Molecules', href: '/#mode=molecule', current: isMoleculeMode, onSelect: () => handleModeChange('molecule') },
+    ];
+    const topBar = (
+        <TopBar
+            brand={brand}
+            mode={themeMode}
+            tabs={topBarTabs}
+            search={<GlobalSearch sources={searchSources} onPick={handleSearchPick} onWantIndex={wantIndex} />}
+            avatar={avatar}
+            onHelp={() => setHelpOpen(true)}
+            sessionNote={session.expired && !session.signedIn ? SESSION_ENDED : null}
+        />
+    );
+    const phoneTopBar = (compact: boolean) => (
+        <PhoneTopBar brand={brand} themeMode={themeMode} mode={atomMode} onModeChange={handleModeChange}
+            onOpenSearch={() => setPhoneSearchOpen(true)} avatar={avatar} compact={compact} />
+    );
+    // A phone held upright: top bar, then the header line under it. Sideways: one merged 44 px line (spec §7).
+    const phoneChrome = isNarrow && (
+        <>
+            {!isPhoneLandscape && phoneTopBar(false)}
+            {isAtomMode && (
+                <div className="phone-header">
+                    {isPhoneLandscape && phoneTopBar(true)}
+                    <LevelNav {...levelNavProps} variant="header" />
+                </div>
+            )}
+            {isMoleculeMode && (
+                <div className="phone-header">
+                    {isPhoneLandscape && phoneTopBar(true)}
+                    <MoleculeNav {...moleculeNavProps} variant="header" />
+                </div>
+            )}
+            {isBondsMode && (
+                <div className="phone-header">
+                    {isPhoneLandscape && phoneTopBar(true)}
+                    <span className="bonds-header">
+                        {systemFormula(bonds.system)} · {bonds.R !== null ? `R = ${bonds.R.toFixed(2)} a₀`
+                            : bondsData.error ? 'not loaded' : 'loading…'}
+                    </span>
+                </div>
+            )}
+            {isBasicMode && isPhoneLandscape && <div className="phone-header">{phoneTopBar(true)}</div>}
+            <PhoneSheet tabs={phoneTabs} active={phoneTab} onChange={setPhoneTab} />
+        </>
+    );
+
+    const viewport = (
+        <main
+            id="canvas-container"
+            className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}`}
+            data-busy={isLoading ? 'true' : 'false'}
+            aria-label="3D view"
+            tabIndex={-1}
+        >
+            <OrbitalViewer
+                onOrbitalRendered={handleOrbitalRendered}
+                onOrbitalFailed={handleOrbitalFailed}
+                enclosedFraction={enclosedFraction}
+                exportHandleRef={exportHandleRef}
+            />
+            {canvasBusyLabel && (
+                <div className="canvas-busy" role="status" aria-live="polite">
+                    <CircularProgress size={22} thickness={5} color="inherit" />
+                    <span>{canvasBusyLabel}</span>
+                </div>
+            )}
+            {/* Spec §3.5: an anion LDA cannot bind draws nothing, and
+                the empty canvas says why. The card's alert
+                (SpeciesControls) is the one announced; while it is on
+                screen this note is for the eye only, so the reason is
+                never heard twice. A folded phone sheet has no card, so
+                there the note goes into a status region that is always
+                mounted in atom mode -- a live region inserted together
+                with its text is not reliably announced. */}
+            {isAtomMode && isNarrow && (
+                <div className="canvas-unbound-live" role="status">
+                    {atomUnbound && phoneTab !== 'explore' && <div className="canvas-unbound">{atomUnbound}</div>}
+                </div>
+            )}
+            {isAtomMode && atomUnbound && !(isNarrow && phoneTab !== 'explore') && (
+                <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
+            )}
+            {showPhaseLegend && !isMoleculeMode && phaseLegend}
+            {/* Molecules: the tier badge, the pick readout, the ESP key and
+                an orbital's ψ key share the bottom-centre slot, stacked
+                (spec §3.8: no new floating panel). The tier heads it and
+                is always there (spec §9.1, preflight D12), so the stack
+                shows whenever a molecule is loaded -- the others keep
+                their own conditions. A molecule that failed to load has
+                no meta: the error, no badge. */}
+            {isMoleculeMode && molecule.meta && (
+                <div className="molecule-legend-stack">
+                    <TierBadge meta={molecule.meta} compact={isNarrow} />
+                    {isNarrow && moleculeAlert}
+                    {molecule.showStructure && (
+                        <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}
+                            geometrySource={molecule.meta.geometrySource} touch={isNarrow} />
+                    )}
+                    {moleculeKeysShown && molecule.surface.kind === 'esp' && (
+                        <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact={isPhoneLandscape} />
+                    )}
+                    {showPhaseLegend && phaseLegend}
+                </div>
+            )}
+            {/* Over the canvas on a desktop; on a phone it heads the key
+                stack instead (with no molecule loaded there is no stack,
+                and nothing for it to cover). */}
+            {moleculeAlert && !(isNarrow && molecule.meta) && moleculeAlert}
+            {isBondsDensity && (
+                <div className="phase-legend density-key" aria-label="surface colour key">
+                    <span className="phase-legend-item">
+                        <span className="phase-legend-swatch" style={{ background: DENSITY_SURFACE_HEX }} />
+                        ρ = {drawnDensityIso} e/a₀³, total electron density
+                    </span>
+                </div>
+            )}
+            {combinationLegend && (
+                <div className="phase-legend" aria-label="combination colour key">
+                    {combinationLegend.map(item => (
+                        <span key={item.label} className="phase-legend-item">
+                            <span className="phase-legend-swatch" style={{ background: item.color }} />{item.label}
+                        </span>
+                    ))}
+                    <span className="phase-legend-item">darker: ψ &lt; 0</span>
+                </div>
+            )}
+            {/* Addendum 3: the element selector is a real periodic
+                table on anything wider than a phone, as a pop-over over
+                the view. A table does not survive a phone width, so
+                below that a searchable list stands in for it -- the two
+                are alternatives, never both at once. */}
+            {isAtomMode && !isNarrow && tableOpen && (
+                <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} onClose={closeTable} />
+            )}
+            {phoneChrome}
+            {isMedium && (
+                <Inspector variant="drawer" body={inspectorBody} open={viewPanelOpen}
+                    onOpenChange={open => setViewPanelOpen(() => open)} />
+            )}
+                {isMoleculeMode && isNarrow && (
+                <MoleculePickerDialog
+                    open={moleculePickerOpen}
+                    entries={moleculeEntries}
+                    error={molecule.indexError}
+                    selectedId={molecule.selectedId}
+                    onSelect={id => dispatch(selectMolecule({ id }))}
+                    onClose={() => setMoleculePickerOpen(false)}
+                />
+            )}
+            {isAtomMode && isNarrow && (
+                <ElementPickerDialog
+                    open={elementPickerOpen}
+                    Z={atomZ}
+                    onSelect={handleAtomElementChange}
+                    onClose={() => setElementPickerOpen(false)}
+                />
+            )}
+            {/* Ruling R17: a solver that did not converge must show up as
+                an explicit error, never as a silently-wrong picture. This
+                should never fire -- every element in range converges. */}
+            {isAtomMode && atomError && (
+                <Alert severity="error" className="atom-error">
+                    {atomError}
+                </Alert>
+            )}
+            {/* Final review I3: Cognito comes back to / with no hash, so a
+                failed sign-in can land on any mode -- by default atom
+                mode, which has no owner corner -- and is said here,
+                whatever is on screen, until dismissed. */}
+            {signInError && (
+                <Alert severity="error" className="sign-in-error" onClose={() => dispatch(sessionErrorDismissed())}>
+                    {signInError}
+                </Alert>
+            )}
+            <Snackbar
+                open={Boolean(error)}
+                onClose={() => dispatch(dismissOrbitalError())}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    severity="warning"
+                    variant="filled"
+                    onClose={() => dispatch(dismissOrbitalError())}
+                >
+                    {error}
+                </Alert>
+            </Snackbar>
+        </main>
+    );
+
     return (
         <>
-            <Box
-                id="canvas-container"
-                className={canvasBusyLabel ? 'busy' : undefined}
-                data-busy={isLoading ? 'true' : 'false'}
-                sx={{
-                    width: '100%',
-                    height: '100vh',
-                    position: 'relative'
-                }}
-            >
-                <OrbitalViewer
-                    onOrbitalRendered={handleOrbitalRendered}
-                    onOrbitalFailed={handleOrbitalFailed}
-                    enclosedFraction={enclosedFraction}
-                    exportHandleRef={exportHandleRef}
-                />
-                {canvasBusyLabel && (
-                    <div className="canvas-busy" role="status" aria-live="polite">
-                        <CircularProgress size={22} thickness={5} color="inherit" />
-                        <span>{canvasBusyLabel}</span>
+            <AppShell
+                layout={layout}
+                wide={isWide}
+                topBar={topBar}
+                rail={<Rail mode={atomMode} onModeChange={handleModeChange} isOwner={isOwner} wide={isWide} />}
+                explore={<ExplorePanel body={exploreContent} />}
+                inspector={<Inspector variant="docked" body={inspectorBody} />}
+                viewport={viewport}
+            />
+            <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} brand={brand}
+                aboutModel={isBasicMode ? <p>{BASIC_ORBITALS_ABOUT}</p> : undefined} />
+            {isNarrow && (
+                <Dialog fullScreen open={phoneSearchOpen} onClose={() => setPhoneSearchOpen(false)} aria-label="Search">
+                    <div className="phone-search-sheet">
+                        <IconButton aria-label="close search" onClick={() => setPhoneSearchOpen(false)}><Close fontSize="small" /></IconButton>
+                        <GlobalSearch variant="sheet" autoFocus sources={searchSources} onWantIndex={wantIndex}
+                            onPick={action => { setPhoneSearchOpen(false); handleSearchPick(action); }} />
                     </div>
-                )}
-                {/* Spec §3.5: an anion LDA cannot bind draws nothing, and
-                    the empty canvas says why. The card's alert
-                    (SpeciesControls) is the one announced; while it is on
-                    screen this note is for the eye only, so the reason is
-                    never heard twice. A folded phone sheet has no card, so
-                    there the note goes into a status region that is always
-                    mounted in atom mode -- a live region inserted together
-                    with its text is not reliably announced. */}
-                {isAtomMode && isNarrow && (
-                    <div className="canvas-unbound-live" role="status">
-                        {atomUnbound && phoneTab !== 'explore' && <div className="canvas-unbound">{atomUnbound}</div>}
-                    </div>
-                )}
-                {isAtomMode && atomUnbound && !(isNarrow && phoneTab !== 'explore') && (
-                    <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
-                )}
-                {showPhaseLegend && !isMoleculeMode && phaseLegend}
-                {/* Molecules: the tier badge, the pick readout, the ESP key and
-                    an orbital's ψ key share the bottom-centre slot, stacked
-                    (spec §3.8: no new floating panel). The tier heads it and
-                    is always there (spec §9.1, preflight D12), so the stack
-                    shows whenever a molecule is loaded -- the others keep
-                    their own conditions. A molecule that failed to load has
-                    no meta: the error, no badge. */}
-                {isMoleculeMode && molecule.meta && (
-                    <div className="molecule-legend-stack">
-                        <TierBadge meta={molecule.meta} compact={isNarrow} />
-                        {isNarrow && moleculeAlert}
-                        {molecule.showStructure && (
-                            <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}
-                                geometrySource={molecule.meta.geometrySource} touch={isNarrow} />
-                        )}
-                        {moleculeKeysShown && molecule.surface.kind === 'esp' && (
-                            <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact={isPhoneLandscape} />
-                        )}
-                        {showPhaseLegend && phaseLegend}
-                    </div>
-                )}
-                {/* Over the canvas on a desktop; on a phone it heads the key
-                    stack instead (with no molecule loaded there is no stack,
-                    and nothing for it to cover). */}
-                {moleculeAlert && !(isNarrow && molecule.meta) && moleculeAlert}
-                {isBondsDensity && (
-                    <div className="phase-legend density-key" aria-label="surface colour key">
-                        <span className="phase-legend-item">
-                            <span className="phase-legend-swatch" style={{ background: DENSITY_SURFACE_HEX }} />
-                            ρ = {drawnDensityIso} e/a₀³, total electron density
-                        </span>
-                    </div>
-                )}
-                {combinationLegend && (
-                    <div className="phase-legend" aria-label="combination colour key">
-                        {combinationLegend.map(item => (
-                            <span key={item.label} className="phase-legend-item">
-                                <span className="phase-legend-swatch" style={{ background: item.color }} />{item.label}
-                            </span>
-                        ))}
-                        <span className="phase-legend-item">darker: ψ &lt; 0</span>
-                    </div>
-                )}
-                {/* Addendum 3: the element selector is a real periodic
-                    table on anything wider than a phone, as a pop-over over
-                    the view. A table does not survive a phone width, so
-                    below that a searchable list stands in for it -- the two
-                    are alternatives, never both at once. */}
-                {isAtomMode && !isNarrow && tableOpen && (
-                    <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} onClose={closeTable} />
-                )}
-                {/* Desktop: navigation down the left (.side-panel), view
-                    settings and the plot down the right (.view-panel). A
-                    phone gets a one-line header and a tabbed bottom sheet
-                    instead (PhoneSheet): the two columns do not fit, and the
-                    single sideways-scrolling strip that stood in for them
-                    split navigation across two places and hid most of
-                    itself off screen. */}
-                {isNarrow ? (
-                    <>
-                        {isAtomMode && (
-                            <div className="phone-header">
-                                <LevelNav {...levelNavProps} variant="header" />
-                            </div>
-                        )}
-                        {isMoleculeMode && (
-                            <div className="phone-header">
-                                <MoleculeNav {...moleculeNavProps} variant="header" />
-                            </div>
-                        )}
-                        {isBondsMode && (
-                            <div className="phone-header">
-                                <span className="bonds-header">
-                                    {systemFormula(bonds.system)} · {bonds.R !== null ? `R = ${bonds.R.toFixed(2)} a₀`
-                                        : bondsData.error ? 'not loaded' : 'loading…'}
-                                </span>
-                            </div>
-                        )}
-                        <PhoneSheet tabs={phoneTabs} active={phoneTab} onChange={setPhoneTab} />
-                    </>
-                ) : (
-                    <>
-                        <Box className="side-panel">
-                            {isAtomMode && (
-                                <LevelNav {...levelNavProps}>
-                                    {subshellPanel}
-                                </LevelNav>
-                            )}
-                            {isBondsMode && bondsPanel}
-                            {isMoleculeMode && (
-                                <>
-                                    <MoleculeNav {...moleculeNavProps} />
-                                    <MoleculeJobsSection />
-                                </>
-                            )}
-                        </Box>
-                        <Box className={`view-panel${viewPanelOpen ? '' : ' folded'}`}>
-                            {isMedium && (
-                                <button
-                                    type="button"
-                                    className="view-panel-toggle"
-                                    aria-expanded={viewPanelOpen}
-                                    onClick={() => setViewPanelOpen(open => !open)}
-                                >
-                                    View settings {viewPanelOpen ? '▾' : '▸'}
-                                </button>
-                            )}
-                            {viewPanelOpen && controls}
-                            {renderRadialPlot(PLOT_WIDTH, isMedium)}
-                        </Box>
-                    </>
-                )}
-                {isMoleculeMode && isNarrow && (
-                    <MoleculePickerDialog
-                        open={moleculePickerOpen}
-                        entries={moleculeEntries}
-                        error={molecule.indexError}
-                        selectedId={molecule.selectedId}
-                        onSelect={id => dispatch(selectMolecule({ id }))}
-                        onClose={() => setMoleculePickerOpen(false)}
-                    />
-                )}
-                {isAtomMode && isNarrow && (
-                    <ElementPickerDialog
-                        open={elementPickerOpen}
-                        Z={atomZ}
-                        onSelect={handleAtomElementChange}
-                        onClose={() => setElementPickerOpen(false)}
-                    />
-                )}
-                {/* Ruling R17: a solver that did not converge must show up as
-                    an explicit error, never as a silently-wrong picture. This
-                    should never fire -- every element in range converges. */}
-                {isAtomMode && atomError && (
-                    <Alert severity="error" className="atom-error">
-                        {atomError}
-                    </Alert>
-                )}
-                {/* Final review I3: Cognito comes back to / with no hash, so a
-                    failed sign-in can land on any mode -- by default atom
-                    mode, which has no owner corner -- and is said here,
-                    whatever is on screen, until dismissed. */}
-                {signInError && (
-                    <Alert severity="error" className="sign-in-error" onClose={() => dispatch(sessionErrorDismissed())}>
-                        {signInError}
-                    </Alert>
-                )}
-                <Snackbar
-                    open={Boolean(error)}
-                    onClose={() => dispatch(dismissOrbitalError())}
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-                >
-                    <Alert
-                        severity="warning"
-                        variant="filled"
-                        onClose={() => dispatch(dismissOrbitalError())}
-                    >
-                        {error}
-                    </Alert>
-                </Snackbar>
-            </Box>
+                </Dialog>
+            )}
         </>
     );
 }

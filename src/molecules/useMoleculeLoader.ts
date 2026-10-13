@@ -14,22 +14,27 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
  * re-picking the molecule already chosen loads it again (selectMolecule has
  * just cleared its meta) instead of leaving "loading" up for ever. A reply
  * for a molecule no longer selected is dropped by metaLoaded/metaFailed.
+ *
+ * `indexOnly` is the top bar's search asking for the index outside
+ * Molecules (spec §8.3, ruling DB4): the index alone loads -- no molecule's
+ * files are fetched and no link is refused while another mode is on screen.
  */
-export function useMoleculeLoader(active: boolean): void {
+export function useMoleculeLoader(active: boolean, { indexOnly = false }: { indexOnly?: boolean } = {}): void {
     const dispatch = useAppDispatch();
     const index = useAppSelector(state => state.molecule.index);
     const indexError = useAppSelector(state => state.molecule.indexError);
     const selectedId = useAppSelector(state => state.molecule.selectedId);
     const loadNonce = useAppSelector(state => state.molecule.loadNonce);
 
+    const wantsIndex = active || indexOnly;
     useEffect(() => {
-        if (!active || index !== null || indexError) return;
+        if (!wantsIndex || index !== null || indexError) return;
         let cancelled = false;
         loadMoleculeIndex()
             .then(entries => { if (!cancelled) dispatch(indexLoaded(libraryEntries(entries))); })
             .catch(error => { if (!cancelled) dispatch(indexFailed(message(error))); });
         return () => { cancelled = true; };
-    }, [active, index, indexError, dispatch]);
+    }, [wantsIndex, index, indexError, dispatch]);
 
     // A link's id passes url_keys' pattern without being in the library: a
     // Bonds diatomic (n2) would load Bonds' meta and fail asLibraryMeta with

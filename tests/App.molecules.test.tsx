@@ -46,8 +46,9 @@ async function enterMolecules(narrow: boolean, { landscape = false, before }: { 
     const store = makeStore();
     before?.(store);
     const utils = render(<Provider store={store}><App /></Provider>);
-    if (narrow) fireEvent.click(screen.getByRole('tab', { name: 'View' }));
-    fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
+    if (narrow) fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // the phone's mode menu (spec §9.8) replaced the Mode toggle in the View tab
+    // Unanchored: the rail item's name is "Molecules (molecule mode)" (WCAG 2.5.3, label in name).
+    fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
     await flush();
     return { store, ...utils };
 }
@@ -156,9 +157,10 @@ describe('Molecules mode', () => {
         installMatchMedia(false);
         const store = makeStore();
         render(<Provider store={store}><App /></Provider>);
-        fireEvent.click(screen.getByRole('button', { name: 'basic orbitals mode' }));
+        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/ }));
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
-        fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
+        fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
         await flush();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
     });
@@ -173,7 +175,8 @@ describe('Molecules mode', () => {
     it('restores the full opacity it lowered on the way out', async () => {
         const { store } = await enterMolecules(false);
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
-        fireEvent.click(screen.getByRole('button', { name: 'atom mode' }));
+        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
         await flush();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
     });
@@ -181,7 +184,8 @@ describe('Molecules mode', () => {
     it('keeps an opacity the user chose inside Molecules on the way out', async () => {
         const { store } = await enterMolecules(false);
         act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.4 })); });
-        fireEvent.click(screen.getByRole('button', { name: 'atom mode' }));
+        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
         await flush();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.4);
     });
@@ -191,11 +195,29 @@ describe('Molecules mode', () => {
         const store = makeStore();
         act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.6 })); });
         render(<Provider store={store}><App /></Provider>);
-        fireEvent.click(screen.getByRole('button', { name: 'molecule mode' }));
+        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
         await flush();
-        fireEvent.click(screen.getByRole('button', { name: 'atom mode' }));
+        fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
         await flush();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
+    });
+
+    it('on a phone, the mode menu enters and leaves Molecules with the old toggle\'s opacity rule (Review Focus 4)', async () => {
+        const { store } = await enterMolecules(true);
+        expect(store.getState().atom.mode).toBe('molecule');
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
+        fireEvent.click(screen.getByRole('button', { name: /^Mode: / }));
+        // Unanchored: the menu reuses the rail's names, "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
+        await flush();
+        expect(store.getState().atom.mode).toBe('atom');
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+        fireEvent.click(screen.getByRole('button', { name: /^Mode: / }));
+        expect(screen.getByRole('button', { name: /atom mode/ })).toHaveAttribute('aria-pressed', 'true');
+        // The names now end in "mode)" and lead with the visible label (WCAG 2.5.3); the four modes, in order, as before.
+        expect(screen.getAllByRole('button', { name: /mode\)$/ }).map(b => b.getAttribute('aria-label')))
+            .toEqual(['Atoms (atom mode)', 'Basic Orbitals (basic orbitals mode)', 'Bonds (bonds mode)', 'Molecules (molecule mode)']);
     });
 
     // Review (Important): a shared link is applied before the first render,
