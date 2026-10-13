@@ -51,7 +51,7 @@ import { useDeltaScfEnergies } from './atom/useDeltaScfEnergies';
 import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidExcitation, isNeutralGround } from './atom/species';
 import { allowedCharges } from './atom/ion_configurations';
 import SpeciesControls from './components/SpeciesControls';
-import Controls, { RelativityReadout, BASIC_ORBITALS_ABOUT } from './components/Controls';
+import Controls, { RelativityReadout, BASIC_ORBITALS_ABOUT, RelativityControl } from './components/Controls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
 import OrbitalViewer from './components/OrbitalViewer';
@@ -109,6 +109,9 @@ import HelpDialog from './shell/HelpDialog';
 import AvatarMenu from './shell/AvatarMenu';
 import PhoneTopBar from './shell/PhoneTopBar';
 import ExplorePanel from './shell/ExplorePanel';
+import AtomExplore from './atom_ui/AtomExplore';
+import ElementTile from './atom_ui/ElementTile';
+import OrbitalEnergyList from './atom_ui/OrbitalEnergyList';
 import Inspector from './shell/Inspector';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
@@ -792,6 +795,8 @@ function App() {
     // Phone: the element is chosen from a full-screen list opened from the
     // element name, since the periodic table does not fit.
     const [elementPickerOpen, setElementPickerOpen] = useState(false);
+    // Desktop: the element tile's ▾ opens the same list as a popover under it (spec §9.1).
+    const [elementListAnchor, setElementListAnchor] = useState<HTMLElement | null>(null);
 
     // What the canvas is waiting for, if anything. The panels switch to the
     // new element or orbital at once while the old picture stays up until
@@ -841,23 +846,18 @@ function App() {
         : (isAtomMode ? atomLevel === 'orbital' : Boolean(renderedParams || renderedField))
             && !combinationLegend && !isBondsDensity;
 
-    // The drill-down's next step. On a desktop it lives in the navigation
-    // card it continues, where the orbital buttons are in view; on a phone
-    // it stays in the controls strip, which is laid out for it.
-    const subshellPanel = (atomLevel === 'shell' || atomLevel === 'orbital') && atomProfile && atomSelectedShell !== null
-        ? (
-            <SubshellPanel
-                subshells={atomProfile.subshells}
-                shellN={atomSelectedShell}
-                selectedSubshell={atomSelectedSubshell}
-                selectedOrbital={atomSelectedOrbital}
-                onSelectSubshell={handleSelectSubshell}
-                onSelectOrbital={handleSelectOrbital}
-                // Ruling C9: the drawn profile's mode, not the switch's.
-                relativity={atomProfile.relativity ?? 'off'}
-            />
-        )
-        : null;
+    // The drill-down's next step. On a desktop its chips continue the
+    // configuration in Explore › Configuration and its energy diagram is in
+    // Explore › Orbitals (spec §9.1); on a phone the whole panel is in the
+    // Explore tab's navigation card.
+    const subshellPanelProps = atomProfile && atomSelectedShell !== null ? {
+        subshells: atomProfile.subshells, shellN: atomSelectedShell, selectedSubshell: atomSelectedSubshell,
+        selectedOrbital: atomSelectedOrbital, onSelectSubshell: handleSelectSubshell, onSelectOrbital: handleSelectOrbital,
+        // Ruling C9: the drawn profile's mode, not the switch's.
+        relativity: atomProfile.relativity ?? 'off',
+    } : null;
+    const showSubshells = atomLevel === 'shell' || atomLevel === 'orbital';
+    const subshellPanel = showSubshells && subshellPanelProps ? <SubshellPanel {...subshellPanelProps} /> : null;
 
     // One element for both layouts: LevelNav places it under the element
     // button on a desktop and at the top of the phone's Explore tab, and the
@@ -898,6 +898,13 @@ function App() {
         relativity: pictureRelativity,
         pictureShown: atomProfile !== null,
     };
+    // The Relativity switch chooses the model, so it sits with the
+    // configuration: Explore › Configuration on a desktop, the phone's
+    // Explore tab (spec §9.1, §9.8).
+    const relativityControl = isAtomMode && (
+        <RelativityControl relativity={relativity} relativityIsDefault={relativityIsDefault}
+            onRelativityChange={handleRelativityChange} relativityReadout={relativityReadout} />
+    );
 
     // Fix round 1 (I1): in Bonds mode, exportAvailability also needs
     // useBondsData's own loading/error (not in Redux) to refuse a picture
@@ -1013,10 +1020,6 @@ function App() {
             surfaceStyle={surfaceStyle}
             onSurfaceStyleChange={handleSurfaceStyleChange}
             isBusy={isAtomMode ? showAtomBusy : showBusy}
-            relativity={relativity}
-            relativityIsDefault={relativityIsDefault}
-            onRelativityChange={handleRelativityChange}
-            relativityReadout={relativityReadout}
             fractionNote={isBondsDensity ? FIXED_RHO_NOTE
                 : isMoleculeMode && molecule.surface.kind === 'esp' ? ESP_SURFACE_NOTE : undefined}
             isoNote={moleculeIsoNote}
@@ -1147,7 +1150,8 @@ function App() {
             {
                 key: 'explore',
                 label: 'Explore',
-                content: <LevelNav {...levelNavProps} variant="body">{subshellPanel}</LevelNav>,
+                // Spec §9.8: Explore holds the left panel's tabs as sections, the Relativity switch included.
+                content: <><LevelNav {...levelNavProps} variant="body">{subshellPanel}</LevelNav>{relativityControl}</>,
             },
             { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
@@ -1168,14 +1172,53 @@ function App() {
         </Alert>
     ) : null;
 
-    const exploreContent = isAtomMode ? <LevelNav {...levelNavProps}>{subshellPanel}</LevelNav>
-        : isBondsMode ? bondsPanel
+    // The Atom screen's Explore panel (spec §9.1): the element tile and the
+    // breadcrumb, then Configuration (the drill-down, Charge/Excite and the
+    // Relativity switch), Orbitals (the whole atom's energies and About) and
+    // Display (the view controls).
+    const valenceShellN = atomProfile ? atomProfile.shells[atomProfile.shells.length - 1]?.n ?? 1 : 1;
+    const atomExplore = (
+        <AtomExplore
+            header={(
+                <>
+                    <ElementTile species={species} tableOpen={tableOpen} onOpenTable={() => setTableOpen(true)}
+                        onToggleTable={() => setTableOpen(open => !open)} onOpenList={setElementListAnchor} />
+                    <LevelNav {...levelNavProps} variant="crumbs" />
+                </>
+            )}
+            configuration={(
+                <>
+                    <LevelNav {...levelNavProps} variant="configuration">
+                        {subshellPanelProps && showSubshells && <SubshellPanel {...subshellPanelProps} part="chips" />}
+                    </LevelNav>
+                    {speciesControls}
+                    {relativityControl}
+                </>
+            )}
+            orbitals={(
+                <>
+                    {atomProfile && (
+                        <SubshellPanel subshells={atomProfile.subshells} shellN={atomSelectedShell ?? valenceShellN}
+                            selectedSubshell={atomSelectedSubshell} selectedOrbital={atomSelectedOrbital}
+                            onSelectSubshell={handleSelectSubshell} onSelectOrbital={handleSelectOrbital}
+                            relativity={atomProfile.relativity ?? 'off'} part="diagram" />
+                    )}
+                    {atomProfile && <OrbitalEnergyList subshells={atomProfile.subshells} relativity={pictureRelativity} />}
+                    <LevelNav {...levelNavProps} variant="about" />
+                </>
+            )}
+            display={controls}
+        />
+    );
+
+    const exploreContent = isBondsMode ? bondsPanel
         : isMoleculeMode ? <><MoleculeNav {...moleculeNavProps} /><MoleculeJobsSection /></>
         // Basic Orbitals had no left column: its n/l/mₗ, combination and view settings go here until 6G-2.
         : controls;
     const inspectorBody = (
         <>
-            {!isBasicMode && controls}
+            {/* The atom's view controls are Explore › Display (spec §9.1); the inspector keeps the plot. */}
+            {!isBasicMode && !isAtomMode && controls}
             {renderRadialPlot(PLOT_WIDTH, false)}
         </>
     );
@@ -1369,6 +1412,10 @@ function App() {
                     onClose={() => setElementPickerOpen(false)}
                 />
             )}
+            {isAtomMode && !isNarrow && (
+                <ElementPickerDialog variant="popover" anchorEl={elementListAnchor} open={elementListAnchor !== null}
+                    Z={atomZ} onSelect={handleAtomElementChange} onClose={() => setElementListAnchor(null)} />
+            )}
             {/* Ruling R17: a solver that did not converge must show up as
                 an explicit error, never as a silently-wrong picture. This
                 should never fire -- every element in range converges. */}
@@ -1409,14 +1456,15 @@ function App() {
                 wide={isWide}
                 topBar={topBar}
                 rail={<Rail mode={atomMode} onModeChange={selectMode} isOwner={isOwner} wide={isWide} />}
-                explore={<ExplorePanel body={exploreContent} />}
+                explore={isAtomMode ? atomExplore : <ExplorePanel body={exploreContent} />}
                 inspector={<Inspector variant="docked" body={inspectorBody} />}
                 viewport={viewport}
                 shellRef={shellRef}
                 fullscreen={fullscreen.active}
             />
             <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} brand={brand}
-                aboutModel={isBasicMode ? <p>{BASIC_ORBITALS_ABOUT}</p> : undefined} />
+                aboutModel={isAtomMode ? <LevelNav {...levelNavProps} variant="about" />
+                    : isBasicMode ? <p>{BASIC_ORBITALS_ABOUT}</p> : undefined} />
             {isNarrow && (
                 <Dialog fullScreen open={phoneSearchOpen} onClose={() => setPhoneSearchOpen(false)} aria-label="Search">
                     <div className="phone-search-sheet">

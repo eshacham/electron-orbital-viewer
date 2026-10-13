@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, within } from '@testing-library/react';
+import { render, fireEvent, within, screen } from '@testing-library/react';
 import LevelNav, { NavigationTarget, relativisticEnergiesSentence, aboutRelativitySentence } from '../../src/components/LevelNav';
 import { speciesConfiguration } from '../../src/atom/species';
 
@@ -466,5 +466,30 @@ describe('LevelNav for a species', () => {
         it('keeps the non-relativistic wording when relativity is off', () => {
             expect(aboutRelativitySentence('off')).toMatch(/non-relativistic/);
         });
+    });
+});
+
+describe('LevelNav parts for the Explore panel (spec §9.1)', () => {
+    const base = { Z: 6, selectedShell: 2, selectedSubshell: { n: 2, l: 1 }, selectedOrbital: { n: 2, l: 1, ml: 0 }, onNavigate: jest.fn() };
+
+    it('crumbs: the back step and the whole breadcrumb', () => {
+        render(<LevelNav {...base} variant="crumbs" />);
+        expect(screen.getByRole('button', { name: /Back to 2p/ })).toBeInTheDocument();
+        expect(screen.getByRole('navigation', { name: 'breadcrumb' })).toHaveTextContent('Carbon');
+        expect(screen.queryByText(/Valence/)).toBeNull();
+    });
+
+    it('configuration: configuration, valence and shell chips, with its children', () => {
+        render(<LevelNav {...base} variant="configuration"><span>subshell chips</span></LevelNav>);
+        expect(screen.getByText(/1s² 2s² 2p²/)).toBeInTheDocument();
+        expect(screen.getByRole('group', { name: 'shells' })).toBeInTheDocument();
+        expect(screen.getByText('subshell chips')).toBeInTheDocument();
+        expect(screen.queryByRole('navigation', { name: 'breadcrumb' })).toBeNull();
+    });
+
+    it('about: the method and the model, expanded, with no toggle', () => {
+        const { container } = render(<LevelNav {...base} variant="about" />);
+        expect(container.querySelector('.level-nav-about')).toHaveTextContent(/central-field model/);
+        expect(screen.queryByRole('button', { name: /about this model/i })).toBeNull();
     });
 });

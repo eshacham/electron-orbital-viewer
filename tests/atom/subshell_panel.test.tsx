@@ -396,3 +396,20 @@ describe('SubshellPanel with spin–orbit', () => {
         expect(formatElectrons(9 / 7)).toBe('1.29');
     });
 });
+
+describe('SubshellPanel parts (spec §9.1: chips in Configuration, the diagram in Orbitals)', () => {
+    // Controller ruling DB8b: this file has no props() helper; the props are inline.
+    const props = () => ({
+        subshells: neonLikeSubshells(), shellN: 2, selectedSubshell: null, onSelectSubshell: () => {}, onSelectOrbital: () => {},
+    });
+    it('chips: the chip row and the hint, no diagram', () => {
+        const { container } = render(<SubshellPanel {...props()} part="chips" />);
+        expect(container.querySelector('.subshell-chip-row')).not.toBeNull();
+        expect(container.querySelector('.subshell-energy-diagram')).toBeNull();
+    });
+    it('diagram: the whole-atom energy diagram, no chips', () => {
+        const { container } = render(<SubshellPanel {...props()} part="diagram" />);
+        expect(container.querySelector('.subshell-energy-diagram')).not.toBeNull();
+        expect(container.querySelector('.subshell-chip-row')).toBeNull();
+    });
+});

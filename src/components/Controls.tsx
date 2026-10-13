@@ -78,8 +78,9 @@ interface ControlsProps {
   compact?: boolean;
 
   /**
-   * The Relativity switch (spec §5 Phase 4; layout contract §3.8: here, in
-   * the right-hand panel on a desktop and the View tab on a phone). The
+   * The Relativity switch (spec §5 Phase 4). The Atom screen now renders
+   * `RelativityControl` itself, in Explore › Configuration (spec §9.1) and
+   * the phone's Explore tab (§9.8), and passes none of these. The
    * *effective* mode -- the user's choice, or the element's default -- so
    * the switch shows what is being solved for. Atom mode only; omitted, the
    * panel is exactly as it was.
@@ -272,6 +273,46 @@ export const BASIC_ORBITALS_ABOUT = 'One electron, Z = 1 — the exact solution,
 /** Phase 1's CombinationControls: MUI upper-cases button text, which "With spin–orbit" does not survive. */
 const KEEP_CASE = { '& .MuiToggleButton-root': { textTransform: 'none' } } as const;
 
+export interface RelativityControlProps {
+  relativity: RelativityMode;
+  relativityIsDefault: boolean;
+  onRelativityChange(mode: RelativityMode): void;
+  relativityReadout: RelativityReadout | null;
+}
+
+/** The Relativity switch (spec §5 Phase 4) -- Explore › Configuration in the Atom screen (spec §9.1); today's markup. */
+export const RelativityControl: React.FC<RelativityControlProps> = ({ relativity, relativityIsDefault, onRelativityChange, relativityReadout }) => (
+  <FormControl component="fieldset" margin="normal" fullWidth className="relativity-controls">
+    <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Relativity</FormLabel>
+    <ToggleButtonGroup
+      value={relativity}
+      exclusive
+      onChange={(event: React.MouseEvent<HTMLElement>, value: RelativityMode | null) => {
+        // An exclusive toggle reports a click on the selected button
+        // as null: that is choosing the shown mode again, which the
+        // store reads as following the default when it is the
+        // element's default (final review I3), so pass it on.
+        onRelativityChange(value ?? relativity);
+      }}
+      aria-label="relativity treatment"
+      size="small"
+      fullWidth
+      sx={KEEP_CASE}
+    >
+      <ToggleButton value="off" aria-label="relativity off">Off</ToggleButton>
+      <ToggleButton value="scalar" aria-label="scalar relativistic">Scalar</ToggleButton>
+      <ToggleButton value="spinOrbit" aria-label="with spin–orbit">With spin–orbit</ToggleButton>
+    </ToggleButtonGroup>
+    <FormHelperText className="relativity-help" sx={{ mx: 0 }}>
+      {relativityHelp(relativity, relativityIsDefault)}
+    </FormHelperText>
+    <Typography variant="body2" component="div" role="status" className="relativity-what-changed"
+      sx={{ mt: 0.75, fontSize: '0.75rem', lineHeight: 1.35 }}>
+      <ReadoutContent content={relativityReadoutContent(relativity, relativityReadout)} />
+    </Typography>
+  </FormControl>
+);
+
 const Controls: React.FC<ControlsProps> = ({
   mode = 'hydrogenic',
   atomLevel,
@@ -381,35 +422,8 @@ const Controls: React.FC<ControlsProps> = ({
           the switch is, so a new contraction is announced when it lands
           (a region inserted together with its text often is not). */}
       {isAtomMode && onRelativityChange && relativity && (
-        <FormControl component="fieldset" margin="normal" fullWidth className="relativity-controls">
-          <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Relativity</FormLabel>
-          <ToggleButtonGroup
-            value={relativity}
-            exclusive
-            onChange={(event: React.MouseEvent<HTMLElement>, value: RelativityMode | null) => {
-              // An exclusive toggle reports a click on the selected button
-              // as null: that is choosing the shown mode again, which the
-              // store reads as following the default when it is the
-              // element's default (final review I3), so pass it on.
-              onRelativityChange(value ?? relativity);
-            }}
-            aria-label="relativity treatment"
-            size="small"
-            fullWidth
-            sx={KEEP_CASE}
-          >
-            <ToggleButton value="off" aria-label="relativity off">Off</ToggleButton>
-            <ToggleButton value="scalar" aria-label="scalar relativistic">Scalar</ToggleButton>
-            <ToggleButton value="spinOrbit" aria-label="with spin–orbit">With spin–orbit</ToggleButton>
-          </ToggleButtonGroup>
-          <FormHelperText className="relativity-help" sx={{ mx: 0 }}>
-            {relativityHelp(relativity, relativityIsDefault)}
-          </FormHelperText>
-          <Typography variant="body2" component="div" role="status" className="relativity-what-changed"
-            sx={{ mt: 0.75, fontSize: '0.75rem', lineHeight: 1.35 }}>
-            <ReadoutContent content={relativityReadoutContent(relativity, relativityReadout)} />
-          </Typography>
-        </FormControl>
+        <RelativityControl relativity={relativity} relativityIsDefault={relativityIsDefault}
+          onRelativityChange={onRelativityChange} relativityReadout={relativityReadout} />
       )}
 
       {isBasicMode && (

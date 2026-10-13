@@ -1,0 +1,28 @@
+/* src/atom_ui/element_tile.css -- the Atom screen's element tile (spec §9.1): 88 × 96, surface-3, radius lg. */
+.element-header { display: flex; flex-direction: column; gap: 8px; }
+.element-header-row { display: flex; align-items: center; justify-content: space-between; }
+.element-header-body { display: flex; align-items: center; gap: 12px; }
+.element-tile {
+  position: relative; display: grid; grid-template-rows: auto 1fr auto auto; justify-items: center;
+  width: var(--ql-size-element-tile-width); height: var(--ql-size-element-tile-height);
+  padding: 6px 8px; box-sizing: border-box; cursor: pointer;
+  border-radius: var(--ql-radius-lg); border: 1px solid var(--ql-color-selected-edge);
+  background: var(--ql-color-surface-3); color: var(--ql-color-text-1); box-shadow: var(--ql-shadow-selected);
+  font-family: var(--ql-font-sans);
+}
+.element-tile-z, .element-tile-electrons {
+  position: absolute; top: 6px; font-size: var(--ql-type-tick-size); line-height: 14px; color: var(--ql-color-text-2);
+}
+.element-tile-z { left: 8px; }
+.element-tile-electrons { right: 8px; }
+.element-tile-symbol { grid-row: 2; align-self: end; font-size: 28px; line-height: 32px; font-weight: 600; }
+.element-tile-name { grid-row: 3; font-size: var(--ql-type-caption-size); line-height: 16px; }
+.element-tile-weight { grid-row: 4; font-size: var(--ql-type-tick-size); line-height: 14px; color: var(--ql-color-text-2); }
+.element-table-button.MuiButton-root { color: var(--ql-color-text-1); border-color: var(--ql-color-border-strong); }
+.element-table-button.MuiButton-root[aria-pressed="true"] { border-color: var(--ql-color-selected-edge); background: var(--ql-color-surface-3); }
+/* The breadcrumb under the tile reads at body size (spec §4.3), not MUI's body1, which the 13 px theme scales to 14.86 px. */
+.explore-header .level-nav-breadcrumbs { font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line); }
+.orbital-energy-list { width: 100%; border-collapse: collapse; font-size: var(--ql-type-body-size); }
+.orbital-energy-list caption { text-align: left; margin-bottom: 6px; }
+.orbital-energy-list th, .orbital-energy-list td { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--ql-color-border-subtle); }
+.orbital-energy-list td:last-child { text-align: right; }

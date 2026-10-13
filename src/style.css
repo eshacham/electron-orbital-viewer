@@ -792,12 +792,13 @@ html, body, #root {
    --------------------------------------------------------------------------- */
 .periodic-table-panel {
   position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  /* A pop-over now: above both side panels, which it used to open beneath
-     on anything narrower than about 1200 px. */
-  z-index: 25;
+  /* Spec §9.1: a popover under the element tile, over the viewport's top-left
+     corner (still a top inset, src/useViewInsets.ts). It covers the title
+     block while it is open. */
+  top: 12px;
+  left: 12px;
+  transform: none;
+  z-index: 20;
   max-height: calc(100vh - 40px);
   overflow: auto;
   box-shadow: var(--ql-shadow-popover);
@@ -1453,3 +1454,9 @@ html, body, #root {
   padding: 8px 16px;
   border-radius: 10px;
 }
+
+/* The desktop's ▾ element list under the element tile (spec §9.1). Paired
+   with MUI's own class: its injected Popover paper rule (max-height:
+   calc(100% - 32px)) loads after this file and won at equal specificity. */
+.MuiPopover-paper.element-list-popover { width: 320px; max-height: min(520px, 70vh); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.MuiPopover-paper.element-list-popover .MuiList-root { overflow-y: auto; }

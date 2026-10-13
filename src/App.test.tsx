@@ -1041,6 +1041,7 @@ describe('App: opening a shared link', () => {
         // to be re-applied once the profile confirms the view.
         expect(store.getState().orbital.pendingCut).toEqual({ clipAxis: 'y', clipPosition: 0.5 });
 
+        fireEvent.click(screen.getByRole('tab', { name: 'Display' })); // the view controls are Explore › Display (spec §9.1)
         fireEvent.click(screen.getByRole('button', { name: 'cut along x' }));
         expect(store.getState().orbital.pendingCut).toBeNull();
 
@@ -1366,10 +1367,11 @@ describe('App: relativity', () => {
         const switchIn = (root: HTMLElement = document.body) => within(root).getByRole('group', { name: 'relativity treatment' });
         const readout = (container: HTMLElement) => container.querySelector('.relativity-what-changed')!;
 
-        it('sits in the right-hand view panel, at scalar by default for gold', () => {
+        // Spec §9.1: Relativity is in Explore › Configuration, no longer the right-hand view panel.
+        it('sits in Explore › Configuration, at scalar by default for gold', () => {
             installMatchMedia(false);
             const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79 });
-            const group = switchIn(container.querySelector('.view-panel') as HTMLElement);
+            const group = switchIn(container.querySelector('.side-panel') as HTMLElement);
             expect(within(group).getByRole('button', { name: 'scalar relativistic' })).toHaveAttribute('aria-pressed', 'true');
             expect(screen.getByText(/Default for this element/)).toBeInTheDocument();
         });
@@ -1421,8 +1423,7 @@ describe('App: relativity', () => {
                 mode: 'atom', Z: 85, charge: -1,
                 unbound: 'Scalar-relativistic SCF for Astatine ion At⁻: LDA does not bind this anion: its 6p electron is not bound by 10⁻⁴ Ha or more.',
             });
-            const about = screen.getAllByRole('button', { name: /about this model/i })[0];
-            fireEvent.click(about);
+            fireEvent.click(screen.getByRole('tab', { name: 'Orbitals' })); // About is expanded inline in Explore › Orbitals (spec §9.1)
             expect(document.querySelector('.level-nav-about')!.textContent).not.toMatch(/This picture/);
         });
 
@@ -1465,11 +1466,12 @@ describe('App: relativity', () => {
             expect(readout(container)).toHaveTextContent(why);
         });
 
-        it('is on the View tab of a phone', () => {
+        // Spec §9.8: the phone's Explore tab holds the left panel's tabs as sections, Relativity included.
+        it('is in the Explore tab of a phone', () => {
             installMatchMedia(true);
             renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
             expect(screen.queryByRole('group', { name: 'relativity treatment' })).toBeNull();
-            fireEvent.click(screen.getByRole('tab', { name: 'View' }));
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
             expect(switchIn(screen.getByRole('tabpanel'))).toBeInTheDocument();
             expect(within(screen.getByRole('tabpanel')).getByText(/6s contracts by 14\.1 %/)).toBeInTheDocument();
         });
@@ -1479,7 +1481,7 @@ describe('App: relativity', () => {
         it('says in About this model that a relativistic picture\'s energies are not', () => {
             installMatchMedia(false);
             const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
-            fireEvent.click(screen.getByRole('button', { name: /about this model/i }));
+            fireEvent.click(screen.getByRole('tab', { name: 'Orbitals' })); // About is expanded inline in Explore › Orbitals (spec §9.1)
             expect(container.querySelector('.level-nav-about')!.textContent).toMatch(/This picture is scalar-relativistic; the ΔSCF energies are not/);
         });
     });

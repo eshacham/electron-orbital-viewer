@@ -49,8 +49,14 @@ interface LevelNavProps {
      * 'full' is the desktop card. A phone splits it: 'header' is the one line
      * that stays on screen -- Back, the element, and where you are -- and
      * 'body' is the rest, in the bottom sheet's Explore tab.
+     *
+     * The other three are the Explore panel's pieces (spec §9.1): `crumbs` is
+     * the back step and the breadcrumb under the element tile;
+     * `configuration` is the configuration, valence and shell chips, with
+     * `children` (the subshell chips) after them; `about` is the method and
+     * the About text, expanded.
      */
-    variant?: 'full' | 'header' | 'body';
+    variant?: 'full' | 'header' | 'body' | 'crumbs' | 'configuration' | 'about';
     /**
      * The species' own occupancies -- an ion's or an excited atom's --
      * rather than the neutral ground state's (Global Constraints: "shell
@@ -314,56 +320,37 @@ const LevelNav: React.FC<LevelNavProps> = ({
             </Box>
         );
     }
-    const isBody = variant === 'body';
-
-    return (
-        <Box className={`level-nav${isBody ? ' level-nav-body' : ''}`} aria-label="level navigation">
-            {/* Ruling C13: the Charge/Excite card sits directly under the
-                element button on a desktop, and as the first thing in a
-                phone's Explore tab -- never a floating panel of its own. */}
-            {isBody && speciesControls}
-            {!isBody && parent && (
-                <Button
-                    size="small"
-                    className="level-nav-back"
-                    onClick={() => onNavigate(parent.target)}
-                    aria-label={parent.spoken === undefined ? undefined : `Back to ${parent.spoken}`}
+    // The pieces the variants share, built once: spec §9.1 splits the card
+    // across the Explore panel, and every variant renders the same markup.
+    const backButton = parent && (
+        <Button
+            size="small"
+            className="level-nav-back"
+            onClick={() => onNavigate(parent.target)}
+            aria-label={parent.spoken === undefined ? undefined : `Back to ${parent.spoken}`}
+        >
+            ← Back to {parent.label}
+        </Button>
+    );
+    const breadcrumbs = (
+        <Breadcrumbs aria-label="breadcrumb" className="level-nav-breadcrumbs">
+            {crumbs.map(crumb => (
+                <Link
+                    key={crumb.key}
+                    component="button"
+                    type="button"
+                    underline="hover"
+                    color="inherit"
+                    aria-label={crumb.spoken}
+                    onClick={() => onNavigate(crumb.target)}
                 >
-                    ← Back to {parent.label}
-                </Button>
-            )}
-            {!isBody && onChangeElement && (
-                <Button
-                    size="small"
-                    variant="outlined"
-                    className="level-nav-change-element"
-                    onClick={onChangeElement}
-                    aria-label={changeElementLabel}
-                >
-                    {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
-                </Button>
-            )}
-            {!isBody && speciesControls}
-            {/* At the whole-atom level the breadcrumb is only the element's
-                name, which the element button already shows. */}
-            {(crumbs.length > 1 || (!onChangeElement && !isBody)) && (
-            <Breadcrumbs aria-label="breadcrumb" className="level-nav-breadcrumbs">
-                {crumbs.map(crumb => (
-                    <Link
-                        key={crumb.key}
-                        component="button"
-                        type="button"
-                        underline="hover"
-                        color="inherit"
-                        aria-label={crumb.spoken}
-                        onClick={() => onNavigate(crumb.target)}
-                    >
-                        {crumb.label}
-                    </Link>
-                ))}
-            </Breadcrumbs>
-            )}
-
+                    {crumb.label}
+                </Link>
+            ))}
+        </Breadcrumbs>
+    );
+    const configurationLines = (
+        <>
             <Typography variant="body2" className="level-nav-configuration">
                 {configurationLabelOf(speciesConfiguration)}
             </Typography>
@@ -423,6 +410,77 @@ const LevelNav: React.FC<LevelNavProps> = ({
                             ? 'Click a ring in the 3D view, or a shell above, to open it'
                             : `${shellName(selectedShell)} only — click it again, or the ✕, for the whole atom`}
             </Typography>
+        </>
+    );
+    const aboutText = (
+        <>
+            {/* The one-line method statement lives here with the rest of
+                the model's framing rather than on the card face, which
+                it made tall enough to push the controls below it under
+                the fold. */}
+            <Typography variant="caption" className="level-nav-method" display="block">
+                {methodStatement(relativity)}
+            </Typography>
+            <Typography variant="body2" className="level-nav-about">
+                This is a central-field model: each electron moves in the
+                spherically averaged potential of the nucleus and every
+                other electron, and open shells are averaged over their
+                sublevels rather than resolved into individual
+                determinants. Exchange and correlation come from the
+                local density approximation (LDA) with the VWN
+                correlation functional. {aboutRelativitySentence(relativity)} An ion or an excited atom uses
+                the same model with its own electron count or one
+                electron moved; ionisation and excitation energies are
+                ΔSCF differences of total energies from the
+                spin-polarised form of the same LDA, never orbital
+                eigenvalues. The picture on screen is drawn from a
+                simpler, spin-restricted form of that LDA, and in it
+                most anions — Cl⁻ included — have no bound state for
+                their extra electron at all.{pictureShown ? relativisticEnergiesSentence(relativity) : ''} The individual s/p/d/f
+                lobes you can select below are a basis choice, not
+                separate physical objects: a partially filled subshell's
+                electrons are smeared uniformly over all of it, not
+                sitting in one lobe rather than another.
+            </Typography>
+        </>
+    );
+
+    if (variant === 'crumbs') {
+        return <Box className="level-nav level-nav-crumbs" aria-label="level navigation">{backButton}{breadcrumbs}</Box>;
+    }
+    if (variant === 'configuration') {
+        return <Box className="level-nav level-nav-configuration-part">{configurationLines}{children}</Box>;
+    }
+    if (variant === 'about') {
+        return <Box className="level-nav level-nav-about-part">{aboutText}</Box>;
+    }
+
+    const isBody = variant === 'body';
+
+    return (
+        <Box className={`level-nav${isBody ? ' level-nav-body' : ''}`} aria-label="level navigation">
+            {/* Ruling C13: the Charge/Excite card sits directly under the
+                element button on a desktop, and as the first thing in a
+                phone's Explore tab -- never a floating panel of its own. */}
+            {isBody && speciesControls}
+            {!isBody && backButton}
+            {!isBody && onChangeElement && (
+                <Button
+                    size="small"
+                    variant="outlined"
+                    className="level-nav-change-element"
+                    onClick={onChangeElement}
+                    aria-label={changeElementLabel}
+                >
+                    {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
+                </Button>
+            )}
+            {!isBody && speciesControls}
+            {/* At the whole-atom level the breadcrumb is only the element's
+                name, which the element button already shows. */}
+            {(crumbs.length > 1 || (!onChangeElement && !isBody)) && breadcrumbs}
+
+            {configurationLines}
 
             {children}
 
@@ -435,34 +493,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 About this model
             </Button>
             <Collapse in={aboutOpen}>
-                {/* The one-line method statement lives here with the rest of
-                    the model's framing rather than on the card face, which
-                    it made tall enough to push the controls below it under
-                    the fold. */}
-                <Typography variant="caption" className="level-nav-method" display="block">
-                    {methodStatement(relativity)}
-                </Typography>
-                <Typography variant="body2" className="level-nav-about">
-                    This is a central-field model: each electron moves in the
-                    spherically averaged potential of the nucleus and every
-                    other electron, and open shells are averaged over their
-                    sublevels rather than resolved into individual
-                    determinants. Exchange and correlation come from the
-                    local density approximation (LDA) with the VWN
-                    correlation functional. {aboutRelativitySentence(relativity)} An ion or an excited atom uses
-                    the same model with its own electron count or one
-                    electron moved; ionisation and excitation energies are
-                    ΔSCF differences of total energies from the
-                    spin-polarised form of the same LDA, never orbital
-                    eigenvalues. The picture on screen is drawn from a
-                    simpler, spin-restricted form of that LDA, and in it
-                    most anions — Cl⁻ included — have no bound state for
-                    their extra electron at all.{pictureShown ? relativisticEnergiesSentence(relativity) : ''} The individual s/p/d/f
-                    lobes you can select below are a basis choice, not
-                    separate physical objects: a partially filled subshell's
-                    electrons are smeared uniformly over all of it, not
-                    sitting in one lobe rather than another.
-                </Typography>
+                {aboutText}
             </Collapse>
         </Box>
     );
