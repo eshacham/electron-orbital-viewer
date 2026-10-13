@@ -6,8 +6,9 @@ jest.mock('../src/orbital_controls_factory', () => ({ createOrbitalControls: jes
 import { createOrbitalWorker } from '../src/workers/createOrbitalWorker';
 import {
     VisualizerContext, setAppearance, setMoleculeOverlay, updateAtomViewInScene, updateOrbitalInScene, presentFieldMesh,
-    setSurfaceStyle, guardMeshLines,
+    setSurfaceStyle, guardGlowExtras, updateFieldInScene, attachShellCompositionLobes,
 } from '../src/orbital_visualizer';
+import { fieldRequestFor } from '../src/combinations';
 import { collectExportSurfaces } from '../src/export/surfaces';
 import { defaultSurfaceStyle, MeshData } from '../src/types/orbital';
 import { CLASSIC_APPEARANCE, type Appearance } from '../src/design/appearance';
@@ -231,9 +232,11 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         expect(context.lights.ambient.intensity).toBe(0.35);
     });
 
-    it('dims the lights for Glow, whose emissive term carries the rest, and restores them for Solid', () => {
+    // Ruling T15-glowcover: the lights dim only while a drawn surface glows, so the orbital is drawn first.
+    it('dims the lights for Glow, whose emissive term carries the rest, and restores them for Solid', async () => {
         const context = buildContext();
         context.lights = { ambient: new THREE.AmbientLight(0xffffff, 0.5), key: new THREE.DirectionalLight(0xffffff, 0.8), fill: new THREE.DirectionalLight(0xffffff, 0.35) };
+        await drawOrbital(context);
         setAppearance(context, glow);
         expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([0.35, 0.6, 0.25]);
         setAppearance(context, { ...glow, finish: 'solid' });
@@ -280,18 +283,105 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         context.frameGuard = { ema: 16, frames: 0 };
         await drawOrbital(context);
         setAppearance(context, glow);
-        for (let i = 0; i < 300; i++) guardMeshLines(context, 40);
-        expect(context.linesSuppressed).toBe(true);
-        expect(extra(context, 'lines')).toBeUndefined();
-        expect(extra(context, 'halo')).toBeDefined();
+        for (let i = 0; i < 300; i++) guardGlowExtras(context, 40);
+        expect(context.extrasSuppressed).toBe(true);
+        // Ruling T15-halo-slow (spec §15): the halo goes with the lines; the rim and emissive stay.
+        expect(extras(context)).toHaveLength(0);
+        expect((surfaceOf(context).material as THREE.MeshStandardMaterial).userData.glow).toBe(true);
         // Restyling is not an appearance change: still off.
         setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'wireframe' });
         setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'solid' });
         setAppearance(context, glow);
-        expect(extra(context, 'lines')).toBeUndefined();
+        expect(extras(context)).toHaveLength(0);
         setAppearance(context, { ...glow, scheme: 'density' });
-        expect(context.linesSuppressed).toBe(false);
+        expect(context.extrasSuppressed).toBe(false);
         expect(context.frameGuard).toEqual({ ema: 16, frames: 0 });
         expect(extra(context, 'lines')).toBeDefined();
+        expect(extra(context, 'halo')).toBeDefined();
+    });
+
+    // Ruling T15-halo-slow: on a phone (lowPower) neither the halo nor the lines, on the drawn orbital too.
+    it('draws no halo and no lines on a phone, but keeps the rim', async () => {
+        const context = buildContext();
+        await drawOrbital(context);
+        setAppearance(context, { ...glow, lowPower: true });
+        expect(extras(context)).toHaveLength(0);
+        expect((surfaceOf(context).material as THREE.MeshStandardMaterial).userData.glow).toBe(true);
+    });
+
+    // Ruling T15-glowcover: what Glow dims the lights for must glow -- the combination overlay and the composition lobes too.
+    const lights = () => ({ ambient: new THREE.AmbientLight(0xffffff, 0.5), key: new THREE.DirectionalLight(0xffffff, 0.8), fill: new THREE.DirectionalLight(0xffffff, 0.35) });
+    const glowOf = (mesh: THREE.Mesh) => (mesh.material as THREE.MeshStandardMaterial).userData;
+    const shaderOf = (mesh: THREE.Mesh) => {
+        const shader = { uniforms: {} as Record<string, THREE.IUniform>, vertexShader: THREE.ShaderLib.physical.vertexShader, fragmentShader: THREE.ShaderLib.physical.fragmentShader };
+        (mesh.material as THREE.MeshStandardMaterial).onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+        return shader;
+    };
+
+    it('glows a combination overlay (emissive, own-tint rim) under Glow, and not under Solid or Classic', async () => {
+        const context = buildContext();
+        context.lights = lights();
+        setAppearance(context, glow);
+        const worker = fakeWorker();
+        (createOrbitalWorker as jest.Mock).mockReturnValue(worker);
+        const pending = updateFieldInScene(context, fieldRequestFor({ kind: 'hybrid', hybrid: 'sp', member: 'all' }, 0.9)!);
+        const piece = (offset: number): MeshData => ({ ...meshData(), positions: [[offset, 0, 0], [offset + 1, 0, 0], [offset, 1, 0]] });
+        worker.onmessage!({ data: { type: 'fieldsSuccess', meshes: [piece(0), piece(5)] } });
+        await pending;
+        expect(context.currentOrbitalGroup!.userData.isFieldOverlay).toBe(true);
+        const overlay = surfaceOf(context);
+        expect(glowOf(overlay).glow).toBe(true);
+        expect(glowOf(overlay).glowUniforms.qlEmissive.value).toBeCloseTo(0.18);
+        expect(shaderOf(overlay).vertexShader).toContain('vQlPhase = 0.0;');
+        expect(context.lights.ambient.intensity).toBe(0.35);
+        setAppearance(context, { ...glow, finish: 'solid' });
+        expect(glowOf(overlay).glow).toBe(false);
+        expect(context.lights.ambient.intensity).toBe(0.5);
+        setAppearance(context, glow);
+        setAppearance(context, { ...glow, scheme: 'classic' });
+        expect(glowOf(overlay).glow).toBe(false);
+        expect(context.lights.ambient.intensity).toBe(0.5);
+    });
+
+    it('glows a shell\'s composition lobes under Glow, and not under Solid or Classic; the shell view alone keeps today\'s lights', () => {
+        const context = buildContext();
+        context.lights = lights();
+        setAppearance(context, glow);
+        updateAtomViewInScene(context, {
+            contourRadius: 4, shellEmphasis: new Float32Array([0.1, 0.4, 1, 0.3, 0.05]), rMin: 0.1, dx: 0.5, size: 5, rMax: 0.1 * Math.exp(2),
+        });
+        expect(context.lights.ambient.intensity).toBe(0.5);
+        const components = [{ n: 2, l: 1, ml: 0, occupancyFraction: 1, colorIndex: 1 }, { n: 2, l: 1, ml: 1, occupancyFraction: 1, colorIndex: 1 }];
+        const lobe = { positions: [[0, 0, 0], [1, 0, 0], [0, 1, 0]], cells: [[0, 1, 2]] };
+        attachShellCompositionLobes(context, context.requestCounter, components, [lobe, lobe]);
+        const lobes: THREE.Mesh[] = [];
+        context.currentOrbitalGroup!.traverse(o => { if (o instanceof THREE.Mesh && o.userData.lobe) lobes.push(o); });
+        expect(lobes).toHaveLength(2);
+        lobes.forEach(mesh => {
+            expect(glowOf(mesh).glow).toBe(true);
+            expect(glowOf(mesh).glowUniforms.qlEmissive.value).toBeCloseTo(0.18);
+        });
+        expect(context.lights.ambient.intensity).toBe(0.35);
+        setAppearance(context, { ...glow, finish: 'solid' });
+        lobes.forEach(mesh => expect(glowOf(mesh).glow).toBe(false));
+        expect(context.lights.ambient.intensity).toBe(0.5);
+        setAppearance(context, { ...glow, scheme: 'classic' });
+        lobes.forEach(mesh => expect(glowOf(mesh).glow).toBeFalsy());
+        expect(context.lights.ambient.intensity).toBe(0.5);
+    });
+
+    it('keeps today\'s lights for a ball-and-stick on its own under Glow, with the atoms\' 0.15 rim', () => {
+        const context = buildContext();
+        context.lights = lights();
+        const oxygen = new THREE.MeshStandardMaterial();
+        oxygen.userData.Z = 8;
+        const overlay = new THREE.Group();
+        overlay.add(new THREE.Mesh(new THREE.SphereGeometry(1), oxygen));
+        setMoleculeOverlay(context, overlay);
+        setAppearance(context, glow);
+        expect([context.lights.ambient.intensity, context.lights.key.intensity, context.lights.fill.intensity]).toEqual([0.5, 0.8, 0.35]);
+        expect(oxygen.userData.glow).toBe(true);
+        expect(oxygen.userData.glowUniforms.qlRimStrength.value).toBeCloseTo(0.15);
+        expect(oxygen.userData.glowUniforms.qlEmissive.value).toBe(0);
     });
 });

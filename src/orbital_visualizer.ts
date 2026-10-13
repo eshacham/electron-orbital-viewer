@@ -50,7 +50,8 @@ import { CPK_COLORS, disposeOverlay } from './molecules/ball_and_stick';
 import { CLASSIC_APPEARANCE, type Appearance } from './design/appearance';
 import { axesStyle, curvePalette, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb, phaseColours } from './design/science';
 import {
-    applyGlow, atomRimFor, attachGlowExtras, fadeGlowExtras, glowSettingsFor, GLOW_LIGHTS, hasGlowLines, removeGlowLines, SOLID_LIGHTS, updateFrameGuard,
+    applyGlow, atomRimFor, attachGlowExtras, fadeGlowExtras, glowSettingsFor, GLOW_LIGHTS, hasGlowExtras, hasGlowingSurface, removeGlowExtras,
+    SOLID_LIGHTS, updateFrameGuard,
 } from './orbital_glow';
 
 /** One colour for a total density (spec §4.1): ψ's red and blue would claim a phase it does not have. */
@@ -198,13 +199,33 @@ export interface VisualizerContext {
     appearance?: Appearance;
     /** The scene's three lights, which the finish sets (§11.1 "Lights"). */
     lights?: { ambient: THREE.AmbientLight; key: THREE.DirectionalLight; fill: THREE.DirectionalLight };
-    /** Ruling R10: Glow's mesh lines latched off by the frame-time guard, until the appearance next changes. */
-    linesSuppressed?: boolean;
-    /** Ruling R10's moving average of frame time (`updateFrameGuard`), fed only while mesh lines are drawn. */
+    /** Ruling R10 / §15: Glow's mesh lines and halo latched off by the frame-time guard, until the appearance next changes. */
+    extrasSuppressed?: boolean;
+    /** Ruling R10's moving average of frame time (`updateFrameGuard`), fed only while the lines or halo are drawn. */
     frameGuard?: { ema: number; frames: number };
 }
 
 const appearanceOf = (context: VisualizerContext): Appearance => context.appearance ?? CLASSIC_APPEARANCE;
+
+/** Glow for this appearance on the current surface style: none on a wireframe, which keeps today's material (§11.1). */
+const surfaceGlow = (context: VisualizerContext, appearance: Appearance) =>
+    context.surfaceStyle.mode === 'solid' ? glowSettingsFor(appearance) : null;
+
+/**
+ * Glow on a phase-less, extras-free surface -- the composition lobes, the
+ * combination overlay: emissive and an own-tint rim (ruling T15-glowcover),
+ * so the lights Glow dims are made up on them too. Left as both hooks.
+ */
+function glowWithoutExtras(context: VisualizerContext, root: THREE.Object3D, isSurface: (mesh: THREE.Mesh) => boolean): void {
+    const glow = (appearance: Appearance) => root.traverse(child => {
+        if (child instanceof THREE.Mesh && isSurface(child)) {
+            applyGlow(child.material as THREE.MeshStandardMaterial, surfaceGlow(context, appearance), { phased: false });
+        }
+    });
+    const recolour = root.userData.applyAppearance as ((a: Appearance) => void) | undefined;
+    root.userData.applyAppearance = (a: Appearance) => { recolour?.(a); glow(a); };
+    root.userData.refreshGlow = () => glow(appearanceOf(context));
+}
 
 /**
  * Calls the `userData[hook]` each object under `root` carries. Gathered
@@ -404,7 +425,7 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
         transition: null,
         appearance: CLASSIC_APPEARANCE,
         lights: { ambient: ambientLight, key: directionalLight, fill: fillLight },
-        linesSuppressed: false,
+        extrasSuppressed: false,
         frameGuard: { ema: 16, frames: 0 },
     };
 
@@ -1242,10 +1263,12 @@ function showFieldOverlay(context: VisualizerContext, meshes: MeshData[], colors
     context.isCompositionView = false;
     const group = createFieldOverlayGroup(meshes, colors, labels, context.surfaceStyle, context.clippingPlanes);
     group.userData.applyAppearance = (a: Appearance) => recolourFieldOverlay(group, curvePalette(a.theme, a.scheme));
+    glowWithoutExtras(context, group, mesh => mesh.material instanceof THREE.MeshStandardMaterial);
     group.userData.applyAppearance(appearanceOf(context));
     context.scene.add(group);
     context.currentOrbitalGroup = group;
     context.currentCaps = null;
+    applyLights(context);
 }
 
 /**
@@ -1386,7 +1409,7 @@ function applyOverlayAppearance(overlay: THREE.Object3D, appearance: Appearance)
         const material = (child as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
         if (material?.userData?.Z === undefined) return;
         if (material.userData.Z === 1) material.color.set(hydrogen);
-        applyGlow(material, rim);
+        applyGlow(material, rim, { phased: false });
     });
 }
 
@@ -1647,6 +1670,7 @@ export function updateAtomViewInScene(
     context.currentOrbitalGroup = view;
     context.currentCaps = view;
     refreshCaps(context);
+    applyLights(context);
 
     if (crossFadeFrom) {
         // Starts fully transparent -- tickCrossFade ramps it (and fades
@@ -1692,6 +1716,7 @@ export function clearShellCompositionLobes(context: VisualizerContext | null): v
     context.currentOrbitalGroup?.remove(existing);
     disposeCompositionLobes(existing);
     if (context.shellViewRadius !== undefined) setShellCutExtent(context, context.shellViewRadius);
+    applyLights(context);
 }
 
 /** Shows the neutral atom's edge at `radius`, or removes it with null. One ring at most. */
@@ -1759,7 +1784,10 @@ export function attachShellCompositionLobes(
         curvePalette(appearanceOf(context).theme, appearanceOf(context).scheme)
     );
     lobes.userData.applyAppearance = (a: Appearance) => recolourCompositionLobes(lobes, curvePalette(a.theme, a.scheme));
+    glowWithoutExtras(context, lobes, mesh => Boolean(mesh.userData.lobe));
+    (lobes.userData.refreshGlow as () => void)();
     context.currentOrbitalGroup.add(lobes);
+    applyLights(context);
     // The lobes reach past the shell's sphere (a 4f by about 1.2x), and the
     // cut was scaled to the sphere alone: at "nothing removed" the plane sat
     // inside the lobes and cut a hole in them. Cover the lobes too.
@@ -1790,6 +1818,7 @@ function clearCurrentOrbital(context: VisualizerContext, scene: THREE.Scene) {
         // Force scene update
         scene.updateMatrixWorld(true);
     }
+    applyLights(context);
 }
 
 // Ring half-width, in on-screen pixels, regardless of zoom (spec bugfix --
@@ -1827,18 +1856,19 @@ export function renderFrame(context: VisualizerContext): void {
 }
 
 /**
- * Ruling R10, one frame of it: while Glow's mesh lines are drawn, feeds the
- * frame time to the moving average, and once that passes 20 ms takes the
- * lines out and latches them off until the appearance next changes (no
+ * Ruling R10, one frame of it: while Glow's mesh lines or halo are drawn,
+ * feeds the frame time to the moving average, and once that passes 20 ms
+ * takes both out (spec §15: "lines and halo off ... when frames exceed
+ * 20 ms") and latches them off until the appearance next changes (no
  * flicker on and off). Exported so the latch can be tested without a
  * WebGLRenderer.
  */
-export function guardMeshLines(context: VisualizerContext, dtMs: number): void {
-    if (!context.frameGuard || context.linesSuppressed || !hasGlowLines(context.currentOrbitalGroup)) return;
+export function guardGlowExtras(context: VisualizerContext, dtMs: number): void {
+    if (!context.frameGuard || context.extrasSuppressed || !hasGlowExtras(context.currentOrbitalGroup)) return;
     if (!updateFrameGuard(context.frameGuard, dtMs)) return;
-    context.linesSuppressed = true;
-    removeGlowLines(context.currentOrbitalGroup);
-    if (context.transition?.kind === 'cross-fade') removeGlowLines(context.transition.outgoing);
+    context.extrasSuppressed = true;
+    removeGlowExtras(context.currentOrbitalGroup);
+    if (context.transition?.kind === 'cross-fade') removeGlowExtras(context.transition.outgoing);
 }
 
 function startAnimationLoop(context: VisualizerContext) {
@@ -1858,7 +1888,7 @@ function startAnimationLoop(context: VisualizerContext) {
         if (context.transition) tickTransition(context, timestamp);
         reportTransitionState(context);
         renderFrame(context);
-        if (previous !== null) guardMeshLines(context, timestamp - previous);
+        if (previous !== null) guardGlowExtras(context, timestamp - previous);
         previous = timestamp;
         context.animationFrameId = requestAnimationFrame(animate);
     }
@@ -1960,7 +1990,7 @@ function updateSceneWithMeshData(
         /** Glow (§11.2) to the current surface mode: extras on a solid surface only. */
         const refreshGlow = (appearance: Appearance) => attachGlowExtras(group, mesh, appearance, {
             radius, clippingPlanes: context.clippingPlanes,
-            solid: context.surfaceStyle.mode === 'solid', linesAllowed: !context.linesSuppressed,
+            solid: context.surfaceStyle.mode === 'solid', extrasAllowed: !context.extrasSuppressed,
         });
 
         // Colours come from the appearance (spec §6.6, §11) and are repainted
@@ -1999,6 +2029,7 @@ function updateSceneWithMeshData(
 
         context.scene.add(group);
         context.currentOrbitalGroup = group;
+        applyLights(context);
 
         if (outgoingShellView) {
             // Starts fully transparent -- tickCrossFade ramps it (and fades
@@ -2138,10 +2169,10 @@ export function setAppearance(context: VisualizerContext | null, appearance: App
     const previous = context.appearance;
     context.appearance = appearance;
     // Ruling R10: a new appearance gets a fresh look at frame time -- before
-    // the objects below re-apply, so the mesh lines may come back. The same
-    // appearance again (a re-run effect) is not a change.
+    // the objects below re-apply, so the lines and halo may come back. The
+    // same appearance again (a re-run effect) is not a change.
     if (!previous || (Object.keys(appearance) as Array<keyof Appearance>).some(key => previous[key] !== appearance[key])) {
-        context.linesSuppressed = false;
+        context.extrasSuppressed = false;
         if (context.frameGuard) {
             context.frameGuard.ema = 16;
             context.frameGuard.frames = 0;
@@ -2161,13 +2192,15 @@ export function setAppearance(context: VisualizerContext | null, appearance: App
 
 /**
  * §11.1 "Lights": Glow lets its emissive term carry part of the light, so
- * the three lights dim; Solid, Classic and a wireframe (today's material)
- * keep today's levels.
+ * the three lights dim -- but only while a surface on screen actually glows
+ * (ruling T15-glowcover). Solid, Classic, a wireframe (today's material), a
+ * shell view or a ball-and-stick on its own keep today's levels: nothing
+ * there would make up the light taken away. Called wherever the drawn
+ * surface or its Glow changes.
  */
 function applyLights(context: VisualizerContext): void {
     if (!context.lights) return;
-    const glowing = context.surfaceStyle.mode === 'solid' && glowSettingsFor(appearanceOf(context)) !== null;
-    const levels = glowing ? GLOW_LIGHTS : SOLID_LIGHTS;
+    const levels = hasGlowingSurface(context.currentOrbitalGroup) ? GLOW_LIGHTS : SOLID_LIGHTS;
     context.lights.ambient.intensity = levels.ambient;
     context.lights.key.intensity = levels.key;
     context.lights.fill.intensity = levels.fill;

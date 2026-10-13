@@ -67,7 +67,7 @@ describe('Glow (spec §11.2)', () => {
         const surface = surfaceIn(group);
         const geometry = surface.geometry;
         const extras = () => group.children.filter(child => child.userData.isGlowExtra);
-        const options = { radius: 2, clippingPlanes: [], solid: true, linesAllowed: true };
+        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
 
         attachGlowExtras(group, surface, glowDark, options);
         expect(extras().map(child => child.userData.isGlowExtra).sort()).toEqual(['halo', 'lines']);
@@ -84,6 +84,37 @@ describe('Glow (spec §11.2)', () => {
         expect(extras()).toHaveLength(0);
         attachGlowExtras(group, surface, CLASSIC_APPEARANCE, options);
         expect(extras()).toHaveLength(0);
+        // Spec §15: the halo follows the lines -- once the frame-time guard says no, neither is drawn.
+        attachGlowExtras(group, surface, glowDark, { ...options, extrasAllowed: false });
+        expect(extras()).toHaveLength(0);
+        expect((surface.material as THREE.MeshStandardMaterial).userData.glow).toBe(true);
+    });
+
+    // Ruling T15-inkrim: §11.2's ink rim is a DARKER colour -- for a phase-less surface too, never white.
+    it('gives a phase-less surface an own-tint rim: lighter additive in Deep Space, darker ink in Light Clean', () => {
+        const material = new THREE.MeshStandardMaterial();
+        applyGlow(material, glowSettingsFor({ ...glowDark, theme: 'light' }), { phased: false });
+        const shader = shaderOf(material);
+        expect(shader.fragmentShader).toContain('vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : mix(diffuseColor.rgb, vec3(1.0), 0.5);');
+        expect(shader.fragmentShader).toContain(': (vQlPhase < -0.5 ? qlRimNegative : qlOwnTint)');
+        expect(shader.uniforms.qlInk.value).toBe(1);
+    });
+
+    // A phase-less mesh has no phaseSign attribute; reading an undeclared one would take whatever generic value WebGL holds.
+    it('does not declare phaseSign on a phase-less mesh, which reads phase 0', () => {
+        const material = new THREE.MeshStandardMaterial();
+        applyGlow(material, glowSettingsFor(glowDark), { phased: false });
+        const shader = shaderOf(material);
+        expect(shader.vertexShader).not.toContain('phaseSign');
+        expect(shader.vertexShader).toContain('vQlPhase = 0.0;');
+        const group = new THREE.Group();
+        const surface = surfaceIn(group);
+        attachGlowExtras(group, surface, glowDark, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: false });
+        expect(shaderOf(surface.material as THREE.MeshStandardMaterial).vertexShader).not.toContain('phaseSign');
+        surface.geometry.setAttribute('phaseSign', new THREE.Float32BufferAttribute([1, -1, 1], 1));
+        const phased = new THREE.Mesh(surface.geometry, new THREE.MeshStandardMaterial({ vertexColors: true }));
+        attachGlowExtras(group, phased, glowDark, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: false });
+        expect(shaderOf(phased.material as THREE.MeshStandardMaterial).vertexShader).toContain('vQlPhase = phaseSign;');
     });
 
     // The halo pushes along MINUS the normal and draws front faces: on the mesher's surfaces the
@@ -107,7 +138,7 @@ describe('Glow (spec §11.2)', () => {
         const group = new THREE.Group();
         const surface = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true }));
         group.add(surface);
-        attachGlowExtras(group, surface, glowDark, { radius: 1, clippingPlanes: [], solid: true, linesAllowed: false });
+        attachGlowExtras(group, surface, glowDark, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: true });
         const halo = (group.children.find(child => child.userData.isGlowExtra === 'halo') as THREE.Mesh).material as THREE.ShaderMaterial;
         expect(halo.vertexShader).toContain('position - normal * qlHaloOffset');
         expect(halo.side).toBe(THREE.FrontSide);
@@ -117,7 +148,7 @@ describe('Glow (spec §11.2)', () => {
     it('leaves a wireframe surface today\'s material, with no rim', () => {
         const group = new THREE.Group();
         const surface = surfaceIn(group);
-        attachGlowExtras(group, surface, glowDark, { radius: 2, clippingPlanes: [], solid: false, linesAllowed: true });
+        attachGlowExtras(group, surface, glowDark, { radius: 2, clippingPlanes: [], solid: false, extrasAllowed: true });
         expect((surface.material as THREE.MeshStandardMaterial).userData.glow).toBeFalsy();
     });
 
@@ -125,7 +156,7 @@ describe('Glow (spec §11.2)', () => {
     it('keeps the extras it already has, disposing nothing', () => {
         const group = new THREE.Group();
         const surface = surfaceIn(group);
-        const options = { radius: 2, clippingPlanes: [], solid: true, linesAllowed: true };
+        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
         attachGlowExtras(group, surface, glowDark, options);
         const before = group.children.filter(child => child.userData.isGlowExtra);
         const disposals = before.map(child => jest.spyOn((child as THREE.Mesh).material as THREE.Material, 'dispose'));
@@ -138,14 +169,16 @@ describe('Glow (spec §11.2)', () => {
     it('fades the halo and the lines with their surface, and new extras join at the current fade', () => {
         const group = new THREE.Group();
         const surface = surfaceIn(group);
-        const options = { radius: 2, clippingPlanes: [], solid: true, linesAllowed: false };
-        attachGlowExtras(group, surface, glowDark, options);
+        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        // Light Clean: lines only.
+        attachGlowExtras(group, surface, { ...glowDark, theme: 'light' }, options);
         const haloOpacity = () => ((group.children.find(c => c.userData.isGlowExtra === 'halo') as THREE.Mesh).material as THREE.ShaderMaterial).uniforms.qlHaloOpacity.value;
         const linesOpacity = () => ((group.children.find(c => c.userData.isGlowExtra === 'lines') as THREE.Mesh).material as THREE.Material).opacity;
         fadeGlowExtras(group, 0);
-        expect(haloOpacity()).toBe(0);
-        attachGlowExtras(group, surface, glowDark, { ...options, linesAllowed: true });
         expect(linesOpacity()).toBe(0);
+        // Deep Space mid-fade: the halo joins at the fade, not at full strength.
+        attachGlowExtras(group, surface, glowDark, options);
+        expect(haloOpacity()).toBe(0);
         fadeGlowExtras(group, 0.5);
         expect(haloOpacity()).toBeCloseTo(0.06);
         expect(linesOpacity()).toBeCloseTo(0.03);
