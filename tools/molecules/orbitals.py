@@ -28,7 +28,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from point_group import irrep_of, label_orbitals, number_labels
+from point_group import UNLABELLED, irrep_of, label_orbitals, number_labels
 
 DEGENERACY_TOL = 1e-4
 VALENCE_THRESHOLD = 0.75
@@ -37,6 +37,12 @@ VALENCE_THRESHOLD = 0.75
 CONSTRUCTED_NOTE = ('constructed from the valence part of the virtual space — not an orbital of this calculation; '
                     'its energy is an upper estimate (its value within the valence space), '
                     "typically several eV above this calculation's orbital energies")
+# Deferred minor (Task 4): what a constructed set's '?' means, as point_group's notes say of a canonical one.
+CONSTRUCTED_UNLABELLED_NOTE = ('these constructed orbitals carry no single irreducible representation (a set of '
+                               'near-equal energy that mixes symmetries, or numerical noise), so left unlabelled')
+# The IAO valence space needs all-electron atoms: past Kr the def2 bases put an ECP on the core, and the IAOs onto
+# MINAO then number fewer than the occupied orbitals, so every valence character would read 0 (Task 4 report).
+LAST_ELEMENT = 36
 orbital_labels = number_labels      # Phase 6's name for the per-irrep numbering, kept for its callers
 
 
@@ -59,6 +65,11 @@ def degeneracy_groups(energies, tol=DEGENERACY_TOL):
 def _valence_space(mol, mf):
     """The orthonormalised IAOs (AO coefficients) and the AO overlap."""
     from pyscf import lo
+    beyond = sorted({mol.atom_pure_symbol(i) for i in range(mol.natm) if mol.atom_charge(i) > LAST_ELEMENT
+                     or mol.atom_nelec_core(i)})
+    if beyond:
+        raise ValueError(f'valence character needs all-electron atoms H–Kr; {", ".join(beyond)} carries an ECP '
+                         'or lies past Kr')
     s = mol.intor_symmetric('int1e_ovlp')
     occupied = np.asarray(mf.mo_coeff)[:, np.asarray(mf.mo_occ) > 0]
     return lo.orth.vec_lowdin(lo.iao.iao(mol, occupied), s), s
@@ -129,7 +140,8 @@ def _mark_lvmo(mol, mf, rows, coefficients, space):
         rows.append({'index': len(rows), 'label': label, 'energyHartree': float(energies[k]), 'occupation': 0.0,
                      'role': 'LVMO', 'kind': 'valence-virtual', 'constructed': True, 'energyApproximate': True,
                      'note': CONSTRUCTED_NOTE, 'valenceCharacter': round(float(character[k]), 4),
-                     'class': 'valence' if character[k] >= VALENCE_THRESHOLD else 'diffuse'})
+                     'class': 'valence' if character[k] >= VALENCE_THRESHOLD else 'diffuse',
+                     **({'labelNote': CONSTRUCTED_UNLABELLED_NOTE} if label == UNLABELLED else {})})
     return rows, np.hstack([coefficients, vvo[:, lowest]])
 
 

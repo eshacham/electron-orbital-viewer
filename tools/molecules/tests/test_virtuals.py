@@ -134,3 +134,31 @@ def test_the_kept_virtuals_never_end_partway_through_a_degenerate_set():
         table = orbital_table(mol, mf, extra_virtuals=extra)
         assert_no_partial_sets(table, mf)
         assert sum(1 for r in table.rows if r['occupation'] == 0 and 'kind' not in r) >= extra
+
+
+def test_a_constructed_set_that_carries_no_single_irrep_says_why(monkeypatch):
+    # Deferred minor (Task 4): a constructed row labelled '?' gets a labelNote, as every canonical '?' does.
+    import orbitals
+    monkeypatch.setattr(orbitals, 'irrep_of', lambda *args: UNLABELLED)
+    mol, mf = scf('h2o', 'def2-TZVPD')
+    [lvmo] = roles(orbital_table(mol, mf), 'LVMO')
+    assert lvmo['label'] == UNLABELLED and lvmo['labelNote'] == orbitals.CONSTRUCTED_UNLABELLED_NOTE
+    assert 'no single irreducible representation' in lvmo['labelNote']
+
+
+def test_a_constructed_set_with_an_irrep_carries_no_label_note():
+    mol, mf = scf('h2o', 'def2-TZVPD')
+    [lvmo] = roles(orbital_table(mol, mf), 'LVMO')
+    assert lvmo['label'] == 'a1' and 'labelNote' not in lvmo
+
+
+def test_atoms_past_krypton_are_refused_rather_than_classified_wrongly():
+    # Deferred minor (Task 4): past Kr the def2 bases carry an ECP, and the IAO onto MINAO then gives fewer
+    # IAOs than occupied orbitals -- every valence character would read 0. Jobs accept H-Kr only, so this is
+    # a guard for the library builder and any later phase, not a reachable job failure.
+    mol = gto.M(atom='H 0 0 0; I 0 0 1.61', unit='Angstrom', basis='def2-SVP', verbose=0)
+    mf = dft.RKS(mol)
+    mf.xc = 'B3LYP'
+    mf.kernel()
+    with pytest.raises(ValueError, match='H–Kr'):
+        orbital_table(mol, mf)
