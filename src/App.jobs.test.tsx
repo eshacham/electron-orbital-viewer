@@ -88,7 +88,7 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(within(side).getByRole('button', { name: 'How this was computed' })).toBeInTheDocument();
         expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
         expect(screen.queryByRole('button', { name: 'Computed' })).toBeNull();
-        expect(container.querySelector('.molecule-legend-stack')).toHaveTextContent('Validated');
+        expect(container.querySelector('.molecule-legend-stack')).toHaveTextContent('Library');
         // Ruling R4-rec: a production build without sign-in shows visitors no owner plumbing.
         expect(screen.queryByText(/Owner sign-in/)).toBeNull();
         expect(mockApi.list).not.toHaveBeenCalled();
@@ -148,7 +148,7 @@ describe('Molecules mode with on-demand molecules', () => {
         const { store, container } = await enterMolecules(false);
         await show(store, 'h2o');
         act(() => { store.dispatch(setShowStructure(false)); });
-        expect(container.querySelector('.molecule-legend-stack')).toHaveTextContent('Validated');
+        expect(container.querySelector('.molecule-legend-stack')).toHaveTextContent('Library');
     });
 
     // Preflight D13 / ruling T16-c: the phone's badge is the chip alone.

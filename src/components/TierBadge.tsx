@@ -3,7 +3,7 @@ import { Chip } from '@mui/material';
 import { tierOf, type MoleculeTier } from '../molecules/types';
 import { validatedLine } from '../validation/geometry_honesty';
 
-export const TIER_LABEL: Record<MoleculeTier, string> = { validated: 'Validated', computed: 'Computed' };
+export const TIER_LABEL: Record<MoleculeTier, string> = { validated: 'Library', computed: 'Computed' };
 export const COMPUTED_LINE = 'Computed on request by the same method; not benchmarked against experiment.';
 
 type BadgeMeta = Parameters<typeof validatedLine>[0] & { tier?: MoleculeTier };

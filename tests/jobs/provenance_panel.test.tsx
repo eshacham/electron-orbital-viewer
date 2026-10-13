@@ -53,7 +53,7 @@ describe('TierBadge', () => {
         expect(validatedLine(methane)).toBe('Curated; geometry from experiment; no property checked against experiment yet.');
         render(<TierBadge meta={methane} />);
         expect(screen.getByRole('note', { name: 'data tier' }))
-            .toHaveTextContent('ValidatedCurated; geometry from experiment; no property checked against experiment yet.');
+            .toHaveTextContent('LibraryCurated; geometry from experiment; no property checked against experiment yet.');
         expect(screen.getByRole('note', { name: 'data tier' })).not.toHaveTextContent(/dipole|optimised/);
     });
     it('names the dipole only where one is checked (water), and the optimised geometry only where there is one', () => {
@@ -68,7 +68,7 @@ describe('TierBadge', () => {
     it('names the tier and says what it means', () => {
         const { rerender } = render(<TierBadge meta={water} />);
         expect(screen.getByRole('note', { name: 'data tier' }))
-            .toHaveTextContent('ValidatedCurated; geometry from experiment; dipole checked against published values.');
+            .toHaveTextContent('LibraryCurated; geometry from experiment; dipole checked against published values.');
         rerender(<TierBadge meta={computed()} />);
         expect(screen.getByRole('note', { name: 'data tier' }))
             .toHaveTextContent('ComputedComputed on request by the same method; not benchmarked against experiment.');
