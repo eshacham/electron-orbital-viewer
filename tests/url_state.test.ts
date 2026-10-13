@@ -25,6 +25,7 @@ import type { RootState } from '../src/store';
 import type { SerialisedAtomProfile } from '../src/workers/atomWorker';
 import { AtomSpecies, speciesKey as computeSpeciesKey, excitationSources, excitationTargets } from '../src/atom/species';
 import { allowedCharges } from '../src/atom/ion_configurations';
+import { DEFAULT_OPACITY } from '../src/types/orbital';
 import type { RelativityMode } from '../src/atom/relativity';
 
 // Production's serializableCheck exceptions (ruling R16), not a bare
@@ -392,7 +393,8 @@ describe('built-in URL keys', () => {
             ['#mode=basic&combo=field&level=3&F=abc&stark=sideways', s => expect(s.orbital.combination).toEqual({ kind: 'field', level: 1, field: 0.03, stark: 'lower' })],
             ['#frac=0.42&op=7&surf=glass&cut=w:0.5&cam=400,0&bogus=1', s => {
                 expect(s.orbital.enclosedFraction).toBe(0.9);
-                expect(s.orbital.surfaceStyle).toMatchObject({ opacity: 1, mode: 'solid', clipAxis: 'none' });
+                // Ruling R20a-2: an unusable op leaves the default, now 0.7 (was 1).
+                expect(s.orbital.surfaceStyle).toMatchObject({ opacity: DEFAULT_OPACITY, mode: 'solid', clipAxis: 'none' });
                 expect(s.orbital.cameraAngles).toBeNull();
             }],
             // A well-formed molecule link switches mode and selects the id;
@@ -403,7 +405,8 @@ describe('built-in URL keys', () => {
             ['#mode=molecule&id=H2O!<script>', s => expect(s.molecule).toMatchObject({
                 selectedId: null, error: 'This link names no molecule in the library (“H2O!<script>”)',
             })],
-            ['#op=&cut=&Z=', s => expect(s.orbital.surfaceStyle.opacity).toBe(1)],
+            // Ruling R20a-2: the default an empty op leaves is now 0.7 (was 1).
+            ['#op=&cut=&Z=', s => expect(s.orbital.surfaceStyle.opacity).toBe(DEFAULT_OPACITY)],
         ];
         for (const [hash, check] of cases) {
             const store = makeStore();
@@ -484,7 +487,21 @@ describe('built-in URL keys', () => {
         const store = makeStore();
         applyStateTo('#mode=basic&combo=field&level=1&F=0x1&op=0x1', store.dispatch);
         expect(store.getState().orbital.combination).toEqual({ kind: 'field', level: 1, field: 0.03, stark: 'lower' });
-        expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+        // Ruling R20a-2: the default a malformed op leaves is now 0.7 (was 1).
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(DEFAULT_OPACITY);
+    });
+
+    // Ruling R20a-2: a fresh session opens at 0.7, and a link made there carries it;
+    // a link made at the old default (every link has always carried op) still opens at 1.
+    it('opens a fresh session at 0.7, writes it into the link, and opens an old op=1 link at 1', () => {
+        expect(DEFAULT_OPACITY).toBe(0.7);
+        const fresh = makeStore();
+        expect(fresh.getState().orbital.surfaceStyle.opacity).toBe(0.7);
+        fresh.dispatch(setMode('atom'));
+        expect(encodeStateOf(fresh.getState())).toMatch(/&op=0\.7&/);
+        const old = restore('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=none&op=1&surf=solid');
+        expect(old.getState().orbital.surfaceStyle.opacity).toBe(1);
+        expect(encodeStateOf(old.getState())).toMatch(/&op=1&/);
     });
 
     // Final review I1: Basic Orbitals applies a new fraction only on Update

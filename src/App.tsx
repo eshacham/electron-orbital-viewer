@@ -65,7 +65,7 @@ import ElementPickerDialog from './components/ElementPickerDialog';
 import { orbitalName } from './orbital_names';
 import { CombinationSelection, fieldRequestFor, combinationCurves, overlayLegend, samePicture } from './combinations';
 import { basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
-import { OrbitalParams, SurfaceStyle } from './types/orbital';
+import { DEFAULT_OPACITY, OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
 import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT, PHONE_LANDSCAPE, WIDE_VIEWPORT, TOPBAR_COMPACT } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
@@ -632,9 +632,10 @@ function App() {
     const showMoleculeBusy = useDelayedFlag(
         isMoleculeMode && (molecule.renderLabel !== null || molecule.isLoadingMeta), BUSY_INDICATOR_DELAY_MS);
     // The structure has to show through the density, so switching into the
-    // mode lowers an untouched full opacity. Only a real switch: a shared
+    // mode lowers an untouched opacity (the default, DEFAULT_OPACITY --
+    // ruling R20a-2 moved it from 1 to 0.7). Only a real switch: a shared
     // link is applied before the first render, so opening one already in
-    // Molecules mode is not "entering" it, and its op=1 is the link's
+    // Molecules mode is not "entering" it, and its op is the link's
     // choice (fix round 1, review Important). Any other value is the
     // user's and stays. Leaving hands back what entering took (final
     // review I1): the other modes would otherwise draw at 60 % and their
@@ -645,11 +646,11 @@ function App() {
         const entered = isMoleculeMode && !wasMoleculeModeRef.current;
         const left = !isMoleculeMode && wasMoleculeModeRef.current;
         wasMoleculeModeRef.current = isMoleculeMode;
-        if (entered && surfaceStyle.opacity === 1) {
+        if (entered && surfaceStyle.opacity === DEFAULT_OPACITY) {
             loweredOpacityRef.current = true;
             dispatch(setSurfaceStyle({ opacity: 0.6 }));
         } else if (left) {
-            if (loweredOpacityRef.current && surfaceStyle.opacity === 0.6) dispatch(setSurfaceStyle({ opacity: 1 }));
+            if (loweredOpacityRef.current && surfaceStyle.opacity === 0.6) dispatch(setSurfaceStyle({ opacity: DEFAULT_OPACITY }));
             loweredOpacityRef.current = false;
         }
         // surfaceStyle is read, not watched: only the change of mode matters.
@@ -751,7 +752,9 @@ function App() {
     );
     // A new species or relativity: nothing in flight belongs to the picture any more (§12).
     useEffect(() => () => thumbnailService.cancelAll(), [atomProfile?.speciesKey, atomProfile?.Z, pictureRelativity]);
-    const stripThemeKey = `${themeMode}|${render.scheme}|${render.finish}`;
+    // Everything a tile's picture depends on besides its content (ruling R20a-4): a change re-requests every tile.
+    // isNarrow is the appearance's lowPower: a phone's thumbnails, like its main view, have no mesh lines or halo.
+    const stripThemeKey = `${themeMode}|${render.scheme}|${render.finish}|${isNarrow ? 'low' : 'full'}`;
     // The radial plot's horizontal range: sized to what is actually being
     // shown, not the sampling grid's rMax (spec bugfix). The grid extent is
     // chosen to comfortably hold the outermost orbital's tail -- for argon

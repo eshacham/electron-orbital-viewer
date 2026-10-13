@@ -17,9 +17,17 @@ export interface SurfaceStyle {
     clipPosition: number;
 }
 
+/**
+ * Ruling R20a-2 (owner): a fresh session opens with the lobes see-through, at
+ * the concept's slider value. Share links always carry `op` (url_state.ts
+ * encodeViewKeys has written it since links began), so every link opens at
+ * the opacity it was made with, old links' op=1 included.
+ */
+export const DEFAULT_OPACITY = 0.7;
+
 export const defaultSurfaceStyle: SurfaceStyle = {
     mode: 'solid',
-    opacity: 1,
+    opacity: DEFAULT_OPACITY,
     clipAxis: 'none',
     clipPosition: 0
 };

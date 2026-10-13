@@ -159,7 +159,8 @@ describe('Molecules mode', () => {
         render(<Provider store={store}><App /></Provider>);
         // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
         fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/ }));
-        expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+        // Ruling R20a-2: the untouched opacity is the new default, 0.7 (was 1).
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.7);
         fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
         await flush();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
@@ -178,7 +179,8 @@ describe('Molecules mode', () => {
         // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
         fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
         await flush();
-        expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+        // Ruling R20a-2: what it hands back is the default it took, now 0.7 (was 1).
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.7);
     });
 
     it('keeps an opacity the user chose inside Molecules on the way out', async () => {
@@ -212,7 +214,8 @@ describe('Molecules mode', () => {
         fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
         await flush();
         expect(store.getState().atom.mode).toBe('atom');
-        expect(store.getState().orbital.surfaceStyle.opacity).toBe(1);
+        // Ruling R20a-2: back to the default it lowered, now 0.7 (was 1).
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.7);
         fireEvent.click(screen.getByRole('button', { name: /^Mode: / }));
         expect(screen.getByRole('button', { name: /atom mode/ })).toHaveAttribute('aria-pressed', 'true');
         // The names now end in "mode)" and lead with the visible label (WCAG 2.5.3); the four modes, in order, as before.
