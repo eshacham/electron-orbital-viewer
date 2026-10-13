@@ -206,3 +206,30 @@ inline; science text identical to `main` on every compared field. No failing ite
 route anything to.
 
 Taken 2026-10-13 at commit `3f8b331`.
+
+---
+
+## Re-taken after the owner's tuning (Task 20a)
+
+**The composites in this folder were re-taken on 2026-10-13 at commit `f774559`**, after the
+owner's review of the Task 19 set (rulings R20a-1..4): one phase palette in both themes
+(Light Clean's lobes are now `#FF7A2F` / `#2F6BFF`, as in Deep Space; the key swatch carries a
+`swatch-ring` outline for 3:1), a fresh session opens at opacity 0.7, Glow tuned towards the
+concept (dimmer translucent body, whitened mesh-line network, wider same-phase rim, soft band
+halo; values in `GLOW_TUNING`), and crisp strip thumbnails in the main view's look
+(tile × dpr × 2, 4× MSAA, same opacity and Glow). The section tables above describe the Task 19
+captures; the layout, token, box and typography results are unchanged in the re-take.
+
+Same tool, scenes, file names and composite commands as Task 19, with one addition:
+`node tools/design/shoot.mjs --task 20a --scenes c-whole,c-2pz,fe-shell --themes dark,light
+--sizes desktop,phone --gl metal --wait 6000`. `--gl metal` renders headless Chromium on the
+Mac's GPU (ANGLE Metal) instead of SwiftShader, so Glow's mesh lines and halo are shot as a user
+sees them, never latched off by ruling R10's guard on ~80 ms software frames (ruling T15-softgl).
+Phone shots show no lines or halo by design (`lowPower`, spec §15).
+
+Re-take results (`/tmp/6g1-20a-metrics.json`): 12/12 shots `settled=true`, `webglCanvases=1`,
+`errors=0`; every colour sample ΔE₀₀ = 0 against its token (canvas on/off within 5); boxes
+top bar 56, rail 76, Explore 315, inspector 290, phone top bar 52, phone header 44 — exact;
+Inter Variable, title 20/600, nav 14/600, body 13/400. `controls card` reads `missing` on desktop
+shots for the capture-time reason in the preamble. `science_diff.mjs` against `origin/main`
+@ 15feebc (`/tmp/6g1-T19main-metrics.json`; main has not moved): **science text identical to main**.

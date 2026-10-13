@@ -3,7 +3,7 @@
 // Vite on a free port and its own headless Chromium, captures each scene in
 // each theme and size, measures boxes, fonts and colours, then stops both in
 // the same foreground run. It never touches the owner's browser or servers.
-//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>']
+//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--gl metal] [--dpr 2]
 // Writes /tmp/6g1-<task>-<scene>-<theme>-<size>.png and /tmp/6g1-<task>-metrics.json.
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -42,6 +42,19 @@ const sizes = arg('sizes', 'desktop,phone').split(',');
 const extraWait = Number(arg('wait', '1500'));
 // Optional presentation preferences (eov.render JSON), e.g. '{"finish":"solid","scheme":"density"}'.
 const renderPrefs = arg('render', null);
+// The GL backend: SwiftShader (software, the default) or the Mac's GPU through
+// ANGLE's Metal backend. On SwiftShader a Glow frame takes ~80 ms, so ruling
+// R10's guard latches the mesh lines and halo off within seconds (ruling
+// T15-softgl); on Metal the frames are a real device's and the look is the
+// one a user sees. Headless either way, never the owner's browser.
+const GL_ARGS = {
+  swiftshader: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+  metal: ['--use-angle=metal', '--ignore-gpu-blocklist'],
+};
+const gl = arg('gl', 'swiftshader');
+if (!GL_ARGS[gl]) throw new Error(`unknown --gl ${gl} (swiftshader | metal)`);
+// Device pixel ratio for every shot; 1 by default (the composites), 2 shows what a Retina screen gets.
+const dpr = Number(arg('dpr', '1'));
 
 function startVite() {
   const vite = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(port), '--strictPort', '--clearScreen', 'false'],
@@ -133,8 +146,10 @@ async function sampleColours(page, png, size) {
       const el = document.querySelector(p.selector);
       if (!el) { out[p.name] = null; continue; }
       const r = el.getBoundingClientRect();
-      const x = Math.max(0, Math.min(canvas.width - 1, Math.round(r.x + (p.px ?? p.x * r.width))));
-      const y = Math.max(0, Math.min(canvas.height - 1, Math.round(r.y + (p.py ?? p.y * r.height))));
+      // The screenshot is in device pixels (--dpr), the layout in CSS pixels.
+      const k = window.devicePixelRatio || 1;
+      const x = Math.max(0, Math.min(canvas.width - 1, Math.round(k * (r.x + (p.px ?? p.x * r.width)))));
+      const y = Math.max(0, Math.min(canvas.height - 1, Math.round(k * (r.y + (p.py ?? p.y * r.height)))));
       const d = g.getImageData(x, y, 1, 1).data;
       out[p.name] = { x, y, token: p.token, hex: `#${[d[0], d[1], d[2]].map(c => c.toString(16).padStart(2, '0')).join('')}` };
     }
@@ -162,7 +177,7 @@ const { vite, ready } = startVite();
 let browser;
 try {
   await ready;
-  browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  browser = await chromium.launch({ args: GL_ARGS[gl] });
   for (const scene of sceneNames) {
     if (!(scene in scenes)) throw new Error(`unknown scene ${scene} (tools/design/scenes.json)`);
     for (const theme of themes) {
@@ -171,7 +186,7 @@ try {
         if (!spec) throw new Error(`unknown size ${size}`);
         const context = await browser.newContext({
           viewport: { width: spec.width, height: spec.height }, isMobile: Boolean(spec.mobile), hasTouch: Boolean(spec.mobile),
-          deviceScaleFactor: 1, reducedMotion: 'reduce',
+          deviceScaleFactor: dpr, reducedMotion: 'reduce',
         });
         await context.addInitScript(({ choice, prefs }) => {
           try {
