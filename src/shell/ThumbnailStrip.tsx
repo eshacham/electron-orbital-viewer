@@ -11,7 +11,7 @@ interface ThumbnailStripProps {
     items: StripItem[];
     label: string;
     rGrid: number[];
-    /** theme|scheme|finish: a change re-requests every visible tile. */
+    /** theme|scheme|finish|power: a change re-requests every visible tile. */
     themeKey: string;
     onSelect(target: NavigationTarget): void;
     /** 'sheet' is the phone's first row of the Explore tab: 56 px tiles, in the flow (spec §9.8). */
@@ -20,8 +20,20 @@ interface ThumbnailStripProps {
     onCollapsedChange?(collapsed: boolean): void;
 }
 
+/**
+ * A tile canvas's backing store: its CSS size in device pixels (ruling
+ * R20a-4), so the picture -- drawn at twice that by render_thumbnail.ts --
+ * is downsampled once, smoothly, and never stretched. At least 2× the CSS
+ * size, as before, so a 1× screen keeps its sharper glyph rings.
+ */
+export function tileBacking(px: number, devicePixelRatio: number): number {
+    const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
+    return Math.round(px * Math.max(2, dpr));
+}
+
 const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: string; onSelect(target: NavigationTarget): void }> = ({ item, px, rGrid, themeKey, onSelect }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const backing = tileBacking(px, typeof window === 'undefined' ? 1 : window.devicePixelRatio);
     const { thumb } = item;
     // Ruling DC12: re-rendered when the renderer is lent, lost or taken back,
     // so a tile still waiting for its image shows its glyph on a context loss.
@@ -52,6 +64,7 @@ const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: s
         let unsubscribe = () => {};
         const start = () => {
             unsubscribe = thumbnailService.request(current, image => {
+                if (context) context.imageSmoothingQuality = 'high';
                 context?.clearRect(0, 0, canvas.width, canvas.height);
                 context?.drawImage(image as unknown as CanvasImageSource, 0, 0, canvas.width, canvas.height);
                 setDrawn(wanted);
@@ -85,7 +98,7 @@ const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: s
         >
             <span className="strip-tile-image" style={{ width: px, height: px }}>
                 {thumb.kind === 'back' ? <ArrowBack aria-hidden /> : (
-                    <canvas ref={canvasRef} className="thumb-canvas" width={px * 2} height={px * 2} aria-hidden="true"
+                    <canvas ref={canvasRef} className="thumb-canvas" width={backing} height={backing} aria-hidden="true"
                         style={showGlyph ? { visibility: 'hidden' } : undefined} />
                 )}
                 {showGlyph && <span className="strip-tile-glyph" aria-hidden="true">{item.label}</span>}

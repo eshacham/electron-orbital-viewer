@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import ThumbnailStrip from '../../src/shell/ThumbnailStrip';
+import ThumbnailStrip, { tileBacking } from '../../src/shell/ThumbnailStrip';
 import { atomStripItems } from '../../src/thumbs/strip_items';
 import { subshellLabel } from '../../src/atom/configurations';
 import { thumbnailService, type ThumbHost } from '../../src/thumbs/ThumbnailService';
@@ -168,5 +168,17 @@ describe('ThumbnailStrip under spin–orbit (bismuth)', () => {
         expect(onSelect).toHaveBeenCalledWith({ level: 'orbital', n: 6, l: 1, ml: 1, j: 0.5 });
         const tile = biItems.find(item => item.spoken === '6p_x orbital of 6p j = 1/2')!;
         expect(tile.thumb.kind === 'orbital' && tile.thumb.request.contentKey).toBe('83|spinOrbit|6|1|1|0.5|0.9');
+    });
+});
+
+// Ruling R20a-4: a tile's canvas holds its CSS size in device pixels (never under 2×,
+// today's), so the 2×-supersampled picture is downsampled once and never stretched.
+describe('tileBacking', () => {
+    it('is the tile in device pixels, at least twice its CSS size', () => {
+        expect(tileBacking(72, 1)).toBe(144);
+        expect(tileBacking(72, 2)).toBe(144);
+        expect(tileBacking(72, 3)).toBe(216);
+        expect(tileBacking(56, 3)).toBe(168);
+        expect(tileBacking(56, Number.NaN)).toBe(112);
     });
 });

@@ -2266,7 +2266,13 @@ export function attachThumbnails(
     service.attach({
         createWorker: createOrbitalWorker,
         isBusy: options.isBusy,
-        themeKey: () => { const a = options.appearance(); return `${a.theme}|${a.scheme}|${a.finish}`; },
+        // Ruling R20a-4: everything the picture depends on besides its content -- the
+        // palette (theme, scheme), the finish, whether the extras are drawn (lowPower)
+        // and the picture's size (the screen's pixel ratio) -- so a stale image is never served.
+        themeKey: () => {
+            const a = options.appearance();
+            return `${a.theme}|${a.scheme}|${a.finish}|${a.lowPower ? 'low' : 'full'}|${thumbs.size()}`;
+        },
         render: meshData => {
             context.thumbnailRendered = true;
             return thumbs.render(meshData, options.appearance());

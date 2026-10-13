@@ -4,7 +4,8 @@ jest.mock('../../src/workers/createOrbitalWorker', () => ({ createOrbitalWorker:
 jest.mock('../../src/orbital_controls_factory', () => ({ createOrbitalControls: jest.fn() }));
 // The real one draws on a WebGLRenderer, which jsdom has not got (render_thumbnail.test.ts covers it with a stand-in).
 jest.mock('../../src/thumbs/render_thumbnail', () => ({
-    createThumbnailRenderer: jest.fn(() => ({ render: jest.fn(async () => ({ width: 160, height: 160 })), dispose: jest.fn() })),
+    // size(): the picture's side, part of the cache key since ruling R20a-4.
+    createThumbnailRenderer: jest.fn(() => ({ render: jest.fn(async () => ({ width: 288, height: 288 })), size: () => 288, dispose: jest.fn() })),
 }));
 
 import { createOrbitalWorker } from '../../src/workers/createOrbitalWorker';
@@ -53,7 +54,8 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         });
     });
 
-    it('ticks the service after each main frame, keyed by theme|scheme|finish, and stops on a lost context', () => {
+    // Ruling R20a-4: the key also says whether the extras are drawn (lowPower) and the picture's size.
+    it('ticks the service after each main frame, keyed by theme|scheme|finish|power|size, and stops on a lost context', () => {
         const context = buildContext();
         const service = new ThumbnailService();
         attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
@@ -62,10 +64,16 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         afterMainFrame(context, null);
         expect(workers).toHaveLength(1);
         expect(workers[0].postMessage).toHaveBeenCalledWith({ type: 'calculate', params });
-        service.store('dark|phase|glow|cached', { width: 1, height: 1 });
+        service.store('dark|phase|glow|full|288|cached', { width: 1, height: 1 });
         const hit = jest.fn();
         service.request({ contentKey: 'cached', params }, hit);
         expect(hit).toHaveBeenCalled();
+        // A picture drawn for a phone (no lines, no halo) or at another size is not served here.
+        service.store('dark|phase|glow|low|288|other', { width: 1, height: 1 });
+        service.store('dark|phase|glow|full|160|other', { width: 1, height: 1 });
+        const miss = jest.fn();
+        service.request({ contentKey: 'other', params }, miss);
+        expect(miss).not.toHaveBeenCalled();
 
         context.renderer.domElement.dispatchEvent(new Event('webglcontextlost'));
         expect(service.status()).toBe('lost');

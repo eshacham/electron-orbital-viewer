@@ -1,29 +1,59 @@
 import * as THREE from 'three';
 import type { MeshData } from '../types/orbital';
+import { DEFAULT_OPACITY } from '../types/orbital';
 import type { Appearance } from '../design/appearance';
 import { linearRgb, phaseColours } from '../design/science';
-import { applyGlow, GLOW_LIGHTS, glowSettingsFor, SOLID_LIGHTS } from '../orbital_glow';
+import { attachGlowExtras, GLOW_LIGHTS, glowSettingsFor, SOLID_LIGHTS } from '../orbital_glow';
+import { setMaterialOpacity } from '../orbital_material';
 import { CANONICAL_CAMERA_DIRECTION } from '../camera_angles';
 import type { ThumbImage } from './ThumbnailService';
 
-const SIZE = 160;
+/** The largest strip tile, in CSS px (ThumbnailStrip's overlay variant; the phone's sheet tiles are 56). */
+export const THUMB_TILE_PX = 72;
+/** The smallest picture drawn, whatever the screen: today's 160, so a 1× screen is never worse off. */
+const MIN_SIZE = 160;
 
 /**
- * Draws one orbital mesh into a 160 × 160 render target on the main
- * renderer and reads it back (spec §12): one scene, one camera, one target,
- * reused; the main view's render target and clear colour are restored before
- * returning, so the next main frame is untouched. Nothing of the main view's
- * scene, camera, lights or appearance is read or written: this scene has its
- * own lights, at the main view's levels for the finish (§11.1 "Lights").
- * Glow's rim applies; the halo and the lines do not (they would not read at
- * 72 px), so the frame-time guard that latches them never sees this scene.
+ * Ruling R20a-4: the picture's side in device pixels -- the tile's CSS size
+ * × devicePixelRatio × 2, so the tile's own canvas (CSS size × dpr) is
+ * drawn from twice its resolution (supersampled, on top of the target's
+ * MSAA): 288 on a 2× screen, 432 on a 3× phone.
  */
-export function createThumbnailRenderer(renderer: THREE.WebGLRenderer): { render(meshData: MeshData, appearance: Appearance): Promise<ThumbImage>; dispose(): void } {
-    // Four samples: the tile is drawn at 144 device pixels from 160, and
-    // aliased lobe edges would shimmer against the tile's border.
-    const target = new THREE.WebGLRenderTarget(SIZE, SIZE, { samples: 4 });
-    // Stored as sRGB (SRGB8_ALPHA8), so the bytes read back are display colours.
-    target.texture.colorSpace = THREE.SRGBColorSpace;
+export function thumbnailSize(devicePixelRatio: number): number {
+    const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
+    return Math.max(MIN_SIZE, Math.ceil(THUMB_TILE_PX * dpr * 2));
+}
+
+/**
+ * Draws one orbital mesh into a render target on the main renderer and
+ * reads it back (spec §12): one scene, one camera, one target, reused (and
+ * re-made only when the size changes); the main view's render target and
+ * clear colour are restored before returning, so the next main frame is
+ * untouched. Nothing of the main view's scene, camera, lights or
+ * appearance is read or written: this scene has its own lights, at the
+ * main view's levels for the finish (§11.1 "Lights").
+ *
+ * Ruling R20a-4: the tile looks like the main view -- the theme's phase
+ * colours, the same see-through surface (the default opacity, which is the
+ * view a fresh session opens with), and the whole Glow finish: rim,
+ * emissive, mesh lines and (Deep Space) the halo, through the same
+ * attachGlowExtras the main view uses. The frame-time guard never sees this
+ * scene (afterMainFrame does not time a frame that carried a thumbnail).
+ */
+export function createThumbnailRenderer(
+    renderer: THREE.WebGLRenderer,
+    { pixelRatio = () => (typeof window === 'undefined' ? 1 : window.devicePixelRatio) }: { pixelRatio?: () => number } = {},
+): { render(meshData: MeshData, appearance: Appearance): Promise<ThumbImage>; size(): number; dispose(): void } {
+    let target: THREE.WebGLRenderTarget | null = null;
+    /** Four MSAA samples on top of the 2× supersample: lobe edges would otherwise shimmer against the tile's border. */
+    function targetOf(side: number): THREE.WebGLRenderTarget {
+        if (target && target.width === side) return target;
+        target?.dispose();
+        target = new THREE.WebGLRenderTarget(side, side, { samples: 4 });
+        // Stored as sRGB (SRGB8_ALPHA8), so the bytes read back are display colours.
+        target.texture.colorSpace = THREE.SRGBColorSpace;
+        return target;
+    }
     const scene = new THREE.Scene();
     // The main view's three lights, placed as initVisualizer places them.
     const ambient = new THREE.AmbientLight(0xffffff, SOLID_LIGHTS.ambient);
@@ -35,8 +65,10 @@ export function createThumbnailRenderer(renderer: THREE.WebGLRenderer): { render
     const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10000);
     camera.up.set(0, 0, 1);
     const direction = new THREE.Vector3(...CANONICAL_CAMERA_DIRECTION).normalize();
+    const size = () => thumbnailSize(pixelRatio());
 
     async function render(meshData: MeshData, appearance: Appearance): Promise<ThumbImage> {
+        const SIZE = size();
         const phase = phaseColours(appearance.theme, appearance.scheme);
         const [positive, negative] = [linearRgb(phase.positive), linearRgb(phase.negative)];
         const geometry = new THREE.BufferGeometry();
@@ -47,15 +79,18 @@ export function createThumbnailRenderer(renderer: THREE.WebGLRenderer): { render
         geometry.computeVertexNormals();
         geometry.computeBoundingSphere();
         const material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.45, metalness: 0 });
-        const glow = glowSettingsFor(appearance);
-        applyGlow(material, glow);
-        const levels = glow ? GLOW_LIGHTS : SOLID_LIGHTS;
+        setMaterialOpacity(material, DEFAULT_OPACITY);
+        const mesh = new THREE.Mesh(geometry, material);
+        const group = new THREE.Group();
+        group.add(mesh);
+        const radius = geometry.boundingSphere?.radius || 1;
+        // The main view's Glow, extras included: the rim and emissive on the surface, the lines and halo beside it.
+        attachGlowExtras(group, mesh, appearance, { radius, clippingPlanes: [], solid: true, extrasAllowed: true });
+        const levels = glowSettingsFor(appearance) ? GLOW_LIGHTS : SOLID_LIGHTS;
         ambient.intensity = levels.ambient;
         key.intensity = levels.key;
         fill.intensity = levels.fill;
-        const mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);
-        const radius = geometry.boundingSphere?.radius || 1;
+        scene.add(group);
         camera.position.copy(direction).multiplyScalar(radius * 4.2);
         camera.lookAt(0, 0, 0);
 
@@ -64,17 +99,18 @@ export function createThumbnailRenderer(renderer: THREE.WebGLRenderer): { render
         const previousAlpha = renderer.getClearAlpha();
         const pixels = new Uint8Array(SIZE * SIZE * 4);
         try {
-            renderer.setRenderTarget(target);
+            const into = targetOf(SIZE);
+            renderer.setRenderTarget(into);
             renderer.setClearColor(0x000000, 0);
             renderer.clear();
             renderer.render(scene, camera);
-            renderer.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, pixels);
+            renderer.readRenderTargetPixels(into, 0, 0, SIZE, SIZE, pixels);
         } finally {
             renderer.setRenderTarget(previousTarget);
             renderer.setClearColor(previousClear, previousAlpha);
-            scene.remove(mesh);
+            scene.remove(group);
             geometry.dispose();
-            material.dispose();
+            group.traverse(object => { ((object as THREE.Mesh).material as THREE.Material | undefined)?.dispose(); });
         }
         // Painted to a 2D canvas (§12), GL's bottom-up rows flipped to an image's top-down.
         const canvas = document.createElement('canvas');
@@ -101,5 +137,5 @@ export function createThumbnailRenderer(renderer: THREE.WebGLRenderer): { render
         return typeof createImageBitmap === 'function' ? createImageBitmap(canvas) : canvas;
     }
 
-    return { render, dispose: () => target.dispose() };
+    return { render, size, dispose: () => { target?.dispose(); target = null; } };
 }
