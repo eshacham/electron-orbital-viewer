@@ -70,6 +70,8 @@ interface ControlsProps {
   onUpdateOrbital: (params: OrbitalParams) => void;
   surfaceStyle: SurfaceStyle;
   onSurfaceStyleChange: (change: Partial<SurfaceStyle>) => void;
+  /** The Atom Display tab offers Glow / Solid / Wireframe itself (ruling R1). */
+  hideSurfaceStyle?: boolean;
 
   isBusy: boolean;
   /** Sheet is showing. Only meaningful on narrow screens. */
@@ -329,6 +331,7 @@ const Controls: React.FC<ControlsProps> = ({
   onUpdateOrbital,
   surfaceStyle,
   onSurfaceStyleChange,
+  hideSurfaceStyle = false,
   isBusy,
   open = true,
   compact = false,
@@ -561,7 +564,7 @@ const Controls: React.FC<ControlsProps> = ({
           mesh, so none of them re-runs the calculation. Surface (solid vs
           wireframe) only has meaning for a marching-cubes mesh -- a shell
           view's cap is always shown, solid (bug fix, task 22 bug 6). */}
-      {isMeshLevel && (
+      {isMeshLevel && !hideSurfaceStyle && (
         <FormControl component="fieldset" margin="normal" fullWidth>
           <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Surface</FormLabel>
           <ToggleButtonGroup

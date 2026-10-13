@@ -52,6 +52,7 @@ import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidE
 import { allowedCharges } from './atom/ion_configurations';
 import SpeciesControls from './components/SpeciesControls';
 import Controls, { RelativityReadout, BASIC_ORBITALS_ABOUT, RelativityControl } from './components/Controls';
+import { AxesSwitch, SurfaceAndScheme } from './atom_ui/DisplayControls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
 import OrbitalViewer from './components/OrbitalViewer';
@@ -1019,12 +1020,16 @@ function App() {
             onUpdateOrbital={handleOrbitalParamsChange}
             surfaceStyle={surfaceStyle}
             onSurfaceStyleChange={handleSurfaceStyleChange}
+            hideSurfaceStyle={isAtomMode}
             isBusy={isAtomMode ? showAtomBusy : showBusy}
             fractionNote={isBondsDensity ? FIXED_RHO_NOTE
                 : isMoleculeMode && molecule.surface.kind === 'esp' ? ESP_SURFACE_NOTE : undefined}
             isoNote={moleculeIsoNote}
         >
-            {moleculeOptions || null}
+            {isAtomMode ? (
+                <SurfaceAndScheme surfaceMode={surfaceStyle.mode} meshLevel={atomLevel === 'orbital'}
+                    onSurfaceMode={mode => handleSurfaceStyleChange({ mode })} />
+            ) : (moleculeOptions || null)}
         </Controls>
     );
 
@@ -1153,7 +1158,7 @@ function App() {
                 // Spec §9.8: Explore holds the left panel's tabs as sections, the Relativity switch included.
                 content: <><LevelNav {...levelNavProps} variant="body">{subshellPanel}</LevelNav>{relativityControl}</>,
             },
-            { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
+            { key: 'view', label: 'View', content: <>{controls}<AxesSwitch />{phoneViewActions}</> },
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ]
         : [
@@ -1207,7 +1212,7 @@ function App() {
                     <LevelNav {...levelNavProps} variant="about" />
                 </>
             )}
-            display={controls}
+            display={<>{controls}<AxesSwitch /></>}
         />
     );
 
