@@ -1,6 +1,6 @@
 import type { ViewInsets } from '../orbital_visualizer';
 import { ScaleBar, formatScaleLabel } from '../scale_bar';
-import { CLASSIC } from '../design/science';
+import { PHASE_HUES } from '../design/science';
 
 /** Long-side cap: 2× a Retina desktop would be ~83 MB of colour alone, times MSAA. */
 export const MAX_EXPORT_SIDE_PX = 4096;
@@ -216,8 +216,8 @@ export function drawOverlays(painter: OverlayPainter, width: number, height: num
         drawLegendRow(painter, width, height, scale, pad, items);
     } else if (spec.phaseLegend) {
         // Left to right, matching the on-screen order (App.tsx's phase-legend div: positive then negative).
-        // Ruling DB9: the fallback is science.ts's own Classic legend colours, not a second literal copy of them.
-        const [positive, negative] = spec.phaseColours ?? [CLASSIC.legendPositive, CLASSIC.legendNegative];
+        // Ruling DB9: the fallback is science.ts's own phase hues, not a second literal copy of them.
+        const [positive, negative] = spec.phaseColours ?? [PHASE_HUES.positive, PHASE_HUES.negative];
         drawLegendRow(painter, width, height, scale, pad, [['ψ > 0', positive], ['ψ < 0', negative]]);
     }
 }

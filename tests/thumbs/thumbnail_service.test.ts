@@ -8,7 +8,8 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 function fakeHost(over: Partial<ThumbHost> = {}) {
     const workers: Array<{ postMessage: jest.Mock; terminate: jest.Mock; onmessage: ((e: { data: unknown }) => void) | null; onerror: (() => void) | null }> = [];
     const renders: MeshData[] = [];
-    let theme = 'dark|phase|glow';
+    // Ruling R22a: look keys carry no scheme (was dark|phase|glow).
+    let theme = 'dark|glow';
     const host: ThumbHost = {
         createWorker: () => {
             const worker = { postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null };
@@ -58,7 +59,7 @@ describe('ThumbnailService (spec §12)', () => {
         expect(workers).toHaveLength(1);
     });
 
-    it('serves a cached image at once, keyed by theme|scheme|content, and evicts past 96', async () => {
+    it('serves a cached image at once, keyed by theme|finish|content, and evicts past 96', async () => {
         const service = new ThumbnailService();
         const { host, workers, setTheme } = fakeHost();
         service.attach(host);
@@ -70,11 +71,11 @@ describe('ThumbnailService (spec §12)', () => {
         const hit = jest.fn();
         service.request({ contentKey: 'a', params }, hit);
         expect(hit).toHaveBeenCalledTimes(1);
-        setTheme('light|phase|glow');
+        setTheme('light|glow');
         const miss = jest.fn();
         service.request({ contentKey: 'a', params }, miss);
         expect(miss).not.toHaveBeenCalled();
-        for (let i = 0; i < 120; i++) service.store(`dark|phase|glow|k${i}`, { width: 1, height: 1 });
+        for (let i = 0; i < 120; i++) service.store(`dark|glow|k${i}`, { width: 1, height: 1 });
         expect(service.cacheSize()).toBe(ThumbnailService.CACHE_LIMIT);
     });
 
@@ -132,8 +133,8 @@ describe('ThumbnailService (spec §12)', () => {
     it('closes an evicted ImageBitmap, which holds GPU-side memory until closed', () => {
         const service = new ThumbnailService();
         const first = { width: 1, height: 1, close: jest.fn() };
-        service.store('dark|phase|glow|first', first);
-        for (let i = 0; i < ThumbnailService.CACHE_LIMIT; i++) service.store(`dark|phase|glow|k${i}`, { width: 1, height: 1 });
+        service.store('dark|glow|first', first);
+        for (let i = 0; i < ThumbnailService.CACHE_LIMIT; i++) service.store(`dark|glow|k${i}`, { width: 1, height: 1 });
         expect(first.close).toHaveBeenCalledTimes(1);
     });
     // Review fix 1 (§12 key, §3.3): a job's mesh is drawn in whatever theme is
@@ -146,7 +147,7 @@ describe('ThumbnailService (spec §12)', () => {
         service.attach({ ...host, render: async () => { drawnIn.push(host.themeKey()); return { width: 160, height: 160 }; } });
         service.request({ contentKey: 'a', params }, jest.fn());
         service.tick();
-        setTheme('light|phase|glow');
+        setTheme('light|glow');
         // The tile re-asks in the new theme: no second job for the same content.
         const light = jest.fn();
         service.request({ contentKey: 'a', params }, light);
@@ -154,9 +155,9 @@ describe('ThumbnailService (spec §12)', () => {
         service.tick();
         await flush();
         expect(workers).toHaveLength(1);
-        expect(drawnIn).toEqual(['light|phase|glow']);
+        expect(drawnIn).toEqual(['light|glow']);
         expect(light).toHaveBeenCalledTimes(1);
-        setTheme('dark|phase|glow');
+        setTheme('dark|glow');
         const dark = jest.fn();
         service.request({ contentKey: 'a', params }, dark);
         expect(dark).not.toHaveBeenCalled();

@@ -13,7 +13,7 @@ import { createThumbnailRenderer } from '../../src/thumbs/render_thumbnail';
 import { afterMainFrame, attachThumbnails, cleanupVisualizer, VisualizerContext } from '../../src/orbital_visualizer';
 import { ThumbnailService } from '../../src/thumbs/ThumbnailService';
 import { defaultSurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
-import { CLASSIC_APPEARANCE, type Appearance } from '../../src/design/appearance';
+import { INITIAL_APPEARANCE, type Appearance } from '../../src/design/appearance';
 
 /** A VisualizerContext without a WebGLRenderer (jsdom has no WebGL) -- tests/visualizer_appearance.test.ts's recipe. */
 function buildContext(): VisualizerContext {
@@ -42,7 +42,7 @@ function withLines(context: VisualizerContext): void {
 
 const params: OrbitalParams = { n: 2, l: 1, ml: 0, Z: 6, resolution: 32, rMax: 8, enclosedFraction: 0.9 };
 const mesh = (): MeshData => ({ positions: [], cells: [], psiSigns: [], densityMap: { data: new Uint8Array(1), side: 1, rMax: 1 }, isoLevel: 1 });
-const glow: Appearance = { ...CLASSIC_APPEARANCE, scheme: 'phase', finish: 'glow' };
+const glow: Appearance = { ...INITIAL_APPEARANCE, finish: 'glow' };
 
 describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
     let workers: Array<{ postMessage: jest.Mock; terminate: jest.Mock; onmessage: ((e: { data: unknown }) => void) | null }>;
@@ -56,7 +56,7 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
     });
 
     // Ruling R20a-4: the key also says whether the extras are drawn (lowPower) and the picture's size.
-    it('ticks the service after each main frame, keyed by theme|scheme|finish|power|size, and stops on a lost context', () => {
+    it('ticks the service after each main frame, keyed by theme|finish|power|size, and stops on a lost context', () => {
         const context = buildContext();
         const service = new ThumbnailService();
         attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
@@ -66,14 +66,15 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         expect(workers).toHaveLength(1);
         expect(workers[0].postMessage).toHaveBeenCalledWith({ type: 'calculate', params });
         // Fix round 1 of Task 20a: the key ends in the committed opacity (the default without an opacity option).
-        service.store('dark|phase|glow|full|288|0.7|cached', { width: 1, height: 1 });
+        // Ruling R22a: the key has no scheme field (was dark|phase|glow|...).
+        service.store('dark|glow|full|288|0.7|cached', { width: 1, height: 1 });
         const hit = jest.fn();
         service.request({ contentKey: 'cached', params }, hit);
         expect(hit).toHaveBeenCalled();
         // A picture drawn for a phone (no lines, no halo) or at another size is not served here.
-        service.store('dark|phase|glow|low|288|0.7|other', { width: 1, height: 1 });
-        service.store('dark|phase|glow|full|160|0.7|other', { width: 1, height: 1 });
-        service.store('dark|phase|glow|full|288|0.4|other', { width: 1, height: 1 });
+        service.store('dark|glow|low|288|0.7|other', { width: 1, height: 1 });
+        service.store('dark|glow|full|160|0.7|other', { width: 1, height: 1 });
+        service.store('dark|glow|full|288|0.4|other', { width: 1, height: 1 });
         const miss = jest.fn();
         service.request({ contentKey: 'other', params }, miss);
         expect(miss).not.toHaveBeenCalled();

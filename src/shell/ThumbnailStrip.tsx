@@ -11,7 +11,7 @@ interface ThumbnailStripProps {
     items: StripItem[];
     label: string;
     rGrid: number[];
-    /** theme|scheme|finish|power: a change re-requests every visible tile. */
+    /** theme|finish|power: a change re-requests every visible tile. */
     themeKey: string;
     onSelect(target: NavigationTarget): void;
     /** 'sheet' is the phone's first row of the Explore tab: 56 px tiles, in the flow (spec §9.8). */

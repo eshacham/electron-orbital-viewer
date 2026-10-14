@@ -53,7 +53,7 @@ import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidE
 import { allowedCharges } from './atom/ion_configurations';
 import SpeciesControls from './components/SpeciesControls';
 import Controls, { RelativityReadout, BASIC_ORBITALS_ABOUT, RelativityControl } from './components/Controls';
-import { AxesSwitch, SurfaceAndScheme } from './atom_ui/DisplayControls';
+import { AxesSwitch, SurfaceStyleControl } from './atom_ui/DisplayControls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
 import OrbitalViewer from './components/OrbitalViewer';
@@ -454,8 +454,8 @@ function App() {
     const [exploreCollapsed, setExploreCollapsed] = useState(false);
     const { mode: themeMode } = useQuantumTheme();
     const render = usePref(renderPref);
-    const phase = useMemo(() => phaseColours(themeMode, render.scheme), [themeMode, render.scheme]);
-    const palette = useMemo(() => curvePalette(themeMode, render.scheme), [themeMode, render.scheme]);
+    const phase = phaseColours(themeMode);
+    const palette = curvePalette(themeMode);
     /** A curve, key or swatch in this theme's palette (index identity, §4.2). */
     const themed = useCallback(<T extends { color: string }>(items: T[]): T[] =>
         items.map(item => ({ ...item, color: themeCurveColour(item.color, palette) })), [palette]);
@@ -763,7 +763,7 @@ function App() {
     // the screen, and the opacity is the main view's as last committed (a slider drag re-renders nothing
     // until it is released).
     const stripThemeKey = thumbLookKey({
-        appearance: { theme: themeMode, scheme: render.scheme, finish: render.finish, lowPower: isNarrow },
+        appearance: { theme: themeMode, finish: render.finish, lowPower: isNarrow },
         opacity: thumbOpacity,
         // The bitmap's side, kept current as the window moves between screens (fix round 1 of Task 20d).
         size: thumbTileDevicePx(screenRatio),
@@ -1032,7 +1032,7 @@ function App() {
         const result = await runExport(kind, {
             state, shareUrl: shareUrlFor(encodeStateOf(state)), csvCurves: csvCurvesNow(),
             handle: exportHandleRef.current, phaseLegend: showPhaseLegend, combinationLegend,
-            phaseColours: [phase.legendPositive, phase.legendNegative],
+            phaseColours: [phase.positive, phase.negative],
             // A DOM Worker's onmessage is typed with `this`; this states that
             // it satisfies CubeWorkerHandle's structural shape, which does not care.
             createCubeWorker: createExportWorker as unknown as () => CubeWorkerHandle,
@@ -1054,8 +1054,8 @@ function App() {
         bondsData.scan, bondsData.meta, bondsData.loading, bondsData.error, h2plusCurve.curve, isAtomMode, activePlotTab,
     ]);
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
-    // Ruling DC6: the glTF item names the scheme and theme whose colours it keeps.
-    const exportLook = useMemo(() => ({ theme: themeMode, scheme: render.scheme }), [themeMode, render.scheme]);
+    // Ruling DC6 / R22a: the glTF item names the theme whose colours it keeps.
+    const exportLook = useMemo(() => ({ theme: themeMode }), [themeMode]);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
     const shareExportBar = useMemo(
         () => (
@@ -1135,7 +1135,7 @@ function App() {
             isoNote={moleculeIsoNote}
         >
             {isAtomMode ? (
-                <SurfaceAndScheme surfaceMode={surfaceStyle.mode} meshLevel={atomLevel === 'orbital'}
+                <SurfaceStyleControl surfaceMode={surfaceStyle.mode} meshLevel={atomLevel === 'orbital'}
                     onSurfaceMode={mode => handleSurfaceStyleChange({ mode })} />
             ) : (moleculeOptions || null)}
         </Controls>
@@ -1487,7 +1487,7 @@ function App() {
             )}
             {isAtomMode && atomProfile && !atomUnbound && (
                 <KeyColumn compact={isNarrow}>
-                    <AtomKeys level={atomLevel} scheme={render.scheme} cutOn={surfaceStyle.clipAxis !== 'none'} phase={phase}
+                    <AtomKeys level={atomLevel} phase={phase}
                         orbitalTiles={!isNarrow && !stripCollapsed && stripItems.some(item => item.thumb.kind === 'orbital')}
                         shellItems={themed(atomCurves).map(curve => ({ label: curve.label, colour: curve.color, spoken: curve.spokenLabel }))} />
                 </KeyColumn>
@@ -1498,11 +1498,11 @@ function App() {
             )}
             {!isMoleculeMode && !isAtomMode && (showPhaseLegend || isBondsDensity || combinationLegend) && (
                 <KeyColumn compact={isNarrow}>
-                    {showPhaseLegend && <PhaseKey positive={phase.legendPositive} negative={phase.legendNegative} />}
+                    {showPhaseLegend && <PhaseKey positive={phase.positive} negative={phase.negative} />}
                     {isBondsDensity && (
                         <div className="phase-legend density-key" aria-label="surface colour key">
                             <span className="phase-legend-item">
-                                <span className="phase-legend-swatch" style={{ background: densitySurfaceHex(themeMode, render.scheme) }} />
+                                <span className="phase-legend-swatch" style={{ background: densitySurfaceHex(themeMode) }} />
                                 ρ = {drawnDensityIso} e/a₀³, total electron density
                             </span>
                         </div>
@@ -1537,7 +1537,7 @@ function App() {
                     {moleculeKeysShown && molecule.surface.kind === 'esp' && (
                         <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact={isPhoneLandscape} />
                     )}
-                    {showPhaseLegend && <PhaseKey positive={phase.legendPositive} negative={phase.legendNegative} />}
+                    {showPhaseLegend && <PhaseKey positive={phase.positive} negative={phase.negative} />}
                 </div>
             )}
             {/* Over the canvas on a desktop; on a phone it heads the key

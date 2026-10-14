@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { applyGlow, attachGlowExtras, fadeGlowExtras, GLOW_TUNING, glowLightsFor, glowSettingsFor, SOLID_LIGHTS, updateFrameGuard } from '../src/orbital_glow';
-import { CLASSIC_APPEARANCE } from '../src/design/appearance';
+import { INITIAL_APPEARANCE } from '../src/design/appearance';
 import { marchingCubes } from '../src/marching_cubes';
 
-const glowDark = { theme: 'dark' as const, scheme: 'phase' as const, finish: 'glow' as const, showAxes: true, lowPower: false };
+const glowDark = { theme: 'dark' as const, finish: 'glow' as const, showAxes: true, lowPower: false };
 const shaderOf = (material: THREE.MeshStandardMaterial) => {
     const shader = {
         uniforms: {} as Record<string, THREE.IUniform>,
@@ -23,10 +23,10 @@ const surfaceIn = (group: THREE.Group) => {
 };
 
 describe('Glow (spec §11.2)', () => {
-    it('is off for Classic and for the Solid finish; additive in Deep Space, an ink rim in Light Clean', () => {
-        expect(glowSettingsFor(CLASSIC_APPEARANCE)).toBeNull();
+    // Ruling R22a: Classic (no Glow) is gone; the Solid finish is the only look without it.
+    it('is off for the Solid finish; additive in Deep Space, an ink rim in Light Clean', () => {
+        expect(glowSettingsFor(INITIAL_APPEARANCE)).toBeNull();
         expect(glowSettingsFor({ ...glowDark, finish: 'solid' })).toBeNull();
-        expect(glowSettingsFor({ ...glowDark, scheme: 'classic' })).toBeNull();
         expect(glowSettingsFor(glowDark)!.mode).toBe('additive');
         expect(glowSettingsFor({ ...glowDark, theme: 'light' })!.mode).toBe('ink');
         expect(glowSettingsFor(glowDark)!.rimPositive.getHexString()).toBe(new THREE.Color('#FFC59A').getHexString());
@@ -89,7 +89,8 @@ describe('Glow (spec §11.2)', () => {
         expect(extras()).toHaveLength(0);
         attachGlowExtras(group, surface, glowDark, { ...options, solid: false });
         expect(extras()).toHaveLength(0);
-        attachGlowExtras(group, surface, CLASSIC_APPEARANCE, options);
+        // Ruling R22a: the Solid finish (was Classic here) takes the extras away.
+        attachGlowExtras(group, surface, INITIAL_APPEARANCE, options);
         expect(extras()).toHaveLength(0);
         // Spec §15: the halo follows the lines -- once the frame-time guard says no, neither is drawn.
         attachGlowExtras(group, surface, glowDark, { ...options, extrasAllowed: false });
@@ -168,7 +169,8 @@ describe('Glow (spec §11.2)', () => {
         const before = group.children.filter(child => child.userData.isGlowExtra);
         const disposals = before.map(child => jest.spyOn((child as THREE.Mesh).material as THREE.Material, 'dispose'));
         attachGlowExtras(group, surface, glowDark, options);
-        attachGlowExtras(group, surface, { ...glowDark, scheme: 'density' }, options);
+        // Ruling R22a: a showAxes change (was a scheme change) is another appearance with the same Glow.
+        attachGlowExtras(group, surface, { ...glowDark, showAxes: false }, options);
         expect(group.children.filter(child => child.userData.isGlowExtra)).toEqual(before);
         disposals.forEach(spy => expect(spy).not.toHaveBeenCalled());
     });

@@ -214,8 +214,8 @@ describe('drawOverlays: a colour-bar key (Molecules ESP view)', () => {
     });
 });
 
-describe('drawOverlays: the ψ legend takes the scheme\'s colours (one source, spec §11.1)', () => {
-    it('paints the legend swatches in the colours it is given, and today\'s without them', () => {
+describe('drawOverlays: the ψ legend takes the theme\'s phase colours (one source, spec §11.1)', () => {
+    it('paints the legend swatches in the colours it is given, and the phase hues without them', () => {
         const paint = (phaseColours?: [string, string]) => {
             const fills: string[] = [];
             const painter = {
@@ -227,7 +227,9 @@ describe('drawOverlays: the ψ legend takes the scheme\'s colours (one source, s
             return fills;
         };
         expect(paint(['#FF7A2F', '#2F6BFF'])).toEqual(expect.arrayContaining(['#FF7A2F', '#2F6BFF']));
-        expect(paint()).toEqual(expect.arrayContaining(['#e02020', '#2040ff']));
+        // Ruling R22a: the fallback is science.ts's phase hues (Classic's red and blue are gone).
+        expect(paint(['#123456', '#654321'])).toEqual(expect.arrayContaining(['#123456', '#654321']));
+        expect(paint()).toEqual(expect.arrayContaining(['#FF7A2F', '#2F6BFF']));
     });
 });
 

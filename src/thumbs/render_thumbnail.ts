@@ -24,7 +24,7 @@ export const THUMB_CAMERA_DIRECTION = CANONICAL_CAMERA_DIRECTION;
  * the upper left in front, the fill low from the right. Fixed to the
  * camera, so every tile is lit the same way whatever its size or place;
  * the levels are GLOW_TUNING[theme].thumb.lights (SOLID_LIGHTS for the
- * Solid finish and Classic, as the main view).
+ * Solid finish, as the main view).
  */
 export const THUMB_LIGHT_RIG = {
     key: [-0.55, 0.65, 0.5] as const,
@@ -135,7 +135,7 @@ export function createThumbnailRenderer(
         const SIZE = thumbnailSize(ratio);
         const factor = thumbSupersample(ratio);
         const OUT = thumbTileDevicePx(ratio);
-        const phase = phaseColours(appearance.theme, appearance.scheme);
+        const phase = phaseColours(appearance.theme);
         const [positive, negative] = [linearRgb(phase.positive), linearRgb(phase.negative)];
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions.flat(), 3));

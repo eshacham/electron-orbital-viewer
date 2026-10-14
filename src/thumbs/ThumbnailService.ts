@@ -6,7 +6,7 @@ import type { MeshData, OrbitalParams } from '../types/orbital';
  * at a low resolution, one job at a time; at most one thumbnail is rendered
  * per animation frame (tick()); nothing starts while the main picture is
  * computing or the user is dragging the camera (host.isBusy()). Images are
- * kept in an LRU of 96, keyed by theme|scheme|finish|power|size|content, so a theme
+ * kept in an LRU of 96, keyed by theme|finish|power|size|content, so a theme
  * switch re-renders and a revisit is instant. The host (OrbitalViewer via
  * orbital_visualizer.attachThumbnails) owns the GPU; this module only
  * schedules, which is why it is testable without WebGL.
@@ -43,7 +43,7 @@ export class ThumbnailService {
     private host: ThumbHost | null = null;
     private lost = false;
     private readonly cache = new Map<string, ThumbImage>();
-    /** By full key (theme|scheme|finish|power|size|content): the tiles waiting for that picture. */
+    /** By full key (theme|finish|power|size|content): the tiles waiting for that picture. */
     private readonly waiting = new Map<string, { contentKey: string; waiters: Set<Waiter> }>();
     private readonly statusListeners = new Set<() => void>();
     /**

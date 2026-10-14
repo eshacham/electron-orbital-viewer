@@ -30,7 +30,7 @@ export interface GlowSettings {
     wash: number;
 }
 
-/** §11.1 "Lights": Solid (and Classic) keep today's levels; Glow's are per theme, in GLOW_TUNING below. */
+/** §11.1 "Lights": Solid keeps today's levels; Glow's are per theme, in GLOW_TUNING below. */
 export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
 
 /**
@@ -86,13 +86,13 @@ export function glowLightsFor(theme: Appearance['theme']): { ambient: number; ke
 }
 
 export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
-    if (appearance.finish !== 'glow' || appearance.scheme === 'classic') return null;
-    const phase = phaseColours(appearance.theme, appearance.scheme);
+    if (appearance.finish !== 'glow') return null;
+    const phase = phaseColours(appearance.theme);
     const tuning = GLOW_TUNING[appearance.theme];
     return {
         mode: appearance.theme === 'dark' ? 'additive' : 'ink',
-        rimPositive: new THREE.Color(phase.rimPositive!),
-        rimNegative: new THREE.Color(phase.rimNegative!),
+        rimPositive: new THREE.Color(phase.rimPositive),
+        rimNegative: new THREE.Color(phase.rimNegative),
         emissive: tuning.emissive,
         rimStrength: tuning.rimStrength,
         rimPower: tuning.rimPower,
@@ -101,13 +101,13 @@ export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
 }
 
 /**
- * Ruling R12 / §11.1 "Ball-and-stick": in Deep Space (non-Classic) the atoms
+ * Ruling R12 / §11.1 "Ball-and-stick": in Deep Space the atoms
  * take the same rim at 0.15 and no emissive. An atom has no phase, so the
  * shader tints its rim from the atom's own colour (`vQlPhase` 0) and the two
  * phase rim colours below are never read.
  */
 export function atomRimFor(appearance: Appearance): GlowSettings | null {
-    if (appearance.theme !== 'dark' || appearance.scheme === 'classic') return null;
+    if (appearance.theme !== 'dark') return null;
     return { mode: 'additive', rimPositive: new THREE.Color(1, 1, 1), rimNegative: new THREE.Color(1, 1, 1), emissive: 0, rimStrength: 0.15, rimPower: 2.5, wash: 0 };
 }
 
@@ -147,7 +147,7 @@ const RIM = /* glsl */`
 
 /**
  * Applies (or removes) the Glow injection in place. Colours and strengths are
- * uniforms, so a theme or scheme change does not recompile; only turning Glow
+ * uniforms, so a theme change does not recompile; only turning Glow
  * on or off does. `phased: false` for a mesh with no `phaseSign` attribute
  * (see VERTEX_HEAD_PLAIN); fixed for a material's life.
  */

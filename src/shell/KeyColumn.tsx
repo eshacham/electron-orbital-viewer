@@ -1,8 +1,7 @@
 import React from 'react';
 import './viewport.css';
 import type { ViewLevel } from '../store/atomSlice';
-import type { ColourScheme } from '../design/presentation';
-import { DENSITY_RAMP, type PhaseColours } from '../design/science';
+import type { PhaseColours } from '../design/science';
 
 /** The right-hand key column (spec §8.5, §11.5): every colour on the view, with text. */
 const KeyColumn: React.FC<{ compact?: boolean; children: React.ReactNode }> = ({ compact = false, children }) => (
@@ -10,7 +9,7 @@ const KeyColumn: React.FC<{ compact?: boolean; children: React.ReactNode }> = ({
 );
 
 /**
- * The ψ key: positive and negative swatches, always in the active scheme's
+ * The ψ key: positive and negative swatches, always in the theme's phase
  * colours (science.ts, the one source the PNG legend and the vertex colours
  * share). `heading` and `label` say what it describes when that is not the
  * surface on the view (ruling T16-tilekey: the strip's orbital tiles).
@@ -43,22 +42,8 @@ export const ShellRingKey: React.FC<{ items: ShellRingItem[] }> = ({ items }) =>
     </div>
 );
 
-/** The "Density on the cut face" bar (§11.5): High at the top, Low at the bottom, an exact caption. */
-export const DensityRampKey: React.FC = () => (
-    <div className="density-ramp-key" aria-label="cut-face density key">
-        <div className="density-ramp-scale">
-            <span className="density-ramp-high">High</span>
-            <span className="density-ramp-bar" style={{ background: `linear-gradient(to top, ${DENSITY_RAMP.join(', ')})` }} />
-            <span className="density-ramp-low">Low</span>
-        </div>
-        <span className="key-caption">|ψ|² on the cut face: from the surface value (Low) to the peak (High), log scale</span>
-    </div>
-);
-
 interface AtomKeysProps {
     level: ViewLevel;
-    scheme: ColourScheme;
-    cutOn: boolean;
     phase: PhaseColours;
     shellItems: ShellRingItem[];
     /** The strip below shows orbital pictures (shell or subshell level): their ψ colours need a key too (§3.3). */
@@ -66,28 +51,21 @@ interface AtomKeysProps {
 }
 
 /**
- * The Atom screen's key column (§9.1 "Viewport", §11.5). The High/Low bar
- * exists only where a scalar is mapped -- an orbital's cut face in the
- * Density scheme -- and never alone beside a phase-coloured surface.
+ * The Atom screen's key column (§9.1 "Viewport", §11.5): the shell rings at
+ * atom and shell level, the ψ key at orbital level. Ruling R22a: no
+ * High/Low bar -- an orbital's surface and cut face are always phase-coloured.
  */
-export const AtomKeys: React.FC<AtomKeysProps> = ({ level, scheme, cutOn, phase, shellItems, orbitalTiles = false }) => {
+export const AtomKeys: React.FC<AtomKeysProps> = ({ level, phase, shellItems, orbitalTiles = false }) => {
     if (level !== 'orbital') {
         return (
             <>
                 <ShellRingKey items={shellItems} />
                 {/* Ruling T16-tilekey (§3.3): the strip's orbital tiles are phase-coloured; at orbital level the surface key covers them. */}
-                {orbitalTiles && <PhaseKey positive={phase.legendPositive} negative={phase.legendNegative} heading="Orbital tiles" label="orbital tile colour key" />}
+                {orbitalTiles && <PhaseKey positive={phase.positive} negative={phase.negative} heading="Orbital tiles" label="orbital tile colour key" />}
             </>
         );
     }
-    return (
-        <>
-            <PhaseKey positive={phase.legendPositive} negative={phase.legendNegative} />
-            {scheme === 'density' && (cutOn
-                ? <DensityRampKey />
-                : <p className="key-note" role="note">Pick a cut axis to see the density inside</p>)}
-        </>
-    );
+    return <PhaseKey positive={phase.positive} negative={phase.negative} />;
 };
 
 export default KeyColumn;

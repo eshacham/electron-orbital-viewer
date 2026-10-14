@@ -40,7 +40,7 @@ const sceneNames = arg('scenes', 'c-whole').split(',');
 const themes = arg('themes', 'dark,light').split(',');
 const sizes = arg('sizes', 'desktop,phone').split(',');
 const extraWait = Number(arg('wait', '1500'));
-// Optional presentation preferences (eov.render JSON), e.g. '{"finish":"solid","scheme":"density"}'.
+// Optional presentation preferences (eov.render JSON), e.g. '{"finish":"solid"}'.
 const renderPrefs = arg('render', null);
 // The GL backend: SwiftShader (software, the default) or the Mac's GPU through
 // ANGLE's Metal backend. On SwiftShader a Glow frame takes ~80 ms, so ruling

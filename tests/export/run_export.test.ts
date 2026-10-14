@@ -784,17 +784,17 @@ describe('Bonds mode exports (ruling C5, Task 13b)', () => {
     });
 });
 
-// Ruling DC6 (spec §11.2): a .glb keeps the vertex colours of the scheme on screen, and its menu line says which.
+// Ruling DC6 (spec §11.2): a .glb keeps the vertex colours on screen, and its menu line says whose -- ruling R22a: the theme's.
 describe('exportItemsFor: the glTF item names the colours it carries', () => {
     const glbDetail = (items: ReturnType<typeof exportItemsFor>) => items.find(i => i.kind === 'glb')?.detail;
-    it('states the active scheme and theme', () => {
-        expect(glbDetail(exportItemsFor('atom', { theme: 'dark', scheme: 'phase' }))).toBe('colours as shown (Phase ψ, Deep Space) — slides and AR');
-        expect(glbDetail(exportItemsFor('bonds', { theme: 'light', scheme: 'classic' }))).toBe('colours as shown (Classic, Light Clean) — slides and AR');
-        expect(glbDetail(exportItemsFor('molecule', { theme: 'light', scheme: 'density' })))
-            .toBe('colours as shown (Density, Light Clean) — surface only (ball-and-stick and dipole arrow not included)');
+    it('states the active theme', () => {
+        expect(glbDetail(exportItemsFor('atom', { theme: 'dark' }))).toBe('colours as shown (Deep Space) — slides and AR');
+        expect(glbDetail(exportItemsFor('bonds', { theme: 'light' }))).toBe('colours as shown (Light Clean) — slides and AR');
+        expect(glbDetail(exportItemsFor('molecule', { theme: 'light' })))
+            .toBe('colours as shown (Light Clean) — surface only (ball-and-stick and dipole arrow not included)');
     });
     it('leaves every other item as it was', () => {
-        const items = exportItemsFor('bonds', { theme: 'dark', scheme: 'phase' });
+        const items = exportItemsFor('bonds', { theme: 'dark' });
         expect(items.filter(i => i.kind !== 'glb')).toEqual(exportItemsFor('bonds').filter(i => i.kind !== 'glb'));
     });
 });

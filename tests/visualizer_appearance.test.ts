@@ -11,9 +11,9 @@ import {
 import { fieldRequestFor } from '../src/combinations';
 import { collectExportSurfaces } from '../src/export/surfaces';
 import { defaultSurfaceStyle, MeshData } from '../src/types/orbital';
-import { CLASSIC_APPEARANCE, type Appearance } from '../src/design/appearance';
+import { INITIAL_APPEARANCE, type Appearance } from '../src/design/appearance';
 import { CURVE_COLORS } from '../src/curve_colors';
-import { CLASSIC, CURVE_COLORS_LIGHT, DENSITY_RAMP, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb } from '../src/design/science';
+import { CURVE_COLORS_LIGHT, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb, PHASE_COLOURS, PHASE_HUES } from '../src/design/science';
 import { CPK_COLORS } from '../src/molecules/ball_and_stick';
 import { GLOW_TUNING } from '../src/orbital_glow';
 
@@ -65,90 +65,69 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
     beforeEach(() => { jest.spyOn(console, 'log').mockImplementation(() => {}); });
     afterEach(() => { (console.log as jest.Mock).mockRestore(); });
 
-    it('draws today\'s Classic constants until told otherwise (§11.3)', async () => {
+    // Ruling R22a (owner) replaces "draws today's Classic constants until told otherwise": the context
+    // starts in INITIAL_APPEARANCE -- Deep Space's phase colours, Solid, the one-hue axes.
+    it('draws the phase colours until told otherwise', async () => {
         const context = buildContext();
         await drawOrbital(context);
         const surface = surfaceOf(context);
-        expect(colourAt(surface, 0)).toEqual([1, 0, 0]);
-        expect(colourAt(surface, 1)).toEqual([0, 0, 1]);
+        linearRgb(PHASE_HUES.positive).forEach((v, k) => expect(colourAt(surface, 0)[k]).toBeCloseTo(v, 6));
+        linearRgb(PHASE_HUES.negative).forEach((v, k) => expect(colourAt(surface, 1)[k]).toBeCloseTo(v, 6));
         const cap = capOf(context).material as THREE.ShaderMaterial;
-        expect(cap.uniforms.positivePhase.value.toArray()).toEqual(displayRgb('#D42020'));
-        expect(cap.uniforms.negativePhase.value.toArray()).toEqual(displayRgb('#2030D4'));
-        expect(cap.uniforms.rampMode.value).toBe(0);
-        expect(context.currentAxesHelper!.children.some(child => child instanceof THREE.AxesHelper)).toBe(true);
+        expect(cap.uniforms.positivePhase.value.toArray()).toEqual(displayRgb(PHASE_HUES.positive));
+        expect(cap.uniforms.negativePhase.value.toArray()).toEqual(displayRgb(PHASE_HUES.negative));
+        expect((surface.material as THREE.MeshStandardMaterial).userData.glow).toBeFalsy();
+        expect(context.currentAxesHelper!.children.some(child => child instanceof THREE.AxesHelper)).toBe(false);
+        expect(context.currentAxesHelper!.children.some(child => child instanceof THREE.LineSegments)).toBe(true);
     });
 
-    it('recolours the same mesh in place for a theme and scheme, and back to Classic exactly', async () => {
+    // Ruling R22a: the way back is to Deep Space (was "and back to Classic exactly").
+    it('recolours the same mesh in place for a theme, and back', async () => {
         const context = buildContext();
         await drawOrbital(context);
         const surface = surfaceOf(context);
         const geometry = surface.geometry;
         const positions = geometry.getAttribute('position').array;
-        setAppearance(context, { theme: 'light', scheme: 'phase', finish: 'solid', showAxes: true, lowPower: false });
+        setAppearance(context, { theme: 'light', finish: 'solid', showAxes: true, lowPower: false });
         expect(surfaceOf(context)).toBe(surface);
         expect(surface.geometry).toBe(geometry);
         expect(geometry.getAttribute('position').array).toBe(positions);
         // Ruling R20a-1: Light Clean now paints Deep Space's phase pair (was #E8590C / #1F5FE0).
         linearRgb('#FF7A2F').forEach((v, k) => expect(colourAt(surface, 0)[k]).toBeCloseTo(v, 6));
         linearRgb('#2F6BFF').forEach((v, k) => expect(colourAt(surface, 1)[k]).toBeCloseTo(v, 6));
-        setAppearance(context, CLASSIC_APPEARANCE);
-        expect(colourAt(surface, 0)).toEqual([1, 0, 0]);
-        expect(colourAt(surface, 1)).toEqual([0, 0, 1]);
+        setAppearance(context, INITIAL_APPEARANCE);
+        expect(surfaceOf(context)).toBe(surface);
+        linearRgb(PHASE_COLOURS.dark.positive).forEach((v, k) => expect(colourAt(surface, 0)[k]).toBeCloseTo(v, 6));
+        linearRgb(PHASE_COLOURS.dark.negative).forEach((v, k) => expect(colourAt(surface, 1)[k]).toBeCloseTo(v, 6));
     });
 
-    // DC11: the Classic a user actually picks -- in Light Clean, with Glow chosen as the finish.
-    it('draws Classic exactly in Light Clean with Glow chosen too: colours, caps, AxesHelper, today\'s materials and lights', async () => {
-        const context = buildContext();
-        // Ruling DC11b: the context's own lights (Task 15), at today's levels (initVisualizer's), which Classic keeps.
-        context.lights = { ambient: new THREE.AmbientLight(0xffffff, 0.5), key: new THREE.DirectionalLight(0xffffff, 0.8), fill: new THREE.DirectionalLight(0xffffff, 0.35) };
-        const lights = [context.lights.ambient, context.lights.key, context.lights.fill];
-        await drawOrbital(context);
-        setAppearance(context, { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
-        // The Glow step really changed the lights and the surface, so the Classic checks below can fail.
-        // Ruling R20a-3: the Glow lights are tuned values now (GLOW_LIGHTS), not literals here.
-        expect(lights.map(light => light.intensity)).toEqual([GLOW_LIGHTS.ambient, GLOW_LIGHTS.key, GLOW_LIGHTS.fill]);
-        expect(context.currentOrbitalGroup!.children.some(child => child.userData.isGlowExtra)).toBe(true);
-        setAppearance(context, { theme: 'light', scheme: 'classic', finish: 'glow', showAxes: true, lowPower: false });
-        const surface = surfaceOf(context);
-        expect(colourAt(surface, 0)).toEqual([1, 0, 0]);
-        expect(colourAt(surface, 1)).toEqual([0, 0, 1]);
-        const cap = capOf(context).material as THREE.ShaderMaterial;
-        expect(cap.uniforms.positivePhase.value.toArray()).toEqual(displayRgb(CLASSIC.capPositive));
-        expect(cap.uniforms.negativePhase.value.toArray()).toEqual(displayRgb(CLASSIC.capNegative));
-        expect(cap.uniforms.rampMode.value).toBe(0);
-        const axes = context.currentAxesHelper!;
-        expect(axes.visible).toBe(true);
-        expect(axes.children.some(child => child instanceof THREE.AxesHelper)).toBe(true);
-        expect(axes.children.some(child => child instanceof THREE.Mesh)).toBe(false); // no arrowheads
-        // No Glow material: the surface is today's MeshStandardMaterial, and nothing else was added to the group.
-        expect(surface.material).toBeInstanceOf(THREE.MeshStandardMaterial);
-        // Ruling DC11b: Glow's real marks -- the shader injection flag and the halo/lines marker -- are gone.
-        expect((surface.material as THREE.MeshStandardMaterial).userData.glow).toBeFalsy();
-        expect(context.currentOrbitalGroup!.children.some(child => child.userData.isGlowExtra)).toBe(false);
-        expect(lights.map(light => light.intensity)).toEqual([0.5, 0.8, 0.35]);
-    });
-
-    it('maps |ψ|² on the cut face through the density ramp only in the Density scheme', async () => {
+    // Ruling R22a (owner) replaces "maps |ψ|² on the cut face through the density ramp only in the Density
+    // scheme" (and the DC11 Light-Clean Classic case): an orbital's cut face is always shaded by phase.
+    it('shades an orbital\'s cut face by phase in every look, with no density ramp', async () => {
         const context = buildContext();
         await drawOrbital(context);
         const cap = capOf(context).material as THREE.ShaderMaterial;
-        setAppearance(context, { theme: 'dark', scheme: 'density', finish: 'solid', showAxes: true, lowPower: false });
-        expect(cap.uniforms.rampMode.value).toBe(1);
-        expect(cap.uniforms.ramp.value[0].toArray()).toEqual(displayRgb(DENSITY_RAMP[0]));
-        expect(cap.uniforms.positivePhase.value.toArray()).toEqual(displayRgb('#FF7A2F'));
-        setAppearance(context, { theme: 'dark', scheme: 'phase', finish: 'solid', showAxes: true, lowPower: false });
-        expect(cap.uniforms.rampMode.value).toBe(0);
+        expect(cap.uniforms.rampMode).toBeUndefined();
+        expect(cap.uniforms.ramp).toBeUndefined();
+        expect(cap.fragmentShader).not.toContain('ramp[');
+        for (const look of [
+            { theme: 'dark', finish: 'solid' }, { theme: 'light', finish: 'glow' }, { theme: 'light', finish: 'solid' },
+        ] as const) {
+            setAppearance(context, { ...look, showAxes: true, lowPower: false });
+            expect(cap.uniforms.positivePhase.value.toArray()).toEqual(displayRgb(PHASE_COLOURS[look.theme].positive));
+            expect(cap.uniforms.negativePhase.value.toArray()).toEqual(displayRgb(PHASE_COLOURS[look.theme].negative));
+        }
     });
 
     it('restyles the axes to one hue, hides them on request, and keeps them a helper', async () => {
         const context = buildContext();
         await drawOrbital(context);
-        setAppearance(context, { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
+        setAppearance(context, { theme: 'dark', finish: 'glow', showAxes: true, lowPower: false });
         const axes = context.currentAxesHelper!;
         expect(axes.children.some(child => child instanceof THREE.AxesHelper)).toBe(false);
         expect(axes.children.some(child => child instanceof THREE.LineSegments)).toBe(true);
         expect(axes.userData.isAxes).toBe(true);
-        setAppearance(context, { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: false, lowPower: false });
+        setAppearance(context, { theme: 'dark', finish: 'glow', showAxes: false, lowPower: false });
         expect(context.currentAxesHelper!.visible).toBe(false);
     });
 
@@ -161,12 +140,13 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
         context.currentOrbitalGroup!.traverse(o => { if (o instanceof THREE.Mesh && o.userData.isCap) cap = o.material as THREE.ShaderMaterial; });
         const paletteOf = () => (cap as unknown as THREE.ShaderMaterial).uniforms.palette.value.map((v: THREE.Vector3) => v.toArray());
         expect(paletteOf()[3]).toEqual(displayRgb(CURVE_COLORS[3]));
-        setAppearance(context, { theme: 'light', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
+        setAppearance(context, { theme: 'light', finish: 'glow', showAxes: true, lowPower: false });
         expect(paletteOf()[3]).toEqual(displayRgb(CURVE_COLORS_LIGHT[3]));
     });
 
     // DC2: the ESP map overrides the surface's colours, but its cut face is the density's material -- never NaN, never ψ's red.
-    it('gives a cut ESP map\'s cut face the density surface colour, in Classic and in a theme', () => {
+    // Ruling R22a: in each theme (was "in Classic and in a theme").
+    it('gives a cut ESP map\'s cut face the density surface colour, in each theme', () => {
         const context = buildContext();
         context.surfaceStyle = { ...defaultSurfaceStyle, clipAxis: 'x', clipPosition: 0.5 };
         const esp = new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]);
@@ -176,16 +156,17 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
         const positive = () => (cap.material as THREE.ShaderMaterial).uniforms.positivePhase.value as THREE.Vector3;
         expect(cap.parent!.visible).toBe(true);
         // Ruling DC2b: display space, the space the cap shader ramps in, so the cut face matches the surface and the key.
-        expect(positive().toArray()).toEqual(displayRgb(CLASSIC.densitySurface));
-        const look: Appearance = { theme: 'light', scheme: 'phase', finish: 'solid', showAxes: true, lowPower: false };
+        expect(positive().toArray()).toEqual(displayRgb(densitySurfaceHex('dark')));
+        const look: Appearance = { theme: 'light', finish: 'solid', showAxes: true, lowPower: false };
         setAppearance(context, look);
-        expect(positive().toArray()).toEqual(displayRgb(densitySurfaceHex(look.theme, look.scheme)));
+        expect(positive().toArray()).toEqual(displayRgb(densitySurfaceHex(look.theme)));
         // The ESP's own colouring is left alone by a theme change.
         expect(Array.from(surface.geometry.getAttribute('color').array)).toEqual(Array.from(esp));
     });
 
     // Ruling R12, from science.ts: CPK white would vanish on Light Clean's page.
-    it('greys hydrogen in Light Clean, and gives it back its CPK white in Classic and in Deep Space', () => {
+    // Ruling R22a: Deep Space alone gives the white back (Classic is gone).
+    it('greys hydrogen in Light Clean, and gives it back its CPK white in Deep Space', () => {
         const context = buildContext();
         const hydrogen = new THREE.MeshStandardMaterial({ color: CPK_COLORS[1] });
         hydrogen.userData.Z = 1;
@@ -195,12 +176,10 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
         overlay.add(new THREE.Mesh(new THREE.SphereGeometry(1), hydrogen), new THREE.Mesh(new THREE.SphereGeometry(1), oxygen));
         setMoleculeOverlay(context, overlay);
         expect(hydrogen.color.getHexString()).toBe(CPK_COLORS[1].slice(1));
-        setAppearance(context, { theme: 'light', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
+        setAppearance(context, { theme: 'light', finish: 'glow', showAxes: true, lowPower: false });
         expect(`#${hydrogen.color.getHexString().toUpperCase()}`).toBe(LIGHT_HYDROGEN);
         expect(oxygen.color.getHexString()).toBe(CPK_COLORS[8].slice(1));
-        setAppearance(context, { theme: 'light', scheme: 'classic', finish: 'glow', showAxes: true, lowPower: false });
-        expect(hydrogen.color.getHexString()).toBe(CPK_COLORS[1].slice(1));
-        setAppearance(context, { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
+        setAppearance(context, { theme: 'dark', finish: 'glow', showAxes: true, lowPower: false });
         expect(hydrogen.color.getHexString()).toBe(CPK_COLORS[1].slice(1));
     });
 });
@@ -209,7 +188,7 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
     beforeEach(() => { jest.spyOn(console, 'log').mockImplementation(() => {}); });
     afterEach(() => { (console.log as jest.Mock).mockRestore(); });
 
-    const glow = { theme: 'dark' as const, scheme: 'phase' as const, finish: 'glow' as const, showAxes: true, lowPower: false };
+    const glow = { theme: 'dark' as const, finish: 'glow' as const, showAxes: true, lowPower: false };
     const extras = (context: VisualizerContext) => context.currentOrbitalGroup!.children.filter(child => child.userData.isGlowExtra);
     const extra = (context: VisualizerContext, kind: 'halo' | 'lines') => extras(context).find(child => child.userData.isGlowExtra === kind) as THREE.Mesh | undefined;
 
@@ -306,7 +285,8 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'solid' });
         setAppearance(context, glow);
         expect(extras(context)).toHaveLength(0);
-        setAppearance(context, { ...glow, scheme: 'density' });
+        // Ruling R22a: a showAxes change (was a scheme change) is the new appearance here.
+        setAppearance(context, { ...glow, showAxes: false });
         expect(context.extrasSuppressed).toBe(false);
         expect(context.frameGuard).toEqual({ ema: 16, frames: 0 });
         expect(extra(context, 'lines')).toBeDefined();
@@ -331,7 +311,8 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         return shader;
     };
 
-    it('glows a combination overlay (emissive, own-tint rim) under Glow, and not under Solid or Classic', async () => {
+    // Ruling R22a: Solid is the one look without Glow (Classic is gone).
+    it('glows a combination overlay (emissive, own-tint rim) under Glow, and not under Solid', async () => {
         const context = buildContext();
         context.lights = lights();
         setAppearance(context, glow);
@@ -352,12 +333,11 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         expect(glowOf(overlay).glow).toBe(false);
         expect(context.lights.ambient.intensity).toBe(0.5);
         setAppearance(context, glow);
-        setAppearance(context, { ...glow, scheme: 'classic' });
-        expect(glowOf(overlay).glow).toBe(false);
-        expect(context.lights.ambient.intensity).toBe(0.5);
+        expect(glowOf(overlay).glow).toBe(true);
     });
 
-    it('glows a shell\'s composition lobes under Glow, and not under Solid or Classic; the shell view alone keeps today\'s lights', () => {
+    // Ruling R22a: Solid is the one look without Glow (Classic is gone).
+    it('glows a shell\'s composition lobes under Glow, and not under Solid; the shell view alone keeps today\'s lights', () => {
         const context = buildContext();
         context.lights = lights();
         setAppearance(context, glow);
@@ -380,9 +360,8 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         setAppearance(context, { ...glow, finish: 'solid' });
         lobes.forEach(mesh => expect(glowOf(mesh).glow).toBe(false));
         expect(context.lights.ambient.intensity).toBe(0.5);
-        setAppearance(context, { ...glow, scheme: 'classic' });
-        lobes.forEach(mesh => expect(glowOf(mesh).glow).toBeFalsy());
-        expect(context.lights.ambient.intensity).toBe(0.5);
+        setAppearance(context, glow);
+        lobes.forEach(mesh => expect(glowOf(mesh).glow).toBe(true));
     });
 
     it('keeps today\'s lights for a ball-and-stick on its own under Glow, with the atoms\' 0.15 rim', () => {

@@ -124,15 +124,15 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // valid to animate between.
     const lastAnimatedSpeciesRef = useRef<string | null>(null);
 
-    // How the scene is drawn (spec §6.6): theme, scheme, finish, axes. Never part of a link.
+    // How the scene is drawn (spec §6.6): theme, finish, axes. Never part of a link.
     const { mode: themeMode } = useQuantumTheme();
-    const { scheme, finish } = usePref(renderPref);
+    const { finish } = usePref(renderPref);
     // Only showAxes: a plot-tab change (the same pref) must not repaint the scene.
     const { showAxes } = usePref(displayPref);
     const isNarrow = useMediaQuery(NARROW_VIEWPORT);
     const appearance = useMemo<Appearance>(
-        () => ({ theme: themeMode, scheme, finish, showAxes, lowPower: isNarrow }),
-        [themeMode, scheme, finish, showAxes, isNarrow]
+        () => ({ theme: themeMode, finish, showAxes, lowPower: isNarrow }),
+        [themeMode, finish, showAxes, isNarrow]
     );
     // Read by the export handle, which outlives renders.
     const appearanceRef = useRef(appearance);
@@ -213,7 +213,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         };
     }, [dispatch, exportHandleRef]);
 
-    // Spec §6.6: a theme, scheme, finish or axes change restyles the scene in place.
+    // Spec §6.6: a theme, finish or axes change restyles the scene in place.
     useEffect(() => {
         setAppearance(visualizerContextRef.current, appearance);
     }, [appearance]);

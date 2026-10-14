@@ -4,11 +4,11 @@ jest.mock('../../src/workers/createOrbitalWorker', () => ({ createOrbitalWorker:
 jest.mock('../../src/orbital_controls_factory', () => ({ createOrbitalControls: jest.fn() }));
 
 import { createOrbitalWorker } from '../../src/workers/createOrbitalWorker';
-import { VisualizerContext, updateFieldInScene, DENSITY_SURFACE_COLOUR } from '../../src/orbital_visualizer';
+import { VisualizerContext, updateFieldInScene } from '../../src/orbital_visualizer';
 import { defaultSurfaceStyle, MeshData } from '../../src/types/orbital';
 import { FieldRenderRequest } from '../../src/field_source';
 import { h2plusSource } from '../../src/bonds/h2plus';
-import { CLASSIC, displayRgb } from '../../src/design/science';
+import { densitySurfaceHex, displayRgb, linearRgb, PHASE_HUES } from '../../src/design/science';
 
 function buildContext(): VisualizerContext {
     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
@@ -52,7 +52,8 @@ const vertexColours = (context: VisualizerContext) =>
 describe('density colour', () => {
     it('paints a density surface and its cut face one colour', async () => {
         const context = await draw({ ...base, densityIsoValue: 0.002 });
-        const c = DENSITY_SURFACE_COLOUR;
+        // Ruling R22a: no Classic default any more -- the context draws Deep Space's density colour until told otherwise.
+        const c = new THREE.Color(densitySurfaceHex('dark'));
         expect(vertexColours(context)).toEqual([c.r, c.g, c.b, c.r, c.g, c.b, c.r, c.g, c.b].map(Math.fround));
         const capColours: THREE.Vector3[] = [];
         context.currentCaps!.traverse(object => {
@@ -62,11 +63,12 @@ describe('density colour', () => {
         expect(capColours.length).toBeGreaterThan(0);
         // Ruling DC2: compare the Vector3's own components -- Vector3.equals(Color) compared undefined with undefined and hid a NaN uniform.
         // Ruling DC2b: in display space (the cap shader's), so the cut face shows the same colour as the surface.
-        expect(capColours.map(v => v.toArray())).toEqual(capColours.map(() => displayRgb(CLASSIC.densitySurface)));
+        expect(capColours.map(v => v.toArray())).toEqual(capColours.map(() => displayRgb(densitySurfaceHex('dark'))));
     });
 
     it('keeps phase colours for an orbital', async () => {
         const context = await draw(base);
-        expect(vertexColours(context).slice(0, 3)).toEqual([1, 0, 0]);
+        // Ruling R22a: ψ > 0's phase hue (Classic's pure red is gone).
+        expect(vertexColours(context).slice(0, 3)).toEqual(linearRgb(PHASE_HUES.positive).map(Math.fround));
     });
 });

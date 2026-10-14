@@ -4,7 +4,7 @@ import {
 } from '../../src/thumbs/render_thumbnail';
 import { THUMB_FILL, THUMB_TILE_PX, thumbLookKey, thumbSupersample, thumbTileDevicePx } from '../../src/thumbs/thumb_key';
 import type { MeshData } from '../../src/types/orbital';
-import { CLASSIC_APPEARANCE, type Appearance } from '../../src/design/appearance';
+import { INITIAL_APPEARANCE, type Appearance } from '../../src/design/appearance';
 import { linearRgb, phaseColours } from '../../src/design/science';
 import { GLOW_TUNING, SOLID_LIGHTS } from '../../src/orbital_glow';
 import { DEFAULT_OPACITY } from '../../src/types/orbital';
@@ -48,7 +48,7 @@ function stubRenderer() {
 }
 
 describe('createThumbnailRenderer (spec §12: a target on the main renderer)', () => {
-    const glow: Appearance = { theme: 'light', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false };
+    const glow: Appearance = { theme: 'light', finish: 'glow', showAxes: true, lowPower: false };
 
     it('draws into its own target in the theme\'s phase colours, then gives the main view back its target and clear colour', async () => {
         const { renderer, mainTarget, seen, current } = stubRenderer();
@@ -64,7 +64,7 @@ describe('createThumbnailRenderer (spec §12: a target on the main renderer)', (
         expect(renderer.readRenderTargetPixels).toHaveBeenCalledWith(seen[0].target, 0, 0, 288, 288, expect.any(Uint8Array));
         const [surface] = seen[0].meshes;
         const colours = Array.from((surface.geometry.getAttribute('color') as THREE.BufferAttribute).array);
-        const phase = phaseColours('light', 'phase');
+        const phase = phaseColours('light');
         expect(colours.slice(0, 3)).toEqual(linearRgb(phase.positive).map(c => expect.closeTo(c, 6)));
         expect(colours.slice(6, 9)).toEqual(linearRgb(phase.negative).map(c => expect.closeTo(c, 6)));
         // Ruling R20a-4: the main view's look -- Glow's rim on a see-through surface at the
@@ -81,13 +81,14 @@ describe('createThumbnailRenderer (spec §12: a target on the main renderer)', (
         expect(renderer.setClearColor).toHaveBeenLastCalledWith(expect.objectContaining({ r: new THREE.Color(0x123456).r }), 0.25);
     });
 
-    it('lights a Solid or Classic thumbnail like the main view, and leaves nothing behind in its scene', async () => {
+    // Ruling R22a: Classic is gone -- INITIAL_APPEARANCE is the Solid finish.
+    it('lights a Solid thumbnail like the main view, and leaves nothing behind in its scene', async () => {
         const { renderer, seen } = stubRenderer();
         const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer);
-        await thumbs.render(triangle(), CLASSIC_APPEARANCE);
+        await thumbs.render(triangle(), INITIAL_APPEARANCE);
         expect(seen[0].lights).toEqual([SOLID_LIGHTS.ambient, SOLID_LIGHTS.key, SOLID_LIGHTS.fill]);
         const surface = seen[0].meshes[0];
-        await thumbs.render(triangle(), CLASSIC_APPEARANCE);
+        await thumbs.render(triangle(), INITIAL_APPEARANCE);
         expect(seen[1].meshes).toHaveLength(1);
         expect(seen[1].meshes[0]).not.toBe(surface);
         expect(surface.parent?.parent ?? null).toBeNull();
@@ -239,7 +240,7 @@ describe('downsampleThumbnail', () => {
 // Fix round 1 of Task 20d: the key must say which bitmap it files. Keyed on the render target, DPR 1 and
 // 1.5 (and 1.333 and 2) shared a key, so a 72 px bitmap was served to a 108 px canvas and stretched.
 describe('the cache key identifies the bitmap', () => {
-    const look = { theme: 'dark' as const, scheme: 'phase' as const, finish: 'glow' as const, lowPower: false };
+    const look = { theme: 'dark' as const, finish: 'glow' as const, lowPower: false };
     const keyAt = (dpr: number) => thumbLookKey({ appearance: look, opacity: 0.7, size: thumbTileDevicePx(dpr) });
 
     it('differs between screens whose bitmaps differ, even where the render targets match', () => {
@@ -254,7 +255,7 @@ describe('the cache key identifies the bitmap', () => {
         const { renderer } = stubRenderer();
         const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer, { pixelRatio: () => ratio });
         for (ratio of [1, 4 / 3, 1.5, 2, 3]) {
-            const image = await thumbs.render(triangle(), { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
+            const image = await thumbs.render(triangle(), { theme: 'dark', finish: 'glow', showAxes: true, lowPower: false });
             expect(thumbs.size()).toBe(image.width);
             expect(thumbs.size()).toBe(thumbTileDevicePx(ratio));
         }

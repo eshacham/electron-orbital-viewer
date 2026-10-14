@@ -17,8 +17,6 @@ import { ViewerExportHandle } from './handle';
 import { encodeStl } from './stl';
 import { encodeGlb } from './gltf';
 import { exportAppLabel } from '../design/brands';
-import { SCHEME_LABEL } from '../design/appearance';
-import type { ColourScheme } from '../design/presentation';
 import type { ThemeMode } from '../design/tokens';
 import { THEME_LABEL } from '../design/ThemeSwitch';
 import { CubeAtom } from './cube';
@@ -44,7 +42,7 @@ import { ESP_LIMIT_HARTREE, ESP_SIGN_NOTE, ESP_SURFACE_DENSITY, ESP_TICKS, espCo
 
 export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb' | 'cube';
 
-/** The glTF item's opening words; exportItemsFor names the scheme and theme in their place. */
+/** The glTF item's opening words; exportItemsFor names the theme in their place. */
 const GLB_COLOURS_KEPT = 'colours kept';
 
 export interface ExportItem { kind: ExportKind; label: string; detail: string; }
@@ -65,16 +63,16 @@ export const EXPORT_ITEMS: ExportItem[] = [
  * atom/Basic Orbitals wording. Every other kind's label is mode-independent.
  *
  * Ruling DC6 (spec §11.2): given the look on screen, the glTF item says
- * whose colours it carries -- a .glb keeps the active scheme's vertex colours.
+ * whose colours it carries -- a .glb keeps the theme's vertex colours (ruling R22a: the theme alone decides them).
  */
-export function exportItemsFor(mode: ViewMode, look?: { theme: ThemeMode; scheme: ColourScheme }): ExportItem[] {
+export function exportItemsFor(mode: ViewMode, look?: { theme: ThemeMode }): ExportItem[] {
     const items = mode === 'molecule'
         ? MOLECULE_EXPORT_ITEMS
         : mode !== 'bonds'
             ? EXPORT_ITEMS
             : EXPORT_ITEMS.map(item => (item.kind === 'csv' ? { ...item, label: 'Potential curve (CSV)' } : item));
     if (!look) return items;
-    const shown = `colours as shown (${SCHEME_LABEL[look.scheme]}, ${THEME_LABEL[look.theme]})`;
+    const shown = `colours as shown (${THEME_LABEL[look.theme]})`;
     return items.map(item => (item.kind === 'glb' ? { ...item, detail: item.detail.replace(GLB_COLOURS_KEPT, shown) } : item));
 }
 

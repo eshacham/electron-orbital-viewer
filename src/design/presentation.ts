@@ -7,12 +7,14 @@ import { createPref } from './local_pref';
  * a link opens in the receiver's own finish.
  */
 export type Finish = 'glow' | 'solid';
-export type ColourScheme = 'phase' | 'density' | 'classic';
-export interface RenderPrefs { finish: Finish; scheme: ColourScheme }
+/**
+ * Ruling R22a (owner): the surface is always coloured by the sign of ψ --
+ * there is no colour-scheme choice, so the finish is the only preference.
+ */
+export interface RenderPrefs { finish: Finish }
 
 export const RENDER_KEY = 'eov.render';
-export const DEFAULT_RENDER: RenderPrefs = { finish: 'glow', scheme: 'phase' };
-const SCHEMES: readonly ColourScheme[] = ['phase', 'density', 'classic'];
+export const DEFAULT_RENDER: RenderPrefs = { finish: 'glow' };
 
 function parse(raw: string | null): Record<string, unknown> {
     try {
@@ -23,12 +25,10 @@ function parse(raw: string | null): Record<string, unknown> {
     }
 }
 
+/** A value stored before ruling R22a may still carry `scheme`; it is ignored, and the finish kept. */
 export function decodeRender(raw: string | null): RenderPrefs {
     const value = parse(raw);
-    return {
-        finish: value.finish === 'solid' ? 'solid' : 'glow',
-        scheme: SCHEMES.includes(value.scheme as ColourScheme) ? value.scheme as ColourScheme : DEFAULT_RENDER.scheme,
-    };
+    return { finish: value.finish === 'solid' ? 'solid' : 'glow' };
 }
 
 export const renderPref = createPref<RenderPrefs>(RENDER_KEY, { decode: decodeRender, encode: value => JSON.stringify(value) });

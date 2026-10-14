@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { DensityMap } from './types/orbital';
-import { DENSITY_RAMP, displayRgb } from './design/science';
+import { displayRgb, PHASE_HUES } from './design/science';
 
 /**
  * Solid faces over a cut-away plane, shaded by the density they cut through.
@@ -23,8 +23,9 @@ import { DENSITY_RAMP, displayRgb } from './design/science';
 // ramp below has to be perceptual. Ramping in the linear working space and
 // converting afterwards lifts the dark end from 53/255 to 137/255, which flattens
 // the whole gradient into a narrow band of near-identical colour.
-const POSITIVE_PHASE = new THREE.Vector3(0xd4 / 255, 0x20 / 255, 0x20 / 255);
-const NEGATIVE_PHASE = new THREE.Vector3(0x20 / 255, 0x30 / 255, 0xd4 / 255);
+// Until the visualizer paints them for its appearance (setCapsPhaseColours), the phase hues.
+const POSITIVE_PHASE = new THREE.Vector3(...displayRgb(PHASE_HUES.positive));
+const NEGATIVE_PHASE = new THREE.Vector3(...displayRgb(PHASE_HUES.negative));
 
 const CAP_VERTEX_SHADER = /* glsl */`
     varying vec3 vWorldPosition;
@@ -44,8 +45,6 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
     uniform vec3 negativePhase;
     uniform float rMax;
     uniform float opacity;
-    uniform float rampMode;
-    uniform vec3 ramp[6];
 
     varying vec3 vWorldPosition;
 
@@ -66,21 +65,10 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         float climb = abs(signedClimb);
 
         vec3 phase = signedClimb >= 0.0 ? positivePhase : negativePhase;
-        // Worked in display space, so the output needs no further colour
-        // conversion.
-        vec3 color;
-        if (rampMode > 0.5) {
-            // "Density on the cut face" (spec §11.5): |ψ|² from the surface
-            // value (Low) to the peak (High), log scale -- climb is exactly
-            // that quantity -- through the six-stop ramp.
-            float t = clamp(climb, 0.0, 1.0) * 5.0;
-            int i = int(floor(t));
-            color = mix(ramp[i], ramp[min(i + 1, 5)], t - float(i));
-        } else {
-            // Dark where the cut meets the surface, full colour through the body of
-            // the lobe, washing out at the densest point.
-            color = mix(phase * (0.25 + 0.75 * climb), vec3(1.0), pow(climb, 2.2));
-        }
+        // Dark where the cut meets the surface, full colour through the body of
+        // the lobe, washing out at the densest point. Worked in display space,
+        // so the output needs no further colour conversion.
+        vec3 color = mix(phase * (0.25 + 0.75 * climb), vec3(1.0), pow(climb, 2.2));
 
         fragColor = vec4(color, opacity);
     }
@@ -163,9 +151,7 @@ export function createClipCaps(
             positivePhase: { value: POSITIVE_PHASE.clone() },
             negativePhase: { value: NEGATIVE_PHASE.clone() },
             rMax: { value: densityMap.rMax },
-            opacity: { value: opacity },
-            rampMode: { value: 0 },
-            ramp: { value: DENSITY_RAMP.map(hex => new THREE.Vector3(...displayRgb(hex))) }
+            opacity: { value: opacity }
         },
         vertexShader: CAP_VERTEX_SHADER,
         fragmentShader: CAP_FRAGMENT_SHADER,
@@ -229,7 +215,7 @@ export function setCapsOpacity(caps: THREE.Object3D | null, opacity: number): vo
 /**
  * Recolours the cut face's "positive" shade; a density has no phase, so it
  * takes the surface's own colour. Display-space 0–1 (science.ts displayRgb),
- * like the ramp it feeds -- a THREE.Color's linear components would draw the
+ * like the shading it feeds -- a THREE.Color's linear components would draw the
  * cut face darker than the surface it belongs to (ruling DC2b).
  */
 export function setCapsPositiveColour(caps: THREE.Object3D, colour: [number, number, number]): void {
@@ -241,21 +227,13 @@ export function setCapsPositiveColour(caps: THREE.Object3D, colour: [number, num
     });
 }
 
-/** The cut face's two phase colours, display-space 0–1 (science.ts displayRgb of phaseColours' caps). */
+/** The cut face's two phase colours, display-space 0–1 (science.ts displayRgb of phaseColours). */
 export function setCapsPhaseColours(caps: THREE.Object3D, positive: [number, number, number], negative: [number, number, number]): void {
     caps.traverse(object => {
         const material = (object as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
         if (!material?.uniforms?.positivePhase) return;
         material.uniforms.positivePhase.value.set(...positive);
         material.uniforms.negativePhase.value.set(...negative);
-    });
-}
-
-/** The Density scheme's ramp on the cut face, on or off (spec §11.5). */
-export function setCapsDensityRamp(caps: THREE.Object3D, on: boolean): void {
-    caps.traverse(object => {
-        const material = (object as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
-        if (material?.uniforms?.rampMode) material.uniforms.rampMode.value = on ? 1 : 0;
     });
 }
 

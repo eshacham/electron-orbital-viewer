@@ -598,16 +598,29 @@ describe('OrbitalViewer: the grid cell', () => {
     });
 });
 
-// Spec §3.2, §6.6: a theme or scheme change restyles the scene; the renderer is never rebuilt.
+// Spec §3.2, §6.6: a theme or finish change restyles the scene; the renderer is never rebuilt.
 describe('OrbitalViewer: appearance', () => {
-    it('restyles in place on a theme or scheme change -- one renderer for the session (spec §3.2)', () => {
+    // Ruling R22a: the finish (was the scheme) is the preference changed here -- there is no scheme.
+    it('restyles in place on a theme or finish change -- one renderer for the session (spec §3.2)', () => {
         renderViewer();
         act(() => { themeChoicePref.set('light'); });
-        act(() => { renderPref.set({ finish: 'solid', scheme: 'classic' }); });
+        act(() => { renderPref.set({ finish: 'solid' }); });
         expect(initVisualizer).not.toHaveBeenCalled();
         expect(cleanupVisualizer).not.toHaveBeenCalled();
         expect(setAppearance).toHaveBeenLastCalledWith(expect.anything(),
-            expect.objectContaining({ theme: 'light', scheme: 'classic', finish: 'solid' }));
+            expect.objectContaining({ theme: 'light', finish: 'solid' }));
+        window.localStorage.clear();
+    });
+
+    // Ruling R22a (owner): a returning user's eov.render still names Classic; it keeps their
+    // finish, and the renderer is told no scheme at all -- it draws the phase colours.
+    it('reads an old stored Classic choice as its finish alone', () => {
+        window.localStorage.setItem('eov.render', '{"finish":"solid","scheme":"classic"}');
+        jest.clearAllMocks();
+        render(<Provider store={createAppStore()}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        const appearance = (setAppearance as jest.Mock).mock.calls.at(-1)![1];
+        expect(appearance).toMatchObject({ finish: 'solid' });
+        expect(Object.keys(appearance).sort()).toEqual(['finish', 'lowPower', 'showAxes', 'theme']);
         window.localStorage.clear();
     });
 });

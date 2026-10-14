@@ -59,7 +59,7 @@ export function thumbOpacityOf(opacity: number): number {
 }
 
 export interface ThumbLook {
-    appearance: Pick<Appearance, 'theme' | 'scheme' | 'finish' | 'lowPower'>;
+    appearance: Pick<Appearance, 'theme' | 'finish' | 'lowPower'>;
     /** The main view's committed opacity (orbitalSlice's thumbOpacity). */
     opacity: number;
     /**
@@ -70,7 +70,7 @@ export interface ThumbLook {
     size: number;
 }
 
-/** theme|scheme|finish|power|size|opacity. */
+/** theme|finish|power|size|opacity. */
 export function thumbLookKey({ appearance: a, opacity, size }: ThumbLook): string {
-    return `${a.theme}|${a.scheme}|${a.finish}|${a.lowPower ? 'low' : 'full'}|${size}|${thumbOpacityOf(opacity)}`;
+    return `${a.theme}|${a.finish}|${a.lowPower ? 'low' : 'full'}|${size}|${thumbOpacityOf(opacity)}`;
 }

@@ -11,7 +11,7 @@ import './inspector_atom.css';
 interface AtomInspectorProps {
     variant: 'docked' | 'drawer' | 'stacked';
     /**
-     * The Display settings (surface, colour scheme, enclosed fraction,
+     * The Display settings (surface style, enclosed fraction,
      * opacity, cut, axes), heading the inspector above Plot | Data (ruling
      * R20b-atoms). App leaves it out of the phone's stacked inspector: there
      * the sheet's View tab holds them.

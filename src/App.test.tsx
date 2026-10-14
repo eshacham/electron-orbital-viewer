@@ -489,6 +489,9 @@ describe('App', () => {
             const view = screen.getByRole('tab', { name: 'View' });
             fireEvent.click(view);
             expect(screen.getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument(); // the Mode toggle moved to the phone's mode menu (spec §9.8)
+            // Ruling R22a (owner): the View tab has no colour-scheme choice.
+            expect(screen.queryByRole('group', { name: 'colour scheme' })).toBeNull();
+            expect(screen.queryByText('Colour scheme')).toBeNull();
             fireEvent.click(view);
             expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
         });
@@ -1395,7 +1398,8 @@ describe('App: shell', () => {
         const inspector = screen.getByRole('complementary', { name: 'Inspector' });
         const display = within(inspector).getByRole('region', { name: 'Display' });
         expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
-        expect(within(display).getByRole('button', { name: 'Phase ψ colours' })).toBeInTheDocument();
+        // Ruling R22a (owner): the colour-scheme toggle (was asserted here by its Phase ψ button) is gone.
+        expect(within(display).queryByRole('button', { name: 'Phase ψ colours' })).toBeNull();
         expect(within(display).getByRole('checkbox', { name: 'Show axes' })).toBeInTheDocument();
         expect(within(display).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
         expect(display.compareDocumentPosition(within(inspector).getByRole('tab', { name: 'Plot' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -1429,6 +1433,9 @@ describe('App: shell', () => {
             expect([mode, toggle.getAttribute('aria-expanded')]).toEqual([mode, 'true']);
             expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
             expect(within(display).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
+            // Ruling R22a (owner): no mode offers a colour-scheme choice.
+            expect([mode, screen.queryByRole('group', { name: 'colour scheme' })]).toEqual([mode, null]);
+            expect([mode, screen.queryByText('Colour scheme')]).toEqual([mode, null]);
         };
         check('atoms');
         fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));

@@ -23,7 +23,7 @@ const items = atomStripItems({ profile, level: 'orbital', selectedShell: 2, sele
 
 describe('ThumbnailStrip (spec §9.1, §13)', () => {
     it('is a listbox of labelled options, grouped by subshell, the shown orbital selected', () => {
-        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|phase|glow" onSelect={jest.fn()} />);
+        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
         const list = screen.getByRole('listbox', { name: 'orbitals in view' });
         expect(screen.getByRole('group', { name: '2p' })).toBeInTheDocument();
         // Ruling T16-optname (spec §13): options are named "<label> orbital"; the brief pinned the bare label.
@@ -35,7 +35,7 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
     it('selects with a click or Enter, moves with the arrows, and folds to its handle', () => {
         const onSelect = jest.fn();
         const onCollapsedChange = jest.fn();
-        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|phase|glow" onSelect={onSelect} onCollapsedChange={onCollapsedChange} />);
+        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={onSelect} onCollapsedChange={onCollapsedChange} />);
         // Ruling T16-optname (spec §13): options are named "<label> orbital"; the brief pinned the bare label.
         fireEvent.click(screen.getByRole('option', { name: '2p_x orbital' }));
         expect(onSelect).toHaveBeenCalledWith({ level: 'orbital', n: 2, l: 1, ml: 1 });
@@ -54,7 +54,7 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
     it('is one tab stop with working arrows again after a collapse and an expand', () => {
         function Controlled() {
             const [collapsed, setCollapsed] = useState(false);
-            return <ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|phase|glow" onSelect={jest.fn()}
+            return <ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()}
                 collapsed={collapsed} onCollapsedChange={setCollapsed} />;
         }
         render(<Controlled />);
@@ -89,7 +89,7 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
             return at(0, 0);
         });
         try {
-            render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|phase|glow" onSelect={jest.fn()} />);
+            render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
             expect(scrollIntoView).not.toHaveBeenCalled();
             // The tile starts 500 px into the list; centring 72 px in 300 px leaves 114 px before it.
             expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ left: 386 }));
@@ -113,11 +113,11 @@ describe('ThumbnailStrip on a lost WebGL context', () => {
             // A worker that never answers: every orbital tile stays pending.
             createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
             isBusy: () => false,
-            themeKey: () => 'dark|phase|glow',
+            themeKey: () => 'dark|glow',
             render: () => new Promise(() => {}),
         };
         thumbnailService.attach(host);
-        const { container } = render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|phase|glow" onSelect={jest.fn()} />);
+        const { container } = render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
         act(() => { thumbnailService.tick(); });
         expect(container.querySelectorAll('.strip-tile-glyph')).toHaveLength(0);
 
@@ -144,10 +144,10 @@ describe('ThumbnailStrip when a thumbnail cannot be made', () => {
                 return worker as unknown as Worker;
             },
             isBusy: () => false,
-            themeKey: () => 'dark|phase|glow',
+            themeKey: () => 'dark|glow',
             render: () => new Promise(() => {}),
         });
-        const { container } = render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|phase|glow" onSelect={jest.fn()} />);
+        const { container } = render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
         act(() => { thumbnailService.tick(); });
         expect(container.querySelectorAll('.strip-tile-glyph')).toHaveLength(0);
         act(() => { workers[0].onmessage!({ data: { type: 'error', message: 'no mesh' } }); });
@@ -167,7 +167,7 @@ describe('ThumbnailStrip under spin–orbit (bismuth)', () => {
 
     it('names each j-level group in its spoken form, shows the j-label, and opens the j-level\'s own orbital', () => {
         const onSelect = jest.fn();
-        render(<ThumbnailStrip items={biItems} label="orbitals in view" rGrid={biGrid} themeKey="dark|phase|glow" onSelect={onSelect} />);
+        render(<ThumbnailStrip items={biItems} label="orbitals in view" rGrid={biGrid} themeKey="dark|glow" onSelect={onSelect} />);
         const half = screen.getByRole('group', { name: '6p j = 1/2' });
         const threeHalves = screen.getByRole('group', { name: '6p j = 3/2' });
         expect(half).toHaveTextContent(subshellLabel(6, 1, 0.5));
@@ -202,7 +202,7 @@ describe('ThumbnailStrip and the committed opacity', () => {
 
     it('re-requests the tiles once a new opacity is committed, and not on drag ticks', () => {
         const store = createAppStore();
-        const look = { theme: 'dark' as const, scheme: 'phase' as const, finish: 'glow' as const, lowPower: false };
+        const look = { theme: 'dark' as const, finish: 'glow' as const, lowPower: false };
         const keyNow = () => thumbLookKey({ appearance: look, opacity: store.getState().orbital.thumbOpacity, size: 288 });
         thumbnailService.attach({
             createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
@@ -217,7 +217,8 @@ describe('ThumbnailStrip and the committed opacity', () => {
         render(<Provider store={store}><Strip /></Provider>);
         const orbitalTiles = items.filter(item => item.thumb.kind === 'orbital').length;
         expect(request).toHaveBeenCalledTimes(orbitalTiles);
-        expect(keyNow()).toBe('dark|phase|glow|full|288|0.7');
+        // Ruling R22a: the look key has no scheme field (was dark|phase|glow|...).
+        expect(keyNow()).toBe('dark|glow|full|288|0.7');
 
         act(() => { [0.65, 0.5, 0.4].forEach(value => store.dispatch(previewOpacity(value))); });
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.4);
@@ -225,7 +226,7 @@ describe('ThumbnailStrip and the committed opacity', () => {
 
         act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.4 })); });
         expect(request).toHaveBeenCalledTimes(2 * orbitalTiles);
-        expect(keyNow()).toBe('dark|phase|glow|full|288|0.4');
+        expect(keyNow()).toBe('dark|glow|full|288|0.4');
     });
 });
 
@@ -251,7 +252,7 @@ describe('ThumbnailStrip and the device pixel ratio', () => {
     const changeRatio = (next: number) => act(() => { ratio = next; [...listeners].forEach(listener => listener()); });
 
     it('re-requests every tile, at the new bitmap size, when the ratio changes', () => {
-        const look = { theme: 'dark' as const, scheme: 'phase' as const, finish: 'glow' as const, lowPower: false };
+        const look = { theme: 'dark' as const, finish: 'glow' as const, lowPower: false };
         thumbnailService.attach({
             createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
             isBusy: () => false, themeKey: () => thumbLookKey({ appearance: look, opacity: 0.7, size: thumbTileDevicePx(ratio) }),
