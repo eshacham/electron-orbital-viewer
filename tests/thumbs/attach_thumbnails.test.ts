@@ -12,7 +12,7 @@ import { createOrbitalWorker } from '../../src/workers/createOrbitalWorker';
 import { createThumbnailRenderer } from '../../src/thumbs/render_thumbnail';
 import { afterMainFrame, attachThumbnails, cleanupVisualizer, VisualizerContext } from '../../src/orbital_visualizer';
 import { ThumbnailService } from '../../src/thumbs/ThumbnailService';
-import { defaultSurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
+import { DEFAULT_OPACITY, defaultSurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
 import { INITIAL_APPEARANCE, type Appearance } from '../../src/design/appearance';
 
 /** A VisualizerContext without a WebGLRenderer (jsdom has no WebGL) -- tests/visualizer_appearance.test.ts's recipe. */
@@ -85,6 +85,35 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         expect(context.onAfterFrame).toBeUndefined();
     });
 
+    // Review A, M1: three.js restores the main renderer on its own after a
+    // context loss, but nothing told the service -- it stayed 'lost' for the
+    // rest of the session and every strip tile showed its glyph fallback
+    // forever, even though the main view had recovered.
+    it('re-attaches the thumbnail service on a restored context', () => {
+        const context = buildContext();
+        const service = new ThumbnailService();
+        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
+        context.renderer.domElement.dispatchEvent(new Event('webglcontextlost'));
+        expect(service.status()).toBe('lost');
+        context.renderer.domElement.dispatchEvent(new Event('webglcontextrestored'));
+        expect(service.status()).toBe('ready');
+    });
+
+    // Review A, M1: disposeThumbnails frees the render target; it must also
+    // drop both context listeners so a later loss/restore on the same canvas
+    // (e.g. after the host has moved on) cannot still reach this service.
+    it('removes both context listeners when the thumbnails are disposed', () => {
+        const context = buildContext();
+        const service = new ThumbnailService();
+        const removeSpy = jest.spyOn(context.renderer.domElement, 'removeEventListener');
+        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
+        context.disposeThumbnails!();
+        const removedTypes = removeSpy.mock.calls.map(call => call[0]);
+        expect(removedTypes).toEqual(expect.arrayContaining(['webglcontextlost', 'webglcontextrestored']));
+        context.renderer.domElement.dispatchEvent(new Event('webglcontextlost'));
+        expect(service.status()).toBe('ready');
+    });
+
     // Ruling R10 times the main picture. A thumbnail's render and read-back
     // land in the frame interval after it, so that interval is not fed to the
     // guard: a strip filling up must not latch Glow's lines and halo off.
@@ -122,7 +151,8 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         afterMainFrame(context, 16);
         await Promise.resolve();
         await Promise.resolve();
-        expect(thumbs.render).toHaveBeenCalledWith(expect.anything(), glow, 0.4);
+        // Fourth argument added by review A's M4 fix: !context.extrasSuppressed (the R10 latch), true here (unsuppressed).
+        expect(thumbs.render).toHaveBeenCalledWith(expect.anything(), glow, 0.4, true);
         expect(ready).toHaveBeenCalled();
         const hit = jest.fn();
         service.request({ contentKey: 'c', params }, hit);
@@ -131,5 +161,23 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         const miss = jest.fn();
         service.request({ contentKey: 'c', params }, miss);
         expect(miss).not.toHaveBeenCalled();
+    });
+
+    // Review A, M4: once the main view's R10 guard has latched the lines/halo off for the
+    // session, the strip must agree -- it must not keep drawing them in every tile.
+    it('passes extrasAllowed: false once the main view\'s R10 latch has fired', async () => {
+        const context = buildContext();
+        withLines(context);
+        const service = new ThumbnailService();
+        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
+        const thumbs = (createThumbnailRenderer as jest.Mock).mock.results.at(-1)!.value as { render: jest.Mock };
+        context.extrasSuppressed = true;
+        service.request({ contentKey: 'c', params }, jest.fn());
+        afterMainFrame(context, null);
+        workers[0].onmessage!({ data: { type: 'success', meshData: mesh() } });
+        afterMainFrame(context, 16);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(thumbs.render).toHaveBeenCalledWith(expect.anything(), glow, DEFAULT_OPACITY, false);
     });
 });

@@ -101,7 +101,10 @@ export function downsampleThumbnail(pixels: Uint8Array, side: number, factor: nu
 export function createThumbnailRenderer(
     renderer: THREE.WebGLRenderer,
     { pixelRatio = () => (typeof window === 'undefined' ? 1 : window.devicePixelRatio) }: { pixelRatio?: () => number } = {},
-): { render(meshData: MeshData, appearance: Appearance, opacity?: number): Promise<ThumbImage>; size(): number; dispose(): void } {
+): {
+    render(meshData: MeshData, appearance: Appearance, opacity?: number, extrasAllowed?: boolean): Promise<ThumbImage>;
+    size(): number; dispose(): void;
+} {
     let target: THREE.WebGLRenderTarget | null = null;
     /** Four MSAA samples on top of the supersample: lobe edges would otherwise shimmer against the tile's border. */
     function targetOf(side: number): THREE.WebGLRenderTarget {
@@ -130,7 +133,9 @@ export function createThumbnailRenderer(
     // two ratios can share a render target (216 at 1× and 1.5×) but never a bitmap (72 vs 108).
     const size = () => thumbTileDevicePx(pixelRatio());
 
-    async function render(meshData: MeshData, appearance: Appearance, opacity: number = DEFAULT_OPACITY): Promise<ThumbImage> {
+    async function render(
+        meshData: MeshData, appearance: Appearance, opacity: number = DEFAULT_OPACITY, extrasAllowed: boolean = true,
+    ): Promise<ThumbImage> {
         const ratio = pixelRatio();
         const SIZE = thumbnailSize(ratio);
         const factor = thumbSupersample(ratio);
@@ -153,7 +158,10 @@ export function createThumbnailRenderer(
         const radius = sphere && sphere.radius > 0 ? sphere.radius : 1;
         const centre = sphere ? sphere.center.clone() : new THREE.Vector3();
         // The main view's Glow, extras included: the rim and emissive on the surface, the lines and halo beside it.
-        attachGlowExtras(group, mesh, appearance, { radius, clippingPlanes: [], solid: true, extrasAllowed: true });
+        // Review A, M4: honour the main view's R10 frame-time latch (extrasSuppressed),
+        // not just appearance.lowPower -- a latched main view no longer draws lines/halo
+        // either, and the strip must not disagree once the device has shown it is slow.
+        attachGlowExtras(group, mesh, appearance, { radius, clippingPlanes: [], solid: true, extrasAllowed });
         const glowing = glowSettingsFor(appearance) !== null;
         if (glowing) tuneThumbnailGlow(group, mesh, appearance.theme);
         const levels = glowing ? GLOW_TUNING[appearance.theme].thumb.lights : SOLID_LIGHTS;

@@ -5,7 +5,8 @@ jest.mock('../src/workers/createOrbitalWorker', () => ({ createOrbitalWorker: je
 jest.mock('../src/orbital_controls_factory', () => ({ createOrbitalControls: jest.fn() }));
 
 import {
-    VisualizerContext, ViewInsets, frameOrbital, handleResize, setViewInsets, tickTransition, updateAtomViewInScene,
+    VisualizerContext, ViewInsets, frameOrbital, handleResize, refitToCanvas, setViewInsets, tickTransition,
+    updateAtomViewInScene,
 } from '../src/orbital_visualizer';
 import { defaultSurfaceStyle } from '../src/types/orbital';
 
@@ -115,6 +116,25 @@ describe('the camera fit follows the canvas, not only the insets', () => {
         expect(context.renderer.domElement.clientHeight).toBe(640);
 
         expect(distance(context)).toBe(before);
+    });
+
+    // Review A, M2: both current callers (setViewInsets, handleResize) happen to call
+    // applyViewOffset right after refitToCanvas, which updates the projection matrix --
+    // masking that refitToCanvas's own near/far change did not. A future direct caller
+    // would draw one frame with a stale projection; refitToCanvas must update it itself.
+    it('updates its own projection matrix after moving near/far, without relying on a caller (review A, M2)', () => {
+        const context = buildContext(868, 640);
+        setViewInsets(context, DESKTOP);
+        frameOrbital(context, 3);
+        // Changes the canvas size directly (not through handleResize, which would call
+        // applyViewOffset itself) so refitToCanvas is the only thing touched in this test.
+        context.renderer.setSize(600, 900);
+        const spy = jest.spyOn(context.camera, 'updateProjectionMatrix');
+        spy.mockClear();
+        const farBefore = context.camera.far;
+        refitToCanvas(context);
+        expect(context.camera.far).not.toBe(farBefore);
+        expect(spy).toHaveBeenCalled();
     });
 });
 

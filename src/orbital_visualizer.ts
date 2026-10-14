@@ -10,7 +10,7 @@ import { ScaleBar, computeScaleBar, worldUnitsPerPixel } from './scale_bar';
 import { createOrbitalWorker } from './workers/createOrbitalWorker';
 import { createThumbnailRenderer } from './thumbs/render_thumbnail';
 import { thumbLookKey } from './thumbs/thumb_key';
-import type { ThumbnailService } from './thumbs/ThumbnailService';
+import type { ThumbHost, ThumbnailService } from './thumbs/ThumbnailService';
 import { createOrbitalControls } from './orbital_controls_factory';
 import {
     createShellView,
@@ -592,8 +592,14 @@ function applyViewOffset(context: VisualizerContext): void {
  * fade drives the camera from its own two distances, so both are rescaled
  * with it (bug 2: the fade used to land on the old fit). A cross fade does
  * not move the camera, so the plain rescale is right for it.
+ *
+ * Review A, M2: calls `camera.updateProjectionMatrix()` itself after moving
+ * near/far, rather than relying on both current callers (setViewInsets,
+ * handleResize) happening to call applyViewOffset right afterwards -- a
+ * future caller that did not would otherwise draw one frame with a stale
+ * projection. Exported so this can be tested in isolation from those callers.
  */
-function refitToCanvas(context: VisualizerContext): void {
+export function refitToCanvas(context: VisualizerContext): void {
     if (!isLaidOut(context)) return;
     const oldFactor = context.fitFactor ?? fitFactorFor(context);
     const newFactor = fitFactorFor(context);
@@ -613,6 +619,7 @@ function refitToCanvas(context: VisualizerContext): void {
     const distance = offset.length();
     camera.near = Math.max(0.01, Math.min(camera.near, distance / 1000));
     camera.far = Math.max(camera.far, distance * 10);
+    camera.updateProjectionMatrix();
     controls.update();
 }
 
@@ -2327,7 +2334,7 @@ export function attachThumbnails(
     const thumbs = createThumbnailRenderer(context.renderer);
     // Ruling R20a-4 (fix round 1): the main view's committed opacity; the default when the host gives none.
     const opacity = () => options.opacity?.() ?? DEFAULT_OPACITY;
-    service.attach({
+    const thumbHost: ThumbHost = {
         createWorker: createOrbitalWorker,
         isBusy: options.isBusy,
         // Everything the picture depends on besides its content (thumb_key.ts, the
@@ -2335,10 +2342,23 @@ export function attachThumbnails(
         themeKey: () => thumbLookKey({ appearance: options.appearance(), opacity: opacity(), size: thumbs.size() }),
         render: meshData => {
             context.thumbnailRendered = true;
-            return thumbs.render(meshData, options.appearance(), opacity());
+            return thumbs.render(meshData, options.appearance(), opacity(), !context.extrasSuppressed);
         },
-    });
+    };
+    service.attach(thumbHost);
     context.onAfterFrame = () => service.tick();
-    context.disposeThumbnails = thumbs.dispose;
-    context.renderer.domElement.addEventListener('webglcontextlost', () => service.markLost());
+    // Review A, M1: three.js restores the main renderer on its own (one
+    // canvas, never remounted, §3.2); nothing told the service, so it stayed
+    // 'lost' for the rest of the session and every strip tile kept showing
+    // its glyph fallback after a GPU reset recovered. Re-attach on restore.
+    const host = context.renderer.domElement;
+    const onLost = () => service.markLost();
+    const onRestored = () => service.attach(thumbHost);
+    host.addEventListener('webglcontextlost', onLost);
+    host.addEventListener('webglcontextrestored', onRestored);
+    context.disposeThumbnails = () => {
+        host.removeEventListener('webglcontextlost', onLost);
+        host.removeEventListener('webglcontextrestored', onRestored);
+        thumbs.dispose();
+    };
 }

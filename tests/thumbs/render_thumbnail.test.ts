@@ -121,6 +121,19 @@ describe('createThumbnailRenderer (spec §12: a target on the main renderer)', (
         expect(seen[1].meshes).toHaveLength(1);
     });
 
+    // Review A, M4: the main view's R10 frame-time guard can latch Glow's lines/halo off
+    // for the rest of the session on a slow device; without this the strip ignored the
+    // latch and kept drawing them in every tile. A 4th argument, defaulting to true (every
+    // existing caller/test above is unaffected), lets the host say the latch is on.
+    it('honours the main view\'s R10 extras latch when the host passes extrasAllowed: false', async () => {
+        const { renderer, seen } = stubRenderer();
+        const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer, { pixelRatio: () => 1 });
+        await thumbs.render(triangle(), { ...glow, theme: 'dark' }, DEFAULT_OPACITY, false);
+        expect(seen[0].meshes).toHaveLength(1);
+        await thumbs.render(triangle(), { ...glow, theme: 'dark' }, DEFAULT_OPACITY, true);
+        expect(seen[1].meshes.map(mesh => mesh.userData.isGlowExtra ?? 'surface').sort()).toEqual(['halo', 'lines', 'surface']);
+    });
+
     it('restores the main view even when the draw throws', async () => {
         const { renderer, mainTarget, current } = stubRenderer();
         renderer.render.mockImplementationOnce(() => { throw new Error('context lost'); });
