@@ -2,7 +2,7 @@ import { DensityMap, MeshData, OrbitalParams } from './types/orbital';
 import { marchingCubes } from './marching_cubes';
 import { isoLevelForEnclosedFraction } from './radial_distribution';
 import {
-    AnalyticFieldSource, FieldEvaluator, FieldSource, GridFieldSource,
+    AnalyticFieldSource, FieldEvaluator, FieldSource, GridFieldSource, HydrogenicRecipe, RadialSamples,
     hydrogenicSource, makeFieldEvaluator, FieldRenderRequest, fieldOnGrid,
 } from './field_source';
 import { makeWaveFunctionEvaluator } from './quantum_functions';
@@ -268,6 +268,101 @@ function interpolateSample(field: SampledField, x: number, y: number, z: number)
 }
 
 /**
+ * Fix A (ruling R22b): the nucleus grid sample, replaced by the mean of
+ * |psi|^2 over the nucleus voxel, for an SCF source only.
+ *
+ * With relativity on, a heavy atom's s (and spin-orbit p half) radial
+ * function is singular at r = 0 (R ~ r^(gamma-1), gamma < 1: task-22b-findings
+ * .md §3). `cubeOf` always lays a sample exactly on the nucleus whenever
+ * `resolution` is even, and `isoLevelForEnclosedFraction` treats that one
+ * point as if it stood for a whole voxel of density -- for Ac 6s it holds
+ * 97-99.6% of the sampled total, so the "90% surface" collapses to the one
+ * voxel around the nucleus (a 6-vertex octahedron, |psi|^2 = 7.70e+4). The
+ * point sample is not representative of its cell; this replaces it with the
+ * cell's own mean, approximated by the voxel's equal-volume sphere,
+ * radius a = h*(3/(4*pi))^(1/3):
+ *
+ *   <|psi|^2> = 3 * Integral_0^a R(r)^2 r^2 dr / (4*pi*a^3)
+ *
+ * No angular quadrature is needed: a *normalised* real Y_lm integrates to 1
+ * over the whole sphere regardless of l or ml, so this applies unchanged to
+ * s orbitals and to spin-orbit p½. The radial integral is a sum over the log
+ * grid (dr = r dx): Integral_0^a R(r)^2 r^2 dr ~= Sum_{r_j < a} R_j^2 r_j^3 dx.
+ */
+function nucleusVoxelAmplitude(radial: RadialSamples, voxelStep: number): number {
+    const { R, rMin, dx, size } = radial;
+    const a = voxelStep * Math.cbrt(3 / (4 * Math.PI));
+
+    let sum = 0;
+    for (let j = 0; j < size; j++) {
+        const r = rMin * Math.exp(j * dx);
+        if (r >= a) break;
+        sum += R[j] * R[j] * r * r * r;
+    }
+    const meanSquare = (3 * sum * dx) / (4 * Math.PI * a * a * a);
+    return Math.sqrt(Math.max(0, meanSquare));
+}
+
+/**
+ * Applies `nucleusVoxelAmplitude` above to the one sample that sits exactly
+ * on the nucleus -- only reachable when `resolution` is even (`cubeOf`'s
+ * centre index `resolution / 2` is then exact on every axis) and the recipe
+ * is an SCF source (`radialSamples` present). Never applied to a
+ * `CombinationRecipe` (hybrids, Stark states read `sampleFieldSource`'s true
+ * point values instead -- this is meshing-path only) or to Basic Orbitals
+ * (no `radialSamples`: this returns `field` unchanged, so their mesh and iso
+ * stay byte-identical). The sign of the replacement is read off the sample it
+ * replaces, which is never exactly zero for an s or p½ state at ml = 0 (R(rMin)
+ * and the angular factor are both nonzero there).
+ */
+function withCorrectedNucleusSample(field: SampledField, recipe: HydrogenicRecipe, resolution: number): SampledField {
+    const radial = recipe.radialSamples;
+    if (!radial || resolution % 2 !== 0) return field;
+
+    const { side, step, samples } = field;
+    const centre = side >> 1;
+    const index = (centre * side + centre) * side + centre;
+
+    const amplitude = nucleusVoxelAmplitude(radial, step);
+    const sign = samples[index] < 0 ? -1 : 1;
+
+    const corrected = samples.slice();
+    corrected[index] = sign * amplitude;
+    return { ...field, samples: corrected };
+}
+
+/**
+ * Fix C (ruling R22b, honesty guard): a mesh confined to a couple of voxels
+ * around the nucleus, inside a box many times that size, is not the
+ * orbital's surface -- it is the same one-voxel degeneracy Fix A targets
+ * (a 6-vertex octahedron one voxel across), whether surviving through some
+ * path Fix A does not reach or from a future bug like it. Rather than hand
+ * the renderer a "surface" that is really a speck, this fails loudly:
+ * orbitalWorker.ts's catch already turns a thrown error into a `type:
+ * 'error'` response, which ThumbnailService already shows as its glyph
+ * (ruling T16-failtile) and OrbitalViewer.tsx's `onOrbitalFailed` already
+ * shows as a short, dismissible message instead of an empty canvas.
+ *
+ * Scoped to the analytic path only (never the grid path a molecule's ESP/MO
+ * surface takes): "the nucleus" (the box's own centre) is a meaningful
+ * landmark only when the box is centred on one atom, as every analytic
+ * orbital source's is.
+ */
+const DEGENERATE_SURFACE_VOXELS = 2;
+const MUCH_LARGER_BOX_VOXELS = 10;
+
+function checkSurfaceResolved(field: SampledField, mesh: MeshData): void {
+    const boxHalfWidth = -field.origin;
+    if (!(boxHalfWidth > field.step * MUCH_LARGER_BOX_VOXELS)) return;
+
+    const limitSq = (DEGENERATE_SURFACE_VOXELS * field.step) ** 2;
+    for (const [x, y, z] of mesh.positions) {
+        if (x * x + y * y + z * z > limitSq) return;
+    }
+    throw new Error('Could not resolve this surface: the computed mesh is confined to the nucleus voxel.');
+}
+
+/**
  * The isosurface of any field source (spec §4.1). An analytic source is
  * sampled once per point of a (resolution + 1)³ grid over its box; a grid
  * source is meshed on its own grid.
@@ -284,7 +379,13 @@ export function generateFieldMesh(source: FieldSource, resolution: number, enclo
     checkBox(resolution, source.rMax);
     checkFraction(enclosedFraction);
     const evaluate = makeFieldEvaluator(source.recipe);
-    return meshFromSamples(sampleAnalytic(source, evaluate, resolution), enclosedFraction, evaluate);
+    const sampled = sampleAnalytic(source, evaluate, resolution);
+    const corrected = source.recipe.type === 'hydrogenic'
+        ? withCorrectedNucleusSample(sampled, source.recipe, resolution)
+        : sampled;
+    const mesh = meshFromSamples(corrected, enclosedFraction, evaluate);
+    checkSurfaceResolved(corrected, mesh);
+    return mesh;
 }
 
 /** One orbital's isosurface; unchanged behaviour, now a field source like any other. */

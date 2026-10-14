@@ -656,7 +656,15 @@ export function frameOrbital(
     if (!context || context.isDisposed) return;
 
     const { camera, controls } = context;
-    const distance = fitDistance(context, rMax);
+    // Fix B (ruling R22b): clamp before deriving near/far, so far > distance
+    // always holds even when fitDistance comes back below OrbitControls' own
+    // minDistance -- which it did for the nucleus-voxel-degenerate meshes Fix
+    // A (orbital_mesh.ts) now corrects, and could again for some future
+    // degenerate surface (task-22b-findings.md §1: distance 0.0018, far
+    // 0.018, then controls.update() below clamped the camera out to
+    // minDistance 0.1, putting the whole scene beyond the far plane). `?? 0`
+    // covers a fake `controls` in a test fixture with no minDistance set.
+    const distance = Math.max(fitDistance(context, rMax), controls.minDistance ?? 0);
     context.fitFactor = fitFactorFor(context);
 
     const direction = restoreDefaultDirection
@@ -911,6 +919,9 @@ function cancelTransition(context: VisualizerContext, { cameraStays = false }: {
  */
 function placeShellFadeCamera(context: VisualizerContext, distance: number): void {
     const { camera, controls } = context;
+    // Fix B (ruling R22b): same clamp as frameOrbital, and for the same
+    // reason -- see its comment.
+    distance = Math.max(distance, controls.minDistance ?? 0);
     const direction = camera.position.clone().sub(controls.target);
     if (direction.lengthSq() === 0) direction.set(0, 0, 1);
     direction.normalize();

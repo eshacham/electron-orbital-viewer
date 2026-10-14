@@ -1,9 +1,10 @@
-import { generateOrbitalMesh } from '../src/orbital_mesh';
+import { generateOrbitalMesh, generateFieldMesh, sampleFieldSource } from '../src/orbital_mesh';
 import { makeWaveFunctionEvaluator, radialWaveFunction } from '../src/quantum_functions';
 import { computeSamplingRadius } from '../src/orbital_presets';
 import { MeshData, OrbitalParams } from '../src/types/orbital';
 import { solveAtom, AtomSolution } from '../src/atom/scf';
-import { buildAtomProfile, subshellSamplingRadius } from '../src/atom/atom_profile';
+import { buildAtomProfile, subshellSamplingRadius, radiusEnclosing } from '../src/atom/atom_profile';
+import { hydrogenicSource } from '../src/field_source';
 
 /**
  * Welds vertices that share a position and reports the topology of the result.
@@ -167,13 +168,20 @@ describe('radialSamples override', () => {
         // A radial factor with no nodes and a much faster decay than R_32 --
         // nothing like the analytic curve. If radialSamples were silently
         // ignored this mesh would come out identical to analyticMesh instead
-        // of having a markedly different iso level.
+        // of having a markedly different iso level. Decay rate 0.3, not the
+        // original 3: ruling R22b's Fix C (orbital_mesh.ts checkSurfaceResolved)
+        // now rejects a mesh confined to the nucleus voxel, and this synthetic
+        // R (no r^l suppression at the origin, unlike a real l=2 state) decayed
+        // so fast at rate 3 that its own genuinely-tiny 90% surface tripped
+        // that guard at this test's coarse resolution (32). Rate 0.3 keeps the
+        // "much faster than R_32, markedly different iso" intent (R_32 itself
+        // decays over tens of a0) while resolving to a real, many-voxel surface.
         const rMin = 1e-4;
         const rMaxSample = 60;
         const size = 2001;
         const dx = Math.log(rMaxSample / rMin) / (size - 1);
         const R = new Float64Array(size);
-        for (let j = 0; j < size; j++) R[j] = Math.exp(-3 * rMin * Math.exp(j * dx));
+        for (let j = 0; j < size; j++) R[j] = Math.exp(-0.3 * rMin * Math.exp(j * dx));
 
         const overriddenMesh = generateOrbitalMesh({ ...params, radialSamples: { R, rMin, dx, size } });
 
@@ -359,5 +367,126 @@ describe('l > 0 orbitals are never single-signed (angular part must vary)', () =
         expect(pos).toBeGreaterThan(0);
         expect(neg).toBeGreaterThan(0);
         expect(Math.abs(pos - neg) / (pos + neg)).toBeLessThan(0.05);
+    });
+});
+
+/**
+ * Task 22b, ruling R22b: with relativity on, a heavy atom's s (and
+ * spin-orbit p½) radial function is singular at r = 0 (task-22b-findings.md
+ * §3). One Cartesian grid sample sits exactly on the nucleus, and
+ * isoLevelForEnclosedFraction counted it as if it stood for a whole voxel --
+ * for Ac 6s it held 97-99.6% of the sampled density, so the "90% surface"
+ * collapsed to a 6-vertex octahedron one voxel across (|psi|^2 = 7.70e+4,
+ * radius 5.1e-4 a0) instead of a real sphere out near r90 = 2.28 a0. Fix A
+ * (orbital_mesh.ts, withCorrectedNucleusSample) replaces that one sample with
+ * the nucleus voxel's own mean density.
+ *
+ * Real `solveAtom` output, not a synthetic radial function: the bug is
+ * specifically about a real relativistic R(r)'s singularity at the origin.
+ */
+describe('Fix A (ruling R22b): a relativistic s/p½ orbital\'s 90% surface is not the nucleus voxel', () => {
+    jest.setTimeout(5 * 60 * 1000);
+
+    /** u^2 (+ Q^2 for a relativistic state): proportional to P(r), as atom_profile.ts's subshellCurveOf builds it. */
+    function radialCurveOf(state: { u: Float64Array; Q?: Float64Array }): Float64Array {
+        const { u, Q } = state;
+        const values = new Float64Array(u.length);
+        if (Q) { for (let j = 0; j < values.length; j++) values[j] = u[j] * u[j] + Q[j] * Q[j]; }
+        else { for (let j = 0; j < values.length; j++) values[j] = u[j] * u[j]; }
+        return values;
+    }
+
+    function meshReach(mesh: MeshData): number {
+        let maxR = 0;
+        for (const [x, y, z] of mesh.positions) maxR = Math.max(maxR, Math.hypot(x, y, z));
+        return maxR;
+    }
+
+    /** One SCF orbital's params at a given resolution, boxed at 2x its radial r90 (plenty of room). */
+    function scfOrbitalParams(
+        Z: number, n: number, l: number, state: { R: Float64Array }, grid: AtomSolution['grid'],
+        r90: number, resolution: number,
+    ): OrbitalParams {
+        return {
+            n, l, ml: 0, Z, resolution, rMax: r90 * 2, enclosedFraction: 0.9,
+            radialSamples: { R: state.R, rMin: grid.rMin, dx: grid.dx, size: grid.size },
+        };
+    }
+
+    // Measured (see the task report): maxR lands within ~1% of r90 for every
+    // case below, comfortably inside the findings' ±5% tolerance; 64³ and
+    // 128³ iso levels agree to ~1-2%.
+    const cases: Array<{
+        name: string; Z: number; relativity: 'scalar' | 'spinOrbit'; n: number; l: number; j?: number;
+    }> = [
+        { name: 'Ac scalar 6s', Z: 89, relativity: 'scalar', n: 6, l: 0 },
+        { name: 'Ac scalar 7s', Z: 89, relativity: 'scalar', n: 7, l: 0 },
+        { name: 'Au scalar 6s', Z: 79, relativity: 'scalar', n: 6, l: 0 },
+        { name: 'Cs scalar 6s', Z: 55, relativity: 'scalar', n: 6, l: 0 },
+    ];
+
+    it.each(cases)('$name: furthest vertex tracks r90, not the nucleus voxel', ({ Z, relativity, n, l, j }) => {
+        const atom = solveAtom(Z, relativity);
+        const state = atom.states.find(s => s.n === n && s.l === l && (j === undefined || s.j === j))!;
+        const r90 = radiusEnclosing(atom.grid, radialCurveOf(state), 0.9);
+
+        let isoAt64 = 0;
+        let isoAt128 = 0;
+        for (const resolution of [64, 128]) {
+            const mesh = generateOrbitalMesh(scfOrbitalParams(Z, n, l, state, atom.grid, r90, resolution));
+            // The old bug: a 6-vertex octahedron reaching 5e-4 to 1e-3 a0,
+            // regardless of r90. The fix: a real surface near r90.
+            expect(mesh.positions.length).toBeGreaterThan(1000);
+            const reach = meshReach(mesh);
+            expect(reach).toBeGreaterThan(r90 * 0.95);
+            expect(reach).toBeLessThan(r90 * 1.05);
+            if (resolution === 64) isoAt64 = mesh.isoLevel;
+            else isoAt128 = mesh.isoLevel;
+        }
+        expect(Math.abs(isoAt128 - isoAt64) / isoAt64).toBeLessThan(0.05);
+    });
+
+    it('Pb spin-orbit 6p½ p_z: furthest vertex tracks r90, well-resolved at 64³', () => {
+        const atom = solveAtom(82, 'spinOrbit');
+        const state = atom.states.find(s => s.n === 6 && s.l === 1 && s.j === 0.5)!;
+        const r90 = radiusEnclosing(atom.grid, radialCurveOf(state), 0.9);
+
+        const mesh64 = generateOrbitalMesh(scfOrbitalParams(82, 6, 1, state, atom.grid, r90, 64));
+        const mesh128 = generateOrbitalMesh(scfOrbitalParams(82, 6, 1, state, atom.grid, r90, 128));
+
+        // As-is (before Fix A), the 128³ mesh reached only 4.6 a0 with a
+        // pinched waist (task-22b-findings.md's prototype table).
+        expect(meshReach(mesh128)).toBeGreaterThan(4.6 * 0.9);
+        expect(mesh64.positions.length).toBeGreaterThan(3000);
+        expect(Math.abs(mesh128.isoLevel - mesh64.isoLevel) / mesh64.isoLevel).toBeLessThan(0.05);
+    });
+
+    it('never touches sampleFieldSource: cube export, hybrids and Stark states keep the true point value', () => {
+        const atom = solveAtom(89, 'scalar');
+        const state = atom.states.find(s => s.n === 6 && s.l === 0)!;
+        const source = hydrogenicSource({
+            n: 6, l: 0, ml: 0, Z: 89, resolution: 64, rMax: 4.9, enclosedFraction: 0.9,
+            radialSamples: { R: state.R, rMin: atom.grid.rMin, dx: atom.grid.dx, size: atom.grid.size },
+        });
+        const field = sampleFieldSource(source, 64);
+        const centre = (field.side >> 1);
+        const index = (centre * field.side + centre) * field.side + centre;
+        // The raw point value at the nucleus: R(rMin) * Y_00, hugely larger
+        // than the corrected voxel mean generateFieldMesh computes for the
+        // same source (the meshing-path-only test above gets iso ~4e-3;
+        // sampleFieldSource's own untouched sample is nowhere near that
+        // scale -- it is the same R(rMin) ~ 987 singularity the bug report
+        // measured).
+        expect(Math.abs(field.samples[index])).toBeGreaterThan(100);
+    });
+
+    it('rejects an unresolvable surface instead of drawing a one-voxel speck (Fix C)', () => {
+        // A box so enormous relative to the real orbital that even the
+        // corrected mesh cannot resolve a 90% surface inside it -- the
+        // degenerate-surface guard must fire rather than hand back a speck.
+        const source = hydrogenicSource({
+            n: 1, l: 0, ml: 0, Z: 1, resolution: 64, rMax: 400, enclosedFraction: 0.9,
+        });
+        expect(() => generateFieldMesh(source, 64, 0.9)).toThrow(/could not resolve this surface/i);
     });
 });

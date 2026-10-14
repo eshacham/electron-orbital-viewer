@@ -28,7 +28,11 @@ function buildContext(width: number, height: number): VisualizerContext {
     } as unknown as THREE.WebGLRenderer;
     return {
         scene: new THREE.Scene(), camera, renderer,
-        controls: { target: new THREE.Vector3(), update: () => {} } as unknown as VisualizerContext['controls'],
+        // minDistance 0.1 matches the real OrbitControls setup
+        // (orbital_visualizer.ts's createOrbitalControls) -- ruling R22b's
+        // Fix B clamps against it, so the fixture needs the real value for
+        // the "fit tests" describe block below to exercise the real clamp.
+        controls: { target: new THREE.Vector3(), update: () => {}, minDistance: 0.1 } as unknown as VisualizerContext['controls'],
         currentOrbitalGroup: null, currentAxesHelper: null, isDisposed: false,
         surfaceStyle: { ...defaultSurfaceStyle }, clipPlane, clippingPlanes: [clipPlane],
         currentCaps: null, activeWorker: null, requestCounter: 0, isShellView: false, transition: null,
@@ -216,6 +220,43 @@ describe('a shell fade interrupted by a non-animated update', () => {
         setViewInsets(fresh, DESKTOP);
         updateAtomViewInScene(fresh, shellParams(2), { animate: false });
         expect(distance(context)).toBeCloseTo(distance(fresh), 6);
+    });
+});
+
+/**
+ * Fix B (ruling R22b, task-22b-findings.md §4): frameOrbital derives near/far
+ * from the *unclamped* fit distance, then calls controls.update(), which
+ * clamps the camera's actual distance to controls.minDistance. When the fit
+ * distance comes in below minDistance -- which it did for a degenerate,
+ * nucleus-voxel orbital mesh (Fix A in orbital_mesh.ts fixes that case, but
+ * this guard is for any future one) -- far ends up smaller than the camera's
+ * real, clamped distance, and the whole scene sits beyond the far plane: an
+ * empty canvas, not even the axes helper drawn.
+ */
+describe('frameOrbital clamps to minDistance before deriving near/far (Fix B)', () => {
+    it('keeps far > distance > near for a box far smaller than minDistance', () => {
+        const context = buildContext(1000, 900);
+        setViewInsets(context, DESKTOP);
+        // rMax = 1e-4: the same order of magnitude as the degenerate Ac 6s
+        // mesh's radius (5.1e-4 a0) that produced an empty main view.
+        frameOrbital(context, 1e-4);
+
+        const d = distance(context);
+        expect(context.camera.far).toBeGreaterThan(d);
+        expect(d).toBeGreaterThan(context.camera.near);
+        // The clamp is exactly controls.minDistance, not merely "big enough".
+        expect(d).toBeCloseTo(context.controls.minDistance, 9);
+    });
+
+    it('leaves a normally-sized orbital framing untouched', () => {
+        const context = buildContext(1000, 900);
+        setViewInsets(context, DESKTOP);
+        frameOrbital(context, 2.7);
+
+        const d = distance(context);
+        expect(context.camera.far).toBeGreaterThan(d);
+        expect(d).toBeGreaterThan(context.camera.near);
+        expect(d).toBeGreaterThan(context.controls.minDistance * 10);
     });
 });
 

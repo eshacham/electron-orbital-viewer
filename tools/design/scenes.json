@@ -8,5 +8,11 @@
   "na-ion": "#mode=atom&Z=11&charge=1&level=atom",
   "basic-3dz2": "#mode=basic&n=3&l=2&ml=0",
   "bonds-n2": "#mode=bonds&system=n2",
-  "water": "#mode=molecule&id=h2o"
+  "water": "#mode=molecule&id=h2o",
+  "ac-6s-shell": "#mode=atom&Z=89&rel=scalar&level=shell&n=6",
+  "ac-6s-orbital": "#mode=atom&Z=89&rel=scalar&level=orbital&n=6&l=0&ml=0",
+  "ac-7s-orbital": "#mode=atom&Z=89&rel=scalar&level=orbital&n=7&l=0&ml=0",
+  "ac-6s-off-orbital": "#mode=atom&Z=89&rel=off&level=orbital&n=6&l=0&ml=0",
+  "au-6s-orbital": "#mode=atom&Z=79&rel=scalar&level=orbital&n=6&l=0&ml=0",
+  "pb-6p12-orbital": "#mode=atom&Z=82&rel=so&level=orbital&n=6&l=1&j=1/2&ml=0"
 }
