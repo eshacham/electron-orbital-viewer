@@ -8,7 +8,11 @@ import type { ViewInsets } from './orbital_visualizer';
  */
 export const TOP_ZONES = ['.viewport-title', '.viewport-toolbar'];
 export const RIGHT_ZONES = ['.key-column', '.inspector-drawer'];
-export const BOTTOM_ZONES = ['.thumbnail-strip', '.molecule-legend-stack'];
+// Ruling R22c: Molecules' key stack is retired -- its colour keys now live in
+// `.key-column` (already a right zone, above), and the tier/readout prose it
+// used to carry moved off the canvas entirely, so there is no bottom zone of
+// its own left to measure.
+export const BOTTOM_ZONES = ['.thumbnail-strip'];
 /** A phone's top bar and the header line under it (spec §9.8). */
 export const PHONE_TOP_ZONES = ['.phone-topbar', '.phone-header'];
 const OBSERVED_ZONES = [...TOP_ZONES, ...RIGHT_ZONES, ...BOTTOM_ZONES, ...PHONE_TOP_ZONES, '.phone-sheet'].join(', ');
@@ -18,7 +22,7 @@ const OBSERVED_ZONES = [...TOP_ZONES, ...RIGHT_ZONES, ...BOTTOM_ZONES, ...PHONE_
  * docked Explore panel and inspector sit beside the cell, not over it, so
  * they are not counted (spec §8.5); what is counted is every overlay zone
  * inside it: on a desktop the title block and toolbar along the top, the key column and the medium-width inspector drawer down the
- * right, the thumbnail strip and Molecules' key stack along the bottom; on a
+ * right, the thumbnail strip along the bottom; on a
  * phone the top bar and header line, and the sheet.
  */
 export function measureViewInsets(container: HTMLElement, narrow: boolean): ViewInsets {

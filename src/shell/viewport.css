@@ -12,6 +12,10 @@
   margin: 2px 0 0; color: var(--ql-color-text-2);
   font: var(--ql-type-subtitle-weight) var(--ql-type-subtitle-size) / var(--ql-type-subtitle-line) var(--ql-font-sans);
 }
+/* Ruling R22c: Molecules' tier/library line, under the description it
+   already has (same `TierBadge` component and wording as the canvas chip it
+   replaces -- only its max-width and margin change, to sit in the flow here). */
+.viewport-title .tier-badge { margin-top: 6px; max-width: 100%; }
 .viewport-toolbar { position: absolute; z-index: 11; top: 12px; right: 12px; display: flex; gap: 6px; }
 .viewport-toolbar .MuiIconButton-root {
   width: var(--ql-size-toolbar-button); height: var(--ql-size-toolbar-button);

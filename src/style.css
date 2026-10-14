@@ -1,11 +1,12 @@
 /* public/style.css */
 /* A phone's overlays under the 52 px top bar and the header line below it
-   (spec §9.8): the scale readout (and anything placed level with it) and
-   the molecule legend stack. Named once, so the tier badge that sits up at
-   the readout's level from inside the stack (V3) follows either if it moves. */
+   (spec §9.8): the scale readout, and anything placed level with it (the
+   key column's phone position, viewport.css). Ruling R22c retired the
+   molecule legend stack this variable also used to place -- its own tier
+   badge now rides in the phone header, and its colour keys in the key
+   column above, so only the one overlay-top offset is left to name. */
 :root {
   --phone-overlay-top: 112px;
-  --phone-legend-stack-top: 156px;
 }
 html, body, #root {
   height: 100%;
@@ -644,7 +645,6 @@ html, body, #root {
   .phone-header { top: 8px; display: flex; align-items: center; gap: 4px; }
   :root {
     --phone-overlay-top: 60px;
-    --phone-legend-stack-top: 104px;
   }
   .phone-sheet {
     top: 8px;
@@ -1077,42 +1077,13 @@ html, body, #root {
   text-overflow: ellipsis;
 }
 
-/* Task 9: the ESP key and (later) the molecule readout share the ψ legend's
-   bottom-centre slot (.phase-legend), stacked -- spec §3.8 reuses that slot
-   rather than adding a new floating panel. Separate rules throughout
-   (ruling D29), not a combined selector: panel_contrast's rule() helper only
-   finds a standalone `^.selector {` rule, and a combined one would also
-   defeat it for any class it is joined with. */
-.molecule-legend-stack {
-  position: absolute;
-  /* The bottom-centre slot (ruling T16-d), stacked above the scale readout
-     rather than beside it: centred at its level, the readout chip ran under
-     the scale (found live, Task 16, water at 1440 px). 76 px is the scale
-     readout's 20 px offset, its 48 px height and an 8 px gap. The molecule
-     is framed above the stack (useViewInsets counts it as the bottom). */
-  left: var(--free-center-x, 50%);
-  bottom: 76px;
-  transform: translateX(-50%);
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  pointer-events: none;
-  max-width: min(520px, calc(100vw - 24px));
-}
-/* A fixed height on a desktop, centred, so the stack's top -- the bottom of
-   the area the molecule is framed in -- does not move as the pointer goes
-   from atom to atom (a moving frame would move the atom under the pointer).
-   Five lines of pick and a line of note; a rarer longer pick scrolls. */
-.molecule-legend-stack .molecule-readout {
-  height: 104px;
-  box-sizing: border-box;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
+/* Ruling R22c (owner review 2026-10-14): Task 9's bottom-centre legend stack
+   -- a dark prose chip over the 3D view the owner could not scroll while
+   hovering -- is retired. The ESP/phase key it carried now lives in
+   `.key-column` (viewport.css, separate rules throughout per ruling D29, not
+   a combined selector: panel_contrast's rule() helper only finds a
+   standalone `^.selector {` rule); the tier line moved into the title block
+   and the pick readout into the Explore panel (`.molecule-selection` below). */
 .esp-legend {
   padding: 6px 12px;
   border-radius: 8px;
@@ -1308,9 +1279,10 @@ html, body, #root {
   color: var(--ql-color-text-1);
 }
 
-/* Dark chip over the canvas, like `.esp-legend` (same background/alpha so
-   both read together in `.molecule-legend-stack`); this component does not
-   position itself -- see MoleculeReadout's own comment. */
+/* Ruling R22c: no longer a chip floating over the canvas -- it lives in a
+   `.molecule-selection` section (Explore panel or the phone's Explore tab)
+   now, so a long pick scrolls on its own there rather than trapping the
+   pointer over the 3D view. */
 .molecule-readout {
   padding: 6px 12px;
   border-radius: 8px;
@@ -1319,7 +1291,27 @@ html, body, #root {
   color: var(--ql-color-text-1);
   font-size: 12px;
   text-align: center;
-  pointer-events: auto;
+  max-height: 140px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+/* The readout's own small section in the Explore panel (desktop) or the
+   phone's Explore tab (ruling R22c), under the molecule navigator: a plain
+   heading (no colour override -- it inherits the panel's own text-1, as
+   `.molecule-nav-browse` already does) above the scrolling readout. */
+.molecule-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* The phone header's molecule name button and its tier chip, side by side
+   (ruling R22c) -- `.phone-header` itself is only a flex row when sideways
+   (below), so this gives both orientations one row without depending on it. */
+.molecule-phone-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .molecule-view-options {
@@ -1338,12 +1330,6 @@ html, body, #root {
   width: 300px;
   box-sizing: border-box;
 }
-/* An orbital's ψ key joins the readout in the stack rather than sitting
-   over it in the same slot. */
-.molecule-legend-stack .phase-legend {
-  position: static;
-  transform: none;
-}
 /* On a phone the sheet is the card: no chrome of its own inside it, as
    for #controls and the radial plot there. */
 @media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
@@ -1355,58 +1341,29 @@ html, body, #root {
   }
 }
 
-/* Ruling D30 (Task 9's deferral, fixed in Task 16): on a phone the legend
-   stack takes .phase-legend's phone placement -- top right, under the
-   header -- and its compact padding and type. These come after the base
-   rule above on purpose: a media query adds no specificity, so the phone
-   rules Task 9 placed earlier in the file lost to the base rule's left,
-   bottom and transform. It starts below the scale readout (top left at
-   60px, about 34px tall) rather than level with it as the one-line ψ key
-   does: the stack is near full width, and the readout's own width follows
-   the scale, so no right-hand inset would reliably clear it (found live,
-   Task 16, pyridine at 390 and 844 px). */
+/* Ruling R22c (fix round 1, review Minor 3's class, now self-positioned):
+   a failed surface's alert, under the phone header rather than at
+   `.atom-error`'s top: 80px, which the header itself covers there. The
+   legend stack it used to ride in (for its "under the header" placement) is
+   retired, so this carries its own position now. MUI's standard error
+   colours, stated so they are tested. */
 @media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
-  .molecule-legend-stack {
-    top: var(--phone-legend-stack-top);
-    bottom: auto;
-    left: auto;
-    right: 12px;
-    transform: none;
-    gap: 4px;
-  }
-  .molecule-legend-stack .esp-legend {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-  /* Room for the ⓘ toggle, which the padding above would otherwise put
-     over the scale's last tick (found live, fix round 1). */
-  .molecule-legend-stack .esp-legend.compact {
-    padding-right: 30px;
-  }
-  .molecule-legend-stack .molecule-readout {
-    height: auto;
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-  /* Fix round 1 (review Minor 3): a failed surface's alert heads the stack
-     here, under the header, instead of .atom-error's top: 80px over the
-     readout chip. MUI's standard error colours, stated so they are tested. */
   .molecule-error {
+    position: absolute;
+    top: calc(var(--phone-overlay-top) + 2px);
+    left: 12px;
+    right: 12px;
+    z-index: 10;
     color: var(--ql-color-error-text);
     background-color: var(--ql-color-error-bg);
     padding: 2px 10px;
     font-size: 12px;
   }
-  .molecule-legend-stack .phase-legend {
-    padding: 4px 8px;
-    gap: 8px;
-    font-size: 12px;
-  }
 }
 /* The sideways phone docks the sheet at the right: the same pull-in as
-   .phase-legend gets there, so the stack stays over the free canvas. */
+   `.key-column.compact` gets there, so the alert stays over the free canvas. */
 @media (max-height: 500px) {
-  .molecule-legend-stack {
+  .molecule-error {
     right: calc(46vw + 12px);
   }
 }
@@ -1418,7 +1375,9 @@ html, body, #root {
 .structure-preview-atom { stroke: rgba(0, 0, 0, 0.6); stroke-width: 0.02; }
 .structure-preview-caption { display: flex; align-items: center; gap: 4px; }
 
-/* Phase 6B-2: tier badge (in .molecule-legend-stack) and the jobs panels in the side panel / Explore tab. */
+/* Phase 6B-2: tier badge (the title block on a desktop, ruling R22c; the
+   phone header's `.molecule-phone-header-row` otherwise) and the jobs panels
+   in the side panel / Explore tab. */
 .tier-badge { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px; background: var(--ql-color-surface-2); color: var(--ql-color-text-1); font-size: 0.8125rem; max-width: 520px; }
 .molecule-jobs { display: flex; flex-direction: column; gap: 8px; }
 .molecule-jobs .MuiAccordion-root { border-radius: 10px; background: var(--ql-color-surface-1); }
@@ -1463,30 +1422,15 @@ html, body, #root {
 .owner-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 8px; }
 .owner-bar-target { display: flex; align-items: center; gap: 6px; }
 /* A phone's badge is the chip alone (preflight D13, ruling T16-c): no card
-   behind it, so the stack is no taller than the chip. It takes the pointer
-   (V2) although the stack it sits in does not: its title is the only place
-   a pointer reads its line. The chip is small, so it hides little of the
-   canvas from a drag. */
+   behind it, so the header row is no taller for carrying it. It takes the
+   pointer (V2) although `.phone-header` does not: its title is the only
+   place a pointer reads its line. The chip is small, so it hides little of
+   the canvas from a drag. Ruling R22c: it flows inline in
+   `.molecule-phone-header-row` now (beside the molecule name), rather than
+   needing its own absolute position inside the retired legend stack. */
 .tier-badge.compact { padding: 0; background: none; pointer-events: auto; }
 /* V1: MUI's warning orange under white text is 3.1:1; this amber is 6.1:1. */
 .tier-badge .tier-chip-computed { background-color: #a84300; color: #ffffff; }
-/* A sideways phone has ~130 px between the header and the molecule, and the
-   stack starts at 104 px: even the compact chip, as a row of its own, put
-   the readout's bottom over the molecule's top (found live, Task 12, water
-   at 844x390). There it sits up at the scale readout's level instead, at
-   the stack's right end -- clear of the scale (left) and the header (which
-   ends at ~140 px across) -- and out of the stack's flow, so the stack is
-   no taller than Phase 6 made it. */
-@media (max-height: 500px) {
-  .molecule-legend-stack .tier-badge.compact {
-    position: absolute;
-    /* V3: the scale readout's own top, measured from the stack's -- derived
-       from the two offsets that place them, not a number that silently goes
-       wrong when either moves. */
-    top: calc(var(--phone-overlay-top) - var(--phone-legend-stack-top));
-    right: 0;
-  }
-}
 /* The followed job's status has no card of its own (the accordions above it
    have MUI's): in the desktop side panel it sat as dark text straight on the
    black scene (found live, Task 12, ammonia running). The same light card as

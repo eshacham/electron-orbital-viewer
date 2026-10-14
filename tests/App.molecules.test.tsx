@@ -253,8 +253,12 @@ describe('Molecules mode', () => {
         expect(container.querySelector('.side-panel .molecule-nav-orbital')).toHaveTextContent('Showing 1b1 (HOMO)');
     });
 
-    // Ruling T16-c: a sideways phone gets the compact ESP key.
-    it('uses the compact ESP key on a sideways phone only', async () => {
+    // Ruling R22c: the ESP key now lives in the right-hand key column on
+    // every viewport (desktop included), not just a sideways phone -- the
+    // column is a narrow strip everywhere, so it is compact everywhere (the
+    // brief's own "colour keys ... compact, no prose"). Replaces the old
+    // T16-c test, which this ruling overrides.
+    it('keeps the ESP key compact wherever it is shown', async () => {
         const { store, container, unmount } = await enterMolecules(true, { landscape: true });
         pickWater(store);
         act(() => { store.dispatch(setSurface({ kind: 'esp' })); });
@@ -263,22 +267,27 @@ describe('Molecules mode', () => {
         const upright = await enterMolecules(true);
         pickWater(upright.store);
         act(() => { upright.store.dispatch(setSurface({ kind: 'esp' })); });
-        expect(upright.container.querySelector('.esp-legend')).not.toBeNull();
-        expect(upright.container.querySelector('.esp-legend.compact')).toBeNull();
+        expect(upright.container.querySelector('.esp-legend.compact')).not.toBeNull();
+        upright.unmount();
+        const desk = await enterMolecules(false);
+        pickWater(desk.store);
+        act(() => { desk.store.dispatch(setSurface({ kind: 'esp' })); });
+        expect(desk.container.querySelector('.esp-legend.compact')).not.toBeNull();
     });
 
-    // Review Minor 3: on a phone the error joins the key stack (under the
-    // header) instead of sitting over the readout chip at top: 80px.
-    it('puts a failed surface\'s alert in the key stack on a phone, and over the canvas on a desktop', async () => {
+    // Review Minor 3; ruling R22c: the legend stack that used to carry the
+    // phone's alert is retired, so it keeps its own class/position
+    // (`.molecule-error`) rather than riding in a shared container.
+    it('puts a failed surface\'s alert under the phone header, and over the canvas on a desktop', async () => {
         const phone = await enterMolecules(true);
         pickWater(phone.store);
         act(() => { phone.store.dispatch(renderFailed('HTTP 404')); });
-        expect(phone.container.querySelector('.molecule-legend-stack [role="alert"]')).not.toBeNull();
+        expect(phone.container.querySelector('.molecule-error[role="alert"]')).not.toBeNull();
         phone.unmount();
         const desk = await enterMolecules(false);
         pickWater(desk.store);
         act(() => { desk.store.dispatch(renderFailed('HTTP 404')); });
-        expect(desk.container.querySelector('.molecule-legend-stack [role="alert"]')).toBeNull();
+        expect(desk.container.querySelector('.molecule-error')).toBeNull();
         expect(screen.getByRole('alert')).toHaveTextContent('HTTP 404');
     });
 

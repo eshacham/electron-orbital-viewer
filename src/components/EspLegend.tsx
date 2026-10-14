@@ -17,8 +17,11 @@ interface EspLegendProps {
  * The ESP map's key: states the fixed scale, the 0.001 surface (ruling D4:
  * exact, not an enclosed fraction) and the method, and -- once a surface is
  * drawn -- this molecule's own range, flagging when it runs past the fixed
- * scale. Sits in `.molecule-legend-stack`, the bottom-centre slot the ψ
- * legend (`.phase-legend`) uses (spec §3.8: no new floating panel).
+ * scale. Ruling R22c (owner review 2026-10-14): sits in the right-hand key
+ * column every mode uses (`KeyColumn`), always `compact` there -- the column
+ * is a narrow strip on any viewport, and the brief's own "colour keys ...
+ * compact, no prose" -- so the notes stay behind the info toggle rather than
+ * printed beside the bar.
  */
 const EspLegend: React.FC<EspLegendProps> = ({ range, method, compact = false }) => {
     const [notesOpen, setNotesOpen] = useState(false);

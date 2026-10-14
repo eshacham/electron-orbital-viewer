@@ -7,6 +7,7 @@ import {
     Dialog,
     IconButton,
     Snackbar,
+    Typography,
 } from '@mui/material';
 import Close from '@mui/icons-material/Close';
 import HelpOutline from '@mui/icons-material/HelpOutline';
@@ -1256,6 +1257,21 @@ function App() {
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
+    // Ruling R22c (owner review 2026-10-14): the hover/pick readout moves off
+    // the canvas into a stable Explore-panel section -- desktop's panel and
+    // the phone's Explore tab both scroll on their own (never the canvas),
+    // so a long pick no longer traps the pointer under an unscrollable
+    // overlay. Gated exactly as `.molecule-legend-stack` gated
+    // `MoleculeReadout` before: a molecule loaded, with its structure shown
+    // (nothing to pick with the ball-and-stick off).
+    const moleculeSelectionSection = molecule.meta && molecule.showStructure && (
+        <div className="molecule-selection">
+            <Typography variant="subtitle2" className="molecule-selection-heading">Selection</Typography>
+            <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}
+                geometrySource={molecule.meta.geometrySource} touch={isNarrow} />
+        </div>
+    );
+
     // A phone has no viewport toolbar (ruling R6): Reset view, Share and Export end the View tab, as before.
     const phoneViewActions = (
         <div className="view-actions">
@@ -1271,8 +1287,10 @@ function App() {
         ? [
             {
                 key: 'explore', label: 'Explore',
+                // Ruling R22c: the readout heads the tab, ahead of the navigator.
                 content: (
                     <>
+                        {moleculeSelectionSection}
                         <MoleculeNav {...moleculeNavProps} variant="body" />
                         <MoleculeJobsSection />
                     </>
@@ -1317,8 +1335,10 @@ function App() {
     // A molecule that did not load, or a surface that did not draw (spec
     // §3.5). Said once -- not as a Snackbar too (Bonds' ruling C9) -- and a
     // failed surface is cleared rather than left standing beside its own
-    // error. On a phone it heads the key stack: at .atom-error's top: 80px
-    // it sat over the readout chip (fix round 1, review Minor 3).
+    // error. On a phone `.molecule-error` sits under the header rather than
+    // at `.atom-error`'s top: 80px, which the phone's own header covers
+    // (fix round 1, review Minor 3; ruling R22c: now self-positioned, the
+    // legend stack it used to ride in having been retired).
     const moleculeAlert = isMoleculeMode && (molecule.error || molecule.renderError) ? (
         <Alert severity="error" className={isNarrow && molecule.meta ? 'molecule-error' : 'atom-error'}>
             {molecule.error ?? `Could not draw ${SURFACE_NAME[molecule.surface.kind]}: ${molecule.renderError}`}
@@ -1365,7 +1385,8 @@ function App() {
     );
 
     const exploreContent = isBondsMode ? bondsPanel
-        : isMoleculeMode ? <><MoleculeNav {...moleculeNavProps} /><MoleculeJobsSection /></>
+        // Ruling R22c: the readout's section sits under the navigator (the brief's own placement).
+        : isMoleculeMode ? <><MoleculeNav {...moleculeNavProps} />{moleculeSelectionSection}<MoleculeJobsSection /></>
         // Basic Orbitals: its choice of orbital -- n/l/mₗ, combination, Update Orbital (ruling R20b).
         : renderControls('selection');
     // Basic Orbitals, Bonds and Molecules (the atom has its own: atomInspector above): the view
@@ -1427,7 +1448,12 @@ function App() {
             {isMoleculeMode && (
                 <div className="phone-header">
                     {isPhoneLandscape && phoneTopBar(true)}
-                    <MoleculeNav {...moleculeNavProps} variant="header" />
+                    {/* Ruling R22c: a phone has no `TitleBlock` to carry the tier
+                        line, so it rides in the phone's own header row instead. */}
+                    <div className="molecule-phone-header-row">
+                        <MoleculeNav {...moleculeNavProps} variant="header" />
+                        {molecule.meta && <TierBadge meta={molecule.meta} compact />}
+                    </div>
                 </div>
             )}
             {isBondsMode && (
@@ -1480,7 +1506,14 @@ function App() {
             {isAtomMode && atomUnbound && !(isNarrow && phoneTab !== 'explore') && (
                 <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
             )}
-            {!isNarrow && <TitleBlock title={viewTitleText} subtitle={viewSubtitle} />}
+            {!isNarrow && (
+                <TitleBlock title={viewTitleText} subtitle={viewSubtitle}>
+                    {/* Ruling R22c: the library/tier line moves here from the canvas
+                        (was `.molecule-legend-stack`'s `TierBadge`) -- same component,
+                        same wording, just under the molecule's own description now. */}
+                    {isMoleculeMode && molecule.meta && <TierBadge meta={molecule.meta} />}
+                </TitleBlock>
+            )}
             {!isNarrow && (
                 <ViewportToolbar onResetView={handleResetView} shareExport={shareExportToolbar}
                     fullscreen={fullscreen.active} onToggleFullscreen={fullscreen.toggle} />
@@ -1519,31 +1552,28 @@ function App() {
                     )}
                 </KeyColumn>
             )}
-            {/* Molecules: the tier badge, the pick readout, the ESP key and
-                an orbital's ψ key share the bottom-centre slot, stacked
-                (spec §3.8: no new floating panel). The tier heads it and
-                is always there (spec §9.1, preflight D12), so the stack
-                shows whenever a molecule is loaded -- the others keep
-                their own conditions. A molecule that failed to load has
-                no meta: the error, no badge. */}
-            {isMoleculeMode && molecule.meta && (
-                <div className="molecule-legend-stack">
-                    <TierBadge meta={molecule.meta} compact={isNarrow} />
-                    {isNarrow && moleculeAlert}
-                    {molecule.showStructure && (
-                        <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}
-                            geometrySource={molecule.meta.geometrySource} touch={isNarrow} />
-                    )}
+            {/* Ruling R22c (owner review 2026-10-14): Molecules' canvas keeps
+                only the colour keys §3.3 requires -- the ESP/phase key, in
+                the same right-hand key column every other mode uses, compact
+                and without their prose notes (the notes stay a tap away
+                behind EspLegend's own info toggle). The tier line and the
+                pick readout, which used to share this bottom-centre stack,
+                are prose and moved off the canvas entirely: the tier into the
+                title block, the readout into the Explore panel. */}
+            {isMoleculeMode && molecule.meta && ((moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend) && (
+                <KeyColumn compact={isNarrow}>
                     {moleculeKeysShown && molecule.surface.kind === 'esp' && (
-                        <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact={isPhoneLandscape} />
+                        <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact />
                     )}
                     {showPhaseLegend && <PhaseKey positive={phase.positive} negative={phase.negative} />}
-                </div>
+                </KeyColumn>
             )}
-            {/* Over the canvas on a desktop; on a phone it heads the key
-                stack instead (with no molecule loaded there is no stack,
-                and nothing for it to cover). */}
-            {moleculeAlert && !(isNarrow && molecule.meta) && moleculeAlert}
+            {/* A molecule that failed to load, or a surface that failed to
+                draw (spec §3.5): over the canvas on a desktop
+                (`.atom-error`); on a phone, under the header, in its own
+                position now that the legend stack it used to ride in is
+                gone (`.molecule-error`, ruling R22c). */}
+            {moleculeAlert}
             {/* Addendum 3: the element selector is a real periodic
                 table on anything wider than a phone, as a pop-over over
                 the view. A table does not survive a phone width, so

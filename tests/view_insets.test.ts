@@ -58,12 +58,16 @@ describe('measureViewInsets', () => {
         expect(open).toEqual(closed);
     });
 
-    // Ruling T16-d, kept: Molecules' key stack along the bottom.
-    it('on a desktop, keeps the molecule clear of the legend stack along the bottom', () => {
+    // Ruling R22c: the legend stack is retired (its colour keys moved into
+    // `.key-column`, its prose off the canvas entirely) -- an element still
+    // carrying the old class is no longer a bottom zone, so it adds no
+    // stale inset (replaces the old T16-d "kept" test, which this ruling
+    // overrides).
+    it('no longer counts the retired legend-stack class as a bottom zone', () => {
         const root = layout({ width: 711, height: 820 }, {
             '.molecule-legend-stack': { left: 120, right: 580, top: 640, bottom: 808, width: 460, height: 168 },
         });
-        expect(measureViewInsets(root, false)).toEqual({ top: 0, right: 0, bottom: 180, left: 0 });
+        expect(measureViewInsets(root, false)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
     });
 
     // The docked panels are siblings of the viewport now (spec §8.5: "the side-panel and view-panel selectors go").

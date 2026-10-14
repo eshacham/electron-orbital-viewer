@@ -89,7 +89,8 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(within(side).getByRole('button', { name: 'How this was computed' })).toBeInTheDocument();
         expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
         expect(screen.queryByRole('button', { name: 'Computed' })).toBeNull();
-        expect(container.querySelector('.molecule-legend-stack')).toHaveTextContent('Library');
+        // Ruling R22c: the tier line moved from the canvas's legend stack into the title block.
+        expect(container.querySelector('.viewport-title')).toHaveTextContent('Library');
         // Ruling R4-rec: a production build without sign-in shows visitors no owner plumbing.
         expect(screen.queryByText(/Owner sign-in/)).toBeNull();
         expect(mockApi.list).not.toHaveBeenCalled();
@@ -112,7 +113,8 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(within(side).queryByRole('button', { name: 'Computed' })).toBeNull();
         expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
         // Anyone may open a computed molecule's link, and is told what it is.
-        expect(container.querySelector('.molecule-legend-stack')).toHaveTextContent('Computed');
+        // Ruling R22c: the tier line moved from the canvas's legend stack into the title block.
+        expect(container.querySelector('.viewport-title')).toHaveTextContent('Computed');
         fireEvent.click(within(side).getByRole('button', { name: 'How this was computed' }));
         await flush();
         expect(screen.queryByText(/Owner only/)).toBeNull();
@@ -138,7 +140,8 @@ describe('Molecules mode with on-demand molecules', () => {
         BUILD_ENV.dev = true;
         const { store, container } = await enterMolecules(false);
         await show(store, KEY);
-        expect(container.querySelector('.molecule-legend-stack')).toHaveTextContent('Computed');
+        // Ruling R22c: the tier line moved from the canvas's legend stack into the title block.
+        expect(container.querySelector('.viewport-title')).toHaveTextContent('Computed');
         fireEvent.click(screen.getByRole('button', { name: 'How this was computed' }));
         await flush();
         expect(screen.getByText(/Cost: spent \$0\.00 \(This Mac\)\./)).toBeInTheDocument();
@@ -150,14 +153,16 @@ describe('Molecules mode with on-demand molecules', () => {
         const { store, container } = await enterMolecules(false);
         await show(store, 'h2o');
         act(() => { store.dispatch(setShowStructure(false)); });
-        expect(container.querySelector('.molecule-legend-stack')).toHaveTextContent('Library');
+        // Ruling R22c: the tier badge lives in the title block now, unaffected by showStructure.
+        expect(container.querySelector('.viewport-title')).toHaveTextContent('Library');
     });
 
     // Preflight D13 / ruling T16-c: the phone's badge is the chip alone.
     it('on a phone, the badge is compact and still says what the tier means', async () => {
         const { store, container } = await enterMolecules(true);
         await show(store, 'h2o');
-        const badge = within(container.querySelector('.molecule-legend-stack') as HTMLElement).getByRole('note', { name: 'data tier' });
+        // Ruling R22c: a phone has no viewport-title, so the compact badge rides in the phone header instead.
+        const badge = within(container.querySelector('.phone-header') as HTMLElement).getByRole('note', { name: 'data tier' });
         expect(badge).toHaveClass('compact');
         // Final review I2: water's own line -- its dipole is checked; its geometry is experiment's.
         expect(badge).toHaveAccessibleDescription('Curated; geometry from experiment; dipole checked against published values.');
@@ -168,7 +173,8 @@ describe('Molecules mode with on-demand molecules', () => {
         const { store, container } = await enterMolecules(false);
         await show(store, '0'.repeat(64));
         expect(screen.getByText(/This computed molecule has no finished result yet/)).toBeInTheDocument();
-        expect(container.querySelector('.molecule-legend-stack')).toBeNull();
+        // Ruling R22c: no meta loaded means no tier badge, wherever it would otherwise render.
+        expect(container.querySelector('.tier-badge')).toBeNull();
     });
 
     it("puts the owner's panels in the phone's Explore tab", async () => {

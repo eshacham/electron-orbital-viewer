@@ -6,10 +6,10 @@ interface MoleculeReadoutProps { atoms: MoleculeAtom[]; pick: MoleculePick | nul
 
 /**
  * Lengths and angles for whatever the pointer is on (tap on a phone), with
- * where the geometry comes from. A dark chip over the canvas, like
- * `EspLegend`; whichever task assembles the Molecules view places it inside
- * `.molecule-legend-stack` alongside `EspLegend` (Task 9's own note) rather
- * than this component positioning itself.
+ * where the geometry comes from. Ruling R22c (owner review 2026-10-14): no
+ * longer a chip floating over the canvas -- App.tsx places it in a scrolling
+ * Explore-panel section (desktop) or the phone's Explore tab, never over the
+ * 3D view, so a long pick scrolls with the mouse instead of trapping it.
  */
 const MoleculeReadout: React.FC<MoleculeReadoutProps> = ({ atoms, pick, geometrySource, touch }) => {
     const bonds = useMemo(() => detectBonds(atoms), [atoms]);
