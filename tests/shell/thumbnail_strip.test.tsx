@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import ThumbnailStrip, { tileBacking } from '../../src/shell/ThumbnailStrip';
 import { atomStripItems } from '../../src/thumbs/strip_items';
@@ -10,7 +12,9 @@ import { Provider } from 'react-redux';
 import { createAppStore } from '../../src/store';
 import { useAppSelector } from '../../src/store/hooks';
 import { previewOpacity, setSurfaceStyle } from '../../src/store/orbitalSlice';
-import { thumbLookKey } from '../../src/thumbs/thumb_key';
+import { THUMB_TILE_PX, thumbLookKey, thumbTileDevicePx } from '../../src/thumbs/thumb_key';
+import { CANVAS_BACKDROPS, SHADOWS, TOKENS, TYPE } from '../../src/design/tokens';
+import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 
 const profile = neonProfile();
 const rGrid = Array.from({ length: profile.size }, (_, j) => profile.rMin * Math.exp(j * profile.dx));
@@ -176,15 +180,17 @@ describe('ThumbnailStrip under spin–orbit (bismuth)', () => {
     });
 });
 
-// Ruling R20a-4: a tile's canvas holds its CSS size in device pixels (never under 2×,
-// today's), so the 2×-supersampled picture is downsampled once and never stretched.
+// Ruling R20a-4: a tile's canvas holds its CSS size in device pixels. Ruling R20d: exactly that, on a
+// 1× screen too (was at least 2×, which the browser then shrank), so the tile's bitmap -- made at the
+// same device size -- is drawn 1:1 and shown unscaled.
 describe('tileBacking', () => {
-    it('is the tile in device pixels, at least twice its CSS size', () => {
-        expect(tileBacking(72, 1)).toBe(144);
+    it('is the tile in device pixels, the size of the bitmap it is given', () => {
+        expect(tileBacking(72, 1)).toBe(72);
         expect(tileBacking(72, 2)).toBe(144);
         expect(tileBacking(72, 3)).toBe(216);
         expect(tileBacking(56, 3)).toBe(168);
-        expect(tileBacking(56, Number.NaN)).toBe(112);
+        expect(tileBacking(56, Number.NaN)).toBe(56);
+        for (const dpr of [1, 1.25, 1.5, 2, 2.625, 3]) expect(tileBacking(THUMB_TILE_PX, dpr)).toBe(thumbTileDevicePx(dpr));
     });
 });
 
@@ -219,5 +225,47 @@ describe('ThumbnailStrip and the committed opacity', () => {
         act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.4 })); });
         expect(request).toHaveBeenCalledTimes(2 * orbitalTiles);
         expect(keyNow()).toBe('dark|phase|glow|full|288|0.4');
+    });
+});
+
+// Ruling R20d: labels one step larger, and the selected tile clearly marked -- the concept's selected 2p_z tile.
+describe('strip tile styles (ruling R20d)', () => {
+    const css = readFileSync(resolve(__dirname, '../../src/shell/strip.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = (selector: string) => {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const match = new RegExp(`(^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(css);
+        if (!match) throw new Error(`No rule for ${selector}`);
+        return match[2];
+    };
+    const rgb = (hex: string) => parseCssColor(hex).slice(0, 3) as [number, number, number];
+
+    it('sets tile labels at the body size from tokens (13 px, was the 12 px caption)', () => {
+        expect(rule('.strip-tile-label')).toMatch(/font:\s*500 var\(--ql-type-body-size\) \/ var\(--ql-size-thumb-label\)/);
+        expect(TYPE.body.size).toBe(13);
+        expect(TYPE.body.size).toBeGreaterThan(TYPE.caption.size);
+    });
+
+    it('rings the selected tile in a 2 px selected-edge, with a soft glow of that hue in Deep Space only (§4.6)', () => {
+        expect(rule('.strip-tile.selected .strip-tile-image::after')).toMatch(/border:\s*2px solid var\(--ql-color-selected-edge\)/);
+        expect(rule('.strip-tile.selected .strip-tile-image')).toMatch(/box-shadow:\s*var\(--ql-shadow-selected-tile\)/);
+        const [r, g, b] = rgb(TOKENS.dark['selected-edge']);
+        expect(SHADOWS.dark['selected-tile']).toContain(`rgba(${r},${g},${b},`);
+        expect(SHADOWS.light['selected-tile']).toBe('none');
+    });
+
+    // §13: the selected edge is a control edge in its selected state, >= 3:1 against the tile and the canvas behind it.
+    it('keeps the selected ring at 3:1 or better against the tile and the canvas, in both themes', () => {
+        for (const mode of ['dark', 'light'] as const) {
+            const edge = rgb(TOKENS[mode]['selected-edge']);
+            for (const behind of [TOKENS[mode]['surface-2'], ...CANVAS_BACKDROPS[mode].slice(0, 2)]) {
+                expect(contrastRatio(edge, rgb(behind))).toBeGreaterThanOrEqual(3);
+            }
+        }
+    });
+
+    it('draws the tile edge over a picture that spans the whole tile, so the canvas is never scaled', () => {
+        expect(rule('.strip-tile-image canvas')).toMatch(/position:\s*absolute;\s*inset:\s*0;\s*width:\s*100%;\s*height:\s*100%/);
+        expect(rule('.strip-tile-image')).not.toMatch(/(^|;)\s*border:/);
+        expect(rule('.strip-tile-image::after')).toMatch(/border:\s*1px solid var\(--ql-color-border-subtle\)/);
     });
 });

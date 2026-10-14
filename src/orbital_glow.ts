@@ -52,6 +52,11 @@ export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
  *   lit by its rim; Light Clean keeps them up so the lights, not an
  *   emissive term, shade the body -- and a ball-and-stick drawn beside a
  *   glowing surface there is lit as in Solid (it takes no Glow of its own).
+ * - `thumb` (ruling R20d): a strip tile's own fixed light rig (levels here;
+ *   the directions are render_thumbnail.ts's THUMB_LIGHT_RIG) and its rim,
+ *   halo and line strengths -- the same Glow, a little stronger where a
+ *   72 px tile would lose it. Independent of the main view's lights and of
+ *   the frame-time guard.
  */
 export const GLOW_TUNING = {
     dark: {
@@ -62,6 +67,7 @@ export const GLOW_TUNING = {
         halo: { opacity: 0.6, offset: 0.08, power: 1 },
         wash: 0,
         lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
+        thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 1.25, haloOpacity: 1.0, linesOpacity: 0.03 },
     },
     light: {
         emissive: 0.05,
@@ -70,6 +76,7 @@ export const GLOW_TUNING = {
         lines: { opacity: 0.1, whiten: 0.85, additive: false },
         wash: 0.7,
         lights: { ambient: 1.0, key: 1.0, fill: 0.4 },
+        thumb: { lights: { ambient: 1.0, key: 1.1, fill: 0.4 }, rimStrength: 1.15, linesOpacity: 0.035 },
     },
 } as const;
 
@@ -386,6 +393,23 @@ export function fadeGlowExtras(group: THREE.Object3D | null, fraction: number): 
         const material = (child as THREE.Mesh).material as THREE.ShaderMaterial;
         const full = fullOpacity(kind, material.userData.qlTheme as Appearance['theme']);
         material.uniforms[kind === 'halo' ? 'qlHaloOpacity' : 'qlLinesOpacity'].value = full * fraction;
+    }
+}
+
+/**
+ * Ruling R20d: a strip tile's Glow strengths (GLOW_TUNING[theme].thumb) on
+ * a surface attachGlowExtras has dressed: its rim, and its halo and lines
+ * if it has them. The tile's own scene only; the main view never calls it.
+ */
+export function tuneThumbnailGlow(group: THREE.Object3D, surface: THREE.Mesh, theme: Appearance['theme']): void {
+    const thumb: { rimStrength: number; linesOpacity: number; haloOpacity?: number } = GLOW_TUNING[theme].thumb;
+    const uniforms = (surface.material as THREE.Material).userData.glowUniforms as GlowUniforms | undefined;
+    if (uniforms && (surface.material as THREE.Material).userData.glow) uniforms.qlRimStrength.value = thumb.rimStrength;
+    for (const child of group.children) {
+        const kind = child.userData.isGlowExtra as GlowExtra | undefined;
+        const material = (child as THREE.Mesh).material as THREE.ShaderMaterial;
+        if (kind === 'halo' && thumb.haloOpacity !== undefined) material.uniforms.qlHaloOpacity.value = thumb.haloOpacity;
+        if (kind === 'lines') material.uniforms.qlLinesOpacity.value = thumb.linesOpacity;
     }
 }
 

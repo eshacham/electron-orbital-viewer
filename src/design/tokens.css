@@ -114,6 +114,7 @@
   --ql-shadow-panel: inset 0 1px 0 rgba(255,255,255,.03);
   --ql-shadow-popover: 0 12px 32px rgba(0,0,0,.45);
   --ql-shadow-selected: 0 0 0 1px #1FB6F5, 0 0 12px rgba(31,182,245,.35);
+  --ql-shadow-selected-tile: 0 0 12px 1px rgba(31,182,245,.5);
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -153,6 +154,7 @@
   --ql-shadow-panel: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10);
   --ql-shadow-popover: 0 12px 24px rgba(16,24,40,.12);
   --ql-shadow-selected: 0 0 0 1px #1662E0;
+  --ql-shadow-selected-tile: none;
 }
 @media (prefers-reduced-motion: reduce) {
   :root { --ql-motion-hover: 0ms; --ql-motion-panel: 0ms; }

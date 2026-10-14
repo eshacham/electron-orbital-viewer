@@ -21,14 +21,15 @@ interface ThumbnailStripProps {
 }
 
 /**
- * A tile canvas's backing store: its CSS size in device pixels (ruling
- * R20a-4), so the picture -- drawn at twice that by render_thumbnail.ts --
- * is downsampled once, smoothly, and never stretched. At least 2× the CSS
- * size, as before, so a 1× screen keeps its sharper glyph rings.
+ * A tile canvas's backing store: its CSS size in device pixels, exactly
+ * (rulings R20a-4, R20d). An overlay tile's bitmap is made at that size by
+ * render_thumbnail.ts (thumbTileDevicePx), so it is drawn 1:1 and the
+ * browser shows the canvas unscaled; a larger backing would only be shrunk
+ * again by CSS, which is what made the tiles soft.
  */
 export function tileBacking(px: number, devicePixelRatio: number): number {
     const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
-    return Math.round(px * Math.max(2, dpr));
+    return Math.round(px * dpr);
 }
 
 const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: string; onSelect(target: NavigationTarget): void }> = ({ item, px, rGrid, themeKey, onSelect }) => {
@@ -64,9 +65,16 @@ const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: s
         let unsubscribe = () => {};
         const start = () => {
             unsubscribe = thumbnailService.request(current, image => {
-                if (context) context.imageSmoothingQuality = 'high';
-                context?.clearRect(0, 0, canvas.width, canvas.height);
-                context?.drawImage(image as unknown as CanvasImageSource, 0, 0, canvas.width, canvas.height);
+                if (context) {
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    // 1:1 when the bitmap is the canvas's size (an overlay tile); a phone's smaller sheet tile scales it down smoothly.
+                    if (image.width === canvas.width && image.height === canvas.height) context.drawImage(image as unknown as CanvasImageSource, 0, 0);
+                    else {
+                        context.imageSmoothingEnabled = true;
+                        context.imageSmoothingQuality = 'high';
+                        context.drawImage(image as unknown as CanvasImageSource, 0, 0, canvas.width, canvas.height);
+                    }
+                }
                 setDrawn(wanted);
             }, () => setFailed(wanted));
         };

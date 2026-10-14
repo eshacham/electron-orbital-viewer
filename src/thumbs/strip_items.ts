@@ -6,8 +6,13 @@ import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
 import type { ThumbRequest } from './ThumbnailService';
 import type { RingLayer } from './ring_glyph';
 
-/** §12: strips mesh at 32³. */
-export const THUMB_RESOLUTION = 32;
+/**
+ * Ruling R20d (overrides §12's 32³): strips mesh at 64³ -- 32³'s ~560-vertex
+ * p lobes showed their facets even at 72 px. Measured on the dev machine
+ * (headless Chromium, Metal): ~75-90 ms a job, a full M-shell strip (9
+ * tiles) filled in under 1 s; 48³ was ~50 ms a job.
+ */
+export const THUMB_RESOLUTION = 64;
 
 const LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
 

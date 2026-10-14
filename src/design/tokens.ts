@@ -140,17 +140,23 @@ export const TOKENS: Record<ThemeMode, ColorTokens> = {
     },
 };
 
-/** §4.6: panels have no drop shadow in Deep Space; the selected glow is the concept's cyan halo. Light Clean has no glow. */
-export const SHADOWS: Record<ThemeMode, { panel: string; popover: string; selected: string }> = {
+/**
+ * §4.6: panels have no drop shadow in Deep Space; the selected glow is the concept's cyan halo. Light Clean has no glow.
+ * `selected-tile` (ruling R20d): the glow around the selected strip tile, whose 2 px `selected-edge` ring is drawn
+ * inside the tile (strip.css) -- the concept's selected 2p_z tile, a little stronger than `selected`'s; none in Light Clean.
+ */
+export const SHADOWS: Record<ThemeMode, { panel: string; popover: string; selected: string; 'selected-tile': string }> = {
     dark: {
         panel: 'inset 0 1px 0 rgba(255,255,255,.03)',
         popover: '0 12px 32px rgba(0,0,0,.45)',
         selected: '0 0 0 1px #1FB6F5, 0 0 12px rgba(31,182,245,.35)',
+        'selected-tile': '0 0 12px 1px rgba(31,182,245,.5)',
     },
     light: {
         panel: '0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10)',
         popover: '0 12px 24px rgba(16,24,40,.12)',
         selected: '0 0 0 1px #1662E0',
+        'selected-tile': 'none',
     },
 };
 

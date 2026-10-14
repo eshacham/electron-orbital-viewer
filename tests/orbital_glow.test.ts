@@ -207,12 +207,15 @@ describe('Glow (spec §11.2)', () => {
                 halo: { opacity: 0.6, offset: 0.08, power: 1 },
                 wash: 0,
                 lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
+                // Ruling R20d: the strip tiles' own rig and strengths -- a brighter key, rim and halo, fainter lines at 64³.
+                thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 1.25, haloOpacity: 1.0, linesOpacity: 0.03 },
             },
             light: {
                 emissive: 0.05, rimStrength: 1.0, rimPower: 1.5,
                 lines: { opacity: 0.1, whiten: 0.85, additive: false },
                 wash: 0.7,
                 lights: { ambient: 1.0, key: 1.0, fill: 0.4 },
+                thumb: { lights: { ambient: 1.0, key: 1.1, fill: 0.4 }, rimStrength: 1.15, linesOpacity: 0.035 },
             },
         });
         expect(glowLightsFor('dark')).toBe(GLOW_TUNING.dark.lights);
