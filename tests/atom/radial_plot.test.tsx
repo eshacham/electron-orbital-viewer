@@ -177,6 +177,22 @@ describe('RadialPlot', () => {
         expect(container.querySelector('svg')).not.toBeNull();
     });
 
+    // Ruling R23b-2 (fix round 1): disclosure convention -- collapsed points
+    // down (will expand), expanded points up (will collapse). This toggle
+    // had it backwards (▸ collapsed, ▾ expanded) and the audit missed it;
+    // the accessible name and aria-expanded are unchanged, only the glyph.
+    it('points the fold toggle down when collapsed and up when expanded (ruling R23b-2)', () => {
+        const { getByRole } = render(<RadialPlot n={1} l={0} Z={18} rMax={5} curves={twoCurves()} compact />);
+        const collapsed = getByRole('button', { name: /D\(r\) plot/ });
+        expect(collapsed).toHaveAttribute('aria-expanded', 'false');
+        expect(collapsed).toHaveTextContent('D(r) plot ▾');
+        fireEvent.click(collapsed);
+        const expanded = getByRole('button', { name: /Radial distribution/ });
+        expect(expanded).toHaveAttribute('aria-expanded', 'true');
+        expect(expanded).toHaveTextContent('▴');
+        expect(expanded).not.toHaveTextContent('▾');
+    });
+
     // Task 10 carry: "6p³⁄₂" is read as superscripts and a fraction slash.
     // The visible label stays as it is; the spoken one rides beside it.
     it('says a j-level curve\'s name aloud as "6p j = 3/2"', () => {

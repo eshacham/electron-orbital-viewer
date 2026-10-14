@@ -272,7 +272,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                     aria-expanded={false}
                     onClick={() => setExpanded(true)}
                 >
-                    D(r) plot ▸
+                    D(r) plot ▾
                 </button>
             </div>
         );
@@ -294,7 +294,7 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                         aria-expanded
                         onClick={() => setExpanded(false)}
                     >
-                        {title} ▾
+                        {title} ▴
                     </button>
                 ) : title}
             </div>
