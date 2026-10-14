@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import TopBar, { TopBarTab } from '../../src/shell/TopBar';
 import { BRANDS } from '../../src/design/brands';
 
@@ -46,6 +46,26 @@ describe('TopBar (spec §8.1)', () => {
         expect(screen.queryByLabelText('search slot')).toBeNull();
         fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
         expect(screen.getByLabelText('search slot')).toBeInTheDocument();
+    });
+
+    // Final review I1: below 1100 px the search lives in a popover; picking a result used
+    // to leave the popover open with focus trapped inside it (GlobalSearch.pick() blurs its
+    // input, and MUI's FocusTrap pulls focus back into the paper). The parent bumps
+    // searchPickSignal when a pick happens; TopBar closes the popover and returns focus
+    // to the icon button that opened it.
+    it('closes the compact search popover and returns focus to the icon button when a result is picked (final review I1)', async () => {
+        const { rerender } = render(
+            <TopBar brand={BRANDS[0]} mode="dark" tabs={[]} search={<input aria-label="search slot" />} avatar={null}
+                onHelp={jest.fn()} compactSearch searchPickSignal={0} />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+        expect(screen.getByLabelText('search slot')).toBeInTheDocument();
+        rerender(
+            <TopBar brand={BRANDS[0]} mode="dark" tabs={[]} search={<input aria-label="search slot" />} avatar={null}
+                onHelp={jest.fn()} compactSearch searchPickSignal={1} />,
+        );
+        await waitFor(() => expect(screen.queryByLabelText('search slot')).toBeNull());
+        expect(screen.getByRole('button', { name: 'Search' })).toHaveFocus();
     });
 
     // Ruling T18-a11y-carry (a), spec §13 "arrow keys inside tab rows": the area tabs are one

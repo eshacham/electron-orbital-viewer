@@ -32,12 +32,22 @@ interface TopBarProps {
     sessionNote?: string | null;
     /** Below 1100 px: the search is an icon opening a 360 px popover (spec §7). */
     compactSearch?: boolean;
+    /**
+     * Bumped by the parent every time a search result is picked (final review I1).
+     * GlobalSearch.pick() blurs its own input but has no way to tell this popover
+     * the pick happened, so without this signal the popover stayed open with focus
+     * trapped inside it (MUI's FocusTrap pulls focus back into the paper once the
+     * active element becomes body). A change closes the popover and returns focus
+     * to the icon button that opened it.
+     */
+    searchPickSignal?: number;
 }
 
 /** The 56 px top bar (spec §8.1): brand, area tabs, search, theme, help, avatar. */
-const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, avatar, onHelp, sessionNote, compactSearch }) => {
+const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, avatar, onHelp, sessionNote, compactSearch, searchPickSignal }) => {
     const [searchAnchor, setSearchAnchor] = useState<HTMLElement | null>(null);
     const searchButtonRef = useRef<HTMLButtonElement | null>(null);
+    const lastPickSignalRef = useRef(searchPickSignal);
     // §13 "arrow keys inside tab rows": the area tabs are one Tab stop, the
     // current area, with the arrow keys, Home and End inside (ruling T18-a11y-carry).
     const tabsRef = useRef<HTMLElement | null>(null);
@@ -69,14 +79,27 @@ const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, avatar, onHe
         return () => window.cancelAnimationFrame(frame);
     }, [searchAnchor]);
 
+    // Final review I1: a pick closes the popover and returns focus to the icon
+    // button, the same place Escape/click-away leaves it.
+    useEffect(() => {
+        if (searchPickSignal === undefined || searchPickSignal === lastPickSignalRef.current) return;
+        lastPickSignalRef.current = searchPickSignal;
+        setSearchAnchor(current => {
+            if (current) searchButtonRef.current?.focus();
+            return null;
+        });
+    }, [searchPickSignal]);
+
     return (
         <header className="app-topbar">
             <a className="app-topbar-brand" href="/" aria-label={`${brand.name}, home`}>
                 <BrandMark size={28} />
                 <Wordmark brand={brand} mode={mode} />
             </a>
+            {/* Final review B, M1: these are the four view modes now (R23a), not "areas" --
+                the old Explore/Molecules area-tab concept is gone. */}
             {tabs.length > 0 && (
-                <nav ref={tabsRef} className="app-topbar-tabs" aria-label="areas">
+                <nav ref={tabsRef} className="app-topbar-tabs" aria-label="view modes">
                     {tabs.map(tab => (
                         <a
                             key={tab.key}

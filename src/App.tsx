@@ -603,8 +603,13 @@ function App() {
     );
     // The same entries as the picker: computed molecules for the owner only (ruling R4).
     const searchSources = useMemo(() => ({ molecules: moleculeEntries }), [moleculeEntries]);
+    // Final review I1: bumped on every pick so TopBar's compact (761-1099 px)
+    // search popover closes and returns focus to the icon button instead of
+    // staying open with focus trapped inside it.
+    const [searchPickSignal, setSearchPickSignal] = useState(0);
     // Opening a result does what the existing pickers do (spec §8.3).
     const handleSearchPick = useCallback((action: SearchAction) => {
+        setSearchPickSignal(count => count + 1);
         switch (action.kind) {
             case 'element':
                 if (atomMode !== 'atom') handleModeChange('atom');
@@ -1481,6 +1486,7 @@ function App() {
             onHelp={() => setHelpOpen(true)}
             sessionNote={session.expired && !session.signedIn ? SESSION_ENDED : null}
             compactSearch={compactTopBar}
+            searchPickSignal={searchPickSignal}
         />
     );
     const phoneTopBar = (compact: boolean) => (
