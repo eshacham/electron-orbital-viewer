@@ -1,7 +1,7 @@
 {
   "desktop": [
     { "name": "top bar", "selector": ".app-topbar", "x": 0.42, "py": 4, "token": "bg-bar" },
-    { "name": "rail", "selector": ".app-rail", "x": 0.5, "y": 0.985, "token": "bg-bar" },
+    { "name": "mode tabs", "selector": ".app-topbar-tabs", "x": 0.5, "py": 4, "token": "bg-bar" },
     { "name": "page gutter", "selector": ".app-workspace", "px": 6, "y": 0.5, "token": "bg-app" },
     { "name": "explore panel", "selector": ".explore-panel", "x": 0.5, "y": 0.992, "token": "surface-1" },
     { "name": "inspector", "selector": ".inspector", "x": 0.5, "y": 0.992, "token": "surface-1" },

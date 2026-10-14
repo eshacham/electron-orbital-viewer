@@ -3,8 +3,10 @@
 // Vite on a free port and its own headless Chromium, captures each scene in
 // each theme and size, measures boxes, fonts and colours, then stops both in
 // the same foreground run. It never touches the owner's browser or servers.
-//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--gl metal] [--dpr 2] [--drawer open] [--crop <selector>]
-// Writes /tmp/6g1-<task>-<scene>-<theme>-<size>.png and /tmp/6g1-<task>-metrics.json.
+//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--gl metal] [--dpr 2] [--drawer open] [--crop <selector>] [--run <label>]
+// Writes /tmp/6g1-<task>-<scene>-<theme>-<size>.png and /tmp/6g1-<task>-<run>-metrics.json
+// (--run defaults to a timestamp, so a second invocation for the same --task never overwrites
+// the first run's aggregated metrics -- final review B-I2).
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -32,6 +34,12 @@ const SIZES = {
 
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
 const task = arg('task', 'adhoc');
+// Final review B-I2: the metrics file used to be named by --task alone, so a
+// second run for the same task (e.g. splitting sizes across invocations to
+// keep one run short) silently overwrote the first run's results. --run adds
+// a per-invocation label to the filename; it defaults to a timestamp, so two
+// runs never collide unless the caller deliberately repeats --run.
+const runId = arg('run', new Date().toISOString().replace(/[:.]/g, '-'));
 const port = Number(arg('port', '5411'));
 if (OWNER_PORTS.has(port)) throw new Error(`port ${port} is the owner's; use 5411-5419`);
 const scenes = JSON.parse(readFileSync(resolve(DEFAULT_ROOT, 'tools/design/scenes.json'), 'utf8'));
@@ -111,7 +119,17 @@ function collectMetrics() {
     boxes: Object.fromEntries(['.app-topbar', '.app-rail', '.explore-panel', '#canvas-container', '.inspector', '.thumbnail-strip',
       '.viewport-title', '.viewport-toolbar', '.key-column', '.phone-topbar', '.phone-header', '.phone-sheet',
       '.element-tile', '.periodic-table-mini'].map(s => [s, box(s)])),
-    fonts: { title: font('.viewport-title h1'), nav: font('.app-topbar-tab'), body: font('.explore-panel .ql-body') ?? font('.explore-panel'), caption: font('.ql-caption') },
+    // Final review B-I2: '.ql-caption' alone read null in every capture -- the only elements
+    // that carry that literal class (orbital facts' notes, the energy table caption, a search
+    // result's detail line) are gated behind a tab or a query that most scenes never open. The
+    // key column's heading/caption spans (viewport.css) share the same --ql-type-caption-size
+    // role and are real, visible text in virtually every scene (spec §3.3: every colour has a
+    // key) -- fall back to '.ql-caption' only if a scene truly has neither.
+    fonts: {
+      title: font('.viewport-title h1'), nav: font('.app-topbar-tab'),
+      body: font('.explore-panel .ql-body') ?? font('.explore-panel'),
+      caption: font('.key-heading') ?? font('.key-caption') ?? font('.ql-caption'),
+    },
     canvases: canvases.length,
     // DC9b: a canvas that ever received a WebGL context (wrapped in the init
     // script below) is only "the" renderer's canvas while that context is
@@ -138,8 +156,15 @@ function collectMetrics() {
   };
 }
 
+// Final review B-I2: 'zoom' (720 CSS px) used to fall into the 'desktop' bucket by elimination
+// (its name does not start with 'phone'), even though ruling R9 makes NARROW_VIEWPORT match at
+// that width -- the app renders its phone layout there, so desktop-only selectors like
+// '.explore-panel' and the pre-R23a '.app-rail' sampled nothing. 'phone-landscape' and 'zoom'
+// both render the phone layout; only their viewport dimensions differ.
+const PHONE_LAYOUT_SIZES = new Set(['phone', 'phone-landscape', 'zoom']);
+
 async function sampleColours(page, png, size) {
-  const points = samplePoints[size.startsWith('phone') ? 'phone' : 'desktop'];
+  const points = samplePoints[PHONE_LAYOUT_SIZES.has(size) ? 'phone' : 'desktop'];
   return page.evaluate(async ({ b64, points }) => {
     const image = new Image();
     image.src = `data:image/png;base64,${b64}`;
@@ -244,11 +269,15 @@ try {
         let enclosedNote;
         if (await drawerBar.count()) {
           await drawerBar.click();
-          await page.waitForTimeout(400);
+          // Final review B-I2 (deferred from Task 19): a blind 400 ms timeout, not an explicit
+          // settle -- on a slower run the drawer's open transition (or a re-fit it triggers)
+          // could still be in flight when the note was read or the open shot was taken. settle()
+          // is the same wait the initial load uses: quiet for the canvas, not a guess at a duration.
+          await settle(page);
           enclosedNote = await readNote();
           if (!drawerOpen) {
             await page.locator('.inspector-drawer .inspector-bar-button[aria-expanded="true"]').first().click();
-            await page.waitForTimeout(400);
+            await settle(page);
           }
         } else {
           enclosedNote = await readNote();
@@ -279,5 +308,6 @@ try {
   await browser?.close();
   vite.kill('SIGTERM');
 }
-writeFileSync(`/tmp/6g1-${task}-metrics.json`, JSON.stringify(results, null, 2));
-console.log(`wrote /tmp/6g1-${task}-metrics.json (${results.length} shots)`);
+const metricsFile = `/tmp/6g1-${task}-${runId}-metrics.json`;
+writeFileSync(metricsFile, JSON.stringify(results, null, 2));
+console.log(`wrote ${metricsFile} (${results.length} shots)`);
