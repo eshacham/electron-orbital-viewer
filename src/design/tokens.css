@@ -3,8 +3,6 @@
   --ql-font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --ql-size-top-bar: 56px;
   --ql-size-phone-top-bar: 52px;
-  --ql-size-rail: 76px;
-  --ql-size-rail-wide: 184px;
   --ql-size-explore: 315px;
   --ql-size-explore-medium: 300px;
   --ql-size-inspector: 290px;
@@ -70,9 +68,6 @@
   --ql-type-tick-size: 11px;
   --ql-type-tick-line: 14px;
   --ql-type-tick-weight: 400;
-  --ql-type-rail-size: 11px;
-  --ql-type-rail-line: 14px;
-  --ql-type-rail-weight: 500;
   --ql-motion-hover: 120ms;
   --ql-motion-panel: 180ms;
 }

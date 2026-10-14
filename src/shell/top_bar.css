@@ -32,7 +32,5 @@
   background: var(--ql-color-avatar); color: var(--ql-color-on-fill);
   font: 600 13px var(--ql-font-sans);
 }
-/* §7: the area tabs hide below 1100 px; the rail is enough. */
-@media (max-width: 1099px) { .app-topbar-tabs { display: none; } }
 .avatar-menu { padding: 12px 16px; min-width: 260px; display: flex; flex-direction: column; gap: 12px; }
 .avatar-menu .owner-bar { margin-top: 0; }

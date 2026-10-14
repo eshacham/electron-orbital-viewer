@@ -49,8 +49,11 @@ async function enterMolecules(narrow: boolean, { landscape = false, before }: { 
     before?.(store);
     const utils = render(<Provider store={store}><App /></Provider>);
     if (narrow) fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // the phone's mode menu (spec §9.8) replaced the Mode toggle in the View tab
-    // Unanchored: the rail item's name is "Molecules (molecule mode)" (WCAG 2.5.3, label in name).
-    fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
+    // Unanchored: the item's name is "Molecules (molecule mode)" (WCAG
+    // 2.5.3, label in name). Ruling R23a: on a desktop this is now the top
+    // bar's own tab (a link); the phone's mode menu (opened above) still
+    // renders it as a button.
+    fireEvent.click(screen.getByRole(narrow ? 'button' : 'link', { name: /molecule mode/ }));
     await flush();
     return { store, ...utils };
 }
@@ -188,11 +191,13 @@ describe('Molecules mode', () => {
         installMatchMedia(false);
         const store = makeStore();
         render(<Provider store={store}><App /></Provider>);
-        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/ }));
+        // Unanchored: the item's name is "<Visible label> (<old name>)"
+        // (WCAG 2.5.3, label in name). Ruling R23a: the desktop mode switch
+        // is now the top bar's own tab (a link), not the rail's button.
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/ }));
         // Ruling R20a-2: the untouched opacity is the new default, 0.7 (was 1).
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.7);
-        fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
+        fireEvent.click(screen.getByRole('link', { name: /molecule mode/ }));
         await flush();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
     });
@@ -207,8 +212,8 @@ describe('Molecules mode', () => {
     it('restores the full opacity it lowered on the way out', async () => {
         const { store } = await enterMolecules(false);
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
-        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
+        // Unanchored: the desktop mode switch is the top bar's own tab now (ruling R23a), a link not a button.
+        fireEvent.click(screen.getByRole('link', { name: /atom mode/ }));
         await flush();
         // Ruling R20a-2: what it hands back is the default it took, now 0.7 (was 1).
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.7);
@@ -217,8 +222,8 @@ describe('Molecules mode', () => {
     it('keeps an opacity the user chose inside Molecules on the way out', async () => {
         const { store } = await enterMolecules(false);
         act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.4 })); });
-        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
+        // Unanchored: the desktop mode switch is the top bar's own tab now (ruling R23a), a link not a button.
+        fireEvent.click(screen.getByRole('link', { name: /atom mode/ }));
         await flush();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.4);
     });
@@ -228,10 +233,10 @@ describe('Molecules mode', () => {
         const store = makeStore();
         act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.6 })); });
         render(<Provider store={store}><App /></Provider>);
-        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
+        // Unanchored: the desktop mode switch is the top bar's own tab now (ruling R23a), a link not a button.
+        fireEvent.click(screen.getByRole('link', { name: /molecule mode/ }));
         await flush();
-        fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
+        fireEvent.click(screen.getByRole('link', { name: /atom mode/ }));
         await flush();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
     });
@@ -249,9 +254,11 @@ describe('Molecules mode', () => {
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.7);
         fireEvent.click(screen.getByRole('button', { name: /^Mode: / }));
         expect(screen.getByRole('button', { name: /atom mode/ })).toHaveAttribute('aria-pressed', 'true');
-        // The names now end in "mode)" and lead with the visible label (WCAG 2.5.3); the four modes, in order, as before.
+        // The names now end in "mode)" and lead with the visible label (WCAG
+        // 2.5.3); ruling R23a reordered the four modes to Orbitals | Atoms |
+        // Bonds | Molecules and renamed "Basic Orbitals" to "Orbitals".
         expect(screen.getAllByRole('button', { name: /mode\)$/ }).map(b => b.getAttribute('aria-label')))
-            .toEqual(['Atoms (atom mode)', 'Basic Orbitals (basic orbitals mode)', 'Bonds (bonds mode)', 'Molecules (molecule mode)']);
+            .toEqual(['Orbitals (basic orbitals mode)', 'Atoms (atom mode)', 'Bonds (bonds mode)', 'Molecules (molecule mode)']);
     });
 
     // Review (Important): a shared link is applied before the first render,

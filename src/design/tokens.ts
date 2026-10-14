@@ -118,7 +118,7 @@ export const TOKENS: Record<ThemeMode, ColorTokens> = {
         'accent-fill': '#1662E0',
         'selected-fill': '#1662E0',
         'selected-edge': '#1662E0',
-        // §4.1: the rail's active item is surface-3 in Light Clean.
+        // §4.1: the mode menu's active item is surface-3 in Light Clean.
         'rail-active': '#E3EEFE',
         avatar: '#1662E0',
         success: '#15803D',
@@ -170,8 +170,6 @@ export const CANVAS_BACKDROPS: Record<ThemeMode, string[]> = {
 export const LAYOUT = {
     topBar: 56,
     phoneTopBar: 52,
-    rail: 76,
-    railWide: 184,
     explore: 315,
     exploreMedium: 300,
     inspector: 290,
@@ -213,7 +211,6 @@ export const TYPE = {
     subtitle: { size: 13, line: 18, weight: 400 },
     caption: { size: 12, line: 16, weight: 400 },
     tick: { size: 11, line: 14, weight: 400 },
-    rail: { size: 11, line: 14, weight: 500 },
 } as const;
 
 /** §4.3: on a phone body is 14; captions stay TYPE.caption's 12. */

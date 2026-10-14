@@ -28,8 +28,12 @@ describe('design tokens (spec §4)', () => {
         expect(css).toMatch(/prefers-reduced-motion: reduce\)[^}]*--ql-motion-hover: 0ms/);
     });
 
-    it('sizes the desktop grid as §7 does: 76 + 315 + 290 + 4 × 12 = 729', () => {
-        expect(LAYOUT.rail + LAYOUT.explore + LAYOUT.inspector + 4 * LAYOUT.gutter).toBe(729);
+    // Ruling R23a (round 23): the rail is gone, so LAYOUT.rail no longer
+    // exists -- the desktop grid's fixed-width budget is now just Explore,
+    // inspector and the workspace's own 4 gutters (left pad, two internal
+    // gaps, right pad); was 76 + 315 + 290 + 4 × 12 = 729 with the rail.
+    it('sizes the desktop grid as §7 does, less the rail (ruling R23a): 315 + 290 + 4 × 12 = 653', () => {
+        expect(LAYOUT.explore + LAYOUT.inspector + 4 * LAYOUT.gutter).toBe(653);
         // §8.6: PLOT_WIDTH becomes 258 (290 − 2 × 16).
         expect(LAYOUT.plotWidth).toBe(LAYOUT.inspector - 2 * LAYOUT.panelPadding);
     });

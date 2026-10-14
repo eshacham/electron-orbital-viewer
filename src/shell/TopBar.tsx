@@ -17,6 +17,8 @@ export interface TopBarTab {
     href: string;
     current: boolean;
     onSelect(): void;
+    /** Label-in-name (WCAG 2.5.3): "<label> (<old name>)". Defaults to the visible label alone. */
+    ariaLabel?: string;
 }
 
 interface TopBarProps {
@@ -80,6 +82,7 @@ const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, avatar, onHe
                             key={tab.key}
                             className="app-topbar-tab"
                             href={tab.href}
+                            aria-label={tab.ariaLabel}
                             aria-current={tab.current ? 'page' : undefined}
                             onClick={event => { event.preventDefault(); tab.onSelect(); }}
                         >

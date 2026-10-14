@@ -35,7 +35,7 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose, brand, aboutMode
             <h2 className="ql-section">Keyboard</h2>
             <ul>
                 <li>⌘K (Mac) or Ctrl+K: search elements, molecules and orbitals.</li>
-                <li>Tab moves between areas; the arrow keys move inside the mode rail, tab rows, chip groups and the orbital strip.</li>
+                <li>Tab moves between areas; the arrow keys move inside tab rows, chip groups and the orbital strip.</li>
                 <li>Esc closes menus, popovers, the inspector drawer and full screen.</li>
             </ul>
             <h2 className="ql-section">Export formats</h2>

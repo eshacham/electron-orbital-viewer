@@ -106,7 +106,7 @@ import { withComputed } from './jobs/computed';
 import { selectIsOwner, sessionErrorDismissed, sessionFailed } from './store/jobsSlice';
 import AppShell from './shell/AppShell';
 import TopBar, { TopBarTab } from './shell/TopBar';
-import Rail from './shell/Rail';
+import { MODE_ITEMS, MODE_LABEL } from './shell/Rail';
 import GlobalSearch from './shell/GlobalSearch';
 import HelpDialog from './shell/HelpDialog';
 import AvatarMenu from './shell/AvatarMenu';
@@ -470,9 +470,6 @@ function App() {
     // The molecule index loads when Molecules opens -- or when someone starts a search (spec §8.3).
     const [searchWantsIndex, setSearchWantsIndex] = useState(false);
     const wantIndex = useCallback(() => setSearchWantsIndex(true), []);
-    // §8.1: "Explore" returns to the last of Atoms, Basic Orbitals and Bonds used.
-    const lastExploreModeRef = useRef<ViewMode>(atomMode === 'molecule' ? 'atom' : atomMode);
-    useEffect(() => { if (atomMode !== 'molecule') lastExploreModeRef.current = atomMode; }, [atomMode]);
 
     // Only say anything if the calculation is actually taking a while; see
     // useDelayedFlag for why.
@@ -1414,11 +1411,20 @@ function App() {
         />
     );
     const urlMode = (viewMode: ViewMode) => ({ atom: 'atom', hydrogenic: 'basic', bonds: 'bonds', molecule: 'molecule' })[viewMode];
-    const topBarTabs: TopBarTab[] = [
-        { key: 'explore', label: 'Explore', href: `/#mode=${urlMode(lastExploreModeRef.current)}`, current: !isMoleculeMode,
-            onSelect: () => selectMode(lastExploreModeRef.current) },
-        { key: 'molecules', label: 'Molecules', href: '/#mode=molecule', current: isMoleculeMode, onSelect: () => selectMode('molecule') },
-    ];
+    // Ruling R23a (round 23): the rail is gone and the Explore/Molecules
+    // "area tab" concept with it -- the top bar's tabs are the four modes
+    // themselves, in MODE_ITEMS' order (Orbitals | Atoms | Bonds |
+    // Molecules), each routing through the same guarded selectMode the old
+    // rail did. mode=basic, the rest of the URL and every share link are
+    // untouched -- only "Basic Orbitals"' visible name changes.
+    const topBarTabs: TopBarTab[] = MODE_ITEMS.map(({ mode: itemMode, oldName }) => ({
+        key: itemMode,
+        label: MODE_LABEL[itemMode],
+        href: `/#mode=${urlMode(itemMode)}`,
+        current: atomMode === itemMode,
+        ariaLabel: `${MODE_LABEL[itemMode]} (${oldName})`,
+        onSelect: () => selectMode(itemMode),
+    }));
     const topBar = (
         <TopBar
             brand={brand}
@@ -1648,7 +1654,6 @@ function App() {
                 layout={layout}
                 wide={isWide}
                 topBar={topBar}
-                rail={<Rail mode={atomMode} onModeChange={selectMode} isOwner={isOwner} wide={isWide} />}
                 explore={isAtomMode ? atomExplore : (
                     <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
                 )}

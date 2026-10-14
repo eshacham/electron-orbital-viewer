@@ -62,8 +62,11 @@ async function enterMolecules(narrow: boolean) {
     const store = createAppStore();
     const utils = render(<Provider store={store}><App /></Provider>);
     if (narrow) fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // the phone's mode menu (spec §9.8) replaced the Mode toggle in the View tab
-    // Unanchored: the rail item's name is "Molecules (molecule mode)" (WCAG 2.5.3, label in name).
-    fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
+    // Unanchored: the item's name is "Molecules (molecule mode)" (WCAG
+    // 2.5.3, label in name). Ruling R23a: on a desktop this is now the top
+    // bar's own tab (a link); the phone's mode menu (opened above) still
+    // renders it as a button.
+    fireEvent.click(screen.getByRole(narrow ? 'button' : 'link', { name: /molecule mode/ }));
     await flush();
     return { store, ...utils };
 }
@@ -264,8 +267,10 @@ describe('a sign-in that did not complete', () => {
         render(<Provider store={store}><App /></Provider>);
         expect(screen.getByRole('alert')).toHaveTextContent(SIGN_IN_FAILED);
         expect(screen.queryByText(/evil/)).toBeNull();
-        // Unanchored: the rail item's name is "Molecules (molecule mode)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /molecule mode/ }));
+        // Unanchored: the item's name is "Molecules (molecule mode)" (WCAG
+        // 2.5.3, label in name). Ruling R23a: the desktop mode switch is now
+        // the top bar's own tab (a link), not the rail's button.
+        fireEvent.click(screen.getByRole('link', { name: /molecule mode/ }));
         await flush();
         expect(screen.getAllByText(SIGN_IN_FAILED)).toHaveLength(1);
         fireEvent.click(screen.getByRole('button', { name: 'Close' }));

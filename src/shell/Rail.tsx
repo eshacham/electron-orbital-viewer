@@ -1,21 +1,27 @@
 import React, { useRef } from 'react';
-import AdminPanelSettingsOutlined from '@mui/icons-material/AdminPanelSettingsOutlined';
 import type { ViewMode } from '../store/atomSlice';
 import { AtomsIcon, BasicOrbitalsIcon, BondsIcon, MoleculesIcon } from './icons';
 import { useRovingFocus } from './useRovingFocus';
 import './rail.css';
 
-export const MODE_LABEL: Record<ViewMode, string> = { atom: 'Atoms', hydrogenic: 'Basic Orbitals', bonds: 'Bonds', molecule: 'Molecules' };
+// Ruling R23a (round 23): the desktop/tablet rail is gone -- its four
+// destinations moved into the top bar's tabs, in this order, and
+// "Basic Orbitals" became "Orbitals" everywhere user-visible. This
+// component now renders only the phone's mode menu (PhoneTopBar's
+// "<Mode> ▾" button opens it); App.tsx builds the top bar's tabs from
+// MODE_ITEMS below, so the order, labels and old accessible names have one
+// source.
+export const MODE_LABEL: Record<ViewMode, string> = { hydrogenic: 'Orbitals', atom: 'Atoms', bonds: 'Bonds', molecule: 'Molecules' };
 
 // oldName is the old Mode toggle's accessible name (spec §8.2): tests and
 // assistive-technology users already know it. Controller ruling
 // WCAG-2.5.3-detail (label-in-name, WCAG 2.5.3): the rendered aria-label is
 // "<Visible label> (<old name>)" -- e.g. "Atoms (atom mode)" -- so the
-// visible label is now part of the accessible name, with the old name kept
+// visible label is part of the accessible name, with the old name kept
 // inside the parentheses for continuity.
-const ITEMS: Array<{ mode: ViewMode; oldName: string; Icon: React.FC }> = [
-    { mode: 'atom', oldName: 'atom mode', Icon: AtomsIcon },
+export const MODE_ITEMS: Array<{ mode: ViewMode; oldName: string; Icon: React.FC }> = [
     { mode: 'hydrogenic', oldName: 'basic orbitals mode', Icon: BasicOrbitalsIcon },
+    { mode: 'atom', oldName: 'atom mode', Icon: AtomsIcon },
     { mode: 'bonds', oldName: 'bonds mode', Icon: BondsIcon },
     { mode: 'molecule', oldName: 'molecule mode', Icon: MoleculesIcon },
 ];
@@ -24,24 +30,19 @@ interface RailProps {
     mode: ViewMode;
     /** App's handleModeChange: the four modes and their side effects, unchanged. */
     onModeChange(mode: ViewMode): void;
-    isOwner: boolean;
-    /** 'menu' is the phone's mode menu: the same list, no Admin link. */
-    variant?: 'rail' | 'menu';
-    /** ≥ 1680 px: icon and label in a row (spec §7). */
-    wide?: boolean;
 }
 
 /**
- * The mode rail (spec §8.2). Learning and Gallery join it when they exist
- * (ruling R3); until then "real or absent" keeps them out.
+ * The phone's mode menu (spec §8.2, as amended by ruling R23a): opened from
+ * PhoneTopBar's "<Mode> ▾" button.
  */
-const Rail: React.FC<RailProps> = ({ mode, onModeChange, isOwner, variant = 'rail', wide = false }) => {
+const Rail: React.FC<RailProps> = ({ mode, onModeChange }) => {
     const itemsRef = useRef<HTMLDivElement>(null);
     useRovingFocus(itemsRef, { selector: '.app-rail-item', orientation: 'vertical' });
     return (
-        <nav className={`app-rail${variant === 'menu' ? ' as-menu' : ''}${wide ? ' wide' : ''}`} aria-label="view mode">
+        <nav className="app-rail" aria-label="view mode">
             <div className="app-rail-items" ref={itemsRef}>
-                {ITEMS.map(({ mode: itemMode, oldName, Icon }) => (
+                {MODE_ITEMS.map(({ mode: itemMode, oldName, Icon }) => (
                     <button
                         key={itemMode}
                         type="button"
@@ -55,12 +56,6 @@ const Rail: React.FC<RailProps> = ({ mode, onModeChange, isOwner, variant = 'rai
                     </button>
                 ))}
             </div>
-            {isOwner && variant === 'rail' && (
-                <a className="app-rail-item app-rail-admin" href="/admin.html">
-                    <AdminPanelSettingsOutlined sx={{ fontSize: 20 }} aria-hidden />
-                    <span className="app-rail-label">Admin</span>
-                </a>
-            )}
         </nav>
     );
 };

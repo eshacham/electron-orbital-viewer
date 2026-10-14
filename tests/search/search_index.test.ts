@@ -16,10 +16,12 @@ describe('search index (spec §8.3)', () => {
         expect(first(query, 'Molecules')?.action).toEqual({ kind: 'molecule', id: 'h2o' });
     });
 
-    it('finds Basic orbitals by their names, written loosely', () => {
-        expect(first('3dz2', 'Basic orbitals')?.action).toEqual({ kind: 'basic', n: 3, l: 2, ml: 0 });
-        expect(first('3dz2', 'Basic orbitals')?.label).toBe('3d_z²');
-        expect(first('4f xyz', 'Basic orbitals')?.action).toEqual({ kind: 'basic', n: 4, l: 3, ml: -2 });
+    // Ruling R23a: the group is named "Orbitals" now (was "Basic orbitals");
+    // the action's 'basic' kind is the internal id and is unchanged.
+    it('finds Orbitals by their names, written loosely', () => {
+        expect(first('3dz2', 'Orbitals')?.action).toEqual({ kind: 'basic', n: 3, l: 2, ml: 0 });
+        expect(first('3dz2', 'Orbitals')?.label).toBe('3d_z²');
+        expect(first('4f xyz', 'Orbitals')?.action).toEqual({ kind: 'basic', n: 4, l: 3, ml: -2 });
     });
 
     it('finds the Bonds systems, H₂⁺ included', () => {
@@ -40,7 +42,7 @@ describe('search index (spec §8.3)', () => {
     it('keeps groups in order and each to six', () => {
         const groups = searchAll('c', sources).map(r => r.group);
         expect(groups).toEqual([...groups].sort((a, b) =>
-            ['Elements', 'Molecules', 'Bonds', 'Basic orbitals'].indexOf(a) - ['Elements', 'Molecules', 'Bonds', 'Basic orbitals'].indexOf(b)));
+            ['Elements', 'Molecules', 'Bonds', 'Orbitals'].indexOf(a) - ['Elements', 'Molecules', 'Bonds', 'Orbitals'].indexOf(b)));
         for (const group of new Set(groups)) expect(groups.filter(g => g === group).length).toBeLessThanOrEqual(SEARCH_GROUP_LIMIT);
     });
 

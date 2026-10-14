@@ -1,17 +1,18 @@
-/* src/shell/rail.css -- the mode rail (spec §8.2): 76 px, bg-bar, right border-subtle. */
+/* src/shell/rail.css -- the mode menu (spec §8.2). Ruling R23a (round 23):
+   the desktop/tablet rail is gone (its four destinations moved into the top
+   bar's tabs); this file now styles only the phone's mode menu, opened from
+   PhoneTopBar's "<Mode> ▾" button. */
 .app-rail {
-  grid-area: rail;
   display: flex; flex-direction: column; gap: 4px;
-  min-height: 0; box-sizing: border-box; padding: 12px 8px;
+  box-sizing: border-box; padding: 8px; min-width: 220px;
   background: var(--ql-color-bg-bar);
-  border-right: 1px solid var(--ql-color-border-subtle);
 }
 .app-rail-items { display: flex; flex-direction: column; gap: 4px; }
 .app-rail-item {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 8px 4px; border: 1px solid transparent; border-radius: var(--ql-radius-md);
-  background: none; color: var(--ql-color-text-3); cursor: pointer; text-align: center; text-decoration: none;
-  font: var(--ql-type-rail-weight) var(--ql-type-rail-size) / var(--ql-type-rail-line) var(--ql-font-sans);
+  display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px;
+  min-height: var(--ql-size-touch); padding: 8px 12px; border: 1px solid transparent; border-radius: var(--ql-radius-md);
+  background: none; color: var(--ql-color-text-3); cursor: pointer; text-align: left; text-decoration: none;
+  font: 500 var(--ql-type-nav-size) / var(--ql-type-nav-line) var(--ql-font-sans);
   transition: background-color var(--ql-motion-hover) ease-out;
 }
 .app-rail-item:hover { background-color: var(--ql-color-surface-3); }
@@ -20,14 +21,4 @@
   border-color: var(--ql-color-selected-edge);
   color: var(--ql-color-text-1);
   box-shadow: var(--ql-shadow-selected);
-}
-.app-rail-admin { margin-top: auto; }
-.app-rail.wide .app-rail-item {
-  flex-direction: row; justify-content: flex-start; gap: 10px; padding: 10px 12px;
-  font-size: var(--ql-type-nav-size); line-height: var(--ql-type-nav-line);
-}
-.app-rail.as-menu { border-right: 0; padding: 8px; min-width: 220px; }
-.app-rail.as-menu .app-rail-item {
-  flex-direction: row; justify-content: flex-start; gap: 12px; min-height: var(--ql-size-touch);
-  font-size: var(--ql-type-nav-size); line-height: var(--ql-type-nav-line);
 }

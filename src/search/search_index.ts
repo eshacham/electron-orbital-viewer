@@ -19,8 +19,11 @@ export type SearchAction =
     | { kind: 'bonds'; system: BondsSystemId }
     | { kind: 'basic'; n: number; l: number; ml: number };
 
-export type SearchGroup = 'Elements' | 'Molecules' | 'Bonds' | 'Basic orbitals';
-export const SEARCH_GROUP_ORDER: readonly SearchGroup[] = ['Elements', 'Molecules', 'Bonds', 'Basic orbitals'];
+// Ruling R23a (round 23): the group is named "Orbitals" now, matching the
+// top bar's tab and the phone's mode menu ("Basic Orbitals" renamed in the
+// UI only -- the action kind below, 'basic', is the internal id and stays).
+export type SearchGroup = 'Elements' | 'Molecules' | 'Bonds' | 'Orbitals';
+export const SEARCH_GROUP_ORDER: readonly SearchGroup[] = ['Elements', 'Molecules', 'Bonds', 'Orbitals'];
 export const SEARCH_GROUP_LIMIT = 6;
 
 export interface SearchResult {
@@ -107,7 +110,7 @@ const BASIC_ORBITALS = (() => {
 function basicResults(q: string): SearchResult[] {
     if (q.length < 2 || !/^[1-9]/.test(q)) return [];
     return BASIC_ORBITALS.filter(orbital => orbital.key.startsWith(q)).map(({ n, l, ml, name }) => ({
-        key: `basic-${n}-${l}-${ml}`, group: 'Basic orbitals', label: name, detail: 'Hydrogen-like, Z = 1 · Basic Orbitals',
+        key: `basic-${n}-${l}-${ml}`, group: 'Orbitals', label: name, detail: 'Hydrogen-like, Z = 1 · Orbitals',
         action: { kind: 'basic', n, l, ml },
     }));
 }
@@ -119,7 +122,7 @@ export function searchAll(query: string, sources: SearchSources): SearchResult[]
         Elements: elementResults(q),
         Molecules: moleculeResults(query, sources.molecules),
         Bonds: bondsResults(q),
-        'Basic orbitals': basicResults(q),
+        Orbitals: basicResults(q),
     };
     return SEARCH_GROUP_ORDER.flatMap(group => groups[group].slice(0, SEARCH_GROUP_LIMIT));
 }

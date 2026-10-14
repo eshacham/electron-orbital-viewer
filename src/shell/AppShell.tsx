@@ -6,7 +6,6 @@ interface AppShellProps {
     /** ≥ 1680 px (spec §7). */
     wide?: boolean;
     topBar?: React.ReactNode;
-    rail?: React.ReactNode;
     explore?: React.ReactNode;
     /** Docked on a desktop; at medium width App renders it inside the viewport as a drawer instead. */
     inspector?: React.ReactNode;
@@ -26,12 +25,13 @@ function skipTo(event: React.MouseEvent<HTMLAnchorElement>, id: string): void {
 }
 
 /**
- * The app frame (spec §7, §10): top bar, rail, Explore, the viewport cell
- * and the inspector on a grid. App keeps all its state and effects and
- * passes these slots; the viewport cell never remounts when the layout
- * changes (spec §3.2), because it is always this element's child.
+ * The app frame (spec §7, §10, as amended by ruling R23a): top bar, Explore,
+ * the viewport cell and the inspector on a grid -- the rail is gone, its
+ * four destinations now the top bar's mode tabs. App keeps all its state and
+ * effects and passes these slots; the viewport cell never remounts when the
+ * layout changes (spec §3.2), because it is always this element's child.
  */
-const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, rail, explore, inspector, viewport, exploreCollapsed = false, onExpandExplore, fullscreen = false, shellRef }) => {
+const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, explore, inspector, viewport, exploreCollapsed = false, onExpandExplore, fullscreen = false, shellRef }) => {
     const classes = ['app-shell', layout, wide && 'wide', exploreCollapsed && 'explore-collapsed', fullscreen && 'is-fullscreen'].filter(Boolean).join(' ');
     return (
         <div ref={shellRef} className={classes}>
@@ -40,7 +40,6 @@ const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, rail,
                     <a className="skip-link" href="#canvas-container" onClick={event => skipTo(event, 'canvas-container')}>Skip to 3D view</a>
                     <a className="skip-link" href="#explore-panel" onClick={event => skipTo(event, 'explore-panel')}>Skip to controls</a>
                     {topBar}
-                    {rail}
                 </>
             )}
             <div className="app-workspace">

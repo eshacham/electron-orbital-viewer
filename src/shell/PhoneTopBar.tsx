@@ -46,7 +46,7 @@ const PhoneTopBar: React.FC<PhoneTopBarProps> = ({ brand, themeMode, mode, onMod
                 {MODE_LABEL[mode]} ▾
             </Button>
             <Popover open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
-                <Rail variant="menu" mode={mode} isOwner={false} onModeChange={next => { setAnchor(null); onModeChange(next); }} />
+                <Rail mode={mode} onModeChange={next => { setAnchor(null); onModeChange(next); }} />
             </Popover>
             <IconButton className="ql-icon-button" aria-label="Search" onClick={onOpenSearch}>
                 <SearchIcon fontSize="small" />

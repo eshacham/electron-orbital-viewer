@@ -47,7 +47,10 @@ export const NARROW_VIEWPORT = '(max-width: 760px), (max-height: 500px), (max-wi
  */
 export const MEDIUM_VIEWPORT = '(max-width: 1289px)';
 
-/** Below 1100 px the top bar drops its area tabs and the search becomes an icon (spec §7). */
+// Ruling R23a (round 23): the rail is gone and the top bar's tabs are the
+// only mode nav there is, so they no longer drop out below 1100 px -- only
+// the search still shrinks to an icon there.
+/** Below 1100 px the top bar's search becomes an icon (spec §7, as amended by ruling R23a). */
 export const TOPBAR_COMPACT = '(max-width: 1099px)';
 
 /**

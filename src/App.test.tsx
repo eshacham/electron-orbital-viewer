@@ -236,8 +236,8 @@ describe('App', () => {
         // the element selector (not Basic Orbitals' selects) is what shows.
         // On a desktop viewport that selector is the periodic table.
         expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /atom mode/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /basic orbitals mode/i })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /atom mode/i })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /basic orbitals mode/i })).toBeInTheDocument();
     });
 
     it('defaults to atom mode and shows LevelNav for the default element', () => {
@@ -254,7 +254,7 @@ describe('App', () => {
     it('switching to Basic Orbitals restores the n/l/mL panel, with no element control of its own', () => {
         renderWithProvider(<App />);
 
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
 
         expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
         expect(screen.getByRole('combobox', { name: /Angular \(l\)/i })).toBeInTheDocument();
@@ -293,7 +293,7 @@ describe('App', () => {
         // proof the switch *changed* it rather than it having never been set.
         expect(store.getState().orbital.currentParams?.rMax).toBeCloseTo(1.7);
 
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
 
         // App.tsx's default Basic Orbitals selection is n=3, l=2, and Z is
         // now fixed at 1 for the whole mode (BASIC_ORBITALS_Z).
@@ -357,11 +357,11 @@ describe('App', () => {
         const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
         act(() => { store.dispatch(setSurfaceStyle({ clipAxis: 'z', clipPosition: -0.2 })); });
 
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         expect(store.getState().orbital.surfaceStyle.clipAxis).toBe('none');
 
-        // Unanchored: the rail item's name is "Atoms (atom mode)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
+        // Unanchored: the top bar's tab name is "Atoms (atom mode)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('link', { name: /atom mode/i }));
         expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'z', clipPosition: -0.2 });
     });
 
@@ -442,7 +442,7 @@ describe('App', () => {
         it('is not shown at all in Basic Orbitals mode, which has no element', () => {
             installMatchMedia(false);
             renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
 
             expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
         });
@@ -516,7 +516,7 @@ describe('App', () => {
 
         it('draws a chosen combination at once, with its key and its radial components', () => {
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             chooseCombination('sp³');
 
             expect(store.getState().orbital.currentField?.sources.map(s => s.id))
@@ -529,7 +529,7 @@ describe('App', () => {
 
         it('redraws when the enclosed fraction changes, with no Update step', () => {
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             chooseCombination('Electric field');
             fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
             fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
@@ -540,7 +540,7 @@ describe('App', () => {
         // Ruling T20b-enclosed: the inspector's enclosed fraction applies on change, with the dispatch Update Orbital sends.
         it('redraws the orbital in the panel when the enclosed fraction changes, as Update Orbital would', () => {
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             const { n, l, ml } = store.getState().orbital.basicSelection;
             const inspector = screen.getByRole('complementary', { name: 'Inspector' });
             fireEvent.mouseDown(within(inspector).getByRole('combobox', { name: /electron enclosed/i }));
@@ -553,7 +553,7 @@ describe('App', () => {
         // Review Focus 1.
         it('None redraws the orbital in the panel', () => {
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             chooseCombination('sp');
             chooseCombination(/None/);
             expect(store.getState().orbital.currentField).toBeNull();
@@ -563,11 +563,11 @@ describe('App', () => {
         // Review Focus 2.
         it('a combination survives a round trip through atom mode, and is not drawn there', () => {
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             chooseCombination('sp²');
-            fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /atom mode/i }));
             expect(store.getState().orbital.currentField).toBeNull();
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             expect(store.getState().orbital.currentField?.sources.map(s => s.id))
                 .toEqual(['hybrid:sp2:0', 'hybrid:sp2:1', 'hybrid:sp2:2']);
             expect(store.getState().orbital.currentParams).toBeNull();
@@ -778,8 +778,8 @@ describe('App', () => {
 
         it('draws exact H2+ and shows the Bonds panel beside the curve', () => {
             const { store, container } = renderWithProvider(<App />);
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'h2plus', R: 2, state: '1sigma_g' });
             expect(screen.getByText(/Exact within Born–Oppenheimer/)).toBeInTheDocument();
             expect(screen.getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
@@ -793,21 +793,21 @@ describe('App', () => {
         // Ruling C7: the curve's worker exists only while Bonds shows H₂⁺.
         it('starts the H2+ curve worker only in Bonds with H2+, and stops it on the way out', () => {
             renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             expect(createH2PlusCurveWorker).not.toHaveBeenCalled();
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             expect(createH2PlusCurveWorker).toHaveBeenCalledTimes(1);
             const worker = (createH2PlusCurveWorker as jest.Mock).mock.results[0].value;
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             expect(worker.terminate).toHaveBeenCalled();
         });
 
         // Task 9's carry: a curve that could not be computed says why, where the curve would be.
         it('shows why the H2+ curve could not be computed', async () => {
             const { container } = renderWithProvider(<App />);
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             const worker = (createH2PlusCurveWorker as jest.Mock).mock.results[0].value;
             await act(async () => { worker.onmessage({ data: { type: 'error', message: 'no root in the bracket' } }); });
             expect(within(container.querySelector('.view-panel') as HTMLElement).getByRole('alert'))
@@ -816,8 +816,8 @@ describe('App', () => {
 
         it('redraws only for a different picture, not for every change to the selection', () => {
             const { store } = renderWithProvider(<App />);
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             const drawn = store.getState().orbital.currentField;
             // A ρ chosen while H₂⁺'s orbital is shown changes the selection, not the picture.
             act(() => { store.dispatch(setDensityIso(0.05)); });
@@ -829,13 +829,13 @@ describe('App', () => {
         // Review Focus 1.
         it('Bonds and back restores the Basic Orbitals request', () => {
             const { store } = renderWithProvider(<App />);
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/ }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/ }));
             const basic = store.getState().orbital.currentParams;
-            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             expect(store.getState().orbital.currentParams).toBeNull();
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/ }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/ }));
             expect(store.getState().orbital.currentField).toBeNull();
             expect(store.getState().orbital.currentParams).toEqual(basic);
         });
@@ -846,11 +846,11 @@ describe('App', () => {
         // fraction changes while Bonds is showing, and again on the way back.
         it('keeps a Basic combination out of Bonds, through atom mode and a fraction change, and redraws it on return', () => {
             const { store } = renderWithProvider(<App />);
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             chooseCombination('sp³');
-            fireEvent.click(screen.getByRole('button', { name: /atom mode/i }));
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            fireEvent.click(screen.getByRole('link', { name: /atom mode/i }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             expect(store.getState().orbital.currentField?.sources.map(s => s.id)).toEqual(['h2plus:2.0000:1sigma_g']);
             expect(screen.queryByLabelText('combination colour key')).not.toBeInTheDocument();
 
@@ -859,7 +859,7 @@ describe('App', () => {
             expect(drawn?.sources.map(s => s.recipe.type)).toEqual(['h2plus']);
             expect(drawn?.enclosedFraction).toBe(0.75);
 
-            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             expect(store.getState().orbital.currentField?.sources.map(s => s.id))
                 .toEqual(['hybrid:sp3:0', 'hybrid:sp3:1', 'hybrid:sp3:2', 'hybrid:sp3:3']);
             expect(store.getState().orbital.currentField?.enclosedFraction).toBe(0.75);
@@ -868,8 +868,8 @@ describe('App', () => {
 
         it('draws a molecule\'s density at a fixed ρ, says so beside the fraction, and keys the grey surface', async () => {
             const { store, container } = renderWithProvider(<App />);
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             chooseSystem('N₂ — Nitrogen');
             await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
                 .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@07' }));
@@ -891,8 +891,8 @@ describe('App', () => {
         // The canvas says what it is waiting for.
         it('keys the drawn density, not the pending selection, while a point loads and after a load fails', async () => {
             const { store } = renderWithProvider(<App />);
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             chooseSystem('N₂ — Nitrogen');
             await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
                 .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@07' }));
@@ -927,8 +927,8 @@ describe('App', () => {
         it('reports a molecule that fails to load in the panel only', async () => {
             (loadScan as jest.Mock).mockRejectedValue(new Error('Could not load /molecules/v1/n2/scan.json (HTTP 403)'));
             const { store } = renderWithProvider(<App />);
-            // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             chooseSystem('N₂ — Nitrogen');
             expect(await screen.findByText(/N₂ could not be loaded/)).toBeInTheDocument();
             expect(store.getState().orbital.error).toBeNull();
@@ -955,7 +955,7 @@ describe('App', () => {
     it('switching to Basic Orbitals draws the selection held in the store', () => {
         const { store } = renderWithProvider(<App />);
         act(() => { store.dispatch(setBasicSelection({ n: 2, l: 1, ml: 1 })); });
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
     });
 });
@@ -1027,7 +1027,7 @@ describe('App: opening a shared link', () => {
         applyStateTo(hash, store.dispatch);
         render(<Provider store={store}><App /></Provider>);
 
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         // The solve for the abandoned atom link still lands and still clears
         // atom.pendingView -- that must not resurrect the link's cut here.
         act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
@@ -1167,8 +1167,8 @@ describe('App: Share', () => {
         const writeText = jest.fn().mockResolvedValue(undefined);
         Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
         const { store } = renderWithProvider(<App />);
-        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+        // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
         act(() => {
             store.dispatch(setH2PlusR(3.5));
             store.dispatch(setBondsView({ kind: 'h2plus', state: '1sigma_u' }));
@@ -1217,18 +1217,24 @@ describe('App: shell', () => {
         Reflect.deleteProperty(navigator, 'clipboard');
     });
 
-    it('lays out the workstation: banner, view-mode rail, Explore, the 3D view and the inspector', () => {
+    // Ruling R23a (round 23): the rail is gone -- its four destinations are
+    // the top bar's own tabs now, in order Orbitals | Atoms | Bonds | Molecules.
+    it('lays out the workstation: banner with the mode tabs, Explore, the 3D view and the inspector', () => {
         renderWithProvider(<App />);
-        expect(screen.getByRole('banner')).toBeInTheDocument();
-        expect(screen.getByRole('navigation', { name: 'view mode' })).toBeInTheDocument();
+        const banner = screen.getByRole('banner');
+        expect(banner).toBeInTheDocument();
+        expect(screen.queryByRole('navigation', { name: 'view mode' })).toBeNull();
+        expect(within(banner).getAllByRole('link', { name: /mode\)$/ }).map(link => link.getAttribute('aria-label'))).toEqual([
+            'Orbitals (basic orbitals mode)', 'Atoms (atom mode)', 'Bonds (bonds mode)', 'Molecules (molecule mode)',
+        ]);
         expect(screen.getByRole('complementary', { name: 'Explore' })).toBeInTheDocument();
         expect(screen.getByRole('main', { name: '3D view' })).toHaveAttribute('id', 'canvas-container');
         expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveClass('view-panel');
     });
 
-    it('reads top bar → rail → Explore → toolbar → strip → inspector, under one h1 (spec §13)', () => {
+    it('reads top bar → Explore → toolbar → strip → inspector, under one h1 (spec §13)', () => {
         const { container } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
-        const order = ['.app-topbar', '.app-rail', '.explore-panel', '.viewport-toolbar', '.thumbnail-strip', '.inspector']
+        const order = ['.app-topbar', '.explore-panel', '.viewport-toolbar', '.thumbnail-strip', '.inspector']
             .map(selector => container.querySelector(selector)!);
         order.forEach(element => expect(element).not.toBeNull());
         for (let i = 1; i < order.length; i++) {
@@ -1237,29 +1243,34 @@ describe('App: shell', () => {
         expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     });
 
-    it('the Explore tab returns to the last of Atoms, Basic Orbitals and Bonds; Molecules has its own', () => {
+    // Ruling R23a replaces the old Explore/Molecules "area tab" pair (and its
+    // lastExploreModeRef memory) with four direct mode tabs: each switches to
+    // its own mode outright, with no "last of Atoms, Basic Orbitals and
+    // Bonds" to return to.
+    it('each top bar tab switches directly to its own mode', () => {
         const { store } = renderWithProvider(<App />);
-        // Unanchored: the rail item's name is "Bonds (bonds mode)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
-        fireEvent.click(screen.getByRole('link', { name: 'Molecules' }));
-        expect(store.getState().atom.mode).toBe('molecule');
-        expect(screen.getByRole('link', { name: 'Molecules' })).toHaveAttribute('aria-current', 'page');
-        fireEvent.click(screen.getByRole('link', { name: 'Explore' }));
+        // Unanchored: the top bar's tab name is "Bonds (bonds mode)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
         expect(store.getState().atom.mode).toBe('bonds');
+        fireEvent.click(screen.getByRole('link', { name: /molecule mode/ }));
+        expect(store.getState().atom.mode).toBe('molecule');
+        expect(screen.getByRole('link', { name: /molecule mode/ })).toHaveAttribute('aria-current', 'page');
+        fireEvent.click(screen.getByRole('link', { name: /atom mode/ }));
+        expect(store.getState().atom.mode).toBe('atom');
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/ }));
+        expect(store.getState().atom.mode).toBe('hydrogenic');
     });
 
     // Spec §8.2: like the old exclusive Mode toggle, re-picking the mode on screen dispatches nothing,
     // so Bonds' picture is not cleared (its request effect would never redraw it).
-    it('re-picking the mode already shown, from the Explore tab or the rail, leaves the picture alone', () => {
+    it('re-picking the mode already shown, from its own top bar tab, leaves the picture alone', () => {
         const { store } = renderWithProvider(<App />);
-        // Unanchored: the rail item's name is "Bonds (bonds mode)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+        // Unanchored: the top bar's tab name is "Bonds (bonds mode)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
         const field = store.getState().orbital.currentField;
         const nonce = store.getState().orbital.basicRenderNonce;
         expect(field).not.toBeNull();
-        fireEvent.click(screen.getByRole('link', { name: 'Explore' }));
-        expect(store.getState().orbital.currentField).toBe(field);
-        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+        fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
         expect(store.getState().orbital.currentField).toBe(field);
         expect(store.getState().orbital.basicRenderNonce).toBe(nonce);
         expect(store.getState().atom.mode).toBe('bonds');
@@ -1359,7 +1370,7 @@ describe('App: shell', () => {
     // settings in the inspector, above the plot -- where Bonds and Molecules have theirs.
     it('in Basic Orbitals, puts n/l/mₗ and Update Orbital in Explore, and the view settings in the inspector', () => {
         const { container } = renderWithProvider(<App />);
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         const explore = screen.getByRole('complementary', { name: 'Explore' });
         const inspector = screen.getByRole('complementary', { name: 'Inspector' });
         for (const name of [/Principal \(n\)/i, /Angular \(l\)/i, /Magnetic/i, /combination/i]) {
@@ -1381,7 +1392,7 @@ describe('App: shell', () => {
 
     it("in Basic Orbitals, the inspector's opacity slider commits the same setSurfaceStyle as before", () => {
         const { store } = renderWithProvider(<App />);
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         const before = store.getState().orbital;
         const slider = within(screen.getByRole('complementary', { name: 'Inspector' })).getByRole('slider', { name: 'surface opacity' });
         fireEvent.keyDown(slider, { key: 'ArrowLeft' });
@@ -1438,20 +1449,20 @@ describe('App: shell', () => {
             expect([mode, screen.queryByText('Colour scheme')]).toEqual([mode, null]);
         };
         check('atoms');
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         check('basic');
-        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
-        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+        // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
         await act(async () => {});     // Bonds' and Molecules' files load as the mode opens; let them land
         check('bonds');
-        fireEvent.click(screen.getByRole('link', { name: 'Molecules' }));     // Molecules is a top-bar tab, not a rail item
+        fireEvent.click(screen.getByRole('link', { name: /molecule mode/ }));     // all four modes are top-bar tabs now (ruling R23a)
         await act(async () => {});
         check('molecules');
     });
 
     it('folding Display hides its settings, survives a mode change and a reload, and leaves the share link alone', () => {
         const { store, unmount } = renderWithProvider(<App />);
-        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         const link = encodeStateOf(store.getState());
         const inspector = () => screen.getByRole('complementary', { name: 'Inspector' });
         fireEvent.click(within(inspector()).getByRole('button', { name: 'Display' }));
@@ -1460,7 +1471,7 @@ describe('App: shell', () => {
         expect(encodeStateOf(store.getState())).toBe(link);
         // Whatever plot there is stays in the inspector, now at its top.
         expect(within(inspector()).getByRole('region', { name: 'Display' })).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: /\(atom mode\)/ }));
+        fireEvent.click(screen.getByRole('link', { name: /\(atom mode\)/ }));
         expect(within(inspector()).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         unmount();
 

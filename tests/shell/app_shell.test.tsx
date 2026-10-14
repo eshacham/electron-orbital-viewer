@@ -5,8 +5,10 @@ import AppShell from '../../src/shell/AppShell';
 const viewport = <main id="canvas-container" tabIndex={-1} aria-label="3D view">canvas</main>;
 
 describe('AppShell (spec §7, §13 landmarks and skip links)', () => {
+    // Ruling R23a (round 23): AppShell no longer takes a `rail` slot -- the
+    // rail's four destinations are the top bar's own tabs now.
     it('lays the desktop grid out with skip links that move focus without touching the hash', () => {
-        const { container } = render(<AppShell layout="desktop" topBar={<header>top</header>} rail={<nav aria-label="view mode" />}
+        const { container } = render(<AppShell layout="desktop" topBar={<header>top</header>}
             explore={<p>explore</p>} inspector={<aside aria-label="Inspector">inspector</aside>} viewport={viewport} />);
         expect(container.firstElementChild).toHaveClass('app-shell', 'desktop');
         expect(screen.getByRole('complementary', { name: 'Explore' })).toHaveClass('explore-panel', 'side-panel');

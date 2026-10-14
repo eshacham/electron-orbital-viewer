@@ -41,7 +41,10 @@ import { failOrbitalCalculation, dismissOrbitalError } from '../src/store/orbita
 function renderBasicOrbitals() {
     const store = createAppStore();
     render(<Provider store={store}><App /></Provider>);
-    fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+    // Ruling R23a: the rail is gone on a desktop -- the mode switch is now
+    // the top bar's own tab (a link, not a button); unanchored on the old
+    // name, as before (WCAG 2.5.3, label in name).
+    fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
     return store;
 }
 
