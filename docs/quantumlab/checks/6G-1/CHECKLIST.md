@@ -244,3 +244,23 @@ Deep Space is unchanged. All 14 composites were rebuilt from fresh `--gl metal` 
 The Deep Space and whole-atom composites came out byte-identical to the previous re-take. 12/12
 shots `settled=true`, `webglCanvases=1`, `errors=0`, tokens ΔE₀₀ 0, boxes exact.
 `science_diff.mjs` against `origin/main` @ 15feebc: **science text identical to main**.
+
+### Task 20d re-take (strip thumbnails, designer review)
+
+Re-taken 2026-10-13 after Task 20d (ruling R20d). The strip tiles are now box-filtered from a
+supersampled render target (at least 3× the tile's CSS size, 4× MSAA) to a bitmap at exactly the
+tile's device size, and drawn 1:1. Before, a 144 px canvas was shrunk by CSS to 70 px.
+
+- Meshes are 64³ (was 32³).
+- Every bounding sphere is fitted to 80 % of the tile, centred, from the canonical three-quarter view.
+- Tiles use a fixed per-theme light rig and Glow strengths (`GLOW_TUNING[theme].thumb`).
+- Ring glyphs use the same 80 % fill, drawn as gradients.
+- Labels are 13 px.
+- The selected tile has a 2 px selected-edge ring and, in Deep Space, a soft glow (`--ql-shadow-selected-tile`).
+
+Commands: `node tools/design/shoot.mjs --task 20d --scenes c-whole,c-2pz,fe-shell --themes dark,light
+--sizes desktop,phone --gl metal --wait 6000`, plus `--task 20d-dpr2 … --dpr 2`, then Task 19's
+composite loop. Results: 20/20 shots `settled=true`, `webglCanvases=1`, `errors=0`; tokens are ΔE₀₀ 0
+and boxes are exact. `science_diff.mjs` against `origin/main` @ 15feebc: **science text identical to main**.
+The 8 desktop composites changed. The 6 phone composites came out byte-identical, because the
+phone's strip lives in the closed Explore sheet.
