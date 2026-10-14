@@ -1,49 +1,30 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { Accordion, AccordionDetails, AccordionSummary, Alert } from '@mui/material';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectMolecule } from '../store/moleculeSlice';
 import {
-    followJob, jobFetchFailed, jobUpdated, refreshComputed, requestDraftChanged, requestOpened, selectIsOwner, sessionFailed,
+    followJob, jobUpdated, refreshComputed, requestDraftChanged, requestOpened, selectIsOwner, sessionFailed,
 } from '../store/jobsSlice';
-import { tierOf } from '../molecules/types';
-import { isJobKey } from '../molecules/job_paths';
 import { jobsApi, jobsPoller } from '../jobs/client';
 import { approvedBody, retryBody } from '../jobs/request_form';
 import type { AvailableQuoteOption, JobRequest, JobView, Quote } from '../jobs/api_types';
 import type { RequestForm } from '../jobs/request_form';
 import { signInHere } from './OwnerBar';
-import ProvenancePanel from './ProvenancePanel';
 import RequestPanel from './RequestPanel';
 import JobStatusPanel from './JobStatusPanel';
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
 /**
- * Molecules mode's job pieces, under the navigation card (the desktop side
- * panel and the phone's Explore tab, spec §9.7): how the molecule on screen
- * was computed, for everyone; for the owner, the request panel and the
- * followed job's status.
+ * Molecules mode's job tools, under the navigation card (the desktop side
+ * panel and the phone's Explore tab, spec §9.7): the owner's request panel
+ * and the followed job's status. "How this was computed" (everyone's own
+ * provenance) moved out to MoleculeProvenanceFooter (ruling R23f-2), so a
+ * desktop/medium layout can pin it below this section instead of above it;
+ * this component has nothing to show anyone else.
  */
 const MoleculeJobsSection: React.FC = () => {
     const dispatch = useAppDispatch();
-    const meta = useAppSelector(state => state.molecule.meta);
     const isOwner = useAppSelector(selectIsOwner);
     const jobs = useAppSelector(state => state.jobs);
-    const computedKey = meta && tierOf(meta) === 'computed' && isJobKey(meta.id) ? meta.id : null;
-    const ownerJob = computedKey && isOwner ? jobs.records[computedKey] ?? null : null;
-    const ownerJobError = computedKey && isOwner ? jobs.recordErrors[computedKey] ?? null : null;
-
-    // The owner's time and cost for the computed molecule on screen: one read, no polling -- it has finished.
-    useEffect(() => {
-        if (!computedKey || !isOwner || ownerJob || ownerJobError) return undefined;
-        let cancelled = false;
-        const target = jobs.target;
-        jobsApi().get(computedKey).then(
-            view => { if (!cancelled) dispatch(jobUpdated(view, target)); },
-            error => { if (!cancelled) dispatch(jobFetchFailed({ key: computedKey, message: message(error) })); },
-        );
-        return () => { cancelled = true; };
-    }, [computedKey, isOwner, ownerJob, ownerJobError, jobs.target, dispatch]);
 
     const open = useCallback((key: string) => {
         dispatch(selectMolecule({ id: key }));
@@ -74,9 +55,10 @@ const MoleculeJobsSection: React.FC = () => {
     const submit = useCallback((body: JobRequest) => jobsApi().submit(body), []);
 
     const expired = !isOwner && jobs.session.expired;
+    // Real or absent (§3.5): with provenance gone, there is nothing here for anyone else.
+    if (!isOwner && !expired) return null;
     return (
         <div className="molecule-jobs">
-            {meta && <ProvenancePanel meta={meta} ownerJob={ownerJob} ownerJobError={ownerJobError} />}
             {isOwner && jobs.computed.error && (
                 <Alert severity="warning">Could not list this month’s computed molecules: {jobs.computed.error}</Alert>
             )}

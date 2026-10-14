@@ -165,6 +165,19 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             // menu waits for it (run_export's pngReason).
             context.onTransitionChange = (active) => dispatch(setLevelTransition(active));
             visualizerContextRef.current = context;
+            // Ruling R23f-3's live check (and any future one like it): the
+            // camera's raw position/target/distance, read live -- not
+            // cameraAnglesOf's rounded, distance-less angles (a shared
+            // link's own concern, §6.5), which would miss exactly the kind
+            // of distance-only change a bad camera re-fit makes. Dev builds
+            // only, beside the existing `window.__eovInsets` (useViewInsets).
+            if (BUILD_ENV.dev) {
+                (window as Window & { __eovCamera?: () => { position: number[]; target: number[]; distance: number } }).__eovCamera = () => ({
+                    position: context.camera.position.toArray(),
+                    target: context.controls.target.toArray(),
+                    distance: context.camera.position.distanceTo(context.controls.target),
+                });
+            }
             context.controls.addEventListener('start', () => { draggingRef.current = true; });
             context.controls.addEventListener('end', () => { draggingRef.current = false; });
             // Spec §12: the strips' thumbnails are drawn by this renderer -- never a second WebGL context.

@@ -14,6 +14,8 @@
   "bonds-co-orbital": "#mode=bonds&system=co&state=mo%3Arestricted%3A5%CF%83%3A0",
   "water": "#mode=molecule&id=h2o",
   "molecule-complex": "#mode=molecule&id=glycine",
+  "water-orbitals": "#mode=molecule&id=h2o&show=mo:4",
+  "molecule-complex-orbitals": "#mode=molecule&id=glycine&show=mo:0",
   "ac-6s-shell": "#mode=atom&Z=89&rel=scalar&level=shell&n=6",
   "ac-6s-orbital": "#mode=atom&Z=89&rel=scalar&level=orbital&n=6&l=0&ml=0",
   "ac-7s-orbital": "#mode=atom&Z=89&rel=scalar&level=orbital&n=7&l=0&ml=0",

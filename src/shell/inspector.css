@@ -23,7 +23,7 @@
 .inspector-display-toggle:hover .inspector-display-chevron { color: var(--ql-color-text-1); }
 /* Basic Orbitals' view half of Controls (ruling R20b): laid out as #controls is. */
 .controls-view { display: flex; flex-direction: column; }
-.inspector #controls, .inspector .controls-view, .inspector .radial-plot, .inspector .molecule-orbital-card {
+.inspector #controls, .inspector .controls-view, .inspector .radial-plot {
   position: static; width: auto; max-width: none !important; max-height: none; overflow: visible;
   margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
 }

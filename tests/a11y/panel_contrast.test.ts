@@ -79,11 +79,15 @@ const PAIRS: Pair[] = [
     { selector: '.molecule-readout', declares: [`background: ${v('surface-2')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
     { selector: '.molecule-caption', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.molecule-orbital-degeneracy', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-1' },
-    { selector: '.molecule-orbital-card', declares: [`background-color: ${v('surface-1')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
+    // Ruling R23f: the orbital list moved from its own right-column card
+    // (`.molecule-orbital-card`, removed from style.css) into the Explore
+    // panel's `.molecule-nav`, whose own pairing already covers its text.
     { selector: '.molecule-orbital-gap', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.molecule-orbital-gap-caveat', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.molecule-orbital-legend', declares: [`background-color: ${v('surface-1')}`, `color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
-    { selector: '.molecule-nav-orbital', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
+    // Ruling R23f: the "Showing <orbital> -- pick another ... on the right"
+    // summary (`.molecule-nav-orbital`) is retired along with the move --
+    // the list itself, now beside the switch, already names the orbital drawn.
     { selector: '.molecule-error', declares: [`background-color: ${v('error-bg')}`, `color: ${v('error-text')}`], fg: 'error-text', bg: 'error-bg' },
     { selector: '.sign-in-error', declares: [`background-color: ${v('error-bg')}`, `color: ${v('error-text')}`], fg: 'error-text', bg: 'error-bg' },
     { selector: '.tier-badge', declares: [`background: ${v('surface-2')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },

@@ -3,7 +3,6 @@ import { Button, ToggleButton, ToggleButtonGroup, Typography } from '@mui/materi
 import MoleculePicker from './MoleculePicker';
 import MoleculeOrbitalList from './MoleculeOrbitalList';
 import { formatFormula } from '../molecules/catalogue';
-import { orbitalEnergyText, orbitalTag } from '../molecules/orbital_display';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeIndexEntry } from '../molecules/types';
 import type { MoleculeSurface } from '../store/moleculeSlice';
@@ -44,7 +43,6 @@ const MoleculeNav: React.FC<MoleculeNavProps> = ({
 
     const choose = (id: string) => { onSelectMolecule(id); setPickerOpen(false); };
     const homo = meta?.orbitals.find(o => o.role === 'HOMO') ?? meta?.orbitals[0];
-    const drawnOrbital = surface.kind === 'mo' ? meta?.orbitals.find(o => o.index === surface.index) : undefined;
     const picker = <MoleculePicker entries={entries} error={indexError} selectedId={selectedId} onSelect={choose} />;
 
     return (
@@ -68,20 +66,19 @@ const MoleculeNav: React.FC<MoleculeNavProps> = ({
                         <ToggleButton value="esp">Electrostatic potential</ToggleButton>
                         <ToggleButton value="mo">Orbitals</ToggleButton>
                     </ToggleButtonGroup>
-                    {/* Ruling T16-a: on a desktop the list is the right-hand
-                        column's (the plot slot), so the card names the orbital
-                        drawn and says where the others are. The phone's
-                        Explore tab keeps the list: its Plot tab is out of sight. */}
-                    {surface.kind === 'mo' && variant === 'full' && drawnOrbital && (
-                        <Typography variant="body2" className="molecule-nav-orbital">
-                            Showing {drawnOrbital.label}{drawnOrbital.role ? ` (${drawnOrbital.role})` : ''}, {orbitalEnergyText(drawnOrbital)}
-                            {' '}— pick another in the orbital list on the right.
-                            {/* Fix round 1: what Phase 6D knows of the orbital, as its own sentence -- inside the role's
-                                brackets it nested a second pair ("(LUMO; partly diffuse (55 % valence) …)"). */}
-                            {orbitalTag(drawnOrbital) && ` ${drawnOrbital.label} is ${orbitalTag(drawnOrbital)}.`}
-                        </Typography>
-                    )}
-                    {surface.kind === 'mo' && variant === 'body' && (
+                    {/* Ruling R23f: the orbital list (and its legend) lives in
+                        the Explore panel now, under this switch, on every
+                        layout -- a desktop/tablet's docked panel and a
+                        phone's Explore tab alike (variant no longer matters
+                        here; it still does for the picker and browse list
+                        above/below, which the phone alone needs inline).
+                        Retires the old desktop-only "Showing <orbital> --
+                        pick another in the orbital list on the right"
+                        summary: the list itself, now beside the switch, both
+                        names the orbital drawn (its own `.selected` row and
+                        `aria-pressed`) and carries its per-orbital marks and
+                        captions, so restating it here would only repeat it. */}
+                    {surface.kind === 'mo' && (
                         <MoleculeOrbitalList orbitals={meta.orbitals} selectedIndex={surface.index}
                             onSelect={index => onSurfaceChange({ kind: 'mo', index })}
                             method={meta.method.density} symmetry={meta.symmetry} />

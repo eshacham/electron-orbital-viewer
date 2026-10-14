@@ -135,16 +135,20 @@ describe('MoleculeNav', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Orbitals' }));
         expect(onSurfaceChange).toHaveBeenLastCalledWith({ kind: 'mo', index: 4 });
     });
-    // Ruling T16-a: on a desktop the orbital list is the right-hand
-    // column's (the plot slot); the card names the orbital drawn and says
-    // where the list is. A phone's Explore tab keeps it, the Plot tab being
-    // out of sight there.
-    it('names the orbital drawn rather than repeating the list (desktop), and keeps the list on a phone', () => {
+    // Ruling R23f (replacing T16-a): the list sits beside the switch on
+    // every variant now -- a desktop's docked Explore panel ('full') and a
+    // phone's Explore tab ('body') alike -- so there is nothing left for
+    // 'full' to say instead of it (the old "Showing <orbital> -- pick
+    // another in the orbital list on the right" summary is retired: the
+    // list itself, right here, already names what is drawn via its own
+    // `.selected` row and `aria-pressed`).
+    it('shows the orbital list beside the switch on every variant', () => {
         const { container, rerender } = render(<MoleculeNav {...navProps} surface={{ kind: 'mo', index: 4 }} />);
-        expect(container.querySelector('.molecule-orbital-list')).toBeNull();
-        expect(container.querySelector('.molecule-nav-orbital')).toHaveTextContent('Showing 1b1 (HOMO), −0.310 Ha (−8.44 eV)');
+        const list = () => container.querySelector('.molecule-orbital-list');
+        expect(list()).not.toBeNull();
+        expect(within(list() as HTMLElement).getByRole('button', { name: /1b1/ })).toHaveAttribute('aria-pressed', 'true');
         rerender(<MoleculeNav {...navProps} variant="body" surface={{ kind: 'mo', index: 4 }} />);
-        expect(container.querySelector('.molecule-orbital-list')).not.toBeNull();
+        expect(list()).not.toBeNull();
     });
     it('states where the geometry and the density come from', () => {
         const { container } = render(<MoleculeNav {...navProps} />);
@@ -295,21 +299,23 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(textbookLumo(WATER_V3)?.note?.startsWith(`the LVMO, ${LVMO_NOTE}, constructed from the valence part`)).toBe(true);
         expect(textbookLumo(waterMeta().orbitals)).toEqual({ orbital: waterMeta().orbitals[5], note: null });
     });
-    it('says what the drawn orbital is where it names it, with an upper estimate as one, and no nested brackets', () => {
+    // Ruling R23f retires the "Showing <orbital> -- pick another in the
+    // orbital list on the right" summary this test used to check (MoleculeNav
+    // no longer says anything extra about the drawn orbital: the list beside
+    // the switch, tested directly in "MoleculeOrbitalList" and "Phase 6D"
+    // above, already carries its label, role chip, marks and energy). What
+    // MoleculeNav must still get right is wiring `surface.index` through as
+    // the list's `selectedIndex` across a rerender.
+    it('passes the drawn orbital through to the list as it changes', () => {
         const meta = waterMeta({ orbitals: [...WATER_V3, { ...COMPUTED_LVMO[2], index: 8 }], symmetry: V3_SYMMETRY });
         const { container, rerender } = render(<MoleculeNav {...navProps} meta={meta} surface={{ kind: 'mo', index: 5 }} />);
-        const showing = () => container.querySelector('.molecule-nav-orbital')!.textContent!;
-        expect(showing()).toBe('Showing 4a1 (LUMO), −0.010 Ha (−0.27 eV) — pick another in the orbital list on the right. '
-            + '4a1 is partly diffuse (55 % valence): its shape depends on the basis.');
+        const selected = () => (container.querySelector('.molecule-orbital-row.selected') as HTMLElement).textContent;
+        expect(selected()).toContain('4a1');
         rerender(<MoleculeNav {...navProps} meta={meta} surface={{ kind: 'mo', index: 7 }} />);
-        expect(showing()).toBe('Showing a1 (LVMO), 0.190 Ha (5.17 eV), upper estimate — pick another in the orbital list on the right. '
-            + `a1 is ${VALENCE_VIRTUAL_NOTE}.`);
+        expect(selected()).toContain('a1');
+        expect(selected()).toContain('upper est.');
         rerender(<MoleculeNav {...navProps} meta={meta} surface={{ kind: 'mo', index: 8 }} />);
-        expect(showing()).toContain(`2πu is ${LVMO_NOTE}.`);
-        for (const index of [5, 6, 7, 8]) {
-            rerender(<MoleculeNav {...navProps} meta={meta} surface={{ kind: 'mo', index }} />);
-            expect(maxBracketDepth(showing())).toBe(1);
-        }
+        expect(selected()).toContain('2πu');
     });
     // Fix round 1 (review Important): every distinct label note, under its own label -- a combined label such as
     // BF3's 1a1′+1e′ carries one too, and a "?" with no note still gets a sentence.
@@ -372,16 +378,6 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(row).toHaveTextContent('×3');
     });
 });
-
-/** The deepest bracket nesting in `text`: 1 means brackets, but none inside another. */
-function maxBracketDepth(text: string): number {
-    let depth = 0, max = 0;
-    for (const c of text) {
-        if (c === '(') max = Math.max(max, ++depth);
-        else if (c === ')') depth--;
-    }
-    return max;
-}
 
 describe('readout and view options', () => {
     it('reads out a pick, or says how to get one', () => {

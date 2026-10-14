@@ -95,9 +95,9 @@ import MoleculeNav from './components/MoleculeNav';
 import MoleculePickerDialog from './components/MoleculePickerDialog';
 import MoleculeReadout from './components/MoleculeReadout';
 import MoleculeViewOptions from './components/MoleculeViewOptions';
-import MoleculeOrbitalList from './components/MoleculeOrbitalList';
 import EspLegend from './components/EspLegend';
 import MoleculeJobsSection from './components/MoleculeJobsSection';
+import MoleculeProvenanceFooter from './components/MoleculeProvenanceFooter';
 import TierBadge from './components/TierBadge';
 import { ConnectedOwnerBar, signInHere } from './components/OwnerBar';
 import { useComputedList } from './jobs/useComputedList';
@@ -944,7 +944,34 @@ function App() {
     // Ruling R23c-3 (owner): the "hover or tap" hint, while nothing is picked,
     // moves into the viewport's key/caption corner -- desktop/tablet only (a
     // phone's Explore tab keeps MoleculeReadout's own in-panel wording).
-    const showHoverCaption = isMoleculeMode && Boolean(molecule.meta) && molecule.showStructure && !molecule.pick && !isNarrow;
+    //
+    // Ruling R23f-3 (root cause of the hover flicker): `.key-column` is a
+    // measured camera inset (useViewInsets' RIGHT_ZONES), and this caption
+    // lives inside it. Gating the caption's own *mount* on `!molecule.pick`
+    // made every pick/unpick -- which happens on nearly every pointermove
+    // while hovering -- add or remove a DOM node inside that zone (for a
+    // density surface, with no other key shown, the whole `<KeyColumn>`
+    // below used to mount/unmount with it). Each such change fires
+    // useViewInsets' MutationObserver, which re-measures `.key-column`'s
+    // width and calls setViewInsets -- which re-fits and re-centres the
+    // camera (orbital_visualizer.ts). The model then moves under a
+    // *stationary* mouse, so the very next pointermove often lands on a
+    // different atom/bond (or none), toggling the pick again: a visible
+    // jump on every hover transition, which reads as heavy flicker while
+    // moving the mouse across the molecule.
+    //
+    // The fix is to stop the pick from ever changing what is mounted in that
+    // zone: `moleculeCaptionZone` says whether the corner *could* show the
+    // caption (exactly the old `showHoverCaption` condition, minus the pick),
+    // and gates both the caption's mount and the whole `<KeyColumn>`'s, below
+    // -- neither now depends on `molecule.pick`. `showHoverCaption` is kept
+    // only to say whether the caption's *text* should read, toggled with a
+    // CSS class (`.hidden`, visibility, not display) that does not change
+    // the DOM's shape or the element's reserved size, so `.key-column`'s
+    // measured rect -- and the insets derived from it -- stay exactly the
+    // same whatever is picked.
+    const moleculeCaptionZone = isMoleculeMode && Boolean(molecule.meta) && molecule.showStructure && !isNarrow;
+    const showHoverCaption = moleculeCaptionZone && !molecule.pick;
 
     // The drill-down's next step. On a desktop its chips continue the
     // configuration in Explore › Configuration and its energy diagram is in
@@ -1161,19 +1188,15 @@ function App() {
     );
 
     const renderRadialPlot = (width: number, collapsible: boolean) => {
-        // Ruling D23: where the other modes plot, Molecules lists its
-        // orbitals by energy (degenerate sets grouped by energy, which
-        // MoDiagram's label grouping cannot do for these point groups).
-        if (isMoleculeMode) {
-            return molecule.meta && (
-                <div className="molecule-orbital-card">
-                    <MoleculeOrbitalList orbitals={molecule.meta.orbitals}
-                        selectedIndex={molecule.surface.kind === 'mo' ? molecule.surface.index : null}
-                        onSelect={index => dispatch(setSurface({ kind: 'mo', index }))}
-                        method={molecule.meta.method.density} symmetry={molecule.meta.symmetry} />
-                </div>
-            );
-        }
+        // Ruling R23f: the orbital list that used to stand here (ruling D23,
+        // "where the other modes plot") moved into the Explore panel, beside
+        // the Density | Electrostatic potential | Orbitals switch
+        // (MoleculeNav) -- the left panel chooses WHAT you look at, this
+        // "plot slot" is part of the right panel's HOW/data, and the list is
+        // a choice, not a plot. Molecules has nothing left for this slot, on
+        // a desktop (inspectorBody) or a phone (there is no Plot tab for it
+        // any more, below).
+        if (isMoleculeMode) return null;
         if (isBondsMode) {
             return (
                 <BondsCurvePlot bonds={bonds} data={bondsData} h2plus={h2plusCurve} width={width}
@@ -1288,17 +1311,21 @@ function App() {
         ? [
             {
                 key: 'explore', label: 'Explore',
-                // Ruling R22c: the readout heads the tab, ahead of the navigator.
+                // Ruling R22c: the readout heads the tab, ahead of the
+                // navigator. Ruling R23f: the navigator's own switch now
+                // carries the orbital list (MoleculeNav). There is no Plot
+                // tab any more (below): it had nothing left once the list
+                // moved here, its one-time reason for existing (ruling D23).
                 content: (
                     <>
                         {moleculeSelectionSection}
                         <MoleculeNav {...moleculeNavProps} variant="body" />
+                        <MoleculeProvenanceFooter />
                         <MoleculeJobsSection />
                     </>
                 ),
             },
             { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
-            { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ]
         : isBondsMode
         ? [
@@ -1386,8 +1413,23 @@ function App() {
     );
 
     const exploreContent = isBondsMode ? bondsPanel
-        // Ruling R22c: the readout's section sits under the navigator (the brief's own placement).
-        : isMoleculeMode ? <><MoleculeNav {...moleculeNavProps} />{moleculeSelectionSection}<MoleculeJobsSection /></>
+        // Ruling R22c: the readout's section sits under the navigator (the
+        // brief's own placement). Ruling R23f-2: "How this was computed"
+        // (MoleculeProvenanceFooter, pinned) sits outside the scrolling part
+        // -- the panel's own footer, below everything else -- so it never
+        // scrolls out of reach and the Selection section above it (inside
+        // the scroll) is free to show its full text (Task 23c's fixed
+        // 140 px readout height is dropped, style.css).
+        : isMoleculeMode ? (
+            <div className="molecule-explore">
+                <div className="molecule-explore-scroll">
+                    <MoleculeNav {...moleculeNavProps} />
+                    {moleculeSelectionSection}
+                    <MoleculeJobsSection />
+                </div>
+                <MoleculeProvenanceFooter pinned />
+            </div>
+        )
         // Basic Orbitals: its choice of orbital -- n/l/mₗ, combination, Update Orbital (ruling R20b).
         : renderControls('selection');
     // Basic Orbitals, Bonds and Molecules (the atom has its own: atomInspector above): the view
@@ -1570,15 +1612,25 @@ function App() {
                 pick readout, which used to share this bottom-centre stack,
                 are prose and moved off the canvas entirely: the tier into the
                 title block, the readout into the Explore panel. */}
-            {isMoleculeMode && molecule.meta && ((moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend || showHoverCaption) && (
+            {isMoleculeMode && molecule.meta && ((moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend || moleculeCaptionZone) && (
                 <KeyColumn compact={isNarrow}>
                     {moleculeKeysShown && molecule.surface.kind === 'esp' && (
                         <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact />
                     )}
                     {showPhaseLegend && <PhaseKey positive={phase.positive} negative={phase.negative} />}
                     {/* Ruling R23c-3: the placeholder instruction, relocated here from the
-                        Explore panel's Selection section -- shown only while nothing is picked. */}
-                    {showHoverCaption && <p className="molecule-hover-caption">Hover or tap an atom or bond</p>}
+                        Explore panel's Selection section -- its text reads only while
+                        nothing is picked. Ruling R23f-3: mounted whenever the corner
+                        *could* show it (moleculeCaptionZone), not only while unpicked --
+                        see showHoverCaption's own comment above for why: picking must
+                        never add or remove this node, only repaint it, so `.key-column`'s
+                        measured size (and the camera inset derived from it) never moves
+                        because of a hover. */}
+                    {moleculeCaptionZone && (
+                        <p className={`molecule-hover-caption${showHoverCaption ? '' : ' hidden'}`}>
+                            Hover or tap an atom or bond
+                        </p>
+                    )}
                 </KeyColumn>
             )}
             {/* A molecule that failed to load, or a surface that failed to

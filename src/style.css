@@ -1299,18 +1299,14 @@ html, body, #root {
   color: var(--ql-color-text-2);
   font-size: 11px;
 }
-/* Ruling T16-a: the drawn orbital's name in the navigation card. */
-.molecule-nav-orbital {
-  color: var(--ql-color-text-1);
-}
-
 /* Ruling R22c: no longer a chip floating over the canvas -- it lives in a
    `.molecule-selection` section (Explore panel or the phone's Explore tab)
    now, so a long pick scrolls on its own there rather than trapping the
-   pointer over the 3D view. Ruling R23c-3: a FIXED height, not a cap -- the
-   Selection section always reserves this much room, so whatever sits below
-   it (the jobs/provenance section's "How this was computed" link) never
-   moves as a pick's text grows or shrinks; a long pick scrolls inside it. */
+   pointer over the 3D view. Ruling R23f-2 drops Task 23c's fixed 140 px
+   height here (which used to reserve room so "How this was computed" below
+   never moved): that link is now its own pinned footer outside this panel's
+   scroll (`.molecule-explore-footer`, below), so this grows to its full
+   text instead, and the panel around it scrolls when it has to. */
 .molecule-readout {
   padding: 6px 12px;
   border-radius: 8px;
@@ -1319,9 +1315,6 @@ html, body, #root {
   color: var(--ql-color-text-1);
   font-size: 12px;
   text-align: center;
-  height: 140px;
-  overflow-y: auto;
-  box-sizing: border-box;
 }
 /* The readout's own small section in the Explore panel (desktop) or the
    phone's Explore tab (ruling R22c), under the molecule navigator: a plain
@@ -1337,7 +1330,13 @@ html, body, #root {
    inside `.key-column` -- so it shares its bottom-right anchor rather than
    needing one of its own) -- desktop/tablet only (a phone has no such
    corner; its Explore tab keeps the in-panel wording, MoleculeReadout.tsx).
-   Shown only while nothing is picked; gone the moment a pick exists. */
+   Ruling R23f-3: always in the DOM whenever the corner could show it
+   (App.tsx's `moleculeCaptionZone`) -- only `.hidden` (visibility, not
+   display or unmounting) depends on the pick, so picking never changes
+   `.key-column`'s measured size (the hover flicker's root cause: that
+   measurement is a camera inset, and this element used to mount and unmount
+   with every pick). visibility keeps its layout box (and so the column's
+   width) exactly the same whichever state it is in. */
 .molecule-hover-caption {
   margin: 0;
   padding: 6px 10px;
@@ -1347,6 +1346,9 @@ html, body, #root {
   font-size: var(--ql-type-caption-size);
   line-height: var(--ql-type-caption-line);
   white-space: nowrap;
+}
+.molecule-hover-caption.hidden {
+  visibility: hidden;
 }
 /* The phone header's molecule name button and its tier chip, side by side
    (ruling R22c) -- `.phone-header` itself is only a flex row when sideways
@@ -1362,27 +1364,71 @@ html, body, #root {
   gap: 2px;
 }
 
-/* Task 16: Molecules mode's plot slot (ruling D23) -- the orbital list on
-   the same light card as the navigation column, the width of the controls
-   card above it in the right-hand column. Own rule (ruling D29). */
-.molecule-orbital-card {
-  background-color: var(--ql-color-surface-1);
-  color: var(--ql-color-text-1);
-  border-radius: 8px;
-  padding: 10px 14px;
-  box-shadow: var(--ql-shadow-panel);
-  width: 300px;
-  box-sizing: border-box;
+/* Ruling R23f: the Explore panel's own content, split into a scrolling part
+   (MoleculeNav -- picker, surface switch and, under it, the orbital list
+   that used to be Task 16's `.molecule-orbital-card` in the plot slot --
+   the Selection section and the owner's job tools) and, pinned below it, the
+   provenance footer (next rule): `.molecule-explore` fills the Explore
+   panel's own body (`.explore-body` already gives that a definite height,
+   app_shell.css/explore.css), so distributing it between a flexible
+   scrolling child and an auto-height pinned one actually has room to work
+   with. On a phone this wrapper is not used (phoneTabs composes the same
+   pieces directly;  MoleculeProvenanceFooter renders unpinned, in flow). */
+.molecule-explore {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
-/* On a phone the sheet is the card: no chrome of its own inside it, as
-   for #controls and the radial plot there. */
-@media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
-  .phone-sheet-body .molecule-orbital-card {
-    width: auto;
-    padding: 0;
-    background: none;
-    box-shadow: none;
-  }
+.molecule-explore-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ql-size-section-gap);
+}
+/* Ruling R23f-2 (owner): "How this was computed" pinned to the Explore
+   panel's bottom edge -- this footer is the last flex item of
+   `.molecule-explore` above, sized to its own content while collapsed (just
+   the trigger's own height), so it never scrolls with
+   `.molecule-explore-scroll` and never moves regardless of how tall the
+   Selection section (or anything else above it) grows. Opening it must not
+   resize the footer or shrink the scroll area above (a true overlay, "so
+   nothing above moves" -- not even the scroll area's own size or scroll
+   position): the explanation (`.provenance-body`, AccordionDetails) is
+   taken out of flow and anchored to the footer's own top edge, growing
+   upward over the scrolling content instead of displacing it, capped near
+   70% of the panel's own height (the Explore panel fills most of the
+   window, so a viewport fraction approximates that without measuring it)
+   and scrolling inside past that. The trigger -- the footer's only in-flow
+   content -- stays exactly where it is either way. */
+.molecule-provenance-footer {
+  position: relative;
+  flex: 0 0 auto;
+}
+.molecule-provenance-footer .provenance-body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  z-index: 1;
+  max-height: calc(70vh - 60px);
+  overflow-y: auto;
+  margin-bottom: 4px;
+  border-radius: var(--ql-radius-md);
+  background-color: var(--ql-color-surface-1);
+  box-shadow: var(--ql-shadow-panel);
+}
+/* MUI's Collapse wrapper (slotProps.transition) measures its child's natural
+   height to animate the reveal; an absolutely positioned child (above) has
+   none in flow, so the wrapper itself would otherwise collapse to 0 and hide
+   it. It is not part of the panel's own flow either way (the absolutely
+   positioned child inside it is what paints), so letting it size and
+   overflow freely costs nothing. */
+.molecule-provenance-footer .MuiCollapse-root {
+  overflow: visible;
+  height: auto !important;
 }
 
 /* Ruling R22c (fix round 1, review Minor 3's class, now self-positioned):
