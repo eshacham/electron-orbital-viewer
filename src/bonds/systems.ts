@@ -10,22 +10,80 @@ export const DIATOMIC_IDS = ['h2', 'he2', 'li2', 'b2', 'c2', 'n2', 'o2', 'f2', '
 export type DiatomicId = typeof DIATOMIC_IDS[number];
 export type BondsSystemId = 'h2plus' | DiatomicId;
 
-export const BONDS_SYSTEMS: ReadonlyArray<{ id: BondsSystemId; formula: string; name: string }> = [
-    { id: 'h2plus', formula: 'H₂⁺', name: 'Hydrogen molecular ion — exact' },
-    { id: 'h2', formula: 'H₂', name: 'Hydrogen' },
-    { id: 'he2', formula: 'He₂', name: 'Helium dimer' },
-    { id: 'li2', formula: 'Li₂', name: 'Lithium' },
-    { id: 'b2', formula: 'B₂', name: 'Boron' },
-    { id: 'c2', formula: 'C₂', name: 'Carbon' },
-    { id: 'n2', formula: 'N₂', name: 'Nitrogen' },
-    { id: 'o2', formula: 'O₂', name: 'Oxygen' },
-    { id: 'f2', formula: 'F₂', name: 'Fluorine' },
-    { id: 'co', formula: 'CO', name: 'Carbon monoxide' },
-    { id: 'hf', formula: 'HF', name: 'Hydrogen fluoride' },
+/**
+ * The System select's groups (ruling R23e, owner): the list stays molecules
+ * (MO theory needs a concrete system to teach from) but is organised by the
+ * kind of bond each one shows.
+ */
+export type BondsGroupName =
+    | 'One-electron bond (exact)'
+    | 'σ bonds from s orbitals'
+    | 'σ and π bonds (second-row homonuclear)'
+    | 'Polar bonds (heteronuclear)';
+
+export const BOND_GROUP_ORDER: readonly BondsGroupName[] = [
+    'One-electron bond (exact)',
+    'σ bonds from s orbitals',
+    'σ and π bonds (second-row homonuclear)',
+    'Polar bonds (heteronuclear)',
+];
+
+export const BONDS_SYSTEMS: ReadonlyArray<{ id: BondsSystemId; formula: string; name: string; group: BondsGroupName }> = [
+    { id: 'h2plus', formula: 'H₂⁺', name: 'Hydrogen molecular ion — exact', group: 'One-electron bond (exact)' },
+    { id: 'h2', formula: 'H₂', name: 'Hydrogen', group: 'σ bonds from s orbitals' },
+    { id: 'he2', formula: 'He₂', name: 'Helium dimer', group: 'σ bonds from s orbitals' },
+    { id: 'li2', formula: 'Li₂', name: 'Lithium', group: 'σ bonds from s orbitals' },
+    { id: 'b2', formula: 'B₂', name: 'Boron', group: 'σ and π bonds (second-row homonuclear)' },
+    { id: 'c2', formula: 'C₂', name: 'Carbon', group: 'σ and π bonds (second-row homonuclear)' },
+    { id: 'n2', formula: 'N₂', name: 'Nitrogen', group: 'σ and π bonds (second-row homonuclear)' },
+    { id: 'o2', formula: 'O₂', name: 'Oxygen', group: 'σ and π bonds (second-row homonuclear)' },
+    { id: 'f2', formula: 'F₂', name: 'Fluorine', group: 'σ and π bonds (second-row homonuclear)' },
+    { id: 'co', formula: 'CO', name: 'Carbon monoxide', group: 'Polar bonds (heteronuclear)' },
+    { id: 'hf', formula: 'HF', name: 'Hydrogen fluoride', group: 'Polar bonds (heteronuclear)' },
 ];
 
 export function isBondsSystemId(value: unknown): value is BondsSystemId {
     return BONDS_SYSTEMS.some(system => system.id === value);
+}
+
+/**
+ * The textbook bond order for each system (ruling R23e), for the System
+ * select, where every option needs a number before its molecule's data has
+ * loaded. For every homonuclear system this equals meta.json's own
+ * `bondOrder` -- (bonding − antibonding)/2 over its MO occupations,
+ * `bondOrderFromOrbitals` in mo_diagram.ts -- checked against the shipped
+ * occupations in tests/bonds/mo_diagram.test.tsx's `bondOrderFromOrbitals`
+ * suite. CO and HF carry no g/u antibonding mark in their orbital labels
+ * (meta.json's own `bondOrder` is null for them, by the same rule, see
+ * MoleculeMeta's doc comment), so their entries here are the textbook value
+ * alone, unchecked against data.
+ */
+export const TEXTBOOK_BOND_ORDER: Record<BondsSystemId, number> = {
+    h2plus: 0.5, h2: 1, he2: 0, li2: 1, b2: 1, c2: 2, n2: 3, o2: 2, f2: 1, co: 3, hf: 1,
+};
+
+/** Only O₂'s ground state is paramagnetic among the eleven systems (ruling R23e's own example); B₂ also has two
+ * unpaired electrons in the shipped data (spin: 2), but the ruling's wording names only O₂, so only O₂ is marked. */
+const PARAMAGNETIC: ReadonlySet<BondsSystemId> = new Set(['o2']);
+
+function bondTypeName(order: number): string {
+    if (order === 0) return 'no bond';
+    if (order === 0.5) return 'one-electron bond';
+    if (order === 1) return 'single bond';
+    if (order === 2) return 'double bond';
+    if (order === 3) return 'triple bond';
+    return `bond, order ${order}`;
+}
+
+/**
+ * The System select's per-option line (ruling R23e, e.g. "triple bond, order
+ * 3", "no bond, order 0", "double bond, order 2, paramagnetic").
+ */
+export function bondOrderSelectText(id: BondsSystemId): string {
+    const order = TEXTBOOK_BOND_ORDER[id];
+    const orderText = Number.isInteger(order) ? String(order) : '½';
+    const base = `${bondTypeName(order)}, order ${orderText}`;
+    return PARAMAGNETIC.has(id) ? `${base}, paramagnetic` : base;
 }
 
 export function systemFormula(id: BondsSystemId): string {

@@ -398,18 +398,15 @@ html, body, #root {
   /* Ruling R20a-1: the outline carries 3:1 where the shared hue alone does not (Light Clean). */
   box-shadow: 0 0 0 1px var(--ql-color-swatch-ring);
 }
-/* A molecule's density key is wider than the ψ key, and Bonds' side panel
-   narrows the free canvas: centred, it ran under a long scale readout (found
-   live, Task 13, N₂ at 1440 px). It sits at the free area's right edge
-   instead, 2·centre − left being that edge. One class, ahead of the phone
-   rules below, so they still move it to the top right there. */
-.density-key {
-  left: calc(2 * var(--free-center-x, 50%) - var(--free-left, 0px) - 20px);
-  transform: translateX(-100%);
-  /* Its own width: anchored 20 px from the cell's right edge, shrink-to-fit
-     would otherwise give it only those 20 px and wrap it into a column. */
-  width: max-content;
-}
+/* Ruling R23c-1 moved every key into `.key-column` (viewport.css), bottom-right,
+   stacked in normal flow; that rule already resets `.density-key`'s position
+   and transform. What it does not reset is width: left over from when this
+   chip floated on its own at the canvas's free-area edge (Task 13), a fixed
+   `width: max-content` kept the chip from ever wrapping -- harmless there,
+   but inside the column's 220 px cap (viewport.css) it pushed the chip past
+   the column's right edge (found live, task 23e). No width here now: the
+   column's `align-items: stretch` sizes it like every other key, and ρ's
+   long sentence wraps inside it like the rest. */
 
 .radial-plot-peak {
   stroke: var(--ql-color-text-3);
@@ -1028,6 +1025,23 @@ html, body, #root {
 .mo-footer {
   color: var(--ql-color-text-2);
   font-size: 11px;
+}
+/* Ruling R23e: a title and a one-line legend over the diagram, in normal
+   flow with everything around it (the owner's "don't they need a
+   group/title?") -- no absolute positioning here, so there is nothing for
+   it to overlap the Show switch above it with. */
+.mo-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mo-heading {
+  color: var(--ql-color-text-1);
+  font-weight: 600;
+}
+.mo-legend {
+  display: block;
+  color: var(--ql-color-text-2);
 }
 
 /* BondsPanel (Task 12). Ruling C6: dark-on-light, as LevelNav -- its own

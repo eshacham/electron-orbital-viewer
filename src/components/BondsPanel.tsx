@@ -1,13 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, FormControl, InputLabel, LinearProgress, MenuItem, Select, Slider, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { Alert, FormControl, InputLabel, LinearProgress, ListSubheader, MenuItem, Select, Slider, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { BondsState, BondsView } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
-import { BONDS_SYSTEMS, BondsSystemId, DENSITY_ISO_VALUES, nearestScanIndex, systemFormula } from '../bonds/systems';
+import { BOND_GROUP_ORDER, BONDS_SYSTEMS, BondsSystemId, DENSITY_ISO_VALUES, bondOrderSelectText, nearestScanIndex, systemFormula } from '../bonds/systems';
 import { H2PLUS_R_RANGE, h2plusTotalEnergy } from '../bonds/h2plus';
 import { bondsCaptions, densitySurfaceText, frontierText, lengths, orbitalCaveats, signed } from '../bonds/captions';
 import { bondAxisMinimumDensity } from '../bonds/bond_density';
 import { bondOrderText, h2plusOrbitals } from '../bonds/mo_diagram';
+import { MoleculeOrbitalInfo } from '../molecules/types';
 import MoDiagram from './MoDiagram';
+
+/** The orbital "One orbital" opens onto when none is picked yet: the highest occupied one (HOMO; SOMO if open-shell). */
+function frontierOccupiedIndex(orbitals: readonly MoleculeOrbitalInfo[]): number | null {
+    return (orbitals.find(o => o.role === 'HOMO') ?? orbitals.find(o => o.role === 'SOMO'))?.index ?? null;
+}
 
 interface BondsPanelProps {
     bonds: BondsState;
@@ -80,10 +86,24 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
     return (
         <div className="bonds-panel">
             <FormControl fullWidth size="small" margin="dense">
-                <InputLabel id="bonds-system-label">System</InputLabel>
-                <Select labelId="bonds-system-label" label="System" value={bonds.system}
-                    onChange={event => onSelectSystem(event.target.value as BondsSystemId)}>
-                    {BONDS_SYSTEMS.map(s => <MenuItem key={s.id} value={s.id}>{s.formula} — {s.name}</MenuItem>)}
+                <InputLabel id="bonds-system-label">Molecule (by bond type)</InputLabel>
+                <Select labelId="bonds-system-label" label="Molecule (by bond type)" value={bonds.system}
+                    onChange={event => onSelectSystem(event.target.value as BondsSystemId)}
+                    renderValue={value => {
+                        const system = BONDS_SYSTEMS.find(s => s.id === value);
+                        return system ? `${system.formula} — ${system.name}` : value;
+                    }}>
+                    {BOND_GROUP_ORDER.flatMap(group => [
+                        <ListSubheader key={group}>{group}</ListSubheader>,
+                        ...BONDS_SYSTEMS.filter(s => s.group === group).map(s => (
+                            <MenuItem key={s.id} value={s.id} aria-label={`${s.formula} — ${s.name}, ${bondOrderSelectText(s.id)}`}>
+                                <div>
+                                    <div>{s.formula} — {s.name}</div>
+                                    <Typography variant="caption" color="text.secondary" component="div">{bondOrderSelectText(s.id)}</Typography>
+                                </div>
+                            </MenuItem>
+                        )),
+                    ])}
                 </Select>
             </FormControl>
 
@@ -130,8 +150,22 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                 </ToggleButtonGroup>
             ) : (
                 <>
-                    <ToggleButton size="small" fullWidth value="density" selected={view.kind === 'density'} aria-label="Total electron density"
-                        onChange={() => onView({ kind: 'density' })}>Total density</ToggleButton>
+                    {/* Ruling R23e: an explicit, two-way switch -- the owner's reading of the
+                        old lone "Total density" button as ambiguous ("Is Total density a
+                        button?"). Picking "One orbital" with nothing picked yet opens on the
+                        frontier (HOMO, or SOMO where the ground state is open-shell); picking
+                        it again, or a box in the diagram below, is unchanged. */}
+                    <ToggleButtonGroup exclusive size="small" fullWidth aria-label="Show" value={view.kind === 'density' ? 'density' : 'orbital'}
+                        onChange={(_, v) => {
+                            if (v === 'density') onView({ kind: 'density' });
+                            else if (v === 'orbital' && selectedIndex === null && orbitals) {
+                                const index = frontierOccupiedIndex(orbitals);
+                                if (index !== null) onView(viewForIndex(index));
+                            }
+                        }}>
+                        <ToggleButton value="density" aria-label="Total electron density">Total density</ToggleButton>
+                        <ToggleButton value="orbital" aria-label="One orbital" disabled={!orbitals || orbitals.length === 0}>One orbital</ToggleButton>
+                    </ToggleButtonGroup>
                     {view.kind === 'density' && (
                         <>
                             <ToggleButtonGroup exclusive size="small" fullWidth aria-label="Density surface" value={bonds.densityIso}
@@ -148,8 +182,15 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
             {note && <Typography variant="caption" className="bonds-note">{note}</Typography>}
 
             {orbitals && orbitals.length > 0 && (
-                <MoDiagram orbitals={orbitals} selectedIndex={selectedIndex} footer={footer}
-                    onSelect={index => onView(viewForIndex(index))} />
+                <div className="mo-section">
+                    <Typography variant="subtitle2" className="mo-heading">Molecular orbitals (lowest energy at the bottom)</Typography>
+                    <Typography variant="caption" className="mo-legend">
+                        σ/π: symmetry about the bond axis; g/u: even/odd through the centre; * antibonding; numbers count orbitals of
+                        that symmetry from the lowest; arrows show electrons.
+                    </Typography>
+                    <MoDiagram orbitals={orbitals} selectedIndex={selectedIndex} footer={footer}
+                        onSelect={index => onView(viewForIndex(index))} />
+                </div>
             )}
             {frontier && <Typography variant="caption" className="bonds-frontier">{frontier}</Typography>}
             {caveats.map(caveat => <Typography key={caveat} variant="caption" className="bonds-note">{caveat}</Typography>)}

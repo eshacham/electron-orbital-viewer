@@ -2,7 +2,8 @@ import React from 'react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { buildMoDiagram, bondOrderText, h2plusOrbitals, spinOrderNote } from '../../src/bonds/mo_diagram';
+import { bondOrderFromOrbitals, buildMoDiagram, bondOrderText, h2plusOrbitals, spinOrderNote } from '../../src/bonds/mo_diagram';
+import { BondsSystemId, TEXTBOOK_BOND_ORDER } from '../../src/bonds/systems';
 import MoDiagram from '../../src/components/MoDiagram';
 import { MoleculeMeta, MoleculeOrbitalInfo } from '../../src/molecules/types';
 
@@ -51,6 +52,55 @@ describe('buildMoDiagram', () => {
         const levels = h2plusOrbitals(2);
         expect(levels.map(o => [o.label, o.occupation])).toEqual([['1σg', 1], ['1σu*', 0]]);
         expect(levels[0].energyHartree).toBeCloseTo(-1.1026342145, 9);
+    });
+});
+
+/**
+ * Ruling R23e: the System select's per-option bond order (systems.ts'
+ * TEXTBOOK_BOND_ORDER) against (bonding − antibonding)/2 over each
+ * homonuclear system's own shipped occupations (v3, tools/molecules/out --
+ * label/occupation pairs copied from the published meta.json, same shape
+ * fixtureOrbitals above reads from disk for N₂/O₂/HF). CO and HF's labels
+ * carry no antibonding star (heteronuclear: g/u symmetry, and so the star,
+ * does not apply -- meta.json's own bondOrder is null for them too, the
+ * comment on MoleculeMeta.bondOrder says so), so there is nothing to derive
+ * them from; TEXTBOOK_BOND_ORDER carries their value unchecked, and this
+ * only confirms bondOrderFromOrbitals correctly declines to guess.
+ */
+describe('bondOrderFromOrbitals', () => {
+    const occ = (label: string, occupation: number) => ({ label, occupation });
+    const SHIPPED: Record<Exclude<BondsSystemId, 'h2plus'>, Array<{ label: string; occupation: number }>> = {
+        h2: [occ('1σg', 2), occ('1σu*', 0)],
+        he2: [occ('1σg', 2), occ('1σu*', 2)],
+        li2: [occ('1σg', 2), occ('1σu*', 2), occ('2σg', 2), occ('2σu*', 0)],
+        b2: [occ('1σg', 1), occ('1σu*', 1), occ('2σg', 1), occ('2σu*', 1), occ('1πu', 1), occ('1πu', 1), occ('3σg', 0),
+            occ('1πg*', 0), occ('1πg*', 0), occ('3σu*', 0), occ('1σg', 1), occ('1σu*', 1), occ('2σg', 1), occ('2σu*', 1),
+            occ('3σg', 0), occ('1πu', 0), occ('1πu', 0), occ('1πg*', 0), occ('1πg*', 0), occ('3σu*', 0)],
+        c2: [occ('1σg', 2), occ('1σu*', 2), occ('2σg', 2), occ('2σu*', 2), occ('1πu', 2), occ('1πu', 2), occ('3σg', 0),
+            occ('1πg*', 0), occ('1πg*', 0), occ('3σu*', 0)],
+        n2: [occ('1σg', 2), occ('1σu*', 2), occ('2σg', 2), occ('2σu*', 2), occ('1πu', 2), occ('1πu', 2), occ('3σg', 2),
+            occ('1πg*', 0), occ('1πg*', 0), occ('3σu*', 0)],
+        o2: [occ('1σg', 1), occ('1σu*', 1), occ('2σg', 1), occ('2σu*', 1), occ('1πu', 1), occ('1πu', 1), occ('3σg', 1),
+            occ('1πg*', 1), occ('1πg*', 1), occ('3σu*', 0), occ('1σg', 1), occ('1σu*', 1), occ('2σg', 1), occ('2σu*', 1),
+            occ('3σg', 1), occ('1πu', 1), occ('1πu', 1), occ('1πg*', 0), occ('1πg*', 0), occ('3σu*', 0)],
+        f2: [occ('1σg', 2), occ('1σu*', 2), occ('2σg', 2), occ('2σu*', 2), occ('3σg', 2), occ('1πu', 2), occ('1πu', 2),
+            occ('1πg*', 2), occ('1πg*', 2), occ('3σu*', 0)],
+        co: [occ('1σ', 2), occ('2σ', 2), occ('3σ', 2), occ('4σ', 2), occ('1π', 2), occ('1π', 2), occ('5σ', 2),
+            occ('2π', 0), occ('2π', 0), occ('6σ', 0)],
+        hf: [occ('1σ', 2), occ('2σ', 2), occ('3σ', 2), occ('1π', 2), occ('1π', 2), occ('4σ', 0)],
+    };
+
+    it.each(['h2', 'he2', 'li2', 'b2', 'c2', 'n2', 'o2', 'f2'] as const)('matches the textbook value for %s', id => {
+        expect(bondOrderFromOrbitals(SHIPPED[id])).toBe(TEXTBOOK_BOND_ORDER[id]);
+    });
+
+    it('declines to guess for a heteronuclear molecule (no antibonding star to sum by)', () => {
+        expect(bondOrderFromOrbitals(SHIPPED.co)).toBeNull();
+        expect(bondOrderFromOrbitals(SHIPPED.hf)).toBeNull();
+    });
+
+    it('is null with nothing to sum', () => {
+        expect(bondOrderFromOrbitals([])).toBeNull();
     });
 });
 

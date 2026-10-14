@@ -268,4 +268,79 @@ describe('BondsPanel', () => {
         expect(screen.getByText(/3σu\*: this orbital's shape mixes with another σ virtual of the same symmetry/)).toBeInTheDocument();
         expect(screen.getByText(/Bond order 3\./)).toBeInTheDocument();
     });
+
+    // Ruling R23e: the list stays molecules, grouped by bond type, each with its bond order.
+    describe('the System select', () => {
+        it('is labelled "Molecule (by bond type)" and keeps the closed box reading as before', () => {
+            render(<BondsPanel bonds={h2plus} data={empty} note={null} {...handlers} />);
+            expect(screen.getByRole('combobox', { name: 'Molecule (by bond type)' }))
+                .toHaveTextContent('H₂⁺ — Hydrogen molecular ion — exact');
+        });
+
+        it('groups every system by bond type, in order, each labelled with its bond order', () => {
+            render(<BondsPanel bonds={h2plus} data={empty} note={null} {...handlers} />);
+            fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Molecule (by bond type)' }));
+            const listbox = screen.getByRole('listbox');
+            ['One-electron bond (exact)', 'σ bonds from s orbitals', 'σ and π bonds (second-row homonuclear)', 'Polar bonds (heteronuclear)']
+                .forEach(group => expect(within(listbox).getByText(group)).toBeInTheDocument());
+            // MUI's Menu gives ListSubheader an 'option' role too (it is not interactive and carries no
+            // aria-label, unlike a real MenuItem); keep only the eleven systems' own entries.
+            const labels = within(listbox).getAllByRole('option').map(o => o.getAttribute('aria-label')).filter((label): label is string => label !== null);
+            expect(labels).toEqual([
+                'H₂⁺ — Hydrogen molecular ion — exact, one-electron bond, order ½',
+                'H₂ — Hydrogen, single bond, order 1',
+                'He₂ — Helium dimer, no bond, order 0',
+                'Li₂ — Lithium, single bond, order 1',
+                'B₂ — Boron, single bond, order 1',
+                'C₂ — Carbon, double bond, order 2',
+                'N₂ — Nitrogen, triple bond, order 3',
+                'O₂ — Oxygen, double bond, order 2, paramagnetic',
+                'F₂ — Fluorine, single bond, order 1',
+                'CO — Carbon monoxide, triple bond, order 3',
+                'HF — Hydrogen fluoride, single bond, order 1',
+            ]);
+        });
+
+        it('still picks a system by clicking it', () => {
+            render(<BondsPanel bonds={h2plus} data={empty} note={null} {...handlers} />);
+            fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Molecule (by bond type)' }));
+            fireEvent.click(screen.getByRole('option', { name: /^CO —/ }));
+            expect(handlers.onSelectSystem).toHaveBeenCalledWith('co');
+        });
+    });
+
+    // Ruling R23e: "Total density" / "One orbital" replaces the single lone
+    // toggle, so it reads as a real two-way switch (owner: "Is Total density a
+    // button?"), and the list below it gets a title and a legend.
+    describe('the Show switch and the titled orbital list', () => {
+        it('titles the molecular-orbital list and explains its labels', () => {
+            render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
+            expect(screen.getByText('Molecular orbitals (lowest energy at the bottom)')).toBeInTheDocument();
+            expect(screen.getByText(/σ\/π: symmetry about the bond axis; g\/u: even\/odd through the centre; \* antibonding/))
+                .toBeInTheDocument();
+        });
+
+        it('shows Total density selected by default, and One orbital disabled until orbitals are known', () => {
+            const fresh = reducer(undefined, selectBondsSystem('n2'));
+            render(<BondsPanel bonds={fresh} data={{ ...empty, loading: true }} note={null} {...handlers} />);
+            expect(screen.getByRole('button', { name: 'Total electron density' })).toHaveAttribute('aria-pressed', 'true');
+            const oneOrbital = screen.getByRole('button', { name: 'One orbital' });
+            expect(oneOrbital).toHaveAttribute('aria-pressed', 'false');
+            expect(oneOrbital).toBeDisabled();
+        });
+
+        it('opens "One orbital" on the frontier orbital (HOMO) when nothing is picked yet', () => {
+            render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
+            fireEvent.click(screen.getByRole('button', { name: 'One orbital' }));
+            expect(handlers.onView).toHaveBeenCalledWith({ kind: 'mo', label: '3σg', spin: 'restricted', component: 0 });
+        });
+
+        it('does nothing on "One orbital" when an orbital is already shown (it is already the frontier)', () => {
+            const mo = reducer(n2, setBondsView({ kind: 'mo', label: '1πg*', spin: 'restricted', component: 0 }));
+            handlers.onView.mockClear();
+            render(<BondsPanel bonds={mo} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
+            fireEvent.click(screen.getByRole('button', { name: 'One orbital' }));
+            expect(handlers.onView).not.toHaveBeenCalled();
+        });
+    });
 });

@@ -64,6 +64,8 @@ const PAIRS: Pair[] = [
     { selector: '.mo-break', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.mo-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.mo-footer', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
+    { selector: '.mo-heading', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
+    { selector: '.mo-legend', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.side-panel .bonds-panel', declares: [`background-color: ${v('surface-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.bonds-panel', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.bonds-captions', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },

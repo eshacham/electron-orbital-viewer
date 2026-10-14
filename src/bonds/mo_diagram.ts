@@ -109,6 +109,25 @@ export function spinOrderNote(model: MoDiagramModel): string | null {
     return `Levels drawn at α energies; ${where} ${pairs}. ↓ marks the matching β orbital.`;
 }
 
+/**
+ * (bonding − antibonding)/2 over a molecule's MO occupations (ruling R23e;
+ * MoleculeMeta.bondOrder's own doc comment, types.ts). Only a homonuclear
+ * molecule's labels carry the antibonding star (g/u symmetry splits bonding
+ * from antibonding there); a heteronuclear one's σ/π labels carry no such
+ * mark, so there is nothing to sum by -- this returns null, and the caller
+ * falls back to a textbook value (systems.ts' TEXTBOOK_BOND_ORDER).
+ */
+export function bondOrderFromOrbitals(orbitals: readonly Pick<MoleculeOrbitalInfo, 'label' | 'occupation'>[]): number | null {
+    if (orbitals.length === 0 || !orbitals.some(o => o.label.includes('*'))) return null;
+    let bonding = 0;
+    let antibonding = 0;
+    for (const orbital of orbitals) {
+        if (orbital.label.includes('*')) antibonding += orbital.occupation;
+        else bonding += orbital.occupation;
+    }
+    return (bonding - antibonding) / 2;
+}
+
 export function bondOrderText(order: number | null | undefined): string {
     if (order === null || order === undefined) return 'Bond order is not defined by g/u counting for a heteronuclear molecule.';
     if (order === 0) return 'Bond order 0 — no bond: the antibonding electrons cancel the bonding ones.';

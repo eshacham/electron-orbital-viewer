@@ -762,8 +762,9 @@ describe('App', () => {
             fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
             fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
         };
+        // Ruling R23e: the select's label is now "Molecule (by bond type)" (grouped by bond type, each with its bond order).
         const chooseSystem = (option: string) => {
-            fireEvent.mouseDown(screen.getByRole('combobox', { name: 'System' }));
+            fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Molecule (by bond type)' }));
             fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
         };
 
