@@ -128,10 +128,28 @@ export function bondOrderFromOrbitals(orbitals: readonly Pick<MoleculeOrbitalInf
     return (bonding - antibonding) / 2;
 }
 
+function formatBondOrderNumber(order: number): string {
+    return Number.isInteger(order) ? String(order) : `${Math.floor(order) || ''}½`;
+}
+
 export function bondOrderText(order: number | null | undefined): string {
     if (order === null || order === undefined) return 'Bond order is not defined by g/u counting for a heteronuclear molecule.';
     if (order === 0) return 'Bond order 0 — no bond: the antibonding electrons cancel the bonding ones.';
-    return `Bond order ${Number.isInteger(order) ? order : `${Math.floor(order) || ''}½`}`;
+    return `Bond order ${formatBondOrderNumber(order)}`;
+}
+
+/**
+ * Ruling T23e-COHF (fix round 1): a heteronuclear molecule's footer used to
+ * say only that bond order "is not defined by g/u counting" -- true of the
+ * g/u-counting method, but left the panel silently disagreeing with the
+ * System select, which (ruling R23e) shows CO and HF's textbook bond order
+ * (systems.ts' TEXTBOOK_BOND_ORDER, the same source this takes `order`
+ * from). This states the number and why g/u counting doesn't reach it,
+ * instead of only the latter.
+ */
+export function heteronuclearBondOrderText(order: number): string {
+    return `Bond order ${formatBondOrderNumber(order)} — counted from the valence orbitals' bonding/antibonding character; `
+        + "g/u labels don't apply to a heteronuclear molecule.";
 }
 
 /** H₂⁺'s one electron: each level's energy is the exact E_el of that state, a Born–Oppenheimer eigenvalue, not a Kohn–Sham one. */

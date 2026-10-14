@@ -62,9 +62,31 @@ export const TEXTBOOK_BOND_ORDER: Record<BondsSystemId, number> = {
     h2plus: 0.5, h2: 1, he2: 0, li2: 1, b2: 1, c2: 2, n2: 3, o2: 2, f2: 1, co: 3, hf: 1,
 };
 
-/** Only O₂'s ground state is paramagnetic among the eleven systems (ruling R23e's own example); B₂ also has two
- * unpaired electrons in the shipped data (spin: 2), but the ruling's wording names only O₂, so only O₂ is marked. */
-const PARAMAGNETIC: ReadonlySet<BondsSystemId> = new Set(['o2']);
+/**
+ * Whether a ground state has unpaired electrons, from the data's own
+ * multiplicity (ruling T23e-B2; MoleculeMeta's `spin`, 2S -- 0 for a closed
+ * shell, 2 for the two unpaired π electrons O₂ and B₂'s triplet ground
+ * states both carry). Null when there is no `spin` to read: not yet loaded,
+ * or H₂⁺, which is solved exactly (h2plusOrbitals) and never carries a
+ * MoleculeMeta at all -- the caller falls back to TEXTBOOK_PARAMAGNETIC.
+ */
+export function isParamagneticSpin(spin: number | null | undefined): boolean | null {
+    return spin === null || spin === undefined ? null : spin > 0;
+}
+
+/**
+ * The System select's per-option paramagnetic marker (ruling T23e-B2),
+ * needed before a molecule's data loads. Every entry but h2plus matches
+ * `isParamagneticSpin` on the shipped data's own `spin` -- checked in
+ * tests/bonds/systems.test.ts against the real v3 values (O₂ and B₂ carry
+ * spin: 2; every other diatomic, 0). H₂⁺ has no `spin` field to check against
+ * (see isParamagneticSpin) and is not paramagnetic by the sense this app's
+ * captions use: one electron with nothing to pair against isn't what
+ * "paramagnetic" describes for the other ten systems.
+ */
+export const TEXTBOOK_PARAMAGNETIC: Record<BondsSystemId, boolean> = {
+    h2plus: false, h2: false, he2: false, li2: false, b2: true, c2: false, n2: false, o2: true, f2: false, co: false, hf: false,
+};
 
 function bondTypeName(order: number): string {
     if (order === 0) return 'no bond';
@@ -83,7 +105,7 @@ export function bondOrderSelectText(id: BondsSystemId): string {
     const order = TEXTBOOK_BOND_ORDER[id];
     const orderText = Number.isInteger(order) ? String(order) : '½';
     const base = `${bondTypeName(order)}, order ${orderText}`;
-    return PARAMAGNETIC.has(id) ? `${base}, paramagnetic` : base;
+    return TEXTBOOK_PARAMAGNETIC[id] ? `${base}, paramagnetic` : base;
 }
 
 export function systemFormula(id: BondsSystemId): string {

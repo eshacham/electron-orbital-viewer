@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, FormControl, InputLabel, LinearProgress, ListSubheader, MenuItem, Select, Slider, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { BondsState, BondsView } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
-import { BOND_GROUP_ORDER, BONDS_SYSTEMS, BondsSystemId, DENSITY_ISO_VALUES, bondOrderSelectText, nearestScanIndex, systemFormula } from '../bonds/systems';
+import { BOND_GROUP_ORDER, BONDS_SYSTEMS, BondsSystemId, DENSITY_ISO_VALUES, TEXTBOOK_BOND_ORDER, bondOrderSelectText, nearestScanIndex, systemFormula } from '../bonds/systems';
 import { H2PLUS_R_RANGE, h2plusTotalEnergy } from '../bonds/h2plus';
 import { bondsCaptions, densitySurfaceText, frontierText, lengths, orbitalCaveats, signed } from '../bonds/captions';
 import { bondAxisMinimumDensity } from '../bonds/bond_density';
-import { bondOrderText, h2plusOrbitals } from '../bonds/mo_diagram';
+import { bondOrderText, h2plusOrbitals, heteronuclearBondOrderText } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
 import MoDiagram from './MoDiagram';
 
@@ -67,9 +67,16 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
     const energy = isExact
         ? `E = ${signed(h2plusTotalEnergy(draftR, view.kind === 'h2plus' ? view.state : '1sigma_g'), 5)} Ha (exact, Born–Oppenheimer)`
         : meta ? `E = ${signed(meta.totalEnergyHartree, 5)} Ha, ${meta.method.energies}` : null;
+    // Ruling T23e-COHF (fix round 1): meta.bondOrder is null for a heteronuclear molecule by
+    // design (g/u counting does not apply to it, MoleculeMeta's own doc comment) -- the select
+    // still shows a number there (ruling R23e, from TEXTBOOK_BOND_ORDER), so the footer must
+    // read the same constant instead of only saying the method doesn't reach one, or the two
+    // would contradict each other in the same panel.
     const footer = isExact
         ? `${withFullStop(bondOrderText(0.5))} One electron, exact energies.`
-        : withFullStop(bondOrderText(meta?.bondOrder));
+        : meta && meta.bondOrder === null
+            ? withFullStop(heteronuclearBondOrderText(TEXTBOOK_BOND_ORDER[bonds.system]))
+            : withFullStop(bondOrderText(meta?.bondOrder));
     const frontier = !isExact && meta ? frontierText(meta.orbitals) : null;
     const caveats = isExact ? [] : orbitalCaveats(meta);
     const densityMethod = scan?.densityMethod ?? meta?.method.density ?? null;

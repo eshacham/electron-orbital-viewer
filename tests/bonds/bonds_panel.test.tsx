@@ -18,6 +18,38 @@ const n2Scan: MoleculeScan = fixture('scan.json');
 const n2Meta: MoleculeMeta = fixture('meta.json');
 const n2Basis: MoleculeBasis = fixture('basis.json');
 
+const o2Fixture = (file: string) => JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules/o2', file), 'utf8'));
+/** The committed O₂ fixture: real shipped shape, open-shell (spin: 2, SOMO/LUMO roles, no HOMO). */
+const o2Meta: MoleculeMeta = o2Fixture('meta.json');
+
+const hfFixture = (file: string) => JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules/hf', file), 'utf8'));
+/** The committed HF fixture (ruling T23e-COHF): real shipped shape, bondOrder: null (heteronuclear). */
+const hfMeta: MoleculeMeta = hfFixture('meta.json');
+
+/**
+ * CO has no committed fixture directory; this is the real v3 data's shape
+ * (meta.json, confirmed live against the published CDN before writing this
+ * test), used only for the heteronuclear footer test below (ruling
+ * T23e-COHF) -- same style as he2Meta/o2Scan's hand-rolled shapes elsewhere
+ * in this file.
+ */
+const coMeta = {
+    id: 'co', bondOrder: null, spin: 0, totalEnergyHartree: -113.16206639693935, multireference: false, t1AtRe: null,
+    method: { density: 'B3LYP/def2-TZVP', energies: 'CCSD(T)/aug-cc-pVTZ (frozen core)' },
+    orbitals: [
+        { index: 0, label: '1σ', energyHartree: -19.2382, occupation: 2, spin: 'restricted' },
+        { index: 1, label: '2σ', energyHartree: -10.2948, occupation: 2, spin: 'restricted' },
+        { index: 2, label: '3σ', energyHartree: -1.1719, occupation: 2, spin: 'restricted' },
+        { index: 3, label: '4σ', energyHartree: -0.5836, occupation: 2, spin: 'restricted' },
+        { index: 4, label: '1π', energyHartree: -0.4842, occupation: 2, spin: 'restricted' },
+        { index: 5, label: '1π', energyHartree: -0.4842, occupation: 2, spin: 'restricted' },
+        { index: 6, label: '5σ', energyHartree: -0.386, occupation: 2, spin: 'restricted', role: 'HOMO' },
+        { index: 7, label: '2π', energyHartree: -0.0379, occupation: 0, spin: 'restricted', role: 'LUMO' },
+        { index: 8, label: '2π', energyHartree: -0.0379, occupation: 0, spin: 'restricted' },
+        { index: 9, label: '6σ', energyHartree: 0.5708, occupation: 0, spin: 'restricted' },
+    ],
+} as unknown as MoleculeMeta;
+
 // He₂'s shape and numbers as the v1 data ship them (tools/molecules/out/v1/he2/scan.json).
 const heScan = {
     id: 'he2', name: 'Helium dimer', formula: 'He₂', spin: 0,
@@ -43,6 +75,7 @@ const heMeta = {
 } as unknown as MoleculeMeta;
 const he2 = reducer(reducer(undefined, selectBondsSystem('he2')), setScanPoint({ system: 'he2', index: 1, RBohr: 3.0 }));
 const n2 = reducer(reducer(undefined, selectBondsSystem('n2')), setScanPoint({ system: 'n2', index: 7, RBohr: n2Scan.points[7].RBohr }));
+const o2 = reducer(reducer(undefined, selectBondsSystem('o2')), setScanPoint({ system: 'o2', index: 0, RBohr: 2.28 }));
 
 /** C₂ and B₂ (ruling T4-d): kept, with T1 at R_e above the single-reference limit. */
 const c2Scan = {
@@ -291,7 +324,8 @@ describe('BondsPanel', () => {
                 'H₂ — Hydrogen, single bond, order 1',
                 'He₂ — Helium dimer, no bond, order 0',
                 'Li₂ — Lithium, single bond, order 1',
-                'B₂ — Boron, single bond, order 1',
+                // Ruling T23e-B2: B₂'s two unpaired π electrons (spin: 2 in the shipped data) are paramagnetic too.
+                'B₂ — Boron, single bond, order 1, paramagnetic',
                 'C₂ — Carbon, double bond, order 2',
                 'N₂ — Nitrogen, triple bond, order 3',
                 'O₂ — Oxygen, double bond, order 2, paramagnetic',
@@ -341,6 +375,40 @@ describe('BondsPanel', () => {
             render(<BondsPanel bonds={mo} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
             fireEvent.click(screen.getByRole('button', { name: 'One orbital' }));
             expect(handlers.onView).not.toHaveBeenCalled();
+        });
+
+        // frontierOccupiedIndex's fallback path: an open-shell ground state (O₂) names no
+        // HOMO at all (its frontier orbital is singly occupied, role SOMO), unlike N₂ above.
+        it('opens "One orbital" on the SOMO when the ground state is open-shell and nothing is picked yet', () => {
+            render(<BondsPanel bonds={o2} data={{ ...empty, meta: o2Meta }} note={null} {...handlers} />);
+            expect(o2Meta.orbitals.some(o => o.role === 'HOMO')).toBe(false);
+            fireEvent.click(screen.getByRole('button', { name: 'One orbital' }));
+            expect(handlers.onView).toHaveBeenCalledWith({ kind: 'mo', label: '1πg*', spin: 'alpha', component: 0 });
+        });
+    });
+
+    // Ruling T23e-COHF (fix round 1): the footer used to say only that bond order "is not
+    // defined by g/u counting" for CO/HF, while the System select (ruling R23e) shows a real
+    // number for them -- a contradiction inside the same panel. Both now read
+    // systems.ts' TEXTBOOK_BOND_ORDER (see tests/bonds/systems.test.ts for the cross-check).
+    describe('the heteronuclear footer', () => {
+        it('states CO’s bond order and why g/u counting does not reach it', () => {
+            const co = reducer(undefined, selectBondsSystem('co'));
+            render(<BondsPanel bonds={co} data={{ ...empty, meta: coMeta }} note={null} {...handlers} />);
+            expect(screen.getByText("Bond order 3 — counted from the valence orbitals' bonding/antibonding character; "
+                + "g/u labels don't apply to a heteronuclear molecule.")).toBeInTheDocument();
+        });
+
+        it('states the same for HF, from the real shipped fixture', () => {
+            const hf = reducer(undefined, selectBondsSystem('hf'));
+            render(<BondsPanel bonds={hf} data={{ ...empty, meta: hfMeta }} note={null} {...handlers} />);
+            expect(screen.getByText("Bond order 1 — counted from the valence orbitals' bonding/antibonding character; "
+                + "g/u labels don't apply to a heteronuclear molecule.")).toBeInTheDocument();
+        });
+
+        it("leaves a homonuclear molecule's footer as it was", () => {
+            render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
+            expect(screen.getByText('Bond order 3.')).toBeInTheDocument();
         });
     });
 });
