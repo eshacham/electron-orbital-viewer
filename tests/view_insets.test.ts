@@ -33,12 +33,29 @@ describe('measureViewInsets', () => {
         expect(measureViewInsets(root, false)).toEqual({ top: 76, right: 71, bottom: 120, left: 0 });
     });
 
-    it('counts the periodic table and the inspector drawer, folded or open', () => {
+    // Ruling T20c-ptable-inset changes this test: the periodic table is no longer counted (the drawer still is).
+    it('counts the inspector drawer, folded or open, but not the periodic table', () => {
         const root = layout({ width: 900, height: 700 }, {
             '.periodic-table-panel': { left: 12, right: 584, top: 12, bottom: 262, width: 572, height: 250 },
             '.inspector-drawer': { left: 566, right: 900, top: 0, bottom: 700, width: 334, height: 700 },
         });
-        expect(measureViewInsets(root, false)).toEqual({ top: 262, right: 334, bottom: 0, left: 0 });
+        expect(measureViewInsets(root, false)).toEqual({ top: 0, right: 334, bottom: 0, left: 0 });
+    });
+
+    // Ruling T20c-ptable-inset: the table is a transient picker, not a §3.6 overlay zone, so opening it
+    // measures the same insets as before -- setViewInsets then has nothing to change, and the camera stays put.
+    it('measures the same insets with the periodic table open as with it closed', () => {
+        const zones = {
+            '.viewport-title': { left: 12, right: 330, top: 12, bottom: 76, width: 318, height: 64 },
+            '.viewport-toolbar': { left: 495, right: 699, top: 12, bottom: 48, width: 204, height: 36 },
+            '.thumbnail-strip': { left: 12, right: 699, top: 700, bottom: 808, width: 687, height: 108 },
+        };
+        const closed = measureViewInsets(layout({ width: 711, height: 820 }, zones), false);
+        const open = measureViewInsets(layout({ width: 711, height: 820 }, {
+            ...zones,
+            '.periodic-table-panel': { left: 12, right: 584, top: 12, bottom: 358, width: 572, height: 346 },
+        }), false);
+        expect(open).toEqual(closed);
     });
 
     // Ruling T16-d, kept: Molecules' key stack along the bottom.

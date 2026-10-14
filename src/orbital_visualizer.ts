@@ -90,10 +90,10 @@ export interface VisualizerContext {
     /**
      * CSS pixels of the canvas covered by panels, per edge. The camera
      * centres the scene in what is left and fits it to that area, so the
-     * periodic table or the phone's navigation card do not sit on the atom.
+     * viewport frame's overlays or the phone's sheet do not sit on the atom.
      */
     viewInsets?: ViewInsets;
-    /** fitFactorFor() as of the last framing, so a change of insets can rescale the distance by the ratio. */
+    /** fitFactorFor() the camera is fitted at, so a change of insets or canvas size can rescale the distance by the ratio (refitToCanvas). */
     fitFactor?: number;
     /**
      * The radius the cut position is a fraction of: the object actually
@@ -533,6 +533,16 @@ export interface ViewInsets {
     left: number;
 }
 
+/**
+ * Whether the canvas has a real size. Mid layout swap (desktop to phone, a
+ * tablet turning) the cell can be 0 px wide for a frame; a fit computed
+ * against that is meaningless (task 20c, bug 1).
+ */
+function isLaidOut(context: VisualizerContext): boolean {
+    const element = context.renderer.domElement;
+    return element.clientWidth > 0 && element.clientHeight > 0;
+}
+
 /** Canvas size in CSS pixels, falling back to 1x1 before layout. */
 function canvasSize(context: VisualizerContext): { width: number; height: number } {
     const element = context.renderer.domElement;
@@ -548,7 +558,7 @@ function canvasSize(context: VisualizerContext): { width: number; height: number
  */
 function fitFactorFor(context: VisualizerContext): number {
     const insets = context.viewInsets;
-    if (!insets) return 1;
+    if (!insets || !isLaidOut(context)) return 1;
     const { width, height } = canvasSize(context);
     const freeWidth = Math.max(width - insets.left - insets.right, width * 0.25);
     const freeHeight = Math.max(height - insets.top - insets.bottom, height * 0.25);
@@ -571,11 +581,46 @@ function applyViewOffset(context: VisualizerContext): void {
 }
 
 /**
+ * Keeps the camera's fit in step with the free area, after the insets or the
+ * canvas size changed: the distance scales by the ratio of the old and new
+ * fit factors, so whatever zoom the user had chosen is kept in proportion
+ * rather than reset. `context.fitFactor` always describes the fit the
+ * camera is at; every change of the factor's inputs comes through here, so
+ * the ratio never starts from a canvas that no longer exists (task 20c).
+ *
+ * A canvas with no size is skipped -- the next real resize re-fits. A shell
+ * fade drives the camera from its own two distances, so both are rescaled
+ * with it (bug 2: the fade used to land on the old fit). A cross fade does
+ * not move the camera, so the plain rescale is right for it.
+ */
+function refitToCanvas(context: VisualizerContext): void {
+    if (!isLaidOut(context)) return;
+    const oldFactor = context.fitFactor ?? fitFactorFor(context);
+    const newFactor = fitFactorFor(context);
+    context.fitFactor = newFactor;
+    if (context.framedRMax === undefined || !(oldFactor > 0) || oldFactor === newFactor) return;
+
+    const ratio = newFactor / oldFactor;
+    const transition = context.transition;
+    if (transition?.kind === 'shell-fade') {
+        transition.fromCameraDistance *= ratio;
+        transition.toCameraDistance *= ratio;
+    }
+    const { camera, controls } = context;
+    const offset = camera.position.clone().sub(controls.target).multiplyScalar(ratio);
+    camera.position.copy(controls.target).add(offset);
+    // Closer must not clip the object on the near plane; further must not lose it past the far one.
+    const distance = offset.length();
+    camera.near = Math.max(0.01, Math.min(camera.near, distance / 1000));
+    camera.far = Math.max(camera.far, distance * 10);
+    controls.update();
+}
+
+/**
  * Tells the visualizer which parts of the canvas are covered by panels.
  *
- * The scene is re-centred in the free area at once, and the camera distance
- * scales by the ratio of the old and new fit factors, so whatever zoom the
- * user had chosen is kept in proportion rather than reset.
+ * The scene is re-centred in the free area at once, and the camera re-fits
+ * to it (refitToCanvas).
  */
 export function setViewInsets(context: VisualizerContext | null, insets: ViewInsets): void {
     if (!context || context.isDisposed) return;
@@ -583,18 +628,8 @@ export function setViewInsets(context: VisualizerContext | null, insets: ViewIns
     if (previous && previous.top === insets.top && previous.right === insets.right
         && previous.bottom === insets.bottom && previous.left === insets.left) return;
 
-    const oldFactor = context.fitFactor ?? fitFactorFor(context);
     context.viewInsets = insets;
-    const newFactor = fitFactorFor(context);
-    context.fitFactor = newFactor;
-
-    if (context.framedRMax !== undefined && !context.transition && oldFactor > 0) {
-        const { camera, controls } = context;
-        const offset = camera.position.clone().sub(controls.target).multiplyScalar(newFactor / oldFactor);
-        camera.position.copy(controls.target).add(offset);
-        camera.far = Math.max(camera.far, offset.length() * 10);
-        controls.update();
-    }
+    refitToCanvas(context);
     applyViewOffset(context);
 }
 
@@ -2236,7 +2271,10 @@ function applyLights(context: VisualizerContext): void {
 
 export function handleResize(context: VisualizerContext, width: number, height: number) {
     if (!context) return;
-    
+    // A cell collapsed mid layout swap is not a size to draw at, nor to fit
+    // the camera against (task 20c, bug 1); the layout's next size is.
+    if (!(width > 0 && height > 0)) return;
+
     const { camera, renderer } = context;
     
     // Update camera aspect ratio
@@ -2247,6 +2285,8 @@ export function handleResize(context: VisualizerContext, width: number, height: 
     
     // Update renderer size
     renderer.setSize(width, height);
+    // The fit depends on the canvas size as much as on the insets.
+    refitToCanvas(context);
     // The view offset is expressed in canvas pixels, so it has to follow.
     applyViewOffset(context);
 }

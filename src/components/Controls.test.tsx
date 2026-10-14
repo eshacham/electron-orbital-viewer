@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import Controls, { cutDepthLabel, relativityHelp, whatChangedText, relativityReadoutText } from './Controls';
+import { basicOrbitalParams } from '../orbital_presets';
 
 const baseProps = {
   initialN: 3,
@@ -528,6 +529,38 @@ describe('Controls: part', () => {
     fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
     fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
     expect(onEnclosedFractionChange).toHaveBeenCalledWith(0.75);
+  });
+
+  // Ruling T20b-enclosed: the enclosed fraction sits in the inspector now, away from Update Orbital, so in
+  // Basic Orbitals a committed choice applies at once -- the same update Update Orbital sends.
+  it("in Basic Orbitals, a committed enclosed fraction sends Update Orbital's update for the current selection", () => {
+    const onUpdateOrbital = jest.fn();
+    const onEnclosedFractionChange = jest.fn();
+    render(<Controls {...baseProps} part="view" initialN={3} initialL={2} initialMl={-1}
+      onUpdateOrbital={onUpdateOrbital} onEnclosedFractionChange={onEnclosedFractionChange} />);
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
+    expect(onEnclosedFractionChange).toHaveBeenCalledWith(0.75);
+    expect(onUpdateOrbital).toHaveBeenCalledTimes(1);
+    expect(onUpdateOrbital).toHaveBeenCalledWith(basicOrbitalParams(3, 2, -1, 0.75));
+  });
+
+  it('sends no orbital update for the enclosed fraction while a combination is drawn, or in the other modes', () => {
+    const onUpdateOrbital = jest.fn();
+    const choose = () => {
+      fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
+      fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
+    };
+    const { unmount } = render(<Controls {...baseProps} part="view" onUpdateOrbital={onUpdateOrbital}
+      combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} />);
+    choose();
+    unmount();
+    for (const mode of ['atom', 'bonds', 'molecule'] as const) {
+      const view = render(<Controls {...baseProps} mode={mode} atomLevel="orbital" onUpdateOrbital={onUpdateOrbital} />);
+      choose();
+      view.unmount();
+    }
+    expect(onUpdateOrbital).not.toHaveBeenCalled();
   });
 
   it("checks n/l/mₗ once, from the selection part only: the view part sends no correction of its own", () => {

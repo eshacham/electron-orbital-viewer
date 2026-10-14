@@ -834,8 +834,8 @@ html, body, #root {
 .periodic-table-panel {
   position: absolute;
   /* Spec §9.1: a popover under the element tile, over the viewport's top-left
-     corner (still a top inset, src/useViewInsets.ts). It covers the title
-     block while it is open. */
+     corner. It covers the title block while it is open. Not a camera inset
+     (ruling T20c-ptable-inset): a transient picker does not zoom the view. */
   top: 12px;
   left: 12px;
   transform: none;

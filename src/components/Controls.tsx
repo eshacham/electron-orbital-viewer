@@ -421,8 +421,16 @@ const Controls: React.FC<ControlsProps> = ({
 
   const handleUpdateOrbital = () => {
     const params: OrbitalParams = basicOrbitalParams(initialN, initialL, initialMl, initialEnclosedFraction);
-    console.log("Update Orbital Clicked with params:", params);
-      onUpdateOrbital(params);
+    onUpdateOrbital(params);
+  };
+
+  // Ruling T20b-enclosed: in Basic Orbitals the fraction sits in the
+  // inspector, away from Update Orbital, so a chosen fraction applies at
+  // once -- the same update Update Orbital sends, for the selection in the
+  // panel. A drawn combination redraws on the fraction by itself (App).
+  const handleEnclosedFraction = (fraction: number) => {
+    onEnclosedFractionChange(fraction);
+    if (isBasicMode && !combinationActive) onUpdateOrbital(basicOrbitalParams(initialN, initialL, initialMl, fraction));
   };
 
   return (
@@ -517,7 +525,7 @@ const Controls: React.FC<ControlsProps> = ({
             id="enclosed-select"
             value={initialEnclosedFraction.toString()}
             label="Electron enclosed"
-            onChange={(e: SelectChangeEvent<string>) => onEnclosedFractionChange(parseFloat(e.target.value))}
+            onChange={(e: SelectChangeEvent<string>) => handleEnclosedFraction(parseFloat(e.target.value))}
             disabled={Boolean(fractionNote)}
           >
             {ENCLOSED_FRACTIONS.map(fraction => (

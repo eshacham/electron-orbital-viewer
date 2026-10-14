@@ -114,10 +114,10 @@ import ExplorePanel from './shell/ExplorePanel';
 import AtomExplore from './atom_ui/AtomExplore';
 import ElementTile from './atom_ui/ElementTile';
 import OrbitalEnergyList from './atom_ui/OrbitalEnergyList';
-import AtomInspector, { InspectorDisplay } from './atom_ui/AtomInspector';
+import AtomInspector from './atom_ui/AtomInspector';
 import { plotAriaLabel, plotTabsFor, resolvePlotTab, tabCurves } from './atom/plot_tabs';
 import { atomFacts, orbitalFacts, shellFacts, subshellFacts } from './orbital_facts';
-import Inspector from './shell/Inspector';
+import Inspector, { InspectorDisplay } from './shell/Inspector';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
@@ -1367,13 +1367,10 @@ function App() {
         // Basic Orbitals: its choice of orbital -- n/l/mₗ, combination, Update Orbital (ruling R20b).
         : renderControls('selection');
     // Basic Orbitals, Bonds and Molecules (the atom has its own: atomInspector above): the view
-    // settings above the plot -- for Basic Orbitals its view half of Controls (ruling R20b).
-    const inspectorBody = (
-        <>
-            {isBasicMode ? renderControls('view') : controls}
-            {renderRadialPlot(PLOT_WIDTH, false)}
-        </>
-    );
+    // settings above the plot -- for Basic Orbitals its view half of Controls (ruling R20b) -- under
+    // the foldable Display heading, as in the Atom inspector (ruling T20b-display-header).
+    const inspectorDisplay = <InspectorDisplay>{isBasicMode ? renderControls('view') : controls}</InspectorDisplay>;
+    const inspectorBody = renderRadialPlot(PLOT_WIDTH, false);
 
     const session = useAppSelector(state => state.jobs.session);
     const avatar = (
@@ -1555,7 +1552,7 @@ function App() {
             )}
             {phoneChrome}
             {isMedium && (isAtomMode ? atomInspector('drawer') : (
-                <Inspector variant="drawer" body={inspectorBody} open={viewPanelOpen}
+                <Inspector variant="drawer" top={inspectorDisplay} body={inspectorBody} open={viewPanelOpen}
                     onOpenChange={open => setViewPanelOpen(() => open)} />
             ))}
                 {isMoleculeMode && isNarrow && (
@@ -1623,7 +1620,7 @@ function App() {
                 explore={isAtomMode ? atomExplore : (
                     <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
                 )}
-                inspector={isAtomMode ? atomInspector('docked') : <Inspector variant="docked" body={inspectorBody} />}
+                inspector={isAtomMode ? atomInspector('docked') : <Inspector variant="docked" top={inspectorDisplay} body={inspectorBody} />}
                 viewport={viewport}
                 shellRef={shellRef}
                 exploreCollapsed={isMedium && exploreCollapsed}

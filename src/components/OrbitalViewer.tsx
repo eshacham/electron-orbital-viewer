@@ -666,13 +666,13 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         };
     }, [stateParams, fieldRequest]);
 
-    // Handle resize
+    // Handle resize. Mid desktop -> phone swap the cell is 0 px wide for a
+    // frame (task 20c, bug 1): skipped, as the ResizeObserver below does.
     useEffect(() => {
         const handleResize = () => {
-            if (canvasHostRef.current && visualizerContextRef.current) {
-                visualizerHandleResize(visualizerContextRef.current,
-                    canvasHostRef.current.clientWidth,
-                    canvasHostRef.current.clientHeight);
+            const host = canvasHostRef.current;
+            if (host && visualizerContextRef.current && host.clientWidth > 0 && host.clientHeight > 0) {
+                visualizerHandleResize(visualizerContextRef.current, host.clientWidth, host.clientHeight);
             }
         };
         window.addEventListener('resize', handleResize);

@@ -1,8 +1,12 @@
 import { useEffect } from 'react';
 import type { ViewInsets } from './orbital_visualizer';
 
-/** The viewport frame's overlay zones (spec §8.5), each measured as a camera inset. */
-export const TOP_ZONES = ['.viewport-title', '.viewport-toolbar', '.periodic-table-panel'];
+/**
+ * The viewport frame's overlay zones (spec §8.5), each measured as a camera
+ * inset. Not the periodic table (ruling T20c-ptable-inset): it is a
+ * transient picker, and opening it must not zoom the view out.
+ */
+export const TOP_ZONES = ['.viewport-title', '.viewport-toolbar'];
 export const RIGHT_ZONES = ['.key-column', '.inspector-drawer'];
 export const BOTTOM_ZONES = ['.thumbnail-strip', '.molecule-legend-stack'];
 /** A phone's top bar and the header line under it (spec §9.8). */
@@ -13,8 +17,7 @@ const OBSERVED_ZONES = [...TOP_ZONES, ...RIGHT_ZONES, ...BOTTOM_ZONES, ...PHONE_
  * Which parts of the viewport cell are covered, in CSS pixels per edge. The
  * docked Explore panel and inspector sit beside the cell, not over it, so
  * they are not counted (spec §8.5); what is counted is every overlay zone
- * inside it: on a desktop the title block, toolbar and periodic table along
- * the top, the key column and the medium-width inspector drawer down the
+ * inside it: on a desktop the title block and toolbar along the top, the key column and the medium-width inspector drawer down the
  * right, the thumbnail strip and Molecules' key stack along the bottom; on a
  * phone the top bar and header line, and the sheet.
  */

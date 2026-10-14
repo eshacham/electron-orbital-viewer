@@ -1,6 +1,6 @@
 import React, { useId, useState } from 'react';
 import { Button } from '@mui/material';
-import Inspector from '../shell/Inspector';
+import Inspector, { InspectorDisplay } from '../shell/Inspector';
 import TabRow from '../shell/TabRow';
 import type { PlotTab } from '../atom/plot_tabs';
 import type { PlotTabId } from '../design/presentation';
@@ -29,11 +29,6 @@ interface AtomInspectorProps {
     csvReason: string | null;
     onExportCsv(): void;
 }
-
-/** The Display section at the top of the Atom inspector (ruling R20b-atoms); App uses it in the plain inspector too. */
-export const InspectorDisplay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <section className="inspector-display" aria-label="Display">{children}</section>
-);
 
 /** The Atom screen's inspector (spec §9.1): Display on top (ruling R20b-atoms), then Plot, with its function tabs, and Data. */
 const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, plot, facts, csvReason, onExportCsv }) => {

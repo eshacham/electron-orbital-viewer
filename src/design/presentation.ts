@@ -35,10 +35,15 @@ export const renderPref = createPref<RenderPrefs>(RENDER_KEY, { decode: decodeRe
 
 /** The inspector's plot tabs (spec §9.1): R(r), |R(r)|², today's radial distribution, ρ(r). */
 export type PlotTabId = 'wave' | 'density' | 'distribution' | 'rho';
-export interface DisplayPrefs { showAxes: boolean; plotTab: PlotTabId }
+export interface DisplayPrefs {
+    showAxes: boolean;
+    plotTab: PlotTabId;
+    /** The inspector's Display section is expanded (ruling T20b-display-header). */
+    displayOpen: boolean;
+}
 
 export const DISPLAY_KEY = 'eov.display';
-export const DEFAULT_DISPLAY: DisplayPrefs = { showAxes: true, plotTab: 'distribution' };
+export const DEFAULT_DISPLAY: DisplayPrefs = { showAxes: true, plotTab: 'distribution', displayOpen: true };
 const PLOT_TABS: readonly PlotTabId[] = ['wave', 'density', 'distribution', 'rho'];
 
 export function decodeDisplay(raw: string | null): DisplayPrefs {
@@ -46,6 +51,7 @@ export function decodeDisplay(raw: string | null): DisplayPrefs {
     return {
         showAxes: typeof value.showAxes === 'boolean' ? value.showAxes : DEFAULT_DISPLAY.showAxes,
         plotTab: PLOT_TABS.includes(value.plotTab as PlotTabId) ? value.plotTab as PlotTabId : DEFAULT_DISPLAY.plotTab,
+        displayOpen: typeof value.displayOpen === 'boolean' ? value.displayOpen : DEFAULT_DISPLAY.displayOpen,
     };
 }
 

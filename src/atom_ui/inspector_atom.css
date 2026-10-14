@@ -1,6 +1,4 @@
-/* src/atom_ui/inspector_atom.css -- the Atom inspector's Display section, plot tabs and facts card (spec §9.1). */
-/* Ruling R20b-atoms: the Display settings head the inspector, padded as the tab body below them is. */
-.inspector-display { padding: var(--ql-size-panel-padding) var(--ql-size-panel-padding) 0; }
+/* src/atom_ui/inspector_atom.css -- the Atom inspector's plot tabs and facts card (spec §9.1). The Display section is src/shell/inspector.css's. */
 .plot-tab-panel { padding-top: 12px; }
 /* The plot's function tabs at caption size, docked, in the drawer and stacked in the phone sheet: their
    labels are the curve symbols, so the row is one line at 256 px (ruling T13-tablabels). */

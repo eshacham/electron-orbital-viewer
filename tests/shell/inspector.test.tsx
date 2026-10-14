@@ -1,6 +1,7 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import Inspector from '../../src/shell/Inspector';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import Inspector, { InspectorDisplay } from '../../src/shell/Inspector';
+import { DEFAULT_DISPLAY, displayPref } from '../../src/design/presentation';
 
 const tabs = [{ key: 'plot', label: 'Plot', content: <p>plot body</p> }, { key: 'data', label: 'Data', content: <p>data body</p> }];
 
@@ -78,5 +79,44 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
         expect(screen.queryByRole('tab')).toBeNull();
         expect(screen.getByRole('region', { name: 'Plot' })).toHaveTextContent('plot body');
         expect(screen.getByRole('region', { name: 'Data' })).toHaveTextContent('data body');
+    });
+});
+
+// Ruling T20b-display-header: the view settings get a visible "Display" heading and fold, so the plot can be
+// brought above the fold on a short window. The choice is a presentation preference in eov.display.
+describe('InspectorDisplay', () => {
+    afterEach(() => { act(() => { displayPref.set(DEFAULT_DISPLAY); }); window.localStorage.clear(); });
+
+    it('heads the settings with a Display heading whose button discloses them, expanded by default', () => {
+        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
+        const region = screen.getByRole('region', { name: 'Display' });
+        const heading = within(region).getByRole('heading', { name: 'Display' });
+        expect(heading).toHaveClass('ql-section');
+        const toggle = within(heading).getByRole('button', { name: 'Display' });
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(within(region).getByRole('button', { name: 'surface opacity' })).toBeInTheDocument();
+        expect(document.getElementById(toggle.getAttribute('aria-controls')!)).toContainElement(screen.getByRole('button', { name: 'surface opacity' }));
+    });
+
+    it('collapsing hides the settings and is remembered across a reload (eov.display)', () => {
+        const { unmount } = render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
+        fireEvent.click(screen.getByRole('button', { name: 'Display' }));
+        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('button', { name: 'surface opacity' })).toBeNull();
+        expect(JSON.parse(window.localStorage.getItem('eov.display')!)).toMatchObject({ displayOpen: false });
+        unmount();
+
+        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
+        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('button', { name: 'surface opacity' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Display' }));
+        expect(screen.getByRole('button', { name: 'surface opacity' })).toBeInTheDocument();
+    });
+
+    it('keeps the other display preferences when it folds', () => {
+        act(() => { displayPref.set({ ...DEFAULT_DISPLAY, showAxes: false, plotTab: 'rho' }); });
+        render(<InspectorDisplay><p>settings</p></InspectorDisplay>);
+        fireEvent.click(screen.getByRole('button', { name: 'Display' }));
+        expect(displayPref.get()).toEqual({ showAxes: false, plotTab: 'rho', displayOpen: false });
     });
 });

@@ -7,6 +7,18 @@
 /* With a section above the tabs (ruling R20b-atoms) the section, tabs and body scroll as one. */
 .inspector-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
 .inspector-scroll > .inspector-body { flex: none; overflow: visible; }
+/* The Display section heads the inspector in every mode (rulings R20b-atoms, T20b-display-header), padded as
+   the body below it is; its heading is a section title whose button folds the settings away. */
+.inspector-display { padding: var(--ql-size-panel-padding) var(--ql-size-panel-padding) 0; }
+.inspector-display-toggle {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  min-height: var(--ql-size-control-row); padding: 0; margin: 0; cursor: pointer;
+  border: 0; border-radius: var(--ql-radius-xs); background: none;
+  color: inherit; font: inherit; text-align: left;
+}
+.inspector-display-chevron { color: var(--ql-color-text-2); transition: transform var(--ql-motion-hover) ease-out; }
+.inspector-display-toggle[aria-expanded="false"] .inspector-display-chevron { transform: rotate(-90deg); }
+.inspector-display-toggle:hover .inspector-display-chevron { color: var(--ql-color-text-1); }
 /* Basic Orbitals' view half of Controls (ruling R20b): laid out as #controls is. */
 .controls-view { display: flex; flex-direction: column; }
 .inspector #controls, .inspector .controls-view, .inspector .radial-plot, .inspector .molecule-orbital-card {

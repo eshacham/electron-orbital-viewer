@@ -1,5 +1,8 @@
 import React, { useId } from 'react';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 import TabRow, { type TabItem } from './TabRow';
+import { displayPref } from '../design/presentation';
+import { usePref } from '../design/usePref';
 import './inspector.css';
 
 export interface InspectorTab extends TabItem { content: React.ReactNode }
@@ -99,6 +102,30 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
     }
 
     return <aside className="inspector view-panel" aria-label="Inspector">{content}</aside>;
+};
+
+/**
+ * The view settings at the top of the inspector, in every mode (rulings
+ * R20b-atoms, T20b-display-header): a "Display" heading whose button folds
+ * them away, so the plot can come up on a short window. Whether it is open
+ * is a presentation preference (eov.display), never part of a link.
+ */
+export const InspectorDisplay: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const display = usePref(displayPref);
+    const bodyId = useId();
+    const open = display.displayOpen;
+    return (
+        <section className="inspector-display" aria-label="Display">
+            <h2 className="ql-section inspector-display-heading">
+                <button type="button" className="inspector-display-toggle" aria-expanded={open} aria-controls={open ? bodyId : undefined}
+                    onClick={() => displayPref.set({ ...displayPref.get(), displayOpen: !open })}>
+                    Display
+                    <ExpandMore className="inspector-display-chevron" fontSize="small" aria-hidden="true" />
+                </button>
+            </h2>
+            {open && <div id={bodyId}>{children}</div>}
+        </section>
+    );
 };
 
 export default Inspector;

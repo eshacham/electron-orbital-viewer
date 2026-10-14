@@ -578,6 +578,24 @@ describe('OrbitalViewer: the grid cell', () => {
             (globalThis as { ResizeObserver?: unknown }).ResizeObserver = original;
         }
     });
+
+    // Task 20c, bug 1: mid desktop -> phone swap the cell is 0 px wide; sizing the renderer to it misframed the camera.
+    it('does not resize the renderer to a cell the layout has collapsed to 0 px on a window resize', () => {
+        const width = jest.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(0);
+        const height = jest.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(764);
+        try {
+            renderViewer();
+            act(() => { window.dispatchEvent(new Event('resize')); });
+            expect(handleResize).not.toHaveBeenCalled();
+            width.mockReturnValue(390);
+            height.mockReturnValue(844);
+            act(() => { window.dispatchEvent(new Event('resize')); });
+            expect(handleResize).toHaveBeenCalledWith(expect.anything(), 390, 844);
+        } finally {
+            width.mockRestore();
+            height.mockRestore();
+        }
+    });
 });
 
 // Spec §3.2, §6.6: a theme or scheme change restyles the scene; the renderer is never rebuilt.

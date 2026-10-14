@@ -13,9 +13,9 @@ import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, r
 import { setSurfaceStyle, setBasicSelection, requestCut, finishOrbitalCalculation } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
-import { computeSamplingRadius, SHELL_VIEW_CUT_AXIS, DEFAULT_ENCLOSED_FRACTION } from './orbital_presets';
+import { basicOrbitalParams, computeSamplingRadius, SHELL_VIEW_CUT_AXIS, DEFAULT_ENCLOSED_FRACTION } from './orbital_presets';
 import { clearProfileCacheForTests, setCachedProfile } from './atom/profile_cache';
-import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from './url_state';
+import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo, encodeStateOf } from './url_state';
 import { registerBondsUrlKeys } from './bonds/bonds_url';
 import type { ViewerExportHandle } from './export/handle';
 import { createH2PlusCurveWorker } from './workers/createH2PlusCurveWorker';
@@ -532,6 +532,22 @@ describe('App', () => {
             fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
             expect(store.getState().orbital.currentField?.enclosedFraction).toBe(0.75);
             expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'polarized1s', field: 0.03 });
+        });
+
+        // Ruling T20b-enclosed: the inspector's enclosed fraction applies on change, with the dispatch Update Orbital sends.
+        it('redraws the orbital in the panel when the enclosed fraction changes, as Update Orbital would', () => {
+            // App logs each orbital request as a debugging aid; muted so the run stays readable.
+            const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+            const { n, l, ml } = store.getState().orbital.basicSelection;
+            const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+            fireEvent.mouseDown(within(inspector).getByRole('combobox', { name: /electron enclosed/i }));
+            fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
+            expect(store.getState().orbital.enclosedFraction).toBe(0.75);
+            expect(store.getState().orbital.currentParams).toEqual(basicOrbitalParams(n, l, ml, 0.75));
+            expect(store.getState().orbital.isLoading).toBe(true);
+            log.mockRestore();
         });
 
         // Review Focus 1.
@@ -1400,6 +1416,54 @@ describe('App: shell', () => {
         const display = within(inspector).getByRole('region', { name: 'Display' });
         expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
         expect(display.compareDocumentPosition(within(inspector).getByRole('tab', { name: 'Plot' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    // Ruling T20b-display-header: in every mode the inspector's view settings sit under a visible "Display"
+    // heading that folds them away, so the plot can come up on a short window.
+    it('heads the view settings with a foldable Display heading in Atoms, Basic Orbitals, Bonds and Molecules', async () => {
+        (loadScan as jest.Mock).mockResolvedValue(n2Scan);
+        (loadMoleculeMeta as jest.Mock).mockImplementation(async (id: string) => ({ ...n2Meta, id }));
+        (loadBasis as jest.Mock).mockImplementation(async (id: string) => ({ ...n2Basis, id }));
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        const check = (mode: string) => {
+            const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+            const display = within(inspector).getByRole('region', { name: 'Display' });
+            const toggle = within(within(display).getByRole('heading', { name: 'Display' })).getByRole('button', { name: 'Display' });
+            expect([mode, toggle.getAttribute('aria-expanded')]).toEqual([mode, 'true']);
+            expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
+            expect(within(display).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
+        };
+        check('atoms');
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        check('basic');
+        // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
+        fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+        await act(async () => {});     // Bonds' and Molecules' files load as the mode opens; let them land
+        check('bonds');
+        fireEvent.click(screen.getByRole('link', { name: 'Molecules' }));     // Molecules is a top-bar tab, not a rail item
+        await act(async () => {});
+        check('molecules');
+    });
+
+    it('folding Display hides its settings, survives a mode change and a reload, and leaves the share link alone', () => {
+        const { store, unmount } = renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        const link = encodeStateOf(store.getState());
+        const inspector = () => screen.getByRole('complementary', { name: 'Inspector' });
+        fireEvent.click(within(inspector()).getByRole('button', { name: 'Display' }));
+        expect(within(inspector()).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
+        expect(within(inspector()).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
+        expect(encodeStateOf(store.getState())).toBe(link);
+        // Whatever plot there is stays in the inspector, now at its top.
+        expect(within(inspector()).getByRole('region', { name: 'Display' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /\(atom mode\)/ }));
+        expect(within(inspector()).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
+        unmount();
+
+        renderWithProvider(<App />);
+        expect(within(inspector()).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(within(inspector()).getByRole('button', { name: 'Display' }));
+        expect(within(inspector()).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
     });
 
     // Ruling T13-shellcard: under a shell's name the card states that shell's facts, not the whole atom's.
