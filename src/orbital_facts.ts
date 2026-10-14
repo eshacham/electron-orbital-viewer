@@ -99,7 +99,9 @@ export function subshellFacts(
             { term: 'Electrons', value: `${electrons} of ${capacity}` },
             { term: 'Radial nodes', value: radialNodes(s.n, s.l) },
             { term: 'Angular nodes', value: `${s.l} per orbital` },
-            { term: 'Enclosed', value: `${percent(extras.enclosedFraction)} of the electron` },
+            // Ruling FR-M6 (final review A, M6): a subshell holds several orbitals, each
+            // with its own 90% surface -- "of the electron" reads as if it held one.
+            { term: 'Enclosed', value: `${percent(extras.enclosedFraction)} of each orbital's probability` },
             ...(extras.energy === null ? [] : [{ term: 'Orbital energy', value: energyText(extras.energy, extras.method) }]),
         ],
         notes: ['ψ changes sign across every node.'],

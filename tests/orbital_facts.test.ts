@@ -42,6 +42,10 @@ describe('orbital facts (spec §9.1 "Data")', () => {
         const sub = subshellFacts({ n: 3, l: 2, electrons: 6 }, { enclosedFraction: 0.9, energy: -0.3, method: 'non-relativistic LDA' });
         expect(sub.title).toBe('3d subshell');
         expect(sub.rows.find(r => r.term === 'Electrons')?.value).toBe('6 of 10');
+        // Final review A, M6: a 3d^6 subshell's surface encloses 90% of EACH orbital's
+        // probability, not 90% "of the electron" as if the subshell held one. The
+        // orbital-level card above keeps "of the electron" -- it does hold one.
+        expect(sub.rows.find(r => r.term === 'Enclosed')?.value).toBe("90 % of each orbital's probability");
         const atom = atomFacts({ title: 'Whole atom', configuration: '1s² 2s² 2p²', valence: '2s² 2p²', shellCount: 2, drawnRadius: 2.346, method: 'non-relativistic LDA' });
         expect(atom.rows.map(r => r.term)).toEqual(['Configuration', 'Valence', 'Shells', 'Drawn radius']);
         expect(atom.rows[3].value).toBe('2.35 a₀ (non-relativistic LDA)');
