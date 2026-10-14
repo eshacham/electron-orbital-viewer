@@ -873,7 +873,7 @@ function disposeOrbitalGroup(group: THREE.Object3D, isShellView: boolean): void 
  * applied to in-flight animation state instead of a parallel mechanism of
  * its own.
  */
-function cancelTransition(context: VisualizerContext): void {
+function cancelTransition(context: VisualizerContext, { cameraStays = false }: { cameraStays?: boolean } = {}): void {
     const transition = context.transition;
     if (!transition) return;
 
@@ -889,8 +889,37 @@ function cancelTransition(context: VisualizerContext): void {
         setShellViewCurve(context.currentOrbitalGroup, transition.toCurve);
         setShellViewRadius(context.currentOrbitalGroup, transition.toRadius);
         context.framedRMax = transition.finalFramedRadius;
+        // Ruling T20c-fade: the camera lands where the fade was taking it.
+        // framedRMax now says the view is framed, so a non-animated update
+        // with the same params would not re-frame, and the camera would stay
+        // wherever the fade had got to. `cameraStays` is for a caller about
+        // to start the next fade, which eases on from where the camera is
+        // instead of jumping to this fade's end first.
+        if (!cameraStays) placeShellFadeCamera(context, transition.toCameraDistance);
     }
     context.transition = null;
+}
+
+/**
+ * Puts the camera `distance` from the origin along its current bearing, with
+ * the clip range to match: one frame of a shell fade's camera move, or its
+ * end. The bearing is re-read every time, exactly like frameOrbital does,
+ * rather than a bearing frozen at the transition's start: the user is free
+ * to keep dragging the view while the zoom eases, and this keeps following
+ * wherever they end up looking rather than fighting them back to a stale
+ * direction.
+ */
+function placeShellFadeCamera(context: VisualizerContext, distance: number): void {
+    const { camera, controls } = context;
+    const direction = camera.position.clone().sub(controls.target);
+    if (direction.lengthSq() === 0) direction.set(0, 0, 1);
+    direction.normalize();
+
+    controls.target.set(0, 0, 0);
+    camera.position.copy(direction.multiplyScalar(distance));
+    camera.near = Math.max(0.01, distance / 1000);
+    camera.far = distance * 10;
+    camera.updateProjectionMatrix();
 }
 
 /**
@@ -914,22 +943,7 @@ function tickShellFade(context: VisualizerContext, transition: ShellFadeTransiti
     setShellViewRadius(context.currentOrbitalGroup, lerp(transition.fromRadius, transition.toRadius, cameraT));
 
     if (cameraT > 0) {
-        const { camera, controls } = context;
-        const distance = lerp(transition.fromCameraDistance, transition.toCameraDistance, cameraT);
-        // Re-read the current bearing every frame, exactly like frameOrbital
-        // does, rather than a bearing frozen at the transition's start: the
-        // user is free to keep dragging the view while the zoom eases, and
-        // this keeps following wherever they end up looking rather than
-        // fighting them back to a stale direction.
-        const direction = camera.position.clone().sub(controls.target);
-        if (direction.lengthSq() === 0) direction.set(0, 0, 1);
-        direction.normalize();
-
-        controls.target.set(0, 0, 0);
-        camera.position.copy(direction.multiplyScalar(distance));
-        camera.near = Math.max(0.01, distance / 1000);
-        camera.far = distance * 10;
-        camera.updateProjectionMatrix();
+        placeShellFadeCamera(context, lerp(transition.fromCameraDistance, transition.toCameraDistance, cameraT));
     }
 
     const totalDuration = Math.max(
@@ -991,8 +1005,8 @@ export function reportTransitionState(context: VisualizerContext): void {
     context.onTransitionChange?.(active);
 }
 
-/** Ticks whichever kind of transition is running -- dispatches to the two functions above. */
-function tickTransition(context: VisualizerContext, timestamp: number): void {
+/** Ticks whichever kind of transition is running -- dispatches to the two functions above. Exported for tests. */
+export function tickTransition(context: VisualizerContext, timestamp: number): void {
     const transition = context.transition;
     if (!transition) return;
 
@@ -1623,8 +1637,10 @@ export function updateAtomViewInScene(
     context.activeWorker = null;
     context.requestCounter++;
     // Settle any in-flight level-transition animation before this request's
-    // own effects start landing (see cancelTransition's doc comment).
-    cancelTransition(context);
+    // own effects start landing (see cancelTransition's doc comment). A
+    // request that fades on (below) moves the camera on from where it is.
+    const fadesOn = Boolean(options.animate && context.isShellView && context.currentOrbitalGroup);
+    cancelTransition(context, { cameraStays: fadesOn });
 
     // Frame on the contour radius -- the radius that actually bounds the
     // sphere drawn below -- not the sampling grid's rMax (spec bugfix: the

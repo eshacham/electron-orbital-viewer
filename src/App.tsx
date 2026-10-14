@@ -272,7 +272,6 @@ function App() {
     useUrlStateSync(window, undefined, closeTable);
 
     const handleOrbitalParamsChange = useCallback((newParams: OrbitalParams) => {
-        console.log('App.tsx: Orbital params changing:', newParams);
         dispatch(startOrbitalCalculation(newParams));
     }, [dispatch]);
 

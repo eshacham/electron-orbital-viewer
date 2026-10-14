@@ -536,8 +536,6 @@ describe('App', () => {
 
         // Ruling T20b-enclosed: the inspector's enclosed fraction applies on change, with the dispatch Update Orbital sends.
         it('redraws the orbital in the panel when the enclosed fraction changes, as Update Orbital would', () => {
-            // App logs each orbital request as a debugging aid; muted so the run stays readable.
-            const log = jest.spyOn(console, 'log').mockImplementation(() => {});
             const { store } = renderWithProvider(<App />);
             fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
             const { n, l, ml } = store.getState().orbital.basicSelection;
@@ -547,7 +545,6 @@ describe('App', () => {
             expect(store.getState().orbital.enclosedFraction).toBe(0.75);
             expect(store.getState().orbital.currentParams).toEqual(basicOrbitalParams(n, l, ml, 0.75));
             expect(store.getState().orbital.isLoading).toBe(true);
-            log.mockRestore();
         });
 
         // Review Focus 1.

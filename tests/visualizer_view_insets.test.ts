@@ -5,7 +5,7 @@ jest.mock('../src/workers/createOrbitalWorker', () => ({ createOrbitalWorker: je
 jest.mock('../src/orbital_controls_factory', () => ({ createOrbitalControls: jest.fn() }));
 
 import {
-    VisualizerContext, ViewInsets, frameOrbital, handleResize, setViewInsets, updateAtomViewInScene,
+    VisualizerContext, ViewInsets, frameOrbital, handleResize, setViewInsets, tickTransition, updateAtomViewInScene,
 } from '../src/orbital_visualizer';
 import { defaultSurfaceStyle } from '../src/types/orbital';
 
@@ -72,9 +72,8 @@ describe('the camera fit follows the canvas, not only the insets', () => {
         setViewInsets(context, PHONE);       // the insets measured in that frame
         handleResize(context, 390, 844);     // the phone layout
 
-        const fresh = freshDistance(390, 844, PHONE, 2.7);
-        expect(distance(context)).toBeGreaterThan(fresh * 0.99);
-        expect(distance(context)).toBeLessThan(fresh * 1.01);
+        // Ruling T20c-fade: tightened from a 1 % band -- the re-fit is exact, so it lands on the fresh distance.
+        expect(distance(context)).toBeCloseTo(freshDistance(390, 844, PHONE, 2.7), 6);
     });
 
     it('a resize re-fits the camera: a tablet rotated landscape -> portrait frames as a fresh portrait load', () => {
@@ -152,5 +151,50 @@ describe('an inset change during a shell fade', () => {
         setViewInsets(context, DESKTOP);
 
         expect(Math.abs(distance(context) - start) / start).toBeLessThan(1e-9);
+    });
+});
+
+// Ruling T20c-fade (carried into Task 20d): a fade interrupted by a non-animated update (reduced motion
+// switched on mid-fade, say) used to leave the camera wherever the fade had got to.
+describe('a shell fade interrupted by a non-animated update', () => {
+    it('ends at the distance a fresh load frames, not part-way', () => {
+        const context = buildContext(1000, 900);
+        setViewInsets(context, DESKTOP);
+        updateAtomViewInScene(context, shellParams(8), { animate: true });     // the first view: instant
+        updateAtomViewInScene(context, shellParams(2), { animate: true });     // drilling in: a shell fade
+        expect(context.transition?.kind).toBe('shell-fade');
+        const from = distance(context);
+
+        tickTransition(context, 0);
+        tickTransition(context, 425);                                          // the camera half-way through its move
+        expect(context.transition?.kind).toBe('shell-fade');
+        const fresh = buildContext(1000, 900);
+        setViewInsets(fresh, DESKTOP);
+        updateAtomViewInScene(fresh, shellParams(2), { animate: false });
+        expect(distance(context)).toBeLessThan(from * 0.99);
+        expect(distance(context)).toBeGreaterThan(distance(fresh) * 1.01);
+
+        updateAtomViewInScene(context, shellParams(2), { animate: false });
+        expect(context.transition).toBeNull();
+        expect(distance(context)).toBeCloseTo(distance(fresh), 6);
+        // The clip range follows the camera, as tickShellFade sets it.
+        expect(context.camera.near).toBeCloseTo(Math.max(0.01, distance(fresh) / 1000), 9);
+        expect(context.camera.far).toBeCloseTo(distance(fresh) * 10, 9);
+    });
+
+    it('an animated update mid-fade eases on from where the camera is, without a jump', () => {
+        const context = buildContext(1000, 900);
+        setViewInsets(context, DESKTOP);
+        updateAtomViewInScene(context, shellParams(8), { animate: true });
+        updateAtomViewInScene(context, shellParams(2), { animate: true });
+        tickTransition(context, 0);
+        tickTransition(context, 425);
+        const partWay = distance(context);
+
+        updateAtomViewInScene(context, shellParams(4), { animate: true });     // a quick second click
+        const transition = context.transition as Extract<VisualizerContext['transition'], { kind: 'shell-fade' }>;
+        expect(transition.kind).toBe('shell-fade');
+        expect(distance(context)).toBeCloseTo(partWay, 9);
+        expect(transition.fromCameraDistance).toBeCloseTo(partWay, 9);
     });
 });
