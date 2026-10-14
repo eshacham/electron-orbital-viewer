@@ -1,10 +1,12 @@
 // tests/App.molecules.test.tsx -- Molecules mode assembled in the app (Task 16).
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, screen, fireEvent, within, act, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createAppStore } from '../src/store';
 import {
-    selectMolecule, metaLoaded, metaFailed, setSurface, renderStarted, renderFinished, renderFailed,
+    selectMolecule, metaLoaded, metaFailed, setSurface, renderStarted, renderFinished, renderFailed, setPick,
 } from '../src/store/moleculeSlice';
 import { setSurfaceStyle } from '../src/store/orbitalSlice';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from '../src/url_state';
@@ -144,6 +146,35 @@ describe('Molecules mode', () => {
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
         expect(within(viewPanel).getByLabelText('Ball-and-stick')).toBeInTheDocument();
         expect(within(viewPanel).getByText(/μ = 1\.86 D .*Ozone has strong multireference character\./)).toBeInTheDocument();
+    });
+
+    // Ruling R22c (brief requirement 5): the hover/pick readout lives in the
+    // Explore panel (never over the canvas), updates live, and keeps
+    // role=status/aria-live -- replaces the floating-chip placement the old
+    // `.molecule-legend-stack` tests (above, now retired) used to assert.
+    it('puts the hover/pick readout in the Explore panel, never over the canvas, and updates it live', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const readout = within(side).getByRole('status');
+        expect(readout).toHaveClass('molecule-readout');
+        expect(container.querySelector('#canvas-container .molecule-readout')).toBeNull();
+        expect(readout).toHaveAttribute('aria-live', 'polite');
+        expect(readout).toHaveTextContent('Hover over an atom or bond for angles and lengths');
+        act(() => { store.dispatch(setPick({ kind: 'atom', index: 0 })); });
+        expect(within(side).getByRole('status')).toHaveTextContent('∠H–O–H 104.5°');
+    });
+
+    // Ruling R22c: jsdom's CSS imports are stubbed (jest.config.ts), so
+    // getComputedStyle cannot see style.css -- read the rule's own source,
+    // the project's established way of asserting a CSS property
+    // (tests/a11y/panel_contrast.test.ts does the same for colour pairs).
+    it('declares the readout scrollable and never hidden from the pointer', () => {
+        const css = readFileSync(resolve(__dirname, '../src/style.css'), 'utf8');
+        const start = css.indexOf('.molecule-readout {');
+        const rule = css.slice(start, css.indexOf('}', start));
+        expect(rule).toMatch(/overflow-y:\s*auto/);
+        expect(rule).not.toMatch(/pointer-events:\s*none/);
     });
 
     it('does not start a hydrogen calculation, and lowers an untouched full opacity so the structure shows', async () => {
