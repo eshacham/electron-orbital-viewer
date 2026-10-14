@@ -41,7 +41,9 @@ describe('ElementTile (spec §9.1)', () => {
             onOpenTable={onOpenTable} onToggleTable={onToggleTable} onOpenList={onOpenList} />);
         fireEvent.click(screen.getByRole('button', { name: /^change element/ }));
         expect(onOpenTable).toHaveBeenCalled();
-        fireEvent.click(screen.getByRole('button', { name: 'Periodic Table' }));
+        // Ruling R23d: the "Periodic Table" text button is now a miniature of the
+        // table itself, named after the element it already shows selected.
+        fireEvent.click(screen.getByRole('button', { name: 'Periodic table, Carbon selected — open' }));
         expect(onToggleTable).toHaveBeenCalled();
         fireEvent.click(screen.getByRole('button', { name: 'Choose an element from a list' }));
         expect(onOpenList).toHaveBeenCalledWith(expect.any(HTMLElement));

@@ -1,0 +1,41 @@
+/* src/atom_ui/periodic_table_mini.css -- the "Periodic Table" button's
+   replacement (ruling R23d): a miniature of PeriodicTable.tsx's own 18-column
+   + f-block layout at a glance, beside the element tile. The cell geometry
+   (grid-column, block tint) mirrors src/style.css's .periodic-tile rules at
+   roughly a fifth of the scale; the colours themselves come from the same
+   BLOCK_COLORS import, never restated (spec §3.4). */
+.periodic-table-mini {
+  width: var(--ql-size-periodic-mini-width);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: 1px solid var(--ql-color-border-strong);
+  border-radius: var(--ql-radius-md);
+  background: var(--ql-color-surface-2);
+  transition: transform var(--ql-motion-hover) ease, box-shadow var(--ql-motion-hover) ease;
+}
+.periodic-table-mini:hover { transform: translateY(-1px); box-shadow: var(--ql-shadow-panel); }
+.periodic-table-mini[aria-expanded="true"] { border-color: var(--ql-color-selected-edge); }
+.periodic-table-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(18, 1fr);
+  gap: 1px;
+}
+.periodic-table-mini-f-row { margin-top: 2px; }
+.periodic-table-mini-cell {
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: 1px;
+}
+.periodic-table-mini-cell.block-s { background: rgba(91, 141, 217, 0.35); }
+.periodic-table-mini-cell.block-p { background: rgba(217, 139, 74, 0.35); }
+.periodic-table-mini-cell.block-d { background: rgba(74, 168, 138, 0.35); }
+.periodic-table-mini-cell.block-f { background: rgba(157, 122, 212, 0.35); }
+.periodic-table-mini-cell.selected {
+  box-shadow: 0 0 0 1px var(--ql-color-selected-edge);
+  filter: brightness(1.6);
+}

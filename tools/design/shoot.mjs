@@ -3,7 +3,7 @@
 // Vite on a free port and its own headless Chromium, captures each scene in
 // each theme and size, measures boxes, fonts and colours, then stops both in
 // the same foreground run. It never touches the owner's browser or servers.
-//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--gl metal] [--dpr 2] [--drawer open]
+//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--gl metal] [--dpr 2] [--drawer open] [--crop <selector>]
 // Writes /tmp/6g1-<task>-<scene>-<theme>-<size>.png and /tmp/6g1-<task>-metrics.json.
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -57,6 +57,11 @@ if (!GL_ARGS[gl]) throw new Error(`unknown --gl ${gl} (swiftshader | metal)`);
 const dpr = Number(arg('dpr', '1'));
 // At medium width the inspector is a folded drawer; `--drawer open` shoots it open (its Display section, ruling R20b-atoms).
 const drawerOpen = arg('drawer', 'folded') === 'open';
+// --crop <selector>: alongside the full-page shot, an element-only screenshot
+// of that selector (at the run's --dpr), so a small, dense control -- the
+// periodic-table miniature, ruling R23d -- can be checked for crispness
+// without upscaling a raster after the fact.
+const cropSelector = arg('crop', null);
 
 function startVite() {
   const vite = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(port), '--strictPort', '--clearScreen', 'false'],
@@ -104,7 +109,8 @@ function collectMetrics() {
     theme: document.documentElement.dataset.theme ?? null,
     title: document.title,
     boxes: Object.fromEntries(['.app-topbar', '.app-rail', '.explore-panel', '#canvas-container', '.inspector', '.thumbnail-strip',
-      '.viewport-title', '.viewport-toolbar', '.key-column', '.phone-topbar', '.phone-header', '.phone-sheet'].map(s => [s, box(s)])),
+      '.viewport-title', '.viewport-toolbar', '.key-column', '.phone-topbar', '.phone-header', '.phone-sheet',
+      '.element-tile', '.periodic-table-mini'].map(s => [s, box(s)])),
     fonts: { title: font('.viewport-title h1'), nav: font('.app-topbar-tab'), body: font('.explore-panel .ql-body') ?? font('.explore-panel'), caption: font('.ql-caption') },
     canvases: canvases.length,
     // DC9b: a canvas that ever received a WebGL context (wrapped in the init
@@ -252,11 +258,19 @@ try {
         const metrics = await page.evaluate(collectMetrics);
         metrics.text.enclosedNote = enclosedNote;
         const on = await sampleColours(page, png, size);
+        let cropFile = null;
+        if (cropSelector) {
+          const crop = page.locator(cropSelector).first();
+          if (await crop.count()) {
+            cropFile = `/tmp/6g1-${task}-${scene}-${theme}-${size}-crop.png`;
+            await crop.screenshot({ path: cropFile });
+          }
+        }
         await page.addStyleTag({ content: '#orbital-canvas-host canvas { visibility: hidden !important; }' });
         await page.waitForTimeout(150);
         const off = await sampleColours(page, await page.screenshot(), size);
-        results.push({ scene, theme, size, file, settled, metrics, colours: judge(on, off, theme), errors });
-        console.log(`${file}  settled=${settled}  webgl=${metrics.webglCanvases}  webglCreated=${metrics.webglContextsCreated}  errors=${errors.length}`);
+        results.push({ scene, theme, size, file, cropFile, settled, metrics, colours: judge(on, off, theme), errors });
+        console.log(`${file}  settled=${settled}  webgl=${metrics.webglCanvases}  webglCreated=${metrics.webglContextsCreated}  errors=${errors.length}${cropFile ? `  crop=${cropFile}` : ''}`);
         await context.close();
       }
     }

@@ -1,10 +1,10 @@
 import React from 'react';
-import { Button, IconButton, Tooltip } from '@mui/material';
+import { IconButton, Tooltip } from '@mui/material';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import GridOnOutlined from '@mui/icons-material/GridOnOutlined';
 import { elementFor } from '../elements';
 import { ATOMIC_WEIGHT_SOURCE, atomicWeightLabel } from '../atomic_weights';
 import { isNeutralGround, speciesSymbol, type AtomSpecies } from '../atom/species';
+import PeriodicTableMini from './PeriodicTableMini';
 import './element_tile.css';
 
 interface ElementTileProps {
@@ -56,10 +56,10 @@ const ElementTile: React.FC<ElementTileProps> = ({ species, tableOpen, onOpenTab
                     <span className="element-tile-name">{name}</span>
                     <span className="element-tile-weight ql-tabular">{atomicWeightLabel(species.Z)}</span>
                 </button>
-                <Button variant="outlined" size="small" className="element-table-button" startIcon={<GridOnOutlined fontSize="small" />}
-                    aria-pressed={tableOpen} onClick={onToggleTable}>
-                    Periodic Table
-                </Button>
+                {/* Ruling R23d: the "Periodic Table" text button is a miniature of the
+                    table itself, the current element's cell already lit, so where it
+                    sits is visible before the big table is ever opened. */}
+                <PeriodicTableMini Z={species.Z} name={name} open={tableOpen} onToggle={onToggleTable} />
             </div>
         </div>
     );

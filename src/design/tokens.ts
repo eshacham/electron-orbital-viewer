@@ -186,6 +186,8 @@ export const LAYOUT = {
     touch: 44,
     elementTileWidth: 88,
     elementTileHeight: 96,
+    /** Ruling R23d: the periodic-table miniature beside the element tile, 140-170 px wide. */
+    periodicMiniWidth: 152,
     thumb: 72,
     thumbPhone: 56,
     thumbLabel: 16,

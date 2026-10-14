@@ -103,7 +103,7 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect, onClose }) =
     }, [onClose]);
 
     return (
-        <Box className="periodic-table-panel" aria-label="periodic table" role="dialog">
+        <Box id="periodic-table-panel" className="periodic-table-panel" aria-label="periodic table" role="dialog">
             <Box className="periodic-table-header">
                 <Typography variant="body2" className="periodic-table-current">
                     {element ? `${element.atomicNumber} — ${element.symbol} (${element.name})` : `Z = ${Z}`}
