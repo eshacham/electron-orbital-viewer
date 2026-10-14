@@ -941,6 +941,10 @@ function App() {
         ? moleculeKeysShown && molecule.surface.kind === 'mo'
         : (isAtomMode ? atomLevel === 'orbital' : Boolean(renderedParams || renderedField))
             && !combinationLegend && !isBondsDensity;
+    // Ruling R23c-3 (owner): the "hover or tap" hint, while nothing is picked,
+    // moves into the viewport's key/caption corner -- desktop/tablet only (a
+    // phone's Explore tab keeps MoleculeReadout's own in-panel wording).
+    const showHoverCaption = isMoleculeMode && Boolean(molecule.meta) && molecule.showStructure && !molecule.pick && !isNarrow;
 
     // The drill-down's next step. On a desktop its chips continue the
     // configuration in Explore › Configuration and its energy diagram is in
@@ -1566,12 +1570,15 @@ function App() {
                 pick readout, which used to share this bottom-centre stack,
                 are prose and moved off the canvas entirely: the tier into the
                 title block, the readout into the Explore panel. */}
-            {isMoleculeMode && molecule.meta && ((moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend) && (
+            {isMoleculeMode && molecule.meta && ((moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend || showHoverCaption) && (
                 <KeyColumn compact={isNarrow}>
                     {moleculeKeysShown && molecule.surface.kind === 'esp' && (
                         <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact />
                     )}
                     {showPhaseLegend && <PhaseKey positive={phase.positive} negative={phase.negative} />}
+                    {/* Ruling R23c-3: the placeholder instruction, relocated here from the
+                        Explore panel's Selection section -- shown only while nothing is picked. */}
+                    {showHoverCaption && <p className="molecule-hover-caption">Hover or tap an atom or bond</p>}
                 </KeyColumn>
             )}
             {/* A molecule that failed to load, or a surface that failed to

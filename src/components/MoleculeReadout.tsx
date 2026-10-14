@@ -13,7 +13,11 @@ interface MoleculeReadoutProps { atoms: MoleculeAtom[]; pick: MoleculePick | nul
  */
 const MoleculeReadout: React.FC<MoleculeReadoutProps> = ({ atoms, pick, geometrySource, touch }) => {
     const bonds = useMemo(() => detectBonds(atoms), [atoms]);
-    const lines = pick ? describePick(atoms, bonds, pick) : [`${touch ? 'Tap' : 'Hover over'} an atom or bond for angles and lengths`];
+    // Ruling R23c-3: on a desktop (not `touch`) the "nothing picked yet" hint
+    // moves to a bottom-right viewport caption (App.tsx's .molecule-hover-caption),
+    // so it is not said twice -- a phone has no such corner, so its Explore tab
+    // keeps the in-panel line.
+    const lines = pick ? describePick(atoms, bonds, pick) : touch ? ['Tap an atom or bond for angles and lengths'] : [];
     return (
         <div className="molecule-readout" role="status" aria-live="polite">
             {lines.map(line => <div key={line}>{line}</div>)}

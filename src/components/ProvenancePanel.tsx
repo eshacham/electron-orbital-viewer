@@ -142,7 +142,13 @@ const ProvenancePanel: React.FC<ProvenancePanelProps> = ({ meta, ownerJob, owner
     const timeLimit = provenance?.timeLimitSeconds;
     return (
         <Accordion disableGutters className="provenance-panel" slotProps={{ transition: { unmountOnExit: true } }}>
-            <AccordionSummary aria-controls="provenance-body" id="provenance-head">How this was computed</AccordionSummary>
+            {/* Ruling R23c-3: styled as a text link (style.css's .provenance-trigger) --
+                same accordion, role and accessible name, just not painted as a bar. The
+                arrow is decorative (aria-hidden), so the name stays "How this was computed". */}
+            <AccordionSummary aria-controls="provenance-body" id="provenance-head" className="provenance-trigger">
+                How this was computed
+                <span aria-hidden="true" className="provenance-trigger-arrow">→</span>
+            </AccordionSummary>
             {/* m5: MUI gives the details' region the summary's aria-controls id itself. */}
             <AccordionDetails className="provenance-body">
                 <Typography variant="body2">Method: {meta.method.density}, PySCF {provenance?.pyscfVersion ?? meta.generator.pyscf}.</Typography>

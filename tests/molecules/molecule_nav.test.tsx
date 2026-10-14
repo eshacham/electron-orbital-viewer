@@ -391,6 +391,14 @@ describe('readout and view options', () => {
         rerender(<MoleculeReadout atoms={waterAtoms()} pick={null} geometrySource="experiment (CCCBDB)" touch />);
         expect(container.textContent).toMatch(/Tap an atom or bond/);
     });
+    // Ruling R23c-3: on a desktop (not `touch`) the hint moves to a viewport-corner
+    // caption (App.tsx), so the Explore-panel readout says nothing extra while
+    // unpicked -- just the always-on geometry/connectivity note.
+    it('says nothing extra on a desktop while unpicked, leaving the hint to the viewport caption', () => {
+        const { container } = render(<MoleculeReadout atoms={waterAtoms()} pick={null} geometrySource="experiment (CCCBDB)" touch={false} />);
+        expect(container.textContent).not.toMatch(/hover|tap/i);
+        expect(container.textContent).toMatch(/geometry: experiment \(CCCBDB\)/);
+    });
     it('toggles structure and dipole and states the arrow convention', () => {
         const onShowDipole = jest.fn();
         const { container } = render(<MoleculeViewOptions showStructure showDipole onShowStructure={() => {}} onShowDipole={onShowDipole} dipoleText="μ = 1.86 D" />);

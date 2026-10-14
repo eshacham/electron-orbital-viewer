@@ -206,11 +206,14 @@ describe('Glow (spec §11.2)', () => {
             dark: {
                 emissive: 0.1, rimStrength: 1.0, rimPower: 1.8,
                 lines: { opacity: 0.05, whiten: 0.3, additive: true },
-                halo: { opacity: 0.6, offset: 0.08, power: 1 },
+                // Ruling R23c-2 (owner): the halo read as too thick -- a third of the
+                // offset (band width) and half the opacity (peak alpha).
+                halo: { opacity: 0.3, offset: 0.027, power: 1 },
                 wash: 0,
                 lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
                 // Ruling R20d: the strip tiles' own rig and strengths -- a brighter key, rim and halo, fainter lines at 64³.
-                thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 1.25, haloOpacity: 1.0, linesOpacity: 0.03 },
+                // Ruling R23c-2: haloOpacity halved alongside the main view's halo.opacity above.
+                thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 1.25, haloOpacity: 0.5, linesOpacity: 0.03 },
             },
             light: {
                 emissive: 0.05, rimStrength: 1.0, rimPower: 1.5,

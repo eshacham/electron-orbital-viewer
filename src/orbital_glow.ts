@@ -64,10 +64,14 @@ export const GLOW_TUNING = {
         rimStrength: 1.0,
         rimPower: 1.8,
         lines: { opacity: 0.05, whiten: 0.3, additive: true },
-        halo: { opacity: 0.6, offset: 0.08, power: 1 },
+        // Ruling R23c-2 (owner): the halo was too thick -- about a third of
+        // the push (offset, so the band is a third as wide, main view and
+        // tiles alike: tuneThumbnailGlow never overrides it) and about half
+        // the peak alpha (opacity, and thumb's haloOpacity below). Rim glow untouched.
+        halo: { opacity: 0.3, offset: 0.027, power: 1 },
         wash: 0,
         lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
-        thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 1.25, haloOpacity: 1.0, linesOpacity: 0.03 },
+        thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 1.25, haloOpacity: 0.5, linesOpacity: 0.03 },
     },
     light: {
         emissive: 0.05,

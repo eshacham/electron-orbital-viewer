@@ -155,6 +155,10 @@ describe('Molecules mode', () => {
     // Explore panel (never over the canvas), updates live, and keeps
     // role=status/aria-live -- replaces the floating-chip placement the old
     // `.molecule-legend-stack` tests (above, now retired) used to assert.
+    // Ruling R23c-3 changes this test: the "nothing picked yet" hint is no
+    // longer said inside the Explore-panel readout on a desktop -- it is a
+    // one-line caption in the viewport's key/caption corner instead, gone
+    // once something is picked.
     it('puts the hover/pick readout in the Explore panel, never over the canvas, and updates it live', async () => {
         const { store, container } = await enterMolecules(false);
         pickWater(store);
@@ -163,9 +167,12 @@ describe('Molecules mode', () => {
         expect(readout).toHaveClass('molecule-readout');
         expect(container.querySelector('#canvas-container .molecule-readout')).toBeNull();
         expect(readout).toHaveAttribute('aria-live', 'polite');
-        expect(readout).toHaveTextContent('Hover over an atom or bond for angles and lengths');
+        expect(readout).not.toHaveTextContent(/hover|tap/i);
+        const caption = container.querySelector('#canvas-container .molecule-hover-caption');
+        expect(caption).toHaveTextContent('Hover or tap an atom or bond');
         act(() => { store.dispatch(setPick({ kind: 'atom', index: 0 })); });
         expect(within(side).getByRole('status')).toHaveTextContent('∠H–O–H 104.5°');
+        expect(container.querySelector('#canvas-container .molecule-hover-caption')).toBeNull();
     });
 
     // Ruling R22c: jsdom's CSS imports are stubbed (jest.config.ts), so
@@ -178,6 +185,11 @@ describe('Molecules mode', () => {
         const rule = css.slice(start, css.indexOf('}', start));
         expect(rule).toMatch(/overflow-y:\s*auto/);
         expect(rule).not.toMatch(/pointer-events:\s*none/);
+        // Ruling R23c-3: a FIXED height (not a cap), so the Selection section
+        // always reserves the same room and "How this was computed" below it
+        // never moves as a pick's text grows or shrinks.
+        expect(rule).toMatch(/height:\s*140px/);
+        expect(rule).not.toMatch(/max-height/);
     });
 
     it('does not start a hydrogen calculation, and lowers an untouched full opacity so the structure shows', async () => {

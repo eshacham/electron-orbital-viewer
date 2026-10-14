@@ -356,6 +356,13 @@ html, body, #root {
 .viewport-cell:has(> .thumbnail-strip.overlay) .scale-readout {
   bottom: calc(var(--free-bottom, 0px) + 8px);
 }
+/* Ruling R23c-1: the key column (viewport.css) is bottom-aligned with the
+   scale readout above -- same rule, same value, so the two corners never
+   drift apart; with the strip along the bottom edge it clears it the same
+   way the scale readout does, rather than sitting over its first tiles. */
+.viewport-cell:has(> .thumbnail-strip.overlay) .key-column {
+  bottom: calc(var(--free-bottom, 0px) + 8px);
+}
 
 /* A phone has no viewport toolbar (ruling R6): Reset view, Share and Export
    end the View tab instead, wrapped so they sit in a line and wrap if tight. */
@@ -578,9 +585,13 @@ html, body, #root {
      scale readout, under the header line (it moved down by the top bar,
      spec §9.8). The column's own chip styling (padding, gap, font-size) is
      viewport.css's `.key-column.compact .phase-legend`; this only positions
-     the column itself, so there is exactly one rule for its top. */
+     the column itself, so there is exactly one rule for its top. Ruling
+     R23c-1 moved the desktop rule's anchor to `bottom`: reset to `auto`
+     here, as `.scale-readout` already does above, so a phone does not get
+     both edges set (which would stretch the column's height between them). */
   .key-column.compact {
     top: calc(var(--phone-overlay-top) + 2px);
+    bottom: auto;
   }
 }
 
@@ -1282,7 +1293,10 @@ html, body, #root {
 /* Ruling R22c: no longer a chip floating over the canvas -- it lives in a
    `.molecule-selection` section (Explore panel or the phone's Explore tab)
    now, so a long pick scrolls on its own there rather than trapping the
-   pointer over the 3D view. */
+   pointer over the 3D view. Ruling R23c-3: a FIXED height, not a cap -- the
+   Selection section always reserves this much room, so whatever sits below
+   it (the jobs/provenance section's "How this was computed" link) never
+   moves as a pick's text grows or shrinks; a long pick scrolls inside it. */
 .molecule-readout {
   padding: 6px 12px;
   border-radius: 8px;
@@ -1291,7 +1305,7 @@ html, body, #root {
   color: var(--ql-color-text-1);
   font-size: 12px;
   text-align: center;
-  max-height: 140px;
+  height: 140px;
   overflow-y: auto;
   box-sizing: border-box;
 }
@@ -1303,6 +1317,22 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+/* Ruling R23c-3: the "nothing picked yet" hint, as a one-line caption in the
+   viewport's key/caption corner (bottom-right, beside the colour keys,
+   inside `.key-column` -- so it shares its bottom-right anchor rather than
+   needing one of its own) -- desktop/tablet only (a phone has no such
+   corner; its Explore tab keeps the in-panel wording, MoleculeReadout.tsx).
+   Shown only while nothing is picked; gone the moment a pick exists. */
+.molecule-hover-caption {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--ql-radius-md);
+  background: var(--ql-color-surface-2);
+  color: var(--ql-color-text-2);
+  font-size: var(--ql-type-caption-size);
+  line-height: var(--ql-type-caption-line);
+  white-space: nowrap;
 }
 /* The phone header's molecule name button and its tier chip, side by side
    (ruling R22c) -- `.phone-header` itself is only a flex row when sideways
@@ -1383,6 +1413,35 @@ html, body, #root {
 .molecule-jobs .MuiAccordion-root { border-radius: 10px; background: var(--ql-color-surface-1); }
 .provenance-body { display: flex; flex-direction: column; gap: 6px; }
 .provenance-list { margin: 0; padding-left: 18px; font-size: 0.875rem; }
+/* Ruling R23c-3: "How this was computed" reads as a text link -- accent
+   colour, underline on hover/focus, a trailing arrow -- rather than a full-
+   width accordion bar. It is still MUI's AccordionSummary (ButtonBase), so
+   the global focus ring (theme.ts's MuiButtonBase override) is untouched;
+   this only repaints it and shrinks its hit area to the label's own width.
+   Qualified by the Accordion's own `.provenance-panel` (as `.molecule-jobs
+   .MuiAccordion-root` above already does): MUI's emotion styles and this
+   plain stylesheet tie at one class of specificity, so a bare `.provenance-
+   trigger` lost the cascade to MUI's own generated class in practice. */
+.provenance-panel .provenance-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  flex-grow: 0;
+  min-height: 0;
+  padding: 4px 0;
+  margin: 4px 0;
+  background: none;
+  color: var(--ql-color-accent-text);
+  font-size: var(--ql-type-body-size);
+  font-weight: 600;
+}
+.provenance-panel .provenance-trigger:hover, .provenance-panel .provenance-trigger.Mui-focusVisible {
+  text-decoration: underline;
+  background: none;
+}
+.provenance-panel .provenance-trigger .MuiAccordionSummary-content { flex-grow: 0; margin: 0; }
+.provenance-panel .provenance-trigger-arrow { font-weight: 400; }
 
 /* Phase 6B-2 Task 10: the request panel and its preview. */
 .request-panel, .job-status { display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem; }

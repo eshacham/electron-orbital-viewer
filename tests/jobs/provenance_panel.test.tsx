@@ -143,6 +143,17 @@ describe('ProvenancePanel', () => {
         open();
         expect(document.querySelectorAll('#provenance-body')).toHaveLength(1);
     });
+    // Ruling R23c-3: styled as a text link (style.css's .provenance-trigger) with a
+    // decorative trailing arrow -- role and accessible name (and so `open()` above,
+    // and every "How this was computed" button query elsewhere) are unchanged.
+    it('styles the trigger as a link, with a decorative arrow that does not change its name', () => {
+        render(<ProvenancePanel meta={waterMeta({ method: TZVPD })} ownerJob={null} />);
+        const trigger = screen.getByRole('button', { name: 'How this was computed' });
+        expect(trigger).toHaveClass('provenance-trigger');
+        const arrow = trigger.querySelector('.provenance-trigger-arrow');
+        expect(arrow).toHaveAttribute('aria-hidden', 'true');
+        expect(arrow).toHaveTextContent('→');
+    });
     it('shows the owner the time against its prediction, and the cost', () => {
         render(<ProvenancePanel meta={computed()} ownerJob={jobFixture('get_done')} />);
         open();

@@ -24,8 +24,13 @@
   border: 1px solid var(--ql-color-border-subtle);
 }
 .viewport-toolbar .MuiIconButton-root:hover { background: var(--ql-color-surface-3); }
+/* Ruling R23c-1 (owner): the key column moves from the viewport's
+   right-middle into its bottom-right corner, bottom-aligned with the scale
+   bar (bottom-left) -- the four corners are title / toolbar / scale / key.
+   Its bottom matches the scale bar's own (style.css: 20px, or clear of the
+   strip when one is present), kept in the one place both read from. */
 .key-column {
-  position: absolute; z-index: 10; right: 12px; top: 50%; transform: translateY(-50%);
+  position: absolute; z-index: 10; right: 12px; bottom: 20px;
   display: flex; flex-direction: column; align-items: stretch; gap: 8px; max-width: 220px;
 }
 /* Inside the column the keys are chips in the flow, not floating overlays of their own. */
@@ -43,8 +48,9 @@
 /* DB6/DX7: the phone key column's own "under the header" top offset is
    style.css's narrow-viewport rule (keyed on --phone-overlay-top, replacing
    the old per-chip .phase-legend selector) -- not duplicated here, so there
-   is exactly one rule for it. Only the vertical-centring transform is undone. */
-.key-column.compact { transform: none; }
+   is exactly one rule for it. Ruling R23c-1 retired the desktop rule's
+   transform (the column no longer centres vertically), so there is nothing
+   left for `.compact` to undo. */
 .key-column.compact .phase-legend { flex-direction: row; padding: 4px 8px; font-size: var(--ql-type-caption-size); }
 .key-column .shell-ring-key {
   padding: 8px 10px; border-radius: var(--ql-radius-md); background: var(--ql-color-surface-2); color: var(--ql-color-text-1);
