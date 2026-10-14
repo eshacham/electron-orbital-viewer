@@ -43,6 +43,9 @@ const AvatarMenu: React.FC<AvatarMenuProps> = ({ session, isOwner, dev, ownerBar
     const label = signedIn ? `Owner menu, signed in as ${session.email ?? 'the owner'}` : canSignIn ? 'Owner sign-in' : 'Menu';
     // A visitor of a production build with sign-in gets straight to Cognito.
     const opensMenu = signedIn || dev || isOwner || Boolean(extra) || !session.configured;
+    // Final review B, M1: the popover used to always say "Owner", including the phone's
+    // visitor case (label 'Menu'), which holds only Theme and Help -- nothing owner-related.
+    const popoverLabel = label === 'Menu' ? 'Menu' : 'Owner';
     return (
         <>
             <Tooltip title={signedIn ? 'Owner menu' : label}>
@@ -63,7 +66,7 @@ const AvatarMenu: React.FC<AvatarMenuProps> = ({ session, isOwner, dev, ownerBar
                 onClose={() => setAnchor(null)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                slotProps={{ paper: { className: 'avatar-menu', role: 'dialog', 'aria-label': 'Owner' } as object }}
+                slotProps={{ paper: { className: 'avatar-menu', role: 'dialog', 'aria-label': popoverLabel } as object }}
             >
                 {(signedIn || canSignIn) && ownerBar}
                 {isOwner && (

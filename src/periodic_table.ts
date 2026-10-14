@@ -32,6 +32,17 @@ export const BLOCK_LABELS: Record<Block, string> = {
     f: 'f-block',
 };
 
+/**
+ * Final review B, M3: a tile's tinted background, derived from BLOCK_COLORS
+ * (the one source, spec §3.4) rather than restated as a hand-copied rgba()
+ * literal in style.css and periodic_table_mini.css -- both now call this
+ * instead of carrying their own colour. `alphaPercent` is 0-100, the tile's
+ * own choice (the big table's 20 vs the miniature's 35, legible at its scale).
+ */
+export function blockTint(block: Block, alphaPercent: number): string {
+    return `color-mix(in srgb, ${BLOCK_COLORS[block]} ${alphaPercent}%, transparent)`;
+}
+
 /** Where one element sits, and what it is. */
 export interface Tile {
     atomicNumber: number;

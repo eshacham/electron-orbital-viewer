@@ -16,4 +16,18 @@ describe('useFullscreen (spec §8.5)', () => {
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(screen.getByText('off')).toBeInTheDocument();
     });
+
+    // Final review B, M7: this listener is on document and used to act on every Esc, so
+    // one meant for something else (the search popover, a disclosure) also left focus mode.
+    it('ignores an Esc already handled by something else (defaultPrevented)', () => {
+        render(<Probe />);
+        act(() => screen.getByText('toggle').click());
+        expect(screen.getByText('on')).toBeInTheDocument();
+        const handled = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        handled.preventDefault();
+        act(() => { document.dispatchEvent(handled); });
+        expect(screen.getByText('on')).toBeInTheDocument();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(screen.getByText('off')).toBeInTheDocument();
+    });
 });

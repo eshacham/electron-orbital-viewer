@@ -30,11 +30,11 @@
   aspect-ratio: 1;
   border: 1px solid transparent;
   border-radius: 1px;
+  /* Final review B, M3: the border and background both come from the component's
+     inline style (BLOCK_COLORS via blockTint) now -- this used to restate the
+     same four colours by hand as rgba() literals here, at a different alpha
+     than style.css's own copy. */
 }
-.periodic-table-mini-cell.block-s { background: rgba(91, 141, 217, 0.35); }
-.periodic-table-mini-cell.block-p { background: rgba(217, 139, 74, 0.35); }
-.periodic-table-mini-cell.block-d { background: rgba(74, 168, 138, 0.35); }
-.periodic-table-mini-cell.block-f { background: rgba(157, 122, 212, 0.35); }
 .periodic-table-mini-cell.selected {
   box-shadow: 0 0 0 1px var(--ql-color-selected-edge);
   filter: brightness(1.6);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { MAIN_TABLE, F_BLOCK_ROWS, BLOCK_COLORS, Tile } from '../periodic_table';
+import { MAIN_TABLE, F_BLOCK_ROWS, BLOCK_COLORS, Tile, blockTint } from '../periodic_table';
 import './periodic_table_mini.css';
 
 interface PeriodicTableMiniProps {
@@ -15,8 +15,9 @@ interface PeriodicTableMiniProps {
 /**
  * The "Periodic Table" button's replacement (ruling R23d): a miniature of
  * `PeriodicTable.tsx`'s own layout -- same 18 columns, same detached
- * f-block rows, same block colours (`BLOCK_COLORS`, the one source,
- * imported rather than restated) -- with the selected element's cell lit by
+ * f-block rows, same block colours (`BLOCK_COLORS`, the one source, via
+ * `blockTint` for the background too -- final review B, M3 -- rather than
+ * restated) -- with the selected element's cell lit by
  * `selected-edge` (periodic_table_mini.css), so where the current element
  * sits is visible without opening the big table at all. Clicking it still
  * opens the big table; nothing about that behaviour changes, only that the
@@ -35,7 +36,11 @@ const PeriodicTableMini: React.FC<PeriodicTableMiniProps> = ({ Z, name, open, on
             key={tile.atomicNumber}
             className={['periodic-table-mini-cell', `block-${tile.block}`, tile.atomicNumber === Z ? 'selected' : '']
                 .filter(Boolean).join(' ')}
-            style={{ gridColumn: tile.group ?? (tile.fIndex ?? 0) + 3, borderColor: BLOCK_COLORS[tile.block] }}
+            style={{
+                gridColumn: tile.group ?? (tile.fIndex ?? 0) + 3,
+                borderColor: BLOCK_COLORS[tile.block],
+                background: blockTint(tile.block, 35),
+            }}
             data-z={tile.atomicNumber}
         />
     );

@@ -14,7 +14,7 @@ interface ExplorePanelProps {
     onTab?(key: string): void;
     /** Without tabs: today's left-column content, as it is (6G-1 for Basic, Bonds and Molecules). */
     body?: React.ReactNode;
-    /** Medium width: a chevron that folds the panel to the rail (spec §7). */
+    /** Medium width: a chevron that hides the panel (a reveal button brings it back, spec §7). */
     onCollapse?(): void;
 }
 

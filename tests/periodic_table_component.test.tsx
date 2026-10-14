@@ -95,6 +95,19 @@ describe('PeriodicTable', () => {
         expect(onClose).toHaveBeenCalledTimes(2);
     });
 
+    // Final review B, M7: this listener is on window and used to act on every Esc, so one
+    // meant for something else (the search popover, a disclosure) also closed the table.
+    it('ignores an Esc already handled by something else (defaultPrevented)', () => {
+        const onClose = jest.fn();
+        render(<PeriodicTable Z={1} onSelect={() => {}} onClose={onClose} />);
+        const handled = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        handled.preventDefault();
+        window.dispatchEvent(handled);
+        expect(onClose).not.toHaveBeenCalled();
+        fireEvent.keyDown(window, { key: 'Escape' });
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
     it('closes once an element is picked', () => {
         const onSelect = jest.fn();
         const onClose = jest.fn();

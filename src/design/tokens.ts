@@ -167,6 +167,10 @@ export const CANVAS_BACKDROPS: Record<ThemeMode, string[]> = {
 };
 
 /** Sizes in px (§4.4, §7, §8). */
+// Final review B, M2 (and A, M9): labelGap, chip, input, thumbPhone, keyBar, iconRail and
+// iconButton were emitted into tokens.css and used nowhere (grep over src/**/*.{css,tsx,ts}) --
+// leftovers from the pre-R23a rail and earlier layout passes. Removed so the generated
+// sheet stays honest; re-add a role here (not just in CSS) if it is needed again.
 export const LAYOUT = {
     topBar: 56,
     phoneTopBar: 52,
@@ -178,10 +182,7 @@ export const LAYOUT = {
     gutter: 12,
     panelPadding: 16,
     sectionGap: 16,
-    labelGap: 6,
     controlRow: 28,
-    chip: 32,
-    input: 36,
     search: 36,
     touch: 44,
     elementTileWidth: 88,
@@ -189,13 +190,9 @@ export const LAYOUT = {
     /** Ruling R23d: the periodic-table miniature beside the element tile, 140-170 px wide. */
     periodicMiniWidth: 152,
     thumb: 72,
-    thumbPhone: 56,
     thumbLabel: 16,
     stripHandle: 28,
     toolbarButton: 36,
-    keyBar: 28,
-    iconRail: 20,
-    iconButton: 18,
     plotWidth: 258,
 } as const;
 

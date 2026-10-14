@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { IconButton, Tooltip } from '@mui/material';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { elementFor } from '../elements';
@@ -23,6 +23,9 @@ interface ElementTileProps {
  * standard atomic weight.
  */
 const ElementTile: React.FC<ElementTileProps> = ({ species, tableOpen, onOpenTable, onToggleTable, onOpenList }) => {
+    const id = useId();
+    const electronsId = `${id}-electrons`;
+    const weightId = `${id}-weight`;
     const element = elementFor(species.Z);
     const name = element?.name ?? `Z = ${species.Z}`;
     // The charge only: an excitation is not part of a symbol.
@@ -48,13 +51,18 @@ const ElementTile: React.FC<ElementTileProps> = ({ species, tableOpen, onOpenTab
                     className="element-tile"
                     title={ATOMIC_WEIGHT_SOURCE}
                     aria-label={`change element, currently ${spokenName}`}
+                    // Final review B, M4: aria-label replaces the button's whole text, so the
+                    // weight and electron count (spec §9.1 content, not decoration) would
+                    // otherwise never reach a screen reader. A description adds them back
+                    // without changing the name assistive tech announces for the button.
+                    aria-describedby={`${electronsId} ${weightId}`}
                     onClick={onOpenTable}
                 >
                     <span className="element-tile-z ql-tabular">{species.Z}</span>
-                    <span className="element-tile-electrons ql-tabular">{species.Z - species.charge} e⁻</span>
+                    <span id={electronsId} className="element-tile-electrons ql-tabular">{species.Z - species.charge} e⁻</span>
                     <span className="element-tile-symbol">{symbol}</span>
                     <span className="element-tile-name">{name}</span>
-                    <span className="element-tile-weight ql-tabular">{atomicWeightLabel(species.Z)}</span>
+                    <span id={weightId} className="element-tile-weight ql-tabular">{atomicWeightLabel(species.Z)}</span>
                 </button>
                 {/* Ruling R23d: the "Periodic Table" text button is a miniature of the
                     table itself, the current element's cell already lit, so where it

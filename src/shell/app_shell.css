@@ -17,9 +17,10 @@
 .app-shell.wide .app-workspace { grid-template-columns: var(--ql-size-explore) minmax(0, 1fr) var(--ql-size-inspector-wide); }
 .app-shell.medium .app-workspace { grid-template-columns: var(--ql-size-explore-medium) minmax(0, 1fr); }
 .app-shell.explore-collapsed .explore-panel { display: none; }
-/* Medium width (spec §7): a 28 px reveal button stands in for the panel. */
+/* Medium width (spec §7): a 28 px reveal button stands in for the panel.
+   Final review B, M2: a desktop-layout variant of this rule was unreachable --
+   App only ever collapses Explore at medium width (isMedium && exploreCollapsed). */
 .app-shell.explore-collapsed .app-workspace { grid-template-columns: 28px minmax(0, 1fr); }
-.app-shell.desktop.explore-collapsed .app-workspace { grid-template-columns: minmax(0, 1fr) var(--ql-size-inspector); }
 .explore-reveal {
   align-self: start; width: 28px; height: 56px; border-radius: var(--ql-radius-md);
   border: 1px solid var(--ql-color-border-subtle); background: var(--ql-color-surface-1);

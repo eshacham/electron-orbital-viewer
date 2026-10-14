@@ -4,6 +4,7 @@ import {
     F_BLOCK_ROWS,
     BLOCK_COLORS,
     blockFor,
+    blockTint,
     groupFor,
     tileOf,
     occupiesItsBlockSubshell,
@@ -80,6 +81,15 @@ describe('blocks', () => {
         for (const tile of PERIODIC_TABLE) {
             expect(BLOCK_COLORS[tile.block]).toMatch(/^#[0-9a-f]{6}$/);
         }
+    });
+
+    // Final review B, M3: the big table and the miniature used to restate BLOCK_COLORS'
+    // hex values as hand-copied rgba() literals (at two different alphas) in style.css and
+    // periodic_table_mini.css. blockTint derives the tint from BLOCK_COLORS so there is one
+    // source for the colour, with each caller free to choose its own alpha.
+    it('tints a block colour from the one source, at the caller\'s alpha', () => {
+        expect(blockTint('s', 20)).toBe(`color-mix(in srgb, ${BLOCK_COLORS.s} 20%, transparent)`);
+        expect(blockTint('d', 35)).toBe(`color-mix(in srgb, ${BLOCK_COLORS.d} 35%, transparent)`);
     });
 
     /**

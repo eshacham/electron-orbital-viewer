@@ -27,6 +27,7 @@ describe('AvatarMenu (spec §8.1 item 6, §5)', () => {
         expect(button).toHaveTextContent('ES');
         fireEvent.click(button);
         expect(screen.getByText('owner bar')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Owner' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('radio', { name: 'NovaLab' }));
         expect(onBrand).toHaveBeenCalledWith('novalab');
     });
@@ -43,6 +44,10 @@ describe('AvatarMenu (spec §8.1 item 6, §5)', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
         expect(screen.getByRole('button', { name: 'theme and help' })).toBeInTheDocument();
         expect(screen.queryByText('owner bar')).toBeNull();
+        // Final review B, M1: the popover was always named "Owner", even here where it
+        // holds only Theme and Help for a visitor -- the stale name from before R23a
+        // moved the avatar to carry the phone's menu too.
+        expect(screen.getByRole('dialog', { name: 'Menu' })).toBeInTheDocument();
     });
 
     it('makes initials from the address', () => {

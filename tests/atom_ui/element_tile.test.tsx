@@ -16,6 +16,19 @@ describe('ElementTile (spec §9.1)', () => {
         expect(tile.getAttribute('title')).toMatch(/IUPAC CIAAW 2021/);
     });
 
+    // Final review B, M4: aria-label replaced the button's whole text, so a screen-reader
+    // user never heard the standard atomic weight (spec §9.1 lists it as content, not
+    // decoration) or the electron count. aria-describedby adds them without changing the name.
+    it('describes the atomic weight and the electron count, not just the name, to assistive tech', () => {
+        render(<ElementTile {...props} species={{ Z: 6, charge: 0, excitation: null }} />);
+        const tile = screen.getByRole('button', { name: 'change element, currently Carbon' });
+        const describedBy = tile.getAttribute('aria-describedby');
+        expect(describedBy).toBeTruthy();
+        const description = describedBy!.split(/\s+/).map(id => document.getElementById(id)?.textContent ?? '').join(' ');
+        expect(description).toMatch(/12\.011/);
+        expect(description).toMatch(/6 e⁻/);
+    });
+
     it('reads an ion: Na⁺ with 11 protons and 10 electrons', () => {
         render(<ElementTile {...props} species={{ Z: 11, charge: 1, excitation: null }} />);
         const tile = screen.getByRole('button', { name: 'change element, currently Na⁺ · Sodium' });

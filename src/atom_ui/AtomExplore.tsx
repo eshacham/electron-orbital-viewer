@@ -5,7 +5,7 @@ interface AtomExploreProps {
     header: React.ReactNode;
     configuration: React.ReactNode;
     orbitals: React.ReactNode;
-    /** Medium width: a chevron that folds the panel to the rail (spec §7). */
+    /** Medium width: a chevron that hides the panel (a reveal button brings it back, spec §7). */
     onCollapse?(): void;
 }
 

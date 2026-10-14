@@ -39,11 +39,11 @@ export function useMediaQuery(query: string): boolean {
 export const NARROW_VIEWPORT = '(max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait)';
 
 /**
- * Wider than a phone, but not wide enough for the rail, Explore, a usable
- * view and the docked inspector side by side: below 1290 px the docked
- * inspector would push the canvas under 560 px (spec §7). Here the inspector
- * is a drawer over the view instead, folded to a 44 px bar until asked.
- * Only meaningful when NARROW_VIEWPORT does not match.
+ * Wider than a phone, but not wide enough for Explore, a usable view and the
+ * docked inspector side by side: below 1290 px the docked inspector would
+ * push the canvas under 560 px (spec §7). Here the inspector is a drawer
+ * over the view instead, folded to a 44 px bar until asked. Only meaningful
+ * when NARROW_VIEWPORT does not match.
  */
 export const MEDIUM_VIEWPORT = '(max-width: 1289px)';
 
@@ -54,9 +54,10 @@ export const MEDIUM_VIEWPORT = '(max-width: 1289px)';
 export const TOPBAR_COMPACT = '(max-width: 1099px)';
 
 /**
- * Wide desktop (spec §7): at 1680 px and over, the rail shows icon and label
- * in a row (184 px) and the inspector widens to 320. Only meaningful when
- * neither NARROW_VIEWPORT nor MEDIUM_VIEWPORT matches.
+ * Wide desktop (spec §7): at 1680 px and over, the docked inspector widens
+ * to 320 px (app_shell.css `.wide`). Only meaningful when neither
+ * NARROW_VIEWPORT nor MEDIUM_VIEWPORT matches. (R23a: the rail is gone --
+ * this breakpoint no longer changes how the rail itself is shown.)
  */
 export const WIDE_VIEWPORT = '(min-width: 1680px)';
 

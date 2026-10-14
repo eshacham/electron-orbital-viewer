@@ -72,6 +72,9 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
 
     if (variant === 'drawer') {
         const bar: TabItem[] = tabs ?? [{ key: 'view', label: 'View' }];
+        // Final review B, M6: an id for the panel a bar button opens, so aria-controls
+        // can point assistive tech straight at it (the panel only exists while open).
+        const drawerPanelId = `${id}-drawer-panel`;
         return (
             <aside className={`inspector inspector-drawer view-panel ${open ? 'open' : 'folded'}`} aria-label="Inspector"
                 onKeyDown={open ? onDrawerKey : undefined}>
@@ -85,6 +88,7 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
                                 className="inspector-bar-button"
                                 aria-label={tabs ? `${item.label} panel` : 'View settings'}
                                 aria-expanded={expanded}
+                                aria-controls={expanded ? drawerPanelId : undefined}
                                 onClick={() => {
                                     if (expanded) { onOpenChange?.(false); return; }
                                     if (tabs) onTab?.(item.key);
@@ -96,7 +100,7 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
                         );
                     })}
                 </div>
-                {open && <div className="inspector-drawer-panel">{content}</div>}
+                {open && <div id={drawerPanelId} className="inspector-drawer-panel">{content}</div>}
             </aside>
         );
     }

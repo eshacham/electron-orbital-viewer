@@ -7,6 +7,7 @@ import {
     BLOCK_LABELS,
     Block,
     Tile,
+    blockTint,
     tileOf,
 } from '../periodic_table';
 import { elementFor } from '../elements';
@@ -72,6 +73,9 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect, onClose }) =
                     // gap in periods 6 and 7 visibly points at them.
                     gridColumn: tile.group ?? (tile.fIndex ?? 0) + 3,
                     borderColor: BLOCK_COLORS[tile.block],
+                    // Final review B, M3: was a .block-{s,p,d,f} CSS rule restating BLOCK_COLORS
+                    // by hand at 0.20 alpha; blockTint derives it from the one source instead.
+                    background: blockTint(tile.block, 20),
                 }}
                 data-z={tile.atomicNumber}
                 data-block={tile.block}
@@ -95,9 +99,10 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect, onClose }) =
         );
     };
 
-    // Escape closes it, as it would any pop-over.
+    // Escape closes it, as it would any pop-over -- unless something else (the
+    // search popover, a disclosure) already handled the key (final review B, M7).
     useEffect(() => {
-        const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+        const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) onClose(); };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [onClose]);

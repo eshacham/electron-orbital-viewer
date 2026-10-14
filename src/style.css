@@ -908,13 +908,11 @@ html, body, #root {
   font-size: 11px;
   font-weight: 600;
 }
-/* Colour is carried by the border (set inline, per block) plus a tinted
-   face; the tint is applied here rather than inline so hover and selection
-   can override it without fighting an inline style's specificity. */
-.periodic-tile.block-s { background: rgba(91, 141, 217, 0.20); }
-.periodic-tile.block-p { background: rgba(217, 139, 74, 0.20); }
-.periodic-tile.block-d { background: rgba(74, 168, 138, 0.20); }
-.periodic-tile.block-f { background: rgba(157, 122, 212, 0.20); }
+/* Colour is carried by the border and a tinted face, both inline from
+   BLOCK_COLORS via blockTint (final review B, M3: this used to restate the
+   same four colours by hand as rgba() literals here). Hover and selection
+   below only ever touch filter/box-shadow, never background, so there is no
+   specificity fight with the inline style. */
 .periodic-tile:hover { filter: brightness(1.45); }
 /* A group is a column, so selecting or hovering one member lights all of
    them -- they share a valence configuration, which is what makes them a

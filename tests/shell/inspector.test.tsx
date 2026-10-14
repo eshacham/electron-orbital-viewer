@@ -61,6 +61,16 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
         expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Data panel' }));
     });
 
+    // Final review B, M6: the drawer bar buttons had aria-expanded but no aria-controls,
+    // so assistive tech had no way to jump straight to the panel a button opened.
+    it('points the open drawer bar button at the panel it opened with aria-controls', () => {
+        render(<Inspector variant="drawer" tabs={tabs} activeTab="data" open onOpenChange={jest.fn()} />);
+        const button = screen.getByRole('button', { name: 'Data panel' });
+        const controls = button.getAttribute('aria-controls');
+        expect(controls).toBeTruthy();
+        expect(document.getElementById(controls!)).toContainElement(screen.getByText('data body'));
+    });
+
     // Ruling R20b-atoms: the Atom screen's Display settings head the inspector, above Plot | Data,
     // docked and in the open drawer, and scroll with the tabs rather than squeezing them.
     it('puts a top section above its tabs, in one scroll area, docked and in the open drawer', () => {
