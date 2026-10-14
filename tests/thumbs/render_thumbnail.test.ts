@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
     createThumbnailRenderer, downsampleThumbnail, THUMB_CAMERA_DIRECTION, THUMB_LIGHT_RIG, thumbnailSize,
 } from '../../src/thumbs/render_thumbnail';
-import { THUMB_FILL, THUMB_TILE_PX, thumbSupersample, thumbTileDevicePx } from '../../src/thumbs/thumb_key';
+import { THUMB_FILL, THUMB_TILE_PX, thumbLookKey, thumbSupersample, thumbTileDevicePx } from '../../src/thumbs/thumb_key';
 import type { MeshData } from '../../src/types/orbital';
 import { CLASSIC_APPEARANCE, type Appearance } from '../../src/design/appearance';
 import { linearRgb, phaseColours } from '../../src/design/science';
@@ -104,7 +104,8 @@ describe('createThumbnailRenderer (spec §12: a target on the main renderer)', (
         await thumbs.render(triangle(), glow);
         expect(seen[1].target).toBe(seen[0].target);
         ratio = 3;
-        expect(thumbs.size()).toBe(432);
+        // Fix round 1 of Task 20d: size() is the bitmap's side (the cache key's size), 72 × 3; the target is 432.
+        expect(thumbs.size()).toBe(216);
         await thumbs.render(triangle(), glow);
         expect(seen[2].target).not.toBe(seen[0].target);
         expect((seen[2].target as THREE.WebGLRenderTarget).width).toBe(432);
@@ -234,3 +235,29 @@ describe('downsampleThumbnail', () => {
         expect(at(1, 1)).toEqual([0, 0, 0, 0]);
     });
 });
+
+// Fix round 1 of Task 20d: the key must say which bitmap it files. Keyed on the render target, DPR 1 and
+// 1.5 (and 1.333 and 2) shared a key, so a 72 px bitmap was served to a 108 px canvas and stretched.
+describe('the cache key identifies the bitmap', () => {
+    const look = { theme: 'dark' as const, scheme: 'phase' as const, finish: 'glow' as const, lowPower: false };
+    const keyAt = (dpr: number) => thumbLookKey({ appearance: look, opacity: 0.7, size: thumbTileDevicePx(dpr) });
+
+    it('differs between screens whose bitmaps differ, even where the render targets match', () => {
+        expect(thumbnailSize(1)).toBe(thumbnailSize(1.5));
+        expect(keyAt(1)).not.toBe(keyAt(1.5));
+        expect(thumbnailSize(4 / 3)).toBe(thumbnailSize(2));
+        expect(keyAt(4 / 3)).not.toBe(keyAt(2));
+    });
+
+    it('is the size of the bitmap the renderer hands back, at every ratio', async () => {
+        let ratio = 1;
+        const { renderer } = stubRenderer();
+        const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer, { pixelRatio: () => ratio });
+        for (ratio of [1, 4 / 3, 1.5, 2, 3]) {
+            const image = await thumbs.render(triangle(), { theme: 'dark', scheme: 'phase', finish: 'glow', showAxes: true, lowPower: false });
+            expect(thumbs.size()).toBe(image.width);
+            expect(thumbs.size()).toBe(thumbTileDevicePx(ratio));
+        }
+    });
+});
+

@@ -4,7 +4,7 @@ jest.mock('../../src/workers/createOrbitalWorker', () => ({ createOrbitalWorker:
 jest.mock('../../src/orbital_controls_factory', () => ({ createOrbitalControls: jest.fn() }));
 // The real one draws on a WebGLRenderer, which jsdom has not got (render_thumbnail.test.ts covers it with a stand-in).
 jest.mock('../../src/thumbs/render_thumbnail', () => ({
-    // size(): the picture's side, part of the cache key since ruling R20a-4.
+    // size(): the bitmap's side, part of the cache key since ruling R20a-4 (the bitmap's since fix round 1 of Task 20d).
     createThumbnailRenderer: jest.fn(() => ({ render: jest.fn(async () => ({ width: 288, height: 288 })), size: () => 288, dispose: jest.fn() })),
 }));
 

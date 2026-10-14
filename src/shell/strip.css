@@ -47,3 +47,10 @@
 }
 .strip-tile.selected .strip-tile-label { color: var(--ql-color-text-1); font-weight: 600; }
 .thumbnail-strip.sheet .strip-list { justify-content: flex-start; }
+/* §4.3 "On a phone, body is 14" (the sheet is the phone's strip, §9.8). A long label ("Whole atom") wraps to
+   two centred lines within a 72 px column instead of running past its 56 px tile; every sheet label keeps
+   two lines' height, so the tile images stay in one row. */
+.thumbnail-strip.sheet .strip-tile-label {
+  font-size: 14px; line-height: 17px; height: 34px; max-width: var(--ql-size-thumb);
+  white-space: normal; text-align: center;
+}

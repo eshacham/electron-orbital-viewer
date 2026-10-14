@@ -1096,6 +1096,10 @@ function beginShellFade(context: VisualizerContext, params: AtomShellViewParams,
         // Should not happen given this is only called once the caller has
         // already confirmed a shell view is showing, but there is nothing
         // sane to animate from nothing -- fall back to the instant path.
+        // Ruling T20d-strand: the caller kept the camera where a cancelled
+        // fade left it (cameraStays), so the instant path must re-frame
+        // rather than trust that fade's framedRMax.
+        context.framedRMax = undefined;
         updateAtomViewInScene(context, params);
         return;
     }

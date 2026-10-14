@@ -15,6 +15,7 @@ import { previewOpacity, setSurfaceStyle } from '../../src/store/orbitalSlice';
 import { THUMB_TILE_PX, thumbLookKey, thumbTileDevicePx } from '../../src/thumbs/thumb_key';
 import { CANVAS_BACKDROPS, SHADOWS, TOKENS, TYPE } from '../../src/design/tokens';
 import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
+import { useDevicePixelRatio } from '../../src/thumbs/useDevicePixelRatio';
 
 const profile = neonProfile();
 const rGrid = Array.from({ length: profile.size }, (_, j) => profile.rMin * Math.exp(j * profile.dx));
@@ -228,6 +229,53 @@ describe('ThumbnailStrip and the committed opacity', () => {
     });
 });
 
+// Fix round 1 of Task 20d: a tile's bitmap is made at the screen's device size, so moving the window to a
+// screen with another ratio (or zooming the page) must re-request every tile in the new size.
+describe('ThumbnailStrip and the device pixel ratio', () => {
+    const listeners = new Set<() => void>();
+    let ratio = 1;
+    beforeEach(() => {
+        ratio = 1;
+        listeners.clear();
+        Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => ratio });
+        Object.defineProperty(window, 'matchMedia', {
+            configurable: true,
+            value: (query: string) => ({
+                matches: query === `(resolution: ${ratio}dppx)`, media: query,
+                addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+                removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+            }),
+        });
+    });
+    afterEach(() => { act(() => { thumbnailService.detach(); }); jest.restoreAllMocks(); });
+    const changeRatio = (next: number) => act(() => { ratio = next; [...listeners].forEach(listener => listener()); });
+
+    it('re-requests every tile, at the new bitmap size, when the ratio changes', () => {
+        const look = { theme: 'dark' as const, scheme: 'phase' as const, finish: 'glow' as const, lowPower: false };
+        thumbnailService.attach({
+            createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            isBusy: () => false, themeKey: () => thumbLookKey({ appearance: look, opacity: 0.7, size: thumbTileDevicePx(ratio) }),
+            render: () => new Promise(() => {}),
+        });
+        const request = jest.spyOn(thumbnailService, 'request');
+        function Strip() {
+            const dpr = useDevicePixelRatio();
+            return <ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} onSelect={jest.fn()}
+                themeKey={thumbLookKey({ appearance: look, opacity: 0.7, size: thumbTileDevicePx(dpr) })} />;
+        }
+        const { container } = render(<Strip />);
+        const orbitalTiles = items.filter(item => item.thumb.kind === 'orbital').length;
+        expect(request).toHaveBeenCalledTimes(orbitalTiles);
+        expect((container.querySelector('canvas.thumb-canvas') as HTMLCanvasElement).width).toBe(72);
+
+        changeRatio(1.5);
+        expect(request).toHaveBeenCalledTimes(2 * orbitalTiles);
+        expect((container.querySelector('canvas.thumb-canvas') as HTMLCanvasElement).width).toBe(108);
+        changeRatio(1.5);
+        expect(request).toHaveBeenCalledTimes(2 * orbitalTiles);
+    });
+});
+
 // Ruling R20d: labels one step larger, and the selected tile clearly marked -- the concept's selected 2p_z tile.
 describe('strip tile styles (ruling R20d)', () => {
     const css = readFileSync(resolve(__dirname, '../../src/shell/strip.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -243,6 +291,21 @@ describe('strip tile styles (ruling R20d)', () => {
         expect(rule('.strip-tile-label')).toMatch(/font:\s*500 var\(--ql-type-body-size\) \/ var\(--ql-size-thumb-label\)/);
         expect(TYPE.body.size).toBe(13);
         expect(TYPE.body.size).toBeGreaterThan(TYPE.caption.size);
+    });
+
+    // Fix round 1 of Task 20d (§4.3 "On a phone, body is 14"): the sheet's labels are 14 px, and a long one
+    // ("Whole atom") wraps to two centred lines rather than running past its 56 px tile; every sheet label
+    // keeps two lines' height, so the tile images stay in one row.
+    it('sets the phone sheet\'s labels at 14 px, wrapping to two centred lines', () => {
+        const sheet = rule('.thumbnail-strip.sheet .strip-tile-label');
+        expect(sheet).toMatch(/font-size:\s*14px/);
+        expect(sheet).toMatch(/white-space:\s*normal/);
+        expect(sheet).toMatch(/text-align:\s*center/);
+        expect(sheet).toMatch(/max-width:\s*var\(--ql-size-thumb\)/);
+        const line = Number(/line-height:\s*(\d+)px/.exec(sheet)![1]);
+        expect(line).toBeGreaterThanOrEqual(14);
+        expect(sheet).toMatch(new RegExp(`height:\\s*${2 * line}px`));
+        expect(sheet).not.toMatch(/text-overflow|overflow:\s*hidden/);
     });
 
     it('rings the selected tile in a 2 px selected-edge, with a soft glow of that hue in Deep Space only (§4.6)', () => {

@@ -62,7 +62,11 @@ export interface ThumbLook {
     appearance: Pick<Appearance, 'theme' | 'scheme' | 'finish' | 'lowPower'>;
     /** The main view's committed opacity (orbitalSlice's thumbOpacity). */
     opacity: number;
-    /** thumbnailSize() for the screen. */
+    /**
+     * thumbTileDevicePx() for the screen: the bitmap's side (fix round 1 of
+     * Task 20d). Not thumbnailSize(): two ratios can share a render target
+     * (216 at 1× and at 1.5×) but not a bitmap (72 vs 108).
+     */
     size: number;
 }
 

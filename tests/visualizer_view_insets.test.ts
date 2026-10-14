@@ -197,4 +197,25 @@ describe('a shell fade interrupted by a non-animated update', () => {
         expect(distance(context)).toBeCloseTo(partWay, 9);
         expect(transition.fromCameraDistance).toBeCloseTo(partWay, 9);
     });
+
+    // Ruling T20d-strand: if the view cannot be faded from (no curve or radius to read), the next update
+    // falls back to the instant path -- which must re-frame, not trust the cancelled fade's framedRMax.
+    it('re-frames when the next fade cannot start and falls back to the instant path', () => {
+        const context = buildContext(1000, 900);
+        setViewInsets(context, DESKTOP);
+        updateAtomViewInScene(context, shellParams(8), { animate: true });
+        updateAtomViewInScene(context, shellParams(2), { animate: true });
+        tickTransition(context, 0);
+        tickTransition(context, 425);
+        // Nothing left to read a curve from: beginShellFade's fallback.
+        context.currentOrbitalGroup!.traverse(child => { child.userData.isCap = false; });
+
+        updateAtomViewInScene(context, shellParams(2), { animate: true });
+        expect(context.transition).toBeNull();
+        const fresh = buildContext(1000, 900);
+        setViewInsets(fresh, DESKTOP);
+        updateAtomViewInScene(fresh, shellParams(2), { animate: false });
+        expect(distance(context)).toBeCloseTo(distance(fresh), 6);
+    });
 });
+

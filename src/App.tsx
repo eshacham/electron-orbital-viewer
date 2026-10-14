@@ -123,7 +123,8 @@ import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
 import { atomStripItems } from './thumbs/strip_items';
 import { thumbnailService } from './thumbs/ThumbnailService';
-import { thumbLookKey, thumbnailSize } from './thumbs/thumb_key';
+import { thumbLookKey, thumbTileDevicePx } from './thumbs/thumb_key';
+import { useDevicePixelRatio } from './thumbs/useDevicePixelRatio';
 import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
 import { viewTitle } from './shell/view_title';
 import { useDocumentTitle } from './shell/useDocumentTitle';
@@ -755,6 +756,7 @@ function App() {
     );
     // A new species or relativity: nothing in flight belongs to the picture any more (§12).
     useEffect(() => () => thumbnailService.cancelAll(), [atomProfile?.speciesKey, atomProfile?.Z, pictureRelativity]);
+    const screenRatio = useDevicePixelRatio();
     // Everything a tile's picture depends on besides its content (ruling R20a-4): a change re-requests every
     // tile. The same key the thumbnail service files pictures under (thumb_key.ts): isNarrow is the
     // appearance's lowPower (a phone's tiles, like its main view, have no lines or halo), the size follows
@@ -763,7 +765,8 @@ function App() {
     const stripThemeKey = thumbLookKey({
         appearance: { theme: themeMode, scheme: render.scheme, finish: render.finish, lowPower: isNarrow },
         opacity: thumbOpacity,
-        size: thumbnailSize(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
+        // The bitmap's side, kept current as the window moves between screens (fix round 1 of Task 20d).
+        size: thumbTileDevicePx(screenRatio),
     });
     // The radial plot's horizontal range: sized to what is actually being
     // shown, not the sampling grid's rMax (spec bugfix). The grid extent is

@@ -126,7 +126,9 @@ export function createThumbnailRenderer(
     const key = new THREE.DirectionalLight(0xffffff, SOLID_LIGHTS.key);
     const fill = new THREE.DirectionalLight(0xffffff, SOLID_LIGHTS.fill);
     scene.add(ambient, key, fill, key.target, fill.target);
-    const size = () => thumbnailSize(pixelRatio());
+    // The cache key's size (fix round 1 of Task 20d): the bitmap's side, which is what a tile is given --
+    // two ratios can share a render target (216 at 1× and 1.5×) but never a bitmap (72 vs 108).
+    const size = () => thumbTileDevicePx(pixelRatio());
 
     async function render(meshData: MeshData, appearance: Appearance, opacity: number = DEFAULT_OPACITY): Promise<ThumbImage> {
         const ratio = pixelRatio();
