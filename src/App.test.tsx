@@ -331,7 +331,8 @@ describe('App', () => {
         expect(screen.getByLabelText('shell colour key')).toBeInTheDocument();
         expect(screen.getByLabelText('orbital tile colour key')).toHaveTextContent('Orbital tilesψ > 0ψ < 0');
 
-        fireEvent.click(screen.getByRole('button', { name: 'Hide the orbital strip' }));
+        // Ruling R23b-3: the handle's name is now "Hide orbitals" (was "Hide the orbital strip").
+        fireEvent.click(screen.getByRole('button', { name: 'Hide orbitals' }));
         expect(screen.queryByLabelText('orbital tile colour key')).toBeNull();
     });
 

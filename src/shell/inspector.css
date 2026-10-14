@@ -17,7 +17,9 @@
   color: inherit; font: inherit; text-align: left;
 }
 .inspector-display-chevron { color: var(--ql-color-text-2); transition: transform var(--ql-motion-hover) ease-out; }
-.inspector-display-toggle[aria-expanded="false"] .inspector-display-chevron { transform: rotate(-90deg); }
+/* Ruling R23b-2: disclosure convention -- collapsed points down (ExpandMore's
+   own direction, "expand"); expanded rotates it to point up ("collapse"). */
+.inspector-display-toggle[aria-expanded="true"] .inspector-display-chevron { transform: rotate(180deg); }
 .inspector-display-toggle:hover .inspector-display-chevron { color: var(--ql-color-text-1); }
 /* Basic Orbitals' view half of Controls (ruling R20b): laid out as #controls is. */
 .controls-view { display: flex; flex-direction: column; }

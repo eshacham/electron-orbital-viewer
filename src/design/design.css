@@ -12,6 +12,15 @@ html, body, #root { font-family: var(--ql-font-sans); }
 .ql-icon-button { color: var(--ql-color-text-2); }
 /* §13: a 2 px ring with a 2 px offset on every interactive element, never removed. */
 :focus-visible { outline: 2px solid var(--ql-color-focus-ring); outline-offset: 2px; }
+/* Ruling R23b-1 (owner): an outlined input/Select's own focused border
+   (theme.ts) is the indicator -- this ring would otherwise land on the
+   inner input/select box and overdraw the floating label. Select's focused
+   element carries both classes, so one rule covers OutlinedInput, Select,
+   TextField and Autocomplete, which all render through OutlinedInput. */
+.MuiOutlinedInput-input:focus-visible,
+.MuiSelect-select:focus-visible {
+  outline: none;
+}
 /* §13: "Skip to 3D view" and "Skip to controls", visible when focused. */
 .skip-link {
   position: absolute; left: 8px; top: -48px; z-index: 100;

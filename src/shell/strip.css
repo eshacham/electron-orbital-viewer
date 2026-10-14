@@ -5,10 +5,14 @@
 }
 .thumbnail-strip.overlay > * { pointer-events: auto; }
 .strip-handle {
+  display: inline-flex; align-items: center; gap: 4px;
   height: var(--ql-size-strip-handle); min-width: 44px; padding: 0 10px; cursor: pointer;
   border-radius: var(--ql-radius-md); border: 1px solid var(--ql-color-border-subtle);
   background: var(--ql-color-surface-2); color: var(--ql-color-text-2);
 }
+/* Ruling R23b-3: the handle's text label, caption size from tokens; the handle's own
+   height (the strip's collapsed-zone camera inset) is unchanged -- only its width grows. */
+.strip-handle-label { font: var(--ql-type-caption-weight) var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans); }
 .strip-list {
   /* A scrolling list clips whatever leaves it: 8 px all round holds the focus ring (4 px past a tile:
      2 px offset + 2 px) and the selected tile's glow (ruling R20d). */

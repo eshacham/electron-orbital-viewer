@@ -26,9 +26,20 @@ describe.each(THEME_MODES)('quantumTheme(%s)', mode => {
         expect((overrides.MuiButtonBase!.styleOverrides!.root as Record<string, unknown>)['&.Mui-focusVisible']).toEqual(ring);
         expect((overrides.MuiChip!.styleOverrides!.root as Record<string, unknown>)['&.Mui-focusVisible']).toEqual(ring);
         expect((overrides.MuiSlider!.styleOverrides!.thumb as Record<string, unknown>)['&.Mui-focusVisible']).toEqual(ring);
-        expect((overrides.MuiOutlinedInput!.styleOverrides!.root as Record<string, unknown>)['&.Mui-focused']).toEqual(ring);
         // The keyboard walk found LevelNav's breadcrumb Links (component="button") showing the browser's `outline: auto`.
         expect((overrides.MuiLink!.styleOverrides!.root as Record<string, unknown>)['&.Mui-focusVisible']).toEqual(ring);
+    });
+
+    // Ruling R23b-1 (owner): the outlined input/Select's own focused border is
+    // the indicator -- the ring above would land on the inner input/select box
+    // and overdraw the floating label -- so it gets no extra outline; its
+    // fieldset border is pinned to the focus-ring token at 2 px instead.
+    it('gives an outlined input/Select only its own 2 px focused border, in the focus-ring token', () => {
+        const outlined = theme.components!.MuiOutlinedInput!.styleOverrides!.root as Record<string, unknown>;
+        expect(outlined['&.Mui-focused']).toBeUndefined();
+        expect(outlined['&.Mui-focused .MuiOutlinedInput-notchedOutline']).toEqual({
+            borderColor: TOKENS[mode]['focus-ring'], borderWidth: 2,
+        });
     });
 });
 

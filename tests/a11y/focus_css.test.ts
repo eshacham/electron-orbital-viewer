@@ -14,6 +14,9 @@ const strip = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
 const OUTLINE_REPLACED: Record<string, string> = {
     '.global-search-input': '.global-search:focus-within draws the 2 px ring on the whole control',
     '#canvas-container.viewport-cell:focus': '#canvas-container.viewport-cell:focus-visible draws it for keyboard focus',
+    // Ruling R23b-1 (owner): these draw their own 2 px focus-ring fieldset border (theme.ts) instead.
+    '.MuiOutlinedInput-input:focus-visible': 'the fieldset border theme.ts pins to the focus-ring token is the replacement ring',
+    '.MuiSelect-select:focus-visible': 'the fieldset border theme.ts pins to the focus-ring token is the replacement ring',
 };
 
 describe('focus is never removed (spec §13)', () => {

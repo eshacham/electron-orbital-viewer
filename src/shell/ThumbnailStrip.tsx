@@ -155,8 +155,12 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({ items, label, rGrid, th
     return (
         <div className={`thumbnail-strip ${variant}${collapsed ? ' collapsed' : ''}`}>
             {onCollapsedChange && (
+                // Ruling R23b-3: the handle names what it opens -- "Orbitals" plus the
+                // action. The chevron stays aria-hidden (a bare glyph reads poorly), so
+                // the accessible name is exactly the visible label, with no aria-label.
                 <button type="button" className="strip-handle" aria-expanded={!collapsed} aria-controls={collapsed ? undefined : listId}
-                    aria-label={collapsed ? 'Show the orbital strip' : 'Hide the orbital strip'} onClick={() => onCollapsedChange(!collapsed)}>
+                    onClick={() => onCollapsedChange(!collapsed)}>
+                    <span className="strip-handle-label">{collapsed ? 'Show orbitals' : 'Hide orbitals'}</span>
                     <span aria-hidden="true">{collapsed ? '▴' : '▾'}</span>
                 </button>
             )}

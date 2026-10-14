@@ -45,8 +45,17 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
         expect(document.activeElement).toBe(screen.getByRole('option', { name: '2p_x orbital' }));
         fireEvent.keyDown(document.activeElement!, { key: 'Enter' });
         expect(onSelect).toHaveBeenLastCalledWith({ level: 'orbital', n: 2, l: 1, ml: 1 });
-        fireEvent.click(screen.getByRole('button', { name: 'Hide the orbital strip' }));
+        // Ruling R23b-3: the handle's name is now "Hide orbitals" / "Show orbitals" (was "Hide/Show the orbital strip").
+        fireEvent.click(screen.getByRole('button', { name: 'Hide orbitals' }));
         expect(onCollapsedChange).toHaveBeenCalledWith(true);
+    });
+
+    // Ruling R23b-3 (owner): the collapse/expand control names what it opens, visibly,
+    // and its accessible name is exactly that visible text -- no aria-label divergence.
+    it('shows the handle\'s action as visible text matching its accessible name', () => {
+        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} onCollapsedChange={jest.fn()} />);
+        const handle = screen.getByRole('button', { name: 'Hide orbitals' });
+        expect(handle).toHaveTextContent('Hide orbitals');
     });
 
     // Controller ruling DX2: the listbox mounts only while expanded, so the
@@ -58,9 +67,10 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
                 collapsed={collapsed} onCollapsedChange={setCollapsed} />;
         }
         render(<Controlled />);
-        fireEvent.click(screen.getByRole('button', { name: 'Hide the orbital strip' }));
+        // Ruling R23b-3: the handle's name is now "Hide orbitals" / "Show orbitals" (was "Hide/Show the orbital strip").
+        fireEvent.click(screen.getByRole('button', { name: 'Hide orbitals' }));
         expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Show the orbital strip' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Show orbitals' }));
         const options = screen.getAllByRole('option');
         // Ruling T16-optname (spec §13): options are named "<label> orbital"; the brief pinned the bare label.
         expect(options.filter(option => option.tabIndex === 0)).toEqual([screen.getByRole('option', { name: '2p_z orbital' })]);
@@ -307,6 +317,12 @@ describe('strip tile styles (ruling R20d)', () => {
         expect(line).toBeGreaterThanOrEqual(14);
         expect(sheet).toMatch(new RegExp(`height:\\s*${2 * line}px`));
         expect(sheet).not.toMatch(/text-overflow|overflow:\s*hidden/);
+    });
+
+    // Ruling R23b-3 (owner): the handle names what it opens; its accessible name
+    // is exactly the visible label (the chevron stays aria-hidden), set in caption size from tokens.
+    it('sets the strip handle\'s text label at caption size from tokens', () => {
+        expect(rule('.strip-handle-label')).toMatch(/font:\s*var\(--ql-type-caption-weight\) var\(--ql-type-caption-size\) \/ var\(--ql-type-caption-line\) var\(--ql-font-sans\)/);
     });
 
     it('rings the selected tile in a 2 px selected-edge, with a soft glow of that hue in Deep Space only (§4.6)', () => {

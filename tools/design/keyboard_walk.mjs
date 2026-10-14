@@ -45,16 +45,33 @@ try {
       const element = document.activeElement;
       if (!element || element === document.body) return null;
       const host = element.closest('.global-search, .MuiSlider-thumb, .MuiInputBase-root, .MuiButtonBase-root') ?? element;
-      const style = getComputedStyle(host);
-      // The token as the browser resolves it, for comparing with the computed outline colour.
+      // The token as the browser resolves it, for comparing with the computed outline/border colour.
       const probe = document.createElement('span');
       probe.style.color = 'var(--ql-color-focus-ring)';
       document.body.appendChild(probe);
       const ring = getComputedStyle(probe).color;
       probe.remove();
+      const role = element.getAttribute('role') ?? element.tagName.toLowerCase();
+      const name = (element.getAttribute('aria-label') ?? element.textContent ?? '').trim().slice(0, 60);
+      // Ruling R23b-1: an outlined input/Select (OutlinedInput/Select/TextField/
+      // Autocomplete) carries its focus ring as its own fieldset border
+      // (theme.ts), not the global outline this walk checks for everything
+      // else -- measure that border instead, so it is not flagged as a stop
+      // with no ring.
+      if (host.classList.contains('MuiOutlinedInput-root')) {
+        const fieldset = host.querySelector('.MuiOutlinedInput-notchedOutline');
+        const border = fieldset ? getComputedStyle(fieldset) : null;
+        return {
+          role, name,
+          outline: border?.borderStyle ?? 'none',
+          width: border ? parseFloat(border.borderTopWidth) || 0 : 0,
+          colour: border?.borderColor ?? '',
+          tokenColour: border?.borderColor === ring,
+        };
+      }
+      const style = getComputedStyle(host);
       return {
-        role: element.getAttribute('role') ?? element.tagName.toLowerCase(),
-        name: (element.getAttribute('aria-label') ?? element.textContent ?? '').trim().slice(0, 60),
+        role, name,
         outline: style.outlineStyle,
         width: parseFloat(style.outlineWidth) || 0,
         colour: style.outlineColor,

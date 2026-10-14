@@ -1,4 +1,6 @@
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import Inspector, { InspectorDisplay } from '../../src/shell/Inspector';
 import { DEFAULT_DISPLAY, displayPref } from '../../src/design/presentation';
@@ -118,5 +120,16 @@ describe('InspectorDisplay', () => {
         render(<InspectorDisplay><p>settings</p></InspectorDisplay>);
         fireEvent.click(screen.getByRole('button', { name: 'Display' }));
         expect(displayPref.get()).toEqual({ showAxes: false, plotTab: 'rho', displayOpen: false });
+    });
+
+    // Ruling R23b-2 (owner): disclosure chevrons follow convention -- expanded
+    // points up (the action is "collapse"), collapsed points down (the action
+    // is "expand"). ExpandMore's own, unrotated direction already points down,
+    // so only the expanded state needs a rotation, to 180deg (was rotating the
+    // collapsed state to -90deg, pointing sideways instead of down).
+    it('points the Display chevron down when collapsed and up when expanded', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/shell/inspector.css'), 'utf8');
+        expect(css).toMatch(/\.inspector-display-toggle\[aria-expanded="true"\]\s*\.inspector-display-chevron\s*\{\s*transform:\s*rotate\(180deg\);\s*\}/);
+        expect(css).not.toMatch(/\[aria-expanded="false"\]\s*\.inspector-display-chevron/);
     });
 });
