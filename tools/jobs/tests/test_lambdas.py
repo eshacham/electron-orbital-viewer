@@ -11,12 +11,21 @@ from jobs.tests.stores import make_store
 WATER_XYZ = '3\nwater\nO 0 0 0.11779\nH 0 0.75545 -0.47116\nH 0 -0.75545 -0.47116\n'
 
 
-def event(method, path, body=None, query=None, b64=False):
+def event(method, path, body=None, query=None, b64=False, groups='[owners]', claims=None, authorizer=True):
+    """An HTTP API v2 Lambda proxy event. Defaults to an owner token (every
+    other test in this file is a route test, not an owner-check test, so it
+    should see the request reach `api.handle` as before); `groups`/`claims`/
+    `authorizer` let the owner-check tests below pick a specific shape of
+    the real `requestContext.authorizer.jwt.claims` the HTTP API JWT
+    authorizer hands the Lambda."""
     raw = json.dumps(body) if body is not None else None
     if raw is not None and b64:
         raw = base64.b64encode(raw.encode()).decode()
+    request_context = {'http': {'method': method}, 'requestId': 'r1'}
+    if authorizer:
+        request_context['authorizer'] = {'jwt': {'claims': claims if claims is not None else {'cognito:groups': groups}}}
     return {'version': '2.0', 'rawPath': path, 'queryStringParameters': query, 'body': raw, 'isBase64Encoded': b64,
-            'requestContext': {'http': {'method': method}, 'requestId': 'r1'}}
+            'requestContext': request_context}
 
 
 def approved(api, body):
@@ -77,3 +86,83 @@ def test_body_limit_matches_the_local_server():
     from jobs.lambdas import MAX_BODY
     from jobs.local_server import MAX_BODY as LOCAL_MAX_BODY
     assert MAX_BODY == LOCAL_MAX_BODY
+
+
+# -- the owner check (the brief, 2026-10-15) ---------------------------------
+
+NOT_OWNER = {'code': 'not-owner', 'message': 'This account is not allowed to use the jobs API.'}
+
+
+def test_the_owner_is_allowed_on_every_route(api):
+    """Every route `compute_stack.ROUTES` names, with a default (owner) event."""
+    body = {'recipe': 'single', 'molecule': {'xyz': WATER_XYZ}}
+    preview = handle_http(api, event('POST', '/api/v1/jobs/preview', body))
+    assert preview['statusCode'] == 200
+    submitted = handle_http(api, event('POST', '/api/v1/jobs', approved(api, body)))
+    assert submitted['statusCode'] == 201
+    key = json.loads(submitted['body'])['key']
+    assert handle_http(api, event('GET', '/api/v1/jobs'))['statusCode'] == 200
+    assert handle_http(api, event('GET', f'/api/v1/jobs/{key}'))['statusCode'] == 200
+    assert handle_http(api, event('GET', '/api/v1/costs'))['statusCode'] == 200
+
+
+@pytest.mark.parametrize('claim', [
+    '[owners]',          # HTTP API v2's own stringified single-value array
+    '[owners admin]',    # stringified multi-value array, space-joined
+    'owners',            # a bare group name, no brackets
+    '["owners"]',        # a JSON-ish array string
+    ['owners'],          # a real list (e.g. a non-stringifying authorizer)
+    ['admin', 'owners'],
+])
+def test_group_claim_shapes_that_name_the_owner_are_allowed(api, claim):
+    out = handle_http(api, event('GET', '/api/v1/costs', groups=claim))
+    assert out['statusCode'] == 200
+
+
+@pytest.mark.parametrize('claim', [
+    '[admin]', 'admin', ['admin'], '[]', '', '["admin"]',
+])
+def test_group_claim_shapes_without_the_owner_are_refused(api, claim):
+    out = handle_http(api, event('GET', '/api/v1/costs', groups=claim))
+    assert out['statusCode'] == 403
+    assert json.loads(out['body'])['error'] == NOT_OWNER
+
+
+def test_non_owner_is_refused_before_the_api_is_called(api, monkeypatch):
+    calls = []
+    monkeypatch.setattr(api, 'handle', lambda *a, **k: calls.append((a, k)))
+    out = handle_http(api, event('GET', '/api/v1/costs', groups='[admin]'))
+    assert out['statusCode'] == 403 and json.loads(out['body'])['error'] == NOT_OWNER
+    assert calls == []
+
+
+def test_no_groups_claim_is_refused_before_the_api_is_called(api, monkeypatch):
+    """claims present (a real token), but no cognito:groups key at all."""
+    calls = []
+    monkeypatch.setattr(api, 'handle', lambda *a, **k: calls.append((a, k)))
+    out = handle_http(api, event('GET', '/api/v1/costs', claims={'sub': 'abc-123'}))
+    assert out['statusCode'] == 403 and json.loads(out['body'])['error'] == NOT_OWNER
+    assert calls == []
+
+
+def test_missing_authorizer_is_refused_before_the_api_is_called(api, monkeypatch):
+    calls = []
+    monkeypatch.setattr(api, 'handle', lambda *a, **k: calls.append((a, k)))
+    out = handle_http(api, event('GET', '/api/v1/costs', authorizer=False))
+    assert out['statusCode'] == 403 and json.loads(out['body'])['error'] == NOT_OWNER
+    assert calls == []
+
+
+def test_the_403_is_logged_without_the_token_or_an_email(api, capsys):
+    handle_http(api, event('GET', '/api/v1/costs', groups='[admin]'))
+    logged = capsys.readouterr().out
+    assert '"status":403' in logged and '"route":"GET /api/v1/costs"' in logged and '"requestId":"r1"' in logged
+    assert 'admin' not in logged and '@' not in logged
+
+
+def test_owner_group_name_is_configurable(api, monkeypatch):
+    """OWNER_GROUP (set by the compute stack on the api Lambda) names the
+    group that counts as the owner; it defaults to 'owners'."""
+    monkeypatch.setenv('OWNER_GROUP', 'admins')
+    assert handle_http(api, event('GET', '/api/v1/costs', groups='[admins]'))['statusCode'] == 200
+    assert handle_http(api, event('GET', '/api/v1/costs', groups='[owners]'))['statusCode'] == 403
