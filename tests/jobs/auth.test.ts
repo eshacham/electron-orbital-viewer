@@ -55,7 +55,17 @@ describe('signing in', () => {
         await expect(auth.start()).resolves.toBe('/#mode=molecule&id=h2o');
         expect(userManager.signinRedirectCallback).toHaveBeenCalledWith('http://localhost:5391/?code=abc&state=xyz');
         expect(replaceUrl).toHaveBeenCalledWith('/#mode=molecule&id=h2o');
-        expect(events.at(-1)).toEqual({ identity: { email: 'owner@example.com' }, reason: 'signed-in' });
+        // No cognito:groups claim on this profile (PROFILE has none): the owner check (jobsSlice's selectIsOwner) sees no groups.
+        expect(events.at(-1)).toEqual({ identity: { email: 'owner@example.com', groups: [] }, reason: 'signed-in' });
+    });
+    it("reads the ID token's cognito:groups claim into the identity, for the owner-group check", async () => {
+        const { auth } = setup('http://localhost:5391/?code=abc&state=xyz', {
+            signinRedirectCallback: jest.fn(async () => user({ profile: { ...PROFILE, 'cognito:groups': ['owners'] } as never })),
+        });
+        const events: SessionEvent[] = [];
+        auth.onChange(event => events.push(event));
+        await auth.start();
+        expect(events.at(-1)).toEqual({ identity: { email: 'owner@example.com', groups: ['owners'] }, reason: 'signed-in' });
     });
     it('keeps the refresh token for the tab, never the access or ID token', async () => {
         const { auth } = setup('http://localhost:5391/?code=abc&state=xyz');

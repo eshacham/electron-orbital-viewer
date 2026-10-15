@@ -32,7 +32,9 @@ export async function startOwnerSession(dispatch: (action: UnknownAction) => unk
     });
     current = auth;
     auth.onChange(({ identity, reason }) => {
-        dispatch(reason === 'expired' ? sessionExpired() : sessionChanged({ signedIn: identity !== null, email: identity?.email ?? null }));
+        dispatch(reason === 'expired' ? sessionExpired() : sessionChanged({
+            signedIn: identity !== null, email: identity?.email ?? null, groups: identity?.groups ?? [],
+        }));
     });
     try {
         return await auth.start();

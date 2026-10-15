@@ -39,7 +39,8 @@ const OwnerBar: React.FC<OwnerBarProps> = ({
 }) => {
     const signInLine = session.signedIn ? (
         <Typography variant="caption">
-            Signed in as {session.email ?? 'the owner'} · <Link component="button" variant="caption" onClick={onSignOut}>Sign out</Link>
+            {isOwner ? `Signed in as ${session.email ?? 'the owner'}` : 'Signed in — this account is not an owner'}
+            {' · '}<Link component="button" variant="caption" onClick={onSignOut}>Sign out</Link>
         </Typography>
     ) : session.configured ? (
         <Link component="button" variant="caption" className="owner-sign-in" onClick={onSignIn}>Owner sign-in</Link>

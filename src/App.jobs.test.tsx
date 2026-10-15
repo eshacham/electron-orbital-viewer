@@ -226,7 +226,8 @@ describe('Molecules mode with on-demand molecules', () => {
     it('says an ended session, with the way back, rather than hiding the request panel silently', async () => {
         BUILD_ENV.cognito = COGNITO;
         const { store, container } = await enterMolecules(false);
-        act(() => { store.dispatch(sessionChanged({ signedIn: true, email: 'owner@example.com' })); });
+        // The owner group claim (selectIsOwner needs it since the owner-group check, 2026-10-15).
+        act(() => { store.dispatch(sessionChanged({ signedIn: true, email: 'owner@example.com', groups: ['owners'] })); });
         await flush();
         act(() => { store.dispatch(sessionExpired()); });
         const side = container.querySelector('.side-panel') as HTMLElement;
@@ -240,7 +241,8 @@ describe('Molecules mode with on-demand molecules', () => {
         BUILD_ENV.jobsApiUrl = 'https://abc.execute-api.us-east-1.amazonaws.com';
         const { store, container } = await enterMolecules(false);
         expect(mockApi.list).not.toHaveBeenCalled();
-        act(() => { store.dispatch(sessionChanged({ signedIn: true, email: 'owner@example.com' })); });
+        // The owner group claim (selectIsOwner needs it since the owner-group check, 2026-10-15).
+        act(() => { store.dispatch(sessionChanged({ signedIn: true, email: 'owner@example.com', groups: ['owners'] })); });
         await flush();
         expect(mockApi.list).toHaveBeenCalledWith(currentMonth(), 'DONE');
         const side = container.querySelector('.side-panel') as HTMLElement;
@@ -250,6 +252,24 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(screen.getByText(/Signed in as owner@example.com/)).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/admin.html');
         expect(screen.queryByRole('group', { name: 'where jobs run' })).toBeNull();
+    });
+
+    // The brief, 2026-10-15: a signed-in user with no `owners` group claim is
+    // refused by the server (tools/jobs/lambdas.py); the UI must not offer
+    // controls that would only end in a 403.
+    it('gives a signed-in non-owner no request panel, no Computed category and no dashboard link', async () => {
+        BUILD_ENV.cognito = COGNITO;
+        BUILD_ENV.jobsApiUrl = 'https://abc.execute-api.us-east-1.amazonaws.com';
+        const { store, container } = await enterMolecules(false);
+        act(() => { store.dispatch(sessionChanged({ signedIn: true, email: 'visitor@example.com', groups: [] })); });
+        await flush();
+        expect(mockApi.list).not.toHaveBeenCalled();
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
+        expect(within(side).queryByRole('button', { name: 'Computed' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Owner menu, signed in as visitor@example.com' }));
+        expect(screen.getByText(/Signed in — this account is not an owner/)).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Dashboard' })).toBeNull();
     });
 });
 

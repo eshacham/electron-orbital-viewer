@@ -11,11 +11,18 @@ export interface OwnerSession {
     configured: boolean;
     signedIn: boolean;
     email: string | null;
+    /** The ID token's own `cognito:groups` claim (owner_session.ts, from auth.ts's OwnerIdentity).
+     * Signed in alone is not enough: the server-side check (tools/jobs/lambdas.py) requires the
+     * `owners` group too, and the UI's own rule (selectIsOwner) must agree with it (the brief, 2026-10-15). */
+    groups: string[];
     /** The session ended under the owner (a refresh was refused): said on screen, never a silent failure. */
     expired: boolean;
     /** A sign-in that came back with an error (cancelled, MFA failed). */
     error: string | null;
 }
+
+/** tools/jobs/lambdas.py's OWNER_GROUP default -- the one Cognito group the server trusts. */
+const OWNER_GROUP = 'owners';
 
 export interface ComputedList { month: string | null; jobs: JobView[] | null; error: string | null; nonce: number }
 
@@ -58,7 +65,7 @@ function savedTarget(): JobsTarget {
 export function initialJobsState(): JobsState {
     return {
         target: savedTarget(),
-        session: { configured: BUILD_ENV.cognito !== null, signedIn: false, email: null, expired: false, error: null },
+        session: { configured: BUILD_ENV.cognito !== null, signedIn: false, email: null, groups: [], expired: false, error: null },
         records: {},
         recordErrors: {},
         followedKey: null,
@@ -80,9 +87,10 @@ const jobsSlice = createSlice({
             state.followedKey = null;
             state.computed = { month: null, jobs: null, error: null, nonce: state.computed.nonce + 1 };
         },
-        sessionChanged: (state, action: PayloadAction<{ signedIn: boolean; email: string | null }>) => {
+        sessionChanged: (state, action: PayloadAction<{ signedIn: boolean; email: string | null; groups: string[] }>) => {
             state.session.signedIn = action.payload.signedIn;
             state.session.email = action.payload.email;
+            state.session.groups = action.payload.groups;
             if (action.payload.signedIn) {
                 state.session.expired = false;
                 state.session.error = null;
@@ -92,6 +100,7 @@ const jobsSlice = createSlice({
         sessionExpired: state => {
             state.session.signedIn = false;
             state.session.email = null;
+            state.session.groups = [];
             state.session.expired = true;
         },
         sessionFailed: (state, action: PayloadAction<string>) => {
@@ -141,9 +150,16 @@ const jobsSlice = createSlice({
     },
 });
 
-/** Spec §9's owner rule, verbatim: a signed-in session, or the dev server running jobs on this Mac (no auth there, $0). */
+/**
+ * Spec §9's owner rule, server-aligned (the brief, 2026-10-15): a signed-in
+ * session whose ID token carries the `owners` group -- the same group
+ * tools/jobs/lambdas.py requires, so a signed-in non-owner sees no owner
+ * plumbing here either, not just a 403 from the API it never reaches -- or
+ * the dev server running jobs on this Mac (no auth there, $0).
+ */
 export const selectIsOwner = (state: { jobs: JobsState }): boolean =>
-    state.jobs.session.signedIn || (BUILD_ENV.dev && state.jobs.target === 'local');
+    (state.jobs.session.signedIn && state.jobs.session.groups.includes(OWNER_GROUP))
+    || (BUILD_ENV.dev && state.jobs.target === 'local');
 
 export const {
     setTarget, sessionChanged, sessionExpired, sessionFailed, sessionErrorDismissed, jobUpdated, jobFetchFailed, followJob,

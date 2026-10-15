@@ -18,19 +18,33 @@ describe('who is the owner', () => {
         expect(s.target).toBe('local');
         expect(owner(s)).toBe(true);
         expect(owner(reducer(s, setTarget('aws')))).toBe(false);
-        expect(owner(reducer(reducer(s, setTarget('aws')), sessionChanged({ signedIn: true, email: 'owner@example.com' })))).toBe(true);
+        // The owners group claim: a sign-in with no claim at all (the common case before this feature) must not be the owner.
+        expect(owner(reducer(reducer(s, setTarget('aws')), sessionChanged({ signedIn: true, email: 'owner@example.com', groups: ['owners'] })))).toBe(true);
     });
-    it('in production only a signed-in session is the owner, and the target cannot move', () => {
+    it('in production a signed-in session with the owners group claim is the owner, and the target cannot move', () => {
         const s = initialJobsState();
         expect(s.target).toBe('aws');
         expect(owner(s)).toBe(false);
         expect(reducer(s, setTarget('local')).target).toBe('aws');
-        const signedIn = reducer(s, sessionChanged({ signedIn: true, email: 'owner@example.com' }));
+        const signedIn = reducer(s, sessionChanged({ signedIn: true, email: 'owner@example.com', groups: ['owners'] }));
         expect(owner(signedIn)).toBe(true);
         const expired = reducer(signedIn, sessionExpired());
         expect(owner(expired)).toBe(false);
-        expect(expired.session).toEqual(expect.objectContaining({ expired: true, signedIn: false, email: null }));
-        expect(reducer(expired, sessionChanged({ signedIn: true, email: 'o' })).session.expired).toBe(false);
+        expect(expired.session).toEqual(expect.objectContaining({ expired: true, signedIn: false, email: null, groups: [] }));
+        expect(reducer(expired, sessionChanged({ signedIn: true, email: 'o', groups: ['owners'] })).session.expired).toBe(false);
+    });
+    // The brief, 2026-10-15: the server (tools/jobs/lambdas.py) refuses any
+    // token without the `owners` group, so a signed-in visitor with no
+    // group, or some other group, must not see owner plumbing either.
+    it('a signed-in session with no owners group claim, in production or on the dev server pointed at AWS, is not the owner', () => {
+        const prod = reducer(initialJobsState(), sessionChanged({ signedIn: true, email: 'visitor@example.com', groups: [] }));
+        expect(owner(prod)).toBe(false);
+        const otherGroup = reducer(initialJobsState(), sessionChanged({ signedIn: true, email: 'visitor@example.com', groups: ['admin'] }));
+        expect(owner(otherGroup)).toBe(false);
+        BUILD_ENV.dev = true;
+        const devOnAws = reducer(reducer(initialJobsState(), setTarget('aws')),
+            sessionChanged({ signedIn: true, email: 'visitor@example.com', groups: [] }));
+        expect(owner(devOnAws)).toBe(false);
     });
     it('remembers the dev target the owner chose', () => {
         BUILD_ENV.dev = true;

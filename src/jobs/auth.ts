@@ -3,7 +3,11 @@ import type { CognitoSettings } from './build_env';
 
 export const SESSION_KEY = 'eov.owner.session';
 export type OwnerPage = '/' | '/admin.html';
-export interface OwnerIdentity { email: string | null }
+/** `groups`: the ID token's own `cognito:groups` claim (real array -- unlike the
+ * HTTP API authorizer's stringified copy the Lambda sees, the JWT itself is
+ * never flattened), so the owner check in jobsSlice's selectIsOwner reads it
+ * with no parsing beyond `Array.isArray`. */
+export interface OwnerIdentity { email: string | null; groups: string[] }
 
 /**
  * What a failed sign-in says. Fixed words, never the answer's own text: an
@@ -95,7 +99,17 @@ function withTimeout(promise: Promise<unknown>, ms: number): Promise<void> {
     });
 }
 
-const identityOf = (user: User): OwnerIdentity => ({ email: typeof user.profile.email === 'string' ? user.profile.email : null });
+/** Cognito adds `cognito:groups` to every ID token for a user in any group,
+ * with no scope needed; a user in none has no claim at all. */
+function groupsOf(profile: User['profile']): string[] {
+    const raw = (profile as Record<string, unknown>)['cognito:groups'];
+    return Array.isArray(raw) ? raw.filter((g): g is string => typeof g === 'string') : [];
+}
+
+const identityOf = (user: User): OwnerIdentity => ({
+    email: typeof user.profile.email === 'string' ? user.profile.email : null,
+    groups: groupsOf(user.profile),
+});
 
 /**
  * oidc-client-ts keeps the return path in this tab's sessionStorage (only a
