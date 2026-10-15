@@ -37,7 +37,7 @@ After a deploy, `deploy.sh site` prints `JOBS_AWS_API_URL=…`. Put it in `.env.
 The anomaly monitor filters on the `app` cost-allocation tag, and creating it before that tag is active could roll back the whole compute deploy. So the compute phases pass `-c anomalyMonitor=off` until it is turned on:
 
 ```
-ANOMALY_MONITOR=on infra/deploy.sh compute    # once step 3 under "Owner actions" has succeeded
+ANOMALY_MONITOR=on infra/deploy.sh compute    # once step 4 under "Owner actions" has succeeded
 ```
 
 When `ANOMALY_MONITOR` is unset, `deploy.sh` keeps whatever the deployed stack has, so a routine redeploy never removes the monitor. `ANOMALY_MONITOR=off` removes it.
@@ -49,9 +49,9 @@ When `ANOMALY_MONITOR` is unset, `deploy.sh` keeps whatever the deployed stack h
 After `destroy-compute`:
 
 - **The live site still has the deleted stack's API URL and Cognito settings** baked in, so its owner sign-in points at nothing. Run `infra/deploy.sh site` to rebuild it without them (the sign-in is hidden again).
-- **A later redeploy creates a new user pool and a new SNS subscription.** Repeat owner actions 1 and 2 below: confirm the new subscription email, then create your sign-in again and enrol TOTP. The old authenticator entry no longer works. The anomaly monitor comes back off; turn it on again with `ANOMALY_MONITOR=on`.
+- **A later redeploy creates a new user pool and a new SNS subscription.** Repeat owner actions 1–3 below: confirm the new subscription email, create your sign-in again and enrol TOTP (the old authenticator entry no longer works), and add yourself to the new pool's `owners` group again -- a redeploy's group is new and empty like the pool itself. The anomaly monitor comes back off; turn it on again with `ANOMALY_MONITOR=on`.
 
-## Owner actions (once per compute stack: repeat 1–2 after a destroy-compute and redeploy)
+## Owner actions (once per compute stack: repeat 1–3 after a destroy-compute and redeploy)
 
 1. Confirm the SNS subscription email ("AWS Notification - Subscription Confirmation"). Budget emails need no confirmation.
 2. Create your sign-in. The email is the one in `infra/owner.env`:
@@ -62,7 +62,14 @@ After `destroy-compute`:
      --desired-delivery-mediums EMAIL
    ```
    Then sign in from the site's "Owner sign-in", set a password and enrol an authenticator app (TOTP).
-3. **The controller activates the cost-allocation tags with the CLI** (the owner asked for this, 2026-10-05): `aws ce update-cost-allocation-tags-status --cost-allocation-tags-status TagKey=app,Status=Active TagKey=component,Status=Active`. It succeeds only once AWS Billing has seen the tags on a billed resource, which is up to 24 h after the first job; before that it fails with `Tag keys not found: app,component` (checked 2026-10-05). Try it after the first AWS job, and again at each later task until it succeeds; record the result in the ledger. The daily billing figure and the anomaly monitor filter on these tags. Once it has succeeded (`{"Errors": []}`), turn the anomaly monitor on with `ANOMALY_MONITOR=on infra/deploy.sh compute`.
+3. **Add yourself to the `owners` group.** The Cognito JWT authorizer only proves a token is signed by this pool -- it says nothing about who signed in -- so the api Lambda refuses every route (preview, submit, list, costs) to a token without the `owners` group claim (`tools/jobs/lambdas.py`'s `OWNER_GROUP` check, the brief 2026-10-15). CDK creates the group (`OwnerGroupName` in the stack's outputs, `owners` by default) but adds no one to it -- the owner's username is not in the repo:
+   ```
+   aws cognito-idp admin-add-user-to-group \
+     --user-pool-id "$(aws cloudformation describe-stacks --stack-name ElectronOrbitalViewerComputeStack --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)" \
+     --username "$ALERT_EMAIL" --group-name "$(aws cloudformation describe-stacks --stack-name ElectronOrbitalViewerComputeStack --query "Stacks[0].Outputs[?OutputKey=='OwnerGroupName'].OutputValue" --output text)"
+   ```
+   An already-open sign-in's ID token was minted before this and carries no `cognito:groups` claim: sign in again (or wait for the hourly token to refresh) before the site shows owner controls.
+4. **The controller activates the cost-allocation tags with the CLI** (the owner asked for this, 2026-10-05): `aws ce update-cost-allocation-tags-status --cost-allocation-tags-status TagKey=app,Status=Active TagKey=component,Status=Active`. It succeeds only once AWS Billing has seen the tags on a billed resource, which is up to 24 h after the first job; before that it fails with `Tag keys not found: app,component` (checked 2026-10-05). Try it after the first AWS job, and again at each later task until it succeeds; record the result in the ledger. The daily billing figure and the anomaly monitor filter on these tags. Once it has succeeded (`{"Errors": []}`), turn the anomaly monitor on with `ANOMALY_MONITOR=on infra/deploy.sh compute`.
 
 ## Controls
 

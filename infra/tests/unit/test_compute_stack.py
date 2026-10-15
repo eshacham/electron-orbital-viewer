@@ -159,6 +159,22 @@ def test_cognito_owner_only_with_totp(template):
     template.resource_count_is('AWS::Cognito::ManagedLoginBranding', 1)
 
 
+def test_owners_group_exists_and_is_wired_to_the_api_lambda(template):
+    """The brief, 2026-10-15: a Cognito group the owner is added to by hand
+    after deploy (infra/README), the api Lambda's own OWNER_GROUP env var
+    naming it (tools/jobs/lambdas.py's server-side check), and an output so
+    deploy.sh/the owner never has to read it out of the console."""
+    (pool,) = template.find_resources('AWS::Cognito::UserPool')
+    (group,) = props(template, 'AWS::Cognito::UserPoolGroup')
+    assert group['UserPoolId'] == {'Ref': pool}
+    assert group['GroupName'] == 'owners'
+    assert group['Description']
+    (api_fn,) = [f for f in props(template, 'AWS::Lambda::Function')
+                 if f['Handler'] == 'jobs.lambdas.api_handler']
+    assert api_fn['Environment']['Variables']['OWNER_GROUP'] == 'owners'
+    template.has_output('OwnerGroupName', {'Value': 'owners'})
+
+
 def test_lambdas_and_their_bundle(template):
     fns = props(template, 'AWS::Lambda::Function')
     assert sorted(f['Handler'] for f in fns) == ['jobs.lambdas.api_handler', 'jobs.lambdas.billing_handler',
@@ -211,7 +227,7 @@ def test_reconcile_describes_only_ecs_tasks(template):
 
 def test_outputs_for_deploy_and_jobs_scripts(template):
     for name in ('JobsApiUrl', 'UserPoolId', 'UserPoolClientId', 'CognitoAuthority', 'CognitoDomain', 'JobsTableName',
-                 'WorkerRepositoryUri', 'ApiFunctionName', 'ApiRoleName', 'WorkerLogGroup'):
+                 'WorkerRepositoryUri', 'ApiFunctionName', 'ApiRoleName', 'WorkerLogGroup', 'OwnerGroupName'):
         template.has_output(name, {})
 
 

@@ -37,6 +37,10 @@ SUBMIT_THROTTLE = {'ThrottlingRateLimit': 1, 'ThrottlingBurstLimit': 5}
 LOG_RETENTION = logs.RetentionDays.ONE_MONTH
 WORKER_LOG_GROUP = '/electron-orbital-viewer/worker'
 CONTEXT_KEYS = ('dataBucketName', 'siteOrigin', 'alertEmail', 'imageTag')
+# tools/jobs/lambdas.py's OWNER_GROUP default: the only group the server-side
+# check accepts (the brief, 2026-10-15). The pool has no users in CDK -- add
+# the owner to it by hand after deploy (infra/README's "Owner actions").
+OWNER_GROUP_NAME = 'owners'
 
 
 def compute_context(node) -> dict | None:
@@ -171,7 +175,7 @@ class ComputeStack(Stack):
                                        resource_name=f'{job_definition.job_definition_name}:*')]))
         api_fn = function('ApiFunction', 'jobs.lambdas.api_handler', api_role, 29, {
             'SPOT_QUEUE': queues['spot'].job_queue_arn, 'ON_DEMAND_QUEUE': queues['on-demand'].job_queue_arn,
-            'JOB_DEFINITION': job_definition.job_definition_arn})
+            'JOB_DEFINITION': job_definition.job_definition_arn, 'OWNER_GROUP': OWNER_GROUP_NAME})
 
         reconcile_role = lambda_role('ReconcileRole', 'reconcile Lambda: job table, Batch/ECS reads, alerts')
         table.grant_read_write_data(reconcile_role)
@@ -230,6 +234,13 @@ class ComputeStack(Stack):
             managed_login_version=cognito.ManagedLoginVersion.NEWER_MANAGED_LOGIN)
         cognito.CfnManagedLoginBranding(self, 'LoginBranding', user_pool_id=pool.user_pool_id,
                                         client_id=client.user_pool_client_id, use_cognito_provided_values=True)
+        # No users are added here (the owner's username is not in the repo,
+        # and infra/owner.env is never read by CDK): infra/README's one-time
+        # `admin-add-user-to-group` adds the owner after deploy. The group's
+        # name alone is what the api Lambda's OWNER_GROUP env var trusts.
+        owner_group = cognito.CfnUserPoolGroup(self, 'OwnersGroup', user_pool_id=pool.user_pool_id,
+                                               group_name=OWNER_GROUP_NAME,
+                                               description='Owner: may use the jobs API')
 
         # -- HTTP API -------------------------------------------------------------
         api = apigw.HttpApi(self, 'JobsApi', api_name='electron-orbital-viewer-jobs', create_default_stage=True,
@@ -272,5 +283,6 @@ class ComputeStack(Stack):
                             ('WorkerRepositoryUri', repository.repository_uri),
                             ('ApiFunctionName', api_fn.function_name), ('ApiRoleName', api_role.role_name),
                             ('DenySubmitPolicyArn', deny_submit.managed_policy_arn),
-                            ('WorkerLogGroup', worker_logs.log_group_name)):
+                            ('WorkerLogGroup', worker_logs.log_group_name),
+                            ('OwnerGroupName', owner_group.group_name)):
             CfnOutput(self, name, value=value)
