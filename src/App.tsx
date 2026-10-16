@@ -47,7 +47,7 @@ import {
     ViewMode,
 } from './store/atomSlice';
 import { RelativityMode, defaultRelativityFor, shortMethodLabel } from './atom/relativity';
-import { subshellLabel, subshellSpokenLabel, configurationLabelOf, valenceConfigurationLabelOf } from './atom/configurations';
+import { subshellLabel, subshellSpokenLabel, configurationLabelOf, valenceConfigurationLabelOf, valenceShellsOf } from './atom/configurations';
 import { useAtomSolver } from './atom/useAtomSolver';
 import { useDeltaScfEnergies } from './atom/useDeltaScfEnergies';
 import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidExcitation, isNeutralGround } from './atom/species';
@@ -797,13 +797,13 @@ function App() {
     const atomCurves: RadialCurve[] = useMemo(() => {
         if (!atomProfile) return [];
         if (atomLevel === 'atom') {
-            // The outermost shell is named as such here too (Addendum 2's
-            // core/valence distinction), so the plot and the lit ring in the
-            // 3D view are saying the same thing. `shells` is ascending n from
-            // the configuration, so the last entry is the valence shell.
-            const valenceIndex = atomProfile.shells.length - 1;
+            // The valence shells are named as such here too (Addendum 2's
+            // core/valence distinction, extended by ruling P14 to a partly
+            // filled d/f below the outermost shell), so the plot and the lit
+            // ring in the 3D view are saying the same thing.
+            const valenceShells = valenceShellsOf(speciesConfiguration(species));
             return atomProfile.shells.map((shell, i) => ({
-                label: i === valenceIndex ? `n=${shell.n} valence` : `n=${shell.n}`,
+                label: valenceShells.has(shell.n) ? `n=${shell.n} valence` : `n=${shell.n}`,
                 color: CURVE_COLORS[i % CURVE_COLORS.length],
                 points: atomRGrid.map((r, j) => ({ r, value: shell.curve[j] })),
             }));
@@ -826,7 +826,7 @@ function App() {
             color: CURVE_COLORS[shellSubshells.indexOf(subshell) % CURVE_COLORS.length],
             points: atomRGrid.map((r, j) => ({ r, value: subshell.curve[j] })),
         }));
-    }, [atomProfile, atomLevel, atomSelectedShell, atomSelectedSubshell, atomRGrid]);
+    }, [atomProfile, atomLevel, atomSelectedShell, atomSelectedSubshell, atomRGrid, species]);
 
     // The same curves the plot is showing, from the non-relativistic solve,
     // dashed (spec §5 Phase 4) -- extracted to a pure helper (fix round 1,
@@ -1028,6 +1028,9 @@ function App() {
         onNavigate: handleLevelNavigate,
         onChangeElement: isNarrow ? () => setElementPickerOpen(true) : () => setTableOpen(true),
         relativity: pictureRelativity,
+        // Ruling P18: the switch's own effective mode, which can be ahead of
+        // the drawn picture's (pictureRelativity) while a re-solve is in flight.
+        selectedRelativity: relativity,
         pictureShown: atomProfile !== null,
     };
     // The Relativity switch chooses the model, so it sits with the

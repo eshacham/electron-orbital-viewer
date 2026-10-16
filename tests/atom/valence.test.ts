@@ -22,7 +22,9 @@ describe('valence shell', () => {
 
     it('is the outermost shell, not the highest-energy subshell: iron\'s is N (4s), not M (3d)', () => {
         expect(valenceShellFor(26)).toBe(4);
-        expect(valenceConfigurationLabel(26)).toBe('4s²');
+        // Ruling P14: the label also carries iron's open 3d⁶, which sits
+        // below the outermost shell but still counts as valence.
+        expect(valenceConfigurationLabel(26)).toBe('3d⁶ 4s²');
     });
 
     it('gives the alkali metals one identical lonely s electron', () => {

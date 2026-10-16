@@ -255,10 +255,45 @@ export function valenceShellFor(Z: number): number {
     return valenceShellOf(configurationFor(Z));
 }
 
-/** The outermost shell alone, for any configuration — what `valenceConfigurationLabel` below reports for a neutral atom. */
+const capacityOf = (s: SubshellOccupancy) => 2 * (2 * s.l + 1);
+
+/**
+ * Ruling P14 (R-valence): the outermost shell, plus any (n−1)d or (n−2)f
+ * subshell beneath it that is partly filled. A transition metal's open d
+ * subshell, or a lanthanide/actinide's open f, is chemically live even
+ * though it sits below the outermost shell -- iron's 3d⁶ is not inert the
+ * way its 1s²/2s²2p⁶ core is -- but a *filled* d or f subshell (zinc's
+ * 3d¹⁰, ytterbium's 4f¹⁴) is exactly as inert as the rest of the core, and
+ * stays out. Kept in configuration order (ascending n, then l), same as
+ * `configurationLabelOf` reads it elsewhere -- e.g. protactinium reads
+ * "5f² 6d¹ 7s²", not "7s² 6d¹ 5f²".
+ */
+export function valenceSubshellsOf(configuration: SubshellOccupancy[]): SubshellOccupancy[] {
+    const outer = valenceShellOf(configuration);
+    return configuration.filter(s =>
+        s.n === outer || (s.l >= 2 && s.n < outer && s.electrons > 0 && s.electrons < capacityOf(s)));
+}
+
+/** The n values valenceSubshellsOf spans -- e.g. {5, 6, 7} for protactinium (5f, 6d, 7s). */
+export function valenceShellsOf(configuration: SubshellOccupancy[]): ReadonlySet<number> {
+    return new Set(valenceSubshellsOf(configuration).map(s => s.n));
+}
+
+/** The outermost shell, plus any open (n−1)d/(n−2)f beneath it (ruling P14) — what `valenceConfigurationLabel` below reports for a neutral atom. */
 export function valenceConfigurationLabelOf(configuration: SubshellOccupancy[]): string {
-    const valenceN = valenceShellOf(configuration);
-    return configurationLabelOf(configuration.filter(subshell => subshell.n === valenceN));
+    return configurationLabelOf(valenceSubshellsOf(configuration));
+}
+
+/**
+ * Names which subshell(s) below the outermost shell are counted as valence
+ * and why, e.g. "open 5f and 6d count as valence" for protactinium -- null
+ * when the outermost shell is the whole story, which is most elements.
+ */
+export function valenceNote(configuration: SubshellOccupancy[]): string | null {
+    const outer = valenceShellOf(configuration);
+    const inner = valenceSubshellsOf(configuration).filter(s => s.n < outer).map(s => `${s.n}${'spdfgh'[s.l]}`);
+    if (inner.length === 0) return null;
+    return `open ${inner.join(' and ')} count${inner.length === 1 ? 's' : ''} as valence`;
 }
 
 /** e.g. 17 -> "3s² 3p⁵" — the outermost shell alone, which is what a periodic-table group has in common. */

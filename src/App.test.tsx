@@ -1746,6 +1746,22 @@ describe('App: relativity', () => {
             expect(readout(container)).toHaveTextContent('Solving the picture with spin–orbit… the picture on screen is still scalar-relativistic.');
         });
 
+        // Ruling P18 (D13): Help's About text (LevelNav variant="about") is
+        // whatever App passes it, so it must name the switch's mode -- not
+        // the stale picture's -- while also saying the picture is still the
+        // old one. Same scenario as the readout test just above (a spin–orbit
+        // solve in flight over a scalar picture), read through Help instead.
+        it('Help names the mode being solved for, and says the on-screen picture is still the old one', () => {
+            installMatchMedia(false);
+            renderWithProvider(<App />, {
+                mode: 'atom', Z: 79, relativityOverride: 'spinOrbit', isSolving: true, profile: scalarGold(),
+            });
+            fireEvent.click(screen.getByRole('button', { name: 'Help' }));
+            const dialog = screen.getByRole('dialog', { name: 'Help' });
+            expect(dialog).toHaveTextContent('radial Dirac equation');
+            expect(dialog).toHaveTextContent('The picture on screen is still scalar-relativistic; the one with spin–orbit is being solved.');
+        });
+
         it('says why a relativistic picture has no comparison', () => {
             installMatchMedia(false);
             const why = 'No non-relativistic comparison: LDA does not bind the 4f without relativity.';

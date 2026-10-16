@@ -1,4 +1,8 @@
-import { configurationFor, shellsFor, configurationLabel, subshellLabel } from '../../src/atom/configurations';
+import {
+    configurationFor, shellsFor, configurationLabel, subshellLabel,
+    valenceConfigurationLabelOf, valenceShellsOf, valenceNote,
+} from '../../src/atom/configurations';
+import { ionConfigurationFor } from '../../src/atom/ion_configurations';
 import { MAX_ATOMIC_NUMBER } from '../../src/elements';
 
 describe('electron configurations', () => {
@@ -93,5 +97,34 @@ describe('electron configurations', () => {
         [118, '1s² 2s² 2p⁶ 3s² 3p⁶ 3d¹⁰ 4s² 4p⁶ 4d¹⁰ 4f¹⁴ 5s² 5p⁶ 5d¹⁰ 5f¹⁴ 6s² 6p⁶ 6d¹⁰ 7s² 7p⁶'], // Og: [Rn] 5f14 6d10 7s2 7p6
     ] as Array<[number, string]>)('knows the full configuration of Z=%i', (Z, expected) => {
         expect(configurationLabel(Z)).toBe(expected);
+    });
+});
+
+// Ruling P14 (R-valence): valence is the outermost shell, plus any partly
+// filled (n-1)d or (n-2)f subshell beneath it -- a filled d/f subshell is
+// core, same as it always was, and so is a d/f subshell that happens to
+// still be open but sits two or more shells below the outermost one.
+describe('valence (ruling P14)', () => {
+    const label = (Z: number) => valenceConfigurationLabelOf(configurationFor(Z));
+
+    it.each([
+        [6, '2s² 2p²', null], [11, '3s¹', null], [17, '3s² 3p⁵', null],
+        [26, '3d⁶ 4s²', 'open 3d counts as valence'], [30, '4s²', null], [29, '4s¹', null], [24, '3d⁵ 4s¹', 'open 3d counts as valence'],
+        [58, '4f¹ 5d¹ 6s²', 'open 4f and 5d count as valence'], [64, '4f⁷ 5d¹ 6s²', 'open 4f and 5d count as valence'],
+        [70, '6s²', null], [71, '5d¹ 6s²', 'open 5d counts as valence'],
+        [91, '5f² 6d¹ 7s²', 'open 5f and 6d count as valence'], [92, '5f³ 6d¹ 7s²', 'open 5f and 6d count as valence'],
+    ])('Z=%i reads %s', (Z, expected, note) => {
+        expect(label(Z)).toBe(expected);
+        expect(valenceNote(configurationFor(Z))).toBe(note);
+    });
+
+    it('shell set spans every valence subshell', () => {
+        expect([...valenceShellsOf(configurationFor(91))].sort()).toEqual([5, 6, 7]);
+        expect([...valenceShellsOf(configurationFor(30))]).toEqual([4]);
+    });
+
+    it('the outermost shell is always whole, even when it ends in a filled d (Zn²⁺ = [Ar] 3d¹⁰)', () => {
+        expect(valenceConfigurationLabelOf(ionConfigurationFor(30, 2))).toBe('3s² 3p⁶ 3d¹⁰');
+        expect(valenceNote(ionConfigurationFor(30, 2))).toBeNull();
     });
 });

@@ -3,7 +3,7 @@ import { Box, Breadcrumbs, Link, Chip, Typography, Collapse, Button } from '@mui
 import { elementFor } from '../elements';
 import {
     SubshellOccupancy, configurationFor, shellsOf, configurationLabelOf, subshellLabel, subshellSpokenLabel,
-    valenceShellOf, valenceConfigurationLabelOf,
+    valenceShellsOf, valenceConfigurationLabelOf, valenceNote,
 } from '../atom/configurations';
 import { orbitalName } from '../orbital_names';
 import { methodStatement, type RelativityMode } from '../atom/relativity';
@@ -92,6 +92,15 @@ interface LevelNavProps {
      */
     relativity?: RelativityMode;
     /**
+     * Ruling P18: the Relativity switch's own effective mode -- what is
+     * being solved for, which during a re-solve (or with Help open while
+     * one is in flight) can be ahead of `relativity`, the mode actually
+     * drawn. Defaults to `relativity`, so every existing caller that only
+     * ever had one mode to report keeps describing that one mode exactly
+     * as before.
+     */
+    selectedRelativity?: RelativityMode;
+    /**
      * Whether a picture is on screen at all (final review M6): with none --
      * an unbound verdict, a failed solve -- About says nothing about "this
      * picture", whichever mode the switch is in. Defaults to true.
@@ -154,6 +163,29 @@ export function relativisticEnergiesSentence(mode: RelativityMode): string {
     }
 }
 
+const PICTURE_WORDS: Record<RelativityMode, string> = {
+    off: 'non-relativistic',
+    scalar: 'scalar-relativistic',
+    spinOrbit: 'the Dirac (spin–orbit) one',
+};
+const SELECTED_WORDS: Record<RelativityMode, string> = {
+    off: 'the non-relativistic one',
+    scalar: 'the scalar-relativistic one',
+    spinOrbit: 'the one with spin–orbit',
+};
+
+/**
+ * Ruling P18: when the Relativity switch (`selected`) has moved ahead of
+ * what is actually drawn (`picture`) -- a re-solve in flight, most often --
+ * About says so explicitly, rather than quietly describing the switch's
+ * method as if it were already on screen. Null when the two agree, which
+ * is the ordinary case and leaves the paragraph exactly as it was.
+ */
+export function aboutPictureSentence(selected: RelativityMode, picture: RelativityMode): string | null {
+    if (selected === picture) return null;
+    return `The picture on screen is still ${PICTURE_WORDS[picture]}; ${SELECTED_WORDS[selected]} is being solved.`;
+}
+
 interface Crumb {
     key: string;
     label: string;
@@ -194,8 +226,12 @@ const LevelNav: React.FC<LevelNavProps> = ({
     Z, selectedShell, selectedSubshell, selectedOrbital, onNavigate, onChangeElement, children,
     variant = 'full', configuration, speciesSymbol, speciesTitle, speciesControls, shellsUnavailable = false,
     relativity = 'off',
+    selectedRelativity,
     pictureShown = true,
 }) => {
+    // P18: what the switch is solving for. Ordinarily the same mode as
+    // `relativity` (the picture actually drawn) -- it only differs mid re-solve.
+    const effectiveSelectedRelativity = selectedRelativity ?? relativity;
     const [aboutOpen, setAboutOpen] = useState(false);
     // §13: the shells are one Tab stop with the arrow keys inside. Here, before
     // any early return, so the hook order never changes.
@@ -220,8 +256,11 @@ const LevelNav: React.FC<LevelNavProps> = ({
     // core. Showing the valence configuration on its own is what makes a
     // group visible as a group -- Li/Na/K all read ns¹, F/Cl both ns²np⁵,
     // Ne/Ar both ns²np⁶ -- without asserting any bonding model the app does
-    // not compute (see valenceShellOf).
-    const valenceN = valenceShellOf(speciesConfiguration);
+    // not compute. Ruling P14 extends this: a transition metal's or
+    // lanthanide/actinide's partly filled (n-1)d or (n-2)f is just as live
+    // chemically, so it counts as valence too (see valenceShellsOf).
+    const valenceShells = valenceShellsOf(speciesConfiguration);
+    const openValenceNote = valenceNote(speciesConfiguration);
 
     const crumbs: Crumb[] = [
         { key: 'atom', label: rootLabel, target: { level: 'atom' } },
@@ -361,8 +400,14 @@ const LevelNav: React.FC<LevelNavProps> = ({
             </Typography>
             <Typography variant="body2" className="level-nav-valence">
                 Valence: {valenceConfigurationLabelOf(speciesConfiguration)}
-                {/* Hydrogen and helium have one shell and so no core at all. */}
-                {shells.length > 1 && (
+                {/* Ruling P14: when an open d/f subshell below the outermost
+                    shell is itself counted as valence, that is what the note
+                    says instead -- "everything inside is core" would now be
+                    wrong. Hydrogen and helium have one shell and so no core
+                    at all, with or without a note. */}
+                {openValenceNote ? (
+                    <span className="level-nav-valence-note"> · {openValenceNote}</span>
+                ) : shells.length > 1 && (
                     <span className="level-nav-valence-note"> · everything inside is core</span>
                 )}
             </Typography>
@@ -370,7 +415,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
             <Box ref={shellsRef} className="level-nav-shells" role="group" aria-label="shells">
                 {shells.map(shell => {
                     const isSelected = selectedShell === shell.n;
-                    const isValence = shell.n === valenceN;
+                    const isValence = valenceShells.has(shell.n);
                     return (
                         <Chip
                             key={shell.n}
@@ -417,6 +462,9 @@ const LevelNav: React.FC<LevelNavProps> = ({
             </Typography>
         </>
     );
+    // P18: null while the switch and the drawn picture agree (the ordinary
+    // case), or while there is no picture to describe (ruling M6).
+    const pictureSentence = pictureShown ? aboutPictureSentence(effectiveSelectedRelativity, relativity) : null;
     const aboutText = (
         <>
             {/* The one-line method statement lives here with the rest of
@@ -424,7 +472,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 it made tall enough to push the controls below it under
                 the fold. */}
             <Typography variant="caption" className="level-nav-method" display="block">
-                {methodStatement(relativity)}
+                {methodStatement(effectiveSelectedRelativity)}
             </Typography>
             <Typography variant="body2" className="level-nav-about">
                 This is a central-field model: each electron moves in the
@@ -433,7 +481,8 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 sublevels rather than resolved into individual
                 determinants. Exchange and correlation come from the
                 local density approximation (LDA) with the VWN
-                correlation functional. {aboutRelativitySentence(relativity)} An ion or an excited atom uses
+                correlation functional. {aboutRelativitySentence(effectiveSelectedRelativity)}
+                {pictureSentence ? ` ${pictureSentence}` : ''} An ion or an excited atom uses
                 the same model with its own electron count or one
                 electron moved; ionisation and excitation energies are
                 ΔSCF differences of total energies from the
@@ -441,7 +490,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 eigenvalues. The picture on screen is drawn from a
                 simpler, spin-restricted form of that LDA, and in it
                 most anions — Cl⁻ included — have no bound state for
-                their extra electron at all.{pictureShown ? relativisticEnergiesSentence(relativity) : ''} The individual s/p/d/f
+                their extra electron at all.{pictureShown ? relativisticEnergiesSentence(effectiveSelectedRelativity) : ''} The individual s/p/d/f
                 lobes you can select below are a basis choice, not
                 separate physical objects: a partially filled subshell's
                 electrons are smeared uniformly over all of it, not
