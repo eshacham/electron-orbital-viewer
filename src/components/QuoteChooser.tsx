@@ -71,23 +71,20 @@ function OptionCard({ option, chosen }: { option: QuoteOption; chosen: boolean }
 }
 
 /** Each line's estimate and maximum, and how it is worked out, for the option chosen. */
+// Ruling P13: the four-column table clipped its notes in a 300 px panel; the lines are stacked now.
 function LineDetails({ option }: { option: AvailableQuoteOption }) {
     return (
         <details className="quote-details">
             <summary>What makes up the price</summary>
-            <table className="quote-lines" aria-label={`${optionLabel(option.option)} price, line by line`}>
-                <thead><tr><th scope="col">Item</th><th scope="col">Estimated</th><th scope="col">Up to</th><th scope="col">How</th></tr></thead>
-                <tbody>
-                    {option.lines.map(line => (
-                        <tr key={line.item}>
-                            <th scope="row">{line.label}</th>
-                            <td>{formatUsd(line.estimateUsd)}</td>
-                            <td>{formatUsd(line.maximumUsd)}</td>
-                            <td className="quote-option-note">{line.note}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            <ul className="quote-lines" aria-label={`${optionLabel(option.option)} price, line by line`}>
+                {option.lines.map(line => (
+                    <li key={line.item} className="quote-line">
+                        <span className="quote-line-item">{line.label}</span>
+                        <span className="quote-line-amounts">estimated {formatUsd(line.estimateUsd)} · up to {formatUsd(line.maximumUsd)}</span>
+                        <span className="quote-line-note">{line.note}</span>
+                    </li>
+                ))}
+            </ul>
         </details>
     );
 }

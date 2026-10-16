@@ -1524,8 +1524,12 @@ html, body, #root {
 .quote-option-note { color: var(--ql-color-text-2); font-size: 0.75rem; }
 .quote-option-unavailable { color: var(--ql-color-warning); font-size: 0.75rem; }
 .quote-details summary { cursor: pointer; font-weight: 600; }
-.quote-lines { border-collapse: collapse; margin-top: 4px; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
-.quote-lines th, .quote-lines td { text-align: left; vertical-align: top; padding: 2px 6px 2px 0; }
+/* Ruling P13 / R-pricebreakdown: stacked lines, not a four-column table -- the table clipped its notes in a 300 px panel. */
+.quote-lines { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; font-size: var(--ql-type-caption-size); font-variant-numeric: tabular-nums; }
+.quote-line { display: grid; gap: 1px; min-width: 0; }
+.quote-line-item { font-weight: 600; color: var(--ql-color-text-1); }
+.quote-line-amounts { color: var(--ql-color-text-2); }
+.quote-line-note { color: var(--ql-color-text-3); overflow-wrap: anywhere; }
 .quote-reference { margin: 0; }
 .job-cost-lines { margin: 4px 0; padding-left: 18px; font-size: 0.75rem; }
 
