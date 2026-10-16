@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import LevelNav, { aboutRelativitySentence, aboutPictureSentence } from '../../src/components/LevelNav';
+import LevelNav, { aboutRelativitySentence, aboutPictureSentence, relativisticEnergiesSentence } from '../../src/components/LevelNav';
 import { methodStatement, type RelativityMode } from '../../src/atom/relativity';
 
 /**
@@ -44,6 +44,22 @@ describe('LevelNav "About this model" follows the Relativity switch (ruling P18)
     it('never says "no spin-orbit" once spin–orbit actually is the selected and drawn mode', () => {
         const text = renderAbout('spinOrbit', 'spinOrbit');
         expect(text).not.toContain('no spin-orbit');
+    });
+
+    // Ruling T2-picturesentence (review fix round 1): relativisticEnergiesSentence
+    // describes the sphere actually drawn ("This picture is/includes…"), so
+    // it must read the DRAWN mode even while the switch is ahead of it --
+    // reading the selected mode here would have the paragraph claim the
+    // on-screen picture both "is still scalar-relativistic" (aboutPictureSentence)
+    // and, two sentences later, "includes spin–orbit coupling" for the same picture.
+    it('never claims the drawn picture includes spin-orbit while the switch is still solving for it', () => {
+        const text = renderAbout('spinOrbit', 'scalar');
+        // The drawn picture's own (scalar) ΔSCF sentence is present...
+        expect(text).toContain(relativisticEnergiesSentence('scalar').trim());
+        // ...and the selected mode's (spin-orbit) ΔSCF sentence, which would
+        // contradict it, is absent.
+        expect(text).not.toContain(relativisticEnergiesSentence('spinOrbit').trim());
+        expect(text).not.toContain('This picture includes spin–orbit');
     });
 });
 

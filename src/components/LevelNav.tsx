@@ -490,7 +490,14 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 eigenvalues. The picture on screen is drawn from a
                 simpler, spin-restricted form of that LDA, and in it
                 most anions — Cl⁻ included — have no bound state for
-                their extra electron at all.{pictureShown ? relativisticEnergiesSentence(effectiveSelectedRelativity) : ''} The individual s/p/d/f
+                {/* Ruling T2-picturesentence: this sentence is "This picture
+                    is/includes…", describing the sphere actually drawn, so it
+                    reads `relativity` (the drawn picture's mode) -- never the
+                    selected mode, or it would contradict aboutPictureSentence
+                    above while a re-solve is in flight (selected spin-orbit,
+                    drawn scalar: "still scalar-relativistic" followed by
+                    "This picture includes spin-orbit" is self-contradictory). */}
+                their extra electron at all.{pictureShown ? relativisticEnergiesSentence(relativity) : ''} The individual s/p/d/f
                 lobes you can select below are a basis choice, not
                 separate physical objects: a partially filled subshell's
                 electrons are smeared uniformly over all of it, not

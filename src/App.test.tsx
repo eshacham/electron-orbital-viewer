@@ -1760,6 +1760,13 @@ describe('App: relativity', () => {
             const dialog = screen.getByRole('dialog', { name: 'Help' });
             expect(dialog).toHaveTextContent('radial Dirac equation');
             expect(dialog).toHaveTextContent('The picture on screen is still scalar-relativistic; the one with spin–orbit is being solved.');
+            // Ruling T2-picturesentence (review fix round 1): the ΔSCF sentence
+            // describes the drawn (scalar) picture, never the selected
+            // (spin-orbit) one -- otherwise the dialog would contradict the
+            // "still scalar-relativistic" sentence just above by also
+            // claiming the same on-screen picture includes spin-orbit.
+            expect(dialog).toHaveTextContent('This picture is scalar-relativistic; the ΔSCF energies are not');
+            expect(dialog).not.toHaveTextContent('This picture includes spin–orbit');
         });
 
         it('says why a relativistic picture has no comparison', () => {
