@@ -823,13 +823,19 @@ describe('App', () => {
             // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
             fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'h2plus', R: 2, state: '1sigma_g' });
-            expect(screen.getByText(/Exact within Born–Oppenheimer/)).toBeInTheDocument();
             expect(screen.getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
             // Layout contract §3.8: the panel down the left, the curve under the controls on the right.
             expect(container.querySelector('.side-panel .bonds-panel')).not.toBeNull();
-            expect(within(container.querySelector('.view-panel') as HTMLElement)
-                .getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
+            const inspector = container.querySelector('.view-panel') as HTMLElement;
+            expect(within(inspector).getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
             expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ψ > 0');
+            // Phase 6G-2 Task 9 (ruling P19): the methods list ("Exact within
+            // Born–Oppenheimer …") moved out of BondsPanel's Explore column
+            // into the inspector's Data tab -- "where this comes from" data,
+            // not navigation, and never duplicated into the side panel.
+            fireEvent.click(within(inspector).getByRole('tab', { name: 'Data' }));
+            expect(within(inspector).getByText(/Exact within Born–Oppenheimer/)).toBeInTheDocument();
+            expect(container.querySelector('.side-panel')?.textContent).not.toMatch(/Exact within Born–Oppenheimer/);
         });
 
         // Ruling C7: the curve's worker exists only while Bonds shows H₂⁺.

@@ -84,7 +84,8 @@ import { downloadBlob } from './export/download';
 import { ViewerExportHandle } from './export/handle';
 import { CubeWorkerHandle } from './export/cube_request';
 import { createExportWorker } from './workers/createExportWorker';
-import BondsPanel from './components/BondsPanel';
+import BondsExplore from './bonds_ui/BondsExplore';
+import BondsInspector from './bonds_ui/BondsInspector';
 import BondsCurvePlot from './components/BondsCurvePlot';
 import { useBondsData } from './bonds/useBondsData';
 import { useH2PlusCurve } from './bonds/useH2PlusCurve';
@@ -1266,9 +1267,10 @@ function App() {
 
     // Bonds mode's navigation (layout contract §3.8): the desktop's left
     // column, the phone's Explore tab. The curve is not in it -- it goes
-    // where every mode's plot goes (renderRadialPlot).
-    const bondsPanel = (
-        <BondsPanel
+    // where every mode's plot goes (renderRadialPlot); the frontier line,
+    // caveats and methods list are the inspector's (Task 9, bondsInspector below).
+    const bondsExplore = (
+        <BondsExplore
             bonds={bonds}
             data={bondsData}
             note={bondsNote}
@@ -1285,7 +1287,7 @@ function App() {
     // Combination picker -- replaces the old n/l/mₗ selects and Update
     // Orbital button. One element, reused on the desktop (inside the shared
     // ExplorePanel below) and on the phone (ahead of the view half, in the
-    // sheet's "Orbital & view" tab), exactly as `bondsPanel` and `controls` are.
+    // sheet's "Orbital & view" tab), exactly as `bondsExplore` and `controls` are.
     const basicExplore = (
         <BasicExplore
             selection={{ n, l, ml }}
@@ -1428,6 +1430,20 @@ function App() {
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
+    // Bonds mode's inspector (spec §9.3, Phase 6G-2 Task 9): the same
+    // Display-above-Plot-and-Data composition as Atom's and Basic Orbitals',
+    // with `controls` (the view settings Bonds and Molecules share,
+    // `inspectorDisplay` below) heading it, exactly as it headed the plain
+    // Inspector this replaces. Plot is `renderRadialPlot` (BondsCurvePlot),
+    // unchanged; Data is the frontier line, caveats and methods list that
+    // used to sit under the MO diagram in BondsPanel (ruling P19).
+    const bondsInspector = (variant: 'docked' | 'drawer' | 'stacked') => (
+        <BondsInspector variant={variant} display={variant === 'stacked' ? undefined : controls}
+            open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
+            bonds={bonds} data={bondsData}
+            plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)} />
+    );
+
     // Ruling R22c (owner review 2026-10-14): the hover/pick readout moves off
     // the canvas into a stable Explore-panel section -- desktop's panel and
     // the phone's Explore tab both scroll on their own (never the canvas),
@@ -1476,9 +1492,10 @@ function App() {
         ]
         : isBondsMode
         ? [
-            { key: 'explore', label: 'Explore', content: bondsPanel },
+            { key: 'explore', label: 'Explore', content: bondsExplore },
             { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
-            { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
+            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
+            { key: 'plot', label: 'Plot', content: bondsInspector('stacked') },
         ]
         : isAtomMode
         ? [
@@ -1575,7 +1592,7 @@ function App() {
         />
     );
 
-    const exploreContent = isBondsMode ? bondsPanel
+    const exploreContent = isBondsMode ? bondsExplore
         // Ruling R22c: the readout's section sits under the navigator (the
         // brief's own placement). Ruling R23f-2: "How this was computed"
         // (MoleculeProvenanceFooter, pinned) sits outside the scrolling part
@@ -1824,7 +1841,7 @@ function App() {
                 <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} onClose={closeTable} />
             )}
             {phoneChrome}
-            {isMedium && (isAtomMode ? atomInspector('drawer') : isBasicMode ? basicInspector('drawer') : (
+            {isMedium && (isAtomMode ? atomInspector('drawer') : isBasicMode ? basicInspector('drawer') : isBondsMode ? bondsInspector('drawer') : (
                 <Inspector variant="drawer" top={inspectorDisplay} body={inspectorBody} open={viewPanelOpen}
                     onOpenChange={open => setViewPanelOpen(() => open)} />
             ))}
@@ -1892,7 +1909,7 @@ function App() {
                 explore={isAtomMode ? atomExplore : (
                     <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
                 )}
-                inspector={isAtomMode ? atomInspector('docked') : isBasicMode ? basicInspector('docked')
+                inspector={isAtomMode ? atomInspector('docked') : isBasicMode ? basicInspector('docked') : isBondsMode ? bondsInspector('docked')
                     : <Inspector variant="docked" top={inspectorDisplay} body={inspectorBody} />}
                 viewport={viewport}
                 shellRef={shellRef}

@@ -15,7 +15,25 @@ function frontierOccupiedIndex(orbitals: readonly MoleculeOrbitalInfo[]): number
     return (orbitals.find(o => o.role === 'HOMO') ?? orbitals.find(o => o.role === 'SOMO'))?.index ?? null;
 }
 
-interface BondsPanelProps {
+/**
+ * The frontier line, the near-tie caveats and the method captions -- Bonds
+ * mode's "where this comes from" data (spec §3.1), read by BondsInspector's
+ * Data tab (Phase 6G-2 Task 9). Pulled out of the panel itself so the
+ * Explore column (this file) stays navigation -- what to draw -- and the
+ * inspector holds how it was computed, the same split every other mode's
+ * Plot | Data inspector keeps.
+ */
+export function bondsDataLines(bonds: Pick<BondsState, 'system'>, data: BondsData): { frontier: string | null; caveats: string[]; captions: string[] } {
+    const isExact = bonds.system === 'h2plus';
+    const { scan, meta } = data;
+    return {
+        frontier: !isExact && meta ? frontierText(meta.orbitals) : null,
+        caveats: isExact ? [] : orbitalCaveats(meta),
+        captions: bondsCaptions(bonds.system, scan),
+    };
+}
+
+export interface BondsPanelProps {
     bonds: BondsState;
     data: BondsData;
     /** Why the drawn picture differs from the selection, if it does. */
@@ -77,8 +95,6 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
         : meta && meta.bondOrder === null
             ? withFullStop(heteronuclearBondOrderText(TEXTBOOK_BOND_ORDER[bonds.system]))
             : withFullStop(bondOrderText(meta?.bondOrder));
-    const frontier = !isExact && meta ? frontierText(meta.orbitals) : null;
-    const caveats = isExact ? [] : orbitalCaveats(meta);
     const densityMethod = scan?.densityMethod ?? meta?.method.density ?? null;
     // Whether a surface is one envelope or splits around each nucleus, read
     // off the density drawn (≈ 200 basis evaluations, once per point).
@@ -199,12 +215,6 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                         onSelect={index => onView(viewForIndex(index))} />
                 </div>
             )}
-            {frontier && <Typography variant="caption" className="bonds-frontier">{frontier}</Typography>}
-            {caveats.map(caveat => <Typography key={caveat} variant="caption" className="bonds-note">{caveat}</Typography>)}
-
-            <ul className="bonds-captions" aria-label="methods">
-                {bondsCaptions(bonds.system, scan).map(caption => <li key={caption}>{caption}</li>)}
-            </ul>
         </div>
     );
 };

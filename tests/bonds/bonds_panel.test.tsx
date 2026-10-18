@@ -228,7 +228,9 @@ describe('BondsPanel', () => {
         fireEvent.click(screen.getByRole('button', { name: /1σu\* \(1 of 1\)/ }));
         expect(handlers.onView).toHaveBeenCalledWith({ kind: 'mo', label: '1σu*', spin: 'restricted', component: 0 });
         expect(screen.getByText(/E = −5\.80000 Ha, FCI\/aug-cc-pVTZ \(no counterpoise correction\)/)).toBeInTheDocument();
-        expect(screen.getByText('HOMO 1σu* (ε = −0.550 Ha)')).toBeInTheDocument();
+        // The frontier line ("HOMO 1σu* …") moved to BondsInspector's Data tab
+        // (Phase 6G-2 Task 9, ruling P19): BondsPanel is navigation now, not
+        // "where this comes from" data. See bonds_inspector.test.tsx.
     });
 
     it("snaps a molecule's R slider to the scan's points", () => {
@@ -292,15 +294,12 @@ describe('BondsPanel', () => {
         expect(screen.getByText(/3σu\* is not among the orbitals kept/)).toBeInTheDocument();
     });
 
-    it('lists the captions and the near-tie caveat under the diagram', () => {
-        const meta = { ...n2Meta, orbitals: n2Meta.orbitals.map(o => (o.label === '3σu*'
-            ? { ...o, nearTie: { minaoWeight: 0.3484, runnerUpMinaoWeight: 0.316, runnerUpEnergyHartree: 0.2243 } } : o)) };
-        render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta }} note={null} {...handlers} />);
-        const list = screen.getByRole('list', { name: 'methods' });
-        expect(within(list).getByText(/not valid beyond R = 2\.41 a₀/)).toBeInTheDocument();
-        expect(screen.getByText(/3σu\*: this orbital's shape mixes with another σ virtual of the same symmetry/)).toBeInTheDocument();
-        expect(screen.getByText(/Bond order 3\./)).toBeInTheDocument();
-    });
+    // The methods list and the near-tie caveat moved to BondsInspector's Data
+    // tab (Phase 6G-2 Task 9, ruling P19) -- see bonds_inspector.test.tsx's
+    // "lists the captions and the near-tie caveat" test. The footer this test
+    // also checked ("Bond order 3.") is still BondsPanel's own (MoDiagram's
+    // footer prop, unchanged) and stays covered by "leaves a homonuclear
+    // molecule's footer as it was" below.
 
     // Ruling R23e: the list stays molecules, grouped by bond type, each with its bond order.
     describe('the System select', () => {

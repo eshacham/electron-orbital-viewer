@@ -1,0 +1,40 @@
+/* src/bonds_ui/bonds_explore.css -- Bonds' Explore panel header tile (spec
+   §9.3, Phase 6G-2 Task 9): a light surface-3 card, the same family as the
+   Atom screen's element tile (src/atom_ui/element_tile.css) and Basic
+   Orbitals' (src/basic_ui/basic_explore.css), but laid out as a simple
+   stack -- the group line's text length varies by system, unlike those
+   fixed 88 x 96 tiles. */
+.bonds-explore {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bonds-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--ql-radius-lg);
+  background: var(--ql-color-surface-3);
+  color: var(--ql-color-text-1);
+  font-family: var(--ql-font-sans);
+}
+.bonds-tile-formula {
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 600;
+}
+.bonds-tile-name {
+  font-size: var(--ql-type-body-size);
+  line-height: var(--ql-type-body-line);
+}
+.bonds-tile-group,
+.bonds-tile-order {
+  font-size: var(--ql-type-caption-size);
+  line-height: 16px;
+  color: var(--ql-color-text-2);
+}
+.bonds-tile-chip {
+  align-self: flex-start;
+  margin-top: 4px;
+}
