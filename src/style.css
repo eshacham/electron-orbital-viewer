@@ -779,12 +779,23 @@ html, body, #root {
 }
 /* Phase 6G-2 (P16): a chip's label + occupancy + energy no longer truncate
    in a narrow inspector -- the chip grows and the energy wraps onto its own
-   line instead. */
+   line instead. `!important` on height: MUI's own .MuiChip-root rule is the
+   same single-class specificity and can land after this one in the cascade,
+   so without it the root stayed pinned to its one-line height and the
+   wrapped second (energy) line spilled below the chip's background instead
+   of growing it (live check after the first pass, Carbon 2p_z). The label's
+   own padding is horizontal only by default; vertical padding is added here
+   so two lines sit with even breathing room instead of touching the top and
+   bottom edges. border-radius is already RADIUS.sm (theme.ts's MuiChip
+   override, 6px) for every chip, one- or two-line, so no token change is
+   needed there for a taller pill. */
 .subshell-chip {
-  height: auto;
+  height: auto !important;
 }
 .subshell-chip .MuiChip-label {
   white-space: normal;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 .subshell-chip-content {
   display: flex;
