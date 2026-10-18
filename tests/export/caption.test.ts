@@ -58,10 +58,13 @@ describe('export captions', () => {
         expect(level2).not.toContain('F << 1 a.u.');
     });
 
-    // Final review I1: in Basic Orbitals the fraction only takes effect on
-    // Update Orbital, so until then the caption names the drawn contour, not
-    // the panel's. Combinations redraw as the fraction changes, so they
-    // follow the panel at once.
+    // Final review I1: in Basic Orbitals the fraction only takes effect once it is
+    // actually drawn, so until then the caption names the drawn contour, not the
+    // panel's. Combinations redraw as the fraction changes, so they follow the
+    // panel at once.
+    // Ruling P3: chips draw on selection; Update Orbital is gone. This test dispatches
+    // startOrbitalCalculation/setEnclosedFraction directly (no UI), so the drawn-vs-chosen
+    // distinction it pins is unaffected by chips replacing Update Orbital's button press.
     it('names the contour drawn, not one the panel has not applied yet', () => {
         const store = makeStore();
         store.dispatch(setMode('hydrogenic'));

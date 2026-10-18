@@ -167,10 +167,12 @@ export const CANVAS_BACKDROPS: Record<ThemeMode, string[]> = {
 };
 
 /** Sizes in px (§4.4, §7, §8). */
-// Final review B, M2 (and A, M9): labelGap, chip, input, thumbPhone, keyBar, iconRail and
+// Final review B, M2 (and A, M9): labelGap, input, thumbPhone, keyBar, iconRail and
 // iconButton were emitted into tokens.css and used nowhere (grep over src/**/*.{css,tsx,ts}) --
 // leftovers from the pre-R23a rail and earlier layout passes. Removed so the generated
-// sheet stays honest; re-add a role here (not just in CSS) if it is needed again.
+// sheet stays honest; re-add a role here (not just in CSS) if it is needed again. `chip` was
+// one of them too; Phase 6G-2 Task 6 re-adds it, now genuinely used (BasicExplore's n /
+// subshell / orbital rows, spec §4.4).
 export const LAYOUT = {
     topBar: 56,
     phoneTopBar: 52,
@@ -185,6 +187,7 @@ export const LAYOUT = {
     controlRow: 28,
     search: 36,
     touch: 44,
+    chip: 32,
     elementTileWidth: 88,
     elementTileHeight: 96,
     /** Ruling R23d: the periodic-table miniature beside the element tile, 140-170 px wide. */

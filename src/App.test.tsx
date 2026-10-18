@@ -10,7 +10,7 @@ import moleculeReducer from './store/moleculeSlice';
 import jobsReducer from './store/jobsSlice';
 import bondsReducer, { setDensityIso, setH2PlusR, setBondsView, setScanPoint, selectBondsSystem } from './store/bondsSlice';
 import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView, setElement } from './store/atomSlice';
-import { setSurfaceStyle, setBasicSelection, requestCut, finishOrbitalCalculation } from './store/orbitalSlice';
+import { setSurfaceStyle, setBasicSelection, requestCut, finishOrbitalCalculation, startOrbitalCalculation } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
 import { basicOrbitalParams, computeSamplingRadius, SHELL_VIEW_CUT_AXIS, DEFAULT_ENCLOSED_FRACTION } from './orbital_presets';
@@ -27,6 +27,7 @@ import { hintPref } from './design/presentation';
 import { MEDIUM_VIEWPORT } from './useMediaQuery';
 import * as downloadModule from './export/download';
 import { readBlob } from '../tests/export/fixtures';
+import { DRAW_DEBOUNCE_MS } from './basic_ui/useDrawOnSelection';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -252,13 +253,15 @@ describe('App', () => {
         expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
     });
 
-    it('switching to Basic Orbitals restores the n/l/mL panel, with no element control of its own', () => {
+    // Ruling P3: chips draw on selection; Update Orbital is gone. The n/l/mL selects
+    // became BasicExplore's chip rows (Phase 6G-2 Task 6).
+    it('switching to Basic Orbitals restores the n / subshell / orbital chips, with no element control of its own', () => {
         renderWithProvider(<App />);
 
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
 
-        expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
-        expect(screen.getByRole('combobox', { name: /Angular \(l\)/i })).toBeInTheDocument();
+        expect(screen.getByRole('group', { name: /energy level/i })).toBeInTheDocument();
+        expect(screen.getByRole('group', { name: /^subshell/i })).toBeInTheDocument();
         // Addendum 2's mode rename: no second element control, Z fixed at 1
         // -- but the one-electron framing still stated outright (spec §7).
         expect(screen.queryByRole('combobox', { name: /Nucleus/i })).not.toBeInTheDocument();
@@ -508,6 +511,41 @@ describe('App', () => {
         });
     });
 
+    // Ruling P3 / plan step 5: the phone sheet reuses BasicExplore itself, ahead of the
+    // view half, in the one "Orbital & view" tab (Basic Orbitals has no drill-down to
+    // give the chips a tab of their own).
+    it('on a phone, puts the chips and the combination picker ahead of the view settings in one "Orbital & view" tab', () => {
+        installMatchMedia(true);
+        renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // spec §9.8
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Orbital & view' }));
+        const panel = screen.getByRole('tabpanel');
+        const chips = within(panel).getByRole('group', { name: /energy level/i });
+        const opacity = within(panel).getByRole('slider', { name: 'surface opacity' });
+        expect(chips.compareDocumentPosition(opacity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(within(panel).getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
+    });
+
+    // Plan step 5 / ruling P3: useDrawOnSelection's debounce never fires on mount, so
+    // entering the mode (the nonce effect's own draw) must not be followed by a second,
+    // redundant draw 150 ms later for the very same, unchanged selection.
+    it('entering the mode draws once (nonce), not twice', () => {
+        jest.useFakeTimers();
+        try {
+            const { store } = renderWithProvider(<App />);
+            const dispatchSpy = jest.spyOn(store, 'dispatch');
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+            const drawsAtEntry = dispatchSpy.mock.calls.filter(([action]) => action.type === startOrbitalCalculation.type).length;
+            expect(drawsAtEntry).toBe(1);
+            act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+            const drawsAfterWaiting = dispatchSpy.mock.calls.filter(([action]) => action.type === startOrbitalCalculation.type).length;
+            expect(drawsAfterWaiting).toBe(1);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
     describe('Basic Orbitals combinations', () => {
         const chooseCombination = (option: string | RegExp) => {
             fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
@@ -539,8 +577,9 @@ describe('App', () => {
             expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'polarized1s', field: 0.03 });
         });
 
-        // Ruling T20b-enclosed: the inspector's enclosed fraction applies on change, with the dispatch Update Orbital sends.
-        it('redraws the orbital in the panel when the enclosed fraction changes, as Update Orbital would', () => {
+        // Ruling T20b-enclosed: the inspector's enclosed fraction applies on change, with the
+        // same dispatch a chip's own debounced draw sends (ruling P3: Update Orbital is gone).
+        it('redraws the orbital in the panel when the enclosed fraction changes', () => {
             const { store } = renderWithProvider(<App />);
             fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             const { n, l, ml } = store.getState().orbital.basicSelection;
@@ -1423,16 +1462,21 @@ describe('App: shell', () => {
 
     // Ruling R20b (owner decision): Basic Orbitals keeps its choice of orbital in Explore and puts its view
     // settings in the inspector, above the plot -- where Bonds and Molecules have theirs.
-    it('in Basic Orbitals, puts n/l/mₗ and Update Orbital in Explore, and the view settings in the inspector', () => {
+    // Ruling P3: chips draw on selection; Update Orbital is gone. BasicExplore's chips
+    // (and the combination picker it now renders itself) replace the old n/l/mₗ selects
+    // and Update Orbital button in Explore; the view settings stay in the inspector.
+    it('in Basic Orbitals, puts the n / subshell / orbital chips and the combination picker in Explore, and the view settings in the inspector', () => {
         const { container } = renderWithProvider(<App />);
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         const explore = screen.getByRole('complementary', { name: 'Explore' });
         const inspector = screen.getByRole('complementary', { name: 'Inspector' });
-        for (const name of [/Principal \(n\)/i, /Angular \(l\)/i, /Magnetic/i, /combination/i]) {
-            expect(within(explore).getByRole('combobox', { name })).toBeInTheDocument();
-            expect(within(inspector).queryByRole('combobox', { name })).toBeNull();
+        for (const name of [/energy level/i, /^subshell/i, /^orbital/i]) {
+            expect(within(explore).getByRole('group', { name })).toBeInTheDocument();
+            expect(within(inspector).queryByRole('group', { name })).toBeNull();
         }
-        expect(within(explore).getByRole('button', { name: 'Update Orbital' })).toBeInTheDocument();
+        expect(within(explore).getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
+        expect(within(inspector).queryByRole('combobox', { name: /combination/i })).toBeNull();
+        expect(within(explore).queryByRole('button', { name: 'Update Orbital' })).toBeNull();
         expect(within(explore).getByText(/one electron, Z = 1/i)).toBeInTheDocument();
         expect(within(inspector).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
         expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
@@ -1442,7 +1486,11 @@ describe('App: shell', () => {
         // The settings sit above the plot, as in Bonds' inspector.
         const opacity = within(inspector).getByRole('slider', { name: 'surface opacity' });
         expect(opacity.compareDocumentPosition(inspector.querySelector('.radial-plot')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // Preflight D30 / ruling P3: the selection half no longer renders in Basic
+        // Orbitals at all, so the view half (in the inspector) carries #controls now --
+        // still exactly one on the page.
         expect(container.querySelectorAll('#controls')).toHaveLength(1);
+        expect(inspector.querySelector('#controls')).not.toBeNull();
     });
 
     it("in Basic Orbitals, the inspector's opacity slider commits the same setSurfaceStyle as before", () => {

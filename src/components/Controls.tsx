@@ -6,7 +6,6 @@ import {
   Select,
   MenuItem,
   TextField,
-  Button,
   SelectChangeEvent,
   ToggleButton,
   ToggleButtonGroup,
@@ -19,10 +18,8 @@ import {
 import { OrbitalParams, RenderMode, ClipAxis, SurfaceStyle } from '@/types/orbital';
 import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../orbital_presets';
 import { ELEMENTS, elementLabel } from '../elements';
-import { orbitalName } from '../orbital_names';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
-import CombinationControls from './CombinationControls';
-import { CombinationSelection, NO_COMBINATION, combinationTitle, selectionProblem } from '../combinations';
+import { CombinationSelection, NO_COMBINATION } from '../combinations';
 import { RelativityMode, shortMethodLabel } from '../atom/relativity';
 import type { ValenceSContraction } from '../atom/relativistic_comparison';
 
@@ -54,15 +51,23 @@ interface ControlsProps {
   /** Slot for SubshellPanel at level 2; empty otherwise. Keeps this component ignorant of atomSlice/SubshellPanel specifics. */
   children?: React.ReactNode;
 
+  /**
+   * Basic Orbitals' n/l/mₗ (Redux state, `state.orbital.basicSelection`):
+   * read here only by the inspector's enclosed-fraction select, which still
+   * draws through `onUpdateOrbital` for the *current* selection (ruling
+   * T20b-enclosed) -- the selection itself is chosen in `BasicExplore` now
+   * (Phase 6G-2 Task 6, ruling P3), not here.
+   */
   initialN: number;
-  onNChange: (value: number) => void;
   initialL: number;
-  onLChange: (value: number) => void;
   initialMl: number;
-  onMlChange: (value: number) => void;
-  /** Basic Orbitals' hybrid / electric-field choice (spec §5 Phase 1). Defaults to none, which is exactly the old panel. */
+  /**
+   * Basic Orbitals' hybrid / electric-field choice (spec §5 Phase 1):
+   * read here only to gate `handleEnclosedFraction` below (a combination
+   * redraws on the fraction by itself, in App) -- `BasicExplore` renders
+   * `CombinationControls` itself now.
+   */
   combination?: CombinationSelection;
-  onCombinationChange?: (selection: CombinationSelection) => void;
   initialEnclosedFraction: number;
   onEnclosedFractionChange: (value: number) => void;
   /** The density contour the last render actually used, or null before one. */
@@ -80,11 +85,13 @@ interface ControlsProps {
   hideSurfaceStyle?: boolean;
   /**
    * Which half of the panel to draw (ruling R20b): 'selection' is what is
-   * drawn -- n/l/mₗ, the combination, the Z = 1 note, Update Orbital (and in
-   * atom mode the Relativity switch and element picker); 'view' is how it is
-   * shown -- the enclosed fraction, the children, Surface, Opacity, Cut away
-   * and the busy bar. 'all' (the default) is both, in today's order. Basic
-   * Orbitals puts its selection in Explore and its view in the inspector.
+   * drawn -- in atom mode the Relativity switch and element picker; 'view'
+   * is how it is shown -- the enclosed fraction, the children, Surface,
+   * Opacity, Cut away and the busy bar. 'all' (the default) is both, in
+   * today's order. Basic Orbitals' own selection (n/l/mₗ, the combination,
+   * the Z = 1 note, the chips that replaced Update Orbital) moved to
+   * `BasicExplore` entirely (Phase 6G-2 Task 6, ruling P3) -- 'selection' in
+   * Basic Orbitals mode renders nothing now.
    */
   part?: 'all' | 'selection' | 'view';
 
@@ -283,10 +290,6 @@ const ReadoutContent: React.FC<{ content: string | WhatChangedParts | null }> = 
   );
 };
 
-/** Spec §7's one-electron framing, said under the Basic Orbitals controls and in Help. */
-export const BASIC_ORBITALS_ABOUT = 'One electron, Z = 1 — the exact solution, and the idealised shape every multi-electron orbital '
-  + 'is a distortion of. Pick an element in Atom mode for a real, many-electron atom.';
-
 /** Phase 1's CombinationControls: MUI upper-cases button text, which "With spin–orbit" does not survive. */
 const KEEP_CASE = { '& .MuiToggleButton-root': { textTransform: 'none' } } as const;
 
@@ -337,10 +340,10 @@ const Controls: React.FC<ControlsProps> = ({
   onAtomElementChange,
   showElementPicker = true,
   children,
-  initialN, onNChange,
-  initialL, onLChange,
-  initialMl, onMlChange,
-  combination = NO_COMBINATION, onCombinationChange,
+  initialN,
+  initialL,
+  initialMl,
+  combination = NO_COMBINATION,
   initialEnclosedFraction, onEnclosedFractionChange,
   isoLevel,
   onUpdateOrbital,
@@ -360,9 +363,10 @@ const Controls: React.FC<ControlsProps> = ({
   isoNote,
 }) => {
   const isAtomMode = mode === 'atom';
-  // Basic Orbitals' own controls (n/l/mₗ, combinations, Update Orbital, the
-  // Z = 1 note) belong to that mode alone, not to "not atom mode": Bonds is
-  // a third mode with none of them.
+  // Basic Orbitals' chosen fraction still redraws through this component
+  // (handleEnclosedFraction below); its selection itself (n/l/mₗ,
+  // combinations, the chips that replaced Update Orbital, the Z = 1 note)
+  // belongs to `BasicExplore` now (Phase 6G-2 Task 6, ruling P3).
   const isBasicMode = mode === 'hydrogenic';
   const showSelection = part !== 'view';
   const showView = part !== 'selection';
@@ -384,22 +388,6 @@ const Controls: React.FC<ControlsProps> = ({
   // entirely -- the selects stay visible but frozen, so the way back to a
   // single orbital is obvious rather than a control that vanished.
   const combinationActive = combination.kind !== 'none';
-  // The dropdown options follow from n and l directly. They were state
-  // seeded for n = 3 and corrected in an effect, so the first render of any
-  // other selection (a restored link's 4f, say) handed MUI an out-of-range
-  // value for a frame.
-  const lOptions = React.useMemo(() => Array.from({ length: initialN }, (_, i) => i), [initialN]);
-  const mlOptions = React.useMemo(() => Array.from({ length: 2 * initialL + 1 }, (_, i) => i - initialL), [initialL]);
-
-  // If the current l is not valid for a new n, reset it; ml follows from the l effect.
-  // The selects' own part does this, so a split panel corrects once (ruling R20b).
-  useEffect(() => {
-    if (showSelection && !lOptions.includes(initialL)) onLChange(lOptions[0] ?? 0);
-  }, [lOptions, onLChange]); // initialL is intentionally not here to avoid loops if L is reset
-
-  useEffect(() => {
-    if (showSelection && !mlOptions.includes(initialMl)) onMlChange(mlOptions[0] ?? 0);
-  }, [mlOptions, onMlChange]); // initialMl is intentionally not here
 
   // On a phone #controls is one horizontally scrolling strip, and it keeps
   // whatever scroll position it was left at. Drilling into a shell inserts
@@ -419,15 +407,11 @@ const Controls: React.FC<ControlsProps> = ({
     strip.scrollTo({ left: panel.offsetLeft - strip.offsetLeft, behavior: 'smooth' });
   }, [hasDrillDownPanel, compact, open]);
 
-  const handleUpdateOrbital = () => {
-    const params: OrbitalParams = basicOrbitalParams(initialN, initialL, initialMl, initialEnclosedFraction);
-    onUpdateOrbital(params);
-  };
-
   // Ruling T20b-enclosed: in Basic Orbitals the fraction sits in the
-  // inspector, away from Update Orbital, so a chosen fraction applies at
-  // once -- the same update Update Orbital sends, for the selection in the
-  // panel. A drawn combination redraws on the fraction by itself (App).
+  // inspector, so a chosen fraction applies at once -- the same update the
+  // chips' own debounced draw sends (useDrawOnSelection, App.tsx), for the
+  // selection BasicExplore currently has chosen. A drawn combination
+  // redraws on the fraction by itself (App).
   const handleEnclosedFraction = (fraction: number) => {
     onEnclosedFractionChange(fraction);
     if (isBasicMode && !combinationActive) onUpdateOrbital(basicOrbitalParams(initialN, initialL, initialMl, fraction));
@@ -436,7 +420,12 @@ const Controls: React.FC<ControlsProps> = ({
   return (
     <Box
       // One #controls on the page (tests and insets read it): the view half is .controls-view.
-      id={part === 'view' ? undefined : 'controls'}
+      // Everywhere but Basic Orbitals, the selection half (still rendered by
+      // App's renderControls('selection')) carries it, as always. Basic
+      // Orbitals' own selection half no longer renders at all -- BasicExplore
+      // owns it entirely now (Phase 6G-2 Task 6, preflight D30) -- so its
+      // view half has to carry the id instead, or nothing on the page would.
+      id={part === 'view' && mode !== 'hydrogenic' ? undefined : 'controls'}
       ref={stripRef}
       className={[part === 'view' ? 'controls-view' : '', compact ? 'compact' : '', open ? 'open' : 'closed'].filter(Boolean).join(' ')}
       sx={{
@@ -458,61 +447,10 @@ const Controls: React.FC<ControlsProps> = ({
           onRelativityChange={onRelativityChange} relativityReadout={relativityReadout} />
       )}
 
-      {showSelection && isBasicMode && (
-        <>
-          <Typography id="orbital-name" variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
-            {combinationActive
-              ? `${combinationTitle(combination)}${selectionProblem(combination) ? ' — not drawn' : ''}`
-              : orbitalName(initialN, initialL, initialMl)}
-          </Typography>
-
-          <FormControl fullWidth margin="normal" size="small" >
-            <InputLabel id="n-select-label">Principal (n)</InputLabel>
-            <Select
-              labelId="n-select-label"
-              id="n-select"
-              value={initialN.toString()} // Select value must be a string if items are strings
-              label="Principal (n)"
-              onChange={(e: SelectChangeEvent<string>) => onNChange(parseInt(e.target.value, 10))}
-              disabled={combinationActive}
-            >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth margin="normal" size="small">
-            <InputLabel id="l-select-label">Angular (l)</InputLabel>
-            <Select
-              labelId="l-select-label"
-              id="l-select"
-              value={initialL.toString()}
-              label="Angular (l)"
-              onChange={(e: SelectChangeEvent<string>) => onLChange(parseInt(e.target.value, 10))}
-              disabled={combinationActive || lOptions.length === 0}
-            >
-              {lOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth margin="normal" size="small">
-            <InputLabel id="ml-select-label">Magnetic (m_l)</InputLabel>
-            <Select
-              labelId="ml-select-label"
-              id="ml-select"
-              value={initialMl.toString()}
-              label="Magnetic (m_l)"
-              onChange={(e: SelectChangeEvent<string>) => onMlChange(parseInt(e.target.value, 10))}
-              disabled={combinationActive || mlOptions.length === 0}
-            >
-              {mlOptions.map(val => <MenuItem key={val} value={val.toString()}>{val}</MenuItem>)}
-            </Select>
-          </FormControl>
-
-          {/* Next to n/l/mₗ (spec §5 Phase 1). While a combination is drawn the
-              three selects stay in view, disabled, so the way back is obvious. */}
-          <CombinationControls selection={combination} onChange={selection => onCombinationChange?.(selection)} />
-        </>
-      )}
+      {/* Basic Orbitals' whole selection -- the orbital-name heading, the
+          n/l/mₗ chips, the Combination picker and the Z = 1 note -- moved to
+          `BasicExplore` (Phase 6G-2 Task 6, ruling P3): Explore draws it, not
+          this component's 'selection' half, which renders nothing here now. */}
 
       {/* A raw density threshold is not comparable between orbitals; the share
           of the electron enclosed is. The density that achieves it is derived
@@ -577,15 +515,10 @@ const Controls: React.FC<ControlsProps> = ({
           </Select>
           <FormHelperText>neutral atom, central-field SCF</FormHelperText>
         </FormControl>
-      )) : isBasicMode && (
-        /* Addendum 2's mode rename: the element control is gone and Z is
-           fixed at 1, so this mode is exactly one electron bound to one
-           proton -- the case the Schrodinger equation solves exactly. Spec
-           §7 still requires the one-electron framing to be stated outright,
-           which is what this line does now that there is no picker to carry
-           it. */
-        <FormHelperText className="basic-orbitals-note">{BASIC_ORBITALS_ABOUT}</FormHelperText>
-      ))}
+      )) : null)}
+      {/* Basic Orbitals' one-electron, Z = 1 note (spec §7) moved to
+          `BasicExplore`'s tile caption (Phase 6G-2 Task 6) -- there is no
+          element picker here for it to stand in for any more. */}
 
       {/* SubshellPanel at level 2; empty at every other level (see App.tsx).
           In Molecules mode, the structure and dipole switches. */}
@@ -708,20 +641,9 @@ const Controls: React.FC<ControlsProps> = ({
         </>
       )}
 
-      {/* Reset View moved to the viewport toolbar (spec §8.5); Update
-          Orbital stays here, next to the parameters it applies. */}
-      {showSelection && isBasicMode && !combinationActive && (
-        <Box className="controls-actions" sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-          <Button
-            id="update-orbital"
-            variant="contained"
-            color="primary"
-            onClick={handleUpdateOrbital}
-          >
-            Update Orbital
-          </Button>
-        </Box>
-      )}
+      {/* Reset View moved to the viewport toolbar (spec §8.5); Update Orbital
+          is gone (ruling P3) -- a chip change draws itself, debounced
+          (useDrawOnSelection, App.tsx). */}
 
       {/* Progress bar: with the view settings, as in Bonds' and Molecules' inspector. */}
       {showView && (

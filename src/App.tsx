@@ -27,6 +27,7 @@ import {
     clearPendingCut,
     cameraMoved,
     previewOpacity,
+    type BasicSelection,
 } from './store/orbitalSlice';
 import {
     setMode,
@@ -53,7 +54,9 @@ import { useDeltaScfEnergies } from './atom/useDeltaScfEnergies';
 import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidExcitation, isNeutralGround } from './atom/species';
 import { allowedCharges } from './atom/ion_configurations';
 import SpeciesControls from './components/SpeciesControls';
-import Controls, { RelativityReadout, BASIC_ORBITALS_ABOUT, RelativityControl } from './components/Controls';
+import Controls, { RelativityReadout, RelativityControl } from './components/Controls';
+import BasicExplore, { BASIC_ORBITALS_ABOUT } from './basic_ui/BasicExplore';
+import { useDrawOnSelection } from './basic_ui/useDrawOnSelection';
 import { AxesSwitch, SurfaceStyleControl } from './atom_ui/DisplayControls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
@@ -244,10 +247,14 @@ function App() {
     const enclosedFraction = useAppSelector(state => state.orbital.enclosedFraction);
     const combination = useAppSelector(state => state.orbital.combination);
     const basicRenderNonce = useAppSelector(state => state.orbital.basicRenderNonce);
-    // Stable, because Controls' n/l effects list these callbacks as dependencies.
-    const setN = useCallback((value: number) => dispatch(setBasicSelection({ n: value })), [dispatch]);
-    const setL = useCallback((value: number) => dispatch(setBasicSelection({ l: value })), [dispatch]);
-    const setMl = useCallback((value: number) => dispatch(setBasicSelection({ ml: value })), [dispatch]);
+    // BasicExplore's chips report a change this way (ruling P3) -- one
+    // handler for n, l and mₗ alike, replacing the old setN/setL/setMl
+    // Controls' three selects each called their own. Stable, since
+    // BasicExplore's own correction effects list it as a dependency.
+    const handleBasicSelectionChange = useCallback(
+        (change: Partial<BasicSelection>) => dispatch(setBasicSelection(change)),
+        [dispatch]
+    );
     const handleEnclosedFractionChange = useCallback((value: number) => dispatch(setEnclosedFraction(value)), [dispatch]);
     const handleCombinationChange = useCallback((value: CombinationSelection) => dispatch(setCombination(value)), [dispatch]);
     const renderedField = useAppSelector(state => state.orbital.currentField);
@@ -523,6 +530,19 @@ function App() {
         dispatch(startOrbitalCalculation(basicOrbitalParams(n, l, ml, enclosedFraction)));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [basicRenderNonce]);
+
+    // Ruling P3: a chip change in BasicExplore draws itself, 150 ms after the
+    // last one -- the debounce never fires on mount (useDrawOnSelection), so
+    // this never double-draws with the nonce effect just above (entering the
+    // mode, or a restored link, still draws exactly once). Disabled whenever
+    // a combination is drawn instead: changing n/l/mₗ while one is showing
+    // must not replace it (the selects used to stay frozen for the same
+    // reason).
+    useDrawOnSelection(
+        { n, l, ml },
+        isBasicMode && combination.kind === 'none',
+        s => handleOrbitalParamsChange(basicOrbitalParams(s.n, s.l, s.ml, enclosedFraction))
+    );
 
     // A combination draws as soon as it is chosen, and again when the
     // enclosed fraction changes. Going back to None redraws the n/l/mₗ still in
@@ -1172,15 +1192,11 @@ function App() {
             onAtomElementChange={handleAtomElementChange}
             showElementPicker={false}
             initialN={n}
-            onNChange={setN}
             initialL={l}
-            onLChange={setL}
             initialMl={ml}
-            onMlChange={setMl}
             initialEnclosedFraction={enclosedFraction}
             onEnclosedFractionChange={handleEnclosedFractionChange}
             combination={combination}
-            onCombinationChange={handleCombinationChange}
             isoLevel={isoLevel}
             onUpdateOrbital={handleOrbitalParamsChange}
             surfaceStyle={surfaceStyle}
@@ -1213,6 +1229,22 @@ function App() {
             onScanIndex={handleScanIndex}
             onView={(view: BondsView) => dispatch(setBondsView(view))}
             onDensityIso={(value: number) => dispatch(setDensityIso(value))}
+        />
+    );
+
+    // Basic Orbitals' Explore content (spec §9.2, ruling P3): the header
+    // tile, the n / subshell / orbital chips that draw on selection, and the
+    // Combination picker -- replaces the old n/l/mₗ selects and Update
+    // Orbital button. One element, reused on the desktop (inside the shared
+    // ExplorePanel below) and on the phone (ahead of the view half, in the
+    // sheet's "Orbital & view" tab), exactly as `bondsPanel` and `controls` are.
+    const basicExplore = (
+        <BasicExplore
+            selection={{ n, l, ml }}
+            onChange={handleBasicSelectionChange}
+            combination={combination}
+            onCombinationChange={handleCombinationChange}
+            onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined}
         />
     );
 
@@ -1385,7 +1417,11 @@ function App() {
             { key: 'plot', label: 'Plot', content: atomInspector('stacked') },
         ]
         : [
-            { key: 'view', label: 'Orbital & view', content: <>{controls}{phoneViewActions}</> },
+            // Ruling P3: BasicExplore (the tile, the chips, the Combination picker)
+            // ahead of Controls' view half -- the same split as the desktop's
+            // Explore panel and inspector, in one scrolling tab since there is no
+            // drill-down here to ask for a tab of its own.
+            { key: 'view', label: 'Orbital & view', content: <>{basicExplore}{renderControls('view')}{phoneViewActions}</> },
             { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
         ];
 
@@ -1459,8 +1495,8 @@ function App() {
                 <MoleculeProvenanceFooter pinned />
             </div>
         )
-        // Basic Orbitals: its choice of orbital -- n/l/mₗ, combination, Update Orbital (ruling R20b).
-        : renderControls('selection');
+        // Basic Orbitals: its header tile and chips (ruling P3) -- BasicExplore.
+        : basicExplore;
     // Basic Orbitals, Bonds and Molecules (the atom has its own: atomInspector above): the view
     // settings above the plot -- for Basic Orbitals its view half of Controls (ruling R20b) -- under
     // the foldable Display heading, as in the Atom inspector (ruling T20b-display-header).

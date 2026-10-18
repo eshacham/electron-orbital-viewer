@@ -1,15 +1,20 @@
 import React from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import Controls, { cutDepthLabel, relativityHelp, whatChangedText, relativityReadoutText } from './Controls';
 import { basicOrbitalParams } from '../orbital_presets';
+import BasicExplore from '../basic_ui/BasicExplore';
+import { useDrawOnSelection } from '../basic_ui/useDrawOnSelection';
+import { NO_COMBINATION } from '../combinations';
+import type { BasicSelection } from '../store/orbitalSlice';
 
+// Ruling P3: chips draw on selection; Update Orbital is gone. Basic Orbitals' n/l/mₗ,
+// its Z = 1 note and Update Orbital moved to BasicExplore (Phase 6G-2 Task 6) --
+// `baseProps` below no longer needs onNChange/onLChange/onMlChange/onUpdateOrbital's
+// selection-side callers, only the view-half props Controls itself still reads.
 const baseProps = {
   initialN: 3,
-  onNChange: () => {},
   initialL: 2,
-  onLChange: () => {},
   initialMl: 0,
-  onMlChange: () => {},
   initialEnclosedFraction: 0.9,
   onEnclosedFractionChange: () => {},
   isoLevel: 1e-5,
@@ -21,16 +26,16 @@ const baseProps = {
 };
 
 describe('Controls', () => {
-  it('renders with initial values and calls onNChange when N is changed', () => {
-    const onNChange = jest.fn();
+  // Ruling P3: chips draw on selection; Update Orbital is gone. Basic Orbitals' n/l/mₗ
+  // selects moved to BasicExplore, so a bare Controls render has nothing of theirs left
+  // to assert on here -- the Electron enclosed select (view half, 'all' by default) is
+  // the nearest "is this really a panel" smoke test that still applies.
+  it('renders with initial values', () => {
     render(
       <Controls
         initialN={3}
-        onNChange={onNChange}
         initialL={2}
-        onLChange={() => {}}
         initialMl={0}
-        onMlChange={() => {}}
         initialEnclosedFraction={0.9}
         onEnclosedFractionChange={() => {}}
         isoLevel={1e-5}
@@ -41,17 +46,11 @@ describe('Controls', () => {
         isBusy={false}
       />
     );
-    // Example: check if N select is rendered
-    expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
-
-    // Simulate changing N (you may need to adjust the selector based on your actual markup)
-    // fireEvent.change(screen.getByLabelText(/principal quantum number/i), { target: { value: '4' } });
-    // expect(onNChange).toHaveBeenCalledWith(4);
+    expect(screen.getByRole('combobox', { name: /Electron enclosed/i })).toBeInTheDocument();
   });
 
-  // Omitting `mode` entirely (as every pre-existing test here does) must
-  // still be the Basic Orbitals panel -- the n/l/mL selects and the explicit
-  // Update Orbital step, not atom mode's drill-down.
+  // Omitting `mode` entirely (as every pre-existing test here does) must still be the
+  // Basic Orbitals panel's view half -- Surface, Opacity, Cut away -- not atom mode's.
   // Fix round 1 of Task 20a (R20a-4): with onOpacityPreview, a drag's ticks go there and only the
   // release reaches onSurfaceStyleChange (which commits the opacity the thumbnails follow).
   it('sends opacity drag ticks to onOpacityPreview and commits only on release', () => {
@@ -77,33 +76,26 @@ describe('Controls', () => {
     expect(onSurfaceStyleChange).toHaveBeenCalledWith({ opacity: 0.95 });
   });
 
-  it('defaults to Basic Orbitals when mode is omitted', () => {
+  // Ruling P3: chips draw on selection; Update Orbital is gone. "Basic Orbitals" used
+  // to mean the n/l/mL selects plus the Element select's absence; the selects are gone
+  // from Controls now (BasicExplore owns them), so the Element select's absence is what is left to tell it apart from atom mode here.
+  it('defaults to Basic Orbitals when mode is omitted: no Element select, unlike atom mode', () => {
     render(<Controls {...baseProps} />);
-    expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /update orbital/i })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /surface style/i })).toBeInTheDocument();
   });
 
   // Addendum 2's mode rename: atom mode covers every real element now, so
   // Basic Orbitals has no element control of its own and is fixed at Z = 1.
+  // Ruling P3: chips draw on selection; Update Orbital is gone. The one-electron,
+  // Z = 1 framing and the "renders at Z = 1 whatever n/l/mL are chosen" behaviour
+  // moved to BasicExplore (tests/basic_ui/basic_explore.test.tsx), which owns the
+  // whole selection now -- Controls has no nucleus (Z) picker to assert on either way.
   describe('Basic Orbitals mode', () => {
     it('has no nucleus (Z) picker', () => {
       render(<Controls {...baseProps} />);
       expect(screen.queryByRole('combobox', { name: /Nucleus/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
-    });
-
-    // Spec §7: the one-electron framing must stay stated outright. It used
-    // to ride on the Z picker's helper text, which is gone.
-    it('still says outright that it is one electron at Z = 1', () => {
-      render(<Controls {...baseProps} />);
-      expect(screen.getByText(/one electron, Z = 1/i)).toBeInTheDocument();
-    });
-
-    it('renders at Z = 1 whatever n/l/mL are chosen', () => {
-      const onUpdateOrbital = jest.fn();
-      render(<Controls {...baseProps} initialN={4} initialL={3} initialMl={-2} onUpdateOrbital={onUpdateOrbital} />);
-      fireEvent.click(screen.getByRole('button', { name: /update orbital/i }));
-      expect(onUpdateOrbital).toHaveBeenCalledWith(expect.objectContaining({ n: 4, l: 3, ml: -2, Z: 1, resolution: 128 }));
     });
   });
 
@@ -261,28 +253,18 @@ describe('cut depth', () => {
   });
 });
 
+// Ruling P3: chips draw on selection; Update Orbital is gone. CombinationControls
+// moved into BasicExplore with the rest of Basic Orbitals' selection (Phase 6G-2
+// Task 6) -- Controls itself renders it in neither mode now. Its "sits with the
+// chips", "disables while drawn" and "reports the choice" coverage moved to
+// tests/basic_ui/basic_explore.test.tsx.
 describe('Combination picker', () => {
-  it('sits with n/l/mL in Basic Orbitals, and not in atom mode', () => {
+  it('is never in Controls -- BasicExplore renders it now, in neither atom nor Basic Orbitals mode', () => {
     const { unmount } = render(<Controls {...baseProps} />);
-    expect(screen.getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /combination/i })).not.toBeInTheDocument();
     unmount();
     render(<Controls {...baseProps} mode="atom" atomLevel="atom" />);
     expect(screen.queryByRole('combobox', { name: /combination/i })).not.toBeInTheDocument();
-  });
-
-  it('disables n/l/mL and hides Update Orbital while a combination is drawn', () => {
-    render(<Controls {...baseProps} combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} />);
-    expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.queryByRole('button', { name: /update orbital/i })).not.toBeInTheDocument();
-    expect(screen.getByText('sp³ hybrids — all 4')).toBeInTheDocument();
-  });
-
-  it('reports the choice', () => {
-    const onCombinationChange = jest.fn();
-    render(<Controls {...baseProps} onCombinationChange={onCombinationChange} />);
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-    fireEvent.click(within(screen.getByRole('listbox')).getByText('sp'));
-    expect(onCombinationChange).toHaveBeenCalledWith({ kind: 'hybrid', hybrid: 'sp', member: 'all' });
   });
 });
 
@@ -472,24 +454,25 @@ describe('Controls: Molecules mode', () => {
 // Ruling R20b (owner decision): Basic Orbitals' choice of orbital stays in Explore and its view
 // settings go to the inspector, as Bonds' and Molecules' do -- one component split by `part`.
 describe('Controls: part', () => {
-  it("'selection' holds n/l/mₗ, the combination, the Z = 1 note and Update Orbital -- no view settings", () => {
-    const { container } = render(<Controls {...baseProps} part="selection" />);
-    expect(screen.getByRole('combobox', { name: /Principal \(n\)/i })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: /Angular \(l\)/i })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: /Magnetic/i })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
-    expect(screen.getByText(/one electron, Z = 1/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Update Orbital' })).toBeInTheDocument();
+  // Ruling P3: chips draw on selection; Update Orbital is gone. Basic Orbitals' whole
+  // selection (n/l/mₗ, the combination, the Z = 1 note, the chips that replaced Update
+  // Orbital) moved to BasicExplore (Phase 6G-2 Task 6) -- Controls' own 'selection' part
+  // renders nothing for Basic Orbitals now; that coverage moved to
+  // tests/basic_ui/basic_explore.test.tsx.
+  it("'selection' in Basic Orbitals renders nothing -- its selection lives in BasicExplore now", () => {
+    render(<Controls {...baseProps} part="selection" />);
+    expect(screen.queryByRole('combobox', { name: /Principal \(n\)/i })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
+    expect(screen.queryByText(/one electron, Z = 1/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: /electron enclosed/i })).toBeNull();
     expect(screen.queryByRole('slider', { name: 'surface opacity' })).toBeNull();
-    expect(screen.queryByRole('group', { name: 'surface style' })).toBeNull();
-    expect(screen.queryByRole('group', { name: 'cut-away axis' })).toBeNull();
-    expect(container.querySelector('#controls')).not.toBeNull();
   });
 
-  it("'view' holds the enclosed fraction, Surface, Opacity and Cut away, in Bonds' order -- no selection, and no second #controls", () => {
+  it("'view' holds the enclosed fraction, Surface, Opacity and Cut away, in Bonds' order -- no selection", () => {
     const { container } = render(
-      <Controls {...baseProps} part="view" surfaceStyle={{ mode: 'solid', opacity: 1, clipAxis: 'x', clipPosition: 0 }} />
+      <Controls {...baseProps} part="view" mode="atom" atomLevel="orbital"
+        surfaceStyle={{ mode: 'solid', opacity: 1, clipAxis: 'x', clipPosition: 0 }} />
     );
     expect(screen.queryByRole('combobox', { name: /Principal \(n\)/i })).toBeNull();
     expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
@@ -505,23 +488,34 @@ describe('Controls: part', () => {
     for (let i = 1; i < order.length; i++) {
       expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
-    expect(container.querySelector('#controls')).toBeNull();
     expect(container.querySelector('.controls-view')).not.toBeNull();
   });
 
-  it('sends the same calls from either part as the whole panel does', () => {
-    const onNChange = jest.fn();
+  // Preflight D30 / ruling P3: with the selection half gone entirely in Basic Orbitals,
+  // the *view* half has to carry #controls there instead -- the insets and other tests
+  // read it, and there must be exactly one `#controls` on the page.
+  it('carries #controls on the view half in Basic Orbitals mode (its own selection half renders nothing)', () => {
+    const { container } = render(<Controls {...baseProps} part="view" mode="hydrogenic" />);
+    expect(container.querySelector('#controls')).not.toBeNull();
+  });
+
+  it('still has no id on the view half in the other modes (the selection half carries it there)', () => {
+    for (const mode of ['atom', 'bonds', 'molecule'] as const) {
+      const { container, unmount } = render(<Controls {...baseProps} part="view" mode={mode} atomLevel="orbital" />);
+      expect(container.querySelector('#controls')).toBeNull();
+      unmount();
+    }
+  });
+
+  it('a bare part="selection" render (any non-Basic mode) still carries #controls, as always', () => {
+    const { container } = render(<Controls {...baseProps} part="selection" mode="atom" atomLevel="atom" />);
+    expect(container.querySelector('#controls')).not.toBeNull();
+  });
+
+  it('sends the same calls from the view part as the whole panel does', () => {
     const onSurfaceStyleChange = jest.fn();
     const onEnclosedFractionChange = jest.fn();
-    render(
-      <>
-        <Controls {...baseProps} part="selection" onNChange={onNChange} />
-        <Controls {...baseProps} part="view" onSurfaceStyleChange={onSurfaceStyleChange} onEnclosedFractionChange={onEnclosedFractionChange} />
-      </>
-    );
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: /Principal \(n\)/i }));
-    fireEvent.click(within(screen.getByRole('listbox')).getByText('4'));
-    expect(onNChange).toHaveBeenCalledWith(4);
+    render(<Controls {...baseProps} part="view" onSurfaceStyleChange={onSurfaceStyleChange} onEnclosedFractionChange={onEnclosedFractionChange} />);
     fireEvent.keyDown(screen.getByRole('slider', { name: 'surface opacity' }), { key: 'ArrowLeft' });
     expect(onSurfaceStyleChange).toHaveBeenCalledWith({ opacity: 0.95 });
     fireEvent.click(screen.getByRole('button', { name: 'wireframe surface' }));
@@ -531,9 +525,10 @@ describe('Controls: part', () => {
     expect(onEnclosedFractionChange).toHaveBeenCalledWith(0.75);
   });
 
-  // Ruling T20b-enclosed: the enclosed fraction sits in the inspector now, away from Update Orbital, so in
-  // Basic Orbitals a committed choice applies at once -- the same update Update Orbital sends.
-  it("in Basic Orbitals, a committed enclosed fraction sends Update Orbital's update for the current selection", () => {
+  // Ruling T20b-enclosed: the enclosed fraction sits in the inspector, so in Basic
+  // Orbitals a committed choice applies at once -- the same update a chip's own
+  // debounced draw sends (useDrawOnSelection, App.tsx) for the current selection.
+  it('in Basic Orbitals, a committed enclosed fraction redraws the current selection at once', () => {
     const onUpdateOrbital = jest.fn();
     const onEnclosedFractionChange = jest.fn();
     render(<Controls {...baseProps} part="view" initialN={3} initialL={2} initialMl={-1}
@@ -563,15 +558,38 @@ describe('Controls: part', () => {
     expect(onUpdateOrbital).not.toHaveBeenCalled();
   });
 
-  it("checks n/l/mₗ once, from the selection part only: the view part sends no correction of its own", () => {
-    const onLChange = jest.fn();
-    render(
-      <>
-        <Controls {...baseProps} part="selection" initialN={1} initialL={2} onLChange={onLChange} />
-        <Controls {...baseProps} part="view" initialN={1} initialL={2} onLChange={onLChange} />
-      </>
-    );
-    expect(onLChange).toHaveBeenCalledTimes(1);
-    expect(onLChange).toHaveBeenCalledWith(0);
+  // Review Focus 1: three chip clicks within 150 ms (n, then l, then mₗ) draw once,
+  // for the final selection -- through BasicExplore's own chips and useDrawOnSelection's
+  // debounce, exactly as a real App render wires them (App.tsx, beside the nonce effect).
+  describe('Review Focus 1: three quick chip changes', () => {
+    function BasicDrawHarness({ draw }: { draw: (s: BasicSelection) => void }) {
+      const [selection, setSelection] = React.useState<BasicSelection>({ n: 3, l: 2, ml: 0 });
+      useDrawOnSelection(selection, true, draw);
+      return (
+        <BasicExplore
+          selection={selection}
+          onChange={change => setSelection(s => ({ ...s, ...change }))}
+          combination={NO_COMBINATION}
+          onCombinationChange={() => {}}
+        />
+      );
+    }
+
+    it('draws once, for the last of three quick chip changes (Review Focus 1)', () => {
+      jest.useFakeTimers();
+      try {
+        const draw = jest.fn();
+        render(<BasicDrawHarness draw={draw} />);
+        fireEvent.click(screen.getByRole('button', { name: 'n = 4' }));
+        fireEvent.click(screen.getByRole('button', { name: '4p subshell' }));
+        fireEvent.click(screen.getByRole('button', { name: '4p_x orbital' }));
+        expect(draw).not.toHaveBeenCalled();
+        act(() => { jest.advanceTimersByTime(150); });
+        expect(draw).toHaveBeenCalledTimes(1);
+        expect(draw).toHaveBeenCalledWith({ n: 4, l: 1, ml: 1 });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });

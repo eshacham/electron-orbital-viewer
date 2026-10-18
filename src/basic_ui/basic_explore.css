@@ -1,0 +1,71 @@
+/* src/basic_ui/basic_explore.css -- Basic Orbitals' Explore panel (spec §9.2, Phase 6G-2 Task 6). */
+
+/* The fixed Z = 1 tile: 88 x 96, surface-3, radius lg -- the same shape as
+   the Atom screen's element tile (src/atom_ui/element_tile.css), reusing its
+   size tokens since Basic Orbitals' tile never changes size either. */
+.basic-tile {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  align-content: center;
+  width: var(--ql-size-element-tile-width);
+  height: var(--ql-size-element-tile-height);
+  padding: 6px 8px;
+  box-sizing: border-box;
+  border-radius: var(--ql-radius-lg);
+  background: var(--ql-color-surface-3);
+  color: var(--ql-color-text-1);
+  font-family: var(--ql-font-sans);
+}
+.basic-tile-z {
+  font-size: var(--ql-type-tick-size);
+  line-height: 14px;
+  color: var(--ql-color-text-2);
+  align-self: start;
+}
+.basic-tile-symbol {
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 600;
+}
+.basic-tile-name {
+  font-size: var(--ql-type-caption-size);
+  line-height: 16px;
+}
+.basic-tile-caption {
+  display: block;
+  margin-top: 8px;
+  color: var(--ql-color-text-2);
+}
+
+.basic-heading {
+  margin-top: 16px;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.basic-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+/* Spec §4.4: chips are 32 px, radius md. `!important` overrides theme.ts's
+   MuiChip root rule (radius sm, 6 px) at equal specificity -- the same
+   reason subshell-chip's height override needs it (style.css). */
+.basic-chip {
+  height: var(--ql-size-chip) !important;
+  border-radius: var(--ql-radius-md) !important;
+}
+
+/* The selected chip (ruling T16-optname carries its own name; this is only
+   the look): selected-fill + a selected-edge ring, with Deep Space's glow
+   and Light Clean's plain ring (§4.6 -- shadow-selected already encodes
+   that split, SHADOWS in tokens.ts). */
+.basic-chip.selected {
+  background: var(--ql-color-selected-fill) !important;
+  border: 1px solid var(--ql-color-selected-edge);
+  box-shadow: var(--ql-shadow-selected);
+  color: var(--ql-color-on-fill);
+}
