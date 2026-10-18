@@ -38,12 +38,18 @@ export type PlotTabId = 'wave' | 'density' | 'distribution' | 'rho';
 export interface DisplayPrefs {
     showAxes: boolean;
     plotTab: PlotTabId;
-    /** The inspector's Display section is expanded (ruling T20b-display-header). */
-    displayOpen: boolean;
+    /**
+     * Whether the inspector's Display section is expanded (ruling
+     * T20b-display-header). `null` means the viewer has never chosen --
+     * ruling P16 (owner) then opens it by the window's own height (short
+     * windows start folded so the plot comes up without scrolling), rather
+     * than pinning a single default for every window size.
+     */
+    displayOpen: boolean | null;
 }
 
 export const DISPLAY_KEY = 'eov.display';
-export const DEFAULT_DISPLAY: DisplayPrefs = { showAxes: true, plotTab: 'distribution', displayOpen: true };
+export const DEFAULT_DISPLAY: DisplayPrefs = { showAxes: true, plotTab: 'distribution', displayOpen: null };
 const PLOT_TABS: readonly PlotTabId[] = ['wave', 'density', 'distribution', 'rho'];
 
 export function decodeDisplay(raw: string | null): DisplayPrefs {
@@ -51,6 +57,8 @@ export function decodeDisplay(raw: string | null): DisplayPrefs {
     return {
         showAxes: typeof value.showAxes === 'boolean' ? value.showAxes : DEFAULT_DISPLAY.showAxes,
         plotTab: PLOT_TABS.includes(value.plotTab as PlotTabId) ? value.plotTab as PlotTabId : DEFAULT_DISPLAY.plotTab,
+        // Only a real boolean is a viewer's stored choice; anything else (never
+        // set, or malformed) stays null so the window's height decides (P16).
         displayOpen: typeof value.displayOpen === 'boolean' ? value.displayOpen : DEFAULT_DISPLAY.displayOpen,
     };
 }

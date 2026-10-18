@@ -113,11 +113,16 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
  * R20b-atoms, T20b-display-header): a "Display" heading whose button folds
  * them away, so the plot can come up on a short window. Whether it is open
  * is a presentation preference (eov.display), never part of a link.
+ *
+ * Ruling P16 (owner): until the viewer picks one way or the other,
+ * `displayOpen` is `null` and the section opens by the window's own
+ * height -- folded below 1000 px tall, so the plot is not pushed off
+ * screen, open at or above it. A stored choice always wins.
  */
 export const InspectorDisplay: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const display = usePref(displayPref);
     const bodyId = useId();
-    const open = display.displayOpen;
+    const open = display.displayOpen ?? (typeof window === 'undefined' || window.innerHeight >= 1000);
     return (
         <section className="inspector-display" aria-label="Display">
             <h2 className="ql-section inspector-display-heading">

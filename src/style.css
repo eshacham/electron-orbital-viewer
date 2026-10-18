@@ -777,6 +777,23 @@ html, body, #root {
   gap: 6px;
   margin: 6px 0;
 }
+/* Phase 6G-2 (P16): a chip's label + occupancy + energy no longer truncate
+   in a narrow inspector -- the chip grows and the energy wraps onto its own
+   line instead. */
+.subshell-chip {
+  height: auto;
+}
+.subshell-chip .MuiChip-label {
+  white-space: normal;
+}
+.subshell-chip-content {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 4px;
+}
+.subshell-chip-energy {
+  flex-basis: 100%;
+}
 .subshell-panel-legend {
   color: var(--ql-color-text-2);
   margin-top: 4px;

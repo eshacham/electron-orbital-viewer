@@ -97,7 +97,11 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
 // Ruling T20b-display-header: the view settings get a visible "Display" heading and fold, so the plot can be
 // brought above the fold on a short window. The choice is a presentation preference in eov.display.
 describe('InspectorDisplay', () => {
-    afterEach(() => { act(() => { displayPref.set(DEFAULT_DISPLAY); }); window.localStorage.clear(); });
+    // src/setupTests.ts gives every test a desktop-tall window (>= 1000 px) by
+    // default, so "expanded by default" below means what it always meant for
+    // these tests; the short-window default (ruling P16) gets its own tests,
+    // each setting window.innerHeight itself and restored here afterwards.
+    afterEach(() => { act(() => { displayPref.set(DEFAULT_DISPLAY); }); window.localStorage.clear(); window.innerHeight = 1200; });
 
     it('heads the settings with a Display heading whose button discloses them, expanded by default', () => {
         render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
@@ -130,6 +134,40 @@ describe('InspectorDisplay', () => {
         render(<InspectorDisplay><p>settings</p></InspectorDisplay>);
         fireEvent.click(screen.getByRole('button', { name: 'Display' }));
         expect(displayPref.get()).toEqual({ showAxes: false, plotTab: 'rho', displayOpen: false });
+    });
+
+    // Ruling P16 (owner): a short window starts the Display section folded,
+    // so the plot comes up without scrolling, but only while the viewer has
+    // never chosen -- a stored choice (either way) always wins.
+    it('starts collapsed on a window shorter than 1000 px when nothing is stored', () => {
+        window.innerHeight = 800;
+        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
+        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('button', { name: 'surface opacity' })).toBeNull();
+    });
+
+    it('starts expanded on a window 1000 px tall or more when nothing is stored', () => {
+        window.innerHeight = 1000;
+        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
+        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('button', { name: 'surface opacity' })).toBeInTheDocument();
+    });
+
+    it('a stored choice to stay open wins over a short window', () => {
+        act(() => { displayPref.set({ ...DEFAULT_DISPLAY, displayOpen: true }); });
+        window.innerHeight = 700;
+        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
+        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('button', { name: 'surface opacity' })).toBeInTheDocument();
+    });
+
+    it('clicking always stores a real boolean, not the window-derived default it started from', () => {
+        window.innerHeight = 800; // nothing stored yet -- starts collapsed by height alone
+        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
+        fireEvent.click(screen.getByRole('button', { name: 'Display' }));
+        const stored = JSON.parse(window.localStorage.getItem('eov.display')!).displayOpen;
+        expect(typeof stored).toBe('boolean');
+        expect(stored).toBe(true);
     });
 
     // Ruling R23b-2 (owner): disclosure chevrons follow convention -- expanded

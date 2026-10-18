@@ -258,8 +258,11 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                             <span className="subshell-chip-occupancy">
                                                 {electrons} of {capacity} e⁻
                                             </span>
-                                            {' · '}
-                                            {/* Spec §3.1: a relativistic eigenvalue states its method. */}
+                                            {/* Spec §3.1: a relativistic eigenvalue states its method. No
+                                                ' · ' separator here (Phase 6G-2, P16): the energy wraps onto
+                                                its own line (.subshell-chip-energy's flex-basis: 100%) instead
+                                                of truncating in a narrow inspector, and the line break reads
+                                                as the separator. */}
                                             <span
                                                 className="subshell-chip-energy"
                                                 title={relativity === 'off' ? undefined : `orbital energy (eigenvalue): ${methodStatement(relativity)}`}

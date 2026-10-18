@@ -1,4 +1,6 @@
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, fireEvent } from '@testing-library/react';
 import SubshellPanel, { spreadLabels, formatElectrons } from '../../src/components/SubshellPanel';
 import { SerialisedSubshell } from '../../src/workers/atomWorker';
@@ -44,6 +46,36 @@ describe('SubshellPanel', () => {
         expect(text).toMatch(/-1\.300 Ha/);
         expect(text).toMatch(/-0\.500 Ha/);
         expect(text).toMatch(/orbital energy/i);
+    });
+
+    // Phase 6G-2 (P16): on a narrow inspector the energy wraps onto its own
+    // line instead of truncating -- the chip holds its energy as the last
+    // element of .subshell-chip-content, with no ' · ' separator in front of
+    // it any more (the line break, via flex-basis: 100% in style.css, reads
+    // as the separator instead).
+    it('holds the orbital energy as its own last element, with the wrap rule in CSS', () => {
+        const { container } = render(
+            <SubshellPanel
+                subshells={neonLikeSubshells()}
+                shellN={2}
+                selectedSubshell={null}
+                onSelectSubshell={() => {}}
+                onSelectOrbital={() => {}}
+            />
+        );
+        const contents = Array.from(container.querySelectorAll('.subshell-chip-content'));
+        expect(contents).toHaveLength(2); // 2s and 2p
+        for (const content of contents) {
+            const energy = content.querySelector('.subshell-chip-energy');
+            expect(energy).not.toBeNull();
+            expect(content.lastElementChild).toBe(energy);
+            expect(energy!.previousSibling?.textContent ?? '').not.toMatch(/·/);
+        }
+        expect(container.textContent ?? '').toMatch(/-0\.500 Ha \(orbital energy\)/);
+
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+        expect(css).toMatch(/\.subshell-chip-energy\s*\{\s*flex-basis:\s*100%;?\s*\}/);
+        expect(css).toMatch(/\.subshell-chip-content\s*\{[^}]*flex-wrap:\s*wrap;?[^}]*\}/);
     });
 
     // Addendum 2: "convey the partial filling ... an explicit '2 of 6'
