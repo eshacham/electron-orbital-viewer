@@ -43,7 +43,11 @@
 /* The concept's selected 2p_z tile: a 2 px selected-edge ring and, in Deep Space, a soft glow (§4.6: none in Light Clean). */
 .strip-tile.selected .strip-tile-image { box-shadow: var(--ql-shadow-selected-tile); }
 .strip-tile.selected .strip-tile-image::after { border: 2px solid var(--ql-color-selected-edge); }
-.strip-tile-glyph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 13px var(--ql-font-sans); color: var(--ql-color-text-2); }
+/* Ruling T10-I1: a two-word glyph ("Total density", a Bonds tile while its point loads) wraps centred, inside the tile. */
+.strip-tile-glyph {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 4px;
+  text-align: center; font: 600 13px / 1.2 var(--ql-font-sans); color: var(--ql-color-text-2);
+}
 /* Ruling R20d: labels at the body size (13 px, was the 12 px caption). */
 .strip-tile-label {
   height: var(--ql-size-thumb-label); font: 500 var(--ql-type-body-size) / var(--ql-size-thumb-label) var(--ql-font-sans);

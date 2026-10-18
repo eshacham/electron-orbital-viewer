@@ -58,7 +58,9 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
     const [drawn, setDrawn] = useState<string | null>(null);
     // Ruling T16-failtile: a picture that will not come falls back as on a lost context.
     const [failed, setFailed] = useState<string | null>(null);
-    const showGlyph = thumb.kind === 'orbital' && drawn !== wanted && (status !== 'ready' || failed === wanted);
+    // Ruling T10-I1: a pending tile (its data still loading) is its glyph and label, and asks for nothing.
+    const pending = thumb.kind === 'pending';
+    const showGlyph = pending || (thumb.kind === 'orbital' && drawn !== wanted && (status !== 'ready' || failed === wanted));
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -122,7 +124,7 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
                     // on mount); for an orbital tile, only once its image has arrived
                     // (Task 10: was `!showGlyph`, which also counted a tile still waiting).
                     <canvas ref={canvasRef} className="thumb-canvas" width={backing} height={backing} aria-hidden="true"
-                        data-drawn={thumb.kind !== 'orbital' || drawn === wanted ? 'true' : 'false'}
+                        data-drawn={!pending && (thumb.kind !== 'orbital' || drawn === wanted) ? 'true' : 'false'}
                         style={showGlyph ? { visibility: 'hidden' } : undefined} />
                 )}
                 {showGlyph && <span className="strip-tile-glyph" aria-hidden="true">{item.label}</span>}

@@ -18,8 +18,12 @@ export const THUMB_RESOLUTION = 64;
 
 const LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
 
-/** 'orbital': a picture from the thumbnail service -- any ThumbRequest (an orbital, or since Task 10 a field or grid surface). */
-export type StripThumb = { kind: 'orbital'; request: ThumbRequest } | { kind: 'rings'; rings: RingLayer[]; rMax: number } | { kind: 'back' };
+/**
+ * 'orbital': a picture from the thumbnail service -- any ThumbRequest (an orbital, or since Task 10 a field or grid surface).
+ * 'pending': its glyph and label only, asking for nothing -- a picture whose data is still loading (ruling T10-I1).
+ */
+export type StripThumb =
+    | { kind: 'orbital'; request: ThumbRequest } | { kind: 'pending' } | { kind: 'rings'; rings: RingLayer[]; rMax: number } | { kind: 'back' };
 
 /**
  * Generic over what a tile dispatches: `NavigationTarget` (the default, the

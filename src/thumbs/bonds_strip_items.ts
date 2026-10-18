@@ -29,23 +29,32 @@ const viewKey = (view: BondsView): string =>
 
 const sameView = (a: BondsView, b: BondsView): boolean => viewKey(a) === viewKey(b);
 
-/**
- * One tile: the main view's own request for that view (bondsFieldRequest),
- * meshed at BONDS_THUMB_RESOLUTION. `where` is the scan point's id (or H₂⁺'s
- * R) and `drawnAt` what the surface's level depends on, so no two pictures
- * -- another point, ρ, fraction or colouring -- share a cache key.
- */
-function tile(
-    key: string, label: string, spoken: string, target: BondsView, selected: boolean,
-    field: FieldRenderRequest, colouring: Exclude<ThumbColouring, object>, system: string, where: string, drawnAt: string, fraction: number,
-): BondsStripItem {
+interface TileSpec {
+    key: string;
+    label: string;
+    spoken: string;
+    target: BondsView;
+    selected: boolean;
+    /** The main view's own request for this view (bondsFieldRequest), meshed here at BONDS_THUMB_RESOLUTION. */
+    field: FieldRenderRequest;
+    colouring: Exclude<ThumbColouring, object>;
+    /**
+     * Everything else the picture depends on, for the cache key: the system, the
+     * scan point's id (or H₂⁺'s R), the view and its level -- `density@ρ` for
+     * the density, drawn at ρ (ruling T10-M4: no enclosed fraction), or
+     * `<view>|<fraction>` for an orbital -- so no two pictures share a key.
+     */
+    content: string;
+}
+
+function tile({ key, label, spoken, target, selected, field, colouring, content }: TileSpec): BondsStripItem {
     return {
         key, label, spoken, group: null, groupSpoken: null, target, selected,
         thumb: {
             kind: 'orbital',
             request: {
                 kind: 'field',
-                contentKey: `bonds|${system}|${where}|${drawnAt}|${fraction}|${colouring}`,
+                contentKey: `bonds|${content}|${colouring}`,
                 field: { ...field, resolution: BONDS_THUMB_RESOLUTION },
                 colouring,
             },
@@ -72,16 +81,22 @@ export function bondsStripItems({ bonds, data, h2plusR, enclosedFraction }: Bond
             const built = bondsFieldRequest({ ...bonds, R: h2plusR, view }, null, enclosedFraction);
             if (!built) return [];
             const label = H2PLUS_LABELS[state];
-            return [tile(`h2plus-${state}`, label, `${label} orbital`, view, sameView(view, bonds.view),
-                built.request, 'phase', 'h2plus', String(h2plusR), viewKey(view), enclosedFraction)];
+            return [tile({
+                key: `h2plus-${state}`, label, spoken: `${label} orbital`, target: view, selected: sameView(view, bonds.view),
+                field: built.request, colouring: 'phase', content: `h2plus|${h2plusR}|${viewKey(view)}|${enclosedFraction}`,
+            })];
         });
     }
     const densityView: BondsView = { kind: 'density' };
     const density = bondsFieldRequest({ ...bonds, view: densityView }, data.basis, enclosedFraction);
     if (!density || !data.basis || !data.meta) return [];
     const where = data.basis.id;
-    const items = [tile('density', 'Total density', 'total electron density', densityView, bonds.view.kind === 'density',
-        density.request, 'density', bonds.system, where, `density@${bonds.densityIso}`, enclosedFraction)];
+    const items = [tile({
+        // Ruling T10-I2 (WCAG 2.5.3): the name starts with the visible label.
+        key: 'density', label: 'Total density', spoken: 'Total density, total electron density', target: densityView,
+        selected: bonds.view.kind === 'density', field: density.request, colouring: 'density',
+        content: `${bonds.system}|${where}|density@${bonds.densityIso}`,
+    })];
     const orbitals = data.meta.orbitals;
     for (const orbital of orbitals) {
         const spin = orbital.spin ?? 'restricted';
@@ -93,8 +108,21 @@ export function bondsStripItems({ bonds, data, h2plusR, enclosedFraction }: Bond
         const label = `${orbital.label}${SPIN_SUFFIX[spin]}`;
         // Ruling T16-optname: "<label> orbital"; a degenerate partner also says which of its set it is, as the diagram's box does.
         const spoken = siblings.length > 1 ? `${label} orbital (${view.component + 1} of ${siblings.length})` : `${label} orbital`;
-        items.push(tile(`mo-${orbital.index}`, label, spoken, view, sameView(view, bonds.view),
-            built.request, 'phase', bonds.system, where, viewKey(view), enclosedFraction));
+        items.push(tile({
+            key: `mo-${orbital.index}`, label, spoken, target: view, selected: sameView(view, bonds.view),
+            field: built.request, colouring: 'phase', content: `${bonds.system}|${where}|${viewKey(view)}|${enclosedFraction}`,
+        }));
     }
     return items;
+}
+
+/**
+ * Ruling T10-I1: the strip while the same molecule's next scan point loads --
+ * the tiles last shown, each on its glyph and label and asking for nothing,
+ * so the strip (a bottom inset zone, and the phone sheet's first row) never
+ * leaves and comes back, and no tile is meshed from another R's basis. The
+ * selection follows `view`, which may have changed meanwhile.
+ */
+export function pendingBondsStripItems(items: readonly BondsStripItem[], view: BondsView): BondsStripItem[] {
+    return items.map(item => ({ ...item, selected: sameView(item.target, view), thumb: { kind: 'pending' } }));
 }

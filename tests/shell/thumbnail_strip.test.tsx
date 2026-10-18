@@ -122,6 +122,8 @@ describe('ThumbnailStrip on a lost WebGL context', () => {
         const host: ThumbHost = {
             // A worker that never answers: every orbital tile stays pending.
             createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            // Ruling T10-M7: a complete ThumbHost since Task 10 (these strips queue no grid job).
+            createGridWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
             isBusy: () => false,
             themeKey: () => 'dark|glow',
             render: () => new Promise(() => {}),
@@ -148,6 +150,8 @@ describe('ThumbnailStrip when a thumbnail cannot be made', () => {
     it('shows the glyph and label of the tile whose job failed', () => {
         const workers: Array<{ onmessage: ((event: { data: unknown }) => void) | null }> = [];
         thumbnailService.attach({
+            // Ruling T10-M7: a complete ThumbHost since Task 10 (this strip queues no grid job).
+            createGridWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
             createWorker: () => {
                 const worker = { postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null };
                 workers.push(worker);
@@ -205,6 +209,34 @@ describe('ThumbnailStrip data-drawn (D15)', () => {
     });
 });
 
+// Ruling T10-I1: a 'pending' tile -- Bonds' strip while the next scan point's
+// files load -- shows its glyph and label, asks the service for nothing, and
+// does not count as drawn.
+describe('ThumbnailStrip pending tiles (T10-I1)', () => {
+    afterEach(() => { act(() => { thumbnailService.detach(); }); });
+
+    it('shows a pending tile\'s glyph and label and requests nothing for it', () => {
+        thumbnailService.attach({
+            createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            createGridWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            isBusy: () => false,
+            themeKey: () => 'dark|glow',
+            render: () => new Promise(() => {}),
+        });
+        const request = jest.spyOn(thumbnailService, 'request');
+        try {
+            const pending = items.slice(1).map(item => ({ ...item, thumb: { kind: 'pending' as const } }));
+            const { container } = render(<ThumbnailStrip items={pending} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
+            expect(request).not.toHaveBeenCalled();
+            expect([...container.querySelectorAll('.strip-tile-glyph')].map(glyph => glyph.textContent)).toEqual(['2s', '2p_y', '2p_z', '2p_x']);
+            expect([...container.querySelectorAll('canvas.thumb-canvas')].map(canvas => canvas.getAttribute('data-drawn'))).toEqual(['false', 'false', 'false', 'false']);
+            expect(screen.getByRole('option', { name: '2p_z orbital' })).toHaveAttribute('aria-selected', 'true');
+        } finally {
+            request.mockRestore();
+        }
+    });
+});
+
 // Ruling T16-spoken: under spin–orbit a group is a j-level; it reads
 // "6p j = 3/2" to a screen reader and shows "6p³⁄₂". Bismuth-shaped: gold's
 // fixture with its 6p split into j = 1/2 and 3/2, as Bi's valence 6p is.
@@ -254,6 +286,8 @@ describe('ThumbnailStrip and the committed opacity', () => {
         const keyNow = () => thumbLookKey({ appearance: look, opacity: store.getState().orbital.thumbOpacity, size: 288 });
         thumbnailService.attach({
             createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            // Ruling T10-M7: a complete ThumbHost since Task 10 (these strips queue no grid job).
+            createGridWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
             isBusy: () => false, themeKey: keyNow, render: () => new Promise(() => {}),
         });
         const request = jest.spyOn(thumbnailService, 'request');
@@ -303,6 +337,8 @@ describe('ThumbnailStrip and the device pixel ratio', () => {
         const look = { theme: 'dark' as const, finish: 'glow' as const, lowPower: false };
         thumbnailService.attach({
             createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            // Ruling T10-M7: a complete ThumbHost since Task 10 (these strips queue no grid job).
+            createGridWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
             isBusy: () => false, themeKey: () => thumbLookKey({ appearance: look, opacity: 0.7, size: thumbTileDevicePx(ratio) }),
             render: () => new Promise(() => {}),
         });
@@ -438,6 +474,8 @@ describe('ThumbnailStrip visibility gating (spec §12, D15 Step 1)', () => {
 
         thumbnailService.attach({
             createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            // Ruling T10-M7: a complete ThumbHost since Task 10 (these strips queue no grid job).
+            createGridWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
             isBusy: () => false, themeKey: () => 'dark|glow', render: () => new Promise(() => {}),
         });
         const request = jest.spyOn(thumbnailService, 'request');

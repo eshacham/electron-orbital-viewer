@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { bondsStripItems, BONDS_THUMB_RESOLUTION } from '../../src/thumbs/bonds_strip_items';
+import { bondsStripItems, BONDS_THUMB_RESOLUTION, pendingBondsStripItems } from '../../src/thumbs/bonds_strip_items';
 import type { BondsState } from '../../src/store/bondsSlice';
 import type { BondsData } from '../../src/bonds/useBondsData';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
@@ -39,7 +39,8 @@ describe('bondsStripItems (spec §9.3 Strip, §12)', () => {
     it('opens a molecule\'s strip on the total density, then every orbital in the diagram\'s order', () => {
         const items = bondsStripItems({ bonds: n2Bonds(), data: n2Data(), h2plusR: null, enclosedFraction: 0.9 });
         expect(items.map(item => item.label)).toEqual(['Total density', ...n2Meta.orbitals.map(o => o.label)]);
-        expect(items[0]).toMatchObject({ spoken: 'total electron density', target: { kind: 'density' }, selected: true, group: null });
+        // Ruling T10-I2 (WCAG 2.5.3): the name holds the visible label (was 'total electron density').
+        expect(items[0]).toMatchObject({ label: 'Total density', spoken: 'Total density, total electron density', target: { kind: 'density' }, selected: true, group: null });
         expect(items.slice(1).map(item => item.target)).toEqual([
             { kind: 'mo', label: '1σg', spin: 'restricted', component: 0 },
             { kind: 'mo', label: '1σu*', spin: 'restricted', component: 0 },
@@ -98,13 +99,24 @@ describe('bondsStripItems (spec §9.3 Strip, §12)', () => {
         });
         const keys = requests(at(AT)).map(request => request.contentKey);
         expect(new Set(keys).size).toBe(keys.length);
-        expect(keys[0]).toBe('bonds|n2|n2@07|density@0.002|0.9|density');
+        // Ruling T10-M4: the density is drawn at ρ, so its key has no enclosed fraction (was '…|density@0.002|0.9|density').
+        expect(keys[0]).toBe('bonds|n2|n2@07|density@0.002|density');
         expect(keys[1]).toBe('bonds|n2|n2@07|mo:1σg:restricted:0|0.9|phase');
         const elsewhere = requests(at(8)).map(request => request.contentKey);
         expect(elsewhere.filter(key => keys.includes(key))).toEqual([]);
         // The density is drawn at its ρ: another ρ is another picture.
         const otherIso = requests(bondsStripItems({ bonds: n2Bonds({ densityIso: 0.01 }), data: n2Data(), h2plusR: null, enclosedFraction: 0.9 }));
         expect(otherIso[0].contentKey).not.toBe(keys[0]);
+    });
+
+    // Ruling T10-M4: a new enclosed fraction re-meshes the orbitals, never the density (drawn at ρ).
+    it('keeps the density tile\'s key when the enclosed fraction changes, and changes every orbital\'s', () => {
+        const at = (enclosedFraction: number) => requests(bondsStripItems({ bonds: n2Bonds(), data: n2Data(), h2plusR: null, enclosedFraction }))
+            .map(request => request.contentKey);
+        const [density90, ...orbitals90] = at(0.9);
+        const [density75, ...orbitals75] = at(0.75);
+        expect(density75).toBe(density90);
+        orbitals75.forEach((key, i) => expect(key).not.toBe(orbitals90[i]));
     });
 
     it('names an open-shell molecule\'s orbitals with their spin', () => {
@@ -148,5 +160,18 @@ describe('bondsStripItems (spec §9.3 Strip, §12)', () => {
         expect(bondsStripItems({ ...args, bonds: n2Bonds({ scanIndex: null, R: null }), data: n2Data() })).toEqual([]);
         // And once it has, every tile is there.
         expect(bondsStripItems({ ...args, data: n2Data() })).toHaveLength(1 + n2Meta.orbitals.length);
+    });
+
+    // Ruling T10-I1: while the same molecule's next scan point loads, the strip stays up as glyphs --
+    // the tiles of the point last shown, each asking for nothing, so no basis but this R's is ever meshed.
+    it('turns a strip into glyph tiles that ask for nothing, keeping keys, labels, names and targets', () => {
+        const shown = bondsStripItems({ bonds: n2Bonds(), data: n2Data(), h2plusR: null, enclosedFraction: 0.9 });
+        const view = { kind: 'mo', label: '2σu*', spin: 'restricted', component: 0 } as const;
+        const pending = pendingBondsStripItems(shown, view);
+        expect(pending.map(item => item.thumb)).toEqual(shown.map(() => ({ kind: 'pending' })));
+        expect(pending.map(item => [item.key, item.label, item.spoken, item.target]))
+            .toEqual(shown.map(item => [item.key, item.label, item.spoken, item.target]));
+        // The selection follows the view chosen meanwhile, as the diagram's does.
+        expect(pending.filter(item => item.selected).map(item => item.target)).toEqual([view]);
     });
 });

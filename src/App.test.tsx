@@ -958,7 +958,9 @@ describe('App', () => {
             const stillKeyed = () => {
                 expect(store.getState().orbital.currentField).toBe(drawn);
                 expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ρ = 0.002 e/a₀³, total electron density');
-                expect(screen.queryByText('ψ > 0')).not.toBeInTheDocument();
+                // Ruling T10-I1: the strip (and so its "Orbital tiles" ψ key) now stays up while a point loads;
+                // the surface's own key -- the only 'surface colour key' (getByLabelText throws on two) -- has no ψ.
+                expect(within(screen.getByLabelText('surface colour key')).queryByText('ψ > 0')).not.toBeInTheDocument();
                 expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
             };
             stillKeyed();
@@ -1000,7 +1002,8 @@ describe('App', () => {
             await waitFor(() => expect(within(screen.getByRole('listbox', { name: 'orbitals in view' })).getAllByRole('option')).toHaveLength(1 + n2Meta.orbitals.length));
             const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
             const [first] = within(strip).getAllByRole('option');
-            expect(first).toHaveAttribute('aria-label', 'total electron density');
+            // Ruling T10-I2 (WCAG 2.5.3): the name holds the visible label "Total density".
+            expect(first).toHaveAttribute('aria-label', 'Total density, total electron density');
             expect(first).toHaveAttribute('aria-selected', 'true');
             // Ruling T16-tilekey with D9: the grey density has the ρ key; the strip's phase-coloured tiles get theirs.
             expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ρ = 0.002 e/a₀³, total electron density');
@@ -1028,6 +1031,58 @@ describe('App', () => {
                 expect(cancelAll).toHaveBeenCalledTimes(1);
                 act(() => { store.dispatch(selectBondsSystem('h2plus')); });
                 expect(cancelAll).toHaveBeenCalledTimes(2);
+            } finally {
+                cancelAll.mockRestore();
+            }
+        });
+
+        // Ruling T10-I1: an uncached R step must not take the strip away -- that moved the
+        // camera's bottom inset (and the phone sheet) twice per step. The tiles show their
+        // glyphs meanwhile and ask for nothing until the new point's own basis has landed.
+        it('keeps the strip up as glyphs while the next scan point loads, asking for nothing until its basis lands (T10-I1)', async () => {
+            const idle = () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker;
+            act(() => { thumbnailService.attach({ createWorker: idle, createGridWorker: idle, isBusy: () => false, themeKey: () => 'dark|glow|full|72|0.7', render: () => new Promise(() => {}) }); });
+            const request = jest.spyOn(thumbnailService, 'request');
+            try {
+                const { store } = renderWithProvider(<App />);
+                fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+                chooseSystem('N₂ — Nitrogen');
+                await waitFor(() => expect(within(screen.getByRole('listbox', { name: 'orbitals in view' })).getAllByRole('option')).toHaveLength(1 + n2Meta.orbitals.length));
+                const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
+                expect(request.mock.calls.some(([asked]) => asked.contentKey.includes('n2@07'))).toBe(true);
+
+                let land = () => {};
+                (loadBasis as jest.Mock).mockImplementation((id: string) => (id === 'n2@08'
+                    ? new Promise(resolve => { land = () => resolve({ ...n2Basis, id }); })
+                    : Promise.resolve({ ...n2Basis, id })));
+                request.mockClear();
+                act(() => { store.dispatch(setScanPoint({ system: 'n2', index: 8, RBohr: n2Scan.points[8].RBohr })); });
+                // The same listbox, never unmounted: every tile on its glyph, nothing asked for.
+                expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBe(strip);
+                expect(within(strip).getAllByRole('option')).toHaveLength(1 + n2Meta.orbitals.length);
+                expect(strip.querySelectorAll('.strip-tile-glyph')).toHaveLength(1 + n2Meta.orbitals.length);
+                expect(request).not.toHaveBeenCalled();
+
+                await act(async () => { land(); });
+                await waitFor(() => expect(request.mock.calls.some(([asked]) => asked.contentKey.includes('n2@08'))).toBe(true));
+                expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBe(strip);
+                expect(request.mock.calls.every(([asked]) => asked.contentKey.includes('n2@08'))).toBe(true);
+            } finally {
+                request.mockRestore();
+                act(() => { thumbnailService.detach(); });
+            }
+        });
+
+        // Ruling T10-M6: outside Bonds mode a Bonds system change (a restored link, say) is not
+        // Bonds' strip changing, so another mode's waiting tiles are left alone.
+        it('cancels nothing when the Bonds system changes outside Bonds mode (T10-M6)', () => {
+            const cancelAll = jest.spyOn(thumbnailService, 'cancelAll');
+            try {
+                const { store } = renderWithProvider(<App />);
+                expect(store.getState().atom.mode).not.toBe('bonds');
+                cancelAll.mockClear();
+                act(() => { store.dispatch(selectBondsSystem('co')); });
+                expect(cancelAll).not.toHaveBeenCalled();
             } finally {
                 cancelAll.mockRestore();
             }

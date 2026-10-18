@@ -128,7 +128,7 @@ import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
 import { atomStripItems, basicStripItems } from './thumbs/strip_items';
-import { bondsStripItems } from './thumbs/bonds_strip_items';
+import { bondsStripItems, pendingBondsStripItems, type BondsStripItem } from './thumbs/bonds_strip_items';
 import { thumbnailService } from './thumbs/ThumbnailService';
 import { thumbLookKey, thumbTileDevicePx } from './thumbs/thumb_key';
 import { useDevicePixelRatio } from './thumbs/useDevicePixelRatio';
@@ -815,17 +815,33 @@ function App() {
     // Keyed on meta and basis, not bondsData itself (a new object every render): new items re-centre the strip.
     const bondsMeta = bondsData.meta;
     const bondsBasis = bondsData.basis;
-    const bondsStrip = useMemo(
+    const builtBondsStrip = useMemo(
         () => (isBondsMode
             ? bondsStripItems({ bonds, data: { meta: bondsMeta, basis: bondsBasis }, h2plusR: bonds.system === 'h2plus' ? bonds.R : null, enclosedFraction })
             : []),
         [isBondsMode, bonds, bondsMeta, bondsBasis, enclosedFraction],
     );
+    // Ruling T10-I1: while the same molecule's next scan point loads, the strip stays up -- its last
+    // tiles on their glyphs, asking for nothing -- rather than leaving and coming back: it is a bottom
+    // inset zone (the camera re-fits on every change) and the phone sheet's first row. The tiles last
+    // built are remembered across renders (React's "state from the previous render" pattern, so the
+    // strip is never absent for even one commit); a new system starts afresh.
+    const [lastBondsStrip, setLastBondsStrip] = useState<{ system: BondsSystemId; items: BondsStripItem[] } | null>(null);
+    if (builtBondsStrip.length > 0 && lastBondsStrip?.items !== builtBondsStrip) setLastBondsStrip({ system: bonds.system, items: builtBondsStrip });
+    const bondsPointLoading = bondsData.loading;
+    const bondsStrip = useMemo(() => {
+        if (builtBondsStrip.length > 0) return builtBondsStrip;
+        if (isBondsMode && bondsPointLoading && lastBondsStrip?.system === bonds.system) return pendingBondsStripItems(lastBondsStrip.items, bonds.view);
+        return [];
+    }, [builtBondsStrip, isBondsMode, bondsPointLoading, lastBondsStrip, bonds.system, bonds.view]);
     const handleBondsStripSelect = useCallback((view: BondsView) => dispatch(setBondsView(view)), [dispatch]);
     // A new species or relativity: nothing in flight belongs to the picture any more (§12).
     useEffect(() => () => thumbnailService.cancelAll(), [atomProfile?.speciesKey, atomProfile?.Z, pictureRelativity]);
     // Likewise a new Bonds system (§12; Review Focus 5, preflight D19): its old jobs are cancelled.
-    useEffect(() => () => thumbnailService.cancelAll(), [bonds.system]);
+    // Ruling T10-M6: only in Bonds mode -- elsewhere (a restored link) the system changing is not Bonds'
+    // strip changing, and another mode's waiting tiles are left alone. Leaving Bonds also cancels, as its
+    // tiles go; harmless, since React runs every cleanup before the next mode's tiles ask for anything.
+    useEffect(() => (isBondsMode ? () => thumbnailService.cancelAll() : undefined), [isBondsMode, bonds.system]);
     // Ruling T16-tilekey with preflight D9: the strip's orbital tiles are phase-coloured; they get a key
     // of their own only where the column holds no phase key already -- Bonds with the density drawn.
     const bondsOrbitalTiles = !isNarrow && !stripCollapsed && bondsStrip.some(item => item.target.kind !== 'density');
