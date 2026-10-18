@@ -23,6 +23,7 @@ import { resetH2PlusCurveForTests } from './bonds/useH2PlusCurve';
 import { loadScan, loadMoleculeMeta, loadBasis } from './molecules/loader';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from './molecules/types';
 import { brandPref } from './design/brands';
+import { hintPref } from './design/presentation';
 import { MEDIUM_VIEWPORT } from './useMediaQuery';
 import * as downloadModule from './export/download';
 import { readBlob } from '../tests/export/fixtures';
@@ -1203,6 +1204,58 @@ describe('App: Share', () => {
         expect((linkField as HTMLInputElement).value).toMatch(/^https?:\/\/.*#mode=atom&Z=1&level=atom&/);
 
         document.execCommand = originalExecCommand;
+    });
+});
+
+describe('App: the first-view hint (Task 5, ruling P17)', () => {
+    beforeEach(() => { window.localStorage.clear(); });
+    afterEach(() => { window.localStorage.clear(); });
+
+    it('shows on first render in Atoms mode', () => {
+        renderWithProvider(<App />);
+        expect(screen.getByRole('note')).toHaveTextContent('Drag to rotate · pick a shell to explore');
+    });
+
+    it('never renders in Orbitals mode', () => {
+        renderWithProvider(<App />, { mode: 'hydrogenic' });
+        expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    });
+
+    // The other suggestion the hint names, besides rotating (OrbitalViewer's
+    // own job -- it is mocked out of this file, so that path is pinned at
+    // the component level instead, in tests/orbital_viewer.test.tsx).
+    it('goes away once a shell is picked, and remembers it', () => {
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        expect(screen.getByRole('note')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByText(/K shell \(n=1\)/));
+
+        expect(screen.queryByRole('note')).not.toBeInTheDocument();
+        expect(hintPref.get()).toEqual({ rotateDismissed: true });
+    });
+
+    // Review Focus 1's own recipe: hintPref lives in localStorage only (spec
+    // §6.7), never in a link, so dismissing it by its own button -- which
+    // touches no Redux state at all -- must leave the share link untouched.
+    it('leaves the share link byte-identical before and after dismissal (Review Focus 1)', async () => {
+        const writeText = jest.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+        try {
+            renderWithProvider(<App />);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+            await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+
+            fireEvent.click(screen.getByRole('button', { name: 'Dismiss hint' }));
+            expect(screen.queryByRole('note')).not.toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+            await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+
+            expect(writeText.mock.calls[1][0]).toBe(writeText.mock.calls[0][0]);
+        } finally {
+            Reflect.deleteProperty(navigator, 'clipboard');
+        }
     });
 });
 

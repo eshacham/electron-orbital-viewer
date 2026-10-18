@@ -23,6 +23,7 @@ import {
     radiusUnderPointer,
     setHoverRadius,
     defaultCameraPosition,
+    initialCameraPosition,
     attachShellCompositionLobes,
     clearShellCompositionLobes,
     setReferenceRing,
@@ -31,6 +32,7 @@ import {
 import { wholeAtomFramingRadius } from '../../src/atom/framing';
 import { shellComposition } from '../../src/atom/shell_composition';
 import { defaultSurfaceStyle, SurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
+import { cutFaceCameraDirection } from '../../src/camera_angles';
 
 /** What is in the scene apart from the axes, which are a helper, not a view. */
 const sceneContent = (context: { scene: THREE.Scene }) =>
@@ -371,6 +373,31 @@ describe('defaultCameraPosition (spec bugfix: no axis is viewed edge-on by defau
     it('sits at exactly the requested distance from the origin', () => {
         expect(defaultCameraPosition(12).length()).toBeCloseTo(12);
         expect(defaultCameraPosition(1).length()).toBeCloseTo(1);
+    });
+});
+
+// Task 5 / preflight D1: a shared link's cut is already in the store by the
+// time initVisualizer runs (main.tsx's applyState() happens before React
+// mounts the viewer), so the very first camera placement should already face
+// it -- otherwise the camera starts canonical and stays there, since the
+// first frameOrbital call after the mesh lands (restoreDefaultDirection left
+// false) only ever rescales whatever direction is already set.
+describe('initialCameraPosition (preflight D1: the first camera placement already faces a restored cut)', () => {
+    it('is exactly defaultCameraPosition with no cut', () => {
+        expect(initialCameraPosition(12, 'none').equals(defaultCameraPosition(12))).toBe(true);
+    });
+
+    it('faces the cut face when a cut axis is already known', () => {
+        const direction = initialCameraPosition(12, 'x').clone().normalize();
+        const expected = new THREE.Vector3(...cutFaceCameraDirection('x'));
+        expect(direction.x).toBeCloseTo(expected.x, 9);
+        expect(direction.y).toBeCloseTo(expected.y, 9);
+        expect(direction.z).toBeCloseTo(expected.z, 9);
+    });
+
+    it('sits at the requested distance regardless of axis', () => {
+        expect(initialCameraPosition(7, 'y').length()).toBeCloseTo(7);
+        expect(initialCameraPosition(7, 'none').length()).toBeCloseTo(7);
     });
 });
 

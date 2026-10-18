@@ -41,7 +41,7 @@ import { FieldRenderRequest } from './field_source';
 import { DENSITY_SURFACE_HEX } from './bonds/systems';
 import { createFieldOverlayGroup, recolourFieldOverlay } from './field_overlay_view';
 import { markExportSurface } from './export/surfaces';
-import { CANONICAL_CAMERA_DIRECTION } from './camera_angles';
+import { CANONICAL_CAMERA_DIRECTION, cutFaceCameraDirection } from './camera_angles';
 import { framingRadiusFor } from './atom/framing';
 import {
     createReferenceRing,
@@ -349,6 +349,27 @@ export function defaultCameraPosition(distance: number): THREE.Vector3 {
 }
 
 /**
+ * The camera's very first position: canonical, or -- preflight D1 -- already
+ * facing the cut face when `initialClipAxis` says a cut is active. This
+ * matters because `main.tsx` restores a shared link's state (including its
+ * cut) before React ever mounts `OrbitalViewer`, so by the time
+ * `initVisualizer` runs for a link such as `cut=x:0.5`, the store already
+ * knows the axis -- without this, the camera would start at the plain
+ * canonical view and stay there, since the first `frameOrbital` call after
+ * the mesh lands (`restoreDefaultDirection` left at its default `false`)
+ * only ever rescales whatever direction the camera already has.
+ *
+ * A free function, like `defaultCameraPosition` above (which this wraps),
+ * so it can be unit-tested: `initVisualizer` itself constructs a real
+ * `THREE.WebGLRenderer`, which has no WebGL context under jsdom.
+ */
+export function initialCameraPosition(distance: number, initialClipAxis: ClipAxis): THREE.Vector3 {
+    return initialClipAxis === 'none'
+        ? defaultCameraPosition(distance)
+        : new THREE.Vector3(...cutFaceCameraDirection(initialClipAxis)).normalize().multiplyScalar(distance);
+}
+
+/**
  * How far a press may travel and still count as a click rather than a
  * camera drag. A few pixels absorbs the wobble of a real mouse click and a
  * touch tap without swallowing any deliberate orbit.
@@ -365,7 +386,12 @@ function isPickable(context: VisualizerContext, r: number | null): boolean {
     );
 }
 
-export function initVisualizer(container: HTMLElement, initialCameraZ: number = 12): VisualizerContext {
+export function initVisualizer(
+    container: HTMLElement,
+    initialCameraZ: number = 12,
+    /** preflight D1: a restored link's cut, already in the store by the time this is called -- see initialCameraPosition's doc comment. */
+    initialClipAxis: ClipAxis = 'none',
+): VisualizerContext {
     const scene = new THREE.Scene();
     // Transparent: the viewport cell paints the theme's canvas gradient token
     // behind the canvas (spec §6.6), so a theme change never touches the renderer.
@@ -376,7 +402,7 @@ export function initVisualizer(container: HTMLElement, initialCameraZ: number = 
     // instead of pointing at the viewer. Must be set before OrbitControls is
     // created: it reads `up` once, in its constructor.
     camera.up.set(0, 0, 1);
-    camera.position.copy(defaultCameraPosition(initialCameraZ));
+    camera.position.copy(initialCameraPosition(initialCameraZ, initialClipAxis));
 
     // stencil defaults to false since three r163, and without the buffer every
     // stencil test passes — which would draw the cut-away caps as full quads
@@ -650,13 +676,16 @@ export function frameOrbital(
     context: VisualizerContext | null,
     rMax: number,
     /**
-     * Also swing the camera back to the app's canonical viewing angle,
-     * rather than keeping wherever the user has orbited to.
+     * Also swing the camera back to the app's standard viewing angle --
+     * canonical with no cut, or square at the cut face with one
+     * (standardViewDirection, ruling P17) -- rather than keeping wherever
+     * the user has orbited to.
      *
      * Off by default, because re-framing happens on every scale change and
      * silently undoing someone's rotation each time would be maddening. On
      * for the two places that mean "give me the standard view of this":
-     * Reset View, and picking a new element (see App.tsx).
+     * Reset View (also P17: it now faces an active cut, not just the plain
+     * canonical angle), and picking a new element (see App.tsx).
      */
     restoreDefaultDirection = false
 ) {
@@ -675,7 +704,7 @@ export function frameOrbital(
     context.fitFactor = fitFactorFor(context);
 
     const direction = restoreDefaultDirection
-        ? defaultCameraPosition(1)
+        ? new THREE.Vector3(...standardViewDirection(context))
         : camera.position.clone().sub(controls.target);
     if (direction.lengthSq() === 0) direction.set(0, 0, 1);
     direction.normalize();
@@ -715,6 +744,21 @@ export function frameOrbital(
 const SHELL_VIEW_FALLBACK_AXIS: Exclude<ClipAxis, 'none'> = SHELL_VIEW_CUT_AXIS;
 function shellViewClipAxis(context: VisualizerContext): ClipAxis {
     return context.surfaceStyle.clipAxis === 'none' ? SHELL_VIEW_FALLBACK_AXIS : context.surfaceStyle.clipAxis;
+}
+
+/**
+ * The view that means "look at this the way the app itself would choose to"
+ * (ruling P17 / preflight D1): the plain canonical three-quarter view with no
+ * cut, or square at the cut's exposed face with one. Used by `frameOrbital`'s
+ * `restoreDefaultDirection` branch (Reset View, picking an element) and by
+ * `OrbitalViewer`'s restored-link effect, for the same `angles === null`
+ * case `applyCameraAngles` otherwise defaults to plain canonical. A shell
+ * view has no visible surface besides its cut face (see `shellViewClipAxis`'s
+ * own doc comment), so it always counts as "cut", never 'none'.
+ */
+export function standardViewDirection(context: VisualizerContext): readonly [number, number, number] {
+    const axis = context.isShellView ? shellViewClipAxis(context) : context.surfaceStyle.clipAxis;
+    return axis === 'none' ? CANONICAL_CAMERA_DIRECTION : cutFaceCameraDirection(axis);
 }
 
 /**

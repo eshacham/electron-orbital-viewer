@@ -127,6 +127,7 @@ import { thumbnailService } from './thumbs/ThumbnailService';
 import { thumbLookKey, thumbTileDevicePx } from './thumbs/thumb_key';
 import { useDevicePixelRatio } from './thumbs/useDevicePixelRatio';
 import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
+import FirstViewHint from './shell/FirstViewHint';
 import { viewTitle } from './shell/view_title';
 import { useDocumentTitle } from './shell/useDocumentTitle';
 import { useFullscreen } from './shell/useFullscreen';
@@ -136,7 +137,7 @@ import { useBrand } from './design/useBrand';
 import { brandPref } from './design/brands';
 import { LAYOUT } from './design/tokens';
 import { usePref } from './design/usePref';
-import { displayPref, renderPref, type PlotTabId } from './design/presentation';
+import { displayPref, renderPref, hintPref, type PlotTabId } from './design/presentation';
 import { curvePalette, densitySurfaceHex, phaseColours, themeCurveColour } from './design/science';
 import { BUILD_ENV } from './jobs/build_env';
 import { SESSION_ENDED } from './jobs/api';
@@ -315,6 +316,20 @@ function App() {
         return (await copyText(url)) ? { kind: 'copied' } : { kind: 'manual', url };
     }, [stateNow]);
 
+    // Task 5 (ruling P17): the one-time hint goes away once the viewer does
+    // either of the two things it suggests, not only via its own button --
+    // picking a shell (handleLevelNavigate below), or rotating the camera
+    // (OrbitalViewer's own controls 'start' listener, which only fires on a
+    // real pointer drag). That second path is *not* wired through Redux's
+    // cameraAngles here: P17's own fix makes the standard view non-canonical
+    // whenever a cut is active, so a plain "cameraAngles changed since mount"
+    // watch cannot tell a real drag apart from the viewer's own first paint
+    // settling onto that standard view -- caught live, where every cut-away
+    // Atoms scene dismissed the hint on load before anyone had touched it.
+    const dismissHint = useCallback(() => {
+        if (!hintPref.get().rotateDismissed) hintPref.set({ rotateDismissed: true });
+    }, []);
+
     const handleSurfaceStyleChange = useCallback((change: Partial<SurfaceStyle>) => {
         dispatch(setSurfaceStyle(change));
         // A user-driven cut change while a link's cut is still waiting on the
@@ -398,11 +413,12 @@ function App() {
     const handleLevelNavigate = useCallback((target: NavigationTarget) => {
         switch (target.level) {
             case 'atom': dispatch(goToLevel('atom')); break;
-            case 'shell': dispatch(drillToShell(target.n)); break;
+            // Task 5 (ruling P17): picking a shell is the hint's other suggestion.
+            case 'shell': dispatch(drillToShell(target.n)); dismissHint(); break;
             case 'subshell': dispatch(drillToSubshell(target.n, target.l, target.j)); break;
             case 'orbital': dispatch(drillToOrbital(target.n, target.l, target.ml, target.j)); break;
         }
-    }, [dispatch]);
+    }, [dispatch, dismissHint]);
 
     // Addendum 2's readability follow-up: a subshell chip is a toggle.
     // Selecting one isolates its orbitals in the composition view (iron's
@@ -455,6 +471,8 @@ function App() {
     const [exploreCollapsed, setExploreCollapsed] = useState(false);
     const { mode: themeMode } = useQuantumTheme();
     const render = usePref(renderPref);
+    // Task 5 (ruling P17): the one-time hint's own dismissed flag.
+    const hintDismissed = usePref(hintPref).rotateDismissed;
     const phase = phaseColours(themeMode);
     const palette = curvePalette(themeMode);
     /** A curve, key or swatch in this theme's palette (index identity, §4.2). */
@@ -1550,6 +1568,9 @@ function App() {
                     <CircularProgress size={22} thickness={5} color="inherit" />
                     <span>{canvasBusyLabel}</span>
                 </div>
+            )}
+            {isAtomMode && !hintDismissed && (
+                <FirstViewHint onDismiss={dismissHint} />
             )}
             {/* Spec §3.5: an anion LDA cannot bind draws nothing, and
                 the empty canvas says why. The card's alert

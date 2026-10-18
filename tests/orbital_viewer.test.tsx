@@ -36,6 +36,10 @@ jest.mock('../src/orbital_visualizer', () => ({
     pointerRaycaster: jest.fn(),
     setAppearance: jest.fn(),
     attachThumbnails: jest.fn(),
+    // Task 5 (preflight D1): OrbitalViewer now passes this through to the
+    // (also mocked) applyCameraAngles; a fixed stand-in is enough for every
+    // test here except the one below that overrides it to check the wiring.
+    standardViewDirection: jest.fn(() => [0.75, 0.42, 0.5]),
 }));
 // Only applyCameraAngles is mocked (as a spy to record call order); the rest
 // of the module -- isCanonicalAngles etc., which orbitalSlice's own reducers
@@ -58,9 +62,9 @@ import { clearShellMeshCacheForTests, setCachedShellMeshes, shellMeshCacheKey } 
 import { COMPOSITE_ORBITAL_RESOLUTION } from '../src/atom/shell_composition';
 import { neonProfile } from './export/fixtures';
 import { framingRadiusFor } from '../src/atom/framing';
-import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes, attachThumbnails } from '../src/orbital_visualizer';
+import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes, attachThumbnails, standardViewDirection } from '../src/orbital_visualizer';
 import { themeChoicePref } from '../src/design/theme_storage';
-import { DEFAULT_RENDER, renderPref } from '../src/design/presentation';
+import { DEFAULT_RENDER, renderPref, hintPref } from '../src/design/presentation';
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
@@ -154,6 +158,60 @@ describe('OrbitalViewer: reset and restore in the same commit', () => {
         });
 
         expect(order).toEqual(['frameOrbital', 'applyCameraAngles']);
+    });
+});
+
+// Preflight D1: a share link with a cut but no saved angle (url_state.ts's
+// decodeViewKeys always dispatches restoreCamera, null when there is no cam
+// key) must still open facing the cut face, not the plain canonical angle --
+// so the context's own standard direction, not a fixed default, is what
+// reaches applyCameraAngles.
+describe('OrbitalViewer: a restored link with no saved angle still faces an active cut (preflight D1)', () => {
+    it('passes the context\'s own standard direction through to applyCameraAngles', () => {
+        const store = renderViewer();
+        (standardViewDirection as jest.Mock).mockReturnValue([0.1, 0.2, 0.3]);
+
+        act(() => { store.dispatch(restoreCamera(null)); });
+
+        expect(standardViewDirection).toHaveBeenCalledWith(expect.objectContaining({ camera: expect.anything() }));
+        expect(applyCameraAngles).toHaveBeenCalledWith(expect.anything(), expect.anything(), null, [0.1, 0.2, 0.3]);
+    });
+
+    it('a saved angle still wins outright -- the standard direction is only the null-angle fallback', () => {
+        const store = renderViewer();
+        (standardViewDirection as jest.Mock).mockReturnValue([0.1, 0.2, 0.3]);
+
+        act(() => { store.dispatch(restoreCamera({ azimuth: 12, elevation: 8 })); });
+
+        expect(applyCameraAngles).toHaveBeenCalledWith(
+            expect.anything(), expect.anything(), { azimuth: 12, elevation: 8 }, [0.1, 0.2, 0.3]
+        );
+    });
+});
+
+// Task 5 (ruling P17): the hint's "drag to rotate" dismissal must fire from
+// an actual pointer drag, never from the app's own camera placement -- a
+// live check caught exactly this: P17's fix makes the standard view
+// non-canonical whenever a cut is active, so a naive "cameraAngles changed"
+// watch (tried first, in App.tsx) dismissed the hint on first paint of every
+// cut-away Atoms scene, before the viewer had touched anything. OrbitControls
+// only fires 'start' from a real pointer-down-then-move, never from
+// frameOrbital/applyCameraAngles setting the camera directly, so that event
+// is what this listens for instead.
+describe('OrbitalViewer: a real drag dismisses the first-view hint (Task 5, ruling P17)', () => {
+    it('dismisses on the controls\' own "start" event', () => {
+        const store = createAppStore();
+        act(() => { store.dispatch(setMode('hydrogenic')); });
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+
+        const results = (initVisualizer as jest.Mock).mock.results;
+        const context = results[results.length - 1].value;
+        const startCalls = (context.controls.addEventListener as jest.Mock).mock.calls;
+        const onStart = startCalls.find(([event]: [string, unknown]) => event === 'start')[1];
+
+        expect(hintPref.get().rotateDismissed).toBe(false);
+        act(() => { onStart(); });
+        expect(hintPref.get().rotateDismissed).toBe(true);
     });
 });
 

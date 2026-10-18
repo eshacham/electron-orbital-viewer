@@ -30,7 +30,8 @@ import {
     VisualizerContext,
     renderFrame,
     setAppearance,
-    attachThumbnails
+    attachThumbnails,
+    standardViewDirection
 } from '../orbital_visualizer';
 import { thumbnailService } from '../thumbs/ThumbnailService';
 import { captureViewPng, freeAreaCrop } from '../export/png';
@@ -46,7 +47,7 @@ import { OrbitalParams } from '../types/orbital';
 import { useMoleculeView } from '../molecules/useMoleculeView';
 import { useQuantumTheme } from '../design/useQuantumTheme';
 import { usePref } from '../design/usePref';
-import { displayPref, renderPref } from '../design/presentation';
+import { displayPref, renderPref, hintPref } from '../design/presentation';
 import { canvasSolid } from '../design/science';
 import type { Appearance } from '../design/appearance';
 
@@ -155,7 +156,17 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     useEffect(() => {
         if (canvasHostRef.current) {
             console.log('OrbitalViewer: Initializing visualizer');
-            const context = initVisualizer(canvasHostRef.current);
+            // preflight D1: a shared link's cut is already in the store by
+            // now -- main.tsx restores it before React ever mounts this
+            // component -- so the very first camera placement can face it
+            // too, rather than starting canonical and never turning (the
+            // first frameOrbital call after the mesh lands keeps whatever
+            // direction the camera already has). This reads surfaceStyle
+            // once, from this render's closure, deliberately: re-running
+            // this effect on every later surfaceStyle change would remount
+            // the one canvas (spec §3.2), which is why it stays out of the
+            // deps array below.
+            const context = initVisualizer(canvasHostRef.current, 12, surfaceStyle.clipAxis);
             // Pointer -> radius (spec §6, the reverse of the plot's own
             // onHoverRadius): both directions land on the same atomSlice
             // action, so hovering the plot and hovering the cut face agree
@@ -178,7 +189,21 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                     distance: context.camera.position.distanceTo(context.controls.target),
                 });
             }
-            context.controls.addEventListener('start', () => { draggingRef.current = true; });
+            context.controls.addEventListener('start', () => {
+                draggingRef.current = true;
+                // Task 5 (ruling P17): the one-time hint's other dismissal
+                // path. OrbitControls only fires 'start' from a real pointer
+                // interaction (mouse/touch down then move), never from a
+                // programmatic reposition (frameOrbital, applyCameraAngles) --
+                // which matters here because P17's own fix makes the standard
+                // view non-canonical whenever a cut is active, and a plain
+                // Redux cameraAngles watch cannot tell that apart from an
+                // actual drag (caught live: every cut-away Atoms view was
+                // settling onto its own standard direction and immediately
+                // dismissing the hint on first paint, before the viewer had
+                // touched anything).
+                if (!hintPref.get().rotateDismissed) hintPref.set({ rotateDismissed: true });
+            });
             context.controls.addEventListener('end', () => { draggingRef.current = false; });
             // Spec §12: the strips' thumbnails are drawn by this renderer -- never a second WebGL context.
             attachThumbnails(context, thumbnailService, {
@@ -639,7 +664,12 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     useEffect(() => {
         const context = visualizerContextRef.current;
         if (!context || cameraRestoreNonce === 0) return;
-        applyCameraAngles(context.camera, context.controls.target, restoredCameraAngles);
+        // preflight D1: no saved angle (restoredCameraAngles === null) means
+        // "the standard view", which standardViewDirection resolves against
+        // this context's own cut -- so a link such as cut=x:0.5 with no cam
+        // key still opens facing the cut face, not edge-on at the plain
+        // canonical angle applyCameraAngles would otherwise default to.
+        applyCameraAngles(context.camera, context.controls.target, restoredCameraAngles, standardViewDirection(context));
         context.controls.update();
         // Only a restore moves the camera; the user's own moves also change
         // cameraAngles and must not.

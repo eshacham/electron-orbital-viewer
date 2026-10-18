@@ -6,9 +6,11 @@ jest.mock('../src/orbital_controls_factory', () => ({ createOrbitalControls: jes
 
 import {
     VisualizerContext, ViewInsets, frameOrbital, handleResize, refitToCanvas, setViewInsets, tickTransition,
-    updateAtomViewInScene,
+    updateAtomViewInScene, standardViewDirection,
 } from '../src/orbital_visualizer';
 import { defaultSurfaceStyle } from '../src/types/orbital';
+import { CANONICAL_CAMERA_DIRECTION, cutFaceCameraDirection } from '../src/camera_angles';
+import { SHELL_VIEW_CUT_AXIS } from '../src/orbital_presets';
 
 /**
  * A VisualizerContext without a WebGLRenderer (tests/visualizer_appearance.test.ts's recipe), whose
@@ -56,6 +58,74 @@ function freshDistance(width: number, height: number, insets: ViewInsets, rMax: 
 
 const DESKTOP: ViewInsets = { top: 80, right: 71, bottom: 120, left: 0 };
 const PHONE: ViewInsets = { top: 104, right: 0, bottom: 45, left: 0 };
+
+/** Where the camera is actually looking from, distance-free (cameraAnglesOf's own recipe, without the rounding). */
+function directionOf(context: VisualizerContext): THREE.Vector3 {
+    return context.camera.position.clone().sub(context.controls.target).normalize();
+}
+
+/** Compares directions only, so neither side need already be unit length -- CANONICAL_CAMERA_DIRECTION, used below, is not. */
+function expectDirection(actual: THREE.Vector3, expected: readonly [number, number, number]): void {
+    const a = actual.clone().normalize();
+    const e = new THREE.Vector3(...expected).normalize();
+    expect(a.x).toBeCloseTo(e.x, 9);
+    expect(a.y).toBeCloseTo(e.y, 9);
+    expect(a.z).toBeCloseTo(e.z, 9);
+}
+
+// Task 5 / preflight D1: standardViewDirection is what both frameOrbital's
+// restoreDefaultDirection branch and OrbitalViewer's restored-link effect
+// read, so a cut's exposed face -- not the plain canonical angle -- is what
+// Reset View, an element pick and a share link with no saved angle all land on.
+describe('standardViewDirection (ruling P17: Reset View also faces an active cut)', () => {
+    it('is the canonical direction with no cut', () => {
+        const context = buildContext(868, 640);
+        expectDirection(new THREE.Vector3(...standardViewDirection(context)), CANONICAL_CAMERA_DIRECTION);
+    });
+
+    it('faces the cut face when one is active', () => {
+        const context = buildContext(868, 640);
+        context.surfaceStyle = { ...context.surfaceStyle, clipAxis: 'y' };
+        expectDirection(new THREE.Vector3(...standardViewDirection(context)), cutFaceCameraDirection('y'));
+    });
+
+    it('a shell view has no surface besides its cut face, so it counts as cut even at clipAxis none', () => {
+        const context = buildContext(868, 640);
+        context.isShellView = true;
+        expectDirection(new THREE.Vector3(...standardViewDirection(context)), cutFaceCameraDirection(SHELL_VIEW_CUT_AXIS));
+    });
+
+    it('a shell view still honours a real axis over its fallback', () => {
+        const context = buildContext(868, 640);
+        context.isShellView = true;
+        context.surfaceStyle = { ...context.surfaceStyle, clipAxis: 'z' };
+        expectDirection(new THREE.Vector3(...standardViewDirection(context)), cutFaceCameraDirection('z'));
+    });
+});
+
+describe('frameOrbital\'s restoreDefaultDirection (preflight D1: the step 1 fixture)', () => {
+    it('swings to the cut face with a cut active', () => {
+        const context = buildContext(868, 640);
+        context.surfaceStyle = { ...context.surfaceStyle, clipAxis: 'x' };
+        frameOrbital(context, 5, true);
+        expectDirection(directionOf(context), cutFaceCameraDirection('x'));
+    });
+
+    it('swings to the plain canonical direction with clipAxis none', () => {
+        const context = buildContext(868, 640);
+        frameOrbital(context, 5, true);
+        expectDirection(directionOf(context), CANONICAL_CAMERA_DIRECTION);
+    });
+
+    it('keeps the camera\'s own direction when not asked to restore it (unchanged behaviour)', () => {
+        const context = buildContext(868, 640);
+        context.surfaceStyle = { ...context.surfaceStyle, clipAxis: 'x' };
+        context.camera.position.set(3, 4, 5);
+        const before = directionOf(context);
+        frameOrbital(context, 5, false);
+        expectDirection(directionOf(context), [before.x, before.y, before.z]);
+    });
+});
 
 /** A shell view's params (tests/atom/level_transition_animation.test.ts's atomShellParams). */
 function shellParams(contourRadius = 4) {

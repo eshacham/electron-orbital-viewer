@@ -64,3 +64,19 @@ export function decodeDisplay(raw: string | null): DisplayPrefs {
 }
 
 export const displayPref = createPref<DisplayPrefs>(DISPLAY_KEY, { decode: decodeDisplay, encode: value => JSON.stringify(value) });
+
+/**
+ * Atoms mode's one-time "Drag to rotate" hint (Task 5, ruling P17): seen
+ * once, then never again -- localStorage only, never in a link (spec §6.7).
+ */
+export interface HintPrefs { rotateDismissed: boolean }
+
+export const HINT_KEY = 'eov.hint';
+export const DEFAULT_HINT: HintPrefs = { rotateDismissed: false };
+
+export function decodeHint(raw: string | null): HintPrefs {
+    const value = parse(raw);
+    return { rotateDismissed: value.rotateDismissed === true };
+}
+
+export const hintPref = createPref<HintPrefs>(HINT_KEY, { decode: decodeHint, encode: value => JSON.stringify(value) });

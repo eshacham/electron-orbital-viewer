@@ -1,0 +1,38 @@
+/* Task 5 (ruling P17): the one-time "Drag to rotate" hint. Centre-bottom
+   above the strip (spec §8.5), the same free area the busy chip and the
+   unbound note use (style.css's .canvas-busy) -- D10: there is no
+   --strip-clearance; --free-bottom (useViewInsets) is what those two already
+   read, so this reuses it rather than inventing a second variable.
+   Interactive (its own dismiss button), unlike those two, so pointer-events
+   stay on; not an inset zone (it never changes what the camera frames). */
+.first-view-hint {
+  position: absolute;
+  left: var(--free-center-x, 50%);
+  bottom: calc(var(--free-bottom, 140px) + 12px);
+  transform: translateX(-50%);
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 8px;
+  background: var(--ql-color-surface-2);
+  border: 1px solid var(--ql-color-border-subtle);
+  color: var(--ql-color-text-1);
+  font-size: var(--ql-type-caption-size);
+  line-height: var(--ql-type-caption-line);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.first-view-hint-dismiss {
+  padding: 4px !important;
+}
+
+/* D10: a first load can show the hint and "Calculating..." at once (the
+   solve the link's own species/level needs). The hint stacks above the busy
+   chip rather than sitting under it -- both are otherwise anchored to the
+   same spot (see .canvas-busy's own desktop rule in style.css). */
+.viewport-cell:has(> .canvas-busy) .first-view-hint {
+  bottom: calc(var(--free-bottom, 140px) + 12px + 44px);
+}
