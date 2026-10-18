@@ -1435,6 +1435,57 @@ describe('App: shell', () => {
         }
     });
 
+    // Task 7 fix round 1, Important 2: the Basic Orbitals screen's own version of the
+    // test above -- it must go through the real App wiring (displayPref.plotTab,
+    // basicTabCurves, handleExport), not build the curves itself.
+    it('Basic Orbitals: exports the curves of the plot tab on screen (ruling C6)', async () => {
+        const download = jest.spyOn(downloadModule, 'downloadBlob').mockImplementation(() => {});
+        try {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+            // The default selection (n=3, l=2, ml=0) draws on entry (the nonce effect); the mocked
+            // OrbitalViewer never calls back, so the render is finished here, as the isostale test does.
+            act(() => { store.dispatch(finishOrbitalCalculation({ isoLevel: 1e-4 })); });
+            fireEvent.click(screen.getByRole('tab', { name: 'Wave function R(r)' }));
+            fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Export CSV of this plot' }));
+            await waitFor(() => expect(download).toHaveBeenCalled());
+            const text = new TextDecoder().decode(await readBlob(download.mock.calls[0][0] as Blob));
+            expect(text).toContain('3d · R(r)');
+            expect(text).toContain('# quantity: R(r)');
+        } finally {
+            download.mockRestore();
+            window.localStorage.clear();
+        }
+    });
+
+    // Ruling T7-dist (fix round 1): the D(r) tab is unchanged from before this task --
+    // a plain 'P(r)' CSV header and today's quantity text, never the shared tab's own label.
+    it('Basic Orbitals: the D(r) tab\'s CSV stays exactly as before (ruling T7-dist)', async () => {
+        const download = jest.spyOn(downloadModule, 'downloadBlob').mockImplementation(() => {});
+        try {
+            const { store, container } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+            act(() => { store.dispatch(finishOrbitalCalculation({ isoLevel: 1e-4 })); });
+            // D(r) is the default tab -- no tab click needed. It keeps today's single-curve
+            // plot exactly: its own title (not the Atom screen's "D(r) = 4πr²ρ(r)"), its area
+            // fill, and no legend/hover line (isMultiCurve stays false).
+            expect(screen.getByText('Radial distribution — r²R(r)²')).toBeInTheDocument();
+            expect(container.querySelector('.radial-plot-fill')).not.toBeNull();
+            expect(container.querySelector('.radial-plot-legend')).toBeNull();
+            fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Export CSV of this plot' }));
+            await waitFor(() => expect(download).toHaveBeenCalled());
+            const text = new TextDecoder().decode(await readBlob(download.mock.calls[0][0] as Blob));
+            expect(text).toContain('P(r)');
+            expect(text).not.toContain('D(r)');
+            expect(text).toContain('# quantity: P(r) = r^2*R(r)^2, probability per bohr');
+        } finally {
+            download.mockRestore();
+            window.localStorage.clear();
+        }
+    });
+
     // Ruling DX1/DC1: the inspector column holds its place while the atom solves (§8.6), then gains its tabs.
     it('keeps the Atom inspector landmark before the profile arrives, and gives it Plot and Data once it does', () => {
         const { store } = renderWithProvider(<App />);

@@ -77,6 +77,7 @@ import { CURVE_COLORS } from './curve_colors';
 import { buildComparisonCurves, radialPlotRange } from './atom/comparison_curves';
 import { useUrlStateSync } from './useUrlStateSync';
 import { hasSharedView, encodeStateOf } from './url_state';
+import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
 import { exportAvailability, exportItemsFor, runExport, ExportKind, ExportOptions } from './export/run_export';
 import { CsvCurve } from './export/csv';
 import { downloadBlob } from './export/download';
@@ -938,13 +939,25 @@ function App() {
     // displayPref.plotTab persists across modes (ruling P2), and the curves
     // come straight from the analytic R(r) -- there is no solved profile to
     // draw from, unlike atomTabCurves above.
+    //
+    // Ruling T7-dist (fix round 1): the D(r) tab is *not* one of the new
+    // curve-array tabs -- it stays exactly today's single-curve plot (its
+    // own title, its fill, no legend) and CSV ('P(r)', today's default
+    // quantity text), unlike the shared PlotTab's "Radial distribution
+    // D(r) = 4πr²ρ(r)" title/label the Atom screen's distribution tab uses.
+    // So this only builds curves for R(r)/|R|²; the distribution case below
+    // is the same manual 'P(r)' curve csvCurvesNow built before this task.
     const basicActivePlotTab = resolvePlotTab(BASIC_PLOT_TABS, display.plotTab);
-    const basicTabCurves = useMemo(
-        () => (renderedParams
-            ? hydrogenicTabCurves(basicActivePlotTab.id, { n: renderedParams.n, l: renderedParams.l, Z: 1, rMax: renderedParams.rMax, colour: CURVE_COLORS[0] })
-            : []),
-        [renderedParams, basicActivePlotTab],
-    );
+    const basicTabCurves = useMemo(() => {
+        if (!renderedParams) return [];
+        const { n, l, Z, rMax } = renderedParams;
+        if (basicActivePlotTab.id === 'distribution') {
+            // CSV only (ruling T7-dist): the plot itself renders through RadialPlot's single-curve
+            // path below, not from this curve, so `color` is unused -- kept only to satisfy RadialCurve.
+            return [{ label: 'P(r)', color: CURVE_COLORS[0], points: radialProfile(n, l, Z, rMax, PLOT_SAMPLE_COUNT).map(p => ({ r: p.r, value: p.probability })) }];
+        }
+        return hydrogenicTabCurves(basicActivePlotTab.id, { n, l, Z: 1, rMax, colour: CURVE_COLORS[0] });
+    }, [renderedParams, basicActivePlotTab]);
     // The Data card (spec §9.2, same component as §9.1): null while a
     // combination is drawn instead of one orbital (renderedParams is then
     // null too -- the two are mutually exclusive, orbitalSlice's own rule).
@@ -1307,8 +1320,25 @@ function App() {
                     />
                 );
             }
-            // The plot tab on screen (spec §9.2: "Plot tabs as §9.1").
-            return renderedParams && (
+            if (!renderedParams) return null;
+            // Ruling T7-dist: the D(r) tab is unchanged from before this task -- RadialPlot's own
+            // single-curve path (its title, its fill, no legend), not the shared tabs' curve-array one.
+            if (basicActivePlotTab.id === 'distribution') {
+                return (
+                    <RadialPlot
+                        n={renderedParams.n}
+                        l={renderedParams.l}
+                        Z={renderedParams.Z}
+                        rMax={renderedParams.rMax}
+                        width={width}
+                        collapsible={collapsible}
+                        lineColour={palette[0]}
+                    />
+                );
+            }
+            // The R(r) / |R|² tabs (spec §9.2: "Plot tabs as §9.1") -- the same curve-array
+            // rendering the Atom screen's own orbital-level wave/density tabs already use.
+            return (
                 <RadialPlot
                     n={renderedParams.n}
                     l={renderedParams.l}
