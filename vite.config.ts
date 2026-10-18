@@ -52,6 +52,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), serveLocalMolecules()],
     root: 'public',
+    // Relative to root: public/static/ is served at / and copied into dist/ as-is (the library's prerendered
+    // structure pictures, spec §12); the default, public/public/, does not exist, so nothing else is copied.
+    publicDir: 'static',
     build: {
       outDir: '../dist',
       emptyOutDir: true,
@@ -77,7 +80,10 @@ export default defineConfig(({ mode }) => {
         {
           find: /^\.\.\/src\/(.*)/,
           replacement: resolve(__dirname, 'src/$1')
-        }
+        },
+        // A dev-only page's `<script src="../src/…">`: Vite rewrites the html's relative src against the root
+        // (public/) to `/src/…` before resolving it, which the alias above no longer matches.
+        { find: /^\/src\/(.*)/, replacement: resolve(__dirname, 'src/$1') },
       ]
     },
     server: {
