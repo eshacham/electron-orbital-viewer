@@ -99,11 +99,14 @@ describe('Glow (spec §11.2)', () => {
     });
 
     // Ruling T15-inkrim: §11.2's ink rim is a DARKER colour -- for a phase-less surface too, never white.
-    it('gives a phase-less surface an own-tint rim: lighter additive in Deep Space, darker ink in Light Clean', () => {
+    // Ruling R24-2 (owner, "too much white glare"): Deep Space's additive tint is the surface's own colour
+    // (was mixed half-way to white, a whitish rim on every density, ESP map and lobe).
+    it('gives a phase-less surface an own-colour rim: its own colour added in Deep Space, darker ink in Light Clean', () => {
         const material = new THREE.MeshStandardMaterial();
         applyGlow(material, glowSettingsFor({ ...glowDark, theme: 'light' }), { phased: false });
         const shader = shaderOf(material);
-        expect(shader.fragmentShader).toContain('vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : mix(diffuseColor.rgb, vec3(1.0), 0.5);');
+        expect(shader.fragmentShader).toContain('vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : diffuseColor.rgb;');
+        expect(shader.fragmentShader).not.toMatch(/qlOwnTint = [^;]*vec3\(1\.0\)/);
         expect(shader.fragmentShader).toContain(': (vQlPhase < -0.5 ? qlRimNegative : qlOwnTint)');
         expect(shader.uniforms.qlInk.value).toBe(1);
     });
@@ -204,8 +207,10 @@ describe('Glow (spec §11.2)', () => {
         // paler towards the edge (wash) with a thin ink outline, as concept Option 2.
         expect(GLOW_TUNING).toEqual({
             dark: {
-                emissive: 0.1, rimStrength: 1.0, rimPower: 1.8,
-                lines: { opacity: 0.05, whiten: 0.3, additive: true },
+                // Ruling R24-2 (owner, "too much white glare"): the rim is a same-hue edge accent, not a glare --
+                // half the strength and a narrower band (was 1.0 / 1.8); the lines add their own phase, unwhitened (was 0.3).
+                emissive: 0.1, rimStrength: 0.5, rimPower: 3.0,
+                lines: { opacity: 0.05, whiten: 0, additive: true },
                 // Ruling R23c-2 (owner): the halo read as too thick -- a third of the
                 // offset (band width) and half the opacity (peak alpha).
                 halo: { opacity: 0.3, offset: 0.027, power: 1 },
@@ -213,12 +218,15 @@ describe('Glow (spec §11.2)', () => {
                 lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
                 // Ruling R20d: the strip tiles' own rig and strengths -- a brighter key, rim and halo, fainter lines at 64³.
                 // Ruling R23c-2: haloOpacity halved alongside the main view's halo.opacity above.
-                thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 1.25, haloOpacity: 0.5, linesOpacity: 0.03 },
+                // Ruling R24-2: the tile's rim halved with the main view's (was 1.25), so tiles match the view.
+                thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 0.625, haloOpacity: 0.5, linesOpacity: 0.03 },
             },
             light: {
                 emissive: 0.05, rimStrength: 1.0, rimPower: 1.5,
-                lines: { opacity: 0.1, whiten: 0.85, additive: false },
-                wash: 0.7,
+                // Ruling R24-2: lines barely lighter than the body (was 0.85) and no wash towards white (was 0.7) --
+                // the body is the phase colour; the ink rim stays.
+                lines: { opacity: 0.1, whiten: 0.2, additive: false },
+                wash: 0,
                 lights: { ambient: 1.0, key: 1.0, fill: 0.4 },
                 thumb: { lights: { ambient: 1.0, key: 1.1, fill: 0.4 }, rimStrength: 1.15, linesOpacity: 0.035 },
             },
@@ -237,13 +245,15 @@ describe('Glow (spec §11.2)', () => {
         expect(glowSettingsFor({ ...glowDark, theme: 'light' })!.emissive).toBeLessThan(0.2);
     });
 
-    // Fix round 1 of Task 20a: Light Clean's body washes towards white at the edge (never another hue), inked at the outline.
-    it('washes Light Clean\'s body paler towards its edge and inks a thin outline; Deep Space has no wash', () => {
+    // Fix round 1 of Task 20a: Light Clean inks a thin outline in the body's own phase.
+    // Ruling R24-2 (owner, "too much white glare"): the body is no longer washed towards white -- wash is 0 in
+    // both themes, so a lobe reads as its own science colour (was 0.7 in Light Clean, the main source of the glare).
+    it('inks Light Clean\'s outline without washing its body towards white; neither theme washes', () => {
         const material = new THREE.MeshStandardMaterial({ vertexColors: true });
         applyGlow(material, glowSettingsFor({ ...glowDark, theme: 'light' }));
         const shader = shaderOf(material);
         expect(shader.fragmentShader).toContain('mix(mix(outgoingLight, vec3(1.0), qlWash * qlRim), qlRimColour, qlRim * qlRim * qlRim * qlRimStrength)');
-        expect(shader.uniforms.qlWash.value).toBeCloseTo(GLOW_TUNING.light.wash);
+        expect(shader.uniforms.qlWash.value).toBe(0);
         applyGlow(material, glowSettingsFor(glowDark));
         expect(shader.uniforms.qlWash.value).toBe(0);
     });

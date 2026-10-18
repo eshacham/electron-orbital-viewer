@@ -22,10 +22,10 @@ export interface GlowSettings {
     /** The Fresnel exponent: lower is a wider rim. */
     rimPower: number;
     /**
-     * Light Clean only (ink): how far the body is mixed towards white where
-     * it faces the viewer, fading out into the ink rim -- Option 2's pale
-     * see-through sphere with a saturated edge. A paler tint of the same
-     * phase, never another hue; the alpha (the user's opacity) is untouched.
+     * Ink mode only: how far the body is mixed towards white towards its
+     * edge, fading out into the ink rim (Option 2's pale see-through sphere).
+     * Ruling R24-2 (owner): 0 in both themes -- the body shows its own
+     * science colour; kept as a knob, never another hue.
      */
     wash: number;
 }
@@ -36,17 +36,23 @@ export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
 /**
  * Ruling R20a-3: every tuned Glow value, in one place (a test pins them).
  * Tuned live against the concept (original-concepts.png Options 1 and 2):
- * translucent lobes with a visible fine mesh-line network, a bright
- * same-phase rim and, in Deep Space, a soft halo.
+ * translucent lobes with a visible fine mesh-line network, a same-phase rim
+ * and, in Deep Space, a soft halo.
+ * Ruling R24-2 (owner: "the orbitals have too much white glare"): at the
+ * default opacity the body of every surface reads as its own science colour
+ * (phase, density, ESP), never a whitened or pastel version -- Light Clean
+ * has no wash and near-unwhitened lines (its ink rim stays); Deep Space's
+ * rim is a modest same-hue edge accent (half the strength, a narrower band)
+ * and its lines add their own colour, unwhitened. Science hexes unchanged.
  * - `lines.opacity`: the mesh lines' alpha; `lines.whiten`: how far each
- *   line's own phase colour is mixed towards white (the concept's lines are
- *   lighter than the lobe in both themes); `lines.additive`: added light
+ *   line's own phase colour is mixed towards white (kept low, R24-2, so the
+ *   lines never lighten the body visibly); `lines.additive`: added light
  *   (Deep Space) or painted over (Light Clean, where added light vanishes).
  * - `halo.offset`: the push along the normals, as a fraction of the mesh
  *   radius; `halo.opacity`: its peak alpha; `halo.power`: how fast it fades
  *   towards its own outer edge (higher is softer).
- * - `wash` (Light Clean): the body mixed towards white where it faces the
- *   viewer, fading into the ink rim (see GlowSettings.wash); 0 in Deep Space.
+ * - `wash`: the body mixed towards white towards its edge (see
+ *   GlowSettings.wash); 0 in both themes since R24-2 (was 0.7 in Light Clean).
  * - `lights`: the three lights while a surface glows (§11.1 "Lights"), per
  *   theme. Deep Space dims them so the body stays a dark, see-through glass
  *   lit by its rim; Light Clean keeps them up so the lights, not an
@@ -61,9 +67,9 @@ export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
 export const GLOW_TUNING = {
     dark: {
         emissive: 0.1,
-        rimStrength: 1.0,
-        rimPower: 1.8,
-        lines: { opacity: 0.05, whiten: 0.3, additive: true },
+        rimStrength: 0.5,
+        rimPower: 3.0,
+        lines: { opacity: 0.05, whiten: 0, additive: true },
         // Ruling R23c-2 (owner): the halo was too thick -- about a third of
         // the push (offset, so the band is a third as wide, main view and
         // tiles alike: tuneThumbnailGlow never overrides it) and about half
@@ -71,14 +77,14 @@ export const GLOW_TUNING = {
         halo: { opacity: 0.3, offset: 0.027, power: 1 },
         wash: 0,
         lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
-        thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 1.25, haloOpacity: 0.5, linesOpacity: 0.03 },
+        thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 0.625, haloOpacity: 0.5, linesOpacity: 0.03 },
     },
     light: {
         emissive: 0.05,
         rimStrength: 1.0,
         rimPower: 1.5,
-        lines: { opacity: 0.1, whiten: 0.85, additive: false },
-        wash: 0.7,
+        lines: { opacity: 0.1, whiten: 0.2, additive: false },
+        wash: 0,
         lights: { ambient: 1.0, key: 1.0, fill: 0.4 },
         thumb: { lights: { ambient: 1.0, key: 1.1, fill: 0.4 }, rimStrength: 1.15, linesOpacity: 0.035 },
     },
@@ -139,10 +145,11 @@ const FRAGMENT_HEAD = 'uniform vec3 qlRimPositive;\nuniform vec3 qlRimNegative;\
 const RIM = /* glsl */`
     // Fresnel rim, in the surface's own phase (vQlPhase: +1, -1, or 0 where
     // the mesh has no phase -- a density, an ESP map, an atom, a lobe -- which
-    // takes a tint of its own colour: lighter where the rim adds light (Deep
-    // Space), darker where it is ink (Light Clean, §11.2 "darker rim colour").
+    // takes its own colour: added as it is where the rim adds light (Deep
+    // Space; ruling R24-2: no longer mixed half-way to white, a whitish rim),
+    // darker where it is ink (Light Clean, §11.2 "darker rim colour").
     float qlRim = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), qlRimPower);
-    vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : mix(diffuseColor.rgb, vec3(1.0), 0.5);
+    vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : diffuseColor.rgb;
     vec3 qlRimColour = vQlPhase > 0.5 ? qlRimPositive : (vQlPhase < -0.5 ? qlRimNegative : qlOwnTint);
     outgoingLight = qlInk > 0.5
         ? mix(mix(outgoingLight, vec3(1.0), qlWash * qlRim), qlRimColour, qlRim * qlRim * qlRim * qlRimStrength)
