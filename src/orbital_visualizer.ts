@@ -2386,20 +2386,30 @@ export function handleResize(context: VisualizerContext, width: number, height: 
 export function attachThumbnails(
     context: VisualizerContext,
     service: ThumbnailService,
-    options: { isBusy(): boolean; appearance(): Appearance; opacity?(): number },
+    options: {
+        isBusy(): boolean; appearance(): Appearance; opacity?(): number;
+        /**
+         * Task 10: the grid worker a molecule's density grid is meshed in
+         * (createGridMeshWorker), lent by the caller rather than imported here
+         * -- its module reads import.meta.url, which ts-jest cannot load, and
+         * every test of this module would otherwise have to mock it.
+         */
+        createGridWorker(): Worker;
+    },
 ): void {
     const thumbs = createThumbnailRenderer(context.renderer);
     // Ruling R20a-4 (fix round 1): the main view's committed opacity; the default when the host gives none.
     const opacity = () => options.opacity?.() ?? DEFAULT_OPACITY;
     const thumbHost: ThumbHost = {
         createWorker: createOrbitalWorker,
+        createGridWorker: options.createGridWorker,
         isBusy: options.isBusy,
         // Everything the picture depends on besides its content (thumb_key.ts, the
         // strip's key too): palette, finish, extras (lowPower), size and opacity.
         themeKey: () => thumbLookKey({ appearance: options.appearance(), opacity: opacity(), size: thumbs.size() }),
-        render: meshData => {
+        render: (meshData, colouring) => {
             context.thumbnailRendered = true;
-            return thumbs.render(meshData, options.appearance(), opacity(), !context.extrasSuppressed);
+            return thumbs.render(meshData, options.appearance(), opacity(), !context.extrasSuppressed, colouring);
         },
     };
     service.attach(thumbHost);

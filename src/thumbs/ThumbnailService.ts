@@ -1,29 +1,64 @@
 import type { MeshData, OrbitalParams } from '../types/orbital';
+import type { FieldRenderRequest } from '../field_source';
+import type { GridMeshRequest } from '../molecules/grid_mesh_request';
+import type { ScalarGrid } from '../molecules/esp';
 
 /**
  * Thumbnails for the strips (spec §12 item 1), from the MAIN renderer --
- * never a second WebGL context. Meshes come from the existing orbital worker
- * at a low resolution, one job at a time; at most one thumbnail is rendered
- * per animation frame (tick()); nothing starts while the main picture is
- * computing or the user is dragging the camera (host.isBusy()). Images are
- * kept in an LRU of 96, keyed by theme|finish|power|size|content, so a theme
- * switch re-renders and a revisit is instant. The host (OrbitalViewer via
+ * never a second WebGL context. Meshes come from the workers that already
+ * draw the main view, at a low resolution, one job at a time; at most one
+ * thumbnail is rendered per animation frame (tick()); nothing starts while
+ * the main picture is computing or the user is dragging the camera
+ * (host.isBusy()). Images are kept in an LRU of 96, keyed by
+ * theme|finish|power|size|content, so a theme switch re-renders and a
+ * revisit is instant. The host (OrbitalViewer via
  * orbital_visualizer.attachThumbnails) owns the GPU; this module only
  * schedules, which is why it is testable without WebGL.
  */
 export type ThumbImage = { width: number; height: number };
 
-export interface ThumbRequest {
-    /** Everything the picture depends on except the theme: species, relativity, orbital, fraction. */
-    contentKey: string;
-    params: OrbitalParams;
-}
+/**
+ * How a tile's surface is coloured (Task 10): the ψ phase colours (an
+ * orbital), the density's one colour (science.ts densitySurfaceHex), or an
+ * ESP mapped onto it -- the same three the main view draws.
+ */
+export type ThumbColouring = 'phase' | 'density' | { kind: 'esp'; grid: ScalarGrid; limit: number };
+
+/**
+ * What a tile asks for. `contentKey` is everything the picture depends on
+ * except the look (theme, finish, size, opacity: thumb_key.ts) -- the
+ * colouring included, which the item builders write into it.
+ */
+export type ThumbRequest =
+    /** An orbital from the orbital worker's 'calculate' (the Atom and Orbitals strips). Without a `kind`, as before Task 10. */
+    | { kind?: 'orbital'; contentKey: string; params: OrbitalParams }
+    /** One analytic source from the orbital worker's 'calculateFields' (Bonds' tiles). */
+    | { kind: 'field'; contentKey: string; field: FieldRenderRequest; colouring: ThumbColouring }
+    /** A sampled grid from the grid worker (a molecule's density or ESP surface). */
+    | { kind: 'grid'; contentKey: string; grid: GridMeshRequest; colouring: ThumbColouring };
 
 export interface ThumbHost {
     createWorker(): Worker;
+    /** The grid worker (createGridMeshWorker): a molecule's density grid is meshed there, as in the main view. */
+    createGridWorker(): Worker;
     isBusy(): boolean;
     themeKey(): string;
-    render(meshData: MeshData): Promise<ThumbImage>;
+    render(meshData: MeshData, colouring: ThumbColouring): Promise<ThumbImage>;
+}
+
+const colouringOf = (request: ThumbRequest): ThumbColouring => (request.kind === 'field' || request.kind === 'grid' ? request.colouring : 'phase');
+
+/** What a job's worker is sent: each worker's own message, exactly as the main view sends it. */
+function messageOf(request: ThumbRequest): unknown {
+    if (request.kind === 'field') return { type: 'calculateFields', request: request.field };
+    if (request.kind === 'grid') return request.grid;
+    return { type: 'calculate', params: request.params };
+}
+
+/** The mesh in a worker's reply, or null for an error (or a field reply that drew nothing). */
+function meshOf(request: ThumbRequest, data: { type?: string; meshData?: MeshData; meshes?: MeshData[] } | undefined): MeshData | null {
+    if (request.kind === 'field') return data?.type === 'fieldsSuccess' ? data.meshes?.[0] ?? null : null;
+    return data?.type === 'success' ? data.meshData ?? null : null;
 }
 
 export type ThumbStatus = 'detached' | 'ready' | 'lost';
@@ -52,9 +87,9 @@ export class ThumbnailService {
      * under the theme it was drawn in -- so a theme switch while a job is
      * under way can never file one theme's picture under another's key.
      */
-    private queue: Array<{ contentKey: string; params: OrbitalParams }> = [];
+    private queue: ThumbRequest[] = [];
     private inFlight: { contentKey: string; worker: Worker } | null = null;
-    private ready: Array<{ contentKey: string; meshData: MeshData }> = [];
+    private ready: Array<{ contentKey: string; meshData: MeshData; colouring: ThumbColouring }> = [];
     private rendering = false;
 
     attach(host: ThumbHost): void {
@@ -132,7 +167,7 @@ export class ThumbnailService {
         const waiter: Waiter = { onReady, onFailed };
         entry.waiters.add(waiter);
         this.waiting.set(key, entry);
-        if (!this.hasJob(contentKey)) this.queue.push({ contentKey, params: request.params });
+        if (!this.hasJob(contentKey)) this.queue.push(request);
         return () => {
             entry.waiters.delete(waiter);
             // Still wanted by another tile, or already answered or cancelled (a later request has its own entry).
@@ -181,11 +216,11 @@ export class ThumbnailService {
         if (!host || this.lost || host.isBusy()) return;
         if (this.ready.length > 0) {
             if (this.rendering) return;
-            const { contentKey, meshData } = this.ready.shift()!;
+            const { contentKey, meshData, colouring } = this.ready.shift()!;
             // Read together with the appearance host.render draws in: the picture's own theme.
             const key = this.keyOf(contentKey);
             this.rendering = true;
-            host.render(meshData).then(
+            host.render(meshData, colouring).then(
                 image => {
                     this.rendering = false;
                     // A reply for a picture that has gone meanwhile (a lost context, a detach) is not cached.
@@ -200,14 +235,16 @@ export class ThumbnailService {
             return;
         }
         if (this.inFlight || this.queue.length === 0) return;
-        const { contentKey, params } = this.queue.shift()!;
-        const worker = host.createWorker();
+        const request = this.queue.shift()!;
+        const { contentKey } = request;
+        const worker = request.kind === 'grid' ? host.createGridWorker() : host.createWorker();
         this.inFlight = { contentKey, worker };
         worker.onmessage = (event: MessageEvent) => {
             worker.terminate();
             if (this.inFlight?.worker !== worker) return; // cancelled meanwhile
             this.inFlight = null;
-            if (event.data?.type === 'success') this.ready.push({ contentKey, meshData: event.data.meshData as MeshData });
+            const meshData = meshOf(request, event.data);
+            if (meshData) this.ready.push({ contentKey, meshData, colouring: colouringOf(request) });
             else this.fail(contentKey);
         };
         worker.onerror = () => {
@@ -216,7 +253,7 @@ export class ThumbnailService {
             this.inFlight = null;
             this.fail(contentKey);
         };
-        worker.postMessage({ type: 'calculate', params });
+        worker.postMessage(messageOf(request));
     }
 }
 

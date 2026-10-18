@@ -167,6 +167,44 @@ describe('ThumbnailStrip when a thumbnail cannot be made', () => {
     });
 });
 
+// Preflight D15 (fixed in Task 10): shoot.mjs counts `data-drawn="true"` as
+// "this tile's picture is showing". A tile still waiting for its image shows
+// neither glyph nor picture, so it must not count -- it did, which made
+// thumbsDrawn read "all drawn" the moment a strip appeared.
+describe('ThumbnailStrip data-drawn (D15)', () => {
+    afterEach(() => { act(() => { thumbnailService.detach(); }); });
+
+    it('marks an orbital tile drawn only once its image has arrived; a ring glyph at once', async () => {
+        const workers: Array<{ onmessage: ((event: { data: unknown }) => void) | null }> = [];
+        thumbnailService.attach({
+            createWorker: () => {
+                const worker = { postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null };
+                workers.push(worker);
+                return worker as unknown as Worker;
+            },
+            createGridWorker: () => { throw new Error('no grid tile here'); },
+            isBusy: () => false,
+            themeKey: () => 'dark|glow',
+            render: async () => ({ width: 72, height: 72 }),
+        });
+        const whole = atomStripItems({ profile, level: 'atom', selectedShell: null, selectedOrbital: null, enclosedFraction: 0.9, palette: CURVE_COLORS });
+        const rings = render(<ThumbnailStrip items={whole} label="shells" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
+        const ringCanvases = [...rings.container.querySelectorAll('canvas.thumb-canvas')];
+        expect(ringCanvases.length).toBeGreaterThan(0);
+        expect(ringCanvases.every(canvas => canvas.getAttribute('data-drawn') === 'true')).toBe(true);
+        rings.unmount();
+
+        const { container } = render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
+        const drawnFlags = () => [...container.querySelectorAll('canvas.thumb-canvas')].map(canvas => canvas.getAttribute('data-drawn'));
+        act(() => { thumbnailService.tick(); });
+        expect(drawnFlags()).toEqual(['false', 'false', 'false', 'false']);
+        act(() => { workers[0].onmessage!({ data: { type: 'success', meshData: { positions: [], cells: [], psiSigns: [] } } }); });
+        await act(async () => { thumbnailService.tick(); await Promise.resolve(); await Promise.resolve(); });
+        // The first job is 2s's: only its tile is drawn; the others still wait.
+        expect(drawnFlags()).toEqual(['true', 'false', 'false', 'false']);
+    });
+});
+
 // Ruling T16-spoken: under spin–orbit a group is a j-level; it reads
 // "6p j = 3/2" to a screen reader and shows "6p³⁄₂". Bismuth-shaped: gold's
 // fixture with its 6p split into j = 1/2 and 3/2, as Bi's valence 6p is.

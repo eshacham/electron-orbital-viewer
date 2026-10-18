@@ -5,7 +5,10 @@ import type { Appearance } from '../design/appearance';
  * R20a-4 and its fix round): one key, built here, used both by the strip
  * (ThumbnailStrip's themeKey, which re-requests a tile when it changes) and
  * by the service's cache (attachThumbnails' host), so the two always agree.
- * No three.js here: App imports it.
+ * No three.js here: App imports it. A tile's colouring (Task 10: phase,
+ * density or ESP) is part of its content, not its look: the item builders
+ * write it into the request's contentKey (bonds_strip_items.ts), so two
+ * colourings of one surface are filed apart.
  */
 
 /** The largest strip tile, in CSS px (ThumbnailStrip's overlay variant; the phone's sheet tiles are 56). */

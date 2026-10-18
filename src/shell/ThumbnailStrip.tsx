@@ -119,9 +119,10 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
                     // D15: shoot.mjs has no live hook into the thumbnail service, so it
                     // counts this attribute instead -- the picture (not the glyph) is
                     // showing. True for a ring glyph tile at once (drawn synchronously
-                    // on mount); for an orbital tile, only once its image has arrived.
+                    // on mount); for an orbital tile, only once its image has arrived
+                    // (Task 10: was `!showGlyph`, which also counted a tile still waiting).
                     <canvas ref={canvasRef} className="thumb-canvas" width={backing} height={backing} aria-hidden="true"
-                        data-drawn={showGlyph ? 'false' : 'true'}
+                        data-drawn={thumb.kind !== 'orbital' || drawn === wanted ? 'true' : 'false'}
                         style={showGlyph ? { visibility: 'hidden' } : undefined} />
                 )}
                 {showGlyph && <span className="strip-tile-glyph" aria-hidden="true">{item.label}</span>}

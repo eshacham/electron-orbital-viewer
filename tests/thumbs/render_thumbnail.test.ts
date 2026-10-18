@@ -5,7 +5,9 @@ import {
 import { THUMB_FILL, THUMB_TILE_PX, thumbLookKey, thumbSupersample, thumbTileDevicePx } from '../../src/thumbs/thumb_key';
 import type { MeshData } from '../../src/types/orbital';
 import { INITIAL_APPEARANCE, type Appearance } from '../../src/design/appearance';
-import { linearRgb, phaseColours } from '../../src/design/science';
+import { densitySurfaceHex, linearRgb, phaseColours } from '../../src/design/science';
+import { espVertexColors } from '../../src/molecules/esp_color';
+import type { ScalarGrid } from '../../src/molecules/esp';
 import { GLOW_TUNING, SOLID_LIGHTS } from '../../src/orbital_glow';
 import { DEFAULT_OPACITY } from '../../src/types/orbital';
 
@@ -218,6 +220,53 @@ describe('createThumbnailRenderer (spec §12: a target on the main renderer)', (
 
 // Ruling R20d: the picture is at least 3× the tile's CSS size, at least 2× its device size, and a whole
 // multiple of the device size, so the tile's bitmap is a box filter of it -- no CSS or non-integer scaling.
+// Task 10 (spec §12, ruling P5): a tile is drawn in the colouring its strip asks for --
+// the phase colours (an orbital), the density's one colour, or a mapped ESP.
+describe('createThumbnailRenderer colourings (Task 10)', () => {
+    const dark: Appearance = { theme: 'dark', finish: 'glow', showAxes: true, lowPower: false };
+    const coloursOf = (mesh: THREE.Mesh) => Array.from((mesh.geometry.getAttribute('color') as THREE.BufferAttribute).array);
+    const signsOf = (mesh: THREE.Mesh) => Array.from((mesh.geometry.getAttribute('phaseSign') as THREE.BufferAttribute).array);
+
+    it('draws every vertex of a density in the theme\'s density colour, display hex to linear as the main view does', async () => {
+        const { renderer, seen } = stubRenderer();
+        const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer, { pixelRatio: () => 1 });
+        await thumbs.render(triangle(), dark, DEFAULT_OPACITY, true, 'density');
+        const surface = seen[0].meshes[0];
+        const expected = linearRgb(densitySurfaceHex('dark'));
+        const colours = coloursOf(surface);
+        expect(colours).toHaveLength(9);
+        for (let i = 0; i < 3; i++) expect(colours.slice(3 * i, 3 * i + 3)).toEqual(expected.map(c => expect.closeTo(c, 6)));
+        // A density has no phase: the Glow rim takes no phase tint (the main view's 0, orbital_visualizer.ts).
+        expect(signsOf(surface)).toEqual([0, 0, 0]);
+    });
+
+    it('copies an ESP colouring\'s vertex colours verbatim', async () => {
+        const { renderer, seen } = stubRenderer();
+        const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer, { pixelRatio: () => 1 });
+        // A 2 × 2 × 2 grid ramping in x: the three vertices sample three different potentials.
+        const grid: ScalarGrid = {
+            shape: [2, 2, 2], origin: [0, 0, 0], spacing: 1,
+            values: new Float32Array([-0.05, -0.05, -0.05, -0.05, 0.05, 0.05, 0.05, 0.05]),
+        };
+        const mesh = triangle();
+        await thumbs.render(mesh, dark, DEFAULT_OPACITY, true, { kind: 'esp', grid, limit: 0.05 });
+        const surface = seen[0].meshes[0];
+        expect(coloursOf(surface)).toEqual(Array.from(espVertexColors(mesh.positions, grid, 0.05).colors));
+        expect(signsOf(surface)).toEqual([0, 0, 0]);
+    });
+
+    it('draws the phase colours when asked for them, exactly as without a colouring', async () => {
+        const { renderer, seen } = stubRenderer();
+        const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer, { pixelRatio: () => 1 });
+        await thumbs.render(triangle(), dark, DEFAULT_OPACITY, true, 'phase');
+        await thumbs.render(triangle(), dark);
+        expect(coloursOf(seen[0].meshes[0])).toEqual(coloursOf(seen[1].meshes[0]));
+        expect(signsOf(seen[0].meshes[0])).toEqual([1, 1, -1]);
+        const phase = phaseColours('dark');
+        expect(coloursOf(seen[0].meshes[0]).slice(6, 9)).toEqual(linearRgb(phase.negative).map(c => expect.closeTo(c, 6)));
+    });
+});
+
 describe('thumbnail sizes', () => {
     it.each([1, 1.25, 1.5, 2, 2.625, 3])('at devicePixelRatio %p', dpr => {
         const device = thumbTileDevicePx(dpr);

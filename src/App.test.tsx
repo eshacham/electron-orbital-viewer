@@ -28,6 +28,7 @@ import { MEDIUM_VIEWPORT } from './useMediaQuery';
 import * as downloadModule from './export/download';
 import { readBlob } from '../tests/export/fixtures';
 import { DRAW_DEBOUNCE_MS } from './basic_ui/useDrawOnSelection';
+import { thumbnailService } from './thumbs/ThumbnailService';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -926,7 +927,9 @@ describe('App', () => {
             expect(store.getState().orbital.currentField?.densityIsoValue).toBe(0.002);
 
             expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ρ = 0.002 e/a₀³, total electron density');
-            expect(screen.queryByText('ψ > 0')).not.toBeInTheDocument();
+            // Task 10: the strip's orbital tiles now bring their own ψ key ("Orbital tiles", T16-tilekey); the
+            // surface's key -- the only 'surface colour key' (getByLabelText throws on two) -- still has no ψ.
+            expect(within(screen.getByLabelText('surface colour key')).queryByText('ψ > 0')).not.toBeInTheDocument();
             expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
             expect(screen.getByText('The density is drawn at a fixed ρ, chosen with the ρ buttons beside the orbitals — not at an enclosed fraction.')).toBeInTheDocument();
             expect(within(container.querySelector('.view-panel') as HTMLElement)
@@ -983,6 +986,53 @@ describe('App', () => {
             expect(screen.getAllByRole('alert')).toHaveLength(1);
         });
 
+        // Task 10 (spec §9.3 "Strip", §12): the Bonds strip -- the total density, then
+        // every orbital the diagram lists -- and a tile is the diagram's own choice.
+        it('the strip opens on the total density, lists every orbital, and draws the one chosen', async () => {
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+            // H₂⁺: its two exact states, phase-coloured like the surface, so the ψ key covers them (preflight D9).
+            const h2plusStrip = screen.getByRole('listbox', { name: 'orbitals in view' });
+            expect(within(h2plusStrip).getAllByRole('option').map(option => option.getAttribute('aria-label'))).toEqual(['1σg orbital', '1σu* orbital']);
+            expect(screen.queryByLabelText('orbital tile colour key')).not.toBeInTheDocument();
+
+            chooseSystem('N₂ — Nitrogen');
+            await waitFor(() => expect(within(screen.getByRole('listbox', { name: 'orbitals in view' })).getAllByRole('option')).toHaveLength(1 + n2Meta.orbitals.length));
+            const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
+            const [first] = within(strip).getAllByRole('option');
+            expect(first).toHaveAttribute('aria-label', 'total electron density');
+            expect(first).toHaveAttribute('aria-selected', 'true');
+            // Ruling T16-tilekey with D9: the grey density has the ρ key; the strip's phase-coloured tiles get theirs.
+            expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ρ = 0.002 e/a₀³, total electron density');
+            expect(screen.getByLabelText('orbital tile colour key')).toHaveTextContent('Orbital tiles');
+
+            fireEvent.click(within(strip).getByRole('option', { name: '2σu* orbital' }));
+            expect(store.getState().bonds.view).toEqual({ kind: 'mo', label: '2σu*', spin: 'restricted', component: 0 });
+            await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
+                .toEqual({ type: 'gaussianMO', moleculeId: 'n2@07', index: 3 }));
+            expect(within(screen.getByRole('listbox', { name: 'orbitals in view' })).getByRole('option', { name: '2σu* orbital' }))
+                .toHaveAttribute('aria-selected', 'true');
+            // The surface is phase-coloured now: its ψ key covers the tiles too.
+            expect(screen.queryByLabelText('orbital tile colour key')).not.toBeInTheDocument();
+        });
+
+        // Review Focus 5, second half (preflight D19): a job in flight for the old
+        // system is cancelled; the items' half is tests/thumbs/bonds_strip_items.test.ts.
+        it('cancels every thumbnail job when the Bonds system changes (Review Focus 5)', () => {
+            const cancelAll = jest.spyOn(thumbnailService, 'cancelAll');
+            try {
+                const { store } = renderWithProvider(<App />);
+                fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+                cancelAll.mockClear();
+                act(() => { store.dispatch(selectBondsSystem('co')); });
+                expect(cancelAll).toHaveBeenCalledTimes(1);
+                act(() => { store.dispatch(selectBondsSystem('h2plus')); });
+                expect(cancelAll).toHaveBeenCalledTimes(2);
+            } finally {
+                cancelAll.mockRestore();
+            }
+        });
+
         it('on a phone: the header names the system and R, and the sheet has Explore, View and Plot', async () => {
             installMatchMedia(true);
             const { store } = renderWithProvider(<App />);
@@ -995,6 +1045,10 @@ describe('App', () => {
             await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
             expect(screen.getByText('N₂ · R = 2.07 a₀')).toBeInTheDocument();
             expect(within(screen.getByRole('tabpanel')).getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
+            // Task 10 (spec §9.8): the strip is the Explore tab's first row, as in Atoms and Orbitals.
+            const sheetStrip = await within(screen.getByRole('tabpanel')).findByRole('listbox', { name: 'orbitals in view' });
+            expect(sheetStrip.closest('.thumbnail-strip')).toHaveClass('sheet');
+            expect(sheetStrip.compareDocumentPosition(screen.getByLabelText('molecular orbital energy diagram')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
             fireEvent.click(screen.getByRole('tab', { name: 'Plot' }));
             expect(within(screen.getByRole('tabpanel')).getByLabelText('potential energy curve')).toBeInTheDocument();
         });

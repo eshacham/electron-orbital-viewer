@@ -22,7 +22,8 @@ describe('the atom strip (spec §9.1 "Strip")', () => {
         expect(items.find(item => item.selected)?.label).toBe('2p_z');
         expect(items[3].target).toEqual({ level: 'orbital', n: 2, l: 1, ml: 0 });
         const thumb = items[3].thumb;
-        expect(thumb.kind === 'orbital' && thumb.request.params).toMatchObject({ n: 2, l: 1, ml: 0, Z: 10, resolution: THUMB_RESOLUTION });
+        // Task 10: a tile's request is a union now (orbital | field | grid); an Atom tile's is the orbital kind, with params.
+        expect(thumb.kind === 'orbital' && 'params' in thumb.request && thumb.request.params).toMatchObject({ n: 2, l: 1, ml: 0, Z: 10, resolution: THUMB_RESOLUTION });
         expect(thumb.kind === 'orbital' && thumb.request.contentKey).toContain('2|1|0');
     });
 
@@ -61,7 +62,8 @@ describe('the Basic Orbitals strip (spec §9.2 "Strip", Task 8): n² tiles group
     it('requests every tile at the strip resolution and Z = 1', () => {
         const items = basicStripItems({ selection: { n: 4, l: 2, ml: 1 }, enclosedFraction: 0.9 });
         for (const item of items) {
-            expect(item.thumb.kind === 'orbital' && item.thumb.request.params).toMatchObject({ resolution: THUMB_RESOLUTION, Z: 1 });
+            // Task 10: a tile's request is a union now (orbital | field | grid); a Basic tile's is the orbital kind, with params.
+            expect(item.thumb.kind === 'orbital' && 'params' in item.thumb.request && item.thumb.request.params).toMatchObject({ resolution: THUMB_RESOLUTION, Z: 1 });
         }
     });
 

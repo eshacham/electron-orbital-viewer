@@ -43,11 +43,19 @@ function withLines(context: VisualizerContext): void {
 const params: OrbitalParams = { n: 2, l: 1, ml: 0, Z: 6, resolution: 32, rMax: 8, enclosedFraction: 0.9 };
 const mesh = (): MeshData => ({ positions: [], cells: [], psiSigns: [], densityMap: { data: new Uint8Array(1), side: 1, rMax: 1 }, isoLevel: 1 });
 const glow: Appearance = { ...INITIAL_APPEARANCE, finish: 'glow' };
+// Task 10: the host lends its grid worker factory (OrbitalViewer passes createGridMeshWorker); a stand-in here.
+let gridWorkers: Array<{ postMessage: jest.Mock; terminate: jest.Mock; onmessage: ((e: { data: unknown }) => void) | null }> = [];
+const createGridWorker = () => {
+    const worker = { postMessage: jest.fn(), terminate: jest.fn(), onmessage: null };
+    gridWorkers.push(worker);
+    return worker as unknown as Worker;
+};
 
 describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
     let workers: Array<{ postMessage: jest.Mock; terminate: jest.Mock; onmessage: ((e: { data: unknown }) => void) | null }>;
     beforeEach(() => {
         workers = [];
+        gridWorkers = [];
         (createOrbitalWorker as jest.Mock).mockImplementation(() => {
             const worker = { postMessage: jest.fn(), terminate: jest.fn(), onmessage: null };
             workers.push(worker);
@@ -59,7 +67,7 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
     it('ticks the service after each main frame, keyed by theme|finish|power|size, and stops on a lost context', () => {
         const context = buildContext();
         const service = new ThumbnailService();
-        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
+        attachThumbnails(context, service, { isBusy: () => false, createGridWorker, appearance: () => glow });
         expect(service.status()).toBe('ready');
         service.request({ contentKey: 'c', params }, jest.fn());
         afterMainFrame(context, null);
@@ -92,7 +100,7 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
     it('re-attaches the thumbnail service on a restored context', () => {
         const context = buildContext();
         const service = new ThumbnailService();
-        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
+        attachThumbnails(context, service, { isBusy: () => false, createGridWorker, appearance: () => glow });
         context.renderer.domElement.dispatchEvent(new Event('webglcontextlost'));
         expect(service.status()).toBe('lost');
         context.renderer.domElement.dispatchEvent(new Event('webglcontextrestored'));
@@ -106,7 +114,7 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         const context = buildContext();
         const service = new ThumbnailService();
         const removeSpy = jest.spyOn(context.renderer.domElement, 'removeEventListener');
-        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
+        attachThumbnails(context, service, { isBusy: () => false, createGridWorker, appearance: () => glow });
         context.disposeThumbnails!();
         const removedTypes = removeSpy.mock.calls.map(call => call[0]);
         expect(removedTypes).toEqual(expect.arrayContaining(['webglcontextlost', 'webglcontextrestored']));
@@ -121,7 +129,7 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         const context = buildContext();
         withLines(context);
         const service = new ThumbnailService();
-        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
+        attachThumbnails(context, service, { isBusy: () => false, createGridWorker, appearance: () => glow });
         service.request({ contentKey: 'c', params }, jest.fn());
         afterMainFrame(context, null);
         workers[0].onmessage!({ data: { type: 'success', meshData: mesh() } });
@@ -142,7 +150,7 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         const context = buildContext();
         const service = new ThumbnailService();
         let opacity = 0.4;
-        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow, opacity: () => opacity });
+        attachThumbnails(context, service, { isBusy: () => false, createGridWorker, appearance: () => glow, opacity: () => opacity });
         const thumbs = (createThumbnailRenderer as jest.Mock).mock.results.at(-1)!.value as { render: jest.Mock };
         const ready = jest.fn();
         service.request({ contentKey: 'c', params }, ready);
@@ -152,7 +160,8 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         await Promise.resolve();
         await Promise.resolve();
         // Fourth argument added by review A's M4 fix: !context.extrasSuppressed (the R10 latch), true here (unsuppressed).
-        expect(thumbs.render).toHaveBeenCalledWith(expect.anything(), glow, 0.4, true);
+        // Fifth added by Task 10: the tile's colouring -- an orbital request's is 'phase'.
+        expect(thumbs.render).toHaveBeenCalledWith(expect.anything(), glow, 0.4, true, 'phase');
         expect(ready).toHaveBeenCalled();
         const hit = jest.fn();
         service.request({ contentKey: 'c', params }, hit);
@@ -169,7 +178,7 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         const context = buildContext();
         withLines(context);
         const service = new ThumbnailService();
-        attachThumbnails(context, service, { isBusy: () => false, appearance: () => glow });
+        attachThumbnails(context, service, { isBusy: () => false, createGridWorker, appearance: () => glow });
         const thumbs = (createThumbnailRenderer as jest.Mock).mock.results.at(-1)!.value as { render: jest.Mock };
         context.extrasSuppressed = true;
         service.request({ contentKey: 'c', params }, jest.fn());
@@ -178,6 +187,39 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         afterMainFrame(context, 16);
         await Promise.resolve();
         await Promise.resolve();
-        expect(thumbs.render).toHaveBeenCalledWith(expect.anything(), glow, DEFAULT_OPACITY, false);
+        // Fifth argument added by Task 10: the tile's colouring ('phase' for an orbital request).
+        expect(thumbs.render).toHaveBeenCalledWith(expect.anything(), glow, DEFAULT_OPACITY, false, 'phase');
+    });
+
+    // Task 10 (ruling P5): a Bonds tile is meshed by the orbital worker's
+    // calculateFields, a molecule's grid by the grid worker the host lends,
+    // and each is drawn in the colouring it asked for.
+    it('meshes a field tile in the orbital worker and a grid tile in the lent grid worker, drawing each in its colouring', async () => {
+        const context = buildContext();
+        const service = new ThumbnailService();
+        attachThumbnails(context, service, { isBusy: () => false, createGridWorker, appearance: () => glow });
+        const thumbs = (createThumbnailRenderer as jest.Mock).mock.results.at(-1)!.value as { render: jest.Mock };
+        const field = {
+            sources: [{ kind: 'analytic' as const, id: 'h2plus', rMax: 6, recipe: { type: 'h2plus' as const, R: 2, state: '1sigma_g' as const } }],
+            colors: ['#ffffff'], memberLabels: ['1σg'], resolution: 40, enclosedFraction: 0.9, label: '1σg',
+        };
+        service.request({ kind: 'field', contentKey: 'f', field, colouring: 'density' }, jest.fn());
+        afterMainFrame(context, null);
+        expect(workers[0].postMessage).toHaveBeenCalledWith({ type: 'calculateFields', request: field });
+        workers[0].onmessage!({ data: { type: 'fieldsSuccess', meshes: [mesh()] } });
+        afterMainFrame(context, 16);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(thumbs.render).toHaveBeenLastCalledWith(expect.anything(), glow, DEFAULT_OPACITY, true, 'density');
+
+        const grid = {
+            type: 'calculate' as const, requestId: 0, enclosedFraction: 0.9,
+            source: { kind: 'grid' as const, id: 'g', shape: [2, 2, 2] as [number, number, number], origin: [0, 0, 0] as [number, number, number], spacing: 1, quantity: 'density' as const, values: new Float32Array(8) },
+        };
+        service.request({ kind: 'grid', contentKey: 'g', grid, colouring: 'density' }, jest.fn());
+        afterMainFrame(context, 16);
+        expect(gridWorkers).toHaveLength(1);
+        expect(workers).toHaveLength(1);
+        expect(gridWorkers[0].postMessage).toHaveBeenCalledWith(grid);
     });
 });

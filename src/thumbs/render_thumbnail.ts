@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import type { MeshData } from '../types/orbital';
 import { DEFAULT_OPACITY } from '../types/orbital';
 import type { Appearance } from '../design/appearance';
-import { linearRgb, phaseColours } from '../design/science';
+import { densitySurfaceHex, linearRgb, phaseColours } from '../design/science';
+import { espVertexColors } from '../molecules/esp_color';
 import { attachGlowExtras, GLOW_TUNING, glowSettingsFor, SOLID_LIGHTS, tuneThumbnailGlow } from '../orbital_glow';
 import { setMaterialOpacity } from '../orbital_material';
 import { CANONICAL_CAMERA_DIRECTION } from '../camera_angles';
-import type { ThumbImage } from './ThumbnailService';
+import type { ThumbColouring, ThumbImage } from './ThumbnailService';
 import { THUMB_FILL, thumbnailSize, thumbOpacityOf, thumbSupersample, thumbTileDevicePx } from './thumb_key';
 
 export { thumbnailSize };
@@ -75,6 +76,18 @@ export function downsampleThumbnail(pixels: Uint8Array, side: number, factor: nu
     return image;
 }
 
+/** Each vertex's colour, in three's linear working space, for the tile's colouring. */
+function surfaceColours(meshData: MeshData, appearance: Appearance, colouring: ThumbColouring): ArrayLike<number> {
+    if (colouring === 'density') {
+        const colour = linearRgb(densitySurfaceHex(appearance.theme));
+        return meshData.positions.flatMap(() => colour);
+    }
+    if (colouring !== 'phase') return espVertexColors(meshData.positions, colouring.grid, colouring.limit).colors;
+    const phase = phaseColours(appearance.theme);
+    const [positive, negative] = [linearRgb(phase.positive), linearRgb(phase.negative)];
+    return meshData.psiSigns.flatMap(sign => (sign === 1 ? positive : negative));
+}
+
 /**
  * Draws one orbital mesh into a render target on the main renderer and
  * reads it back (spec §12): one scene, one camera, one target, reused (and
@@ -97,12 +110,19 @@ export function downsampleThumbnail(pixels: Uint8Array, side: number, factor: nu
  * THUMB_FILL of the tile, seen from THUMB_CAMERA_DIRECTION, centred, and lit
  * by THUMB_LIGHT_RIG at the tiles' own levels, with the tiles' Glow
  * strengths (GLOW_TUNING[theme].thumb).
+ *
+ * Task 10: `colouring` paints the surface as the main view would paint the
+ * same mesh (updateSceneWithMeshData): 'phase' in the theme's phase colours
+ * (the default, and every tile before Task 10); 'density' every vertex the
+ * theme's density colour, display hex to linear (ruling DC2b); an ESP map's
+ * own vertex colours (espVertexColors), copied as they are. A density or an
+ * ESP has no phase, so the Glow rim takes no phase tint there (phaseSign 0).
  */
 export function createThumbnailRenderer(
     renderer: THREE.WebGLRenderer,
     { pixelRatio = () => (typeof window === 'undefined' ? 1 : window.devicePixelRatio) }: { pixelRatio?: () => number } = {},
 ): {
-    render(meshData: MeshData, appearance: Appearance, opacity?: number, extrasAllowed?: boolean): Promise<ThumbImage>;
+    render(meshData: MeshData, appearance: Appearance, opacity?: number, extrasAllowed?: boolean, colouring?: ThumbColouring): Promise<ThumbImage>;
     size(): number; dispose(): void;
 } {
     let target: THREE.WebGLRenderTarget | null = null;
@@ -135,17 +155,18 @@ export function createThumbnailRenderer(
 
     async function render(
         meshData: MeshData, appearance: Appearance, opacity: number = DEFAULT_OPACITY, extrasAllowed: boolean = true,
+        colouring: ThumbColouring = 'phase',
     ): Promise<ThumbImage> {
         const ratio = pixelRatio();
         const SIZE = thumbnailSize(ratio);
         const factor = thumbSupersample(ratio);
         const OUT = thumbTileDevicePx(ratio);
-        const phase = phaseColours(appearance.theme);
-        const [positive, negative] = [linearRgb(phase.positive), linearRgb(phase.negative)];
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions.flat(), 3));
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.psiSigns.flatMap(sign => (sign === 1 ? positive : negative)), 3));
-        geometry.setAttribute('phaseSign', new THREE.Float32BufferAttribute(meshData.psiSigns.map(sign => (sign === 1 ? 1 : -1)), 1));
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(surfaceColours(meshData, appearance, colouring), 3));
+        geometry.setAttribute('phaseSign', new THREE.Float32BufferAttribute(colouring === 'phase'
+            ? meshData.psiSigns.map(sign => (sign === 1 ? 1 : -1))
+            : new Array<number>(meshData.positions.length).fill(0), 1));
         geometry.setIndex(meshData.cells.flat());
         geometry.computeVertexNormals();
         geometry.computeBoundingSphere();

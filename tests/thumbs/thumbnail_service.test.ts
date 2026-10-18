@@ -1,28 +1,47 @@
-import { ThumbnailService, ThumbHost, ThumbImage } from '../../src/thumbs/ThumbnailService';
+import { ThumbnailService, ThumbHost, ThumbImage, type ThumbColouring } from '../../src/thumbs/ThumbnailService';
 import type { MeshData, OrbitalParams } from '../../src/types/orbital';
+import type { FieldRenderRequest, GridFieldSource } from '../../src/field_source';
+import type { GridMeshRequest } from '../../src/molecules/grid_mesh_request';
 
 const params: OrbitalParams = { n: 2, l: 1, ml: 0, Z: 6, resolution: 32, rMax: 8, enclosedFraction: 0.9 };
 const mesh = (): MeshData => ({ positions: [], cells: [], psiSigns: [], densityMap: { data: new Uint8Array(1), side: 1, rMax: 1 }, isoLevel: 1 });
 const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 
+type FakeWorker = { postMessage: jest.Mock; terminate: jest.Mock; onmessage: ((e: { data: unknown }) => void) | null; onerror: (() => void) | null };
+
 function fakeHost(over: Partial<ThumbHost> = {}) {
-    const workers: Array<{ postMessage: jest.Mock; terminate: jest.Mock; onmessage: ((e: { data: unknown }) => void) | null; onerror: (() => void) | null }> = [];
+    const workers: FakeWorker[] = [];
+    // Task 10: the grid worker (a molecule's density/ESP grid) is a second factory, kept apart so a test can tell which was used.
+    const gridWorkers: FakeWorker[] = [];
     const renders: MeshData[] = [];
+    const colourings: ThumbColouring[] = [];
+    const make = (into: FakeWorker[]) => () => {
+        const worker: FakeWorker = { postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null };
+        into.push(worker);
+        return worker as unknown as Worker;
+    };
     // Ruling R22a: look keys carry no scheme (was dark|phase|glow).
     let theme = 'dark|glow';
     const host: ThumbHost = {
-        createWorker: () => {
-            const worker = { postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null };
-            workers.push(worker);
-            return worker as unknown as Worker;
-        },
+        createWorker: make(workers),
+        createGridWorker: make(gridWorkers),
         isBusy: () => false,
         themeKey: () => theme,
-        render: async meshData => { renders.push(meshData); return { width: 160, height: 160 } as ThumbImage; },
+        render: async (meshData, colouring) => { renders.push(meshData); colourings.push(colouring); return { width: 160, height: 160 } as ThumbImage; },
         ...over,
     };
-    return { host, workers, renders, setTheme: (next: string) => { theme = next; } };
+    return { host, workers, gridWorkers, renders, colourings, setTheme: (next: string) => { theme = next; } };
 }
+
+/** One analytic source, as a Bonds tile asks for it (bonds_strip_items.ts). */
+const field: FieldRenderRequest = {
+    sources: [{ kind: 'analytic', id: 'h2plus:2:1sigma_g', rMax: 6, recipe: { type: 'h2plus', R: 2, state: '1sigma_g' } }],
+    colors: ['#ffffff'], memberLabels: ['1σg'], resolution: 40, enclosedFraction: 0.9, label: 'H₂⁺ 1σg',
+};
+const gridSource: GridFieldSource = {
+    kind: 'grid', id: 'h2o-density', shape: [2, 2, 2], origin: [0, 0, 0], spacing: 1, quantity: 'density', values: new Float32Array(8),
+};
+const grid: GridMeshRequest = { type: 'calculate', source: gridSource, enclosedFraction: 0.9, requestId: 0 };
 
 describe('ThumbnailService (spec §12)', () => {
     it('starts one worker at a time and renders at most one thumbnail per frame', async () => {
@@ -210,6 +229,130 @@ describe('ThumbnailService (spec §12)', () => {
             service.cancelAll();
             fake.workers[0].onmessage!({ data: { type: 'error', message: 'late' } });
             expect(failed).not.toHaveBeenCalled();
+        });
+    });
+
+    // Task 10 (spec §12, ruling P5): Bonds' and Molecules' tiles are meshed by
+    // the workers that already draw them -- a field request by the orbital
+    // worker's 'calculateFields', a grid by the grid worker -- and drawn in
+    // the colouring the tile asks for.
+    describe('field and grid jobs (Task 10)', () => {
+        it('posts a field request to the orbital worker as calculateFields and draws its one mesh in the tile\'s colouring', async () => {
+            const service = new ThumbnailService();
+            const { host, workers, gridWorkers, renders, colourings } = fakeHost();
+            service.attach(host);
+            const ready = jest.fn();
+            service.request({ kind: 'field', contentKey: 'bonds|density', field, colouring: 'density' }, ready);
+            service.tick();
+            expect(gridWorkers).toHaveLength(0);
+            expect(workers).toHaveLength(1);
+            expect(workers[0].postMessage).toHaveBeenCalledWith({ type: 'calculateFields', request: field });
+            const drawn = mesh();
+            workers[0].onmessage!({ data: { type: 'fieldsSuccess', meshes: [drawn] } });
+            service.tick();
+            await flush();
+            expect(renders).toEqual([drawn]);
+            expect(colourings).toEqual(['density']);
+            expect(ready).toHaveBeenCalledTimes(1);
+        });
+
+        it('posts a grid request to the grid worker and draws the mesh it answers with', async () => {
+            const service = new ThumbnailService();
+            const { host, workers, gridWorkers, renders, colourings } = fakeHost();
+            service.attach(host);
+            const esp: ThumbColouring = { kind: 'esp', grid: { ...gridSource, values: new Float32Array(8) }, limit: 0.05 };
+            service.request({ kind: 'grid', contentKey: 'mol|h2o|esp', grid, colouring: esp }, jest.fn());
+            service.tick();
+            expect(workers).toHaveLength(0);
+            expect(gridWorkers).toHaveLength(1);
+            expect(gridWorkers[0].postMessage).toHaveBeenCalledWith(grid);
+            const drawn = mesh();
+            gridWorkers[0].onmessage!({ data: { type: 'success', meshData: drawn, requestId: 0 } });
+            service.tick();
+            await flush();
+            expect(renders).toEqual([drawn]);
+            expect(colourings).toEqual([esp]);
+        });
+
+        it('still takes an orbital request without a kind, and draws it in the phase colours', async () => {
+            const service = new ThumbnailService();
+            const { host, workers, colourings } = fakeHost();
+            service.attach(host);
+            service.request({ contentKey: 'a', params }, jest.fn());
+            service.request({ kind: 'orbital', contentKey: 'b', params: { ...params, ml: 1 } }, jest.fn());
+            service.tick();
+            expect(workers[0].postMessage).toHaveBeenCalledWith({ type: 'calculate', params });
+            workers[0].onmessage!({ data: { type: 'success', meshData: mesh() } });
+            service.tick();
+            await flush();
+            service.tick();
+            expect(workers[1].postMessage).toHaveBeenCalledWith({ type: 'calculate', params: { ...params, ml: 1 } });
+            expect(colourings).toEqual(['phase']);
+        });
+
+        it('starts no field or grid job while the main view is busy', () => {
+            const service = new ThumbnailService();
+            let busy = true;
+            const { host, workers, gridWorkers } = fakeHost({ isBusy: () => busy });
+            service.attach(host);
+            service.request({ kind: 'field', contentKey: 'f', field, colouring: 'phase' }, jest.fn());
+            service.request({ kind: 'grid', contentKey: 'g', grid, colouring: 'density' }, jest.fn());
+            service.tick();
+            service.tick();
+            expect(workers).toHaveLength(0);
+            expect(gridWorkers).toHaveLength(0);
+            busy = false;
+            service.tick();
+            expect(workers).toHaveLength(1);
+        });
+
+        // Review Focus 5's second half (App cancels on a Bonds system change; preflight D19).
+        it('drops a queued field job, and the one in flight, on cancelAll', () => {
+            const service = new ThumbnailService();
+            const { host, workers, renders } = fakeHost();
+            service.attach(host);
+            const failed = jest.fn();
+            service.request({ kind: 'field', contentKey: 'bonds|n2|first', field, colouring: 'density' }, jest.fn(), failed);
+            service.request({ kind: 'field', contentKey: 'bonds|n2|second', field, colouring: 'phase' }, jest.fn(), failed);
+            service.tick();
+            service.cancelAll();
+            expect(workers[0].terminate).toHaveBeenCalled();
+            workers[0].onmessage!({ data: { type: 'fieldsSuccess', meshes: [mesh()] } });
+            service.tick();
+            service.tick();
+            expect(workers).toHaveLength(1);
+            expect(renders).toHaveLength(0);
+            expect(failed).not.toHaveBeenCalled();
+        });
+
+        // Ruling T16-failtile, for the new kinds: a tile whose job fails shows its glyph and label.
+        it('tells the tile when a field or grid worker fails', () => {
+            const service = new ThumbnailService();
+            const { host, workers, gridWorkers } = fakeHost();
+            service.attach(host);
+            const fieldFailed = jest.fn();
+            const gridFailed = jest.fn();
+            service.request({ kind: 'field', contentKey: 'f', field, colouring: 'phase' }, jest.fn(), fieldFailed);
+            service.request({ kind: 'grid', contentKey: 'g', grid, colouring: 'density' }, jest.fn(), gridFailed);
+            service.tick();
+            workers[0].onmessage!({ data: { type: 'error', message: 'no basis registered' } });
+            expect(fieldFailed).toHaveBeenCalledTimes(1);
+            service.tick();
+            gridWorkers[0].onerror!();
+            expect(gridFailed).toHaveBeenCalledTimes(1);
+        });
+
+        it('counts a field reply with no mesh as a failure, never a blank tile', () => {
+            const service = new ThumbnailService();
+            const { host, workers, renders } = fakeHost();
+            service.attach(host);
+            const failed = jest.fn();
+            service.request({ kind: 'field', contentKey: 'f', field, colouring: 'phase' }, jest.fn(), failed);
+            service.tick();
+            workers[0].onmessage!({ data: { type: 'fieldsSuccess', meshes: [] } });
+            service.tick();
+            expect(failed).toHaveBeenCalledTimes(1);
+            expect(renders).toHaveLength(0);
         });
     });
 });

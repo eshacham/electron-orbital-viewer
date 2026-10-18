@@ -128,6 +128,7 @@ import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
 import { atomStripItems, basicStripItems } from './thumbs/strip_items';
+import { bondsStripItems } from './thumbs/bonds_strip_items';
 import { thumbnailService } from './thumbs/ThumbnailService';
 import { thumbLookKey, thumbTileDevicePx } from './thumbs/thumb_key';
 import { useDevicePixelRatio } from './thumbs/useDevicePixelRatio';
@@ -808,8 +809,26 @@ function App() {
         () => (isBasicMode ? basicStripItems({ selection: { n, l, ml }, enclosedFraction }) : []),
         [isBasicMode, n, l, ml, enclosedFraction],
     );
+    // Task 10 (spec §9.3 "Strip"): Bonds' total density and every orbital the
+    // diagram lists, or H₂⁺'s two states -- nothing until this point's basis has
+    // loaded (Review Focus 5). A tile sets the view, exactly as the diagram does.
+    // Keyed on meta and basis, not bondsData itself (a new object every render): new items re-centre the strip.
+    const bondsMeta = bondsData.meta;
+    const bondsBasis = bondsData.basis;
+    const bondsStrip = useMemo(
+        () => (isBondsMode
+            ? bondsStripItems({ bonds, data: { meta: bondsMeta, basis: bondsBasis }, h2plusR: bonds.system === 'h2plus' ? bonds.R : null, enclosedFraction })
+            : []),
+        [isBondsMode, bonds, bondsMeta, bondsBasis, enclosedFraction],
+    );
+    const handleBondsStripSelect = useCallback((view: BondsView) => dispatch(setBondsView(view)), [dispatch]);
     // A new species or relativity: nothing in flight belongs to the picture any more (§12).
     useEffect(() => () => thumbnailService.cancelAll(), [atomProfile?.speciesKey, atomProfile?.Z, pictureRelativity]);
+    // Likewise a new Bonds system (§12; Review Focus 5, preflight D19): its old jobs are cancelled.
+    useEffect(() => () => thumbnailService.cancelAll(), [bonds.system]);
+    // Ruling T16-tilekey with preflight D9: the strip's orbital tiles are phase-coloured; they get a key
+    // of their own only where the column holds no phase key already -- Bonds with the density drawn.
+    const bondsOrbitalTiles = !isNarrow && !stripCollapsed && bondsStrip.some(item => item.target.kind !== 'density');
     const screenRatio = useDevicePixelRatio();
     // Everything a tile's picture depends on besides its content (ruling R20a-4): a change re-requests every
     // tile. The same key the thumbnail service files pictures under (thumb_key.ts): isNarrow is the
@@ -1492,7 +1511,18 @@ function App() {
         ]
         : isBondsMode
         ? [
-            { key: 'explore', label: 'Explore', content: bondsExplore },
+            // Task 10 (spec §9.8): the strip is the Explore tab's first row, as in Atoms and Orbitals.
+            {
+                key: 'explore', label: 'Explore', content: (
+                    <>
+                        {bondsStrip.length > 0 && (
+                            <ThumbnailStrip items={bondsStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
+                                onSelect={handleBondsStripSelect} variant="sheet" />
+                        )}
+                        {bondsExplore}
+                    </>
+                ),
+            },
             { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
             // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
             { key: 'plot', label: 'Plot', content: bondsInspector('stacked') },
@@ -1774,6 +1804,11 @@ function App() {
                 <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
                     onSelect={handleBasicSelectionChange} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
             )}
+            {/* Task 10: Bonds' strip -- the total density and every orbital, or H₂⁺'s two states. */}
+            {isBondsMode && !isNarrow && bondsStrip.length > 0 && (
+                <ThumbnailStrip items={bondsStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
+                    onSelect={handleBondsStripSelect} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
+            )}
             {!isMoleculeMode && !isAtomMode && (showPhaseLegend || isBondsDensity || combinationLegend) && (
                 <KeyColumn compact={isNarrow}>
                     {showPhaseLegend && <PhaseKey positive={phase.positive} negative={phase.negative} />}
@@ -1784,6 +1819,9 @@ function App() {
                                 ρ = {drawnDensityIso} e/a₀³, total electron density
                             </span>
                         </div>
+                    )}
+                    {isBondsDensity && bondsOrbitalTiles && (
+                        <PhaseKey positive={phase.positive} negative={phase.negative} heading="Orbital tiles" label="orbital tile colour key" />
                     )}
                     {combinationLegend && (
                         <div className="phase-legend" aria-label="combination colour key">

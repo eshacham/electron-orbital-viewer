@@ -43,6 +43,7 @@ import { shellAtRadius } from '../atom/shell_pick';
 import { outermostFeatureRadius } from '../atom/framing';
 import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '../atom/shell_mesh_cache';
 import { createShellCompositionWorker } from '../workers/createShellCompositionWorker';
+import { createGridMeshWorker } from '../workers/createGridMeshWorker';
 import { LobeMeshData } from '../workers/shellCompositionWorker';
 import { OrbitalParams } from '../types/orbital';
 import { useMoleculeView } from '../molecules/useMoleculeView';
@@ -211,6 +212,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 isBusy: () => busyRef.current || draggingRef.current,
                 appearance: () => appearanceRef.current,
                 opacity: () => thumbOpacityRef.current,
+                // Task 10: a molecule's density-grid tiles are meshed where its main surface is.
+                createGridWorker: createGridMeshWorker,
             });
 
             if (exportHandleRef) {
