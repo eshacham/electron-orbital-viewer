@@ -31,7 +31,8 @@ import {
     renderFrame,
     setAppearance,
     attachThumbnails,
-    standardViewDirection
+    standardViewDirection,
+    standardViewAxis
 } from '../orbital_visualizer';
 import { thumbnailService } from '../thumbs/ThumbnailService';
 import { captureViewPng, freeAreaCrop } from '../export/png';
@@ -234,6 +235,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                     collectSurfaces: () => collectExportSurfaces(context.currentOrbitalGroup),
                     surfaceCount: () => countExportSurfaces(context.currentOrbitalGroup),
                     cameraAngles: () => cameraAnglesOf(context.camera, context.controls.target),
+                    standardAxis: () => standardViewAxis(context),
                 };
             }
         }
@@ -257,14 +259,18 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     }, [appearance]);
 
     // The camera's direction, into the store once it settles (OrbitControls
-    // fires every damped frame), so a shared link can carry it.
+    // fires every damped frame), so a shared link can carry it. The settled
+    // angle is compared against *this* axis's own standard view (fix round
+    // 1): without it, the app's own placement at the cut face's standard
+    // view -- not a drag -- reads as a real move and writes `cam=` into an
+    // otherwise untouched link (camera_angles.ts's isStandardAngles).
     useEffect(() => {
         const context = visualizerContextRef.current;
         if (!context) return;
         let timer: ReturnType<typeof setTimeout> | null = null;
         const settle = () => {
             timer = null;
-            dispatch(cameraMoved(cameraAnglesOf(context.camera, context.controls.target)));
+            dispatch(cameraMoved(cameraAnglesOf(context.camera, context.controls.target), standardViewAxis(context)));
         };
         const onChange = () => {
             if (timer !== null) clearTimeout(timer);

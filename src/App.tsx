@@ -305,10 +305,13 @@ function App() {
     // (Review Focus 3). The camera is read off the view itself first (final
     // review M4): the store hears of a move only once the camera has settled,
     // so a click straight after a drag would otherwise copy the old angle.
+    // standardAxis() goes along with it (fix round 1): read this way, the
+    // angle could just as easily be the app's own standard-view placement as
+    // a real drag, and cameraMoved needs the axis to tell those apart.
     const store = useAppStore();
     const stateNow = useCallback(() => {
         const angles = exportHandleRef.current?.cameraAngles();
-        if (angles) store.dispatch(cameraMoved(angles));
+        if (angles) store.dispatch(cameraMoved(angles, exportHandleRef.current?.standardAxis() ?? 'none'));
         return store.getState();
     }, [store]);
     const handleShare = useCallback(async (): Promise<ShareOutcome> => {

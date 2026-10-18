@@ -9,7 +9,7 @@ import reducer, {
 import { setMode, solveUnbound } from '../src/store/atomSlice';
 import { fieldRequestFor, NO_COMBINATION } from '../src/combinations';
 import { basicOrbitalParams, DEFAULT_ENCLOSED_FRACTION } from '../src/orbital_presets';
-import { CANONICAL_CAMERA_ANGLES } from '../src/camera_angles';
+import { CANONICAL_CAMERA_ANGLES, standardCameraAngles } from '../src/camera_angles';
 
 const makeStore = () => createAppStore();
 
@@ -185,6 +185,52 @@ describe('orbitalSlice: camera', () => {
         store.dispatch(resetView());
         store.dispatch(restoreCamera({ azimuth: 70, elevation: -15 }));
         expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 70, elevation: -15 });
+    });
+
+    // Review (fix round 1): an untouched cut-active view's own standard angle
+    // is the cut face's, not the plain canonical one (ruling P17) -- so that
+    // is what must fold back to null now, given the axis it was settled
+    // under. Finding 1(a).
+    describe('folds an angle equal to the *active* standard view, not only the plain canonical one', () => {
+        const cutFaceAngle = standardCameraAngles('x');
+
+        it('cameraMoved: the cut face\'s own angle, with that cut active, stays null', () => {
+            const store = makeStore();
+            store.dispatch(cameraMoved(cutFaceAngle, 'x'));
+            expect(store.getState().orbital.cameraAngles).toBeNull();
+        });
+
+        it('cameraMoved: the very same angle, with no cut active, is a real move', () => {
+            const store = makeStore();
+            store.dispatch(cameraMoved(cutFaceAngle, 'none'));
+            expect(store.getState().orbital.cameraAngles).toEqual(cutFaceAngle);
+        });
+
+        it('cameraMoved: a real drag away from the standard view is still stored, cut active or not', () => {
+            const store = makeStore();
+            store.dispatch(cameraMoved({ azimuth: 5, elevation: 5 }, 'x'));
+            expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 5, elevation: 5 });
+        });
+
+        it('restoreCamera: a link at the cut face\'s own angle, for the same cut, folds to null', () => {
+            const store = makeStore();
+            store.dispatch(restoreCamera(cutFaceAngle, 'x'));
+            expect(store.getState().orbital).toMatchObject({ cameraAngles: null, cameraRestoreNonce: 1 });
+        });
+
+        it('restoreCamera: a link at a genuinely different angle still restores exactly', () => {
+            const store = makeStore();
+            store.dispatch(restoreCamera({ azimuth: 70, elevation: -15 }, 'x'));
+            expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 70, elevation: -15 });
+        });
+
+        it('with no axis argument, both actions keep today\'s canonical-only rule (every pre-existing caller)', () => {
+            const store = makeStore();
+            store.dispatch(cameraMoved(CANONICAL_CAMERA_ANGLES));
+            expect(store.getState().orbital.cameraAngles).toBeNull();
+            store.dispatch(restoreCamera(cutFaceAngle));
+            expect(store.getState().orbital.cameraAngles).toEqual(cutFaceAngle);
+        });
     });
 });
 

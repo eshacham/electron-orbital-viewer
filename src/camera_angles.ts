@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { ClipAxis } from './types/orbital';
 
 /**
  * Which side the camera looks from, in whole degrees with z up: azimuth
@@ -91,6 +92,33 @@ export function directionFromAngles({ azimuth, elevation }: CameraAngles): THREE
 
 export function isCanonicalAngles(angles: CameraAngles): boolean {
     return angles.azimuth === CANONICAL_CAMERA_ANGLES.azimuth && angles.elevation === CANONICAL_CAMERA_ANGLES.elevation;
+}
+
+/**
+ * The "nothing to report" angle for whichever clip axis is active right now:
+ * the plain canonical view with none, else the cut face's own (preflight D1,
+ * ruling P17). `isCanonicalAngles` above is the `axis === 'none'` case of
+ * this, kept separately since it names a fixed constant most callers already
+ * know by name.
+ */
+export function standardCameraAngles(axis: ClipAxis): CameraAngles {
+    return axis === 'none' ? CANONICAL_CAMERA_ANGLES : anglesFromDirection(...cutFaceCameraDirection(axis));
+}
+
+/**
+ * Whether `angles` already *is* the standard view for `axis` -- fix round 1:
+ * `cameraMoved`/`restoreCamera` fold an angle equal to the standard view back
+ * to null (nothing a share link need carry), the same way they always folded
+ * one equal to the plain canonical angle. Without this, every settle onto a
+ * cut's own standard view (frameOrbital's restoreDefaultDirection, or the
+ * very first camera placement, ruling P17) reads as a real camera move and
+ * writes `cam=` into an otherwise-untouched link (preflight D1's own fix
+ * surfaced this: the standard view stopped being only ever the canonical
+ * one, so `isCanonicalAngles` alone silently went stale).
+ */
+export function isStandardAngles(angles: CameraAngles, axis: ClipAxis): boolean {
+    const standard = standardCameraAngles(axis);
+    return angles.azimuth === standard.azimuth && angles.elevation === standard.elevation;
 }
 
 export function cameraAnglesOf(camera: THREE.Camera, target: THREE.Vector3): CameraAngles {

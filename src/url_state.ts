@@ -179,8 +179,14 @@ function decodeViewKeys(params: URLSearchParams, dispatch: AppDispatch): void {
     if (surface === 'solid' || surface === 'wire') dispatch(setSurfaceStyle({ mode: surface === 'wire' ? 'wireframe' : 'solid' }));
     const cut = parseCut(params.get('cut'));
     if (cut) dispatch(requestCut(cut));
-    // No cam key means the canonical view, so a link always sets the camera.
-    dispatch(restoreCamera(parseCamera(params.get('cam'))));
+    // No cam key means the standard view, so a link always sets the camera.
+    // The axis is this link's own just-parsed cut, not a read-back of store
+    // state: the atom-mode decoder that would know whether this link lands
+    // on a shell view runs after this (ANY_MODE) group (applyStateTo), so
+    // that part of "standard view" is a known limit here (fix round 1) --
+    // unlike cameraMoved (OrbitalViewer.tsx), which asks the live context and
+    // so always knows.
+    dispatch(restoreCamera(parseCamera(params.get('cam')), cut?.clipAxis ?? 'none'));
 }
 
 /** A j-level as a link writes it: '1/2', '3/2', '5/2', '7/2' -- the spec's own notation, not 1.5. */

@@ -4,7 +4,7 @@ import { FieldRenderRequest } from '../field_source';
 import { setMode, solveUnbound } from './atomSlice';
 import { BASIC_ORBITALS_Z, DEFAULT_ENCLOSED_FRACTION } from '../orbital_presets';
 import { CombinationSelection, NO_COMBINATION } from '../combinations';
-import { CameraAngles, isCanonicalAngles } from '../camera_angles';
+import { CameraAngles, isStandardAngles } from '../camera_angles';
 import type { RootState } from './index';
 
 export interface BasicSelection { n: number; l: number; ml: number; }
@@ -173,19 +173,44 @@ const orbitalSlice = createSlice({
       state.basicRenderNonce += 1;
     },
     // The viewer reports the camera once it settles. Stored as null at the
-    // canonical view, so an untouched view's link carries no cam key.
-    cameraMoved: (state, action: PayloadAction<CameraAngles>) => {
-      const next = isCanonicalAngles(action.payload) ? null : action.payload;
-      const current = state.cameraAngles;
-      const same = next === null
-        ? current === null
-        : current !== null && current.azimuth === next.azimuth && current.elevation === next.elevation;
-      if (!same) state.cameraAngles = next;
+    // *standard* view for whatever clip axis is active -- plain canonical
+    // with none, else the cut face's own (ruling P17) -- so an untouched
+    // view's link carries no cam key. `axis` defaults to 'none' (the old,
+    // canonical-only rule) for any caller that does not pass one, which is
+    // exactly right for every existing test: with no cut, the standard view
+    // *is* the canonical one. Fix round 1 (review finding 1): before this,
+    // only the plain canonical angle folded to null, so the very settle that
+    // P17's own fix produces for an untouched cut-away view -- the app's own
+    // placement, not a drag -- read as a real move and wrote `cam=` into an
+    // otherwise untouched link.
+    cameraMoved: {
+      reducer(state, action: PayloadAction<{ angles: CameraAngles; axis: ClipAxis }>) {
+        const { angles, axis } = action.payload;
+        const next = isStandardAngles(angles, axis) ? null : angles;
+        const current = state.cameraAngles;
+        const same = next === null
+          ? current === null
+          : current !== null && current.azimuth === next.azimuth && current.elevation === next.elevation;
+        if (!same) state.cameraAngles = next;
+      },
+      prepare(angles: CameraAngles, axis: ClipAxis = 'none') {
+        return { payload: { angles, axis } };
+      },
     },
-    // A restored link: the nonce is what the viewer watches.
-    restoreCamera: (state, action: PayloadAction<CameraAngles | null>) => {
-      state.cameraAngles = action.payload && !isCanonicalAngles(action.payload) ? action.payload : null;
-      state.cameraRestoreNonce += 1;
+    // A restored link: the nonce is what the viewer watches. `axis` is the
+    // link's own cut (url_state.ts passes the just-parsed `cut`, not a
+    // read-back of store state -- the atom-mode decoder that would know
+    // whether this lands on a shell view runs after this one, so that part
+    // of the standard view is a known limit here, unlike cameraMoved above).
+    restoreCamera: {
+      reducer(state, action: PayloadAction<{ angles: CameraAngles | null; axis: ClipAxis }>) {
+        const { angles, axis } = action.payload;
+        state.cameraAngles = angles && !isStandardAngles(angles, axis) ? angles : null;
+        state.cameraRestoreNonce += 1;
+      },
+      prepare(angles: CameraAngles | null, axis: ClipAxis = 'none') {
+        return { payload: { angles, axis } };
+      },
     },
     // A shared link's cut. Applied now, and again by App once the linked view
     // is on screen, because entering an orbital view clears the cut.

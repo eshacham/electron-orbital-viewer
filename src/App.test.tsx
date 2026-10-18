@@ -1146,7 +1146,7 @@ describe('App: Share', () => {
         Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
         mockViewerHandle = {
             capturePng: jest.fn(), collectSurfaces: () => [], surfaceCount: () => 0,
-            cameraAngles: () => ({ azimuth: 40, elevation: 20 }),
+            cameraAngles: () => ({ azimuth: 40, elevation: 20 }), standardAxis: () => 'none',
         };
         try {
             const { store } = renderWithProvider(<App />);

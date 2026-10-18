@@ -321,5 +321,9 @@ export function octahedron(name = 'octa'): ExportSurface {
 
 /** A stand-in for OrbitalViewer's export handle: holds nothing unless told to. */
 export function exportHandle(overrides: Partial<ViewerExportHandle> = {}): ViewerExportHandle {
-    return { capturePng: jest.fn(), collectSurfaces: () => [], surfaceCount: () => 0, cameraAngles: () => CANONICAL_CAMERA_ANGLES, ...overrides };
+    return {
+        capturePng: jest.fn(), collectSurfaces: () => [], surfaceCount: () => 0,
+        cameraAngles: () => CANONICAL_CAMERA_ANGLES, standardAxis: () => 'none',
+        ...overrides,
+    };
 }

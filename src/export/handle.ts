@@ -1,6 +1,7 @@
 import type { ColourBarLegend, CombinationLegendItem } from './png';
 import type { ExportSurface } from './surfaces';
 import type { CameraAngles } from '../camera_angles';
+import type { ClipAxis } from '../types/orbital';
 
 /** What the export code may ask of the 3D view. OrbitalViewer fills it. */
 export interface PngOverlayInput {
@@ -24,4 +25,13 @@ export interface ViewerExportHandle {
      * still), so a link made at the click asks here instead (final review M4).
      */
     cameraAngles(): CameraAngles;
+    /**
+     * The clip axis the standard view is built from right now (fix round 1,
+     * ruling P17): App's Share passes this to `cameraMoved` alongside
+     * `cameraAngles()` above, for the same reason it reads the camera here
+     * rather than from the store -- the angle it reads this way could just
+     * as easily be the app's own standard-view placement as a real drag, and
+     * telling those apart needs this.
+     */
+    standardAxis(): ClipAxis;
 }

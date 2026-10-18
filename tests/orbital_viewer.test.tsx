@@ -40,6 +40,10 @@ jest.mock('../src/orbital_visualizer', () => ({
     // (also mocked) applyCameraAngles; a fixed stand-in is enough for every
     // test here except the one below that overrides it to check the wiring.
     standardViewDirection: jest.fn(() => [0.75, 0.42, 0.5]),
+    // Fix round 1: cameraMoved's dispatch now needs this (the axis the
+    // settled angle is folded against); 'none' matches every existing
+    // test's expectation that the standard view is the plain canonical one.
+    standardViewAxis: jest.fn(() => 'none'),
 }));
 // Only applyCameraAngles is mocked (as a spy to record call order); the rest
 // of the module -- isCanonicalAngles etc., which orbitalSlice's own reducers
@@ -62,14 +66,15 @@ import { clearShellMeshCacheForTests, setCachedShellMeshes, shellMeshCacheKey } 
 import { COMPOSITE_ORBITAL_RESOLUTION } from '../src/atom/shell_composition';
 import { neonProfile } from './export/fixtures';
 import { framingRadiusFor } from '../src/atom/framing';
-import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes, attachThumbnails, standardViewDirection } from '../src/orbital_visualizer';
+import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes, attachThumbnails, standardViewDirection, standardViewAxis } from '../src/orbital_visualizer';
 import { themeChoicePref } from '../src/design/theme_storage';
 import { DEFAULT_RENDER, renderPref, hintPref } from '../src/design/presentation';
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
 import { updateFieldInScene, cancelPendingRender, clearScene, frameOrbital, updateAtomViewInScene, setReferenceRing, getScaleBar, clearFieldMesh, handleResize } from '../src/orbital_visualizer';
-import { applyCameraAngles, cameraAnglesOf } from '../src/camera_angles';
+import { applyCameraAngles, cameraAnglesOf, standardCameraAngles } from '../src/camera_angles';
+import { encodeStateOf, registerBuiltInUrlKeys, resetUrlKeysForTests } from '../src/url_state';
 
 const request = fieldRequestFor({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }, 0.9)!;
 
@@ -331,6 +336,62 @@ describe('OrbitalViewer: reporting the camera', () => {
 
             act(() => { jest.advanceTimersByTime(1000); });
             expect(cameraAnglesOf).toHaveBeenCalledTimes(1);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+});
+
+// Review (fix round 1, finding 1): the settle above reports whatever the
+// camera is actually at, including the app's own placement at the active
+// cut's standard view (ruling P17) -- not a drag. Before the fix, only the
+// plain canonical angle folded back to null, so an untouched cut-active load
+// wrote a real, non-canonical cameraAngles and therefore cam= into the share
+// link. "As close as the existing harness allows" to a true end-to-end
+// check: the real OrbitalViewer, its real 'change'/debounce wiring and the
+// real encodeStateOf/cameraMoved, with only the context/controls (already
+// mocked throughout this file) standing in for three.js and OrbitControls.
+describe('OrbitalViewer: an untouched cut-active load writes no cam= (fix round 1, review finding 1)', () => {
+    beforeEach(() => { registerBuiltInUrlKeys(); });
+    afterEach(() => {
+        resetUrlKeysForTests();
+        (standardViewAxis as jest.Mock).mockReturnValue('none');
+        (cameraAnglesOf as jest.Mock).mockReturnValue({ azimuth: 40, elevation: 20 });
+    });
+
+    /** Mounts, drives the real 'change'->debounce path once, and returns the store. */
+    function settleOnce(axis: 'none' | 'x' | 'y' | 'z', angles: { azimuth: number; elevation: number }) {
+        const store = createAppStore();
+        act(() => { store.dispatch(setMode('atom')); });
+        (standardViewAxis as jest.Mock).mockReturnValue(axis);
+        (cameraAnglesOf as jest.Mock).mockReturnValue(angles);
+
+        render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        const context = (initVisualizer as jest.Mock).mock.results.at(-1)!.value as VisualizerContext;
+        const onChange = (context.controls.addEventListener as jest.Mock).mock.calls
+            .find(([type]) => type === 'change')![1] as () => void;
+
+        act(() => { onChange(); jest.advanceTimersByTime(301); });
+        return store;
+    }
+
+    it('leaves cameraAngles null, and the share link carries no cam=, when the settle lands on the active cut\'s own standard angle', () => {
+        jest.useFakeTimers();
+        try {
+            const store = settleOnce('x', standardCameraAngles('x'));
+            expect(store.getState().orbital.cameraAngles).toBeNull();
+            expect(encodeStateOf(store.getState())).not.toMatch(/[&?]cam=/);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it('still records, and still shares, a real drag away from the standard view', () => {
+        jest.useFakeTimers();
+        try {
+            const store = settleOnce('x', { azimuth: 5, elevation: 5 });
+            expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 5, elevation: 5 });
+            expect(encodeStateOf(store.getState())).toMatch(/[&?]cam=5,5(&|$)/);
         } finally {
             jest.useRealTimers();
         }

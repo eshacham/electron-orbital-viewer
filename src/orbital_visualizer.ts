@@ -747,17 +747,30 @@ function shellViewClipAxis(context: VisualizerContext): ClipAxis {
 }
 
 /**
+ * The clip axis a "standard view" (see `standardViewDirection` below) is
+ * built from right now: the active cut, or -- a shell view has no visible
+ * surface besides its cut face, see `shellViewClipAxis`'s own doc comment --
+ * its own fallback axis when the cut is off. Exported on its own (fix round
+ * 1) because `cameraMoved`/`restoreCamera` need exactly this axis, not a
+ * direction vector, to decide whether a settled angle is the standard view
+ * or a real move -- without it, a settle onto a shell's or a cut's own
+ * standard view reads as a real move and writes `cam=` into an otherwise
+ * untouched link (camera_angles.ts's `isStandardAngles`).
+ */
+export function standardViewAxis(context: VisualizerContext): ClipAxis {
+    return context.isShellView ? shellViewClipAxis(context) : context.surfaceStyle.clipAxis;
+}
+
+/**
  * The view that means "look at this the way the app itself would choose to"
  * (ruling P17 / preflight D1): the plain canonical three-quarter view with no
  * cut, or square at the cut's exposed face with one. Used by `frameOrbital`'s
  * `restoreDefaultDirection` branch (Reset View, picking an element) and by
  * `OrbitalViewer`'s restored-link effect, for the same `angles === null`
- * case `applyCameraAngles` otherwise defaults to plain canonical. A shell
- * view has no visible surface besides its cut face (see `shellViewClipAxis`'s
- * own doc comment), so it always counts as "cut", never 'none'.
+ * case `applyCameraAngles` otherwise defaults to plain canonical.
  */
 export function standardViewDirection(context: VisualizerContext): readonly [number, number, number] {
-    const axis = context.isShellView ? shellViewClipAxis(context) : context.surfaceStyle.clipAxis;
+    const axis = standardViewAxis(context);
     return axis === 'none' ? CANONICAL_CAMERA_DIRECTION : cutFaceCameraDirection(axis);
 }
 

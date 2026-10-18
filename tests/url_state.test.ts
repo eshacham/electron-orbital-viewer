@@ -10,6 +10,7 @@ import {
     registerUrlKeys, resetUrlKeysForTests, encodeStateOf, applyStateTo, encodeState, applyState,
     bindUrlStateStore, hasSharedView, urlModeOf, ANY_MODE, registerBuiltInUrlKeys, parseNumberInRange,
 } from '../src/url_state';
+import { standardCameraAngles } from '../src/camera_angles';
 import { registerBondsUrlKeys } from '../src/bonds/bonds_url';
 import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIso } from '../src/store/bondsSlice';
 import { DIATOMIC_IDS, DENSITY_ISO_VALUES } from '../src/bonds/systems';
@@ -471,6 +472,24 @@ describe('built-in URL keys', () => {
         applyStateTo('#frac=0.5', store.dispatch);
         expect(store.getState().orbital.cameraAngles).toBeNull();
         expect(store.getState().orbital.cameraRestoreNonce).toBe(nonceBefore + 1);
+    });
+
+    // Review (fix round 1, finding 1(d)): decodeViewKeys now passes the
+    // link's own just-parsed cut axis into restoreCamera, so a cam= that
+    // happens to equal that cut's own standard angle folds to null just like
+    // one equal to plain canonical always did -- and, the regression check,
+    // a cam= that genuinely differs still restores exactly regardless of cut.
+    it('a link\'s cam equal to its own cut\'s standard angle folds to null', () => {
+        const store = makeStore();
+        const { azimuth, elevation } = standardCameraAngles('x');
+        applyStateTo(`#cut=x:0.5&cam=${azimuth},${elevation}`, store.dispatch);
+        expect(store.getState().orbital.cameraAngles).toBeNull();
+    });
+
+    it('a link\'s cam at a genuinely different angle still restores exactly, cut or no cut', () => {
+        const store = makeStore();
+        applyStateTo('#cut=x:0.5&cam=70,-15', store.dispatch);
+        expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 70, elevation: -15 });
     });
 
     // Ruling T5/M3: Number() also accepts hex ('0x1') and padded whitespace
