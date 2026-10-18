@@ -123,7 +123,7 @@ import AtomInspector from './atom_ui/AtomInspector';
 import BasicInspector from './basic_ui/BasicInspector';
 import { plotAriaLabel, plotTabsFor, resolvePlotTab, tabCurves, hydrogenicTabCurves, BASIC_PLOT_TABS } from './atom/plot_tabs';
 import { atomFacts, orbitalFacts, shellFacts, subshellFacts } from './orbital_facts';
-import Inspector, { InspectorDisplay } from './shell/Inspector';
+import Inspector, { type InspectorSection } from './shell/Inspector';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
@@ -1339,7 +1339,7 @@ function App() {
         // (MoleculeNav) -- the left panel chooses WHAT you look at, this
         // "plot slot" is part of the right panel's HOW/data, and the list is
         // a choice, not a plot. Molecules has nothing left for this slot, on
-        // a desktop (inspectorBody) or a phone (there is no Plot tab for it
+        // a desktop (moleculeSections has no plot) or a phone (there is no Plot tab for it
         // any more, below).
         if (isMoleculeMode) return null;
         if (isBondsMode) {
@@ -1432,6 +1432,14 @@ function App() {
     // the drawer (ruling R20b-atoms); on a phone the sheet's View tab holds
     // them, so the stacked inspector has none.
     const atomDisplay = <>{controls}<AxesSwitch /></>;
+    // Ruling R24-3: before there is anything to plot, the inspector keeps its
+    // titled sections -- Display, and an empty "Plot and data" -- so its
+    // headers do not move (nor the open one change) when the plot arrives.
+    const waitingSections = (variant: 'docked' | 'drawer' | 'stacked', display: React.ReactNode): InspectorSection[] => [
+        ...(variant === 'stacked' ? [] : [{ key: 'display', title: 'Display', content: display }]),
+        { key: 'plot', title: 'Plot and data', content: null },
+    ];
+
     // The Atom screen's inspector (spec §9.1): docked on a desktop, a drawer
     // at medium width, stacked in the phone's Plot tab (ruling R7). Ruling
     // DX1: before a profile it is the plain inspector, so its column and the
@@ -1444,7 +1452,7 @@ function App() {
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
             facts={atomFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} />
     ) : (
-        <Inspector variant={variant} body={null} top={variant === 'stacked' ? undefined : <InspectorDisplay>{atomDisplay}</InspectorDisplay>}
+        <Inspector variant={variant} sections={waitingSections(variant, atomDisplay)}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
@@ -1461,14 +1469,14 @@ function App() {
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
             facts={basicFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} />
     ) : (
-        <Inspector variant={variant} body={null} top={variant === 'stacked' ? undefined : <InspectorDisplay>{renderControls('view')}</InspectorDisplay>}
+        <Inspector variant={variant} sections={waitingSections(variant, renderControls('view'))}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
     // Bonds mode's inspector (spec §9.3, Phase 6G-2 Task 9): the same
     // Display-above-Plot-and-Data composition as Atom's and Basic Orbitals',
     // with `controls` (the view settings Bonds and Molecules share,
-    // `inspectorDisplay` below) heading it, exactly as it headed the plain
+    // `moleculeSections` below) heading it, exactly as it headed the plain
     // Inspector this replaces. Plot is `renderRadialPlot` (BondsCurvePlot),
     // unchanged; Data is the frontier line, caveats and methods list that
     // used to sit under the MO diagram in BondsPanel (ruling P19).
@@ -1658,11 +1666,10 @@ function App() {
         )
         // Basic Orbitals: its header tile and chips (ruling P3) -- BasicExplore.
         : basicExplore;
-    // Bonds and Molecules (the atom has its own: atomInspector; Basic Orbitals its own: basicInspector,
-    // both above): the view settings above the plot, under the foldable Display heading, as in the
-    // Atom inspector (ruling T20b-display-header).
-    const inspectorDisplay = <InspectorDisplay>{controls}</InspectorDisplay>;
-    const inspectorBody = renderRadialPlot(PLOT_WIDTH, false);
+    // Molecules (the other modes have their own: atomInspector, basicInspector, bondsInspector, above):
+    // the view settings under the titled Display section (rulings T20b-display-header, R24-3) -- its only
+    // section today; Task 12 adds Properties through the same list.
+    const moleculeSections: InspectorSection[] = [{ key: 'display', title: 'Display', content: controls }];
 
     const session = useAppSelector(state => state.jobs.session);
     const avatar = (
@@ -1896,7 +1903,7 @@ function App() {
             )}
             {phoneChrome}
             {isMedium && (isAtomMode ? atomInspector('drawer') : isBasicMode ? basicInspector('drawer') : isBondsMode ? bondsInspector('drawer') : (
-                <Inspector variant="drawer" top={inspectorDisplay} body={inspectorBody} open={viewPanelOpen}
+                <Inspector variant="drawer" sections={moleculeSections} open={viewPanelOpen}
                     onOpenChange={open => setViewPanelOpen(() => open)} />
             ))}
                 {isMoleculeMode && isNarrow && (
@@ -1964,7 +1971,7 @@ function App() {
                     <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
                 )}
                 inspector={isAtomMode ? atomInspector('docked') : isBasicMode ? basicInspector('docked') : isBondsMode ? bondsInspector('docked')
-                    : <Inspector variant="docked" top={inspectorDisplay} body={inspectorBody} />}
+                    : <Inspector variant="docked" sections={moleculeSections} />}
                 viewport={viewport}
                 shellRef={shellRef}
                 exploreCollapsed={isMedium && exploreCollapsed}

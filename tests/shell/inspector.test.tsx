@@ -2,15 +2,23 @@ import React from 'react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import Inspector, { InspectorDisplay } from '../../src/shell/Inspector';
-import { DEFAULT_DISPLAY, displayPref } from '../../src/design/presentation';
+import Inspector from '../../src/shell/Inspector';
+import { DEFAULT_DISPLAY, displayPref, INSPECTOR_ALL_FOLDED } from '../../src/design/presentation';
 
 const tabs = [{ key: 'plot', label: 'Plot', content: <p>plot body</p> }, { key: 'data', label: 'Data', content: <p>data body</p> }];
 
+// Ruling R24-3: every section is a titled header; the Plot | Data tabs live inside "Plot and data".
+const plotAndData = (activeTab = 'plot', onTab: (key: string) => void = jest.fn()) => ({ key: 'plot', title: 'Plot and data', tabs, activeTab, onTab });
+const displaySection = { key: 'display', title: 'Display', content: <button type="button">surface opacity</button> };
+const header = (name: string) => screen.getByRole('button', { name });
+
 describe('Inspector (spec §8.6, §7 tablet)', () => {
+    afterEach(() => { act(() => { displayPref.set(DEFAULT_DISPLAY); }); window.localStorage.clear(); });
+
+    // Ruling R24-3: the tabs sit inside the titled "Plot and data" section (were the inspector's own top row).
     it('docks as the view panel with Plot and Data tabs', () => {
         const onTab = jest.fn();
-        render(<Inspector variant="docked" tabs={tabs} activeTab="plot" onTab={onTab} />);
+        render(<Inspector variant="docked" sections={[plotAndData('plot', onTab)]} />);
         const aside = screen.getByRole('complementary', { name: 'Inspector' });
         expect(aside).toHaveClass('view-panel');
         expect(screen.getByRole('tab', { name: 'Plot' })).toHaveAttribute('aria-selected', 'true');
@@ -19,13 +27,15 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
         expect(onTab).toHaveBeenCalledWith('data');
     });
 
+    // Ruling R24-3: the body is a titled section now (was a bare `body`).
     it('folds to a bar at medium width, opens over the view, and Esc closes it', () => {
         const onOpenChange = jest.fn();
-        const { rerender } = render(<Inspector variant="drawer" body={<p>settings</p>} open={false} onOpenChange={onOpenChange} />);
+        const sections = [{ key: 'display', title: 'Display', content: <p>settings</p> }];
+        const { rerender } = render(<Inspector variant="drawer" sections={sections} open={false} onOpenChange={onOpenChange} />);
         expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveClass('folded');
         fireEvent.click(screen.getByRole('button', { name: 'View settings' }));
         expect(onOpenChange).toHaveBeenLastCalledWith(true);
-        rerender(<Inspector variant="drawer" body={<p>settings</p>} open onOpenChange={onOpenChange} />);
+        rerender(<Inspector variant="drawer" sections={sections} open onOpenChange={onOpenChange} />);
         expect(screen.getByText('settings')).toBeInTheDocument();
         // Ruling T18-a11y-carry (b): Esc is the drawer's own key now -- pressed inside it, not on document.
         fireEvent.keyDown(screen.getByText('settings'), { key: 'Escape' });
@@ -39,7 +49,7 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
         render(
             <>
                 <input aria-label="search elsewhere" />
-                <Inspector variant="drawer" tabs={tabs} activeTab="data" open onOpenChange={onOpenChange} />
+                <Inspector variant="drawer" sections={[plotAndData('data')]} open onOpenChange={onOpenChange} />
             </>,
         );
         const elsewhere = screen.getByRole('textbox', { name: 'search elsewhere' });
@@ -64,120 +74,130 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
     // Final review B, M6: the drawer bar buttons had aria-expanded but no aria-controls,
     // so assistive tech had no way to jump straight to the panel a button opened.
     it('points the open drawer bar button at the panel it opened with aria-controls', () => {
-        render(<Inspector variant="drawer" tabs={tabs} activeTab="data" open onOpenChange={jest.fn()} />);
+        render(<Inspector variant="drawer" sections={[plotAndData('data')]} open onOpenChange={jest.fn()} />);
         const button = screen.getByRole('button', { name: 'Data panel' });
         const controls = button.getAttribute('aria-controls');
         expect(controls).toBeTruthy();
         expect(document.getElementById(controls!)).toContainElement(screen.getByText('data body'));
     });
 
-    // Ruling R20b-atoms: the Atom screen's Display settings head the inspector, above Plot | Data,
-    // docked and in the open drawer, and scroll with the tabs rather than squeezing them.
-    it('puts a top section above its tabs, in one scroll area, docked and in the open drawer', () => {
-        const top = <section aria-label="Display"><p>display settings</p></section>;
-        const { container, rerender } = render(<Inspector variant="docked" top={top} tabs={tabs} activeTab="plot" />);
-        const above = (first: Element, second: Element) => Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
-        expect(above(screen.getByRole('region', { name: 'Display' }), screen.getByRole('tablist', { name: 'Inspector' }))).toBe(true);
-        expect(container.querySelector('.inspector-scroll')).toContainElement(screen.getByRole('region', { name: 'Display' }));
-        expect(container.querySelector('.inspector-scroll')).toContainElement(screen.getByRole('tabpanel'));
-        rerender(<Inspector variant="drawer" top={top} tabs={tabs} activeTab="plot" open={false} />);
-        expect(screen.queryByRole('region', { name: 'Display' })).toBeNull();
-        rerender(<Inspector variant="drawer" top={top} tabs={tabs} activeTab="plot" open />);
-        expect(above(screen.getByRole('region', { name: 'Display' }), screen.getByRole('tablist', { name: 'Inspector' }))).toBe(true);
-    });
-
-    it('stacks its tabs as sections inside the phone sheet (ruling R7)', () => {
-        render(<Inspector variant="stacked" tabs={tabs} />);
+    // Ruling R7; R24-3: the phone sheet shares the component, so each section gets its title, all open.
+    it('stacks its tabs as sections inside the phone sheet, under the section title (ruling R7)', () => {
+        render(<Inspector variant="stacked" sections={[plotAndData()]} />);
         expect(screen.queryByRole('tab')).toBeNull();
+        expect(screen.getByRole('heading', { name: 'Plot and data' })).toBeInTheDocument();
         expect(screen.getByRole('region', { name: 'Plot' })).toHaveTextContent('plot body');
         expect(screen.getByRole('region', { name: 'Data' })).toHaveTextContent('data body');
     });
 });
 
-// Ruling T20b-display-header: the view settings get a visible "Display" heading and fold, so the plot can be
-// brought above the fold on a short window. The choice is a presentation preference in eov.display.
-describe('InspectorDisplay', () => {
-    // src/setupTests.ts gives every test a desktop-tall window (>= 1000 px) by
-    // default, so "expanded by default" below means what it always meant for
-    // these tests; the short-window default (ruling P16) gets its own tests,
-    // each setting window.innerHeight itself and restored here afterwards.
-    afterEach(() => { act(() => { displayPref.set(DEFAULT_DISPLAY); }); window.localStorage.clear(); window.innerHeight = 1200; });
+// Ruling R24-3 (owner: "there is no way to know the other panel is closed"): every section is a titled
+// accordion header, one open at a time; folded headers stay visible above and below the open one.
+describe('Inspector sections (ruling R24-3)', () => {
+    afterEach(() => { act(() => { displayPref.set(DEFAULT_DISPLAY); }); window.localStorage.clear(); });
+    const above = (first: Element, second: Element) => Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
 
-    it('heads the settings with a Display heading whose button discloses them, expanded by default', () => {
-        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
-        const region = screen.getByRole('region', { name: 'Display' });
-        const heading = within(region).getByRole('heading', { name: 'Display' });
-        expect(heading).toHaveClass('ql-section');
-        const toggle = within(heading).getByRole('button', { name: 'Display' });
-        expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        expect(within(region).getByRole('button', { name: 'surface opacity' })).toBeInTheDocument();
-        expect(document.getElementById(toggle.getAttribute('aria-controls')!)).toContainElement(screen.getByRole('button', { name: 'surface opacity' }));
+    it('titles every section with an h2 header button and opens the content section by default', () => {
+        render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
+        const display = within(screen.getByRole('heading', { name: 'Display' })).getByRole('button', { name: 'Display' });
+        const plot = within(screen.getByRole('heading', { name: 'Plot and data' })).getByRole('button', { name: 'Plot and data' });
+        expect(screen.getByRole('heading', { name: 'Display' })).toHaveClass('ql-section');
+        expect(above(display, plot)).toBe(true);
+        expect(display).toHaveAttribute('aria-expanded', 'false');
+        expect(display).not.toHaveAttribute('aria-controls');
+        expect(plot).toHaveAttribute('aria-expanded', 'true');
+        const region = screen.getByRole('region', { name: 'Plot and data' });
+        expect(document.getElementById(plot.getAttribute('aria-controls')!)).toBe(region);
+        expect(region).toContainElement(screen.getByRole('tabpanel'));
+        expect(screen.queryByRole('button', { name: 'surface opacity' })).toBeNull();
     });
 
-    it('collapsing hides the settings and is remembered across a reload (eov.display)', () => {
-        const { unmount } = render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
-        fireEvent.click(screen.getByRole('button', { name: 'Display' }));
-        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
-        expect(screen.queryByRole('button', { name: 'surface opacity' })).toBeNull();
-        expect(JSON.parse(window.localStorage.getItem('eov.display')!)).toMatchObject({ displayOpen: false });
-        unmount();
-
-        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
-        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
-        expect(screen.queryByRole('button', { name: 'surface opacity' })).toBeNull();
-        fireEvent.click(screen.getByRole('button', { name: 'Display' }));
-        expect(screen.getByRole('button', { name: 'surface opacity' })).toBeInTheDocument();
+    it('opens one section at a time, keeps every header visible and focus on the header', () => {
+        render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
+        header('Display').focus();
+        fireEvent.click(header('Display'));
+        expect(header('Display')).toHaveAttribute('aria-expanded', 'true');
+        expect(document.activeElement).toBe(header('Display'));
+        expect(screen.getByRole('region', { name: 'Display' })).toContainElement(screen.getByRole('button', { name: 'surface opacity' }));
+        // The other section folds, but its header is still there, below the open one.
+        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('tabpanel')).toBeNull();
+        expect(above(screen.getByRole('region', { name: 'Display' }), header('Plot and data'))).toBe(true);
+        fireEvent.click(header('Plot and data'));
+        expect(header('Display')).toHaveAttribute('aria-expanded', 'false');
+        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.queryByRole('region', { name: 'Display' })).toBeNull();
     });
 
-    it('keeps the other display preferences when it folds', () => {
+    it('remembers the open section across a reload (eov.display), never in a link, and keeps the other preferences', () => {
         act(() => { displayPref.set({ ...DEFAULT_DISPLAY, showAxes: false, plotTab: 'rho' }); });
-        render(<InspectorDisplay><p>settings</p></InspectorDisplay>);
-        fireEvent.click(screen.getByRole('button', { name: 'Display' }));
-        expect(displayPref.get()).toEqual({ showAxes: false, plotTab: 'rho', displayOpen: false });
+        const { unmount } = render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
+        fireEvent.click(header('Display'));
+        expect(displayPref.get()).toEqual({ showAxes: false, plotTab: 'rho', inspectorOpen: 'display' });
+        expect(window.location.hash).not.toMatch(/display|inspector/);
+        unmount();
+        render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
+        expect(header('Display')).toHaveAttribute('aria-expanded', 'true');
+        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'false');
     });
 
-    // Ruling P16 (owner): a short window starts the Display section folded,
-    // so the plot comes up without scrolling, but only while the viewer has
-    // never chosen -- a stored choice (either way) always wins.
-    it('starts collapsed on a window shorter than 1000 px when nothing is stored', () => {
-        window.innerHeight = 800;
-        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
-        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
-        expect(screen.queryByRole('button', { name: 'surface opacity' })).toBeNull();
+    it('folds the open section on a second press, leaving every header folded, and remembers that', () => {
+        const { unmount } = render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
+        fireEvent.click(header('Plot and data'));
+        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'false');
+        expect(header('Display')).toHaveAttribute('aria-expanded', 'false');
+        expect(displayPref.get().inspectorOpen).toBe(INSPECTOR_ALL_FOLDED);
+        unmount();
+        render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
+        expect(screen.queryByRole('region')).toBeNull();
     });
 
-    it('starts expanded on a window 1000 px tall or more when nothing is stored', () => {
-        window.innerHeight = 1000;
-        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
-        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'true');
-        expect(screen.getByRole('button', { name: 'surface opacity' })).toBeInTheDocument();
+    it('migrates a stored displayOpen: true to an open Display section', () => {
+        window.localStorage.setItem('eov.display', '{"showAxes":true,"plotTab":"distribution","displayOpen":true}');
+        render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
+        expect(header('Display')).toHaveAttribute('aria-expanded', 'true');
+        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'false');
     });
 
-    it('a stored choice to stay open wins over a short window', () => {
-        act(() => { displayPref.set({ ...DEFAULT_DISPLAY, displayOpen: true }); });
-        window.innerHeight = 700;
-        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
-        expect(screen.getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'true');
-        expect(screen.getByRole('button', { name: 'surface opacity' })).toBeInTheDocument();
+    it('opens the only section where Display is all there is (Molecules), and a stored section it lacks falls back to it', () => {
+        act(() => { displayPref.set({ ...DEFAULT_DISPLAY, inspectorOpen: 'plot' }); });
+        render(<Inspector variant="docked" sections={[displaySection]} />);
+        expect(header('Display')).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('region', { name: 'Display' })).toBeInTheDocument();
     });
 
-    it('clicking always stores a real boolean, not the window-derived default it started from', () => {
-        window.innerHeight = 800; // nothing stored yet -- starts collapsed by height alone
-        render(<InspectorDisplay><button type="button">surface opacity</button></InspectorDisplay>);
-        fireEvent.click(screen.getByRole('button', { name: 'Display' }));
-        const stored = JSON.parse(window.localStorage.getItem('eov.display')!).displayOpen;
-        expect(typeof stored).toBe('boolean');
-        expect(stored).toBe(true);
+    it('opens the drawer from its bar at the tabbed section and that tab, folding Display', () => {
+        act(() => { displayPref.set({ ...DEFAULT_DISPLAY, inspectorOpen: 'display' }); });
+        const onTab = jest.fn();
+        const onOpenChange = jest.fn();
+        const { rerender } = render(<Inspector variant="drawer" sections={[displaySection, plotAndData('plot', onTab)]} open={false} onOpenChange={onOpenChange} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Data panel' }));
+        expect(onTab).toHaveBeenLastCalledWith('data');
+        expect(onOpenChange).toHaveBeenLastCalledWith(true);
+        expect(displayPref.get().inspectorOpen).toBe('plot');
+        rerender(<Inspector variant="drawer" sections={[displaySection, plotAndData('data', onTab)]} open onOpenChange={onOpenChange} />);
+        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'true');
+        expect(header('Display')).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.getByRole('tabpanel')).toHaveTextContent('data body');
+        expect(screen.getByRole('button', { name: 'Data panel' })).toHaveAttribute('aria-expanded', 'true');
+        // Inside the open drawer the accordion works as docked: Display opens, Plot and data folds, both headers stay.
+        fireEvent.click(header('Display'));
+        expect(screen.getByRole('region', { name: 'Display' })).toBeInTheDocument();
+        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'false');
     });
 
-    // Ruling R23b-2 (owner): disclosure chevrons follow convention -- expanded
-    // points up (the action is "collapse"), collapsed points down (the action
-    // is "expand"). ExpandMore's own, unrotated direction already points down,
-    // so only the expanded state needs a rotation, to 180deg (was rotating the
-    // collapsed state to -90deg, pointing sideways instead of down).
-    it('points the Display chevron down when collapsed and up when expanded', () => {
+    // The open section fills what is left of the inspector and scrolls inside itself, so the headers never scroll away.
+    it('lets the open section fill the remaining height and scroll inside itself', () => {
         const css = readFileSync(resolve(__dirname, '../../src/shell/inspector.css'), 'utf8');
-        expect(css).toMatch(/\.inspector-display-toggle\[aria-expanded="true"\]\s*\.inspector-display-chevron\s*\{\s*transform:\s*rotate\(180deg\);\s*\}/);
-        expect(css).not.toMatch(/\[aria-expanded="false"\]\s*\.inspector-display-chevron/);
+        expect(css).toMatch(/\.inspector-section-body\s*\{[^}]*flex:\s*1;[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;/);
+        expect(css).toMatch(/\.inspector-section-heading\s*\{[^}]*flex:\s*none;/);
+    });
+
+    // Ruling R23b-2 (owner): disclosure chevrons follow convention -- expanded points up, collapsed down.
+    // R24-3: every section header uses it (was the Display header's own class).
+    it('points every header chevron down when collapsed and up when expanded', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/shell/inspector.css'), 'utf8');
+        expect(css).toMatch(/\.inspector-section-toggle\[aria-expanded="true"\]\s*\.inspector-section-chevron\s*\{\s*transform:\s*rotate\(180deg\);\s*\}/);
+        expect(css).not.toMatch(/\[aria-expanded="false"\]\s*\.inspector-section-chevron/);
     });
 });

@@ -1,29 +1,95 @@
 import React, { useId } from 'react';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import TabRow, { type TabItem } from './TabRow';
-import { displayPref } from '../design/presentation';
+import { displayPref, INSPECTOR_ALL_FOLDED } from '../design/presentation';
 import { usePref } from '../design/usePref';
 import './inspector.css';
 
 export interface InspectorTab extends TabItem { content: React.ReactNode }
 
-interface InspectorProps {
-    variant: 'docked' | 'drawer' | 'stacked';
+/**
+ * One titled inspector section (ruling R24-3): Display, Plot and data,
+ * Properties... It holds either `content` or a row of `tabs` (Plot | Data),
+ * whose `activeTab` and `onTab` the mode owns.
+ */
+export interface InspectorSection {
+    key: string;
+    title: string;
+    content?: React.ReactNode;
     tabs?: InspectorTab[];
     activeTab?: string;
     onTab?(key: string): void;
-    /** Without tabs: today's right-column content (6G-1 for Basic, Bonds and Molecules). */
-    body?: React.ReactNode;
+}
+
+interface InspectorProps {
+    variant: 'docked' | 'drawer' | 'stacked';
+    /** Top to bottom. One is open at a time (docked and drawer); stacked shows them all, titled. */
+    sections: InspectorSection[];
     /**
-     * A section above the tabs (or the body) -- the Atom screen's Display
-     * settings (ruling R20b-atoms). It scrolls together with what is below
-     * it, so a tall section never squeezes the plot out of a short window.
+     * The section open while the viewer has never chosen: the mode's content
+     * section (Plot and data, Properties). Defaults to the last section --
+     * Display only where it is the only one (Molecules today).
      */
-    top?: React.ReactNode;
+    defaultOpen?: string;
     /** Drawer only. */
     open?: boolean;
     onOpenChange?(open: boolean): void;
 }
+
+/** A tabbed section's inside: its tab row and the active tab's panel. */
+const SectionTabs: React.FC<{ section: InspectorSection }> = ({ section }) => {
+    const id = useId();
+    const tabs = section.tabs ?? [];
+    const active = tabs.find(tab => tab.key === section.activeTab) ?? tabs[0];
+    if (!active) return null;
+    return (
+        <>
+            <TabRow idPrefix={id} label="Inspector" tabs={tabs} active={active.key} onChange={key => section.onTab?.(key)} />
+            <div className="inspector-body" role="tabpanel" id={`${id}-panel-${active.key}`} aria-labelledby={`${id}-tab-${active.key}`}>
+                {active.content}
+            </div>
+        </>
+    );
+};
+
+const sectionInside = (section: InspectorSection) => (section.tabs ? <SectionTabs section={section} /> : <div className="inspector-body">{section.content}</div>);
+
+/**
+ * Ruling R24-3 (owner): the inspector's sections are titled accordion
+ * headers, one open at a time. The open one fills the inspector's remaining
+ * height and scrolls inside itself; the folded headers stay above and below
+ * it, so the viewer always sees that the other sections exist and what they
+ * hold. Which one is open is a presentation preference (eov.display), never
+ * part of a link.
+ */
+const Accordion: React.FC<{ sections: InspectorSection[]; openKey: string | null; onToggle(key: string): void }> = ({ sections, openKey, onToggle }) => {
+    const id = useId();
+    return (
+        <div className="inspector-sections">
+            {sections.map(section => {
+                const isOpen = section.key === openKey;
+                const headerId = `${id}-${section.key}-header`;
+                const regionId = `${id}-${section.key}-region`;
+                return (
+                    <section key={section.key} className={`inspector-panel-section${isOpen ? ' open' : ''}`}>
+                        <h2 className="ql-section inspector-section-heading">
+                            <button type="button" id={headerId} className="inspector-section-toggle" aria-expanded={isOpen}
+                                aria-controls={isOpen ? regionId : undefined} onClick={() => onToggle(section.key)}>
+                                {section.title}
+                                <ExpandMore className="inspector-section-chevron" fontSize="small" aria-hidden="true" />
+                            </button>
+                        </h2>
+                        {isOpen && (
+                            <div id={regionId} role="region" aria-labelledby={headerId} className="inspector-section-body">
+                                {sectionInside(section)}
+                            </div>
+                        )}
+                    </section>
+                );
+            })}
+        </div>
+    );
+};
 
 /**
  * The inspector (spec §8.6): docked at 290 px on a desktop; at medium width a
@@ -31,9 +97,15 @@ interface InspectorProps {
  * right edge, non-modal and measured as a camera inset (§7); stacked inside
  * the phone sheet (ruling R7). `.view-panel` stays its class for the tests.
  */
-const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, body, top, open = false, onOpenChange }) => {
+const Inspector: React.FC<InspectorProps> = ({ variant, sections, defaultOpen, open = false, onOpenChange }) => {
     const id = useId();
-    const active = tabs?.find(tab => tab.key === activeTab) ?? tabs?.[0];
+    const display = usePref(displayPref);
+    const keys = sections.map(section => section.key);
+    const fallback = defaultOpen && keys.includes(defaultOpen) ? defaultOpen : keys[keys.length - 1] ?? null;
+    const stored = display.inspectorOpen;
+    // A stored section this inspector lacks (Plot and data, in Molecules) is not a choice about it.
+    const openKey = stored === INSPECTOR_ALL_FOLDED ? null : stored !== null && keys.includes(stored) ? stored : fallback;
+    const choose = (key: string | null) => displayPref.set({ ...displayPref.get(), inspectorOpen: key ?? INSPECTOR_ALL_FOLDED });
 
     // §13: Esc closes the open drawer and puts focus back on the bar button
     // that opened it. It is the drawer's own key -- heard on the drawer, not on
@@ -50,28 +122,30 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
     };
 
     if (variant === 'stacked') {
+        // The phone sheet has its own Explore | View | Plot tabs; here every section is shown, titled, all open,
+        // and a tabbed section's tabs are stacked as sections of their own (ruling R7).
         return (
             <div className="inspector-stacked">
-                {top}
-                {tabs ? tabs.map(tab => <section key={tab.key} aria-label={tab.label} className="inspector-section">{tab.content}</section>) : body}
+                {sections.map(section => (
+                    <React.Fragment key={section.key}>
+                        <h2 className="ql-section">{section.title}</h2>
+                        {section.tabs
+                            ? section.tabs.map(tab => <section key={tab.key} aria-label={tab.label} className="inspector-section">{tab.content}</section>)
+                            : section.content}
+                    </React.Fragment>
+                ))}
             </div>
         );
     }
 
-    const inner = tabs && active ? (
-        <>
-            <TabRow idPrefix={id} label="Inspector" tabs={tabs} active={active.key} onChange={key => onTab?.(key)} />
-            <div className="inspector-body" role="tabpanel" id={`${id}-panel-${active.key}`} aria-labelledby={`${id}-tab-${active.key}`}>
-                {active.content}
-            </div>
-        </>
-    ) : (
-        <div className="inspector-body">{body}</div>
-    );
-    const content = top ? <div className="inspector-scroll">{top}{inner}</div> : inner;
+    const content = <Accordion sections={sections} openKey={openKey} onToggle={key => choose(key === openKey ? null : key)} />;
 
     if (variant === 'drawer') {
-        const bar: TabItem[] = tabs ?? [{ key: 'view', label: 'View' }];
+        // The bar keeps its buttons: one per tab of a tabbed section (each opens the drawer at that section
+        // and tab), or a single View button that opens the drawer as the viewer left it.
+        const tabbed = sections.find(section => section.tabs?.length);
+        const activeTab = tabbed?.tabs?.find(tab => tab.key === tabbed.activeTab) ?? tabbed?.tabs?.[0];
+        const bar = tabbed?.tabs ?? [{ key: 'view', label: 'View' }];
         // Final review B, M6: an id for the panel a bar button opens, so aria-controls
         // can point assistive tech straight at it (the panel only exists while open).
         const drawerPanelId = `${id}-drawer-panel`;
@@ -80,18 +154,21 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
                 onKeyDown={open ? onDrawerKey : undefined}>
                 <div className="inspector-bar">
                     {bar.map(item => {
-                        const expanded = open && (!tabs || active?.key === item.key);
+                        const expanded = open && (!tabbed || (openKey === tabbed.key && activeTab?.key === item.key));
                         return (
                             <button
                                 key={item.key}
                                 type="button"
                                 className="inspector-bar-button"
-                                aria-label={tabs ? `${item.label} panel` : 'View settings'}
+                                aria-label={tabbed ? `${item.label} panel` : 'View settings'}
                                 aria-expanded={expanded}
                                 aria-controls={expanded ? drawerPanelId : undefined}
                                 onClick={() => {
                                     if (expanded) { onOpenChange?.(false); return; }
-                                    if (tabs) onTab?.(item.key);
+                                    if (tabbed) {
+                                        tabbed.onTab?.(item.key);
+                                        if (openKey !== tabbed.key) choose(tabbed.key);
+                                    }
                                     onOpenChange?.(true);
                                 }}
                             >
@@ -106,35 +183,6 @@ const Inspector: React.FC<InspectorProps> = ({ variant, tabs, activeTab, onTab, 
     }
 
     return <aside className="inspector view-panel" aria-label="Inspector">{content}</aside>;
-};
-
-/**
- * The view settings at the top of the inspector, in every mode (rulings
- * R20b-atoms, T20b-display-header): a "Display" heading whose button folds
- * them away, so the plot can come up on a short window. Whether it is open
- * is a presentation preference (eov.display), never part of a link.
- *
- * Ruling P16 (owner): until the viewer picks one way or the other,
- * `displayOpen` is `null` and the section opens by the window's own
- * height -- folded below 1000 px tall, so the plot is not pushed off
- * screen, open at or above it. A stored choice always wins.
- */
-export const InspectorDisplay: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const display = usePref(displayPref);
-    const bodyId = useId();
-    const open = display.displayOpen ?? (typeof window === 'undefined' || window.innerHeight >= 1000);
-    return (
-        <section className="inspector-display" aria-label="Display">
-            <h2 className="ql-section inspector-display-heading">
-                <button type="button" className="inspector-display-toggle" aria-expanded={open} aria-controls={open ? bodyId : undefined}
-                    onClick={() => displayPref.set({ ...displayPref.get(), displayOpen: !open })}>
-                    Display
-                    <ExpandMore className="inspector-display-chevron" fontSize="small" aria-hidden="true" />
-                </button>
-            </h2>
-            {open && <div id={bodyId}>{children}</div>}
-        </section>
-    );
 };
 
 export default Inspector;

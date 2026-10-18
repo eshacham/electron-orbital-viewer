@@ -70,13 +70,4 @@ if (typeof window !== 'undefined') {
     // so answer null quietly -- the same behaviour, without the noise. Tests that
     // need a context supply their own stand-in canvas.
     HTMLCanvasElement.prototype.getContext = (() => null) as HTMLCanvasElement['getContext'];
-
-    // jsdom's default viewport is 768 px tall, shorter than a real desktop
-    // window. Ruling P16 opens the inspector's Display section by the
-    // window's own height when the viewer has never chosen (folded below
-    // 1000 px); matchMedia above already tells the rest of the app this is
-    // a desktop test run, so give it a desktop-tall window too, rather than
-    // leaving every unrelated test to discover and set this itself. Tests
-    // that exercise the short-window default set window.innerHeight themselves.
-    if (window.innerHeight < 1000) window.innerHeight = 1200;
 }

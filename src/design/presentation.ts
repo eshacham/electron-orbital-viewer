@@ -39,17 +39,21 @@ export interface DisplayPrefs {
     showAxes: boolean;
     plotTab: PlotTabId;
     /**
-     * Whether the inspector's Display section is expanded (ruling
-     * T20b-display-header). `null` means the viewer has never chosen --
-     * ruling P16 (owner) then opens it by the window's own height (short
-     * windows start folded so the plot comes up without scrolling), rather
-     * than pinning a single default for every window size.
+     * Which inspector section is open (ruling R24-3: titled sections, one
+     * open at a time) -- a section key ('display', 'plot', ...), or
+     * INSPECTOR_ALL_FOLDED once the viewer has folded the open one. `null`
+     * means the viewer has never chosen: the mode's content section opens
+     * (Plot and data; Display where it is the only one). Supersedes
+     * `displayOpen` (T20b-display-header, P16), which decodeDisplay migrates.
      */
-    displayOpen: boolean | null;
+    inspectorOpen: string | null;
 }
 
+/** inspectorOpen when the viewer has folded the open section and left every one folded (R24-3). */
+export const INSPECTOR_ALL_FOLDED = '';
+
 export const DISPLAY_KEY = 'eov.display';
-export const DEFAULT_DISPLAY: DisplayPrefs = { showAxes: true, plotTab: 'distribution', displayOpen: null };
+export const DEFAULT_DISPLAY: DisplayPrefs = { showAxes: true, plotTab: 'distribution', inspectorOpen: null };
 const PLOT_TABS: readonly PlotTabId[] = ['wave', 'density', 'distribution', 'rho'];
 
 export function decodeDisplay(raw: string | null): DisplayPrefs {
@@ -57,10 +61,19 @@ export function decodeDisplay(raw: string | null): DisplayPrefs {
     return {
         showAxes: typeof value.showAxes === 'boolean' ? value.showAxes : DEFAULT_DISPLAY.showAxes,
         plotTab: PLOT_TABS.includes(value.plotTab as PlotTabId) ? value.plotTab as PlotTabId : DEFAULT_DISPLAY.plotTab,
-        // Only a real boolean is a viewer's stored choice; anything else (never
-        // set, or malformed) stays null so the window's height decides (P16).
-        displayOpen: typeof value.displayOpen === 'boolean' ? value.displayOpen : DEFAULT_DISPLAY.displayOpen,
+        inspectorOpen: decodeInspectorOpen(value),
     };
+}
+
+/**
+ * Ruling R24-3: a stored section key is the viewer's choice. A value stored
+ * before it may carry `displayOpen` instead: true (Display kept open) is
+ * 'display'; false (Display folded, the plot showing) is null -- the default,
+ * which opens the content section, i.e. what that viewer saw.
+ */
+function decodeInspectorOpen(value: Record<string, unknown>): string | null {
+    if (typeof value.inspectorOpen === 'string') return value.inspectorOpen;
+    return value.displayOpen === true ? 'display' : DEFAULT_DISPLAY.inspectorOpen;
 }
 
 export const displayPref = createPref<DisplayPrefs>(DISPLAY_KEY, { decode: decodeDisplay, encode: value => JSON.stringify(value) });

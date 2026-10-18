@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, act } from '@testing-library/react';
 import BasicInspector from '../../src/basic_ui/BasicInspector';
 import RadialPlot from '../../src/components/RadialPlot';
 import { BASIC_PLOT_TABS } from '../../src/atom/plot_tabs';
@@ -73,9 +73,17 @@ describe('BasicInspector (spec §9.2: "Plot tabs as §9.1")', () => {
     it('heads the docked inspector with the Display section, above Plot and Data', () => {
         render(<BasicInspector variant="docked" display={<p>display settings</p>} plotTabs={tabs} plotTab={tabs[0]} onPlotTab={jest.fn()}
             combination={false} plot={<p>plot</p>} facts={facts} csvReason={null} onExportCsv={jest.fn()} />);
+        // Ruling R24-3: titled sections, Display above "Plot and data"; the plot's section opens by default,
+        // and opening Display folds it (its header stays, below).
+        const headers = screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent);
+        expect(headers).toEqual(['Display', 'Plot and data']);
+        expect(screen.getByRole('region', { name: 'Plot and data' })).toContainElement(screen.getByRole('tab', { name: 'Plot' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Display' }));
         const display = screen.getByRole('region', { name: 'Display' });
         expect(display).toHaveTextContent('display settings');
-        expect(display.compareDocumentPosition(screen.getByRole('tab', { name: 'Plot' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.queryByRole('tab', { name: 'Plot' })).toBeNull();
+        expect(display.compareDocumentPosition(screen.getByRole('button', { name: 'Plot and data' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        act(() => { window.localStorage.removeItem('eov.display'); });
     });
 
     it('stacks Plot and Data in the phone sheet', () => {

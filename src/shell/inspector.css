@@ -4,23 +4,27 @@
   display: flex; flex-direction: column; gap: var(--ql-size-section-gap);
   padding: var(--ql-size-panel-padding);
 }
-/* With a section above the tabs (ruling R20b-atoms) the section, tabs and body scroll as one. */
-.inspector-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
-.inspector-scroll > .inspector-body { flex: none; overflow: visible; }
-/* The Display section heads the inspector in every mode (rulings R20b-atoms, T20b-display-header), padded as
-   the body below it is; its heading is a section title whose button folds the settings away. */
-.inspector-display { padding: var(--ql-size-panel-padding) var(--ql-size-panel-padding) 0; }
-.inspector-display-toggle {
+/* Ruling R24-3: titled accordion sections, one open at a time. Every header stays in view; the open
+   section takes the remaining height and scrolls inside itself (its body does not scroll a second time). */
+.inspector-sections { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.inspector-panel-section { display: flex; flex-direction: column; flex: none; min-height: 0; }
+.inspector-panel-section.open { flex: 1; }
+.inspector-panel-section + .inspector-panel-section { border-top: 1px solid var(--ql-color-border-subtle); }
+.inspector-section-heading { flex: none; padding: 6px var(--ql-size-panel-padding); }
+.inspector-section-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
+.inspector-section-body > .inspector-body { flex: none; overflow: visible; }
+.inspector-section-body > .inspector-body:first-child { padding-top: 0; }
+.inspector-section-toggle {
   display: flex; align-items: center; justify-content: space-between; width: 100%;
   min-height: var(--ql-size-control-row); padding: 0; margin: 0; cursor: pointer;
   border: 0; border-radius: var(--ql-radius-xs); background: none;
   color: inherit; font: inherit; text-align: left;
 }
-.inspector-display-chevron { color: var(--ql-color-text-2); transition: transform var(--ql-motion-hover) ease-out; }
+.inspector-section-chevron { color: var(--ql-color-text-2); transition: transform var(--ql-motion-hover) ease-out; }
 /* Ruling R23b-2: disclosure convention -- collapsed points down (ExpandMore's
    own direction, "expand"); expanded rotates it to point up ("collapse"). */
-.inspector-display-toggle[aria-expanded="true"] .inspector-display-chevron { transform: rotate(180deg); }
-.inspector-display-toggle:hover .inspector-display-chevron { color: var(--ql-color-text-1); }
+.inspector-section-toggle[aria-expanded="true"] .inspector-section-chevron { transform: rotate(180deg); }
+.inspector-section-toggle:hover .inspector-section-chevron { color: var(--ql-color-text-1); }
 /* Basic Orbitals' view half of Controls (ruling R20b): laid out as #controls is. */
 .controls-view { display: flex; flex-direction: column; }
 .inspector #controls, .inspector .controls-view, .inspector .radial-plot {

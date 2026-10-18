@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Inspector, { InspectorDisplay } from '../shell/Inspector';
+import Inspector from '../shell/Inspector';
 import { PlotTabRow, DataTabBody } from './PlotDataTabs';
 import type { PlotTab } from '../atom/plot_tabs';
 import type { PlotTabId } from '../design/presentation';
@@ -27,20 +27,29 @@ interface AtomInspectorProps {
     onExportCsv(): void;
 }
 
-/** The Atom screen's inspector (spec §9.1): Display on top (ruling R20b-atoms), then Plot, with its function tabs, and Data. */
+/**
+ * The Atom screen's inspector (spec §9.1): Display on top (ruling R20b-atoms), then "Plot and data" -- Plot,
+ * with its function tabs, and Data -- as titled sections, one open at a time (ruling R24-3).
+ */
 const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, plot, facts, csvReason, onExportCsv }) => {
     const [tab, setTab] = useState('plot');
     return (
         <Inspector
             variant={variant}
-            top={display ? <InspectorDisplay>{display}</InspectorDisplay> : undefined}
             open={open}
             onOpenChange={onOpenChange}
-            activeTab={tab}
-            onTab={setTab}
-            tabs={[
-                { key: 'plot', label: 'Plot', content: <PlotTabRow plotTabs={plotTabs} plotTab={plotTab} onPlotTab={onPlotTab} plot={plot} /> },
-                { key: 'data', label: 'Data', content: <DataTabBody facts={facts} csvReason={csvReason} onExportCsv={onExportCsv} /> },
+            sections={[
+                ...(display ? [{ key: 'display', title: 'Display', content: display }] : []),
+                {
+                    key: 'plot',
+                    title: 'Plot and data',
+                    activeTab: tab,
+                    onTab: setTab,
+                    tabs: [
+                        { key: 'plot', label: 'Plot', content: <PlotTabRow plotTabs={plotTabs} plotTab={plotTab} onPlotTab={onPlotTab} plot={plot} /> },
+                        { key: 'data', label: 'Data', content: <DataTabBody facts={facts} csvReason={csvReason} onExportCsv={onExportCsv} /> },
+                    ],
+                },
             ]}
         />
     );

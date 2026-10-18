@@ -217,6 +217,18 @@ const renderWithProvider = (ui: React.ReactElement, atomState?: Partial<AtomStat
     };
 };
 
+/**
+ * Ruling R24-3: the inspector's sections are titled accordions, one open at a time -- Plot and data by
+ * default, Display folded -- so a test that works a section's controls opens it first.
+ */
+const openInspectorSection = (name: 'Display' | 'Plot and data') => {
+    const header = screen.queryByRole('button', { name, expanded: false });
+    if (header) fireEvent.click(header);
+};
+
+// Ruling R24-3: the open inspector section is remembered in eov.display; start every test from the default.
+afterEach(() => { window.localStorage.removeItem('eov.display'); });
+
 describe('App', () => {
     const originalMatchMedia = window.matchMedia;
     afterEach(() => { window.matchMedia = originalMatchMedia; });
@@ -572,6 +584,7 @@ describe('App', () => {
             const { store } = renderWithProvider(<App />);
             fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             chooseCombination('Electric field');
+            openInspectorSection('Display');
             fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
             fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
             expect(store.getState().orbital.currentField?.enclosedFraction).toBe(0.75);
@@ -585,6 +598,7 @@ describe('App', () => {
             fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             const { n, l, ml } = store.getState().orbital.basicSelection;
             const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+            openInspectorSection('Display');
             fireEvent.mouseDown(within(inspector).getByRole('combobox', { name: /electron enclosed/i }));
             fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
             expect(store.getState().orbital.enclosedFraction).toBe(0.75);
@@ -800,6 +814,7 @@ describe('App', () => {
             fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
         };
         const chooseFraction = (option: string) => {
+            openInspectorSection('Display');
             fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
             fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
         };
@@ -930,8 +945,10 @@ describe('App', () => {
             // Task 10: the strip's orbital tiles now bring their own ψ key ("Orbital tiles", T16-tilekey); the
             // surface's key -- the only 'surface colour key' (getByLabelText throws on two) -- still has no ψ.
             expect(within(screen.getByLabelText('surface colour key')).queryByText('ψ > 0')).not.toBeInTheDocument();
+            openInspectorSection('Display');
             expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
             expect(screen.getByText('The density is drawn at a fixed ρ, chosen with the ρ buttons beside the orbitals — not at an enclosed fraction.')).toBeInTheDocument();
+            openInspectorSection('Plot and data');
             expect(within(container.querySelector('.view-panel') as HTMLElement)
                 .getByLabelText('potential energy curve')).toBeInTheDocument();
         });
@@ -961,6 +978,7 @@ describe('App', () => {
                 // Ruling T10-I1: the strip (and so its "Orbital tiles" ψ key) now stays up while a point loads;
                 // the surface's own key -- the only 'surface colour key' (getByLabelText throws on two) -- has no ψ.
                 expect(within(screen.getByLabelText('surface colour key')).queryByText('ψ > 0')).not.toBeInTheDocument();
+                openInspectorSection('Display');
                 expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
             };
             stillKeyed();
@@ -1271,6 +1289,7 @@ describe('App: opening a shared link', () => {
         expect(store.getState().orbital.pendingCut).toEqual({ clipAxis: 'y', clipPosition: 0.5 });
 
         // Ruling R20b-atoms: the view controls are the inspector's Display section now, there before the profile too.
+        openInspectorSection('Display');
         const display = within(screen.getByRole('complementary', { name: 'Inspector' })).getByRole('region', { name: 'Display' });
         fireEvent.click(within(display).getByRole('button', { name: 'cut along x' }));
         expect(store.getState().orbital.pendingCut).toBeNull();
@@ -1670,14 +1689,17 @@ describe('App: shell', () => {
         expect(within(inspector).queryByRole('combobox', { name: /combination/i })).toBeNull();
         expect(within(explore).queryByRole('button', { name: 'Update Orbital' })).toBeNull();
         expect(within(explore).getByText(/one electron, Z = 1/i)).toBeInTheDocument();
+        // Ruling R24-3: the plot's section is open by default; the settings are in the Display section above it.
+        expect(inspector.querySelector('.radial-plot')).not.toBeNull();
+        openInspectorSection('Display');
         expect(within(inspector).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
         expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         expect(within(inspector).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
         expect(within(inspector).getByRole('group', { name: 'surface style' })).toBeInTheDocument();
         expect(within(inspector).getByRole('group', { name: 'cut-away axis' })).toBeInTheDocument();
-        // The settings sit above the plot, as in Bonds' inspector.
+        // The settings sit above the plot, as in Bonds' inspector -- R24-3: the Plot and data header follows them.
         const opacity = within(inspector).getByRole('slider', { name: 'surface opacity' });
-        expect(opacity.compareDocumentPosition(inspector.querySelector('.radial-plot')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(opacity.compareDocumentPosition(within(inspector).getByRole('button', { name: 'Plot and data' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         // Preflight D30 / ruling P3: the selection half no longer renders in Basic
         // Orbitals at all, so the view half (in the inspector) carries #controls now --
         // still exactly one on the page.
@@ -1689,6 +1711,7 @@ describe('App: shell', () => {
         const { store } = renderWithProvider(<App />);
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         const before = store.getState().orbital;
+        openInspectorSection('Display');
         const slider = within(screen.getByRole('complementary', { name: 'Inspector' })).getByRole('slider', { name: 'surface opacity' });
         fireEvent.keyDown(slider, { key: 'ArrowLeft' });
         const expected = orbitalReducer(before, setSurfaceStyle({ opacity: before.surfaceStyle.opacity - 0.05 })).surfaceStyle;
@@ -1697,18 +1720,23 @@ describe('App: shell', () => {
     });
 
     // Ruling R20b-atoms (owner decision): the Atom screen's Display settings leave Explore for the top of the inspector.
+    // Ruling R24-3: as a titled section above "Plot and data" -- the plot open by default, Display opened on demand.
     it('in Atoms, Explore has Configuration and Orbitals, and Display heads the inspector above Plot and Data', () => {
         const { container } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
         const explore = screen.getByRole('complementary', { name: 'Explore' });
         expect(within(explore).getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Configuration', 'Orbitals']);
         const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+        expect(within(inspector).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
+        expect(within(inspector).getByRole('tab', { name: 'Plot' })).toBeInTheDocument();
+        openInspectorSection('Display');
         const display = within(inspector).getByRole('region', { name: 'Display' });
         expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
         // Ruling R22a (owner): the colour-scheme toggle (was asserted here by its Phase ψ button) is gone.
         expect(within(display).queryByRole('button', { name: 'Phase ψ colours' })).toBeNull();
         expect(within(display).getByRole('checkbox', { name: 'Show axes' })).toBeInTheDocument();
         expect(within(display).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
-        expect(display.compareDocumentPosition(within(inspector).getByRole('tab', { name: 'Plot' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // The Plot and data header stays in view below the open Display section (R24-3).
+        expect(display.compareDocumentPosition(within(inspector).getByRole('button', { name: 'Plot and data' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         expect(container.querySelectorAll('#controls')).toHaveLength(1);
     });
@@ -1720,13 +1748,19 @@ describe('App: shell', () => {
         expect(screen.queryByRole('region', { name: 'Display' })).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'Plot panel' }));
         const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+        // Ruling R24-3: the bar's Plot opens the drawer at Plot and data; the folded Display header sits above it.
+        expect(within(inspector).getByRole('region', { name: 'Plot and data' })).toContainElement(within(inspector).getByRole('tab', { name: 'Plot' }));
+        expect(within(inspector).getByRole('button', { name: 'Display' }).compareDocumentPosition(within(inspector).getByRole('tab', { name: 'Plot' }))
+            & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        openInspectorSection('Display');
         const display = within(inspector).getByRole('region', { name: 'Display' });
         expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
-        expect(display.compareDocumentPosition(within(inspector).getByRole('tab', { name: 'Plot' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(display.compareDocumentPosition(within(inspector).getByRole('button', { name: 'Plot and data' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     // Ruling T20b-display-header: in every mode the inspector's view settings sit under a visible "Display"
-    // heading that folds them away, so the plot can come up on a short window.
+    // heading that folds them away. Ruling R24-3: every section is titled -- Display, then Plot and data in
+    // Atoms, Basic Orbitals and Bonds; Display alone (and so open) in Molecules.
     it('heads the view settings with a foldable Display heading in Atoms, Basic Orbitals, Bonds and Molecules', async () => {
         (loadScan as jest.Mock).mockResolvedValue(n2Scan);
         (loadMoleculeMeta as jest.Mock).mockImplementation(async (id: string) => ({ ...n2Meta, id }));
@@ -1734,8 +1768,12 @@ describe('App: shell', () => {
         renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
         const check = (mode: string) => {
             const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+            const headers = within(inspector).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent);
+            expect([mode, headers]).toEqual([mode, mode === 'molecules' ? ['Display'] : ['Display', 'Plot and data']]);
+            openInspectorSection('Display');
             const display = within(inspector).getByRole('region', { name: 'Display' });
-            const toggle = within(within(display).getByRole('heading', { name: 'Display' })).getByRole('button', { name: 'Display' });
+            // R24-3: the header sits just above the region it labels (it used to be inside a labelled section).
+            const toggle = within(within(inspector).getByRole('heading', { name: 'Display' })).getByRole('button', { name: 'Display' });
             expect([mode, toggle.getAttribute('aria-expanded')]).toEqual([mode, 'true']);
             expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
             expect(within(display).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
@@ -1755,25 +1793,29 @@ describe('App: shell', () => {
         check('molecules');
     });
 
-    it('folding Display hides its settings, survives a mode change and a reload, and leaves the share link alone', () => {
+    // Ruling R24-3 (was: folding Display, T20b-display-header): the open section is one at a time, survives a mode
+    // change and a reload, and is never in the share link.
+    it('opening Display folds Plot and data, survives a mode change and a reload, and leaves the share link alone', () => {
         const { store, unmount } = renderWithProvider(<App />);
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         const link = encodeStateOf(store.getState());
         const inspector = () => screen.getByRole('complementary', { name: 'Inspector' });
+        expect(within(inspector()).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         fireEvent.click(within(inspector()).getByRole('button', { name: 'Display' }));
-        expect(within(inspector()).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
-        expect(within(inspector()).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
+        expect(within(inspector()).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'true');
+        expect(within(inspector()).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
+        expect(within(inspector()).getByRole('button', { name: 'Plot and data' })).toHaveAttribute('aria-expanded', 'false');
+        expect(inspector().querySelector('.radial-plot')).toBeNull();
         expect(encodeStateOf(store.getState())).toBe(link);
-        // Whatever plot there is stays in the inspector, now at its top.
-        expect(within(inspector()).getByRole('region', { name: 'Display' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('link', { name: /\(atom mode\)/ }));
-        expect(within(inspector()).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
+        expect(within(inspector()).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
         unmount();
 
         renderWithProvider(<App />);
+        expect(within(inspector()).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'true');
+        fireEvent.click(within(inspector()).getByRole('button', { name: 'Plot and data' }));
+        expect(within(inspector()).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         expect(within(inspector()).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
-        fireEvent.click(within(inspector()).getByRole('button', { name: 'Display' }));
-        expect(within(inspector()).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
     });
 
     // Ruling T13-shellcard: under a shell's name the card states that shell's facts, not the whole atom's.

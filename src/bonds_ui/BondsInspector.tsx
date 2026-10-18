@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Typography } from '@mui/material';
-import Inspector, { InspectorDisplay } from '../shell/Inspector';
+import Inspector from '../shell/Inspector';
 import { bondsDataLines } from '../components/BondsPanel';
 import { BondsState } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
@@ -24,7 +24,8 @@ interface BondsInspectorProps {
 
 /**
  * Bonds mode's inspector (spec §9.3, Phase 6G-2 Task 9): Display on top,
- * then Plot (the potential curve, unchanged) and Data -- the frontier
+ * then "Plot and data" (titled sections, one open at a time, ruling R24-3):
+ * Plot (the potential curve, unchanged) and Data -- the frontier
  * orbital(s), any near-tie caveat and the method captions `bondsCaptions`
  * returns, moved out of the Explore panel's BondsPanel (ruling P19: that
  * panel chooses what to draw; this is where it came from).
@@ -35,25 +36,31 @@ const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, display, open,
     return (
         <Inspector
             variant={variant}
-            top={display ? <InspectorDisplay>{display}</InspectorDisplay> : undefined}
             open={open}
             onOpenChange={onOpenChange}
-            activeTab={tab}
-            onTab={setTab}
-            tabs={[
-                { key: 'plot', label: 'Plot', content: plot },
+            sections={[
+                ...(display ? [{ key: 'display', title: 'Display', content: display }] : []),
                 {
-                    key: 'data',
-                    label: 'Data',
-                    content: (
-                        <>
-                            {frontier && <Typography variant="caption" className="bonds-frontier">{frontier}</Typography>}
-                            {caveats.map(caveat => <Typography key={caveat} variant="caption" className="bonds-note">{caveat}</Typography>)}
-                            <ul className="bonds-captions" aria-label="methods">
-                                {captions.map(caption => <li key={caption}>{caption}</li>)}
-                            </ul>
-                        </>
-                    ),
+                    key: 'plot',
+                    title: 'Plot and data',
+                    activeTab: tab,
+                    onTab: setTab,
+                    tabs: [
+                        { key: 'plot', label: 'Plot', content: plot },
+                        {
+                            key: 'data',
+                            label: 'Data',
+                            content: (
+                                <>
+                                    {frontier && <Typography variant="caption" className="bonds-frontier">{frontier}</Typography>}
+                                    {caveats.map(caveat => <Typography key={caveat} variant="caption" className="bonds-note">{caveat}</Typography>)}
+                                    <ul className="bonds-captions" aria-label="methods">
+                                        {captions.map(caption => <li key={caption}>{caption}</li>)}
+                                    </ul>
+                                </>
+                            ),
+                        },
+                    ],
                 },
             ]}
         />

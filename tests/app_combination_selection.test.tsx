@@ -126,8 +126,11 @@ describe('App: the n = 2 field slider', () => {
         select(field(2, 0.002, 'both'));
         expect(store.getState().orbital.currentField?.sources.map(s => s.id)).toEqual(['stark:n2:lower', 'stark:n2:upper']);
 
+        // Ruling R24-3: the fraction is in the Display section, folded by default (Plot and data opens).
+        fireEvent.click(screen.getByRole('button', { name: 'Display', expanded: false }));
         fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
         fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
         expect(store.getState().orbital.currentField?.enclosedFraction).toBe(0.75);
+        window.localStorage.removeItem('eov.display');
     });
 });

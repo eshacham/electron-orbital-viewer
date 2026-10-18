@@ -1,43 +1,52 @@
-import { decodeDisplay, decodeRender, DEFAULT_DISPLAY, DEFAULT_RENDER, displayPref, renderPref } from '../../src/design/presentation';
+import { decodeDisplay, decodeRender, DEFAULT_DISPLAY, DEFAULT_RENDER, displayPref, INSPECTOR_ALL_FOLDED, renderPref } from '../../src/design/presentation';
 
 afterEach(() => window.localStorage.clear());
 
 describe('presentation preferences (spec §6.7)', () => {
-    // Ruling T20b-display-header adds displayOpen (the inspector's Display section) to these.
-    // Ruling P16 (owner) overrides the plain `true` default: until the viewer
-    // chooses, displayOpen is null and the window's own height decides.
+    // Ruling R24-3 replaces displayOpen (T20b-display-header, P16) with inspectorOpen: which titled section is
+    // open, null until the viewer chooses (the mode's content section then opens).
     // Ruling R22a (owner): no colour scheme any more -- the finish is eov.render's only field.
-    it('default to Glow, axes shown, the radial distribution tab and no stored Display choice', () => {
+    it('default to Glow, axes shown, the radial distribution tab and no stored inspector section', () => {
         expect(renderPref.get()).toEqual({ finish: 'glow' });
-        expect(displayPref.get()).toEqual({ showAxes: true, plotTab: 'distribution', displayOpen: null });
+        expect(displayPref.get()).toEqual({ showAxes: true, plotTab: 'distribution', inspectorOpen: null });
     });
 
     it('store JSON under eov.render and eov.display', () => {
         // Ruling R22a: the stored value carries no scheme.
         renderPref.set({ finish: 'solid' });
-        displayPref.set({ showAxes: false, plotTab: 'wave', displayOpen: false });
+        // Ruling R24-3: inspectorOpen (a section key) replaces displayOpen.
+        displayPref.set({ showAxes: false, plotTab: 'wave', inspectorOpen: 'display' });
         expect(JSON.parse(window.localStorage.getItem('eov.render')!)).toEqual({ finish: 'solid' });
-        expect(JSON.parse(window.localStorage.getItem('eov.display')!)).toEqual({ showAxes: false, plotTab: 'wave', displayOpen: false });
+        expect(JSON.parse(window.localStorage.getItem('eov.display')!)).toEqual({ showAxes: false, plotTab: 'wave', inspectorOpen: 'display' });
     });
 
     it('read anything malformed as the defaults, field by field', () => {
         expect(decodeRender('not json')).toEqual(DEFAULT_RENDER);
         // Ruling R22a: a stored scheme is no longer a field -- ignored.
         expect(decodeRender('{"finish":"chrome","scheme":"density"}')).toEqual({ finish: 'glow' });
-        // Ruling P16: a non-boolean displayOpen is not a real choice -- stays null.
-        expect(decodeDisplay('{"showAxes":"yes","plotTab":"rho","displayOpen":0}')).toEqual({ showAxes: true, plotTab: 'rho', displayOpen: null });
-        // A value stored before displayOpen existed reads as unset -- the window decides (P16).
-        expect(decodeDisplay('{"showAxes":false,"plotTab":"wave"}')).toEqual({ showAxes: false, plotTab: 'wave', displayOpen: null });
+        // Ruling R24-3: a non-string inspectorOpen (or a non-true displayOpen) is not a choice -- stays null.
+        expect(decodeDisplay('{"showAxes":"yes","plotTab":"rho","inspectorOpen":0,"displayOpen":0}')).toEqual({ showAxes: true, plotTab: 'rho', inspectorOpen: null });
+        // A value stored before either existed reads as unset -- the content section opens (R24-3).
+        expect(decodeDisplay('{"showAxes":false,"plotTab":"wave"}')).toEqual({ showAxes: false, plotTab: 'wave', inspectorOpen: null });
         expect(decodeDisplay(null)).toEqual(DEFAULT_DISPLAY);
     });
 
-    // Ruling P16 (owner): displayOpen is kept only when it is a real boolean --
-    // anything else (never stored, or malformed) stays null, so InspectorDisplay
-    // falls back to the window's own height instead of a single fixed default.
-    it('decodeDisplay keeps displayOpen only when it is a real boolean', () => {
-        expect(decodeDisplay(null).displayOpen).toBeNull();
-        expect(decodeDisplay('{"displayOpen":false}').displayOpen).toBe(false);
-        expect(decodeDisplay('{"displayOpen":"x"}').displayOpen).toBeNull();
+    // Ruling R24-3 (replacing P16's displayOpen test): a stored section key is kept as it is, the
+    // all-folded choice included; an old displayOpen migrates -- true kept Display open, false had the
+    // plot showing, which is the new default (null). Never written back as displayOpen.
+    it('decodeDisplay keeps a stored section and migrates an old displayOpen', () => {
+        expect(decodeDisplay(null).inspectorOpen).toBeNull();
+        expect(decodeDisplay('{"inspectorOpen":"plot"}').inspectorOpen).toBe('plot');
+        expect(decodeDisplay(`{"inspectorOpen":"${INSPECTOR_ALL_FOLDED}"}`).inspectorOpen).toBe(INSPECTOR_ALL_FOLDED);
+        expect(decodeDisplay('{"displayOpen":true}').inspectorOpen).toBe('display');
+        expect(decodeDisplay('{"displayOpen":false}').inspectorOpen).toBeNull();
+        expect(decodeDisplay('{"displayOpen":"x"}').inspectorOpen).toBeNull();
+        // A newer choice wins over a leftover old field.
+        expect(decodeDisplay('{"displayOpen":true,"inspectorOpen":"plot"}').inspectorOpen).toBe('plot');
+        window.localStorage.setItem('eov.display', '{"showAxes":true,"plotTab":"rho","displayOpen":true}');
+        expect(displayPref.get()).toEqual({ showAxes: true, plotTab: 'rho', inspectorOpen: 'display' });
+        displayPref.set(displayPref.get());
+        expect(JSON.parse(window.localStorage.getItem('eov.display')!)).not.toHaveProperty('displayOpen');
     });
 
     // Ruling R22a (owner): a returning user's eov.render from before the scheme went keeps its finish.

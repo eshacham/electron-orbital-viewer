@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Inspector, { InspectorDisplay } from '../shell/Inspector';
+import Inspector from '../shell/Inspector';
 import { PlotTabRow, DataTabBody } from '../atom_ui/PlotDataTabs';
 import type { PlotTab } from '../atom/plot_tabs';
 import type { PlotTabId } from '../design/presentation';
@@ -49,14 +49,21 @@ const BasicInspector: React.FC<BasicInspectorProps> = ({
     return (
         <Inspector
             variant={variant}
-            top={display ? <InspectorDisplay>{display}</InspectorDisplay> : undefined}
             open={open}
             onOpenChange={onOpenChange}
-            activeTab={tab}
-            onTab={setTab}
-            tabs={[
-                { key: 'plot', label: 'Plot', content: plotContent },
-                { key: 'data', label: 'Data', content: <DataTabBody facts={facts} csvReason={csvReason} onExportCsv={onExportCsv} /> },
+            sections={[
+                // Ruling R24-3: titled sections, one open at a time.
+                ...(display ? [{ key: 'display', title: 'Display', content: display }] : []),
+                {
+                    key: 'plot',
+                    title: 'Plot and data',
+                    activeTab: tab,
+                    onTab: setTab,
+                    tabs: [
+                        { key: 'plot', label: 'Plot', content: plotContent },
+                        { key: 'data', label: 'Data', content: <DataTabBody facts={facts} csvReason={csvReason} onExportCsv={onExportCsv} /> },
+                    ],
+                },
             ]}
         />
     );
