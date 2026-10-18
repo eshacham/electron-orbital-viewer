@@ -1,12 +1,9 @@
-import React, { useId, useState } from 'react';
-import { Button } from '@mui/material';
+import React, { useState } from 'react';
 import Inspector, { InspectorDisplay } from '../shell/Inspector';
-import TabRow from '../shell/TabRow';
+import { PlotTabRow, DataTabBody } from './PlotDataTabs';
 import type { PlotTab } from '../atom/plot_tabs';
 import type { PlotTabId } from '../design/presentation';
 import type { OrbitalFacts } from '../orbital_facts';
-import OrbitalFactsCard from './OrbitalFactsCard';
-import './inspector_atom.css';
 
 interface AtomInspectorProps {
     variant: 'docked' | 'drawer' | 'stacked';
@@ -33,24 +30,6 @@ interface AtomInspectorProps {
 /** The Atom screen's inspector (spec §9.1): Display on top (ruling R20b-atoms), then Plot, with its function tabs, and Data. */
 const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, plot, facts, csvReason, onExportCsv }) => {
     const [tab, setTab] = useState('plot');
-    const id = useId();
-    const plotContent = (
-        <>
-            <TabRow idPrefix={`${id}-plot`} label="plot" tabs={plotTabs.map(t => ({ key: t.id, label: t.label, name: t.name }))} active={plotTab.id}
-                onChange={key => onPlotTab(key as PlotTabId)} />
-            <div role="tabpanel" id={`${id}-plot-panel-${plotTab.id}`} aria-labelledby={`${id}-plot-tab-${plotTab.id}`} className="plot-tab-panel">
-                {plot}
-            </div>
-        </>
-    );
-    const dataContent = (
-        <>
-            {facts && <OrbitalFactsCard facts={facts} />}
-            <Button variant="outlined" size="small" disabled={csvReason !== null} title={csvReason ?? undefined} onClick={onExportCsv}>
-                Export CSV of this plot
-            </Button>
-        </>
-    );
     return (
         <Inspector
             variant={variant}
@@ -59,7 +38,10 @@ const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, display, open, o
             onOpenChange={onOpenChange}
             activeTab={tab}
             onTab={setTab}
-            tabs={[{ key: 'plot', label: 'Plot', content: plotContent }, { key: 'data', label: 'Data', content: dataContent }]}
+            tabs={[
+                { key: 'plot', label: 'Plot', content: <PlotTabRow plotTabs={plotTabs} plotTab={plotTab} onPlotTab={onPlotTab} plot={plot} /> },
+                { key: 'data', label: 'Data', content: <DataTabBody facts={facts} csvReason={csvReason} onExportCsv={onExportCsv} /> },
+            ]}
         />
     );
 };

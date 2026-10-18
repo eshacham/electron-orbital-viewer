@@ -1,6 +1,7 @@
 import { solveAtom } from '../../src/atom/scf';
 import { buildSerialisedAtomProfile } from '../../src/workers/atomWorker';
-import { plotTabsFor, resolvePlotTab, tabCurves } from '../../src/atom/plot_tabs';
+import { plotTabsFor, resolvePlotTab, tabCurves, hydrogenicTabCurves, BASIC_PLOT_TABS } from '../../src/atom/plot_tabs';
+import { radialProfile, PLOT_SAMPLE_COUNT } from '../../src/radial_distribution';
 
 const gridOf = (p: { rMin: number; dx: number; size: number }) => Array.from({ length: p.size }, (_, j) => p.rMin * Math.exp(j * p.dx));
 const trapezoid = (r: number[], f: (j: number) => number) => {
@@ -79,5 +80,49 @@ describe('the inspector\'s plot tabs (spec §9.1, ruling R2)', () => {
         const profile = buildSerialisedAtomProfile(solveAtom(1), 0.9);
         const distribution = [{ label: '1s', color: '#4da3ff', points: [{ r: 1, value: 2 }] }];
         expect(tabCurves('distribution', { profile, selectedSubshell: null, rGrid: [], distribution })).toBe(distribution);
+    });
+});
+
+describe('hydrogenicTabCurves (Basic Orbitals, spec §9.2: "Plot tabs as §9.1")', () => {
+    it('offers the same three tabs as an atom orbital\'s, never relativistic', () => {
+        expect(BASIC_PLOT_TABS.map(t => t.id)).toEqual(['wave', 'density', 'distribution']);
+        expect(BASIC_PLOT_TABS.map(t => [t.label, t.name])).toEqual([
+            ['R(r)', 'Wave function R(r)'], ['|R|²', 'Probability density |R|²'], ['D(r)', 'Radial distribution D(r)'],
+        ]);
+    });
+
+    it('plots R(r) itself: 1s at r = 0 is positive and 2 for Z = 1', () => {
+        const [wave] = hydrogenicTabCurves('wave', { n: 1, l: 0, Z: 1, rMax: 5, colour: '#4da3ff' });
+        expect(wave.points[0].r).toBe(0);
+        expect(wave.points[0].value).toBeCloseTo(2, 10);
+        expect(wave.color).toBe('#4da3ff');
+    });
+
+    it('gives |R|² as R(r)\'s own square, pointwise', () => {
+        const inputs = { n: 2, l: 1, Z: 1 as const, rMax: 20, colour: '#ff6b6b' };
+        const [wave] = hydrogenicTabCurves('wave', inputs);
+        const [density] = hydrogenicTabCurves('density', inputs);
+        expect(density.points.length).toBe(wave.points.length);
+        for (let i = 0; i < wave.points.length; i++) {
+            expect(density.points[i].value).toBeCloseTo(wave.points[i].value ** 2, 10);
+        }
+    });
+
+    it('leaves the distribution tab exactly what RadialPlot already plots for n/l/Z (ruling R2)', () => {
+        const profile = radialProfile(3, 2, 1, 40, PLOT_SAMPLE_COUNT);
+        const [distribution] = hydrogenicTabCurves('distribution', { n: 3, l: 2, Z: 1, rMax: 40, colour: '#06d6a0' });
+        expect(distribution.points).toEqual(profile.map(p => ({ r: p.r, value: p.probability })));
+    });
+
+    it('2s changes sign exactly once, at its radial node', () => {
+        const [wave] = hydrogenicTabCurves('wave', { n: 2, l: 0, Z: 1, rMax: 20, colour: '#4da3ff' });
+        // One sample lands exactly on the node (r = 2a0, 20/240 divides it evenly) and is
+        // exactly 0 -- neither sign, so it is dropped before counting the sign changes either side of it.
+        const nonZero = wave.points.map(p => p.value).filter(v => v !== 0);
+        let signChanges = 0;
+        for (let i = 1; i < nonZero.length; i++) {
+            if (Math.sign(nonZero[i]) !== Math.sign(nonZero[i - 1])) signChanges++;
+        }
+        expect(signChanges).toBe(1);
     });
 });

@@ -77,7 +77,6 @@ import { CURVE_COLORS } from './curve_colors';
 import { buildComparisonCurves, radialPlotRange } from './atom/comparison_curves';
 import { useUrlStateSync } from './useUrlStateSync';
 import { hasSharedView, encodeStateOf } from './url_state';
-import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
 import { exportAvailability, exportItemsFor, runExport, ExportKind, ExportOptions } from './export/run_export';
 import { CsvCurve } from './export/csv';
 import { downloadBlob } from './export/download';
@@ -119,7 +118,8 @@ import AtomExplore from './atom_ui/AtomExplore';
 import ElementTile from './atom_ui/ElementTile';
 import OrbitalEnergyList from './atom_ui/OrbitalEnergyList';
 import AtomInspector from './atom_ui/AtomInspector';
-import { plotAriaLabel, plotTabsFor, resolvePlotTab, tabCurves } from './atom/plot_tabs';
+import BasicInspector from './basic_ui/BasicInspector';
+import { plotAriaLabel, plotTabsFor, resolvePlotTab, tabCurves, hydrogenicTabCurves, BASIC_PLOT_TABS } from './atom/plot_tabs';
 import { atomFacts, orbitalFacts, shellFacts, subshellFacts } from './orbital_facts';
 import Inspector, { InspectorDisplay } from './shell/Inspector';
 import TitleBlock from './shell/TitleBlock';
@@ -934,6 +934,30 @@ function App() {
     }, [atomProfile, pictureRelativity, atomLevel, atomSelectedOrbital, atomSelectedSubshell, atomSelectedShell, enclosedFraction,
         isoLevel, isLoading, renderFailed, species]);
 
+    // Basic Orbitals' inspector (spec §9.2: "Plot tabs as §9.1"): the same
+    // displayPref.plotTab persists across modes (ruling P2), and the curves
+    // come straight from the analytic R(r) -- there is no solved profile to
+    // draw from, unlike atomTabCurves above.
+    const basicActivePlotTab = resolvePlotTab(BASIC_PLOT_TABS, display.plotTab);
+    const basicTabCurves = useMemo(
+        () => (renderedParams
+            ? hydrogenicTabCurves(basicActivePlotTab.id, { n: renderedParams.n, l: renderedParams.l, Z: 1, rMax: renderedParams.rMax, colour: CURVE_COLORS[0] })
+            : []),
+        [renderedParams, basicActivePlotTab],
+    );
+    // The Data card (spec §9.2, same component as §9.1): null while a
+    // combination is drawn instead of one orbital (renderedParams is then
+    // null too -- the two are mutually exclusive, orbitalSlice's own rule).
+    // No ΔSCF energy for the analytic hydrogenic orbital, unlike the atom's
+    // (ruling P2 only asks for the iso value and the enclosed fraction), so
+    // `method` is never read (orbitalFacts only reads it when energy is given).
+    const basicFactsNow = useMemo(() => {
+        if (!renderedParams) return null;
+        return orbitalFacts({ n: renderedParams.n, l: renderedParams.l, ml: renderedParams.ml }, {
+            enclosedFraction, isoLevel: renderFailed ? null : isoLevel, isoPending: isLoading, energy: null, method: '',
+        });
+    }, [renderedParams, enclosedFraction, isoLevel, isLoading, renderFailed]);
+
     // Phone: the element is chosen from a full-screen list opened from the
     // element name, since the periodic table does not fit.
     const [elementPickerOpen, setElementPickerOpen] = useState(false);
@@ -1099,11 +1123,10 @@ function App() {
         // Bonds' CSV is the potential curve, built from bondsScan/h2plus's
         // own data (run_export.ts's bondsCsvFor, ruling C5), not a radial curve.
         if (!isBasicMode) return [];
+        // A combination keeps today's single plot (spec §9.2 last line), not the function tabs.
         if (renderedField) return selectionPlot?.curves ?? [];
-        if (!renderedParams) return [];
-        const { n: pn, l: pl, Z: pZ, rMax } = renderedParams;
-        return [{ label: 'P(r)', points: radialProfile(pn, pl, pZ, rMax, PLOT_SAMPLE_COUNT).map(p => ({ r: p.r, value: p.probability })) }];
-    }, [isAtomMode, isBasicMode, atomCurves, activePlotTab, atomTabCurves, renderedField, selectionPlot, renderedParams]);
+        return basicTabCurves;
+    }, [isAtomMode, isBasicMode, atomCurves, activePlotTab, atomTabCurves, renderedField, selectionPlot, basicTabCurves]);
     const handleExport = useCallback(async (kind: ExportKind, options: ExportOptions) => {
         // The file's "view:" link names the angle on screen, as Share's does.
         const state = stateNow();
@@ -1123,13 +1146,17 @@ function App() {
             bondsScan: bondsData.scan, bondsMeta: bondsData.meta, bondsLoading: bondsData.loading, bondsError: bondsData.error,
             h2plusCurve: h2plusCurve.curve,
             // The plot tab's own quantity line; the radial distribution's is null, keeping today's (ruling R2).
-            csvQuantity: isAtomMode ? activePlotTab?.csvQuantity ?? undefined : undefined,
+            // A combination keeps today's default quantity text (spec §9.2 last line): there is no single tab on screen for it.
+            csvQuantity: isAtomMode
+                ? activePlotTab?.csvQuantity ?? undefined
+                : (isBasicMode && !renderedField ? basicActivePlotTab.csvQuantity ?? undefined : undefined),
             ...options,
         });
         downloadBlob(result.blob, result.filename);
     }, [
         stateNow, csvCurvesNow, showPhaseLegend, combinationLegend, phase,
-        bondsData.scan, bondsData.meta, bondsData.loading, bondsData.error, h2plusCurve.curve, isAtomMode, activePlotTab,
+        bondsData.scan, bondsData.meta, bondsData.loading, bondsData.error, h2plusCurve.curve,
+        isAtomMode, activePlotTab, isBasicMode, renderedField, basicActivePlotTab,
     ]);
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
     // Ruling DC6 / R22a: the glTF item names the theme whose colours it keeps.
@@ -1244,7 +1271,6 @@ function App() {
             onChange={handleBasicSelectionChange}
             combination={combination}
             onCombinationChange={handleCombinationChange}
-            onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined}
         />
     );
 
@@ -1281,6 +1307,7 @@ function App() {
                     />
                 );
             }
+            // The plot tab on screen (spec §9.2: "Plot tabs as §9.1").
             return renderedParams && (
                 <RadialPlot
                     n={renderedParams.n}
@@ -1289,7 +1316,11 @@ function App() {
                     rMax={renderedParams.rMax}
                     width={width}
                     collapsible={collapsible}
-                    lineColour={palette[0]}
+                    curves={themed(basicTabCurves)}
+                    title={basicActivePlotTab.title}
+                    caption={basicActivePlotTab.caption}
+                    signed={basicActivePlotTab.signed}
+                    ariaLabel={plotAriaLabel(basicActivePlotTab)}
                 />
             );
         }
@@ -1339,6 +1370,23 @@ function App() {
             facts={atomFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} />
     ) : (
         <Inspector variant={variant} body={null} top={variant === 'stacked' ? undefined : <InspectorDisplay>{atomDisplay}</InspectorDisplay>}
+            open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
+    ));
+
+    // Basic Orbitals' inspector (spec §9.2: "Plot tabs as §9.1"). Mirrors
+    // atomInspector's own DX1 fallback: before the first debounced render
+    // lands (both renderedParams and renderedField null, just after
+    // entering the mode) it is the plain inspector, holding the column and
+    // drawer bar in place, with the view controls still in it.
+    const basicInspector = (variant: 'docked' | 'drawer' | 'stacked') => ((renderedParams || renderedField) ? (
+        <BasicInspector variant={variant} display={variant === 'stacked' ? undefined : renderControls('view')}
+            open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
+            plotTabs={BASIC_PLOT_TABS} plotTab={basicActivePlotTab} onPlotTab={handlePlotTab}
+            combination={Boolean(renderedField)}
+            plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
+            facts={basicFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} />
+    ) : (
+        <Inspector variant={variant} body={null} top={variant === 'stacked' ? undefined : <InspectorDisplay>{renderControls('view')}</InspectorDisplay>}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
@@ -1422,7 +1470,8 @@ function App() {
             // Explore panel and inspector, in one scrolling tab since there is no
             // drill-down here to ask for a tab of its own.
             { key: 'view', label: 'Orbital & view', content: <>{basicExplore}{renderControls('view')}{phoneViewActions}</> },
-            { key: 'plot', label: 'Plot', content: renderRadialPlot(PHONE_PLOT_WIDTH, false) },
+            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
+            { key: 'plot', label: 'Plot', content: basicInspector('stacked') },
         ];
 
     // A molecule that did not load, or a surface that did not draw (spec
@@ -1497,10 +1546,10 @@ function App() {
         )
         // Basic Orbitals: its header tile and chips (ruling P3) -- BasicExplore.
         : basicExplore;
-    // Basic Orbitals, Bonds and Molecules (the atom has its own: atomInspector above): the view
-    // settings above the plot -- for Basic Orbitals its view half of Controls (ruling R20b) -- under
-    // the foldable Display heading, as in the Atom inspector (ruling T20b-display-header).
-    const inspectorDisplay = <InspectorDisplay>{isBasicMode ? renderControls('view') : controls}</InspectorDisplay>;
+    // Bonds and Molecules (the atom has its own: atomInspector; Basic Orbitals its own: basicInspector,
+    // both above): the view settings above the plot, under the foldable Display heading, as in the
+    // Atom inspector (ruling T20b-display-header).
+    const inspectorDisplay = <InspectorDisplay>{controls}</InspectorDisplay>;
     const inspectorBody = renderRadialPlot(PLOT_WIDTH, false);
 
     const session = useAppSelector(state => state.jobs.session);
@@ -1717,7 +1766,7 @@ function App() {
                 <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} onClose={closeTable} />
             )}
             {phoneChrome}
-            {isMedium && (isAtomMode ? atomInspector('drawer') : (
+            {isMedium && (isAtomMode ? atomInspector('drawer') : isBasicMode ? basicInspector('drawer') : (
                 <Inspector variant="drawer" top={inspectorDisplay} body={inspectorBody} open={viewPanelOpen}
                     onOpenChange={open => setViewPanelOpen(() => open)} />
             ))}
@@ -1785,7 +1834,8 @@ function App() {
                 explore={isAtomMode ? atomExplore : (
                     <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
                 )}
-                inspector={isAtomMode ? atomInspector('docked') : <Inspector variant="docked" top={inspectorDisplay} body={inspectorBody} />}
+                inspector={isAtomMode ? atomInspector('docked') : isBasicMode ? basicInspector('docked')
+                    : <Inspector variant="docked" top={inspectorDisplay} body={inspectorBody} />}
                 viewport={viewport}
                 shellRef={shellRef}
                 exploreCollapsed={isMedium && exploreCollapsed}

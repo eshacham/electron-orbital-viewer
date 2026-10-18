@@ -22,8 +22,6 @@ export interface BasicExploreProps {
     onChange(change: Partial<BasicSelection>): void;
     combination: CombinationSelection;
     onCombinationChange(selection: CombinationSelection): void;
-    /** Medium width: a chevron that hides the panel (a reveal button brings it back, spec §7). */
-    onCollapse?(): void;
 }
 
 const N_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];

@@ -2,6 +2,9 @@ import type { SerialisedAtomProfile } from '../workers/atomWorker';
 import type { ViewLevel } from '../store/atomSlice';
 import type { RadialCurve } from '../components/RadialPlot';
 import type { PlotTabId } from '../design/presentation';
+import { radialWaveFunction } from '../quantum_functions';
+import { radialProfile, PLOT_SAMPLE_COUNT } from '../radial_distribution';
+import { subshellLabel } from './configurations';
 
 /**
  * The inspector's plot tabs (spec §9.1). Ruling R2: "Radial distribution"
@@ -101,4 +104,46 @@ export function tabCurves(tab: PlotTabId, inputs: PlotCurveInputs): RadialCurve[
         color: base?.color ?? '#4da3ff',
         points: rGrid.map((r, j) => ({ r, value: square ? sub.R[j] * sub.R[j] : sub.R[j] })),
     }];
+}
+
+/** Basic Orbitals' plot tabs (spec §9.2: "Plot tabs as §9.1"), always the orbital set, never relativistic. */
+export const BASIC_PLOT_TABS: PlotTab[] = plotTabsFor('orbital', false, false);
+
+export interface HydrogenicCurveInputs {
+    n: number;
+    l: number;
+    /** Basic Orbitals mode is always hydrogen-like (orbital_presets.ts's BASIC_ORBITALS_Z). */
+    Z: 1;
+    rMax: number;
+    /** The curve's colour, raw (not yet themed) -- the caller themes it exactly as every other curve (App.tsx's `themed`). */
+    colour: string;
+}
+
+/**
+ * The inspector's plot-tab curves for a single hydrogenic orbital (Basic
+ * Orbitals mode). Unlike `tabCurves` above there is no solved SCF profile to
+ * draw from: R(r) comes straight from the analytic `radialWaveFunction`, so
+ * this needs only n, l and Z (mₗ does not affect the radial part). The
+ * distribution tab reuses `radialProfile` -- today's curve exactly (ruling
+ * R2) -- just reshaped into a `RadialCurve` so all three tabs share one
+ * rendering path (spec §9.2).
+ */
+export function hydrogenicTabCurves(tab: PlotTabId, inputs: HydrogenicCurveInputs): RadialCurve[] {
+    const { n, l, Z, rMax, colour } = inputs;
+    const label = subshellLabel(n, l);
+    if (tab === 'distribution') {
+        return [{
+            label: `${label} · D(r)`,
+            color: colour,
+            points: radialProfile(n, l, Z, rMax, PLOT_SAMPLE_COUNT).map(point => ({ r: point.r, value: point.probability })),
+        }];
+    }
+    if (tab !== 'wave' && tab !== 'density') return [];
+    const square = tab === 'density';
+    const points = Array.from({ length: PLOT_SAMPLE_COUNT + 1 }, (_, i) => {
+        const r = (rMax * i) / PLOT_SAMPLE_COUNT;
+        const R = radialWaveFunction(n, l, r, Z);
+        return { r, value: square ? R * R : R };
+    });
+    return [{ label: `${label} · ${square ? '|R(r)|²' : 'R(r)'}`, color: colour, points }];
 }
