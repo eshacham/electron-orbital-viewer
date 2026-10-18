@@ -5,6 +5,8 @@ import { orbitalName } from '../orbital_names';
 import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
 import type { ThumbRequest } from './ThumbnailService';
 import type { RingLayer } from './ring_glyph';
+import type { BasicSelection } from '../store/orbitalSlice';
+import { basicOrbitalParams } from '../orbital_presets';
 
 /**
  * Ruling R20d (overrides §12's 32³): strips mesh at 64³ -- 32³'s ~560-vertex
@@ -18,14 +20,19 @@ const LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
 
 export type StripThumb = { kind: 'orbital'; request: ThumbRequest } | { kind: 'rings'; rings: RingLayer[]; rMax: number } | { kind: 'back' };
 
-export interface StripItem {
+/**
+ * Generic over what a tile dispatches: `NavigationTarget` (the default, the
+ * Atom strip's own LevelNav targets) or, for Basic Orbitals, a plain
+ * `BasicSelection` -- there is no drill-down there, just n/l/mₗ (Task 8).
+ */
+export interface StripItem<T = NavigationTarget> {
     key: string;
     label: string;
     spoken: string;
     group: string | null;
     /** The group's name for a screen reader: "6p j = 3/2" where the visible label is "6p³⁄₂" (ruling T16-spoken). */
     groupSpoken: string | null;
-    target: NavigationTarget;
+    target: T;
     selected: boolean;
     thumb: StripThumb;
 }
@@ -94,6 +101,45 @@ export function atomStripItems(args: StripArgs): StripItem[] {
                             n: subshell.n, l: subshell.l, ml, Z: profile.Z, resolution: THUMB_RESOLUTION, rMax: subshell.samplingRadius, enclosedFraction,
                             radialSamples: { R: subshell.R, rMin: profile.rMin, dx: profile.dx, size: profile.size },
                         },
+                    },
+                },
+            });
+        }
+    }
+    return items;
+}
+
+/**
+ * The Basic Orbitals strip (spec §9.2 "Strip", §12, Task 8): every orbital of
+ * the current n -- n² tiles, grouped by subshell (l = 0..n-1), each mₗ of
+ * each subshell ascending -- unlike the Atom strip there is no drill-down or
+ * back tile: the whole n² set is always in view, and a tile dispatches the
+ * same `{n, l, ml}` BasicSelection a chip click does (App.tsx's
+ * `useDrawOnSelection` debounce draws it 150 ms later).
+ */
+export function basicStripItems(args: { selection: BasicSelection; enclosedFraction: number }): StripItem<BasicSelection>[] {
+    const { selection, enclosedFraction } = args;
+    const { n } = selection;
+    const items: StripItem<BasicSelection>[] = [];
+    for (let l = 0; l < n; l++) {
+        const group = subshellLabel(n, l);
+        const groupSpoken = subshellSpokenLabel(n, l);
+        for (let ml = -l; ml <= l; ml++) {
+            const name = orbitalName(n, l, ml);
+            items.push({
+                key: `basic-${n}-${l}-${ml}`,
+                label: name,
+                // Ruling T16-optname (spec §13): "3p_x orbital".
+                spoken: `${name} orbital`,
+                group,
+                groupSpoken,
+                target: { n, l, ml },
+                selected: l === selection.l && ml === selection.ml,
+                thumb: {
+                    kind: 'orbital',
+                    request: {
+                        contentKey: `basic|${n}|${l}|${ml}|${enclosedFraction}`,
+                        params: { ...basicOrbitalParams(n, l, ml, enclosedFraction), resolution: THUMB_RESOLUTION },
                     },
                 },
             });

@@ -7,13 +7,19 @@ import type { StripItem } from '../thumbs/strip_items';
 import { useRovingFocus } from './useRovingFocus';
 import './strip.css';
 
-interface ThumbnailStripProps {
-    items: StripItem[];
+/**
+ * Generic over what a tile dispatches (StripItem<T>): `NavigationTarget` by
+ * default (the Atom strip), or a plain `BasicSelection` for Basic Orbitals'
+ * strip (Task 8) -- the component itself never reads the target, only
+ * forwards it to `onSelect`.
+ */
+interface ThumbnailStripProps<T = NavigationTarget> {
+    items: StripItem<T>[];
     label: string;
     rGrid: number[];
     /** theme|finish|power: a change re-requests every visible tile. */
     themeKey: string;
-    onSelect(target: NavigationTarget): void;
+    onSelect(target: T): void;
     /** 'sheet' is the phone's first row of the Explore tab: 56 px tiles, in the flow (spec §9.8). */
     variant?: 'overlay' | 'sheet';
     collapsed?: boolean;
@@ -32,7 +38,11 @@ export function tileBacking(px: number, devicePixelRatio: number): number {
     return Math.round(px * dpr);
 }
 
-const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: string; onSelect(target: NavigationTarget): void }> = ({ item, px, rGrid, themeKey, onSelect }) => {
+interface TileProps<T> { item: StripItem<T>; px: number; rGrid: number[]; themeKey: string; onSelect(target: T): void }
+
+// A plain generic function, not React.FC<...> (which cannot carry a type
+// parameter): T follows whatever StripItem<T> the enclosing strip was given.
+function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const backing = tileBacking(px, typeof window === 'undefined' ? 1 : window.devicePixelRatio);
     const { thumb } = item;
@@ -106,7 +116,12 @@ const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: s
         >
             <span className="strip-tile-image" style={{ width: px, height: px }}>
                 {thumb.kind === 'back' ? <ArrowBack aria-hidden /> : (
+                    // D15: shoot.mjs has no live hook into the thumbnail service, so it
+                    // counts this attribute instead -- the picture (not the glyph) is
+                    // showing. True for a ring glyph tile at once (drawn synchronously
+                    // on mount); for an orbital tile, only once its image has arrived.
                     <canvas ref={canvasRef} className="thumb-canvas" width={backing} height={backing} aria-hidden="true"
+                        data-drawn={showGlyph ? 'false' : 'true'}
                         style={showGlyph ? { visibility: 'hidden' } : undefined} />
                 )}
                 {showGlyph && <span className="strip-tile-glyph" aria-hidden="true">{item.label}</span>}
@@ -114,14 +129,17 @@ const Tile: React.FC<{ item: StripItem; px: number; rGrid: number[]; themeKey: s
             <span className="strip-tile-label" aria-hidden="true">{item.label}</span>
         </div>
     );
-};
+}
 
 /**
  * The thumbnail strip (spec §8.5 bottom zone, §9.1 "Strip", §13): a
  * listbox of labelled options, grouped by subshell, arrow keys inside and
  * Tab out, collapsible to a 28 px handle.
  */
-const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({ items, label, rGrid, themeKey, onSelect, variant = 'overlay', collapsed = false, onCollapsedChange }) => {
+// A plain generic function (not React.FC<...>, which cannot carry a type
+// parameter): T is whatever StripItem<T> the caller's items are in -- the
+// Atom strip's NavigationTarget (the default) or Basic Orbitals' BasicSelection.
+function ThumbnailStrip<T = NavigationTarget>({ items, label, rGrid, themeKey, onSelect, variant = 'overlay', collapsed = false, onCollapsedChange }: ThumbnailStripProps<T>) {
     const listRef = useRef<HTMLDivElement>(null);
     const listId = useId();
     // Ruling DX2: the listbox mounts only while expanded, so `collapsed` re-attaches the roving focus to it.
@@ -144,13 +162,13 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({ items, label, rGrid, th
         else list.scrollLeft = left;
     }, [items, collapsed]);
 
-    const groups: Array<{ label: string | null; spoken: string | null; items: StripItem[] }> = [];
+    const groups: Array<{ label: string | null; spoken: string | null; items: StripItem<T>[] }> = [];
     for (const item of items) {
         const last = groups[groups.length - 1];
         if (last && last.label === item.group) last.items.push(item);
         else groups.push({ label: item.group, spoken: item.groupSpoken, items: [item] });
     }
-    const tile = (item: StripItem) => <Tile key={item.key} item={item} px={px} rGrid={rGrid} themeKey={themeKey} onSelect={onSelect} />;
+    const tile = (item: StripItem<T>) => <Tile key={item.key} item={item} px={px} rGrid={rGrid} themeKey={themeKey} onSelect={onSelect} />;
 
     return (
         <div className={`thumbnail-strip ${variant}${collapsed ? ' collapsed' : ''}`}>
@@ -176,6 +194,6 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({ items, label, rGrid, th
             )}
         </div>
     );
-};
+}
 
 export default ThumbnailStrip;

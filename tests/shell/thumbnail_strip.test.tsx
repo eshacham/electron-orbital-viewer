@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import ThumbnailStrip, { tileBacking } from '../../src/shell/ThumbnailStrip';
-import { atomStripItems } from '../../src/thumbs/strip_items';
+import { atomStripItems, basicStripItems } from '../../src/thumbs/strip_items';
 import { subshellLabel } from '../../src/atom/configurations';
 import { thumbnailService, type ThumbHost } from '../../src/thumbs/ThumbnailService';
 import { goldProfile, neonProfile } from '../export/fixtures';
@@ -347,5 +347,78 @@ describe('strip tile styles (ruling R20d)', () => {
         expect(rule('.strip-tile-image canvas')).toMatch(/position:\s*absolute;\s*inset:\s*0;\s*width:\s*100%;\s*height:\s*100%/);
         expect(rule('.strip-tile-image')).not.toMatch(/(^|;)\s*border:/);
         expect(rule('.strip-tile-image::after')).toMatch(/border:\s*1px solid var\(--ql-color-border-subtle\)/);
+    });
+});
+
+// Task 8: StripItem<T>/ThumbnailStrip<T> are generic over what a tile
+// dispatches -- NavigationTarget by default (every test above), or (Basic
+// Orbitals' own strip) a plain BasicSelection with no `level` field at all.
+// This is as much a compile-time check (onSelect below is typed
+// `(target: BasicSelection) => void`, inferred from `items`) as a runtime
+// one: the strip's own behaviour -- listbox, groups, option names, clicks --
+// does not change for a T other than NavigationTarget.
+describe('ThumbnailStrip<T> (Task 8): generic over the dispatched target', () => {
+    it('renders and dispatches a non-NavigationTarget T (BasicSelection) exactly as it does NavigationTarget', () => {
+        const basicItems = basicStripItems({ selection: { n: 3, l: 2, ml: 0 }, enclosedFraction: 0.9 });
+        const onSelect = jest.fn();
+        render(<ThumbnailStrip items={basicItems} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={onSelect} />);
+        expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBeInTheDocument();
+        expect(screen.getByRole('group', { name: '3d' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: '3d_z² orbital' })).toHaveAttribute('aria-selected', 'true');
+        fireEvent.click(screen.getByRole('option', { name: '3p_x orbital' }));
+        expect(onSelect).toHaveBeenCalledWith({ n: 3, l: 1, ml: 1 });
+    });
+});
+
+// Controller preflight D15/Step 1: §12 "only tiles in view are requested" --
+// the IntersectionObserver gating itself. jsdom has no IntersectionObserver
+// at all (the other tests above rely on that absence, which falls back to
+// requesting at once -- see ThumbnailStrip.tsx's `typeof IntersectionObserver
+// === 'undefined'` branch), so proving the gating needs a real stand-in that
+// never reports an intersection.
+describe('ThumbnailStrip visibility gating (spec §12, D15 Step 1)', () => {
+    const originalIntersectionObserver = (window as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
+    afterEach(() => {
+        (window as unknown as { IntersectionObserver?: unknown }).IntersectionObserver = originalIntersectionObserver;
+        act(() => { thumbnailService.detach(); });
+    });
+
+    it('does not request an off-screen tile\'s picture, and requests it once it is reported on screen', () => {
+        const observed: Element[] = [];
+        // One real observer per tile (ThumbnailStrip.tsx constructs its own): capture every
+        // callback, keyed by the canvas it watches, so each tile can be reported separately.
+        const callbacks = new Map<Element, IntersectionObserverCallback>();
+        class NeverIntersectingObserver {
+            private cb: IntersectionObserverCallback;
+            constructor(cb: IntersectionObserverCallback) { this.cb = cb; }
+            observe(el: Element) { observed.push(el); callbacks.set(el, this.cb); }
+            unobserve() {}
+            disconnect() {}
+            takeRecords() { return []; }
+        }
+        (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = NeverIntersectingObserver;
+
+        thumbnailService.attach({
+            createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            isBusy: () => false, themeKey: () => 'dark|glow', render: () => new Promise(() => {}),
+        });
+        const request = jest.spyOn(thumbnailService, 'request');
+        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
+
+        // Every orbital tile's canvas was handed to its own observer; none has been asked for yet.
+        const orbitalTileCount = items.filter(item => item.thumb.kind === 'orbital').length;
+        expect(observed.length).toBe(orbitalTileCount);
+        expect(request).not.toHaveBeenCalled();
+
+        // Report just the first tile's canvas on screen: only that one tile is requested.
+        const [firstCanvas] = observed;
+        act(() => { callbacks.get(firstCanvas)!([{ isIntersecting: true, target: firstCanvas } as IntersectionObserverEntry], {} as IntersectionObserver); });
+        expect(request).toHaveBeenCalledTimes(1);
+
+        // The rest stay off-screen, and unrequested.
+        for (const canvas of observed.slice(1)) {
+            act(() => { callbacks.get(canvas)!([{ isIntersecting: false, target: canvas } as IntersectionObserverEntry], {} as IntersectionObserver); });
+        }
+        expect(request).toHaveBeenCalledTimes(1);
     });
 });

@@ -126,7 +126,7 @@ import Inspector, { InspectorDisplay } from './shell/Inspector';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
-import { atomStripItems } from './thumbs/strip_items';
+import { atomStripItems, basicStripItems } from './thumbs/strip_items';
 import { thumbnailService } from './thumbs/ThumbnailService';
 import { thumbLookKey, thumbTileDevicePx } from './thumbs/thumb_key';
 import { useDevicePixelRatio } from './thumbs/useDevicePixelRatio';
@@ -791,13 +791,21 @@ function App() {
         [atomProfile]
     );
 
-    // The atom strip (spec §8.5 bottom zone, §9.1 "Strip", §12).
+    // The strip under the canvas (spec §8.5 bottom zone, §9.1/§9.2 "Strip",
+    // §12): the Atom strip's own drill-down tiles, or -- Basic Orbitals has
+    // no drill-down -- every orbital of the current n (Task 8). The two
+    // never show at once (one mode is active at a time), so one collapsed
+    // state serves both.
     const [stripCollapsed, setStripCollapsed] = useState(false);
     const stripItems = useMemo(
         () => (atomProfile && !atomUnbound
             ? atomStripItems({ profile: atomProfile, level: atomLevel, selectedShell: atomSelectedShell, selectedOrbital: atomSelectedOrbital, enclosedFraction, palette })
             : []),
         [atomProfile, atomUnbound, atomLevel, atomSelectedShell, atomSelectedOrbital, enclosedFraction, palette],
+    );
+    const basicStrip = useMemo(
+        () => (isBasicMode ? basicStripItems({ selection: { n, l, ml }, enclosedFraction }) : []),
+        [isBasicMode, n, l, ml, enclosedFraction],
     );
     // A new species or relativity: nothing in flight belongs to the picture any more (§12).
     useEffect(() => () => thumbnailService.cancelAll(), [atomProfile?.speciesKey, atomProfile?.Z, pictureRelativity]);
@@ -1498,8 +1506,19 @@ function App() {
             // Ruling P3: BasicExplore (the tile, the chips, the Combination picker)
             // ahead of Controls' view half -- the same split as the desktop's
             // Explore panel and inspector, in one scrolling tab since there is no
-            // drill-down here to ask for a tab of its own.
-            { key: 'view', label: 'Orbital & view', content: <>{basicExplore}{renderControls('view')}{phoneViewActions}</> },
+            // drill-down here to ask for a tab of its own. Task 8: the strip is this
+            // tab's first row, as the Atom strip is Explore's (spec §9.8).
+            {
+                key: 'view', label: 'Orbital & view', content: (
+                    <>
+                        {basicStrip.length > 0 && (
+                            <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
+                                onSelect={handleBasicSelectionChange} variant="sheet" />
+                        )}
+                        {basicExplore}{renderControls('view')}{phoneViewActions}
+                    </>
+                ),
+            },
             // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
             { key: 'plot', label: 'Plot', content: basicInspector('stacked') },
         ];
@@ -1728,6 +1747,15 @@ function App() {
             {isAtomMode && !isNarrow && stripItems.length > 0 && (
                 <ThumbnailStrip items={stripItems} label="orbitals in view" rGrid={atomRGrid} themeKey={stripThemeKey}
                     onSelect={handleLevelNavigate} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
+            )}
+            {/* Task 8: Basic Orbitals' strip -- every orbital of the current n, grouped by
+                subshell. No back tile and no rings (there is no drill-down here), so there
+                is no r grid to pass. Ruling D9: the strip's tiles are phase-coloured, but the
+                surface itself always is too, so the key column's plain PhaseKey below already
+                covers them -- unlike Atoms, no second "Orbital tiles" heading here. */}
+            {isBasicMode && !isNarrow && basicStrip.length > 0 && (
+                <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
+                    onSelect={handleBasicSelectionChange} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
             )}
             {!isMoleculeMode && !isAtomMode && (showPhaseLegend || isBondsDensity || combinationLegend) && (
                 <KeyColumn compact={isNarrow}>

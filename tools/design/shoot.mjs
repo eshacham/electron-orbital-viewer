@@ -131,6 +131,12 @@ function collectMetrics() {
       caption: font('.key-heading') ?? font('.key-caption') ?? font('.ql-caption'),
     },
     canvases: canvases.length,
+    // D15: the strip's own tiles aren't WebGL -- their canvases are 2D, so they
+    // don't show up in webglCanvases below. ThumbnailStrip.tsx (Task 8) marks
+    // each one data-drawn="true" once its picture (not its glyph) is showing;
+    // this counts how many of them have settled by the time the capture runs.
+    thumbsDrawn: document.querySelectorAll('.thumb-canvas[data-drawn="true"]').length,
+    url: location.href,
     // DC9b: a canvas that ever received a WebGL context (wrapped in the init
     // script below) is only "the" renderer's canvas while that context is
     // still live -- still connected to the document, and not lost (a

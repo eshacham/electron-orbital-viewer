@@ -1000,6 +1000,32 @@ describe('App', () => {
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
     });
+
+    // Task 8 (spec §9.2 "Strip", §12): Basic Orbitals' own strip -- n² tiles
+    // of the current n grouped by subshell, no drill-down -- stands in for
+    // the Atom strip there. Picking a tile is exactly a chip's own change
+    // (setBasicSelection), so the existing 150 ms debounce (useDrawOnSelection)
+    // is what draws it, same as a BasicExplore chip click would.
+    it('in Basic Orbitals mode the strip holds every orbital of n, and choosing one draws it 150 ms later', () => {
+        jest.useFakeTimers();
+        try {
+            const { store } = renderWithProvider(<App />, { mode: 'hydrogenic' });
+            // DEFAULT_BASIC_SELECTION is n = 3, l = 2, mₗ = 0: 9 tiles (3s, 3p×3, 3d×5).
+            const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
+            expect(within(strip).getAllByRole('option')).toHaveLength(9);
+            expect(within(strip).getByRole('option', { name: '3d_z² orbital' })).toHaveAttribute('aria-selected', 'true');
+
+            fireEvent.click(within(strip).getByRole('option', { name: '3p_x orbital' }));
+            expect(store.getState().orbital.basicSelection).toEqual({ n: 3, l: 1, ml: 1 });
+            // Not drawn yet -- the debounce has not elapsed.
+            expect(store.getState().orbital.currentParams).toBeNull();
+
+            act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS); });
+            expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 1, ml: 1, Z: 1 });
+        } finally {
+            jest.useRealTimers();
+        }
+    });
 });
 
 describe('App: opening a shared link', () => {
