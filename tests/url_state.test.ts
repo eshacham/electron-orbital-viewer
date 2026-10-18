@@ -506,18 +506,22 @@ describe('built-in URL keys', () => {
         const store = makeStore();
         applyStateTo('#mode=basic&combo=field&level=1&F=0x1&op=0x1', store.dispatch);
         expect(store.getState().orbital.combination).toEqual({ kind: 'field', level: 1, field: 0.03, stark: 'lower' });
-        // Ruling R20a-2: the default a malformed op leaves is now 0.7 (was 1).
+        // Ruling R20a-2 / R24-1: a malformed op leaves the default (0.9 since R24-1).
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(DEFAULT_OPACITY);
     });
 
-    // Ruling R20a-2: a fresh session opens at 0.7, and a link made there carries it;
-    // a link made at the old default (every link has always carried op) still opens at 1.
-    it('opens a fresh session at 0.7, writes it into the link, and opens an old op=1 link at 1', () => {
-        expect(DEFAULT_OPACITY).toBe(0.7);
+    // Ruling R20a-2: a fresh session opens at the default, and a link made there carries it;
+    // a link made at an older default (every link has always carried op) still opens at its own value.
+    // Ruling R24-1 (owner): the default is 0.9 (was 0.7); an explicit op=0.7 link keeps meaning 0.7.
+    it('opens a fresh session at 0.9, writes it into the link, and opens old op=1 and op=0.7 links at their own value', () => {
+        expect(DEFAULT_OPACITY).toBe(0.9);
         const fresh = makeStore();
-        expect(fresh.getState().orbital.surfaceStyle.opacity).toBe(0.7);
+        expect(fresh.getState().orbital.surfaceStyle.opacity).toBe(0.9);
         fresh.dispatch(setMode('atom'));
-        expect(encodeStateOf(fresh.getState())).toMatch(/&op=0\.7&/);
+        expect(encodeStateOf(fresh.getState())).toMatch(/&op=0\.9&/);
+        const r20 = restore('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=none&op=0.7&surf=solid');
+        expect(r20.getState().orbital.surfaceStyle.opacity).toBe(0.7);
+        expect(encodeStateOf(r20.getState())).toMatch(/&op=0\.7&/);
         const old = restore('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=none&op=1&surf=solid');
         expect(old.getState().orbital.surfaceStyle.opacity).toBe(1);
         expect(encodeStateOf(old.getState())).toMatch(/&op=1&/);

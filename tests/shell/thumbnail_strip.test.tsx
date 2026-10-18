@@ -299,8 +299,8 @@ describe('ThumbnailStrip and the committed opacity', () => {
         render(<Provider store={store}><Strip /></Provider>);
         const orbitalTiles = items.filter(item => item.thumb.kind === 'orbital').length;
         expect(request).toHaveBeenCalledTimes(orbitalTiles);
-        // Ruling R22a: the look key has no scheme field (was dark|phase|glow|...).
-        expect(keyNow()).toBe('dark|glow|full|288|0.7');
+        // Ruling R22a: the look key has no scheme field (was dark|phase|glow|...). R24-1: the default opacity is 0.9 (was 0.7).
+        expect(keyNow()).toBe('dark|glow|full|288|0.9');
 
         act(() => { [0.65, 0.5, 0.4].forEach(value => store.dispatch(previewOpacity(value))); });
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.4);

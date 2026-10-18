@@ -18,12 +18,13 @@ export interface SurfaceStyle {
 }
 
 /**
- * Ruling R20a-2 (owner): a fresh session opens with the lobes see-through, at
- * the concept's slider value. Share links always carry `op` (url_state.ts
- * encodeViewKeys has written it since links began), so every link opens at
- * the opacity it was made with, old links' op=1 included.
+ * Ruling R20a-2 (owner): a fresh session opens with the lobes see-through.
+ * Ruling R24-1 (owner): at 0.9 (was the concept's 0.7). Share links always
+ * carry `op` (url_state.ts encodeViewKeys has written it since links began),
+ * so every link opens at the opacity it was made with -- old links' op=1 and
+ * op=0.7 included.
  */
-export const DEFAULT_OPACITY = 0.7;
+export const DEFAULT_OPACITY = 0.9;
 
 export const defaultSurfaceStyle: SurfaceStyle = {
     mode: 'solid',

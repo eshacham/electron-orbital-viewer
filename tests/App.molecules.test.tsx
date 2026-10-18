@@ -283,8 +283,8 @@ describe('Molecules mode', () => {
         // (WCAG 2.5.3, label in name). Ruling R23a: the desktop mode switch
         // is now the top bar's own tab (a link), not the rail's button.
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/ }));
-        // Ruling R20a-2: the untouched opacity is the new default, 0.7 (was 1).
-        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.7);
+        // Ruling R24-1: the untouched opacity is the default, 0.9 (was 0.7, R20a-2).
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.9);
         fireEvent.click(screen.getByRole('link', { name: /molecule mode/ }));
         await flush();
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.6);
@@ -303,8 +303,8 @@ describe('Molecules mode', () => {
         // Unanchored: the desktop mode switch is the top bar's own tab now (ruling R23a), a link not a button.
         fireEvent.click(screen.getByRole('link', { name: /atom mode/ }));
         await flush();
-        // Ruling R20a-2: what it hands back is the default it took, now 0.7 (was 1).
-        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.7);
+        // Ruling R24-1: what it hands back is the default it took, now 0.9 (was 0.7, R20a-2).
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.9);
     });
 
     it('keeps an opacity the user chose inside Molecules on the way out', async () => {
@@ -338,8 +338,8 @@ describe('Molecules mode', () => {
         fireEvent.click(screen.getByRole('button', { name: /atom mode/ }));
         await flush();
         expect(store.getState().atom.mode).toBe('atom');
-        // Ruling R20a-2: back to the default it lowered, now 0.7 (was 1).
-        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.7);
+        // Ruling R24-1: back to the default it lowered, now 0.9 (was 0.7, R20a-2).
+        expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.9);
         fireEvent.click(screen.getByRole('button', { name: /^Mode: / }));
         expect(screen.getByRole('button', { name: /atom mode/ })).toHaveAttribute('aria-pressed', 'true');
         // The names now end in "mode)" and lead with the visible label (WCAG

@@ -288,10 +288,11 @@ describe('orbitalSlice: the shell-lobe build and level transitions', () => {
 describe('thumbOpacity', () => {
     it('starts at the default, ignores drag ticks, and follows every committed opacity change', () => {
         const store = createAppStore();
-        expect(store.getState().orbital.thumbOpacity).toBe(0.7);
+        // Ruling R24-1: the default is 0.9 (was 0.7).
+        expect(store.getState().orbital.thumbOpacity).toBe(0.9);
         store.dispatch(previewOpacity(0.3));
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(0.3);
-        expect(store.getState().orbital.thumbOpacity).toBe(0.7);
+        expect(store.getState().orbital.thumbOpacity).toBe(0.9);
         store.dispatch(setSurfaceStyle({ opacity: 0.3 }));
         expect(store.getState().orbital.thumbOpacity).toBe(0.3);
         store.dispatch(setSurfaceStyle({ clipAxis: 'x' }));

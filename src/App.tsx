@@ -684,7 +684,7 @@ function App() {
         isMoleculeMode && (molecule.renderLabel !== null || molecule.isLoadingMeta), BUSY_INDICATOR_DELAY_MS);
     // The structure has to show through the density, so switching into the
     // mode lowers an untouched opacity (the default, DEFAULT_OPACITY --
-    // ruling R20a-2 moved it from 1 to 0.7). Only a real switch: a shared
+    // ruling R20a-2 moved it from 1 to 0.7, R24-1 to 0.9) to 0.6. Only a real switch: a shared
     // link is applied before the first render, so opening one already in
     // Molecules mode is not "entering" it, and its op is the link's
     // choice (fix round 1, review Important). Any other value is the
