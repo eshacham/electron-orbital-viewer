@@ -9,6 +9,8 @@ const tabs = BASIC_PLOT_TABS;
 const facts = orbitalFacts({ n: 3, l: 2, ml: 0 }, { enclosedFraction: 0.9, isoLevel: 1e-4, energy: null, method: '' });
 
 describe('BasicInspector (spec §9.2: "Plot tabs as §9.1")', () => {
+    // Ruling R24-3 / fix round 1 (R24-M3): a test that opens a section stores it (eov.display); reset even if it fails.
+    afterEach(() => { act(() => { window.localStorage.removeItem('eov.display'); }); });
     // Ruling T13-isostale: a pending value is seen as "…" and heard as "computing" (as Atoms').
     it('speaks a fact\'s spoken value and hides its visible mark from readers', () => {
         const pending = orbitalFacts({ n: 3, l: 2, ml: 0 }, { enclosedFraction: 0.9, isoLevel: 1e-4, isoPending: true, energy: null, method: '' });
@@ -83,7 +85,6 @@ describe('BasicInspector (spec §9.2: "Plot tabs as §9.1")', () => {
         expect(display).toHaveTextContent('display settings');
         expect(screen.queryByRole('tab', { name: 'Plot' })).toBeNull();
         expect(display.compareDocumentPosition(screen.getByRole('button', { name: 'Plot and data' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        act(() => { window.localStorage.removeItem('eov.display'); });
     });
 
     it('stacks Plot and Data in the phone sheet', () => {

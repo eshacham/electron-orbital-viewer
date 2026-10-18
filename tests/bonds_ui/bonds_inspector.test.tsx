@@ -16,6 +16,8 @@ const n2Meta: MoleculeMeta = fixture('meta.json');
 const n2 = reducer(reducer(undefined, selectBondsSystem('n2')), setScanPoint({ system: 'n2', index: 7, RBohr: n2Scan.points[7].RBohr }));
 
 describe('BondsInspector (spec §9.3, Phase 6G-2 Task 9)', () => {
+    // Ruling R24-3 / fix round 1 (R24-M3): a test that opens a section stores it (eov.display); reset even if it fails.
+    afterEach(() => { act(() => { window.localStorage.removeItem('eov.display'); }); });
     it('has Plot and Data; Plot holds the plot given to it, unchanged', () => {
         render(
             <BondsInspector variant="docked" bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} plot={<p>the curve</p>} />,
@@ -69,7 +71,6 @@ describe('BondsInspector (spec §9.3, Phase 6G-2 Task 9)', () => {
         expect(display).toHaveTextContent('view settings');
         expect(screen.queryByRole('tab', { name: 'Plot' })).toBeNull();
         expect(display.compareDocumentPosition(screen.getByRole('button', { name: 'Plot and data' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        act(() => { window.localStorage.removeItem('eov.display'); });
     });
 
     it('stacks Plot and Data in the phone sheet, with no Display section (the View tab holds it there)', () => {

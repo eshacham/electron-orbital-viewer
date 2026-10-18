@@ -154,7 +154,9 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, defaultOpen, o
                 onKeyDown={open ? onDrawerKey : undefined}>
                 <div className="inspector-bar">
                     {bar.map(item => {
-                        const expanded = open && (!tabbed || (openKey === tabbed.key && activeTab?.key === item.key));
+                        // Ruling R24-I1: the current tab's button reflects the open drawer whatever section is
+                        // open inside it (Display, or none), so it closes it in one click and Esc returns to it.
+                        const expanded = open && (!tabbed || activeTab?.key === item.key);
                         return (
                             <button
                                 key={item.key}

@@ -88,6 +88,8 @@ describe('App: a refused combination', () => {
 });
 
 describe('App: the n = 2 field slider', () => {
+    // Ruling R24-3 / fix round 1 (R24-M3): opening Display stores it (eov.display); reset even if a test fails.
+    afterEach(() => { window.localStorage.removeItem('eov.display'); });
     // Final review: at n = 2 the drawn shapes do not depend on F, so a new
     // F must not recompute them -- only the energies change.
     it('does not re-request an identical picture, while the energies follow F', () => {
@@ -131,6 +133,5 @@ describe('App: the n = 2 field slider', () => {
         fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
         fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
         expect(store.getState().orbital.currentField?.enclosedFraction).toBe(0.75);
-        window.localStorage.removeItem('eov.display');
     });
 });

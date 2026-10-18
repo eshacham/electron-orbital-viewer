@@ -129,12 +129,13 @@ describe('Inspector sections (ruling R24-3)', () => {
         expect(screen.queryByRole('region', { name: 'Display' })).toBeNull();
     });
 
-    it('remembers the open section across a reload (eov.display), never in a link, and keeps the other preferences', () => {
+    // Fix round 1 (R24-M4): the "never in a link" half is App's own test (encodeStateOf before and after);
+    // nothing here writes a hash, so the hash assertion that stood here proved nothing and is gone.
+    it('remembers the open section across a reload (eov.display) and keeps the other preferences', () => {
         act(() => { displayPref.set({ ...DEFAULT_DISPLAY, showAxes: false, plotTab: 'rho' }); });
         const { unmount } = render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
         fireEvent.click(header('Display'));
         expect(displayPref.get()).toEqual({ showAxes: false, plotTab: 'rho', inspectorOpen: 'display' });
-        expect(window.location.hash).not.toMatch(/display|inspector/);
         unmount();
         render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
         expect(header('Display')).toHaveAttribute('aria-expanded', 'true');
@@ -164,6 +165,47 @@ describe('Inspector sections (ruling R24-3)', () => {
         render(<Inspector variant="docked" sections={[displaySection]} />);
         expect(header('Display')).toHaveAttribute('aria-expanded', 'true');
         expect(screen.getByRole('region', { name: 'Display' })).toBeInTheDocument();
+    });
+
+    // Ruling R24-M1: a stored section this mode does not have (Properties, from Molecules after Task 12) opens this
+    // mode's default; the viewer's own "everything folded" stays folded wherever they go.
+    it('falls back to the mode\'s default for a stored section it lacks, and keeps everything folded when that was the choice', () => {
+        act(() => { displayPref.set({ ...DEFAULT_DISPLAY, inspectorOpen: 'properties' }); });
+        const { unmount } = render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
+        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'true');
+        expect(header('Display')).toHaveAttribute('aria-expanded', 'false');
+        unmount();
+        act(() => { displayPref.set({ ...DEFAULT_DISPLAY, inspectorOpen: INSPECTOR_ALL_FOLDED }); });
+        render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
+        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'false');
+        expect(header('Display')).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    // Ruling R24-I1: whatever section is open inside the drawer (Display, or none), the bar button of the tab
+    // that opened it stays expanded, closes the drawer in one click, and is where Esc puts focus back.
+    it('keeps the opening bar button expanded and one click from closing the drawer, with Display or nothing open inside', () => {
+        const onOpenChange = jest.fn();
+        const { rerender } = render(<Inspector variant="drawer" sections={[displaySection, plotAndData('data')]} open={false} onOpenChange={onOpenChange} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Data panel' }));
+        expect(onOpenChange).toHaveBeenLastCalledWith(true);
+        rerender(<Inspector variant="drawer" sections={[displaySection, plotAndData('data')]} open onOpenChange={onOpenChange} />);
+        fireEvent.click(header('Display'));
+        expect(screen.getByRole('region', { name: 'Display' })).toBeInTheDocument();
+        const bar = screen.getByRole('button', { name: 'Data panel' });
+        expect(bar).toHaveAttribute('aria-expanded', 'true');
+        expect(document.getElementById(bar.getAttribute('aria-controls')!)).toContainElement(screen.getByRole('region', { name: 'Display' }));
+        expect(screen.getByRole('button', { name: 'Plot panel' })).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.keyDown(header('Display'), { key: 'Escape' });
+        expect(onOpenChange).toHaveBeenLastCalledWith(false);
+        expect(document.activeElement).toBe(bar);
+        // Everything folded: still the same button, and one click closes.
+        fireEvent.click(header('Display'));
+        expect(screen.queryByRole('region')).toBeNull();
+        expect(bar).toHaveAttribute('aria-expanded', 'true');
+        onOpenChange.mockClear();
+        fireEvent.click(bar);
+        expect(onOpenChange).toHaveBeenCalledTimes(1);
+        expect(onOpenChange).toHaveBeenLastCalledWith(false);
     });
 
     it('opens the drawer from its bar at the tabbed section and that tab, folding Display', () => {
