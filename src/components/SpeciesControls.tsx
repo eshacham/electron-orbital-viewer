@@ -7,6 +7,7 @@ import { allowedCharges } from '../atom/ion_configurations';
 import { BELOW_GROUND_NOTE, DELTA_SCF_LABEL, EnergyReading, deltaScfMethod, ionisedSpeciesOf } from '../atom/delta_scf';
 import { RelativityMode, shortMethodLabel } from '../atom/relativity';
 import { NIST_FIRST_IONISATION_EV } from '../atom/ionisation_references';
+import { signedDifferencePercent, formatSignedPercent, ieLimitationNote } from '../atom/ie_accuracy';
 import { formatDrawnRadius } from '../atom/format_radius';
 import type { EnergiesState } from '../store/atomSlice';
 import type { ReferenceRadii } from '../workers/atomWorker';
@@ -109,19 +110,39 @@ const MethodLabel: React.FC<{ method: string }> = ({ method }) => {
     );
 };
 
-/** "5.37 eV  ΔSCF, LDA", the method one hover away (spec §3.1). */
+/**
+ * "5.37 eV  ΔSCF, LDA", the method one hover away (spec §3.1), and -- for a
+ * neutral atom's ionisation energy (ruling P15) -- its NIST measurement,
+ * the signed percent difference, and, when the gap is large or the species
+ * has an open d/f subshell, the one-line limitation note explaining why.
+ */
 const EnergyLine: React.FC<{
     label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number; noValueReason?: string; pictureFailed?: boolean; isExcitation?: boolean;
-    method: string;
+    method: string; limitationNote?: string | null;
 }> =
-    ({ label, reading, status, measuredEv, noValueReason, pictureFailed, isExcitation, method }) => (
-        <Typography variant="body2" className="species-energy">
-            {label}:{' '}
-            {energyValueText(reading, status, noValueReason, pictureFailed, isExcitation)}
-            {' '}<MethodLabel method={method} />
-            {measuredEv !== undefined && reading && <span className="species-measured"> · measured {measuredEv.toFixed(3)} eV (NIST)</span>}
-        </Typography>
-    );
+    ({ label, reading, status, measuredEv, noValueReason, pictureFailed, isExcitation, method, limitationNote }) => {
+        const percent = measuredEv !== undefined && reading ? signedDifferencePercent(reading.valueEv, measuredEv) : null;
+        return (
+            <>
+                <Typography variant="body2" className="species-energy">
+                    {label}:{' '}
+                    {energyValueText(reading, status, noValueReason, pictureFailed, isExcitation)}
+                    {' '}<MethodLabel method={method} />
+                    {measuredEv !== undefined && reading && (
+                        <span className="species-measured">
+                            {' '}· measured {measuredEv.toFixed(3)} eV (NIST)
+                            {percent !== null && (
+                                <span aria-label="difference from measured"> · {formatSignedPercent(percent)}</span>
+                            )}
+                        </span>
+                    )}
+                </Typography>
+                {limitationNote && (
+                    <Typography variant="caption" display="block" className="species-limitation">{limitationNote}</Typography>
+                )}
+            </>
+        );
+    };
 
 /**
  * Charge and excitation for atom mode (spec §5 Phase 3), with the energies
@@ -152,12 +173,18 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
     const effectiveEnergies = energiesMatch ? energies : NO_ENERGIES;
     const reading = species.excitation ? effectiveEnergies.excitation : effectiveEnergies.ionisation;
 
-    // Ruling C15: the 10 % spec check only covers Z ≤ 18, so the "measured"
-    // comparison only ever shows for that range, and only for the neutral
-    // atom's own first ionisation energy (not a cation's, not an anion's) --
-    // NIST_FIRST_IONISATION_EV has no entries past Z = 18 anyway, but the
-    // Z <= 18 guard says why, rather than leaving it to a lookup miss.
-    const measuredEv = species.charge === 0 && species.Z <= 18 ? NIST_FIRST_IONISATION_EV[species.Z] : undefined;
+    // Ruling P15 overrides C15's display gate: the "measured" comparison
+    // used to stop at Z = 18 because that was as far as the spec's 10 %
+    // validation reached, but R-accuracy wants every calculated ionisation
+    // energy shown beside its NIST value, signed difference and (where the
+    // method is known to be weaker) a limitation note -- the inaccuracy
+    // itself is exactly what P15 wants visible, not hidden past Z = 18.
+    // Still only for the neutral atom's own first ionisation energy (not a
+    // cation's, not an anion's): NIST_FIRST_IONISATION_EV only has that one
+    // reading per element.
+    const measuredEv = species.charge === 0 ? NIST_FIRST_IONISATION_EV[species.Z] : undefined;
+    const ionisationPercent = measuredEv !== undefined && reading ? signedDifferencePercent(reading.valueEv, measuredEv) : null;
+    const limitationNote = measuredEv !== undefined && reading ? ieLimitationNote(species, ionisationPercent) : null;
 
     const excitePopupOpen = menuAnchor !== null;
     const isCurrentOption = (option: Excitation) =>
@@ -263,6 +290,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
                             reading={reading}
                             status={effectiveEnergies.status}
                             measuredEv={measuredEv}
+                            limitationNote={limitationNote}
                             pictureFailed={pictureFailed}
                             // Final review M6: Na⁺'s next electron would
                             // break the neon core, and nothing past Z = 108

@@ -116,7 +116,7 @@ const CATION_CONFIGURATIONS: Readonly<Record<number, readonly string[]>> = {
     87: ['[Rn]'],  // Fr
     88: ['[Rn] 7s1', '[Rn]'],  // Ra
     89: ['[Rn] 7s2', '[Rn] 7s1', '[Rn]'],  // Ac
-    90: ['[Rn] 6d1 7s2', '[Rn] 5f1 6d1', '[Rn] 5f1'],  // Th
+    90: ['[Rn] 6d2 7s1', '[Rn] 5f1 6d1', '[Rn] 5f1'],  // Th -- NIST ASD: Th II ground level is 6d² 7s ⁴F3/2 (6d 7s² ²D3/2 is excited); see preflight D2.
     91: ['[Rn] 5f2 7s2', '[Rn] 5f2 6d1', '[Rn] 5f2'],  // Pa
     92: ['[Rn] 5f3 7s2', '[Rn] 5f4', '[Rn] 5f3'],  // U
     93: ['[Rn] 5f4 6d1 7s1', '[Rn] 5f5', '[Rn] 5f4'],  // Np

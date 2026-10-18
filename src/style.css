@@ -705,6 +705,8 @@ html, body, #root {
    floating over the black 3D view might suggest. */
 .species-method { font-size: 0.75rem; color: var(--ql-color-accent-text); border-bottom: 1px dotted var(--ql-color-accent-text); cursor: help; }
 .species-measured { color: var(--ql-color-text-2); }
+/* Ruling P15: why a d- or f-block (or just large-error) ionisation energy's NIST comparison is off by more than light-element accuracy. */
+.species-limitation { color: var(--ql-color-text-2); }
 .species-compare { color: var(--ql-color-text-2); }
 .species-compare-swatch { display: inline-block; width: 18px; height: 0; border-top: 2px dashed var(--ql-color-text-2); vertical-align: middle; margin-right: 6px; }
 .level-nav-valence {

@@ -257,12 +257,28 @@ describe('SpeciesControls', () => {
         expect(screen.queryByText(/measured/)).toBeNull();
     });
 
-    it('never shows "measured" past Z = 18', () => {
+    // D6 (preflight): ruling P15 overrides C15's old Z ≤ 18 display gate --
+    // the inaccuracy past argon is exactly what R-accuracy wants shown, not
+    // hidden. K (Z = 19, no open d/f) gets the measured value and its signed
+    // difference but no limitation note; Fe (Z = 26, open 3d) gets the note
+    // too, even though its own error is small.
+    it('shows measured, the signed difference and (for a d/f-block element) the note past Z = 18', () => {
         renderControls({
             species: { Z: 19, charge: 0, excitation: null }, // K
             energies: { speciesKey: '19', status: 'done', ionisation: { valueEv: 4.34, fromLabel: 'K', toLabel: 'K⁺' }, excitation: null, message: null },
         });
-        expect(screen.queryByText(/measured/)).toBeNull();
+        const line = screen.getByText(/Ionisation energy/).closest('.species-energy')!;
+        expect(line).toHaveTextContent('measured 4.341 eV (NIST)');
+        expect(line).toHaveTextContent('0.0 %');
+        expect(screen.queryByText(/open shells/)).toBeNull();
+    });
+
+    it('notes the limitation for a d-block element past Z = 18, even with a small error', () => {
+        renderControls({
+            species: { Z: 26, charge: 0, excitation: null }, // Fe
+            energies: { speciesKey: '26', status: 'done', ionisation: { valueEv: 8.042, fromLabel: 'Fe', toLabel: 'Fe⁺' }, excitation: null, message: null },
+        });
+        expect(screen.getByText(/open shells; expect larger errors/)).toBeInTheDocument();
     });
 
     it('compares the drawn radius with the neutral atom\'s, naming the dashed ring', () => {
