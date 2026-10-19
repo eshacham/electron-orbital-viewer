@@ -40,12 +40,14 @@
   white-space: nowrap;
   will-change: transform;
 }
-/* More than 12 atoms and nothing picked: one line at the bottom left of the uncovered area, above the scale
-   readout there (its 20 px offset plus its ~51 px height and a gap) -- with or without a strip under it. */
-.model-label-hint {
+/* More than 12 atoms and nothing picked, or labels hidden as overlapping: one line at the bottom left of the
+   uncovered area, 8 px above the scale readout there -- its own offset (style.css) plus its measured height
+   (OrbitalViewer), so it follows the readout with or without a strip under it (review M7). */
+.model-label-hint,
+.model-label-overlap {
   position: absolute;
   left: calc(var(--free-left, 0px) + 20px);
-  bottom: calc(var(--free-bottom, 0px) + 79px);
+  bottom: calc(var(--scale-readout-bottom, 20px) + var(--scale-readout-height, 0px) + 8px);
   margin: 0;
   padding: 6px 10px;
   border-radius: var(--ql-radius-md);
@@ -57,7 +59,15 @@
   white-space: nowrap;
 }
 /* A phone keeps its scale readout at the top (style.css), so the hint sits just above the sheet. */
-.app-shell.phone .model-label-hint {
+.app-shell.phone .model-label-hint,
+.app-shell.phone .model-label-overlap {
   left: 12px;
   bottom: calc(var(--free-bottom, 0px) + 12px);
+}
+/* Review M2: the labels fade with the canvas while it is busy (style.css: #canvas-container.busy #orbital-canvas-host). */
+.model-labels {
+  transition: opacity 160ms ease;
+}
+#canvas-container.busy .model-labels {
+  opacity: 0.35;
 }

@@ -2,7 +2,7 @@
 // Ruling P10: nothing retyped -- every value is compared with the output of the function the rest of the app
 // already uses for it; only the row labels are literals.
 import React from 'react';
-import { render } from '@testing-library/react';
+import { fireEvent, render, within } from '@testing-library/react';
 import MoleculePropertiesCard from '../../src/molecule_ui/MoleculePropertiesCard';
 import { formatFormula } from '../../src/molecules/catalogue';
 import { formatDipole } from '../../src/molecules/dipole';
@@ -10,7 +10,7 @@ import { formatOrbitalEnergy, formatPointGroup, gapTerm, orbitalGaps, GAP_CAVEAT
 import { validatedLine } from '../../src/validation/geometry_honesty';
 import { COMPUTED_LINE, TIER_LABEL } from '../../src/components/TierBadge';
 import { multiplicityText } from '../../src/molecules/catalogue';
-import { waterMeta } from '../molecules/fixtures';
+import { glycineAtoms, methaneMeta, waterMeta } from '../molecules/fixtures';
 import PreviewDetails from '../../src/components/PreviewDetails';
 import { previewFixture } from '../jobs/api_fixtures';
 
@@ -133,6 +133,46 @@ describe('MoleculePropertiesCard (spec §9.4 Properties, ruling P10)', () => {
 });
 
 // Ruling T12-M1: one wording for the spin multiplicity, the request preview's and the Properties card's.
+// Ruling T14-I2 (spec §9.4.1's "Structure table"): the on-model labels are aria-hidden, so their numbers are
+// here as real tables -- every bond and every two-bond angle, always, whether or not the labels are on.
+describe('MoleculePropertiesCard: the Structure tables (ruling T14-I2)', () => {
+    const cells = (table: HTMLElement) => within(table).getAllByRole('row').slice(1)
+        .map(row => Array.from(row.children).map(cell => cell.textContent));
+
+    it('lists water’s two O–H lengths and its angle, in a folded Structure block a keyboard can open', () => {
+        const { container } = render(<MoleculePropertiesCard meta={waterMeta()} />);
+        const block = container.querySelector('details.molecule-structure') as HTMLDetailsElement;
+        expect(block).not.toBeNull();
+        const summary = block.querySelector('summary')!;
+        expect(summary).toHaveTextContent(/^Structure2 bonds · 1 angle$/);
+        expect(block.open).toBe(false);
+        fireEvent.click(summary);
+        const lengths = within(block).getByRole('table', { name: 'Bond lengths' });
+        expect(cells(lengths)).toEqual([['O1–H2', '0.958 Å'], ['O1–H3', '0.958 Å']]);
+        expect(within(lengths).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Bond', 'Length']);
+        expect(within(lengths).getAllByRole('rowheader').map(h => h.textContent)).toEqual(['O1–H2', 'O1–H3']);
+        const angles = within(block).getByRole('table', { name: 'Angles' });
+        expect(cells(angles)).toEqual([['H2–O1–H3', '104.5°']]);
+        expect(block.querySelector('table')).toHaveClass('ql-tabular');
+    });
+
+    it('lists glycine’s nine bonds and its one angle', () => {
+        const { container } = render(<MoleculePropertiesCard meta={waterMeta({ id: 'glycine', atoms: glycineAtoms() })} />);
+        const block = container.querySelector('details.molecule-structure') as HTMLElement;
+        expect(block.querySelector('summary')).toHaveTextContent(/^Structure9 bonds · 1 angle$/);
+        expect(cells(within(block).getByRole('table', { name: 'Bond lengths' }))).toHaveLength(9);
+        expect(cells(within(block).getByRole('table', { name: 'Angles' }))).toEqual([['C3–O5–H6', expect.stringMatching(/^\d{3}\.\d°$/)]]);
+    });
+
+    it('has no Angles table where no atom has exactly two bonds (methane)', () => {
+        const { container } = render(<MoleculePropertiesCard meta={methaneMeta()} />);
+        const block = container.querySelector('details.molecule-structure') as HTMLElement;
+        expect(block.querySelector('summary')).toHaveTextContent(/^Structure4 bonds$/);
+        expect(cells(within(block).getByRole('table', { name: 'Bond lengths' }))).toHaveLength(4);
+        expect(within(block).queryByRole('table', { name: 'Angles' })).toBeNull();
+    });
+});
+
 describe('multiplicityText', () => {
     it('names the multiplicity after its number, and gives the bare number past the named ones', () => {
         expect(multiplicityText(1)).toBe('1 (singlet)');

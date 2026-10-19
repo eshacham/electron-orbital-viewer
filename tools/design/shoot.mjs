@@ -163,6 +163,8 @@ function collectMetrics() {
       // Task 14: the on-model labels shown (placed by a frame), and the large-molecule hint.
       modelLabels: [...document.querySelectorAll('.model-label')].filter(e => getComputedStyle(e).visibility === 'visible').map(e => e.textContent),
       modelLabelHint: document.querySelector('.model-label-hint')?.textContent ?? null,
+      // Task 14 fix round 1 (ruling T14-I1): how many labels are hidden as overlapping, when any are.
+      modelLabelOverlap: document.querySelector('.model-label-overlap:not([hidden])')?.textContent ?? null,
     },
   };
 }

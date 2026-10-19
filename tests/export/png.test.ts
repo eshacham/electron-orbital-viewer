@@ -1,10 +1,19 @@
 import { exportPixelRatio, freeAreaCrop, drawOverlays, captureViewPng, ExportCanvas, ExportPainter } from '../../src/export/png';
 import { ATOM_METHOD } from '../../src/export/caption';
 
+/** Ruling T14-M1: the painter strokes paths now (the label arcs); painters that draw no labels ignore them. */
+const NO_PATHS = { strokeStyle: '', lineWidth: 1, beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {} };
+
 function recorder() {
     const calls: Array<[string, ...unknown[]]> = [];
     const painter: ExportPainter = {
         fillStyle: '', font: '', textBaseline: 'top',
+        // Ruling T14-M1: the label arcs are stroked paths, so the painter gained these (logged like the rest).
+        strokeStyle: '', lineWidth: 1,
+        beginPath: () => { calls.push(['beginPath']); },
+        moveTo: (x: number, y: number) => { calls.push(['moveTo', x, y]); },
+        lineTo: (x: number, y: number) => { calls.push(['lineTo', x, y]); },
+        stroke: () => { calls.push(['stroke', painter.strokeStyle, painter.lineWidth]); },
         fillRect: (...args: number[]) => { calls.push(['fillRect', ...args]); },
         fillText: (text: string, x: number, y: number) => { calls.push(['fillText', text, x, y]); },
         measureText: (text: string) => ({ width: text.length * 7 }),
@@ -153,6 +162,50 @@ describe('PNG export', () => {
         expect(calls).toContainEqual(['fillText', 'Hi', 28, 28]); // pad = 14 * ratio
     });
 
+    // Ruling T14-M1: the PNG shows what was on screen, the molecule's labels included -- the pills and arcs
+    // shown (not those hidden as overlapping or behind the camera: the caller passes only the shown ones),
+    // under the caption band like the other overlays, shifted by the crop and drawn at the export scale.
+    describe('the molecule labels', () => {
+        const labels = {
+            pills: [{ text: '0.958 Å', x: 350, y: 120 }, { text: '104.5°', x: 380, y: 90 }],
+            arcs: [[{ x: 360, y: 100 }, { x: 370, y: 95 }, { x: 380, y: 100 }]],
+            arcColour: '#1FB6F5',
+        };
+
+        it('paints each shown pill centred on its place, and strokes each arc in the arc colour', () => {
+            const { calls, painter } = recorder();
+            drawOverlays(painter, 800, 600, 2, { caption: ['Water'], scaleBar: null, phaseLegend: false, modelLabels: labels });
+            const texts = calls.filter(c => c[0] === 'fillText');
+            const pill = texts.find(c => c[1] === '0.958 Å')!;
+            expect(pill[2]).toBe(700 - ('0.958 Å'.length * 7) / 2); // x centred: 350 × 2 − half its width
+            expect(pill[3]).toBe(240);
+            expect(texts.find(c => c[1] === '104.5°')).toBeDefined();
+            expect(calls).toContainEqual(['moveTo', 720, 200]);
+            expect(calls).toContainEqual(['lineTo', 760, 200]);
+            expect(calls).toContainEqual(['stroke', '#1FB6F5', 3]); // 1.5 px × 2
+            // Under the caption band: painted first.
+            expect(calls.findIndex(c => c[0] === 'fillText' && c[1] === '0.958 Å'))
+                .toBeLessThan(calls.findIndex(c => c[0] === 'fillText' && c[1] === 'Water'));
+        });
+
+        it('paints nothing of the kind without labels', () => {
+            const { calls, painter } = recorder();
+            drawOverlays(painter, 800, 600, 2, { caption: ['Water'], scaleBar: null, phaseLegend: false });
+            expect(calls.some(c => c[0] === 'stroke')).toBe(false);
+            expect(calls.filter(c => c[0] === 'fillText').map(c => c[1])).toEqual(['Water']);
+        });
+
+        it('moves them by the crop before scaling, as the picture itself is cropped', async () => {
+            const { renderer } = fakeRenderer(1000, 500);
+            const { calls, factory } = recorder();
+            await captureViewPng({ renderer, render: () => {} }, { x: 300, y: 0, width: 400, height: 500 },
+                { caption: [], scaleBar: null, phaseLegend: false, modelLabels: labels }, factory);
+            const pill = calls.find(c => c[0] === 'fillText' && c[1] === '0.958 Å')!;
+            expect(pill[2]).toBe((350 - 300) * 2 - ('0.958 Å'.length * 7) / 2);
+            expect(calls).toContainEqual(['moveTo', (360 - 300) * 2, 200]);
+        });
+    });
+
     // I2: three.js's render() silently no-ops on a lost WebGL context, so
     // without an explicit check drawImage would copy transparent (or stale)
     // pixels into what looks like an ordinary PNG.
@@ -190,6 +243,7 @@ describe('drawOverlays: a colour-bar key (Molecules ESP view)', () => {
         const fills: Array<{ style: string; x: number; y: number; w: number; h: number }> = [];
         const texts: Array<{ text: string; x: number; y: number }> = [];
         const painter = {
+            ...NO_PATHS,
             fillStyle: '' as string, font: '', textBaseline: 'top' as CanvasTextBaseline,
             fillRect(x: number, y: number, w: number, h: number) { fills.push({ style: this.fillStyle, x, y, w, h }); },
             fillText(text: string, x: number, y: number) { texts.push({ text, x, y }); },
@@ -219,6 +273,7 @@ describe('drawOverlays: the ψ legend takes the theme\'s phase colours (one sour
         const paint = (phaseColours?: [string, string]) => {
             const fills: string[] = [];
             const painter = {
+                ...NO_PATHS,
                 set fillStyle(value: string) { fills.push(value); }, get fillStyle() { return ''; },
                 font: '', textBaseline: 'top' as CanvasTextBaseline,
                 fillRect: () => {}, fillText: () => {}, measureText: (text: string) => ({ width: text.length * 7 }),

@@ -180,6 +180,53 @@
   line-height: var(--ql-type-caption-line);
   color: var(--ql-color-text-3);
 }
+/* Ruling T14-I2: the Structure tables -- every bond and two-bond angle, folded under a counting summary. */
+.molecule-structure {
+  margin-top: 12px;
+  border-top: 1px solid var(--ql-color-border-subtle);
+  padding-top: 8px;
+}
+.molecule-structure summary {
+  cursor: pointer;
+  font-size: var(--ql-type-body-size);
+  line-height: var(--ql-type-body-line);
+  font-weight: 600;
+  color: var(--ql-color-text-1);
+}
+.molecule-structure-count {
+  margin-left: 8px;
+  font-size: var(--ql-type-caption-size);
+  font-weight: 400;
+  color: var(--ql-color-text-3);
+}
+.molecule-structure-table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: var(--ql-type-body-size);
+  line-height: var(--ql-type-body-line);
+  color: var(--ql-color-text-1);
+}
+.molecule-structure-table caption {
+  text-align: left;
+  font-size: var(--ql-type-caption-size);
+  line-height: var(--ql-type-caption-line);
+  color: var(--ql-color-text-2);
+}
+.molecule-structure-table th,
+.molecule-structure-table td {
+  padding: 1px 0;
+  text-align: left;
+  font-weight: 400;
+}
+.molecule-structure-table td,
+.molecule-structure-table thead th:last-child {
+  text-align: right;
+}
+.molecule-structure-table thead th {
+  font-size: var(--ql-type-caption-size);
+  color: var(--ql-color-text-3);
+}
 /* While a chosen molecule's facts load (ruling T12-I1). */
 .molecule-properties-status {
   margin: 0;

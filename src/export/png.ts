@@ -54,6 +54,17 @@ export interface CombinationLegendItem { label: string; color: string; }
  */
 export interface ColourBarLegend { colours: string[]; ticks: [string, string, string]; notes: string[]; }
 
+/**
+ * Ruling T14-M1: Molecules' on-model labels as shown at the capture -- the visible pills' centres and their
+ * angle arcs, in the canvas's CSS pixels (MoleculeLabels' snapshot; overlap-hidden ones are not in it) --
+ * and the arcs' colour (the theme's selected-edge).
+ */
+export interface ModelLabelsOverlay {
+    pills: Array<{ text: string; x: number; y: number }>;
+    arcs: Array<Array<{ x: number; y: number }>>;
+    arcColour: string;
+}
+
 export interface OverlaySpec {
     caption: string[];
     scaleBar: ScaleBar | null;
@@ -64,12 +75,20 @@ export interface OverlaySpec {
     footer?: string;
     /** The ψ key's swatches, from science.ts phaseColours (one source); today's colours when absent. */
     phaseColours?: [string, string];
+    /** Molecules' bond lengths and angles, when they are on screen (ruling T14-M1). */
+    modelLabels?: ModelLabelsOverlay | null;
 }
 
 export interface OverlayPainter {
     fillStyle: string | CanvasGradient | CanvasPattern;
+    strokeStyle: string | CanvasGradient | CanvasPattern;
+    lineWidth: number;
     font: string;
     textBaseline: CanvasTextBaseline;
+    beginPath(): void;
+    moveTo(x: number, y: number): void;
+    lineTo(x: number, y: number): void;
+    stroke(): void;
     fillRect(x: number, y: number, w: number, h: number): void;
     fillText(text: string, x: number, y: number): void;
     measureText(text: string): { width: number };
@@ -171,8 +190,37 @@ function drawColourBar(painter: OverlayPainter, width: number, height: number, s
     notes.forEach((note, i) => painter.fillText(note, left, tickY + line * (i + 1)));
 }
 
+/**
+ * Ruling T14-M1: the label arcs (1.5 px, as on screen) and pills, in the export's own overlay style -- white
+ * 12/600 text on the caption band's dark backing -- centred where they were on screen.
+ */
+function drawModelLabels(painter: OverlayPainter, scale: number, labels: ModelLabelsOverlay): void {
+    painter.strokeStyle = labels.arcColour;
+    painter.lineWidth = 1.5 * scale;
+    for (const arc of labels.arcs) {
+        painter.beginPath();
+        arc.forEach((p, i) => (i ? painter.lineTo(p.x * scale, p.y * scale) : painter.moveTo(p.x * scale, p.y * scale)));
+        painter.stroke();
+    }
+    painter.font = `600 ${12 * scale}px ${PNG_FONT}`;
+    painter.textBaseline = 'middle';
+    for (const pill of labels.pills) {
+        const x = pill.x * scale;
+        const y = pill.y * scale;
+        const textWidth = painter.measureText(pill.text).width;
+        const w = textWidth + 12 * scale;
+        const h = 20 * scale;
+        painter.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        painter.fillRect(x - w / 2, y - h / 2, w, h);
+        painter.fillStyle = '#ffffff';
+        painter.fillText(pill.text, x - textWidth / 2, y);
+    }
+}
+
 /** The on-screen overlays, redrawn at export scale (they are DOM, not canvas). */
 export function drawOverlays(painter: OverlayPainter, width: number, height: number, scale: number, spec: OverlaySpec): void {
+    // Under everything else, as on screen (the labels sit beneath every overlay zone).
+    if (spec.modelLabels) drawModelLabels(painter, scale, spec.modelLabels);
     const pad = 14 * scale;
     const line = 18 * scale;
     painter.font = `${13 * scale}px ${PNG_FONT}`;
@@ -286,6 +334,13 @@ export async function captureViewPng(
         renderer.setPixelRatio(previous);
         target.render();
     }
-    if (overlays) drawOverlays(painter, out.width, out.height, ratio, overlays);
+    if (overlays) {
+        // The labels were placed on the whole canvas; the picture is the crop of it.
+        const labels = overlays.modelLabels;
+        const shift = <P extends { x: number; y: number }>(p: P): P => ({ ...p, x: p.x - crop.x, y: p.y - crop.y });
+        drawOverlays(painter, out.width, out.height, ratio, labels
+            ? { ...overlays, modelLabels: { ...labels, pills: labels.pills.map(shift), arcs: labels.arcs.map(arc => arc.map(shift)) } }
+            : overlays);
+    }
     return canvasToBlob(out);
 }

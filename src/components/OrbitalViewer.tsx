@@ -47,7 +47,8 @@ import { createGridMeshWorker } from '../workers/createGridMeshWorker';
 import { LobeMeshData } from '../workers/shellCompositionWorker';
 import { OrbitalParams } from '../types/orbital';
 import { useMoleculeView } from '../molecules/useMoleculeView';
-import MoleculeLabels from './MoleculeLabels';
+import MoleculeLabels, { type LabelsSnapshot } from './MoleculeLabels';
+import { TOKENS } from '../design/tokens';
 import { useQuantumTheme } from '../design/useQuantumTheme';
 import { usePref } from '../design/usePref';
 import { displayPref, renderPref, hintPref } from '../design/presentation';
@@ -93,6 +94,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     const dispatch = useAppDispatch();
     const canvasHostRef = useRef<HTMLDivElement>(null);
     const visualizerContextRef = useRef<VisualizerContext | null>(null);
+    // What Molecules' labels show now, for the PNG export (ruling T14-M1); set while they show anything.
+    const labelsSnapshotRef = useRef<(() => LabelsSnapshot) | null>(null);
     const stateParams = useAppSelector(state => state.orbital.currentParams);
     const fieldRequest = useAppSelector(state => state.orbital.currentField);
     const viewResetNonce = useAppSelector(state => state.orbital.viewResetNonce);
@@ -233,6 +236,10 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                                 ...overlays,
                                 // The same bar the readout shows (see the scale effect below).
                                 scaleBar: getScaleBar(context, height, scaleBarMaxPx(width)),
+                                // Ruling T14-M1: Molecules' labels as shown (none when off, or outside Molecules).
+                                modelLabels: labelsSnapshotRef.current
+                                    ? { ...labelsSnapshotRef.current(), arcColour: TOKENS[appearanceRef.current.theme]['selected-edge'] }
+                                    : null,
                             },
                         );
                     },
@@ -747,6 +754,16 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         return () => observer.disconnect();
     }, []);
 
+    // Review M7 (Task 14): what stacks above the scale readout -- Molecules' label hint -- reads its height
+    // from the viewport cell, measured here once when it appears (and again once the fonts are in), never per frame.
+    const publishScaleReadoutHeight = useCallback((readout: HTMLDivElement | null) => {
+        const cell = canvasHostRef.current?.parentElement;
+        if (!cell) return;
+        const publish = () => cell.style.setProperty('--scale-readout-height', `${readout?.offsetHeight ?? 0}px`);
+        publish();
+        if (readout) document.fonts?.ready.then(() => { if (readout.isConnected) publish(); });
+    }, []);
+
     // Molecules mode's surface, overlay and picking (Phase 6). Called last
     // (D6): its effects run after every effect above in the same commit, so
     // nothing declared earlier can clear or supersede a molecule render that
@@ -760,10 +777,10 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                 is left without React children of its own. */}
             <div ref={canvasHostRef} id="orbital-canvas-host" />
             {/* Ruling P9: bond lengths and angles over the molecule, placed after each frame. */}
-            {atomMode === 'molecule' && <MoleculeLabels contextRef={visualizerContextRef} />}
+            {atomMode === 'molecule' && <MoleculeLabels contextRef={visualizerContextRef} snapshotRef={labelsSnapshotRef} />}
             {/* A scale over an empty canvas (an unbound anion) measures nothing. */}
             {scaleBar && !(atomMode === 'atom' && atomUnbound) && (
-                <div className="scale-readout" aria-label="scale">
+                <div className="scale-readout" aria-label="scale" ref={publishScaleReadoutHeight}>
                     <div className="scale-readout-bar" style={{ width: `${scaleBar.pixels}px` }} />
                     <span className="scale-readout-label">{formatScaleLabel(scaleBar.lengthBohr)}</span>
                 </div>

@@ -32,7 +32,9 @@ export interface Bond { a: number; b: number; lengthAngstrom: number }
 /** How the structure is drawn over the surface (ruling P8): spheres and sticks, van der Waals spheres, or not at all. */
 export type Representation = 'ball-and-stick' | 'space-filling' | 'none';
 
-const symbol = (Z: number) => elementFor(Z)?.symbol ?? `Z${Z}`;
+/** An element's symbol, or `Z<n>` for one the table lacks. */
+export const elementSymbol = (Z: number) => elementFor(Z)?.symbol ?? `Z${Z}`;
+const symbol = elementSymbol;
 function radius(Z: number): number {
     const r = COVALENT_RADII_ANGSTROM[Z];
     if (r === undefined) throw new Error(`no covalent radius for ${symbol(Z)}`);

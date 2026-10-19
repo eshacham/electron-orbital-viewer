@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { anglesAtAtom, BOHR_TO_ANGSTROM, detectBonds } from '../../src/molecules/ball_and_stick';
-import { besideBond, declutter, LABEL_ATOM_LIMIT, LABEL_GAP_PX, modelLabels, projectToCanvas, type AngleLabel } from '../../src/molecules/bond_labels';
-import { carbonChainAtoms, methaneAtoms, waterAtoms } from './fixtures';
+import { besideBond, declutter, LABEL_ATOM_LIMIT, LABEL_GAP_PX, modelLabels, projectToCanvas, structureRows, type AngleLabel } from '../../src/molecules/bond_labels';
+import { carbonChainAtoms, glycineAtoms, methaneAtoms, waterAtoms } from './fixtures';
 
 type Point = [number, number, number];
 const distance = (p: number[], q: number[]) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
@@ -134,9 +134,53 @@ describe('placing the labels on screen', () => {
         expect(declutter([{ x: 0, y: 0, w: 0, h: 0, depth: 1 }, { x: 0, y: 0, w: 0, h: 0, depth: 2 }])).toEqual([true, true]);
     });
 
+    // Ruling T14-I1: angles are scarcer than lengths, and their arcs go with them -- an angle keeps its place
+    // over a nearer length; between labels of one kind the nearer still wins.
+    it('keeps an angle over a nearer overlapping length', () => {
+        const length = { x: 0, y: 0, w: 50, h: 16, depth: 5, rank: 1 };
+        const angle = { x: 20, y: 0, w: 50, h: 16, depth: 9, rank: 0 };
+        expect(declutter([length, angle])).toEqual([false, true]);
+        expect(declutter([{ ...angle, depth: 9 }, { ...angle, depth: 8 }])).toEqual([false, true]);
+    });
+
     it('keeps each length label’s bond ends, for placing it beside the bond', () => {
         const atoms = waterAtoms();
         const [first] = modelLabels(atoms, detectBonds(atoms), null);
         expect(first).toMatchObject({ kind: 'length', ends: [atoms[0].position, atoms[1].position] });
+    });
+});
+
+// Ruling T14-I2: the accessible form of the overlay -- every bond and every two-bond angle, with the overlay's
+// own numbers (describePick's 3 dp Å, anglesAtAtom's 1 dp °), atoms named by element and 1-based index.
+describe('structureRows', () => {
+    it('lists water’s two O–H bonds and its angle at O', () => {
+        const atoms = waterAtoms();
+        const bonds = detectBonds(atoms);
+        expect(structureRows(atoms, bonds)).toEqual({
+            bonds: [{ atoms: 'O1–H2', length: '0.958 Å' }, { atoms: 'O1–H3', length: '0.958 Å' }],
+            angles: [{ atoms: 'H2–O1–H3', angle: '104.5°' }],
+        });
+        // The same texts the overlay draws.
+        const texts = modelLabels(atoms, bonds, null).map(l => l.text);
+        const rows = structureRows(atoms, bonds);
+        expect([...rows.bonds.map(r => r.length), ...rows.angles.map(r => r.angle)]).toEqual(texts);
+    });
+
+    it('lists glycine’s nine bonds and its one two-bond angle (C–O–H at the hydroxyl O)', () => {
+        const atoms = glycineAtoms();
+        const rows = structureRows(atoms, detectBonds(atoms));
+        expect(rows.bonds).toHaveLength(9);
+        expect(rows.angles).toEqual([{ atoms: 'C3–O5–H6', angle: expect.stringMatching(/^\d{3}\.\d°$/) }]);
+        // Every row of the table holds a number the overlay draws, and none is missing.
+        expect([...rows.bonds.map(r => r.length), ...rows.angles.map(r => r.angle)].sort())
+            .toEqual(modelLabels(atoms, detectBonds(atoms), null).map(l => l.text).sort());
+    });
+
+    it('lists every bond above the label limit too (the table is not the overlay)', () => {
+        const atoms = carbonChainAtoms(LABEL_ATOM_LIMIT + 1);
+        const rows = structureRows(atoms, detectBonds(atoms));
+        expect(rows.bonds).toHaveLength(12);
+        expect(rows.angles).toHaveLength(11);
+        expect(rows.angles[0]).toEqual({ atoms: 'C1–C2–C3', angle: '111.0°' });
     });
 });

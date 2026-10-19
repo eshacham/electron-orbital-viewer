@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { anglesAtAtom, BOHR_TO_ANGSTROM, type Bond, type Representation } from './ball_and_stick';
+import { anglesAtAtom, BOHR_TO_ANGSTROM, elementSymbol, type Bond, type Representation } from './ball_and_stick';
 import type { MoleculeAtom, MoleculePick } from './library_types';
 
 /** Spec §9.4.1: above this many atoms only the picked atom or bond is labelled, to avoid clutter. */
@@ -21,6 +21,16 @@ const X_AXIS = new THREE.Vector3(1, 0, 0);
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const bondBetween = (bonds: Bond[], i: number, j: number) => bonds.find(b => (b.a === i && b.b === j) || (b.a === j && b.b === i))!;
 
+/** A bond's length as describePick prints it (3 dp Å). */
+const lengthText = (bond: Bond) => `${bond.lengthAngstrom.toFixed(3)} Å`;
+/** The two neighbours of an atom with exactly two bonds, lower index first, and its angle as anglesAtAtom rounds it; null otherwise (§9.4.1). */
+function twoBondAngle(atoms: MoleculeAtom[], bonds: Bond[], index: number): { neighbours: [number, number]; text: string } | null {
+    const n = bonds.filter(b => b.a === index || b.b === index).map(b => (b.a === index ? b.b : b.a));
+    if (n.length !== 2) return null;
+    const [{ degrees }] = anglesAtAtom(atoms, bonds, index);
+    return { neighbours: [Math.min(n[0], n[1]), Math.max(n[0], n[1])], text: `${degrees.toFixed(1)}°` };
+}
+
 /**
  * What to label on the model (spec §9.4.1, ruling P9): every bond's length and the angle at each atom with
  * exactly two bonds for up to LABEL_ATOM_LIMIT atoms; above it, only the picked atom's angle or the picked
@@ -41,16 +51,16 @@ export function modelLabels(atoms: MoleculeAtom[], bonds: Bond[], pick: Molecule
             if (!all && !(pick?.kind === 'bond' && pick.index === index)) return;
             const [p, q] = [atoms[bond.a].position, atoms[bond.b].position];
             out.push({
-                kind: 'length', bond: index, text: `${bond.lengthAngstrom.toFixed(3)} Å`,
+                kind: 'length', bond: index, text: lengthText(bond),
                 world: [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2], ends: [[...p], [...q]],
             });
         });
     }
     atoms.forEach((atom, index) => {
         if (!all && !(pick?.kind === 'atom' && pick.index === index)) return;
-        const n = bonds.filter(b => b.a === index || b.b === index).map(b => (b.a === index ? b.b : b.a));
-        if (n.length !== 2) return; // §9.4.1: the angle at each atom with exactly two bonds
-        const [{ degrees }] = anglesAtAtom(atoms, bonds, index);
+        const angle = twoBondAngle(atoms, bonds, index);
+        if (!angle) return; // §9.4.1: the angle at each atom with exactly two bonds
+        const n = angle.neighbours;
         const v = new THREE.Vector3(...atom.position);
         const u = new THREE.Vector3(...atoms[n[0]].position).sub(v).normalize();
         const w = new THREE.Vector3(...atoms[n[1]].position).sub(v).normalize();
@@ -67,9 +77,27 @@ export function modelLabels(atoms: MoleculeAtom[], bonds: Bond[], pick: Molecule
             return [v.x + d.x, v.y + d.y, v.z + d.z];
         };
         const arc = Array.from({ length: ARC_POINTS }, (_, i) => at(i / (ARC_POINTS - 1), r));
-        out.push({ kind: 'angle', atom: index, text: `${degrees.toFixed(1)}°`, world: at(0.5, r * LABEL_OUT), arc });
+        out.push({ kind: 'angle', atom: index, text: angle.text, world: at(0.5, r * LABEL_OUT), arc });
     });
     return out;
+}
+
+/** One row of the Structure table: the atoms, by element and 1-based index ("O1–H2", "H2–O1–H3"), and the number. */
+export interface StructureRows { bonds: Array<{ atoms: string; length: string }>; angles: Array<{ atoms: string; angle: string }> }
+
+/**
+ * The overlay's accessible form (ruling T14-I2, spec §9.4.1's "Structure table"): every bond's length and the
+ * angle at every atom with exactly two bonds -- whatever the atom count and whether or not labels are on --
+ * in the overlay's own texts.
+ */
+export function structureRows(atoms: MoleculeAtom[], bonds: Bond[]): StructureRows {
+    const name = (index: number) => `${elementSymbol(atoms[index].Z)}${index + 1}`;
+    const angles: StructureRows['angles'] = [];
+    atoms.forEach((_, index) => {
+        const angle = twoBondAngle(atoms, bonds, index);
+        if (angle) angles.push({ atoms: `${name(angle.neighbours[0])}–${name(index)}–${name(angle.neighbours[1])}`, angle: angle.text });
+    });
+    return { bonds: bonds.map(bond => ({ atoms: `${name(bond.a)}–${name(bond.b)}`, length: lengthText(bond) })), angles };
 }
 
 const scratch = new THREE.Vector3();
@@ -114,13 +142,14 @@ export function besideBond(mid: { x: number; y: number }, a: { x: number; y: num
     return { x: mid.x + nx * reach, y: mid.y + ny * reach };
 }
 
-/** A label's box on screen, centred on (x, y). */
-export interface ScreenBox { x: number; y: number; w: number; h: number; depth: number }
+/** A label's box on screen, centred on (x, y). `rank` orders kinds before depth: lower is kept first (0 when absent). */
+export interface ScreenBox { x: number; y: number; w: number; h: number; depth: number; rank?: number }
 
 /**
- * Which labels to show: nearest first, each unless its box overlaps one already shown, so piled-up labels
- * (a small molecule seen from far away) never print over each other; zooming in makes room and brings the
- * rest back. A null box (behind the camera) is never shown.
+ * Which labels to show: by rank, then nearest first, each unless its box overlaps one already shown, so
+ * piled-up labels (a small molecule seen from far away) never print over each other; zooming in makes room
+ * and brings the rest back. A null box (behind the camera) is never shown. The overlay ranks angles before
+ * lengths (ruling T14-I1): there are fewer of them, and their arcs go with them.
  */
 export function declutter(boxes: Array<ScreenBox | null>): boolean[] {
     const shown = boxes.map(() => false);
@@ -128,7 +157,7 @@ export function declutter(boxes: Array<ScreenBox | null>): boolean[] {
     boxes
         .map((box, index) => ({ box, index }))
         .filter((entry): entry is { box: ScreenBox; index: number } => entry.box !== null)
-        .sort((p, q) => p.box.depth - q.box.depth)
+        .sort((p, q) => (p.box.rank ?? 0) - (q.box.rank ?? 0) || p.box.depth - q.box.depth)
         .forEach(({ box, index }) => {
             const clash = kept.some(k => Math.abs(k.x - box.x) * 2 < k.w + box.w && Math.abs(k.y - box.y) * 2 < k.h + box.h);
             if (clash) return;
@@ -136,4 +165,9 @@ export function declutter(boxes: Array<ScreenBox | null>): boolean[] {
             shown[index] = true;
         });
     return shown;
+}
+
+/** The hint slot's line while overlapping labels are hidden (ruling T14-I1). */
+export function overlapText(count: number): string {
+    return count === 1 ? '1 label overlaps — zoom in to see it' : `${count} labels overlap — zoom in to see them`;
 }

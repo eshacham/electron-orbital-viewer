@@ -44,6 +44,14 @@ jest.mock('../src/orbital_visualizer', () => ({
     // settled angle is folded against); 'none' matches every existing
     // test's expectation that the standard view is the plain canonical one.
     standardViewAxis: jest.fn(() => 'none'),
+    // Task 14 (ruling P9): Molecules' labels listen after each frame; and frame what a structure-only view draws (T13).
+    addAfterFrameListener: jest.fn(() => () => {}),
+    frameStructure: jest.fn(),
+}));
+// Ruling T14-M1: what the export handle hands the PNG painter is checked, not the painting (tests/export/png.test.ts).
+jest.mock('../src/export/png', () => ({
+    ...jest.requireActual('../src/export/png'),
+    captureViewPng: jest.fn(async () => new Blob(['png'], { type: 'image/png' })),
 }));
 // Only applyCameraAngles is mocked (as a spy to record call order); the rest
 // of the module -- isCanonicalAngles etc., which orbitalSlice's own reducers
@@ -68,7 +76,12 @@ import { neonProfile } from './export/fixtures';
 import { framingRadiusFor } from '../src/atom/framing';
 import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes, attachThumbnails, standardViewDirection, standardViewAxis } from '../src/orbital_visualizer';
 import { themeChoicePref } from '../src/design/theme_storage';
-import { DEFAULT_RENDER, renderPref, hintPref } from '../src/design/presentation';
+import { DEFAULT_DISPLAY, DEFAULT_RENDER, displayPref, renderPref, hintPref } from '../src/design/presentation';
+import { metaLoaded, selectMolecule, setSurface } from '../src/store/moleculeSlice';
+import { captureViewPng } from '../src/export/png';
+import { TOKENS } from '../src/design/tokens';
+import type { ViewerExportHandle } from '../src/export/handle';
+import { waterMeta } from './molecules/fixtures';
 import type { VisualizerContext } from '../src/orbital_visualizer';
 import { fieldRequestFor } from '../src/combinations';
 import { basicOrbitalParams } from '../src/orbital_presets';
@@ -753,5 +766,57 @@ describe('OrbitalViewer: thumbnails', () => {
         render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
         expect(initVisualizer).toHaveBeenCalledTimes(1);
         expect(attachThumbnails).toHaveBeenCalledTimes(1);
+    });
+});
+
+// Task 14 fix round 1 (review M5, ruling T14-M1): the labels overlay is Molecules' only, beside the canvas
+// host inside the viewport cell, and the PNG export is handed what it shows.
+describe('OrbitalViewer: Molecules\' bond labels', () => {
+    function renderWithLabels(labels: boolean) {
+        const store = createAppStore();
+        act(() => { displayPref.set({ ...DEFAULT_DISPLAY, moleculeLabels: labels }); });
+        // The molecule hook's picking listens on the canvas: this context carries one.
+        const base = (initVisualizer as jest.Mock).getMockImplementation()!();
+        (initVisualizer as jest.Mock).mockReturnValueOnce({ ...base, renderer: { domElement: document.createElement('canvas') } });
+        const handle: React.MutableRefObject<ViewerExportHandle | null> = { current: null };
+        const { container } = render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} exportHandleRef={handle} /></Provider>);
+        const water = () => act(() => {
+            store.dispatch(setMode('molecule'));
+            // No surface: nothing to fetch or mesh here -- the structure alone.
+            store.dispatch(setSurface({ kind: 'none' }));
+            store.dispatch(selectMolecule({ id: 'h2o' }));
+            store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        });
+        return { store, container, handle, water };
+    }
+    afterEach(() => { act(() => { displayPref.set(DEFAULT_DISPLAY); }); });
+
+    it('mounts the overlay beside the canvas host in Molecules mode only', () => {
+        const { store, container, water } = renderWithLabels(true);
+        expect(container.querySelector('.model-labels')).toBeNull();
+        water();
+        const overlay = container.querySelector('.model-labels');
+        expect(overlay).not.toBeNull();
+        expect(overlay!.previousElementSibling?.id).toBe('orbital-canvas-host');
+        act(() => { store.dispatch(setMode('atom')); });
+        expect(container.querySelector('.model-labels')).toBeNull();
+    });
+
+    it('hands the PNG export the labels shown, with the theme\'s arc colour -- and none when they are off', async () => {
+        const on = renderWithLabels(true);
+        on.water();
+        await act(async () => { await on.handle.current!.capturePng({ caption: [], phaseLegend: false }); });
+        const overlays = (captureViewPng as jest.Mock).mock.calls.at(-1)![2];
+        expect(overlays.modelLabels).toEqual({ pills: [], arcs: [], arcColour: TOKENS.dark['selected-edge'] });
+        // PNG plain asks for no overlays at all, so no labels either.
+        await act(async () => { await on.handle.current!.capturePng(null); });
+        expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2]).toBeNull();
+    });
+
+    it('hands the export no labels while the switch is off', async () => {
+        const off = renderWithLabels(false);
+        off.water();
+        await act(async () => { await off.handle.current!.capturePng({ caption: [], phaseLegend: false }); });
+        expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2].modelLabels).toBeNull();
     });
 });

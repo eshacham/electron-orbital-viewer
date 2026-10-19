@@ -149,7 +149,9 @@ html, body, #root {
   /* Bottom-left of the uncovered area (set by useViewInsets): the corners
      belong to the panels on either side. */
   left: calc(var(--free-left, 0px) + 20px);
-  bottom: 20px;
+  /* A custom property so what stacks above the readout (Molecules' label hint, ruling T14-M7) reads the
+     same offset; OrbitalViewer publishes the readout's measured height as --scale-readout-height. */
+  bottom: var(--scale-readout-bottom, 20px);
   z-index: 10;
   display: flex;
   flex-direction: column;
@@ -353,8 +355,11 @@ html, body, #root {
 /* The scale readout keeps the bottom-left of the uncovered area: with the
    strip along the bottom edge (the Atom view), it sits just above it rather
    than under its first tiles. */
+.viewport-cell:has(> .thumbnail-strip.overlay) {
+  --scale-readout-bottom: calc(var(--free-bottom, 0px) + 8px);
+}
 .viewport-cell:has(> .thumbnail-strip.overlay) .scale-readout {
-  bottom: calc(var(--free-bottom, 0px) + 8px);
+  bottom: var(--scale-readout-bottom);
 }
 /* Ruling R23c-1: the key column (viewport.css) is bottom-aligned with the
    scale readout above -- same rule, same value, so the two corners never

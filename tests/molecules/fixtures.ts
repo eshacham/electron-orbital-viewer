@@ -32,6 +32,16 @@ export function carbonChainAtoms(count: number): MoleculeAtom[] {
     return Array.from({ length: count }, (_, i) => ({ Z: 6, position: [i * r * Math.sin(h), i % 2 ? r * Math.cos(h) : 0, 0] as [number, number, number] }));
 }
 
+/** Glycine as the library holds it (data v3, B3LYP-D3(BJ)/def2-TZVP optimised; bohr): 10 atoms, 9 bonds, one two-bond atom (the hydroxyl O). */
+export function glycineAtoms(): MoleculeAtom[] {
+    const rows: Array<[number, number, number, number]> = [
+        [7, 0.005532, 0, -0.040284], [6, 2.734358, 0, 0.074202], [6, 3.865740, 0, 2.714070], [8, 2.689186, 0, 4.658155],
+        [8, 6.420812, 0, 2.634841], [1, 7.020934, 0, 4.367301], [1, 3.485435, 1.645053, -0.924313], [1, 3.485435, -1.645053, -0.924313],
+        [1, -0.697322, 1.530069, 0.872131], [1, -0.697322, -1.530069, 0.872131],
+    ];
+    return rows.map(([Z, x, y, z]) => ({ Z, position: [x, y, z] as [number, number, number] }));
+}
+
 export function waterMeta(overrides: Record<string, unknown> = {}): LibraryMoleculeMeta {
     const half = 6.43;
     return {
