@@ -28,6 +28,12 @@ export interface GlowSettings {
      * science colour; kept as a knob, never another hue.
      */
     wash: number;
+    /**
+     * Additive mode only: how far a phase-less surface's rim (a density, an
+     * ESP map, a lobe) is mixed from its own colour towards white. Ruling
+     * R24-2c (owner-tuned): 0.51 in Deep Space. Ink mode ignores it.
+     */
+    ownRimWhiten: number;
 }
 
 /** §11.1 "Lights": Solid keeps today's levels; Glow's are per theme, in GLOW_TUNING below. */
@@ -38,12 +44,14 @@ export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
  * Tuned live against the concept (original-concepts.png Options 1 and 2):
  * translucent lobes with a visible fine mesh-line network, a same-phase rim
  * and, in Deep Space, a soft halo.
- * Ruling R24-2 (owner: "the orbitals have too much white glare"): at the
- * default opacity the body of every surface reads as its own science colour
- * (phase, density, ESP), never a whitened or pastel version -- Light Clean
- * has no wash and near-unwhitened lines (its ink rim stays); Deep Space's
- * rim is a modest same-hue edge accent (half the strength, a narrower band)
- * and its lines add their own colour, unwhitened. Science hexes unchanged.
+ * Ruling R24-2 (owner: "the orbitals have too much white glare"): no white
+ * wash -- the body of every surface reads as its own science colour (phase,
+ * density, ESP). Ruling R24-2c: the values below are the OWNER'S OWN, tuned
+ * live on the R24-2b panel (2026-10-19): soft same-hue edges, no white wash.
+ * Deep Space: a narrow same-hue rim (0.75, power 3), a faint halo (0.1),
+ * faint lines, and a phase-less rim half-way to white (ownRimWhiten 0.51).
+ * Light Clean: the ink rim, a little self-glow (0.21) and faint, barely
+ * lightened lines. Science hexes unchanged.
  * - `lines.opacity`: the mesh lines' alpha; `lines.whiten`: how far each
  *   line's own phase colour is mixed towards white (kept low, R24-2, so the
  *   lines never lighten the body visibly); `lines.additive`: added light
@@ -53,6 +61,8 @@ export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
  *   towards its own outer edge (higher is softer).
  * - `wash`: the body mixed towards white towards its edge (see
  *   GlowSettings.wash); 0 in both themes since R24-2 (was 0.7 in Light Clean).
+ * - `ownRimWhiten`: Deep Space's phase-less rim, mixed this far towards white
+ *   (GlowSettings.ownRimWhiten); unused in Light Clean's ink mode.
  * - `lights`: the three lights while a surface glows (§11.1 "Lights"), per
  *   theme. Deep Space dims them so the body stays a dark, see-through glass
  *   lit by its rim; Light Clean keeps them up so the lights, not an
@@ -62,31 +72,36 @@ export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
  *   the directions are render_thumbnail.ts's THUMB_LIGHT_RIG) and its rim,
  *   halo and line strengths -- the same Glow, a little stronger where a
  *   72 px tile would lose it. Independent of the main view's lights and of
- *   the frame-time guard.
+ *   the frame-time guard. R24-2c: scaled with the owner's view values by the
+ *   ratios the tiles already had (dark rim ×1.25, halo ×5/3, lines ×0.6;
+ *   light rim ×1.15, lines ×0.35).
  */
 export const GLOW_TUNING = {
     dark: {
-        emissive: 0.1,
-        rimStrength: 0.5,
-        rimPower: 3.0,
-        lines: { opacity: 0.05, whiten: 0, additive: true },
+        emissive: 0.11,
+        rimStrength: 0.75,
+        rimPower: 3,
+        lines: { opacity: 0.02, whiten: 0.2, additive: true },
         // Ruling R23c-2 (owner): the halo was too thick -- about a third of
         // the push (offset, so the band is a third as wide, main view and
         // tiles alike: tuneThumbnailGlow never overrides it) and about half
         // the peak alpha (opacity, and thumb's haloOpacity below). Rim glow untouched.
-        halo: { opacity: 0.3, offset: 0.027, power: 1 },
+        // R24-2c (owner): opacity 0.1 (was 0.3).
+        halo: { opacity: 0.1, offset: 0.027, power: 1 },
         wash: 0,
+        ownRimWhiten: 0.51,
         lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
-        thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 0.625, haloOpacity: 0.5, linesOpacity: 0.03 },
+        thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 0.94, haloOpacity: 0.17, linesOpacity: 0.012 },
     },
     light: {
-        emissive: 0.05,
-        rimStrength: 1.0,
+        emissive: 0.21,
+        rimStrength: 1,
         rimPower: 1.5,
-        lines: { opacity: 0.1, whiten: 0.2, additive: false },
+        lines: { opacity: 0.06, whiten: 0.12, additive: false },
         wash: 0,
+        ownRimWhiten: 0,
         lights: { ambient: 1.0, key: 1.0, fill: 0.4 },
-        thumb: { lights: { ambient: 1.0, key: 1.1, fill: 0.4 }, rimStrength: 1.15, linesOpacity: 0.035 },
+        thumb: { lights: { ambient: 1.0, key: 1.1, fill: 0.4 }, rimStrength: 1.15, linesOpacity: 0.021 },
     },
 } as const;
 
@@ -107,6 +122,7 @@ export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
         rimStrength: tuning.rimStrength,
         rimPower: tuning.rimPower,
         wash: tuning.wash,
+        ownRimWhiten: tuning.ownRimWhiten,
     };
 }
 
@@ -118,7 +134,7 @@ export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
  */
 export function atomRimFor(appearance: Appearance): GlowSettings | null {
     if (appearance.theme !== 'dark') return null;
-    return { mode: 'additive', rimPositive: new THREE.Color(1, 1, 1), rimNegative: new THREE.Color(1, 1, 1), emissive: 0, rimStrength: 0.15, rimPower: 2.5, wash: 0 };
+    return { mode: 'additive', rimPositive: new THREE.Color(1, 1, 1), rimNegative: new THREE.Color(1, 1, 1), emissive: 0, rimStrength: 0.15, rimPower: 2.5, wash: 0, ownRimWhiten: 0 };
 }
 
 interface GlowUniforms {
@@ -129,6 +145,7 @@ interface GlowUniforms {
     qlRimStrength: THREE.IUniform<number>;
     qlRimPower: THREE.IUniform<number>;
     qlWash: THREE.IUniform<number>;
+    qlOwnRimWhiten: THREE.IUniform<number>;
 }
 
 /**
@@ -141,15 +158,15 @@ interface GlowUniforms {
  */
 const VERTEX_HEAD_PHASED = 'attribute float phaseSign;\nvarying float vQlPhase;\n';
 const VERTEX_HEAD_PLAIN = 'varying float vQlPhase;\n';
-const FRAGMENT_HEAD = 'uniform vec3 qlRimPositive;\nuniform vec3 qlRimNegative;\nuniform float qlInk;\nuniform float qlEmissive;\nuniform float qlRimStrength;\nuniform float qlRimPower;\nuniform float qlWash;\nvarying float vQlPhase;\n';
+const FRAGMENT_HEAD = 'uniform vec3 qlRimPositive;\nuniform vec3 qlRimNegative;\nuniform float qlInk;\nuniform float qlEmissive;\nuniform float qlRimStrength;\nuniform float qlRimPower;\nuniform float qlWash;\nuniform float qlOwnRimWhiten;\nvarying float vQlPhase;\n';
 const RIM = /* glsl */`
     // Fresnel rim, in the surface's own phase (vQlPhase: +1, -1, or 0 where
     // the mesh has no phase -- a density, an ESP map, an atom, a lobe -- which
-    // takes its own colour: added as it is where the rim adds light (Deep
-    // Space; ruling R24-2: no longer mixed half-way to white, a whitish rim),
+    // takes its own colour: added where the rim adds light (Deep Space), mixed
+    // qlOwnRimWhiten of the way to white (ruling R24-2c, owner-tuned), and
     // darker where it is ink (Light Clean, §11.2 "darker rim colour").
     float qlRim = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), qlRimPower);
-    vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : diffuseColor.rgb;
+    vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : mix(diffuseColor.rgb, vec3(1.0), qlOwnRimWhiten);
     vec3 qlRimColour = vQlPhase > 0.5 ? qlRimPositive : (vQlPhase < -0.5 ? qlRimNegative : qlOwnTint);
     outgoingLight = qlInk > 0.5
         ? mix(mix(outgoingLight, vec3(1.0), qlWash * qlRim), qlRimColour, qlRim * qlRim * qlRim * qlRimStrength)
@@ -186,6 +203,7 @@ export function applyGlow(material: THREE.MeshStandardMaterial, settings: GlowSe
         qlRimStrength: { value: 0 },
         qlRimPower: { value: 2.5 },
         qlWash: { value: 0 },
+        qlOwnRimWhiten: { value: 0 },
     };
     uniforms.qlRimPositive.value.copy(settings.rimPositive);
     uniforms.qlRimNegative.value.copy(settings.rimNegative);
@@ -194,6 +212,7 @@ export function applyGlow(material: THREE.MeshStandardMaterial, settings: GlowSe
     uniforms.qlRimStrength.value = settings.rimStrength;
     uniforms.qlRimPower.value = settings.rimPower;
     uniforms.qlWash.value = settings.wash;
+    uniforms.qlOwnRimWhiten.value = settings.ownRimWhiten;
     material.userData.glowUniforms = uniforms;
     if (material.userData.glow) return;
     material.onBeforeCompile = shader => {

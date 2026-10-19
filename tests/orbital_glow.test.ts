@@ -99,16 +99,18 @@ describe('Glow (spec §11.2)', () => {
     });
 
     // Ruling T15-inkrim: §11.2's ink rim is a DARKER colour -- for a phase-less surface too, never white.
-    // Ruling R24-2 (owner, "too much white glare"): Deep Space's additive tint is the surface's own colour
-    // (was mixed half-way to white, a whitish rim on every density, ESP map and lobe).
-    it('gives a phase-less surface an own-colour rim: its own colour added in Deep Space, darker ink in Light Clean', () => {
+    // Ruling R24-2c (owner-tuned): Deep Space's additive tint is the surface's own colour mixed `ownRimWhiten`
+    // of the way to white -- a tuned value (0.51), no longer fixed (A: 0.5, R24-2: 0); Light Clean's ink stays darker.
+    it('gives a phase-less surface an own-colour rim: mixed ownRimWhiten towards white in Deep Space, darker ink in Light Clean', () => {
         const material = new THREE.MeshStandardMaterial();
         applyGlow(material, glowSettingsFor({ ...glowDark, theme: 'light' }), { phased: false });
         const shader = shaderOf(material);
-        expect(shader.fragmentShader).toContain('vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : diffuseColor.rgb;');
-        expect(shader.fragmentShader).not.toMatch(/qlOwnTint = [^;]*vec3\(1\.0\)/);
+        expect(shader.fragmentShader).toContain('vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : mix(diffuseColor.rgb, vec3(1.0), qlOwnRimWhiten);');
         expect(shader.fragmentShader).toContain(': (vQlPhase < -0.5 ? qlRimNegative : qlOwnTint)');
         expect(shader.uniforms.qlInk.value).toBe(1);
+        applyGlow(material, glowSettingsFor(glowDark), { phased: false });
+        expect(shader.uniforms.qlOwnRimWhiten.value).toBeCloseTo(GLOW_TUNING.dark.ownRimWhiten);
+        expect(shader.uniforms.qlInk.value).toBe(0);
     });
 
     // A phase-less mesh has no phaseSign attribute; reading an undeclared one would take whatever generic value WebGL holds.
@@ -203,32 +205,32 @@ describe('Glow (spec §11.2)', () => {
 
     // Ruling R20a-3: the concept look, tuned live (Task 20a) -- pinned so a change is deliberate.
     it('pins the tuned Glow values', () => {
-        // Fix round 1 of Task 20a: lights per theme; Light Clean shaded by its lights (no emissive crutch),
-        // paler towards the edge (wash) with a thin ink outline, as concept Option 2.
+        // Fix round 1 of Task 20a: lights per theme; Light Clean shaded by its lights.
+        // Ruling R24-2c (owner-tuned on the R24-2b panel, 2026-10-19): the values below are the owner's own --
+        // soft same-hue edges, no white wash (rim, emissive, lines, halo and ownRimWhiten from the panel's JSON;
+        // R24-2 had dark rim 0.5, emissive 0.1, lines 0.05/0, halo 0.3, light emissive 0.05, lines 0.1/0.2).
         expect(GLOW_TUNING).toEqual({
             dark: {
-                // Ruling R24-2 (owner, "too much white glare"): the rim is a same-hue edge accent, not a glare --
-                // half the strength and a narrower band (was 1.0 / 1.8); the lines add their own phase, unwhitened (was 0.3).
-                emissive: 0.1, rimStrength: 0.5, rimPower: 3.0,
-                lines: { opacity: 0.05, whiten: 0, additive: true },
-                // Ruling R23c-2 (owner): the halo read as too thick -- a third of the
-                // offset (band width) and half the opacity (peak alpha).
-                halo: { opacity: 0.3, offset: 0.027, power: 1 },
+                emissive: 0.11, rimStrength: 0.75, rimPower: 3,
+                lines: { opacity: 0.02, whiten: 0.2, additive: true },
+                // Ruling R23c-2 (owner): a third of the offset (band width); R24-2c: opacity 0.1 (owner).
+                halo: { opacity: 0.1, offset: 0.027, power: 1 },
                 wash: 0,
+                ownRimWhiten: 0.51,
                 lights: { ambient: 0.15, key: 0.35, fill: 0.15 },
-                // Ruling R20d: the strip tiles' own rig and strengths -- a brighter key, rim and halo, fainter lines at 64³.
-                // Ruling R23c-2: haloOpacity halved alongside the main view's halo.opacity above.
-                // Ruling R24-2: the tile's rim halved with the main view's (was 1.25), so tiles match the view.
-                thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 0.625, haloOpacity: 0.5, linesOpacity: 0.03 },
+                // Ruling R20d: the tiles' own rig and strengths -- a little stronger at 72 px, fainter lines at 64³.
+                // R24-2c: scaled with the owner's view values by the same ratios (rim ×1.25, halo ×5/3, lines ×0.6).
+                thumb: { lights: { ambient: 0.2, key: 0.7, fill: 0.2 }, rimStrength: 0.94, haloOpacity: 0.17, linesOpacity: 0.012 },
             },
             light: {
-                emissive: 0.05, rimStrength: 1.0, rimPower: 1.5,
-                // Ruling R24-2: lines barely lighter than the body (was 0.85) and no wash towards white (was 0.7) --
-                // the body is the phase colour; the ink rim stays.
-                lines: { opacity: 0.1, whiten: 0.2, additive: false },
+                emissive: 0.21, rimStrength: 1, rimPower: 1.5,
+                lines: { opacity: 0.06, whiten: 0.12, additive: false },
                 wash: 0,
+                // Ink mode never reads it: Light Clean's phase-less rim is its own colour, darker.
+                ownRimWhiten: 0,
                 lights: { ambient: 1.0, key: 1.0, fill: 0.4 },
-                thumb: { lights: { ambient: 1.0, key: 1.1, fill: 0.4 }, rimStrength: 1.15, linesOpacity: 0.035 },
+                // R24-2c: lines scaled with the view's (×0.35, as 0.035 was to 0.1); the rim (×1.15) is unchanged.
+                thumb: { lights: { ambient: 1.0, key: 1.1, fill: 0.4 }, rimStrength: 1.15, linesOpacity: 0.021 },
             },
         });
         expect(glowLightsFor('dark')).toBe(GLOW_TUNING.dark.lights);
@@ -242,7 +244,9 @@ describe('Glow (spec §11.2)', () => {
         expect(lights.ambient).toBeGreaterThanOrEqual(SOLID_LIGHTS.ambient);
         expect(lights.key).toBeGreaterThanOrEqual(SOLID_LIGHTS.key);
         expect(lights.fill).toBeGreaterThanOrEqual(SOLID_LIGHTS.fill);
-        expect(glowSettingsFor({ ...glowDark, theme: 'light' })!.emissive).toBeLessThan(0.2);
+        // Ruling R24-2c: the owner tuned Light Clean's emissive to 0.21 (was 0.05); the lights still do the shading,
+        // the emissive stays a minor term (bound was < 0.2).
+        expect(glowSettingsFor({ ...glowDark, theme: 'light' })!.emissive).toBeLessThan(0.25);
     });
 
     // Fix round 1 of Task 20a: Light Clean inks a thin outline in the body's own phase.
