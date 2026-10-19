@@ -5,6 +5,8 @@ import { H2PLUS_LABELS, H2PLUS_STATES } from '../bonds/h2plus';
 import type { FieldRenderRequest } from '../field_source';
 import type { ThumbColouring } from './ThumbnailService';
 import type { StripItem } from './strip_items';
+import type { MoleculeBasis } from '../molecules/types';
+import { orbitalBox } from '../molecules/orbital_box';
 
 /**
  * Spec §12's figure for a molecular orbital's tile: 40³. Gaussian MOs are
@@ -63,6 +65,34 @@ function tile({ key, label, spoken, target, selected, field, colouring, content 
 }
 
 /**
+ * Ruling T10-core: an orbital tile is meshed in a box fitted to its own
+ * orbital (orbital_box.ts), not the whole molecule's -- at 40³ a 1s core
+ * orbital in the molecule's box is a voxel speck. The sampling box is always
+ * centred on the origin, so the tile is given a copy of the basis moved by
+ * −centre (and named for it): the same orbital, sitting at the centre of its
+ * box. The tile frames its own mesh (render_thumbnail.ts), so where the
+ * orbital sits does not show. The main view's request is not touched.
+ */
+function fittedToOrbital(field: FieldRenderRequest, basis: MoleculeBasis, moved: Map<string, MoleculeBasis>): FieldRenderRequest {
+    const [source] = field.sources;
+    if (source.recipe.type !== 'gaussianMO') return field;
+    const { index } = source.recipe;
+    const { centre, halfWidth } = orbitalBox(basis, index, source.rMax);
+    if (halfWidth >= source.rMax) return field;
+    let fitted = basis;
+    if (centre.some(c => c !== 0)) {
+        const id = `${basis.id}~${centre.map(c => c.toFixed(6)).join(',')}`;
+        fitted = moved.get(id) ?? { ...basis, id, atoms: basis.atoms.map(atom => atom.map((x, axis) => x - centre[axis]) as [number, number, number]) };
+        moved.set(id, fitted);
+    }
+    return {
+        ...field,
+        sources: [{ ...source, rMax: halfWidth, recipe: { type: 'gaussianMO', moleculeId: fitted.id, index } }],
+        bases: [fitted],
+    };
+}
+
+/**
  * The Bonds strip (spec §9.3 "Strip", §12, Task 10). H₂⁺: its two exact
  * states at the slider's R. A molecule: the total density first -- drawn at
  * the chosen ρ, in the density's colour, as the main view draws it -- then
@@ -98,6 +128,7 @@ export function bondsStripItems({ bonds, data, h2plusR, enclosedFraction }: Bond
         content: `${bonds.system}|${where}|density@${bonds.densityIso}`,
     })];
     const orbitals = data.meta.orbitals;
+    const moved = new Map<string, MoleculeBasis>();
     for (const orbital of orbitals) {
         const spin = orbital.spin ?? 'restricted';
         const siblings = orbitals.filter(o => o.label === orbital.label && (o.spin ?? 'restricted') === spin);
@@ -110,7 +141,8 @@ export function bondsStripItems({ bonds, data, h2plusR, enclosedFraction }: Bond
         const spoken = siblings.length > 1 ? `${label} orbital (${view.component + 1} of ${siblings.length})` : `${label} orbital`;
         items.push(tile({
             key: `mo-${orbital.index}`, label, spoken, target: view, selected: sameView(view, bonds.view),
-            field: built.request, colouring: 'phase', content: `${bonds.system}|${where}|${viewKey(view)}|${enclosedFraction}`,
+            field: fittedToOrbital(built.request, data.basis, moved), colouring: 'phase',
+            content: `${bonds.system}|${where}|${viewKey(view)}|${enclosedFraction}`,
         }));
     }
     return items;

@@ -6,6 +6,8 @@ import type { BondsData } from '../../src/bonds/useBondsData';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
 import { pointId } from '../../src/bonds/systems';
 import type { ThumbRequest } from '../../src/thumbs/ThumbnailService';
+import { registerMoleculeBasis } from '../../src/molecules/basis_registry';
+import { generateFieldMesh } from '../../src/orbital_mesh';
 
 // Preflight D12: the Bonds fixtures live in tests/fixtures/molecules (the tests in tests/bonds read them there).
 const fixture = (molecule: string, file: string) =>
@@ -15,6 +17,8 @@ const n2Meta: MoleculeMeta = fixture('n2', 'meta.json');
 const n2Basis: MoleculeBasis = fixture('n2', 'basis.json');
 const o2Meta: MoleculeMeta = fixture('o2', 'meta.json');
 const o2Basis: MoleculeBasis = fixture('o2', 'basis.json');
+const hfMeta: MoleculeMeta = fixture('hf', 'meta.json');
+const hfBasis: MoleculeBasis = fixture('hf', 'basis.json');
 
 const AT = 7;
 const n2Bonds = (over: Partial<BondsState> = {}): BondsState => ({
@@ -175,3 +179,51 @@ describe('bondsStripItems (spec §9.3 Strip, §12)', () => {
         expect(pending.filter(item => item.selected).map(item => item.target)).toEqual([view]);
     });
 });
+
+// Ruling T10-core (owner: CO's 1σ and 2σ tiles were truncated shapes). At 40³ over the
+// whole molecule's box a voxel is ~0.37 a₀, as wide as a 1s core's 90 % surface; each
+// orbital tile is now meshed in a box fitted to its own orbital (orbital_box.ts).
+describe('bondsStripItems: each orbital tile in its own box (ruling T10-core)', () => {
+    const hfBonds: BondsState = { system: 'hf', R: 1.73, scanIndex: AT, view: { kind: 'density' }, densityIso: 0.002 };
+    const hfItems = () => requests(bondsStripItems({ bonds: hfBonds, data: loaded(hfMeta, hfBasis, pointId('hf', AT)), h2plusR: null, enclosedFraction: 0.9 }));
+    const moleculeBox = (basis: MoleculeBasis) => Math.max(...basis.atoms.map(atom => Math.hypot(...atom))) + 6.5;
+    const fluorine = hfMeta.atoms.findIndex(atom => atom.Z === 9);
+
+    it('meshes a core orbital in a small box centred on its atom (HF 1σ: fluorine 1s); the density keeps the molecule box', () => {
+        const [density, core] = hfItems();
+        expect(density.field.sources[0].rMax).toBeCloseTo(moleculeBox(hfBasis), 9);
+        expect(density.field.bases?.[0].atoms).toEqual(hfBasis.atoms);
+        const source = core.field.sources[0];
+        expect(source.rMax).toBeLessThan(moleculeBox(hfBasis) / 5);
+        // Centred on fluorine: the tile's copy of the basis is moved so fluorine sits at the box's centre.
+        const shifted = core.field.bases![0];
+        expect(source.recipe).toEqual({ type: 'gaussianMO', moleculeId: shifted.id, index: 0 });
+        expect(shifted.id).not.toBe(`hf@07`);
+        shifted.atoms[fluorine].forEach(x => expect(x).toBeCloseTo(0, 9));
+        expect(shifted.atoms.map((atom, i) => atom[2] - hfBasis.atoms[i][2])).toEqual([0, 1].map(() => -hfBasis.atoms[fluorine][2]));
+        expect(shifted.orbitals).toBe(hfBasis.orbitals);
+        expect(core.field.resolution).toBe(40);
+    });
+
+    it('fits N₂\'s 1σg and 1σu* over both atoms, unmoved', () => {
+        const items = requests(bondsStripItems({ bonds: n2Bonds(), data: n2Data(), h2plusR: null, enclosedFraction: 0.9 }));
+        for (const request of items.slice(1, 3)) {
+            const source = request.field.sources[0];
+            expect(source.rMax).toBeGreaterThan(Math.max(...n2Basis.atoms.map(atom => Math.abs(atom[2]))));
+            expect(source.rMax).toBeLessThan(moleculeBox(n2Basis) / 2);
+            expect(request.field.bases?.[0].atoms).toEqual(n2Basis.atoms);
+        }
+    });
+
+    it('draws HF\'s 1σ tile as a whole, smooth surface, not a voxel speck', () => {
+        const core = hfItems()[1];
+        core.field.bases!.forEach(registerMoleculeBasis);
+        const source = core.field.sources[0];
+        const mesh = generateFieldMesh(source, core.field.resolution, core.field.enclosedFraction);
+        expect(mesh.positions.length).toBeGreaterThan(500);
+        // Whole: nowhere near the box's faces, so nothing of the 90 % surface is cut off.
+        const reach = Math.max(...mesh.positions.flat().map(Math.abs));
+        expect(reach).toBeLessThan(0.6 * source.rMax);
+    });
+});
+
