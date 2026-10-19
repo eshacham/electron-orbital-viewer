@@ -153,6 +153,8 @@ import { brandPref } from './design/brands';
 import { LAYOUT } from './design/tokens';
 import { usePref } from './design/usePref';
 import { displayPref, renderPref, hintPref, type PlotTabId } from './design/presentation';
+import { glowOverridesOf, settledGlowPref } from './design/glow_pref';
+import AdvancedAppearance from './components/AdvancedAppearance';
 import { curvePalette, densitySurfaceHex, phaseColours, themeCurveColour } from './design/science';
 import { BUILD_ENV } from './jobs/build_env';
 import { SESSION_ENDED } from './jobs/api';
@@ -496,6 +498,8 @@ function App() {
     const [exploreCollapsed, setExploreCollapsed] = useState(false);
     const { mode: themeMode } = useQuantumTheme();
     const render = usePref(renderPref);
+    // Task 16b: the viewer's own Glow values as the sliders last left them -- the strip's look (below).
+    const settledGlow = glowOverridesOf(usePref(settledGlowPref), themeMode);
     // Task 5 (ruling P17): the one-time hint's own dismissed flag.
     const hintDismissed = usePref(hintPref).rotateDismissed;
     const phase = phaseColours(themeMode);
@@ -918,9 +922,11 @@ function App() {
     // tile. The same key the thumbnail service files pictures under (thumb_key.ts): isNarrow is the
     // appearance's lowPower (a phone's tiles, like its main view, have no lines or halo), the size follows
     // the screen, and the opacity is the main view's as last committed (a slider drag re-renders nothing
-    // until it is released).
+    // until it is released). Task 16b: the same for the viewer's own Glow values -- the ones last settled
+    // (settledGlowPref, which OrbitalViewer's thumbnail host draws with), so a slider drag asks for nothing
+    // until it rests.
     const stripThemeKey = thumbLookKey({
-        appearance: { theme: themeMode, finish: render.finish, lowPower: isNarrow },
+        appearance: { theme: themeMode, finish: render.finish, lowPower: isNarrow, glow: settledGlow },
         opacity: thumbOpacity,
         // The bitmap's side, kept current as the window moves between screens (fix round 1 of Task 20d).
         size: thumbTileDevicePx(screenRatio),
@@ -1397,6 +1403,12 @@ function App() {
         </Controls>
     );
     const controls = renderControls('all');
+    // Task 16b (owner R24-adv): Glow's own tuning, folded, at the bottom of every Display section and the
+    // phone's view tab; it shows itself only under the Glow finish, while something drawn can glow -- not a
+    // wireframe, nor Atoms' whole-atom view (a shell picture with ring-glyph tiles).
+    const drawsGlow = surfaceStyle.mode !== 'wireframe' && !(isAtomMode && atomLevel === 'atom');
+    const advancedAppearance = <AdvancedAppearance drawsGlow={drawsGlow} lowPower={isNarrow} />;
+    const displayControls = <>{controls}{advancedAppearance}</>;
 
     // Bonds mode's navigation (layout contract §3.8): the desktop's left
     // column, the phone's Explore tab. The curve is not in it -- it goes
@@ -1529,7 +1541,7 @@ function App() {
     // The Atom screen's Display settings head its inspector, docked and in
     // the drawer (ruling R20b-atoms); on a phone the sheet's View tab holds
     // them, so the stacked inspector has none.
-    const atomDisplay = <>{controls}<AxesSwitch /></>;
+    const atomDisplay = <>{controls}<AxesSwitch />{advancedAppearance}</>;
     // Ruling R24-3: before there is anything to plot, the inspector keeps its
     // titled sections -- Display, and an empty "Plot and data" -- so its
     // headers do not move (nor the open one change) when the plot arrives.
@@ -1560,14 +1572,14 @@ function App() {
     // entering the mode) it is the plain inspector, holding the column and
     // drawer bar in place, with the view controls still in it.
     const basicInspector = (variant: 'docked' | 'drawer' | 'stacked') => ((renderedParams || renderedField) ? (
-        <BasicInspector variant={variant} display={variant === 'stacked' ? undefined : renderControls('view')}
+        <BasicInspector variant={variant} display={variant === 'stacked' ? undefined : <>{renderControls('view')}{advancedAppearance}</>}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             plotTabs={BASIC_PLOT_TABS} plotTab={basicActivePlotTab} onPlotTab={handlePlotTab}
             combination={Boolean(renderedField)}
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
             facts={basicFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} />
     ) : (
-        <Inspector variant={variant} sections={waitingSections(variant, renderControls('view'))}
+        <Inspector variant={variant} sections={waitingSections(variant, <>{renderControls('view')}{advancedAppearance}</>)}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
@@ -1579,7 +1591,7 @@ function App() {
     // unchanged; Data is the frontier line, caveats and methods list that
     // used to sit under the MO diagram in BondsPanel (ruling P19).
     const bondsInspector = (variant: 'docked' | 'drawer' | 'stacked') => (
-        <BondsInspector variant={variant} display={variant === 'stacked' ? undefined : controls}
+        <BondsInspector variant={variant} display={variant === 'stacked' ? undefined : displayControls}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             bonds={bonds} data={bondsData}
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)} />
@@ -1613,7 +1625,7 @@ function App() {
     // molecule's Properties (Task 12, ruling P10) while one is chosen -- the content section, open by default.
     // The phone's View tab stacks the Properties section (below).
     const moleculeSections: InspectorSection[] = [
-        { key: 'display', title: 'Display', content: controls },
+        { key: 'display', title: 'Display', content: displayControls },
         ...(moleculeProperties ? [{ key: 'properties', title: 'Properties', content: moleculeProperties }] : []),
     ];
 
@@ -1650,7 +1662,7 @@ function App() {
             {
                 key: 'view', label: 'View', content: (
                     <>
-                        {controls}
+                        {displayControls}
                         {/* Review M3: the inspector's own stacked section, as the other modes' sheets use. Display
                             is this tab's controls already, so only Properties is stacked here. */}
                         <Inspector variant="stacked" sections={moleculeSections.filter(section => section.key === 'properties')} />
@@ -1673,7 +1685,7 @@ function App() {
                     </>
                 ),
             },
-            { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
+            { key: 'view', label: 'View', content: <>{displayControls}{phoneViewActions}</> },
             // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
             { key: 'plot', label: 'Plot', content: bondsInspector('stacked') },
         ]
@@ -1695,7 +1707,7 @@ function App() {
                     </>
                 ),
             },
-            { key: 'view', label: 'View', content: <>{controls}<AxesSwitch />{phoneViewActions}</> },
+            { key: 'view', label: 'View', content: <>{atomDisplay}{phoneViewActions}</> },
             // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
             { key: 'plot', label: 'Plot', content: atomInspector('stacked') },
         ]
@@ -1712,7 +1724,7 @@ function App() {
                             <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
                                 onSelect={handleBasicSelectionChange} variant="sheet" />
                         )}
-                        {basicExplore}{renderControls('view')}{phoneViewActions}
+                        {basicExplore}{renderControls('view')}{advancedAppearance}{phoneViewActions}
                     </>
                 ),
             },

@@ -31,5 +31,6 @@
   "ac-6s-off-orbital": "#mode=atom&Z=89&rel=off&level=orbital&n=6&l=0&ml=0",
   "au-6s-orbital": "#mode=atom&Z=79&rel=scalar&level=orbital&n=6&l=0&ml=0",
   "pb-6p12-orbital": "#mode=atom&Z=82&rel=so&level=orbital&n=6&l=1&j=1/2&ml=0",
-  "og-whole": "#mode=atom&Z=118&level=atom"
+  "og-whole": "#mode=atom&Z=118&level=atom",
+  "glycine-esp": "#mode=molecule&id=glycine&show=esp"
 }

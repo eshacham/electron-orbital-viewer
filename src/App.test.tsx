@@ -29,6 +29,7 @@ import * as downloadModule from './export/download';
 import { readBlob } from '../tests/export/fixtures';
 import { DRAW_DEBOUNCE_MS } from './basic_ui/useDrawOnSelection';
 import { thumbnailService } from './thumbs/ThumbnailService';
+import { GLOW_SETTLE_MS } from './design/glow_pref';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -1739,6 +1740,46 @@ describe('App: shell', () => {
         expect(display.compareDocumentPosition(within(inspector).getByRole('button', { name: 'Plot and data' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         expect(container.querySelectorAll('#controls')).toHaveLength(1);
+    });
+
+    // Task 16b ("Advanced appearance", owner R24-adv): Glow's tuning ends the Display section, folded; a slider
+    // writes eov.glow at once, but the strip's tiles are asked for again only once it rests (GLOW_SETTLE_MS).
+    it('ends Display with the folded Advanced appearance, whose sliders re-request the strip only once they rest', async () => {
+        installMatchMedia(false);
+        const idle = () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker;
+        act(() => { thumbnailService.attach({ createWorker: idle, createGridWorker: idle, isBusy: () => false, themeKey: () => 'dark|glow|full|72|0.9', render: () => new Promise(() => {}) }); });
+        const request = jest.spyOn(thumbnailService, 'request');
+        try {
+            const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+            openInspectorSection('Display');
+            const displayNow = () => within(screen.getByRole('complementary', { name: 'Inspector' })).getByRole('region', { name: 'Display' });
+            // The whole atom wears no Glow (a shell picture, ring-glyph tiles): nothing to tune there.
+            expect(within(displayNow()).queryByRole('button', { name: 'Advanced appearance' })).toBeNull();
+            act(() => { store.dispatch(drillToShell(1)); });
+            expect(screen.getByRole('option', { name: '1s orbital' })).toBeInTheDocument();
+            // Nor does a wireframe.
+            act(() => { store.dispatch(setSurfaceStyle({ mode: 'wireframe' })); });
+            expect(within(displayNow()).queryByRole('button', { name: 'Advanced appearance' })).toBeNull();
+            act(() => { store.dispatch(setSurfaceStyle({ mode: 'solid' })); });
+            const display = displayNow();
+            const advanced = within(display).getByRole('button', { name: 'Advanced appearance' });
+            expect(advanced).toHaveAttribute('aria-expanded', 'false');
+            // At the bottom of the section: after Show axes.
+            expect(within(display).getByRole('checkbox', { name: 'Show axes' }).compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            fireEvent.click(advanced);
+            request.mockClear();
+            const edge = within(display).getByRole('slider', { name: 'Edge glow' });
+            ['ArrowRight', 'ArrowRight', 'ArrowRight'].forEach(key => fireEvent.keyDown(edge, { key }));
+            expect(JSON.parse(window.localStorage.getItem('eov.glow')!)).toEqual({ dark: { rimStrength: 0.78 } });
+            expect(request).not.toHaveBeenCalled();
+            await act(async () => { await new Promise(resolve => setTimeout(resolve, GLOW_SETTLE_MS + 50)); });
+            expect(request).toHaveBeenCalled();
+            expect(request.mock.calls.every(([asked]) => asked.contentKey.length > 0)).toBe(true);
+        } finally {
+            request.mockRestore();
+            act(() => { thumbnailService.detach(); });
+            window.localStorage.removeItem('eov.glow');
+        }
     });
 
     it('in Atoms at medium width, the drawer holds the Display section above Plot and Data', () => {

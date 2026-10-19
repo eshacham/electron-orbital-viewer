@@ -52,6 +52,7 @@ import { TOKENS } from '../design/tokens';
 import { useQuantumTheme } from '../design/useQuantumTheme';
 import { usePref } from '../design/usePref';
 import { displayPref, renderPref, hintPref } from '../design/presentation';
+import { glowOverridesOf, glowPref, settledGlowPref } from '../design/glow_pref';
 import { canvasSolid } from '../design/science';
 import type { Appearance } from '../design/appearance';
 
@@ -137,13 +138,21 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // Only showAxes: a plot-tab change (the same pref) must not repaint the scene.
     const { showAxes } = usePref(displayPref);
     const isNarrow = useMediaQuery(NARROW_VIEWPORT);
+    // Task 16b: the viewer's own Glow values for this theme, live -- the view follows every slider move.
+    const glow = glowOverridesOf(usePref(glowPref), themeMode);
     const appearance = useMemo<Appearance>(
-        () => ({ theme: themeMode, finish, showAxes, lowPower: isNarrow }),
-        [themeMode, finish, showAxes, isNarrow]
+        () => ({ theme: themeMode, finish, showAxes, lowPower: isNarrow, ...(glow ? { glow } : {}) }),
+        [themeMode, finish, showAxes, isNarrow, glow]
     );
     // Read by the export handle, which outlives renders.
     const appearanceRef = useRef(appearance);
     appearanceRef.current = appearance;
+    // Task 16b: the strip's tiles take the Glow values only once the sliders rest (settledGlowPref), as
+    // their look key does (App's stripThemeKey) -- a drag starts no thumbnail jobs, and a tile is drawn
+    // with the values it is filed under.
+    const settledGlow = glowOverridesOf(usePref(settledGlowPref), themeMode);
+    const thumbAppearanceRef = useRef(appearance);
+    thumbAppearanceRef.current = settledGlow === glow ? appearance : { ...appearance, glow: settledGlow };
     // Ruling R20a-4 (fix round 1): the thumbnails' opacity -- the main view's, as last committed.
     const thumbOpacity = useAppSelector(state => state.orbital.thumbOpacity);
     const thumbOpacityRef = useRef(thumbOpacity);
@@ -214,7 +223,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             // Spec §12: the strips' thumbnails are drawn by this renderer -- never a second WebGL context.
             attachThumbnails(context, thumbnailService, {
                 isBusy: () => busyRef.current || draggingRef.current,
-                appearance: () => appearanceRef.current,
+                appearance: () => thumbAppearanceRef.current,
                 opacity: () => thumbOpacityRef.current,
                 // Task 10: a molecule's density-grid tiles are meshed where its main surface is.
                 createGridWorker: createGridMeshWorker,

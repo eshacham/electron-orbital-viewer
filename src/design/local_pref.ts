@@ -75,3 +75,48 @@ export function createPref<T>(key: string, codec: PrefCodec<T>): Pref<T> {
 
     return { get, set, subscribe };
 }
+
+/** What a reader of a pref needs: its value and its changes (usePref takes either). */
+export type PrefView<T> = Pick<Pref<T>, 'get' | 'subscribe'>;
+
+/**
+ * `source` as it was once it stopped changing for `ms` (Task 16b): while a
+ * burst of sets is under way -- a slider being dragged -- readers keep the
+ * value from before it; `ms` after the last set they hear the new one, once.
+ * With no reader subscribed it simply is the source. No timers of its own
+ * outlive its last subscriber.
+ */
+export function settledView<T>(source: Pref<T>, ms: number): PrefView<T> {
+    const listeners = new Set<() => void>();
+    let shown: { value: T } | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let stopSource: (() => void) | null = null;
+
+    const settle = () => {
+        timer = null;
+        shown = { value: source.get() };
+        listeners.forEach(listener => listener());
+    };
+    const onSourceChange = () => {
+        if (timer !== null) clearTimeout(timer);
+        timer = setTimeout(settle, ms);
+    };
+    const get = (): T => {
+        // Nothing pending: the source is settled, and is the value.
+        if (timer === null || shown === null) shown = { value: source.get() };
+        return shown.value;
+    };
+    const subscribe = (listener: () => void): (() => void) => {
+        listeners.add(listener);
+        stopSource ??= source.subscribe(onSourceChange);
+        return () => {
+            listeners.delete(listener);
+            if (listeners.size > 0) return;
+            stopSource?.();
+            stopSource = null;
+            if (timer !== null) clearTimeout(timer);
+            timer = null;
+        };
+    };
+    return { get, subscribe };
+}

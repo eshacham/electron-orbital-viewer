@@ -105,24 +105,116 @@ export const GLOW_TUNING = {
     },
 } as const;
 
+/**
+ * Task 16b ("Advanced appearance", owner R24-adv): the Glow values a viewer
+ * may tune for themselves, by the names GLOW_TUNING uses (`haloOpacity` is
+ * `halo.opacity`, `linesOpacity` / `linesWhiten` are `lines.*`). Body tint
+ * and edge wash are not among them: both whiten the science colours -- the
+ * glare the owner removed (R24-2).
+ */
+export const GLOW_KNOBS = ['rimStrength', 'rimPower', 'emissive', 'haloOpacity', 'linesOpacity', 'linesWhiten', 'ownRimWhiten'] as const;
+export type GlowKnob = typeof GLOW_KNOBS[number];
+/** A viewer's own Glow values for one theme: overrides only, GLOW_TUNING for the rest. */
+export type GlowOverrides = Partial<Record<GlowKnob, number>>;
+export type GlowValues = Record<GlowKnob, number>;
+
+/**
+ * Task 16b: how far each knob may go, in one table. Why these caps: the
+ * phase colours must stay recognisable at every setting, so each range spans
+ * the owner's tuned values (R24-2c) and the A / B looks he compared (66a81c3,
+ * 7355def) with some margin, instead of the throwaway panel's open ranges.
+ * The upper ends are judgement calls against those looks, not measurements.
+ * - rimStrength 0-1.5: owner 0.75 dark / 1 light, A 1.0, B 0.5; 1.5 is twice
+ *   the owner's Deep Space rim -- beyond it the edge, not the body, sets the hue.
+ * - rimPower 1-5 (higher is a thinner edge): owner 3 / 1.5, A 1.8. Below 1
+ *   the Fresnel term covers most of the face, a wash by another name.
+ * - emissive 0-0.35: owner 0.11 / 0.21, A 0.1 / 0.05. The lights, not the
+ *   self-glow, are what shade the body; this keeps the self-glow minor.
+ * - haloOpacity 0-0.4 (Deep Space only): owner 0.1, A and B 0.3 -- which the
+ *   owner had already called too thick (R23c-2).
+ * - linesOpacity 0-0.15: owner 0.02 / 0.06, A 0.05 / 0.1.
+ * - linesWhiten 0-0.6: owner 0.2 / 0.12. A's Light Clean 0.85 was part of
+ *   the white glare (R24-2).
+ * - ownRimWhiten 0-0.6 (Deep Space only, phase-less surfaces): owner 0.51,
+ *   A 0.5. Never applied to an ESP map (ruling T15-b, glowSettingsFor).
+ * `step` is the slider's and the stored value's resolution; every GLOW_TUNING
+ * default sits on it. `darkOnly`: a knob Light Clean never reads (no halo;
+ * the ink rim ignores ownRimWhiten).
+ */
+export const GLOW_CAPS: Readonly<Record<GlowKnob, { min: number; max: number; step: number; darkOnly: boolean }>> = {
+    rimStrength: { min: 0, max: 1.5, step: 0.01, darkOnly: false },
+    rimPower: { min: 1, max: 5, step: 0.1, darkOnly: false },
+    emissive: { min: 0, max: 0.35, step: 0.01, darkOnly: false },
+    haloOpacity: { min: 0, max: 0.4, step: 0.01, darkOnly: true },
+    linesOpacity: { min: 0, max: 0.15, step: 0.005, darkOnly: false },
+    linesWhiten: { min: 0, max: 0.6, step: 0.01, darkOnly: false },
+    ownRimWhiten: { min: 0, max: 0.6, step: 0.01, darkOnly: true },
+};
+
+/** Whether `theme` reads this knob at all (GLOW_CAPS' darkOnly). */
+export function glowKnobApplies(knob: GlowKnob, theme: Appearance['theme']): boolean {
+    return theme === 'dark' || !GLOW_CAPS[knob].darkOnly;
+}
+
+const decimalsOf = (step: number) => Math.max(0, -Math.floor(Math.log10(step) + 1e-9));
+
+/** `value` held inside the knob's caps, on its step (no float dust: 0.3, not 0.30000000000000004). */
+export function clampGlow(knob: GlowKnob, value: number): number {
+    const { min, max, step } = GLOW_CAPS[knob];
+    const held = Math.min(max, Math.max(min, value));
+    return Number((Math.round(held / step) * step).toFixed(decimalsOf(step))) + 0;
+}
+
+/** GLOW_TUNING's values for `theme`, by knob (the owner's own, R24-2c). No halo in Light Clean: 0. */
+export function glowDefaults(theme: Appearance['theme']): GlowValues {
+    const tuning = GLOW_TUNING[theme];
+    return {
+        rimStrength: tuning.rimStrength,
+        rimPower: tuning.rimPower,
+        emissive: tuning.emissive,
+        haloOpacity: theme === 'dark' ? GLOW_TUNING.dark.halo.opacity : 0,
+        linesOpacity: tuning.lines.opacity,
+        linesWhiten: tuning.lines.whiten,
+        ownRimWhiten: tuning.ownRimWhiten,
+    };
+}
+
+/** The values Glow draws with in `theme`: GLOW_TUNING, with the viewer's overrides (clamped) on top. */
+export function effectiveGlow(theme: Appearance['theme'], overrides?: GlowOverrides): GlowValues {
+    const values = glowDefaults(theme);
+    for (const knob of GLOW_KNOBS) {
+        const value = overrides?.[knob];
+        if (typeof value === 'number' && Number.isFinite(value) && glowKnobApplies(knob, theme)) values[knob] = clampGlow(knob, value);
+    }
+    return values;
+}
+
 /** The three lights' levels while a surface glows in `theme` (§11.1 "Lights"). */
 export function glowLightsFor(theme: Appearance['theme']): { ambient: number; key: number; fill: number } {
     return GLOW_TUNING[theme].lights;
 }
 
-export function glowSettingsFor(appearance: Appearance): GlowSettings | null {
+/**
+ * The Glow a surface wears in `appearance` -- GLOW_TUNING with the viewer's
+ * own overrides (`appearance.glow`, Task 16b) -- or null for the Solid finish.
+ * Ruling T15-b (science): an ESP map (`esp`) never whitens its rim. On that
+ * map white means a potential of about 0, so a whitened rim would read every
+ * edge as neutral; ownRimWhiten is 0 there whatever the setting. A density
+ * and the lobes keep the tuned (or the viewer's) value.
+ */
+export function glowSettingsFor(appearance: Appearance, { esp = false }: { esp?: boolean } = {}): GlowSettings | null {
     if (appearance.finish !== 'glow') return null;
     const phase = phaseColours(appearance.theme);
-    const tuning = GLOW_TUNING[appearance.theme];
+    const values = effectiveGlow(appearance.theme, appearance.glow);
     return {
         mode: appearance.theme === 'dark' ? 'additive' : 'ink',
         rimPositive: new THREE.Color(phase.rimPositive),
         rimNegative: new THREE.Color(phase.rimNegative),
-        emissive: tuning.emissive,
-        rimStrength: tuning.rimStrength,
-        rimPower: tuning.rimPower,
-        wash: tuning.wash,
-        ownRimWhiten: tuning.ownRimWhiten,
+        emissive: values.emissive,
+        rimStrength: values.rimStrength,
+        rimPower: values.rimPower,
+        wash: GLOW_TUNING[appearance.theme].wash,
+        ownRimWhiten: esp ? 0 : values.ownRimWhiten,
     };
 }
 
@@ -315,29 +407,27 @@ function removeExtra(group: THREE.Object3D, child: THREE.Object3D): void {
     ((child as THREE.Mesh).material as THREE.Material).dispose();
 }
 
-/** An extra's full-strength alpha in this theme (GLOW_TUNING); the fade scales it. */
-function fullOpacity(kind: GlowExtra, theme: Appearance['theme']): number {
-    return kind === 'halo' ? GLOW_TUNING.dark.halo.opacity : GLOW_TUNING[theme].lines.opacity;
-}
-
 /**
- * Brings an extra's theme-dependent uniforms and blending to `theme` in
- * place: no recompile (blending is render state), so an extra that is kept
- * across a theme switch (ruling DC3) still looks right.
+ * Brings an extra's appearance-dependent uniforms and blending to
+ * `appearance` in place -- the theme's, with the viewer's own halo and line
+ * values (Task 16b): no recompile (blending is render state), so an extra
+ * that is kept across a theme switch or a slider tick (ruling DC3) still
+ * looks right. Its full-strength alpha is remembered for fadeGlowExtras.
  */
-function tuneExtra(material: THREE.ShaderMaterial, kind: GlowExtra, theme: Appearance['theme'], fade: number): void {
-    material.userData.qlTheme = theme;
+function tuneExtra(material: THREE.ShaderMaterial, kind: GlowExtra, appearance: Appearance, fade: number): void {
+    const values = effectiveGlow(appearance.theme, appearance.glow);
     if (kind === 'halo') {
-        material.uniforms.qlHaloOpacity.value = fullOpacity(kind, theme) * fade;
+        material.userData.qlFullOpacity = values.haloOpacity;
+        material.uniforms.qlHaloOpacity.value = values.haloOpacity * fade;
         return;
     }
-    const lines = GLOW_TUNING[theme].lines;
-    material.uniforms.qlLinesOpacity.value = lines.opacity * fade;
-    material.uniforms.qlLinesWhiten.value = lines.whiten;
-    material.blending = lines.additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+    material.userData.qlFullOpacity = values.linesOpacity;
+    material.uniforms.qlLinesOpacity.value = values.linesOpacity * fade;
+    material.uniforms.qlLinesWhiten.value = values.linesWhiten;
+    material.blending = GLOW_TUNING[appearance.theme].lines.additive ? THREE.AdditiveBlending : THREE.NormalBlending;
 }
 
-function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: number, clippingPlanes: THREE.Plane[], theme: Appearance['theme'], fade: number): THREE.Mesh {
+function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: number, clippingPlanes: THREE.Plane[], appearance: Appearance, fade: number): THREE.Mesh {
     const halo = GLOW_TUNING.dark.halo;
     const material = kind === 'halo'
         ? new THREE.ShaderMaterial({
@@ -363,7 +453,7 @@ function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: nu
             clipping: true,
             clippingPlanes,
         });
-    tuneExtra(material, kind, theme, fade);
+    tuneExtra(material, kind, appearance, fade);
     const mesh = new THREE.Mesh(geometry, material);
     // Unmarked for export (export/surfaces.ts collects marked meshes only); this marks it as Glow's.
     mesh.userData.isGlowExtra = kind;
@@ -376,19 +466,20 @@ function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: nu
  * and the mesh lines only on a solid surface, never on a phone (`lowPower`)
  * and not once the frame-time guard has turned them off (`extrasAllowed`
  * false; spec §15: "lines and halo off on phones and when frames exceed
- * 20 ms"). Extras share the surface's geometry.
+ * 20 ms"). Extras share the surface's geometry. `esp`: the surface is an
+ * ESP map, whose rim is never whitened (ruling T15-b, glowSettingsFor).
  *
  * Idempotent (ruling DC3): an extra that is already there and still wanted
  * is kept as it is -- no material disposed, no shader rebuilt; only its
- * theme's uniforms are set -- so calling this again costs nothing.
+ * uniforms are set -- so calling this again, per slider tick, costs nothing.
  */
 export function attachGlowExtras(
     group: THREE.Group,
     surface: THREE.Mesh,
     appearance: Appearance,
-    options: { radius: number; clippingPlanes: THREE.Plane[]; solid: boolean; extrasAllowed: boolean },
+    options: { radius: number; clippingPlanes: THREE.Plane[]; solid: boolean; extrasAllowed: boolean; esp?: boolean },
 ): void {
-    const settings = options.solid ? glowSettingsFor(appearance) : null;
+    const settings = options.solid ? glowSettingsFor(appearance, { esp: options.esp }) : null;
     applyGlow(surface.material as THREE.MeshStandardMaterial, settings, { phased: Boolean(surface.geometry.getAttribute('phaseSign')) });
     const wanted = new Set<GlowExtra>();
     if (settings && !appearance.lowPower && options.extrasAllowed) {
@@ -401,11 +492,10 @@ export function attachGlowExtras(
         if (!kind) continue;
         if (wanted.has(kind)) {
             wanted.delete(kind);
-            const material = (child as THREE.Mesh).material as THREE.ShaderMaterial;
-            if (material.userData.qlTheme !== appearance.theme) tuneExtra(material, kind, appearance.theme, fade);
+            tuneExtra((child as THREE.Mesh).material as THREE.ShaderMaterial, kind, appearance, fade);
         } else removeExtra(group, child);
     }
-    for (const kind of wanted) group.add(createExtra(kind, surface.geometry, options.radius, options.clippingPlanes, appearance.theme, fade));
+    for (const kind of wanted) group.add(createExtra(kind, surface.geometry, options.radius, options.clippingPlanes, appearance, fade));
 }
 
 /**
@@ -421,8 +511,8 @@ export function fadeGlowExtras(group: THREE.Object3D | null, fraction: number): 
         const kind = child.userData.isGlowExtra as GlowExtra | undefined;
         if (!kind) continue;
         const material = (child as THREE.Mesh).material as THREE.ShaderMaterial;
-        const full = fullOpacity(kind, material.userData.qlTheme as Appearance['theme']);
-        material.uniforms[kind === 'halo' ? 'qlHaloOpacity' : 'qlLinesOpacity'].value = full * fraction;
+        // The full strength tuneExtra last set: the theme's, or the viewer's own (Task 16b).
+        material.uniforms[kind === 'halo' ? 'qlHaloOpacity' : 'qlLinesOpacity'].value = (material.userData.qlFullOpacity as number) * fraction;
     }
 }
 
@@ -430,16 +520,23 @@ export function fadeGlowExtras(group: THREE.Object3D | null, fraction: number): 
  * Ruling R20d: a strip tile's Glow strengths (GLOW_TUNING[theme].thumb) on
  * a surface attachGlowExtras has dressed: its rim, and its halo and lines
  * if it has them. The tile's own scene only; the main view never calls it.
+ * Task 16b: with the viewer's own values (`appearance.glow`) the tile keeps
+ * its "a little stronger at 72 px" ratio to the view (R24-2c) -- each
+ * strength is the tile's tuned one scaled by the view's effective value over
+ * its default, so with no overrides it is exactly GLOW_TUNING[theme].thumb.
  */
-export function tuneThumbnailGlow(group: THREE.Object3D, surface: THREE.Mesh, theme: Appearance['theme']): void {
-    const thumb: { rimStrength: number; linesOpacity: number; haloOpacity?: number } = GLOW_TUNING[theme].thumb;
+export function tuneThumbnailGlow(group: THREE.Object3D, surface: THREE.Mesh, appearance: Appearance): void {
+    const thumb: { rimStrength: number; linesOpacity: number; haloOpacity?: number } = GLOW_TUNING[appearance.theme].thumb;
+    const view = effectiveGlow(appearance.theme, appearance.glow);
+    const defaults = glowDefaults(appearance.theme);
+    const scaled = (tile: number, knob: GlowKnob) => (defaults[knob] === 0 ? view[knob] : tile * (view[knob] / defaults[knob]));
     const uniforms = (surface.material as THREE.Material).userData.glowUniforms as GlowUniforms | undefined;
-    if (uniforms && (surface.material as THREE.Material).userData.glow) uniforms.qlRimStrength.value = thumb.rimStrength;
+    if (uniforms && (surface.material as THREE.Material).userData.glow) uniforms.qlRimStrength.value = scaled(thumb.rimStrength, 'rimStrength');
     for (const child of group.children) {
         const kind = child.userData.isGlowExtra as GlowExtra | undefined;
         const material = (child as THREE.Mesh).material as THREE.ShaderMaterial;
-        if (kind === 'halo' && thumb.haloOpacity !== undefined) material.uniforms.qlHaloOpacity.value = thumb.haloOpacity;
-        if (kind === 'lines') material.uniforms.qlLinesOpacity.value = thumb.linesOpacity;
+        if (kind === 'halo' && thumb.haloOpacity !== undefined) material.uniforms.qlHaloOpacity.value = scaled(thumb.haloOpacity, 'haloOpacity');
+        if (kind === 'lines') material.uniforms.qlLinesOpacity.value = scaled(thumb.linesOpacity, 'linesOpacity');
     }
 }
 

@@ -2172,9 +2172,11 @@ function updateSceneWithMeshData(
         // so the closures below hold a number rather than meshData.
         const radius = meshRadius(meshData);
         /** Glow (§11.2) to the current surface mode: extras on a solid surface only. */
+        // Ruling T15-b: an ESP map (the caller's own vertex colours) never whitens its rim.
         const refreshGlow = (appearance: Appearance) => attachGlowExtras(group, mesh, appearance, {
             radius, clippingPlanes: context.clippingPlanes,
             solid: context.surfaceStyle.mode === 'solid', extrasAllowed: !context.extrasSuppressed,
+            esp: surfaceColouring === 'custom',
         });
 
         // Colours come from the appearance (spec §6.6, §11) and are repainted
@@ -2341,10 +2343,23 @@ export function setAppearance(context: VisualizerContext | null, appearance: App
     if (!context || context.isDisposed) return;
     const previous = context.appearance;
     context.appearance = appearance;
+    const changed = previous
+        ? [...new Set([...Object.keys(previous), ...Object.keys(appearance)] as Array<keyof Appearance>)].filter(key => previous[key] !== appearance[key])
+        : null;
+    // Task 16b: an Advanced appearance slider moved -- only the viewer's Glow
+    // values changed. Glow's uniforms follow (refreshGlow), nothing else: no
+    // repaint, no recompile, no re-mesh, the lights as they are. Nor a fresh
+    // look at frame time: a drag is not a new look, and on a device the guard
+    // has latched it would bring the lines and halo back on every tick.
+    if (changed?.length === 1 && changed[0] === 'glow') {
+        callHooks(context.currentOrbitalGroup, 'refreshGlow');
+        if (context.transition?.kind === 'cross-fade') callHooks(context.transition.outgoing, 'refreshGlow');
+        return;
+    }
     // Ruling R10: a new appearance gets a fresh look at frame time -- before
     // the objects below re-apply, so the lines and halo may come back. The
     // same appearance again (a re-run effect) is not a change.
-    if (!previous || (Object.keys(appearance) as Array<keyof Appearance>).some(key => previous[key] !== appearance[key])) {
+    if (!changed || changed.length > 0) {
         context.extrasSuppressed = false;
         if (context.frameGuard) {
             context.frameGuard.ema = 16;

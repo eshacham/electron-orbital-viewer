@@ -1,6 +1,9 @@
 import * as THREE from 'three';
-import { applyGlow, attachGlowExtras, fadeGlowExtras, GLOW_TUNING, glowLightsFor, glowSettingsFor, SOLID_LIGHTS, updateFrameGuard } from '../src/orbital_glow';
-import { INITIAL_APPEARANCE } from '../src/design/appearance';
+import {
+    applyGlow, attachGlowExtras, clampGlow, effectiveGlow, fadeGlowExtras, GLOW_CAPS, GLOW_KNOBS, GLOW_TUNING, glowDefaults, glowLightsFor,
+    glowSettingsFor, SOLID_LIGHTS, tuneThumbnailGlow, updateFrameGuard,
+} from '../src/orbital_glow';
+import { INITIAL_APPEARANCE, type Appearance } from '../src/design/appearance';
 import { marchingCubes } from '../src/marching_cubes';
 
 const glowDark = { theme: 'dark' as const, finish: 'glow' as const, showAxes: true, lowPower: false };
@@ -304,5 +307,101 @@ describe('Glow (spec §11.2)', () => {
         suppress = updateFrameGuard(state, 400) || suppress;
         for (let i = 0; i < 10; i++) suppress = updateFrameGuard(state, 16.7) || suppress;
         expect(suppress).toBe(false);
+    });
+});
+
+// Task 16b ("Advanced appearance", owner R24-adv): the viewer's own Glow values on top of GLOW_TUNING.
+describe('Glow with the viewer\'s own values (Task 16b)', () => {
+    const extraOf = (group: THREE.Group, kind: 'halo' | 'lines') =>
+        (group.children.find(child => child.userData.isGlowExtra === kind) as THREE.Mesh).material as THREE.ShaderMaterial;
+
+    // The caps keep the phase colours recognisable: each range holds the owner's tuned value (R24-2c), on its step.
+    it('caps every knob around the owner\'s tuned values, which sit on each knob\'s step', () => {
+        expect(GLOW_CAPS).toEqual({
+            rimStrength: { min: 0, max: 1.5, step: 0.01, darkOnly: false },
+            rimPower: { min: 1, max: 5, step: 0.1, darkOnly: false },
+            emissive: { min: 0, max: 0.35, step: 0.01, darkOnly: false },
+            haloOpacity: { min: 0, max: 0.4, step: 0.01, darkOnly: true },
+            linesOpacity: { min: 0, max: 0.15, step: 0.005, darkOnly: false },
+            linesWhiten: { min: 0, max: 0.6, step: 0.01, darkOnly: false },
+            ownRimWhiten: { min: 0, max: 0.6, step: 0.01, darkOnly: true },
+        });
+        for (const theme of ['dark', 'light'] as const) {
+            const defaults = glowDefaults(theme);
+            for (const knob of GLOW_KNOBS) expect(clampGlow(knob, defaults[knob])).toBe(defaults[knob]);
+        }
+        expect(glowDefaults('dark')).toEqual({ rimStrength: 0.75, rimPower: 3, emissive: 0.11, haloOpacity: 0.1, linesOpacity: 0.02, linesWhiten: 0.2, ownRimWhiten: 0.51 });
+        expect(effectiveGlow('light', { haloOpacity: 0.3, ownRimWhiten: 0.4, rimStrength: 9 })).toEqual({ ...glowDefaults('light'), rimStrength: 1.5 });
+    });
+
+    it('draws with the overrides: rim, width, brightness and own-rim whitening as uniforms, without recompiling', () => {
+        const material = new THREE.MeshStandardMaterial({ vertexColors: true });
+        applyGlow(material, glowSettingsFor(glowDark), { phased: false });
+        const shader = shaderOf(material);
+        const version = material.version;
+        applyGlow(material, glowSettingsFor({ ...glowDark, glow: { rimStrength: 1.2, rimPower: 2, emissive: 0.3, ownRimWhiten: 0.2 } }), { phased: false });
+        expect(material.version).toBe(version);
+        expect(shader.uniforms.qlRimStrength.value).toBeCloseTo(1.2);
+        expect(shader.uniforms.qlRimPower.value).toBeCloseTo(2);
+        expect(shader.uniforms.qlEmissive.value).toBeCloseTo(0.3);
+        expect(shader.uniforms.qlOwnRimWhiten.value).toBeCloseTo(0.2);
+        // Body tint and edge wash are not knobs: the wash stays the tuned 0 whatever is asked.
+        applyGlow(material, glowSettingsFor({ ...glowDark, glow: { wash: 0.9 } as never }), { phased: false });
+        expect(shader.uniforms.qlWash.value).toBe(0);
+        expect(shader.uniforms.qlRimStrength.value).toBeCloseTo(GLOW_TUNING.dark.rimStrength);
+    });
+
+    // Ruling T15-b (science): on an ESP map white means a potential of about 0, so its rim is never whitened.
+    it('never whitens an ESP map\'s rim, whatever the setting; a density keeps the tuned or chosen value', () => {
+        expect(glowSettingsFor(glowDark, { esp: true })!.ownRimWhiten).toBe(0);
+        expect(glowSettingsFor({ ...glowDark, glow: { ownRimWhiten: 0.6 } }, { esp: true })!.ownRimWhiten).toBe(0);
+        expect(glowSettingsFor(glowDark)!.ownRimWhiten).toBe(0.51);
+        expect(glowSettingsFor({ ...glowDark, glow: { ownRimWhiten: 0.3 } })!.ownRimWhiten).toBe(0.3);
+        const group = new THREE.Group();
+        const surface = surfaceIn(group);
+        attachGlowExtras(group, surface, { ...glowDark, glow: { ownRimWhiten: 0.6 } }, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: false, esp: true });
+        expect((surface.material as THREE.MeshStandardMaterial).userData.glowUniforms.qlOwnRimWhiten.value).toBe(0);
+        attachGlowExtras(group, surface, { ...glowDark, glow: { ownRimWhiten: 0.6 } }, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: false });
+        expect((surface.material as THREE.MeshStandardMaterial).userData.glowUniforms.qlOwnRimWhiten.value).toBe(0.6);
+    });
+
+    it('retunes the halo and lines it keeps, in place, and fades them from the viewer\'s strengths', () => {
+        const group = new THREE.Group();
+        const surface = surfaceIn(group);
+        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        attachGlowExtras(group, surface, glowDark, options);
+        const [halo, lines] = [extraOf(group, 'halo'), extraOf(group, 'lines')];
+        const disposals = [halo, lines].map(material => jest.spyOn(material, 'dispose'));
+        attachGlowExtras(group, surface, { ...glowDark, glow: { haloOpacity: 0.3, linesOpacity: 0.1, linesWhiten: 0.5 } }, options);
+        expect([extraOf(group, 'halo'), extraOf(group, 'lines')]).toEqual([halo, lines]);
+        disposals.forEach(spy => expect(spy).not.toHaveBeenCalled());
+        expect(halo.uniforms.qlHaloOpacity.value).toBeCloseTo(0.3);
+        expect(lines.uniforms.qlLinesOpacity.value).toBeCloseTo(0.1);
+        expect(lines.uniforms.qlLinesWhiten.value).toBeCloseTo(0.5);
+        fadeGlowExtras(group, 0.5);
+        expect(halo.uniforms.qlHaloOpacity.value).toBeCloseTo(0.15);
+        expect(lines.uniforms.qlLinesOpacity.value).toBeCloseTo(0.05);
+    });
+
+    // R24-2c: a tile is "a little stronger at 72 px" than the view; with the viewer's values it keeps that ratio.
+    it('gives a tile the viewer\'s values at the tiles\' own ratios, and exactly the tuned tile values with none', () => {
+        const tile = (appearance: Appearance) => {
+            const group = new THREE.Group();
+            const surface = surfaceIn(group);
+            attachGlowExtras(group, surface, appearance, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: true });
+            tuneThumbnailGlow(group, surface, appearance);
+            return {
+                rim: (surface.material as THREE.MeshStandardMaterial).userData.glowUniforms.qlRimStrength.value as number,
+                halo: group.children.some(c => c.userData.isGlowExtra === 'halo') ? extraOf(group, 'halo').uniforms.qlHaloOpacity.value as number : undefined,
+                lines: extraOf(group, 'lines').uniforms.qlLinesOpacity.value as number,
+            };
+        };
+        expect(tile(glowDark)).toEqual({ rim: GLOW_TUNING.dark.thumb.rimStrength, halo: GLOW_TUNING.dark.thumb.haloOpacity, lines: GLOW_TUNING.dark.thumb.linesOpacity });
+        expect(tile({ ...glowDark, theme: 'light' })).toEqual({ rim: GLOW_TUNING.light.thumb.rimStrength, halo: undefined, lines: GLOW_TUNING.light.thumb.linesOpacity });
+        const tuned = tile({ ...glowDark, glow: { rimStrength: 1.5, haloOpacity: 0.2, linesOpacity: 0.04 } });
+        expect(tuned.rim).toBeCloseTo(GLOW_TUNING.dark.thumb.rimStrength * 2);
+        expect(tuned.halo).toBeCloseTo(GLOW_TUNING.dark.thumb.haloOpacity * 2);
+        expect(tuned.lines).toBeCloseTo(GLOW_TUNING.dark.thumb.linesOpacity * 2);
+        expect(tile({ ...glowDark, glow: { rimStrength: 0 } }).rim).toBe(0);
     });
 });

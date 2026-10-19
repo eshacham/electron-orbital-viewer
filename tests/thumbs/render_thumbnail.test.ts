@@ -216,6 +216,22 @@ describe('createThumbnailRenderer (spec §12: a target on the main renderer)', (
         expect((surface(lightTile).material as THREE.MeshStandardMaterial).userData.glowUniforms.qlRimStrength.value).toBe(GLOW_TUNING.light.thumb.rimStrength);
         expect(uniformsOf(extra(lightTile, 'lines')).qlLinesOpacity.value).toBe(GLOW_TUNING.light.thumb.linesOpacity);
     });
+
+    // Task 16b: the viewer's own Glow values (the appearance the service hands over: the settled ones) reach
+    // the tile at the tiles' own ratios to the view (R24-2c); emissive and width as the view has them.
+    it('wears the viewer\'s own Glow values, at the tiles\' ratios to the view', async () => {
+        const { renderer, seen } = stubRenderer();
+        const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer, { pixelRatio: () => 1 });
+        await thumbs.render(triangle(), { ...glow, theme: 'dark', glow: { rimStrength: 1.5, haloOpacity: 0.2, emissive: 0.3, rimPower: 2 } });
+        const [tile] = seen;
+        const surface = tile.meshes.find(mesh => !mesh.userData.isGlowExtra)!;
+        const uniforms = (surface.material as THREE.MeshStandardMaterial).userData.glowUniforms;
+        expect(uniforms.qlRimStrength.value).toBeCloseTo(GLOW_TUNING.dark.thumb.rimStrength * 1.5 / GLOW_TUNING.dark.rimStrength);
+        expect(uniforms.qlEmissive.value).toBeCloseTo(0.3);
+        expect(uniforms.qlRimPower.value).toBeCloseTo(2);
+        const halo = tile.meshes.find(mesh => mesh.userData.isGlowExtra === 'halo')!;
+        expect((halo.material as THREE.ShaderMaterial).uniforms.qlHaloOpacity.value).toBeCloseTo(GLOW_TUNING.dark.thumb.haloOpacity * 2);
+    });
 });
 
 // Ruling R20d: the picture is at least 3× the tile's CSS size, at least 2× its device size, and a whole
@@ -253,6 +269,20 @@ describe('createThumbnailRenderer colourings (Task 10)', () => {
         const surface = seen[0].meshes[0];
         expect(coloursOf(surface)).toEqual(Array.from(espVertexColors(mesh.positions, grid, 0.05).colors));
         expect(signsOf(surface)).toEqual([0, 0, 0]);
+    });
+
+    // Ruling T15-b (science): on an ESP map white means a potential of about 0 -- an ESP tile's rim is never
+    // whitened, as in the main view; a density tile keeps the tuned 0.51 (or the viewer's own value).
+    it('never whitens an ESP tile\'s rim; a density tile keeps the tuned or the viewer\'s own whitening', async () => {
+        const { renderer, seen } = stubRenderer();
+        const thumbs = createThumbnailRenderer(renderer as unknown as THREE.WebGLRenderer, { pixelRatio: () => 1 });
+        const grid: ScalarGrid = { shape: [2, 2, 2], origin: [0, 0, 0], spacing: 1, values: new Float32Array(8) };
+        const whitenOf = (index: number) => (seen[index].meshes[0].material as THREE.MeshStandardMaterial).userData.glowUniforms.qlOwnRimWhiten.value;
+        await thumbs.render(triangle(), dark, DEFAULT_OPACITY, true, { kind: 'esp', grid, limit: 0.05 });
+        await thumbs.render(triangle(), { ...dark, glow: { ownRimWhiten: 0.6 } }, DEFAULT_OPACITY, true, { kind: 'esp', grid, limit: 0.05 });
+        await thumbs.render(triangle(), dark, DEFAULT_OPACITY, true, 'density');
+        await thumbs.render(triangle(), { ...dark, glow: { ownRimWhiten: 0.3 } }, DEFAULT_OPACITY, true, 'density');
+        expect([0, 1, 2, 3].map(whitenOf)).toEqual([0, 0, GLOW_TUNING.dark.ownRimWhiten, 0.3]);
     });
 
     it('draws the phase colours when asked for them, exactly as without a colouring', async () => {
@@ -310,6 +340,19 @@ describe('the cache key identifies the bitmap', () => {
         expect(keyAt(1)).not.toBe(keyAt(1.5));
         expect(thumbnailSize(4 / 3)).toBe(thumbnailSize(2));
         expect(keyAt(4 / 3)).not.toBe(keyAt(2));
+    });
+
+    // Task 16b: the viewer's own Glow values are part of the look -- a tuned look is filed apart, the untuned
+    // key is as before, and the Solid finish (which has no Glow) ignores them.
+    it('carries the viewer\'s own Glow values while Glow is the finish, in a fixed order', () => {
+        const key = (glow: Record<string, number> | undefined, finish: 'glow' | 'solid' = 'glow') =>
+            thumbLookKey({ appearance: { ...look, finish, glow }, opacity: 0.7, size: 72 });
+        expect(key(undefined)).toBe('dark|glow|full|72|0.7');
+        expect(key({})).toBe('dark|glow|full|72|0.7');
+        expect(key({ rimStrength: 1.2, haloOpacity: 0.2 })).toBe('dark|glow|full|72|0.7|glow:haloOpacity=0.2,rimStrength=1.2');
+        expect(key({ haloOpacity: 0.2, rimStrength: 1.2 })).toBe(key({ rimStrength: 1.2, haloOpacity: 0.2 }));
+        expect(key({ rimStrength: 1.3 })).not.toBe(key({ rimStrength: 1.2 }));
+        expect(key({ rimStrength: 1.2 }, 'solid')).toBe('dark|solid|full|72|0.7');
     });
 
     it('is the size of the bitmap the renderer hands back, at every ratio', async () => {

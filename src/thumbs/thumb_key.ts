@@ -62,7 +62,11 @@ export function thumbOpacityOf(opacity: number): number {
 }
 
 export interface ThumbLook {
-    appearance: Pick<Appearance, 'theme' | 'finish' | 'lowPower'>;
+    /**
+     * `glow`: the viewer's own Glow values (Task 16b) as last SETTLED
+     * (glow_pref.ts's settledGlowPref), never the live drag values.
+     */
+    appearance: Pick<Appearance, 'theme' | 'finish' | 'lowPower' | 'glow'>;
     /** The main view's committed opacity (orbitalSlice's thumbOpacity). */
     opacity: number;
     /**
@@ -73,9 +77,15 @@ export interface ThumbLook {
     size: number;
 }
 
-/** theme|finish|power|size|opacity. */
+/**
+ * theme|finish|power|size|opacity, then -- only while Glow is the finish and
+ * the viewer has tuned it (Task 16b) -- |glow:<knob>=<value>,... in a fixed
+ * order, so a tuned look is filed apart and the untuned key is unchanged.
+ */
 export function thumbLookKey({ appearance: a, opacity, size }: ThumbLook): string {
-    return `${a.theme}|${a.finish}|${a.lowPower ? 'low' : 'full'}|${size}|${thumbOpacityOf(opacity)}`;
+    const base = `${a.theme}|${a.finish}|${a.lowPower ? 'low' : 'full'}|${size}|${thumbOpacityOf(opacity)}`;
+    const tuned = a.finish === 'glow' && a.glow ? Object.entries(a.glow).filter(([, value]) => value !== undefined).sort(([x], [y]) => (x < y ? -1 : 1)) : [];
+    return tuned.length > 0 ? `${base}|glow:${tuned.map(([knob, value]) => `${knob}=${value}`).join(',')}` : base;
 }
 
 /**

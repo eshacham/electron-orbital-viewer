@@ -379,3 +379,76 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         expect(oxygen.userData.glowUniforms.qlEmissive.value).toBe(0);
     });
 });
+
+// Task 16b ("Advanced appearance"): a slider moves the viewer's own Glow values; the main view follows at once,
+// through Glow's uniforms only. Ruling T15-b: the ESP map's rim is never whitened.
+describe('the viewer\'s own Glow values on the drawn surface (Task 16b)', () => {
+    beforeEach(() => { jest.spyOn(console, 'log').mockImplementation(() => {}); });
+    afterEach(() => { (console.log as jest.Mock).mockRestore(); });
+
+    const glow: Appearance = { theme: 'dark', finish: 'glow', showAxes: true, lowPower: false };
+    const uniformsOf = (mesh: THREE.Mesh) => (mesh.material as THREE.MeshStandardMaterial).userData.glowUniforms;
+    const extraOf = (context: VisualizerContext, kind: 'halo' | 'lines') =>
+        (context.currentOrbitalGroup!.children.find(child => child.userData.isGlowExtra === kind) as THREE.Mesh).material as THREE.ShaderMaterial;
+
+    it('follows a slider through the uniforms alone: no repaint, no recompile, no new extras, no fresh frame-time look', async () => {
+        const context = buildContext();
+        context.frameGuard = { ema: 16, frames: 0 };
+        context.lights = { ambient: new THREE.AmbientLight(0xffffff, 0.5), key: new THREE.DirectionalLight(0xffffff, 0.8), fill: new THREE.DirectionalLight(0xffffff, 0.35) };
+        await drawOrbital(context);
+        setAppearance(context, glow);
+        const surface = surfaceOf(context);
+        const material = surface.material as THREE.MeshStandardMaterial;
+        const [halo, lines] = [extraOf(context, 'halo'), extraOf(context, 'lines')];
+        const version = material.version;
+        const colours = surface.geometry.getAttribute('color') as THREE.BufferAttribute;
+        const colourVersion = colours.version;
+        const repaint = jest.spyOn(surface.userData, 'applyAppearance');
+        context.frameGuard.frames = 90;
+
+        setAppearance(context, { ...glow, glow: { rimStrength: 1.2, rimPower: 2, emissive: 0.3, haloOpacity: 0.3, linesOpacity: 0.1, linesWhiten: 0.5 } });
+        expect(uniformsOf(surface).qlRimStrength.value).toBeCloseTo(1.2);
+        expect(uniformsOf(surface).qlRimPower.value).toBeCloseTo(2);
+        expect(uniformsOf(surface).qlEmissive.value).toBeCloseTo(0.3);
+        expect(halo.uniforms.qlHaloOpacity.value).toBeCloseTo(0.3);
+        expect(lines.uniforms.qlLinesOpacity.value).toBeCloseTo(0.1);
+        expect(lines.uniforms.qlLinesWhiten.value).toBeCloseTo(0.5);
+        expect([extraOf(context, 'halo'), extraOf(context, 'lines')]).toEqual([halo, lines]);
+        expect(material.version).toBe(version);
+        expect(colours.version).toBe(colourVersion);
+        expect(repaint).not.toHaveBeenCalled();
+        expect(context.frameGuard.frames).toBe(90);
+        expect(context.lights.ambient.intensity).toBe(GLOW_TUNING.dark.lights.ambient);
+
+        // Reset to default: the owner's values again, exactly.
+        setAppearance(context, glow);
+        expect(uniformsOf(surface).qlRimStrength.value).toBe(GLOW_TUNING.dark.rimStrength);
+        expect(halo.uniforms.qlHaloOpacity.value).toBe(GLOW_TUNING.dark.halo.opacity);
+        expect(lines.uniforms.qlLinesOpacity.value).toBe(GLOW_TUNING.dark.lines.opacity);
+        expect(material.version).toBe(version);
+    });
+
+    it('takes the viewer\'s values for a theme together with the theme', async () => {
+        const context = buildContext();
+        await drawOrbital(context);
+        setAppearance(context, { ...glow, glow: { rimStrength: 1.2 } });
+        setAppearance(context, { ...glow, theme: 'light', glow: { rimStrength: 0.4 } });
+        expect(uniformsOf(surfaceOf(context)).qlRimStrength.value).toBeCloseTo(0.4);
+        expect(uniformsOf(surfaceOf(context)).qlInk.value).toBe(1);
+    });
+
+    // Ruling T15-b (science): on an ESP map white means ≈ 0 potential, so its rim is never whitened -- in the
+    // tuned look or with the viewer's own setting; the density's surface keeps the tuned 0.51 or the viewer's value.
+    it('never whitens the ESP map\'s rim; the density keeps the tuned or the viewer\'s whitening', () => {
+        const context = buildContext();
+        setAppearance(context, glow);
+        presentFieldMesh(context, meshData(), { vertexColors: new Float32Array(9).fill(0.5), boxRMax: 20 });
+        expect(uniformsOf(surfaceOf(context)).qlOwnRimWhiten.value).toBe(0);
+        setAppearance(context, { ...glow, glow: { ownRimWhiten: 0.6 } });
+        expect(uniformsOf(surfaceOf(context)).qlOwnRimWhiten.value).toBe(0);
+        presentFieldMesh(context, meshData(), { boxRMax: 20 });
+        expect(uniformsOf(surfaceOf(context)).qlOwnRimWhiten.value).toBe(0.6);
+        setAppearance(context, glow);
+        expect(uniformsOf(surfaceOf(context)).qlOwnRimWhiten.value).toBe(GLOW_TUNING.dark.ownRimWhiten);
+    });
+});

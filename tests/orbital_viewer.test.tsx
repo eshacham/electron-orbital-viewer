@@ -76,6 +76,7 @@ import { neonProfile } from './export/fixtures';
 import { framingRadiusFor } from '../src/atom/framing';
 import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes, attachThumbnails, standardViewDirection, standardViewAxis } from '../src/orbital_visualizer';
 import { themeChoicePref } from '../src/design/theme_storage';
+import { GLOW_SETTLE_MS, setGlowKnob } from '../src/design/glow_pref';
 import { DEFAULT_DISPLAY, DEFAULT_RENDER, displayPref, renderPref, hintPref } from '../src/design/presentation';
 import { metaLoaded, selectMolecule, setSurface } from '../src/store/moleculeSlice';
 import { captureViewPng } from '../src/export/png';
@@ -754,6 +755,28 @@ describe('OrbitalViewer: appearance', () => {
         expect(appearance).toMatchObject({ finish: 'solid' });
         expect(Object.keys(appearance).sort()).toEqual(['finish', 'lowPower', 'showAxes', 'theme']);
         window.localStorage.clear();
+    });
+});
+
+// Task 16b ("Advanced appearance"): the viewer's own Glow values reach the main view at once -- an appearance
+// with only `glow` changed -- and the thumbnails' appearance only once the sliders rest, as the strip's key does.
+describe('OrbitalViewer: the viewer\'s own Glow values (Task 16b)', () => {
+    it('hands them to the renderer live, and to the thumbnail host once they have settled', async () => {
+        act(() => { themeChoicePref.set('dark'); });
+        jest.clearAllMocks();
+        render(<Provider store={createAppStore()}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        const host = (attachThumbnails as jest.Mock).mock.calls.at(-1)![2] as { appearance(): { glow?: unknown } };
+        expect((setAppearance as jest.Mock).mock.calls.at(-1)![1]).not.toHaveProperty('glow');
+        act(() => { setGlowKnob('dark', 'rimStrength', 1.1); });
+        act(() => { setGlowKnob('dark', 'rimStrength', 1.2); });
+        expect(setAppearance).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ theme: 'dark', glow: { rimStrength: 1.2 } }));
+        expect(host.appearance().glow).toBeUndefined();
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, GLOW_SETTLE_MS + 50)); });
+        expect(host.appearance().glow).toEqual({ rimStrength: 1.2 });
+        // The other theme's values are its own: Light Clean has none.
+        act(() => { themeChoicePref.set('light'); });
+        expect((setAppearance as jest.Mock).mock.calls.at(-1)![1]).not.toHaveProperty('glow');
+        expect(host.appearance().glow).toBeUndefined();
     });
 });
 

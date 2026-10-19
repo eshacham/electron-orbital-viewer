@@ -17,6 +17,8 @@ import { THUMB_TILE_PX, thumbLookKey, thumbTileDevicePx } from '../../src/thumbs
 import { CANVAS_BACKDROPS, SHADOWS, TOKENS, TYPE } from '../../src/design/tokens';
 import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 import { useDevicePixelRatio } from '../../src/thumbs/useDevicePixelRatio';
+import { usePref } from '../../src/design/usePref';
+import { GLOW_SETTLE_MS, glowOverridesOf, setGlowKnob, settledGlowPref } from '../../src/design/glow_pref';
 
 const profile = neonProfile();
 const rGrid = Array.from({ length: profile.size }, (_, j) => profile.rMin * Math.exp(j * profile.dx));
@@ -310,6 +312,47 @@ describe('ThumbnailStrip and the committed opacity', () => {
         act(() => { store.dispatch(setSurfaceStyle({ opacity: 0.4 })); });
         expect(request).toHaveBeenCalledTimes(2 * orbitalTiles);
         expect(keyNow()).toBe('dark|glow|full|288|0.4');
+    });
+});
+
+// Task 16b ("Advanced appearance"): the viewer's own Glow values are part of the tiles' look, but as SETTLED
+// (settledGlowPref) -- a slider drag asks the service for nothing; GLOW_SETTLE_MS after it rests, every tile
+// is asked for once, under a key that names the new values.
+describe('ThumbnailStrip and the viewer\'s own Glow values', () => {
+    afterEach(() => { act(() => { thumbnailService.detach(); }); jest.restoreAllMocks(); jest.useRealTimers(); window.localStorage.clear(); });
+
+    it('re-requests the tiles once a slider has rested, and never while it is dragged', () => {
+        jest.useFakeTimers();
+        const look = { theme: 'dark' as const, finish: 'glow' as const, lowPower: false };
+        const keys: string[] = [];
+        thumbnailService.attach({
+            createWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            createGridWorker: () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker,
+            isBusy: () => false, themeKey: () => keys.at(-1)!, render: () => new Promise(() => {}),
+        });
+        const request = jest.spyOn(thumbnailService, 'request');
+        function Strip() {
+            const glow = glowOverridesOf(usePref(settledGlowPref), 'dark');
+            const key = thumbLookKey({ appearance: { ...look, glow }, opacity: 0.9, size: 72 });
+            keys.push(key);
+            return <ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} onSelect={jest.fn()} themeKey={key} />;
+        }
+        render(<Strip />);
+        const orbitalTiles = items.filter(item => item.thumb.kind === 'orbital').length;
+        expect(request).toHaveBeenCalledTimes(orbitalTiles);
+        expect(keys.at(-1)).toBe('dark|glow|full|72|0.9');
+
+        // A drag: ticks 50 ms apart, then held still for less than the settle time.
+        for (const value of [0.8, 0.9, 1.0, 1.1, 1.2]) {
+            act(() => { setGlowKnob('dark', 'rimStrength', value); jest.advanceTimersByTime(50); });
+        }
+        act(() => { jest.advanceTimersByTime(GLOW_SETTLE_MS - 51); });
+        expect(request).toHaveBeenCalledTimes(orbitalTiles);
+        expect(keys.at(-1)).toBe('dark|glow|full|72|0.9');
+
+        act(() => { jest.advanceTimersByTime(1); });
+        expect(request).toHaveBeenCalledTimes(2 * orbitalTiles);
+        expect(keys.at(-1)).toBe('dark|glow|full|72|0.9|glow:rimStrength=1.2');
     });
 });
 

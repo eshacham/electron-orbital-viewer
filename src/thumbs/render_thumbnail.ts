@@ -182,9 +182,11 @@ export function createThumbnailRenderer(
         // Review A, M4: honour the main view's R10 frame-time latch (extrasSuppressed),
         // not just appearance.lowPower -- a latched main view no longer draws lines/halo
         // either, and the strip must not disagree once the device has shown it is slow.
-        attachGlowExtras(group, mesh, appearance, { radius, clippingPlanes: [], solid: true, extrasAllowed });
+        // Ruling T15-b: an ESP tile, like the ESP map in the main view, never whitens its rim.
+        attachGlowExtras(group, mesh, appearance, { radius, clippingPlanes: [], solid: true, extrasAllowed, esp: typeof colouring === 'object' });
         const glowing = glowSettingsFor(appearance) !== null;
-        if (glowing) tuneThumbnailGlow(group, mesh, appearance.theme);
+        // Task 16b: the viewer's own Glow values (appearance.glow, as settled), at the tiles' ratios.
+        if (glowing) tuneThumbnailGlow(group, mesh, appearance);
         const levels = glowing ? GLOW_TUNING[appearance.theme].thumb.lights : SOLID_LIGHTS;
         ambient.intensity = levels.ambient;
         key.intensity = levels.key;
