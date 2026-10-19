@@ -63,8 +63,14 @@ export function viewTitle(state: RootState): ViewTitle {
         const system = BONDS_SYSTEMS.find(entry => entry.id === state.bonds.system);
         return { title: system ? `${system.formula} — ${system.name}` : 'Bonds', subtitle: viewDescription(state) };
     }
-    const meta = state.molecule.meta;
-    return meta
-        ? { title: moleculeTitle(meta), subtitle: viewDescription(state) }
-        : { title: 'Molecules', subtitle: 'Choose a molecule' };
+    const { meta, surface, representation } = state.molecule;
+    if (!meta) return { title: 'Molecules', subtitle: 'Choose a molecule' };
+    // Ruling P8: no surface (show=none) draws the structure alone, whose one method is where its geometry came from.
+    if (surface.kind === 'none') {
+        return {
+            title: moleculeTitle(meta),
+            subtitle: representation === 'none' ? 'No surface or structure drawn' : `Structure only · geometry: ${meta.geometrySource}`,
+        };
+    }
+    return { title: moleculeTitle(meta), subtitle: viewDescription(state) };
 }

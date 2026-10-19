@@ -1,6 +1,8 @@
 import { drillToOrbital, drillToShell, drillToSubshell, setMode } from '../../src/store/atomSlice';
 import { viewTitle } from '../../src/shell/view_title';
+import { selectMolecule, metaLoaded, setSurface, setRepresentation } from '../../src/store/moleculeSlice';
 import { neonStore, sodiumIonStore } from '../export/fixtures';
+import { waterMeta } from '../molecules/fixtures';
 
 describe('viewTitle (spec §9.1 "Viewport")', () => {
     it('names the species and the level, and states what is drawn and how', () => {
@@ -31,5 +33,18 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         expect(viewTitle(store.getState()).title).toBe('Hydrogen — 3d_z² orbital');
         store.dispatch(setMode('molecule'));
         expect(viewTitle(store.getState())).toEqual({ title: 'Molecules', subtitle: 'Choose a molecule' });
+    });
+
+    // Ruling P8 (spec §9.4): show=none draws the structure alone; the subtitle says so, with where its
+    // geometry came from -- the one method a structure has.
+    it('says a structure-only view is the structure, and where its geometry came from', () => {
+        const store = neonStore();
+        store.dispatch(setMode('molecule'));
+        store.dispatch(selectMolecule({ id: 'h2o' }));
+        store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        store.dispatch(setSurface({ kind: 'none' }));
+        expect(viewTitle(store.getState())).toEqual({ title: 'Water (H₂O)', subtitle: 'Structure only · geometry: experiment (CCCBDB)' });
+        store.dispatch(setRepresentation('none'));
+        expect(viewTitle(store.getState()).subtitle).toBe('No surface or structure drawn');
     });
 });

@@ -17,7 +17,7 @@ import { DIATOMIC_IDS, DENSITY_ISO_VALUES } from '../src/bonds/systems';
 import { H2PLUS_STATES } from '../src/bonds/h2plus';
 import { registerMoleculeUrlKeys } from '../src/molecules/url_keys';
 import { registerComputedUrlKeys } from '../src/jobs/url_keys';
-import { selectMolecule, setShowDipole, setShowStructure, MoleculeSurface } from '../src/store/moleculeSlice';
+import { selectMolecule, setShowDipole, setShowStructure, setRepresentation, MoleculeSurface } from '../src/store/moleculeSlice';
 import type { OrbitalSpin } from '../src/molecules/types';
 import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../src/orbital_presets';
 import { CombinationSelection, selectionProblem, fieldRequestFor } from '../src/combinations';
@@ -227,10 +227,12 @@ function randomView(rand: () => number, shape: Shape) {
         // selectMolecule's own surface field, not setSurface -- a link's id
         // and show arrive together, and (unlike setSurface) there is no
         // meta yet to validate an mo index against (moleculeSlice.ts).
-        const kind = pick(['density', 'esp', 'mo'] as const);
+        // Task 13 (ruling P8): show=none and the three representations are link state too.
+        const kind = pick(['density', 'esp', 'mo', 'none'] as const);
         const surface: MoleculeSurface = kind === 'mo' ? { kind: 'mo', index: int(0, 30) } : { kind };
         store.dispatch(selectMolecule({ id: pick(MOLECULE_SELECTIONS), surface }));
-        store.dispatch(setShowStructure(rand() < 0.8));
+        if (rand() < 0.5) store.dispatch(setShowStructure(rand() < 0.8));
+        else store.dispatch(setRepresentation(pick(['ball-and-stick', 'space-filling', 'none'] as const)));
         store.dispatch(setShowDipole(rand() < 0.8));
     } else {
         const Z = int(1, 118);
@@ -299,10 +301,11 @@ function viewOf(state: RootState) {
             ? { system: bonds.system, R: bonds.R, view: bonds.view, densityIso: bonds.view.kind === 'density' ? bonds.densityIso : null }
             : null,
         // What a Molecules link promises to restore (molecules/url_keys.ts):
-        // id, surface and the two toggles -- not meta/pick/render state,
+        // id, surface, representation and the dipole toggle -- not meta/pick/render state,
         // which a link never carries (meta is reloaded, Task 15's brief).
         molecule: atom.mode === 'molecule'
-            ? { id: molecule.selectedId, surface: molecule.surface, showStructure: molecule.showStructure, showDipole: molecule.showDipole }
+            // Task 13 (ruling P8): the representation replaced the showStructure boolean.
+            ? { id: molecule.selectedId, surface: molecule.surface, representation: molecule.representation, showDipole: molecule.showDipole }
             : null,
         // The contour on screen (final review I1), which a link must reproduce.
         frac: selectShownEnclosedFraction(state),

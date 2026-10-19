@@ -1388,6 +1388,26 @@ html, body, #root {
   gap: 2px;
 }
 
+/* Ruling P8: the Structure segments share the row equally; Space filling sits in a
+   wrapper (its disabled reason's tooltip), which must size like a segment itself. A
+   percentage basis, not 0: a button's padding and border would otherwise floor its
+   share above the bare wrapper's. */
+.molecule-structure-controls .MuiToggleButtonGroup-root > * {
+  flex: 1 1 33.333%;
+  min-width: 0;
+}
+.molecule-structure-segment {
+  display: flex;
+}
+.molecule-structure-segment > .MuiToggleButton-root {
+  flex: 1 1 auto;
+}
+.molecule-structure-controls .MuiToggleButton-root {
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
 /* Ruling R23f: the Explore panel's own content, split into a scrolling part
    (MoleculeNav -- picker, surface switch and, under it, the orbital list
    that used to be Task 16's `.molecule-orbital-card` in the plot slot --

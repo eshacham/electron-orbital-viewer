@@ -1516,6 +1516,17 @@ export function presentFieldMesh(context: VisualizerContext | null, meshData: Me
     return surfaceRadius;
 }
 
+/**
+ * Structure only (`show=none`, ruling P8): there is no surface to fit, so the
+ * camera fits the structure -- a sphere of `structureRadius` -- keyed to the
+ * molecule's box as a surface is, so a surface chosen next at the same box
+ * keeps this camera (presentFieldMesh re-frames only when the box changes).
+ */
+export function frameStructure(context: VisualizerContext | null, structureRadius: number, boxRMax: number): void {
+    if (!context || context.isDisposed) return;
+    frameToSurface(context, structureRadius, boxRMax, context.framedBox !== boxRMax, false);
+}
+
 /** Clears the surface (not the overlay), e.g. on entering Molecules with nothing chosen yet (D20: reuses clearScene). */
 export function clearFieldMesh(context: VisualizerContext | null): void {
     clearScene(context);

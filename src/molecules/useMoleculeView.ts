@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { renderCancelled, renderFailed, renderFinished, renderStarted, setPick, MoleculePick } from '../store/moleculeSlice';
 import {
-    cancelPendingRender, clearFieldMesh, pointerRaycaster, presentFieldMesh, setMoleculeOverlay, updateFieldInScene, VisualizerContext,
+    cancelPendingRender, clearFieldMesh, frameStructure, pointerRaycaster, presentFieldMesh, setMoleculeOverlay, updateFieldInScene,
+    VisualizerContext,
 } from '../orbital_visualizer';
 import { createGridMeshWorker } from '../workers/createGridMeshWorker';
 import { isSuperseded, runMeshWorker } from './mesh_worker_client';
@@ -11,7 +12,7 @@ import type { GridMeshRequest } from './grid_mesh_request';
 import { getDensityGrid, getEspGrid } from './grid_cache';
 import { loadBasis } from './loader';
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY, espVertexColors } from './esp_color';
-import { buildBallAndStick, detectBonds, pickMoleculePart } from './ball_and_stick';
+import { buildBallAndStick, buildSpaceFilling, detectBonds, pickMoleculePart, structureExtent } from './ball_and_stick';
 import { dipoleArrow } from './dipole';
 import { gridHalfWidth, planMoleculeRender } from './render_plan';
 
@@ -20,8 +21,9 @@ const samePick = (a: MoleculePick | null, b: MoleculePick | null) => a?.kind ===
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
- * Molecules mode's scene: the surface (density, ESP-coloured density, or an
- * MO), the structure overlay, and picking. Each surface request is numbered;
+ * Molecules mode's scene: the surface (density, ESP-coloured density, an
+ * MO, or none), the structure overlay (ball and stick, space filling or
+ * none), and picking. Each surface request is numbered;
  * a result that is no longer the newest is dropped, so a slow load for one
  * molecule can never land under another's structure.
  *
@@ -34,7 +36,7 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
     const dispatch = useAppDispatch();
     const meta = useAppSelector(state => state.molecule.meta);
     const surface = useAppSelector(state => state.molecule.surface);
-    const showStructure = useAppSelector(state => state.molecule.showStructure);
+    const representation = useAppSelector(state => state.molecule.representation);
     const showDipole = useAppSelector(state => state.molecule.showDipole);
     const requestRef = useRef(0);
 
@@ -44,11 +46,13 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
         if (!context) return;
         if (!active || !meta) { setMoleculeOverlay(context, null); return; }
         const group = new THREE.Group();
-        if (showStructure) group.add(buildBallAndStick(meta.atoms, detectBonds(meta.atoms)));
+        // Ruling P8. The slice never holds space filling for a molecule it cannot be drawn for (ruling P8b).
+        if (representation === 'ball-and-stick') group.add(buildBallAndStick(meta.atoms, detectBonds(meta.atoms)));
+        else if (representation === 'space-filling') group.add(buildSpaceFilling(meta.atoms));
         const arrow = showDipole ? dipoleArrow(meta) : null;
         if (arrow) group.add(arrow);
         setMoleculeOverlay(context, group);
-    }, [contextRef, active, meta, showStructure, showDipole]);
+    }, [contextRef, active, meta, representation, showDipole]);
 
     // Nothing chosen yet (or the next molecule still loading): do not leave
     // the previous mode's, or the previous molecule's, picture up.
@@ -61,6 +65,15 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
         if (!context || !active || !meta) return;
         const plan = planMoleculeRender(meta, surface, enclosedFraction);
         const requestId = ++requestRef.current;
+        if (plan.kind === 'clear') {
+            // Structure only (ruling P8): the request number above already
+            // supersedes anything still landing; stop it, take the surface
+            // down, and frame the structure (a link may open straight on it).
+            cancelPendingRender(context);
+            clearFieldMesh(context);
+            frameStructure(context, structureExtent(meta.atoms), gridHalfWidth(meta));
+            return;
+        }
         const current = () => requestRef.current === requestId && !context.isDisposed;
         let landed = false;
         // What this request draws, reported with its landing (exports read it, Task 16b).

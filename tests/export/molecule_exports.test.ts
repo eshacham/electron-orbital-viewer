@@ -12,7 +12,7 @@ jest.mock('../../src/molecules/loader', () => ({ ...jest.requireActual('../../sr
 
 import {
     runExport, exportAvailability, exportItemsFor, moleculeCubeJob, EXPORT_ITEMS, ExportKind,
-    PICTURE_BUSY_REASON, NOTHING_DRAWN_REASON, MOLECULE_NONE_REASON, MOLECULE_LOADING_REASON,
+    PICTURE_BUSY_REASON, NOTHING_DRAWN_REASON, MOLECULE_NONE_REASON, MOLECULE_LOADING_REASON, STRUCTURE_ONLY_REASON,
 } from '../../src/export/run_export';
 import { exportFileStem, methodStatement, moleculeDrawnPicture, viewDescription } from '../../src/export/caption';
 import { buildCubeBlob, CubeRequest } from '../../src/export/cube_request';
@@ -222,6 +222,17 @@ describe('refusal reasons (never the Basic Orbitals fallthrough)', () => {
 
     it('nothing landed yet', () => {
         expectAll(exportAvailability(loadedStore().getState()), PICTURE_KINDS, NOTHING_DRAWN_REASON);
+    });
+
+    // Ruling P8: show=none draws no surface on purpose -- not "yet", and not busy -- so the picture
+    // exports say that; the orbital table does not depend on the picture.
+    it('structure only: no surface to export, said as a choice rather than a wait', () => {
+        const store = drawnStore({ kind: 'density' });
+        store.dispatch(setSurface({ kind: 'none' }));
+        const availability = exportAvailability(store.getState());
+        expectAll(availability, PICTURE_KINDS, STRUCTURE_ONLY_REASON);
+        expect(STRUCTURE_ONLY_REASON).toBe('Structure only: no surface is drawn. Choose Density, Electrostatic potential or Orbitals to export one.');
+        expect(availability.csv).toBeNull();
     });
 
     it('a render in flight refuses every picture export (the orbital table does not depend on it)', async () => {

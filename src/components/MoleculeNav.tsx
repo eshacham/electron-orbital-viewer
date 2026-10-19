@@ -56,12 +56,14 @@ const MoleculeNav: React.FC<MoleculeNavProps> = ({
                     <ToggleButtonGroup exclusive size="small" fullWidth aria-label="surface" className="molecule-surface-toggle"
                         value={surface.kind}
                         onChange={(_event, kind: MoleculeSurface['kind'] | null) => {
-                            if (kind === 'density' || kind === 'esp') onSurfaceChange({ kind });
+                            if (kind === 'density' || kind === 'esp' || kind === 'none') onSurfaceChange({ kind });
                             else if (kind === 'mo' && homo) onSurfaceChange({ kind: 'mo', index: homo.index });
                         }}>
                         <ToggleButton value="density">Density</ToggleButton>
                         <ToggleButton value="esp">Electrostatic potential</ToggleButton>
                         <ToggleButton value="mo">Orbitals</ToggleButton>
+                        {/* Ruling P8: structure only (show=none); the name holds the visible label (WCAG 2.5.3). */}
+                        <ToggleButton value="none" aria-label="None (no surface)">None</ToggleButton>
                     </ToggleButtonGroup>
                     {/* Ruling R23f: the orbital list (and its legend) lives in
                         the Explore panel now, under this switch, on every

@@ -4,9 +4,12 @@ import type { LibraryMoleculeMeta, MoleculePick } from '../molecules/library_typ
 import { setMode } from './atomSlice';
 import { isJobKey } from '../molecules/job_paths';
 import { shortKey } from '../jobs/format';
+import type { Representation } from '../molecules/ball_and_stick';
+import { spaceFillingUnavailableReason } from '../molecules/vdw_radii';
 
-export type { MoleculePick };
-export type MoleculeSurface = { kind: 'density' } | { kind: 'esp' } | { kind: 'mo'; index: number };
+export type { MoleculePick, Representation };
+/** `none` (ruling P8, `show=none`): no surface -- the structure alone. */
+export type MoleculeSurface = { kind: 'density' } | { kind: 'esp' } | { kind: 'mo'; index: number } | { kind: 'none' };
 
 /**
  * The surface on the canvas now, as the render that drew it asked for it
@@ -33,7 +36,8 @@ export interface MoleculeState {
     isLoadingMeta: boolean;
     error: string | null;
     surface: MoleculeSurface;
-    showStructure: boolean;
+    /** Ruling P8: replaces the ball-and-stick boolean (`setShowStructure` stays as its alias). */
+    representation: Representation;
     showDipole: boolean;
     pick: MoleculePick | null;
     loadNonce: number;
@@ -47,11 +51,20 @@ export interface MoleculeState {
 
 const initialState: MoleculeState = {
     index: null, indexError: null, selectedId: null, meta: null, isLoadingMeta: false, error: null,
-    surface: { kind: 'density' }, showStructure: true, showDipole: true, pick: null, loadNonce: 0,
+    surface: { kind: 'density' }, representation: 'ball-and-stick', showDipole: true, pick: null, loadNonce: 0,
     renderLabel: null, renderError: null, isoLevel: null, espRange: null, drawn: null,
 };
 
 const hasOrbital = (meta: LibraryMoleculeMeta | null, index: number) => !!meta && meta.orbitals.some(o => o.index === index);
+/** Ruling P8b: space filling needs a tabulated radius for every element of the molecule (known once its meta is in). */
+const spaceFillingRefused = (meta: LibraryMoleculeMeta | null) => !!meta && spaceFillingUnavailableReason(meta.atoms) !== null;
+
+/** Space filling is refused where it cannot be drawn (P8b); with no structure drawn there is nothing left to pick. */
+function applyRepresentation(state: MoleculeState, representation: Representation): void {
+    if (representation === 'space-filling' && spaceFillingRefused(state.meta)) return;
+    state.representation = representation;
+    if (representation === 'none') state.pick = null;
+}
 
 /** A URL id is attacker/typo territory -- never echoed back unbounded (ruling T12-a). */
 const truncateId = (id: string) => (id.length > 40 ? `${id.slice(0, 40)}…` : id);
@@ -85,6 +98,8 @@ const moleculeSlice = createSlice({
             state.meta = action.payload.meta;
             state.isLoadingMeta = false;
             if (state.surface.kind === 'mo' && !hasOrbital(state.meta, state.surface.index)) state.surface = { kind: 'density' };
+            // A link's (or the last molecule's) space filling, for a molecule it cannot be drawn for.
+            if (state.representation === 'space-filling' && spaceFillingRefused(state.meta)) state.representation = 'ball-and-stick';
         },
         /**
          * A URL id that fails url_keys.ts's own id pattern (spec §3.5: a bad
@@ -124,8 +139,12 @@ const moleculeSlice = createSlice({
                 && (surface.kind !== 'mo' || state.surface.kind !== 'mo' || surface.index === state.surface.index)) return;
             state.surface = surface;
             if (surface.kind !== 'esp') state.espRange = null;
+            // Structure only draws no surface, so no contour, landed picture or surface failure is left to describe.
+            if (surface.kind === 'none') { state.isoLevel = null; state.drawn = null; state.renderError = null; }
         },
-        setShowStructure: (state, action: PayloadAction<boolean>) => { state.showStructure = action.payload; if (!action.payload) state.pick = null; },
+        setRepresentation: (state, action: PayloadAction<Representation>) => applyRepresentation(state, action.payload),
+        /** The old ball-and-stick switch (ruling P8): on is ball and stick, off is none. */
+        setShowStructure: (state, action: PayloadAction<boolean>) => applyRepresentation(state, action.payload ? 'ball-and-stick' : 'none'),
         setShowDipole: (state, action: PayloadAction<boolean>) => { state.showDipole = action.payload; },
         setPick: (state, action: PayloadAction<MoleculePick | null>) => { state.pick = action.payload; },
         renderStarted: (state, action: PayloadAction<string>) => { state.renderLabel = action.payload; state.renderError = null; state.drawn = null; },
@@ -154,7 +173,7 @@ const moleculeSlice = createSlice({
 });
 
 export const {
-    indexLoaded, indexFailed, selectMolecule, metaLoaded, metaFailed, linkRejected, jobLinkRejected, setSurface, setShowStructure, setShowDipole,
-    setPick, renderStarted, renderFinished, renderFailed, renderCancelled,
+    indexLoaded, indexFailed, selectMolecule, metaLoaded, metaFailed, linkRejected, jobLinkRejected, setSurface, setRepresentation, setShowStructure,
+    setShowDipole, setPick, renderStarted, renderFinished, renderFailed, renderCancelled,
 } = moleculeSlice.actions;
 export default moleculeSlice.reducer;

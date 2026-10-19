@@ -9,18 +9,19 @@ jest.mock('../../src/molecules/loader', () => ({
 jest.mock('../../src/molecules/grid_cache', () => ({ getDensityGrid: jest.fn(), getEspGrid: jest.fn() }));
 jest.mock('../../src/workers/createGridMeshWorker', () => ({ createGridMeshWorker: jest.fn() }));
 jest.mock('../../src/orbital_visualizer', () => ({
-    presentFieldMesh: jest.fn(() => 2), clearFieldMesh: jest.fn(), setMoleculeOverlay: jest.fn(), cancelPendingRender: jest.fn(),
+    presentFieldMesh: jest.fn(() => 2), clearFieldMesh: jest.fn(), setMoleculeOverlay: jest.fn(), cancelPendingRender: jest.fn(), frameStructure: jest.fn(),
     pointerRaycaster: jest.fn(), updateFieldInScene: jest.fn(async () => ({ status: 'rendered', isoLevel: 0.02 })),
 }));
 
 import { createAppStore } from '../../src/store';
-import { selectMolecule, metaLoaded, setSurface } from '../../src/store/moleculeSlice';
+import { selectMolecule, metaLoaded, setSurface, setRepresentation } from '../../src/store/moleculeSlice';
 import { loadBasis, loadMoleculeIndex, loadMoleculeMeta } from '../../src/molecules/loader';
 import { getDensityGrid, getEspGrid } from '../../src/molecules/grid_cache';
 import { createGridMeshWorker } from '../../src/workers/createGridMeshWorker';
 import {
-    cancelPendingRender, clearFieldMesh, presentFieldMesh, setMoleculeOverlay, updateFieldInScene, VisualizerContext,
+    cancelPendingRender, clearFieldMesh, frameStructure, presentFieldMesh, setMoleculeOverlay, updateFieldInScene, VisualizerContext,
 } from '../../src/orbital_visualizer';
+import { BOHR_TO_ANGSTROM } from '../../src/molecules/ball_and_stick';
 import type { MoleculeBasis } from '../../src/molecules/types';
 import { useMoleculeLoader } from '../../src/molecules/useMoleculeLoader';
 import { useMoleculeView } from '../../src/molecules/useMoleculeView';
@@ -77,6 +78,10 @@ describe('planMoleculeRender', () => {
             sources: [{ kind: 'analytic', id: 'gaussianMO:h2o:4', recipe: { type: 'gaussianMO', moleculeId: 'h2o', index: 4 }, rMax: 6.43 }],
             colors: ['#ffffff'], memberLabels: ['1b1'], resolution: 95, enclosedFraction: 0.8, label: 'Computing 1b1…',
             bases: [waterBasis] } });
+    });
+    // Ruling P8: show=none plans no surface at all -- the mesh is cleared.
+    it('plans a clear canvas for no surface', () => {
+        expect(planMoleculeRender(waterMeta(), { kind: 'none' }, 0.9)).toEqual({ kind: 'clear' });
     });
 });
 
@@ -392,5 +397,48 @@ describe('useMoleculeView', () => {
         expect(clearFieldMesh).toHaveBeenCalledWith(context);
         expect(store.getState().molecule.renderError).toMatch(/HTTP 404/);
         expect(store.getState().molecule.renderLabel).toBeNull();
+    });
+
+    // Ruling P8: no surface draws none -- the mesh is cleared, nothing is computed, nothing is said to be
+    // busy, and a surface still computing is abandoned.
+    it('clears the surface for show=none, cancelling one in flight and starting nothing', async () => {
+        const worker = fakeWorker();
+        (createGridMeshWorker as jest.Mock).mockReturnValue(worker);
+        (getDensityGrid as jest.Mock).mockResolvedValue(densityGrid());
+        const context = fakeContext();
+        const store = makeStore();
+        render(<Provider store={store}><Harness active context={context} /></Provider>);
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o' })); store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() })); });
+        await flush();
+        expect(store.getState().molecule.renderLabel).toBe('Loading Water…');
+        (clearFieldMesh as jest.Mock).mockClear();
+        act(() => { store.dispatch(setSurface({ kind: 'none' })); });
+        await flush();
+        expect(worker.terminate).toHaveBeenCalled();
+        expect(clearFieldMesh).toHaveBeenCalledWith(context);
+        expect(createGridMeshWorker).toHaveBeenCalledTimes(1);
+        expect(store.getState().molecule.renderLabel).toBeNull();
+        expect(store.getState().molecule.drawn).toBeNull();
+        // With no surface to fit, the camera fits the structure: water's hydrogens and their van der Waals
+        // spheres, keyed to the molecule's box as a surface would be.
+        expect(frameStructure).toHaveBeenCalledWith(context, expect.closeTo((0.958 + 1.20) / BOHR_TO_ANGSTROM, 6), expect.closeTo(6.43, 9));
+    });
+    // Ruling P8: the overlay follows the representation -- ball and stick (spheres and sticks), space filling
+    // (van der Waals spheres only), or no structure at all; the dipole arrow is its own switch either way.
+    it('builds the overlay for the representation chosen', async () => {
+        const store = makeStore();
+        render(<Provider store={store}><Harness active context={fakeContext()} /></Provider>);
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o', surface: { kind: 'none' } })); store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() })); });
+        const parts = () => {
+            const overlay = (setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1] as import('three').Group;
+            const found: string[] = [];
+            overlay.traverse(node => { if (node.userData.moleculePart) found.push(node.userData.moleculePart); });
+            return { atoms: found.filter(p => p === 'atom').length, bonds: found.filter(p => p === 'bond').length };
+        };
+        expect(parts()).toEqual({ atoms: 3, bonds: 4 });
+        act(() => { store.dispatch(setRepresentation('space-filling')); });
+        expect(parts()).toEqual({ atoms: 3, bonds: 0 });
+        act(() => { store.dispatch(setRepresentation('none')); });
+        expect(parts()).toEqual({ atoms: 0, bonds: 0 });
     });
 });

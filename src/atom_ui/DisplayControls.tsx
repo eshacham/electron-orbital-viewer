@@ -3,11 +3,9 @@ import { FormControl, FormControlLabel, FormLabel, Switch, ToggleButton, ToggleB
 import type { RenderMode } from '../types/orbital';
 import { displayPref, renderPref } from '../design/presentation';
 import { usePref } from '../design/usePref';
+import { KEEP_CASE } from '../design/mui';
 
 type SurfaceChoice = 'glow' | 'solid' | 'wireframe';
-
-/** MUI upper-cases toggle labels; the inspector's labels keep their own case. */
-const KEEP_CASE = { '& .MuiToggleButton-root': { textTransform: 'none' } } as const;
 
 interface SurfaceStyleControlProps {
     /** The store's surfaceStyle.mode -- what the link carries (ruling R1). */

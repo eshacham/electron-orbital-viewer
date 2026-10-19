@@ -92,9 +92,10 @@ import { useH2PlusCurve } from './bonds/useH2PlusCurve';
 import { bondsFieldRequest } from './bonds/bonds_request';
 import { BondsSystemId, systemFormula } from './bonds/systems';
 import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIso, BondsView } from './store/bondsSlice';
-import { selectMolecule, setSurface, setShowStructure, setShowDipole, MoleculeSurface } from './store/moleculeSlice';
+import { selectMolecule, setSurface, setRepresentation, setShowDipole, MoleculeSurface } from './store/moleculeSlice';
 import { useMoleculeLoader } from './molecules/useMoleculeLoader';
 import { formatDipole } from './molecules/dipole';
+import { spaceFillingUnavailableReason } from './molecules/vdw_radii';
 import MoleculeNav from './components/MoleculeNav';
 import MoleculePickerDialog from './components/MoleculePickerDialog';
 import MoleculeReadout from './components/MoleculeReadout';
@@ -178,10 +179,13 @@ const FIXED_RHO_NOTE = 'The density is drawn at a fixed ρ, chosen with the ρ b
  * D4), so the fraction does not apply and the select is disabled.
  */
 const ESP_SURFACE_NOTE = 'Fixed at ρ = 0.001 e/a₀³ — the surface ESP maps are conventionally drawn on, not an enclosed fraction';
+/** Ruling P8: structure only (show=none) draws no contour, so the enclosed fraction applies to nothing. */
+const NO_SURFACE_NOTE = 'No surface is drawn, so no contour applies';
 
 /** What a failed Molecules render was trying to draw, for its alert. */
 const SURFACE_NAME: Record<MoleculeSurface['kind'], string> = {
-    density: 'the density', esp: 'the electrostatic potential', mo: 'the orbital',
+    // `none` draws nothing, so it never fails (the slice clears a failure when it is chosen).
+    density: 'the density', esp: 'the electrostatic potential', mo: 'the orbital', none: 'no surface',
 };
 
 /** How long a render has to take before the viewer is told it is working. */
@@ -1100,7 +1104,7 @@ function App() {
     // the DOM's shape or the element's reserved size, so `.key-column`'s
     // measured rect -- and the insets derived from it -- stay exactly the
     // same whatever is picked.
-    const moleculeCaptionZone = isMoleculeMode && Boolean(molecule.meta) && molecule.showStructure && !isNarrow;
+    const moleculeCaptionZone = isMoleculeMode && Boolean(molecule.meta) && molecule.representation !== 'none' && !isNarrow;
     const showHoverCaption = moleculeCaptionZone && !molecule.pick;
 
     // The drill-down's next step. On a desktop its chips continue the
@@ -1265,12 +1269,13 @@ function App() {
     const moleculeProperties = molecule.selectedId !== null && (molecule.meta || molecule.isLoadingMeta
         ? <MoleculePropertiesCard meta={molecule.meta} />
         : <p className="molecule-properties-status">This molecule did not load.</p>);
-    // The structure and dipole switches belong with the view settings
+    // The structure segments and the dipole switch belong with the view settings
     // (Controls' children slot), with the dipole's value and -- for ozone --
     // the caveat that must never be separated from it (ruling T7-O3).
     const moleculeOptions = isMoleculeMode && molecule.meta && (
-        <MoleculeViewOptions showStructure={molecule.showStructure} showDipole={molecule.showDipole}
-            onShowStructure={on => dispatch(setShowStructure(on))} onShowDipole={on => dispatch(setShowDipole(on))}
+        <MoleculeViewOptions representation={molecule.representation} onRepresentationChange={r => dispatch(setRepresentation(r))}
+            spaceFillingUnavailable={spaceFillingUnavailableReason(molecule.meta.atoms)}
+            showDipole={molecule.showDipole} onShowDipole={on => dispatch(setShowDipole(on))}
             dipoleText={formatDipole(molecule.meta)} caveat={molecule.meta.caveat ?? null} />
     );
     // What the enclosed fraction produced, under its select (ruling D22).
@@ -1308,7 +1313,8 @@ function App() {
             hideSurfaceStyle={isAtomMode}
             isBusy={isAtomMode ? showAtomBusy : showBusy}
             fractionNote={isBondsDensity ? FIXED_RHO_NOTE
-                : isMoleculeMode && molecule.surface.kind === 'esp' ? ESP_SURFACE_NOTE : undefined}
+                : isMoleculeMode && molecule.surface.kind === 'esp' ? ESP_SURFACE_NOTE
+                : isMoleculeMode && molecule.surface.kind === 'none' ? NO_SURFACE_NOTE : undefined}
             isoNote={moleculeIsoNote}
         >
             {isAtomMode ? (
@@ -1512,8 +1518,8 @@ function App() {
     // so a long pick no longer traps the pointer under an unscrollable
     // overlay. Gated exactly as `.molecule-legend-stack` gated
     // `MoleculeReadout` before: a molecule loaded, with its structure shown
-    // (nothing to pick with the ball-and-stick off).
-    const moleculeSelectionSection = molecule.meta && molecule.showStructure && (
+    // (nothing to pick with no structure drawn; space filling's spheres pick, ruling P8).
+    const moleculeSelectionSection = molecule.meta && molecule.representation !== 'none' && (
         <div className="molecule-selection">
             <Typography variant="subtitle2" className="molecule-selection-heading">Selection</Typography>
             <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}

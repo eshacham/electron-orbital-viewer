@@ -401,14 +401,18 @@ describe('readout and view options', () => {
     });
     it('toggles structure and dipole and states the arrow convention', () => {
         const onShowDipole = jest.fn();
-        const { container } = render(<MoleculeViewOptions showStructure showDipole onShowStructure={() => {}} onShowDipole={onShowDipole} dipoleText="μ = 1.86 D" />);
+        // Task 13 (ruling P8): the structure is a representation now (the switch became the Structure segments).
+        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null}
+            showDipole onShowDipole={onShowDipole} dipoleText="μ = 1.86 D" />);
         fireEvent.click(screen.getByLabelText('Dipole arrow'));   // role is checkbox or switch depending on the MUI minor
         expect(onShowDipole).toHaveBeenCalledWith(false);
         expect(container.textContent).toMatch(/points from − to \+/);
     });
     // Ruling T7-O3: ozone's dipole carries meta.caveat beside it, never shown alone.
     it('shows the caveat beside the dipole when the molecule carries one (T7-O3, ozone)', () => {
-        const { container } = render(<MoleculeViewOptions showStructure showDipole onShowStructure={() => {}} onShowDipole={() => {}}
+        // Task 13 (ruling P8): representation props in place of the old showStructure switch's.
+        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null}
+            showDipole onShowDipole={() => {}}
             dipoleText="μ = 0.65 D" caveat="Ozone has strong multireference character: single-reference B3LYP overestimates its dipole moment." />);
         expect(container.textContent).toMatch(/μ = 0\.65 D/);
         expect(container.textContent).toMatch(/Ozone has strong multireference character: single-reference B3LYP overestimates its dipole moment\./);

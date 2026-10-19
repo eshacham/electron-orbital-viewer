@@ -330,8 +330,71 @@ describe('Molecules mode', () => {
         });
         openDisplay(container); // Task 12: Properties is the section open by default
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
-        expect(within(viewPanel).getByLabelText('Ball-and-stick')).toBeInTheDocument();
+        // Task 13 (ruling P8): the "Ball-and-stick" switch is now the Structure segmented control's first segment.
+        expect(within(viewPanel).getByRole('button', { name: /ball-and-stick structure/ })).toHaveAttribute('aria-pressed', 'true');
         expect(within(viewPanel).getByText(/μ = 1\.86 D .*Ozone has strong multireference character\./)).toBeInTheDocument();
+    });
+
+    // Ruling P8 (spec §9.4 View): Structure is Ball and stick | Space filling | None, each name holding its
+    // visible label (WCAG 2.5.3); None leaves nothing to pick, so the Selection readout and the hover caption go.
+    it('chooses the structure with the Structure segments, and drops Selection and the hover caption for None', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        openDisplay(container);
+        const viewPanel = container.querySelector('.view-panel') as HTMLElement;
+        const group = within(viewPanel).getByRole('group', { name: 'Structure' });
+        expect(within(group).getAllByRole('button').map(b => b.textContent)).toEqual(['Ball and stick', 'Space filling', 'None']);
+        fireEvent.click(within(group).getByRole('button', { name: 'Space filling (space-filling structure)' }));
+        expect(store.getState().molecule.representation).toBe('space-filling');
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        expect(within(side).getByText('Selection')).toBeInTheDocument();
+        expect(container.querySelector('#canvas-container .molecule-hover-caption')).not.toBeNull();
+        fireEvent.click(within(group).getByRole('button', { name: 'None (no structure)' }));
+        expect(store.getState().molecule.representation).toBe('none');
+        expect(within(side).queryByText('Selection')).toBeNull();
+        expect(container.querySelector('#canvas-container .molecule-hover-caption')).toBeNull();
+        fireEvent.click(within(group).getByRole('button', { name: 'Ball and stick (ball-and-stick structure)' }));
+        expect(store.getState().molecule.representation).toBe('ball-and-stick');
+    });
+
+    // Ruling P8b: no van der Waals radius is tabulated for Sc–Co, so Space filling is disabled for a molecule
+    // holding one, and says why where the viewer looks for it.
+    it('disables Space filling for a molecule with no tabulated radius, saying which element and why', async () => {
+        const { store, container } = await enterMolecules(false);
+        // Water's id (the loader refuses an id its index lacks) with iron in place of the oxygen.
+        const iron = waterMeta({ name: 'Iron dihydride', formula: 'FeH2', atoms: waterMeta().atoms.map((a, i) => (i === 0 ? { ...a, Z: 26 } : a)) });
+        const loader = jest.requireMock('../src/molecules/loader') as { loadMoleculeMeta: jest.Mock };
+        loader.loadMoleculeMeta.mockResolvedValueOnce(iron);
+        pickWater(store, iron);
+        await flush();
+        openDisplay(container);
+        const space = within(container.querySelector('.view-panel') as HTMLElement).getByRole('button', { name: /space-filling structure/ });
+        expect(space).toBeDisabled();
+        const reason = 'no van der Waals radius tabulated for Fe (Bondi 1964 / Mantina 2009)';
+        expect(space.closest('[title]')).toHaveAttribute('title', reason);
+        expect(within(container.querySelector('.view-panel') as HTMLElement).getByText(`Space filling is unavailable: ${reason}`)).toBeInTheDocument();
+    });
+
+    // Ruling P8: the surface switch gains None -- structure only -- which clears the surface (show=none).
+    it('offers no surface as the surface switch\'s fourth choice', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const surface = within(side).getByRole('group', { name: 'surface' });
+        fireEvent.click(within(surface).getByRole('button', { name: 'None (no surface)' }));
+        expect(store.getState().molecule.surface).toEqual({ kind: 'none' });
+        expect(within(container.querySelector('.viewport-title') as HTMLElement).getByText('Structure only · geometry: experiment (CCCBDB)'))
+            .toBeInTheDocument();
+        // No contour is drawn, so the enclosed fraction applies to nothing: disabled, saying why (never the
+        // orbital's "contour of constant |ψ|²" fallback), and no colour key stands for a surface.
+        openDisplay(container);
+        expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+        expect(container.textContent).toMatch(/No surface is drawn, so no contour applies/);
+        expect(container.textContent).not.toMatch(/contour of constant/);
+        expect(screen.queryByLabelText('surface colour key')).toBeNull();
+        expect(screen.queryByLabelText('electrostatic potential colour key')).toBeNull();
     });
 
     // Ruling R22c (brief requirement 5): the hover/pick readout lives in the

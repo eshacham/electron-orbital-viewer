@@ -22,6 +22,7 @@ import { ViewMode, ViewLevel } from '../store/atomSlice';
 import { CombinationSelection, NO_COMBINATION } from '../combinations';
 import { RelativityMode, shortMethodLabel } from '../atom/relativity';
 import type { ValenceSContraction } from '../atom/relativistic_comparison';
+import { KEEP_CASE } from '../design/mui';
 
 interface ControlsProps {
   /**
@@ -289,9 +290,6 @@ const ReadoutContent: React.FC<{ content: string | WhatChangedParts | null }> = 
     </>
   );
 };
-
-/** Phase 1's CombinationControls: MUI upper-cases button text, which "With spin–orbit" does not survive. */
-const KEEP_CASE = { '& .MuiToggleButton-root': { textTransform: 'none' } } as const;
 
 export interface RelativityControlProps {
   relativity: RelativityMode;

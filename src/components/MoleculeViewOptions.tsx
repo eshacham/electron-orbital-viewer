@@ -1,9 +1,16 @@
-import React from 'react';
-import { FormControlLabel, FormGroup, Switch, Typography } from '@mui/material';
+import React, { useId } from 'react';
+import { FormControl, FormControlLabel, FormGroup, FormLabel, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import type { Representation } from '../molecules/ball_and_stick';
+import { KEEP_CASE } from '../design/mui';
+import { LAYOUT, TYPE } from '../design/tokens';
 
 interface MoleculeViewOptionsProps {
-    showStructure: boolean; showDipole: boolean;
-    onShowStructure: (on: boolean) => void; onShowDipole: (on: boolean) => void;
+    representation: Representation;
+    onRepresentationChange: (representation: Representation) => void;
+    /** Why this molecule cannot be drawn space-filling (ruling P8b: no tabulated radius for one of its elements), or null. */
+    spaceFillingUnavailable: string | null;
+    showDipole: boolean;
+    onShowDipole: (on: boolean) => void;
     dipoleText: string | null;
     /**
      * Ruling T7-O3: a documented exception to "every number states its
@@ -14,20 +21,55 @@ interface MoleculeViewOptionsProps {
     caveat?: string | null;
 }
 
-/** Molecule-only view settings, shown inside Controls in the right-hand column / View tab. */
-const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({ showStructure, showDipole, onShowStructure, onShowDipole, dipoleText, caveat }) => (
-    <FormGroup className="molecule-view-options">
-        <FormControlLabel control={<Switch size="small" checked={showStructure} onChange={e => onShowStructure(e.target.checked)} />} label="Ball-and-stick" />
-        <FormControlLabel control={<Switch size="small" checked={showDipole} onChange={e => onShowDipole(e.target.checked)} />} label="Dipole arrow" />
-        {dipoleText && (
-            <Typography variant="body2">
-                {dipoleText}{caveat ? ` — ${caveat}` : ''}
+/**
+ * The spec's 32 px segments (§10, Controls row), labels in their own case (preflight D16). Three labels of up to 14 characters
+ * share the inspector's 256 px row, which at body size leaves them touching their borders; the caption
+ * size gives each a few pixels of air.
+ */
+const SEGMENTS = [KEEP_CASE, { '& .MuiToggleButton-root': { height: LAYOUT.chip, fontSize: TYPE.caption.size } }];
+
+/**
+ * Molecule-only view settings, shown inside Controls in the right-hand column / View tab: the structure
+ * (ruling P8, spec §9.4 View: Ball and stick | Space filling | None) and the dipole arrow. Each segment's
+ * name holds its visible label (WCAG 2.5.3).
+ */
+const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
+    representation, onRepresentationChange, spaceFillingUnavailable, showDipole, onShowDipole, dipoleText, caveat,
+}) => {
+    const reasonId = useId();
+    return (
+        <FormGroup className="molecule-view-options">
+            <FormControl component="fieldset" margin="dense" fullWidth className="molecule-structure-controls">
+                <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Structure</FormLabel>
+                <ToggleButtonGroup value={representation} exclusive size="small" fullWidth aria-label="structure" sx={SEGMENTS}
+                    onChange={(_event, next: Representation | null) => { if (next) onRepresentationChange(next); }}>
+                    <ToggleButton value="ball-and-stick" aria-label="Ball and stick (ball-and-stick structure)">Ball and stick</ToggleButton>
+                    {/* A disabled button takes no pointer, so the reason's tooltip hangs on this wrapper. */}
+                    <span className="molecule-structure-segment" title={spaceFillingUnavailable ?? undefined}>
+                        <ToggleButton value="space-filling" aria-label="Space filling (space-filling structure)"
+                            disabled={spaceFillingUnavailable !== null} aria-describedby={spaceFillingUnavailable ? reasonId : undefined}>
+                            Space filling
+                        </ToggleButton>
+                    </span>
+                    <ToggleButton value="none" aria-label="None (no structure)">None</ToggleButton>
+                </ToggleButtonGroup>
+                {spaceFillingUnavailable && (
+                    <Typography id={reasonId} variant="caption" className="molecule-caption">
+                        Space filling is unavailable: {spaceFillingUnavailable}
+                    </Typography>
+                )}
+            </FormControl>
+            <FormControlLabel control={<Switch size="small" checked={showDipole} onChange={e => onShowDipole(e.target.checked)} />} label="Dipole arrow" />
+            {dipoleText && (
+                <Typography variant="body2">
+                    {dipoleText}{caveat ? ` — ${caveat}` : ''}
+                </Typography>
+            )}
+            <Typography variant="caption" className="molecule-caption">
+                The arrow points from − to + (the physics convention), 1 a₀ per debye; many chemistry texts draw it the other way.
             </Typography>
-        )}
-        <Typography variant="caption" className="molecule-caption">
-            The arrow points from − to + (the physics convention), 1 a₀ per debye; many chemistry texts draw it the other way.
-        </Typography>
-    </FormGroup>
-);
+        </FormGroup>
+    );
+};
 
 export default MoleculeViewOptions;

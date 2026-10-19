@@ -1,6 +1,6 @@
 import reducer, {
     selectMolecule, metaLoaded, metaFailed, setSurface, renderStarted, renderFinished, renderFailed, renderCancelled, indexLoaded,
-    linkRejected,
+    linkRejected, setRepresentation, setShowStructure, setPick,
 } from '../../src/store/moleculeSlice';
 import { setMode } from '../../src/store/atomSlice';
 import { encodeMoleculeUrl, decodeMoleculeUrl } from '../../src/molecules/url_keys';
@@ -138,6 +138,58 @@ describe('moleculeSlice', () => {
     });
 });
 
+// Ruling P8: the representation replaces the ball-and-stick boolean; setShowStructure stays as its alias.
+describe('the representation', () => {
+    const water = () => reducer(reducer(init(), selectMolecule({ id: 'h2o' })), metaLoaded({ id: 'h2o', meta: waterMeta() }));
+    /** Iron in place of water's oxygen: neither Bondi nor Mantina tabulates a van der Waals radius for Fe (ruling P8b). */
+    const ironMeta = () => waterMeta({ id: 'feh2', atoms: waterMeta().atoms.map((atom, i) => (i === 0 ? { ...atom, Z: 26 } : atom)) });
+
+    it('starts as ball and stick', () => {
+        expect(init().representation).toBe('ball-and-stick');
+    });
+    it('keeps setShowStructure as the alias: true is ball and stick, false is none', () => {
+        expect(reducer(water(), setShowStructure(false)).representation).toBe('none');
+        expect(reducer(reducer(water(), setShowStructure(false)), setShowStructure(true)).representation).toBe('ball-and-stick');
+    });
+    it('switches to space filling', () => {
+        expect(reducer(water(), setRepresentation('space-filling')).representation).toBe('space-filling');
+    });
+    it('forgets the pick when nothing is left to pick', () => {
+        const picked = reducer(water(), setPick({ kind: 'atom', index: 0 }));
+        expect(reducer(picked, setRepresentation('none')).pick).toBeNull();
+        expect(reducer(picked, setShowStructure(false)).pick).toBeNull();
+        // Space filling's spheres are atoms too: the pick stays.
+        expect(reducer(picked, setRepresentation('space-filling')).pick).toEqual({ kind: 'atom', index: 0 });
+    });
+    it('refuses space filling for a molecule holding an element with no radius, and falls back when one loads', () => {
+        let s = reducer(reducer(init(), selectMolecule({ id: 'feh2' })), metaLoaded({ id: 'feh2', meta: ironMeta() }));
+        expect(reducer(s, setRepresentation('space-filling')).representation).toBe('ball-and-stick');
+        s = reducer(water(), setRepresentation('space-filling'));
+        s = reducer(s, selectMolecule({ id: 'feh2' }));
+        expect(s.representation).toBe('space-filling');
+        expect(reducer(s, metaLoaded({ id: 'feh2', meta: ironMeta() })).representation).toBe('ball-and-stick');
+    });
+});
+
+// Ruling P8: show=none draws no surface. Nothing is drawn, so nothing drawn is remembered -- no contour, no
+// ESP range, no failure of the surface left behind.
+describe('the structure-only surface', () => {
+    it('takes no surface, forgetting what the last one drew or why it failed', () => {
+        let s = reducer(init(), selectMolecule({ id: 'h2o' }));
+        s = reducer(s, metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        s = reducer(s, renderFinished({ isoLevel: 0.02, drawn: { id: 'h2o', surface: { kind: 'density' }, enclosedFraction: 0.9 } }));
+        const none = reducer(s, setSurface({ kind: 'none' }));
+        expect(none.surface).toEqual({ kind: 'none' });
+        expect([none.isoLevel, none.drawn, none.espRange]).toEqual([null, null, null]);
+        expect(reducer(reducer(s, renderFailed('No isosurface')), setSurface({ kind: 'none' })).renderError).toBeNull();
+    });
+    it('keeps no surface across molecules, as it keeps density or ESP', () => {
+        let s = reducer(init(), selectMolecule({ id: 'h2o', surface: { kind: 'none' } }));
+        s = reducer(s, metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        expect(reducer(s, selectMolecule({ id: 'nh3' })).surface).toEqual({ kind: 'none' });
+    });
+});
+
 describe('molecule URL keys', () => {
     it('round-trips', () => {
         let s = reducer(init(), selectMolecule({ id: 'h2o' }));
@@ -153,6 +205,7 @@ describe('molecule URL keys', () => {
     it('ignores invalid values rather than throwing', () => {
         expect(decodeMoleculeUrl({ id: 'H2O!<script>', show: 'mo:x', struct: 'maybe', dipole: '2' })).toEqual({});
         expect(decodeMoleculeUrl({ show: 'mo:-1' })).toEqual({});
-        expect(decodeMoleculeUrl({ id: 'benzene', show: 'esp', struct: '0' })).toEqual({ id: 'benzene', surface: { kind: 'esp' }, structure: false });
+        // Ruling P8: struct=0 now decodes to the representation 'none' (it was the boolean `structure: false`).
+        expect(decodeMoleculeUrl({ id: 'benzene', show: 'esp', struct: '0' })).toEqual({ id: 'benzene', surface: { kind: 'esp' }, representation: 'none' });
     });
 });

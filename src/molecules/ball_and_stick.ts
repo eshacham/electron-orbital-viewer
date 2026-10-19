@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { elementFor } from '../elements';
 import type { MoleculeAtom, MoleculePick } from './library_types';
+import { spaceFillingUnavailableReason, VDW_RADII_ANGSTROM } from './vdw_radii';
 
 export const BOHR_TO_ANGSTROM = 0.529177210903;
 /**
@@ -27,6 +28,9 @@ export const ATOM_RADIUS_FACTOR = 0.4;
 export const BOND_RADIUS_BOHR = 0.12;
 
 export interface Bond { a: number; b: number; lengthAngstrom: number }
+
+/** How the structure is drawn over the surface (ruling P8): spheres and sticks, van der Waals spheres, or not at all. */
+export type Representation = 'ball-and-stick' | 'space-filling' | 'none';
 
 const symbol = (Z: number) => elementFor(Z)?.symbol ?? `Z${Z}`;
 function radius(Z: number): number {
@@ -91,16 +95,10 @@ export function describePick(atoms: MoleculeAtom[], bonds: Bond[], pick: Molecul
 const SPHERE = new THREE.SphereGeometry(1, 24, 16);
 const STICK = new THREE.CylinderGeometry(BOND_RADIUS_BOHR, BOND_RADIUS_BOHR, 1, 12);
 
-/**
- * Spheres and half-sticks, each coloured by its own atom. Deliberately not
- * clipped by the cut: the cut is for seeing inside the density, and the
- * structure is what you are looking for in there.
- */
-export function buildBallAndStick(atoms: MoleculeAtom[], bonds: Bond[]): THREE.Group {
-    const group = new THREE.Group();
-    group.userData.isBallAndStick = true;
+/** One CPK material per element, per group (disposeOverlay disposes them with it). */
+function cpkMaterials(): (Z: number) => THREE.MeshStandardMaterial {
     const materials = new Map<number, THREE.MeshStandardMaterial>();
-    const material = (Z: number) => {
+    return (Z: number) => {
         if (!materials.has(Z)) {
             const created = new THREE.MeshStandardMaterial({ color: CPK_COLORS[Z], roughness: 0.45, metalness: 0 });
             // Which element this is, so a theme can recolour one (orbital_visualizer.ts, ruling R12).
@@ -109,13 +107,29 @@ export function buildBallAndStick(atoms: MoleculeAtom[], bonds: Bond[]): THREE.G
         }
         return materials.get(Z)!;
     };
+}
+
+/** A sphere per atom, of the given radius (Å), tagged for picking. */
+function addAtomSpheres(group: THREE.Group, atoms: MoleculeAtom[], material: (Z: number) => THREE.Material, radiusAngstrom: (Z: number) => number): void {
     atoms.forEach((atom, index) => {
         const sphere = new THREE.Mesh(SPHERE, material(atom.Z));
-        sphere.scale.setScalar(ATOM_RADIUS_FACTOR * radius(atom.Z) / BOHR_TO_ANGSTROM);
+        sphere.scale.setScalar(radiusAngstrom(atom.Z) / BOHR_TO_ANGSTROM);
         sphere.position.copy(vec(atom));
         sphere.userData = { moleculePart: 'atom', index };
         group.add(sphere);
     });
+}
+
+/**
+ * Spheres and half-sticks, each coloured by its own atom. Deliberately not
+ * clipped by the cut: the cut is for seeing inside the density, and the
+ * structure is what you are looking for in there.
+ */
+export function buildBallAndStick(atoms: MoleculeAtom[], bonds: Bond[]): THREE.Group {
+    const group = new THREE.Group();
+    group.userData.isBallAndStick = true;
+    const material = cpkMaterials();
+    addAtomSpheres(group, atoms, material, Z => ATOM_RADIUS_FACTOR * radius(Z));
     const up = new THREE.Vector3(0, 1, 0);
     bonds.forEach((bond, index) => {
         const [p, q] = [vec(atoms[bond.a]), vec(atoms[bond.b])];
@@ -133,6 +147,32 @@ export function buildBallAndStick(atoms: MoleculeAtom[], bonds: Bond[]): THREE.G
     return group;
 }
 
+/**
+ * Space filling (ruling P8, P8b): each atom as its van der Waals sphere, no
+ * sticks -- the overlapping spheres are the molecule's outline. Picking and
+ * the theme's recolour work as for ball and stick. An element with no
+ * tabulated radius (Sc–Co) is refused, never guessed; the control that asks
+ * for this is disabled for such a molecule.
+ */
+export function buildSpaceFilling(atoms: MoleculeAtom[]): THREE.Group {
+    const reason = spaceFillingUnavailableReason(atoms);
+    if (reason) throw new Error(reason);
+    const group = new THREE.Group();
+    addAtomSpheres(group, atoms, cpkMaterials(), Z => VDW_RADII_ANGSTROM[Z]);
+    group.updateMatrixWorld(true);
+    return group;
+}
+
+/**
+ * How far the structure reaches from the origin (bohr): the farthest atom's
+ * van der Waals surface (its covalent radius where none is tabulated) -- what
+ * the camera frames when no surface is drawn (ruling P8). One bound for every
+ * representation, so switching between them never re-zooms.
+ */
+export function structureExtent(atoms: MoleculeAtom[]): number {
+    return Math.max(0, ...atoms.map(atom => vec(atom).length() + (VDW_RADII_ANGSTROM[atom.Z] ?? radius(atom.Z)) / BOHR_TO_ANGSTROM));
+}
+
 export function pickMoleculePart(overlay: THREE.Object3D, raycaster: THREE.Raycaster): MoleculePick | null {
     for (const hit of raycaster.intersectObject(overlay, true)) {
         const part = hit.object.userData.moleculePart;
@@ -142,7 +182,7 @@ export function pickMoleculePart(overlay: THREE.Object3D, raycaster: THREE.Rayca
 }
 
 /**
- * Materials are per-group; the two ball-and-stick geometries (SPHERE, STICK)
+ * Materials are per-group; the two structure geometries (SPHERE, STICK)
  * are module-level and live for the page. An ArrowHelper's own
  * `dispose()` is NOT used here, and we never recurse into its line/cone
  * children either: their geometries are three.js module-level statics

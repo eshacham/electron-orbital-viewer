@@ -9,6 +9,7 @@ import {
 } from '../combinations';
 import { HybridKind, HYBRID_NAMES, hybridCount } from '../hybrids';
 import { MAX_FIELD_AU } from '../field_source';
+import { KEEP_CASE } from '../design/mui';
 import {
   N2_MAX_FIELD_AU, DEBYE_PER_EA0, EV_PER_HARTREE, formatVoltsPerMetre, inducedDipole,
   nextOrderDipoleShare, starkShiftHartree,
@@ -64,10 +65,6 @@ interface CombinationControlsProps {
  * slider commits on release: each commit is a fresh worker render, and
  * dragging would otherwise start one per pixel.
  */
-// MUI capitalises toggle buttons, which turns the quantum number n = 2 into
-// "N = 2" and the hybrid h₁ into "H₁". These labels are symbols; keep their case.
-const KEEP_CASE = { '& .MuiToggleButton-root': { textTransform: 'none' } } as const;
-
 const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, onChange }) => {
   const committedField = selection.kind === 'field' ? selection.field : DEFAULT_FIELD_AU;
   const [draftField, setDraftField] = useState(committedField);

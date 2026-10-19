@@ -161,7 +161,8 @@ export interface MoleculeDrawnPicture {
 export function moleculeDrawnPicture(state: RootState): MoleculeDrawnPicture | null {
     const { meta, drawn, renderLabel, renderError, isoLevel } = state.molecule;
     if (state.atom.mode !== 'molecule' || !meta || !drawn || renderLabel !== null || renderError !== null) return null;
-    if (drawn.id !== meta.id) return null;
+    // Structure only (ruling P8) lands no surface, so it is never a drawn picture.
+    if (drawn.id !== meta.id || drawn.surface.kind === 'none') return null;
     let surface: MoleculeDrawnSurface;
     if (drawn.surface.kind === 'mo') {
         const index = drawn.surface.index;

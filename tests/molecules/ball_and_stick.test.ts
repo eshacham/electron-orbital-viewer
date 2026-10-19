@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { detectBonds, anglesAtAtom, describePick, buildBallAndStick, pickMoleculePart, bondLabel, disposeOverlay } from '../../src/molecules/ball_and_stick';
+import {
+    detectBonds, anglesAtAtom, describePick, buildBallAndStick, buildSpaceFilling, pickMoleculePart, bondLabel, disposeOverlay, BOHR_TO_ANGSTROM, CPK_COLORS,
+    structureExtent,
+} from '../../src/molecules/ball_and_stick';
 import { dipoleArrow, formatDipole } from '../../src/molecules/dipole';
 import { waterAtoms, methaneAtoms, ozoneAtoms, waterMeta, methaneMeta } from './fixtures';
 
@@ -53,6 +56,53 @@ describe('the ball-and-stick group', () => {
         expect(pickMoleculePart(group, raycaster)).toEqual({ kind: 'bond', index: 0 });
         raycaster.set(new THREE.Vector3(10, 30, 30), new THREE.Vector3(-1, 0, 0));
         expect(pickMoleculePart(group, raycaster)).toBeNull();
+    });
+});
+
+// Ruling P8/P8b: space filling draws each atom as its van der Waals sphere -- no sticks -- and the spheres
+// keep what the ball-and-stick atoms carry: CPK materials tagged with Z (ruling R12's recolour) and the
+// picking tags, so hover and tap still name an atom.
+describe('the space-filling group', () => {
+    const atoms = waterAtoms();
+    const group = buildSpaceFilling(atoms);
+    const meshes = group.children as THREE.Mesh[];
+
+    it('has one sphere per atom at its van der Waals radius, and no sticks', () => {
+        expect(meshes).toHaveLength(3);
+        expect(meshes.map(m => m.userData)).toEqual([
+            { moleculePart: 'atom', index: 0 }, { moleculePart: 'atom', index: 1 }, { moleculePart: 'atom', index: 2 },
+        ]);
+        expect(meshes[0].scale.x).toBeCloseTo(1.52 / BOHR_TO_ANGSTROM, 9);
+        expect(meshes[1].scale.x).toBeCloseTo(1.20 / BOHR_TO_ANGSTROM, 9);
+        meshes.forEach((m, i) => expect(m.position.toArray()).toEqual(atoms[i].position));
+        // The spheres overlap: O–H is 0.958 Å, far less than 1.52 + 1.20 Å.
+        expect(meshes[0].position.distanceTo(meshes[1].position) * BOHR_TO_ANGSTROM).toBeLessThan(1.52 + 1.20);
+    });
+    it('colours each sphere by its element, tagged with Z for the theme’s recolour', () => {
+        const materials = meshes.map(m => m.material as THREE.MeshStandardMaterial);
+        expect(materials.map(m => m.userData.Z)).toEqual([8, 1, 1]);
+        expect(`#${materials[0].color.getHexString()}`).toBe(CPK_COLORS[8]);
+        expect(materials[1]).toBe(materials[2]);
+    });
+    it('picks the atom under a ray', () => {
+        const raycaster = new THREE.Raycaster();
+        raycaster.set(new THREE.Vector3(10, 0, -2), new THREE.Vector3(-1, 0, 0));
+        expect(pickMoleculePart(group, raycaster)).toEqual({ kind: 'atom', index: 0 });
+        raycaster.set(new THREE.Vector3(10, 30, 30), new THREE.Vector3(-1, 0, 0));
+        expect(pickMoleculePart(group, raycaster)).toBeNull();
+    });
+    it('refuses an element with no tabulated radius, rather than guessing (ruling P8b)', () => {
+        expect(() => buildSpaceFilling([{ Z: 26, position: [0, 0, 0] }])).toThrow('no van der Waals radius tabulated for Fe');
+    });
+});
+
+// Structure only has no surface to frame the camera on; it frames this instead (ruling P8).
+describe('the structure’s extent', () => {
+    it('reaches the farthest atom’s van der Waals surface, in bohr', () => {
+        expect(structureExtent(waterAtoms())).toBeCloseTo((0.958 + 1.20) / BOHR_TO_ANGSTROM, 9);
+    });
+    it('uses the covalent radius for an element with no van der Waals radius', () => {
+        expect(structureExtent([{ Z: 26, position: [2, 0, 0] }])).toBeCloseTo(2 + 1.32 / BOHR_TO_ANGSTROM, 9);
     });
 });
 

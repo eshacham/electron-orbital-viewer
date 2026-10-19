@@ -11,11 +11,13 @@ export const MOLECULE_MO_RESOLUTION = 95;
  * at the enclosed fraction (the Density view), or -- 'espSurface' -- exactly
  * at ρ = 0.001 e/a₀³ (ESP_SURFACE_DENSITY, ruling D4), coloured by the ESP.
  * An MO plan is evaluated from the basis in the orbital worker, like any
- * Basic Orbitals source.
+ * Basic Orbitals source. A clear plan draws no surface at all.
  */
 export type MoleculeRenderPlan =
     | { kind: 'grid'; fraction: number | 'espSurface'; colourByEsp: boolean; label: string }
-    | { kind: 'mo'; request: FieldRenderRequest; label: string };
+    | { kind: 'mo'; request: FieldRenderRequest; label: string }
+    /** Structure only (`show=none`, ruling P8): no surface -- the mesh is cleared and nothing is computed. */
+    | { kind: 'clear' };
 
 /** The density grid is a centred cube (Phase 1's grid convention), so its half-width is one origin coordinate. */
 export const gridHalfWidth = (meta: LibraryMoleculeMeta) => Math.abs(meta.grid.origin[0]);
@@ -33,6 +35,7 @@ export function moleculeOrbitalSource(meta: LibraryMoleculeMeta, index: number):
 export function planMoleculeRender(
     meta: LibraryMoleculeMeta, surface: MoleculeSurface, enclosedFraction: number, basis?: MoleculeBasis,
 ): MoleculeRenderPlan {
+    if (surface.kind === 'none') return { kind: 'clear' };
     if (surface.kind === 'mo') {
         const orbital = meta.orbitals.find(o => o.index === surface.index);
         const name = orbital?.label ?? `orbital ${surface.index}`;

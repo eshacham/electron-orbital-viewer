@@ -172,6 +172,8 @@ export const H2PLUS_CURVE_NOT_READY_REASON = 'The potential curve is still compu
 /** Task 16b (ruling D5): Molecules mode's own refusals, in the order `moleculePictureReason` checks them. */
 export const MOLECULE_NONE_REASON = 'Choose a molecule first.';
 export const MOLECULE_LOADING_REASON = BONDS_LOADING_REASON;
+/** Ruling P8: show=none draws no surface by choice -- not a wait, so never NOTHING_DRAWN_REASON's "yet". */
+export const STRUCTURE_ONLY_REASON = 'Structure only: no surface is drawn. Choose Density, Electrostatic potential or Orbitals to export one.';
 export const moleculeRenderFailedReason = (error: string) => `The surface failed to draw (${error}), so there is nothing to export.`;
 
 /**
@@ -206,6 +208,7 @@ function moleculePictureReason(state: RootState): string | null {
     const block = moleculeBlockReason(state);
     if (block) return block;
     const molecule = state.molecule;
+    if (molecule.surface.kind === 'none') return STRUCTURE_ONLY_REASON;
     if (molecule.renderError) return moleculeRenderFailedReason(molecule.renderError);
     if (molecule.renderLabel !== null) return PICTURE_BUSY_REASON;
     const drawn = molecule.drawn;
