@@ -9,8 +9,8 @@ import {
 } from '../jobs/request_form';
 import { PreviewFn, usePreview } from '../jobs/usePreview';
 import { SESSION_ENDED } from '../jobs/api';
-import { AvailableQuoteOption, CanonicalAtom, isActive, JobRequest, JobView, PreviewResponse, Recipe } from '../jobs/api_types';
-import type { JobsTarget } from '../store/jobsSlice';
+import { AvailableQuoteOption, isActive, JobRequest, JobView, PreviewResponse, Recipe } from '../jobs/api_types';
+import type { JobsTarget, ResolvedPreview } from '../store/jobsSlice';
 
 export interface RequestPanelProps {
     target: JobsTarget;
@@ -26,9 +26,10 @@ export interface RequestPanelProps {
     onSignIn(): void;
     /**
      * The request workspace (ruling P12) draws the resolved structure on the one canvas: told the atoms
-     * while a preview is shown, and when none is (edited, stale, cleared, the session ended, unmounted).
+     * and the response's formula while a preview is shown, and when none is (edited, stale, cleared, the
+     * session ended, unmounted).
      */
-    onPreviewResolved?(atoms: CanonicalAtom[]): void;
+    onPreviewResolved?(preview: ResolvedPreview): void;
     onPreviewCleared?(): void;
     /** The preview's own SVG drawing; false where the canvas draws the structure instead (the workspace). */
     showStructureSvg?: boolean;
@@ -104,7 +105,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({
     const reportRef = useRef({ onPreviewResolved, onPreviewCleared });
     reportRef.current = { onPreviewResolved, onPreviewCleared };
     useEffect(() => {
-        if (shown) reportRef.current.onPreviewResolved?.(shown.atoms);
+        if (shown) reportRef.current.onPreviewResolved?.({ atoms: shown.atoms, formula: shown.formula });
         else reportRef.current.onPreviewCleared?.();
     }, [shown]);
     useEffect(() => () => reportRef.current.onPreviewCleared?.(), []);
@@ -142,7 +143,9 @@ const RequestPanel: React.FC<RequestPanelProps> = ({
     };
 
     return (
-        <section className="request-panel" aria-label="request a molecule" ref={panel}
+        // Fix round 1 (T16-M5): no region name of its own -- its container names it "Request a molecule" (the
+        // workspace's region, or the phone accordion's), and a second region by the same name would repeat it.
+        <section className="request-panel" ref={panel}
             onFocus={() => { focusedWithin.current = true; }}
             onBlur={event => {
                 const next = event.relatedTarget as Node | null;

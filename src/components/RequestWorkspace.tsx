@@ -2,9 +2,8 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { IconButton } from '@mui/material';
 import Close from '@mui/icons-material/Close';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { previewCleared, previewResolved, requestOpened, selectIsOwner } from '../store/jobsSlice';
+import { previewCleared, previewResolved, requestOpened, ResolvedPreview, selectIsOwner } from '../store/jobsSlice';
 import { NARROW_VIEWPORT, useMediaQuery } from '../useMediaQuery';
-import type { CanonicalAtom } from '../jobs/api_types';
 import RequestPanel from './RequestPanel';
 import { REQUEST_WORKSPACE_ID, useRequestPanel } from './MoleculeJobsSection';
 import './request_workspace.css';
@@ -53,8 +52,21 @@ const RequestWorkspace: React.FC<RequestWorkspaceProps> = ({ returnFocusRef }) =
         dispatch(requestOpened(false));
         returnFocusRef.current?.focus();
     }, [dispatch, returnFocusRef]);
-    const onResolved = useCallback((atoms: CanonicalAtom[]) => { dispatch(previewResolved(atoms)); }, [dispatch]);
+    const onResolved = useCallback((preview: ResolvedPreview) => { dispatch(previewResolved(preview)); }, [dispatch]);
     const onCleared = useCallback(() => { dispatch(previewCleared()); }, [dispatch]);
+    // Fix round 1 (T16-I1): "Already computed — open it" shows that molecule, so the workspace (and its
+    // preview) goes first -- else the preview would stay drawn over the molecule it opens.
+    const openComputed = useCallback((key: string) => { close(); panelProps.onOpen(key); }, [close, panelProps]);
+
+    // Fix round 1 (T16-M1): another molecule chosen meanwhile -- quick pick, the picker, a followed job that
+    // finishes and opens -- closes the workspace, so the canvas shows that molecule rather than the preview.
+    const selectedId = useAppSelector(state => state.molecule.selectedId);
+    const chosenRef = useRef(selectedId);
+    useEffect(() => {
+        if (chosenRef.current === selectedId) return;
+        chosenRef.current = selectedId;
+        if (shown) dispatch(requestOpened(false));
+    }, [selectedId, shown, dispatch]);
 
     if (!shown) return null;
     return (
@@ -69,7 +81,8 @@ const RequestWorkspace: React.FC<RequestWorkspaceProps> = ({ returnFocusRef }) =
                 <IconButton aria-label="Close the request workspace" size="small" onClick={close}><Close fontSize="small" /></IconButton>
             </header>
             <div className="request-workspace-body">
-                <RequestPanel {...panelProps} showStructureSvg={false} onPreviewResolved={onResolved} onPreviewCleared={onCleared} />
+                <RequestPanel {...panelProps} onOpen={openComputed} showStructureSvg={false}
+                    onPreviewResolved={onResolved} onPreviewCleared={onCleared} />
             </div>
         </section>
     );

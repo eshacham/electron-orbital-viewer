@@ -1,5 +1,6 @@
 import { InMemoryWebStorage, User, UserManager, WebStorageStateStore } from 'oidc-client-ts';
 import type { CognitoSettings } from './build_env';
+import { OWNER_GROUP } from '../store/jobsSlice';
 
 export const SESSION_KEY = 'eov.owner.session';
 export type OwnerPage = '/' | '/admin.html';
@@ -149,6 +150,8 @@ export class OwnerAuth {
     private renewing: Promise<boolean> | null = null;
     /** The email of the session last announced, or undefined when none is: a renewal is not a new sign-in. */
     private announced: string | null | undefined = undefined;
+    /** Whether the session held now is an owner's (the `owners` group): only its end is an owner-session expiry. */
+    private ownerSession = false;
 
     constructor(private readonly settings: CognitoSettings, private readonly page: OwnerPage, private readonly deps: OwnerAuthDeps) {
         // oidc-client-ts's own renewal timer lands here as well as explicit renewals.
@@ -300,16 +303,21 @@ export class OwnerAuth {
             this.deps.session.setItem(SESSION_KEY, JSON.stringify(saved));
         }
         const identity = identityOf(user);
+        this.ownerSession = identity.groups.includes(OWNER_GROUP);
         if (this.announced === identity.email) return;
         this.announced = identity.email;
         this.emit({ identity, reason: 'signed-in' });
     }
 
     private async end(reason: 'signed-out' | 'expired'): Promise<void> {
+        // Fix round 1 (T16-M2): "your owner session has ended" -- and the owner's request workspace kept under
+        // that alert -- is for an owner. A signed-in non-owner whose session ends is simply signed out.
+        const said = reason === 'expired' && !this.ownerSession ? 'signed-out' : reason;
+        this.ownerSession = false;
         this.deps.session.removeItem(SESSION_KEY);
         await this.deps.userManager.removeUser();
         this.announced = undefined;
-        this.emit({ identity: null, reason });
+        this.emit({ identity: null, reason: said });
     }
 
     private saved(): SavedSession | null {

@@ -500,7 +500,7 @@ describe('useMoleculeView', () => {
 
         // Methane-like, off-centre: four H round a C at (5, 5, 5) Å.
         const atoms: CanonicalAtom[] = [[6, 5, 5, 5], [1, 5.63, 5.63, 5.63], [1, 4.37, 4.37, 5.63], [1, 4.37, 5.63, 4.37], [1, 5.63, 4.37, 4.37]];
-        act(() => { store.dispatch(previewResolved(atoms)); });
+        act(() => { store.dispatch(previewResolved({ atoms, formula: 'CH4' })); });
         await flush();
         const overlay = (setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1] as import('three').Group;
         expect(overlay === moleculeOverlay).toBe(false);   // (THREE objects are not printable in a failure)

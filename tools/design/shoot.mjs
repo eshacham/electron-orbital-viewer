@@ -4,7 +4,7 @@
 // each theme and size, measures boxes, fonts and colours, then stops both in
 // the same foreground run. It never touches the owner's browser or servers.
 //   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--display '<eov.display JSON>'] [--gl metal] [--dpr 2] [--drawer open] [--crop <selector>] [--run <label>]
-//     [--owner-session] [--jobs-stub [--preview-fixture preview_aws]] [--click <name>] [--type <text>] [--press <key>] [--scroll <text>] ...
+//     [--owner-session] [--jobs-stub [--preview-fixture preview_ok] [--preview-existing get_done]] [--click <name>] [--type <text>] [--press <key>] [--scroll <text>] ...
 // Writes /tmp/6g1-<task>-<scene>-<theme>-<size>.png and /tmp/6g1-<task>-<run>-metrics.json
 //
 // Task 16 of 6G-2 (preflight D3 (a)): the owner's jobs UI, shot without any job server.
@@ -17,8 +17,13 @@
 //                    can reach a real server even past the stub. metrics.api counts what was seen, answered, refused.
 //   --click/--type/--press/--scroll  scripted steps, in the order given, after the scene settles and before the
 //                    shot: click the one control with that accessible name (or that exact text), type into the
-//                    focused field, press a key, scroll an element with that text into view. A click on an
-//                    approve/run/submit control is refused: the check stops at the quote.
+//                    focused text field, press a key, scroll an element with that text into view.
+//   Guards (fix round 1, T16-M3): --owner-session and every scripted step need --jobs-stub (without it /api
+//   proxies to a real server). Nothing a step does may send a job: a click is refused when the name asked for,
+//   or the control it actually lands on, reads Approve…/Run on…/Retry on…/Submit…; --press takes only keys that
+//   cannot activate a control (Escape, Tab, Shift+Tab, arrows, Home, End, PageUp, PageDown -- never Enter or
+//   Space); --type types only into a focused text field and never a line break. And the stub aborts POST
+//   /v1/jobs whatever happens.
 // (--run defaults to a timestamp, so a second invocation for the same --task never overwrites
 // the first run's aggregated metrics -- final review B-I2).
 import { spawn } from 'node:child_process';
@@ -88,24 +93,50 @@ const drawerOpen = arg('drawer', 'folded') === 'open';
 const cropSelector = arg('crop', null);
 const ownerSession = process.argv.includes('--owner-session');
 const jobsStub = process.argv.includes('--jobs-stub');
-const previewFixture = arg('preview-fixture', 'preview_aws');
+const previewFixture = arg('preview-fixture', 'preview_ok');
+// A preview whose molecule is already on record: the preview fixture with a recorded job as its `existing`
+// (what tests/jobs/request_panel.test.tsx composes), e.g. --preview-existing get_done → "Already computed — open it".
+const previewExisting = arg('preview-existing', null);
 // The scripted steps, in argv order.
 const steps = [];
 for (let i = 2; i < process.argv.length; i++) {
   const step = /^--(click|type|press|scroll)$/.exec(process.argv[i]);
   if (step) steps.push({ kind: step[1], value: process.argv[++i] });
 }
-// The check stops at the quote: nothing that would send a job is ever clicked, even stubbed.
-const SENDS_A_JOB = /^(Approve|Run on|Retry on|Submit|Already)/;
-for (const step of steps) if (step.kind === 'click' && SENDS_A_JOB.test(step.value)) throw new Error(`--click "${step.value}" would send a job; the check stops at the quote`);
+// Fix round 1 (T16-M3): steps and the owner session only ever run against the stub.
+if ((ownerSession || steps.length) && !jobsStub) {
+  throw new Error('--owner-session and --click/--type/--press/--scroll need --jobs-stub: without it /api reaches a real job server');
+}
+// The check stops at the quote: nothing that would send a job is ever activated, even stubbed. "Already
+// computed — open it" / "Already running — follow it" only open or follow a job, so they are allowed.
+const SENDS_A_JOB = /^\s*(Approve|Run on|Retry on|Submit)/i;
+// Keys that move focus or scroll or close, and cannot activate a control (Enter and Space would).
+const SAFE_KEYS = new Set(['Escape', 'Tab', 'Shift+Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown']);
+for (const step of steps) {
+  if (step.value === undefined) throw new Error(`--${step.kind} needs a value`);
+  if (step.kind === 'click' && SENDS_A_JOB.test(step.value)) throw new Error(`--click "${step.value}" would send a job; the check stops at the quote`);
+  if (step.kind === 'press' && !SAFE_KEYS.has(step.value)) throw new Error(`--press "${step.value}" could activate a control; only ${[...SAFE_KEYS].join(', ')}`);
+  if (step.kind === 'type' && /[\r\n]/.test(step.value)) throw new Error('--type may not contain a line break');
+}
 
 const FIXTURES = resolve(DEFAULT_ROOT, 'tests/jobs/fixtures/api');
 const fixture = name => JSON.parse(readFileSync(resolve(FIXTURES, `${name}.json`), 'utf8'));
 const JOB_FIXTURES = ['get_done', 'get_running', 'get_failed', 'get_done_aws', 'get_absorbed_aws', 'get_legacy_aws', 'get_retried_aws'];
 if (jobsStub) fixture(previewFixture);   // an unknown --preview-fixture fails here, before anything starts
+if (previewExisting && !JOB_FIXTURES.includes(previewExisting)) throw new Error(`--preview-existing ${previewExisting}: not a job fixture`);
+const previewAnswer = () => {
+  const answer = fixture(previewFixture);
+  return previewExisting ? { ...answer, body: { ...answer.body, existing: fixture(previewExisting).body } } : answer;
+};
 
 /** Answers the page's jobs API from the recorded fixtures only; anything else is aborted and logged (preflight D3 (a)). */
 async function installJobsStub(context, log) {
+  // A computed molecule's result files (/molecules/jobs/<key>/...) are a job's output, not the library: never
+  // fetched under the stub (no CDN, no local results folder) -- the page says it could not load them.
+  await context.route('**/molecules/jobs/**', route => {
+    log.blockedResults.push(new URL(route.request().url()).pathname);
+    return route.abort('blockedbyclient');
+  });
   await context.route('**/api/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -125,7 +156,7 @@ async function installJobsStub(context, log) {
       log.refused.push(where);
       return route.abort('blockedbyclient');
     }
-    const { status, body } = fixture(name);
+    const { status, body } = name === previewFixture ? previewAnswer() : fixture(name);
     log.stubbed.push(`${where} -> ${name} (${status})`);
     return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   });
@@ -147,15 +178,27 @@ async function findNamed(page, name) {
 
 async function runSteps(page) {
   for (const step of steps) {
-    if (step.kind === 'click') await (await findNamed(page, step.value)).click();
+    if (step.kind === 'click') {
+      const target = await findNamed(page, step.value);
+      // The control the click actually lands on, not only the name asked for (a text match inside a button).
+      const landsOn = await target.evaluate(el => {
+        const control = el.closest('button, a, [role="button"], input, summary') ?? el;
+        return `${control.getAttribute('aria-label') ?? ''} ${control.textContent ?? ''}`.trim();
+      });
+      if (SENDS_A_JOB.test(landsOn)) throw new Error(`--click "${step.value}" lands on "${landsOn}", which would send a job`);
+      await target.click();
+    }
     else if (step.kind === 'scroll') await (await findNamed(page, step.value)).scrollIntoViewIfNeeded();
     else if (step.kind === 'press') await page.keyboard.press(step.value);
     else {
+      // A text field only: typed characters on a focused button or radio (a space) would activate it.
       const field = await page.evaluate(() => {
         const el = document.activeElement;
-        return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? (el.getAttribute('aria-label') ?? el.tagName) : null;
+        const text = el?.tagName === 'TEXTAREA'
+          || (el?.tagName === 'INPUT' && ['text', 'search', 'number', 'email', 'tel', 'url'].includes(el.type));
+        return text ? (el.getAttribute('aria-label') ?? el.tagName) : null;
       });
-      if (!field) throw new Error(`--type "${step.value}": nothing editable has focus`);
+      if (!field) throw new Error(`--type "${step.value}": no text field has focus`);
       await page.keyboard.type(step.value);
     }
     await page.waitForTimeout(300);
@@ -381,7 +424,7 @@ try {
             try { window.localStorage.setItem('eov.jobs.target', 'local'); } catch { /* storage refused */ }
           });
         }
-        const api = { seen: [], stubbed: [], refused: [] };
+        const api = { seen: [], stubbed: [], refused: [], blockedResults: [] };
         if (jobsStub) await installJobsStub(context, api);
         const page = await context.newPage();
         const errors = [];
@@ -435,7 +478,7 @@ try {
         metrics.text.enclosedNote = enclosedNote;
         // Every /api request the page made, and what answered it; with --jobs-stub, notStubbed must be 0.
         metrics.api = {
-          seen: api.seen.length, stubbed: api.stubbed, refused: api.refused,
+          seen: api.seen.length, stubbed: api.stubbed, refused: api.refused, blockedResults: api.blockedResults,
           notStubbed: jobsStub ? api.seen.length - api.stubbed.length - api.refused.length : null,
         };
         for (const refused of api.refused) errors.push(`jobs stub refused ${refused}`);

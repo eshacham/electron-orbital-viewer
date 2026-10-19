@@ -9,8 +9,6 @@ import { combinationTitle } from '../combinations';
 import { BONDS_SYSTEMS } from '../bonds/systems';
 import { moleculeTitle, noSurfaceView, viewDescription } from '../export/caption';
 import { formatFormula } from '../molecules/catalogue';
-import { ELEMENTS } from '../elements';
-import type { CanonicalAtom } from '../jobs/api_types';
 
 const SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
 
@@ -25,18 +23,6 @@ const METHOD: Record<RelativityMode, string> = {
     scalar: 'LDA, scalar-relativistic',
     spinOrbit: 'LDA, with spin–orbit',
 };
-
-/** Hill order -- carbon, hydrogen, then alphabetical; alphabetical with no carbon -- as tools/jobs/canonical.py's formula() writes it. */
-function hillFormula(atoms: CanonicalAtom[]): string {
-    const counts = new Map<string, number>();
-    for (const [Z] of atoms) {
-        const symbol = ELEMENTS[Z - 1]?.symbol ?? `Z${Z}`;
-        counts.set(symbol, (counts.get(symbol) ?? 0) + 1);
-    }
-    const rest = [...counts.keys()].filter(s => !counts.has('C') || (s !== 'C' && s !== 'H')).sort();
-    const order = counts.has('C') ? ['C', 'H', ...rest].filter(s => counts.has(s)) : rest;
-    return order.map(s => `${s}${counts.get(s)! > 1 ? counts.get(s) : ''}`).join('');
-}
 
 export interface ViewTitle {
     title: string;
@@ -78,9 +64,10 @@ export function viewTitle(state: RootState): ViewTitle {
         const system = BONDS_SYSTEMS.find(entry => entry.id === state.bonds.system);
         return { title: system ? `${system.formula} — ${system.name}` : 'Bonds', subtitle: viewDescription(state) };
     }
-    // Ruling P12: the request workspace's preview is what the canvas shows meanwhile -- named as one.
-    const preview = state.jobs.request.previewAtoms;
-    if (preview) return { title: `Preview — ${formatFormula(hillFormula(preview))}`, subtitle: 'resolved structure, not yet computed' };
+    // Ruling P12: the request workspace's preview is what the canvas shows meanwhile -- named as one, by the
+    // preview response's own formula (fix round 1, T16-M4: the one its resolved facts show).
+    const { previewAtoms, previewFormula } = state.jobs.request;
+    if (previewAtoms) return { title: `Preview — ${formatFormula(previewFormula ?? '')}`, subtitle: 'resolved structure, not yet computed' };
     const meta = state.molecule.meta;
     if (!meta) return { title: 'Molecules', subtitle: 'Choose a molecule' };
     // Ruling P8 / T13-M: no surface (show=none) -- the line says what is drawn instead, and how it was got.

@@ -271,6 +271,8 @@ describe('Molecules mode with on-demand molecules', () => {
         await enterMolecules(true);
         fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
         fireEvent.click(screen.getByRole('button', { name: 'Request a molecule' }));
+        // Fix round 1 (T16-M5): the accordion's own region is the one named "Request a molecule"; the panel adds none.
+        expect(screen.getAllByRole('region', { name: /request a molecule/i })).toHaveLength(1);
         fireEvent.change(screen.getByRole('textbox', { name: /^molecule/ }), { target: { value: 'water' } });
         fireEvent.click(screen.getByRole('tab', { name: 'View' }));
         expect(screen.queryByRole('textbox', { name: /^molecule/ })).toBeNull();
@@ -320,6 +322,43 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(title.querySelector('.tier-badge')).not.toBeNull();
         expect(viewportCell.querySelector('.thumbnail-strip')).not.toBeNull();
         expect(screen.queryByText(/these are Water’s properties/)).toBeNull();
+    });
+
+    // Fix round 1 (T16-M1): choosing another molecule closes the workspace and the canvas shows that molecule --
+    // from the quick pick, and when a followed job finishes and opens.
+    it('closes the request workspace when another molecule is chosen: quick pick, or a followed job that finishes', async () => {
+        BUILD_ENV.dev = true;
+        mockApi.preview.mockResolvedValue(previewFixture('preview_ok'));
+        const { store, container } = await enterMolecules(false);
+        await show(store, 'h2o');
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const viewportCell = container.querySelector('#canvas-container') as HTMLElement;
+        const preview = async () => {
+            fireEvent.click(within(side).getByRole('button', { name: 'Request a new molecule' }));
+            const workspace = within(viewportCell).getByRole('region', { name: 'Request a molecule' });
+            fireEvent.change(within(workspace).getByRole('textbox', { name: 'molecule (Name)' }), { target: { value: 'water' } });
+            fireEvent.click(within(workspace).getByRole('button', { name: 'Preview' }));
+            await flush();
+            expect(store.getState().jobs.request.previewAtoms).not.toBeNull();
+        };
+        await preview();
+        fireEvent.click(within(within(side).getByRole('group', { name: 'Quick pick' })).getByRole('button', { name: /Ammonia/ }));
+        await flush();
+        expect(store.getState().molecule.selectedId).toBe('nh3');
+        expect(within(viewportCell).queryByRole('region', { name: 'Request a molecule' })).toBeNull();
+        expect(store.getState().jobs.request.previewAtoms).toBeNull();
+        expect(within(viewportCell.querySelector('.viewport-title') as HTMLElement).getByRole('heading', { level: 1 })).not.toHaveTextContent('Preview');
+
+        await preview();
+        act(() => {
+            store.dispatch(jobUpdated({ ...jobFixture('get_running'), key: KEY }));
+            store.dispatch(followJob(KEY));
+        });
+        act(() => { store.dispatch(jobUpdated(jobFixture('get_done'))); });
+        await flush();
+        expect(store.getState().molecule.selectedId).toBe(KEY);
+        expect(within(viewportCell).queryByRole('region', { name: 'Request a molecule' })).toBeNull();
+        expect(store.getState().jobs.request.previewAtoms).toBeNull();
     });
 
     it('says an ended session, with the way back, rather than hiding the request panel silently', async () => {

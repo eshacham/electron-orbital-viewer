@@ -43,6 +43,10 @@ function setup(href: string, overrides: Partial<UserManagerLike> = {}) {
 
 beforeEach(() => window.sessionStorage.clear());
 
+/** Fix round 1 (T16-M2): an owner's session (the `owners` group) -- only its end is an expiry the page says as one. */
+const OWNER_PROFILE = { ...PROFILE, 'cognito:groups': ['owners'] };
+const ownerSignIn = { signinRedirectCallback: jest.fn(async () => user({ profile: OWNER_PROFILE as never })) };
+
 const ORIGIN = 'http://localhost:5391';
 /** What oidc-client-ts throws for an OAuth error answer: its `state` is the one this tab stored, read back by state id. */
 function errorResponse(error: string, state?: unknown): Error {
@@ -151,8 +155,9 @@ describe('a reload, a renewal, and the end of a session', () => {
         put(user({ expires_at: Math.floor(Date.now() / 1000) - 10 }));
         await expect(auth.accessToken()).resolves.toBe('access-2');
     });
+    // Fix round 1 (T16-M2): signed in as an owner -- a non-owner's ending session is a sign-out (below).
     it('calls a refresh refused mid-session an expiry, and forgets the token', async () => {
-        const { auth, events } = setup('http://localhost:5391/?code=abc&state=xyz', { signinSilent: jest.fn(async () => { throw errorResponse('invalid_grant'); }) });
+        const { auth, events } = setup('http://localhost:5391/?code=abc&state=xyz', { ...ownerSignIn, signinSilent: jest.fn(async () => { throw errorResponse('invalid_grant'); }) });
         await auth.start();
         await expect(auth.refresh()).resolves.toBe(false);
         expect(events.at(-1)).toEqual({ identity: null, reason: 'expired' });
@@ -174,8 +179,9 @@ describe('a reload, a renewal, and the end of a session', () => {
         expect(window.sessionStorage.getItem(SESSION_KEY)).not.toBeNull();
         await expect(auth.accessToken()).resolves.toBeNull();
     });
+    // Fix round 1 (T16-M2): signed in as an owner, so the refusal reads as an expiry.
     it("oidc-client-ts's own renewal ends the session only on a refusal", async () => {
-        const { auth, events, userManager } = setup('http://localhost:5391/?code=abc&state=xyz');
+        const { auth, events, userManager } = setup('http://localhost:5391/?code=abc&state=xyz', ownerSignIn);
         await auth.start();
         const onRenewError = (userManager.events.addSilentRenewError as jest.Mock).mock.calls[0][0] as (error: Error) => void;
         onRenewError(new TypeError('Failed to fetch'));
@@ -186,14 +192,45 @@ describe('a reload, a renewal, and the end of a session', () => {
         expect(events.at(-1)?.reason).toBe('expired');
     });
     // m8: a request still refused after a successful renewal ends the session here too, not only in the store.
+    // Fix round 1 (T16-M2): signed in as an owner, so the end reads as an expiry.
     it('expire() forgets the session and says it expired', async () => {
-        const { auth, events } = setup('http://localhost:5391/?code=abc&state=xyz');
+        const { auth, events } = setup('http://localhost:5391/?code=abc&state=xyz', ownerSignIn);
         await auth.start();
         await auth.expire();
         expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
         expect(events.at(-1)).toEqual({ identity: null, reason: 'expired' });
         await expect(auth.accessToken()).resolves.toBeNull();
     });
+    // Fix round 1 (T16-M2): "your owner session has ended" (and the owner's disabled request workspace) is for an
+    // owner. A signed-in non-owner whose session ends -- a refused renewal, oidc-client-ts's own, or expire() --
+    // is simply signed out.
+    it("ends a non-owner's session as a sign-out, never an owner expiry", async () => {
+        const refused = jest.fn(async () => { throw errorResponse('invalid_grant'); });
+        const visitor = setup('http://localhost:5391/?code=abc&state=xyz', { signinSilent: refused });
+        await visitor.auth.start();
+        expect(visitor.events.at(-1)?.identity?.groups).toEqual([]);
+        await expect(visitor.auth.refresh()).resolves.toBe(false);
+        expect(visitor.events.at(-1)).toEqual({ identity: null, reason: 'signed-out' });
+        expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
+
+        const other = setup('http://localhost:5391/?code=abc&state=xyz',
+            { signinRedirectCallback: jest.fn(async () => user({ profile: { ...PROFILE, 'cognito:groups': ['admin'] } as never })) });
+        await other.auth.start();
+        await other.auth.expire();
+        expect(other.events.at(-1)).toEqual({ identity: null, reason: 'signed-out' });
+        const onRenewError = (other.userManager.events.addSilentRenewError as jest.Mock).mock.calls[0][0] as (error: Error) => void;
+        await other.auth.start();
+        onRenewError(errorResponse('invalid_grant'));
+        await new Promise(r => setTimeout(r, 0));
+        expect(other.events.map(event => event.reason)).not.toContain('expired');
+
+        // The same refusal for an owner is an expiry.
+        const owner = setup('http://localhost:5391/?code=abc&state=xyz', { ...ownerSignIn, signinSilent: refused });
+        await owner.auth.start();
+        await owner.auth.refresh();
+        expect(owner.events.at(-1)).toEqual({ identity: null, reason: 'expired' });
+    });
+
     it("signs out through Cognito's logout endpoint", async () => {
         const { auth, location } = setup('http://localhost:5391/?code=abc&state=xyz');
         await auth.start();

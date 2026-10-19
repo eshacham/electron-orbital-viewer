@@ -15,12 +15,13 @@ jest.mock('../../src/jobs/client', () => ({
 import { createAppStore } from '../../src/store';
 import { setMode } from '../../src/store/atomSlice';
 import { requestOpened, sessionChanged, sessionExpired } from '../../src/store/jobsSlice';
+import { selectMolecule } from '../../src/store/moleculeSlice';
 import { SESSION_ENDED } from '../../src/jobs/api';
 import { BUILD_ENV } from '../../src/jobs/build_env';
 import MoleculeJobsSection from '../../src/components/MoleculeJobsSection';
 import RequestWorkspace from '../../src/components/RequestWorkspace';
 import { resetBuildEnv } from './build_env_stub';
-import { previewFixture } from './api_fixtures';
+import { jobFixture, previewFixture } from './api_fixtures';
 
 const COGNITO = { authority: 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_abc', clientId: 'c', domain: 'https://d' };
 const OWNER = { signedIn: true, email: 'owner@example.com', groups: ['owners'] };
@@ -177,6 +178,48 @@ describe('the request workspace (ruling P12)', () => {
         expect(workspace()).toBeNull();
         expect(store.getState().jobs.request.previewAtoms).toBeNull();
         expect(document.querySelector('.request-workspace')).toBeNull();
+    });
+
+    // Fix round 1 (T16-I1): opening the molecule already computed closes the workspace first, so the preview
+    // leaves the canvas and the computed molecule is what is shown. (preview_known's existing job is RUNNING --
+    // "Already running — follow it" -- so a DONE one is composed from the fixtures, as request_panel.test.tsx does.)
+    it('"Already computed — open it" closes the workspace, clears the preview and selects the computed molecule (T16-I1)', async () => {
+        const done = jobFixture('get_done');
+        mockApi.preview.mockImplementation(async () => ({ ...previewFixture('preview_ok'), existing: done }));
+        const { store } = setup();
+        await openAndPreview(store);
+        expect(store.getState().jobs.request.previewAtoms).not.toBeNull();
+        fireEvent.click(within(workspace()!).getByRole('button', { name: 'Already computed — open it' }));
+        await flush();
+        expect(workspace()).toBeNull();
+        expect(store.getState().jobs.request).toEqual(expect.objectContaining({ open: false, previewAtoms: null, previewFormula: null }));
+        expect(store.getState().molecule.selectedId).toBe(done.key);
+        expect(entryButton()).toHaveFocus();
+    });
+
+    // Fix round 1 (T16-M1): any other molecule chosen meanwhile -- quick pick, the picker, a followed job that
+    // finishes (each dispatches selectMolecule) -- closes the workspace and takes the preview off the canvas.
+    it('choosing another molecule while it is open closes it and clears the preview (T16-M1)', async () => {
+        const { store } = setup();
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o' })); });
+        await openAndPreview(store);
+        expect(store.getState().jobs.request.previewAtoms).not.toBeNull();
+        act(() => { store.dispatch(selectMolecule({ id: 'nh3' })); });
+        await flush();
+        expect(workspace()).toBeNull();
+        expect(store.getState().jobs.request).toEqual(expect.objectContaining({ open: false, previewAtoms: null }));
+        // Opened again with the same molecule chosen, it stays open.
+        fireEvent.click(entryButton());
+        await flush();
+        expect(workspace()).not.toBeNull();
+    });
+
+    // Fix round 1 (T16-M5): one region carries the name, the workspace's; the panel inside adds no second one.
+    it('is the one region named "Request a molecule"', () => {
+        setup();
+        fireEvent.click(entryButton());
+        expect(screen.getAllByRole('region', { name: /request a molecule/i })).toHaveLength(1);
+        expect(screen.getByRole('region', { name: /request a molecule/i })).toBe(workspace());
     });
 
     it('with the workspace closed, an ended session is said in Explore with the way back', () => {

@@ -99,7 +99,7 @@ describe('jobs state', () => {
         s = reducer(s, requestOpened(true));
         s = reducer(s, setTarget('aws'));
         // Task 16 (ruling P12): the draft now also carries the preview's atoms drawn on the canvas -- none here.
-        expect(s.request).toEqual({ form: { kind: 'name', text: 'water', recipe: 'single', charge: '-1', multiplicity: '' }, open: true, previewAtoms: null });
+        expect(s.request).toEqual({ form: { kind: 'name', text: 'water', recipe: 'single', charge: '-1', multiplicity: '' }, open: true, previewAtoms: null, previewFormula: null });
     });
     it('a failed sign-in can be dismissed', () => {
         const s = reducer(initialJobsState(), sessionFailed('Sign-in did not complete.'));
@@ -117,12 +117,16 @@ describe('jobs state', () => {
 // they are set, so everything that makes the preview stale, or takes the workspace away, clears them.
 describe('the request preview drawn on the canvas', () => {
     const WATER: CanonicalAtom[] = [[1, 0, -0.75545, -0.47116], [1, 0, 0.75545, -0.47116], [8, 0, 0, 0.11779]];
-    const withPreview = () => reducer(reducer(initialJobsState(), requestOpened(true)), previewResolved(WATER));
+    const withPreview = () => reducer(reducer(initialJobsState(), requestOpened(true)), previewResolved({ atoms: WATER, formula: 'H2O' }));
 
-    it('previewResolved sets the atoms and previewCleared takes them away', () => {
+    // Fix round 1 (T16-M4): the response's own formula travels with the atoms, for the title.
+    it('previewResolved sets the atoms and the formula, and previewCleared takes both away', () => {
         expect(initialJobsState().request.previewAtoms).toBeNull();
-        expect(withPreview().request.previewAtoms).toEqual(WATER);
-        expect(reducer(withPreview(), previewCleared()).request.previewAtoms).toBeNull();
+        expect(initialJobsState().request.previewFormula).toBeNull();
+        expect([withPreview().request.previewAtoms, withPreview().request.previewFormula]).toEqual([WATER, 'H2O']);
+        const cleared = reducer(withPreview(), previewCleared()).request;
+        expect([cleared.previewAtoms, cleared.previewFormula]).toEqual([null, null]);
+        expect(reducer(withPreview(), requestOpened(false)).request.previewFormula).toBeNull();
     });
     it('an edit to the request, closing it or a target switch clears them', () => {
         BUILD_ENV.dev = true;

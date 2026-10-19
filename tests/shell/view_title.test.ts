@@ -54,23 +54,16 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
     });
 
     // Task 16 (ruling P12): while the request workspace's preview is on the canvas, the title names it as a
-    // preview -- Hill-order formula, as the server writes it -- never as the molecule chosen before it.
+    // preview, never as the molecule chosen before it. Fix round 1 (T16-M4): the formula is the preview
+    // response's own (what the resolved facts show), not one rebuilt from the atoms here.
     it('titles a request preview as a preview, not yet computed, and gives the molecule its title back', () => {
         const store = neonStore();
         store.dispatch(setMode('molecule'));
         store.dispatch(selectMolecule({ id: 'h2o' }));
         store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
         const molecule = viewTitle(store.getState());
-        // Caffeine's atoms in any order: C first, H second, then the rest alphabetically.
-        const caffeine = [
-            ...Array.from({ length: 4 }, () => [7, 0, 0, 0]), ...Array.from({ length: 10 }, () => [1, 0, 0, 0]),
-            ...Array.from({ length: 2 }, () => [8, 0, 0, 0]), ...Array.from({ length: 8 }, () => [6, 0, 0, 0]),
-        ] as Array<[number, number, number, number]>;
-        store.dispatch(previewResolved(caffeine));
+        store.dispatch(previewResolved({ atoms: [[8, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]], formula: 'C8H10N4O2' }));
         expect(viewTitle(store.getState())).toEqual({ title: 'Preview — C₈H₁₀N₄O₂', subtitle: 'resolved structure, not yet computed' });
-        // No carbon: alphabetical, as tools/jobs/canonical.py's formula().
-        store.dispatch(previewResolved([[8, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]]));
-        expect(viewTitle(store.getState()).title).toBe('Preview — H₂O');
         store.dispatch(previewCleared());
         expect(viewTitle(store.getState())).toEqual(molecule);
     });

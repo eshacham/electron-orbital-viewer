@@ -286,7 +286,7 @@ describe('refusal reasons (never the Basic Orbitals fallthrough)', () => {
     // preview captioned as the molecule -- refused, and said why; the orbital table is still the molecule's.
     it('a request preview on the canvas refuses every picture export until it clears', () => {
         const store = drawnStore({ kind: 'density' });
-        store.dispatch(previewResolved([[8, 0, 0, 0], [1, 0.76, 0, 0.59], [1, -0.76, 0, 0.59]]));
+        store.dispatch(previewResolved({ atoms: [[8, 0, 0, 0], [1, 0.76, 0, 0.59], [1, -0.76, 0, 0.59]], formula: 'H2O' }));
         const availability = exportAvailability(store.getState());
         expectAll(availability, PICTURE_KINDS, REQUEST_PREVIEW_REASON);
         expect(availability.csv).toBeNull();

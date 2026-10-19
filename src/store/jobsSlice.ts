@@ -22,7 +22,7 @@ export interface OwnerSession {
 }
 
 /** tools/jobs/lambdas.py's OWNER_GROUP default -- the one Cognito group the server trusts. */
-const OWNER_GROUP = 'owners';
+export const OWNER_GROUP = 'owners';
 
 export interface ComputedList { month: string | null; jobs: JobView[] | null; error: string | null; nonce: number }
 
@@ -31,11 +31,18 @@ export interface ComputedList { month: string | null; jobs: JobView[] | null; er
  * not in the panel (final review I2): the phone sheet unmounts a tab's
  * content when it folds or another tab opens, and a pasted XYZ must not go
  * with it. A preview is not kept -- it is asked for again -- but while the
- * request workspace shows one, its resolved atoms (Å, the API's own) are
- * here for the one canvas to draw (ruling P12); anything that makes the
- * preview stale or takes the workspace away clears them.
+ * request workspace shows one, its resolved atoms (Å, the API's own) and
+ * the response's formula are here for the one canvas to draw and the title
+ * to name (ruling P12, fix round 1 T16-M4); anything that makes the preview
+ * stale or takes the workspace away clears both.
  */
-export interface RequestDraft { form: RequestForm; open: boolean; previewAtoms: CanonicalAtom[] | null }
+export interface RequestDraft { form: RequestForm; open: boolean; previewAtoms: CanonicalAtom[] | null; previewFormula: string | null }
+export interface ResolvedPreview { atoms: CanonicalAtom[]; formula: string }
+
+function clearPreview(request: RequestDraft): void {
+    request.previewAtoms = null;
+    request.previewFormula = null;
+}
 // request_form.EMPTY_FORM, written out: importing it would pull the element table into /admin.html.
 const EMPTY_DRAFT: RequestForm = { kind: 'name', text: '', recipe: 'single', charge: '', multiplicity: '' };
 
@@ -73,7 +80,7 @@ export function initialJobsState(): JobsState {
         recordErrors: {},
         followedKey: null,
         computed: { month: null, jobs: null, error: null, nonce: 0 },
-        request: { form: { ...EMPTY_DRAFT }, open: false, previewAtoms: null },
+        request: { form: { ...EMPTY_DRAFT }, open: false, previewAtoms: null, previewFormula: null },
     };
 }
 
@@ -90,7 +97,7 @@ const jobsSlice = createSlice({
             state.followedKey = null;
             state.computed = { month: null, jobs: null, error: null, nonce: state.computed.nonce + 1 };
             // A This Mac preview is not an AWS one (the panel drops it too).
-            state.request.previewAtoms = null;
+            clearPreview(state.request);
         },
         sessionChanged: (state, action: PayloadAction<{ signedIn: boolean; email: string | null; groups: string[] }>) => {
             state.session.signedIn = action.payload.signedIn;
@@ -102,7 +109,7 @@ const jobsSlice = createSlice({
             } else {
                 // Signed out (Review Focus 4): the owner's workspace goes, and its preview leaves the canvas.
                 state.request.open = false;
-                state.request.previewAtoms = null;
+                clearPreview(state.request);
             }
             state.computed.nonce += 1;
         },
@@ -112,11 +119,11 @@ const jobsSlice = createSlice({
             state.session.groups = [];
             state.session.expired = true;
             // The form stays, disabled under the session-ended alert (R4); the preview leaves the canvas.
-            state.request.previewAtoms = null;
+            clearPreview(state.request);
         },
         sessionFailed: (state, action: PayloadAction<string>) => {
             state.session.error = action.payload;
-            state.request.previewAtoms = null;
+            clearPreview(state.request);
         },
         sessionErrorDismissed: state => {
             state.session.error = null;
@@ -155,18 +162,19 @@ const jobsSlice = createSlice({
         },
         requestDraftChanged: (state, action: PayloadAction<Partial<RequestForm>>) => {
             Object.assign(state.request.form, action.payload);
-            state.request.previewAtoms = null;            // the preview belonged to what was typed before
+            clearPreview(state.request);            // the preview belonged to what was typed before
         },
         requestOpened: (state, action: PayloadAction<boolean>) => {
             state.request.open = action.payload;
-            if (!action.payload) state.request.previewAtoms = null;
+            if (!action.payload) clearPreview(state.request);
         },
         /** The request workspace's preview landed: its atoms are drawn on the canvas (ruling P12). */
-        previewResolved: (state, action: PayloadAction<CanonicalAtom[]>) => {
-            state.request.previewAtoms = action.payload;
+        previewResolved: (state, action: PayloadAction<ResolvedPreview>) => {
+            state.request.previewAtoms = action.payload.atoms;
+            state.request.previewFormula = action.payload.formula;
         },
         previewCleared: state => {
-            state.request.previewAtoms = null;
+            clearPreview(state.request);
         },
     },
     extraReducers: builder => {
@@ -175,7 +183,7 @@ const jobsSlice = createSlice({
         // (tests/jobs/jobs_slice.test.ts dispatches the real setMode, so a renamed action fails there).
         builder.addMatcher(isLeavingMolecules, state => {
             state.request.open = false;
-            state.request.previewAtoms = null;
+            clearPreview(state.request);
         });
     },
 });

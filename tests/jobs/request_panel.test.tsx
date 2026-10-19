@@ -216,7 +216,7 @@ describe('reporting the preview to the canvas', () => {
         type('molecule (Name)', 'water');
         press('Preview');
         await flush();
-        expect(onPreviewResolved).toHaveBeenLastCalledWith(previewFixture('preview_ok').atoms);
+        expect(onPreviewResolved).toHaveBeenLastCalledWith({ atoms: previewFixture('preview_ok').atoms, formula: 'H2O' });
         onPreviewCleared.mockClear();
         type('molecule (Name)', 'ethanol');
         expect(onPreviewCleared).toHaveBeenCalled();
