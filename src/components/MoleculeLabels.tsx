@@ -38,7 +38,9 @@ const MoleculeLabels: React.FC<MoleculeLabelsProps> = ({ contextRef, snapshotRef
     const pick = useAppSelector(state => state.molecule.pick);
     const representation = useAppSelector(state => state.molecule.representation);
     const on = usePref(displayPref).moleculeLabels;
-    const shown = on && meta !== null && representation !== 'none';
+    // Ruling P12: a request preview on the canvas is not the molecule these lengths and angles describe.
+    const previewing = useAppSelector(state => state.jobs.request.previewAtoms !== null);
+    const shown = on && meta !== null && representation !== 'none' && !previewing;
     const atoms = meta?.atoms ?? null;
     const bonds = useMemo(() => (atoms ? detectBonds(atoms) : []), [atoms]);
     const many = atoms !== null && atoms.length > LABEL_ATOM_LIMIT;

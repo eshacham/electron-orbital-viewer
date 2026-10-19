@@ -1,0 +1,37 @@
+/* src/components/request_workspace.css -- the owner's request workspace in the viewport cell (ruling P12):
+   left-anchored, full height, min(560px, 55%) of the cell, scrolling inside; a left camera inset
+   (useViewInsets' LEFT_ZONES), so the preview drawn on the canvas sits to its right. */
+.request-workspace {
+  position: absolute; z-index: 12; top: 0; bottom: 0; left: 0;
+  width: var(--request-workspace-width);
+  display: flex; flex-direction: column;
+  background: var(--ql-color-surface-1); color: var(--ql-color-text-1);
+  border-right: 1px solid var(--ql-color-border-subtle);
+  border-radius: 0 var(--ql-radius-xl) var(--ql-radius-xl) 0;
+  box-shadow: var(--ql-shadow-panel);
+}
+/* The cell's own width decides the workspace's; the title block reads the same value to sit beside it. */
+#canvas-container { --request-workspace-width: min(560px, 55%); }
+.request-workspace-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 12px 12px 8px var(--ql-size-panel-padding);
+  border-bottom: 1px solid var(--ql-color-border-subtle);
+}
+.request-workspace-head h2 {
+  margin: 0; color: var(--ql-color-text-1);
+  font: var(--ql-type-section-weight) var(--ql-type-section-size) / var(--ql-type-section-line) var(--ql-font-sans);
+}
+.request-workspace-body {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 12px var(--ql-size-panel-padding) var(--ql-size-panel-padding);
+}
+/* While the workspace is open the title block moves beside it, under the toolbar's row (the top row
+   left of the toolbar is too narrow beside a workspace for "Preview — <formula>"). */
+.viewport-cell.request-open .viewport-title {
+  left: calc(var(--request-workspace-width) + 12px);
+  top: calc(12px + var(--ql-size-toolbar-button) + 8px);
+  max-width: calc(100% - var(--request-workspace-width) - 24px);
+}
+.app-shell.medium .viewport-cell.request-open .viewport-title {
+  max-width: calc(100% - var(--request-workspace-width) - var(--ql-size-inspector-bar) - 24px);
+}

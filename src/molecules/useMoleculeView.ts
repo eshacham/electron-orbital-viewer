@@ -14,10 +14,20 @@ import { ESP_LIMIT_HARTREE, espVertexColors } from './esp_color';
 import { buildBallAndStick, buildSpaceFilling, detectBonds, overlayExtent, pickMoleculePart } from './ball_and_stick';
 import { dipoleArrow } from './dipole';
 import { gridHalfWidth, moleculeGridRequest, planMoleculeRender } from './render_plan';
+import { canonicalToBohr } from '../jobs/structure_projection';
+import type { CanonicalAtom } from '../jobs/api_types';
+import type { MoleculeAtom } from './library_types';
 
 const TAP_TOLERANCE_PX = 6;
 const samePick = (a: MoleculePick | null, b: MoleculePick | null) => a?.kind === b?.kind && a?.index === b?.index;
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/** A request preview's atoms in bohr, centred on their mean position so the camera turns about the preview (ruling P12). */
+function previewStructure(atoms: CanonicalAtom[]): MoleculeAtom[] {
+    const bohr = canonicalToBohr(atoms);
+    const centre = [0, 1, 2].map(k => bohr.reduce((sum, atom) => sum + atom.position[k], 0) / Math.max(1, bohr.length));
+    return bohr.map(atom => ({ ...atom, position: [0, 1, 2].map(k => atom.position[k] - centre[k]) as MoleculeAtom['position'] }));
+}
 
 /**
  * Molecules mode's scene: the surface (density, ESP-coloured density, an
@@ -25,6 +35,10 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
  * none), and picking. Each surface request is numbered;
  * a result that is no longer the newest is dropped, so a slow load for one
  * molecule can never land under another's structure.
+ *
+ * While the owner's request workspace shows a preview (`jobs.request.previewAtoms`, ruling P12), the
+ * scene is that preview instead: its ball and stick, framed, with no surface, no dipole arrow and no
+ * picking; the molecule's own picture is rebuilt when it clears.
  *
  * Busy state is never keyed off a worker's promise alone: a terminated worker
  * replies to nobody, so the MO path's updateFieldInScene and a cancelled mesh
@@ -37,6 +51,7 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
     const surface = useAppSelector(state => state.molecule.surface);
     const representation = useAppSelector(state => state.molecule.representation);
     const showDipole = useAppSelector(state => state.molecule.showDipole);
+    const previewAtoms = useAppSelector(state => state.jobs.request.previewAtoms);
     const requestRef = useRef(0);
     // Ruling T13-I2. The overlay last drawn, the surface chosen now (read by the overlay effect without
     // re-running on it), and the structure radius the camera frames while no surface is drawn -- null
@@ -50,6 +65,17 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
     useEffect(() => {
         const context = contextRef.current;
         if (!context) return;
+        if (active && previewAtoms) {
+            // Ruling P12: the request preview, alone -- framed to what is drawn, as a structure-only view is.
+            const preview = new THREE.Group();
+            const atoms = previewStructure(previewAtoms);
+            preview.add(buildBallAndStick(atoms, detectBonds(atoms)));
+            setMoleculeOverlay(context, preview);
+            overlayRef.current = preview;
+            frameStructure(context, overlayExtent(preview));
+            framedStructureRef.current = null;
+            return;
+        }
         if (!active || !meta) { setMoleculeOverlay(context, null); overlayRef.current = null; return; }
         const group = new THREE.Group();
         // Ruling P8. The slice never holds space filling for a molecule it cannot be drawn for (ruling P8b).
@@ -66,17 +92,26 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
             const extent = overlayExtent(group);
             if (extent > framed) { frameStructure(context, extent); framedStructureRef.current = extent; }
         }
-    }, [contextRef, active, meta, representation, showDipole]);
+    }, [contextRef, active, meta, representation, showDipole, previewAtoms]);
 
     // Nothing chosen yet (or the next molecule still loading): do not leave
     // the previous mode's, or the previous molecule's, picture up.
     useEffect(() => {
-        if (active && !meta) clearFieldMesh(contextRef.current);
-    }, [contextRef, active, meta]);
+        if (active && !meta && !previewAtoms) clearFieldMesh(contextRef.current);
+    }, [contextRef, active, meta, previewAtoms]);
 
     useEffect(() => {
         const context = contextRef.current;
-        if (!context || !active || !meta) return;
+        if (!context || !active) return;
+        if (previewAtoms) {
+            // Ruling P12: no surface under a request preview. The number supersedes anything still landing;
+            // the surface is rebuilt from scratch when the preview clears (this effect runs again then).
+            ++requestRef.current;
+            cancelPendingRender(context);
+            clearFieldMesh(context);
+            return;
+        }
+        if (!meta) return;
         const plan = planMoleculeRender(meta, surface, enclosedFraction);
         const requestId = ++requestRef.current;
         if (plan.kind === 'clear') {
@@ -152,12 +187,13 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
             // The next request, if any, raises its own label straight after.
             dispatch(renderCancelled());
         };
-    }, [contextRef, active, meta, surface, enclosedFraction, dispatch]);
+    }, [contextRef, active, meta, surface, enclosedFraction, dispatch, previewAtoms]);
 
     // Hover with a mouse; tap (press and release without dragging) on touch.
     useEffect(() => {
         const context = contextRef.current;
-        if (!context || !active || !meta) return;
+        // A request preview's parts are not the molecule's: nothing to pick while one is drawn (ruling P12).
+        if (!context || !active || !meta || previewAtoms) return;
         const canvas = context.renderer.domElement;
         let last: MoleculePick | null = null;
         let pressedAt: { x: number; y: number } | null = null;
@@ -192,5 +228,5 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
             canvas.style.cursor = '';
             dispatch(setPick(null));
         };
-    }, [contextRef, active, meta, dispatch]);
+    }, [contextRef, active, meta, dispatch, previewAtoms]);
 }

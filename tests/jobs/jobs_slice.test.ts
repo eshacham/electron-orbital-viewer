@@ -1,7 +1,10 @@
 import reducer, {
     setTarget, sessionChanged, sessionExpired, sessionFailed, jobUpdated, jobFetchFailed, followJob, computedLoaded,
     refreshComputed, selectIsOwner, initialJobsState, JobsState, requestDraftChanged, requestOpened, sessionErrorDismissed,
+    previewResolved, previewCleared,
 } from '../../src/store/jobsSlice';
+import { setMode } from '../../src/store/atomSlice';
+import type { CanonicalAtom } from '../../src/jobs/api_types';
 import { BUILD_ENV } from '../../src/jobs/build_env';
 import { resetBuildEnv } from './build_env_stub';
 import { computedEntries, withComputed } from '../../src/jobs/computed';
@@ -95,7 +98,8 @@ describe('jobs state', () => {
         s = reducer(s, requestDraftChanged({ charge: '-1' }));
         s = reducer(s, requestOpened(true));
         s = reducer(s, setTarget('aws'));
-        expect(s.request).toEqual({ form: { kind: 'name', text: 'water', recipe: 'single', charge: '-1', multiplicity: '' }, open: true });
+        // Task 16 (ruling P12): the draft now also carries the preview's atoms drawn on the canvas -- none here.
+        expect(s.request).toEqual({ form: { kind: 'name', text: 'water', recipe: 'single', charge: '-1', multiplicity: '' }, open: true, previewAtoms: null });
     });
     it('a failed sign-in can be dismissed', () => {
         const s = reducer(initialJobsState(), sessionFailed('Sign-in did not complete.'));
@@ -106,6 +110,48 @@ describe('jobs state', () => {
         const s = reducer(initialJobsState(), computedLoaded({ month: list.month, jobs: list.jobs }));
         expect(s.computed.jobs).toHaveLength(1);
         expect(s.records[list.jobs[0].key].status).toBe('DONE');
+    });
+});
+
+// Task 16 (ruling P12, Review Focus 4's store half): the preview's atoms are drawn on the one canvas while
+// they are set, so everything that makes the preview stale, or takes the workspace away, clears them.
+describe('the request preview drawn on the canvas', () => {
+    const WATER: CanonicalAtom[] = [[1, 0, -0.75545, -0.47116], [1, 0, 0.75545, -0.47116], [8, 0, 0, 0.11779]];
+    const withPreview = () => reducer(reducer(initialJobsState(), requestOpened(true)), previewResolved(WATER));
+
+    it('previewResolved sets the atoms and previewCleared takes them away', () => {
+        expect(initialJobsState().request.previewAtoms).toBeNull();
+        expect(withPreview().request.previewAtoms).toEqual(WATER);
+        expect(reducer(withPreview(), previewCleared()).request.previewAtoms).toBeNull();
+    });
+    it('an edit to the request, closing it or a target switch clears them', () => {
+        BUILD_ENV.dev = true;
+        expect(reducer(withPreview(), requestDraftChanged({ text: 'ethanol' })).request.previewAtoms).toBeNull();
+        const closed = reducer(withPreview(), requestOpened(false));
+        expect([closed.request.open, closed.request.previewAtoms]).toEqual([false, null]);
+        expect(reducer(withPreview(), requestOpened(true)).request.previewAtoms).toEqual(WATER);
+        expect(reducer(withPreview(), setTarget('aws')).request.previewAtoms).toBeNull();
+    });
+    it('the session ending or failing clears them; signing out also closes the workspace', () => {
+        expect(reducer(withPreview(), sessionFailed('Sign-in did not complete.')).request.previewAtoms).toBeNull();
+        const expired = reducer(withPreview(), sessionExpired());
+        // The session-ended alert path keeps the form, and the workspace that shows it (today's R4 behaviour).
+        expect([expired.request.open, expired.request.previewAtoms]).toEqual([true, null]);
+        const signedOut = reducer(withPreview(), sessionChanged({ signedIn: false, email: null, groups: [] }));
+        expect([signedOut.request.open, signedOut.request.previewAtoms]).toEqual([false, null]);
+        // A sign-in (or a refreshed identity) is not a sign-out: nothing is taken away.
+        const signedIn = reducer(withPreview(), sessionChanged({ signedIn: true, email: 'o', groups: ['owners'] }));
+        expect([signedIn.request.open, signedIn.request.previewAtoms]).toEqual([true, WATER]);
+    });
+    it('leaving Molecules closes the workspace and clears them; entering it again changes nothing', () => {
+        for (const mode of ['atom', 'bonds', 'hydrogenic'] as const) {
+            const left = reducer(withPreview(), setMode(mode));
+            expect([left.request.open, left.request.previewAtoms]).toEqual([false, null]);
+        }
+        const stayed = reducer(withPreview(), setMode('molecule'));
+        expect([stayed.request.open, stayed.request.previewAtoms]).toEqual([true, WATER]);
+        // The form itself outlives all of it (final review I2).
+        expect(reducer(reducer(withPreview(), requestDraftChanged({ text: 'water' })), setMode('atom')).request.form.text).toBe('water');
     });
 });
 

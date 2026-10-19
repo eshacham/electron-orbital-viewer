@@ -9,7 +9,7 @@ import {
 } from '../jobs/request_form';
 import { PreviewFn, usePreview } from '../jobs/usePreview';
 import { SESSION_ENDED } from '../jobs/api';
-import { AvailableQuoteOption, isActive, JobRequest, JobView, PreviewResponse, Recipe } from '../jobs/api_types';
+import { AvailableQuoteOption, CanonicalAtom, isActive, JobRequest, JobView, PreviewResponse, Recipe } from '../jobs/api_types';
 import type { JobsTarget } from '../store/jobsSlice';
 
 export interface RequestPanelProps {
@@ -24,6 +24,14 @@ export interface RequestPanelProps {
     /** The session ended mid-session: keep the form, disable it, and offer sign-in (spec §9.5). */
     sessionExpired: boolean;
     onSignIn(): void;
+    /**
+     * The request workspace (ruling P12) draws the resolved structure on the one canvas: told the atoms
+     * while a preview is shown, and when none is (edited, stale, cleared, the session ended, unmounted).
+     */
+    onPreviewResolved?(atoms: CanonicalAtom[]): void;
+    onPreviewCleared?(): void;
+    /** The preview's own SVG drawing; false where the canvas draws the structure instead (the workspace). */
+    showStructureSvg?: boolean;
 }
 
 const KIND_LABEL: Record<InputKind, string> = { name: 'Name', smiles: 'SMILES', xyz: 'XYZ' };
@@ -74,7 +82,10 @@ function SubmitArea({ preview, busy, onOpen, onFollow, onSubmit, onRetry }: Subm
  * optional charge and multiplicity; then Preview, which shows what was
  * resolved and how it would run, before anything is submitted or reserved.
  */
-const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange, preview, submit, onOpen, onFollow, sessionExpired, onSignIn }) => {
+const RequestPanel: React.FC<RequestPanelProps> = ({
+    target, form, onFormChange, preview, submit, onOpen, onFollow, sessionExpired, onSignIn, onPreviewResolved, onPreviewCleared,
+    showStructureSvg = true,
+}) => {
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const { state, run, clear } = usePreview(preview);
@@ -86,6 +97,17 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
     // price never shown (final review I1).
     const signature = `${target}|${formSignature(form)}`;
     const current = state.phase !== 'idle' && state.signature === signature ? state : null;
+
+    // Ruling P12: the preview shown here is the one on the canvas -- reported as it lands and as it goes.
+    // An ended session disables the form under its alert; its preview is not drawn meanwhile.
+    const shown = current?.phase === 'ready' && !sessionExpired ? current.preview : null;
+    const reportRef = useRef({ onPreviewResolved, onPreviewCleared });
+    reportRef.current = { onPreviewResolved, onPreviewCleared };
+    useEffect(() => {
+        if (shown) reportRef.current.onPreviewResolved?.(shown.atoms);
+        else reportRef.current.onPreviewCleared?.();
+    }, [shown]);
+    useEffect(() => () => reportRef.current.onPreviewCleared?.(), []);
 
     // R4: the session ending disables the field the owner is in; focus goes to the way back rather than staying on it.
     const panel = useRef<HTMLElement>(null);
@@ -178,7 +200,7 @@ const RequestPanel: React.FC<RequestPanelProps> = ({ target, form, onFormChange,
                 {current?.phase === 'failed' && !sessionExpired && <Alert severity="error" role="alert">{current.error.message}</Alert>}
                 {current?.phase === 'ready' && (
                     <>
-                        <PreviewDetails preview={current.preview} />
+                        <PreviewDetails preview={current.preview} showStructureSvg={showStructureSvg} />
                         <SubmitArea preview={current.preview} busy={submitting || sessionExpired} onOpen={onOpen} onFollow={onFollow}
                             onSubmit={option => { void send(approvedBody(requestBody(form), option)); }}
                             onRetry={(job, option) => { void send(approvedBody(retryBody(job), option)); }} />

@@ -14,7 +14,10 @@ jest.mock('../../src/orbital_visualizer', () => ({
 }));
 
 import { createAppStore } from '../../src/store';
-import { selectMolecule, metaLoaded, setSurface, setRepresentation } from '../../src/store/moleculeSlice';
+import { selectMolecule, metaLoaded, setSurface, setRepresentation, setShowDipole } from '../../src/store/moleculeSlice';
+import { previewCleared, previewResolved } from '../../src/store/jobsSlice';
+import { canonicalToBohr } from '../../src/jobs/structure_projection';
+import type { CanonicalAtom } from '../../src/jobs/api_types';
 import { loadBasis, loadMoleculeIndex, loadMoleculeMeta } from '../../src/molecules/loader';
 import { getDensityGrid, getEspGrid } from '../../src/molecules/grid_cache';
 import { createGridMeshWorker } from '../../src/workers/createGridMeshWorker';
@@ -475,5 +478,59 @@ describe('useMoleculeView', () => {
         act(() => { store.dispatch(setSurface({ kind: 'none' })); });
         await flush();
         expect((frameStructure as jest.Mock).mock.calls.at(-1)).toEqual([context, spaceFilling]);
+    });
+
+    // Task 16 (ruling P12): the request workspace's preview is drawn on the one canvas -- ball and stick
+    // of the resolved atoms, centred, no surface and no dipole -- and the molecule's own picture returns
+    // when it clears.
+    it('draws a request preview as ball and stick with no surface, and restores the molecule after it', async () => {
+        const worker = fakeWorker();
+        (createGridMeshWorker as jest.Mock).mockReturnValue(worker);
+        (getDensityGrid as jest.Mock).mockResolvedValue(densityGrid());
+        const context = fakeContext();
+        const store = makeStore();
+        render(<Provider store={store}><Harness active context={context} /></Provider>);
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o' })); store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() })); });
+        act(() => { store.dispatch(setShowDipole(true)); });
+        await flush();
+        expect(createGridMeshWorker).toHaveBeenCalledTimes(1);
+        const moleculeOverlay = (setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1] as import('three').Group;
+        (clearFieldMesh as jest.Mock).mockClear();
+        (frameStructure as jest.Mock).mockClear();
+
+        // Methane-like, off-centre: four H round a C at (5, 5, 5) Å.
+        const atoms: CanonicalAtom[] = [[6, 5, 5, 5], [1, 5.63, 5.63, 5.63], [1, 4.37, 4.37, 5.63], [1, 4.37, 5.63, 4.37], [1, 5.63, 4.37, 4.37]];
+        act(() => { store.dispatch(previewResolved(atoms)); });
+        await flush();
+        const overlay = (setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1] as import('three').Group;
+        expect(overlay === moleculeOverlay).toBe(false);   // (THREE objects are not printable in a failure)
+        expect(overlay.children.some(child => child.userData.isBallAndStick)).toBe(true);
+        const parts: string[] = [];
+        overlay.traverse(node => { if (node.userData.moleculePart) parts.push(node.userData.moleculePart); });
+        expect(parts.filter(p => p === 'atom')).toHaveLength(5);
+        expect(parts.filter(p => p === 'bond')).toHaveLength(8);
+        // No dipole arrow: the overlay is the structure alone.
+        expect(overlay.children.length).toBe(1);
+        // Centred on its atoms, so the camera turns about the preview itself.
+        const carbon = canonicalToBohr(atoms)[0].position;
+        const centre = canonicalToBohr(atoms).reduce((sum, a) => sum.map((c, k) => c + a.position[k] / atoms.length), [0, 0, 0]);
+        const drawnCarbon: number[][] = [];
+        overlay.traverse(node => { if (node.userData.moleculePart === 'atom' && node.userData.index === 0) drawnCarbon.push(node.position.toArray()); });
+        expect(drawnCarbon).toHaveLength(1);
+        drawnCarbon[0].forEach((c, k) => expect(c).toBeCloseTo(carbon[k] - centre[k], 6));
+        // No surface: the field mesh is cleared and nothing new is meshed; the camera frames the preview.
+        expect(clearFieldMesh).toHaveBeenCalledWith(context);
+        expect(createGridMeshWorker).toHaveBeenCalledTimes(1);
+        expect(frameStructure).toHaveBeenLastCalledWith(context, overlayExtent(overlay));
+
+        // Cleared: the molecule's own overlay (with its arrow) and its surface come back.
+        act(() => { store.dispatch(previewCleared()); });
+        await flush();
+        const restored = (setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1] as import('three').Group;
+        expect(restored.children.length).toBe(moleculeOverlay.children.length);
+        const restoredParts: string[] = [];
+        restored.traverse(node => { if (node.userData.moleculePart) restoredParts.push(node.userData.moleculePart); });
+        expect(restoredParts.filter(p => p === 'atom')).toHaveLength(3);
+        expect(createGridMeshWorker).toHaveBeenCalledTimes(2);
     });
 });

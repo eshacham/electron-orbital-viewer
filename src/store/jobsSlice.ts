@@ -1,5 +1,5 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { JobView } from '../jobs/api_types';
+import { createSlice, PayloadAction, UnknownAction } from '@reduxjs/toolkit';
+import type { CanonicalAtom, JobView } from '../jobs/api_types';
 import type { RequestForm } from '../jobs/request_form';
 import { BUILD_ENV } from '../jobs/build_env';
 
@@ -30,9 +30,12 @@ export interface ComputedList { month: string | null; jobs: JobView[] | null; er
  * The owner's request as typed, and whether its panel is open. Kept here,
  * not in the panel (final review I2): the phone sheet unmounts a tab's
  * content when it folds or another tab opens, and a pasted XYZ must not go
- * with it. A preview is not kept -- it is asked for again.
+ * with it. A preview is not kept -- it is asked for again -- but while the
+ * request workspace shows one, its resolved atoms (Å, the API's own) are
+ * here for the one canvas to draw (ruling P12); anything that makes the
+ * preview stale or takes the workspace away clears them.
  */
-export interface RequestDraft { form: RequestForm; open: boolean }
+export interface RequestDraft { form: RequestForm; open: boolean; previewAtoms: CanonicalAtom[] | null }
 // request_form.EMPTY_FORM, written out: importing it would pull the element table into /admin.html.
 const EMPTY_DRAFT: RequestForm = { kind: 'name', text: '', recipe: 'single', charge: '', multiplicity: '' };
 
@@ -70,7 +73,7 @@ export function initialJobsState(): JobsState {
         recordErrors: {},
         followedKey: null,
         computed: { month: null, jobs: null, error: null, nonce: 0 },
-        request: { form: { ...EMPTY_DRAFT }, open: false },
+        request: { form: { ...EMPTY_DRAFT }, open: false, previewAtoms: null },
     };
 }
 
@@ -86,6 +89,8 @@ const jobsSlice = createSlice({
             state.recordErrors = {};
             state.followedKey = null;
             state.computed = { month: null, jobs: null, error: null, nonce: state.computed.nonce + 1 };
+            // A This Mac preview is not an AWS one (the panel drops it too).
+            state.request.previewAtoms = null;
         },
         sessionChanged: (state, action: PayloadAction<{ signedIn: boolean; email: string | null; groups: string[] }>) => {
             state.session.signedIn = action.payload.signedIn;
@@ -94,6 +99,10 @@ const jobsSlice = createSlice({
             if (action.payload.signedIn) {
                 state.session.expired = false;
                 state.session.error = null;
+            } else {
+                // Signed out (Review Focus 4): the owner's workspace goes, and its preview leaves the canvas.
+                state.request.open = false;
+                state.request.previewAtoms = null;
             }
             state.computed.nonce += 1;
         },
@@ -102,9 +111,12 @@ const jobsSlice = createSlice({
             state.session.email = null;
             state.session.groups = [];
             state.session.expired = true;
+            // The form stays, disabled under the session-ended alert (R4); the preview leaves the canvas.
+            state.request.previewAtoms = null;
         },
         sessionFailed: (state, action: PayloadAction<string>) => {
             state.session.error = action.payload;
+            state.request.previewAtoms = null;
         },
         sessionErrorDismissed: state => {
             state.session.error = null;
@@ -143,12 +155,35 @@ const jobsSlice = createSlice({
         },
         requestDraftChanged: (state, action: PayloadAction<Partial<RequestForm>>) => {
             Object.assign(state.request.form, action.payload);
+            state.request.previewAtoms = null;            // the preview belonged to what was typed before
         },
         requestOpened: (state, action: PayloadAction<boolean>) => {
             state.request.open = action.payload;
+            if (!action.payload) state.request.previewAtoms = null;
+        },
+        /** The request workspace's preview landed: its atoms are drawn on the canvas (ruling P12). */
+        previewResolved: (state, action: PayloadAction<CanonicalAtom[]>) => {
+            state.request.previewAtoms = action.payload;
+        },
+        previewCleared: state => {
+            state.request.previewAtoms = null;
         },
     },
+    extraReducers: builder => {
+        // Leaving Molecules closes the workspace (Review Focus 4). Matched by type, not by importing
+        // atomSlice's action: this slice also serves /admin.html, which must not pull the atom code in
+        // (tests/jobs/jobs_slice.test.ts dispatches the real setMode, so a renamed action fails there).
+        builder.addMatcher(isLeavingMolecules, state => {
+            state.request.open = false;
+            state.request.previewAtoms = null;
+        });
+    },
 });
+
+const SET_MODE = 'atom/setMode';
+function isLeavingMolecules(action: UnknownAction): action is PayloadAction<string> {
+    return action.type === SET_MODE && (action as PayloadAction<unknown>).payload !== 'molecule';
+}
 
 /**
  * Spec §9's owner rule, server-aligned (the brief, 2026-10-15): a signed-in
@@ -163,6 +198,6 @@ export const selectIsOwner = (state: { jobs: JobsState }): boolean =>
 
 export const {
     setTarget, sessionChanged, sessionExpired, sessionFailed, sessionErrorDismissed, jobUpdated, jobFetchFailed, followJob,
-    computedLoaded, computedFailed, refreshComputed, requestDraftChanged, requestOpened,
+    computedLoaded, computedFailed, refreshComputed, requestDraftChanged, requestOpened, previewResolved, previewCleared,
 } = jobsSlice.actions;
 export default jobsSlice.reducer;

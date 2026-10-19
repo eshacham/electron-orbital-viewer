@@ -4,7 +4,21 @@
 // each theme and size, measures boxes, fonts and colours, then stops both in
 // the same foreground run. It never touches the owner's browser or servers.
 //   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--display '<eov.display JSON>'] [--gl metal] [--dpr 2] [--drawer open] [--crop <selector>] [--run <label>]
+//     [--owner-session] [--jobs-stub [--preview-fixture preview_aws]] [--click <name>] [--type <text>] [--press <key>] [--scroll <text>] ...
 // Writes /tmp/6g1-<task>-<scene>-<theme>-<size>.png and /tmp/6g1-<task>-<run>-metrics.json
+//
+// Task 16 of 6G-2 (preflight D3 (a)): the owner's jobs UI, shot without any job server.
+//   --owner-session  the dev server's owner: jobs on This Mac (eov.jobs.target = local), which is the owner without
+//                    signing in -- the same dev owner src/App.jobs.test.tsx sets up (BUILD_ENV.dev); this build has
+//                    no Cognito settings, so there is no session to inject beyond that.
+//   --jobs-stub      every /api/... request the page makes is answered from tests/jobs/fixtures/api (the recorded
+//                    responses tests/jobs/api_fixtures.ts reads) or aborted and reported as an error -- a submit
+//                    (POST /v1/jobs) always is. Vite's /api proxy is pointed at a closed port meanwhile, so nothing
+//                    can reach a real server even past the stub. metrics.api counts what was seen, answered, refused.
+//   --click/--type/--press/--scroll  scripted steps, in the order given, after the scene settles and before the
+//                    shot: click the one control with that accessible name (or that exact text), type into the
+//                    focused field, press a key, scroll an element with that text into view. A click on an
+//                    approve/run/submit control is refused: the check stops at the quote.
 // (--run defaults to a timestamp, so a second invocation for the same --task never overwrites
 // the first run's aggregated metrics -- final review B-I2).
 import { spawn } from 'node:child_process';
@@ -72,10 +86,89 @@ const drawerOpen = arg('drawer', 'folded') === 'open';
 // periodic-table miniature, ruling R23d -- can be checked for crispness
 // without upscaling a raster after the fact.
 const cropSelector = arg('crop', null);
+const ownerSession = process.argv.includes('--owner-session');
+const jobsStub = process.argv.includes('--jobs-stub');
+const previewFixture = arg('preview-fixture', 'preview_aws');
+// The scripted steps, in argv order.
+const steps = [];
+for (let i = 2; i < process.argv.length; i++) {
+  const step = /^--(click|type|press|scroll)$/.exec(process.argv[i]);
+  if (step) steps.push({ kind: step[1], value: process.argv[++i] });
+}
+// The check stops at the quote: nothing that would send a job is ever clicked, even stubbed.
+const SENDS_A_JOB = /^(Approve|Run on|Retry on|Submit|Already)/;
+for (const step of steps) if (step.kind === 'click' && SENDS_A_JOB.test(step.value)) throw new Error(`--click "${step.value}" would send a job; the check stops at the quote`);
+
+const FIXTURES = resolve(DEFAULT_ROOT, 'tests/jobs/fixtures/api');
+const fixture = name => JSON.parse(readFileSync(resolve(FIXTURES, `${name}.json`), 'utf8'));
+const JOB_FIXTURES = ['get_done', 'get_running', 'get_failed', 'get_done_aws', 'get_absorbed_aws', 'get_legacy_aws', 'get_retried_aws'];
+if (jobsStub) fixture(previewFixture);   // an unknown --preview-fixture fails here, before anything starts
+
+/** Answers the page's jobs API from the recorded fixtures only; anything else is aborted and logged (preflight D3 (a)). */
+async function installJobsStub(context, log) {
+  await context.route('**/api/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (!url.pathname.startsWith('/api/')) return route.continue();   // a module path that merely contains /api/
+    const path = url.pathname.replace(/^\/api(\/aws)?/, '');
+    const method = request.method();
+    let name = null;
+    if (method === 'POST' && path === '/v1/jobs/preview') name = previewFixture;
+    else if (method === 'GET' && path === '/v1/jobs') name = url.searchParams.get('status') === 'DONE' ? 'list_done' : 'list_all';
+    else if (method === 'GET' && path === '/v1/costs') name = 'costs';
+    else if (method === 'GET' && path.startsWith('/v1/jobs/')) {
+      const key = decodeURIComponent(path.slice('/v1/jobs/'.length));
+      name = JOB_FIXTURES.find(n => fixture(n).body.key === key) ?? null;
+    }
+    const where = `${method} ${url.pathname}${url.search}`;
+    if (!name) {
+      log.refused.push(where);
+      return route.abort('blockedbyclient');
+    }
+    const { status, body } = fixture(name);
+    log.stubbed.push(`${where} -> ${name} (${status})`);
+    return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+}
+
+/** The one control named `name` (button, link, tab, radio, ...), else the one element with exactly that text. */
+async function findNamed(page, name) {
+  for (const role of ['button', 'link', 'tab', 'radio', 'checkbox', 'option', 'menuitem', 'textbox']) {
+    const found = page.getByRole(role, { name, exact: true });
+    const count = await found.count();
+    if (count === 1) return found;
+    if (count > 1) throw new Error(`${count} ${role}s are named "${name}"`);
+  }
+  const text = page.getByText(name, { exact: true });
+  const count = await text.count();
+  if (count === 1) return text;
+  throw new Error(count ? `${count} elements read "${name}"` : `nothing is named "${name}"`);
+}
+
+async function runSteps(page) {
+  for (const step of steps) {
+    if (step.kind === 'click') await (await findNamed(page, step.value)).click();
+    else if (step.kind === 'scroll') await (await findNamed(page, step.value)).scrollIntoViewIfNeeded();
+    else if (step.kind === 'press') await page.keyboard.press(step.value);
+    else {
+      const field = await page.evaluate(() => {
+        const el = document.activeElement;
+        return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? (el.getAttribute('aria-label') ?? el.tagName) : null;
+      });
+      if (!field) throw new Error(`--type "${step.value}": nothing editable has focus`);
+      await page.keyboard.type(step.value);
+    }
+    await page.waitForTimeout(300);
+    await settle(page);
+  }
+}
 
 function startVite() {
+  // With the stub, Vite's own /api proxy points at a closed port (discard, 9) and has no AWS route: nothing that
+  // somehow got past the browser-side stub could reach a job server (never the owner's 8787).
+  const env = jobsStub ? { ...process.env, JOBS_LOCAL_API_URL: 'http://127.0.0.1:9', JOBS_AWS_API_URL: '' } : process.env;
   const vite = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(port), '--strictPort', '--clearScreen', 'false'],
-    { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+    { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const ready = new Promise((ok, fail) => {
     const timer = setTimeout(() => fail(new Error('Vite did not start within 30 s')), 30000);
     const watch = chunk => { if (String(chunk).includes(`localhost:${port}`)) { clearTimeout(timer); ok(); } };
@@ -120,7 +213,26 @@ function collectMetrics() {
     title: document.title,
     boxes: Object.fromEntries(['.app-topbar', '.app-rail', '.explore-panel', '#canvas-container', '.inspector', '.thumbnail-strip',
       '.viewport-title', '.viewport-toolbar', '.key-column', '.phone-topbar', '.phone-header', '.phone-sheet',
-      '.element-tile', '.periodic-table-mini'].map(s => [s, box(s)])),
+      '.element-tile', '.periodic-table-mini', '.request-workspace'].map(s => [s, box(s)])),
+    // Task 16: what has focus (Esc returns it to the entry), and anything in the request workspace wider than it.
+    focused: (() => {
+      const el = document.activeElement;
+      if (!el || el === document.body) return null;
+      return `${el.tagName.toLowerCase()} ${el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 60) ?? ''}`;
+    })(),
+    workspaceOverflow: (() => {
+      const space = document.querySelector('.request-workspace-body');
+      if (!space) return null;
+      const r = space.getBoundingClientRect();
+      const right = r.right - parseFloat(getComputedStyle(space).paddingRight) + 1;
+      return [...space.querySelectorAll('*')].filter(e => {
+        const b = e.getBoundingClientRect();
+        return b.width > 0 && (b.right > right || b.left < r.left);
+      }).map(e => `${e.tagName.toLowerCase()}.${e.className}`).slice(0, 10);
+    })(),
+    quoteLines: [...document.querySelectorAll('.request-workspace .quote-line')].map(e => ({
+      width: Math.round(e.getBoundingClientRect().width), clipped: e.scrollWidth > e.clientWidth + 1, text: e.textContent,
+    })),
     // Final review B-I2: '.ql-caption' alone read null in every capture -- the only elements
     // that carry that literal class (orbital facts' notes, the energy table caption, a search
     // result's detail line) are gated behind a tab or a query that most scenes never open. The
@@ -264,12 +376,23 @@ try {
             return context;
           };
         });
+        if (ownerSession) {
+          await context.addInitScript(() => {
+            try { window.localStorage.setItem('eov.jobs.target', 'local'); } catch { /* storage refused */ }
+          });
+        }
+        const api = { seen: [], stubbed: [], refused: [] };
+        if (jobsStub) await installJobsStub(context, api);
         const page = await context.newPage();
         const errors = [];
         page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
         page.on('pageerror', error => errors.push(String(error)));
+        page.on('request', request => {
+          const url = new URL(request.url());
+          if (url.pathname.startsWith('/api/')) api.seen.push(`${request.method()} ${url.pathname}${url.search}`);
+        });
         await page.goto(`http://localhost:${port}/${scenes[scene]}`, { waitUntil: 'load' });
-        const settled = await settle(page);
+        let settled = await settle(page);
         await page.waitForTimeout(extraWait);
         // Ruling R20b-atoms: the Electron-enclosed note is in the inspector now
         // (the Atom Display section, Basic's view settings), so Explore's
@@ -296,10 +419,26 @@ try {
         } else {
           enclosedNote = await readNote();
         }
+        // The scripted steps run last, after the drawer's own clicks, so what they leave (focus, hover) is what is shot.
+        if (steps.length) {
+          try {
+            await runSteps(page);
+          } catch (error) {
+            errors.push(`step failed: ${error.message}`);
+          }
+          settled = await settle(page);
+          await page.waitForTimeout(extraWait);
+        }
         const file = `/tmp/6g1-${task}-${scene}-${theme}-${size}.png`;
         const png = await page.screenshot({ path: file });
         const metrics = await page.evaluate(collectMetrics);
         metrics.text.enclosedNote = enclosedNote;
+        // Every /api request the page made, and what answered it; with --jobs-stub, notStubbed must be 0.
+        metrics.api = {
+          seen: api.seen.length, stubbed: api.stubbed, refused: api.refused,
+          notStubbed: jobsStub ? api.seen.length - api.stubbed.length - api.refused.length : null,
+        };
+        for (const refused of api.refused) errors.push(`jobs stub refused ${refused}`);
         const on = await sampleColours(page, png, size);
         let cropFile = null;
         if (cropSelector) {
@@ -313,7 +452,7 @@ try {
         await page.waitForTimeout(150);
         const off = await sampleColours(page, await page.screenshot(), size);
         results.push({ scene, theme, size, file, cropFile, settled, metrics, colours: judge(on, off, theme), errors });
-        console.log(`${file}  settled=${settled}  webgl=${metrics.webglCanvases}  webglCreated=${metrics.webglContextsCreated}  errors=${errors.length}${cropFile ? `  crop=${cropFile}` : ''}`);
+        console.log(`${file}  settled=${settled}  webgl=${metrics.webglCanvases}  webglCreated=${metrics.webglContextsCreated}  errors=${errors.length}${cropFile ? `  crop=${cropFile}` : ''}${jobsStub ? `  api seen=${api.seen.length} stubbed=${api.stubbed.length} refused=${api.refused.length}` : ''}`);
         await context.close();
       }
     }

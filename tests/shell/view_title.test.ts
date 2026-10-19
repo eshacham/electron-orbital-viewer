@@ -1,6 +1,7 @@
 import { drillToOrbital, drillToShell, drillToSubshell, setMode } from '../../src/store/atomSlice';
 import { viewTitle } from '../../src/shell/view_title';
 import { selectMolecule, metaLoaded, setSurface, setRepresentation, setShowDipole } from '../../src/store/moleculeSlice';
+import { previewCleared, previewResolved } from '../../src/store/jobsSlice';
 import { neonStore, sodiumIonStore } from '../export/fixtures';
 import { waterMeta } from '../molecules/fixtures';
 
@@ -50,5 +51,27 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         expect(viewTitle(store.getState()).subtitle).toBe('Dipole arrow only · μ = 1.86 D (B3LYP/def2-TZVP) · experiment 1.855 D');
         store.dispatch(setShowDipole(false));
         expect(viewTitle(store.getState()).subtitle).toBe('Nothing drawn: no surface, structure or dipole arrow');
+    });
+
+    // Task 16 (ruling P12): while the request workspace's preview is on the canvas, the title names it as a
+    // preview -- Hill-order formula, as the server writes it -- never as the molecule chosen before it.
+    it('titles a request preview as a preview, not yet computed, and gives the molecule its title back', () => {
+        const store = neonStore();
+        store.dispatch(setMode('molecule'));
+        store.dispatch(selectMolecule({ id: 'h2o' }));
+        store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        const molecule = viewTitle(store.getState());
+        // Caffeine's atoms in any order: C first, H second, then the rest alphabetically.
+        const caffeine = [
+            ...Array.from({ length: 4 }, () => [7, 0, 0, 0]), ...Array.from({ length: 10 }, () => [1, 0, 0, 0]),
+            ...Array.from({ length: 2 }, () => [8, 0, 0, 0]), ...Array.from({ length: 8 }, () => [6, 0, 0, 0]),
+        ] as Array<[number, number, number, number]>;
+        store.dispatch(previewResolved(caffeine));
+        expect(viewTitle(store.getState())).toEqual({ title: 'Preview — C₈H₁₀N₄O₂', subtitle: 'resolved structure, not yet computed' });
+        // No carbon: alphabetical, as tools/jobs/canonical.py's formula().
+        store.dispatch(previewResolved([[8, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]]));
+        expect(viewTitle(store.getState()).title).toBe('Preview — H₂O');
+        store.dispatch(previewCleared());
+        expect(viewTitle(store.getState())).toEqual(molecule);
     });
 });

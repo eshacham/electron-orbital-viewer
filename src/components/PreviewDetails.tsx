@@ -53,11 +53,12 @@ export function sizingOf(quote: Quote): Sizing | null {
  * -- and then the worker chosen or the refusal's own reason (spec §9.2).
  * The price options themselves are the request panel's QuoteChooser.
  */
-const PreviewDetails: React.FC<{ preview: PreviewResponse }> = ({ preview }) => {
+const PreviewDetails: React.FC<{ preview: PreviewResponse; showStructureSvg?: boolean }> = ({ preview, showStructureSvg = true }) => {
     const { geometrySource: source, decision, meter, existing } = preview;
     return (
         <div className="preview-details" role="region" aria-label="preview">
-            <StructurePreview atoms={preview.atoms} />
+            {/* Ruling P12: in the request workspace the one canvas draws the structure instead. */}
+            {showStructureSvg && <StructurePreview atoms={preview.atoms} />}
             <dl className="preview-facts">
                 <dt>Resolved</dt>
                 <dd>

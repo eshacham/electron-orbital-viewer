@@ -13,16 +13,18 @@ export const RIGHT_ZONES = ['.key-column', '.inspector-drawer'];
 // used to carry moved off the canvas entirely, so there is no bottom zone of
 // its own left to measure.
 export const BOTTOM_ZONES = ['.thumbnail-strip'];
+/** Ruling P12: the owner's request workspace, down the left of the cell; the preview is framed to its right. */
+export const LEFT_ZONES = ['.request-workspace'];
 /** A phone's top bar and the header line under it (spec §9.8). */
 export const PHONE_TOP_ZONES = ['.phone-topbar', '.phone-header'];
-const OBSERVED_ZONES = [...TOP_ZONES, ...RIGHT_ZONES, ...BOTTOM_ZONES, ...PHONE_TOP_ZONES, '.phone-sheet'].join(', ');
+const OBSERVED_ZONES = [...TOP_ZONES, ...RIGHT_ZONES, ...BOTTOM_ZONES, ...LEFT_ZONES, ...PHONE_TOP_ZONES, '.phone-sheet'].join(', ');
 
 /**
  * Which parts of the viewport cell are covered, in CSS pixels per edge. The
  * docked Explore panel and inspector sit beside the cell, not over it, so
  * they are not counted (spec §8.5); what is counted is every overlay zone
  * inside it: on a desktop the title block and toolbar along the top, the key column and the medium-width inspector drawer down the
- * right, the thumbnail strip along the bottom; on a
+ * right, the thumbnail strip along the bottom, the request workspace down the left; on a
  * phone the top bar and header line, and the sheet.
  */
 export function measureViewInsets(container: HTMLElement, narrow: boolean): ViewInsets {
@@ -46,6 +48,7 @@ export function measureViewInsets(container: HTMLElement, narrow: boolean): View
         each(TOP_ZONES, rect => { insets.top = Math.max(insets.top, rect.bottom - bounds.top); });
         each(RIGHT_ZONES, rect => { insets.right = Math.max(insets.right, bounds.right - rect.left); });
         each(BOTTOM_ZONES, rect => { insets.bottom = Math.max(insets.bottom, bounds.bottom - rect.top); });
+        each(LEFT_ZONES, rect => { insets.left = Math.max(insets.left, rect.right - bounds.left); });
     }
 
     // Round so sub-pixel layout jitter does not count as a change.

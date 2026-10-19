@@ -13,7 +13,9 @@ jest.mock('../../src/molecules/loader', () => ({ ...jest.requireActual('../../sr
 import {
     runExport, exportAvailability, exportItemsFor, moleculeCubeJob, EXPORT_ITEMS, ExportKind,
     PICTURE_BUSY_REASON, NOTHING_DRAWN_REASON, MOLECULE_NONE_REASON, MOLECULE_LOADING_REASON, NO_SURFACE_REASON, NOTHING_SHOWN_REASON,
+    REQUEST_PREVIEW_REASON,
 } from '../../src/export/run_export';
+import { previewCleared, previewResolved } from '../../src/store/jobsSlice';
 import { exportFileStem, methodStatement, moleculeDrawnPicture, viewDescription } from '../../src/export/caption';
 import { buildCubeBlob, CubeRequest } from '../../src/export/cube_request';
 import { setMode } from '../../src/store/atomSlice';
@@ -278,6 +280,19 @@ describe('refusal reasons (never the Basic Orbitals fallthrough)', () => {
         expect(NOTHING_SHOWN_REASON).toBe('Nothing is drawn: no surface, structure or dipole arrow.');
         expect(NOTHING_SHOWN_REASON).not.toMatch(/structure only/i);
         expect(availability.csv).toBeNull();
+    });
+
+    // Task 16 (ruling P12): while the request workspace's preview is on the canvas, a picture would be the
+    // preview captioned as the molecule -- refused, and said why; the orbital table is still the molecule's.
+    it('a request preview on the canvas refuses every picture export until it clears', () => {
+        const store = drawnStore({ kind: 'density' });
+        store.dispatch(previewResolved([[8, 0, 0, 0], [1, 0.76, 0, 0.59], [1, -0.76, 0, 0.59]]));
+        const availability = exportAvailability(store.getState());
+        expectAll(availability, PICTURE_KINDS, REQUEST_PREVIEW_REASON);
+        expect(availability.csv).toBeNull();
+        expect(REQUEST_PREVIEW_REASON).toBe('The view shows a request preview, not this molecule. Close the request to export it.');
+        store.dispatch(previewCleared());
+        expectAll(exportAvailability(store.getState()), PICTURE_KINDS, null);
     });
 
     it('a render in flight refuses every picture export (the orbital table does not depend on it)', async () => {

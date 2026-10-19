@@ -102,6 +102,7 @@ import MoleculeReadout from './components/MoleculeReadout';
 import MoleculeViewOptions from './components/MoleculeViewOptions';
 import EspLegend from './components/EspLegend';
 import MoleculeJobsSection from './components/MoleculeJobsSection';
+import RequestWorkspace, { useRequestWorkspaceOpen } from './components/RequestWorkspace';
 import MoleculeProvenanceFooter from './components/MoleculeProvenanceFooter';
 import MoleculeHeader from './molecule_ui/MoleculeHeader';
 import QuickPick from './molecule_ui/QuickPick';
@@ -647,6 +648,12 @@ function App() {
     useMoleculeLoader(isMoleculeMode, { indexOnly: searchWantsIndex });
     // The owner's computed molecules join the picker as a Computed category; nobody else's picker changes.
     const isOwner = useAppSelector(selectIsOwner);
+    // Ruling P12: the owner's request workspace in the viewport cell, and the preview it puts on the canvas
+    // (useMoleculeView draws it). While it is open the strip and the hover caption, which describe the
+    // molecule, step aside; while its preview is drawn so do the surface keys and the library line.
+    const requestWorkspaceOpen = useRequestWorkspaceOpen();
+    const requestPreviewShown = useAppSelector(state => state.jobs.request.previewAtoms !== null) && isMoleculeMode;
+    const requestEntryRef = useRef<HTMLButtonElement>(null);
     const signInError = useAppSelector(state => state.jobs.session.error);
     const computedJobs = useAppSelector(state => state.jobs.computed.jobs);
     useComputedList(isMoleculeMode);
@@ -904,7 +911,7 @@ function App() {
     useEffect(() => (isMoleculeMode ? () => thumbnailService.cancelAll() : undefined), [isMoleculeMode, molecule.selectedId]);
     // Ruling T16-tilekey with preflight D9: the frontier tiles' ψ hues are keyed in the column unless an orbital's
     // own phase key is there already (the density, the ESP map or no surface drawn).
-    const moleculeOrbitalTiles = !isNarrow && !stripCollapsed
+    const moleculeOrbitalTiles = !isNarrow && !stripCollapsed && !requestWorkspaceOpen
         && moleculeStrip.some(item => 'surface' in item.target && item.target.surface.kind === 'mo');
     const screenRatio = useDevicePixelRatio();
     // Everything a tile's picture depends on besides its content (ruling R20a-4): a change re-requests every
@@ -1124,7 +1131,7 @@ function App() {
     // In Molecules mode only an orbital has a sign: the density is one
     // colour and the ESP map has its own key (EspLegend).
     // Neither key stands over a surface that failed (and was cleared).
-    const moleculeKeysShown = isMoleculeMode && molecule.meta !== null && molecule.renderError === null;
+    const moleculeKeysShown = isMoleculeMode && molecule.meta !== null && molecule.renderError === null && !requestPreviewShown;
     const showPhaseLegend = isMoleculeMode
         ? moleculeKeysShown && molecule.surface.kind === 'mo'
         : (isAtomMode ? atomLevel === 'orbital' : Boolean(renderedParams || renderedField))
@@ -1160,7 +1167,8 @@ function App() {
     // the DOM's shape or the element's reserved size, so `.key-column`'s
     // measured rect -- and the insets derived from it -- stay exactly the
     // same whatever is picked.
-    const moleculeCaptionZone = isMoleculeMode && Boolean(molecule.meta) && molecule.representation !== 'none' && !isNarrow;
+    const moleculeCaptionZone = isMoleculeMode && Boolean(molecule.meta) && molecule.representation !== 'none' && !isNarrow
+        && !requestWorkspaceOpen;
     const showHoverCaption = moleculeCaptionZone && !molecule.pick;
 
     // The drill-down's next step. On a desktop its chips continue the
@@ -1323,7 +1331,15 @@ function App() {
     // molecule is chosen -- "Loading…" until its meta lands -- so a quick pick never folds the open section to
     // Display and back; one that failed to load says so (its alert over the view gives the reason).
     const moleculeProperties = molecule.selectedId !== null && (molecule.meta || molecule.isLoadingMeta
-        ? <MoleculePropertiesCard meta={molecule.meta} />
+        ? (
+            <>
+                {/* Ruling P12: the canvas shows the request's preview meanwhile; these facts are still the molecule's. */}
+                {requestPreviewShown && molecule.meta && (
+                    <p className="molecule-properties-status">The view shows the request’s preview; these are {molecule.meta.name}’s properties.</p>
+                )}
+                <MoleculePropertiesCard meta={molecule.meta} />
+            </>
+        )
         : <p className="molecule-properties-status">This molecule did not load.</p>);
     // The structure segments and the dipole switch belong with the view settings
     // (Controls' children slot), with the dipole's value and -- for ozone --
@@ -1772,7 +1788,8 @@ function App() {
                     {moleculeQuickPick}
                     <MoleculeNav {...moleculeNavProps} ref={moleculeNavRef} />
                     {moleculeSelectionSection}
-                    <MoleculeJobsSection />
+                    {/* Ruling P12: on a desktop or tablet the request opens as a workspace in the viewport cell. */}
+                    <MoleculeJobsSection variant="entry" entryRef={requestEntryRef} />
                 </div>
                 <MoleculeProvenanceFooter pinned />
             </div>
@@ -1868,7 +1885,7 @@ function App() {
     const viewport = (
         <main
             id="canvas-container"
-            className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}`}
+            className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}${requestWorkspaceOpen ? ' request-open' : ''}`}
             data-busy={isLoading ? 'true' : 'false'}
             aria-label="3D view"
             tabIndex={-1}
@@ -1879,6 +1896,8 @@ function App() {
                 enclosedFraction={enclosedFraction}
                 exportHandleRef={exportHandleRef}
             />
+            {/* Ruling P12: ahead of the title block and toolbar, so the Tab order runs entry → workspace → toolbar. */}
+            {isMoleculeMode && <RequestWorkspace returnFocusRef={requestEntryRef} />}
             {canvasBusyLabel && (
                 <div className="canvas-busy" role="status" aria-live="polite">
                     <CircularProgress size={22} thickness={5} color="inherit" />
@@ -1909,7 +1928,7 @@ function App() {
                     {/* Ruling R22c: the library/tier line moves here from the canvas
                         (was `.molecule-legend-stack`'s `TierBadge`) -- same component,
                         same wording, just under the molecule's own description now. */}
-                    {isMoleculeMode && molecule.meta && <TierBadge meta={molecule.meta} />}
+                    {isMoleculeMode && molecule.meta && !requestPreviewShown && <TierBadge meta={molecule.meta} />}
                 </TitleBlock>
             )}
             {!isNarrow && (
@@ -1942,7 +1961,8 @@ function App() {
                     onSelect={handleBondsStripSelect} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
             )}
             {/* Task 15: Molecules' strip -- the molecule's views; its handle says so (ruling R23b-3). */}
-            {isMoleculeMode && !isNarrow && moleculeStrip.length > 0 && (
+            {/* Ruling P12: hidden while the request workspace is open -- it would describe the molecule, not the preview. */}
+            {isMoleculeMode && !isNarrow && moleculeStrip.length > 0 && !requestWorkspaceOpen && (
                 <ThumbnailStrip items={moleculeStrip} label="views of this molecule" rGrid={[]} themeKey={stripThemeKey}
                     onSelect={handleMoleculeStripSelect} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed}
                     handleNoun="views" wrapLabels />

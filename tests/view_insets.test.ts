@@ -76,6 +76,17 @@ describe('measureViewInsets', () => {
         expect(measureViewInsets(root, false)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
     });
 
+    // Task 16 (ruling P12): the request workspace is a left zone -- the camera frames the preview to its right.
+    it('counts the request workspace down the left', () => {
+        const root = layout({ width: 900, height: 820 }, {
+            '.request-workspace': { left: 0, right: 500, top: 0, bottom: 820, width: 500, height: 820 },
+            '.viewport-toolbar': { left: 695, right: 888, top: 12, bottom: 48, width: 193, height: 36 },
+        });
+        expect(measureViewInsets(root, false)).toEqual({ top: 48, right: 0, bottom: 0, left: 500 });
+        // A phone never shows it (the request stays in the sheet), so a stray one is not counted there.
+        expect(measureViewInsets(root, true).left).toBe(0);
+    });
+
     it('on a phone, counts the top bar and the header line below it (spec §9.8)', () => {
         const root = layout({ width: 390, height: 844 }, {
             '.phone-topbar': { left: 0, right: 390, top: 0, bottom: 52, width: 390, height: 52 },

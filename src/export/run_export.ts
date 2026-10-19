@@ -179,6 +179,8 @@ export const MOLECULE_LOADING_REASON = BONDS_LOADING_REASON;
  */
 export const NO_SURFACE_REASON = 'No surface is drawn, so there is no solid or grid to export. Choose Density, Electrostatic potential or Orbitals for one.';
 export const NOTHING_SHOWN_REASON = 'Nothing is drawn: no surface, structure or dipole arrow.';
+/** Ruling P12: the request workspace's preview is on the canvas, not the molecule a file would be captioned as. */
+export const REQUEST_PREVIEW_REASON = 'The view shows a request preview, not this molecule. Close the request to export it.';
 export const moleculeRenderFailedReason = (error: string) => `The surface failed to draw (${error}), so there is nothing to export.`;
 
 /**
@@ -212,6 +214,7 @@ const sameSurface = (a: { kind: string; index?: number }, b: { kind: string; ind
 function moleculePictureReason(state: RootState): string | null {
     const block = moleculeBlockReason(state);
     if (block) return block;
+    if (state.jobs.request.previewAtoms) return REQUEST_PREVIEW_REASON;
     const molecule = state.molecule;
     if (molecule.renderError) return moleculeRenderFailedReason(molecule.renderError);
     if (molecule.renderLabel !== null) return PICTURE_BUSY_REASON;

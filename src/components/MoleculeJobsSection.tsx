@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Accordion, AccordionDetails, AccordionSummary, Alert } from '@mui/material';
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Button } from '@mui/material';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectMolecule } from '../store/moleculeSlice';
 import {
@@ -7,24 +7,28 @@ import {
 } from '../store/jobsSlice';
 import { jobsApi, jobsPoller } from '../jobs/client';
 import { approvedBody, retryBody } from '../jobs/request_form';
+import { SESSION_ENDED } from '../jobs/api';
 import type { AvailableQuoteOption, JobRequest, JobView, Quote } from '../jobs/api_types';
 import type { RequestForm } from '../jobs/request_form';
 import { signInHere } from './OwnerBar';
-import RequestPanel from './RequestPanel';
+import RequestPanel, { RequestPanelProps } from './RequestPanel';
 import JobStatusPanel from './JobStatusPanel';
 
+/** The id the desktop entry's aria-controls names: the request workspace in the viewport cell (ruling P12). */
+export const REQUEST_WORKSPACE_ID = 'request-workspace';
+
 /**
- * Molecules mode's job tools, under the navigation card (the desktop side
- * panel and the phone's Explore tab, spec §9.7): the owner's request panel
- * and the followed job's status. "How this was computed" (everyone's own
- * provenance) moved out to MoleculeProvenanceFooter (ruling R23f-2), so a
- * desktop/medium layout can pin it below this section instead of above it;
- * this component has nothing to show anyone else.
+ * Who may request, and the request panel's wiring to the jobs slice and the
+ * page's jobs client -- shared by the phone's in-sheet panel (here) and the
+ * desktop's request workspace (RequestWorkspace, ruling P12). An ended
+ * session is the owner's, signed out under them: the form stays, disabled,
+ * under its alert (spec §9.5, R4).
  */
-const MoleculeJobsSection: React.FC = () => {
+export function useRequestPanel() {
     const dispatch = useAppDispatch();
     const isOwner = useAppSelector(selectIsOwner);
     const jobs = useAppSelector(state => state.jobs);
+    const expired = !isOwner && jobs.session.expired;
 
     const open = useCallback((key: string) => {
         dispatch(selectMolecule({ id: key }));
@@ -35,6 +39,43 @@ const MoleculeJobsSection: React.FC = () => {
         dispatch(followJob(job.key));
         jobsPoller().restart(job.key);
     }, [dispatch]);
+    // This section lives on the viewer only (/admin.html has its own panels).
+    const signIn = useCallback(() => signInHere('/', text => { dispatch(sessionFailed(text)); }), [dispatch]);
+    const editForm = useCallback((change: Partial<RequestForm>) => { dispatch(requestDraftChanged(change)); }, [dispatch]);
+    // jobsApi() reads the current target and session at call time, so these never go stale.
+    const preview = useCallback((body: JobRequest, signal: AbortSignal) => jobsApi().preview(body, signal), []);
+    const submit = useCallback((body: JobRequest) => jobsApi().submit(body), []);
+
+    const panelProps: RequestPanelProps = {
+        target: jobs.target, form: jobs.request.form, onFormChange: editForm, preview, submit, onOpen: open, onFollow: follow,
+        sessionExpired: expired, onSignIn: signIn,
+    };
+    return { isOwner, expired, jobs, open, follow, signIn, panelProps };
+}
+
+export interface MoleculeJobsSectionProps {
+    /**
+     * `entry` (a desktop or tablet's Explore panel, ruling P12): a "Request a new molecule" button that
+     * opens the request workspace in the viewport cell. `accordion` (the phone's Explore tab): the
+     * request panel itself, in the sheet, with its own drawing of the preview.
+     */
+    variant?: 'entry' | 'accordion';
+    /** The entry button, where focus goes back when the workspace closes. */
+    entryRef?: React.Ref<HTMLButtonElement>;
+}
+
+/**
+ * Molecules mode's job tools, under the navigation card (the desktop side
+ * panel and the phone's Explore tab, spec §9.7): the way into the owner's
+ * request and the followed job's status. "How this was computed" (everyone's
+ * own provenance) moved out to MoleculeProvenanceFooter (ruling R23f-2), so a
+ * desktop/medium layout can pin it below this section instead of above it;
+ * this component has nothing to show anyone else.
+ */
+const MoleculeJobsSection: React.FC<MoleculeJobsSectionProps> = ({ variant = 'accordion', entryRef }) => {
+    const dispatch = useAppDispatch();
+    const { isOwner, expired, jobs, open, follow, panelProps } = useRequestPanel();
+
     // Phase 6C: a retry is priced afresh (a preview of the same molecule) and approved like any run.
     const quote = useCallback(async (view: JobView): Promise<Quote> => {
         const body = retryBody(view);
@@ -47,29 +88,35 @@ const MoleculeJobsSection: React.FC = () => {
     const retry = useCallback(async (view: JobView, option: AvailableQuoteOption) => {
         follow((await jobsApi().submit(approvedBody(retryBody(view), option))).job);
     }, [follow]);
-    // This section lives on the viewer only (/admin.html has its own panels).
-    const signIn = useCallback(() => signInHere('/', text => { dispatch(sessionFailed(text)); }), [dispatch]);
-    const editForm = useCallback((change: Partial<RequestForm>) => { dispatch(requestDraftChanged(change)); }, [dispatch]);
-    // jobsApi() reads the current target and session at call time, so these never go stale.
-    const preview = useCallback((body: JobRequest, signal: AbortSignal) => jobsApi().preview(body, signal), []);
-    const submit = useCallback((body: JobRequest) => jobsApi().submit(body), []);
 
-    const expired = !isOwner && jobs.session.expired;
     // Real or absent (§3.5): with provenance gone, there is nothing here for anyone else.
     if (!isOwner && !expired) return null;
+    const requestOpen = jobs.request.open;
     return (
         <div className="molecule-jobs">
             {isOwner && jobs.computed.error && (
                 <Alert severity="warning">Could not list this month’s computed molecules: {jobs.computed.error}</Alert>
             )}
-            {(isOwner || expired) && (
-                <Accordion disableGutters className="request-accordion" expanded={jobs.request.open || expired}
+            {variant === 'entry' ? (
+                <>
+                    <Button ref={entryRef} variant="outlined" className="request-entry" aria-expanded={requestOpen}
+                        aria-controls={REQUEST_WORKSPACE_ID} onClick={() => dispatch(requestOpened(!requestOpen))}>
+                        Request a new molecule
+                    </Button>
+                    {/* The workspace, when open, says an ended session itself (one alert, not two); closed, this does. */}
+                    {expired && !requestOpen && (
+                        <Alert severity="warning" role="alert"
+                            action={<Button size="small" color="inherit" onClick={panelProps.onSignIn}>Sign in</Button>}>
+                            {SESSION_ENDED}
+                        </Alert>
+                    )}
+                </>
+            ) : (
+                <Accordion disableGutters className="request-accordion" expanded={requestOpen || expired}
                     onChange={(_event, value: boolean) => dispatch(requestOpened(value))}>
                     <AccordionSummary aria-controls="request-body" id="request-head">Request a molecule</AccordionSummary>
                     <AccordionDetails>
-                        <RequestPanel target={jobs.target} form={jobs.request.form} onFormChange={editForm}
-                            preview={preview} submit={submit} onOpen={open} onFollow={follow}
-                            sessionExpired={expired} onSignIn={signIn} />
+                        <RequestPanel {...panelProps} />
                     </AccordionDetails>
                 </Accordion>
             )}

@@ -206,6 +206,55 @@ describe('previewing', () => {
     });
 });
 
+// Task 16 (ruling P12): the request workspace draws the resolved structure on the one canvas, so the panel
+// reports a preview as it lands and as it goes; in the workspace it draws no SVG of its own.
+describe('reporting the preview to the canvas', () => {
+    it('reports the atoms when a preview lands, and that it is gone once the request is edited', async () => {
+        const onPreviewResolved = jest.fn();
+        const onPreviewCleared = jest.fn();
+        setup({ onPreviewResolved, onPreviewCleared });
+        type('molecule (Name)', 'water');
+        press('Preview');
+        await flush();
+        expect(onPreviewResolved).toHaveBeenLastCalledWith(previewFixture('preview_ok').atoms);
+        onPreviewCleared.mockClear();
+        type('molecule (Name)', 'ethanol');
+        expect(onPreviewCleared).toHaveBeenCalled();
+        expect(onPreviewResolved).toHaveBeenCalledTimes(1);
+    });
+    it('a stale or session-ended preview is not reported as shown', async () => {
+        const onPreviewResolved = jest.fn();
+        const onPreviewCleared = jest.fn();
+        const { props, rerender } = setup({ onPreviewResolved, onPreviewCleared });
+        type('molecule (Name)', 'water');
+        press('Preview');
+        await flush();
+        onPreviewCleared.mockClear();
+        rerender(<Harness {...props} sessionExpired />);
+        expect(onPreviewCleared).toHaveBeenCalled();
+        // Signed in again, the same preview is shown again -- and so drawn again.
+        rerender(<Harness {...props} />);
+        expect(onPreviewResolved).toHaveBeenCalledTimes(2);
+        onPreviewCleared.mockClear();
+        rerender(<Harness {...props} target="aws" />);
+        expect(onPreviewCleared).toHaveBeenCalled();
+    });
+    it('draws the structure itself unless told the canvas does (showStructureSvg)', async () => {
+        const { unmount } = setup();
+        type('molecule (Name)', 'water');
+        press('Preview');
+        await flush();
+        expect(screen.getByRole('img', { name: 'preview of the resolved structure, 3 atoms' })).toBeInTheDocument();
+        unmount();
+        setup({ showStructureSvg: false });
+        type('molecule (Name)', 'water');
+        press('Preview');
+        await flush();
+        expect(screen.getByLabelText('preview')).toHaveTextContent('H₂O');
+        expect(screen.queryByRole('img', { name: /preview of the resolved structure/ })).toBeNull();
+    });
+});
+
 describe('submitting', () => {
     it('sends exactly what was previewed, with the option approved and its quote id, and follows the new job', async () => {
         const { props } = setup();

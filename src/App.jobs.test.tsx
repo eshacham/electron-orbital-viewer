@@ -12,7 +12,7 @@ import { currentMonth } from './jobs/format';
 import { loadMoleculeIndex, loadMoleculeMeta, MoleculeLoadError, RESULT_NOT_FINISHED } from './molecules/loader';
 import type { MoleculeProvenance } from './molecules/types';
 import { resetBuildEnv } from '../tests/jobs/build_env_stub';
-import { jobFixture, listFixture } from '../tests/jobs/api_fixtures';
+import { jobFixture, listFixture, previewFixture } from '../tests/jobs/api_fixtures';
 import { LIBRARY_INDEX, waterMeta } from '../tests/molecules/fixtures';
 import App from './App';
 
@@ -100,7 +100,8 @@ describe('Molecules mode with on-demand molecules', () => {
         await show(store, 'h2o');
         const side = container.querySelector('.side-panel') as HTMLElement;
         expect(within(side).getByRole('button', { name: 'How this was computed' })).toBeInTheDocument();
-        expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
+        // Task 16 (ruling P12): on a desktop the request's entry is a button that opens the workspace.
+        expect(within(side).queryByRole('button', { name: 'Request a new molecule' })).toBeNull();
         // Ruling R22c: the tier line moved from the canvas's legend stack into the title block.
         expect(container.querySelector('.viewport-title')).toHaveTextContent('Library');
         // Task 12: the categories are in the header tile's picker popover now.
@@ -124,7 +125,8 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(mockApi.list).not.toHaveBeenCalled();
         expect(mockApi.get).not.toHaveBeenCalled();
         const side = container.querySelector('.side-panel') as HTMLElement;
-        expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
+        // Task 16 (ruling P12): on a desktop the request's entry is a button that opens the workspace.
+        expect(within(side).queryByRole('button', { name: 'Request a new molecule' })).toBeNull();
         // Task 12: the categories are in the header tile's picker popover now.
         const picker = openPicker(side);
         expect(within(picker).getByRole('group', { name: 'molecule categories' })).toBeInTheDocument();
@@ -146,9 +148,16 @@ describe('Molecules mode with on-demand molecules', () => {
         await flush();
         expect(mockApi.list).toHaveBeenCalledWith(currentMonth(), 'DONE');
         const side = container.querySelector('.side-panel') as HTMLElement;
-        expect(within(side).getByRole('button', { name: 'Request a molecule' })).toBeInTheDocument();
-        // m5: MUI gives the details region the summary's aria-controls id; nothing else may carry it.
-        expect(container.querySelectorAll('#request-body')).toHaveLength(1);
+        // Task 16 (ruling P12): on a desktop the request's entry is a button that opens the workspace in the
+        // viewport cell (the phone keeps the accordion, below). m5's rule still holds: one element carries the
+        // id the entry's aria-controls names, and only while it is open.
+        const entry = within(side).getByRole('button', { name: 'Request a new molecule' });
+        expect(container.querySelectorAll('#request-body')).toHaveLength(0);
+        expect(container.querySelectorAll(`#${entry.getAttribute('aria-controls')}`)).toHaveLength(0);
+        fireEvent.click(entry);
+        expect(container.querySelectorAll(`#${entry.getAttribute('aria-controls')}`)).toHaveLength(1);
+        fireEvent.click(entry);
+        expect(container.querySelectorAll(`#${entry.getAttribute('aria-controls')}`)).toHaveLength(0);
         // Task 12: the categories are in the header tile's picker popover now.
         const picker = openPicker(side);
         fireEvent.click(within(picker).getByRole('button', { name: 'Computed' }));
@@ -269,6 +278,50 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(screen.getByRole('textbox', { name: /^molecule/ })).toHaveValue('water');
     });
 
+    // Task 16 (ruling P12): the request opens a workspace in the viewport cell, left of the canvas; while its
+    // preview is drawn the view is titled as the preview, and nothing on screen describes it as the molecule.
+    it('opens the request workspace in the viewport cell, and titles the preview on the canvas as a preview', async () => {
+        BUILD_ENV.dev = true;
+        mockApi.preview.mockResolvedValue(previewFixture('preview_ok'));
+        const { store, container } = await enterMolecules(false);
+        await show(store, 'h2o');
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const viewportCell = container.querySelector('#canvas-container') as HTMLElement;
+        expect(viewportCell.querySelector('.thumbnail-strip')).not.toBeNull();
+        const entry = within(side).getByRole('button', { name: 'Request a new molecule' });
+        fireEvent.click(entry);
+        const workspace = within(viewportCell).getByRole('region', { name: 'Request a molecule' });
+        expect(side.contains(workspace)).toBe(false);
+        // The Tab order: the entry, then the workspace, then the viewport's toolbar.
+        const toolbar = viewportCell.querySelector('.viewport-toolbar') as HTMLElement;
+        expect(entry.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(workspace.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // The strip would describe the molecule, not the preview: it hides while the workspace is open.
+        expect(viewportCell.querySelector('.thumbnail-strip')).toBeNull();
+        expect(viewportCell.querySelector('.molecule-hover-caption')).toBeNull();
+
+        fireEvent.change(within(workspace).getByRole('textbox', { name: 'molecule (Name)' }), { target: { value: 'water' } });
+        fireEvent.click(within(workspace).getByRole('button', { name: 'Preview' }));
+        await flush();
+        const title = viewportCell.querySelector('.viewport-title') as HTMLElement;
+        expect(within(title).getByRole('heading', { level: 1 })).toHaveTextContent('Preview — H₂O');
+        expect(title).toHaveTextContent('resolved structure, not yet computed');
+        // The library line and the surface keys belong to the molecule the preview has replaced on the canvas.
+        expect(title.querySelector('.tier-badge')).toBeNull();
+        expect(viewportCell.querySelector('.key-column')).toBeNull();
+        // Properties is still the molecule's, and says so.
+        expect(screen.getByText('The view shows the request’s preview; these are Water’s properties.')).toBeInTheDocument();
+
+        fireEvent.keyDown(within(workspace).getByRole('textbox', { name: 'molecule (Name)' }), { key: 'Escape' });
+        await flush();                                   // the entry's focus ripple mounts lazily
+        expect(within(viewportCell).queryByRole('region', { name: 'Request a molecule' })).toBeNull();
+        expect(entry).toHaveFocus();
+        expect(within(title).getByRole('heading', { level: 1 })).toHaveTextContent('Water');
+        expect(title.querySelector('.tier-badge')).not.toBeNull();
+        expect(viewportCell.querySelector('.thumbnail-strip')).not.toBeNull();
+        expect(screen.queryByText(/these are Water’s properties/)).toBeNull();
+    });
+
     it('says an ended session, with the way back, rather than hiding the request panel silently', async () => {
         BUILD_ENV.cognito = COGNITO;
         const { store, container } = await enterMolecules(false);
@@ -292,7 +345,8 @@ describe('Molecules mode with on-demand molecules', () => {
         await flush();
         expect(mockApi.list).toHaveBeenCalledWith(currentMonth(), 'DONE');
         const side = container.querySelector('.side-panel') as HTMLElement;
-        expect(within(side).getByRole('button', { name: 'Request a molecule' })).toBeInTheDocument();
+        // Task 16 (ruling P12): on a desktop the request's entry is a button that opens the workspace.
+        expect(within(side).getByRole('button', { name: 'Request a new molecule' })).toBeInTheDocument();
         // Task 12: the categories are in the header tile's picker popover now.
         const picker = openPicker(side);
         expect(within(picker).getByRole('button', { name: 'Computed' })).toBeInTheDocument();
@@ -315,7 +369,8 @@ describe('Molecules mode with on-demand molecules', () => {
         await flush();
         expect(mockApi.list).not.toHaveBeenCalled();
         const side = container.querySelector('.side-panel') as HTMLElement;
-        expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
+        // Task 16 (ruling P12): on a desktop the request's entry is a button that opens the workspace.
+        expect(within(side).queryByRole('button', { name: 'Request a new molecule' })).toBeNull();
         // Task 12: the categories are in the header tile's picker popover now.
         const picker = openPicker(side);
         expect(within(picker).getByRole('group', { name: 'molecule categories' })).toBeInTheDocument();
