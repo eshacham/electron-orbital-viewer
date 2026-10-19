@@ -370,6 +370,38 @@ describe('Molecules mode', () => {
         expect(store.getState().molecule.representation).toBe('ball-and-stick');
     });
 
+    // Ruling P9 (spec §9.4.1, §6.7): "Show bond lengths and angles" is a switch in View, stored in eov.display
+    // and never in a link -- the share link is byte-identical before and after it is turned on.
+    it('offers the bond-label switch in Display, off by default, and leaves the share link byte-identical', async () => {
+        const writeText = jest.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+        // The real keys, so the link carries the molecule view's state and an equal second link means something.
+        resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerMoleculeUrlKeys();
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        openDisplay(container);
+        const viewPanel = container.querySelector('.view-panel') as HTMLElement;
+        const toggle = within(viewPanel).getByRole('checkbox', { name: 'Show bond lengths and angles' });
+        expect(toggle).not.toBeChecked();
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+        expect(writeText.mock.calls[0][0]).toMatch(/#mode=molecule&.*id=h2o/);
+        fireEvent.click(toggle);
+        expect(toggle).toBeChecked();
+        expect(JSON.parse(window.localStorage.getItem('eov.display')!)).toMatchObject({ moleculeLabels: true });
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+        expect(writeText.mock.calls[1][0]).toBe(writeText.mock.calls[0][0]);
+        // Space filling draws no bonds, so only angles are labelled; with no structure there is nothing to label.
+        fireEvent.click(within(viewPanel).getByRole('button', { name: 'Space filling (space-filling structure)' }));
+        expect(within(viewPanel).getByText('Space filling draws no bonds, so only angles are labelled.')).toBeInTheDocument();
+        fireEvent.click(within(viewPanel).getByRole('button', { name: 'None (no structure)' }));
+        expect(within(viewPanel).getByRole('checkbox', { name: 'Show bond lengths and angles' })).toBeDisabled();
+        expect(within(viewPanel).getByText('No structure is drawn, so there is nothing to label.')).toBeInTheDocument();
+        resetUrlKeysForTests();
+    });
+
     // Ruling P8b: no van der Waals radius is tabulated for Sc–Co, so Space filling is disabled for a molecule
     // holding one, and says why where the viewer looks for it.
     it('disables Space filling for a molecule with no tabulated radius, saying which element and why', async () => {

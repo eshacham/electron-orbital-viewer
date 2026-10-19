@@ -135,7 +135,8 @@ describe('Inspector sections (ruling R24-3)', () => {
         act(() => { displayPref.set({ ...DEFAULT_DISPLAY, showAxes: false, plotTab: 'rho' }); });
         const { unmount } = render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
         fireEvent.click(header('Display'));
-        expect(displayPref.get()).toEqual({ showAxes: false, plotTab: 'rho', inspectorOpen: 'display' });
+        // Ruling P9: DisplayPrefs gained moleculeLabels (default off), untouched here.
+        expect(displayPref.get()).toEqual({ showAxes: false, plotTab: 'rho', inspectorOpen: 'display', moleculeLabels: false });
         unmount();
         render(<Inspector variant="docked" sections={[displaySection, plotAndData()]} />);
         expect(header('Display')).toHaveAttribute('aria-expanded', 'true');

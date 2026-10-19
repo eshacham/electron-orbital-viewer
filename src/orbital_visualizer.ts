@@ -206,8 +206,12 @@ export interface VisualizerContext {
     extrasSuppressed?: boolean;
     /** Ruling R10's moving average of frame time (`updateFrameGuard`), fed only while the lines or halo are drawn. */
     frameGuard?: { ema: number; frames: number };
-    /** Called once after each main frame (spec §12: the thumbnail service's turn); set by attachThumbnails. */
-    onAfterFrame?: () => void;
+    /**
+     * Called once each, in order, after each main frame (ruling P9; see afterMainFrame): the thumbnail
+     * service's turn (spec §12, attachThumbnails) and the on-model labels' projection (MoleculeLabels).
+     * Added and removed with addAfterFrameListener. Optional so test doubles need not carry it.
+     */
+    afterFrameListeners?: Set<() => void>;
     /** A thumbnail was drawn on this renderer since the last frame-time sample, which therefore is not the main picture's (see afterMainFrame). */
     thumbnailRendered?: boolean;
     /** Frees the thumbnails' render target (attachThumbnails); called by cleanupVisualizer. */
@@ -462,6 +466,7 @@ export function initVisualizer(
         lights: { ambient: ambientLight, key: directionalLight, fill: fillLight },
         extrasSuppressed: false,
         frameGuard: { ema: 16, frames: 0 },
+        afterFrameListeners: new Set(),
     };
 
     // Levels 1-2 cross-view linkage (spec §6): the plot reports a radius on
@@ -875,9 +880,9 @@ export function cleanupVisualizer(context: VisualizerContext | null) {
             context.moleculeOverlay = null;
         }
         context.isDisposed = true;  // Set flag first
-        context.onAfterFrame = undefined;
         context.disposeThumbnails?.();
         context.disposeThumbnails = undefined;
+        context.afterFrameListeners?.clear();
         if (context.animationFrameId) {
             cancelAnimationFrame(context.animationFrameId);
             context.animationFrameId = undefined;
@@ -2028,8 +2033,9 @@ export function guardGlowExtras(context: VisualizerContext, dtMs: number): void 
 }
 
 /**
- * What follows each main frame: ruling R10's frame-time guard, then the
- * thumbnail service's turn (`onAfterFrame`, spec §12). The guard times the
+ * What follows each main frame: ruling R10's frame-time guard, then each
+ * after-frame listener (the thumbnail service's turn, spec §12; the labels'
+ * projection, ruling P9). The guard times the
  * main picture only. A thumbnail drawn after frame N -- its draw and its
  * pixel read-back -- lands in the interval between frames N and N + 1, so
  * that interval is not fed to it: filling the strip can neither latch Glow's
@@ -2039,7 +2045,14 @@ export function afterMainFrame(context: VisualizerContext, dtMs: number | null):
     const carriedThumbnail = context.thumbnailRendered === true;
     context.thumbnailRendered = false;
     if (dtMs !== null && !carriedThumbnail) guardGlowExtras(context, dtMs);
-    context.onAfterFrame?.();
+    context.afterFrameListeners?.forEach(listener => listener());
+}
+
+/** Runs `listener` after every main frame from now on (ruling P9); returns what removes it. */
+export function addAfterFrameListener(context: VisualizerContext, listener: () => void): () => void {
+    const listeners = context.afterFrameListeners ?? (context.afterFrameListeners = new Set());
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
 }
 
 function startAnimationLoop(context: VisualizerContext) {
@@ -2427,7 +2440,7 @@ export function attachThumbnails(
         },
     };
     service.attach(thumbHost);
-    context.onAfterFrame = () => service.tick();
+    const removeTick = addAfterFrameListener(context, () => service.tick());
     // Review A, M1: three.js restores the main renderer on its own (one
     // canvas, never remounted, §3.2); nothing told the service, so it stayed
     // 'lost' for the rest of the session and every strip tile kept showing
@@ -2438,6 +2451,7 @@ export function attachThumbnails(
     host.addEventListener('webglcontextlost', onLost);
     host.addEventListener('webglcontextrestored', onRestored);
     context.disposeThumbnails = () => {
+        removeTick();
         host.removeEventListener('webglcontextlost', onLost);
         host.removeEventListener('webglcontextrestored', onRestored);
         thumbs.dispose();

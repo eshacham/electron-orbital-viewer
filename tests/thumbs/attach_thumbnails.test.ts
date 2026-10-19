@@ -10,7 +10,7 @@ jest.mock('../../src/thumbs/render_thumbnail', () => ({
 
 import { createOrbitalWorker } from '../../src/workers/createOrbitalWorker';
 import { createThumbnailRenderer } from '../../src/thumbs/render_thumbnail';
-import { afterMainFrame, attachThumbnails, cleanupVisualizer, VisualizerContext } from '../../src/orbital_visualizer';
+import { addAfterFrameListener, afterMainFrame, attachThumbnails, cleanupVisualizer, VisualizerContext } from '../../src/orbital_visualizer';
 import { ThumbnailService } from '../../src/thumbs/ThumbnailService';
 import { DEFAULT_OPACITY, defaultSurfaceStyle, MeshData, OrbitalParams } from '../../src/types/orbital';
 import { INITIAL_APPEARANCE, type Appearance } from '../../src/design/appearance';
@@ -90,7 +90,31 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         context.renderer.domElement.dispatchEvent(new Event('webglcontextlost'));
         expect(service.status()).toBe('lost');
         cleanupVisualizer(context);
-        expect(context.onAfterFrame).toBeUndefined();
+        // Ruling P9: onAfterFrame became the afterFrameListeners set -- cleanup leaves nothing in it.
+        expect(context.afterFrameListeners?.size ?? 0).toBe(0);
+    });
+
+    // Ruling P9: the after-frame hook is a set, so the thumbnails and the on-model labels both get a turn.
+    it('adds exactly one after-frame listener, removes it on dispose, and the frame calls each listener once', () => {
+        const context = buildContext();
+        const service = new ThumbnailService();
+        const tick = jest.spyOn(service, 'tick');
+        attachThumbnails(context, service, { isBusy: () => false, createGridWorker, appearance: () => glow });
+        expect(context.afterFrameListeners?.size).toBe(1);
+        const labels = jest.fn();
+        const removeLabels = addAfterFrameListener(context, labels);
+        expect(context.afterFrameListeners?.size).toBe(2);
+        afterMainFrame(context, null);
+        afterMainFrame(context, 16);
+        expect(tick).toHaveBeenCalledTimes(2);
+        expect(labels).toHaveBeenCalledTimes(2);
+        context.disposeThumbnails!();
+        expect(context.afterFrameListeners?.size).toBe(1);
+        afterMainFrame(context, 16);
+        expect(tick).toHaveBeenCalledTimes(2);
+        expect(labels).toHaveBeenCalledTimes(3);
+        removeLabels();
+        expect(context.afterFrameListeners?.size).toBe(0);
     });
 
     // Review A, M1: three.js restores the main renderer on its own after a

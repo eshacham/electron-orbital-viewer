@@ -21,6 +21,17 @@ export function methaneAtoms(): MoleculeAtom[] {
         .map(([a, b, c]) => ({ Z: 1, position: [s * a, s * b, s * c] as [number, number, number] }))];
 }
 
+/**
+ * Preflight D14 (a): no library molecule has more than 12 atoms (glycine is 10, benzene 12), so the
+ * "> 12 atoms" case is a synthetic carbon zigzag -- C–C 1.54 Å at 111.0°: every inner carbon has exactly
+ * two bonds, the two ends one, and next-but-one neighbours (2.54 Å) are too far apart to bond.
+ */
+export function carbonChainAtoms(count: number): MoleculeAtom[] {
+    const r = 1.54 * BOHR_PER_ANGSTROM;
+    const h = rad(111.0) / 2;
+    return Array.from({ length: count }, (_, i) => ({ Z: 6, position: [i * r * Math.sin(h), i % 2 ? r * Math.cos(h) : 0, 0] as [number, number, number] }));
+}
+
 export function waterMeta(overrides: Record<string, unknown> = {}): LibraryMoleculeMeta {
     const half = 6.43;
     return {

@@ -47,13 +47,15 @@ export interface DisplayPrefs {
      * `displayOpen` (T20b-display-header, P16), which decodeDisplay migrates.
      */
     inspectorOpen: string | null;
+    /** Ruling P9 (spec §9.4.1): bond lengths and angles drawn on the molecule; off by default, never in a link. */
+    moleculeLabels: boolean;
 }
 
 /** inspectorOpen when the viewer has folded the open section and left every one folded (R24-3). */
 export const INSPECTOR_ALL_FOLDED = '';
 
 export const DISPLAY_KEY = 'eov.display';
-export const DEFAULT_DISPLAY: DisplayPrefs = { showAxes: true, plotTab: 'distribution', inspectorOpen: null };
+export const DEFAULT_DISPLAY: DisplayPrefs = { showAxes: true, plotTab: 'distribution', inspectorOpen: null, moleculeLabels: false };
 const PLOT_TABS: readonly PlotTabId[] = ['wave', 'density', 'distribution', 'rho'];
 
 export function decodeDisplay(raw: string | null): DisplayPrefs {
@@ -62,6 +64,7 @@ export function decodeDisplay(raw: string | null): DisplayPrefs {
         showAxes: typeof value.showAxes === 'boolean' ? value.showAxes : DEFAULT_DISPLAY.showAxes,
         plotTab: PLOT_TABS.includes(value.plotTab as PlotTabId) ? value.plotTab as PlotTabId : DEFAULT_DISPLAY.plotTab,
         inspectorOpen: decodeInspectorOpen(value),
+        moleculeLabels: value.moleculeLabels === true,
     };
 }
 

@@ -47,6 +47,7 @@ import { createGridMeshWorker } from '../workers/createGridMeshWorker';
 import { LobeMeshData } from '../workers/shellCompositionWorker';
 import { OrbitalParams } from '../types/orbital';
 import { useMoleculeView } from '../molecules/useMoleculeView';
+import MoleculeLabels from './MoleculeLabels';
 import { useQuantumTheme } from '../design/useQuantumTheme';
 import { usePref } from '../design/usePref';
 import { displayPref, renderPref, hintPref } from '../design/presentation';
@@ -758,6 +759,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             {/* The renderer's canvas is appended here directly, so this element
                 is left without React children of its own. */}
             <div ref={canvasHostRef} id="orbital-canvas-host" />
+            {/* Ruling P9: bond lengths and angles over the molecule, placed after each frame. */}
+            {atomMode === 'molecule' && <MoleculeLabels contextRef={visualizerContextRef} />}
             {/* A scale over an empty canvas (an unbound anion) measures nothing. */}
             {scaleBar && !(atomMode === 'atom' && atomUnbound) && (
                 <div className="scale-readout" aria-label="scale">

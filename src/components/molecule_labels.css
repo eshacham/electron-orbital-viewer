@@ -1,0 +1,63 @@
+/* On-model bond lengths and angles (spec §9.4.1, ruling P9; MoleculeLabels.tsx). The overlay lies over the
+   canvas, which fills #canvas-container, and clips what leaves it. It never takes the pointer, so hover,
+   pick and drag reach the canvas as before; it is not an inset zone (useViewInsets measures named zones
+   only, R23f-3) and sits under every one of them (z-index 10 and up). */
+.model-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+.model-label-arcs {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.model-label-arc {
+  fill: none;
+  stroke: var(--ql-color-selected-edge);
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Placed by a transform from the top left; hidden until a frame has placed it (and while behind the camera). */
+.model-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  padding: 2px 6px;
+  border-radius: var(--ql-radius-sm);
+  background: color-mix(in srgb, var(--ql-color-surface-2) 85%, transparent);
+  color: var(--ql-color-text-1);
+  font-family: var(--ql-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  will-change: transform;
+}
+/* More than 12 atoms and nothing picked: one line at the bottom left of the uncovered area, above the scale
+   readout there (its 20 px offset plus its ~51 px height and a gap) -- with or without a strip under it. */
+.model-label-hint {
+  position: absolute;
+  left: calc(var(--free-left, 0px) + 20px);
+  bottom: calc(var(--free-bottom, 0px) + 79px);
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--ql-radius-md);
+  background: var(--ql-color-surface-2);
+  color: var(--ql-color-text-2);
+  font-family: var(--ql-font-sans);
+  font-size: var(--ql-type-caption-size);
+  line-height: var(--ql-type-caption-line);
+  white-space: nowrap;
+}
+/* A phone keeps its scale readout at the top (style.css), so the hint sits just above the sheet. */
+.app-shell.phone .model-label-hint {
+  left: 12px;
+  bottom: calc(var(--free-bottom, 0px) + 12px);
+}

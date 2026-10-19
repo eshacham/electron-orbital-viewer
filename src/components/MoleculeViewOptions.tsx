@@ -2,6 +2,8 @@ import React, { useId } from 'react';
 import { FormControl, FormControlLabel, FormGroup, FormLabel, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import type { Representation } from '../molecules/ball_and_stick';
 import { KEEP_CASE } from '../design/mui';
+import { displayPref } from '../design/presentation';
+import { usePref } from '../design/usePref';
 import { LAYOUT, TYPE } from '../design/tokens';
 
 interface MoleculeViewOptionsProps {
@@ -32,13 +34,20 @@ const SEGMENTS = [KEEP_CASE, { '& .MuiToggleButton-root': { height: LAYOUT.chip,
 
 /**
  * Molecule-only view settings, shown inside Controls in the right-hand column / View tab: the structure
- * (ruling P8, spec §9.4 View: Ball and stick | Space filling | None) and the dipole arrow. Each segment's
+ * (ruling P8, spec §9.4 View: Ball and stick | Space filling | None), the on-model lengths and angles
+ * (ruling P9, a presentation preference read here) and the dipole arrow. Each segment's
  * name holds its visible label (WCAG 2.5.3).
  */
 const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
     representation, onRepresentationChange, spaceFillingUnavailable, surfaceShown, showDipole, onShowDipole, dipoleText, caveat,
 }) => {
     const reasonId = useId();
+    const labelsNoteId = useId();
+    const display = usePref(displayPref);
+    // Ruling P9: what the labels switch draws depends on the structure (bond_labels.ts modelLabels).
+    const labelsNote = representation === 'none' ? 'No structure is drawn, so there is nothing to label.'
+        : representation === 'space-filling' && display.moleculeLabels ? 'Space filling draws no bonds, so only angles are labelled.'
+        : null;
     return (
         <FormGroup className="molecule-view-options">
             <FormControl component="fieldset" margin="dense" fullWidth className="molecule-structure-controls">
@@ -64,6 +73,11 @@ const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
                     </Typography>
                 )}
             </FormControl>
+            {/* Ruling P9 (spec §9.4.1): a display preference, never in a link. */}
+            <FormControlLabel label="Show bond lengths and angles" disabled={representation === 'none'}
+                control={<Switch size="small" checked={display.moleculeLabels} inputProps={{ 'aria-describedby': labelsNote ? labelsNoteId : undefined }}
+                    onChange={e => displayPref.set({ ...displayPref.get(), moleculeLabels: e.target.checked })} />} />
+            {labelsNote && <Typography id={labelsNoteId} variant="caption" className="molecule-caption">{labelsNote}</Typography>}
             <FormControlLabel control={<Switch size="small" checked={showDipole} onChange={e => onShowDipole(e.target.checked)} />} label="Dipole arrow" />
             {dipoleText && (
                 <Typography variant="body2">

@@ -3,7 +3,7 @@
 // Vite on a free port and its own headless Chromium, captures each scene in
 // each theme and size, measures boxes, fonts and colours, then stops both in
 // the same foreground run. It never touches the owner's browser or servers.
-//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--gl metal] [--dpr 2] [--drawer open] [--crop <selector>] [--run <label>]
+//   node tools/design/shoot.mjs --task T3 --scenes c-whole,c-2pz --themes dark,light --sizes desktop,phone [--port 5411] [--render '<eov.render JSON>'] [--display '<eov.display JSON>'] [--gl metal] [--dpr 2] [--drawer open] [--crop <selector>] [--run <label>]
 // Writes /tmp/6g1-<task>-<scene>-<theme>-<size>.png and /tmp/6g1-<task>-<run>-metrics.json
 // (--run defaults to a timestamp, so a second invocation for the same --task never overwrites
 // the first run's aggregated metrics -- final review B-I2).
@@ -50,6 +50,8 @@ const sizes = arg('sizes', 'desktop,phone').split(',');
 const extraWait = Number(arg('wait', '1500'));
 // Optional presentation preferences (eov.render JSON), e.g. '{"finish":"solid"}'.
 const renderPrefs = arg('render', null);
+// The same for eov.display (Task 14, preflight D15), e.g. '{"moleculeLabels":true}'; the app fills in the fields it omits.
+const displayPrefs = arg('display', null);
 // The GL backend: SwiftShader (software, the default) or the Mac's GPU through
 // ANGLE's Metal backend. On SwiftShader a Glow frame takes ~80 ms, so ruling
 // R10's guard latches the mesh lines and halo off within seconds (ruling
@@ -158,6 +160,9 @@ function collectMetrics() {
       enclosedNote: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent ?? null,
       subshellChips: [...document.querySelectorAll('.subshell-chip')].map(e => e.textContent),
       configuration: document.querySelector('.level-nav-configuration')?.textContent ?? null,
+      // Task 14: the on-model labels shown (placed by a frame), and the large-molecule hint.
+      modelLabels: [...document.querySelectorAll('.model-label')].filter(e => getComputedStyle(e).visibility === 'visible').map(e => e.textContent),
+      modelLabelHint: document.querySelector('.model-label-hint')?.textContent ?? null,
     },
   };
 }
@@ -227,12 +232,13 @@ try {
           viewport: { width: spec.width, height: spec.height }, isMobile: Boolean(spec.mobile), hasTouch: Boolean(spec.mobile),
           deviceScaleFactor: dpr, reducedMotion: 'reduce',
         });
-        await context.addInitScript(({ choice, prefs }) => {
+        await context.addInitScript(({ choice, prefs, display }) => {
           try {
             window.localStorage.setItem('eov.theme', choice);
             if (prefs) window.localStorage.setItem('eov.render', prefs);
+            if (display) window.localStorage.setItem('eov.display', display);
           } catch { /* storage refused: the app keeps its defaults */ }
-        }, { choice: theme, prefs: renderPrefs });
+        }, { choice: theme, prefs: renderPrefs, display: displayPrefs });
         // DC9/DC9b: count WebGL contexts, not canvases by class name. Wraps
         // getContext before any page script runs, and keeps a canvas ->
         // context map for every canvas that receives a context whose type
