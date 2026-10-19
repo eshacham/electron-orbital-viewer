@@ -200,7 +200,8 @@ describe('bondsStripItems: each orbital tile in its own box (ruling T10-core)', 
         expect(source.recipe).toEqual({ type: 'gaussianMO', moleculeId: shifted.id, index: 0 });
         expect(shifted.id).not.toBe(`hf@07`);
         shifted.atoms[fluorine].forEach(x => expect(x).toBeCloseTo(0, 9));
-        expect(shifted.atoms.map((atom, i) => atom[2] - hfBasis.atoms[i][2])).toEqual([0, 1].map(() => -hfBasis.atoms[fluorine][2]));
+        // Review minor: floating-point subtraction need not round-trip exactly, so compare closely, entry by entry.
+        shifted.atoms.forEach((atom, i) => expect(atom[2] - hfBasis.atoms[i][2]).toBeCloseTo(-hfBasis.atoms[fluorine][2], 12));
         expect(shifted.orbitals).toBe(hfBasis.orbitals);
         expect(core.field.resolution).toBe(40);
     });

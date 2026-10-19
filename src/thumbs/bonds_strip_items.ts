@@ -6,7 +6,7 @@ import type { FieldRenderRequest } from '../field_source';
 import type { ThumbColouring } from './ThumbnailService';
 import type { StripItem } from './strip_items';
 import type { MoleculeBasis } from '../molecules/types';
-import { orbitalBox } from '../molecules/orbital_box';
+import { basisCentredOn, orbitalBox } from '../molecules/orbital_box';
 
 /**
  * Spec §12's figure for a molecular orbital's tile: 40³. Gaussian MOs are
@@ -81,9 +81,9 @@ function fittedToOrbital(field: FieldRenderRequest, basis: MoleculeBasis, moved:
     if (halfWidth >= source.rMax) return field;
     let fitted = basis;
     if (centre.some(c => c !== 0)) {
-        const id = `${basis.id}~${centre.map(c => c.toFixed(6)).join(',')}`;
-        fitted = moved.get(id) ?? { ...basis, id, atoms: basis.atoms.map(atom => atom.map((x, axis) => x - centre[axis]) as [number, number, number]) };
-        moved.set(id, fitted);
+        const key = centre.join(',');
+        if (!moved.has(key)) moved.set(key, basisCentredOn(basis, centre));
+        fitted = moved.get(key)!;
     }
     return {
         ...field,

@@ -1,6 +1,9 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { orbitalBox } from '../../src/molecules/orbital_box';
+import { basisCentredOn, orbitalBox } from '../../src/molecules/orbital_box';
+import { registerMoleculeBasis } from '../../src/molecules/basis_registry';
+import { sampleFieldSource } from '../../src/orbital_mesh';
+import { isoLevelForEnclosedFraction } from '../../src/radial_distribution';
 import type { MoleculeBasis, MoleculeMeta } from '../../src/molecules/types';
 
 const fixture = (molecule: string, file: string) =>
@@ -17,7 +20,8 @@ describe('orbitalBox (ruling T10-core)', () => {
     it('fits a core orbital in a small box centred on its atom (HF 1σ: fluorine 1s)', () => {
         const fluorine = hfMeta.atoms.findIndex(atom => atom.Z === 9);
         const box = orbitalBox(hfBasis, index(hfBasis, '1σ'), moleculeBox(hfBasis));
-        expect(box.centre).toEqual(hfBasis.atoms[fluorine]);
+        // Ruling T10-core-I1: the centre is the midpoint of the atom's spheres, so it equals the atom to rounding.
+        box.centre.forEach((c, axis) => expect(c).toBeCloseTo(hfBasis.atoms[fluorine][axis], 12));
         expect(box.halfWidth).toBeLessThan(moleculeBox(hfBasis) / 5);
         // Still wide enough for fluorine's 1s 90 % surface (~0.2 a₀) with room to spare.
         expect(box.halfWidth).toBeGreaterThan(0.5);
@@ -50,3 +54,47 @@ describe('orbitalBox (ruling T10-core)', () => {
         expect(orbitalBox(n2Basis, index(n2Basis, '3σu*'), 2)).toEqual({ centre: [0, 0, 0], halfWidth: 2 });
     });
 });
+
+/**
+ * Ruling T10-core-I1/I2: the fitted box must never cut the surface. These two
+ * scan points (v3 data, basis.json as published: C₂ at scan point 01, F₂ at
+ * equilibrium, 07) are where a 5 % per-shell cut dropped the diffuse shells
+ * that set an orbital's reach -- C₂'s 3σu* at 90 %, F₂'s occupied 3σg at 99 %.
+ * Every fitted tile is sampled exactly as the strip samples it (40³, the basis
+ * moved to the box's centre), and no sample on the box's faces may reach the
+ * tile's own iso level: if one did, the 90 % (99 %) surface would cross the
+ * face and the tile would show a cut-open shape. The full sweep over every
+ * molecule and scan point is tools/thumbs/validate_tile_boxes.mjs.
+ */
+describe('orbitalBox never cuts a surface (rulings T10-core-I1/I2)', () => {
+    const faceOverIso = (basis: MoleculeBasis, orbitalIndex: number, fractions: number[]) => {
+        const limit = moleculeBox(basis);
+        const { centre, halfWidth } = orbitalBox(basis, orbitalIndex, limit);
+        if (halfWidth >= limit) return null;
+        const moved = basisCentredOn(basis, centre);
+        registerMoleculeBasis(moved);
+        const { id } = moved;
+        const { samples, side } = sampleFieldSource({ kind: 'analytic', id, rMax: halfWidth, recipe: { type: 'gaussianMO', moleculeId: id, index: orbitalIndex } }, 40);
+        let face = 0;
+        for (let i = 0; i < side; i++) for (let j = 0; j < side; j++) for (let k = 0; k < side; k++) {
+            if (i !== 0 && i !== side - 1 && j !== 0 && j !== side - 1 && k !== 0 && k !== side - 1) continue;
+            face = Math.max(face, samples[(i * side + j) * side + k] ** 2);
+        }
+        return fractions.map(f => face / isoLevelForEnclosedFraction(samples, f));
+    };
+
+    for (const point of ['c2-01', 'f2-07']) {
+        it(`keeps every tile of ${point} inside its box at 90 % and at 99 %`, () => {
+            const basis: MoleculeBasis = fixture(point, 'basis.json');
+            const cut: string[] = [];
+            for (const orbital of basis.orbitals) {
+                const ratios = faceOverIso(basis, orbital.index, [0.9, 0.99]);
+                ratios?.forEach((ratio, i) => {
+                    if (ratio >= 1) cut.push(`${orbital.label} at ${[90, 99][i]} %: face/iso ${ratio.toFixed(2)}`);
+                });
+            }
+            expect(cut).toEqual([]);
+        });
+    }
+});
+
