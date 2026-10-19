@@ -2,11 +2,10 @@ import React from 'react';
 import { Alert, Link, Typography } from '@mui/material';
 import StructurePreview from './StructurePreview';
 import { PUBCHEM_COMPOUND_URL } from './ProvenancePanel';
-import { formatFormula } from '../molecules/catalogue';
+import { formatFormula, multiplicityText } from '../molecules/catalogue';
 import { formatDuration, formatGB, formatUsd, money, predictionNote } from '../jobs/format';
 import type { AvailableQuoteOption, GeometrySource, PreviewResponse, Quote, Sizing } from '../jobs/api_types';
 
-const SPIN = ['', 'singlet', 'doublet', 'triplet', 'quartet', 'quintet', 'sextet'];
 const signed = (charge: number) => (charge > 0 ? `+${charge}` : charge < 0 ? `−${-charge}` : '0');
 
 /**
@@ -68,7 +67,7 @@ const PreviewDetails: React.FC<{ preview: PreviewResponse }> = ({ preview }) => 
                 </dd>
                 <dt>Formula</dt><dd>{formatFormula(preview.formula)}</dd>
                 <dt>Charge</dt><dd>{signed(preview.charge)}</dd>
-                <dt>Multiplicity</dt><dd>{preview.multiplicity}{SPIN[preview.multiplicity] ? ` (${SPIN[preview.multiplicity]})` : ''}</dd>
+                <dt>Multiplicity</dt><dd>{multiplicityText(preview.multiplicity)}</dd>
                 <dt>Electrons</dt><dd>{preview.electronCount}</dd>
                 <dt>Basis functions</dt><dd>{preview.basisFunctions} ({preview.job.method.basis})</dd>
                 {existing && (

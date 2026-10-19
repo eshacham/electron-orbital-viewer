@@ -180,3 +180,10 @@
   line-height: var(--ql-type-caption-line);
   color: var(--ql-color-text-3);
 }
+/* While a chosen molecule's facts load (ruling T12-I1). */
+.molecule-properties-status {
+  margin: 0;
+  font-size: var(--ql-type-body-size);
+  line-height: var(--ql-type-body-line);
+  color: var(--ql-color-text-3);
+}

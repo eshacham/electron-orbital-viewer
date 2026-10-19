@@ -1259,8 +1259,12 @@ function App() {
     const moleculeQuickPick = (
         <QuickPick entries={moleculeEntries} selectedId={molecule.selectedId} onSelect={moleculeNavProps.onSelectMolecule} />
     );
-    // Ruling P10: the molecule's Properties, from the facts its meta carries (real or absent: none before it loads).
-    const moleculeProperties = molecule.meta && <MoleculePropertiesCard meta={molecule.meta} />;
+    // Ruling P10: the molecule's Properties, from the facts its meta carries. Ruling T12-I1: present while a
+    // molecule is chosen -- "Loading…" until its meta lands -- so a quick pick never folds the open section to
+    // Display and back; one that failed to load says so (its alert over the view gives the reason).
+    const moleculeProperties = molecule.selectedId !== null && (molecule.meta || molecule.isLoadingMeta
+        ? <MoleculePropertiesCard meta={molecule.meta} />
+        : <p className="molecule-properties-status">This molecule did not load.</p>);
     // The structure and dipole switches belong with the view settings
     // (Controls' children slot), with the dipole's value and -- for ozone --
     // the caveat that must never be separated from it (ruling T7-O3).
@@ -1525,6 +1529,15 @@ function App() {
         </div>
     );
 
+    // Molecules' inspector (the other modes have their own: atomInspector, basicInspector, bondsInspector):
+    // the view settings under the titled Display section (rulings T20b-display-header, R24-3), then the
+    // molecule's Properties (Task 12, ruling P10) while one is chosen -- the content section, open by default.
+    // The phone's View tab stacks the Properties section (below).
+    const moleculeSections: InspectorSection[] = [
+        { key: 'display', title: 'Display', content: controls },
+        ...(moleculeProperties ? [{ key: 'properties', title: 'Properties', content: moleculeProperties }] : []),
+    ];
+
     // The phone sheet's tabs, one job each. Basic Orbitals has no drill-down,
     // so its orbital choice and view settings share one tab; Bonds has its
     // panel, as atom mode has its drill-down.
@@ -1549,12 +1562,14 @@ function App() {
                     </>
                 ),
             },
-            // Task 12: the inspector's sections stacked (as ruling R7 stacks the other modes'): Display, then Properties.
+            // Task 12: the view settings, then the inspector's Properties section stacked (as ruling R7 stacks the other modes').
             {
                 key: 'view', label: 'View', content: (
                     <>
                         {controls}
-                        {moleculeProperties && <><h2 className="ql-section">Properties</h2>{moleculeProperties}</>}
+                        {/* Review M3: the inspector's own stacked section, as the other modes' sheets use. Display
+                            is this tab's controls already, so only Properties is stacked here. */}
+                        <Inspector variant="stacked" sections={moleculeSections.filter(section => section.key === 'properties')} />
                         {phoneViewActions}
                     </>
                 ),
@@ -1696,13 +1711,6 @@ function App() {
         )
         // Basic Orbitals: its header tile and chips (ruling P3) -- BasicExplore.
         : basicExplore;
-    // Molecules (the other modes have their own: atomInspector, basicInspector, bondsInspector, above):
-    // the view settings under the titled Display section (rulings T20b-display-header, R24-3), then the
-    // molecule's Properties (Task 12, ruling P10) once it has loaded -- the content section, open by default.
-    const moleculeSections: InspectorSection[] = [
-        { key: 'display', title: 'Display', content: controls },
-        ...(moleculeProperties ? [{ key: 'properties', title: 'Properties', content: moleculeProperties }] : []),
-    ];
 
     const session = useAppSelector(state => state.jobs.session);
     const avatar = (

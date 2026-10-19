@@ -159,6 +159,32 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(screen.getByRole('group', { name: 'where jobs run' })).toBeInTheDocument();
     });
 
+    // Review M4 (Task 12): the owner's jobs section is part of the Explore order -- header tile, quick pick, the
+    // surface switch, Selection, then jobs -- inside the part that scrolls, with the footer pinned below it.
+    it('puts the owner\'s jobs after Selection, inside the scrolling part of Explore', async () => {
+        BUILD_ENV.dev = true;
+        const { store, container } = await enterMolecules(false);
+        await show(store, 'h2o');
+        await flush();
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const scroll = side.querySelector('.molecule-explore-scroll') as HTMLElement;
+        const jobs = side.querySelector('.molecule-jobs') as HTMLElement;
+        expect(jobs).not.toBeNull();
+        const order = [
+            side.querySelector('.molecule-tile') as HTMLElement,
+            within(side).getByRole('group', { name: 'Quick pick' }),
+            within(side).getByRole('group', { name: 'surface' }),
+            within(side).getByText('Selection'),
+            jobs,
+            side.querySelector('.molecule-provenance-footer') as HTMLElement,
+        ];
+        for (let i = 1; i < order.length; i++) {
+            expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        }
+        expect(scroll.contains(jobs)).toBe(true);
+        expect(scroll.contains(order[order.length - 1])).toBe(false);
+    });
+
     it("says a computed molecule is computed, on the canvas, and gives the owner its time and cost", async () => {
         BUILD_ENV.dev = true;
         const { store, container } = await enterMolecules(false);

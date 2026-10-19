@@ -13,6 +13,11 @@ interface MoleculePickerProps {
     autoFocus?: boolean;
 }
 
+/** The library did not load: said in the picker, and under the Explore header tile on a desktop or tablet (ruling T12-I2). */
+export const LibraryLoadAlert: React.FC<{ error: string }> = ({ error }) => (
+    <Alert severity="error" role="alert">Could not load the molecule library: {error}. Reload the page to try again.</Alert>
+);
+
 /** Search plus the spec's five categories. Lives in the navigation column on a desktop and in the Explore tab and a full-screen dialog on a phone. */
 const MoleculePicker: React.FC<MoleculePickerProps> = ({ entries, error, selectedId, onSelect, autoFocus = false }) => {
     const [query, setQuery] = useState('');
@@ -25,7 +30,7 @@ const MoleculePicker: React.FC<MoleculePickerProps> = ({ entries, error, selecte
         [entries],
     );
 
-    if (error) return <Alert severity="error" role="alert">Could not load the molecule library: {error}. Reload the page to try again.</Alert>;
+    if (error) return <LibraryLoadAlert error={error} />;
     if (!entries) return <Typography variant="body2" className="molecule-picker-status">Loading the molecule library…</Typography>;
 
     return (

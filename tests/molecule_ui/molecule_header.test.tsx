@@ -51,6 +51,31 @@ describe('MoleculeHeader (spec §9.4 Build, ruling P1)', () => {
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     });
 
+    // Review M2: Esc closes the popover and gives focus back to the button that opened it.
+    it('closes the popover on Esc and returns focus to "Change"', async () => {
+        render(<MoleculeHeader {...props} />);
+        const change = screen.getByRole('button', { name: 'Change molecule' });
+        change.focus(); // a real click focuses the button; fireEvent.click does not
+        fireEvent.click(change);
+        const popover = screen.getByRole('dialog', { name: 'Choose a molecule' });
+        await waitFor(() => expect(within(popover).getByRole('textbox', { name: 'filter molecules' })).toHaveFocus());
+        fireEvent.keyDown(popover, { key: 'Escape' });
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        expect(change).toHaveFocus();
+        expect(change).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    // Ruling T12-I2: a library that failed to load is said under the tile, not only inside the popover.
+    it('says, under the tile, that the library could not be loaded', () => {
+        render(<MoleculeHeader {...props} entries={null} indexError="HTTP 503" meta={null} selectedId={null} />);
+        expect(screen.getByRole('alert')).toHaveTextContent('Could not load the molecule library: HTTP 503');
+    });
+
+    it('leaves the load failure to the inline list in a phone\'s Explore tab (compact)', () => {
+        render(<MoleculeHeader {...props} entries={null} indexError="HTTP 503" meta={null} selectedId={null} compact onOpenPicker={jest.fn()} />);
+        expect(screen.queryByRole('alert')).toBeNull();
+    });
+
     it('compact (a phone\'s Explore tab): one row, and Change opens the phone\'s full-screen picker rather than a popover', () => {
         const onOpenPicker = jest.fn();
         const { container } = render(<MoleculeHeader {...props} compact onOpenPicker={onOpenPicker} />);

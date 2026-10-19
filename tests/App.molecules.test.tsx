@@ -153,7 +153,47 @@ describe('Molecules mode', () => {
         expect(within(region).getByText('HOMO–LUMO gap')).toBeInTheDocument();
     });
 
-    it('has no Properties section before a molecule has loaded (real or absent)', async () => {
+    // Ruling T12-I1: while a molecule is chosen, Properties stays a section -- "Loading…" until its meta arrives --
+    // so a quick pick never folds the open section to Display and back.
+    it('keeps Properties the open section across a molecule change, loading then filled', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        const viewPanel = container.querySelector('.view-panel') as HTMLElement;
+        const properties = () => within(viewPanel).getByRole('button', { name: 'Properties' });
+        expect(properties()).toHaveAttribute('aria-expanded', 'true');
+        // Another molecule, its meta load held pending until the test lets it land.
+        const loader = jest.requireMock('../src/molecules/loader') as { loadMoleculeMeta: jest.Mock };
+        let land: (meta: ReturnType<typeof waterMeta>) => void = () => {};
+        loader.loadMoleculeMeta.mockImplementationOnce(() => new Promise(resolve => { land = resolve; }));
+        act(() => { store.dispatch(selectMolecule({ id: 'nh3' })); });
+        await flush();
+        expect(store.getState().molecule.meta).toBeNull();
+        expect(properties()).toHaveAttribute('aria-expanded', 'true');
+        expect(within(viewPanel).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
+        const region = () => within(viewPanel).getByRole('region', { name: 'Properties' });
+        expect(region()).toHaveTextContent('Loading…');
+        await act(async () => { land(waterMeta({ id: 'nh3', name: 'Ammonia', formula: 'NH3' })); });
+        await flush();
+        expect(properties()).toHaveAttribute('aria-expanded', 'true');
+        expect(region()).not.toHaveTextContent('Loading…');
+        expect(within(region()).getByText('NH₃')).toBeInTheDocument();
+    });
+
+    // Ruling T12-I2: on a desktop or tablet the library's load failure is said in the panel, under the tile --
+    // not only inside the popover -- as the inline picker said it before.
+    it('says, in the Explore panel, that the molecule library could not be loaded', async () => {
+        const loader = jest.requireMock('../src/molecules/loader') as { loadMoleculeIndex: jest.Mock };
+        loader.loadMoleculeIndex.mockRejectedValueOnce(new Error('HTTP 503'));
+        const { container } = await enterMolecules(false);
+        await flush();
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const alert = within(side).getByRole('alert');
+        expect(alert).toHaveTextContent('Could not load the molecule library');
+        expect((side.querySelector('.molecule-tile') as HTMLElement).compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('has no Properties section before a molecule is chosen (real or absent)', async () => {
         const { container } = await enterMolecules(false);
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
         expect(within(viewPanel).queryByRole('button', { name: 'Properties' })).toBeNull();
@@ -190,6 +230,8 @@ describe('Molecules mode', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'View' }));
         const tabpanel = screen.getByRole('tabpanel');
         const heading = within(tabpanel).getByRole('heading', { name: 'Properties' });
+        // Review M3: the inspector's own stacked section, as the other modes' phone sheets use.
+        expect(heading.closest('.inspector-stacked')).not.toBeNull();
         expect(within(tabpanel).getByText(/Opacity/).compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(within(tabpanel).getByText('Point group')).toBeInTheDocument();
     });

@@ -8,8 +8,11 @@ import { formatFormula } from '../../src/molecules/catalogue';
 import { formatDipole } from '../../src/molecules/dipole';
 import { formatOrbitalEnergy, formatPointGroup, gapTerm, orbitalGaps, GAP_CAVEAT } from '../../src/molecules/orbital_display';
 import { validatedLine } from '../../src/validation/geometry_honesty';
-import { COMPUTED_LINE, tierLine } from '../../src/components/TierBadge';
+import { COMPUTED_LINE, TIER_LABEL } from '../../src/components/TierBadge';
+import { multiplicityText } from '../../src/molecules/catalogue';
 import { waterMeta } from '../molecules/fixtures';
+import PreviewDetails from '../../src/components/PreviewDetails';
+import { previewFixture } from '../jobs/api_fixtures';
 
 type Meta = ReturnType<typeof waterMeta>;
 
@@ -40,11 +43,12 @@ describe('MoleculePropertiesCard (spec §9.4 Properties, ruling P10)', () => {
             { term: 'Formula', value: formatFormula(meta.formula), caption: null },
             { term: 'Point group', value: formatPointGroup(meta.symmetry.pointGroup), caption: null },
             { term: 'Electrons', value: String(meta.electronCount), caption: null },
-            { term: 'Multiplicity', value: String(meta.multiplicity), caption: null },
+            { term: 'Multiplicity', value: multiplicityText(meta.multiplicity), caption: null },
             { term: 'Dipole', value: formatDipole(meta), caption: null },
             { term: gapTerm(gap), value: formatOrbitalEnergy(gap.hartree), caption: GAP_CAVEAT },
             { term: 'Geometry', value: meta.geometrySource, caption: validatedLine(meta) },
-            { term: 'Data tier', value: tierLine(meta), caption: null },
+            // Ruling T12-dup: the tier's name only -- its line is the Geometry caption above (and the title block's).
+            { term: 'Data tier', value: TIER_LABEL.validated, caption: null },
         ]);
         // The label is the one the orbital list gives the same gap.
         expect(gapTerm(gap)).toBe('HOMO–LUMO gap');
@@ -110,13 +114,38 @@ describe('MoleculePropertiesCard (spec §9.4 Properties, ruling P10)', () => {
         });
         const { container } = render(<MoleculePropertiesCard meta={meta} />);
         expect(row(container, 'SOMO–LUMO gap')?.value).toBe(formatOrbitalEnergy(orbitalGaps(meta.orbitals)[0].hartree));
-        expect(row(container, 'Multiplicity')?.value).toBe('2');
+        expect(row(container, 'Multiplicity')?.value).toBe(multiplicityText(2));
     });
 
-    it('captions a computed molecule\'s geometry with the computed line, and its tier row says the same', () => {
+    it('captions a computed molecule\'s geometry with the computed line, and its tier row names the tier', () => {
         const meta: Meta = waterMeta({ tier: 'computed', geometrySource: 'optimised (B3LYP-D3(BJ)/def2-SVP)' });
         const { container } = render(<MoleculePropertiesCard meta={meta} />);
         expect(row(container, 'Geometry')).toEqual({ term: 'Geometry', value: meta.geometrySource, caption: COMPUTED_LINE });
-        expect(row(container, 'Data tier')?.value).toBe(tierLine(meta));
+        expect(row(container, 'Data tier')?.value).toBe(TIER_LABEL.computed);
+    });
+
+    // Ruling T12-I1: the section stays while a chosen molecule's facts are on their way.
+    it('says it is loading while the chosen molecule\'s meta is on its way', () => {
+        const { container } = render(<MoleculePropertiesCard meta={null} />);
+        expect(container.querySelector('dl')).toBeNull();
+        expect(container).toHaveTextContent('Loading…');
+    });
+});
+
+// Ruling T12-M1: one wording for the spin multiplicity, the request preview's and the Properties card's.
+describe('multiplicityText', () => {
+    it('names the multiplicity after its number, and gives the bare number past the named ones', () => {
+        expect(multiplicityText(1)).toBe('1 (singlet)');
+        expect(multiplicityText(2)).toBe('2 (doublet)');
+        expect(multiplicityText(3)).toBe('3 (triplet)');
+        expect(multiplicityText(6)).toBe('6 (sextet)');
+        expect(multiplicityText(7)).toBe('7');
+    });
+
+    it('is the wording both the request preview and the Properties card show', () => {
+        const { container } = render(<PreviewDetails preview={{ ...previewFixture('preview_ok'), multiplicity: 3 }} />);
+        const dt = Array.from(container.querySelectorAll('dt')).find(e => e.textContent === 'Multiplicity') as HTMLElement;
+        expect(dt.nextElementSibling).toHaveTextContent(multiplicityText(3));
+        expect(dt.nextElementSibling?.textContent).toBe('3 (triplet)');
     });
 });

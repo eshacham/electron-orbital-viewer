@@ -23,3 +23,11 @@ export function filterMolecules(entries: MoleculeIndexEntry[], query: string, ca
 export function formatFormula(formula: string): string {
     return formula.replace(/([A-Za-z)])(\d+)/g, (_, head: string, digits: string) => head + [...digits].map(d => SUBSCRIPTS[Number(d)]).join(''));
 }
+
+const SPIN_NAMES = ['', 'singlet', 'doublet', 'triplet', 'quartet', 'quintet', 'sextet'];
+
+/** A spin multiplicity as the app words it wherever it is shown (the request preview, Properties): "1 (singlet)". */
+export function multiplicityText(multiplicity: number): string {
+    const name = SPIN_NAMES[multiplicity];
+    return name ? `${multiplicity} (${name})` : String(multiplicity);
+}
