@@ -1,6 +1,6 @@
 import { drillToOrbital, drillToShell, drillToSubshell, setMode } from '../../src/store/atomSlice';
 import { viewTitle } from '../../src/shell/view_title';
-import { selectMolecule, metaLoaded, setSurface, setRepresentation } from '../../src/store/moleculeSlice';
+import { selectMolecule, metaLoaded, setSurface, setRepresentation, setShowDipole } from '../../src/store/moleculeSlice';
 import { neonStore, sodiumIonStore } from '../export/fixtures';
 import { waterMeta } from '../molecules/fixtures';
 
@@ -44,7 +44,11 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
         store.dispatch(setSurface({ kind: 'none' }));
         expect(viewTitle(store.getState())).toEqual({ title: 'Water (H₂O)', subtitle: 'Structure only · geometry: experiment (CCCBDB)' });
+        // Ruling T13-M: with no structure either, the subtitle never says "Structure only" -- it names the
+        // dipole arrow when that is what is left, and says nothing is drawn when nothing is.
         store.dispatch(setRepresentation('none'));
-        expect(viewTitle(store.getState()).subtitle).toBe('No surface or structure drawn');
+        expect(viewTitle(store.getState()).subtitle).toBe('Dipole arrow only · μ = 1.86 D (B3LYP/def2-TZVP) · experiment 1.855 D');
+        store.dispatch(setShowDipole(false));
+        expect(viewTitle(store.getState()).subtitle).toBe('Nothing drawn: no surface, structure or dipole arrow');
     });
 });

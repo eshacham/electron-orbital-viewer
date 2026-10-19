@@ -21,12 +21,12 @@ import { createGridMeshWorker } from '../../src/workers/createGridMeshWorker';
 import {
     cancelPendingRender, clearFieldMesh, frameStructure, presentFieldMesh, setMoleculeOverlay, updateFieldInScene, VisualizerContext,
 } from '../../src/orbital_visualizer';
-import { BOHR_TO_ANGSTROM } from '../../src/molecules/ball_and_stick';
+import { overlayExtent } from '../../src/molecules/ball_and_stick';
 import type { MoleculeBasis } from '../../src/molecules/types';
 import { useMoleculeLoader } from '../../src/molecules/useMoleculeLoader';
 import { useMoleculeView } from '../../src/molecules/useMoleculeView';
 import { planMoleculeRender } from '../../src/molecules/render_plan';
-import { LIBRARY_INDEX, waterMeta } from './fixtures';
+import { LIBRARY_INDEX, methaneMeta, waterMeta } from './fixtures';
 
 const flush = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 // D36: the app's own store, so the hooks see the state shape they will in the app.
@@ -419,9 +419,10 @@ describe('useMoleculeView', () => {
         expect(createGridMeshWorker).toHaveBeenCalledTimes(1);
         expect(store.getState().molecule.renderLabel).toBeNull();
         expect(store.getState().molecule.drawn).toBeNull();
-        // With no surface to fit, the camera fits the structure: water's hydrogens and their van der Waals
-        // spheres, keyed to the molecule's box as a surface would be.
-        expect(frameStructure).toHaveBeenCalledWith(context, expect.closeTo((0.958 + 1.20) / BOHR_TO_ANGSTROM, 6), expect.closeTo(6.43, 9));
+        // With no surface to fit, the camera fits what is drawn: the overlay on the canvas (ruling T13-I2).
+        const overlay = (setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1];
+        expect(frameStructure).toHaveBeenCalledTimes(1);
+        expect(frameStructure).toHaveBeenCalledWith(context, overlayExtent(overlay));
     });
     // Ruling P8: the overlay follows the representation -- ball and stick (spheres and sticks), space filling
     // (van der Waals spheres only), or no structure at all; the dipole arrow is its own switch either way.
@@ -440,5 +441,39 @@ describe('useMoleculeView', () => {
         expect(parts()).toEqual({ atoms: 3, bonds: 0 });
         act(() => { store.dispatch(setRepresentation('none')); });
         expect(parts()).toEqual({ atoms: 0, bonds: 0 });
+    });
+
+    // Ruling T13-I2: while no surface is drawn, a representation switch re-frames only when the new
+    // structure is bigger -- ball → space keeps the spheres whole, space → ball never zooms in -- and
+    // with a surface drawn the structure never moves the camera.
+    it('re-frames the structure grow-only while no surface is drawn, and never under a surface', async () => {
+        const worker = fakeWorker();
+        (createGridMeshWorker as jest.Mock).mockReturnValue(worker);
+        (getDensityGrid as jest.Mock).mockResolvedValue(densityGrid());
+        const context = fakeContext();
+        const store = makeStore();
+        render(<Provider store={store}><Harness active context={context} /></Provider>);
+        // Methane: no dipole arrow (μ = 0), so the overlay is the structure alone.
+        act(() => { store.dispatch(selectMolecule({ id: 'ch4', surface: { kind: 'none' } })); store.dispatch(metaLoaded({ id: 'ch4', meta: methaneMeta() })); });
+        await flush();
+        const lastOverlay = () => (setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1];
+        const ballAndStick = overlayExtent(lastOverlay());
+        expect((frameStructure as jest.Mock).mock.calls).toEqual([[context, ballAndStick]]);
+        act(() => { store.dispatch(setRepresentation('space-filling')); });
+        const spaceFilling = overlayExtent(lastOverlay());
+        expect(spaceFilling).toBeGreaterThan(ballAndStick);
+        expect((frameStructure as jest.Mock).mock.calls).toEqual([[context, ballAndStick], [context, spaceFilling]]);
+        act(() => { store.dispatch(setRepresentation('ball-and-stick')); });
+        act(() => { store.dispatch(setRepresentation('none')); });
+        expect(frameStructure).toHaveBeenCalledTimes(2);
+        // Under a surface the surface frames the camera; the structure never does.
+        act(() => { store.dispatch(setSurface({ kind: 'density' })); });
+        await flush();
+        act(() => { store.dispatch(setRepresentation('space-filling')); });
+        expect(frameStructure).toHaveBeenCalledTimes(2);
+        // Back to no surface: framed afresh to what is drawn now.
+        act(() => { store.dispatch(setSurface({ kind: 'none' })); });
+        await flush();
+        expect((frameStructure as jest.Mock).mock.calls.at(-1)).toEqual([context, spaceFilling]);
     });
 });

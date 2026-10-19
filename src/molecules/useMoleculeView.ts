@@ -12,7 +12,7 @@ import type { GridMeshRequest } from './grid_mesh_request';
 import { getDensityGrid, getEspGrid } from './grid_cache';
 import { loadBasis } from './loader';
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY, espVertexColors } from './esp_color';
-import { buildBallAndStick, buildSpaceFilling, detectBonds, pickMoleculePart, structureExtent } from './ball_and_stick';
+import { buildBallAndStick, buildSpaceFilling, detectBonds, overlayExtent, pickMoleculePart } from './ball_and_stick';
 import { dipoleArrow } from './dipole';
 import { gridHalfWidth, planMoleculeRender } from './render_plan';
 
@@ -39,12 +39,19 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
     const representation = useAppSelector(state => state.molecule.representation);
     const showDipole = useAppSelector(state => state.molecule.showDipole);
     const requestRef = useRef(0);
+    // Ruling T13-I2. The overlay last drawn, the surface chosen now (read by the overlay effect without
+    // re-running on it), and the structure radius the camera frames while no surface is drawn -- null
+    // whenever a surface is what frames the camera.
+    const overlayRef = useRef<THREE.Group | null>(null);
+    const surfaceRef = useRef(surface);
+    surfaceRef.current = surface;
+    const framedStructureRef = useRef<number | null>(null);
 
     // Structure and dipole: rebuilt only when they change, never by a surface switch.
     useEffect(() => {
         const context = contextRef.current;
         if (!context) return;
-        if (!active || !meta) { setMoleculeOverlay(context, null); return; }
+        if (!active || !meta) { setMoleculeOverlay(context, null); overlayRef.current = null; return; }
         const group = new THREE.Group();
         // Ruling P8. The slice never holds space filling for a molecule it cannot be drawn for (ruling P8b).
         if (representation === 'ball-and-stick') group.add(buildBallAndStick(meta.atoms, detectBonds(meta.atoms)));
@@ -52,6 +59,14 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
         const arrow = showDipole ? dipoleArrow(meta) : null;
         if (arrow) group.add(arrow);
         setMoleculeOverlay(context, group);
+        overlayRef.current = group;
+        // With no surface the structure is the picture: a bigger one (ball and stick → space filling, the
+        // arrow turned on) widens the frame to stay whole; a smaller one never zooms in (ruling T13-I2).
+        const framed = framedStructureRef.current;
+        if (surfaceRef.current.kind === 'none' && framed !== null) {
+            const extent = overlayExtent(group);
+            if (extent > framed) { frameStructure(context, extent); framedStructureRef.current = extent; }
+        }
     }, [contextRef, active, meta, representation, showDipole]);
 
     // Nothing chosen yet (or the next molecule still loading): do not leave
@@ -68,12 +83,16 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
         if (plan.kind === 'clear') {
             // Structure only (ruling P8): the request number above already
             // supersedes anything still landing; stop it, take the surface
-            // down, and frame the structure (a link may open straight on it).
+            // down, and frame what is drawn -- the overlay effect, declared
+            // above, has already built it (a link may open straight on it).
             cancelPendingRender(context);
             clearFieldMesh(context);
-            frameStructure(context, structureExtent(meta.atoms), gridHalfWidth(meta));
+            const extent = overlayRef.current ? overlayExtent(overlayRef.current) : 0;
+            frameStructure(context, extent);
+            framedStructureRef.current = extent;
             return;
         }
+        framedStructureRef.current = null;
         const current = () => requestRef.current === requestId && !context.isDisposed;
         let landed = false;
         // What this request draws, reported with its landing (exports read it, Task 16b).

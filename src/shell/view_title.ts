@@ -7,7 +7,7 @@ import type { RelativityMode } from '../atom/relativity';
 import { orbitalName } from '../orbital_names';
 import { combinationTitle } from '../combinations';
 import { BONDS_SYSTEMS } from '../bonds/systems';
-import { moleculeTitle, viewDescription } from '../export/caption';
+import { moleculeTitle, noSurfaceView, viewDescription } from '../export/caption';
 
 const SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
 
@@ -63,14 +63,8 @@ export function viewTitle(state: RootState): ViewTitle {
         const system = BONDS_SYSTEMS.find(entry => entry.id === state.bonds.system);
         return { title: system ? `${system.formula} — ${system.name}` : 'Bonds', subtitle: viewDescription(state) };
     }
-    const { meta, surface, representation } = state.molecule;
+    const meta = state.molecule.meta;
     if (!meta) return { title: 'Molecules', subtitle: 'Choose a molecule' };
-    // Ruling P8: no surface (show=none) draws the structure alone, whose one method is where its geometry came from.
-    if (surface.kind === 'none') {
-        return {
-            title: moleculeTitle(meta),
-            subtitle: representation === 'none' ? 'No surface or structure drawn' : `Structure only · geometry: ${meta.geometrySource}`,
-        };
-    }
-    return { title: moleculeTitle(meta), subtitle: viewDescription(state) };
+    // Ruling P8 / T13-M: no surface (show=none) -- the line says what is drawn instead, and how it was got.
+    return { title: moleculeTitle(meta), subtitle: noSurfaceView(state)?.line ?? viewDescription(state) };
 }

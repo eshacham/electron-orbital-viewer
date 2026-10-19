@@ -1274,7 +1274,7 @@ function App() {
     // the caveat that must never be separated from it (ruling T7-O3).
     const moleculeOptions = isMoleculeMode && molecule.meta && (
         <MoleculeViewOptions representation={molecule.representation} onRepresentationChange={r => dispatch(setRepresentation(r))}
-            spaceFillingUnavailable={spaceFillingUnavailableReason(molecule.meta.atoms)}
+            spaceFillingUnavailable={spaceFillingUnavailableReason(molecule.meta.atoms)} surfaceShown={molecule.surface.kind !== 'none'}
             showDipole={molecule.showDipole} onShowDipole={on => dispatch(setShowDipole(on))}
             dipoleText={formatDipole(molecule.meta)} caveat={molecule.meta.caveat ?? null} />
     );
@@ -1316,6 +1316,7 @@ function App() {
                 : isMoleculeMode && molecule.surface.kind === 'esp' ? ESP_SURFACE_NOTE
                 : isMoleculeMode && molecule.surface.kind === 'none' ? NO_SURFACE_NOTE : undefined}
             isoNote={moleculeIsoNote}
+            noSurface={isMoleculeMode && molecule.surface.kind === 'none'}
         >
             {isAtomMode ? (
                 <SurfaceStyleControl surfaceMode={surfaceStyle.mode} meshLevel={atomLevel === 'orbital'}
@@ -1523,7 +1524,7 @@ function App() {
         <div className="molecule-selection">
             <Typography variant="subtitle2" className="molecule-selection-heading">Selection</Typography>
             <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}
-                geometrySource={molecule.meta.geometrySource} touch={isNarrow} />
+                geometrySource={molecule.meta.geometrySource} touch={isNarrow} spaceFilling={molecule.representation === 'space-filling'} />
         </div>
     );
 
@@ -1929,7 +1930,8 @@ function App() {
                         because of a hover. */}
                     {moleculeCaptionZone && (
                         <p className={`molecule-hover-caption${showHoverCaption ? '' : ' hidden'}`}>
-                            Hover or tap an atom or bond
+                            {/* Ruling T13-I4: space filling has no bonds to pick. */}
+                            {molecule.representation === 'space-filling' ? 'Hover or tap an atom' : 'Hover or tap an atom or bond'}
                         </p>
                     )}
                 </KeyColumn>

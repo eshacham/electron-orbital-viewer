@@ -345,11 +345,23 @@ describe('Molecules mode', () => {
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
         const group = within(viewPanel).getByRole('group', { name: 'Structure' });
         expect(within(group).getAllByRole('button').map(b => b.textContent)).toEqual(['Ball and stick', 'Space filling', 'None']);
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const readoutNote = () => (within(side).getByRole('status') as HTMLElement).textContent;
+        const hoverCaption = () => container.querySelector('#canvas-container .molecule-hover-caption');
+        expect(readoutNote()).toMatch(/sticks show connectivity, not bond order/);
+        expect(hoverCaption()).toHaveTextContent(/^Hover or tap an atom or bond$/);
         fireEvent.click(within(group).getByRole('button', { name: 'Space filling (space-filling structure)' }));
         expect(store.getState().molecule.representation).toBe('space-filling');
-        const side = container.querySelector('.side-panel') as HTMLElement;
         expect(within(side).getByText('Selection')).toBeInTheDocument();
-        expect(container.querySelector('#canvas-container .molecule-hover-caption')).not.toBeNull();
+        // Ruling T13-I4: space filling draws no sticks and no bonds to pick, so neither text says it does.
+        expect(readoutNote()).toMatch(/geometry: experiment \(CCCBDB\) · van der Waals spheres \(Bondi 1964 \/ Mantina 2009\)/);
+        expect(readoutNote()).not.toMatch(/sticks|bond order/);
+        expect(hoverCaption()).toHaveTextContent(/^Hover or tap an atom$/);
+        // Ruling T13-M: over a surface the spheres can hide it, and the Structure control says so.
+        expect(within(viewPanel).getByText('The spheres can hide the surface inside them.')).toBeInTheDocument();
+        act(() => { store.dispatch(setSurface({ kind: 'none' })); });
+        expect(within(viewPanel).queryByText('The spheres can hide the surface inside them.')).toBeNull();
+        act(() => { store.dispatch(setSurface({ kind: 'density' })); });
         fireEvent.click(within(group).getByRole('button', { name: 'None (no structure)' }));
         expect(store.getState().molecule.representation).toBe('none');
         expect(within(side).queryByText('Selection')).toBeNull();
@@ -390,11 +402,26 @@ describe('Molecules mode', () => {
         // No contour is drawn, so the enclosed fraction applies to nothing: disabled, saying why (never the
         // orbital's "contour of constant |ψ|²" fallback), and no colour key stands for a surface.
         openDisplay(container);
+        // Ruling T13-I3: Surface style, Opacity and Cut away act on nothing either -- disabled, each saying why.
+        const viewPanel = container.querySelector('.view-panel') as HTMLElement;
+        expect(within(viewPanel).getByRole('button', { name: 'solid surface' })).toBeDisabled();
+        expect(within(viewPanel).getByRole('button', { name: 'wireframe surface' })).toBeDisabled();
+        expect(within(viewPanel).getByRole('slider', { name: 'surface opacity' })).toBeDisabled();
+        ['no cut', 'cut along x', 'cut along y', 'cut along z'].forEach(name => expect(within(viewPanel).getByRole('button', { name })).toBeDisabled());
+        expect(within(viewPanel).getByText('No surface is drawn to style.')).toBeInTheDocument();
+        expect(within(viewPanel).getByText('No surface is drawn to make see-through.')).toBeInTheDocument();
+        expect(within(viewPanel).getByText('No surface is drawn to cut; the structure is never cut.')).toBeInTheDocument();
+        expect(viewPanel.textContent).not.toMatch(/slice the orbital open/);
         expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
         expect(container.textContent).toMatch(/No surface is drawn, so no contour applies/);
         expect(container.textContent).not.toMatch(/contour of constant/);
         expect(screen.queryByLabelText('surface colour key')).toBeNull();
         expect(screen.queryByLabelText('electrostatic potential colour key')).toBeNull();
+        // A surface again: all live, the cut's own help back.
+        fireEvent.click(within(surface).getByRole('button', { name: 'Density' }));
+        expect(within(viewPanel).getByRole('slider', { name: 'surface opacity' })).not.toBeDisabled();
+        expect(within(viewPanel).getByRole('button', { name: 'cut along x' })).not.toBeDisabled();
+        expect(viewPanel.textContent).toMatch(/slice the orbital open/);
     });
 
     // Ruling R22c (brief requirement 5): the hover/pick readout lives in the

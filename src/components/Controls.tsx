@@ -85,6 +85,12 @@ interface ControlsProps {
   /** The Atom Display section offers Glow / Solid / Wireframe itself (ruling R1). */
   hideSurfaceStyle?: boolean;
   /**
+   * No surface is drawn (Molecules' `show=none`, ruling T13-I3): Surface, Opacity and Cut away would act on
+   * nothing -- the structure overlay is never styled, faded or cut -- so each is disabled and says why. Their
+   * values (and the link's) are left as they are for the next surface.
+   */
+  noSurface?: boolean;
+  /**
    * Which half of the panel to draw (ruling R20b): 'selection' is what is
    * drawn -- in atom mode the Relativity switch and element picker; 'view'
    * is how it is shown -- the enclosed fraction, the children, Surface,
@@ -291,6 +297,13 @@ const ReadoutContent: React.FC<{ content: string | WhatChangedParts | null }> = 
   );
 };
 
+/** Ruling T13-I3: what Surface, Opacity and Cut away say while no surface is drawn. */
+const NO_SURFACE_NOTES = {
+  style: 'No surface is drawn to style.',
+  opacity: 'No surface is drawn to make see-through.',
+  cut: 'No surface is drawn to cut; the structure is never cut.',
+} as const;
+
 export interface RelativityControlProps {
   relativity: RelativityMode;
   relativityIsDefault: boolean;
@@ -349,6 +362,7 @@ const Controls: React.FC<ControlsProps> = ({
   onSurfaceStyleChange,
   onOpacityPreview,
   hideSurfaceStyle = false,
+  noSurface = false,
   part = 'all',
   isBusy,
   open = true,
@@ -542,10 +556,12 @@ const Controls: React.FC<ControlsProps> = ({
                 aria-label="surface style"
                 size="small"
                 fullWidth
+                disabled={noSurface}
               >
                 <ToggleButton value="solid" aria-label="solid surface">Solid</ToggleButton>
                 <ToggleButton value="wireframe" aria-label="wireframe surface">Wireframe</ToggleButton>
               </ToggleButtonGroup>
+              {noSurface && <FormHelperText sx={{ mx: 0 }}>{NO_SURFACE_NOTES.style}</FormHelperText>}
             </FormControl>
           )}
 
@@ -561,6 +577,7 @@ const Controls: React.FC<ControlsProps> = ({
               max={1}
               step={0.05}
               size="small"
+              disabled={noSurface}
               onChange={(event: Event, value: number | number[]) => {
                 const opacity = Array.isArray(value) ? value[0] : value;
                 if (onOpacityPreview) onOpacityPreview(opacity);
@@ -569,6 +586,7 @@ const Controls: React.FC<ControlsProps> = ({
               onChangeCommitted={onOpacityPreview ? (event: React.SyntheticEvent | Event, value: number | number[]) =>
                 onSurfaceStyleChange({ opacity: Array.isArray(value) ? value[0] : value }) : undefined}
             />
+            {noSurface && <FormHelperText sx={{ mx: 0 }}>{NO_SURFACE_NOTES.opacity}</FormHelperText>}
           </FormControl>
 
           {/* The cut: a plane across the chosen axis, removing the + side of
@@ -591,6 +609,7 @@ const Controls: React.FC<ControlsProps> = ({
               aria-label="cut-away axis"
               size="small"
               fullWidth
+              disabled={noSurface}
             >
               {/* A shell view has no separate surface to show when uncut -- its
                   cut face is the entire visible object (bug fix, task 22 bug 6;
@@ -602,7 +621,7 @@ const Controls: React.FC<ControlsProps> = ({
               <ToggleButton value="z" aria-label="cut along z">Z</ToggleButton>
             </ToggleButtonGroup>
             <FormHelperText className="cut-help" sx={{ mx: 0 }}>
-              {surfaceStyle.clipAxis === 'none'
+              {noSurface ? NO_SURFACE_NOTES.cut : surfaceStyle.clipAxis === 'none'
                 ? 'Pick an axis to slice the orbital open.'
                 : isMeshLevel
                   ? `Removes the part on the +${surfaceStyle.clipAxis} side of a plane perpendicular to the ${surfaceStyle.clipAxis} axis.`
@@ -623,6 +642,7 @@ const Controls: React.FC<ControlsProps> = ({
                   max={isSliceOnlyView ? 95 : 100}
                   step={1}
                   size="small"
+                  disabled={noSurface}
                   marks={isSliceOnlyView ? SLICE_DEPTH_MARKS : CUT_DEPTH_MARKS}
                   // The label above already says the value, in words.
                   valueLabelDisplay="off"

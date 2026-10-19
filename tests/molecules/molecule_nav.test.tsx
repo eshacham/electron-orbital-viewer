@@ -391,6 +391,12 @@ describe('readout and view options', () => {
         rerender(<MoleculeReadout atoms={waterAtoms()} pick={null} geometrySource="experiment (CCCBDB)" touch />);
         expect(container.textContent).toMatch(/Tap an atom or bond/);
     });
+    // Ruling T13-I4: a phone's hint under space filling offers atoms only -- there are no bonds to tap.
+    it('offers only atoms to tap under space filling', () => {
+        const { container } = render(<MoleculeReadout atoms={waterAtoms()} pick={null} geometrySource="experiment (CCCBDB)" touch spaceFilling />);
+        expect(container.textContent).toMatch(/Tap an atom for its angles and neighbours/);
+        expect(container.textContent).not.toMatch(/bond/);
+    });
     // Ruling R23c-3: on a desktop (not `touch`) the hint moves to a viewport-corner
     // caption (App.tsx), so the Explore-panel readout says nothing extra while
     // unpicked -- just the always-on geometry/connectivity note.
@@ -402,7 +408,7 @@ describe('readout and view options', () => {
     it('toggles structure and dipole and states the arrow convention', () => {
         const onShowDipole = jest.fn();
         // Task 13 (ruling P8): the structure is a representation now (the switch became the Structure segments).
-        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null}
+        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null} surfaceShown
             showDipole onShowDipole={onShowDipole} dipoleText="μ = 1.86 D" />);
         fireEvent.click(screen.getByLabelText('Dipole arrow'));   // role is checkbox or switch depending on the MUI minor
         expect(onShowDipole).toHaveBeenCalledWith(false);
@@ -411,7 +417,7 @@ describe('readout and view options', () => {
     // Ruling T7-O3: ozone's dipole carries meta.caveat beside it, never shown alone.
     it('shows the caveat beside the dipole when the molecule carries one (T7-O3, ozone)', () => {
         // Task 13 (ruling P8): representation props in place of the old showStructure switch's.
-        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null}
+        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null} surfaceShown
             showDipole onShowDipole={() => {}}
             dipoleText="μ = 0.65 D" caveat="Ozone has strong multireference character: single-reference B3LYP overestimates its dipole moment." />);
         expect(container.textContent).toMatch(/μ = 0\.65 D/);

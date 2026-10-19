@@ -9,6 +9,8 @@ interface MoleculeViewOptionsProps {
     onRepresentationChange: (representation: Representation) => void;
     /** Why this molecule cannot be drawn space-filling (ruling P8b: no tabulated radius for one of its elements), or null. */
     spaceFillingUnavailable: string | null;
+    /** A surface is drawn under the structure -- space filling's spheres can then hide it (ruling T13-M). */
+    surfaceShown: boolean;
     showDipole: boolean;
     onShowDipole: (on: boolean) => void;
     dipoleText: string | null;
@@ -34,7 +36,7 @@ const SEGMENTS = [KEEP_CASE, { '& .MuiToggleButton-root': { height: LAYOUT.chip,
  * name holds its visible label (WCAG 2.5.3).
  */
 const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
-    representation, onRepresentationChange, spaceFillingUnavailable, showDipole, onShowDipole, dipoleText, caveat,
+    representation, onRepresentationChange, spaceFillingUnavailable, surfaceShown, showDipole, onShowDipole, dipoleText, caveat,
 }) => {
     const reasonId = useId();
     return (
@@ -53,6 +55,9 @@ const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
                     </span>
                     <ToggleButton value="none" aria-label="None (no structure)">None</ToggleButton>
                 </ToggleButtonGroup>
+                {representation === 'space-filling' && surfaceShown && (
+                    <Typography variant="caption" className="molecule-caption">The spheres can hide the surface inside them.</Typography>
+                )}
                 {spaceFillingUnavailable && (
                     <Typography id={reasonId} variant="caption" className="molecule-caption">
                         Space filling is unavailable: {spaceFillingUnavailable}

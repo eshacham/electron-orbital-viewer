@@ -20,6 +20,7 @@ import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { formatFormula } from '../molecules/catalogue';
 import { orbitalEnergyText, orbitalNoun, orbitalTag } from '../molecules/orbital_display';
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY } from '../molecules/esp_color';
+import { formatDipole, hasDipoleArrow } from '../molecules/dipole';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
 export const ATOM_METHOD = 'central-field SCF, LDA exchange + VWN5 correlation, non-relativistic, spherically averaged';
@@ -189,6 +190,21 @@ export function moleculeDrawnPicture(state: RootState): MoleculeDrawnPicture | n
     };
 }
 
+/**
+ * Molecules with no surface (`show=none`, ruling P8): what the canvas shows instead -- the structure, the
+ * dipole arrow alone, or nothing -- and the line that says so, shared by the viewport's subtitle and a
+ * PNG's caption (ruling T13-I1). "Structure only" is said only when a structure is drawn (T13-M).
+ */
+export interface NoSurfaceView { shows: 'structure' | 'dipole' | null; line: string }
+
+export function noSurfaceView(state: RootState): NoSurfaceView | null {
+    const { meta, surface, representation, showDipole } = state.molecule;
+    if (!meta || surface.kind !== 'none') return null;
+    if (representation !== 'none') return { shows: 'structure', line: `Structure only · geometry: ${meta.geometrySource}` };
+    if (showDipole && hasDipoleArrow(meta)) return { shows: 'dipole', line: `Dipole arrow only · ${formatDipole(meta)}` };
+    return { shows: null, line: 'Nothing drawn: no surface, structure or dipole arrow' };
+}
+
 /** 'Water (H₂O)' -- the loaded molecule, drawn or not. */
 export function moleculeTitle(meta: LibraryMoleculeMeta): string {
     return `${meta.name} (${formatFormula(meta.formula)})`;
@@ -257,6 +273,8 @@ function moleculeFileStem(state: RootState): string {
     const meta = state.molecule.meta;
     if (!meta) return 'orbital-viewer_molecule';
     const base = `orbital-viewer_${moleculeFileName(meta)}`;
+    const noSurface = noSurfaceView(state);
+    if (noSurface?.shows) return `${base}_${noSurface.shows}`;
     const drawn = moleculeDrawnPicture(state);
     if (!drawn) return base;
     const { surface } = drawn;

@@ -10,7 +10,7 @@ import { profileRelativity, pictureLanded } from '../store/atomSlice';
 import { CsvCurve, formatNumber, quote, radialCurvesToCsv } from './csv';
 import {
     exportFileStem, methodStatement, shellLabel, viewDescription, referenceRingCaption, deltaScfCsvComment, jLevelShapeCaption,
-    bondsDrawnPicture, moleculeDrawnPicture, moleculeCaveatCaption, moleculeTableFileStem, moleculeTitle,
+    bondsDrawnPicture, moleculeDrawnPicture, moleculeCaveatCaption, moleculeTableFileStem, moleculeTitle, noSurfaceView,
 } from './caption';
 import { ColourBarLegend, CombinationLegendItem } from './png';
 import { ViewerExportHandle } from './handle';
@@ -172,8 +172,13 @@ export const H2PLUS_CURVE_NOT_READY_REASON = 'The potential curve is still compu
 /** Task 16b (ruling D5): Molecules mode's own refusals, in the order `moleculePictureReason` checks them. */
 export const MOLECULE_NONE_REASON = 'Choose a molecule first.';
 export const MOLECULE_LOADING_REASON = BONDS_LOADING_REASON;
-/** Ruling P8: show=none draws no surface by choice -- not a wait, so never NOTHING_DRAWN_REASON's "yet". */
-export const STRUCTURE_ONLY_REASON = 'Structure only: no surface is drawn. Choose Density, Electrostatic potential or Orbitals to export one.';
+/**
+ * Ruling P8 / T13-I1: show=none draws no surface by choice -- not a wait, so never NOTHING_DRAWN_REASON's
+ * "yet". The PNGs still take the structure or the dipole arrow as seen; the solids and the cube carry a
+ * surface or a grid, and there is none. Only with nothing at all on the canvas is every picture refused.
+ */
+export const NO_SURFACE_REASON = 'No surface is drawn, so there is no solid or grid to export. Choose Density, Electrostatic potential or Orbitals for one.';
+export const NOTHING_SHOWN_REASON = 'Nothing is drawn: no surface, structure or dipole arrow.';
 export const moleculeRenderFailedReason = (error: string) => `The surface failed to draw (${error}), so there is nothing to export.`;
 
 /**
@@ -208,7 +213,6 @@ function moleculePictureReason(state: RootState): string | null {
     const block = moleculeBlockReason(state);
     if (block) return block;
     const molecule = state.molecule;
-    if (molecule.surface.kind === 'none') return STRUCTURE_ONLY_REASON;
     if (molecule.renderError) return moleculeRenderFailedReason(molecule.renderError);
     if (molecule.renderLabel !== null) return PICTURE_BUSY_REASON;
     const drawn = molecule.drawn;
@@ -522,8 +526,15 @@ export function exportAvailability(state: RootState, bondsLoad?: { loading: bool
     // MOs never reach `currentField`), so none of the generic reasons below
     // can see its picture -- it has its own, and never falls through to them.
     if (state.atom.mode === 'molecule') {
+        const csv = moleculeBlockReason(state);
+        const noSurface = csv ? null : noSurfaceView(state);
+        if (noSurface) {
+            const png = noSurface.shows ? null : NOTHING_SHOWN_REASON;
+            const solid = noSurface.shows ? NO_SURFACE_REASON : NOTHING_SHOWN_REASON;
+            return { png, 'png-plain': png, csv, stl: solid, glb: solid, cube: solid };
+        }
         const picture = moleculePictureReason(state);
-        return { png: picture, 'png-plain': picture, csv: moleculeBlockReason(state), stl: picture, glb: picture, cube: picture };
+        return { png: picture, 'png-plain': picture, csv, stl: picture, glb: picture, cube: picture };
     }
     if (state.atom.mode === 'bonds') {
         const reason = bondsBlockReason(state, bondsLoad);
@@ -825,7 +836,12 @@ export async function runExport(kind: ExportKind, context: ExportContext): Promi
             // line, same wording as the CSV/cube comment -- null, and so
             // omitted, for anything that draws no such ring.
             const ring = referenceRingCaption(context.state);
-            const caption = [viewDescription(context.state), methodStatement(context.state, context.bondsScan)];
+            // Ruling T13-I1: with no surface the picture is the structure (or the arrow) -- captioned as the
+            // viewport titles it, the molecule then the line saying what is drawn and how it was got.
+            const noSurface = molecule ? noSurfaceView(context.state) : null;
+            const caption = noSurface
+                ? [moleculeTitle(context.state.molecule.meta!), noSurface.line]
+                : [viewDescription(context.state), methodStatement(context.state, context.bondsScan)];
             if (ring) caption.push(ring);
             // Final review I1: j-level lobes are a basis choice the method
             // line does not state -- null, and so omitted, without them.

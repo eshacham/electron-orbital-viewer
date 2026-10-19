@@ -6,15 +6,20 @@ export const DIPOLE_BOHR_PER_DEBYE = 1;
 export const DIPOLE_MIN_DEBYE = 0.05;
 const ARROW_COLOR = '#ffd166';
 
+/** Whether `dipoleArrow` draws one: not below DIPOLE_MIN_DEBYE, where the direction is noise. */
+export function hasDipoleArrow(meta: LibraryMoleculeMeta): boolean {
+    return new THREE.Vector3(...meta.dipoleVectorDebye).length() >= DIPOLE_MIN_DEBYE;
+}
+
 /**
  * μ from − to + (the IUPAC and physics convention), from the centre of
  * nuclear charge, 1 a₀ per debye. Drawn over everything: it is an
  * annotation, and inside an opaque density it would otherwise vanish.
  */
 export function dipoleArrow(meta: LibraryMoleculeMeta): THREE.ArrowHelper | null {
+    if (!hasDipoleArrow(meta)) return null;
     const mu = new THREE.Vector3(...meta.dipoleVectorDebye);
     const magnitude = mu.length();
-    if (magnitude < DIPOLE_MIN_DEBYE) return null;
     const totalZ = meta.atoms.reduce((sum, atom) => sum + atom.Z, 0);
     const origin = meta.atoms
         .reduce((sum, atom) => sum.add(new THREE.Vector3(...atom.position).multiplyScalar(atom.Z)), new THREE.Vector3())

@@ -12,13 +12,14 @@ jest.mock('../../src/molecules/loader', () => ({ ...jest.requireActual('../../sr
 
 import {
     runExport, exportAvailability, exportItemsFor, moleculeCubeJob, EXPORT_ITEMS, ExportKind,
-    PICTURE_BUSY_REASON, NOTHING_DRAWN_REASON, MOLECULE_NONE_REASON, MOLECULE_LOADING_REASON, STRUCTURE_ONLY_REASON,
+    PICTURE_BUSY_REASON, NOTHING_DRAWN_REASON, MOLECULE_NONE_REASON, MOLECULE_LOADING_REASON, NO_SURFACE_REASON, NOTHING_SHOWN_REASON,
 } from '../../src/export/run_export';
 import { exportFileStem, methodStatement, moleculeDrawnPicture, viewDescription } from '../../src/export/caption';
 import { buildCubeBlob, CubeRequest } from '../../src/export/cube_request';
 import { setMode } from '../../src/store/atomSlice';
 import {
     selectMolecule, metaLoaded, metaFailed, linkRejected, setSurface, renderStarted, renderFinished, renderFailed, MoleculeSurface,
+    setRepresentation, setShowDipole,
 } from '../../src/store/moleculeSlice';
 import { getDensityGrid, getEspGrid } from '../../src/molecules/grid_cache';
 import { loadBasis } from '../../src/molecules/loader';
@@ -192,6 +193,35 @@ describe('captions and file stems', () => {
     });
 });
 
+// Ruling T13-I1: a structure-only PNG is captioned as the viewport titles it -- the molecule, then what is
+// drawn and where its geometry came from -- with no colour key (no surface hue is drawn), and named so.
+describe('structure-only pictures', () => {
+    it('captions the structure with the view’s title and "Structure only · geometry: …"', async () => {
+        const store = drawnStore({ kind: 'density' });
+        store.dispatch(setSurface({ kind: 'none' }));
+        const capturePng = jest.fn().mockResolvedValue(new Blob(['png']));
+        const result = await runExport('png', { ...baseContext(store.getState()), handle: exportHandle({ capturePng }) });
+        const overlays = capturePng.mock.calls[0][0];
+        expect(overlays.caption).toEqual(['Water (H₂O)', 'Structure only · geometry: experiment (CCCBDB)']);
+        expect([overlays.phaseLegend, overlays.colourBar]).toEqual([false, null]);
+        expect(result.filename).toBe('orbital-viewer_H2O_structure.png');
+        const plain = await runExport('png-plain', { ...baseContext(store.getState()), handle: exportHandle({ capturePng }) });
+        expect(capturePng.mock.calls[1][0]).toBeNull();
+        expect(plain.filename).toBe('orbital-viewer_H2O_structure_view.png');
+    });
+    it('captions the dipole arrow alone with the dipole it shows', async () => {
+        const store = drawnStore({ kind: 'density' });
+        store.dispatch(setSurface({ kind: 'none' }));
+        store.dispatch(setRepresentation('none'));
+        const capturePng = jest.fn().mockResolvedValue(new Blob(['png']));
+        const result = await runExport('png', { ...baseContext(store.getState()), handle: exportHandle({ capturePng }) });
+        expect(capturePng.mock.calls[0][0].caption).toEqual([
+            'Water (H₂O)', 'Dipole arrow only · μ = 1.86 D (B3LYP/def2-TZVPD) · experiment 1.855 D',
+        ]);
+        expect(result.filename).toBe('orbital-viewer_H2O_dipole.png');
+    });
+});
+
 describe('refusal reasons (never the Basic Orbitals fallthrough)', () => {
     const expectAll = (availability: Record<ExportKind, string | null>, kinds: ExportKind[], reason: string | null) => {
         for (const kind of kinds) expect([kind, availability[kind]]).toEqual([kind, reason]);
@@ -224,14 +254,29 @@ describe('refusal reasons (never the Basic Orbitals fallthrough)', () => {
         expectAll(exportAvailability(loadedStore().getState()), PICTURE_KINDS, NOTHING_DRAWN_REASON);
     });
 
-    // Ruling P8: show=none draws no surface on purpose -- not "yet", and not busy -- so the picture
-    // exports say that; the orbital table does not depend on the picture.
-    it('structure only: no surface to export, said as a choice rather than a wait', () => {
+    // Ruling T13-I1 (spec §8.5, §11.2): with no surface the canvas still shows a picture -- the structure, or
+    // the dipole arrow -- so PNG and PNG plain take it as seen; the solids and the cube have no surface or
+    // grid to carry and stay refused. Only when nothing at all is drawn is PNG refused too, and said so.
+    it('no surface: PNG takes the structure as seen; STL, glTF and cube are refused', () => {
         const store = drawnStore({ kind: 'density' });
         store.dispatch(setSurface({ kind: 'none' }));
         const availability = exportAvailability(store.getState());
-        expectAll(availability, PICTURE_KINDS, STRUCTURE_ONLY_REASON);
-        expect(STRUCTURE_ONLY_REASON).toBe('Structure only: no surface is drawn. Choose Density, Electrostatic potential or Orbitals to export one.');
+        expectAll(availability, ['png', 'png-plain', 'csv'], null);
+        expectAll(availability, ['stl', 'glb', 'cube'], NO_SURFACE_REASON);
+        expect(NO_SURFACE_REASON).toBe('No surface is drawn, so there is no solid or grid to export. Choose Density, Electrostatic potential or Orbitals for one.');
+        // The dipole arrow alone is still a picture.
+        store.dispatch(setRepresentation('none'));
+        expectAll(exportAvailability(store.getState()), ['png', 'png-plain'], null);
+    });
+    it('nothing drawn at all: every picture export is refused, without claiming a structure', () => {
+        const store = drawnStore({ kind: 'density' });
+        store.dispatch(setSurface({ kind: 'none' }));
+        store.dispatch(setRepresentation('none'));
+        store.dispatch(setShowDipole(false));
+        const availability = exportAvailability(store.getState());
+        expectAll(availability, PICTURE_KINDS, NOTHING_SHOWN_REASON);
+        expect(NOTHING_SHOWN_REASON).toBe('Nothing is drawn: no surface, structure or dipole arrow.');
+        expect(NOTHING_SHOWN_REASON).not.toMatch(/structure only/i);
         expect(availability.csv).toBeNull();
     });
 

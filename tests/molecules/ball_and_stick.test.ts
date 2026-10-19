@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import {
     detectBonds, anglesAtAtom, describePick, buildBallAndStick, buildSpaceFilling, pickMoleculePart, bondLabel, disposeOverlay, BOHR_TO_ANGSTROM, CPK_COLORS,
-    structureExtent,
+    overlayExtent,
 } from '../../src/molecules/ball_and_stick';
-import { dipoleArrow, formatDipole } from '../../src/molecules/dipole';
+import { dipoleArrow, formatDipole, hasDipoleArrow } from '../../src/molecules/dipole';
 import { waterAtoms, methaneAtoms, ozoneAtoms, waterMeta, methaneMeta } from './fixtures';
 
 describe('bonds from distances', () => {
@@ -96,13 +96,23 @@ describe('the space-filling group', () => {
     });
 });
 
-// Structure only has no surface to frame the camera on; it frames this instead (ruling P8).
-describe('the structure’s extent', () => {
-    it('reaches the farthest atom’s van der Waals surface, in bohr', () => {
-        expect(structureExtent(waterAtoms())).toBeCloseTo((0.958 + 1.20) / BOHR_TO_ANGSTROM, 9);
+// Structure only has no surface to frame the camera on; it frames what is drawn instead (ruling T13-I2,
+// replacing Task 13's one van-der-Waals bound for every representation, which left ball and stick small).
+describe('the drawn overlay’s extent', () => {
+    it('reaches a ball-and-stick hydrogen’s ball: its position plus 0.4 of its covalent radius, in bohr', () => {
+        expect(overlayExtent(buildBallAndStick(waterAtoms(), detectBonds(waterAtoms())))).toBeCloseTo((0.958 + 0.4 * 0.31) / BOHR_TO_ANGSTROM, 6); // the sphere's vertices are float32
     });
-    it('uses the covalent radius for an element with no van der Waals radius', () => {
-        expect(structureExtent([{ Z: 26, position: [2, 0, 0] }])).toBeCloseTo(2 + 1.32 / BOHR_TO_ANGSTROM, 9);
+    it('reaches a space-filling hydrogen’s van der Waals surface', () => {
+        expect(overlayExtent(buildSpaceFilling(waterAtoms()))).toBeCloseTo((0.958 + 1.20) / BOHR_TO_ANGSTROM, 6);
+    });
+    it('reaches past the dipole arrow’s tip when the arrow is the farthest thing drawn, and is 0 for nothing', () => {
+        const group = new THREE.Group();
+        expect(overlayExtent(group)).toBe(0);
+        const arrow = dipoleArrow(waterMeta())!;
+        group.add(arrow);
+        const tip = arrow.position.clone().add(new THREE.Vector3(0, 1, 0).applyQuaternion(arrow.quaternion).multiplyScalar(arrow.userData.lengthBohr));
+        expect(overlayExtent(group)).toBeGreaterThanOrEqual(tip.length() - 1e-9);
+        expect(overlayExtent(group)).toBeLessThan(tip.length() + 0.6);
     });
 });
 
@@ -118,6 +128,8 @@ describe('the dipole arrow', () => {
     });
     it('draws no arrow below 0.05 D, where the direction is noise', () => {
         expect(dipoleArrow(methaneMeta())).toBeNull();
+        // The same rule, asked without building the arrow (what a subtitle or an export needs to know).
+        expect([hasDipoleArrow(methaneMeta()), hasDipoleArrow(waterMeta())]).toEqual([false, true]);
     });
     it('states the method and the experimental value', () => {
         expect(formatDipole(waterMeta())).toBe('μ = 1.86 D (B3LYP/def2-TZVP) · experiment 1.855 D');

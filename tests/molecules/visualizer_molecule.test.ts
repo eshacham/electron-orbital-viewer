@@ -3,7 +3,7 @@ import * as THREE from 'three';
 jest.mock('../../src/workers/createOrbitalWorker', () => ({ createOrbitalWorker: jest.fn() }));
 jest.mock('../../src/orbital_controls_factory', () => ({ createOrbitalControls: jest.fn() }));
 
-import { VisualizerContext, presentFieldMesh, clearFieldMesh, setMoleculeOverlay, pointerRaycaster } from '../../src/orbital_visualizer';
+import { VisualizerContext, presentFieldMesh, clearFieldMesh, frameStructure, setMoleculeOverlay, pointerRaycaster } from '../../src/orbital_visualizer';
 import { defaultSurfaceStyle, MeshData } from '../../src/types/orbital';
 
 /** As tests/atom/visualizer_dispatch.test.ts: a context without a WebGL renderer. */
@@ -60,6 +60,37 @@ describe('presentFieldMesh', () => {
         presentFieldMesh(context, mesh(), { boxRMax: 6 });
         clearFieldMesh(context);
         expect(context.currentOrbitalGroup).toBeNull();
+    });
+});
+
+// Ruling T13-I2: with no surface the camera frames the structure by the rule a surface is framed by, and
+// leaves the next surface to frame itself exactly as that surface's own link would.
+describe('frameStructure', () => {
+    it('frames a structure of radius r exactly as a surface of radius r is framed', () => {
+        const surface = buildContext();
+        presentFieldMesh(surface, mesh(), { boxRMax: 6 }); // mesh radius 2
+        const structure = buildContext();
+        frameStructure(structure, 2);
+        expect(structure.camera.position.length()).toBeCloseTo(surface.camera.position.length(), 9);
+    });
+    it('keeps the viewing direction, and frames nothing for an empty overlay', () => {
+        const context = buildContext();
+        context.camera.position.set(0, 6, 8);
+        frameStructure(context, 2);
+        expect(context.camera.position.clone().normalize().toArray().map(v => Number(v.toFixed(9)))).toEqual([0, 0.6, 0.8]);
+        const before = context.camera.position.clone();
+        frameStructure(context, 0);
+        expect(context.camera.position.toArray()).toEqual(before.toArray());
+    });
+    it('density → none → density lands the density where its own link would', () => {
+        const link = buildContext();
+        presentFieldMesh(link, mesh(), { boxRMax: 6 });
+        const context = buildContext();
+        presentFieldMesh(context, mesh(), { boxRMax: 6 });
+        clearFieldMesh(context);
+        frameStructure(context, 5);
+        presentFieldMesh(context, mesh(), { boxRMax: 6 });
+        expect(context.camera.position.length()).toBeCloseTo(link.camera.position.length(), 9);
     });
 });
 

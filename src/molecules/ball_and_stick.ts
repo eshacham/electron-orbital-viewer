@@ -164,13 +164,25 @@ export function buildSpaceFilling(atoms: MoleculeAtom[]): THREE.Group {
 }
 
 /**
- * How far the structure reaches from the origin (bohr): the farthest atom's
- * van der Waals surface (its covalent radius where none is tabulated) -- what
- * the camera frames when no surface is drawn (ruling P8). One bound for every
- * representation, so switching between them never re-zooms.
+ * How far what the overlay draws reaches from the origin (bohr): the largest
+ * |centre| + radius of any drawn part's bounding sphere -- a sphere's own
+ * surface, a stick's or the dipole arrow's outer end. What the camera frames
+ * when no surface is drawn (ruling T13-I2: what is drawn, not the largest
+ * representation). 0 for an empty overlay.
  */
-export function structureExtent(atoms: MoleculeAtom[]): number {
-    return Math.max(0, ...atoms.map(atom => vec(atom).length() + (VDW_RADII_ANGSTROM[atom.Z] ?? radius(atom.Z)) / BOHR_TO_ANGSTROM));
+export function overlayExtent(overlay: THREE.Object3D): number {
+    overlay.updateMatrixWorld(true);
+    let extent = 0;
+    const centre = new THREE.Vector3();
+    overlay.traverse(node => {
+        const geometry = (node as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+        if (!geometry) return;
+        if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+        const sphere = geometry.boundingSphere!;
+        centre.copy(sphere.center).applyMatrix4(node.matrixWorld);
+        extent = Math.max(extent, centre.length() + sphere.radius * node.matrixWorld.getMaxScaleOnAxis());
+    });
+    return extent;
 }
 
 export function pickMoleculePart(overlay: THREE.Object3D, raycaster: THREE.Raycaster): MoleculePick | null {
