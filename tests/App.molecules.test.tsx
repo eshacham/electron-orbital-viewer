@@ -58,6 +58,16 @@ async function enterMolecules(narrow: boolean, { landscape = false, before }: { 
     return { store, ...utils };
 }
 
+/**
+ * Task 12 (rulings P10, R24-3): with a molecule loaded the inspector has a Properties section, and with nothing
+ * stored that content section is the open one -- so a test that reads Display's controls opens Display first,
+ * as a viewer would.
+ */
+function openDisplay(container: HTMLElement) {
+    const display = within(container.querySelector('.view-panel') as HTMLElement).getByRole('button', { name: 'Display' });
+    if (display.getAttribute('aria-expanded') !== 'true') fireEvent.click(display);
+}
+
 /** Water chosen and its meta in -- what the loader would have done. */
 function pickWater(store: ReturnType<typeof makeStore>, meta = waterMeta()) {
     act(() => { store.dispatch(selectMolecule({ id: 'h2o' })); store.dispatch(metaLoaded({ id: 'h2o', meta })); });
@@ -65,13 +75,123 @@ function pickWater(store: ReturnType<typeof makeStore>, meta = waterMeta()) {
 
 describe('Molecules mode', () => {
     const originalMatchMedia = window.matchMedia;
-    afterEach(() => { window.matchMedia = originalMatchMedia; });
+    // The open inspector section is a stored preference (R24-3); each test starts from none.
+    afterEach(() => { window.matchMedia = originalMatchMedia; window.localStorage.removeItem('eov.display'); });
 
+    // Task 12 (ruling P1): the picker is no longer inline in the left column -- it hangs, as a popover, under
+    // the header tile's "Change ▾" (spec §9.4 "in a popover"); the quick pick sits under the tile.
     it('puts the picker in the left column on a desktop, and the view settings on the right', async () => {
         const { container } = await enterMolecules(false);
         const side = container.querySelector('.side-panel') as HTMLElement;
-        expect(within(side).getByRole('list', { name: 'molecules' })).toBeInTheDocument();
+        expect(within(side).queryByRole('list', { name: 'molecules' })).toBeNull();
+        expect(within(side).getByRole('group', { name: 'Quick pick' })).toBeInTheDocument();
+        fireEvent.click(within(side).getByRole('button', { name: 'Choose a molecule' }));
+        expect(within(screen.getByRole('dialog', { name: 'Choose a molecule' })).getByRole('list', { name: 'molecules' })).toBeInTheDocument();
         expect(within(container.querySelector('.view-panel') as HTMLElement).getByText(/Opacity/)).toBeInTheDocument();
+    });
+
+    // Task 12 (ruling P1): Explore reads header tile → quick pick → the surface switch (and its list) →
+    // Selection → jobs, with "How this was computed" pinned below.
+    it('heads Explore with the molecule tile and the quick pick, above the surface switch and Selection (desktop)', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush(); // the loader's own meta request settles (no act warning)
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const order = [
+            side.querySelector('.molecule-tile') as HTMLElement,
+            within(side).getByRole('group', { name: 'Quick pick' }),
+            within(side).getByRole('group', { name: 'surface' }),
+            within(side).getByText('Selection'),
+        ];
+        // (The jobs section, owner-only, renders nothing here; its place after Selection is App's markup.)
+        order.forEach(node => expect(node).not.toBeNull());
+        for (let i = 1; i < order.length; i++) {
+            expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        }
+        expect(within(side.querySelector('.molecule-tile') as HTMLElement).getByText('Water')).toBeInTheDocument();
+        // The tier is said once, in the title block (R22c), not again in the tile.
+        expect((side.querySelector('.molecule-tile') as HTMLElement).querySelector('.tier-badge')).toBeNull();
+        // The footer stays outside (and after) the part that scrolls.
+        const scroll = side.querySelector('.molecule-explore-scroll') as HTMLElement;
+        expect(scroll.contains(side.querySelector('.molecule-tile'))).toBe(true);
+        expect(scroll.compareDocumentPosition(side.querySelector('.molecule-provenance-footer') as HTMLElement)
+            & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('chooses a molecule from the header\'s popover and from a quick-pick tile', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        fireEvent.click(within(side).getByRole('button', { name: 'Change molecule' }));
+        const popover = screen.getByRole('dialog', { name: 'Choose a molecule' });
+        fireEvent.click(within(within(popover).getByRole('list', { name: 'molecules' })).getByRole('button', { name: /Ozone/ }));
+        await flush(); // the loader's meta request settles
+        expect(store.getState().molecule.selectedId).toBe('o3');
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        fireEvent.click(within(side).getByRole('button', { name: 'Ammonia (NH₃)' }));
+        await flush();
+        expect(store.getState().molecule.selectedId).toBe('nh3');
+        expect(within(side).getByRole('button', { name: 'Ammonia (NH₃)' })).toHaveAttribute('aria-current', 'true');
+    });
+
+    // Task 12 (rulings P10, R24-3): the inspector's sections are Display and Properties; with nothing stored,
+    // the content section (Properties) is the open one and Display is folded.
+    it('adds a Properties section to the inspector after Display, open by default', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush(); // the loader's own meta request settles (no act warning)
+        const viewPanel = container.querySelector('.view-panel') as HTMLElement;
+        expect(Array.from(viewPanel.querySelectorAll('.inspector-section-toggle')).map(header => header.textContent))
+            .toEqual(['Display', 'Properties']);
+        const display = within(viewPanel).getByRole('button', { name: 'Display' });
+        const properties = within(viewPanel).getByRole('button', { name: 'Properties' });
+        expect(display.compareDocumentPosition(properties) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(properties).toHaveAttribute('aria-expanded', 'true');
+        expect(display).toHaveAttribute('aria-expanded', 'false');
+        const region = within(viewPanel).getByRole('region', { name: 'Properties' });
+        expect(within(region).getByText('Point group')).toBeInTheDocument();
+        expect(within(region).getByText('HOMO–LUMO gap')).toBeInTheDocument();
+    });
+
+    it('has no Properties section before a molecule has loaded (real or absent)', async () => {
+        const { container } = await enterMolecules(false);
+        const viewPanel = container.querySelector('.view-panel') as HTMLElement;
+        expect(within(viewPanel).queryByRole('button', { name: 'Properties' })).toBeNull();
+        expect(within(viewPanel).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    // Task 12: a phone's Explore tab opens with the compact tile and the quick-pick row, then today's order.
+    it('opens the phone\'s Explore tab with the compact tile and the quick pick, then Selection and the switch', async () => {
+        const { store } = await enterMolecules(true);
+        pickWater(store);
+        await flush(); // the loader's own meta request settles (no act warning)
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        const tabpanel = screen.getByRole('tabpanel');
+        const order = [
+            tabpanel.querySelector('.molecule-tile.compact') as HTMLElement,
+            within(tabpanel).getByRole('group', { name: 'Quick pick' }),
+            within(tabpanel).getByText('Selection'),
+            within(tabpanel).getByRole('group', { name: 'surface' }),
+            within(tabpanel).getByText('Browse molecules'),
+        ];
+        order.forEach(node => expect(node).not.toBeNull());
+        for (let i = 1; i < order.length; i++) {
+            expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        }
+        // The compact tile's Change opens the phone's full-screen picker, as the header's name does.
+        fireEvent.click(within(tabpanel.querySelector('.molecule-tile') as HTMLElement).getByRole('button', { name: 'Change molecule' }));
+        expect(screen.getByRole('button', { name: 'close molecule picker' })).toBeInTheDocument();
+    });
+
+    it('gives a phone the Properties under the view settings in its View tab', async () => {
+        const { store } = await enterMolecules(true);
+        pickWater(store);
+        await flush(); // the loader's own meta request settles (no act warning)
+        fireEvent.click(screen.getByRole('tab', { name: 'View' }));
+        const tabpanel = screen.getByRole('tabpanel');
+        const heading = within(tabpanel).getByRole('heading', { name: 'Properties' });
+        expect(within(tabpanel).getByText(/Opacity/).compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(within(tabpanel).getByText('Point group')).toBeInTheDocument();
     });
 
     it('offers the picker from the phone header and in the Explore tab', async () => {
@@ -113,6 +233,7 @@ describe('Molecules mode', () => {
     it('locks the contour to ρ = 0.001 for the ESP map, and shows its key', async () => {
         const { store, container } = await enterMolecules(false);
         pickWater(store);
+        openDisplay(container); // Task 12: Properties is the section open by default
         act(() => { store.dispatch(setSurface({ kind: 'esp' })); store.dispatch(renderFinished({ isoLevel: 0.001, espRange: [-0.06, 0.07] })); });
         expect(container.textContent).toMatch(/Fixed at ρ = 0\.001 e\/a₀³/);
         expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
@@ -126,8 +247,9 @@ describe('Molecules mode', () => {
     // D22: the density and an MO keep the enclosed fraction, and the helper
     // states the contour it produced -- without disabling the select.
     it('states the drawn ρ for the density and |ψ|² for an orbital, leaving the fraction live', async () => {
-        const { store } = await enterMolecules(false);
+        const { store, container } = await enterMolecules(false);
         pickWater(store);
+        openDisplay(container); // Task 12: Properties is the section open by default
         act(() => { store.dispatch(renderFinished({ isoLevel: 0.00234 })); });
         expect(screen.getByText('ρ = 2.34e-3 e/a₀³')).toBeInTheDocument();
         expect(screen.getByRole('combobox', { name: /electron enclosed/i })).not.toHaveAttribute('aria-disabled');
@@ -164,6 +286,7 @@ describe('Molecules mode', () => {
             store.dispatch(selectMolecule({ id: 'o3' }));
             store.dispatch(metaLoaded({ id: 'o3', meta: waterMeta({ id: 'o3', name: 'Ozone', caveat: 'Ozone has strong multireference character.' }) }));
         });
+        openDisplay(container); // Task 12: Properties is the section open by default
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
         expect(within(viewPanel).getByLabelText('Ball-and-stick')).toBeInTheDocument();
         expect(within(viewPanel).getByText(/μ = 1\.86 D .*Ozone has strong multireference character\./)).toBeInTheDocument();

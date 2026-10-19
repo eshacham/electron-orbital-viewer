@@ -28,7 +28,8 @@ interface InspectorProps {
     /**
      * The section open while the viewer has never chosen: the mode's content
      * section (Plot and data, Properties). Defaults to the last section --
-     * Display only where it is the only one (Molecules today).
+     * Display only where it is the only one (Molecules before a molecule has
+     * loaded: its Properties section exists only once there are some).
      */
     defaultOpen?: string;
     /** Drawer only. */

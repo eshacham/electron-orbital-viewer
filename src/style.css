@@ -1238,10 +1238,6 @@ html, body, #root {
   flex-direction: column;
   gap: 8px;
 }
-.molecule-nav-formula {
-  font-weight: 400;
-  opacity: 0.8;
-}
 /* Panel-card text (LIGHT_96): the method/geometry caption under the
    surface toggle (MoleculeNav) and the "not ionisation energies" caption
    under the orbital list (MoleculeOrbitalList). */

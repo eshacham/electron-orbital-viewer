@@ -102,6 +102,9 @@ import MoleculeViewOptions from './components/MoleculeViewOptions';
 import EspLegend from './components/EspLegend';
 import MoleculeJobsSection from './components/MoleculeJobsSection';
 import MoleculeProvenanceFooter from './components/MoleculeProvenanceFooter';
+import MoleculeHeader from './molecule_ui/MoleculeHeader';
+import QuickPick from './molecule_ui/QuickPick';
+import MoleculePropertiesCard from './molecule_ui/MoleculePropertiesCard';
 import TierBadge from './components/TierBadge';
 import { ConnectedOwnerBar, signInHere } from './components/OwnerBar';
 import { useComputedList } from './jobs/useComputedList';
@@ -1246,6 +1249,18 @@ function App() {
         onSurfaceChange: (surface: MoleculeSurface) => dispatch(setSurface(surface)),
         onOpenPicker: () => setMoleculePickerOpen(true),
     };
+    // Task 12 (ruling P1): Molecules' Explore opens with the header tile (name, formula, "Change ▾" -- a
+    // popover on a desktop or tablet, the full-screen picker on a phone) and the quick pick under it.
+    const moleculeHeader = (compact: boolean) => (
+        <MoleculeHeader entries={moleculeEntries} indexError={molecule.indexError} meta={molecule.meta}
+            selectedId={molecule.selectedId} isLoading={molecule.isLoadingMeta} onSelectMolecule={moleculeNavProps.onSelectMolecule}
+            compact={compact} onOpenPicker={moleculeNavProps.onOpenPicker} />
+    );
+    const moleculeQuickPick = (
+        <QuickPick entries={moleculeEntries} selectedId={molecule.selectedId} onSelect={moleculeNavProps.onSelectMolecule} />
+    );
+    // Ruling P10: the molecule's Properties, from the facts its meta carries (real or absent: none before it loads).
+    const moleculeProperties = molecule.meta && <MoleculePropertiesCard meta={molecule.meta} />;
     // The structure and dipole switches belong with the view settings
     // (Controls' children slot), with the dipole's value and -- for ozone --
     // the caveat that must never be separated from it (ruling T7-O3).
@@ -1522,8 +1537,11 @@ function App() {
                 // carries the orbital list (MoleculeNav). There is no Plot
                 // tab any more (below): it had nothing left once the list
                 // moved here, its one-time reason for existing (ruling D23).
+                // Task 12: the compact header tile and the quick pick lead it.
                 content: (
                     <>
+                        {moleculeHeader(true)}
+                        {moleculeQuickPick}
                         {moleculeSelectionSection}
                         <MoleculeNav {...moleculeNavProps} variant="body" />
                         <MoleculeProvenanceFooter />
@@ -1531,7 +1549,16 @@ function App() {
                     </>
                 ),
             },
-            { key: 'view', label: 'View', content: <>{controls}{phoneViewActions}</> },
+            // Task 12: the inspector's sections stacked (as ruling R7 stacks the other modes'): Display, then Properties.
+            {
+                key: 'view', label: 'View', content: (
+                    <>
+                        {controls}
+                        {moleculeProperties && <><h2 className="ql-section">Properties</h2>{moleculeProperties}</>}
+                        {phoneViewActions}
+                    </>
+                ),
+            },
         ]
         : isBondsMode
         ? [
@@ -1657,6 +1684,9 @@ function App() {
         : isMoleculeMode ? (
             <div className="molecule-explore">
                 <div className="molecule-explore-scroll">
+                    {/* Task 12 (ruling P1): the header tile and the quick pick head the column. */}
+                    {moleculeHeader(false)}
+                    {moleculeQuickPick}
                     <MoleculeNav {...moleculeNavProps} />
                     {moleculeSelectionSection}
                     <MoleculeJobsSection />
@@ -1667,9 +1697,12 @@ function App() {
         // Basic Orbitals: its header tile and chips (ruling P3) -- BasicExplore.
         : basicExplore;
     // Molecules (the other modes have their own: atomInspector, basicInspector, bondsInspector, above):
-    // the view settings under the titled Display section (rulings T20b-display-header, R24-3) -- its only
-    // section today; Task 12 adds Properties through the same list.
-    const moleculeSections: InspectorSection[] = [{ key: 'display', title: 'Display', content: controls }];
+    // the view settings under the titled Display section (rulings T20b-display-header, R24-3), then the
+    // molecule's Properties (Task 12, ruling P10) once it has loaded -- the content section, open by default.
+    const moleculeSections: InspectorSection[] = [
+        { key: 'display', title: 'Display', content: controls },
+        ...(moleculeProperties ? [{ key: 'properties', title: 'Properties', content: moleculeProperties }] : []),
+    ];
 
     const session = useAppSelector(state => state.jobs.session);
     const avatar = (
@@ -1903,7 +1936,7 @@ function App() {
             )}
             {phoneChrome}
             {isMedium && (isAtomMode ? atomInspector('drawer') : isBasicMode ? basicInspector('drawer') : isBondsMode ? bondsInspector('drawer') : (
-                <Inspector variant="drawer" sections={moleculeSections} open={viewPanelOpen}
+                <Inspector variant="drawer" sections={moleculeSections} defaultOpen="properties" open={viewPanelOpen}
                     onOpenChange={open => setViewPanelOpen(() => open)} />
             ))}
                 {isMoleculeMode && isNarrow && (
@@ -1971,7 +2004,7 @@ function App() {
                     <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
                 )}
                 inspector={isAtomMode ? atomInspector('docked') : isBasicMode ? basicInspector('docked') : isBondsMode ? bondsInspector('docked')
-                    : <Inspector variant="docked" sections={moleculeSections} />}
+                    : <Inspector variant="docked" sections={moleculeSections} defaultOpen="properties" />}
                 viewport={viewport}
                 shellRef={shellRef}
                 exploreCollapsed={isMedium && exploreCollapsed}

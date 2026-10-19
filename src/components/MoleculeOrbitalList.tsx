@@ -3,7 +3,7 @@ import { Chip, Typography } from '@mui/material';
 import {
     CONSTRUCTED_LABEL, CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, DIFFUSE_NOTE, GAP_CAVEAT, LVMO_NOTE, UNCLASSIFIED_NOTE,
     VALENCE_THRESHOLD, degeneracyCounts, diffuseDescription, formatOrbitalEnergy, isConstructed, isUpperEstimate, labelNotes,
-    labelsSentence, orbitalGaps,
+    gapTerm, labelsSentence, orbitalGaps,
 } from '../molecules/orbital_display';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 
@@ -63,7 +63,7 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, sel
     // begin, and the list opens with the HOMO in view.
     const firstOccupied = rows.findIndex(o => o.occupation > 0);
     const gaps = orbitalGaps(orbitals);
-    const gapText = gaps.length ? gaps.map(g => `${g.name} gap ${formatOrbitalEnergy(g.hartree)}`).join(' · ') : null;
+    const gapText = gaps.length ? gaps.map(g => `${gapTerm(g)} ${formatOrbitalEnergy(g.hartree)}`).join(' · ') : null;
     const homoIndex = (rows.find(o => o.role === 'HOMO') ?? rows[firstOccupied])?.index;
     const diffuse = orbitals.filter(o => o.class === 'diffuse');
     const lvmo = orbitals.some(o => o.role === 'LVMO');

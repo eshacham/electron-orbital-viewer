@@ -70,6 +70,16 @@ async function enterMolecules(narrow: boolean) {
     await flush();
     return { store, ...utils };
 }
+/**
+ * Task 12 (ruling P1): the molecule picker -- and with it the owner's Computed category chip -- is no longer
+ * inline in the Explore panel; it is the popover under the header tile's "Change ▾". Opens it and returns it,
+ * so a test asks about the chips where they are (a negative check on the panel alone would pass vacuously).
+ */
+function openPicker(side: HTMLElement): HTMLElement {
+    fireEvent.click(within(side).getByRole('button', { name: /^(Change|Choose a) molecule$/ }));
+    return screen.getByRole('dialog', { name: 'Choose a molecule' });
+}
+
 async function show(store: ReturnType<typeof createAppStore>, id: string) {
     act(() => { store.dispatch(selectMolecule({ id })); });
     await flush();
@@ -91,9 +101,10 @@ describe('Molecules mode with on-demand molecules', () => {
         const side = container.querySelector('.side-panel') as HTMLElement;
         expect(within(side).getByRole('button', { name: 'How this was computed' })).toBeInTheDocument();
         expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
-        expect(screen.queryByRole('button', { name: 'Computed' })).toBeNull();
         // Ruling R22c: the tier line moved from the canvas's legend stack into the title block.
         expect(container.querySelector('.viewport-title')).toHaveTextContent('Library');
+        // Task 12: the categories are in the header tile's picker popover now.
+        expect(within(openPicker(side)).queryByRole('button', { name: 'Computed' })).toBeNull();
         // Ruling R4-rec: a production build without sign-in shows visitors no owner plumbing.
         expect(screen.queryByText(/Owner sign-in/)).toBeNull();
         expect(mockApi.list).not.toHaveBeenCalled();
@@ -113,8 +124,13 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(mockApi.list).not.toHaveBeenCalled();
         expect(mockApi.get).not.toHaveBeenCalled();
         const side = container.querySelector('.side-panel') as HTMLElement;
-        expect(within(side).queryByRole('button', { name: 'Computed' })).toBeNull();
         expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
+        // Task 12: the categories are in the header tile's picker popover now.
+        const picker = openPicker(side);
+        expect(within(picker).getByRole('group', { name: 'molecule categories' })).toBeInTheDocument();
+        expect(within(picker).queryByRole('button', { name: 'Computed' })).toBeNull();
+        fireEvent.keyDown(picker, { key: 'Escape' });
+        await flush();
         // Anyone may open a computed molecule's link, and is told what it is.
         // Ruling R22c: the tier line moved from the canvas's legend stack into the title block.
         expect(container.querySelector('.viewport-title')).toHaveTextContent('Computed');
@@ -133,8 +149,12 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(within(side).getByRole('button', { name: 'Request a molecule' })).toBeInTheDocument();
         // m5: MUI gives the details region the summary's aria-controls id; nothing else may carry it.
         expect(container.querySelectorAll('#request-body')).toHaveLength(1);
-        fireEvent.click(within(side).getByRole('button', { name: 'Computed' }));
-        expect(within(within(side).getByRole('list', { name: 'molecules' })).getAllByRole('button')).toHaveLength(1);
+        // Task 12: the categories are in the header tile's picker popover now.
+        const picker = openPicker(side);
+        fireEvent.click(within(picker).getByRole('button', { name: 'Computed' }));
+        expect(within(within(picker).getByRole('list', { name: 'molecules' })).getAllByRole('button')).toHaveLength(1);
+        fireEvent.keyDown(picker, { key: 'Escape' });
+        await flush();
         fireEvent.click(screen.getByRole('button', { name: 'Owner sign-in' })); // the owner bar lives in the avatar menu now (ruling R15)
         expect(screen.getByRole('group', { name: 'where jobs run' })).toBeInTheDocument();
     });
@@ -247,7 +267,11 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(mockApi.list).toHaveBeenCalledWith(currentMonth(), 'DONE');
         const side = container.querySelector('.side-panel') as HTMLElement;
         expect(within(side).getByRole('button', { name: 'Request a molecule' })).toBeInTheDocument();
-        expect(within(side).getByRole('button', { name: 'Computed' })).toBeInTheDocument();
+        // Task 12: the categories are in the header tile's picker popover now.
+        const picker = openPicker(side);
+        expect(within(picker).getByRole('button', { name: 'Computed' })).toBeInTheDocument();
+        fireEvent.keyDown(picker, { key: 'Escape' });
+        await flush();
         fireEvent.click(screen.getByRole('button', { name: 'Owner menu, signed in as owner@example.com' })); // ruling R15
         expect(screen.getByText(/Signed in as owner@example.com/)).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/admin.html');
@@ -266,7 +290,12 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(mockApi.list).not.toHaveBeenCalled();
         const side = container.querySelector('.side-panel') as HTMLElement;
         expect(within(side).queryByRole('button', { name: 'Request a molecule' })).toBeNull();
-        expect(within(side).queryByRole('button', { name: 'Computed' })).toBeNull();
+        // Task 12: the categories are in the header tile's picker popover now.
+        const picker = openPicker(side);
+        expect(within(picker).getByRole('group', { name: 'molecule categories' })).toBeInTheDocument();
+        expect(within(picker).queryByRole('button', { name: 'Computed' })).toBeNull();
+        fireEvent.keyDown(picker, { key: 'Escape' });
+        await flush();
         fireEvent.click(screen.getByRole('button', { name: 'Owner menu, signed in as visitor@example.com' }));
         expect(screen.getByText(/Signed in — this account is not an owner/)).toBeInTheDocument();
         expect(screen.queryByRole('link', { name: 'Dashboard' })).toBeNull();

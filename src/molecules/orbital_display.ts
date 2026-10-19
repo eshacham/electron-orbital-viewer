@@ -103,6 +103,9 @@ export function orbitalTag(o: MoleculeOrbitalInfo): string | null {
 
 export interface OrbitalGap { name: string; hartree: number }
 
+/** What a gap is called wherever it is shown -- the orbital list's divider and the Properties card: "HOMO–LUMO gap". */
+export const gapTerm = (gap: OrbitalGap): string => `${gap.name} gap`;
+
 /** The HOMO–LUMO gap (SOMO–LUMO for an open shell) and, where the LVMO is one of the calculation's own orbitals
  * and differs from the LUMO, the HOMO–LVMO gap too (spec §5). A constructed LVMO gives no gap (Ruling D4-energy):
  * its energy is an upper estimate, and a gap to it would overstate the canonical one by several eV. */

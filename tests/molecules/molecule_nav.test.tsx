@@ -117,15 +117,19 @@ describe('MoleculeNav', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Change molecule, currently Water' }));
         expect(onOpenPicker).toHaveBeenCalled();
     });
-    it('shows the picker until a molecule is chosen, then folds it (desktop)', () => {
+    // Task 12 (ruling P1) replaces "shows the picker until a molecule is chosen, then folds it (desktop)": the
+    // desktop's name, formula and picker moved to the Explore header tile (MoleculeHeader, its "Change ▾"
+    // popover -- tests/molecule_ui/molecule_header.test.tsx); a phone's Explore tab keeps the inline list.
+    it('leaves the name and the picker to the header tile on a desktop; a phone\'s Explore tab keeps the inline list', () => {
         const onSelectMolecule = jest.fn();
-        const { rerender } = render(<MoleculeNav {...navProps} meta={null} selectedId={null} onSelectMolecule={onSelectMolecule} />);
+        const { container, rerender } = render(<MoleculeNav {...navProps} onSelectMolecule={onSelectMolecule} />);
+        expect(container.querySelector('.molecule-nav-title')).toBeNull();
+        expect(screen.queryByRole('list', { name: 'molecules' })).toBeNull();
+        expect(screen.queryByRole('button', { name: /Change molecule/ })).toBeNull();
+        rerender(<MoleculeNav {...navProps} variant="body" onSelectMolecule={onSelectMolecule} />);
+        expect(container.querySelector('.molecule-nav-title')).toBeNull();
         fireEvent.click(within(screen.getByRole('list', { name: 'molecules' })).getByRole('button', { name: /Ammonia/ }));
         expect(onSelectMolecule).toHaveBeenCalledWith('nh3');
-        rerender(<MoleculeNav {...navProps} onSelectMolecule={onSelectMolecule} />);
-        expect(screen.queryByRole('list', { name: 'molecules' })).toBeNull();
-        fireEvent.click(screen.getByRole('button', { name: 'Change molecule' }));
-        expect(screen.getByRole('list', { name: 'molecules' })).toBeInTheDocument();
     });
     it('switches surfaces; Orbitals opens at the HOMO', () => {
         const onSurfaceChange = jest.fn();
