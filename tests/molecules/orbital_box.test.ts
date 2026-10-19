@@ -5,6 +5,9 @@ import { registerMoleculeBasis } from '../../src/molecules/basis_registry';
 import { sampleFieldSource } from '../../src/orbital_mesh';
 import { isoLevelForEnclosedFraction } from '../../src/radial_distribution';
 import type { MoleculeBasis, MoleculeMeta } from '../../src/molecules/types';
+import type { LibraryMoleculeMeta } from '../../src/molecules/library_types';
+import { frontierOrbitals } from '../../src/molecules/orbital_display';
+import { gridHalfWidth } from '../../src/molecules/render_plan';
 
 const fixture = (molecule: string, file: string) =>
     JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules', molecule, file), 'utf8'));
@@ -67,8 +70,7 @@ describe('orbitalBox (ruling T10-core)', () => {
  * molecule and scan point is tools/thumbs/validate_tile_boxes.mjs.
  */
 describe('orbitalBox never cuts a surface (rulings T10-core-I1/I2)', () => {
-    const faceOverIso = (basis: MoleculeBasis, orbitalIndex: number, fractions: number[]) => {
-        const limit = moleculeBox(basis);
+    const faceOverIso = (basis: MoleculeBasis, orbitalIndex: number, fractions: number[], limit = moleculeBox(basis)) => {
         const { centre, halfWidth } = orbitalBox(basis, orbitalIndex, limit);
         if (halfWidth >= limit) return null;
         const moved = basisCentredOn(basis, centre);
@@ -93,6 +95,30 @@ describe('orbitalBox never cuts a surface (rulings T10-core-I1/I2)', () => {
                     if (ratio >= 1) cut.push(`${orbital.label} at ${[90, 99][i]} %: face/iso ${ratio.toFixed(2)}`);
                 });
             }
+            expect(cut).toEqual([]);
+        });
+    }
+
+    // Task 15: the Molecules strip's orbital tiles (HOMO, SOMO, LUMO, LVMO) are fitted the same way, within the
+    // density grid's box the main view draws every orbital in. The library's own files: water (a diffuse LUMO, a
+    // constructed LVMO) and the open-shell NO₂. The full sweep over the library is validate_tile_boxes.mjs.
+    for (const molecule of ['h2o', 'no2']) {
+        it(`keeps every frontier tile of the library's ${molecule} inside its box at 90 % and at 99 %`, () => {
+            const meta: LibraryMoleculeMeta = fixture(molecule, 'meta.json');
+            const basis: MoleculeBasis = { ...fixture(molecule, 'basis.json'), id: molecule };
+            const tiles = frontierOrbitals(meta.orbitals);
+            expect(tiles.length).toBeGreaterThanOrEqual(3);
+            const cut: string[] = [];
+            let fitted = 0;
+            for (const { role, orbital } of tiles) {
+                const ratios = faceOverIso(basis, orbital.index, [0.9, 0.99], gridHalfWidth(meta));
+                // A tile that keeps the density's box is the main view's own box: nothing new to prove there.
+                if (ratios) fitted++;
+                ratios?.forEach((ratio, i) => {
+                    if (ratio >= 1) cut.push(`${role} ${orbital.label} at ${[90, 99][i]} %: face/iso ${ratio.toFixed(2)}`);
+                });
+            }
+            expect(fitted).toBeGreaterThan(0); // water's HOMO, NO₂'s HOMO and LUMO get boxes of their own
             expect(cut).toEqual([]);
         });
     }

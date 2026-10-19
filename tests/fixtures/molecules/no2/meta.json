@@ -1,0 +1,247 @@
+{
+ "id": "no2",
+ "name": "Nitrogen dioxide",
+ "formula": "NO2",
+ "atoms": [
+  {
+   "Z": 7,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "Z": 8,
+   "position": [
+    0.0,
+    2.076195321878247,
+    0.8834316948671734
+   ]
+  },
+  {
+   "Z": 8,
+   "position": [
+    0.0,
+    -2.076195321878247,
+    0.8834316948671734
+   ]
+  }
+ ],
+ "geometrySource": "experiment (CCCBDB)",
+ "method": {
+  "density": "B3LYP-D3(BJ)/def2-TZVPD",
+  "energies": "B3LYP-D3(BJ)/def2-TZVPD"
+ },
+ "totalEnergyHartree": -205.16821615281955,
+ "dispersion": {
+  "model": "D3(BJ)",
+  "energyHartree": -0.0015222106309688134,
+  "backend": "pyscf-dispersion 1.5.0"
+ },
+ "dipoleDebye": 0.35984345208876384,
+ "dipoleVectorDebye": [
+  0.0,
+  4.001619176375197e-14,
+  -0.35984345208876384
+ ],
+ "orbitals": [
+  {
+   "index": 0,
+   "label": "1b2",
+   "energyHartree": -19.24554769679189,
+   "occupation": 2.0
+  },
+  {
+   "index": 1,
+   "label": "1a1",
+   "energyHartree": -19.245528981739618,
+   "occupation": 2.0
+  },
+  {
+   "index": 2,
+   "label": "2a1",
+   "energyHartree": -14.566832316642454,
+   "occupation": 2.0
+  },
+  {
+   "index": 3,
+   "label": "3a1",
+   "energyHartree": -1.288502496894453,
+   "occupation": 2.0
+  },
+  {
+   "index": 4,
+   "label": "2b2",
+   "energyHartree": -1.140417106287895,
+   "occupation": 2.0
+  },
+  {
+   "index": 5,
+   "label": "4a1",
+   "energyHartree": -0.6715840527655432,
+   "occupation": 2.0
+  },
+  {
+   "index": 6,
+   "label": "1b1",
+   "energyHartree": -0.5761500473344283,
+   "occupation": 2.0
+  },
+  {
+   "index": 7,
+   "label": "3b2",
+   "energyHartree": -0.5751849792133028,
+   "occupation": 2.0
+  },
+  {
+   "index": 8,
+   "label": "5a1",
+   "energyHartree": -0.5695415004752948,
+   "occupation": 2.0
+  },
+  {
+   "index": 9,
+   "label": "1a2",
+   "energyHartree": -0.38870021078426836,
+   "occupation": 2.0
+  },
+  {
+   "index": 10,
+   "label": "4b2",
+   "energyHartree": -0.376611437839857,
+   "occupation": 2.0,
+   "role": "HOMO"
+  },
+  {
+   "index": 11,
+   "label": "6a1",
+   "energyHartree": -0.22981787731206157,
+   "occupation": 1.0,
+   "role": "SOMO"
+  },
+  {
+   "index": 12,
+   "label": "2b1",
+   "energyHartree": -0.0937485104125987,
+   "occupation": 0.0,
+   "role": "LUMO",
+   "valenceCharacter": 0.9757,
+   "class": "valence"
+  },
+  {
+   "index": 13,
+   "label": "7a1",
+   "energyHartree": 0.03289585901989928,
+   "occupation": 0.0,
+   "valenceCharacter": 0.0402,
+   "class": "diffuse"
+  },
+  {
+   "index": 14,
+   "label": "5b2",
+   "energyHartree": 0.05023524551311726,
+   "occupation": 0.0,
+   "valenceCharacter": 0.0226,
+   "class": "diffuse"
+  },
+  {
+   "index": 15,
+   "label": "8a1",
+   "energyHartree": 0.05372785619099296,
+   "occupation": 0.0,
+   "valenceCharacter": 0.0009,
+   "class": "diffuse"
+  },
+  {
+   "index": 16,
+   "label": "3b1",
+   "energyHartree": 0.058850084472281856,
+   "occupation": 0.0,
+   "valenceCharacter": 0.0083,
+   "class": "diffuse"
+  }
+ ],
+ "grid": {
+  "shape": [
+   96,
+   96,
+   96
+  ],
+  "origin": [
+   -8.576195321878247,
+   -8.576195321878247,
+   -8.576195321878247
+  ],
+  "spacing": 0.18055148046059466
+ },
+ "espGrid": {
+  "shape": [
+   48,
+   48,
+   48
+  ],
+  "origin": [
+   -8.576195321878247,
+   -8.576195321878247,
+   -8.576195321878247
+  ],
+  "spacing": 0.3649444817820531
+ },
+ "espRangeOnSurface": [
+  -0.013754327854516468,
+  0.04017852247220244
+ ],
+ "electronCount": 23,
+ "densityIntegral": 22.999756539634504,
+ "multiplicity": 2,
+ "symmetry": {
+  "pointGroup": "C2v",
+  "labelGroup": "C2v",
+  "labels": "full-group"
+ },
+ "references": [
+  {
+   "quantity": "bond",
+   "value": 1.194,
+   "unit": "Å",
+   "source": "experiment (CCCBDB)",
+   "tolerance": 0.01,
+   "atoms": [
+    0,
+    1
+   ],
+   "label": "N–O"
+  },
+  {
+   "quantity": "angle",
+   "value": 133.9,
+   "unit": "deg",
+   "source": "experiment (CCCBDB)",
+   "tolerance": 1.0,
+   "atoms": [
+    1,
+    0,
+    2
+   ],
+   "label": "O–N–O"
+  },
+  {
+   "quantity": "dipole",
+   "value": 0.316,
+   "unit": "D",
+   "source": "CRC Handbook, via CCCBDB",
+   "tolerance": 0.05
+  }
+ ],
+ "generator": {
+  "pyscf": "2.8.0",
+  "numpy": "2.3.5",
+  "scipy": "1.18.1",
+  "python": "3.12.15",
+  "xc": "B3LYP-D3(BJ) (PySCF >= 2.3: VWN-RPA)",
+  "script": "tools/molecules/build_library.py",
+  "commit": "8982f6231f84288ed43430a9b621e14d2a8f5477",
+  "dataVersion": "v3"
+ }
+}

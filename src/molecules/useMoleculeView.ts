@@ -8,13 +8,12 @@ import {
 } from '../orbital_visualizer';
 import { createGridMeshWorker } from '../workers/createGridMeshWorker';
 import { isSuperseded, runMeshWorker } from './mesh_worker_client';
-import type { GridMeshRequest } from './grid_mesh_request';
 import { getDensityGrid, getEspGrid } from './grid_cache';
 import { loadBasis } from './loader';
-import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY, espVertexColors } from './esp_color';
+import { ESP_LIMIT_HARTREE, espVertexColors } from './esp_color';
 import { buildBallAndStick, buildSpaceFilling, detectBonds, overlayExtent, pickMoleculePart } from './ball_and_stick';
 import { dipoleArrow } from './dipole';
-import { gridHalfWidth, planMoleculeRender } from './render_plan';
+import { gridHalfWidth, moleculeGridRequest, planMoleculeRender } from './render_plan';
 
 const TAP_TOLERANCE_PX = 6;
 const samePick = (a: MoleculePick | null, b: MoleculePick | null) => a?.kind === b?.kind && a?.index === b?.index;
@@ -119,10 +118,7 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
                 }
                 const grid = await getDensityGrid(meta);
                 if (!current()) return;
-                const request: GridMeshRequest = plan.fraction === 'espSurface'
-                    ? { type: 'calculate', source: grid, isoValue: ESP_SURFACE_DENSITY, requestId }
-                    : { type: 'calculate', source: grid, enclosedFraction: plan.fraction, requestId };
-                const job = runMeshWorker(createGridMeshWorker(), request);
+                const job = runMeshWorker(createGridMeshWorker(), moleculeGridRequest(plan, grid, requestId));
                 cancelMesh = job.cancel;
                 const meshData = await job.promise;
                 if (!current()) return;

@@ -24,6 +24,7 @@
   "molecule-complex": "#mode=molecule&id=glycine",
   "water-orbitals": "#mode=molecule&id=h2o&show=mo:4",
   "molecule-complex-orbitals": "#mode=molecule&id=glycine&show=mo:0",
+  "no2": "#mode=molecule&id=no2",
   "ac-6s-shell": "#mode=atom&Z=89&rel=scalar&level=shell&n=6",
   "ac-6s-orbital": "#mode=atom&Z=89&rel=scalar&level=orbital&n=6&l=0&ml=0",
   "ac-7s-orbital": "#mode=atom&Z=89&rel=scalar&level=orbital&n=7&l=0&ml=0",

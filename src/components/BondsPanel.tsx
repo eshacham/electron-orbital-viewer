@@ -8,11 +8,12 @@ import { bondsCaptions, densitySurfaceText, frontierText, lengths, orbitalCaveat
 import { bondAxisMinimumDensity } from '../bonds/bond_density';
 import { bondOrderText, h2plusOrbitals, heteronuclearBondOrderText } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
+import { frontierOccupied } from '../molecules/orbital_display';
 import MoDiagram from './MoDiagram';
 
-/** The orbital "One orbital" opens onto when none is picked yet: the highest occupied one (HOMO; SOMO if open-shell). */
+/** The orbital "One orbital" opens onto when none is picked yet: the HOMO, or the SOMO if open-shell (preflight D8's shared resolver). */
 function frontierOccupiedIndex(orbitals: readonly MoleculeOrbitalInfo[]): number | null {
-    return (orbitals.find(o => o.role === 'HOMO') ?? orbitals.find(o => o.role === 'SOMO'))?.index ?? null;
+    return frontierOccupied(orbitals)?.index ?? null;
 }
 
 /**

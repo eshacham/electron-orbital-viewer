@@ -4,16 +4,15 @@ import { bondsFieldRequest, SPIN_SUFFIX } from '../bonds/bonds_request';
 import { H2PLUS_LABELS, H2PLUS_STATES } from '../bonds/h2plus';
 import type { FieldRenderRequest } from '../field_source';
 import type { ThumbColouring } from './ThumbnailService';
-import type { StripItem } from './strip_items';
+import { MO_THUMB_RESOLUTION, type StripItem } from './strip_items';
 import type { MoleculeBasis } from '../molecules/types';
-import { basisCentredOn, orbitalBox } from '../molecules/orbital_box';
+import { fitToOrbital } from '../molecules/orbital_box';
 
 /**
- * Spec §12's figure for a molecular orbital's tile: 40³. Gaussian MOs are
- * smooth on the tile's scale, and a molecule's strip is up to 21 tiles (O₂'s
- * α and β sets), each a fresh basis evaluation in the worker.
+ * Spec §12's figure for a molecular orbital's tile: 40³ (MO_THUMB_RESOLUTION, shared with the Molecules strip).
+ * A molecule's strip here is up to 21 tiles (O₂'s α and β sets), each a fresh basis evaluation in the worker.
  */
-export const BONDS_THUMB_RESOLUTION = 40;
+export const BONDS_THUMB_RESOLUTION = MO_THUMB_RESOLUTION;
 
 export type BondsStripItem = StripItem<BondsView>;
 
@@ -61,34 +60,6 @@ function tile({ key, label, spoken, target, selected, field, colouring, content 
                 colouring,
             },
         },
-    };
-}
-
-/**
- * Ruling T10-core: an orbital tile is meshed in a box fitted to its own
- * orbital (orbital_box.ts), not the whole molecule's -- at 40³ a 1s core
- * orbital in the molecule's box is a voxel speck. The sampling box is always
- * centred on the origin, so the tile is given a copy of the basis moved by
- * −centre (and named for it): the same orbital, sitting at the centre of its
- * box. The tile frames its own mesh (render_thumbnail.ts), so where the
- * orbital sits does not show. The main view's request is not touched.
- */
-function fittedToOrbital(field: FieldRenderRequest, basis: MoleculeBasis, moved: Map<string, MoleculeBasis>): FieldRenderRequest {
-    const [source] = field.sources;
-    if (source.recipe.type !== 'gaussianMO') return field;
-    const { index } = source.recipe;
-    const { centre, halfWidth } = orbitalBox(basis, index, source.rMax);
-    if (halfWidth >= source.rMax) return field;
-    let fitted = basis;
-    if (centre.some(c => c !== 0)) {
-        const key = centre.join(',');
-        if (!moved.has(key)) moved.set(key, basisCentredOn(basis, centre));
-        fitted = moved.get(key)!;
-    }
-    return {
-        ...field,
-        sources: [{ ...source, rMax: halfWidth, recipe: { type: 'gaussianMO', moleculeId: fitted.id, index } }],
-        bases: [fitted],
     };
 }
 
@@ -141,7 +112,7 @@ export function bondsStripItems({ bonds, data, h2plusR, enclosedFraction }: Bond
         const spoken = siblings.length > 1 ? `${label} orbital (${view.component + 1} of ${siblings.length})` : `${label} orbital`;
         items.push(tile({
             key: `mo-${orbital.index}`, label, spoken, target: view, selected: sameView(view, bonds.view),
-            field: fittedToOrbital(built.request, data.basis, moved), colouring: 'phase',
+            field: fitToOrbital(built.request, data.basis, moved), colouring: 'phase',
             content: `${bonds.system}|${where}|${viewKey(view)}|${enclosedFraction}`,
         }));
     }

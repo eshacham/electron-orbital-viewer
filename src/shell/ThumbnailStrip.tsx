@@ -3,6 +3,11 @@ import ArrowBack from '@mui/icons-material/ArrowBack';
 import type { NavigationTarget } from '../components/LevelNav';
 import { thumbnailService, type ThumbRequest } from '../thumbs/ThumbnailService';
 import { drawRingGlyph } from '../thumbs/ring_glyph';
+import { drawStructureGlyph } from '../thumbs/structure_glyph';
+import { lookTheme } from '../thumbs/thumb_key';
+import { LIGHT_HYDROGEN } from '../design/science';
+import { CPK_COLORS } from '../molecules/ball_and_stick';
+import { TOKENS } from '../design/tokens';
 import type { StripItem } from '../thumbs/strip_items';
 import { useRovingFocus } from './useRovingFocus';
 import './strip.css';
@@ -24,6 +29,10 @@ interface ThumbnailStripProps<T = NavigationTarget> {
     variant?: 'overlay' | 'sheet';
     collapsed?: boolean;
     onCollapsedChange?(collapsed: boolean): void;
+    /** What the handle says it shows or hides (ruling R23b-3): "orbitals" (the default), or Molecules' "views". */
+    handleNoun?: string;
+    /** Labels that are words ("Electrostatic potential", Task 15) wrap to two centred lines, as the phone sheet's do. */
+    wrapLabels?: boolean;
 }
 
 /**
@@ -68,6 +77,19 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
         const context = canvas.getContext('2d');
         if (context) drawRingGlyph(context, canvas.width, thumb.rings, rGrid, thumb.rMax);
     }, [thumb, rGrid]);
+
+    // Task 15 (ruling P6): a molecule's structure, drawn here in Canvas 2D in the look's theme -- the text-3
+    // outline, and hydrogen as the 3D view paints it (ruling R12) -- and redrawn when the theme changes.
+    const theme = lookTheme(themeKey);
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || thumb.kind !== 'structure') return;
+        const context = canvas.getContext('2d');
+        if (context) {
+            drawStructureGlyph(context, canvas.width, thumb.atoms, thumb.representation,
+                { outline: TOKENS[theme]['text-3'], hydrogen: theme === 'light' ? LIGHT_HYDROGEN : CPK_COLORS[1] });
+        }
+    }, [thumb, theme, backing]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -117,17 +139,25 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
             }}
         >
             <span className="strip-tile-image" style={{ width: px, height: px }}>
-                {thumb.kind === 'back' ? <ArrowBack aria-hidden /> : (
+                {thumb.kind === 'back' ? <ArrowBack aria-hidden /> : thumb.kind === 'icon' ? (
+                    // Molecules' "All orbitals" (Task 15): a fixed picture -- three orbital-like circles in the
+                    // label's own colour, no science hue to key -- for a tile that opens a list.
+                    <svg className="strip-tile-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="7" r="4" />
+                        <circle cx="7" cy="16" r="4" />
+                        <circle cx="17" cy="16" r="4" />
+                    </svg>
+                ) : (
                     // D15: shoot.mjs has no live hook into the thumbnail service, so it
                     // counts this attribute instead -- the picture (not the glyph) is
-                    // showing. True for a ring glyph tile at once (drawn synchronously
+                    // showing. True for a ring or structure glyph tile at once (drawn
                     // on mount); for an orbital tile, only once its image has arrived
                     // (Task 10: was `!showGlyph`, which also counted a tile still waiting).
                     <canvas ref={canvasRef} className="thumb-canvas" width={backing} height={backing} aria-hidden="true"
                         data-drawn={!pending && (thumb.kind !== 'orbital' || drawn === wanted) ? 'true' : 'false'}
                         style={showGlyph ? { visibility: 'hidden' } : undefined} />
                 )}
-                {showGlyph && <span className="strip-tile-glyph" aria-hidden="true">{item.label}</span>}
+                {showGlyph && <span className="strip-tile-glyph" aria-hidden="true">{item.glyph ?? item.label}</span>}
             </span>
             <span className="strip-tile-label" aria-hidden="true">{item.label}</span>
         </div>
@@ -142,7 +172,9 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
 // A plain generic function (not React.FC<...>, which cannot carry a type
 // parameter): T is whatever StripItem<T> the caller's items are in -- the
 // Atom strip's NavigationTarget (the default) or Basic Orbitals' BasicSelection.
-function ThumbnailStrip<T = NavigationTarget>({ items, label, rGrid, themeKey, onSelect, variant = 'overlay', collapsed = false, onCollapsedChange }: ThumbnailStripProps<T>) {
+function ThumbnailStrip<T = NavigationTarget>({
+    items, label, rGrid, themeKey, onSelect, variant = 'overlay', collapsed = false, onCollapsedChange, handleNoun = 'orbitals', wrapLabels = false,
+}: ThumbnailStripProps<T>) {
     const listRef = useRef<HTMLDivElement>(null);
     const listId = useId();
     // Ruling DX2: the listbox mounts only while expanded, so `collapsed` re-attaches the roving focus to it.
@@ -174,14 +206,14 @@ function ThumbnailStrip<T = NavigationTarget>({ items, label, rGrid, themeKey, o
     const tile = (item: StripItem<T>) => <Tile key={item.key} item={item} px={px} rGrid={rGrid} themeKey={themeKey} onSelect={onSelect} />;
 
     return (
-        <div className={`thumbnail-strip ${variant}${collapsed ? ' collapsed' : ''}`}>
+        <div className={`thumbnail-strip ${variant}${collapsed ? ' collapsed' : ''}${wrapLabels ? ' wrap-labels' : ''}`}>
             {onCollapsedChange && (
                 // Ruling R23b-3: the handle names what it opens -- "Orbitals" plus the
                 // action. The chevron stays aria-hidden (a bare glyph reads poorly), so
                 // the accessible name is exactly the visible label, with no aria-label.
                 <button type="button" className="strip-handle" aria-expanded={!collapsed} aria-controls={collapsed ? undefined : listId}
                     onClick={() => onCollapsedChange(!collapsed)}>
-                    <span className="strip-handle-label">{collapsed ? 'Show orbitals' : 'Hide orbitals'}</span>
+                    <span className="strip-handle-label">{collapsed ? `Show ${handleNoun}` : `Hide ${handleNoun}`}</span>
                     <span aria-hidden="true">{collapsed ? '▴' : '▾'}</span>
                 </button>
             )}

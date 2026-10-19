@@ -1,4 +1,6 @@
-import type { AnalyticFieldSource, FieldRenderRequest } from '../field_source';
+import type { AnalyticFieldSource, FieldRenderRequest, GridFieldSource } from '../field_source';
+import type { GridMeshRequest } from './grid_mesh_request';
+import { ESP_SURFACE_DENSITY } from './esp_color';
 import type { LibraryMoleculeMeta } from './library_types';
 import type { MoleculeBasis } from './types';
 import type { MoleculeSurface } from '../store/moleculeSlice';
@@ -54,4 +56,17 @@ export function planMoleculeRender(
     }
     if (surface.kind === 'esp') return { kind: 'grid', fraction: 'espSurface', colourByEsp: true, label: `Mapping the potential on ${meta.name}…` };
     return { kind: 'grid', fraction: enclosedFraction, colourByEsp: false, label: `Loading ${meta.name}…` };
+}
+
+/**
+ * The grid worker's request for a grid plan: the density at its enclosed fraction, or the ESP surface exactly at
+ * ρ = ESP_SURFACE_DENSITY (ruling D4). One builder for the main view (useMoleculeView) and the strip's density
+ * and ESP tiles (Task 15), so a tile is meshed exactly as the view it opens.
+ */
+export function moleculeGridRequest(
+    plan: Extract<MoleculeRenderPlan, { kind: 'grid' }>, source: GridFieldSource, requestId: number,
+): GridMeshRequest {
+    return plan.fraction === 'espSurface'
+        ? { type: 'calculate', source, isoValue: ESP_SURFACE_DENSITY, requestId }
+        : { type: 'calculate', source, enclosedFraction: plan.fraction, requestId };
 }

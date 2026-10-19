@@ -96,7 +96,7 @@ import { selectMolecule, setSurface, setRepresentation, setShowDipole, MoleculeS
 import { useMoleculeLoader } from './molecules/useMoleculeLoader';
 import { formatDipole } from './molecules/dipole';
 import { spaceFillingUnavailableReason } from './molecules/vdw_radii';
-import MoleculeNav from './components/MoleculeNav';
+import MoleculeNav, { type MoleculeNavHandle } from './components/MoleculeNav';
 import MoleculePickerDialog from './components/MoleculePickerDialog';
 import MoleculeReadout from './components/MoleculeReadout';
 import MoleculeViewOptions from './components/MoleculeViewOptions';
@@ -133,6 +133,10 @@ import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
 import { atomStripItems, basicStripItems } from './thumbs/strip_items';
 import { bondsStripItems, pendingBondsStripItems, type BondsStripItem } from './thumbs/bonds_strip_items';
+import { moleculeStripItems, pendingMoleculeStripItems, type MoleculeStripItem, type MoleculeStripTarget } from './thumbs/molecule_strip_items';
+import { useMoleculeStripData } from './thumbs/useMoleculeStripData';
+import { ESP_LIMIT_HARTREE } from './molecules/esp_color';
+import { frontierOccupied } from './molecules/orbital_display';
 import { thumbnailService } from './thumbs/ThumbnailService';
 import { thumbLookKey, thumbTileDevicePx } from './thumbs/thumb_key';
 import { useDevicePixelRatio } from './thumbs/useDevicePixelRatio';
@@ -852,6 +856,56 @@ function App() {
     // Ruling T16-tilekey with preflight D9: the strip's orbital tiles are phase-coloured; they get a key
     // of their own only where the column holds no phase key already -- Bonds with the density drawn.
     const bondsOrbitalTiles = !isNarrow && !stripCollapsed && bondsStrip.some(item => item.target.kind !== 'density');
+
+    // Task 15 (spec §9.4 "Strip", §12; rulings P5, P6, P7): the molecule's views -- its structure two ways, the
+    // density, the ESP map, each frontier orbital the data name, and "All orbitals". The pictures are made from
+    // the molecule's own density grid, ESP grid and basis, each tile waiting on its glyph until its file lands.
+    const moleculeStripData = useMoleculeStripData(isMoleculeMode ? molecule.meta : null);
+    const builtMoleculeStrip = useMemo(
+        () => (isMoleculeMode && molecule.meta
+            ? moleculeStripItems({
+                meta: molecule.meta, surface: molecule.surface, representation: molecule.representation, enclosedFraction,
+                densityGrid: moleculeStripData.density, espGrid: moleculeStripData.esp, espLimit: ESP_LIMIT_HARTREE, basis: moleculeStripData.basis,
+            })
+            : []),
+        [isMoleculeMode, molecule.meta, molecule.surface, molecule.representation, enclosedFraction, moleculeStripData],
+    );
+    // Ruling T10-I1, for a molecule change: while the next molecule's meta loads, the strip keeps the last one's
+    // tiles on their glyphs rather than leaving and coming back (a bottom inset zone: the camera would re-fit
+    // twice; the phone sheet's first row would jump). Remembered across renders as Bonds' strip is.
+    const [lastMoleculeStrip, setLastMoleculeStrip] = useState<MoleculeStripItem[] | null>(null);
+    if (builtMoleculeStrip.length > 0 && lastMoleculeStrip !== builtMoleculeStrip) setLastMoleculeStrip(builtMoleculeStrip);
+    const moleculeMetaLoading = molecule.isLoadingMeta;
+    const moleculeStrip = useMemo(() => {
+        if (builtMoleculeStrip.length > 0) return builtMoleculeStrip;
+        if (isMoleculeMode && moleculeMetaLoading && lastMoleculeStrip) {
+            return pendingMoleculeStripItems(lastMoleculeStrip, molecule.surface, molecule.representation);
+        }
+        return [];
+    }, [builtMoleculeStrip, isMoleculeMode, moleculeMetaLoading, lastMoleculeStrip, molecule.surface, molecule.representation]);
+    const moleculeNavRef = useRef<MoleculeNavHandle>(null);
+    // Spec §9.4: "Each tile sets surface / representation exactly as the View tab does" -- the same actions.
+    const moleculeMeta = molecule.meta;
+    const moleculeSurfaceKind = molecule.surface.kind;
+    const handleMoleculeStripSelect = useCallback((target: MoleculeStripTarget) => {
+        if ('openOrbitals' in target) {
+            // Opens the orbital list: on the orbital drawn, or switched to the HOMO (SOMO, preflight D8) as the
+            // surface switch's Orbitals does -- then focus goes to that orbital's row.
+            const first = moleculeMeta && (frontierOccupied(moleculeMeta.orbitals) ?? moleculeMeta.orbitals[0]);
+            if (moleculeSurfaceKind !== 'mo' && first) dispatch(setSurface({ kind: 'mo', index: first.index }));
+            moleculeNavRef.current?.focusOrbitalList();
+            return;
+        }
+        if (target.representation) dispatch(setRepresentation(target.representation));
+        dispatch(setSurface(target.surface));
+    }, [dispatch, moleculeMeta, moleculeSurfaceKind]);
+    // Spec §12 and preflight D19: a new molecule cancels the old one's thumbnail jobs -- in Molecules mode only,
+    // as ruling T10-M6 has it for Bonds (leaving the mode cancels too, as its tiles go).
+    useEffect(() => (isMoleculeMode ? () => thumbnailService.cancelAll() : undefined), [isMoleculeMode, molecule.selectedId]);
+    // Ruling T16-tilekey with preflight D9: the frontier tiles' ψ hues are keyed in the column unless an orbital's
+    // own phase key is there already (the density, the ESP map or no surface drawn).
+    const moleculeOrbitalTiles = !isNarrow && !stripCollapsed
+        && moleculeStrip.some(item => 'surface' in item.target && item.target.surface.kind === 'mo');
     const screenRatio = useDevicePixelRatio();
     // Everything a tile's picture depends on besides its content (ruling R20a-4): a change re-requests every
     // tile. The same key the thumbnail service files pictures under (thumb_key.ts): isNarrow is the
@@ -1075,6 +1129,8 @@ function App() {
         ? moleculeKeysShown && molecule.surface.kind === 'mo'
         : (isAtomMode ? atomLevel === 'orbital' : Boolean(renderedParams || renderedField))
             && !combinationLegend && !isBondsDensity;
+    // Task 15 (D9): the strip's own ψ key, only where the surface's phase key is not already in the column.
+    const moleculeTileKey = isMoleculeMode && moleculeOrbitalTiles && !showPhaseLegend;
     // Ruling R23c-3 (owner): the "hover or tap" hint, while nothing is picked,
     // moves into the viewport's key/caption corner -- desktop/tablet only (a
     // phone's Explore tab keeps MoleculeReadout's own in-panel wording).
@@ -1560,10 +1616,15 @@ function App() {
                 // Task 12: the compact header tile and the quick pick lead it.
                 content: (
                     <>
+                        {/* Task 15 (spec §9.8): the strip is the Explore tab's first row, as in every other mode. */}
+                        {moleculeStrip.length > 0 && (
+                            <ThumbnailStrip items={moleculeStrip} label="views of this molecule" rGrid={[]} themeKey={stripThemeKey}
+                                onSelect={handleMoleculeStripSelect} variant="sheet" />
+                        )}
                         {moleculeHeader(true)}
                         {moleculeQuickPick}
                         {moleculeSelectionSection}
-                        <MoleculeNav {...moleculeNavProps} variant="body" />
+                        <MoleculeNav {...moleculeNavProps} variant="body" ref={moleculeNavRef} />
                         <MoleculeProvenanceFooter />
                         <MoleculeJobsSection />
                     </>
@@ -1709,7 +1770,7 @@ function App() {
                     {/* Task 12 (ruling P1): the header tile and the quick pick head the column. */}
                     {moleculeHeader(false)}
                     {moleculeQuickPick}
-                    <MoleculeNav {...moleculeNavProps} />
+                    <MoleculeNav {...moleculeNavProps} ref={moleculeNavRef} />
                     {moleculeSelectionSection}
                     <MoleculeJobsSection />
                 </div>
@@ -1880,6 +1941,12 @@ function App() {
                 <ThumbnailStrip items={bondsStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
                     onSelect={handleBondsStripSelect} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
             )}
+            {/* Task 15: Molecules' strip -- the molecule's views; its handle says so (ruling R23b-3). */}
+            {isMoleculeMode && !isNarrow && moleculeStrip.length > 0 && (
+                <ThumbnailStrip items={moleculeStrip} label="views of this molecule" rGrid={[]} themeKey={stripThemeKey}
+                    onSelect={handleMoleculeStripSelect} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed}
+                    handleNoun="views" wrapLabels />
+            )}
             {!isMoleculeMode && !isAtomMode && (showPhaseLegend || isBondsDensity || combinationLegend) && (
                 <KeyColumn compact={isNarrow}>
                     {showPhaseLegend && <PhaseKey positive={phase.positive} negative={phase.negative} />}
@@ -1914,12 +1981,15 @@ function App() {
                 pick readout, which used to share this bottom-centre stack,
                 are prose and moved off the canvas entirely: the tier into the
                 title block, the readout into the Explore panel. */}
-            {isMoleculeMode && molecule.meta && ((moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend || moleculeCaptionZone) && (
+            {isMoleculeMode && molecule.meta && ((moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend || moleculeTileKey || moleculeCaptionZone) && (
                 <KeyColumn compact={isNarrow}>
                     {moleculeKeysShown && molecule.surface.kind === 'esp' && (
                         <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact />
                     )}
                     {showPhaseLegend && <PhaseKey positive={phase.positive} negative={phase.negative} />}
+                    {moleculeTileKey && (
+                        <PhaseKey positive={phase.positive} negative={phase.negative} heading="Orbital tiles" label="orbital tile colour key" />
+                    )}
                     {/* Ruling R23c-3: the placeholder instruction, relocated here from the
                         Explore panel's Selection section -- its text reads only while
                         nothing is picked. Ruling R23f-3: mounted whenever the corner

@@ -7,6 +7,8 @@ import type { ThumbRequest } from './ThumbnailService';
 import type { RingLayer } from './ring_glyph';
 import type { BasicSelection } from '../store/orbitalSlice';
 import { basicOrbitalParams } from '../orbital_presets';
+import type { MoleculeAtom } from '../molecules/library_types';
+import type { Representation } from '../molecules/ball_and_stick';
 
 /**
  * Ruling R20d (overrides §12's 32³): strips mesh at 64³ -- 32³'s ~560-vertex
@@ -16,19 +18,29 @@ import { basicOrbitalParams } from '../orbital_presets';
  */
 export const THUMB_RESOLUTION = 64;
 
+/**
+ * Spec §12's figure for a molecular orbital's tile (Bonds and Molecules): 40³. Gaussian MOs are smooth on the
+ * tile's scale, and each tile is a fresh basis evaluation in the worker.
+ */
+export const MO_THUMB_RESOLUTION = 40;
+
 const LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
 
 /**
  * 'orbital': a picture from the thumbnail service -- any ThumbRequest (an orbital, or since Task 10 a field or grid surface).
  * 'pending': its glyph and label only, asking for nothing -- a picture whose data is still loading (ruling T10-I1).
+ * 'structure': a molecule's structure, drawn in Canvas 2D (structure_glyph.ts; ruling P6) -- no WebGL, no job.
+ * 'icon': a fixed picture with its label (Molecules' "All orbitals", which opens a list rather than drawing a view).
  */
 export type StripThumb =
-    | { kind: 'orbital'; request: ThumbRequest } | { kind: 'pending' } | { kind: 'rings'; rings: RingLayer[]; rMax: number } | { kind: 'back' };
+    | { kind: 'orbital'; request: ThumbRequest } | { kind: 'pending' } | { kind: 'rings'; rings: RingLayer[]; rMax: number } | { kind: 'back' }
+    | { kind: 'structure'; atoms: MoleculeAtom[]; representation: Exclude<Representation, 'none'> } | { kind: 'icon' };
 
 /**
- * Generic over what a tile dispatches: `NavigationTarget` (the default, the
- * Atom strip's own LevelNav targets) or, for Basic Orbitals, a plain
- * `BasicSelection` -- there is no drill-down there, just n/l/mₗ (Task 8).
+ * Generic over what a tile dispatches (ruling P7): `NavigationTarget` (the
+ * default, the Atom strip's own LevelNav targets), for Basic Orbitals a plain
+ * `BasicSelection` -- there is no drill-down there, just n/l/mₗ (Task 8) --
+ * Bonds' `BondsView` (Task 10) and Molecules' `MoleculeStripTarget` (Task 15).
  */
 export interface StripItem<T = NavigationTarget> {
     key: string;
@@ -40,6 +52,8 @@ export interface StripItem<T = NavigationTarget> {
     target: T;
     selected: boolean;
     thumb: StripThumb;
+    /** What the tile's glyph says (a pending tile, a lost context) when the label is too long for it; the label by default. */
+    glyph?: string;
 }
 
 interface StripArgs {

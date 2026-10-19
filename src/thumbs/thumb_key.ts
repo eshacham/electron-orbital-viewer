@@ -77,3 +77,11 @@ export interface ThumbLook {
 export function thumbLookKey({ appearance: a, opacity, size }: ThumbLook): string {
     return `${a.theme}|${a.finish}|${a.lowPower ? 'low' : 'full'}|${size}|${thumbOpacityOf(opacity)}`;
 }
+
+/**
+ * The theme a look key was built for (its first field, above): a Canvas-2D glyph drawn by the strip itself
+ * (structure_glyph.ts, Task 15) takes its theme's colours from the same key that re-draws it.
+ */
+export function lookTheme(themeKey: string): Appearance['theme'] {
+    return themeKey.split('|')[0] === 'light' ? 'light' : 'dark';
+}

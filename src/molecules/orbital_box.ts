@@ -1,4 +1,5 @@
 import type { MoleculeBasis } from './types';
+import type { FieldRenderRequest } from '../field_source';
 
 /**
  * Ruling T10-core: a strip tile meshes one molecular orbital at 40³ (spec
@@ -117,5 +118,37 @@ export function basisCentredOn(basis: MoleculeBasis, centre: [number, number, nu
         ...basis,
         id: `${basis.id}~${centre.map(c => c.toFixed(6)).join(',')}`,
         atoms: basis.atoms.map(atom => atom.map((x, axis) => x - centre[axis]) as [number, number, number]),
+    };
+}
+
+/**
+ * Ruling T10-core: an orbital tile (the Bonds strip's, and since Task 15 the
+ * Molecules strip's) is meshed in a box fitted to its own orbital, not the
+ * whole molecule's -- at 40³ a 1s core orbital in the molecule's box is a
+ * voxel speck. `field` is the main view's own request for that orbital (one
+ * gaussianMO source, its rMax the molecule's box). The sampling box is always
+ * centred on the origin, so the tile is given a copy of the basis moved by
+ * −centre (and named for it), shared through `moved` by tiles with the same
+ * centre: the same orbital, sitting at the centre of its box. The tile frames
+ * its own mesh (render_thumbnail.ts), so where the orbital sits does not
+ * show. The main view's request is not touched; anything but one gaussianMO
+ * source, or a box no smaller than the molecule's, is returned as it is.
+ */
+export function fitToOrbital(field: FieldRenderRequest, basis: MoleculeBasis, moved: Map<string, MoleculeBasis>): FieldRenderRequest {
+    const [source] = field.sources;
+    if (field.sources.length !== 1 || source.recipe.type !== 'gaussianMO') return field;
+    const { index } = source.recipe;
+    const { centre, halfWidth } = orbitalBox(basis, index, source.rMax);
+    if (halfWidth >= source.rMax) return field;
+    let fitted = basis;
+    if (centre.some(c => c !== 0)) {
+        const key = centre.join(',');
+        if (!moved.has(key)) moved.set(key, basisCentredOn(basis, centre));
+        fitted = moved.get(key)!;
+    }
+    return {
+        ...field,
+        sources: [{ ...source, rMax: halfWidth, recipe: { type: 'gaussianMO', moleculeId: fitted.id, index } }],
+        bases: [fitted],
     };
 }

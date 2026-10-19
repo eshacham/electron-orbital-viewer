@@ -3,7 +3,7 @@ import { Chip, Typography } from '@mui/material';
 import {
     CONSTRUCTED_LABEL, CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, DIFFUSE_NOTE, GAP_CAVEAT, LVMO_NOTE, UNCLASSIFIED_NOTE,
     VALENCE_THRESHOLD, degeneracyCounts, diffuseDescription, formatOrbitalEnergy, isConstructed, isUpperEstimate, labelNotes,
-    gapTerm, labelsSentence, orbitalGaps,
+    frontierOccupied, gapTerm, labelsSentence, orbitalGaps,
 } from '../molecules/orbital_display';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 
@@ -64,7 +64,8 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, sel
     const firstOccupied = rows.findIndex(o => o.occupation > 0);
     const gaps = orbitalGaps(orbitals);
     const gapText = gaps.length ? gaps.map(g => `${gapTerm(g)} ${formatOrbitalEnergy(g.hartree)}`).join(' · ') : null;
-    const homoIndex = (rows.find(o => o.role === 'HOMO') ?? rows[firstOccupied])?.index;
+    // Preflight D8: the shared resolver (the HOMO, else the SOMO); older data, the highest occupied row.
+    const homoIndex = (frontierOccupied(orbitals) ?? rows[firstOccupied])?.index;
     const diffuse = orbitals.filter(o => o.class === 'diffuse');
     const lvmo = orbitals.some(o => o.role === 'LVMO');
     const constructed = orbitals.some(isConstructed);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useImperativeHandle, useRef } from 'react';
 import { Button, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import MoleculePicker from './MoleculePicker';
 import MoleculeOrbitalList from './MoleculeOrbitalList';
@@ -6,6 +6,7 @@ import { formatFormula } from '../molecules/catalogue';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeIndexEntry } from '../molecules/types';
 import type { MoleculeSurface } from '../store/moleculeSlice';
+import { frontierOccupied } from '../molecules/orbital_display';
 
 
 interface MoleculeNavProps {
@@ -27,9 +28,34 @@ interface MoleculeNavProps {
     onOpenPicker?: () => void;
 }
 
-const MoleculeNav: React.FC<MoleculeNavProps> = ({
+/** What App may ask of the card (Task 15): the strip's "All orbitals" tile puts focus in the orbital list. */
+export interface MoleculeNavHandle {
+    /**
+     * Focuses the row of the orbital drawn, in the list beside the surface switch -- now, or, when the list is
+     * not on screen yet (the surface was switched to Orbitals in the same event), once it renders.
+     */
+    focusOrbitalList(): void;
+}
+
+const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
     variant = 'full', entries, indexError, meta, selectedId, surface, onSelectMolecule, onSurfaceChange, onOpenPicker,
-}) => {
+}, ref) => {
+    const navRef = useRef<HTMLDivElement>(null);
+    const focusWanted = useRef(false);
+    // The pressed row is the orbital drawn: the list opens centred on it, so focus lands where the eye already is.
+    const focusRow = () => {
+        const row = navRef.current?.querySelector<HTMLElement>('.molecule-orbital-row[aria-pressed="true"]')
+            ?? navRef.current?.querySelector<HTMLElement>('.molecule-orbital-row');
+        row?.focus();
+        return Boolean(row);
+    };
+    useImperativeHandle(ref, () => ({ focusOrbitalList: () => { focusWanted.current = !focusRow(); } }), []);
+    // One render later at most: a wish the next render cannot meet (no list) is dropped, never kept to steal focus later.
+    useEffect(() => {
+        if (!focusWanted.current) return;
+        focusWanted.current = false;
+        focusRow();
+    });
     const name = meta?.name ?? entries?.find(e => e.id === selectedId)?.name ?? null;
     const title = name ? `${name}` : 'Choose a molecule';
 
@@ -47,10 +73,11 @@ const MoleculeNav: React.FC<MoleculeNavProps> = ({
     // Task 12 (ruling P1): the name, the loading line and the picker moved to the header tile above this card
     // (MoleculeHeader and its "Change ▾" popover); until a molecule has loaded the desktop card has nothing.
     if (variant === 'full' && !meta) return null;
-    const homo = meta?.orbitals.find(o => o.role === 'HOMO') ?? meta?.orbitals[0];
+    // Preflight D8: the HOMO, or the SOMO where the data name no HOMO (one shared resolver); older data, the first.
+    const homo = (meta && frontierOccupied(meta.orbitals)) ?? meta?.orbitals[0];
 
     return (
-        <div className="molecule-nav level-nav">
+        <div className="molecule-nav level-nav" ref={navRef}>
             {meta && (
                 <>
                     <ToggleButtonGroup exclusive size="small" fullWidth aria-label="surface" className="molecule-surface-toggle"
@@ -95,6 +122,7 @@ const MoleculeNav: React.FC<MoleculeNavProps> = ({
             )}
         </div>
     );
-};
+});
+MoleculeNav.displayName = 'MoleculeNav';
 
 export default MoleculeNav;

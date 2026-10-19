@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Runs validate_tile_boxes.ts (rulings T10-core / T10-core-I2): every Bonds molecule × scan point
-// × {90, 95, 99} %, no strip tile cut by its fitted box. First fetches every scan point's
-// basis.json through its own Vite (the dev server serves the molecule data, from
+// × {90, 95, 99} %, no strip tile cut by its fitted box -- and (Task 15) every library molecule's
+// frontier tiles, the Molecules strip's. First fetches every scan point's basis.json, and every
+// library molecule's meta.json and basis.json, through its own Vite (the dev server serves the molecule data, from
 // tools/molecules/out when it exists locally, else from the published site) into --data, once;
 // then bundles the sweep with the repo's esbuild and runs it with node (~70 s). Foreground only:
 // Vite is started and stopped inside this run, and never on the owner's ports.
@@ -28,7 +29,7 @@ const built = spawnSync(join(ROOT, 'node_modules/.bin/esbuild'),
 if (built.status !== 0) process.exit(built.status ?? 2);
 const run = extra => spawnSync(process.execPath, [bundle, '--data', data, ...extra], { stdio: 'inherit' }).status;
 
-if (!existsSync(join(data, 'complete.json'))) {
+if (!existsSync(join(data, 'complete.json')) || !existsSync(join(data, 'library', 'complete.json'))) {
   const vite = spawn(join(ROOT, 'node_modules/.bin/vite'), ['--port', String(port), '--strictPort', '--clearScreen', 'false'],
     { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
   try {

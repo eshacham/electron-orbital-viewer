@@ -3,7 +3,8 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import ThumbnailStrip, { tileBacking } from '../../src/shell/ThumbnailStrip';
-import { atomStripItems, basicStripItems } from '../../src/thumbs/strip_items';
+import { atomStripItems, basicStripItems, type StripItem } from '../../src/thumbs/strip_items';
+import { waterAtoms } from '../molecules/fixtures';
 import { subshellLabel } from '../../src/atom/configurations';
 import { thumbnailService, type ThumbHost } from '../../src/thumbs/ThumbnailService';
 import { goldProfile, neonProfile } from '../export/fixtures';
@@ -393,6 +394,18 @@ describe('strip tile styles (ruling R20d)', () => {
         expect(sheet).not.toMatch(/text-overflow|overflow:\s*hidden/);
     });
 
+    // Task 15: the Molecules strip's word labels ("Electrostatic potential") wrap to two centred lines in a column
+    // a little wider than the tile -- one line each widened the columns until eight tiles ran off the canvas.
+    it('wraps a wrap-labels overlay strip\'s labels to two centred lines, a little wider than the tile', () => {
+        const wrapped = rule('.thumbnail-strip.overlay.wrap-labels .strip-tile-label');
+        expect(wrapped).toMatch(/white-space:\s*normal/);
+        expect(wrapped).toMatch(/text-align:\s*center/);
+        expect(wrapped).toMatch(/height:\s*calc\(2 \* var\(--ql-size-thumb-label\)\)/);
+        expect(wrapped).toMatch(/max-width:\s*calc\(var\(--ql-size-thumb\) \+ 16px\)/);
+        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} wrapLabels />);
+        expect(screen.getByRole('listbox', { name: 'orbitals in view' }).closest('.thumbnail-strip')).toHaveClass('wrap-labels');
+    });
+
     // Ruling R23b-3 (owner): the handle names what it opens; its accessible name
     // is exactly the visible label (the chevron stays aria-hidden), set in caption size from tokens.
     it('sets the strip handle\'s text label at caption size from tokens', () => {
@@ -496,5 +509,66 @@ describe('ThumbnailStrip visibility gating (spec §12, D15 Step 1)', () => {
             act(() => { callbacks.get(canvas)!([{ isIntersecting: false, target: canvas } as IntersectionObserverEntry], {} as IntersectionObserver); });
         }
         expect(request).toHaveBeenCalledTimes(1);
+    });
+});
+
+// Task 15 (ruling P6): the Molecules strip's structure tiles are Canvas-2D glyphs of the molecule
+// (structure_glyph.ts), drawn at once like a ring glyph, in the theme's colours; "All orbitals" is an icon tile.
+describe('ThumbnailStrip structure and icon tiles (Task 15)', () => {
+    type Target = { pick: string };
+    const water = waterAtoms();
+    const molecule: StripItem<Target>[] = [
+        { key: 'ball', label: 'Ball and stick', spoken: 'Ball and stick structure', group: null, groupSpoken: null, target: { pick: 'ball' }, selected: true,
+            thumb: { kind: 'structure', atoms: water, representation: 'ball-and-stick' } },
+        { key: 'space', label: 'Space filling', spoken: 'Space filling structure', group: null, groupSpoken: null, target: { pick: 'space' }, selected: false,
+            thumb: { kind: 'structure', atoms: water, representation: 'space-filling' } },
+        { key: 'all', label: 'All orbitals', spoken: 'All orbitals — open the list', group: null, groupSpoken: null, target: { pick: 'all' }, selected: false,
+            thumb: { kind: 'icon' } },
+    ];
+    afterEach(() => { jest.restoreAllMocks(); });
+
+    it('draws each structure tile\'s glyph at once, marks it drawn, and redraws it in the other theme\'s colours', () => {
+        const strokes: string[] = [];
+        const ctx = {
+            fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: 'butt',
+            clearRect: jest.fn(), beginPath: jest.fn(), arc: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), fill: jest.fn(),
+            stroke: jest.fn(function (this: { strokeStyle: string }) { strokes.push(ctx.strokeStyle); }),
+        };
+        jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as RenderingContext);
+        // (The visibility test above leaves its spy in place; start this count from zero.)
+        const request = jest.spyOn(thumbnailService, 'request');
+        request.mockClear();
+        const { container, rerender } = render(<ThumbnailStrip items={molecule} label="views of this molecule" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} />);
+        // Two water glyphs: three atoms each; ball and stick's two bonds as four half-sticks on two outlines, space filling none.
+        expect(ctx.arc).toHaveBeenCalledTimes(6);
+        expect(ctx.lineTo).toHaveBeenCalledTimes(6);
+        expect(strokes).toContain(TOKENS.dark['text-3']);
+        expect(request).not.toHaveBeenCalled();
+        expect([...container.querySelectorAll('canvas.thumb-canvas')].map(canvas => canvas.getAttribute('data-drawn'))).toEqual(['true', 'true']);
+        strokes.length = 0;
+        rerender(<ThumbnailStrip items={molecule} label="views of this molecule" rGrid={[]} themeKey="light|glow" onSelect={jest.fn()} />);
+        expect(strokes).toContain(TOKENS.light['text-3']);
+        expect(strokes).not.toContain(TOKENS.dark['text-3']);
+    });
+
+    it('shows the icon tile as a three-circle picture with its label, and forwards its target', () => {
+        const onSelect = jest.fn();
+        const { container } = render(<ThumbnailStrip items={molecule} label="views of this molecule" rGrid={[]} themeKey="dark|glow" onSelect={onSelect} />);
+        const option = screen.getByRole('option', { name: 'All orbitals — open the list' });
+        expect(option.querySelector('canvas')).toBeNull();
+        const icon = option.querySelector('svg.strip-tile-icon') as SVGElement;
+        expect(icon).toHaveAttribute('aria-hidden', 'true');
+        expect(icon.querySelectorAll('circle')).toHaveLength(3);
+        expect(option).toHaveTextContent('All orbitals');
+        fireEvent.click(option);
+        expect(onSelect).toHaveBeenCalledWith({ pick: 'all' });
+        expect(container.querySelectorAll('canvas.thumb-canvas')).toHaveLength(2);
+    });
+
+    // Ruling R23b-3: the handle names what it opens -- here the molecule's views, not "orbitals".
+    it('names its handle for what the strip holds', () => {
+        render(<ThumbnailStrip items={molecule} label="views of this molecule" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()}
+            onCollapsedChange={jest.fn()} handleNoun="views" />);
+        expect(screen.getByRole('button', { name: 'Hide views' })).toHaveTextContent('Hide views');
     });
 });

@@ -14,6 +14,9 @@ import { registerMoleculeUrlKeys } from '../src/molecules/url_keys';
 import { PHONE_LANDSCAPE } from '../src/useMediaQuery';
 import App from '../src/App';
 import { LIBRARY_INDEX, waterMeta } from './molecules/fixtures';
+import { thumbnailService } from '../src/thumbs/ThumbnailService';
+import { setMode } from '../src/store/atomSlice';
+import { clearGridCache } from '../src/molecules/grid_cache';
 
 jest.mock('../src/components/OrbitalViewer', () => ({ __esModule: true, default: () => <div data-testid="orbital-viewer" /> }));
 jest.mock('../src/orbital_visualizer', () => ({}));
@@ -27,11 +30,20 @@ jest.mock('../src/workers/createH2PlusCurveWorker', () => ({
     createH2PlusCurveWorker: jest.fn(() => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null })),
 }));
 jest.mock('../src/workers/createGridMeshWorker', () => ({ createGridMeshWorker: jest.fn() }));
+// Task 15: the strip's density, ESP and orbital tiles need the molecule's density grid, ESP grid and basis. Unless
+// a test asks for them (the strip's own, below) they never land, so no other test sees a late, un-awaited update.
+// A function, not a const arrow: the mock factories are hoisted above this line and call it only later.
+function never(): Promise<never> { return new Promise(() => {}); }
 jest.mock('../src/molecules/loader', () => ({
     ...jest.requireActual('../src/molecules/loader'),
     loadMoleculeIndex: jest.fn(async () => LIBRARY_INDEX),
     loadMoleculeMeta: jest.fn(async () => waterMeta()),
-    loadDensityGrid: jest.fn(),
+    loadDensityGrid: jest.fn(() => never()),
+    loadBasis: jest.fn(() => never()),
+}));
+jest.mock('../src/molecules/esp', () => ({
+    ...jest.requireActual('../src/molecules/esp'),
+    loadEspGrid: jest.fn(() => never()),
 }));
 
 function installMatchMedia(narrow: boolean, landscape = false) {
@@ -770,5 +782,172 @@ describe('Molecules mode', () => {
         act(() => { store.dispatch(selectMolecule({ id: 'h2o' })); store.dispatch(metaFailed({ id: 'h2o', message: 'HTTP 403' })); });
         expect(screen.getByRole('alert')).toHaveTextContent('Could not load “h2o”: HTTP 403');
         expect(document.querySelector('.MuiSnackbar-root')).toBeNull();
+    });
+
+    // Task 15 (spec §9.4 Strip, §12; rulings P6, P7): the molecule's views under the canvas.
+    describe('the strip', () => {
+        // Tiny stand-ins: no worker meshes them here (the thumbnail service is detached), they only have to arrive.
+        const loader = jest.requireMock('../src/molecules/loader') as Record<'loadDensityGrid' | 'loadBasis', jest.Mock>;
+        const esp = jest.requireMock('../src/molecules/esp') as Record<'loadEspGrid', jest.Mock>;
+        const grid = () => ({ shape: [2, 2, 2], origin: [-1, -1, -1], spacing: 2, values: new Float32Array(8) });
+        const basis = JSON.parse(readFileSync(resolve(__dirname, 'fixtures/molecules/h2o/basis.json'), 'utf8'));
+        beforeEach(() => {
+            clearGridCache(); // the other tests' never-landing grids stay out of this one's way
+            loader.loadDensityGrid.mockImplementation(async (meta: { id: string }) => ({ kind: 'grid', id: `density:${meta.id}`, quantity: 'density', ...grid() }));
+            esp.loadEspGrid.mockImplementation(async () => grid());
+            loader.loadBasis.mockImplementation(async (id: string) => ({ ...basis, id }));
+        });
+        afterEach(() => {
+            [loader.loadDensityGrid, esp.loadEspGrid, loader.loadBasis].forEach(mock => mock.mockImplementation(never));
+            clearGridCache();
+        });
+        const STRIP = 'views of this molecule';
+        const strip = () => screen.getByRole('listbox', { name: STRIP });
+        const optionNames = () => within(strip()).getAllByRole('option').map(option => option.getAttribute('aria-label'));
+
+        it('shows the molecule\'s views as a listbox under the canvas, the drawn one selected (desktop)', async () => {
+            const { store, container } = await enterMolecules(false);
+            pickWater(store);
+            await flush(); // the meta, the grids and the basis settle
+            expect(container.querySelector('#canvas-container')!.contains(strip())).toBe(true);
+            expect(optionNames()).toEqual([
+                'Ball and stick structure', 'Space filling structure', 'Electron density surface',
+                'Electrostatic potential on the density surface, red negative to blue positive',
+                'HOMO orbital', 'LUMO orbital', 'All orbitals — open the list',
+            ]);
+            expect(within(strip()).getByRole('option', { name: 'Electron density surface' })).toHaveAttribute('aria-selected', 'true');
+            // Ruling R23b-3: the handle names what it folds away.
+            expect(screen.getByRole('button', { name: 'Hide views' })).toBeInTheDocument();
+        });
+
+        it('draws the orbital a frontier tile names, exactly as the orbital list does', async () => {
+            const { store } = await enterMolecules(false);
+            pickWater(store);
+            await flush();
+            fireEvent.click(within(strip()).getByRole('option', { name: 'HOMO orbital' }));
+            expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 4 });
+            expect(within(strip()).getByRole('option', { name: 'HOMO orbital' })).toHaveAttribute('aria-selected', 'true');
+            fireEvent.click(within(strip()).getByRole('option', { name: /^Electrostatic potential/ }));
+            expect(store.getState().molecule.surface).toEqual({ kind: 'esp' });
+        });
+
+        it('shows the structure alone, in the tile\'s representation, from a structure tile', async () => {
+            const { store } = await enterMolecules(false);
+            pickWater(store);
+            await flush();
+            fireEvent.click(within(strip()).getByRole('option', { name: 'Space filling structure' }));
+            expect(store.getState().molecule).toMatchObject({ surface: { kind: 'none' }, representation: 'space-filling' });
+            expect(within(strip()).getByRole('option', { name: 'Space filling structure' })).toHaveAttribute('aria-selected', 'true');
+            fireEvent.click(within(strip()).getByRole('option', { name: 'Ball and stick structure' }));
+            expect(store.getState().molecule).toMatchObject({ surface: { kind: 'none' }, representation: 'ball-and-stick' });
+        });
+
+        it('opens the orbital list from "All orbitals", on the HOMO, and puts focus on its row', async () => {
+            const { store, container } = await enterMolecules(false);
+            pickWater(store);
+            await flush();
+            fireEvent.click(within(strip()).getByRole('option', { name: 'All orbitals — open the list' }));
+            expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 4 });
+            const list = container.querySelector('.side-panel .molecule-orbital-list') as HTMLElement;
+            expect(list).not.toBeNull();
+            const homoRow = within(list).getByRole('button', { name: /1b1/ });
+            expect(homoRow).toHaveAttribute('aria-pressed', 'true');
+            expect(document.activeElement).toBe(homoRow);
+            // Already showing an orbital: the list opens on it, and the choice is kept.
+            act(() => { store.dispatch(setSurface({ kind: 'mo', index: 2 })); });
+            fireEvent.click(within(strip()).getByRole('option', { name: 'All orbitals — open the list' }));
+            expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 2 });
+            expect(document.activeElement).toBe(within(list).getByRole('button', { name: /1b2/ }));
+        });
+
+        // Ruling T16-tilekey with preflight D9: the orbital tiles' ψ hues get a key of their own only while the
+        // column holds no phase key already -- the density, the ESP map or no surface drawn; never beside an orbital's.
+        it('keys the orbital tiles\' phase colours while the drawn surface is not an orbital', async () => {
+            const { store } = await enterMolecules(false);
+            pickWater(store);
+            await flush();
+            expect(screen.getByLabelText('orbital tile colour key')).toHaveTextContent('Orbital tilesψ > 0ψ < 0');
+            act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
+            expect(screen.queryByLabelText('orbital tile colour key')).toBeNull();
+            expect(screen.getByLabelText('surface colour key')).toBeInTheDocument();
+            act(() => { store.dispatch(setSurface({ kind: 'esp' })); });
+            expect(screen.getByLabelText('orbital tile colour key')).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: 'Hide views' }));
+            expect(screen.queryByLabelText('orbital tile colour key')).toBeNull();
+        });
+
+        // Spec §12, preflight D19 (Review Focus 5's equivalent here): a new molecule cancels the old one's jobs.
+        it('cancels every thumbnail job when the molecule changes', async () => {
+            const { store } = await enterMolecules(false);
+            pickWater(store);
+            await flush();
+            const cancelAll = jest.spyOn(thumbnailService, 'cancelAll');
+            try {
+                act(() => { store.dispatch(selectMolecule({ id: 'nh3' })); });
+                expect(cancelAll).toHaveBeenCalledTimes(1);
+                await flush();
+            } finally {
+                cancelAll.mockRestore();
+            }
+        });
+
+        // As ruling T10-M6 for Bonds: outside Molecules a molecule change (a search result, a restored link) is not
+        // this strip's change, and another mode's waiting tiles are left alone.
+        it('cancels nothing when the molecule changes outside Molecules mode', async () => {
+            const { store } = await enterMolecules(false);
+            pickWater(store);
+            await flush();
+            act(() => { store.dispatch(setMode('atom')); });
+            const cancelAll = jest.spyOn(thumbnailService, 'cancelAll');
+            try {
+                act(() => { store.dispatch(selectMolecule({ id: 'nh3' })); });
+                expect(cancelAll).not.toHaveBeenCalled();
+                await flush();
+            } finally {
+                cancelAll.mockRestore();
+            }
+        });
+
+        // Ruling T10-I1: the strip is a bottom inset zone, so a molecule change must not take it away and bring it
+        // back (the camera would re-fit twice): its tiles wait on their glyphs while the next molecule loads.
+        it('keeps the strip up as glyphs while the next molecule loads, and fills it once it has', async () => {
+            const { store, container } = await enterMolecules(false);
+            pickWater(store);
+            await flush();
+            const before = strip();
+            const loader = jest.requireMock('../src/molecules/loader') as { loadMoleculeMeta: jest.Mock };
+            let land: (meta: ReturnType<typeof waterMeta>) => void = () => {};
+            loader.loadMoleculeMeta.mockImplementationOnce(() => new Promise(resolve => { land = resolve; }));
+            const drawnStructures = () => before.querySelectorAll('canvas.thumb-canvas[data-drawn="true"]').length;
+            expect(drawnStructures()).toBe(2);
+            fireEvent.click(within(container.querySelector('.side-panel') as HTMLElement).getByRole('button', { name: 'Ammonia (NH₃)' }));
+            await flush();
+            expect(store.getState().molecule.meta).toBeNull();
+            expect(strip()).toBe(before);
+            // Every tile on its glyph -- the structure glyphs too, which would draw the molecule being left.
+            expect([...before.querySelectorAll('.strip-tile-glyph')].map(glyph => glyph.textContent)).toEqual([
+                'Ball and stick', 'Space filling', 'Electron density', 'ESP', 'HOMO', 'LUMO',
+            ]);
+            expect(drawnStructures()).toBe(0);
+            await act(async () => { land(waterMeta({ id: 'nh3', name: 'Ammonia', formula: 'NH3' })); await new Promise(r => setTimeout(r, 0)); });
+            await flush();
+            expect(strip()).toBe(before);
+            // The new molecule's structure is drawn at once; its pictures wait for the (here detached) renderer.
+            expect(drawnStructures()).toBe(2);
+        });
+
+        // Spec §9.8: on a phone the strip is the Explore tab's first row, as in every other mode.
+        it('heads the phone\'s Explore tab', async () => {
+            const { store } = await enterMolecules(true);
+            pickWater(store);
+            await flush();
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            const tabpanel = screen.getByRole('tabpanel');
+            const sheetStrip = within(tabpanel).getByRole('listbox', { name: STRIP });
+            expect(sheetStrip.closest('.thumbnail-strip')).toHaveClass('sheet');
+            expect(sheetStrip.compareDocumentPosition(tabpanel.querySelector('.molecule-tile') as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            fireEvent.click(within(sheetStrip).getByRole('option', { name: 'All orbitals — open the list' }));
+            expect(document.activeElement).toBe(within(tabpanel).getByRole('button', { name: /1b1/ }));
+        });
     });
 });

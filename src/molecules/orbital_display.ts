@@ -90,6 +90,34 @@ function lowest(orbitals: MoleculeOrbitalInfo[]): MoleculeOrbitalInfo | null {
 }
 const lowestWithRole = (orbitals: MoleculeOrbitalInfo[], role: string) => lowest(orbitals.filter(o => o.role === role));
 
+/** The roles a frontier orbital can carry (meta.json's `role`), in the order they are shown: occupied, then empty. */
+export const FRONTIER_ROLES = ['HOMO', 'SOMO', 'LUMO', 'LVMO'] as const;
+export type FrontierRole = typeof FRONTIER_ROLES[number];
+
+/**
+ * Preflight D8: every frontier orbital the data names, one per role, in FRONTIER_ROLES order -- each named by
+ * its own role, never relabelled (a SOMO is never called the HOMO). A degenerate set shares its role; its first
+ * member (lowest index) stands for it. An open shell may name both: NO₂'s data has a doubly occupied HOMO (4b2)
+ * below its SOMO (6a1); O₂'s (spin-unrestricted) has SOMOs and no HOMO. Older data names none.
+ */
+export function frontierOrbitals<T extends { index: number; role?: string }>(orbitals: readonly T[]): Array<{ role: FrontierRole; orbital: T }> {
+    return FRONTIER_ROLES.flatMap(role => {
+        const named = orbitals.filter(o => o.role === role);
+        if (!named.length) return [];
+        return [{ role, orbital: named.reduce((a, b) => (b.index < a.index ? b : a)) }];
+    });
+}
+
+/**
+ * Preflight D8: the occupied orbital a view opens on when none is picked yet -- the HOMO, or the SOMO where the
+ * data name no HOMO (an open shell such as O₂). Null when the data name neither (older data); callers that must
+ * show something fall back to their own choice.
+ */
+export function frontierOccupied<T extends { index: number; role?: string }>(orbitals: readonly T[]): T | null {
+    const frontier = frontierOrbitals(orbitals);
+    return (frontier.find(f => f.role === 'HOMO') ?? frontier.find(f => f.role === 'SOMO'))?.orbital ?? null;
+}
+
 /** What follows an orbital's role wherever it is named (the "Showing" line, captions): null for an occupied orbital,
  * a valence canonical virtual that is not the LVMO, or older data, which makes no claim either way (spec §4). */
 export function orbitalTag(o: MoleculeOrbitalInfo): string | null {

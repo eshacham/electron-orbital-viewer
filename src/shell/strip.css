@@ -48,12 +48,20 @@
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 4px;
   text-align: center; font: 600 13px / 1.2 var(--ql-font-sans); color: var(--ql-color-text-2);
 }
+/* Task 15: Molecules' "All orbitals" tile -- three outlined circles in the label's colour (text-2), no science hue. */
+.strip-tile-icon { width: 55%; height: 55%; fill: none; stroke: var(--ql-color-text-2); stroke-width: 1.5; }
 /* Ruling R20d: labels at the body size (13 px, was the 12 px caption). */
 .strip-tile-label {
   height: var(--ql-size-thumb-label); font: 500 var(--ql-type-body-size) / var(--ql-size-thumb-label) var(--ql-font-sans);
   color: var(--ql-color-text-2); white-space: nowrap;
 }
 .strip-tile.selected .strip-tile-label { color: var(--ql-color-text-1); font-weight: 600; }
+/* Task 15: the Molecules strip's labels are words ("Electron density", "Electrostatic potential"): on one line
+   each widened its column to the label and eight tiles ran off the canvas, so they wrap to two centred lines
+   within a column a little wider than the tile, and every label keeps two lines' height (one row of images). */
+.thumbnail-strip.overlay.wrap-labels .strip-tile-label {
+  height: calc(2 * var(--ql-size-thumb-label)); max-width: calc(var(--ql-size-thumb) + 16px); white-space: normal; text-align: center;
+}
 .thumbnail-strip.sheet .strip-list { justify-content: flex-start; }
 /* §4.3 "On a phone, body is 14" (the sheet is the phone's strip, §9.8). A long label ("Whole atom") wraps to
    two centred lines within a 72 px column instead of running past its 56 px tile; every sheet label keeps
