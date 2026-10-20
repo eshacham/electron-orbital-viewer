@@ -1244,9 +1244,11 @@ export interface UpdateOrbitalOptions {
  * Re-frame only when the scale changes, so repeated updates at the same box
  * (another mₗ of the same subshell, or another member of the same Basic
  * Orbitals combination) leave the viewer's chosen angle and zoom alone.
+ * `frameBox` is that scale when the request names one smaller than its
+ * sampling box (FieldRenderRequest.frameBox, ruling T10-mainbox).
  */
-function prepareBoxFraming(context: VisualizerContext, boxRMax: number): boolean {
-    const reframe = context.framedBox !== boxRMax;
+function prepareBoxFraming(context: VisualizerContext, boxRMax: number, frameBox: number = boxRMax): boolean {
+    const reframe = context.framedBox !== frameBox;
     // The box until the mesh lands; then the surface itself (see frameToSurface).
     context.clipExtent = boxRMax;
     updateClipPlane(
@@ -1270,7 +1272,8 @@ function prepareBoxFraming(context: VisualizerContext, boxRMax: number): boolean
 function frameToSurface(
     context: VisualizerContext,
     surfaceRadius: number,
-    boxRMax: number,
+    /** The box the framing is kept for (prepareBoxFraming's key). */
+    frameBox: number,
     reframe: boolean,
     showAxes: boolean
 ): void {
@@ -1289,7 +1292,7 @@ function frameToSurface(
         // larger. The surface is the sphere, with room round it for the
         // axes and their labels.
         frameOrbital(context, (surfaceRadius * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3));
-        context.framedBox = boxRMax;
+        context.framedBox = frameBox;
     }
     if (showAxes) {
         addAxesHelper(context, surfaceRadius * AXES_LENGTH_FACTOR);
@@ -1435,12 +1438,14 @@ export async function updateFieldInScene(
     const startedAt = performance.now();
 
     const boxRMax = Math.max(...request.sources.map(source => source.rMax));
+    // Ruling T10-mainbox: what the camera keeps its framing for, which may be smaller than the sampling box.
+    const frameBox = request.frameBox ?? boxRMax;
 
     return new Promise((resolve, reject) => {
         const worker = createOrbitalWorker();
         context.activeWorker = worker;
 
-        const reframe = prepareBoxFraming(context, boxRMax);
+        const reframe = prepareBoxFraming(context, boxRMax, frameBox);
 
         const cleanup = () => {
             worker.terminate();
@@ -1471,7 +1476,7 @@ export async function updateFieldInScene(
                         showFieldOverlay(context, meshes, request.colors, request.memberLabels);
                     }
                     const surfaceRadius = Math.max(...meshes.map(meshRadius)) || boxRMax;
-                    frameToSurface(context, surfaceRadius, boxRMax, reframe, showAxes);
+                    frameToSurface(context, surfaceRadius, frameBox, reframe, showAxes);
                     console.log(`Visualizer: ${request.label} drawn in ${Math.round(performance.now() - startedAt)} ms`);
                     resolve({ status: 'rendered', isoLevel: meshes[0].isoLevel });
                 } else {

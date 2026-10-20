@@ -1,0 +1,268 @@
+{
+ "id": "ch3oh",
+ "name": "Methanol",
+ "formula": "CH3OH",
+ "atoms": [
+  {
+   "Z": 6,
+   "position": [
+    0.009660412229605316,
+    0.0,
+    -0.00865530469847165
+   ]
+  },
+  {
+   "Z": 8,
+   "position": [
+    2.6943355847112374,
+    0.0,
+    -0.006552700925974334
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    3.2762558632973717,
+    0.0,
+    1.715948232958346
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    -0.5834600463296912,
+    0.0,
+    -1.979443404561795
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    -0.7727859052906624,
+    1.6840794191621495,
+    0.9074832779837879
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    -0.7727859052906624,
+    -1.6840794191621495,
+    0.9074832779837879
+   ]
+  }
+ ],
+ "geometrySource": "B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)",
+ "method": {
+  "density": "B3LYP-D3(BJ)/def2-TZVPD",
+  "energies": "B3LYP-D3(BJ)/def2-TZVPD"
+ },
+ "totalEnergyHartree": -115.78119300682305,
+ "dispersion": {
+  "model": "D3(BJ)",
+  "energyHartree": -0.0031036515346540413,
+  "backend": "pyscf-dispersion 1.5.0"
+ },
+ "dipoleDebye": 1.655669711421508,
+ "dipoleVectorDebye": [
+  -0.9546811846747031,
+  -3.1040959328703028e-15,
+  1.352710622767
+ ],
+ "orbitals": [
+  {
+   "index": 0,
+   "label": "1a'",
+   "energyHartree": -19.131943170533205,
+   "occupation": 2.0
+  },
+  {
+   "index": 1,
+   "label": "2a'",
+   "energyHartree": -10.21508815412771,
+   "occupation": 2.0
+  },
+  {
+   "index": 2,
+   "label": "3a'",
+   "energyHartree": -1.0246349275762565,
+   "occupation": 2.0
+  },
+  {
+   "index": 3,
+   "label": "4a'",
+   "energyHartree": -0.6880372773233014,
+   "occupation": 2.0
+  },
+  {
+   "index": 4,
+   "label": "5a'",
+   "energyHartree": -0.5146023826481491,
+   "occupation": 2.0
+  },
+  {
+   "index": 5,
+   "label": "1a\"",
+   "energyHartree": -0.4453328061469871,
+   "occupation": 2.0
+  },
+  {
+   "index": 6,
+   "label": "6a'",
+   "energyHartree": -0.43226913443108184,
+   "occupation": 2.0
+  },
+  {
+   "index": 7,
+   "label": "7a'",
+   "energyHartree": -0.34511336508269963,
+   "occupation": 2.0
+  },
+  {
+   "index": 8,
+   "label": "2a\"",
+   "energyHartree": -0.2849120045087752,
+   "occupation": 2.0,
+   "role": "HOMO"
+  },
+  {
+   "index": 9,
+   "label": "8a'",
+   "energyHartree": -0.002890819730739084,
+   "occupation": 0.0,
+   "role": "LUMO",
+   "valenceCharacter": 0.4526,
+   "class": "diffuse"
+  },
+  {
+   "index": 10,
+   "label": "9a'",
+   "energyHartree": 0.025620009199119286,
+   "occupation": 0.0,
+   "valenceCharacter": 0.3569,
+   "class": "diffuse"
+  },
+  {
+   "index": 11,
+   "label": "3a\"",
+   "energyHartree": 0.05862948671158117,
+   "occupation": 0.0,
+   "valenceCharacter": 0.1179,
+   "class": "diffuse"
+  },
+  {
+   "index": 12,
+   "label": "10a'",
+   "energyHartree": 0.06079510727030492,
+   "occupation": 0.0,
+   "valenceCharacter": 0.1202,
+   "class": "diffuse"
+  },
+  {
+   "index": 13,
+   "label": "11a'",
+   "energyHartree": 0.08732441551907921,
+   "occupation": 0.0,
+   "valenceCharacter": 0.151,
+   "class": "diffuse"
+  },
+  {
+   "index": 14,
+   "label": "a'",
+   "energyHartree": 0.194000243675241,
+   "occupation": 0.0,
+   "role": "LVMO",
+   "kind": "valence-virtual",
+   "constructed": true,
+   "energyApproximate": true,
+   "note": "constructed from the valence part of the virtual space — not an orbital of this calculation; its energy is an upper estimate (its value within the valence space), typically several eV above this calculation's orbital energies",
+   "valenceCharacter": 1.0,
+   "class": "valence"
+  }
+ ],
+ "grid": {
+  "shape": [
+   96,
+   96,
+   96
+  ],
+  "origin": [
+   -9.776255863297372,
+   -9.776255863297372,
+   -9.776255863297372
+  ],
+  "spacing": 0.20581591291152362
+ },
+ "espGrid": {
+  "shape": [
+   48,
+   48,
+   48
+  ],
+  "origin": [
+   -9.776255863297372,
+   -9.776255863297372,
+   -9.776255863297372
+  ],
+  "spacing": 0.41601088779988815
+ },
+ "espRangeOnSurface": [
+  -0.05273352085186822,
+  0.06338861829550702
+ ],
+ "electronCount": 18,
+ "densityIntegral": 18.00025160908494,
+ "multiplicity": 1,
+ "symmetry": {
+  "pointGroup": "Cs",
+  "labelGroup": "Cs",
+  "labels": "full-group"
+ },
+ "references": [
+  {
+   "quantity": "bond",
+   "value": 1.427,
+   "unit": "Å",
+   "source": "experiment (CCCBDB); plausibility check of the optimised geometry",
+   "tolerance": 0.03,
+   "atoms": [
+    0,
+    1
+   ],
+   "label": "C–O"
+  },
+  {
+   "quantity": "bond",
+   "value": 0.956,
+   "unit": "Å",
+   "source": "experiment (CCCBDB); plausibility check of the optimised geometry",
+   "tolerance": 0.03,
+   "atoms": [
+    1,
+    2
+   ],
+   "label": "O–H"
+  },
+  {
+   "quantity": "dipole",
+   "value": 1.7,
+   "unit": "D",
+   "source": "CRC Handbook, via CCCBDB",
+   "tolerance": 0.17
+  }
+ ],
+ "generator": {
+  "pyscf": "2.8.0",
+  "numpy": "2.3.5",
+  "scipy": "1.18.1",
+  "python": "3.12.15",
+  "xc": "B3LYP-D3(BJ) (PySCF >= 2.3: VWN-RPA)",
+  "script": "tools/molecules/build_library.py",
+  "commit": "8982f6231f84288ed43430a9b621e14d2a8f5477",
+  "dataVersion": "v3"
+ },
+ "geometryOptimisation": {
+  "converged": true,
+  "maxGradient": 2.033e-05
+ }
+}

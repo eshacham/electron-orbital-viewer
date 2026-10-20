@@ -1,15 +1,16 @@
 #!/usr/bin/env node
-// Runs validate_tile_boxes.ts (rulings T10-core / T10-core-I2): every Bonds molecule × scan point
-// × {90, 95, 99} %, no strip tile cut by its fitted box -- and (Task 15) every library molecule's
-// frontier tiles, the Molecules strip's. First fetches every scan point's basis.json, and every
+// Runs validate_tile_boxes.ts (rulings T10-core / T10-core-I2, T10-mainbox): every Bonds molecule × scan
+// point × orbital × {90, 95, 99} % and every library molecule × orbital × fraction, no main-view surface
+// cut by its box (Task 16c); no strip tile cut by its box -- every Bonds orbital and (Task 15) every library
+// molecule's frontier tiles. First fetches every scan point's basis.json, and every
 // library molecule's meta.json and basis.json, through its own Vite (the dev server serves the molecule data, from
 // tools/molecules/out when it exists locally, else from the published site) into --data, once;
-// then bundles the sweep with the repo's esbuild and runs it with node (~70 s). Foreground only:
+// then bundles the sweep with the repo's esbuild and runs it with node. Foreground only:
 // Vite is started and stopped inside this run, and never on the owner's ports.
-//   node tools/thumbs/validate_tile_boxes.mjs [--data /tmp/eov-tile-box-data] [--port 5411] [--only c2]
+//   node tools/thumbs/validate_tile_boxes.mjs [--data /tmp/eov-tile-box-data] [--port 5411] [--only c2] [--jobs N] [--skip-main] [--skip-tiles]
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MOLECULE_DATA_VERSION } from '../../src/molecules/data_version.ts';
@@ -50,4 +51,7 @@ if (!existsSync(join(data, 'complete.json')) || !existsSync(join(data, 'library'
     vite.kill('SIGTERM');
   }
 }
-process.exit(run(only ? ['--only', only] : []) ?? 2);
+const flags = ['--skip-main', '--skip-tiles'].filter(flag => process.argv.includes(flag));
+// The main-view sweep samples every orbital at up to ~145³ three times over: about 25 min on one thread.
+const jobs = arg('jobs', String(Math.max(1, availableParallelism() - 2)));
+process.exit(run([...(only ? ['--only', only] : []), '--jobs', jobs, ...flags]) ?? 2);

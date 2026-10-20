@@ -29,6 +29,9 @@ import type { LibraryMoleculeMeta } from '../../src/molecules/library_types';
 import type { MoleculeBasis } from '../../src/molecules/types';
 import { makeStore, baseContext, readText, exportHandle, octahedron } from './fixtures';
 import { waterMeta } from '../molecules/fixtures';
+import { planMoleculeRender } from '../../src/molecules/render_plan';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { DIFFUSE_NOTE, LVMO_NOTE } from '../../src/molecules/orbital_display';
 
 const OZONE_CAVEAT = 'Ozone has strong multireference character: single-reference B3LYP overestimates its dipole moment.';
@@ -463,6 +466,25 @@ describe('cube', () => {
         expect(job.resolution).toBe(95);
         expect(job.atoms).toHaveLength(3);
         expect(job.title).toContain('MO 1b1 (HOMO)');
+    });
+
+    // Task 16c (ruling T10-mainbox): an orbital that reaches past the density's box is drawn in a grown box at a
+    // finer resolution; the cube is "on the grid as drawn", so it is that grid, not the density's box at 95.
+    it('MO: the grid the view drew, where the molecule\'s orbitals grow the box (CH₃OH\'s LUMO)', async () => {
+        const fixture = (file: string) => JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules/ch3oh', file), 'utf8'));
+        const meta: LibraryMoleculeMeta = fixture('meta.json');
+        const basis: MoleculeBasis = { ...fixture('basis.json'), id: meta.id };
+        (loadBasis as jest.Mock).mockResolvedValue(basis);
+        const lumo = meta.orbitals.find(o => o.role === 'LUMO')!.index;
+        const store = drawnStore({ kind: 'mo', index: lumo }, meta);
+        const job = await moleculeCubeJob(store.getState());
+        if (job.type !== 'fieldCube') throw new Error('expected a field cube');
+        const drawn = planMoleculeRender(meta, { kind: 'mo', index: lumo }, store.getState().orbital.enclosedFraction, basis);
+        if (drawn.kind !== 'mo') throw new Error('expected an orbital plan');
+        expect(job.source).toEqual(drawn.request.sources[0]);
+        expect(job.resolution).toBe(drawn.request.resolution);
+        expect(job.source.rMax).toBeGreaterThan(Math.abs(meta.grid.origin[0]));
+        expect(job.resolution).toBeGreaterThan(95);
     });
 
     // D11: the cube description named only the role, never the tag -- a constructed LVMO's exported grid read

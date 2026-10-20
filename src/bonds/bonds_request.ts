@@ -3,6 +3,7 @@ import type { BondsState, BondsView } from '../store/bondsSlice';
 import { BasisOrbital, MoleculeBasis, OrbitalSpin } from '../molecules/types';
 import { H2PLUS_LABELS, H2PlusState, h2plusSource } from './h2plus';
 import { BONDS_RESOLUTION, DENSITY_SURFACE_HEX, MOLECULE_PADDING, pointId, snapH2PlusR, systemFormula } from './systems';
+import { orbitalViewBox, viewResolution } from '../molecules/view_box';
 
 export { DENSITY_SURFACE_HEX };
 
@@ -72,12 +73,21 @@ export function bondsFieldRequest(
     const bases = [basis];
     const orbital = findOrbital(basis, state.view);
     if (orbital) {
+        // Ruling T10-mainbox: every orbital of this point is sampled in one box that holds the widest surface any
+        // of them has at this fraction (view_box.ts), at a resolution that keeps the molecule box's step, and
+        // framed for the molecule's box -- so neither another orbital nor the density moves the camera.
+        const box = orbitalViewBox(basis, basis.orbitals.map(o => o.index), enclosedFraction, rMax);
         const source: AnalyticFieldSource = {
-            kind: 'analytic', id: `gaussianMO:${basis.id}:${orbital.index}`, rMax,
+            kind: 'analytic', id: `gaussianMO:${basis.id}:${orbital.index}`, rMax: box,
             recipe: { type: 'gaussianMO', moleculeId: basis.id, index: orbital.index },
         };
         const label = `${formula} ${orbital.label}${SPIN_SUFFIX[orbital.spin]} ${where}`;
-        return { note: null, request: singleSourceRequest(source, SINGLE_SOURCE_COLOR, label, enclosedFraction, { bases }) };
+        return {
+            note: null,
+            request: singleSourceRequest(source, SINGLE_SOURCE_COLOR, label, enclosedFraction, {
+                bases, resolution: viewResolution(BONDS_RESOLUTION, rMax, box), frameBox: rMax,
+            }),
+        };
     }
     // Review Focus 2: an orbital this geometry does not keep (or a label from
     // another molecule) is never a blank or stale picture -- the density is

@@ -34,7 +34,7 @@ import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../molecules/typ
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { getDensityGrid, getEspGrid } from '../molecules/grid_cache';
 import { loadBasis } from '../molecules/loader';
-import { MOLECULE_MO_RESOLUTION, moleculeOrbitalSource } from '../molecules/render_plan';
+import { planMoleculeRender } from '../molecules/render_plan';
 import {
     CONSTRUCTED_NOTE, DIFFUSE_NOTE, HARTREE_TO_EV as ORBITAL_HARTREE_TO_EV, LVMO_NOTE, VALENCE_THRESHOLD, orbitalNoun,
 } from '../molecules/orbital_display';
@@ -748,8 +748,12 @@ export async function moleculeCubeJob(state: RootState): Promise<CubeJob> {
     // Final review M5: a constructed LVMO is not called a "molecular orbital" right after being said not to be one.
     const role = surface.role ? ` (${surface.role})` : '';
     const tag = surface.tag ? `${surface.label} is ${surface.tag}; ` : '';
+    // The grid the view drew it on (ruling T10-mainbox: its box and resolution depend on the enclosed fraction).
+    const plan = planMoleculeRender(meta, { kind: 'mo', index: surface.mo }, drawn.enclosedFraction ?? state.orbital.enclosedFraction, basis);
+    if (plan.kind !== 'mo') throw new Error('Molecule data is not available for this export yet.');
+    const [source] = plan.request.sources;
     return {
-        type: 'fieldCube', source: moleculeOrbitalSource(meta, surface.mo), resolution: MOLECULE_MO_RESOLUTION, atoms, bases: [basis], title,
+        type: 'fieldCube', source, resolution: plan.request.resolution, atoms, bases: [basis], title,
         description: `psi(x,y,z), real, bohr^-3/2, ${surface.label}${role} ${orbitalNoun(surface)}, `
             + `on the grid as drawn; ${tag}${method}; lengths in bohr`,
     };

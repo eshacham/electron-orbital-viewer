@@ -19,8 +19,9 @@ import type { FieldRenderRequest } from '../field_source';
  * reaches as far as its most diffuse primitive that matters (normalised
  * weight over PRIMITIVE_SHARE of the largest), out to the radius holding
  * 99.99 % of that primitive's own density. Nothing here evaluates the
- * orbital: it is cheap enough for a render, and the main view (which meshes
- * the whole molecule's box) is not involved. tools/thumbs/validate_tile_boxes.mjs
+ * orbital: it is cheap enough for a render. The main view's own box (ruling
+ * T10-mainbox) is view_box.ts's, which bounds its probe with originReach
+ * below. tools/thumbs/validate_tile_boxes.mjs
  * proves the rule over every Bonds molecule and scan point at 90/95/99 %.
  */
 export const CENTRE_SHARE = 5e-2;
@@ -67,12 +68,8 @@ function shellReach(exponents: number[], coefficients: number[], l: number): num
     return reach;
 }
 
-/**
- * The box a tile meshes `basis.orbitals[index]` in. Never larger than
- * `limit` (the molecule's own box, centred on the origin): where the fitted
- * cube would not be smaller, that box is returned unchanged.
- */
-export function orbitalBox(basis: MoleculeBasis, index: number, limit: number): OrbitalBox {
+/** Each shell's share of `basis.orbitals[index]` (Σ c² over its AOs), and their total. */
+function shellShares(basis: MoleculeBasis, index: number): { shares: number[]; total: number } {
     const coefficients = basis.orbitals[index].coefficients;
     const shares: number[] = [];
     let offset = 0;
@@ -83,7 +80,16 @@ export function orbitalBox(basis: MoleculeBasis, index: number, limit: number): 
         shares.push(share);
         offset += width;
     }
-    const total = shares.reduce((sum, share) => sum + share, 0);
+    return { shares, total: shares.reduce((sum, share) => sum + share, 0) };
+}
+
+/**
+ * The box a tile meshes `basis.orbitals[index]` in. Never larger than
+ * `limit` (the main view's box, centred on the origin): where the fitted
+ * cube would not be smaller, that box is returned unchanged.
+ */
+export function orbitalBox(basis: MoleculeBasis, index: number, limit: number): OrbitalBox {
+    const { shares, total } = shellShares(basis, index);
     // Centre: the middle of the atoms' spheres for the shells that carry the orbital.
     const low = [Infinity, Infinity, Infinity];
     const high = [-Infinity, -Infinity, -Infinity];
@@ -109,6 +115,26 @@ export function orbitalBox(basis: MoleculeBasis, index: number, limit: number): 
 }
 
 /**
+ * Half-width, a₀, of the origin-centred cube round every shell carrying at
+ * least REACH_SHARE of `basis.orbitals[index]`, each out to its 99.99 %
+ * radius: orbitalBox's reach, about the origin the main view's sampling box
+ * is centred on (ruling T10-mainbox, view_box.ts). Evaluates nothing; it is
+ * loose for diffuse orbitals, which is why the main view only uses it to
+ * bound where a probe looks.
+ */
+export function originReach(basis: MoleculeBasis, index: number): number {
+    const { shares, total } = shellShares(basis, index);
+    let halfWidth = 0;
+    basis.shells.forEach((shell, s) => {
+        if (shares[s] < REACH_SHARE * total) return;
+        const atom = basis.atoms[shell.atom];
+        const reach = shellReach(shell.exponents, shell.coefficients, shell.l);
+        for (let axis = 0; axis < 3; axis++) halfWidth = Math.max(halfWidth, Math.abs(atom[axis]) + reach);
+    });
+    return halfWidth;
+}
+
+/**
  * A copy of `basis` moved by −centre, named for it: the same orbitals, with
  * `centre` at the origin. The sampling cube is always centred on the origin
  * (orbital_mesh.ts), so this is how a tile's fitted box is put on its orbital.
@@ -126,13 +152,14 @@ export function basisCentredOn(basis: MoleculeBasis, centre: [number, number, nu
  * Molecules strip's) is meshed in a box fitted to its own orbital, not the
  * whole molecule's -- at 40³ a 1s core orbital in the molecule's box is a
  * voxel speck. `field` is the main view's own request for that orbital (one
- * gaussianMO source, its rMax the molecule's box). The sampling box is always
+ * gaussianMO source, its rMax the main view's box: the molecule's, grown
+ * where an orbital reaches past it, ruling T10-mainbox). The sampling box is always
  * centred on the origin, so the tile is given a copy of the basis moved by
  * −centre (and named for it), shared through `moved` by tiles with the same
  * centre: the same orbital, sitting at the centre of its box. The tile frames
  * its own mesh (render_thumbnail.ts), so where the orbital sits does not
  * show. The main view's request is not touched; anything but one gaussianMO
- * source, or a box no smaller than the molecule's, is returned as it is.
+ * source, or a box no smaller than the main view's, is returned as it is.
  */
 export function fitToOrbital(field: FieldRenderRequest, basis: MoleculeBasis, moved: Map<string, MoleculeBasis>): FieldRenderRequest {
     const [source] = field.sources;

@@ -100,6 +100,30 @@ describe('updateFieldInScene', () => {
         expect(context.currentCaps).not.toBeNull();
     });
 
+    // Ruling T10-mainbox (Task 16c): a molecule's orbital is sampled in a box grown past the molecule's, but the
+    // camera keeps the user's zoom for as long as the request's frameBox (the molecule's box) is unchanged.
+    it('re-frames when the frame box changes, not when only the sampling box does', async () => {
+        const context = buildContext();
+        const land = async (rMax: number, frameBox?: number) => {
+            const worker = fakeWorker();
+            (createOrbitalWorker as jest.Mock).mockReturnValue(worker);
+            const request: FieldRenderRequest = { ...single, sources: [{ ...single.sources[0], rMax }], ...(frameBox ? { frameBox } : {}) };
+            const pending = updateFieldInScene(context, request);
+            worker.onmessage!({ data: { type: 'fieldsSuccess', meshes: [fakeMesh(0)] } });
+            await pending;
+        };
+        await land(8, 8);
+        expect(context.framedBox).toBe(8);
+        const zoomed = new THREE.Vector3(0, 3, 40);
+        context.camera.position.copy(zoomed); // the user zooms out
+        await land(9.6, 8); // the same molecule box, a grown sampling box: the zoom stays
+        expect(context.framedBox).toBe(8);
+        expect(context.camera.position).toEqual(zoomed);
+        await land(9.6); // no frame box: keyed on the sampling box, as before -- it changed, so the camera re-frames
+        expect(context.framedBox).toBe(9.6);
+        expect(context.camera.position).not.toEqual(zoomed);
+    });
+
     it('drops a result a newer request has superseded', async () => {
         const first = fakeWorker();
         const second = fakeWorker();

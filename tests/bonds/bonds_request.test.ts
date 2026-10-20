@@ -71,6 +71,11 @@ describe('bondsFieldRequest', () => {
         expect(request.densityIsoValue).toBeUndefined();
         expect(request.bases).toEqual([basis]);
         expect(request.label).toBe('N₂ 1πg* at R = 2.07 a₀');
+        // Task 16c (ruling T10-mainbox): framed for the molecule's box; this compact one-shell basis reaches
+        // nowhere past it, so the sampling box and resolution are the molecule's as before.
+        expect(request.frameBox).toBeCloseTo(1.037 + 6.5, 12);
+        expect(request.sources[0].rMax).toBeCloseTo(1.037 + 6.5, 12);
+        expect(request.resolution).toBe(96);
     });
 
     it('names the spin of an unrestricted orbital', () => {

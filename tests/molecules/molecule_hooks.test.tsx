@@ -80,6 +80,9 @@ describe('planMoleculeRender', () => {
         expect(mo).toEqual({ kind: 'mo', label: 'Computing 1b1…', request: {
             sources: [{ kind: 'analytic', id: 'gaussianMO:h2o:4', recipe: { type: 'gaussianMO', moleculeId: 'h2o', index: 4 }, rMax: 6.43 }],
             colors: ['#ffffff'], memberLabels: ['1b1'], resolution: 95, enclosedFraction: 0.8, label: 'Computing 1b1…',
+            // Task 16c (ruling T10-mainbox): an MO is framed for the density's box; this stub basis carries no
+            // orbital, so nothing grows the sampling box past it.
+            frameBox: 6.43,
             bases: [waterBasis] } });
     });
     // Ruling P8: show=none plans no surface at all -- the mesh is cleared.

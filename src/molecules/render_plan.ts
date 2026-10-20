@@ -4,6 +4,7 @@ import { ESP_SURFACE_DENSITY } from './esp_color';
 import type { LibraryMoleculeMeta } from './library_types';
 import type { MoleculeBasis } from './types';
 import type { MoleculeSurface } from '../store/moleculeSlice';
+import { orbitalViewBox, viewResolution } from './view_box';
 
 /** Spec §4.2's budget case: one MO on a 96³ grid. */
 export const MOLECULE_MO_RESOLUTION = 95;
@@ -24,9 +25,12 @@ export type MoleculeRenderPlan =
 /** The density grid is a centred cube (Phase 1's grid convention), so its half-width is one origin coordinate. */
 export const gridHalfWidth = (meta: LibraryMoleculeMeta) => Math.abs(meta.grid.origin[0]);
 
-/** An MO is drawn in the density's own box, so switching between them keeps the camera. */
-export function moleculeOrbitalSource(meta: LibraryMoleculeMeta, index: number): AnalyticFieldSource {
-    return { kind: 'analytic', id: `gaussianMO:${meta.id}:${index}`, recipe: { type: 'gaussianMO', moleculeId: meta.id, index }, rMax: gridHalfWidth(meta) };
+/**
+ * An MO is sampled in the density's own box, grown where the molecule's orbitals reach past it (ruling
+ * T10-mainbox, `rMax`), and framed for the density's box, so switching between them keeps the camera.
+ */
+function moleculeOrbitalSource(meta: LibraryMoleculeMeta, index: number, rMax: number): AnalyticFieldSource {
+    return { kind: 'analytic', id: `gaussianMO:${meta.id}:${index}`, recipe: { type: 'gaussianMO', moleculeId: meta.id, index }, rMax };
 }
 
 /**
@@ -42,14 +46,20 @@ export function planMoleculeRender(
         const orbital = meta.orbitals.find(o => o.index === surface.index);
         const name = orbital?.label ?? `orbital ${surface.index}`;
         const label = `Computing ${name}…`;
+        // Ruling T10-mainbox: one box for every orbital in the list at this fraction, holding the widest surface
+        // (view_box.ts), at a resolution that keeps the density box's step. It needs the basis; a plan read
+        // only for its label keeps the density's box.
+        const densityBox = gridHalfWidth(meta);
+        const box = basis ? orbitalViewBox(basis, meta.orbitals.map(o => o.index), enclosedFraction, densityBox) : densityBox;
         return {
             kind: 'mo', label,
             request: {
                 // The member is named for what it is, as Bonds names its
                 // orbitals (bonds_request.ts), never the busy text: an
                 // exported solid or a colour key must not read "Computing…".
-                sources: [moleculeOrbitalSource(meta, surface.index)], colors: ['#ffffff'], memberLabels: [name],
-                resolution: MOLECULE_MO_RESOLUTION, enclosedFraction, label,
+                sources: [moleculeOrbitalSource(meta, surface.index, box)], colors: ['#ffffff'], memberLabels: [name],
+                resolution: viewResolution(MOLECULE_MO_RESOLUTION, densityBox, box), enclosedFraction, label,
+                frameBox: densityBox,
                 ...(basis ? { bases: [basis] } : {}),
             },
         };

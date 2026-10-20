@@ -122,6 +122,15 @@ export interface FieldRenderRequest {
      * fraction. 'gaussianDensity' sources only; see generateIsoValueMesh for why.
      */
     densityIsoValue?: number;
+    /**
+     * The box, a₀, the camera keeps its framing for: it re-frames only when
+     * this changes (default: the largest source's rMax). Ruling T10-mainbox:
+     * a molecule's orbital is sampled in a box grown to hold its surface,
+     * but framed for the molecule's own box, as its density is -- so moving
+     * between the density and an orbital, or changing the enclosed
+     * fraction, keeps the user's zoom as it did before the box grew.
+     */
+    frameBox?: number;
 }
 
 /**
