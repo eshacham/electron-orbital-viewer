@@ -13,13 +13,14 @@
 //                    no Cognito settings, so there is no session to inject beyond that.
 //   --jobs-stub      every /api/... request the page makes is answered from tests/jobs/fixtures/api (the recorded
 //                    responses tests/jobs/api_fixtures.ts reads) or aborted and reported as an error -- a submit
-//                    (POST /v1/jobs) always is. Vite's /api proxy is pointed at a closed port meanwhile, so nothing
-//                    can reach a real server even past the stub. metrics.api counts what was seen, answered, refused.
+//                    (POST /v1/jobs) always is. metrics.api counts what was seen, answered, refused.
+//   Every run (Task 16d): Vite's /api proxy points at a closed port and has no AWS route, so nothing -- stubbed or
+//                    not -- can reach a real job server; without --jobs-stub the page's /api requests simply fail.
 //   --click/--type/--press/--scroll  scripted steps, in the order given, after the scene settles and before the
 //                    shot: click the one control with that accessible name (or that exact text), type into the
 //                    focused text field, press a key, scroll an element with that text into view.
 //   Guards (fix round 1, T16-M3): --owner-session and every scripted step need --jobs-stub (without it /api
-//   proxies to a real server). Nothing a step does may send a job: a click is refused when the name asked for,
+//   has no answer at all). Nothing a step does may send a job: a click is refused when the name asked for,
 //   or the control it actually lands on, reads Approve…/Run on…/Retry on…/Submit…; --press takes only keys that
 //   cannot activate a control (Escape, Tab, Shift+Tab, arrows, Home, End, PageUp, PageDown -- never Enter or
 //   Space); --type types only into a focused text field and never a line break. And the stub aborts POST
@@ -105,7 +106,7 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 // Fix round 1 (T16-M3): steps and the owner session only ever run against the stub.
 if ((ownerSession || steps.length) && !jobsStub) {
-  throw new Error('--owner-session and --click/--type/--press/--scroll need --jobs-stub: without it /api reaches a real job server');
+  throw new Error('--owner-session and --click/--type/--press/--scroll need --jobs-stub: without it /api has no answer');
 }
 // The check stops at the quote: nothing that would send a job is ever activated, even stubbed. "Already
 // computed — open it" / "Already running — follow it" only open or follow a job, so they are allowed.
@@ -206,10 +207,14 @@ async function runSteps(page) {
   }
 }
 
+// Task 16d item 15: in EVERY run -- stubbed or not -- Vite's own /api proxy points at a closed port (discard, 9)
+// and has no AWS route. Only --jobs-stub answers /api (in the browser); a plain shot's /api requests fail at the
+// proxy, so no run of this tool can ever reach a job server (never the owner's 8787) or the AWS API.
+const DEAD_API = 'http://127.0.0.1:9';
+const VITE_ENV = { ...process.env, JOBS_LOCAL_API_URL: DEAD_API, JOBS_AWS_API_URL: '' };
+
 function startVite() {
-  // With the stub, Vite's own /api proxy points at a closed port (discard, 9) and has no AWS route: nothing that
-  // somehow got past the browser-side stub could reach a job server (never the owner's 8787).
-  const env = jobsStub ? { ...process.env, JOBS_LOCAL_API_URL: 'http://127.0.0.1:9', JOBS_AWS_API_URL: '' } : process.env;
+  const env = VITE_ENV;
   const vite = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(port), '--strictPort', '--clearScreen', 'false'],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const ready = new Promise((ok, fail) => {
