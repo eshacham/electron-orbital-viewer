@@ -5,7 +5,7 @@ import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeBasis } from '../molecules/types';
 import type { MoleculeSurface, Representation } from '../store/moleculeSlice';
 import { fitToOrbital } from '../molecules/orbital_box';
-import { frontierOrbitals } from '../molecules/orbital_display';
+import { CONSTRUCTED_LABEL, frontierOrbitals, isConstructed } from '../molecules/orbital_display';
 import { moleculeGridRequest, planMoleculeRender } from '../molecules/render_plan';
 import { spaceFillingUnavailableReason } from '../molecules/vdw_radii';
 import { MO_THUMB_RESOLUTION, type StripItem, type StripThumb } from './strip_items';
@@ -124,7 +124,8 @@ export function moleculeStripItems(args: MoleculeStripArgs): MoleculeStripItem[]
                 };
             }
             // Ruling T16-optname: "<label> orbital"; preflight D8: the label is the orbital's own role, never relabelled.
-            add(`mo-${role}`, role, `${role} orbital`, target, thumb);
+            // Task 16d item 6 (T15-M3): a constructed orbital's name says so, in the words of the list's ◇ mark.
+            add(`mo-${role}`, role, isConstructed(orbital) ? `${role} orbital (${CONSTRUCTED_LABEL})` : `${role} orbital`, target, thumb);
         }
     }
 

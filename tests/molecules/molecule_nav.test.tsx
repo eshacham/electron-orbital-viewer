@@ -214,6 +214,8 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(within(lvmo).getByText('upper est.')).toHaveAttribute('aria-hidden', 'true');
         expect(screen.getByRole('button', { name: /0\.190 Ha \(5\.17 eV\) upper estimate LVMO/ })).toBe(lvmo);
         expect(within(lvmo).getByRole('img', { name: 'constructed: not an orbital of this calculation' })).toHaveTextContent('◇');
+        // Task 16d item 6 (T15-M3): the row's own name says it is constructed, as the strip tile's does.
+        expect(lvmo).toHaveAccessibleName(expect.stringContaining('constructed: not an orbital of this calculation'));
         expect(container.textContent).not.toContain('≈');
         expect(container.textContent).toContain(`◇ LVMO ${CONSTRUCTED_NOTE}.`);
         // Ruling LVMO-wording: not every LVMO is antibonding (BF3's is boron's empty 2p).

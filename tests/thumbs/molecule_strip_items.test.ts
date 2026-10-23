@@ -62,7 +62,17 @@ describe('moleculeStripItems (spec §9.4 Strip, §12; rulings P5, P6, P7)', () =
         expect(items.map(item => item.label)).toEqual([
             'Ball and stick', 'Space filling', 'Electron density', 'Electrostatic potential', 'HOMO', 'LUMO', 'LVMO', 'All orbitals',
         ]);
-        expect(byLabel(items, 'LVMO')).toMatchObject({ spoken: 'LVMO orbital', target: { surface: { kind: 'mo', index: 10 } } });
+        // Task 16d item 6 (T15-M3): the visible label stays "LVMO"; the spoken name says what the list's ◇ mark says.
+        expect(byLabel(items, 'LVMO')).toMatchObject({
+            spoken: 'LVMO orbital (constructed: not an orbital of this calculation)', target: { surface: { kind: 'mo', index: 10 } },
+        });
+    });
+
+    // Task 16d item 6 (T15-M3): only a constructed orbital's name carries the caveat; one of the calculation's own does not.
+    it('says "constructed" only of a constructed LVMO', () => {
+        const own = { ...h2oMeta, orbitals: h2oMeta.orbitals.map(({ constructed: _c, kind: _k, ...o }) => o) } as LibraryMoleculeMeta;
+        expect(byLabel(moleculeStripItems(args({ meta: own })), 'LVMO').spoken).toBe('LVMO orbital');
+        expect(byLabel(moleculeStripItems(args({ meta: h2oMeta })), 'HOMO').spoken).toBe('HOMO orbital');
     });
 
     // Preflight D8: an open shell's tiles are named by their roles -- NO₂'s data name a HOMO and a SOMO.
