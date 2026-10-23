@@ -13,7 +13,7 @@ import { loadBasis } from './loader';
 import { ESP_LIMIT_HARTREE, espVertexColors } from './esp_color';
 import { buildBallAndStick, buildSpaceFilling, detectBonds, overlayExtent, pickMoleculePart } from './ball_and_stick';
 import { dipoleArrow } from './dipole';
-import { gridHalfWidth, moleculeGridRequest, planMoleculeRender } from './render_plan';
+import { gridHalfWidth, moleculeCentre, moleculeGridRequest, planMoleculeRender } from './render_plan';
 import { canonicalToBohr } from '../jobs/structure_projection';
 import type { CanonicalAtom } from '../jobs/api_types';
 import type { MoleculeAtom } from './library_types';
@@ -89,8 +89,10 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
         // arrow turned on) widens the frame to stay whole; a smaller one never zooms in (ruling T13-I2).
         const framed = framedStructureRef.current;
         if (surfaceRef.current.kind === 'none' && framed !== null) {
-            const extent = overlayExtent(group);
-            if (extent > framed) { frameStructure(context, extent); framedStructureRef.current = extent; }
+            // Task 16d: measured and framed about the molecule's own centre, as every Molecules view is.
+            const centre = moleculeCentre(meta);
+            const extent = overlayExtent(group, centre);
+            if (extent > framed) { frameStructure(context, extent, centre); framedStructureRef.current = extent; }
         }
     }, [contextRef, active, meta, representation, showDipole, previewAtoms]);
 
@@ -121,8 +123,9 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
             // above, has already built it (a link may open straight on it).
             cancelPendingRender(context);
             clearFieldMesh(context);
-            const extent = overlayRef.current ? overlayExtent(overlayRef.current) : 0;
-            frameStructure(context, extent);
+            const centre = moleculeCentre(meta);
+            const extent = overlayRef.current ? overlayExtent(overlayRef.current, centre) : 0;
+            frameStructure(context, extent, centre);
             framedStructureRef.current = extent;
             return;
         }
@@ -163,7 +166,8 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
                     if (!current()) return;
                     esp = espVertexColors(meshData.positions, espGrid, ESP_LIMIT_HARTREE);
                 }
-                presentFieldMesh(context, meshData, { vertexColors: esp?.colors, boxRMax: gridHalfWidth(meta) });
+                // Task 16d: framed, and turned, about the molecule's own centre (glycine's atoms sit off the origin).
+                presentFieldMesh(context, meshData, { vertexColors: esp?.colors, boxRMax: gridHalfWidth(meta), frameCentre: moleculeCentre(meta) });
                 landed = true;
                 dispatch(renderFinished({ isoLevel: meshData.isoLevel, espRange: esp ? [esp.min, esp.max] : undefined, drawn }));
             } catch (error) {

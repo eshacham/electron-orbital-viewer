@@ -88,6 +88,12 @@ export interface VisualizerContext {
      */
     framedBox?: number;
     /**
+     * Task 16d: the point the camera was framed about and turns about -- a library molecule's own centre
+     * (Molecules), whose atoms need not sit round the origin (glycine's N is at it, its far O 8.3 a₀ out).
+     * Absent means the origin, as every other mode frames. Reset View re-frames about it.
+     */
+    framedCentre?: [number, number, number];
+    /**
      * CSS pixels of the canvas covered by panels, per edge. The camera
      * centres the scene in what is left and fits it to that area, so the
      * viewport frame's overlays or the phone's sheet do not sit on the atom.
@@ -692,7 +698,9 @@ export function frameOrbital(
      * Reset View (also P17: it now faces an active cut, not just the plain
      * canonical angle), and picking a new element (see App.tsx).
      */
-    restoreDefaultDirection = false
+    restoreDefaultDirection = false,
+    /** Task 16d: the point to frame and turn about (Molecules: the molecule's own centre); the origin when absent. */
+    centre?: [number, number, number],
 ) {
     if (!context || context.isDisposed) return;
 
@@ -714,14 +722,15 @@ export function frameOrbital(
     if (direction.lengthSq() === 0) direction.set(0, 0, 1);
     direction.normalize();
 
-    controls.target.set(0, 0, 0);
-    camera.position.copy(direction.multiplyScalar(distance));
+    controls.target.set(...(centre ?? [0, 0, 0]));
+    camera.position.copy(controls.target).add(direction.multiplyScalar(distance));
     camera.near = Math.max(0.01, distance / 1000);
     camera.far = distance * 10;
     camera.updateProjectionMatrix();
     controls.update();
 
     context.framedRMax = rMax;
+    context.framedCentre = centre;
 }
 
 /**
@@ -996,6 +1005,7 @@ function placeShellFadeCamera(context: VisualizerContext, distance: number): voi
     direction.normalize();
 
     controls.target.set(0, 0, 0);
+    context.framedCentre = undefined;
     camera.position.copy(direction.multiplyScalar(distance));
     camera.near = Math.max(0.01, distance / 1000);
     camera.far = distance * 10;
@@ -1275,7 +1285,12 @@ function frameToSurface(
     /** The box the framing is kept for (prepareBoxFraming's key). */
     frameBox: number,
     reframe: boolean,
-    showAxes: boolean
+    showAxes: boolean,
+    /**
+     * Task 16d: frame about this point (Molecules: the molecule's own centre), fitting the surface's reach from it,
+     * not from the origin. The cut and the axes stay keyed on the reach from the origin, where they sit.
+     */
+    framing?: { centre: [number, number, number]; radius: number },
 ): void {
     // The cut position is a fraction of the surface drawn, so the slider
     // spans exactly the orbital (see clipExtent).
@@ -1291,7 +1306,7 @@ function frameToSurface(
         // frameOrbital fits a box of this half-width, i.e. a sphere √3
         // larger. The surface is the sphere, with room round it for the
         // axes and their labels.
-        frameOrbital(context, (surfaceRadius * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3));
+        frameOrbital(context, ((framing?.radius ?? surfaceRadius) * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3), false, framing?.centre);
         context.framedBox = frameBox;
     }
     if (showAxes) {
@@ -1475,8 +1490,10 @@ export async function updateFieldInScene(
                     } else {
                         showFieldOverlay(context, meshes, request.colors, request.memberLabels);
                     }
-                    const surfaceRadius = Math.max(...meshes.map(meshRadius)) || boxRMax;
-                    frameToSurface(context, surfaceRadius, frameBox, reframe, showAxes);
+                    const surfaceRadius = Math.max(...meshes.map(m => meshRadius(m))) || boxRMax;
+                    const centre = request.frameCentre;
+                    frameToSurface(context, surfaceRadius, frameBox, reframe, showAxes,
+                        centre && { centre, radius: Math.max(...meshes.map(m => meshRadius(m, centre))) || surfaceRadius });
                     console.log(`Visualizer: ${request.label} drawn in ${Math.round(performance.now() - startedAt)} ms`);
                     resolve({ status: 'rendered', isoLevel: meshes[0].isoLevel });
                 } else {
@@ -1512,7 +1529,11 @@ export async function updateFieldInScene(
  * its orbitals, which share one box, keep the user's camera. Reuses
  * `frameToSurface` rather than duplicating its framing/clearing logic (D20).
  */
-export interface PresentFieldMeshOptions { vertexColors?: Float32Array; boxRMax: number; showAxes?: boolean }
+export interface PresentFieldMeshOptions {
+    vertexColors?: Float32Array; boxRMax: number; showAxes?: boolean;
+    /** Task 16d: frame and turn about this point (the molecule's own centre), fitting the surface's reach from it. */
+    frameCentre?: [number, number, number];
+}
 
 export function presentFieldMesh(context: VisualizerContext | null, meshData: MeshData, options: PresentFieldMeshOptions): number {
     if (!context || context.isDisposed) return 0;
@@ -1522,7 +1543,9 @@ export function presentFieldMesh(context: VisualizerContext | null, meshData: Me
     cancelTransition(context);
     updateSceneWithMeshData(context, meshData, false, DENSITY_SURFACE_COLOUR, options.vertexColors);
     const surfaceRadius = meshRadius(meshData) || options.boxRMax;
-    frameToSurface(context, surfaceRadius, options.boxRMax, context.framedBox !== options.boxRMax, !!options.showAxes);
+    const centre = options.frameCentre;
+    frameToSurface(context, surfaceRadius, options.boxRMax, context.framedBox !== options.boxRMax, !!options.showAxes,
+        centre && { centre, radius: meshRadius(meshData, centre) || surfaceRadius });
     return surfaceRadius;
 }
 
@@ -1532,11 +1555,12 @@ export function presentFieldMesh(context: VisualizerContext | null, meshData: Me
  * rule a landed surface is framed by (frameToSurface's margin), keeping the
  * viewing direction. No box is recorded, so the next surface frames itself
  * exactly as its own link would (ruling T13-I2). Nothing drawn (radius 0)
- * leaves the camera where it is.
+ * leaves the camera where it is. `centre` (Task 16d): the molecule's own
+ * centre, which `structureRadius` is then measured from; the origin when absent.
  */
-export function frameStructure(context: VisualizerContext | null, structureRadius: number): void {
+export function frameStructure(context: VisualizerContext | null, structureRadius: number, centre?: [number, number, number]): void {
     if (!context || context.isDisposed || !(structureRadius > 0)) return;
-    frameOrbital(context, (structureRadius * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3));
+    frameOrbital(context, (structureRadius * ORBITAL_FRAMING_MARGIN) / Math.sqrt(3), false, centre);
     context.framedBox = undefined;
 }
 
@@ -2244,10 +2268,11 @@ const ORBITAL_FRAMING_MARGIN = 1.3;
 const AXES_LENGTH_FACTOR = 1.15;
 
 /** Distance from the nucleus to the furthest vertex of a mesh. */
-function meshRadius(meshData: MeshData): number {
+/** The furthest vertex's distance from `centre` (the origin by default). */
+function meshRadius(meshData: MeshData, [cx, cy, cz]: readonly [number, number, number] = [0, 0, 0]): number {
     let max = 0;
     for (const [x, y, z] of meshData.positions) {
-        const r = x * x + y * y + z * z;
+        const r = (x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2;
         if (r > max) max = r;
     }
     return Math.sqrt(max);

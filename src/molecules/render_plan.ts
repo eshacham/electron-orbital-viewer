@@ -26,6 +26,21 @@ export type MoleculeRenderPlan =
 export const gridHalfWidth = (meta: LibraryMoleculeMeta) => Math.abs(meta.grid.origin[0]);
 
 /**
+ * Task 16d: the molecule's own centre -- the middle of its atoms' extent -- which every Molecules view is framed and
+ * turned about. A library molecule's atoms need not sit round the origin (glycine's N is at it, its far O 8.3 a₀
+ * out); framing a sphere about the origin left such a molecule half the size its own extent allows.
+ */
+export function moleculeCentre(meta: Pick<LibraryMoleculeMeta, 'atoms'>): [number, number, number] {
+    if (meta.atoms.length === 0) return [0, 0, 0];
+    const axis = (k: number) => {
+        const values = meta.atoms.map(atom => atom.position[k]);
+        // + 0: a symmetric molecule's centre is 0, never -0.
+        return (Math.min(...values) + Math.max(...values)) / 2 + 0;
+    };
+    return [axis(0), axis(1), axis(2)];
+}
+
+/**
  * An MO is sampled in the density's own box, grown where the molecule's orbitals reach past it (ruling
  * T10-mainbox, `rMax`), and framed for the density's box, so switching between them keeps the camera.
  */
@@ -63,6 +78,8 @@ export function planMoleculeRender(
                 sources: [moleculeOrbitalSource(meta, surface.index, box)], colors: ['#ffffff'], memberLabels: [name],
                 resolution: basis ? viewResolution(MOLECULE_MO_RESOLUTION, densityBox, box, basis.nao) : MOLECULE_MO_RESOLUTION, enclosedFraction, label,
                 frameBox: densityBox,
+                // Task 16d: turned about the molecule's own centre, as its density is.
+                frameCentre: moleculeCentre(meta),
                 ...(basis ? { bases: [basis] } : {}),
             },
         };

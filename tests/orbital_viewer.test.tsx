@@ -181,6 +181,22 @@ describe('OrbitalViewer: reset and restore in the same commit', () => {
     });
 });
 
+// Task 16d item 2: Molecules frames about the molecule's own centre; Reset View re-frames about the same point.
+describe('OrbitalViewer: Reset View keeps the centre the view was framed about', () => {
+    it('hands frameOrbital the framed centre (none outside Molecules)', () => {
+        const base = (initVisualizer as jest.Mock).getMockImplementation()!();
+        (initVisualizer as jest.Mock).mockReturnValueOnce({ ...base, framedCentre: [3.5, 0, 1.5] });
+        const store = renderViewer();
+        act(() => { store.dispatch(resetView()); });
+        expect(frameOrbital).toHaveBeenLastCalledWith(expect.anything(), 5, true, [3.5, 0, 1.5]);
+    });
+    it('passes no centre when the view was framed about the origin', () => {
+        const store = renderViewer();
+        act(() => { store.dispatch(resetView()); });
+        expect(frameOrbital).toHaveBeenLastCalledWith(expect.anything(), 5, true, undefined);
+    });
+});
+
 // Preflight D1: a share link with a cut but no saved angle (url_state.ts's
 // decodeViewKeys always dispatches restoreCamera, null when there is no cam
 // key) must still open facing the cut face, not the plain canonical angle --

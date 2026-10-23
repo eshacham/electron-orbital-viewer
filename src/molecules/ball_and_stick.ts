@@ -166,15 +166,17 @@ export function buildSpaceFilling(atoms: MoleculeAtom[]): THREE.Group {
 }
 
 /**
- * How far what the overlay draws reaches from the origin (bohr): the largest
- * |centre| + radius of any drawn part's bounding sphere -- a sphere's own
+ * How far what the overlay draws reaches from the origin -- or from `from`,
+ * the molecule's own centre (Task 16d) -- in bohr: the largest distance +
+ * radius of any drawn part's bounding sphere -- a sphere's own
  * surface, a stick's or the dipole arrow's outer end. What the camera frames
  * when no surface is drawn (ruling T13-I2: what is drawn, not the largest
  * representation). 0 for an empty overlay.
  */
-export function overlayExtent(overlay: THREE.Object3D): number {
+export function overlayExtent(overlay: THREE.Object3D, from: readonly [number, number, number] = [0, 0, 0]): number {
     overlay.updateMatrixWorld(true);
     let extent = 0;
+    const origin = new THREE.Vector3(...from);
     const centre = new THREE.Vector3();
     overlay.traverse(node => {
         const geometry = (node as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
@@ -182,7 +184,7 @@ export function overlayExtent(overlay: THREE.Object3D): number {
         if (!geometry.boundingSphere) geometry.computeBoundingSphere();
         const sphere = geometry.boundingSphere!;
         centre.copy(sphere.center).applyMatrix4(node.matrixWorld);
-        extent = Math.max(extent, centre.length() + sphere.radius * node.matrixWorld.getMaxScaleOnAxis());
+        extent = Math.max(extent, centre.distanceTo(origin) + sphere.radius * node.matrixWorld.getMaxScaleOnAxis());
     });
     return extent;
 }

@@ -28,7 +28,7 @@ import { overlayExtent } from '../../src/molecules/ball_and_stick';
 import type { MoleculeBasis } from '../../src/molecules/types';
 import { useMoleculeLoader } from '../../src/molecules/useMoleculeLoader';
 import { useMoleculeView } from '../../src/molecules/useMoleculeView';
-import { planMoleculeRender } from '../../src/molecules/render_plan';
+import { moleculeCentre, planMoleculeRender } from '../../src/molecules/render_plan';
 import { LIBRARY_INDEX, methaneMeta, waterMeta } from './fixtures';
 
 const flush = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
@@ -83,6 +83,8 @@ describe('planMoleculeRender', () => {
             // Task 16c (ruling T10-mainbox): an MO is framed for the density's box; this stub basis carries no
             // orbital, so nothing grows the sampling box past it.
             frameBox: 6.43,
+            // Task 16d item 2: framed, and turned, about the molecule's own centre (water's O sits at the origin).
+            frameCentre: moleculeCentre(meta),
             bases: [waterBasis] } });
     });
     // Ruling P8: show=none plans no surface at all -- the mesh is cleared.
@@ -297,6 +299,36 @@ describe('useMoleculeView', () => {
         await flush();
         expect((updateFieldInScene as jest.Mock).mock.calls.at(-1)[1].frameBox).toBe(densityBox);
     });
+    // Task 16d item 2 (carried since 6G-1): glycine's first view was framed small -- its atoms sit off the origin
+    // (N at the origin, the far O 8.3 a₀ out), and the camera framed a sphere about the origin. Every Molecules view
+    // is framed, and turned, about the molecule's own centre: the density, an orbital and the structure alone.
+    it('frames the density, an orbital and the structure alone about the molecule\'s own centre (Task 16d)', async () => {
+        const worker = fakeWorker();
+        (createGridMeshWorker as jest.Mock).mockReturnValue(worker);
+        (getDensityGrid as jest.Mock).mockResolvedValue(densityGrid());
+        const context = fakeContext();
+        const store = makeStore();
+        render(<Provider store={store}><Harness active context={context} /></Provider>);
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o' })); store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() })); });
+        await flush();
+        const centre = moleculeCentre(waterMeta());
+        expect(Math.hypot(...centre)).toBeGreaterThan(0.1);   // the fixture's O is at the origin: a real offset
+        const { requestId } = worker.postMessage.mock.calls[0][0];
+        act(() => { worker.onmessage!({ data: { type: 'success', meshData: meshOf(1), requestId } }); });
+        await flush();
+        expect((presentFieldMesh as jest.Mock).mock.calls[0][2].frameCentre).toEqual(centre);
+        act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
+        await flush();
+        expect((updateFieldInScene as jest.Mock).mock.calls.at(-1)[1].frameCentre).toEqual(centre);
+        act(() => { store.dispatch(setSurface({ kind: 'none' })); });
+        await flush();
+        expect((frameStructure as jest.Mock).mock.calls.at(-1)[2]).toEqual(centre);
+    });
+    it('takes a molecule\'s centre as the middle of its atoms\' extent (Task 16d)', () => {
+        const atoms = [{ Z: 7, position: [0, 0, 0] }, { Z: 8, position: [7, 0, 4] }, { Z: 1, position: [3, 1.6, -1] }];
+        expect(moleculeCentre(waterMeta({ atoms } as never))).toEqual([3.5, 0.8, 1.5]);
+        expect(moleculeCentre(methaneMeta())).toEqual([0, 0, 0]);
+    });
     it('draws an orbital through updateFieldInScene with its basis, and the overlay follows the mode', async () => {
         const context = fakeContext();
         const store = makeStore();
@@ -447,7 +479,9 @@ describe('useMoleculeView', () => {
         // With no surface to fit, the camera fits what is drawn: the overlay on the canvas (ruling T13-I2).
         const overlay = (setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1];
         expect(frameStructure).toHaveBeenCalledTimes(1);
-        expect(frameStructure).toHaveBeenCalledWith(context, overlayExtent(overlay));
+        // Task 16d item 2: measured and framed about the molecule's own centre.
+        const centre = moleculeCentre(waterMeta());
+        expect(frameStructure).toHaveBeenCalledWith(context, overlayExtent(overlay, centre), centre);
     });
     // Ruling P8: the overlay follows the representation -- ball and stick (spheres and sticks), space filling
     // (van der Waals spheres only), or no structure at all; the dipole arrow is its own switch either way.
@@ -482,12 +516,14 @@ describe('useMoleculeView', () => {
         act(() => { store.dispatch(selectMolecule({ id: 'ch4', surface: { kind: 'none' } })); store.dispatch(metaLoaded({ id: 'ch4', meta: methaneMeta() })); });
         await flush();
         const lastOverlay = () => (setMoleculeOverlay as jest.Mock).mock.calls.at(-1)[1];
-        const ballAndStick = overlayExtent(lastOverlay());
-        expect((frameStructure as jest.Mock).mock.calls).toEqual([[context, ballAndStick]]);
+        // Task 16d item 2: every structure frame is about the molecule's own centre (methane's: the origin).
+        const centre = moleculeCentre(methaneMeta());
+        const ballAndStick = overlayExtent(lastOverlay(), centre);
+        expect((frameStructure as jest.Mock).mock.calls).toEqual([[context, ballAndStick, centre]]);
         act(() => { store.dispatch(setRepresentation('space-filling')); });
-        const spaceFilling = overlayExtent(lastOverlay());
+        const spaceFilling = overlayExtent(lastOverlay(), centre);
         expect(spaceFilling).toBeGreaterThan(ballAndStick);
-        expect((frameStructure as jest.Mock).mock.calls).toEqual([[context, ballAndStick], [context, spaceFilling]]);
+        expect((frameStructure as jest.Mock).mock.calls).toEqual([[context, ballAndStick, centre], [context, spaceFilling, centre]]);
         act(() => { store.dispatch(setRepresentation('ball-and-stick')); });
         act(() => { store.dispatch(setRepresentation('none')); });
         expect(frameStructure).toHaveBeenCalledTimes(2);
@@ -499,7 +535,7 @@ describe('useMoleculeView', () => {
         // Back to no surface: framed afresh to what is drawn now.
         act(() => { store.dispatch(setSurface({ kind: 'none' })); });
         await flush();
-        expect((frameStructure as jest.Mock).mock.calls.at(-1)).toEqual([context, spaceFilling]);
+        expect((frameStructure as jest.Mock).mock.calls.at(-1)).toEqual([context, spaceFilling, centre]);
     });
 
     // Task 16 (ruling P12): the request workspace's preview is drawn on the one canvas -- ball and stick

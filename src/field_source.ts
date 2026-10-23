@@ -131,6 +131,11 @@ export interface FieldRenderRequest {
      * fraction, keeps the user's zoom as it did before the box grew.
      */
     frameBox?: number;
+    /**
+     * Task 16d: the point the view is framed and turned about -- a library molecule's own centre, as its density
+     * is framed (render_plan.ts moleculeCentre). Absent: the origin, as every other source.
+     */
+    frameCentre?: [number, number, number];
 }
 
 /**

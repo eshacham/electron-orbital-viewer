@@ -674,8 +674,10 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // distance (see frameOrbital's restoreDefaultDirection).
     useEffect(() => {
         if (viewResetNonce === 0) return;
-        const rMax = visualizerContextRef.current?.framedRMax;
-        if (rMax) frameOrbital(visualizerContextRef.current, rMax, true);
+        const context = visualizerContextRef.current;
+        const rMax = context?.framedRMax;
+        // Task 16d: about the point the view was framed about (a molecule's own centre in Molecules).
+        if (rMax) frameOrbital(context, rMax, true, context?.framedCentre);
     }, [viewResetNonce]);
 
     // A restored link turns the camera. frameOrbital keeps the direction it
