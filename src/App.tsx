@@ -276,6 +276,8 @@ function App() {
     const handleCombinationChange = useCallback((value: CombinationSelection) => dispatch(setCombination(value)), [dispatch]);
     const renderedField = useAppSelector(state => state.orbital.currentField);
     const renderFailed = useAppSelector(state => state.orbital.renderFailed);
+    // Task 16d item 10: ruling R10's frame-time guard has Glow's halo and mesh lines off (Advanced appearance says so).
+    const glowExtrasSuppressed = useAppSelector(state => state.orbital.glowExtrasSuppressed);
 
     // Ruling R28: the only thing that starts a solve is a species change --
     // the element, its charge or its excitation (or an enclosedFraction
@@ -1407,8 +1409,16 @@ function App() {
     // Task 16b (owner R24-adv): Glow's own tuning, folded, at the bottom of every Display section and the
     // phone's view tab; it shows itself only under the Glow finish, while something drawn can glow -- not a
     // wireframe, nor Atoms' whole-atom view (a shell picture with ring-glyph tiles).
-    const drawsGlow = surfaceStyle.mode !== 'wireframe' && !(isAtomMode && atomLevel === 'atom');
-    const advancedAppearance = <AdvancedAppearance drawsGlow={drawsGlow} lowPower={isNarrow} />;
+    // Task 16d item 12: nor while Molecules draws no surface (surface None, or a request preview) -- as under a
+    // wireframe, sliders whose only effect is a tile 300 ms later would read as broken.
+    const moleculeNoSurface = isMoleculeMode && (molecule.surface.kind === 'none' || requestPreviewShown);
+    const drawsGlow = surfaceStyle.mode !== 'wireframe' && !(isAtomMode && atomLevel === 'atom') && !moleculeNoSurface;
+    // Task 16d item 13: the edge whiteness acts only on a phase-less surface (vQlPhase 0): a molecule's density
+    // (never its ESP map, ruling T15-b), the Bonds total density, a shell's composition lobes, a combination overlay.
+    const phaselessDrawn = (moleculeKeysShown && molecule.surface.kind === 'density') || isBondsDensity
+        || (isAtomMode && atomLevel === 'shell') || combinationLegend !== null;
+    const advancedAppearance = <AdvancedAppearance drawsGlow={drawsGlow} lowPower={isNarrow} phaselessDrawn={phaselessDrawn}
+        extrasSuppressed={glowExtrasSuppressed} />;
     const displayControls = <>{controls}{advancedAppearance}</>;
 
     // Bonds mode's navigation (layout contract §3.8): the desktop's left

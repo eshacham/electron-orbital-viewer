@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setHoverRadius as setAtomHoverRadius, drillToShell } from '../store/atomSlice';
 import {
-    cameraMoved, startCompositionBuild, endCompositionBuild, failCompositionBuild, setLevelTransition,
+    cameraMoved, startCompositionBuild, endCompositionBuild, failCompositionBuild, setLevelTransition, setGlowExtrasSuppressed,
 } from '../store/orbitalSlice';
 import { applyCameraAngles, cameraAnglesOf } from '../camera_angles';
 import { ScaleBar, formatScaleLabel, scaleBarMaxPx } from '../scale_bar';
@@ -190,6 +190,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             // M9: a level transition blends two pictures, so the export
             // menu waits for it (run_export's pngReason).
             context.onTransitionChange = (active) => dispatch(setLevelTransition(active));
+            // Task 16d item 10: the frame-time guard's latch, for Advanced appearance's Halo and Mesh rows.
+            context.onExtrasSuppressedChange = (suppressed) => dispatch(setGlowExtrasSuppressed(suppressed));
             visualizerContextRef.current = context;
             // Ruling R23f-3's live check (and any future one like it): the
             // camera's raw position/target/distance, read live -- not
@@ -272,6 +274,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             if (exportHandleRef) exportHandleRef.current = null;
             // No animation loop is left to report the end of one in flight.
             dispatch(setLevelTransition(false));
+            dispatch(setGlowExtrasSuppressed(false));
         };
     }, [dispatch, exportHandleRef]);
 

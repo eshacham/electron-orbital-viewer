@@ -8,7 +8,7 @@ import { createAppStore } from '../src/store';
 import {
     selectMolecule, metaLoaded, metaFailed, setSurface, renderStarted, renderFinished, renderFailed, setPick,
 } from '../src/store/moleculeSlice';
-import { setSurfaceStyle } from '../src/store/orbitalSlice';
+import { setGlowExtrasSuppressed, setSurfaceStyle } from '../src/store/orbitalSlice';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from '../src/url_state';
 import { registerMoleculeUrlKeys } from '../src/molecules/url_keys';
 import { PHONE_LANDSCAPE } from '../src/useMediaQuery';
@@ -209,6 +209,35 @@ describe('Molecules mode', () => {
         expect(region).toHaveTextContent('This molecule did not load.');
         expect(region).not.toHaveTextContent('Loading…');
         expect(region.querySelector('dl')).toBeNull();
+    });
+
+    // Task 16d items 12, 13 and 10: Advanced appearance is absent while no surface is drawn (as under a wireframe);
+    // its edge whiteness is offered only over the density (an orbital's rim is its phase's, an ESP map's is never
+    // whitened); and the frame-time guard's latch, up from the viewer through the store, disables the extras' rows.
+    it('fits Advanced appearance to the surface drawn: none hides it, edge whiteness only over the density', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        openDisplay(container);
+        const viewPanel = container.querySelector('.view-panel') as HTMLElement;
+        const block = () => within(viewPanel).queryByRole('button', { name: 'Advanced appearance' });
+        fireEvent.click(block()!);
+        const whiteness = () => within(viewPanel).queryByRole('slider', { name: 'Edge whiteness (density and lobes)' });
+        expect(whiteness()).not.toBeNull();
+        act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
+        expect(block()).not.toBeNull();
+        expect(whiteness()).toBeNull();
+        act(() => { store.dispatch(setSurface({ kind: 'esp' })); });
+        expect(whiteness()).toBeNull();
+        act(() => { store.dispatch(setSurface({ kind: 'none' })); });
+        expect(block()).toBeNull();
+        act(() => { store.dispatch(setSurface({ kind: 'density' })); });
+        expect(block()).not.toBeNull();
+        if (block()!.getAttribute('aria-expanded') !== 'true') fireEvent.click(block()!);
+        expect(within(viewPanel).getByRole('slider', { name: 'Halo' })).toBeEnabled();
+        act(() => { store.dispatch(setGlowExtrasSuppressed(true)); });
+        expect(within(viewPanel).getByRole('slider', { name: 'Halo' })).toBeDisabled();
+        expect(within(viewPanel).getByText('Off to keep this device smooth')).toBeInTheDocument();
     });
 
     // Ruling T12-I2: on a desktop or tablet the library's load failure is said in the panel, under the tile --

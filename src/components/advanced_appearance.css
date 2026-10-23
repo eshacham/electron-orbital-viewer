@@ -26,3 +26,9 @@
 .advanced-appearance-value { color: var(--ql-color-text-1); }
 .advanced-appearance-row .MuiSlider-root { margin: 0 8px; width: auto; }
 .advanced-appearance-reset { align-self: flex-start; margin-top: 4px; }
+/* Task 16d item 10: why the halo and mesh rows are disabled (ruling R10's frame-time guard has them off). */
+.advanced-appearance-note {
+  margin: 4px 0 0;
+  font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line);
+  color: var(--ql-color-text-2);
+}

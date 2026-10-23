@@ -72,6 +72,11 @@ interface OrbitalState {
   compositionFailed: boolean;
   /** A level-transition animation is running (the visualizer reports it): the picture is between two views. */
   levelTransition: boolean;
+  /**
+   * Task 16d item 10: ruling R10's frame-time guard has taken Glow's halo and mesh lines off until the appearance
+   * next changes (the visualizer reports it), so Advanced appearance can say why those rows do nothing.
+   */
+  glowExtrasSuppressed: boolean;
 }
 
 const initialState: OrbitalState = {
@@ -94,6 +99,7 @@ const initialState: OrbitalState = {
   compositionBusy: false,
   compositionFailed: false,
   levelTransition: false,
+  glowExtrasSuppressed: false,
 };
 
 /** Bonds mode's recipes (Phase 5): what only Bonds asks the viewer to draw. */
@@ -243,6 +249,9 @@ const orbitalSlice = createSlice({
     setLevelTransition: (state, action: PayloadAction<boolean>) => {
       state.levelTransition = action.payload;
     },
+    setGlowExtrasSuppressed: (state, action: PayloadAction<boolean>) => {
+      state.glowExtrasSuppressed = action.payload;
+    },
   },
   // Combinations belong to Basic Orbitals. Leaving for atom mode drops the
   // request, so no effect can redraw a hybrid over an atom, and the viewer
@@ -321,7 +330,8 @@ export const {
   startCompositionBuild,
   endCompositionBuild,
   failCompositionBuild,
-  setLevelTransition
+  setLevelTransition,
+  setGlowExtrasSuppressed
 } = orbitalSlice.actions;
 
 /**

@@ -210,6 +210,8 @@ export interface VisualizerContext {
     lights?: { ambient: THREE.AmbientLight; key: THREE.DirectionalLight; fill: THREE.DirectionalLight };
     /** Ruling R10 / §15: Glow's mesh lines and halo latched off by the frame-time guard, until the appearance next changes. */
     extrasSuppressed?: boolean;
+    /** Task 16d item 10: told when that latch is set and when a new appearance lifts it (OrbitalViewer puts it in the store). */
+    onExtrasSuppressedChange?: (suppressed: boolean) => void;
     /** Ruling R10's moving average of frame time (`updateFrameGuard`), fed only while the lines or halo are drawn. */
     frameGuard?: { ema: number; frames: number };
     /**
@@ -2059,6 +2061,7 @@ export function guardGlowExtras(context: VisualizerContext, dtMs: number): void 
     context.extrasSuppressed = true;
     removeGlowExtras(context.currentOrbitalGroup);
     if (context.transition?.kind === 'cross-fade') removeGlowExtras(context.transition.outgoing);
+    context.onExtrasSuppressedChange?.(true);
 }
 
 /**
@@ -2390,6 +2393,7 @@ export function setAppearance(context: VisualizerContext | null, appearance: App
     // the objects below re-apply, so the lines and halo may come back. The
     // same appearance again (a re-run effect) is not a change.
     if (!changed || changed.length > 0) {
+        if (context.extrasSuppressed) context.onExtrasSuppressedChange?.(false);
         context.extrasSuppressed = false;
         if (context.frameGuard) {
             context.frameGuard.ema = 16;

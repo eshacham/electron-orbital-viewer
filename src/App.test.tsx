@@ -1768,7 +1768,10 @@ describe('App: shell', () => {
             expect(within(display).getByRole('checkbox', { name: 'Show axes' }).compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
             fireEvent.click(advanced);
             request.mockClear();
-            const edge = within(display).getByRole('slider', { name: 'Edge glow' });
+            // Task 16d item 13: a shell's composition lobes are phase-less, so the edge whiteness is offered here.
+            expect(within(display).getByRole('slider', { name: 'Edge whiteness (density and lobes)' })).toBeInTheDocument();
+            // Task 16d item 11: "Edge glow" is now "Edge strength".
+            const edge = within(display).getByRole('slider', { name: 'Edge strength' });
             ['ArrowRight', 'ArrowRight', 'ArrowRight'].forEach(key => fireEvent.keyDown(edge, { key }));
             expect(JSON.parse(window.localStorage.getItem('eov.glow')!)).toEqual({ dark: { rimStrength: 0.78 } });
             expect(request).not.toHaveBeenCalled();

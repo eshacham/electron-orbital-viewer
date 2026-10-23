@@ -797,6 +797,22 @@ describe('OrbitalViewer: the viewer\'s own Glow values (Task 16b)', () => {
     });
 });
 
+// Task 16d item 10: the frame-time guard's latch goes up into the store (Advanced appearance reads it there).
+describe('OrbitalViewer: the frame-time guard\'s latch', () => {
+    it('puts the viewer\'s report in the store, and clears it on the way out', () => {
+        const store = createAppStore();
+        const { unmount } = render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        const context = (initVisualizer as jest.Mock).mock.results.at(-1)!.value as VisualizerContext;
+        act(() => { context.onExtrasSuppressedChange!(true); });
+        expect(store.getState().orbital.glowExtrasSuppressed).toBe(true);
+        act(() => { context.onExtrasSuppressedChange!(false); });
+        expect(store.getState().orbital.glowExtrasSuppressed).toBe(false);
+        act(() => { context.onExtrasSuppressedChange!(true); });
+        unmount();
+        expect(store.getState().orbital.glowExtrasSuppressed).toBe(false);
+    });
+});
+
 // Spec §12: thumbnails borrow the one renderer; there is never a second WebGL context.
 describe('OrbitalViewer: thumbnails', () => {
     it('lends the one renderer to the thumbnail service once, on mount (spec §12)', () => {

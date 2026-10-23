@@ -293,6 +293,25 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         expect(extra(context, 'halo')).toBeDefined();
     });
 
+    // Task 16d item 10: the latch is reported up (OrbitalViewer puts it in the store), so Advanced appearance can say
+    // why its Halo and Mesh rows do nothing -- and that it has lifted.
+    it('reports the latch when the guard sets it and when a new appearance lifts it', async () => {
+        const context = buildContext();
+        context.frameGuard = { ema: 16, frames: 0 };
+        const reported = jest.fn();
+        context.onExtrasSuppressedChange = reported;
+        await drawOrbital(context);
+        setAppearance(context, glow);
+        reported.mockClear();
+        for (let i = 0; i < 300; i++) guardGlowExtras(context, 40);
+        expect(reported.mock.calls).toEqual([[true]]);
+        setAppearance(context, { ...glow, showAxes: false });
+        expect(reported.mock.calls).toEqual([[true], [false]]);
+        // A new appearance with nothing latched says nothing.
+        setAppearance(context, glow);
+        expect(reported.mock.calls).toEqual([[true], [false]]);
+    });
+
     // Ruling T15-halo-slow: on a phone (lowPower) neither the halo nor the lines, on the drawn orbital too.
     it('draws no halo and no lines on a phone, but keeps the rim', async () => {
         const context = buildContext();
