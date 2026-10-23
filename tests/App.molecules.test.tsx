@@ -192,6 +192,25 @@ describe('Molecules mode', () => {
         expect(within(region()).getByText('NH₃')).toBeInTheDocument();
     });
 
+    // Task 16d item 7 (T12 re-review minor): a molecule whose meta failed keeps its Properties section, and says so
+    // (the alert over the view gives the reason) -- never "Loading…" forever, never a silent empty card.
+    it('says in Properties that a molecule did not load when its meta failed', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        const viewPanel = container.querySelector('.view-panel') as HTMLElement;
+        const loader = jest.requireMock('../src/molecules/loader') as { loadMoleculeMeta: jest.Mock };
+        loader.loadMoleculeMeta.mockImplementationOnce(never);
+        act(() => { store.dispatch(selectMolecule({ id: 'nh3' })); });
+        await flush();
+        act(() => { store.dispatch(metaFailed({ id: 'nh3', message: 'Could not load /molecules/v3/nh3/meta.json (HTTP 503)' })); });
+        const region = within(viewPanel).getByRole('region', { name: 'Properties' });
+        expect(within(viewPanel).getByRole('button', { name: 'Properties' })).toHaveAttribute('aria-expanded', 'true');
+        expect(region).toHaveTextContent('This molecule did not load.');
+        expect(region).not.toHaveTextContent('Loading…');
+        expect(region.querySelector('dl')).toBeNull();
+    });
+
     // Ruling T12-I2: on a desktop or tablet the library's load failure is said in the panel, under the tile --
     // not only inside the popover -- as the inline picker said it before.
     it('says, in the Explore panel, that the molecule library could not be loaded', async () => {

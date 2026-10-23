@@ -4,12 +4,12 @@
 import React from 'react';
 import { fireEvent, render, within } from '@testing-library/react';
 import MoleculePropertiesCard from '../../src/molecule_ui/MoleculePropertiesCard';
-import { formatFormula } from '../../src/molecules/catalogue';
+// Task 16d item 7: one import from catalogue (it was imported twice).
+import { formatFormula, multiplicityText } from '../../src/molecules/catalogue';
 import { formatDipole } from '../../src/molecules/dipole';
 import { formatOrbitalEnergy, formatPointGroup, gapTerm, orbitalGaps, GAP_CAVEAT } from '../../src/molecules/orbital_display';
 import { validatedLine } from '../../src/validation/geometry_honesty';
 import { COMPUTED_LINE, TIER_LABEL } from '../../src/components/TierBadge';
-import { multiplicityText } from '../../src/molecules/catalogue';
 import { glycineAtoms, methaneMeta, waterMeta } from '../molecules/fixtures';
 import PreviewDetails from '../../src/components/PreviewDetails';
 import { previewFixture } from '../jobs/api_fixtures';
