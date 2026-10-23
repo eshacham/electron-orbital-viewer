@@ -64,7 +64,7 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, sel
     const firstOccupied = rows.findIndex(o => o.occupation > 0);
     const gaps = orbitalGaps(orbitals);
     const gapText = gaps.length ? gaps.map(g => `${gapTerm(g)} ${formatOrbitalEnergy(g.hartree)}`).join(' · ') : null;
-    // Preflight D8: the shared resolver (the HOMO, else the SOMO); older data, the highest occupied row.
+    // Preflight D8 / Task 16d: the shared resolver (an open shell's SOMO, else the HOMO); older data, the highest occupied row.
     const homoIndex = (frontierOccupied(orbitals) ?? rows[firstOccupied])?.index;
     const diffuse = orbitals.filter(o => o.class === 'diffuse');
     const lvmo = orbitals.some(o => o.role === 'LVMO');

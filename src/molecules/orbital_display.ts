@@ -109,13 +109,15 @@ export function frontierOrbitals<T extends { index: number; role?: string }>(orb
 }
 
 /**
- * Preflight D8: the occupied orbital a view opens on when none is picked yet -- the HOMO, or the SOMO where the
- * data name no HOMO (an open shell such as O₂). Null when the data name neither (older data); callers that must
- * show something fall back to their own choice.
+ * Preflight D8: the occupied orbital a view opens on when none is picked yet -- the frontier occupied orbital.
+ * Task 16d item 5 (T15-M2, science): for an open shell that is its SOMO, the highest occupied level, even where the
+ * data also name a doubly occupied HOMO below it (NO₂: 6a1 over 4b2); O₂ names SOMOs alone. A closed shell opens on
+ * its HOMO. Null when the data name neither (older data); callers that must show something fall back to their own
+ * choice.
  */
 export function frontierOccupied<T extends { index: number; role?: string }>(orbitals: readonly T[]): T | null {
     const frontier = frontierOrbitals(orbitals);
-    return (frontier.find(f => f.role === 'HOMO') ?? frontier.find(f => f.role === 'SOMO'))?.orbital ?? null;
+    return (frontier.find(f => f.role === 'SOMO') ?? frontier.find(f => f.role === 'HOMO'))?.orbital ?? null;
 }
 
 /** What follows an orbital's role wherever it is named (the "Showing" line, captions): null for an occupied orbital,

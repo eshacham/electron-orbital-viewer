@@ -22,8 +22,9 @@ describe('frontier orbitals (preflight D8)', () => {
         expect(frontierOrbitals(no2.orbitals).map(f => [f.role, f.orbital.index, f.orbital.label])).toEqual([
             ['HOMO', 10, '4b2'], ['SOMO', 11, '6a1'], ['LUMO', 12, '2b1'],
         ]);
-        // The view opens on the HOMO where the data name one.
-        expect(frontierOccupied(no2.orbitals)?.index).toBe(10);
+        // Task 16d item 5 (T15-M2, science): a radical's frontier orbital is its SOMO -- the view opens on 6a1, not the
+        // doubly occupied 4b2 below it (was: the HOMO wherever the data name one).
+        expect(frontierOccupied(no2.orbitals)).toMatchObject({ index: 11, role: 'SOMO', label: '6a1' });
     });
 
     it('opens on the SOMO where the data name no HOMO (O₂, spin-unrestricted)', () => {

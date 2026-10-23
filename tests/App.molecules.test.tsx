@@ -860,6 +860,35 @@ describe('Molecules mode', () => {
             expect(document.activeElement).toBe(within(list).getByRole('button', { name: /1b2/ }));
         });
 
+        // Task 16d item 5 (T15-M2, science): a radical's frontier orbital is its SOMO -- NO₂ (²A₁) names a doubly
+        // occupied HOMO 4b2 below its singly occupied 6a1 -- so the Orbitals switch and "All orbitals" open on 6a1.
+        it('opens a radical on its SOMO, from the Orbitals switch and from "All orbitals" (NO₂)', async () => {
+            const no2 = JSON.parse(readFileSync(resolve(__dirname, 'fixtures/molecules/no2/meta.json'), 'utf8'));
+            const no2Basis = JSON.parse(readFileSync(resolve(__dirname, 'fixtures/molecules/no2/basis.json'), 'utf8'));
+            loader.loadBasis.mockImplementation(async (id: string) => ({ ...no2Basis, id }));
+            const metaLoader = (jest.requireMock('../src/molecules/loader') as Record<'loadMoleculeMeta', jest.Mock>).loadMoleculeMeta;
+            metaLoader.mockImplementation(async () => no2);
+            try {
+                const { store, container } = await enterMolecules(false);
+                const pickNo2 = () => act(() => { store.dispatch(selectMolecule({ id: 'no2' })); store.dispatch(metaLoaded({ id: 'no2', meta: no2 })); });
+                pickNo2();
+                await flush();
+                const somo = no2.orbitals.find((o: { role?: string }) => o.role === 'SOMO');
+                expect(somo).toMatchObject({ index: 11, label: '6a1', occupation: 1 });
+                const side = container.querySelector('.side-panel') as HTMLElement;
+                fireEvent.click(within(side).getByRole('button', { name: 'Orbitals' }));
+                expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 11 });
+                // And from the strip, starting again from the density.
+                act(() => { store.dispatch(setSurface({ kind: 'density' })); });
+                fireEvent.click(within(strip()).getByRole('option', { name: 'All orbitals — open the list' }));
+                expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 11 });
+                const list = side.querySelector('.molecule-orbital-list') as HTMLElement;
+                expect(document.activeElement).toBe(within(list).getByRole('button', { name: /^6a1/ }));
+            } finally {
+                metaLoader.mockImplementation(async () => waterMeta());
+            }
+        });
+
         // Ruling T16-tilekey with preflight D9: the orbital tiles' ψ hues get a key of their own only while the
         // column holds no phase key already -- the density, the ESP map or no surface drawn; never beside an orbital's.
         it('keys the orbital tiles\' phase colours while the drawn surface is not an orbital', async () => {

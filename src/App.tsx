@@ -900,7 +900,8 @@ function App() {
     const moleculeSurfaceKind = molecule.surface.kind;
     const handleMoleculeStripSelect = useCallback((target: MoleculeStripTarget) => {
         if ('openOrbitals' in target) {
-            // Opens the orbital list: on the orbital drawn, or switched to the HOMO (SOMO, preflight D8) as the
+            // Opens the orbital list: on the orbital drawn, or switched to the frontier occupied orbital -- an open
+            // shell's SOMO, else the HOMO (preflight D8, Task 16d) -- as the
             // surface switch's Orbitals does -- then focus goes to that orbital's row.
             const first = moleculeMeta && (frontierOccupied(moleculeMeta.orbitals) ?? moleculeMeta.orbitals[0]);
             if (moleculeSurfaceKind !== 'mo' && first) dispatch(setSurface({ kind: 'mo', index: first.index }));

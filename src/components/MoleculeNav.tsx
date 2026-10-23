@@ -73,7 +73,7 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
     // Task 12 (ruling P1): the name, the loading line and the picker moved to the header tile above this card
     // (MoleculeHeader and its "Change ▾" popover); until a molecule has loaded the desktop card has nothing.
     if (variant === 'full' && !meta) return null;
-    // Preflight D8: the HOMO, or the SOMO where the data name no HOMO (one shared resolver); older data, the first.
+    // Preflight D8 / Task 16d: the SOMO of an open shell, else the HOMO (one shared resolver); older data, the first.
     const homo = (meta && frontierOccupied(meta.orbitals)) ?? meta?.orbitals[0];
 
     return (
