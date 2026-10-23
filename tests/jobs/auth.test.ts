@@ -3,7 +3,7 @@ import {
     OwnerAuth, SESSION_KEY, safeReturnTo, logoutUrl, UserManagerLike, SessionEvent, SIGN_IN_FAILED, SignInFailed, makeUserManager,
 } from '../../src/jobs/auth';
 import { configureStore } from '@reduxjs/toolkit';
-import jobsReducer from '../../src/store/jobsSlice';
+import jobsReducer, { requestOpened, sessionChanged, sessionExpired } from '../../src/store/jobsSlice';
 import { ownerAuth, setOwnerAuthForTests, startOwnerSession } from '../../src/jobs/owner_session';
 import { BUILD_ENV } from '../../src/jobs/build_env';
 import { resetBuildEnv } from './build_env_stub';
@@ -229,6 +229,35 @@ describe('a reload, a renewal, and the end of a session', () => {
         await owner.auth.start();
         await owner.auth.refresh();
         expect(owner.events.at(-1)).toEqual({ identity: null, reason: 'expired' });
+    });
+
+    // Task 16d item 8 (Task 16 re-review): one episode can end twice -- a 401 on a token the client still held, the
+    // renewal refused (refresh → 'expired'), then client.ts's expire() on that 401. The second end is still an
+    // owner's: the workspace and its disabled form stay under the alert (R4), never closed as by a sign-out.
+    it("an owner's session that ends twice in one episode is an expiry both times, and the workspace stays", async () => {
+        const refused = jest.fn(async () => { throw errorResponse('invalid_grant'); });
+        const { auth, events } = setup('http://localhost:5391/?code=abc&state=xyz', { ...ownerSignIn, signinSilent: refused });
+        // The page's own mirror of the session (owner_session.ts).
+        const store = configureStore({ reducer: { jobs: jobsReducer } });
+        auth.onChange(({ identity, reason }) => {
+            store.dispatch(reason === 'expired' ? sessionExpired() : sessionChanged({
+                signedIn: identity !== null, email: identity?.email ?? null, groups: identity?.groups ?? [],
+            }));
+        });
+        await auth.start();
+        store.dispatch(requestOpened(true));
+        await expect(auth.refresh()).resolves.toBe(false);
+        await auth.expire();
+        expect(events.map(event => event.reason)).toEqual(['signed-in', 'expired', 'expired']);
+        expect(store.getState().jobs.request.open).toBe(true);
+        expect(store.getState().jobs.session.expired).toBe(true);
+
+        // A non-owner's double end stays a sign-out both times.
+        const visitor = setup('http://localhost:5391/?code=abc&state=xyz', { signinSilent: refused });
+        await visitor.auth.start();
+        await visitor.auth.refresh();
+        await visitor.auth.expire();
+        expect(visitor.events.map(event => event.reason)).toEqual(['signed-in', 'signed-out', 'signed-out']);
     });
 
     it("signs out through Cognito's logout endpoint", async () => {

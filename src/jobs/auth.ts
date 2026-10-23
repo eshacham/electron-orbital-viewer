@@ -150,8 +150,13 @@ export class OwnerAuth {
     private renewing: Promise<boolean> | null = null;
     /** The email of the session last announced, or undefined when none is: a renewal is not a new sign-in. */
     private announced: string | null | undefined = undefined;
-    /** Whether the session held now is an owner's (the `owners` group): only its end is an owner-session expiry. */
-    private ownerSession = false;
+    /**
+     * Whose session this episode holds -- an owner's (the `owners` group) or another's -- or null when none was
+     * signed in. Only an owner's end is an owner-session expiry. Task 16d item 8: kept through an expiry, so a
+     * second end of the same episode (a refused renewal, then client.ts's expire() on the 401 that started it)
+     * is still known for whose it was; a sign-out clears it, and the next sign-in sets it afresh.
+     */
+    private held: 'owner' | 'other' | null = null;
 
     constructor(private readonly settings: CognitoSettings, private readonly page: OwnerPage, private readonly deps: OwnerAuthDeps) {
         // oidc-client-ts's own renewal timer lands here as well as explicit renewals.
@@ -303,7 +308,7 @@ export class OwnerAuth {
             this.deps.session.setItem(SESSION_KEY, JSON.stringify(saved));
         }
         const identity = identityOf(user);
-        this.ownerSession = identity.groups.includes(OWNER_GROUP);
+        this.held = identity.groups.includes(OWNER_GROUP) ? 'owner' : 'other';
         if (this.announced === identity.email) return;
         this.announced = identity.email;
         this.emit({ identity, reason: 'signed-in' });
@@ -311,9 +316,11 @@ export class OwnerAuth {
 
     private async end(reason: 'signed-out' | 'expired'): Promise<void> {
         // Fix round 1 (T16-M2): "your owner session has ended" -- and the owner's request workspace kept under
-        // that alert -- is for an owner. A signed-in non-owner whose session ends is simply signed out.
-        const said = reason === 'expired' && !this.ownerSession ? 'signed-out' : reason;
-        this.ownerSession = false;
+        // that alert -- is for an owner. A signed-in non-owner whose session ends is simply signed out. Task 16d
+        // item 8: only when a non-owner's session was actually held -- an owner's second end in one episode stays
+        // an expiry (it was a sign-out, which closed the workspace under the alert, R4).
+        const said = reason === 'expired' && this.held === 'other' ? 'signed-out' : reason;
+        if (reason === 'signed-out') this.held = null;
         this.deps.session.removeItem(SESSION_KEY);
         await this.deps.userManager.removeUser();
         this.announced = undefined;
