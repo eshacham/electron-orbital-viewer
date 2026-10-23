@@ -60,13 +60,15 @@ const RequestWorkspace: React.FC<RequestWorkspaceProps> = ({ returnFocusRef }) =
 
     // Fix round 1 (T16-M1): another molecule chosen meanwhile -- quick pick, the picker, a followed job that
     // finishes and opens -- closes the workspace, so the canvas shows that molecule rather than the preview.
-    const selectedId = useAppSelector(state => state.molecule.selectedId);
-    const chosenRef = useRef(selectedId);
+    // Task 16d item 9: keyed on loadNonce, which every selectMolecule bumps, so re-picking the molecule already
+    // chosen (quick-pick Water under a water preview) closes it too -- the id alone does not change then.
+    const loadNonce = useAppSelector(state => state.molecule.loadNonce);
+    const chosenRef = useRef(loadNonce);
     useEffect(() => {
-        if (chosenRef.current === selectedId) return;
-        chosenRef.current = selectedId;
+        if (chosenRef.current === loadNonce) return;
+        chosenRef.current = loadNonce;
         if (shown) dispatch(requestOpened(false));
-    }, [selectedId, shown, dispatch]);
+    }, [loadNonce, shown, dispatch]);
 
     if (!shown) return null;
     return (

@@ -361,6 +361,30 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(store.getState().jobs.request.previewAtoms).toBeNull();
     });
 
+    // Task 16d item 9 (Task 16 re-review): re-picking the molecule already chosen -- quick-pick Water under a water
+    // preview -- reloads it behind the preview; the workspace closes for it too, as for any other choice.
+    it('closes the request workspace when the molecule already chosen is picked again', async () => {
+        BUILD_ENV.dev = true;
+        mockApi.preview.mockResolvedValue(previewFixture('preview_ok'));
+        const { store, container } = await enterMolecules(false);
+        await show(store, 'h2o');
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const viewportCell = container.querySelector('#canvas-container') as HTMLElement;
+        fireEvent.click(within(side).getByRole('button', { name: 'Request a new molecule' }));
+        const workspace = within(viewportCell).getByRole('region', { name: 'Request a molecule' });
+        fireEvent.change(within(workspace).getByRole('textbox', { name: 'molecule (Name)' }), { target: { value: 'water' } });
+        fireEvent.click(within(workspace).getByRole('button', { name: 'Preview' }));
+        await flush();
+        expect(store.getState().jobs.request.previewAtoms).not.toBeNull();
+        const nonce = store.getState().molecule.loadNonce;
+        fireEvent.click(within(within(side).getByRole('group', { name: 'Quick pick' })).getByRole('button', { name: /Water/ }));
+        await flush();
+        expect(store.getState().molecule.selectedId).toBe('h2o');
+        expect(store.getState().molecule.loadNonce).toBe(nonce + 1);
+        expect(within(viewportCell).queryByRole('region', { name: 'Request a molecule' })).toBeNull();
+        expect(store.getState().jobs.request.previewAtoms).toBeNull();
+    });
+
     it('says an ended session, with the way back, rather than hiding the request panel silently', async () => {
         BUILD_ENV.cognito = COGNITO;
         const { store, container } = await enterMolecules(false);
