@@ -8,7 +8,8 @@ import type { ScalarGrid } from '../../src/molecules/esp';
 import type { LibraryMoleculeMeta } from '../../src/molecules/library_types';
 import type { MoleculeBasis } from '../../src/molecules/types';
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY } from '../../src/molecules/esp_color';
-import { gridHalfWidth, planMoleculeRender } from '../../src/molecules/render_plan';
+import { gridHalfWidth } from '../../src/molecules/render_plan';
+import { originReach } from '../../src/molecules/orbital_box';
 import { methaneMeta, waterMeta } from '../molecules/fixtures';
 
 // The library's own files (data v3) for the orbital tiles: water and the open-shell NO₂.
@@ -88,8 +89,8 @@ describe('moleculeStripItems (spec §9.4 Strip, §12; rulings P5, P6, P7)', () =
         });
     });
 
-    // Task 16c: the limit is the main view's box (ruling T10-mainbox), which grows past the density's where an orbital reaches past it.
-    it('evaluates each frontier orbital from the basis at 40³, in a box fitted to it and never larger than the main view\'s', () => {
+    // Task 16c fix round 1 (ruling T16c-I1): a tile never probes; its limit is the density's box or the orbital's originReach, whichever is larger.
+    it('evaluates each frontier orbital from the basis at 40³, in a box fitted to it and never larger than its limit', () => {
         const items = moleculeStripItems(args({ meta: h2oMeta }));
         for (const [label, index] of [['HOMO', 4], ['LUMO', 5], ['LVMO', 10]] as const) {
             const request = requestOf(byLabel(items, label));
@@ -102,8 +103,7 @@ describe('moleculeStripItems (spec §9.4 Strip, §12; rulings P5, P6, P7)', () =
             expect(request.field.sources).toHaveLength(1);
             const [source] = request.field.sources;
             expect(source.recipe).toMatchObject({ type: 'gaussianMO', index });
-            const main = planMoleculeRender(h2oMeta, { kind: 'mo', index }, 0.9, h2oBasis);
-            expect(source.rMax).toBeLessThanOrEqual(main.kind === 'mo' ? main.request.sources[0].rMax : NaN);
+            expect(source.rMax).toBeLessThanOrEqual(Math.max(gridHalfWidth(h2oMeta), originReach(h2oBasis, index)));
             // The basis the worker registers is the one the recipe names (moved onto the box's centre, or the molecule's own).
             expect(request.field.bases).toHaveLength(1);
             expect(source.recipe.type === 'gaussianMO' && source.recipe.moleculeId).toBe(request.field.bases![0].id);

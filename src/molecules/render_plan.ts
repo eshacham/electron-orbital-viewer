@@ -40,17 +40,20 @@ function moleculeOrbitalSource(meta: LibraryMoleculeMeta, index: number, rMax: n
  */
 export function planMoleculeRender(
     meta: LibraryMoleculeMeta, surface: MoleculeSurface, enclosedFraction: number, basis?: MoleculeBasis,
+    /** `probe: false`: keep the density's box -- the strip's tiles fit their own (fitToOrbital) and never probe (ruling T16c-I1). */
+    { probe = true }: { probe?: boolean } = {},
 ): MoleculeRenderPlan {
     if (surface.kind === 'none') return { kind: 'clear' };
     if (surface.kind === 'mo') {
         const orbital = meta.orbitals.find(o => o.index === surface.index);
         const name = orbital?.label ?? `orbital ${surface.index}`;
         const label = `Computing ${name}…`;
-        // Ruling T10-mainbox: one box for every orbital in the list at this fraction, holding the widest surface
-        // (view_box.ts), at a resolution that keeps the density box's step. It needs the basis; a plan read
-        // only for its label keeps the density's box.
+        // Rulings T10-mainbox / T16c-I1: the orbital's own box, grown past the density's where its surface reaches
+        // further at this fraction (view_box.ts), at a resolution that keeps the density box's step within the
+        // caps (T16c-cap), framed for the density's box. It needs the basis; a plan read only for its label
+        // keeps the density's box.
         const densityBox = gridHalfWidth(meta);
-        const box = basis ? orbitalViewBox(basis, meta.orbitals.map(o => o.index), enclosedFraction, densityBox) : densityBox;
+        const box = basis && probe ? orbitalViewBox(basis, surface.index, enclosedFraction, densityBox) : densityBox;
         return {
             kind: 'mo', label,
             request: {
@@ -58,7 +61,7 @@ export function planMoleculeRender(
                 // orbitals (bonds_request.ts), never the busy text: an
                 // exported solid or a colour key must not read "Computing…".
                 sources: [moleculeOrbitalSource(meta, surface.index, box)], colors: ['#ffffff'], memberLabels: [name],
-                resolution: viewResolution(MOLECULE_MO_RESOLUTION, densityBox, box), enclosedFraction, label,
+                resolution: basis ? viewResolution(MOLECULE_MO_RESOLUTION, densityBox, box, basis.nao) : MOLECULE_MO_RESOLUTION, enclosedFraction, label,
                 frameBox: densityBox,
                 ...(basis ? { bases: [basis] } : {}),
             },

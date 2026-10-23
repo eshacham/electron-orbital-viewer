@@ -111,7 +111,8 @@ export function moleculeStripItems(args: MoleculeStripArgs): MoleculeStripItem[]
             const target: MoleculeStripTarget = { surface: { kind: 'mo', index: orbital.index } };
             let thumb: StripThumb = { kind: 'pending' };
             if (basis !== 'loading') {
-                const plan = planMoleculeRender(meta, target.surface, enclosedFraction, basis);
+                // Ruling T16c-I1: a tile fits its own box (fitToOrbital), so the main view's probe is not run for it.
+                const plan = planMoleculeRender(meta, target.surface, enclosedFraction, basis, { probe: false });
                 if (plan.kind !== 'mo') continue;
                 thumb = {
                     kind: 'orbital',

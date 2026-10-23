@@ -104,7 +104,8 @@ export function bondsStripItems({ bonds, data, h2plusR, enclosedFraction }: Bond
         const spin = orbital.spin ?? 'restricted';
         const siblings = orbitals.filter(o => o.label === orbital.label && (o.spin ?? 'restricted') === spin);
         const view: BondsView = { kind: 'mo', label: orbital.label, spin, component: siblings.indexOf(orbital) };
-        const built = bondsFieldRequest({ ...bonds, view }, data.basis, enclosedFraction);
+        // Ruling T16c-I1: a tile fits its own box (fitToOrbital), so the main view's probe is not run for it.
+        const built = bondsFieldRequest({ ...bonds, view }, data.basis, enclosedFraction, { probe: false });
         // Real or absent (§3.5): an orbital this basis does not keep would be drawn as the density, under its label.
         if (!built || built.note !== null) continue;
         const label = `${orbital.label}${SPIN_SUFFIX[spin]}`;

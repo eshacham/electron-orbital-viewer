@@ -278,6 +278,25 @@ describe('useMoleculeView', () => {
         expect(options.boxRMax).toBeCloseTo(6.43, 9);
         expect(store.getState().molecule.espRange?.[0]).toBeCloseTo(-0.02, 6);
     });
+    // Task 16c fix round 1 (review Minor 3): the density and an orbital are framed for one box -- the density grid's --
+    // so moving between them keeps the user's zoom, however far the orbital's own sampling box grows.
+    it('frames the density and an orbital for the same box (rulings T10-mainbox, T16c-I1)', async () => {
+        const worker = fakeWorker();
+        (createGridMeshWorker as jest.Mock).mockReturnValue(worker);
+        (getDensityGrid as jest.Mock).mockResolvedValue(densityGrid());
+        const store = makeStore();
+        render(<Provider store={store}><Harness active context={fakeContext()} /></Provider>);
+        act(() => { store.dispatch(selectMolecule({ id: 'h2o' })); store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() })); });
+        await flush();
+        const { requestId } = worker.postMessage.mock.calls[0][0];
+        act(() => { worker.onmessage!({ data: { type: 'success', meshData: meshOf(1), requestId } }); });
+        await flush();
+        const densityBox = (presentFieldMesh as jest.Mock).mock.calls[0][2].boxRMax;
+        expect(densityBox).toBeCloseTo(6.43, 9);
+        act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
+        await flush();
+        expect((updateFieldInScene as jest.Mock).mock.calls.at(-1)[1].frameBox).toBe(densityBox);
+    });
     it('draws an orbital through updateFieldInScene with its basis, and the overlay follows the mode', async () => {
         const context = fakeContext();
         const store = makeStore();

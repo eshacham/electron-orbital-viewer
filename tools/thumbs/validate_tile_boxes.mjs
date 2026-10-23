@@ -7,7 +7,7 @@
 // tools/molecules/out when it exists locally, else from the published site) into --data, once;
 // then bundles the sweep with the repo's esbuild and runs it with node. Foreground only:
 // Vite is started and stopped inside this run, and never on the owner's ports.
-//   node tools/thumbs/validate_tile_boxes.mjs [--data /tmp/eov-tile-box-data] [--port 5411] [--only c2] [--jobs N] [--skip-main] [--skip-tiles]
+//   node tools/thumbs/validate_tile_boxes.mjs [--data /tmp/eov-tile-box-data] [--port 5411] [--only c2] [--jobs N] [--skip-main] [--skip-tiles] [--reference-face 0.1]
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
@@ -52,6 +52,8 @@ if (!existsSync(join(data, 'complete.json')) || !existsSync(join(data, 'library'
   }
 }
 const flags = ['--skip-main', '--skip-tiles'].filter(flag => process.argv.includes(flag));
+const referenceFace = arg('reference-face', null);
+if (referenceFace) flags.push('--reference-face', referenceFace);
 // The main-view sweep samples every orbital at up to ~145³ three times over: about 25 min on one thread.
 const jobs = arg('jobs', String(Math.max(1, availableParallelism() - 2)));
 process.exit(run([...(only ? ['--only', only] : []), '--jobs', jobs, ...flags]) ?? 2);

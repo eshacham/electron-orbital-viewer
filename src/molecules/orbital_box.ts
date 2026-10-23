@@ -152,21 +152,28 @@ export function basisCentredOn(basis: MoleculeBasis, centre: [number, number, nu
  * Molecules strip's) is meshed in a box fitted to its own orbital, not the
  * whole molecule's -- at 40³ a 1s core orbital in the molecule's box is a
  * voxel speck. `field` is the main view's own request for that orbital (one
- * gaussianMO source, its rMax the main view's box: the molecule's, grown
- * where an orbital reaches past it, ruling T10-mainbox). The sampling box is always
+ * gaussianMO source; its rMax the molecule's box, as the strips ask for it
+ * with `probe: false`). A tile is fitted within the larger of that box and
+ * the orbital's originReach (ruling T16c-I1), and falls back to that larger
+ * box where the fit would not be smaller. The sampling box is always
  * centred on the origin, so the tile is given a copy of the basis moved by
  * −centre (and named for it), shared through `moved` by tiles with the same
  * centre: the same orbital, sitting at the centre of its box. The tile frames
  * its own mesh (render_thumbnail.ts), so where the orbital sits does not
  * show. The main view's request is not touched; anything but one gaussianMO
- * source, or a box no smaller than the main view's, is returned as it is.
+ * source is returned as it is.
  */
 export function fitToOrbital(field: FieldRenderRequest, basis: MoleculeBasis, moved: Map<string, MoleculeBasis>): FieldRenderRequest {
     const [source] = field.sources;
     if (field.sources.length !== 1 || source.recipe.type !== 'gaussianMO') return field;
     const { index } = source.recipe;
-    const { centre, halfWidth } = orbitalBox(basis, index, source.rMax);
-    if (halfWidth >= source.rMax) return field;
+    // Ruling T16c-I1: the tile's own limit -- the request's box (the molecule's, as the strips ask for it), or the
+    // orbital's whole originReach where that is further, so a diffuse orbital's tile holds its surface without a probe.
+    const limit = Math.max(source.rMax, originReach(basis, index));
+    const { centre, halfWidth } = orbitalBox(basis, index, limit);
+    if (halfWidth >= limit) {
+        return limit > source.rMax ? { ...field, sources: [{ ...source, rMax: limit }] } : field;
+    }
     let fitted = basis;
     if (centre.some(c => c !== 0)) {
         const key = centre.join(',');

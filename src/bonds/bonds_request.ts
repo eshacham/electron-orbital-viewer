@@ -54,6 +54,8 @@ function singleSourceRequest(
  */
 export function bondsFieldRequest(
     state: BondsState, basis: MoleculeBasis | null, enclosedFraction: number,
+    /** `probe: false`: keep the molecule's box -- the strip's tiles fit their own (fitToOrbital) and never probe (ruling T16c-I1). */
+    { probe = true }: { probe?: boolean } = {},
 ): { request: FieldRenderRequest; note: string | null } | null {
     if (state.system === 'h2plus') {
         // The slice keeps R on the slider; this is the last guard before the
@@ -73,10 +75,11 @@ export function bondsFieldRequest(
     const bases = [basis];
     const orbital = findOrbital(basis, state.view);
     if (orbital) {
-        // Ruling T10-mainbox: every orbital of this point is sampled in one box that holds the widest surface any
-        // of them has at this fraction (view_box.ts), at a resolution that keeps the molecule box's step, and
-        // framed for the molecule's box -- so neither another orbital nor the density moves the camera.
-        const box = orbitalViewBox(basis, basis.orbitals.map(o => o.index), enclosedFraction, rMax);
+        // Rulings T10-mainbox / T16c-I1: the orbital is sampled in its own box, grown past the molecule's where its
+        // surface reaches further at this fraction (view_box.ts), at a resolution that keeps the molecule box's
+        // step within the caps (T16c-cap), and framed for the molecule's box -- so neither another orbital nor the
+        // density moves the camera.
+        const box = probe ? orbitalViewBox(basis, orbital.index, enclosedFraction, rMax) : rMax;
         const source: AnalyticFieldSource = {
             kind: 'analytic', id: `gaussianMO:${basis.id}:${orbital.index}`, rMax: box,
             recipe: { type: 'gaussianMO', moleculeId: basis.id, index: orbital.index },
@@ -85,7 +88,7 @@ export function bondsFieldRequest(
         return {
             note: null,
             request: singleSourceRequest(source, SINGLE_SOURCE_COLOR, label, enclosedFraction, {
-                bases, resolution: viewResolution(BONDS_RESOLUTION, rMax, box), frameBox: rMax,
+                bases, resolution: viewResolution(BONDS_RESOLUTION, rMax, box, basis.nao), frameBox: rMax,
             }),
         };
     }

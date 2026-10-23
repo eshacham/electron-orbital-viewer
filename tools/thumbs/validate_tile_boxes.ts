@@ -3,10 +3,10 @@
 // tile's. Bundled and run by validate_tile_boxes.mjs (which also fetches the data); not part of the app or the
 // jest suite.
 //
-// MAIN VIEW (ruling T10-mainbox). For every basis.json of every Bonds molecule at every scan point, every
-// orbital (the Bonds list offers each), and every library molecule's every orbital (the Molecules list
-// offers each), at 90, 95 and 99 %: the request the app sends -- bondsFieldRequest / planMoleculeRender,
-// so the box and resolution are view_box.ts's as shipped -- is sampled exactly as the orbital worker
+// MAIN VIEW (rulings T10-mainbox, T16c-I1, T16c-cap). For every basis.json of every Bonds molecule at every
+// scan point, every orbital (the Bonds list offers each), and every library molecule's every orbital (the
+// Molecules list offers each), at 90, 95 and 99 %: the request the app sends -- bondsFieldRequest /
+// planMoleculeRender, so each orbital's own box and resolution are view_box.ts's as shipped -- is sampled exactly as the orbital worker
 // samples it (sampleFieldSource at the request's own box and resolution), its iso level found as the worker
 // finds it (isoLevelForEnclosedFraction), and
 //   - face/iso = the largest |ψ|² on the box's six faces over that iso level. ≥ 1 means the surface crosses
@@ -14,21 +14,25 @@
 //   - "past the molecule's box" counts the surfaces with a sample at or above the iso level outside the
 //     molecule's own box (Bonds: the farthest atom + MOLECULE_PADDING; Molecules: the density grid's) --
 //     the surfaces that box cut before Task 16c;
-//   - the step 2·rMax/resolution is checked against the molecule box's (no coarser, unless capped).
+//   - the step 2·rMax/resolution is compared with the molecule box's: every case the caps coarsen is listed
+//     with its factor, and the resolution must be view_box.ts's rule's;
+//   - where the surface comes near a face (face/iso ≥ REFERENCE_FACE), the iso level is compared with an
+//     exact-superset reference (same step and centre, padded by half the grid a side): how much density the
+//     box leaves out.
 //
-// STRIP TILES (rulings T10-core, Task 15). Every Bonds orbital and every library molecule's frontier tiles
-// (HOMO, SOMO, LUMO, LVMO -- frontierOrbitals): fitToOrbital fits a tile within the main view's box at that
-// fraction (its `limit`, now view_box.ts's). A fitted tile is sampled exactly as the strip samples it -- 40³,
+// STRIP TILES (rulings T10-core, Task 15, T16c-I1). Every Bonds orbital and every library molecule's frontier
+// tiles (HOMO, SOMO, LUMO, LVMO -- frontierOrbitals): fitToOrbital fits a tile within the larger of the
+// molecule's box and the orbital's originReach (its `limit`; tiles never probe). A fitted tile is sampled exactly as the strip samples it -- 40³,
 // the basis moved to the box's centre (basisCentredOn) -- and so is a reference with the SAME step and SAME
 // centre in a box twice as wide (80³). The tile's samples are then an exact subset of the reference's, so:
 //   - left-out density = the reference's share outside the tile box;
 //   - face/iso = as above, on the tile's own 40³ grid and iso level. ≥ 1 is a CUT (exit code 1).
-// A tile that keeps the main view's box is sampled at 40³ in that box and checked the same way.
-//   node tools/thumbs/validate_tile_boxes.mjs [--data DIR] [--port 5411] [--only c2] [--jobs 8] [--skip-main] [--skip-tiles]
+// A tile that keeps its limit box is sampled at 40³ in that box and checked the same way.
+//   node tools/thumbs/validate_tile_boxes.mjs [--data DIR] [--port 5411] [--only c2] [--jobs 8] [--skip-main] [--skip-tiles] [--reference-face 0.1]
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { isMainThread, parentPort, Worker, workerData } from 'worker_threads';
-import { basisCentredOn, orbitalBox } from '../../src/molecules/orbital_box';
+import { basisCentredOn, orbitalBox, originReach } from '../../src/molecules/orbital_box';
 import { registerMoleculeBasis } from '../../src/molecules/basis_registry';
 import { sampleFieldSource } from '../../src/orbital_mesh';
 import { isoLevelForEnclosedFraction } from '../../src/radial_distribution';
@@ -36,9 +40,9 @@ import { BONDS_RESOLUTION, BONDS_SYSTEMS, BondsSystemId, MOLECULE_PADDING } from
 import { bondsFieldRequest } from '../../src/bonds/bonds_request';
 import reducer, { selectBondsSystem, setBondsView, setScanPoint } from '../../src/store/bondsSlice';
 import { gridHalfWidth, MOLECULE_MO_RESOLUTION, planMoleculeRender } from '../../src/molecules/render_plan';
-import { MAX_VIEW_RESOLUTION } from '../../src/molecules/view_box';
+import { MAX_VIEW_RESOLUTION, viewResolution } from '../../src/molecules/view_box';
 import { frontierOrbitals } from '../../src/molecules/orbital_display';
-import type { FieldRenderRequest } from '../../src/field_source';
+import type { AnalyticFieldSource, FieldRenderRequest } from '../../src/field_source';
 import type { BasisOrbital, MoleculeBasis, MoleculeIndexEntry } from '../../src/molecules/types';
 import type { LibraryMoleculeMeta } from '../../src/molecules/library_types';
 
@@ -121,57 +125,88 @@ const pct = (f: number) => `${Math.round(f * 100)} %`;
 const list = (lines: string[]) => (lines.length === 0 ? 'none' : `\n    ${lines.join('\n    ')}`);
 
 interface MainTally {
-    cases: number; points: number;
+    cases: number; points: number; samples: number; samplesBefore: number;
     grown: Map<number, number>; pastOld: Map<number, number>; worstFace: Map<number, { value: number; at: string }>;
     largest: { ratio: number; box: number; at: string }; highest: { resolution: number; at: string };
-    capped: string[]; coarser: string[]; cut: string[];
+    /** Every case whose step is coarser than the molecule box's, with its factor and the cap that set it (ruling T16c-cap). */
+    coarsened: string[];
+    /** A resolution other than view_box's rule gives: a bug. */
+    wrongResolution: string[];
+    /** Exact-superset reference checks, where the surface comes near the box (face/iso ≥ REFERENCE_FACE). */
+    referenced: number; worstIso: { value: number; at: string }; worstLeft: { value: number; at: string }; isoOff: string[];
+    cut: string[];
 }
 
 const newMainTally = (): MainTally => ({
-    cases: 0, points: 0,
+    cases: 0, points: 0, samples: 0, samplesBefore: 0,
     grown: new Map(FRACTIONS.map(f => [f, 0])), pastOld: new Map(FRACTIONS.map(f => [f, 0])),
     worstFace: new Map(FRACTIONS.map(f => [f, { value: 0, at: '' }])),
-    largest: { ratio: 1, box: 0, at: '' }, highest: { resolution: 0, at: '' }, capped: [], coarser: [], cut: [],
+    largest: { ratio: 1, box: 0, at: '' }, highest: { resolution: 0, at: '' }, coarsened: [], wrongResolution: [],
+    referenced: 0, worstIso: { value: 1, at: '' }, worstLeft: { value: 0, at: '' }, isoOff: [], cut: [],
 });
 
+/** Where the surface comes this near the box (face/iso), its iso level is also checked against a reference that holds everything. */
+const REFERENCE_FACE = Number(arg('reference-face') ?? 0.1);
+/** isoLevelForEnclosedFraction's histogram bin, 10^(12/4096); two bins is the tolerance reported. */
+const ISO_TWO_BINS = 10 ** (24 / 4096);
+
 /**
- * One point or molecule: `requestFor(orbital, f)` is the app's own main-view request. `oldBox` and
- * `baseResolution` are the box and resolution every orbital was drawn in before Task 16c.
+ * The exact-superset reference for a main-view grid (box B, resolution N): the same step and centre, padded by
+ * ⌈N/2⌉ steps a side, so the view's samples are exactly the reference's middle. Returns iso view/ref and the
+ * reference's share of the density outside the view's box.
+ */
+function againstReference(source: AnalyticFieldSource, resolution: number, viewIso: number, fraction: number): { isoRatio: number; left: number } {
+    const step = (2 * source.rMax) / resolution;
+    const pad = Math.ceil(resolution / 2);
+    const reference = sampleFieldSource({ ...source, rMax: source.rMax + pad * step }, resolution + 2 * pad);
+    const side = reference.side;
+    let total = 0, inside = 0;
+    for (let i = 0; i < side; i++) for (let j = 0; j < side; j++) for (let k = 0; k < side; k++) {
+        const d = reference.samples[(i * side + j) * side + k] ** 2;
+        total += d;
+        if (i >= pad && i <= pad + resolution && j >= pad && j <= pad + resolution && k >= pad && k <= pad + resolution) inside += d;
+    }
+    return { isoRatio: viewIso / isoLevelForEnclosedFraction(reference.samples, fraction), left: 1 - inside / total };
+}
+
+/**
+ * One point or molecule: `requestFor(orbital, f)` is the app's own main-view request (ruling T16c-I1: each
+ * orbital its own box). `oldBox` and `baseResolution` are the box and resolution every orbital was drawn in
+ * before Task 16c; `nao` the basis's size, which the mesh budget caps the resolution by.
  */
 function checkMainView(
-    tally: MainTally, name: string, orbitals: readonly BasisOrbital[], oldBox: number, baseResolution: number,
+    tally: MainTally, name: string, orbitals: readonly BasisOrbital[], oldBox: number, baseResolution: number, nao: number,
     requestFor: (orbital: BasisOrbital, fraction: number) => FieldRenderRequest,
 ): void {
     tally.points++;
-    const boxes = new Map<number, { box: number; resolution: number }>();
-    for (const f of FRACTIONS) {
-        const first = requestFor(orbitals[0], f);
-        const box = first.sources[0].rMax;
-        const resolution = first.resolution;
-        boxes.set(f, { box, resolution });
-        if (box > oldBox) tally.grown.set(f, tally.grown.get(f)! + 1);
-        const where = `${name} at ${pct(f)}`;
-        if (box / oldBox > tally.largest.ratio) tally.largest = { ratio: box / oldBox, box, at: where };
-        if (resolution > tally.highest.resolution) tally.highest = { resolution, at: where };
-        if ((2 * box) / resolution > (2 * oldBox) / baseResolution * (1 + 1e-12)) {
-            (resolution >= MAX_VIEW_RESOLUTION ? tally.capped : tally.coarser).push(`${where}: box ${box.toFixed(2)} a₀ at ${resolution}`);
-        }
-    }
+    const grown = new Set<number>();
     for (const orbital of orbitals) {
         // The same box and resolution at two fractions is the same grid: sampled once.
         const grids = new Map<string, Sampled>();
         for (const f of FRACTIONS) {
-            const { box, resolution } = boxes.get(f)!;
             tally.cases++;
             const request = requestFor(orbital, f);
             const [source] = request.sources;
+            const box = source.rMax;
+            const { resolution } = request;
             const label = `${name} ${orbital.label}${orbital.spin === 'restricted' ? '' : ` (${orbital.spin})`} at ${pct(f)}`;
-            // Ruling T10-mainbox: one box per (point, fraction), whatever the orbital.
-            if (source.rMax !== box || request.resolution !== resolution) tally.cut.push(`${label}: box ${source.rMax} differs from the point's ${box}`);
-            const grid = `${source.rMax}|${request.resolution}`;
+            tally.samples += (resolution + 1) ** 3;
+            tally.samplesBefore += (baseResolution + 1) ** 3;
+            if (box > oldBox) grown.add(f);
+            if (box / oldBox > tally.largest.ratio) tally.largest = { ratio: box / oldBox, box, at: label };
+            if (resolution > tally.highest.resolution) tally.highest = { resolution, at: label };
+            if (resolution !== viewResolution(baseResolution, oldBox, box, nao)) tally.wrongResolution.push(`${label}: ${resolution}`);
+            const factor = (box / resolution) / (oldBox / baseResolution);
+            if (factor > 1 + 1e-12) {
+                const cap = resolution >= MAX_VIEW_RESOLUTION ? `the resolution cap ${MAX_VIEW_RESOLUTION}`
+                    : resolution === baseResolution ? `the mesh budget (${nao} basis functions: no growth past ${baseResolution})`
+                        : `the mesh budget (${nao} basis functions)`;
+                tally.coarsened.push(`${label}: box ${box.toFixed(2)} a₀ @ ${resolution}, step ×${factor.toFixed(3)} (${cap})`);
+            }
+            const grid = `${box}|${resolution}`;
             if (!grids.has(grid)) {
                 request.bases?.forEach(registerMoleculeBasis);
-                grids.set(grid, sampleFieldSource(source, request.resolution));
+                grids.set(grid, sampleFieldSource(source, resolution));
             }
             const sampled = grids.get(grid)!;
             const iso = isoLevelForEnclosedFraction(sampled.samples, f);
@@ -180,22 +215,34 @@ function checkMainView(
             if (ratio > worst.value) { worst.value = ratio; worst.at = label; }
             if (reachesPast(sampled, iso, oldBox)) tally.pastOld.set(f, tally.pastOld.get(f)! + 1);
             if (ratio >= 1) tally.cut.push(`${label}: box ${box.toFixed(2)} a₀ at ${resolution}, face/iso ${ratio.toFixed(3)}`);
+            if (ratio >= REFERENCE_FACE) {
+                tally.referenced++;
+                const { isoRatio, left } = againstReference(source, resolution, iso, f);
+                if (isoRatio > tally.worstIso.value) tally.worstIso = { value: isoRatio, at: label };
+                if (left > tally.worstLeft.value) tally.worstLeft = { value: left, at: label };
+                if (isoRatio > ISO_TWO_BINS) tally.isoOff.push(`${label}: iso view/ref ${isoRatio.toFixed(4)}, left out ${(100 * left).toFixed(3)} %`);
+            }
         }
     }
+    for (const f of grown) tally.grown.set(f, tally.grown.get(f)! + 1);
 }
 
 function reportMain(title: string, tally: MainTally): void {
     console.log(`${title} main view: ${tally.points} points, ${tally.cases} orbital × fraction cases`);
     for (const f of FRACTIONS) {
         const worst = tally.worstFace.get(f)!;
-        console.log(`  at ${pct(f)}: box grown at ${tally.grown.get(f)} of ${tally.points}; `
+        console.log(`  at ${pct(f)}: some orbital's box grown at ${tally.grown.get(f)} of ${tally.points}; `
             + `${tally.pastOld.get(f)} surfaces reach past the molecule's own box (cut before Task 16c); `
             + `worst face/iso ${worst.value.toFixed(4)} (${worst.at})`);
     }
-    console.log(`  largest box ${tally.largest.box.toFixed(2)} a₀, ${tally.largest.ratio.toFixed(3)} × the molecule's (${tally.largest.at}); `
+    console.log(`  mean samples per mesh ${(tally.samples / tally.cases / 1e6).toFixed(3)} M (before Task 16c ${(tally.samplesBefore / tally.cases / 1e6).toFixed(3)} M); `
+        + `largest box ${tally.largest.box.toFixed(2)} a₀, ${tally.largest.ratio.toFixed(3)} × the molecule's (${tally.largest.at}); `
         + `highest resolution ${tally.highest.resolution} (${(tally.highest.resolution + 1) ** 3} samples, ${tally.highest.at})`);
-    console.log(`  step coarser than the molecule box's, at the resolution cap ${MAX_VIEW_RESOLUTION}: ${list(tally.capped)}`);
-    console.log(`  step coarser than the molecule box's, under the cap (a bug): ${list(tally.coarser)}`);
+    console.log(`  iso level against an exact-superset reference, ${tally.referenced} cases with face/iso ≥ ${REFERENCE_FACE}: `
+        + `worst iso view/ref ${tally.worstIso.value.toFixed(4)} (${tally.worstIso.at}), worst left out ${(100 * tally.worstLeft.value).toFixed(3)} % (${tally.worstLeft.at}); `
+        + `beyond two histogram bins: ${list(tally.isoOff)}`);
+    console.log(`  step coarser than the molecule box's (ruling T16c-cap), ${tally.coarsened.length} cases: ${list(tally.coarsened)}`);
+    console.log(`  resolution other than view_box's rule (a bug): ${list(tally.wrongResolution)}`);
     console.log(`  CUT: ${list(tally.cut)}`);
 }
 
@@ -209,7 +256,7 @@ const newTileTally = (): TileTally => ({
     worstFace: new Map(FRACTIONS.map(f => [f, { value: 0, at: '' }])), cut: [],
 });
 
-/** One orbital's tile: `limitFor(f)` is the main view's box at that fraction, the box fitToOrbital fits within. */
+/** One orbital's tile: `limitFor(f)` is the box fitToOrbital fits within -- the molecule's, or the orbital's originReach where further (ruling T16c-I1). */
 function checkTile(tally: TileTally, name: string, basis: MoleculeBasis, index: number, limitFor: (fraction: number) => number): void {
     const fitted = orbitalBox(basis, index, Infinity);
     let tile: Sampled | null = null;
@@ -219,7 +266,7 @@ function checkTile(tally: TileTally, name: string, basis: MoleculeBasis, index: 
         const limit = limitFor(f);
         let sampled: Sampled;
         if (fitted.halfWidth >= limit) {
-            // fitToOrbital keeps the main view's own box.
+            // fitToOrbital keeps the limit box itself.
             tally.mainBox++;
             if (!mainBoxTiles.has(limit)) mainBoxTiles.set(limit, sample(basis, index, limit, TILE_RESOLUTION));
             sampled = mainBoxTiles.get(limit)!;
@@ -253,7 +300,7 @@ function checkTile(tally: TileTally, name: string, basis: MoleculeBasis, index: 
 }
 
 function reportTiles(title: string, tally: TileTally): void {
-    console.log(`${title} strip tiles: ${tally.cases} tile × fraction cases: fitted ${tally.fitted}, in the main view's box ${tally.mainBox}`);
+    console.log(`${title} strip tiles: ${tally.cases} tile × fraction cases: fitted ${tally.fitted}, in their limit box ${tally.mainBox}`);
     for (const f of FRACTIONS) {
         const worst = tally.worstFace.get(f)!;
         console.log(`  at ${pct(f)}: worst face/iso ${worst.value.toFixed(4)} (${worst.at})`);
@@ -286,11 +333,11 @@ function sweepBondsFile(dir: string, file: string, { main, tiles }: Options, t: 
     const [system, point] = basis.id.split('@') as [BondsSystemId, string];
     const requestFor = (orbital: BasisOrbital, f: number) => bondsRequest(system, Number(point), basis, orbital, f);
     const moleculeBox = Math.max(...basis.atoms.map(atom => Math.hypot(...atom))) + MOLECULE_PADDING;
-    if (main) checkMainView(t.bondsMain, basis.id, basis.orbitals, moleculeBox, BONDS_RESOLUTION, requestFor);
+    if (main) checkMainView(t.bondsMain, basis.id, basis.orbitals, moleculeBox, BONDS_RESOLUTION, basis.nao, requestFor);
     if (!tiles) return;
     for (const orbital of basis.orbitals) {
         checkTile(t.bondsTiles, `${basis.id} ${orbital.label}${orbital.spin === 'restricted' ? '' : ` (${orbital.spin})`}`, basis, orbital.index,
-            f => requestFor(orbital, f).sources[0].rMax);
+            () => Math.max(moleculeBox, originReach(basis, orbital.index)));
     }
 }
 
@@ -306,10 +353,10 @@ function sweepLibraryMolecule(dir: string, id: string, { main, tiles }: Options,
         return plan.request;
     };
     const orbitals = meta.orbitals.map(o => basis.orbitals[o.index]);
-    if (main) checkMainView(t.libraryMain, id, orbitals, gridHalfWidth(meta), MOLECULE_MO_RESOLUTION, requestFor);
+    if (main) checkMainView(t.libraryMain, id, orbitals, gridHalfWidth(meta), MOLECULE_MO_RESOLUTION, basis.nao, requestFor);
     if (!tiles) return;
     for (const { role, orbital } of frontierOrbitals(meta.orbitals)) {
-        checkTile(t.libraryTiles, `${id} ${role} ${orbital.label}`, basis, orbital.index, f => requestFor(orbital, f).sources[0].rMax);
+        checkTile(t.libraryTiles, `${id} ${role} ${orbital.label}`, basis, orbital.index, () => Math.max(gridHalfWidth(meta), originReach(basis, orbital.index)));
     }
 }
 
@@ -323,12 +370,16 @@ function runJobs(dir: string, jobs: Job[], options: Options): Tallies {
 
 function mergeMain(a: MainTally, b: MainTally): MainTally {
     const sum = (x: Map<number, number>, y: Map<number, number>) => new Map(FRACTIONS.map(f => [f, x.get(f)! + y.get(f)!]));
+    const larger = <T extends { value: number }>(x: T, y: T) => (x.value >= y.value ? x : y);
     return {
-        cases: a.cases + b.cases, points: a.points + b.points, grown: sum(a.grown, b.grown), pastOld: sum(a.pastOld, b.pastOld),
-        worstFace: new Map(FRACTIONS.map(f => [f, a.worstFace.get(f)!.value >= b.worstFace.get(f)!.value ? a.worstFace.get(f)! : b.worstFace.get(f)!])),
+        cases: a.cases + b.cases, points: a.points + b.points, samples: a.samples + b.samples, samplesBefore: a.samplesBefore + b.samplesBefore,
+        grown: sum(a.grown, b.grown), pastOld: sum(a.pastOld, b.pastOld),
+        worstFace: new Map(FRACTIONS.map(f => [f, larger(a.worstFace.get(f)!, b.worstFace.get(f)!)])),
         largest: a.largest.ratio >= b.largest.ratio ? a.largest : b.largest,
         highest: a.highest.resolution >= b.highest.resolution ? a.highest : b.highest,
-        capped: [...a.capped, ...b.capped], coarser: [...a.coarser, ...b.coarser], cut: [...a.cut, ...b.cut],
+        coarsened: [...a.coarsened, ...b.coarsened], wrongResolution: [...a.wrongResolution, ...b.wrongResolution],
+        referenced: a.referenced + b.referenced, worstIso: larger(a.worstIso, b.worstIso), worstLeft: larger(a.worstLeft, b.worstLeft),
+        isoOff: [...a.isoOff, ...b.isoOff], cut: [...a.cut, ...b.cut],
     };
 }
 

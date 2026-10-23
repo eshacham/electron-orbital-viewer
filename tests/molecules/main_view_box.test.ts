@@ -1,11 +1,22 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+
+// Task 16c fix round 1 (ruling T16c-I1): count the probe's evaluations; everything else evaluates as before.
+jest.mock('../../src/molecules/gaussian_basis', () => {
+    const actual = jest.requireActual('../../src/molecules/gaussian_basis');
+    return { ...actual, moOnGrid: jest.fn(actual.moOnGrid) };
+});
+import { moOnGrid } from '../../src/molecules/gaussian_basis';
+import { bondsStripItems } from '../../src/thumbs/bonds_strip_items';
+import { moleculeStripItems } from '../../src/thumbs/molecule_strip_items';
+import type { GridFieldSource } from '../../src/field_source';
+import type { MoleculeMeta } from '../../src/molecules/types';
 import { bondsFieldRequest } from '../../src/bonds/bonds_request';
 import reducer, { selectBondsSystem, setBondsView, setScanPoint } from '../../src/store/bondsSlice';
 import type { BondsSystemId } from '../../src/bonds/systems';
 import { BONDS_RESOLUTION, MOLECULE_PADDING } from '../../src/bonds/systems';
 import { gridHalfWidth, MOLECULE_MO_RESOLUTION, planMoleculeRender } from '../../src/molecules/render_plan';
-import { MAX_VIEW_RESOLUTION, orbitalViewBox, viewResolution } from '../../src/molecules/view_box';
+import { MAX_VIEW_RESOLUTION, PROBE_RESOLUTION, VIEW_MESH_BUDGET_MS, orbitalViewBox, predictedMeshMs, viewResolution } from '../../src/molecules/view_box';
 import { registerMoleculeBasis } from '../../src/molecules/basis_registry';
 import { sampleFieldSource } from '../../src/orbital_mesh';
 import { isoLevelForEnclosedFraction } from '../../src/radial_distribution';
@@ -101,28 +112,80 @@ describe('the main view holds the surface it draws (ruling T10-mainbox)', () => 
     });
 });
 
-describe('one box per scan point and fraction, framed for the molecule (ruling T10-mainbox)', () => {
-    it("gives every Bonds orbital at a point the same box and resolution, framed for the molecule's box", () => {
+/** The orbital indices the probe evaluated since the last clear (its grid is PROBE_RESOLUTION + 1 points a side). */
+const probed = () => (moOnGrid as jest.Mock).mock.calls
+    .filter(([, , grid]) => grid.shape[0] === PROBE_RESOLUTION + 1)
+    .map(([, index]) => index as number);
+const indexOf = (basis: MoleculeBasis, label: string, spin: OrbitalSpin) => basis.orbitals.find(o => o.label === label && o.spin === spin)!.index;
+
+/**
+ * Ruling T10-mainbox, amended by T16c-I1 (fix round 1): each drawn orbital
+ * gets its own box -- frameBox (the molecule's box) is what keeps the user's
+ * zoom across orbital switches, so the box no longer has to be the point's
+ * widest. Only the drawn orbital is probed, so the cost no longer grows with
+ * the number of orbitals listed (a computed molecule lists hundreds).
+ */
+describe('each drawn orbital gets its own box, framed for the molecule (rulings T10-mainbox, T16c-I1)', () => {
+    it("grows the box only for the orbital that needs it, and frames every orbital for the molecule's box", () => {
         const basis = bondsBasis('b2-07');
         const box = moleculeBox(basis);
         for (const fraction of [0.9, 0.99]) {
-            const requests = everyView(basis).map(({ orbital, component }) => bondsRequest('b2', basis, fraction, orbital, component));
-            const [first] = requests;
-            // B₂'s diffuse 3σu* reaches past the molecule's box at both fractions (the bug), so the box grows ...
-            expect(first.sources[0].rMax).toBeGreaterThan(box);
-            for (const request of requests) {
-                // ... the same for every orbital, so switching between them keeps the camera,
-                expect(request.sources[0].rMax).toBe(first.sources[0].rMax);
-                expect(request.resolution).toBe(first.resolution);
-                // which keeps its framing for the molecule's own box (as the density's),
-                expect(request.frameBox).toBe(box);
-                // and the step is no coarser than the molecule box's at 96.
-                expect((2 * request.sources[0].rMax) / request.resolution).toBeLessThanOrEqual((2 * box) / BONDS_RESOLUTION);
-            }
+            const diffuse = bondsRequest('b2', basis, fraction, { label: '3σu*', spin: 'alpha' });
+            const compact = bondsRequest('b2', basis, fraction, { label: '1σg', spin: 'alpha' });
+            // B₂'s diffuse 3σu* reaches past the molecule's box (the bug), so its own box grows ...
+            expect(diffuse.sources[0].rMax).toBeGreaterThan(box);
+            // ... while the 1σg core keeps today's box and grid exactly,
+            expect(compact.sources[0].rMax).toBe(box);
+            expect(compact.resolution).toBe(BONDS_RESOLUTION);
+            // and both keep their framing for the molecule's box, so switching between them keeps the zoom.
+            expect(diffuse.frameBox).toBe(box);
+            expect(compact.frameBox).toBe(box);
         }
         // The box is fraction-aware: 99 % reaches further than 90 %.
-        expect(bondsRequest('b2', basis, 0.99, basis.orbitals[0]).sources[0].rMax)
-            .toBeGreaterThan(bondsRequest('b2', basis, 0.9, basis.orbitals[0]).sources[0].rMax);
+        expect(bondsRequest('b2', basis, 0.99, { label: '3σu*', spin: 'alpha' }).sources[0].rMax)
+            .toBeGreaterThan(bondsRequest('b2', basis, 0.9, { label: '3σu*', spin: 'alpha' }).sources[0].rMax);
+    });
+
+    it('probes only the orbital drawn, in Bonds and in Molecules', () => {
+        const basis = bondsBasis('b2-07');
+        (moOnGrid as jest.Mock).mockClear();
+        bondsRequest('b2', basis, 0.93, { label: '3σu*', spin: 'alpha' });
+        expect(probed()).toEqual([indexOf(basis, '3σu*', 'alpha')]);
+        (moOnGrid as jest.Mock).mockClear();
+        const lumo = ch3ohMeta.orbitals.find(o => o.role === 'LUMO')!.index;
+        moleculeRequest(ch3ohMeta, ch3ohBasis, lumo, 0.93);
+        expect(probed()).toEqual([lumo]);
+    });
+
+    it('never probes for the strips: a tile fits its own box', () => {
+        const basis = bondsBasis('b2-07');
+        const meta = { id: basis.id, orbitals: basis.orbitals.map(({ coefficients, ...orbital }) => orbital) } as unknown as MoleculeMeta;
+        const bonds = reducer(reducer(undefined, selectBondsSystem('b2')), setScanPoint({ index: 7, RBohr: 3.0 }));
+        (moOnGrid as jest.Mock).mockClear();
+        const tiles = bondsStripItems({ bonds, data: { meta, basis }, h2plusR: null, enclosedFraction: 0.94 });
+        expect(tiles.length).toBe(basis.orbitals.length + 1);
+        const density: GridFieldSource = { kind: 'grid', id: 'd', shape: [2, 2, 2], origin: [-1, -1, -1], spacing: 2, quantity: 'density', values: new Float32Array(8) };
+        moleculeStripItems({
+            meta: ch3ohMeta, surface: { kind: 'density' }, representation: 'ball-and-stick', enclosedFraction: 0.94,
+            densityGrid: density, espGrid: { shape: [2, 2, 2], origin: [-1, -1, -1], spacing: 2, values: new Float32Array(8) }, espLimit: 0.05, basis: ch3ohBasis,
+        });
+        expect(probed()).toEqual([]);
+    });
+
+    it("gives a Molecules orbital its own box, framed for the density grid's", () => {
+        const half = gridHalfWidth(ch3ohMeta);
+        const lumo = moleculeRequest(ch3ohMeta, ch3ohBasis, ch3ohMeta.orbitals.find(o => o.role === 'LUMO')!.index, 0.9);
+        const homo = moleculeRequest(ch3ohMeta, ch3ohBasis, ch3ohMeta.orbitals.find(o => o.role === 'HOMO')!.index, 0.9);
+        expect(lumo.sources[0].rMax).toBeGreaterThan(half);
+        expect(homo.sources[0].rMax).toBe(half);
+        expect(homo.resolution).toBe(MOLECULE_MO_RESOLUTION);
+        for (const request of [lumo, homo]) {
+            expect(request.frameBox).toBe(half);
+            expect((2 * request.sources[0].rMax) / request.resolution).toBeLessThanOrEqual((2 * half) / MOLECULE_MO_RESOLUTION);
+        }
+        // Read before the basis has loaded (for its label only), the plan keeps the density's box.
+        const labelOnly = planMoleculeRender(ch3ohMeta, { kind: 'mo', index: ch3ohMeta.orbitals[0].index }, 0.9);
+        expect(labelOnly.kind === 'mo' && labelOnly.request.sources[0].rMax).toBe(half);
     });
 
     it("leaves the density view exactly as it was: the molecule's box at 96", () => {
@@ -145,34 +208,43 @@ describe('one box per scan point and fraction, framed for the molecule (ruling T
         }
     });
 
-    it("gives every Molecules orbital the same box, framed for the density grid's", () => {
-        const half = gridHalfWidth(ch3ohMeta);
-        const requests = ch3ohMeta.orbitals.map(o => moleculeRequest(ch3ohMeta, ch3ohBasis, o.index, 0.9));
-        const [first] = requests;
-        expect(first.sources[0].rMax).toBeGreaterThan(half);
-        for (const request of requests) {
-            expect(request.sources[0].rMax).toBe(first.sources[0].rMax);
-            expect(request.resolution).toBe(first.resolution);
-            expect(request.frameBox).toBe(half);
-            expect((2 * request.sources[0].rMax) / request.resolution).toBeLessThanOrEqual((2 * half) / MOLECULE_MO_RESOLUTION);
-        }
-        // Read before the basis has loaded (for its label only), the plan keeps the density's box.
-        const labelOnly = planMoleculeRender(ch3ohMeta, { kind: 'mo', index: ch3ohMeta.orbitals[0].index }, 0.9);
-        expect(labelOnly.kind === 'mo' && labelOnly.request.sources[0].rMax).toBe(half);
-    });
-
     it('sets no reach for an orbital the basis does not carry', () => {
         const basis = bondsBasis('li2-07');
-        expect(orbitalViewBox(basis, [99], 0.9, 5)).toBe(5);
+        expect(orbitalViewBox(basis, 99, 0.9, 5)).toBe(5);
     });
 });
 
-describe('viewResolution', () => {
-    it("keeps the base resolution while the box has not grown, and the base step where it has, up to the cap", () => {
-        expect(viewResolution(96, 8, 8)).toBe(96);
-        expect(viewResolution(96, 8, 7)).toBe(96);
-        expect(viewResolution(96, 8, 10)).toBe(120);
-        expect(viewResolution(96, 8, 10.01)).toBe(121);
-        expect(viewResolution(95, 8, 40)).toBe(MAX_VIEW_RESOLUTION);
+/**
+ * Ruling T16c-cap: the resolution that keeps the step grows with the box only
+ * up to MAX_VIEW_RESOLUTION and up to what the mesh budget affords for this
+ * many basis functions (predictedMeshMs ≤ VIEW_MESH_BUDGET_MS); past either
+ * cap the step grows instead -- the surface stays whole. Never below today's
+ * resolution.
+ */
+describe('viewResolution (ruling T16c-cap)', () => {
+    it("keeps the base resolution while the box has not grown, and the base step where it has, up to the caps", () => {
+        expect(viewResolution(96, 8, 8, 62)).toBe(96);
+        expect(viewResolution(96, 8, 7, 62)).toBe(96);
+        expect(viewResolution(96, 8, 9, 62)).toBe(108);
+        expect(viewResolution(96, 8, 9.01, 62)).toBe(109);
+    });
+
+    it('caps the resolution at 130–135', () => {
+        expect(MAX_VIEW_RESOLUTION).toBeGreaterThanOrEqual(130);
+        expect(MAX_VIEW_RESOLUTION).toBeLessThanOrEqual(135);
+        expect(viewResolution(96, 8, 40, 12)).toBe(MAX_VIEW_RESOLUTION);
+    });
+
+    it('stays within the mesh budget for the basis size, and never drops below the base resolution', () => {
+        for (const nao of [12, 28, 62, 113, 157, 205, 286]) {
+            const resolution = viewResolution(95, 8, 16, nao);
+            expect(resolution).toBeGreaterThanOrEqual(95);
+            // Grown past the base, it is affordable; at the base it is today's grid, whatever it costs.
+            if (resolution > 95) expect(predictedMeshMs(resolution, nao)).toBeLessThanOrEqual(VIEW_MESH_BUDGET_MS);
+            if (resolution < MAX_VIEW_RESOLUTION && resolution > 95) expect(predictedMeshMs(resolution + 1, nao)).toBeGreaterThan(VIEW_MESH_BUDGET_MS);
+        }
+        // B₂ (62 basis functions): the budget stops short of the 132 the resolution cap would allow; SF₆ (286) cannot grow at all.
+        expect(viewResolution(96, 8, 10.86, 62)).toBeLessThan(MAX_VIEW_RESOLUTION);
+        expect(viewResolution(95, 9.45, 14.2, 286)).toBe(95);
     });
 });
