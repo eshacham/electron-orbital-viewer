@@ -261,7 +261,7 @@ function collectMetrics() {
     title: document.title,
     boxes: Object.fromEntries(['.app-topbar', '.app-rail', '.explore-panel', '#canvas-container', '.inspector', '.thumbnail-strip',
       '.viewport-title', '.viewport-toolbar', '.key-column', '.phone-topbar', '.phone-header', '.phone-sheet',
-      '.element-tile', '.periodic-table-mini', '.request-workspace'].map(s => [s, box(s)])),
+      '.element-tile', '.periodic-table-mini', '.request-workspace', '.scale-readout', '.first-view-hint'].map(s => [s, box(s)])),
     // Task 16: what has focus (Esc returns it to the entry), and anything in the request workspace wider than it.
     focused: (() => {
       const el = document.activeElement;
@@ -480,7 +480,9 @@ try {
         const file = `/tmp/6g1-${task}-${scene}-${theme}-${size}.png`;
         const png = await page.screenshot({ path: file });
         const metrics = await page.evaluate(collectMetrics);
-        metrics.text.enclosedNote = enclosedNote;
+        // 6G-2 Task 17: under ruling R24-3 the inspector opens its content section, so Display (and the note) is
+        // folded at load; a run with `--click Display` reads it after the steps instead (collectMetrics' own read).
+        metrics.text.enclosedNote = enclosedNote ?? metrics.text.enclosedNote;
         // Every /api request the page made, and what answered it; with --jobs-stub, notStubbed must be 0.
         metrics.api = {
           seen: api.seen.length, stubbed: api.stubbed, refused: api.refused, blockedResults: api.blockedResults,

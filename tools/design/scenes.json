@@ -13,6 +13,9 @@
   "bonds-o2": "#mode=bonds&system=o2",
   "bonds-h2plus": "#mode=bonds&system=h2plus",
   "bonds-co-orbital": "#mode=bonds&system=co&state=mo%3Arestricted%3A5%CF%83%3A0",
+  "bonds-n2-sg": "#mode=bonds&system=n2&state=mo%3Arestricted%3A3%CF%83g%3A0",
+  "bonds-b2-3su-alpha": "#mode=bonds&system=b2&state=mo%3Aalpha%3A3%CF%83u*%3A0",
+  "bonds-li2-2sg-99": "#mode=bonds&system=li2&state=mo%3Arestricted%3A2%CF%83g%3A0&frac=0.99",
   "water": "#mode=molecule&id=h2o",
   "water-space": "#mode=molecule&id=h2o&struct=space",
   "water-structure": "#mode=molecule&id=h2o&show=none",
@@ -23,6 +26,8 @@
   "benzene-structure": "#mode=molecule&id=benzene&show=none",
   "molecule-complex": "#mode=molecule&id=glycine",
   "water-orbitals": "#mode=molecule&id=h2o&show=mo:4",
+  "water-esp": "#mode=molecule&id=h2o&show=esp",
+  "c2h2-deep": "#mode=molecule&id=c2h2&show=mo:5&struct=space",
   "molecule-complex-orbitals": "#mode=molecule&id=glycine&show=mo:0",
   "no2": "#mode=molecule&id=no2",
   "ac-6s-shell": "#mode=atom&Z=89&rel=scalar&level=shell&n=6",
@@ -32,5 +37,6 @@
   "au-6s-orbital": "#mode=atom&Z=79&rel=scalar&level=orbital&n=6&l=0&ml=0",
   "pb-6p12-orbital": "#mode=atom&Z=82&rel=so&level=orbital&n=6&l=1&j=1/2&ml=0",
   "og-whole": "#mode=atom&Z=118&level=atom",
+  "pa-whole": "#mode=atom&Z=91&level=atom",
   "glycine-esp": "#mode=molecule&id=glycine&show=esp"
 }

@@ -10,6 +10,8 @@
   "original-concepts": {
     "file": "docs/quantumlab/references/original-concepts.png",
     "dark-modern": { "x": 12, "y": 5, "width": 754, "height": 463 },
-    "light-clean": { "x": 778, "y": 5, "width": 748, "height": 463 }
+    "light-clean": { "x": 778, "y": 5, "width": 748, "height": 463 },
+    "cinematic": { "x": 12, "y": 510, "width": 866, "height": 475 },
+    "cinematic-strip": { "x": 252, "y": 876, "width": 608, "height": 96 }
   }
 }
