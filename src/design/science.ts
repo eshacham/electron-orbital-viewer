@@ -83,6 +83,14 @@ export function canvasSolid(theme: ThemeMode): string {
     return TOKENS[theme]['canvas-solid'];
 }
 
+/**
+ * Task 16d: the ink a PNG export paints straight onto that canvas -- the scale bar, its label and the legend
+ * row's labels -- the theme's text-1, as the on-screen scale bar. (White on Light Clean's canvas was invisible.)
+ */
+export function overlayInk(theme: ThemeMode): string {
+    return TOKENS[theme]['text-1'];
+}
+
 /** sRGB hex → linear-light components: what three.js vertex colours are read in. */
 export function linearRgb(hex: string): [number, number, number] {
     const [r, g, b] = hexToRgb255(hex);

@@ -1,5 +1,7 @@
 import { exportPixelRatio, freeAreaCrop, drawOverlays, captureViewPng, ExportCanvas, ExportPainter } from '../../src/export/png';
 import { ATOM_METHOD } from '../../src/export/caption';
+import { canvasSolid, overlayInk } from '../../src/design/science';
+import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 
 /** Ruling T14-M1: the painter strokes paths now (the label arcs); painters that draw no labels ignore them. */
 const NO_PATHS = { strokeStyle: '', lineWidth: 1, beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {} };
@@ -297,5 +299,42 @@ describe('captureViewPng over a transparent canvas (spec §6.6)', () => {
         const draw = calls.findIndex(c => c[0] === 'drawImage');
         expect(fill).toBeGreaterThanOrEqual(0);
         expect(fill).toBeLessThan(draw);
+    });
+});
+
+// Task 16d item 1 (carried since 6G-1): the marks painted straight onto the canvas -- the scale bar, its label and
+// the legend row's labels -- take the theme's ink, so they read on Light Clean's pale canvas as on the dark one.
+// Text on its own dark backing (the caption band, the colour bar, the label pills) stays white.
+describe('drawOverlays: the theme\'s ink for marks on the bare canvas (Task 16d)', () => {
+    function paint(ink?: string) {
+        const texts: Array<{ text: string; style: string }> = [];
+        const fills: Array<{ style: string; w: number; h: number }> = [];
+        const painter = {
+            ...NO_PATHS,
+            fillStyle: '' as string, font: '', textBaseline: 'top' as CanvasTextBaseline,
+            fillRect(_x: number, _y: number, w: number, h: number) { fills.push({ style: this.fillStyle, w, h }); },
+            fillText(text: string) { texts.push({ text, style: this.fillStyle }); },
+            measureText: (text: string) => ({ width: text.length * 7 }),
+        };
+        drawOverlays(painter, 800, 600, 2, {
+            caption: ['Water'], scaleBar: { lengthBohr: 2, pixels: 50 }, phaseLegend: true, ink,
+        });
+        return { texts, fills };
+    }
+    it.each(['dark', 'light'] as const)('paints the scale bar, its label and the ψ key\'s labels in %s\'s ink', theme => {
+        const ink = overlayInk(theme);
+        const { texts, fills } = paint(ink);
+        expect(fills.find(f => f.w === 100 && f.h === 6)!.style).toBe(ink);
+        for (const label of ['2 a₀', 'ψ > 0', 'ψ < 0']) expect(texts.find(t => t.text === label)!.style).toBe(ink);
+        // The caption sits on its own dark band: white whatever the theme.
+        expect(texts.find(t => t.text === 'Water')!.style).toBe('#ffffff');
+    });
+    it('keeps white without an ink (what a dark export always drew)', () => {
+        const { texts } = paint();
+        expect(texts.find(t => t.text === '2 a₀')!.style).toBe('#ffffff');
+    });
+    it.each(['dark', 'light'] as const)('reads against %s\'s solid canvas at AA for text (4.5:1)', theme => {
+        const rgb = (css: string) => parseCssColor(css).slice(0, 3) as [number, number, number];
+        expect(contrastRatio(rgb(overlayInk(theme)), rgb(canvasSolid(theme)))).toBeGreaterThanOrEqual(4.5);
     });
 });

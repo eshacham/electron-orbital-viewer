@@ -53,7 +53,7 @@ import { useQuantumTheme } from '../design/useQuantumTheme';
 import { usePref } from '../design/usePref';
 import { displayPref, renderPref, hintPref } from '../design/presentation';
 import { glowOverridesOf, glowPref, settledGlowPref } from '../design/glow_pref';
-import { canvasSolid } from '../design/science';
+import { canvasSolid, overlayInk } from '../design/science';
 import type { Appearance } from '../design/appearance';
 
 interface ShellCompositionSuccessMessage {
@@ -245,6 +245,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                                 ...overlays,
                                 // The same bar the readout shows (see the scale effect below).
                                 scaleBar: getScaleBar(context, height, scaleBarMaxPx(width)),
+                                // Task 16d: the scale bar and legend labels in the theme's ink (white was lost on Light Clean).
+                                ink: overlayInk(appearanceRef.current.theme),
                                 // Ruling T14-M1: Molecules' labels as shown (none when off, or outside Molecules).
                                 modelLabels: labelsSnapshotRef.current
                                     ? { ...labelsSnapshotRef.current(), arcColour: TOKENS[appearanceRef.current.theme]['selected-edge'] }

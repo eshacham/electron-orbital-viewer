@@ -77,6 +77,12 @@ export interface OverlaySpec {
     phaseColours?: [string, string];
     /** Molecules' bond lengths and angles, when they are on screen (ruling T14-M1). */
     modelLabels?: ModelLabelsOverlay | null;
+    /**
+     * Task 16d: the colour of the marks painted on the bare canvas -- the scale bar, its label and the legend
+     * row's labels (science.ts overlayInk: the theme's text-1). White when absent. Text on its own dark backing
+     * (caption band, colour bar, label pills) stays white whatever the theme.
+     */
+    ink?: string;
 }
 
 export interface OverlayPainter {
@@ -114,12 +120,12 @@ export interface ExportCanvas {
  */
 function drawLegendRow(
     painter: OverlayPainter, width: number, height: number, scale: number,
-    pad: number, items: Array<[string, string | null]>,
+    pad: number, items: Array<[string, string | null]>, ink: string,
 ): void {
     let right = width - pad;
     for (const [label, color] of [...items].reverse()) {
         const textWidth = painter.measureText(label).width;
-        painter.fillStyle = '#ffffff';
+        painter.fillStyle = ink;
         painter.fillText(label, right - textWidth, height - pad);
         if (color) {
             painter.fillStyle = color;
@@ -243,9 +249,10 @@ export function drawOverlays(painter: OverlayPainter, width: number, height: num
     }
 
     painter.textBaseline = 'bottom';
+    const ink = spec.ink ?? '#ffffff';
     if (spec.scaleBar) {
         const barY = height - pad - 3 * scale;
-        painter.fillStyle = '#ffffff';
+        painter.fillStyle = ink;
         painter.fillRect(pad, barY, spec.scaleBar.pixels * scale, 3 * scale);
         painter.fillText(formatScaleLabel(spec.scaleBar.lengthBohr), pad, barY - 4 * scale);
     }
@@ -261,12 +268,12 @@ export function drawOverlays(painter: OverlayPainter, width: number, height: num
             ...spec.combinationLegend.map(item => [item.label, item.color] as [string, string | null]),
             ['darker: ψ < 0', null],
         ];
-        drawLegendRow(painter, width, height, scale, pad, items);
+        drawLegendRow(painter, width, height, scale, pad, items, ink);
     } else if (spec.phaseLegend) {
         // Left to right, matching the on-screen order (App.tsx's phase-legend div: positive then negative).
         // Ruling DB9: the fallback is science.ts's own phase hues, not a second literal copy of them.
         const [positive, negative] = spec.phaseColours ?? [PHASE_HUES.positive, PHASE_HUES.negative];
-        drawLegendRow(painter, width, height, scale, pad, [['ψ > 0', positive], ['ψ < 0', negative]]);
+        drawLegendRow(painter, width, height, scale, pad, [['ψ > 0', positive], ['ψ < 0', negative]], ink);
     }
 }
 

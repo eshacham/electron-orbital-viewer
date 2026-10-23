@@ -81,6 +81,7 @@ import { DEFAULT_DISPLAY, DEFAULT_RENDER, displayPref, renderPref, hintPref } fr
 import { metaLoaded, selectMolecule, setSurface } from '../src/store/moleculeSlice';
 import { captureViewPng } from '../src/export/png';
 import { TOKENS } from '../src/design/tokens';
+import { overlayInk } from '../src/design/science';
 import type { ViewerExportHandle } from '../src/export/handle';
 import { waterMeta } from './molecules/fixtures';
 import type { VisualizerContext } from '../src/orbital_visualizer';
@@ -834,6 +835,19 @@ describe('OrbitalViewer: Molecules\' bond labels', () => {
         // PNG plain asks for no overlays at all, so no labels either.
         await act(async () => { await on.handle.current!.capturePng(null); });
         expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2]).toBeNull();
+    });
+
+    // Task 16d item 1: the scale bar is painted in the theme's ink, so a Light Clean PNG shows it.
+    it('hands the export the theme\'s ink for the marks painted on the bare canvas', async () => {
+        const on = renderWithLabels(true);
+        on.water();
+        act(() => { themeChoicePref.set('dark'); });
+        await act(async () => { await on.handle.current!.capturePng({ caption: [], phaseLegend: false }); });
+        expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2].ink).toBe(overlayInk('dark'));
+        act(() => { themeChoicePref.set('light'); });
+        await act(async () => { await on.handle.current!.capturePng({ caption: [], phaseLegend: false }); });
+        expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2].ink).toBe(overlayInk('light'));
+        expect(overlayInk('light')).not.toBe(overlayInk('dark'));
     });
 
     it('hands the export no labels while the switch is off', async () => {
