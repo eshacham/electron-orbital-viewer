@@ -576,6 +576,9 @@ describe('ThumbnailStrip structure and icon tiles (Task 15)', () => {
             fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: 'butt',
             clearRect: jest.fn(), beginPath: jest.fn(), arc: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), fill: jest.fn(),
             stroke: jest.fn(function (this: { strokeStyle: string }) { strokes.push(ctx.strokeStyle); }),
+            // Task 16d item 3: the glyph shades its discs and sticks with gradients (structure_glyph.test.ts checks them).
+            createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+            createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
         };
         jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as RenderingContext);
         // (The visibility test above leaves its spy in place; start this count from zero.)
