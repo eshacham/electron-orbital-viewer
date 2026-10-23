@@ -96,8 +96,9 @@ export function moleculeStripItems(args: MoleculeStripArgs): MoleculeStripItem[]
             densityGrid === 'loading' || espGrid === 'loading' || plan.kind !== 'grid' ? { kind: 'pending' } : {
                 kind: 'orbital',
                 request: {
-                    // Drawn at a fixed ρ (ruling D4), so the enclosed fraction is not part of the picture.
-                    kind: 'grid', contentKey: `mol|${meta.id}|esp|${ESP_SURFACE_DENSITY}`, grid: moleculeGridRequest(plan, densityGrid, 0),
+                    // Drawn at a fixed ρ (ruling D4), so the enclosed fraction is not part of the picture; the colour
+                    // limit is (Task 16d item 4, T15-M1).
+                    kind: 'grid', contentKey: `mol|${meta.id}|esp|${ESP_SURFACE_DENSITY}|${espLimit}`, grid: moleculeGridRequest(plan, densityGrid, 0),
                     colouring: { kind: 'esp', grid: espGrid, limit: espLimit },
                 },
             },

@@ -84,9 +84,17 @@ describe('moleculeStripItems (spec §9.4 Strip, §12; rulings P5, P6, P7)', () =
         });
         const espRequest = requestOf(byLabel(items, 'Electrostatic potential'));
         expect(espRequest).toEqual({
-            kind: 'grid', contentKey: `mol|h2o|esp|${ESP_SURFACE_DENSITY}`, colouring: { kind: 'esp', grid: esp, limit: ESP_LIMIT_HARTREE },
+            // Task 16d item 4 (T15-M1): the colour limit is in the key (below).
+            kind: 'grid', contentKey: `mol|h2o|esp|${ESP_SURFACE_DENSITY}|${ESP_LIMIT_HARTREE}`, colouring: { kind: 'esp', grid: esp, limit: ESP_LIMIT_HARTREE },
             grid: { type: 'calculate', source: density, isoValue: ESP_SURFACE_DENSITY, requestId: 0 },
         });
+    });
+
+    // Task 16d item 4 (T15-M1): a tile coloured at another ESP limit is another picture, never the cached one.
+    it('keys the ESP tile by its colour limit too', () => {
+        const keyAt = (espLimit: number) => (requestOf(byLabel(moleculeStripItems(args({ espLimit })), 'Electrostatic potential')) as { contentKey: string }).contentKey;
+        expect(keyAt(ESP_LIMIT_HARTREE)).not.toBe(keyAt(ESP_LIMIT_HARTREE * 2));
+        expect(keyAt(0.05)).toBe(keyAt(0.05));
     });
 
     // Task 16c fix round 1 (ruling T16c-I1): a tile never probes; its limit is the density's box or the orbital's originReach, whichever is larger.
