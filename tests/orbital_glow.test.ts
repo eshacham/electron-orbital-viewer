@@ -365,6 +365,23 @@ describe('Glow with the viewer\'s own values (Task 16b)', () => {
         expect((surface.material as THREE.MeshStandardMaterial).userData.glowUniforms.qlOwnRimWhiten.value).toBe(0.6);
     });
 
+    // Task 16d item 14 (16b review M5): a halo or mesh lines set to 0 are not drawn at all -- no additive pass, and
+    // nothing for the frame-time guard to time -- and come back when the value does.
+    it('draws no halo or mesh lines whose strength is 0, and brings them back above it', () => {
+        const group = new THREE.Group();
+        const surface = surfaceIn(group);
+        const kinds = () => group.children.filter(child => child.userData.isGlowExtra).map(child => child.userData.isGlowExtra).sort();
+        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        attachGlowExtras(group, surface, { ...glowDark, glow: { haloOpacity: 0 } }, options);
+        expect(kinds()).toEqual(['lines']);
+        attachGlowExtras(group, surface, { ...glowDark, glow: { linesOpacity: 0 } }, options);
+        expect(kinds()).toEqual(['halo']);
+        attachGlowExtras(group, surface, { ...glowDark, glow: { haloOpacity: 0, linesOpacity: 0 } }, options);
+        expect(kinds()).toEqual([]);
+        attachGlowExtras(group, surface, glowDark, options);
+        expect(kinds()).toEqual(['halo', 'lines']);
+    });
+
     it('retunes the halo and lines it keeps, in place, and fades them from the viewer\'s strengths', () => {
         const group = new THREE.Group();
         const surface = surfaceIn(group);

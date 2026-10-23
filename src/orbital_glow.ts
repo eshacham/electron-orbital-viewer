@@ -483,8 +483,11 @@ export function attachGlowExtras(
     applyGlow(surface.material as THREE.MeshStandardMaterial, settings, { phased: Boolean(surface.geometry.getAttribute('phaseSign')) });
     const wanted = new Set<GlowExtra>();
     if (settings && !appearance.lowPower && options.extrasAllowed) {
-        if (appearance.theme === 'dark') wanted.add('halo');
-        wanted.add('lines');
+        // Task 16d item 14: an extra the viewer has set to 0 is not drawn at all -- no additive pass for nothing,
+        // and nothing for the frame-time guard to time.
+        const values = effectiveGlow(appearance.theme, appearance.glow);
+        if (appearance.theme === 'dark' && values.haloOpacity > 0) wanted.add('halo');
+        if (values.linesOpacity > 0) wanted.add('lines');
     }
     const fade = (group.userData.glowFade as number | undefined) ?? 1;
     for (const child of [...group.children]) {
