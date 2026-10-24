@@ -1,4 +1,4 @@
-import React, { useEffect, useImperativeHandle, useRef } from 'react';
+import React, { useEffect, useId, useImperativeHandle, useRef } from 'react';
 import { Button, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import MoleculePicker from './MoleculePicker';
 import MoleculeOrbitalList from './MoleculeOrbitalList';
@@ -41,6 +41,7 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
     variant = 'full', entries, indexError, meta, selectedId, surface, onSelectMolecule, onSurfaceChange, onOpenPicker,
 }, ref) => {
     const navRef = useRef<HTMLDivElement>(null);
+    const surfaceLabelId = useId();
     const focusWanted = useRef(false);
     // The pressed row is the orbital drawn: the list opens centred on it, so focus lands where the eye already is.
     const focusRow = () => {
@@ -80,7 +81,9 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
         <div className="molecule-nav level-nav" ref={navRef}>
             {meta && (
                 <>
-                    <ToggleButtonGroup exclusive size="small" fullWidth aria-label="surface" className="molecule-surface-toggle"
+                    {/* Owner R25-A4: a visible label over the switch, which names its group (WCAG 2.5.3). */}
+                    <Typography variant="subtitle2" id={surfaceLabelId} className="molecule-surface-label">Surface</Typography>
+                    <ToggleButtonGroup exclusive size="small" fullWidth aria-labelledby={surfaceLabelId} className="molecule-surface-toggle"
                         value={surface.kind}
                         onChange={(_event, kind: MoleculeSurface['kind'] | null) => {
                             if (kind === 'density' || kind === 'esp' || kind === 'none') onSurfaceChange({ kind });
@@ -89,8 +92,9 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
                         <ToggleButton value="density">Density</ToggleButton>
                         <ToggleButton value="esp">Electrostatic potential</ToggleButton>
                         <ToggleButton value="mo">Orbitals</ToggleButton>
-                        {/* Ruling P8: structure only (show=none); the name holds the visible label (WCAG 2.5.3). */}
-                        <ToggleButton value="none" aria-label="None (no surface)">None</ToggleButton>
+                        {/* Ruling P8: structure only (show=none, the link's key unchanged). Owner R25-A4: "None" said nothing
+                            of what is left out -- it reads "No surface", and that is its name. */}
+                        <ToggleButton value="none">No surface</ToggleButton>
                     </ToggleButtonGroup>
                     {/* Ruling R23f: the orbital list (and its legend) lives in
                         the Explore panel now, under this switch, on every

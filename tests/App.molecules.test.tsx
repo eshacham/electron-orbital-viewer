@@ -113,7 +113,7 @@ describe('Molecules mode', () => {
         const side = container.querySelector('.side-panel') as HTMLElement;
         const order = [
             side.querySelector('.molecule-tile') as HTMLElement,
-            within(side).getByRole('group', { name: 'surface' }),
+            within(side).getByRole('group', { name: 'Surface' }) /* R25-A4: named by its visible label */,
             within(side).getByText('Selection'),
         ];
         // (The jobs section, owner-only, renders nothing here; its place after Selection is App's markup.)
@@ -281,7 +281,7 @@ describe('Molecules mode', () => {
         const order = [
             tabpanel.querySelector('.molecule-tile.compact') as HTMLElement,
             within(tabpanel).getByText('Selection'),
-            within(tabpanel).getByRole('group', { name: 'surface' }),
+            within(tabpanel).getByRole('group', { name: 'Surface' }) /* R25-A4: named by its visible label */,
             within(tabpanel).getByText('Browse molecules'),
         ];
         order.forEach(node => expect(node).not.toBeNull());
@@ -499,8 +499,9 @@ describe('Molecules mode', () => {
         pickWater(store);
         await flush();
         const side = container.querySelector('.side-panel') as HTMLElement;
-        const surface = within(side).getByRole('group', { name: 'surface' });
-        fireEvent.click(within(surface).getByRole('button', { name: 'None (no surface)' }));
+        const surface = within(side).getByRole('group', { name: 'Surface' }) /* R25-A4: named by its visible label */;
+        // Owner R25-A4: "None" reads "No surface" now, its name its visible text.
+        fireEvent.click(within(surface).getByRole('button', { name: 'No surface' }));
         expect(store.getState().molecule.surface).toEqual({ kind: 'none' });
         expect(within(container.querySelector('.viewport-title') as HTMLElement).getByText('Structure only · geometry: experiment (CCCBDB)'))
             .toBeInTheDocument();

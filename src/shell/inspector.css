@@ -1,6 +1,7 @@
 /* src/shell/inspector.css -- the inspector's inside (spec §8.6) and its medium-width drawer (§7). */
+/* Owner R25-A4: both scrolling bodies keep their scrollbar's gutter, so content never changes width as one comes and goes. */
 .inspector-body {
-  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
   display: flex; flex-direction: column; gap: var(--ql-size-section-gap);
   padding: var(--ql-size-panel-padding);
 }
@@ -11,7 +12,7 @@
 .inspector-panel-section.open { flex: 1; }
 .inspector-panel-section + .inspector-panel-section { border-top: 1px solid var(--ql-color-border-subtle); }
 .inspector-section-heading { flex: none; padding: 6px var(--ql-size-panel-padding); }
-.inspector-section-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
+.inspector-section-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; display: flex; flex-direction: column; }
 .inspector-section-body > .inspector-body { flex: none; overflow: visible; }
 .inspector-section-body > .inspector-body:first-child { padding-top: 0; }
 .inspector-section-toggle {

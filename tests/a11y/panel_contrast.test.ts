@@ -84,7 +84,9 @@ const PAIRS: Pair[] = [
     // panel's `.molecule-nav`, whose own pairing already covers its text.
     { selector: '.molecule-orbital-gap', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.molecule-orbital-gap-caveat', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
-    { selector: '.molecule-orbital-legend', declares: [`background-color: ${v('surface-1')}`, `color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
+    // Owner R25-A4: the key is in the caption under the list now, no longer an opaque sticky band over the rows, so it
+    // declares no background of its own; it sits on the panel's surface-1.
+    { selector: '.molecule-orbital-legend', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     // Ruling R23f: the "Showing <orbital> -- pick another ... on the right"
     // summary (`.molecule-nav-orbital`) is retired along with the move --
     // the list itself, now beside the switch, already names the orbital drawn.

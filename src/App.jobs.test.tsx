@@ -182,7 +182,7 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(jobs).not.toBeNull();
         const order = [
             side.querySelector('.molecule-tile') as HTMLElement,
-            within(side).getByRole('group', { name: 'surface' }),
+            within(side).getByRole('group', { name: 'Surface' }) /* R25-A4: named by its visible label */,
             within(side).getByText('Selection'),
             jobs,
             side.querySelector('.molecule-provenance-footer') as HTMLElement,

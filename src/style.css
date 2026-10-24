@@ -1260,6 +1260,10 @@ html, body, #root {
   flex-direction: column;
   gap: 8px;
 }
+/* Owner R25-A4: the switch's visible label, as close to it as the Selection heading is to its readout. */
+.molecule-surface-label {
+  margin-bottom: -4px;
+}
 /* Panel-card text (LIGHT_96): the method/geometry caption under the
    surface toggle (MoleculeNav) and the "not ionisation energies" caption
    under the orbital list (MoleculeOrbitalList). */
@@ -1302,15 +1306,30 @@ html, body, #root {
 .molecule-orbital-degeneracy {
   color: var(--ql-color-text-3);
 }
-/* Ruling T16-b: where the virtuals end and the occupied orbitals begin. */
-.molecule-orbital-gap {
+/* Owner R25-A4: the list first, its notes under it as its caption (the gap note, the key to the marks, the
+   method and label notes) -- nothing sits over a row, so nothing needs an opening scroll to clear it. */
+.molecule-orbital-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.molecule-orbital-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Ruling T16-b: where the virtuals end and the occupied orbitals begin -- a plain rule between the rows; its
+   words are the caption's gap note (R25-A4). */
+.molecule-orbital-gap-rule {
+  flex: none;
   margin: 2px 0;
-  padding: 2px 6px;
   border-top: 1px dashed var(--ql-color-border-strong);
-  border-bottom: 1px dashed var(--ql-color-border-strong);
+}
+/* The gap note, first line of the caption (R25-A4; it was the labelled divider between the rows). */
+.molecule-orbital-gap {
   color: var(--ql-color-text-2);
-  font-size: 11px;
-  text-align: center;
+  font-size: var(--ql-type-caption-size);
+  line-height: 1.35;
 }
 /* Phase 6D: the gap divider's Kohn–Sham caveat, on its own line in the divider's own colour. */
 .molecule-orbital-gap-caveat {
@@ -1333,15 +1352,10 @@ html, body, #root {
   display: block;
   font-size: 11px;
 }
-/* Fix round 1: the key to the ◌/◇ marks and "upper est.", held at the top of the list as it scrolls; opaque so
-   rows passing under it do not show through. */
+/* Fix round 1: the key to the ◌/◇ marks and "upper est."; in the caption under the list since owner R25-A4 (it
+   was held, sticky and opaque, at the top of the list, over the rows). */
 .molecule-orbital-legend {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   margin: 0;
-  padding: 2px 6px;
-  background-color: var(--ql-color-surface-1);
   color: var(--ql-color-text-2);
   font-size: 11px;
 }
@@ -1450,6 +1464,9 @@ html, body, #root {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* Owner R25-A4: the gutter is kept whether or not a scrollbar shows, so switching the surface (the orbital
+     list comes and goes) never changes the content's width -- the flicker. */
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: var(--ql-size-section-gap);

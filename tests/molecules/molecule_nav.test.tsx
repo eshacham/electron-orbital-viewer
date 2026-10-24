@@ -56,19 +56,26 @@ describe('MoleculeOrbitalList', () => {
         expect(onSelect).toHaveBeenCalledWith(3);
         expect(container.textContent).toMatch(/Kohn–Sham orbital energies, B3LYP\/def2-TZVP\. Not ionisation energies\./);
     });
-    // Ruling T16-b: descending order stays (it reads like an MO diagram), so
-    // the gap between the last virtual and the HOMO is marked, and labelled.
-    it('marks the HOMO–LUMO gap with a labelled divider between the virtuals and the occupied orbitals', () => {
-        render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
+    // Ruling T16-b: descending order stays (it reads like an MO diagram), so the gap between the last virtual and
+    // the HOMO is marked. Owner R25-A4 moves its words -- the gap and the Kohn–Sham caveat -- below the list as its
+    // caption (they sat between the rows, over the HOMO); a plain rule still marks where the occupied orbitals begin.
+    it('marks the HOMO–LUMO gap with a rule between the virtuals and the occupied orbitals, and says it under the list (R25-A4)', () => {
+        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
             method="B3LYP/def2-TZVP" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
         // Fix round 1: a note, not a separator -- screen readers skip a separator's children, so the gap and its
         // caveat would go unannounced.
-        const divider = screen.getByRole('note');
-        expect(divider.textContent).toBe(`HOMO–LUMO gap 0.320 Ha (8.71 eV). ${GAP_CAVEAT}.`);
+        const note = screen.getByRole('note');
+        expect(note.textContent).toBe(`HOMO–LUMO gap 0.320 Ha (8.71 eV). ${GAP_CAVEAT}.`);
         expect(screen.queryByRole('separator')).toBeNull();
         const [lumo, homo] = screen.getAllByRole('button');
-        expect(lumo.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(divider.compareDocumentPosition(homo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        const rule = container.querySelector('.molecule-orbital-gap-rule') as HTMLElement;
+        expect(rule).toHaveAttribute('aria-hidden', 'true');
+        expect(lumo.compareDocumentPosition(rule) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(rule.compareDocumentPosition(homo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // The words follow every row, outside the part that scrolls.
+        const rows = screen.getAllByRole('button');
+        expect(rows[rows.length - 1].compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect((container.querySelector('.molecule-orbital-list') as HTMLElement).contains(note)).toBe(false);
     });
     // Final review M6: open-shell NO₂ (ROKS) has a singly occupied orbital
     // between the HOMO and the LUMO, so its divider spans SOMO -> LUMO.
@@ -90,8 +97,7 @@ describe('MoleculeOrbitalList', () => {
         const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
             const at = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 100, width: 100, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
             if (this.classList.contains('molecule-orbital-list')) return at(100, 200);
-            // Task 17 fix: the scroll now also keeps the gap note above the HOMO in view, so it is placed where it sits.
-            if (this.classList.contains('molecule-orbital-gap')) return at(480, 36);
+            // (R25-A4: the gap note is under the list now, so nothing over the HOMO is placed here any more.)
             if (this.textContent?.includes('HOMO') && this.tagName === 'BUTTON') return at(520, 30);
             return at(0, 0);
         });
@@ -140,6 +146,22 @@ describe('MoleculeNav', () => {
         expect(onSurfaceChange).toHaveBeenLastCalledWith({ kind: 'esp' });
         fireEvent.click(screen.getByRole('button', { name: 'Orbitals' }));
         expect(onSurfaceChange).toHaveBeenLastCalledWith({ kind: 'mo', index: 4 });
+    });
+    // Owner R25-A4: "not clear what none is" -- the switch has a visible "Surface" label above it, which names the
+    // group, and its fourth choice reads "No surface" (visible text and name alike; the link's show=none is unchanged).
+    it('labels the switch "Surface" above it, and its fourth choice "No surface" (R25-A4)', () => {
+        const onSurfaceChange = jest.fn();
+        const { container } = render(<MoleculeNav {...navProps} onSurfaceChange={onSurfaceChange} />);
+        const group = screen.getByRole('group', { name: 'Surface' });
+        const label = container.querySelector(`#${group.getAttribute('aria-labelledby')}`) as HTMLElement;
+        expect(label).toHaveTextContent(/^Surface$/);
+        expect(label.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(within(group).getAllByRole('button').map(button => button.textContent)).toEqual(['Density', 'Electrostatic potential', 'Orbitals', 'No surface']);
+        const none = within(group).getByRole('button', { name: 'No surface' });
+        expect(none).not.toHaveAttribute('aria-label');
+        fireEvent.click(none);
+        expect(onSurfaceChange).toHaveBeenLastCalledWith({ kind: 'none' });
+        expect(screen.queryByText(/^None$/)).toBeNull();
     });
     // Ruling R23f (replacing T16-a): the list sits beside the switch on
     // every variant now -- a desktop's docked Explore panel ('full') and a
@@ -351,36 +373,37 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         const third = list(silent, { pointGroup: 'D3h', labelGroup: 'D3h', labels: 'full-group' });
         expect(third.container.textContent).toContain(`?: ${UNLABELLED_NOTE}.`);
     });
-    // Fix round 1: the marks are explained before the first row that carries one, in a key that stays at the top of the
-    // list as it scrolls, not only in the caption under the last row.
-    it('keys the marks at the top of the list, ahead of every row', () => {
+    // Fix round 1 keyed the marks at the top of the list, held there as it scrolled. Owner R25-A4: the list comes
+    // first; the key is part of its caption under the last row, beside the gap note it now sits with.
+    it('keys the marks under the list, after every row (R25-A4)', () => {
         const { container } = list();
         const key = container.querySelector('.molecule-orbital-legend')!;
         expect(key.textContent).toBe('◌ partly diffuse virtual (under 75 % valence) · '
             + '◇ constructed LVMO, not an orbital of this calculation · upper est.: its energy is an upper estimate');
-        expect(key.compareDocumentPosition(screen.getAllByRole('button')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        const rows = screen.getAllByRole('button');
+        expect(rows[rows.length - 1].compareDocumentPosition(key) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect((container.querySelector('.molecule-orbital-list') as HTMLElement).contains(key)).toBe(false);
         const { container: legacy } = list(waterMeta().orbitals, { pointGroup: 'C2v', labelGroup: 'C2v' });
         expect(legacy.querySelector('.molecule-orbital-legend')).toBeNull();
     });
-    // 6G-2 Task 17 fix (Fail 2): centring the HOMO left the gap note just above it under the sticky key -- water's
-    // Orbitals view clipped the note's first line on a desktop and hid it on a tablet. The list opens with the HOMO
-    // centred unless that would put the note under the key; then the note's top sits at the key's bottom instead.
-    it('opens with the gap note clear of the sticky key when centring the HOMO would hide it (Task 17 fix)', () => {
-        const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-            const at = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 100, width: 100, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
-            if (this.classList.contains('molecule-orbital-list')) return at(100, 200);
-            if (this.classList.contains('molecule-orbital-legend')) return at(100, 60);
-            if (this.classList.contains('molecule-orbital-gap')) return at(460, 50);
-            if (this.textContent?.includes('HOMO') && this.tagName === 'BUTTON') return at(520, 30);
-            return at(0, 0);
-        });
+    // 6G-2 Task 17 fix (Fail 2) kept the gap note clear of the sticky key with an opening scroll of its own. Owner
+    // R25-A4 moved both under the list, so that rule is gone (the list opens with the HOMO centred, above) and this
+    // pins what made it unnecessary: the part that scrolls holds the rows and the plain gap rule only, and none of the
+    // list's rules is sticky -- nothing can lie over a row.
+    it('lets nothing cover a row: the scrolling part holds only rows and the gap rule, and nothing in it is sticky (R25-A4)', () => {
         const { container } = list();
-        // Centring the HOMO would scroll 335 px and leave the note's top 25 px under the 60 px key; 300 puts it at the
-        // key's bottom edge, with the HOMO right under the note.
-        const scrollTop = (container.querySelector('.molecule-orbital-list') as HTMLElement).scrollTop;
-        expect(scrollTop).toBe(300);
-        expect(460 - scrollTop).toBeGreaterThanOrEqual(100 + 60);
-        rects.mockRestore();
+        const scrolling = container.querySelector('.molecule-orbital-list') as HTMLElement;
+        for (const child of Array.from(scrolling.children)) {
+            expect(child.classList.contains('molecule-orbital-row') || child.classList.contains('molecule-orbital-gap-rule')).toBe(true);
+        }
+        const notes = container.querySelector('.molecule-orbital-notes') as HTMLElement;
+        expect(scrolling.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(notes.querySelector('.molecule-orbital-legend')).not.toBeNull();
+        expect(within(notes).getByRole('note')).toBeInTheDocument();
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+        const rules = css.match(/^\.molecule-orbital[^{]*\{[^}]*\}/gm) ?? [];
+        expect(rules.length).toBeGreaterThan(5);
+        for (const rule of rules) expect(rule).not.toMatch(/position:\s*sticky/);
     });
     // Fix round 1: at the card's 300 px a row with ×3, the LVMO chip and the estimate (silane's constructed t2) overflowed.
     // jsdom has no layout, so this pins the rules that let it fit: the energy column may shrink below its content and
