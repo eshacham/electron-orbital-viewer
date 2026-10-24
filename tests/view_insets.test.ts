@@ -1,4 +1,5 @@
-import { measureViewInsets } from '../src/useViewInsets';
+import { renderHook, waitFor } from '@testing-library/react';
+import { measureViewInsets, useViewInsets } from '../src/useViewInsets';
 
 /** A container with children at fixed rectangles, since jsdom does no layout. */
 function layout(container: { width: number; height: number }, children: Record<string, Partial<DOMRect>>): HTMLElement {
@@ -117,5 +118,25 @@ describe('measureViewInsets', () => {
             '.phone-sheet': { left: 0, right: 390, top: 796, bottom: 844, width: 390, height: 48 },
         });
         expect(measureViewInsets(root, true).bottom).toBe(48);
+    });
+});
+
+// 6G-2 Task 17 fix (Fail 1): the first-view hint stops short of the right-hand zones -- the same key column and
+// drawer the camera insets measure -- so the free area's right edge is published beside its left and bottom.
+describe('useViewInsets', () => {
+    it('publishes the covered right edge as --free-right, beside --free-left and --free-bottom', async () => {
+        const root = layout({ width: 688, height: 688 }, {
+            '#orbital-canvas-host': { left: 0, right: 688, top: 0, bottom: 688, width: 688, height: 688 },
+            '.key-column': { left: 412, right: 632, top: 440, bottom: 592, width: 220, height: 152 },
+            '.inspector-drawer': { left: 644, right: 688, top: 0, bottom: 688, width: 44, height: 688 },
+            '.thumbnail-strip': { left: 12, right: 632, top: 530, bottom: 676, width: 620, height: 146 },
+        });
+        const host = root.querySelector<HTMLElement>('#orbital-canvas-host')!;
+        const onChange = jest.fn();
+        renderHook(() => useViewInsets({ current: host }, false, onChange));
+        await waitFor(() => expect(onChange).toHaveBeenCalled());
+        expect(root.style.getPropertyValue('--free-right')).toBe('276px');
+        expect(root.style.getPropertyValue('--free-left')).toBe('0px');
+        expect(root.style.getPropertyValue('--free-bottom')).toBe('158px');
     });
 });

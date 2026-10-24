@@ -36,3 +36,25 @@
 .viewport-cell:has(> .canvas-busy) .first-view-hint {
   bottom: calc(var(--free-bottom, 140px) + 12px + 44px);
 }
+
+/* 6G-2 Task 17 fix: centred, the hint ran into the scale readout (bottom-left
+   of the free area) wherever the readout grew or the cell narrowed. On a
+   desktop or tablet it stacks on the readout instead, 8 px above it on the
+   same left edge -- the readout's own offset plus its measured height, as
+   Molecules' label hint does (molecule_labels.css, review M7) -- and stops
+   short of the right-hand zones the camera insets measure (--free-right: the
+   key column, the folded drawer), wrapping rather than running under them.
+   A phone keeps the rule above: its readout is at the top, under the header. */
+.app-shell:not(.phone) .first-view-hint {
+  left: calc(var(--free-left, 0px) + 20px);
+  bottom: calc(var(--scale-readout-bottom, 20px) + var(--scale-readout-height, 0px) + 8px);
+  transform: none;
+  max-width: calc(100% - var(--free-left, 0px) - var(--free-right, 0px) - 32px);
+  white-space: normal;
+}
+/* D10 on a desktop or tablet: the busy chip sits centre-bottom over the strip
+   (style.css); with no readout drawn yet (a first load) the stacked spot
+   alone would be under it, so the hint takes whichever is higher. */
+.app-shell:not(.phone) .viewport-cell:has(> .canvas-busy) .first-view-hint {
+  bottom: max(calc(var(--scale-readout-bottom, 20px) + var(--scale-readout-height, 0px) + 8px), calc(var(--free-bottom, 0px) + 12px + 44px));
+}

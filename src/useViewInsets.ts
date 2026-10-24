@@ -91,6 +91,8 @@ export function useViewInsets(
                 container.style.setProperty('--free-center-x', `${insets.left + (width - insets.left - insets.right) / 2}px`);
                 container.style.setProperty('--free-center-y', `${insets.top + (height - insets.top - insets.bottom) / 2}px`);
                 container.style.setProperty('--free-left', `${insets.left}px`);
+                // 6G-2 Task 17 fix: what sits on the free area's left (the first-view hint) stops short of the key column and drawer.
+                container.style.setProperty('--free-right', `${insets.right}px`);
                 // Spec §8.5 "Centre-bottom above strip": the busy and unbound chips sit on this.
                 container.style.setProperty('--free-bottom', `${insets.bottom}px`);
                 onChange(insets);
