@@ -1,4 +1,6 @@
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, screen } from '@testing-library/react';
 import KeyColumn, { AtomKeys, PhaseKey, ShellRingKey } from '../../src/shell/KeyColumn';
 import { phaseColours } from '../../src/design/science';
@@ -63,5 +65,46 @@ describe('the Atom screen\'s keys (spec §11.5)', () => {
     it('labels every ring colour', () => {
         render(<ShellRingKey items={shellItems} />);
         expect(screen.getByLabelText('shell colour key')).toHaveTextContent('n=1');
+    });
+});
+
+// 6G-2 Task 17 round 2 (ruling T17-key, spec §3.3: every colour keyed on screen). On a phone the compact key is a
+// row; Pa's seven shell rings and the cut-face caption ran past the screen's right edge (n=5 cut, n=6, n=7 and the
+// caption hidden). The row now wraps inside the column's 220 px, and the caption takes a line of its own. jsdom does
+// no layout, so these pin the rules; shoot.mjs's `keyColumn.hidden` [] is the live proof.
+describe('the compact (phone) key wraps rather than running off screen (ruling T17-key)', () => {
+    const strip = (file: string) => readFileSync(resolve(__dirname, file), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = (source: string, selector: string) => {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const match = new RegExp(`(^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(source);
+        if (!match) throw new Error(`No rule for ${selector}`);
+        return match[2];
+    };
+    const viewport = strip('../../src/shell/viewport.css');
+
+    it('wraps the compact row onto as many lines as its keys need', () => {
+        const row = rule(viewport, '.key-column.compact .phase-legend');
+        expect(row).toMatch(/flex-direction:\s*row;/);
+        expect(row).toMatch(/flex-wrap:\s*wrap;/);
+    });
+
+    it('gives the cut-face caption a line of its own in the compact key, never squeezed beside the swatches', () => {
+        expect(rule(viewport, '.key-column.compact .key-caption')).toMatch(/flex-basis:\s*100%;/);
+    });
+
+    it('keeps the phone key column inside the screen: right 12 px, at most 220 px, under the header (one rule for its top)', () => {
+        expect(rule(viewport, '.key-column')).toMatch(/right:\s*12px;/);
+        expect(rule(viewport, '.key-column')).toMatch(/max-width:\s*220px;/);
+        const style = strip('../../src/style.css');
+        // DB6/DX7: style.css holds the single phone top rule, keyed on --phone-overlay-top; nothing else re-sets it.
+        expect(style.match(/\.key-column\.compact\s*\{[^}]*top:\s*calc\(var\(--phone-overlay-top\) \+ 2px\)/g)).toHaveLength(1);
+        expect(viewport).not.toMatch(/\.key-column\.compact\s*\{[^}]*top:/);
+    });
+
+    it('renders every one of seven rings and the caption as its own item (Pa, Z = 91)', () => {
+        const rings = [1, 2, 3, 4, 5, 6, 7].map(n => ({ label: n >= 5 ? `n=${n} valence` : `n=${n}`, colour: '#4da3ff' }));
+        const { container } = render(<KeyColumn compact><ShellRingKey items={rings} /></KeyColumn>);
+        expect(container.querySelectorAll('.phase-legend-item')).toHaveLength(7);
+        expect(container.querySelector('.key-caption')).toHaveTextContent('cut face shading is scaled to local shell structure');
     });
 });
