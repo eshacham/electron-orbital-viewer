@@ -44,7 +44,10 @@
    its width so neither the Full screen button nor the key's right edge sits
    under it. useViewInsets already measures .key-column and .inspector-drawer
    by their actual DOM rects, so the camera inset follows this automatically. */
-.app-shell.medium .viewport-toolbar, .app-shell.medium .key-column { right: calc(var(--ql-size-inspector-bar) + 12px); }
+/* 6G-2 Task 17 fix: the strip too -- it ran 29 px under the folded bar on a tablet, clipping its last tile's label
+   (its own right inset, strip.css, is 12 px). Its box is the bottom zone useViewInsets measures, so nothing else moves. */
+.app-shell.medium .viewport-toolbar, .app-shell.medium .key-column,
+.app-shell.medium .thumbnail-strip.overlay { right: calc(var(--ql-size-inspector-bar) + 12px); }
 /* DB6/DX7: the phone key column's own "under the header" top offset is
    style.css's narrow-viewport rule (keyed on --phone-overlay-top, replacing
    the old per-chip .phase-legend selector) -- not duplicated here, so there

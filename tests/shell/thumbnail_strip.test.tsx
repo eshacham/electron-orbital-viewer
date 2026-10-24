@@ -618,3 +618,26 @@ describe('ThumbnailStrip structure and icon tiles (Task 15)', () => {
         expect(screen.getByRole('button', { name: 'Hide views' })).toHaveTextContent('Hide views');
     });
 });
+
+// 6G-2 Task 17 fix (Fail 3): at medium width (tablet) the strip ran 29 px under the folded inspector drawer bar,
+// clipping the last tile's label. Ruling DB3 already pulls the toolbar and the key column in by the bar's width;
+// the strip joins that rule (jsdom does no layout: shoot.mjs's `overlaps.strip` is the live proof, 0 px).
+describe('strip at medium width (ruling DB3, Task 17 fix)', () => {
+    const css = readFileSync(resolve(__dirname, '../../src/shell/viewport.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+    it('clears the folded drawer bar as the toolbar and the key column do', () => {
+        const match = /([^{}]*\.app-shell\.medium \.thumbnail-strip\.overlay[^{}]*)\{([^}]*)\}/.exec(css);
+        expect(match).not.toBeNull();
+        const selectors = match![1].split(',').map(s => s.trim());
+        expect(selectors).toEqual(expect.arrayContaining([
+            '.app-shell.medium .viewport-toolbar', '.app-shell.medium .key-column', '.app-shell.medium .thumbnail-strip.overlay',
+        ]));
+        expect(match![2]).toMatch(/right:\s*calc\(var\(--ql-size-inspector-bar\) \+ 12px\);/);
+    });
+
+    it('outranks the strip\'s own 12 px right inset (strip.css)', () => {
+        const strip = readFileSync(resolve(__dirname, '../../src/shell/strip.css'), 'utf8');
+        // `.thumbnail-strip.overlay` (two classes) sets right: 12px; the medium rule (four classes) wins wherever both apply.
+        expect(strip).toMatch(/\.thumbnail-strip\.overlay \{[^}]*right: 12px;/);
+    });
+});
