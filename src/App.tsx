@@ -870,8 +870,9 @@ function App() {
     const bondsOrbitalTiles = !isNarrow && !stripCollapsed && bondsStrip.some(item => item.target.kind !== 'density');
 
     // Task 15 (spec §9.4 "Strip", §12; rulings P5, P6, P7): the molecule's views -- its structure two ways, the
-    // density, the ESP map, each frontier orbital the data name, and "All orbitals". The pictures are made from
-    // the molecule's own density grid, ESP grid and basis, each tile waiting on its glyph until its file lands.
+    // density, the ESP map, each frontier orbital the data name, and "Orbital list" (R25-A2; "All orbitals" before).
+    // The pictures are made from the molecule's own density grid, ESP grid and basis, each tile waiting on its
+    // glyph until its file lands.
     const moleculeStripData = useMoleculeStripData(isMoleculeMode ? molecule.meta : null);
     const builtMoleculeStrip = useMemo(
         () => (isMoleculeMode && molecule.meta
@@ -901,12 +902,14 @@ function App() {
     const moleculeSurfaceKind = molecule.surface.kind;
     const handleMoleculeStripSelect = useCallback((target: MoleculeStripTarget) => {
         if ('openOrbitals' in target) {
-            // Opens the orbital list: on the orbital drawn, or switched to the frontier occupied orbital -- an open
-            // shell's SOMO, else the HOMO (preflight D8, Task 16d) -- as the
-            // surface switch's Orbitals does -- then focus goes to that orbital's row.
+            // Goes to the orbital list: on the orbital drawn, or switched to the frontier occupied orbital -- an open
+            // shell's SOMO, else the HOMO (preflight D8, Task 16d) -- as the surface switch's Orbitals does. Owner
+            // R25-A2: then the list is scrolled into view in Explore (on a phone, the Explore sheet the tile sits in),
+            // focus goes to that orbital's row and the list is highlighted for a moment -- visible even when Orbitals
+            // was already drawn.
             const first = moleculeMeta && (frontierOccupied(moleculeMeta.orbitals) ?? moleculeMeta.orbitals[0]);
             if (moleculeSurfaceKind !== 'mo' && first) dispatch(setSurface({ kind: 'mo', index: first.index }));
-            moleculeNavRef.current?.focusOrbitalList();
+            moleculeNavRef.current?.revealOrbitalList();
             return;
         }
         if (target.representation) dispatch(setRepresentation(target.representation));

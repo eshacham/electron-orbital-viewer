@@ -140,7 +140,7 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
         >
             <span className="strip-tile-image" style={{ width: px, height: px }}>
                 {thumb.kind === 'back' ? <ArrowBack aria-hidden /> : thumb.kind === 'icon' ? (
-                    // Molecules' "All orbitals" (Task 15): a fixed picture -- three orbital-like circles in the
+                    // Molecules' "Orbital list" (Task 15; R25-A2): a fixed picture -- three orbital-like circles in the
                     // label's own colour, no science hue to key -- for a tile that opens a list.
                     <svg className="strip-tile-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="12" cy="7" r="4" />

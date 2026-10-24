@@ -57,8 +57,8 @@ function shows(target: MoleculeStripTarget, surface: MoleculeSurface, representa
  *   density grid, meshed by the request the main view sends) · one tile per
  *   frontier orbital the data name, by role -- HOMO, SOMO (an open shell),
  *   LUMO, LVMO (field jobs evaluated from the basis at 40³, each in a box
- *   fitted to its orbital, ruling T10-core) · All orbitals (an icon: it opens
- *   the orbital list).
+ *   fitted to its orbital, ruling T10-core) · Orbital list (an icon: it brings
+ *   the orbital list into view, owner R25-A2 -- it was "All orbitals").
  * A tile whose file is still loading waits on its glyph and label (ruling
  * T10-I1), so the row never reshuffles as files land; one whose file cannot
  * be had is left out (real or absent, §3.5).
@@ -129,7 +129,7 @@ export function moleculeStripItems(args: MoleculeStripArgs): MoleculeStripItem[]
         }
     }
 
-    add('all-orbitals', 'All orbitals', 'All orbitals — open the list', { openOrbitals: true }, { kind: 'icon' });
+    add('orbital-list', 'Orbital list', 'Orbital list — go to the list', { openOrbitals: true }, { kind: 'icon' });
     return items;
 }
 

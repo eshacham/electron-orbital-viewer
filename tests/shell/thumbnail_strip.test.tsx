@@ -556,7 +556,8 @@ describe('ThumbnailStrip visibility gating (spec §12, D15 Step 1)', () => {
 });
 
 // Task 15 (ruling P6): the Molecules strip's structure tiles are Canvas-2D glyphs of the molecule
-// (structure_glyph.ts), drawn at once like a ring glyph, in the theme's colours; "All orbitals" is an icon tile.
+// (structure_glyph.ts), drawn at once like a ring glyph, in the theme's colours; "Orbital list" (owner R25-A2's
+// name for "All orbitals") is an icon tile.
 describe('ThumbnailStrip structure and icon tiles (Task 15)', () => {
     type Target = { pick: string };
     const water = waterAtoms();
@@ -565,7 +566,7 @@ describe('ThumbnailStrip structure and icon tiles (Task 15)', () => {
             thumb: { kind: 'structure', atoms: water, representation: 'ball-and-stick' } },
         { key: 'space', label: 'Space filling', spoken: 'Space filling structure', group: null, groupSpoken: null, target: { pick: 'space' }, selected: false,
             thumb: { kind: 'structure', atoms: water, representation: 'space-filling' } },
-        { key: 'all', label: 'All orbitals', spoken: 'All orbitals — open the list', group: null, groupSpoken: null, target: { pick: 'all' }, selected: false,
+        { key: 'all', label: 'Orbital list', spoken: 'Orbital list — go to the list', group: null, groupSpoken: null, target: { pick: 'all' }, selected: false,
             thumb: { kind: 'icon' } },
     ];
     afterEach(() => { jest.restoreAllMocks(); });
@@ -600,12 +601,12 @@ describe('ThumbnailStrip structure and icon tiles (Task 15)', () => {
     it('shows the icon tile as a three-circle picture with its label, and forwards its target', () => {
         const onSelect = jest.fn();
         const { container } = render(<ThumbnailStrip items={molecule} label="views of this molecule" rGrid={[]} themeKey="dark|glow" onSelect={onSelect} />);
-        const option = screen.getByRole('option', { name: 'All orbitals — open the list' });
+        const option = screen.getByRole('option', { name: 'Orbital list — go to the list' });
         expect(option.querySelector('canvas')).toBeNull();
         const icon = option.querySelector('svg.strip-tile-icon') as SVGElement;
         expect(icon).toHaveAttribute('aria-hidden', 'true');
         expect(icon.querySelectorAll('circle')).toHaveLength(3);
-        expect(option).toHaveTextContent('All orbitals');
+        expect(option).toHaveTextContent('Orbital list');
         fireEvent.click(option);
         expect(onSelect).toHaveBeenCalledWith({ pick: 'all' });
         expect(container.querySelectorAll('canvas.thumb-canvas')).toHaveLength(2);

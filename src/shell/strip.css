@@ -48,7 +48,7 @@
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 4px;
   text-align: center; font: 600 13px / 1.2 var(--ql-font-sans); color: var(--ql-color-text-2);
 }
-/* Task 15: Molecules' "All orbitals" tile -- three outlined circles in the label's colour (text-2), no science hue. */
+/* Task 15: Molecules' "Orbital list" tile (owner R25-A2's name for "All orbitals") -- three outlined circles in the label's colour (text-2), no science hue. */
 .strip-tile-icon { width: 55%; height: 55%; fill: none; stroke: var(--ql-color-text-2); stroke-width: 1.5; }
 /* Ruling R20d: labels at the body size (13 px, was the 12 px caption). */
 .strip-tile-label {

@@ -39,10 +39,11 @@ const requestOf = (item: MoleculeStripItem): ThumbRequest => {
 const byLabel = (items: MoleculeStripItem[], label: string) => items.find(item => item.label === label)!;
 
 describe('moleculeStripItems (spec §9.4 Strip, §12; rulings P5, P6, P7)', () => {
+    // Owner R25-A2: the last tile reads "Orbital list" (it was "All orbitals", whose effect could not be seen).
     it('lists water\'s views in order, each with the picture it needs', () => {
         const items = moleculeStripItems(args());
         expect(items.map(item => item.label)).toEqual([
-            'Ball and stick', 'Space filling', 'Electron density', 'Electrostatic potential', 'HOMO', 'LUMO', 'All orbitals',
+            'Ball and stick', 'Space filling', 'Electron density', 'Electrostatic potential', 'HOMO', 'LUMO', 'Orbital list',
         ]);
         expect(items.map(item => item.thumb.kind)).toEqual(['structure', 'structure', 'orbital', 'orbital', 'orbital', 'orbital', 'icon']);
         expect(items.slice(2, 6).map(item => requestOf(item).kind)).toEqual(['grid', 'grid', 'field', 'field']);
@@ -53,14 +54,14 @@ describe('moleculeStripItems (spec §9.4 Strip, §12; rulings P5, P6, P7)', () =
         expect(moleculeStripItems(args()).map(item => item.spoken)).toEqual([
             'Ball and stick structure', 'Space filling structure', 'Electron density surface',
             'Electrostatic potential on the density surface, red negative to blue positive',
-            'HOMO orbital', 'LUMO orbital', 'All orbitals — open the list',
+            'HOMO orbital', 'LUMO orbital', 'Orbital list — go to the list',
         ]);
     });
 
     it('adds the LVMO where the data name one (the library\'s water: a constructed LVMO)', () => {
         const items = moleculeStripItems(args({ meta: h2oMeta }));
         expect(items.map(item => item.label)).toEqual([
-            'Ball and stick', 'Space filling', 'Electron density', 'Electrostatic potential', 'HOMO', 'LUMO', 'LVMO', 'All orbitals',
+            'Ball and stick', 'Space filling', 'Electron density', 'Electrostatic potential', 'HOMO', 'LUMO', 'LVMO', 'Orbital list',
         ]);
         // Task 16d item 6 (T15-M3): the visible label stays "LVMO"; the spoken name says what the list's ◇ mark says.
         expect(byLabel(items, 'LVMO')).toMatchObject({
@@ -79,7 +80,7 @@ describe('moleculeStripItems (spec §9.4 Strip, §12; rulings P5, P6, P7)', () =
     it('gives an open shell its SOMO tile, labelled by its role (NO₂)', () => {
         const items = moleculeStripItems(args({ meta: no2Meta, basis: no2Basis }));
         expect(items.map(item => item.label)).toEqual([
-            'Ball and stick', 'Space filling', 'Electron density', 'Electrostatic potential', 'HOMO', 'SOMO', 'LUMO', 'All orbitals',
+            'Ball and stick', 'Space filling', 'Electron density', 'Electrostatic potential', 'HOMO', 'SOMO', 'LUMO', 'Orbital list',
         ]);
         expect(byLabel(items, 'SOMO')).toMatchObject({ spoken: 'SOMO orbital', target: { surface: { kind: 'mo', index: 11 } } });
         expect(byLabel(items, 'HOMO').target).toEqual({ surface: { kind: 'mo', index: 10 } });
@@ -145,21 +146,21 @@ describe('moleculeStripItems (spec §9.4 Strip, §12; rulings P5, P6, P7)', () =
         const loading = moleculeStripItems(args({ densityGrid: 'loading', espGrid: 'loading', basis: 'loading' }));
         expect(loading.map(item => [item.label, item.thumb.kind])).toEqual([
             ['Ball and stick', 'structure'], ['Space filling', 'structure'], ['Electron density', 'pending'],
-            ['Electrostatic potential', 'pending'], ['HOMO', 'pending'], ['LUMO', 'pending'], ['All orbitals', 'icon'],
+            ['Electrostatic potential', 'pending'], ['HOMO', 'pending'], ['LUMO', 'pending'], ['Orbital list', 'icon'],
         ]);
-        // No grids: the two structure tiles, the frontier orbitals and All orbitals only.
+        // No grids: the two structure tiles, the frontier orbitals and Orbital list only.
         expect(moleculeStripItems(args({ densityGrid: null, espGrid: null })).map(item => item.label))
-            .toEqual(['Ball and stick', 'Space filling', 'HOMO', 'LUMO', 'All orbitals']);
+            .toEqual(['Ball and stick', 'Space filling', 'HOMO', 'LUMO', 'Orbital list']);
         // The ESP surface needs both grids: the potential's own grid missing drops that tile alone.
         expect(moleculeStripItems(args({ espGrid: null })).map(item => item.label))
-            .toEqual(['Ball and stick', 'Space filling', 'Electron density', 'HOMO', 'LUMO', 'All orbitals']);
+            .toEqual(['Ball and stick', 'Space filling', 'Electron density', 'HOMO', 'LUMO', 'Orbital list']);
         expect(byLabel(moleculeStripItems(args({ espGrid: 'loading' })), 'Electrostatic potential').thumb.kind).toBe('pending');
         // Its glyph is short: "Electrostatic" alone does not fit inside a 72 px tile (the label under it is in full).
         expect(byLabel(loading, 'Electrostatic potential').glyph).toBe('ESP');
         expect(loading.filter(item => item.glyph !== undefined).map(item => item.label)).toEqual(['Electrostatic potential']);
-        // No basis: no orbital tiles (All orbitals still opens the list, which needs only the meta).
+        // No basis: no orbital tiles (Orbital list still goes to the list, which needs only the meta).
         expect(moleculeStripItems(args({ basis: null })).map(item => item.label))
-            .toEqual(['Ball and stick', 'Space filling', 'Electron density', 'Electrostatic potential', 'All orbitals']);
+            .toEqual(['Ball and stick', 'Space filling', 'Electron density', 'Electrostatic potential', 'Orbital list']);
     });
 
     it('has no Space filling tile for a molecule holding an element with no van der Waals radius (ruling P8b)', () => {

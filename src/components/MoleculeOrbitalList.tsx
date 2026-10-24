@@ -13,6 +13,8 @@ interface MoleculeOrbitalListProps {
     onSelect: (index: number) => void;
     method: string;
     symmetry: LibraryMoleculeMeta['symmetry'];
+    /** Owner R25-A2: set for a moment after the strip's "Orbital list" tile brings the list into view (style.css). */
+    highlight?: boolean;
 }
 
 const OCCUPANCY: Record<number, string> = { 2: '↑↓', 1: '↑', 0: '' };
@@ -58,7 +60,7 @@ export function centredScrollTop(list: HTMLElement, row: HTMLElement): number {
  * label notes. Older data, with no classes, says its virtuals are
  * unclassified rather than implying either.
  */
-const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, selectedIndex, onSelect, method, symmetry }) => {
+const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, selectedIndex, onSelect, method, symmetry, highlight = false }) => {
     const rows = useMemo(() => [...orbitals].sort((a, b) => b.energyHartree - a.energyHartree), [orbitals]);
     const counts = useMemo(() => degeneracyCounts(orbitals), [orbitals]);
     // Ruling T16-b: highest first reads like an MO diagram, but puts the
@@ -93,7 +95,7 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, sel
     }, [orbitals]);
     return (
         <div className="molecule-orbital-block">
-            <div className="molecule-orbital-list" ref={listRef}>
+            <div className={`molecule-orbital-list${highlight ? ' highlight' : ''}`} ref={listRef}>
                 {rows.map((orbital, position) => {
                     const role = orbital.role ? String(orbital.role) : null;
                     const degenerate = counts.get(orbital.index) ?? 1;

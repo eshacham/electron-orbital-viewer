@@ -875,7 +875,7 @@ describe('Molecules mode', () => {
             expect(optionNames()).toEqual([
                 'Ball and stick structure', 'Space filling structure', 'Electron density surface',
                 'Electrostatic potential on the density surface, red negative to blue positive',
-                'HOMO orbital', 'LUMO orbital', 'All orbitals — open the list',
+                'HOMO orbital', 'LUMO orbital', 'Orbital list — go to the list',
             ]);
             expect(within(strip()).getByRole('option', { name: 'Electron density surface' })).toHaveAttribute('aria-selected', 'true');
             // Ruling R23b-3: the handle names what it folds away.
@@ -904,11 +904,12 @@ describe('Molecules mode', () => {
             expect(store.getState().molecule).toMatchObject({ surface: { kind: 'none' }, representation: 'ball-and-stick' });
         });
 
-        it('opens the orbital list from "All orbitals", on the HOMO, and puts focus on its row', async () => {
+        // Owner R25-A2: the tile is "Orbital list" now (it was "All orbitals").
+        it('opens the orbital list from "Orbital list", on the HOMO, and puts focus on its row', async () => {
             const { store, container } = await enterMolecules(false);
             pickWater(store);
             await flush();
-            fireEvent.click(within(strip()).getByRole('option', { name: 'All orbitals — open the list' }));
+            fireEvent.click(within(strip()).getByRole('option', { name: 'Orbital list — go to the list' }));
             expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 4 });
             const list = container.querySelector('.side-panel .molecule-orbital-list') as HTMLElement;
             expect(list).not.toBeNull();
@@ -917,14 +918,47 @@ describe('Molecules mode', () => {
             expect(document.activeElement).toBe(homoRow);
             // Already showing an orbital: the list opens on it, and the choice is kept.
             act(() => { store.dispatch(setSurface({ kind: 'mo', index: 2 })); });
-            fireEvent.click(within(strip()).getByRole('option', { name: 'All orbitals — open the list' }));
+            fireEvent.click(within(strip()).getByRole('option', { name: 'Orbital list — go to the list' }));
             expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 2 });
             expect(document.activeElement).toBe(within(list).getByRole('button', { name: /1b2/ }));
         });
 
+        // Owner R25-A2: "clicking on it does nothing" -- with Orbitals already drawn, the tile only moved focus. Now its
+        // effect is always visible: Explore scrolls the list into view, focus lands on the drawn row, and the list
+        // is highlighted briefly.
+        it('brings the list into view from "Orbital list" even with Orbitals already drawn, focused and highlighted (R25-A2)', async () => {
+            const { store, container } = await enterMolecules(false);
+            pickWater(store);
+            await flush();
+            act(() => { store.dispatch(setSurface({ kind: 'mo', index: 2 })); });
+            const side = container.querySelector('.side-panel') as HTMLElement;
+            const scroller = side.querySelector('.molecule-explore-scroll') as HTMLElement;
+            const list = side.querySelector('.molecule-orbital-list') as HTMLElement;
+            expect(list).not.toHaveClass('highlight');
+            // Explore shows 100–500; the list sits at 700–1000, below the fold.
+            const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+                const at = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 100, width: 100, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+                if (this === scroller) return at(100, 400);
+                if (this === list) return at(700, 300);
+                return at(0, 0);
+            });
+            try {
+                scroller.scrollTop = 0;
+                fireEvent.click(within(strip()).getByRole('option', { name: 'Orbital list — go to the list' }));
+                // The drawn orbital is kept, not switched to the HOMO.
+                expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 2 });
+                // Scrolled just far enough that the list's bottom clears Explore's, 8 px in: 1000 − 500 + 8.
+                expect(scroller.scrollTop).toBe(508);
+                expect(document.activeElement).toBe(within(list).getByRole('button', { name: /1b2/ }));
+                expect(list).toHaveClass('highlight');
+            } finally {
+                rects.mockRestore();
+            }
+        });
+
         // Task 16d item 5 (T15-M2, science): a radical's frontier orbital is its SOMO -- NO₂ (²A₁) names a doubly
-        // occupied HOMO 4b2 below its singly occupied 6a1 -- so the Orbitals switch and "All orbitals" open on 6a1.
-        it('opens a radical on its SOMO, from the Orbitals switch and from "All orbitals" (NO₂)', async () => {
+        // occupied HOMO 4b2 below its singly occupied 6a1 -- so the Orbitals switch and "Orbital list" open on 6a1.
+        it('opens a radical on its SOMO, from the Orbitals switch and from "Orbital list" (NO₂)', async () => {
             const no2 = JSON.parse(readFileSync(resolve(__dirname, 'fixtures/molecules/no2/meta.json'), 'utf8'));
             const no2Basis = JSON.parse(readFileSync(resolve(__dirname, 'fixtures/molecules/no2/basis.json'), 'utf8'));
             loader.loadBasis.mockImplementation(async (id: string) => ({ ...no2Basis, id }));
@@ -942,7 +976,7 @@ describe('Molecules mode', () => {
                 expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 11 });
                 // And from the strip, starting again from the density.
                 act(() => { store.dispatch(setSurface({ kind: 'density' })); });
-                fireEvent.click(within(strip()).getByRole('option', { name: 'All orbitals — open the list' }));
+                fireEvent.click(within(strip()).getByRole('option', { name: 'Orbital list — go to the list' }));
                 expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 11 });
                 const list = side.querySelector('.molecule-orbital-list') as HTMLElement;
                 expect(document.activeElement).toBe(within(list).getByRole('button', { name: /^6a1/ }));
@@ -1039,8 +1073,25 @@ describe('Molecules mode', () => {
             const sheetStrip = within(tabpanel).getByRole('listbox', { name: STRIP });
             expect(sheetStrip.closest('.thumbnail-strip')).toHaveClass('sheet');
             expect(sheetStrip.compareDocumentPosition(tabpanel.querySelector('.molecule-tile') as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-            fireEvent.click(within(sheetStrip).getByRole('option', { name: 'All orbitals — open the list' }));
-            expect(document.activeElement).toBe(within(tabpanel).getByRole('button', { name: /1b1/ }));
+            // Owner R25-A2: on a phone the tile sits in the open Explore sheet, and the sheet's own body is what scrolls
+            // the list into view -- here a list at 600–900 under a body showing 400–800: down until its bottom clears, 8 px in.
+            expect(tabpanel).toHaveClass('phone-sheet-body');
+            const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+                const at = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 100, width: 100, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+                if (this === tabpanel) return at(400, 400);
+                if (this.classList.contains('molecule-orbital-list')) return at(600, 300);
+                return at(0, 0);
+            });
+            try {
+                tabpanel.scrollTop = 0;
+                fireEvent.click(within(sheetStrip).getByRole('option', { name: 'Orbital list — go to the list' }));
+                await flush(); // the switch to Orbitals renders the list a render later
+                expect(document.activeElement).toBe(within(tabpanel).getByRole('button', { name: /1b1/ }));
+                expect(tabpanel.scrollTop).toBe(900 - 800 + 8);
+                expect(tabpanel.querySelector('.molecule-orbital-list')).toHaveClass('highlight');
+            } finally {
+                rects.mockRestore();
+            }
         });
     });
 });

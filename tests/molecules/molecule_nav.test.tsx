@@ -1,8 +1,9 @@
 import React from 'react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { render, screen, fireEvent, within } from '@testing-library/react';
-import MoleculeNav from '../../src/components/MoleculeNav';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
+import MoleculeNav, { LIST_HIGHLIGHT_MS, revealScrollTop } from '../../src/components/MoleculeNav';
+import type { MoleculeNavHandle } from '../../src/components/MoleculeNav';
 import MoleculeOrbitalList from '../../src/components/MoleculeOrbitalList';
 import MoleculeReadout from '../../src/components/MoleculeReadout';
 import MoleculeViewOptions from '../../src/components/MoleculeViewOptions';
@@ -177,6 +178,59 @@ describe('MoleculeNav', () => {
         expect(within(list() as HTMLElement).getByRole('button', { name: /1b1/ })).toHaveAttribute('aria-pressed', 'true');
         rerender(<MoleculeNav {...navProps} variant="body" surface={{ kind: 'mo', index: 4 }} />);
         expect(list()).not.toBeNull();
+    });
+    // Owner R25-A2: the strip's "Orbital list" tile asks the card to reveal its list -- scroll it into view in the
+    // panel that holds it, focus the drawn row, and highlight the list for about a second.
+    it('reveals the list: scrolls only as far as needed, focuses the drawn row, highlights it briefly (R25-A2)', () => {
+        jest.useFakeTimers();
+        try {
+            const ref = React.createRef<MoleculeNavHandle>();
+            const { container } = render(
+                <div className="molecule-explore-scroll"><MoleculeNav {...navProps} surface={{ kind: 'mo', index: 3 }} ref={ref} /></div>,
+            );
+            const list = container.querySelector('.molecule-orbital-list') as HTMLElement;
+            expect(list).not.toHaveClass('highlight');
+            act(() => { ref.current!.revealOrbitalList(); });
+            expect(document.activeElement).toBe(within(list).getByRole('button', { name: /3a1/ }));
+            expect(list).toHaveClass('highlight');
+            act(() => { jest.advanceTimersByTime(LIST_HIGHLIGHT_MS - 1); });
+            expect(list).toHaveClass('highlight');
+            act(() => { jest.advanceTimersByTime(1); });
+            expect(list).not.toHaveClass('highlight');
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+    it('waits a render for a list that is not on screen yet, and drops the wish if it never comes (R25-A2)', () => {
+        const ref = React.createRef<MoleculeNavHandle>();
+        const { container, rerender } = render(<MoleculeNav {...navProps} ref={ref} />);
+        // The surface switched to Orbitals in the same event: the list is there one render later.
+        act(() => { ref.current!.revealOrbitalList(); });
+        expect(container.querySelector('.molecule-orbital-list')).toBeNull();
+        rerender(<MoleculeNav {...navProps} surface={{ kind: 'mo', index: 4 }} ref={ref} />);
+        const list = container.querySelector('.molecule-orbital-list') as HTMLElement;
+        expect(document.activeElement).toBe(within(list).getByRole('button', { name: /1b1/ }));
+        expect(list).toHaveClass('highlight');
+        // A wish the next render cannot meet is dropped, never kept to steal focus later.
+        const { container: other, rerender: rerenderOther } = render(<MoleculeNav {...navProps} ref={ref} />);
+        act(() => { ref.current!.revealOrbitalList(); });
+        rerenderOther(<MoleculeNav {...navProps} surface={{ kind: 'esp' }} ref={ref} />);
+        (document.activeElement as HTMLElement).blur();
+        rerenderOther(<MoleculeNav {...navProps} surface={{ kind: 'mo', index: 4 }} ref={ref} />);
+        expect(other.querySelector('.molecule-orbital-list')).not.toHaveClass('highlight');
+        expect(document.activeElement).toBe(document.body);
+    });
+    it('scrolls a panel only as far as it must to show an element, 8 px in from its edge (R25-A2)', () => {
+        const box = (top: number, height: number) => ({ getBoundingClientRect: () => ({ top, bottom: top + height, height }) }) as unknown as HTMLElement;
+        const panel = (scrollTop: number) => ({ ...box(100, 400), scrollTop }) as unknown as HTMLElement;
+        // Already in view: no scroll.
+        expect(revealScrollTop(panel(50), box(200, 100))).toBe(50);
+        // Below: down until its bottom clears (1000 − 500 + 8), never so far its top leaves.
+        expect(revealScrollTop(panel(0), box(700, 300))).toBe(508);
+        expect(revealScrollTop(panel(0), box(150, 600))).toBe(42);
+        // Above: up until its top shows, 8 px in; never below zero.
+        expect(revealScrollTop(panel(300), box(20, 100))).toBe(212);
+        expect(revealScrollTop(panel(10), box(20, 100))).toBe(0);
     });
     it('states where the geometry and the density come from', () => {
         const { container } = render(<MoleculeNav {...navProps} />);

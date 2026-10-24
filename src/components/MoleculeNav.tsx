@@ -1,7 +1,7 @@
-import React, { useEffect, useId, useImperativeHandle, useRef } from 'react';
+import React, { useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
 import { Button, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import MoleculePicker from './MoleculePicker';
-import MoleculeOrbitalList from './MoleculeOrbitalList';
+import MoleculeOrbitalList, { centredScrollTop } from './MoleculeOrbitalList';
 import { formatFormula } from '../molecules/catalogue';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeIndexEntry } from '../molecules/types';
@@ -28,13 +28,37 @@ interface MoleculeNavProps {
     onOpenPicker?: () => void;
 }
 
-/** What App may ask of the card (Task 15): the strip's "All orbitals" tile puts focus in the orbital list. */
+/** What App may ask of the card (Task 15): the strip's "Orbital list" tile brings the orbital list into view. */
 export interface MoleculeNavHandle {
     /**
-     * Focuses the row of the orbital drawn, in the list beside the surface switch -- now, or, when the list is
-     * not on screen yet (the surface was switched to Orbitals in the same event), once it renders.
+     * Owner R25-A2 (it only moved focus, invisible with Orbitals already drawn): scrolls the list into view in the
+     * panel that holds it (a desktop/tablet's Explore, a phone's Explore sheet), the drawn orbital's row into view
+     * in the list, focuses that row and highlights the list for LIST_HIGHLIGHT_MS -- now, or, when the list is not
+     * on screen yet (the surface was switched to Orbitals in the same event), once it renders.
      */
-    focusOrbitalList(): void;
+    revealOrbitalList(): void;
+}
+
+/** How long the list stays highlighted after the "Orbital list" tile (R25-A2; style.css fades it out). */
+export const LIST_HIGHLIGHT_MS = 1000;
+/** The panels the list scrolls in: Molecules' Explore on a desktop or tablet, the phone sheet's body. */
+const PANEL_SCROLLERS = '.molecule-explore-scroll, .phone-sheet-body';
+const REVEAL_MARGIN = 8;
+
+/**
+ * The panel's scrollTop that shows `element`: unchanged when it is in view; else scrolled only as far as needed
+ * to bring its far edge REVEAL_MARGIN inside the panel's, never so far that its near edge leaves -- a list taller
+ * than the panel shows its top. scrollTop is set on the panel alone, never through scrollIntoView, which also
+ * scrolls every scrolling ancestor (centredScrollTop's reason).
+ */
+export function revealScrollTop(panel: HTMLElement, element: HTMLElement): number {
+    const view = panel.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
+    const top = view.top + REVEAL_MARGIN;
+    const bottom = view.bottom - REVEAL_MARGIN;
+    if (box.top < top) return Math.max(0, panel.scrollTop - (top - box.top));
+    if (box.bottom > bottom) return panel.scrollTop + Math.min(box.bottom - bottom, box.top - top);
+    return panel.scrollTop;
 }
 
 const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
@@ -42,20 +66,31 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
 }, ref) => {
     const navRef = useRef<HTMLDivElement>(null);
     const surfaceLabelId = useId();
-    const focusWanted = useRef(false);
-    // The pressed row is the orbital drawn: the list opens centred on it, so focus lands where the eye already is.
-    const focusRow = () => {
-        const row = navRef.current?.querySelector<HTMLElement>('.molecule-orbital-row[aria-pressed="true"]')
-            ?? navRef.current?.querySelector<HTMLElement>('.molecule-orbital-row');
-        row?.focus();
-        return Boolean(row);
+    const revealWanted = useRef(false);
+    const [highlight, setHighlight] = useState(false);
+    const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => { if (highlightTimer.current !== null) clearTimeout(highlightTimer.current); }, []);
+    // The pressed row is the orbital drawn: the list is scrolled to it, so focus lands where the eye already is.
+    const reveal = () => {
+        const list = navRef.current?.querySelector<HTMLElement>('.molecule-orbital-list');
+        const row = list?.querySelector<HTMLElement>('.molecule-orbital-row[aria-pressed="true"]')
+            ?? list?.querySelector<HTMLElement>('.molecule-orbital-row');
+        if (!list || !row) return false;
+        list.scrollTop = centredScrollTop(list, row);
+        const panel = list.closest<HTMLElement>(PANEL_SCROLLERS);
+        if (panel) panel.scrollTop = revealScrollTop(panel, list);
+        row.focus({ preventScroll: true });
+        setHighlight(true);
+        if (highlightTimer.current !== null) clearTimeout(highlightTimer.current);
+        highlightTimer.current = setTimeout(() => { highlightTimer.current = null; setHighlight(false); }, LIST_HIGHLIGHT_MS);
+        return true;
     };
-    useImperativeHandle(ref, () => ({ focusOrbitalList: () => { focusWanted.current = !focusRow(); } }), []);
+    useImperativeHandle(ref, () => ({ revealOrbitalList: () => { revealWanted.current = !reveal(); } }), []);
     // One render later at most: a wish the next render cannot meet (no list) is dropped, never kept to steal focus later.
     useEffect(() => {
-        if (!focusWanted.current) return;
-        focusWanted.current = false;
-        focusRow();
+        if (!revealWanted.current) return;
+        revealWanted.current = false;
+        reveal();
     });
     const name = meta?.name ?? entries?.find(e => e.id === selectedId)?.name ?? null;
     const title = name ? `${name}` : 'Choose a molecule';
@@ -111,7 +146,7 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
                     {surface.kind === 'mo' && (
                         <MoleculeOrbitalList orbitals={meta.orbitals} selectedIndex={surface.index}
                             onSelect={index => onSurfaceChange({ kind: 'mo', index })}
-                            method={meta.method.density} symmetry={meta.symmetry} />
+                            method={meta.method.density} symmetry={meta.symmetry} highlight={highlight} />
                     )}
                     <Typography variant="caption" className="molecule-caption">
                         Geometry: {meta.geometrySource}. Density, potential and orbitals: {meta.method.density} (PySCF).

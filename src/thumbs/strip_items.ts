@@ -30,7 +30,7 @@ const LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
  * 'orbital': a picture from the thumbnail service -- any ThumbRequest (an orbital, or since Task 10 a field or grid surface).
  * 'pending': its glyph and label only, asking for nothing -- a picture whose data is still loading (ruling T10-I1).
  * 'structure': a molecule's structure, drawn in Canvas 2D (structure_glyph.ts; ruling P6) -- no WebGL, no job.
- * 'icon': a fixed picture with its label (Molecules' "All orbitals", which opens a list rather than drawing a view).
+ * 'icon': a fixed picture with its label (Molecules' "Orbital list", which goes to a list rather than drawing a view).
  */
 export type StripThumb =
     | { kind: 'orbital'; request: ThumbRequest } | { kind: 'pending' } | { kind: 'rings'; rings: RingLayer[]; rMax: number } | { kind: 'back' }
