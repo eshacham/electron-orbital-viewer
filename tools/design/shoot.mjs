@@ -262,6 +262,43 @@ function collectMetrics() {
     boxes: Object.fromEntries(['.app-topbar', '.app-rail', '.explore-panel', '#canvas-container', '.inspector', '.thumbnail-strip',
       '.viewport-title', '.viewport-toolbar', '.key-column', '.phone-topbar', '.phone-header', '.phone-sheet',
       '.element-tile', '.periodic-table-mini', '.request-workspace', '.scale-readout', '.first-view-hint'].map(s => [s, box(s)])),
+    // 6G-2 Task 17 fix: overlap (w × h px, 0 when clear, null when either is absent) of what must never cover
+    // another zone. `hint`: the first-view hint against every overlay zone (Fail 1, scale readout); `strip`: the
+    // strip against the folded drawer bar at medium width (Fail 3).
+    overlaps: (() => {
+      const rect = selector => {
+        const el = document.querySelector(selector);
+        const r = el?.getBoundingClientRect();
+        return r && r.width > 0 && r.height > 0 ? r : null;
+      };
+      const overlap = (a, b) => {
+        const A = rect(a), B = rect(b);
+        if (!A || !B) return null;
+        const w = Math.min(A.right, B.right) - Math.max(A.left, B.left);
+        const h = Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top);
+        return w > 0 && h > 0 ? { w: Math.round(w), h: Math.round(h) } : 0;
+      };
+      return {
+        hint: Object.fromEntries(['.scale-readout', '.key-column', '.thumbnail-strip', '.viewport-toolbar', '.viewport-title',
+          '.inspector-drawer .inspector-bar', '.canvas-busy', '.phone-topbar', '.phone-header', '.phone-sheet']
+          .map(s => [s, overlap('.first-view-hint', s)])),
+        strip: { '.inspector-drawer .inspector-bar': overlap('.thumbnail-strip.overlay', '.inspector-drawer .inspector-bar') },
+      };
+    })(),
+    // 6G-2 Task 17 fix (Fail 2): how much of the MO list's gap note is out of sight -- under the list's sticky key, or
+    // past the list's bottom edge. 0 means the note is whole and readable.
+    orbitalGapNote: (() => {
+      const list = document.querySelector('.molecule-orbital-list');
+      const note = list?.querySelector('.molecule-orbital-gap');
+      if (!list || !note) return null;
+      const L = list.getBoundingClientRect(), N = note.getBoundingClientRect();
+      if (!(N.height > 0)) return null;
+      const key = list.querySelector('.molecule-orbital-legend')?.getBoundingClientRect();
+      const visibleTop = Math.max(L.top, key ? key.bottom : L.top);
+      const hidden = Math.max(0, Math.min(N.bottom, visibleTop) - N.top) + Math.max(0, N.bottom - Math.max(N.top, L.bottom));
+      return { hiddenPx: Math.round(hidden), noteTop: Math.round(N.top), noteHeight: Math.round(N.height),
+        keyBottom: key ? Math.round(key.bottom) : null, listTop: Math.round(L.top), listBottom: Math.round(L.bottom) };
+    })(),
     // Task 16: what has focus (Esc returns it to the entry), and anything in the request workspace wider than it.
     focused: (() => {
       const el = document.activeElement;
@@ -354,7 +391,8 @@ async function sampleColours(page, png, size) {
       const r = el.getBoundingClientRect();
       // The screenshot is in device pixels (--dpr), the layout in CSS pixels.
       const k = window.devicePixelRatio || 1;
-      const x = Math.max(0, Math.min(canvas.width - 1, Math.round(k * (r.x + (p.px ?? p.x * r.width)))));
+      // `dx` (6G-2 Task 17 fix) shifts a fractional x by CSS px: x 1, dx 8 is 8 px past the element's right edge.
+      const x = Math.max(0, Math.min(canvas.width - 1, Math.round(k * (r.x + (p.px ?? p.x * r.width) + (p.dx ?? 0)))));
       const y = Math.max(0, Math.min(canvas.height - 1, Math.round(k * (r.y + (p.py ?? p.y * r.height)))));
       const d = g.getImageData(x, y, 1, 1).data;
       out[p.name] = { x, y, token: p.token, hex: `#${[d[0], d[1], d[2]].map(c => c.toString(16).padStart(2, '0')).join('')}` };

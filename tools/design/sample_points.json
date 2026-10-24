@@ -5,7 +5,7 @@
     { "name": "page gutter", "selector": ".app-workspace", "px": 6, "y": 0.5, "token": "bg-app" },
     { "name": "explore panel", "selector": ".explore-panel", "x": 0.5, "y": 0.992, "token": "surface-1" },
     { "name": "inspector", "selector": ".inspector", "x": 0.5, "y": 0.992, "token": "surface-1" },
-    { "name": "controls card", "selector": "#controls", "x": 0.97, "y": 0.5, "token": "surface-1" },
+    { "name": "controls card", "selector": "#controls", "x": 1, "dx": 8, "y": 0.5, "token": "surface-1" },
     { "name": "canvas left edge", "selector": "#canvas-container", "x": 0.03, "y": 0.6, "token": "canvas" },
     { "name": "canvas upper right", "selector": "#canvas-container", "x": 0.97, "y": 0.22, "token": "canvas" }
   ],
