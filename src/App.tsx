@@ -57,7 +57,7 @@ import SpeciesControls from './components/SpeciesControls';
 import Controls, { RelativityReadout, RelativityControl } from './components/Controls';
 import BasicExplore, { BASIC_ORBITALS_ABOUT } from './basic_ui/BasicExplore';
 import { useDrawOnSelection } from './basic_ui/useDrawOnSelection';
-import { AxesSwitch, SurfaceStyleControl } from './atom_ui/DisplayControls';
+import { AxesSwitch } from './atom_ui/DisplayControls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
 import OrbitalViewer from './components/OrbitalViewer';
@@ -1419,9 +1419,9 @@ function App() {
             isoNote={moleculeIsoNote}
             noSurface={isMoleculeMode && molecule.surface.kind === 'none'}
         >
-            {isAtomMode ? (
-                <SurfaceStyleControl meshLevel={atomLevel === 'orbital'} />
-            ) : (moleculeOptions || null)}
+            {/* Molecules' structure and dipole options. Ruling R25-finish: the Glow | Solid finish Atoms passed here
+                is Controls' own now, in every mode. */}
+            {moleculeOptions || null}
         </Controls>
     );
     const controls = renderControls('all');

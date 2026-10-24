@@ -510,12 +510,13 @@ describe('Molecules mode', () => {
         // No contour is drawn, so the enclosed fraction applies to nothing: disabled, saying why (never the
         // orbital's "contour of constant |ψ|²" fallback), and no colour key stands for a surface.
         openDisplay(container);
-        // Ruling T13-I3: Opacity and Cut away act on nothing either -- disabled, each saying why. Owner R25-B1: the
-        // Surface style (Solid | Wireframe) it named first is gone in every state, so is its note.
+        // Ruling T13-I3: Surface style, Opacity and Cut away act on nothing -- disabled, each saying why. Owner R25-B1
+        // removed Wireframe; ruling R25-finish brings the Glow | Solid finish here, disabled with its note again.
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
-        expect(within(viewPanel).queryByRole('group', { name: 'surface style' })).toBeNull();
-        expect(within(viewPanel).queryByRole('button', { name: /solid surface|wireframe surface/ })).toBeNull();
-        expect(within(viewPanel).queryByText('No surface is drawn to style.')).toBeNull();
+        expect(within(viewPanel).queryByRole('button', { name: /wireframe surface/ })).toBeNull();
+        expect(within(viewPanel).getByRole('button', { name: 'glow surface' })).toBeDisabled();
+        expect(within(viewPanel).getByRole('button', { name: 'solid surface' })).toBeDisabled();
+        expect(within(viewPanel).getByText('No surface is drawn to style.')).toBeInTheDocument();
         expect(within(viewPanel).getByRole('slider', { name: 'surface opacity' })).toBeDisabled();
         ['no cut', 'cut along x', 'cut along y', 'cut along z'].forEach(name => expect(within(viewPanel).getByRole('button', { name })).toBeDisabled());
         expect(within(viewPanel).getByText('No surface is drawn to make see-through.')).toBeInTheDocument();

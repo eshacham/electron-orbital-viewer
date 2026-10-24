@@ -1,4 +1,5 @@
 import React from 'react';
+import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import Controls, { cutDepthLabel, relativityHelp, whatChangedText, relativityReadoutText } from './Controls';
 import { basicOrbitalParams } from '../orbital_presets';
@@ -24,6 +25,18 @@ const baseProps = {
   onSurfaceStyleChange: () => {},
   isBusy: false,
 };
+
+// R25-finish: jsdom's computed style ignores selector specificity (the last matching rule wins), so whether KEEP_CASE
+// beat MUI's uppercase depended on which test first inserted MUI's base ToggleButton style -- the case test failed run
+// alone, and again once the finish control (a KEEP_CASE group) rendered earlier in this file. Insert MUI's base style
+// first, as a browser's specificity would rank it, so the case test (Relativity control) reads the browser's answer in any order.
+beforeAll(() => {
+  render(
+    <ToggleButtonGroup exclusive size="small" fullWidth value="a">
+      <ToggleButton value="a">a</ToggleButton><ToggleButton value="b">b</ToggleButton><ToggleButton value="c">c</ToggleButton>
+    </ToggleButtonGroup>,
+  ).unmount();
+});
 
 describe('Controls', () => {
   // Ruling P3: chips draw on selection; Update Orbital is gone. Basic Orbitals' n/l/mₗ
@@ -86,21 +99,40 @@ describe('Controls', () => {
     expect(screen.getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
   });
 
-  // Owner R25-B1: the Wireframe option is removed everywhere; Solid alone would be a control that does nothing
-  // (spec §3.5), so Controls has no Surface style in any mode (Atoms' Glow | Solid finish is DisplayControls').
-  it('offers no Surface style (Solid | Wireframe) in any mode (owner R25-B1)', () => {
+  // Owner R25-B1 removed Wireframe everywhere (no Solid | Wireframe in any mode -- still pinned here). Ruling
+  // R25-finish (controller) replaces "offers no Surface style in any mode": the Glow | Solid finish -- the viewer's
+  // own, global, never in a link -- is offered in the view settings of every mode, by the one shared control
+  // (DisplayControls' SurfaceStyleControl, rendered by Controls itself), wherever the surface is a mesh.
+  it('offers the one Glow | Solid finish control in every mode, never Wireframe (ruling R25-finish)', () => {
     for (const props of [
       { mode: 'hydrogenic' as const },
       { mode: 'bonds' as const },
       { mode: 'molecule' as const },
       { mode: 'atom' as const, atomLevel: 'orbital' as const, atomZ: 6, onAtomElementChange: () => {} },
     ]) {
-      const { unmount } = render(<Controls {...baseProps} {...props} />);
-      expect(screen.queryByRole('group', { name: /surface style/i })).toBeNull();
-      expect(screen.queryByRole('button', { name: /wireframe|solid surface/i })).toBeNull();
+      const { container, unmount } = render(<Controls {...baseProps} {...props} />);
+      const groups = screen.getAllByRole('group', { name: 'surface style' });
+      expect([props.mode, groups.length]).toEqual([props.mode, 1]);
+      expect(groups[0]).toHaveTextContent(/^GlowSolid$/);
+      expect(container.querySelectorAll('.surface-style-controls')).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: /wireframe/i })).toBeNull();
       expect(screen.queryByText('Wireframe')).toBeNull();
+      // It sits with the other surface settings, just before Opacity.
+      expect(groups[0].compareDocumentPosition(screen.getByRole('slider', { name: 'surface opacity' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       unmount();
     }
+    // The selection half (Explore) never carries it.
+    render(<Controls {...baseProps} mode="hydrogenic" part="selection" />);
+    expect(screen.queryByRole('group', { name: 'surface style' })).toBeNull();
+  });
+
+  // Ruling R25-finish with T13-I3: while Molecules draws no surface the finish acts on nothing -- disabled, saying why,
+  // like Opacity and Cut away.
+  it('disables the finish while no surface is drawn, saying why (R25-finish, T13-I3)', () => {
+    render(<Controls {...baseProps} mode="molecule" noSurface />);
+    expect(screen.getByRole('button', { name: 'glow surface' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'solid surface' })).toBeDisabled();
+    expect(screen.getByText('No surface is drawn to style.')).toBeInTheDocument();
   });
 
   // Addendum 2's mode rename: atom mode covers every real element now, so

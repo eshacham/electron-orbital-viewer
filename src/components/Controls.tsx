@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { OrbitalParams, ClipAxis, SurfaceStyle } from '@/types/orbital';
 import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../orbital_presets';
+import { SurfaceStyleControl } from '../atom_ui/DisplayControls';
 import { ELEMENTS, elementLabel } from '../elements';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
 import { CombinationSelection, NO_COMBINATION } from '../combinations';
@@ -533,11 +534,14 @@ const Controls: React.FC<ControlsProps> = ({
 
       {showView && (
         <>
-          {/* Opacity and cut-away are view-only: they restyle the existing mesh, so
-              neither re-runs the calculation. Owner R25-B1: the Surface (Solid |
-              Wireframe) control that stood first here is gone -- Wireframe was
-              removed and Solid alone would do nothing (Atoms' Glow | Solid finish
-              is DisplayControls'). */}
+          {/* The finish, opacity and cut-away are view-only: they restyle the existing
+              mesh, so none re-runs the calculation. Owner R25-B1: the Surface (Solid |
+              Wireframe) control that stood here is gone with Wireframe. Ruling
+              R25-finish: the Glow | Solid finish (the viewer's own, global, never in a
+              link) stands here instead in every mode -- the one shared control, shown
+              wherever the surface is a mesh (a shell view has none) and disabled with
+              its note while no surface is drawn (T13-I3). */}
+          <SurfaceStyleControl meshLevel={isMeshLevel} disabled={noSurface} />
 
           <FormControl component="fieldset" margin="normal" fullWidth>
             <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>

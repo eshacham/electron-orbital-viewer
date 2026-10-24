@@ -22,7 +22,7 @@ import { createH2PlusCurveWorker } from './workers/createH2PlusCurveWorker';
 import { resetH2PlusCurveForTests } from './bonds/useH2PlusCurve';
 import { loadScan, loadMoleculeMeta, loadBasis } from './molecules/loader';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from './molecules/types';
-import { hintPref } from './design/presentation';
+import { hintPref, renderPref } from './design/presentation';
 import { MEDIUM_VIEWPORT } from './useMediaQuery';
 import * as downloadModule from './export/download';
 import { readBlob } from '../tests/export/fixtures';
@@ -1194,6 +1194,19 @@ describe('App: opening a shared link', () => {
         expect(encodeStateOf(store.getState())).toMatch(/&surf=solid(&|$)/);
     });
 
+    // Ruling R25-finish: Atoms keeps the same control, at the orbital level, and the same Glow-only rule for its tuning.
+    it('keeps the finish in Atoms\' Display at the orbital level, Solid folding away Advanced appearance (R25-finish)', () => {
+        openLink('#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&frac=0.9&cut=none&op=1&surf=solid');
+        openInspectorSection('Display');
+        const display = within(screen.getByRole('complementary', { name: 'Inspector' })).getByRole('region', { name: 'Display' });
+        expect(display.querySelectorAll('.surface-style-controls')).toHaveLength(1);
+        expect(within(display).getByRole('button', { name: 'Advanced appearance' })).toBeInTheDocument();
+        fireEvent.click(within(display).getByRole('button', { name: 'solid surface' }));
+        expect(within(display).queryByRole('button', { name: 'Advanced appearance' })).toBeNull();
+        fireEvent.click(within(display).getByRole('button', { name: 'glow surface' }));
+        expect(within(display).getByRole('button', { name: 'Advanced appearance' })).toBeInTheDocument();
+    });
+
     it('keeps a linked cut at the orbital level, where entering it would clear the cut', () => {
         const store = openLink('#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&cut=y:0.25');
         expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'y', clipPosition: 0.5 });
@@ -1745,8 +1758,8 @@ describe('App: shell', () => {
         expect(within(inspector).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
         expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         expect(within(inspector).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
-        // Owner R25-B1: Orbitals' Surface style (Solid | Wireframe) is gone with the Wireframe option.
-        expect(within(inspector).queryByRole('group', { name: 'surface style' })).toBeNull();
+        // Owner R25-B1 removed Orbitals' Solid | Wireframe; ruling R25-finish offers the Glow | Solid finish here instead.
+        expect(within(inspector).getByRole('group', { name: 'surface style' })).toHaveTextContent(/^GlowSolid$/);
         expect(within(inspector).getByRole('group', { name: 'cut-away axis' })).toBeInTheDocument();
         // The settings sit above the plot, as in Bonds' inspector -- R24-3: the Plot and data header follows them.
         const opacity = within(inspector).getByRole('slider', { name: 'surface opacity' });
@@ -1898,6 +1911,47 @@ describe('App: shell', () => {
         fireEvent.click(screen.getByRole('link', { name: /molecule mode/ }));     // all four modes are top-bar tabs now (ruling R23a)
         await act(async () => {});
         check('molecules');
+    });
+
+    // Ruling R25-finish (controller): the Glow | Solid finish -- one global preference (eov.render, never in a link) -- is
+    // offered in Display in every mode, not only Atoms; Advanced appearance (Glow's tuning) shows only under Glow.
+    it('offers the Glow | Solid finish in Display in Orbitals, Bonds and Molecules; Solid folds away Advanced appearance (R25-finish)', async () => {
+        (loadScan as jest.Mock).mockResolvedValue(n2Scan);
+        (loadMoleculeMeta as jest.Mock).mockImplementation(async (id: string) => ({ ...n2Meta, id }));
+        (loadBasis as jest.Mock).mockImplementation(async (id: string) => ({ ...n2Basis, id }));
+        const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        const link = () => encodeStateOf(store.getState());
+        const check = (mode: string, finish: 'glow' | 'solid') => {
+            openInspectorSection('Display');
+            const display = within(screen.getByRole('complementary', { name: 'Inspector' })).getByRole('region', { name: 'Display' });
+            const group = within(display).getByRole('group', { name: 'surface style' });
+            expect([mode, group.textContent]).toEqual([mode, 'GlowSolid']);
+            expect([mode, within(group).getByRole('button', { name: `${finish} surface` }).getAttribute('aria-pressed')]).toEqual([mode, 'true']);
+            return { display, group };
+        };
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+        const basic = check('basic', 'glow');
+        expect(within(basic.display).getByRole('button', { name: 'Advanced appearance' })).toBeInTheDocument();
+        const before = link();
+        fireEvent.click(within(basic.group).getByRole('button', { name: 'solid surface' }));
+        expect(renderPref.get().finish).toBe('solid');
+        expect(within(basic.display).queryByRole('button', { name: 'Advanced appearance' })).toBeNull();
+        // The finish is the viewer's own: the share link is byte-identical.
+        expect(link()).toBe(before);
+        // Global: the next mode shows the same finish, and choosing Glow there brings Advanced appearance back.
+        fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+        await act(async () => {});
+        const bonds = check('bonds', 'solid');
+        expect(within(bonds.display).queryByRole('button', { name: 'Advanced appearance' })).toBeNull();
+        fireEvent.click(within(bonds.group).getByRole('button', { name: 'glow surface' }));
+        expect(within(bonds.display).getByRole('button', { name: 'Advanced appearance' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('link', { name: /molecule mode/ }));
+        await act(async () => {});
+        const molecules = check('molecules', 'glow');
+        fireEvent.click(within(molecules.group).getByRole('button', { name: 'solid surface' }));
+        expect(within(molecules.display).queryByRole('button', { name: 'Advanced appearance' })).toBeNull();
+        expect(renderPref.get().finish).toBe('solid');
+        act(() => { renderPref.set({ ...renderPref.get(), finish: 'glow' }); });
     });
 
     // Ruling R24-3 (was: folding Display, T20b-display-header): the open section is one at a time, survives a mode
