@@ -168,8 +168,9 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(screen.getByRole('group', { name: 'where jobs run' })).toBeInTheDocument();
     });
 
-    // Review M4 (Task 12): the owner's jobs section is part of the Explore order -- header tile, quick pick, the
-    // surface switch, Selection, then jobs -- inside the part that scrolls, with the footer pinned below it.
+    // Review M4 (Task 12): the owner's jobs section is part of the Explore order -- header tile, the surface
+    // switch, Selection, then jobs -- inside the part that scrolls, with the footer pinned below it. (Owner R25-A3
+    // removed the quick pick from after the tile.)
     it('puts the owner\'s jobs after Selection, inside the scrolling part of Explore', async () => {
         BUILD_ENV.dev = true;
         const { store, container } = await enterMolecules(false);
@@ -181,7 +182,6 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(jobs).not.toBeNull();
         const order = [
             side.querySelector('.molecule-tile') as HTMLElement,
-            within(side).getByRole('group', { name: 'Quick pick' }),
             within(side).getByRole('group', { name: 'surface' }),
             within(side).getByText('Selection'),
             jobs,
@@ -367,8 +367,8 @@ describe('Molecules mode with on-demand molecules', () => {
     });
 
     // Fix round 1 (T16-M1): choosing another molecule closes the workspace and the canvas shows that molecule --
-    // from the quick pick, and when a followed job finishes and opens.
-    it('closes the request workspace when another molecule is chosen: quick pick, or a followed job that finishes', async () => {
+    // from the picker (the quick pick until owner R25-A3 removed it), and when a followed job finishes and opens.
+    it('closes the request workspace when another molecule is chosen: the picker, or a followed job that finishes', async () => {
         BUILD_ENV.dev = true;
         mockApi.preview.mockResolvedValue(previewFixture('preview_ok'));
         const { store, container } = await enterMolecules(false);
@@ -384,7 +384,7 @@ describe('Molecules mode with on-demand molecules', () => {
             expect(store.getState().jobs.request.previewAtoms).not.toBeNull();
         };
         await preview();
-        fireEvent.click(within(within(side).getByRole('group', { name: 'Quick pick' })).getByRole('button', { name: /Ammonia/ }));
+        fireEvent.click(within(openPicker(side)).getByRole('button', { name: /Ammonia/ }));
         await flush();
         expect(store.getState().molecule.selectedId).toBe('nh3');
         expect(within(viewportCell).queryByRole('region', { name: 'Request a molecule' })).toBeNull();
@@ -403,8 +403,8 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(store.getState().jobs.request.previewAtoms).toBeNull();
     });
 
-    // Task 16d item 9 (Task 16 re-review): re-picking the molecule already chosen -- quick-pick Water under a water
-    // preview -- reloads it behind the preview; the workspace closes for it too, as for any other choice.
+    // Task 16d item 9 (Task 16 re-review): re-picking the molecule already chosen -- Water from the picker (the quick
+    // pick until owner R25-A3) under a water preview -- reloads it behind the preview; the workspace closes for it too.
     it('closes the request workspace when the molecule already chosen is picked again', async () => {
         BUILD_ENV.dev = true;
         mockApi.preview.mockResolvedValue(previewFixture('preview_ok'));
@@ -419,7 +419,8 @@ describe('Molecules mode with on-demand molecules', () => {
         await flush();
         expect(store.getState().jobs.request.previewAtoms).not.toBeNull();
         const nonce = store.getState().molecule.loadNonce;
-        fireEvent.click(within(within(side).getByRole('group', { name: 'Quick pick' })).getByRole('button', { name: /Water/ }));
+        // The library's Water, the row marked current (the owner's list also holds a computed Water).
+        fireEvent.click(within(openPicker(side)).getAllByRole('button', { name: 'H₂O Water' }).find(row => row.classList.contains('Mui-selected'))!);
         await flush();
         expect(store.getState().molecule.selectedId).toBe('h2o');
         expect(store.getState().molecule.loadNonce).toBe(nonce + 1);

@@ -1,4 +1,4 @@
-/* src/molecule_ui/molecule_explore.css -- Molecules' Explore header tile, quick pick and the inspector's
+/* src/molecule_ui/molecule_explore.css -- Molecules' Explore header tile (the quick pick went in owner R25-A3) and the inspector's
    Properties card (spec §9.4, Phase 6G-2 Task 12, ruling P1). Tokens only. */
 
 /* The header tile: the same surface-3 card family as Bonds' tile and the element tile. */
@@ -69,83 +69,6 @@
 .MuiPopover-paper.molecule-list-popover .molecule-picker-list {
   max-height: none;
   overflow-y: auto;
-}
-
-/* Quick pick. Ruling T12-fit: five tiles share one row of whatever width the panel has (Explore 315,
-   the tablet's 300, a phone's sheet) -- never a sideways scroll. Each column shrinks with the panel; the
-   picture is square, at most the concept's 72 px (--ql-size-thumb). */
-.quick-pick {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-.quick-pick .ql-section {
-  margin: 0;
-}
-.quick-pick-row {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
-}
-.quick-pick-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  color: var(--ql-color-text-2);
-  font-family: var(--ql-font-sans);
-}
-.quick-pick-image,
-.quick-pick-formula {
-  display: block;
-  width: 100%;
-  max-width: var(--ql-size-thumb);
-  aspect-ratio: 1;
-  box-sizing: border-box;
-  border-radius: var(--ql-radius-md);
-  border: 1px solid var(--ql-color-border-subtle);
-  background: var(--ql-color-surface-2);
-}
-.quick-pick-image {
-  object-fit: cover;
-}
-.quick-pick-formula {
-  display: grid;
-  place-items: center;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ql-color-text-1);
-  overflow-wrap: anywhere;
-}
-.quick-pick-tile:hover .quick-pick-image,
-.quick-pick-tile:hover .quick-pick-formula {
-  border-color: var(--ql-color-border-strong);
-}
-/* The current molecule: the selected-edge ring (and Deep Space's soft glow), as the strip's selected tile. */
-.quick-pick-tile.selected .quick-pick-image,
-.quick-pick-tile.selected .quick-pick-formula {
-  border-color: var(--ql-color-selected-edge);
-  box-shadow: var(--ql-shadow-selected);
-}
-.quick-pick-label {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  max-width: 100%;
-  text-align: center;
-  font-size: var(--ql-type-tick-size);
-  line-height: var(--ql-type-tick-line);
-  overflow-wrap: anywhere;
-}
-.quick-pick-tile.selected .quick-pick-label {
-  color: var(--ql-color-text-1);
 }
 
 /* The inspector's Properties: caption labels, body values, tabular numerals (spec §4.3). */

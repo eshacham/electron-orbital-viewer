@@ -58,10 +58,10 @@ const RequestWorkspace: React.FC<RequestWorkspaceProps> = ({ returnFocusRef }) =
     // preview) goes first -- else the preview would stay drawn over the molecule it opens.
     const openComputed = useCallback((key: string) => { close(); panelProps.onOpen(key); }, [close, panelProps]);
 
-    // Fix round 1 (T16-M1): another molecule chosen meanwhile -- quick pick, the picker, a followed job that
+    // Fix round 1 (T16-M1): another molecule chosen meanwhile -- the picker, a followed job that
     // finishes and opens -- closes the workspace, so the canvas shows that molecule rather than the preview.
     // Task 16d item 9: keyed on loadNonce, which every selectMolecule bumps, so re-picking the molecule already
-    // chosen (quick-pick Water under a water preview) closes it too -- the id alone does not change then.
+    // chosen (Water from the picker under a water preview) closes it too -- the id alone does not change then.
     const loadNonce = useAppSelector(state => state.molecule.loadNonce);
     const chosenRef = useRef(loadNonce);
     useEffect(() => {

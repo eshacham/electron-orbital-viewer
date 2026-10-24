@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Alert, Chip, List, ListItemButton, TextField, Typography } from '@mui/material';
 import { LIBRARY_CATEGORIES } from '../molecules/library_types';
 import { filterMolecules, formatFormula } from '../molecules/catalogue';
+import { structureThumbAlt, structureThumbUrl } from '../molecules/thumb_paths';
 import type { MoleculeIndexEntry } from '../molecules/types';
 import { COMPUTED_CATEGORY } from '../jobs/computed';
 
@@ -17,6 +18,24 @@ interface MoleculePickerProps {
 export const LibraryLoadAlert: React.FC<{ error: string }> = ({ error }) => (
     <Alert severity="error" role="alert">Could not load the molecule library: {error}. Reload the page to try again.</Alert>
 );
+
+/**
+ * Owner R25-A3: a row's build-time ball-and-stick picture (Task 11, the quick pick's tiles until R25 removed
+ * them), 40 px. A computed molecule has none built, and a picture that fails to load is dropped; either way the
+ * slot stays, empty, so the formula column stays aligned -- the row's own formula is the fallback.
+ */
+const PickerThumb: React.FC<{ entry: MoleculeIndexEntry }> = ({ entry }) => {
+    const [missing, setMissing] = useState(false);
+    const built = entry.category !== COMPUTED_CATEGORY.key;
+    return (
+        <span className="molecule-picker-thumb">
+            {built && !missing && (
+                <img className="molecule-picker-image" src={structureThumbUrl(entry.id)} alt={structureThumbAlt(entry.name)}
+                    width={40} height={40} loading="lazy" onError={() => setMissing(true)} />
+            )}
+        </span>
+    );
+};
 
 /** Search plus the spec's five categories. Lives in the navigation column on a desktop and in the Explore tab and a full-screen dialog on a phone. */
 const MoleculePicker: React.FC<MoleculePickerProps> = ({ entries, error, selectedId, onSelect, autoFocus = false }) => {
@@ -57,12 +76,18 @@ const MoleculePicker: React.FC<MoleculePickerProps> = ({ entries, error, selecte
                 <Typography variant="body2" className="molecule-picker-status">No molecule matches “{query}”.</Typography>
             ) : (
                 <List dense aria-label="molecules" className="molecule-picker-list">
-                    {matches.map(entry => (
-                        <ListItemButton key={entry.id} selected={entry.id === selectedId} onClick={() => onSelect(entry.id)} className="molecule-picker-item">
-                            <span className="molecule-picker-formula">{formatFormula(entry.formula)}</span>
-                            <span className="molecule-picker-name">{entry.name}</span>
-                        </ListItemButton>
-                    ))}
+                    {matches.map(entry => {
+                        const formula = formatFormula(entry.formula);
+                        return (
+                            // R25-A3: named by its visible text (WCAG 2.5.3), not the picture's alt text before it.
+                            <ListItemButton key={entry.id} selected={entry.id === selectedId} onClick={() => onSelect(entry.id)}
+                                className="molecule-picker-item" aria-label={`${formula} ${entry.name}`}>
+                                <PickerThumb entry={entry} />
+                                <span className="molecule-picker-formula">{formula}</span>
+                                <span className="molecule-picker-name">{entry.name}</span>
+                            </ListItemButton>
+                        );
+                    })}
                 </List>
             )}
         </div>

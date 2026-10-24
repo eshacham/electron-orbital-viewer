@@ -91,27 +91,28 @@ describe('Molecules mode', () => {
     afterEach(() => { window.matchMedia = originalMatchMedia; window.localStorage.removeItem('eov.display'); });
 
     // Task 12 (ruling P1): the picker is no longer inline in the left column -- it hangs, as a popover, under
-    // the header tile's "Change ▾" (spec §9.4 "in a popover"); the quick pick sits under the tile.
+    // the header tile's "Change ▾" (spec §9.4 "in a popover"). Owner R25-A3: the quick pick under the tile is gone
+    // (its thumbnails are in the picker's rows now), so this asserts its absence instead of its presence.
     it('puts the picker in the left column on a desktop, and the view settings on the right', async () => {
         const { container } = await enterMolecules(false);
         const side = container.querySelector('.side-panel') as HTMLElement;
         expect(within(side).queryByRole('list', { name: 'molecules' })).toBeNull();
-        expect(within(side).getByRole('group', { name: 'Quick pick' })).toBeInTheDocument();
+        expect(within(side).queryByRole('group', { name: 'Quick pick' })).toBeNull();
+        expect(side.querySelector('.quick-pick')).toBeNull();
         fireEvent.click(within(side).getByRole('button', { name: 'Choose a molecule' }));
         expect(within(screen.getByRole('dialog', { name: 'Choose a molecule' })).getByRole('list', { name: 'molecules' })).toBeInTheDocument();
         expect(within(container.querySelector('.view-panel') as HTMLElement).getByText(/Opacity/)).toBeInTheDocument();
     });
 
-    // Task 12 (ruling P1): Explore reads header tile → quick pick → the surface switch (and its list) →
-    // Selection → jobs, with "How this was computed" pinned below.
-    it('heads Explore with the molecule tile and the quick pick, above the surface switch and Selection (desktop)', async () => {
+    // Task 12 (ruling P1): Explore reads header tile → the surface switch (and its list) → Selection → jobs, with
+    // "How this was computed" pinned below. Owner R25-A3 removed the quick pick from between the tile and the switch.
+    it('heads Explore with the molecule tile, above the surface switch and Selection (desktop)', async () => {
         const { store, container } = await enterMolecules(false);
         pickWater(store);
         await flush(); // the loader's own meta request settles (no act warning)
         const side = container.querySelector('.side-panel') as HTMLElement;
         const order = [
             side.querySelector('.molecule-tile') as HTMLElement,
-            within(side).getByRole('group', { name: 'Quick pick' }),
             within(side).getByRole('group', { name: 'surface' }),
             within(side).getByText('Selection'),
         ];
@@ -130,7 +131,9 @@ describe('Molecules mode', () => {
             & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('chooses a molecule from the header\'s popover and from a quick-pick tile', async () => {
+    // Owner R25-A3: the second choice was a quick-pick tile; with the quick pick gone, it is the popover again, whose
+    // rows now carry the thumbnails the tiles had and mark the current molecule.
+    it('chooses a molecule from the header\'s popover, whose rows show the structure thumbnails', async () => {
         const { store, container } = await enterMolecules(false);
         pickWater(store);
         const side = container.querySelector('.side-panel') as HTMLElement;
@@ -140,10 +143,17 @@ describe('Molecules mode', () => {
         await flush(); // the loader's meta request settles
         expect(store.getState().molecule.selectedId).toBe('o3');
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-        fireEvent.click(within(side).getByRole('button', { name: 'Ammonia (NH₃)' }));
+        fireEvent.click(within(side).getByRole('button', { name: 'Change molecule' }));
+        const again = screen.getByRole('dialog', { name: 'Choose a molecule' });
+        const ammonia = within(again).getByRole('button', { name: 'NH₃ Ammonia' });
+        expect(ammonia.querySelector('img')).toHaveAttribute('alt', 'Ball-and-stick model of Ammonia');
+        fireEvent.click(ammonia);
         await flush();
         expect(store.getState().molecule.selectedId).toBe('nh3');
-        expect(within(side).getByRole('button', { name: 'Ammonia (NH₃)' })).toHaveAttribute('aria-current', 'true');
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        fireEvent.click(within(side).getByRole('button', { name: 'Change molecule' }));
+        expect(within(screen.getByRole('dialog', { name: 'Choose a molecule' })).getByRole('button', { name: 'NH₃ Ammonia' }))
+            .toHaveClass('Mui-selected');
     });
 
     // Task 12 (rulings P10, R24-3): the inspector's sections are Display and Properties; with nothing stored,
@@ -166,7 +176,7 @@ describe('Molecules mode', () => {
     });
 
     // Ruling T12-I1: while a molecule is chosen, Properties stays a section -- "Loading…" until its meta arrives --
-    // so a quick pick never folds the open section to Display and back.
+    // so a molecule change never folds the open section to Display and back.
     it('keeps Properties the open section across a molecule change, loading then filled', async () => {
         const { store, container } = await enterMolecules(false);
         pickWater(store);
@@ -260,8 +270,9 @@ describe('Molecules mode', () => {
         expect(within(viewPanel).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'true');
     });
 
-    // Task 12: a phone's Explore tab opens with the compact tile and the quick-pick row, then today's order.
-    it('opens the phone\'s Explore tab with the compact tile and the quick pick, then Selection and the switch', async () => {
+    // Task 12: a phone's Explore tab opens with the compact tile, then today's order. Owner R25-A3: the quick-pick
+    // row that followed the tile is gone.
+    it('opens the phone\'s Explore tab with the compact tile, then Selection and the switch', async () => {
         const { store } = await enterMolecules(true);
         pickWater(store);
         await flush(); // the loader's own meta request settles (no act warning)
@@ -269,7 +280,6 @@ describe('Molecules mode', () => {
         const tabpanel = screen.getByRole('tabpanel');
         const order = [
             tabpanel.querySelector('.molecule-tile.compact') as HTMLElement,
-            within(tabpanel).getByRole('group', { name: 'Quick pick' }),
             within(tabpanel).getByText('Selection'),
             within(tabpanel).getByRole('group', { name: 'surface' }),
             within(tabpanel).getByText('Browse molecules'),
@@ -278,6 +288,9 @@ describe('Molecules mode', () => {
         for (let i = 1; i < order.length; i++) {
             expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         }
+        expect(within(tabpanel).queryByRole('group', { name: 'Quick pick' })).toBeNull();
+        // The inline browse list's rows show the thumbnails too (R25-A3).
+        expect(within(tabpanel).getByRole('button', { name: 'H₂O Water' }).querySelector('img')).not.toBeNull();
         // The compact tile's Change opens the phone's full-screen picker, as the header's name does.
         fireEvent.click(within(tabpanel.querySelector('.molecule-tile') as HTMLElement).getByRole('button', { name: 'Change molecule' }));
         expect(screen.getByRole('button', { name: 'close molecule picker' })).toBeInTheDocument();
@@ -997,7 +1010,9 @@ describe('Molecules mode', () => {
             loader.loadMoleculeMeta.mockImplementationOnce(() => new Promise(resolve => { land = resolve; }));
             const drawnStructures = () => before.querySelectorAll('canvas.thumb-canvas[data-drawn="true"]').length;
             expect(drawnStructures()).toBe(2);
-            fireEvent.click(within(container.querySelector('.side-panel') as HTMLElement).getByRole('button', { name: 'Ammonia (NH₃)' }));
+            // Owner R25-A3: chosen from the header's picker (the quick-pick tile this used is gone).
+            fireEvent.click(within(container.querySelector('.side-panel') as HTMLElement).getByRole('button', { name: 'Change molecule' }));
+            fireEvent.click(within(screen.getByRole('dialog', { name: 'Choose a molecule' })).getByRole('button', { name: 'NH₃ Ammonia' }));
             await flush();
             expect(store.getState().molecule.meta).toBeNull();
             expect(strip()).toBe(before);

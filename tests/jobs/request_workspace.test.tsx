@@ -197,7 +197,7 @@ describe('the request workspace (ruling P12)', () => {
         expect(entryButton()).toHaveFocus();
     });
 
-    // Fix round 1 (T16-M1): any other molecule chosen meanwhile -- quick pick, the picker, a followed job that
+    // Fix round 1 (T16-M1): any other molecule chosen meanwhile -- the picker, a followed job that
     // finishes (each dispatches selectMolecule) -- closes the workspace and takes the preview off the canvas.
     it('choosing another molecule while it is open closes it and clears the preview (T16-M1)', async () => {
         const { store } = setup();

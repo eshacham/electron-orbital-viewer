@@ -105,7 +105,6 @@ import MoleculeJobsSection from './components/MoleculeJobsSection';
 import RequestWorkspace, { useRequestWorkspaceOpen } from './components/RequestWorkspace';
 import MoleculeProvenanceFooter from './components/MoleculeProvenanceFooter';
 import MoleculeHeader from './molecule_ui/MoleculeHeader';
-import QuickPick from './molecule_ui/QuickPick';
 import MoleculePropertiesCard from './molecule_ui/MoleculePropertiesCard';
 import TierBadge from './components/TierBadge';
 import { ConnectedOwnerBar, signInHere } from './components/OwnerBar';
@@ -1327,17 +1326,15 @@ function App() {
         onOpenPicker: () => setMoleculePickerOpen(true),
     };
     // Task 12 (ruling P1): Molecules' Explore opens with the header tile (name, formula, "Change ▾" -- a
-    // popover on a desktop or tablet, the full-screen picker on a phone) and the quick pick under it.
+    // popover on a desktop or tablet, the full-screen picker on a phone). Owner R25-A3: the quick pick that sat
+    // under it is gone; its thumbnails are in the picker's rows (MoleculePicker), superseding T12-fit and D7.
     const moleculeHeader = (compact: boolean) => (
         <MoleculeHeader entries={moleculeEntries} indexError={molecule.indexError} meta={molecule.meta}
             selectedId={molecule.selectedId} isLoading={molecule.isLoadingMeta} onSelectMolecule={moleculeNavProps.onSelectMolecule}
             compact={compact} onOpenPicker={moleculeNavProps.onOpenPicker} />
     );
-    const moleculeQuickPick = (
-        <QuickPick entries={moleculeEntries} selectedId={molecule.selectedId} onSelect={moleculeNavProps.onSelectMolecule} />
-    );
     // Ruling P10: the molecule's Properties, from the facts its meta carries. Ruling T12-I1: present while a
-    // molecule is chosen -- "Loading…" until its meta lands -- so a quick pick never folds the open section to
+    // molecule is chosen -- "Loading…" until its meta lands -- so a molecule change never folds the open section to
     // Display and back; one that failed to load says so (its alert over the view gives the reason).
     const moleculeProperties = molecule.selectedId !== null && (molecule.meta || molecule.isLoadingMeta
         ? (
@@ -1652,7 +1649,7 @@ function App() {
                 // carries the orbital list (MoleculeNav). There is no Plot
                 // tab any more (below): it had nothing left once the list
                 // moved here, its one-time reason for existing (ruling D23).
-                // Task 12: the compact header tile and the quick pick lead it.
+                // Task 12: the compact header tile leads it.
                 content: (
                     <>
                         {/* Task 15 (spec §9.8): the strip is the Explore tab's first row, as in every other mode. */}
@@ -1661,7 +1658,6 @@ function App() {
                                 onSelect={handleMoleculeStripSelect} variant="sheet" />
                         )}
                         {moleculeHeader(true)}
-                        {moleculeQuickPick}
                         {moleculeSelectionSection}
                         <MoleculeNav {...moleculeNavProps} variant="body" ref={moleculeNavRef} />
                         <MoleculeProvenanceFooter />
@@ -1806,9 +1802,8 @@ function App() {
         : isMoleculeMode ? (
             <div className="molecule-explore">
                 <div className="molecule-explore-scroll">
-                    {/* Task 12 (ruling P1): the header tile and the quick pick head the column. */}
+                    {/* Task 12 (ruling P1): the header tile heads the column. */}
                     {moleculeHeader(false)}
-                    {moleculeQuickPick}
                     <MoleculeNav {...moleculeNavProps} ref={moleculeNavRef} />
                     {moleculeSelectionSection}
                     {/* Ruling P12: on a desktop or tablet the request opens as a workspace in the viewport cell. */}

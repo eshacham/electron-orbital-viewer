@@ -1217,6 +1217,23 @@ html, body, #root {
 .molecule-picker-item {
   gap: 10px;
 }
+/* Owner R25-A3: the row's build-time structure picture (the quick pick's, until R25), 40 px; the slot stays,
+   empty, when there is none, so the formula column stays aligned. */
+.molecule-picker-thumb {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+}
+.molecule-picker-image {
+  display: block;
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  object-fit: cover;
+  border-radius: var(--ql-radius-sm);
+  border: 1px solid var(--ql-color-border-subtle);
+  background: var(--ql-color-surface-2);
+}
 .molecule-picker-formula {
   min-width: 84px;
   font-weight: 600;
