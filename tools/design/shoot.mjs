@@ -314,17 +314,23 @@ function collectMetrics() {
         insideCell: within(C, V) && within(C, W), keys: keys.length, hidden };
     })(),
     // 6G-2 Task 17 fix (Fail 2): how much of the MO list's gap note is out of sight -- under the list's sticky key, or
-    // past the list's bottom edge. 0 means the note is whole and readable.
+    // past the list's bottom edge. 0 means the note is whole and readable. Owner R25-A4 moved the note (and the key)
+    // under the list as its caption: then inList is false, nothing in the list may be sticky (stickyInList 0), the
+    // note sits below the list's bottom edge (belowList), and nothing of it can be hidden by the list (hiddenPx 0).
     orbitalGapNote: (() => {
       const list = document.querySelector('.molecule-orbital-list');
-      const note = list?.querySelector('.molecule-orbital-gap');
+      const note = list?.parentElement?.querySelector('.molecule-orbital-gap');
       if (!list || !note) return null;
       const L = list.getBoundingClientRect(), N = note.getBoundingClientRect();
       if (!(N.height > 0)) return null;
-      const key = list.querySelector('.molecule-orbital-legend')?.getBoundingClientRect();
+      const inList = list.contains(note);
+      const stickyInList = [...list.querySelectorAll('*')].filter(e => getComputedStyle(e).position === 'sticky').length;
+      const key = inList ? list.querySelector('.molecule-orbital-legend')?.getBoundingClientRect() : null;
       const visibleTop = Math.max(L.top, key ? key.bottom : L.top);
-      const hidden = Math.max(0, Math.min(N.bottom, visibleTop) - N.top) + Math.max(0, N.bottom - Math.max(N.top, L.bottom));
-      return { hiddenPx: Math.round(hidden), noteTop: Math.round(N.top), noteHeight: Math.round(N.height),
+      const hidden = !inList ? 0
+        : Math.max(0, Math.min(N.bottom, visibleTop) - N.top) + Math.max(0, N.bottom - Math.max(N.top, L.bottom));
+      return { hiddenPx: Math.round(hidden), inList, stickyInList, belowList: N.top >= L.bottom - 0.5,
+        noteTop: Math.round(N.top), noteHeight: Math.round(N.height),
         keyBottom: key ? Math.round(key.bottom) : null, listTop: Math.round(L.top), listBottom: Math.round(L.bottom) };
     })(),
     // Task 16: what has focus (Esc returns it to the entry), and anything in the request workspace wider than it.
