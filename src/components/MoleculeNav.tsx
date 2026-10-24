@@ -46,6 +46,16 @@ const PANEL_SCROLLERS = '.molecule-explore-scroll, .phone-sheet-body';
 const REVEAL_MARGIN = 8;
 
 /**
+ * R25-A-I1: whether the list is actually displayed -- not inside a folded tablet Explore (`<aside hidden>`) nor a
+ * panel full screen hides (display: none). A list that is mounted but not displayed counts as missing, so the
+ * one-render wait covers its unfolding and nothing is focused or highlighted unseen.
+ */
+function isDisplayed(element: HTMLElement): boolean {
+    if (element.closest('[hidden]')) return false;
+    return typeof element.checkVisibility !== 'function' || element.checkVisibility();
+}
+
+/**
  * The panel's scrollTop that shows `element`: unchanged when it is in view; else scrolled only as far as needed
  * to bring its far edge REVEAL_MARGIN inside the panel's, never so far that its near edge leaves -- a list taller
  * than the panel shows its top. scrollTop is set on the panel alone, never through scrollIntoView, which also
@@ -67,7 +77,9 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
     const navRef = useRef<HTMLDivElement>(null);
     const surfaceLabelId = useId();
     const revealWanted = useRef(false);
-    const [highlight, setHighlight] = useState(false);
+    // R25-A-M1: 0 is off; each press counts up, and the list alternates its highlight class by parity so a second
+    // press within the second replays the fade (style.css) rather than leaving it where it was.
+    const [highlightRun, setHighlightRun] = useState(0);
     const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => () => { if (highlightTimer.current !== null) clearTimeout(highlightTimer.current); }, []);
     // The pressed row is the orbital drawn: the list is scrolled to it, so focus lands where the eye already is.
@@ -75,14 +87,14 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
         const list = navRef.current?.querySelector<HTMLElement>('.molecule-orbital-list');
         const row = list?.querySelector<HTMLElement>('.molecule-orbital-row[aria-pressed="true"]')
             ?? list?.querySelector<HTMLElement>('.molecule-orbital-row');
-        if (!list || !row) return false;
+        if (!list || !row || !isDisplayed(list)) return false;
         list.scrollTop = centredScrollTop(list, row);
         const panel = list.closest<HTMLElement>(PANEL_SCROLLERS);
         if (panel) panel.scrollTop = revealScrollTop(panel, list);
         row.focus({ preventScroll: true });
-        setHighlight(true);
+        setHighlightRun(run => run + 1);
         if (highlightTimer.current !== null) clearTimeout(highlightTimer.current);
-        highlightTimer.current = setTimeout(() => { highlightTimer.current = null; setHighlight(false); }, LIST_HIGHLIGHT_MS);
+        highlightTimer.current = setTimeout(() => { highlightTimer.current = null; setHighlightRun(0); }, LIST_HIGHLIGHT_MS);
         return true;
     };
     useImperativeHandle(ref, () => ({ revealOrbitalList: () => { revealWanted.current = !reveal(); } }), []);
@@ -116,7 +128,9 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
         <div className="molecule-nav level-nav" ref={navRef}>
             {meta && (
                 <>
-                    {/* Owner R25-A4: a visible label over the switch, which names its group (WCAG 2.5.3). */}
+                    {/* Owner R25-A4: a visible label over the switch, which names its group (WCAG 2.5.3); R25-A-M4: the
+                        field's own gap spaces them. */}
+                    <div className="molecule-surface-field">
                     <Typography variant="subtitle2" id={surfaceLabelId} className="molecule-surface-label">Surface</Typography>
                     <ToggleButtonGroup exclusive size="small" fullWidth aria-labelledby={surfaceLabelId} className="molecule-surface-toggle"
                         value={surface.kind}
@@ -131,6 +145,7 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
                             of what is left out -- it reads "No surface", and that is its name. */}
                         <ToggleButton value="none">No surface</ToggleButton>
                     </ToggleButtonGroup>
+                    </div>
                     {/* Ruling R23f: the orbital list (and its legend) lives in
                         the Explore panel now, under this switch, on every
                         layout -- a desktop/tablet's docked panel and a
@@ -146,7 +161,7 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
                     {surface.kind === 'mo' && (
                         <MoleculeOrbitalList orbitals={meta.orbitals} selectedIndex={surface.index}
                             onSelect={index => onSurfaceChange({ kind: 'mo', index })}
-                            method={meta.method.density} symmetry={meta.symmetry} highlight={highlight} />
+                            method={meta.method.density} symmetry={meta.symmetry} highlightRun={highlightRun} />
                     )}
                     <Typography variant="caption" className="molecule-caption">
                         Geometry: {meta.geometrySource}. Density, potential and orbitals: {meta.method.density} (PySCF).

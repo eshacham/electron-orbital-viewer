@@ -186,6 +186,8 @@ const FIXED_RHO_NOTE = 'The density is drawn at a fixed ρ, chosen with the ρ b
 const ESP_SURFACE_NOTE = 'Fixed at ρ = 0.001 e/a₀³ — the surface ESP maps are conventionally drawn on, not an enclosed fraction';
 /** Ruling P8: structure only (show=none) draws no contour, so the enclosed fraction applies to nothing. */
 const NO_SURFACE_NOTE = 'No surface is drawn, so no contour applies';
+/** R25-A-I1: how long after the "Orbital list" tile left full screen its reveal may still follow. */
+const REVEAL_AFTER_FULLSCREEN_MS = 2000;
 
 /** What a failed Molecules render was trying to draw, for its alert. */
 const SURFACE_NAME: Record<MoleculeSurface['kind'], string> = {
@@ -511,6 +513,8 @@ function App() {
     useDocumentTitle(`${viewTitleText} · ${BRAND.name}`);
     const shellRef = useRef<HTMLDivElement>(null);
     const fullscreen = useFullscreen(shellRef);
+    const fullscreenActive = fullscreen.active;
+    const toggleFullscreen = fullscreen.toggle;
     const [helpOpen, setHelpOpen] = useState(false);
     const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
     // The molecule index loads when Molecules opens -- or when someone starts a search (spec §8.3).
@@ -895,6 +899,9 @@ function App() {
         return [];
     }, [builtMoleculeStrip, isMoleculeMode, moleculeMetaLoading, lastMoleculeStrip, molecule.surface, molecule.representation]);
     const moleculeNavRef = useRef<MoleculeNavHandle>(null);
+    // R25-A-I1: when the "Orbital list" tile was pressed in full screen (where Explore is not shown), the time it
+    // asked; the list is revealed once full screen has gone -- the native exit lands a little later, on its own event.
+    const revealAfterFullscreen = useRef<number | null>(null);
     // Spec §9.4: "Each tile sets surface / representation exactly as the View tab does" -- the same actions.
     const moleculeMeta = molecule.meta;
     const moleculeSurfaceKind = molecule.surface.kind;
@@ -905,14 +912,30 @@ function App() {
             // R25-A2: then the list is scrolled into view in Explore (on a phone, the Explore sheet the tile sits in),
             // focus goes to that orbital's row and the list is highlighted for a moment -- visible even when Orbitals
             // was already drawn.
+            // R25-A-I1: the list must be on screen to be seen -- a tablet's folded Explore unfolds (the reveal waits
+            // the one render that takes), and full screen, which shows no Explore at all, is left first (the user
+            // asked to see the list); the reveal follows once it has gone.
             const first = moleculeMeta && (frontierOccupied(moleculeMeta.orbitals) ?? moleculeMeta.orbitals[0]);
             if (moleculeSurfaceKind !== 'mo' && first) dispatch(setSurface({ kind: 'mo', index: first.index }));
+            if (isMedium && exploreCollapsed) setExploreCollapsed(false);
+            if (fullscreenActive) {
+                revealAfterFullscreen.current = Date.now();
+                toggleFullscreen();
+                return;
+            }
             moleculeNavRef.current?.revealOrbitalList();
             return;
         }
         if (target.representation) dispatch(setRepresentation(target.representation));
         dispatch(setSurface(target.surface));
-    }, [dispatch, moleculeMeta, moleculeSurfaceKind]);
+    }, [dispatch, moleculeMeta, moleculeSurfaceKind, isMedium, exploreCollapsed, fullscreenActive, toggleFullscreen]);
+    useEffect(() => {
+        const asked = revealAfterFullscreen.current;
+        if (fullscreenActive || asked === null) return;
+        revealAfterFullscreen.current = null;
+        // A full screen that did not end at once (a refused exit) and ended later for another reason reveals nothing.
+        if (Date.now() - asked < REVEAL_AFTER_FULLSCREEN_MS) moleculeNavRef.current?.revealOrbitalList();
+    }, [fullscreenActive]);
     // Spec §12 and preflight D19: a new molecule cancels the old one's thumbnail jobs -- in Molecules mode only,
     // as ruling T10-M6 has it for Bonds (leaving the mode cancels too, as its tiles go).
     useEffect(() => (isMoleculeMode ? () => thumbnailService.cancelAll() : undefined), [isMoleculeMode, molecule.selectedId]);

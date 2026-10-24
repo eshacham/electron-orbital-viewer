@@ -11,7 +11,7 @@ import {
 import { setGlowExtrasSuppressed, setSurfaceStyle } from '../src/store/orbitalSlice';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from '../src/url_state';
 import { registerMoleculeUrlKeys } from '../src/molecules/url_keys';
-import { PHONE_LANDSCAPE } from '../src/useMediaQuery';
+import { MEDIUM_VIEWPORT, PHONE_LANDSCAPE } from '../src/useMediaQuery';
 import App from '../src/App';
 import { LIBRARY_INDEX, waterMeta } from './molecules/fixtures';
 import { thumbnailService } from '../src/thumbs/ThumbnailService';
@@ -46,17 +46,19 @@ jest.mock('../src/molecules/esp', () => ({
     loadEspGrid: jest.fn(() => never()),
 }));
 
-function installMatchMedia(narrow: boolean, landscape = false) {
+// R25-A fix round: `medium` is a tablet (MEDIUM_VIEWPORT matches, nothing narrow).
+function installMatchMedia(narrow: boolean, landscape = false, medium = false) {
     (window as unknown as { matchMedia: unknown }).matchMedia = (media: string) => ({
-        media, matches: media === PHONE_LANDSCAPE ? landscape : narrow, addEventListener: () => {}, removeEventListener: () => {},
+        media, matches: media === PHONE_LANDSCAPE ? landscape : media === MEDIUM_VIEWPORT ? (medium || narrow) : narrow,
+        addEventListener: () => {}, removeEventListener: () => {},
     });
 }
 // D17 / D36: the app's own store, so every slice App reads (bonds too) is there.
 const makeStore = () => createAppStore();
 const flush = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
 
-async function enterMolecules(narrow: boolean, { landscape = false, before }: { landscape?: boolean; before?: (store: ReturnType<typeof makeStore>) => void } = {}) {
-    installMatchMedia(narrow, landscape);
+async function enterMolecules(narrow: boolean, { landscape = false, medium = false, before }: { landscape?: boolean; medium?: boolean; before?: (store: ReturnType<typeof makeStore>) => void } = {}) {
+    installMatchMedia(narrow, landscape, medium);
     const store = makeStore();
     before?.(store);
     const utils = render(<Provider store={store}><App /></Provider>);
@@ -927,6 +929,44 @@ describe('Molecules mode', () => {
         // Owner R25-A2: "clicking on it does nothing" -- with Orbitals already drawn, the tile only moved focus. Now its
         // effect is always visible: Explore scrolls the list into view, focus lands on the drawn row, and the list
         // is highlighted briefly.
+        // R25-A-I1 (review): on a tablet with Explore folded the list was mounted but not displayed, so the tile changed
+        // nothing visible. It unfolds Explore, then reveals the list there.
+        it('unfolds a folded Explore on a tablet, then brings the list into view, focused and highlighted (R25-A-I1)', async () => {
+            const { store, container } = await enterMolecules(false, { medium: true });
+            pickWater(store);
+            await flush();
+            act(() => { store.dispatch(setSurface({ kind: 'mo', index: 2 })); });
+            fireEvent.click(screen.getByRole('button', { name: 'Hide the Explore panel' }));
+            const explore = container.querySelector('#explore-panel') as HTMLElement;
+            expect(explore).toHaveAttribute('hidden');
+            fireEvent.click(within(strip()).getByRole('option', { name: 'Orbital list — go to the list' }));
+            await flush();
+            expect(explore).not.toHaveAttribute('hidden');
+            const list = explore.querySelector('.molecule-orbital-list') as HTMLElement;
+            expect(document.activeElement).toBe(within(list).getByRole('button', { name: /1b2/ }));
+            expect(list).toHaveClass('highlight');
+            expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 2 });
+        });
+
+        // R25-A-I1 (review, controller ruling): in full screen Explore is not shown at all; the user asked to see the
+        // list, so the tile leaves full screen first, then reveals it.
+        it('leaves full screen, then brings the list into view, focused and highlighted (R25-A-I1)', async () => {
+            const { store, container } = await enterMolecules(false);
+            pickWater(store);
+            await flush();
+            fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
+            const shell = container.querySelector('.app-shell') as HTMLElement;
+            expect(shell).toHaveClass('is-fullscreen');
+            fireEvent.click(within(strip()).getByRole('option', { name: 'Orbital list — go to the list' }));
+            await flush();
+            expect(shell).not.toHaveClass('is-fullscreen');
+            // Not in full screen: the density drawn before switches to the HOMO, as from the docked layout.
+            expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 4 });
+            const list = container.querySelector('#explore-panel .molecule-orbital-list') as HTMLElement;
+            expect(document.activeElement).toBe(within(list).getByRole('button', { name: /1b1/ }));
+            expect(list).toHaveClass('highlight');
+        });
+
         it('brings the list into view from "Orbital list" even with Orbitals already drawn, focused and highlighted (R25-A2)', async () => {
             const { store, container } = await enterMolecules(false);
             pickWater(store);

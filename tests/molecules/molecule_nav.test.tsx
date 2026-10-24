@@ -233,6 +233,62 @@ describe('MoleculeNav', () => {
         expect(other.querySelector('.molecule-orbital-list')).not.toHaveClass('highlight');
         expect(document.activeElement).toBe(document.body);
     });
+    // R25-A-I1 (review): a list in the DOM but not displayed (a folded tablet Explore, full screen) is a list not
+    // there yet -- the one-render wait covers its unfolding, and nothing is focused or highlighted unseen.
+    it('treats a list that is not displayed as missing, and reveals it once it shows (R25-A-I1)', () => {
+        const ref = React.createRef<MoleculeNavHandle>();
+        const tree = (hidden: boolean) => <div hidden={hidden}><MoleculeNav {...navProps} surface={{ kind: 'mo', index: 4 }} ref={ref} /></div>;
+        const { container, rerender } = render(tree(true));
+        const list = container.querySelector('.molecule-orbital-list') as HTMLElement;
+        act(() => { ref.current!.revealOrbitalList(); });
+        expect(list).not.toHaveClass('highlight');
+        expect(document.activeElement).toBe(document.body);
+        rerender(tree(false));
+        expect(document.activeElement).toBe(within(list).getByRole('button', { name: /1b1/ }));
+        expect(list).toHaveClass('highlight');
+    });
+    // R25-A-M1 (review): a second press within the second replays the fade -- the class alternates with a replay
+    // class whose animation has another name (the same name would not restart), and the second runs a full second.
+    it('replays the highlight on a second press within the second (R25-A-M1)', () => {
+        jest.useFakeTimers();
+        try {
+            const ref = React.createRef<MoleculeNavHandle>();
+            const { container } = render(<MoleculeNav {...navProps} surface={{ kind: 'mo', index: 4 }} ref={ref} />);
+            const list = container.querySelector('.molecule-orbital-list') as HTMLElement;
+            act(() => { ref.current!.revealOrbitalList(); });
+            expect(list).toHaveClass('highlight');
+            expect(list).not.toHaveClass('highlight-replay');
+            act(() => { jest.advanceTimersByTime(600); });
+            act(() => { ref.current!.revealOrbitalList(); });
+            expect(list).toHaveClass('highlight');
+            expect(list).toHaveClass('highlight-replay');
+            act(() => { jest.advanceTimersByTime(LIST_HIGHLIGHT_MS - 1); });
+            expect(list).toHaveClass('highlight');
+            act(() => { jest.advanceTimersByTime(1); });
+            expect(list).not.toHaveClass('highlight');
+            act(() => { ref.current!.revealOrbitalList(); });
+            expect(list).not.toHaveClass('highlight-replay');
+        } finally {
+            jest.useRealTimers();
+        }
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+        expect(css).toMatch(/\.molecule-orbital-list\.highlight \{ animation: ql-list-highlight /);
+        expect(css).toMatch(/\.molecule-orbital-list\.highlight\.highlight-replay \{ animation-name: ql-list-highlight-replay; \}/);
+        expect(css).toMatch(/@keyframes ql-list-highlight-replay/);
+    });
+    // R25-A-M4 (review): the label sits 4 px over the switch through a field wrapper's own gap, not a negative margin.
+    it('spaces the "Surface" label from the switch with its own field gap, no negative margin (R25-A-M4)', () => {
+        const { container } = render(<MoleculeNav {...navProps} />);
+        const field = container.querySelector('.molecule-surface-field') as HTMLElement;
+        expect(field).not.toBeNull();
+        expect(within(field).getByText('Surface')).toBeInTheDocument();
+        expect(within(field).getByRole('group', { name: 'Surface' })).toBeInTheDocument();
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+        const start = css.indexOf('.molecule-surface-field {');
+        expect(start).toBeGreaterThanOrEqual(0);
+        expect(css.slice(start, css.indexOf('}', start))).toMatch(/gap: 4px/);
+        expect(css).not.toMatch(/\.molecule-surface-label \{[^}]*margin-bottom: -/);
+    });
     it('scrolls a panel only as far as it must to show an element, 8 px in from its edge (R25-A2)', () => {
         const box = (top: number, height: number) => ({ getBoundingClientRect: () => ({ top, bottom: top + height, height }) }) as unknown as HTMLElement;
         const panel = (scrollTop: number) => ({ ...box(100, 400), scrollTop }) as unknown as HTMLElement;
