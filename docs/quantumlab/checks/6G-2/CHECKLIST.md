@@ -9,7 +9,9 @@ T12–T16d).
 run are fixed, three in the app and one in the check. The affected scenes and sizes were re-shot under
 `--task 6g2-final-fix*` (52 shots, all opened); see "Fixed after the first run" below. Every fail cell now reads pass
 with the new numbers. No text could change (CSS placement, a list's opening scroll, a sample point), so the science
-diff was not re-run.
+diff was not re-run. **Round 2** (`9f6aa1c`..`fec264c`) fixed two more problems found in that re-shoot: Pa's phone
+keys ran off screen (ruling T17-key), and the hint sat on an unbound anion's note (ruling T17-hint). See "Round 2"
+under "Fixed after the first run".
 
 **Scenes** (`tools/design/scenes.json`; the new ones were added in this task, with their ids and state keys
 taken from `src/bonds/bonds_url.ts` and the live `molecules/v3` index and metas):
@@ -57,6 +59,11 @@ $S --task 6g2-final-fix --run tablet1 --scenes basic-3dz2,basic-n4,bonds-n2,bond
 $S --task 6g2-final-fix --run tablet2 --scenes water-orbitals,water-esp,benzene,c2h2-deep --themes dark,light --sizes tablet               # Fails 2, 3
 $S --task 6g2-final-fix --run mo --scenes water-orbitals --themes dark,light --sizes desktop,phone                     # Fail 2
 $S --task 6g2-final-fix-disp --run disp --click Display --scenes <the same 12> --themes dark --sizes desktop             # Fail 4
+# round 2 (9f6aa1c..fec264c): T17-key and T17-hint
+$S --task 6g2-final-fix2-before --run before|before-cl --scenes pa-whole,pa-shell-5 | cl-anion --themes dark --sizes phone | desktop,tablet   # found, before the fix
+$S --task 6g2-final-fix2 --run pa --scenes pa-whole,pa-shell-5 --themes dark,light --sizes phone,tablet,desktop
+$S --task 6g2-final-fix2 --run cl --scenes cl-anion --themes dark,light --sizes desktop,tablet,phone
+$S --task 6g2-final-fix2 --run phone-keys --scenes basic-3dz2,bonds-n2,water-esp,c-whole --themes dark --sizes phone       # no regression
 # science diff
 git worktree add --detach /tmp/6g2-main 72c8112 && (cd /tmp/6g2-main && npm ci --silent)   # npm ci, not a symlink
 node tools/design/shoot.mjs --root /tmp/6g2-main --task 6g2-main --run final1 --gl metal --port 5412 --jobs-stub \
@@ -302,9 +309,40 @@ The first run (`509c79a`) reported four fails. Each is fixed, tested and pinned 
    surface 8 px past its right edge (`x 1, dx 8`; `dx` is a new CSS-px offset in `sample_points.json`). **Result:**
    **12/12 read #071828, ΔE₀₀ 0** with Display open. No other colour sample changed.
 
-**Seen in the re-shoot, not one of the four (pre-existing, unchanged from the first run's Pa phone shot):** on a
-phone, Pa's key column (seven shells) runs past the screen's right edge. "n=5 valence" is cut at the edge, and the
-n=6 and n=7 entries and the cut-face caption are not visible in the 220×106 box. Left for a separate decision.
+### Round 2: found in the re-shoot, then fixed (rulings T17-key, T17-hint)
+
+5. **Pa's phone key ran off the screen (found; pre-existing; §3.3, every colour keyed).**
+   - **What was wrong:** the compact phone key is one row, and Pa has seven shell rings plus the cut-face caption.
+     The column box was 220×106 at (158,114) and itself inside the screen, but its row overflowed it. The new
+     `keyColumn` metric listed **4 keys hidden**: "n=5 valence" (cut at the edge), "n=6 valence", "n=7 valence"
+     and the caption.
+   - **Fix (`9f6aa1c`):** the compact row wraps inside the column's 220 px, and the caption takes its own line.
+     The single phone-top rule (`--phone-overlay-top`, DB6/DX7) is unchanged and pinned by a test.
+   - **Why wrapping:** of the three options (wrap, two columns, scroll inside the box), wrapping is the simplest.
+     Every key stays visible with nothing to scroll and no cue needed. On a phone the key column is not a camera
+     inset, and Pa's wrapped key ends at y 234, above the model.
+   - **After (run `6g2-final-fix2`):**
+
+     | scene | size | key column (x,y w×h), both themes | keys | hidden |
+     |---|---|---|---|---|
+     | pa-whole | phone | (158,114) 220×120 | 8 | **0** (was 4) |
+     | pa-whole | tablet / desktop | (754,366) / (912,498) 202×232 | 8 | 0 |
+     | pa-shell-5 (O shell) | phone | (158,114) 220×68 | 5 | 0 |
+     | pa-shell-5 | tablet / desktop | (754,334) / (912,466) 202×248 | 8 (with "Orbital tiles") | 0 |
+
+     Every box is inside the canvas cell and the window (`insideCell` true). Other phone keys (basic-3dz2,
+     bonds-n2, water-esp, c-whole) read 0 hidden. c-whole's caption now has its own line (220×68, was 220×74).
+6. **The hint sat on an unbound anion's note (desktop and tablet).**
+   - **What was wrong:** Cl⁻ has no scale readout, so the hint fell to the bottom-left, under the centred unbound
+     note. Overlap: **74×42 px** on desktop and **144×42 px** on tablet.
+   - **Fix (`0d2b17b`):** the hint is not shown while an anion is unbound. Nothing is drawn and every shell chip is
+     disabled, so "Drag to rotate · pick a shell to explore" would be untrue (§3.5). It is hidden, not dismissed,
+     and returns with a bound species.
+   - **After:** no hint in any of the six Cl⁻ shots (dark and light, desktop, tablet and phone). The unbound note
+     alone is over the empty canvas. `overlaps.hint` now includes `.canvas-unbound`.
+7. **Probe note (not a fail):** `pa-shell-5`, new to this check, reads an "explore panel" colour miss on desktop
+   and tablet. Its subshell cards reach the panel's foot, where the sample (y 0.992) lands on a card. This is the
+   same kind of probe placement fault as item 4; the panel fill is exact.
 
 ## Composites
 
@@ -376,6 +414,8 @@ apply to none of the 12 scenes, apart from C's unchanged valence line. They are 
 2. The Kohn–Sham gap note is whole under the MO-list key (`hiddenPx` 0), desktop and tablet.
 3. The tablet strip clears the drawer bar: 0 overlap, was 29 px.
 4. The `controls card` sample reads the card surface: ΔE₀₀ 0 in 12/12 Display-open scenes.
+5. Pa's phone keys are all on screen: 0 hidden of 8, was 4 (round 2, T17-key).
+6. The hint is not shown while an anion is unbound, so it never sits on the unbound note (round 2, T17-hint).
 
 The two known pre-existing issues (second-row core "Could not resolve", and the cut plane measured from the
 origin) are listed in note 4 and are not 6G-2 fails.
