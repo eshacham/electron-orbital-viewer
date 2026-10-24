@@ -280,10 +280,29 @@ function collectMetrics() {
       };
       return {
         hint: Object.fromEntries(['.scale-readout', '.key-column', '.thumbnail-strip', '.viewport-toolbar', '.viewport-title',
-          '.inspector-drawer .inspector-bar', '.canvas-busy', '.phone-topbar', '.phone-header', '.phone-sheet']
+          '.inspector-drawer .inspector-bar', '.canvas-busy', '.canvas-unbound', '.phone-topbar', '.phone-header', '.phone-sheet']
           .map(s => [s, overlap('.first-view-hint', s)])),
         strip: { '.inspector-drawer .inspector-bar': overlap('.thumbnail-strip.overlay', '.inspector-drawer .inspector-bar') },
       };
+    })(),
+    // 6G-2 Task 17 round 2 (ruling T17-key, spec §3.3): the key column inside the canvas cell and on screen, and every
+    // key in it whole -- a swatch item, heading or caption that runs past the column, the cell or the window, or is
+    // cut inside itself, is listed in `hidden` by its text. `hidden` [] and `insideCell` true is the pass.
+    keyColumn: (() => {
+      const column = document.querySelector('.key-column');
+      const cell = document.querySelector('#canvas-container');
+      if (!column || !cell) return null;
+      const C = column.getBoundingClientRect(), V = cell.getBoundingClientRect();
+      const W = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+      const within = (r, b) => r.left >= b.left - 1 && r.right <= b.right + 1 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1;
+      const keys = [...column.querySelectorAll('.phase-legend-item, .key-heading, .key-caption, .density-key, .esp-legend, .molecule-hover-caption')]
+        .filter(e => !e.closest('.hidden'));
+      const hidden = keys.filter(e => {
+        const r = e.getBoundingClientRect();
+        return !(r.width > 0 && r.height > 0) || !within(r, C) || !within(r, V) || !within(r, W) || e.scrollWidth > e.clientWidth + 1;
+      }).map(e => e.textContent.trim());
+      return { box: { x: Math.round(C.x), y: Math.round(C.y), width: Math.round(C.width), height: Math.round(C.height) },
+        insideCell: within(C, V) && within(C, W), keys: keys.length, hidden };
     })(),
     // 6G-2 Task 17 fix (Fail 2): how much of the MO list's gap note is out of sight -- under the list's sticky key, or
     // past the list's bottom edge. 0 means the note is whole and readable.

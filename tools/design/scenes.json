@@ -38,5 +38,7 @@
   "pb-6p12-orbital": "#mode=atom&Z=82&rel=so&level=orbital&n=6&l=1&j=1/2&ml=0",
   "og-whole": "#mode=atom&Z=118&level=atom",
   "pa-whole": "#mode=atom&Z=91&level=atom",
+  "pa-shell-5": "#mode=atom&Z=91&level=shell&n=5",
+  "cl-anion": "#mode=atom&Z=17&charge=-1&level=atom",
   "glycine-esp": "#mode=molecule&id=glycine&show=esp"
 }
