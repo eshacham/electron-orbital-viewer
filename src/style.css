@@ -1347,6 +1347,9 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* A hairline between the list's scroll edge (often mid-row) and its caption, so the notes read as notes. */
+  padding-top: 6px;
+  border-top: 1px solid var(--ql-color-border-subtle);
 }
 /* Ruling T16-b: where the virtuals end and the occupied orbitals begin -- a plain rule between the rows; its
    words are the caption's gap note (R25-A4). */
