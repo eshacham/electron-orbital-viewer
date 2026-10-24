@@ -14,6 +14,8 @@
 //   --jobs-stub      every /api/... request the page makes is answered from tests/jobs/fixtures/api (the recorded
 //                    responses tests/jobs/api_fixtures.ts reads) or aborted and reported as an error -- a submit
 //                    (POST /v1/jobs) always is. metrics.api counts what was seen, answered, refused.
+//   --jobs-down      (with --jobs-stub; owner R25-A1) the stub answers every /api request as Vite's proxy does when
+//                    the local job server is not running: HTTP 500, empty body. Still nothing leaves the browser.
 //   Every run (Task 16d): Vite's /api proxy points at a closed port and has no AWS route, so nothing -- stubbed or
 //                    not -- can reach a real job server; without --jobs-stub the page's /api requests simply fail.
 //   --click/--type/--press/--scroll  scripted steps, in the order given, after the scene settles and before the
@@ -95,6 +97,7 @@ const cropSelector = arg('crop', null);
 const ownerSession = process.argv.includes('--owner-session');
 const jobsStub = process.argv.includes('--jobs-stub');
 const previewFixture = arg('preview-fixture', 'preview_ok');
+const jobsDown = process.argv.includes('--jobs-down');
 // A preview whose molecule is already on record: the preview fixture with a recorded job as its `existing`
 // (what tests/jobs/request_panel.test.tsx composes), e.g. --preview-existing get_done → "Already computed — open it".
 const previewExisting = arg('preview-existing', null);
@@ -108,6 +111,7 @@ for (let i = 2; i < process.argv.length; i++) {
 if ((ownerSession || steps.length) && !jobsStub) {
   throw new Error('--owner-session and --click/--type/--press/--scroll need --jobs-stub: without it /api has no answer');
 }
+if (jobsDown && !jobsStub) throw new Error('--jobs-down is a mode of --jobs-stub');
 // The check stops at the quote: nothing that would send a job is ever activated, even stubbed. "Already
 // computed — open it" / "Already running — follow it" only open or follow a job, so they are allowed.
 const SENDS_A_JOB = /^\s*(Approve|Run on|Retry on|Submit)/i;
@@ -153,6 +157,11 @@ async function installJobsStub(context, log) {
       name = JOB_FIXTURES.find(n => fixture(n).body.key === key) ?? null;
     }
     const where = `${method} ${url.pathname}${url.search}`;
+    // R25-A1: the local job server not running -- what Vite's proxy answers then (a POST /v1/jobs included).
+    if (jobsDown) {
+      log.stubbed.push(`${where} -> down (500)`);
+      return route.fulfill({ status: 500, contentType: 'text/plain', body: '' });
+    }
     if (!name) {
       log.refused.push(where);
       return route.abort('blockedbyclient');
