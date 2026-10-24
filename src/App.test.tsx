@@ -1421,6 +1421,31 @@ describe('App: the first-view hint (Task 5, ruling P17)', () => {
         expect(screen.queryByRole('note')).not.toBeInTheDocument();
     });
 
+    // 6G-2 Task 17 round 2 (ruling T17-hint): an unbound anion draws nothing and its shells cannot be opened, so the
+    // hint's "Drag to rotate · pick a shell" would be untrue (spec §3.5) -- and on a desktop it sat on the centred
+    // unbound note (Cl⁻: 74 × 42 px; tablet 144 × 42). It stays away while nothing is drawn, without being dismissed,
+    // and the unbound note is the only thing over the empty canvas.
+    it('stays away while an anion is unbound, without being dismissed', () => {
+        const originalMatchMedia = window.matchMedia;
+        (createAtomWorker as jest.Mock).mockClear();
+        clearProfileCacheForTests();
+        try {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, { Z: 17, charge: -1 });
+            expect(screen.getByRole('note')).toHaveTextContent('Drag to rotate');
+            const solver = (createAtomWorker as jest.Mock).mock.results[0].value;
+            const { requestId } = solver.postMessage.mock.calls[0][0];
+            act(() => {
+                solver.onmessage({ data: { type: 'unbound', message: 'LDA does not bind this anion: its 3p electron is not bound.', requestId } });
+            });
+            expect(container.querySelector('.canvas-unbound')).not.toBeNull();
+            expect(container.querySelector('.first-view-hint')).toBeNull();
+            expect(hintPref.get().rotateDismissed).toBe(false);
+        } finally {
+            window.matchMedia = originalMatchMedia;
+        }
+    });
+
     // The other suggestion the hint names, besides rotating (OrbitalViewer's
     // own job -- it is mocked out of this file, so that path is pinned at
     // the component level instead, in tests/orbital_viewer.test.tsx).

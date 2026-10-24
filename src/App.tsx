@@ -1927,7 +1927,9 @@ function App() {
                     <span>{canvasBusyLabel}</span>
                 </div>
             )}
-            {isAtomMode && !hintDismissed && (
+            {/* Ruling T17-hint: not while an anion is unbound -- nothing is drawn and no shell can be opened, so the
+                hint would be untrue (§3.5) and would sit on the unbound note. Hidden, not dismissed. */}
+            {isAtomMode && !hintDismissed && !atomUnbound && (
                 <FirstViewHint onDismiss={dismissHint} />
             )}
             {/* Spec §3.5: an anion LDA cannot bind draws nothing, and
