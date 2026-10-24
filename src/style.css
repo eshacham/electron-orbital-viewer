@@ -1264,6 +1264,15 @@ html, body, #root {
 .molecule-surface-label {
   margin-bottom: -4px;
 }
+/* Owner R25-A4: four labels, one of them "No surface", in a docked Explore whose scroller keeps its scrollbar
+   gutter -- 266 px of column on a desktop, 251 on a tablet. At body size they needed 282 px and the last segment
+   was clipped; at caption size with 4 px side padding they need 241 (measured live). The phone sheet keeps its
+   own size; it has the room. */
+.explore-panel .molecule-surface-toggle .MuiToggleButton-root {
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: var(--ql-type-caption-size);
+}
 /* Panel-card text (LIGHT_96): the method/geometry caption under the
    surface toggle (MoleculeNav) and the "not ionisation energies" caption
    under the orbital list (MoleculeOrbitalList). */

@@ -179,6 +179,19 @@ describe('MoleculeNav', () => {
         rerender(<MoleculeNav {...navProps} variant="body" surface={{ kind: 'mo', index: 4 }} />);
         expect(list()).not.toBeNull();
     });
+    // R25-A4 live check: with "No surface" and the reserved scrollbar gutter, the switch's four labels needed 282 px
+    // at body size in a docked Explore column of 266 (desktop) / 251 (tablet) -- the last segment was clipped. At
+    // caption size with 4 px side padding they need 241 (measured, /tmp/r25a-measure.mjs). jsdom has no layout, so
+    // the rule's own source is pinned; the phone sheet (356 px) keeps its own size.
+    it('fits the switch in the docked Explore column: caption-size labels, 4 px side padding (R25-A4)', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+        const start = css.indexOf('.explore-panel .molecule-surface-toggle .MuiToggleButton-root {');
+        expect(start).toBeGreaterThanOrEqual(0);
+        const rule = css.slice(start, css.indexOf('}', start));
+        expect(rule).toMatch(/padding-left: 4px/);
+        expect(rule).toMatch(/padding-right: 4px/);
+        expect(rule).toMatch(/font-size: var\(--ql-type-caption-size\)/);
+    });
     // Owner R25-A2: the strip's "Orbital list" tile asks the card to reveal its list -- scroll it into view in the
     // panel that holds it, focus the drawn row, and highlight the list for about a second.
     it('reveals the list: scrolls only as far as needed, focuses the drawn row, highlights it briefly (R25-A2)', () => {
