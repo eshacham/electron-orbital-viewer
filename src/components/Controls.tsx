@@ -15,7 +15,7 @@ import {
   Slider,
   Typography,
 } from '@mui/material';
-import { OrbitalParams, RenderMode, ClipAxis, SurfaceStyle } from '@/types/orbital';
+import { OrbitalParams, ClipAxis, SurfaceStyle } from '@/types/orbital';
 import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../orbital_presets';
 import { ELEMENTS, elementLabel } from '../elements';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
@@ -82,10 +82,8 @@ interface ControlsProps {
    * onSurfaceStyleChange; without it every tick does, as before.
    */
   onOpacityPreview?: (opacity: number) => void;
-  /** The Atom Display section offers Glow / Solid / Wireframe itself (ruling R1). */
-  hideSurfaceStyle?: boolean;
   /**
-   * No surface is drawn (Molecules' `show=none`, ruling T13-I3): Surface, Opacity and Cut away would act on
+   * No surface is drawn (Molecules' `show=none`, ruling T13-I3): Opacity and Cut away would act on
    * nothing -- the structure overlay is never styled, faded or cut -- so each is disabled and says why. Their
    * values (and the link's) are left as they are for the next surface.
    */
@@ -297,9 +295,8 @@ const ReadoutContent: React.FC<{ content: string | WhatChangedParts | null }> = 
   );
 };
 
-/** Ruling T13-I3: what Surface, Opacity and Cut away say while no surface is drawn. */
+/** Ruling T13-I3: what Opacity and Cut away say while no surface is drawn. */
 const NO_SURFACE_NOTES = {
-  style: 'No surface is drawn to style.',
   opacity: 'No surface is drawn to make see-through.',
   cut: 'No surface is drawn to cut; the structure is never cut.',
 } as const;
@@ -361,7 +358,6 @@ const Controls: React.FC<ControlsProps> = ({
   surfaceStyle,
   onSurfaceStyleChange,
   onOpacityPreview,
-  hideSurfaceStyle = false,
   noSurface = false,
   part = 'all',
   isBusy,
@@ -385,10 +381,9 @@ const Controls: React.FC<ControlsProps> = ({
   // Bug fix (task 22, bug 6): levels 1-2 in atom mode render a spherical
   // shell view straight from the shader (orbital_visualizer.ts's
   // updateAtomViewInScene / shell_view.ts) rather than a marching-cubes
-  // mesh -- there is no separate solid-vs-wireframe surface to switch
-  // between (Surface), and no meaningful "uncut" state (Cut away's Off
-  // option: a shell view's cut face is its *only* visible content, see
-  // shellViewClipAxis's doc comment in orbital_visualizer.ts). Both matter
+  // mesh -- there is no meaningful "uncut" state (Cut away's Off option: a
+  // shell view's cut face is its *only* visible content, see
+  // shellViewClipAxis's doc comment in orbital_visualizer.ts). It matters
   // again once level 3 hands the render back to the same marching-cubes
   // pipeline Basic Orbitals always uses -- so the condition is level, not
   // mode. (Resolution used to be gated here too; there is no such control
@@ -538,32 +533,11 @@ const Controls: React.FC<ControlsProps> = ({
 
       {showView && (
         <>
-          {/* Surface, opacity and cut-away are view-only: they restyle the existing
-              mesh, so none of them re-runs the calculation. Surface (solid vs
-              wireframe) only has meaning for a marching-cubes mesh -- a shell
-              view's cap is always shown, solid (bug fix, task 22 bug 6). */}
-          {isMeshLevel && !hideSurfaceStyle && (
-            <FormControl component="fieldset" margin="normal" fullWidth>
-              <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Surface</FormLabel>
-              <ToggleButtonGroup
-                value={surfaceStyle.mode}
-                exclusive
-                onChange={(event: React.MouseEvent<HTMLElement>, newValue: RenderMode | null) => {
-                  if (newValue !== null) {
-                    onSurfaceStyleChange({ mode: newValue });
-                  }
-                }}
-                aria-label="surface style"
-                size="small"
-                fullWidth
-                disabled={noSurface}
-              >
-                <ToggleButton value="solid" aria-label="solid surface">Solid</ToggleButton>
-                <ToggleButton value="wireframe" aria-label="wireframe surface">Wireframe</ToggleButton>
-              </ToggleButtonGroup>
-              {noSurface && <FormHelperText sx={{ mx: 0 }}>{NO_SURFACE_NOTES.style}</FormHelperText>}
-            </FormControl>
-          )}
+          {/* Opacity and cut-away are view-only: they restyle the existing mesh, so
+              neither re-runs the calculation. Owner R25-B1: the Surface (Solid |
+              Wireframe) control that stood first here is gone -- Wireframe was
+              removed and Solid alone would do nothing (Atoms' Glow | Solid finish
+              is DisplayControls'). */}
 
           <FormControl component="fieldset" margin="normal" fullWidth>
             <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>

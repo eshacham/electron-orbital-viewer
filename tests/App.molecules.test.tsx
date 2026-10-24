@@ -221,7 +221,7 @@ describe('Molecules mode', () => {
         expect(region.querySelector('dl')).toBeNull();
     });
 
-    // Task 16d items 12, 13 and 10: Advanced appearance is absent while no surface is drawn (as under a wireframe);
+    // Task 16d items 12, 13 and 10: Advanced appearance is absent while no surface is drawn;
     // its edge whiteness is offered only over the density (an orbital's rim is its phase's, an ESP map's is never
     // whitened); and the frame-time guard's latch, up from the viewer through the store, disables the extras' rows.
     it('fits Advanced appearance to the surface drawn: none hides it, edge whiteness only over the density', async () => {
@@ -508,13 +508,14 @@ describe('Molecules mode', () => {
         // No contour is drawn, so the enclosed fraction applies to nothing: disabled, saying why (never the
         // orbital's "contour of constant |ψ|²" fallback), and no colour key stands for a surface.
         openDisplay(container);
-        // Ruling T13-I3: Surface style, Opacity and Cut away act on nothing either -- disabled, each saying why.
+        // Ruling T13-I3: Opacity and Cut away act on nothing either -- disabled, each saying why. Owner R25-B1: the
+        // Surface style (Solid | Wireframe) it named first is gone in every state, so is its note.
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
-        expect(within(viewPanel).getByRole('button', { name: 'solid surface' })).toBeDisabled();
-        expect(within(viewPanel).getByRole('button', { name: 'wireframe surface' })).toBeDisabled();
+        expect(within(viewPanel).queryByRole('group', { name: 'surface style' })).toBeNull();
+        expect(within(viewPanel).queryByRole('button', { name: /solid surface|wireframe surface/ })).toBeNull();
+        expect(within(viewPanel).queryByText('No surface is drawn to style.')).toBeNull();
         expect(within(viewPanel).getByRole('slider', { name: 'surface opacity' })).toBeDisabled();
         ['no cut', 'cut along x', 'cut along y', 'cut along z'].forEach(name => expect(within(viewPanel).getByRole('button', { name })).toBeDisabled());
-        expect(within(viewPanel).getByText('No surface is drawn to style.')).toBeInTheDocument();
         expect(within(viewPanel).getByText('No surface is drawn to make see-through.')).toBeInTheDocument();
         expect(within(viewPanel).getByText('No surface is drawn to cut; the structure is never cut.')).toBeInTheDocument();
         expect(viewPanel.textContent).not.toMatch(/slice the orbital open/);

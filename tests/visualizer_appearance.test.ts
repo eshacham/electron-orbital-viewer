@@ -202,18 +202,18 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         expect(collectExportSurfaces(context.currentOrbitalGroup)).toHaveLength(before.length);
     });
 
-    it('drops the extras for a wireframe and brings them back for the solid surface', async () => {
+    // Owner R25-B1: replaces "drops the extras for a wireframe and brings them back for the solid surface" -- there is
+    // no wireframe; a restyle (opacity, cut) keeps the surface's Glow, its extras and the Glow lights as they are.
+    it('keeps Glow, its extras and the Glow lights through a restyle', async () => {
         const context = buildContext();
         context.lights = { ambient: new THREE.AmbientLight(0xffffff, 0.5), key: new THREE.DirectionalLight(0xffffff, 0.8), fill: new THREE.DirectionalLight(0xffffff, 0.35) };
         await drawOrbital(context);
         setAppearance(context, glow);
-        setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'wireframe' });
-        expect(extras(context)).toHaveLength(0);
-        // §11.1 "Material": Wireframe = today's -- today's material, so today's lights.
-        expect((surfaceOf(context).material as THREE.MeshStandardMaterial).userData.glow).toBe(false);
-        expect(context.lights.ambient.intensity).toBe(0.5);
-        setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'solid' });
-        expect(extras(context)).toHaveLength(2);
+        const before = extras(context);
+        expect(before).toHaveLength(2);
+        setSurfaceStyle(context, { ...context.surfaceStyle, opacity: 0.4, clipAxis: 'x', clipPosition: 0 });
+        expect(extras(context)).toEqual(before);
+        expect((surfaceOf(context).material as THREE.MeshStandardMaterial).userData.glow).toBe(true);
         // Ruling R20a-3: the tuned Glow ambient (was the literal 0.35).
         expect(context.lights.ambient.intensity).toBe(GLOW_LIGHTS.ambient);
     });
@@ -280,9 +280,8 @@ describe('Glow on the drawn orbital (spec §11.2)', () => {
         // Ruling T15-halo-slow (spec §15): the halo goes with the lines; the rim and emissive stay.
         expect(extras(context)).toHaveLength(0);
         expect((surfaceOf(context).material as THREE.MeshStandardMaterial).userData.glow).toBe(true);
-        // Restyling is not an appearance change: still off.
-        setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'wireframe' });
-        setSurfaceStyle(context, { ...context.surfaceStyle, mode: 'solid' });
+        // Restyling is not an appearance change: still off. (Owner R25-B1: an opacity restyle, was a wireframe round trip.)
+        setSurfaceStyle(context, { ...context.surfaceStyle, opacity: 0.5 });
         setAppearance(context, glow);
         expect(extras(context)).toHaveLength(0);
         // Ruling R22a: a showAxes change (was a scheme change) is the new appearance here.

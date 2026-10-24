@@ -228,10 +228,6 @@ export interface VisualizerContext {
 
 const appearanceOf = (context: VisualizerContext): Appearance => context.appearance ?? INITIAL_APPEARANCE;
 
-/** Glow for this appearance on the current surface style: none on a wireframe, which keeps today's material (§11.1). */
-const surfaceGlow = (context: VisualizerContext, appearance: Appearance) =>
-    context.surfaceStyle.mode === 'solid' ? glowSettingsFor(appearance) : null;
-
 /**
  * Glow on a phase-less, extras-free surface -- the composition lobes, the
  * combination overlay: emissive and an own-tint rim (ruling T15-glowcover),
@@ -240,7 +236,7 @@ const surfaceGlow = (context: VisualizerContext, appearance: Appearance) =>
 function glowWithoutExtras(context: VisualizerContext, root: THREE.Object3D, isSurface: (mesh: THREE.Mesh) => boolean): void {
     const glow = (appearance: Appearance) => root.traverse(child => {
         if (child instanceof THREE.Mesh && isSurface(child)) {
-            applyGlow(child.material as THREE.MeshStandardMaterial, surfaceGlow(context, appearance), { phased: false });
+            applyGlow(child.material as THREE.MeshStandardMaterial, glowSettingsFor(appearance), { phased: false });
         }
     });
     const recolour = root.userData.applyAppearance as ((a: Appearance) => void) | undefined;
@@ -824,26 +820,22 @@ function backdropOpacityFor(context: VisualizerContext): number {
 
 /**
  * Puts the caps where the plane is, and shows them only when they mean
- * something: there has to be a cut, and a solid surface for it to cut
- * through -- except for a shell view, which (per shellViewClipAxis's doc
- * comment above) always has a real cut and is never wireframe, so its cap
- * is always shown regardless of the shared clip/mode style.
+ * something: there has to be a cut -- except for a shell view, which (per
+ * shellViewClipAxis's doc comment above) always has a real cut, so its cap
+ * is always shown regardless of the shared clip style. (Owner R25-B1: the
+ * surface is always solid now; a wireframe used to hide the caps too.)
  */
 function refreshCaps(context: VisualizerContext) {
     const { surfaceStyle, currentCaps, isShellView } = context;
-    setCapsVisible(
-        currentCaps,
-        isShellView ? true : (surfaceStyle.clipAxis !== 'none' && surfaceStyle.mode === 'solid')
-    );
+    setCapsVisible(currentCaps, isShellView ? true : surfaceStyle.clipAxis !== 'none');
     setCapsOpacity(currentCaps, backdropOpacityFor(context));
     positionCaps(currentCaps, context.clipPlane);
     positionReferenceRing(context.referenceRing ?? null, context.clipPlane);
 }
 
-/** Restyles the orbital — mode, opacity, cut plane — without recalculating it. */
+/** Restyles the orbital — opacity, cut plane — without recalculating it. */
 export function setSurfaceStyle(context: VisualizerContext | null, style: SurfaceStyle) {
     if (!context || context.isDisposed) return;
-    const modeChanged = context.surfaceStyle.mode !== style.mode;
     context.surfaceStyle = style;
     applySurfaceStyle(context.currentOrbitalGroup, style);
     updateClipPlane(
@@ -857,13 +849,8 @@ export function setSurfaceStyle(context: VisualizerContext | null, style: Surfac
     // are not part of the caps assembly) -- see shell_composition_view.ts's
     // own opacity weighting by occupancy, which this preserves.
     setCompositionLobesOpacity(findCompositionLobes(context.currentOrbitalGroup), style.opacity);
-    // Solid <-> Wireframe adds or drops Glow (a wireframe is today's look,
-    // §11.1). Only then: this runs on every opacity and cut-slider tick, and
-    // rebuilding the halo's shader per tick would stutter (ruling DC3).
-    if (modeChanged) {
-        callHooks(context.currentOrbitalGroup, 'refreshGlow');
-        applyLights(context);
-    }
+    // Owner R25-B1: no restyle adds or drops Glow any more (the Solid <-> Wireframe switch did), so Glow and the
+    // lights are left as they are -- this runs on every opacity and cut-slider tick (ruling DC3).
 }
 
 /** Scale bar for the current camera, or null if there is nothing to measure. */
@@ -2203,11 +2190,10 @@ function updateSceneWithMeshData(
         // Glow's halo offset is a fraction of this; worked out once, here,
         // so the closures below hold a number rather than meshData.
         const radius = meshRadius(meshData);
-        /** Glow (§11.2) to the current surface mode: extras on a solid surface only. */
+        /** Glow (§11.2) to the appearance, its extras while the frame-time guard allows them. */
         // Ruling T15-b: an ESP map (the caller's own vertex colours) never whitens its rim.
         const refreshGlow = (appearance: Appearance) => attachGlowExtras(group, mesh, appearance, {
-            radius, clippingPlanes: context.clippingPlanes,
-            solid: context.surfaceStyle.mode === 'solid', extrasAllowed: !context.extrasSuppressed,
+            radius, clippingPlanes: context.clippingPlanes, extrasAllowed: !context.extrasSuppressed,
             esp: surfaceColouring === 'custom',
         });
 
@@ -2238,7 +2224,7 @@ function updateSceneWithMeshData(
         };
         paint(appearanceOf(context));
         mesh.userData.applyAppearance = paint;
-        // setSurfaceStyle's hook for a Solid <-> Wireframe switch: Glow only, no repaint.
+        // The hook for a change of Glow values (setAppearance's glow-only path): Glow only, no repaint.
         mesh.userData.refreshGlow = () => refreshGlow(appearanceOf(context));
         context.currentCaps = caps;
         refreshCaps(context);
@@ -2415,8 +2401,8 @@ export function setAppearance(context: VisualizerContext | null, appearance: App
 /**
  * §11.1 "Lights": Glow lets its emissive term carry part of the light, so
  * the three lights dim -- but only while a surface on screen actually glows
- * (ruling T15-glowcover). Solid, a wireframe (today's material), a
- * shell view or a ball-and-stick on its own keep today's levels: nothing
+ * (ruling T15-glowcover). Solid, a shell view or a ball-and-stick on
+ * its own keep today's levels: nothing
  * there would make up the light taken away. Called wherever the drawn
  * surface or its Glow changes.
  */

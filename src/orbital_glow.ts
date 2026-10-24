@@ -461,9 +461,8 @@ function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: nu
 }
 
 /**
- * Brings a surface's Glow to `appearance`: the material injection on a solid
- * surface (a wireframe keeps today's material, §11.1); the halo (Deep Space)
- * and the mesh lines only on a solid surface, never on a phone (`lowPower`)
+ * Brings a surface's Glow to `appearance`: the material injection; the halo
+ * (Deep Space) and the mesh lines, never on a phone (`lowPower`)
  * and not once the frame-time guard has turned them off (`extrasAllowed`
  * false; spec §15: "lines and halo off on phones and when frames exceed
  * 20 ms"). Extras share the surface's geometry. `esp`: the surface is an
@@ -477,9 +476,10 @@ export function attachGlowExtras(
     group: THREE.Group,
     surface: THREE.Mesh,
     appearance: Appearance,
-    options: { radius: number; clippingPlanes: THREE.Plane[]; solid: boolean; extrasAllowed: boolean; esp?: boolean },
+    options: { radius: number; clippingPlanes: THREE.Plane[]; extrasAllowed: boolean; esp?: boolean },
 ): void {
-    const settings = options.solid ? glowSettingsFor(appearance, { esp: options.esp }) : null;
+    // Owner R25-B1: every surface is solid (the Wireframe option and the `solid` flag that kept it Glow-free are gone).
+    const settings = glowSettingsFor(appearance, { esp: options.esp });
     applyGlow(surface.material as THREE.MeshStandardMaterial, settings, { phased: Boolean(surface.geometry.getAttribute('phaseSign')) });
     const wanted = new Set<GlowExtra>();
     if (settings && !appearance.lowPower && options.extrasAllowed) {

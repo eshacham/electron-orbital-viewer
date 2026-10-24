@@ -2,9 +2,10 @@ import { createPref } from './local_pref';
 
 /**
  * How the 3D view is drawn, as the viewer's own preference (spec §6.7):
- * localStorage only, never in a link. Ruling R1: the link keeps `surf`
- * (solid or wireframe) as today; Glow is a finish of the solid surface, so
- * a link opens in the receiver's own finish.
+ * localStorage only, never in a link. Glow is a finish of the solid surface,
+ * so a link opens in the receiver's own finish. (Ruling R1 kept Wireframe in
+ * the link's `surf`; owner R25-B1 removed the Wireframe option, so `surf`
+ * always reads solid.)
  */
 export type Finish = 'glow' | 'solid';
 /**

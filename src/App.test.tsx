@@ -1184,6 +1184,17 @@ describe('App: opening a shared link', () => {
         expect(store.getState().orbital.pendingCut).toBeNull();
     });
 
+    // Owner R25-B1: the Wireframe option is gone. A link copied while it was on (surf=wire) -- or naming it in full --
+    // opens on the solid surface in the viewer's own finish, and the link written back says solid.
+    it.each(['wire', 'wireframe'])('opens an old surf=%s link on the solid surface, offering no Wireframe (owner R25-B1)', value => {
+        const store = openLink(`#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&frac=0.9&cut=none&op=1&surf=${value}`);
+        openInspectorSection('Display');
+        expect(screen.getByRole('group', { name: 'surface style' })).toHaveTextContent(/^GlowSolid$/);
+        expect(screen.getByRole('button', { name: 'glow surface' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.queryByRole('button', { name: /wireframe/i })).toBeNull();
+        expect(encodeStateOf(store.getState())).toMatch(/&surf=solid(&|$)/);
+    });
+
     it('keeps a linked cut at the orbital level, where entering it would clear the cut', () => {
         const store = openLink('#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&cut=y:0.25');
         expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: 'y', clipPosition: 0.5 });
@@ -1721,7 +1732,8 @@ describe('App: shell', () => {
         expect(within(inspector).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
         expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         expect(within(inspector).getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
-        expect(within(inspector).getByRole('group', { name: 'surface style' })).toBeInTheDocument();
+        // Owner R25-B1: Orbitals' Surface style (Solid | Wireframe) is gone with the Wireframe option.
+        expect(within(inspector).queryByRole('group', { name: 'surface style' })).toBeNull();
         expect(within(inspector).getByRole('group', { name: 'cut-away axis' })).toBeInTheDocument();
         // The settings sit above the plot, as in Bonds' inspector -- R24-3: the Plot and data header follows them.
         const opacity = within(inspector).getByRole('slider', { name: 'surface opacity' });
@@ -1742,7 +1754,8 @@ describe('App: shell', () => {
         fireEvent.keyDown(slider, { key: 'ArrowLeft' });
         const expected = orbitalReducer(before, setSurfaceStyle({ opacity: before.surfaceStyle.opacity - 0.05 })).surfaceStyle;
         expect(store.getState().orbital.surfaceStyle.opacity).toBeCloseTo(expected.opacity);
-        expect(store.getState().orbital.surfaceStyle).toMatchObject({ mode: expected.mode, clipAxis: expected.clipAxis });
+        // Owner R25-B1: the render mode compared here is gone with the Wireframe option; the cut is the rest of the style.
+        expect(store.getState().orbital.surfaceStyle).toMatchObject({ clipAxis: expected.clipAxis });
     });
 
     // Ruling R20b-atoms (owner decision): the Atom screen's Display settings leave Explore for the top of the inspector.
@@ -1782,10 +1795,7 @@ describe('App: shell', () => {
             expect(within(displayNow()).queryByRole('button', { name: 'Advanced appearance' })).toBeNull();
             act(() => { store.dispatch(drillToShell(1)); });
             expect(screen.getByRole('option', { name: '1s orbital' })).toBeInTheDocument();
-            // Nor does a wireframe.
-            act(() => { store.dispatch(setSurfaceStyle({ mode: 'wireframe' })); });
-            expect(within(displayNow()).queryByRole('button', { name: 'Advanced appearance' })).toBeNull();
-            act(() => { store.dispatch(setSurfaceStyle({ mode: 'solid' })); });
+            // Owner R25-B1: "nor does a wireframe" went with the Wireframe option -- a shell's surface always wears Glow.
             const display = displayNow();
             const advanced = within(display).getByRole('button', { name: 'Advanced appearance' });
             expect(advanced).toHaveAttribute('aria-expanded', 'false');

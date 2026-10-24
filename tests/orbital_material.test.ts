@@ -18,17 +18,17 @@ const buildOrbital = (initial: SurfaceStyle, planes: THREE.Plane[] = []) => {
 };
 
 describe('orbital material', () => {
-    it('draws a lit surface in solid mode and lines in wireframe mode', () => {
-        expect(createOrbitalMaterial(style({ mode: 'solid' }), []).wireframe).toBe(false);
-        expect(createOrbitalMaterial(style({ mode: 'wireframe' }), []).wireframe).toBe(true);
+    // Owner R25-B1: the Wireframe option is gone -- the surface is always the lit, shaded solid (was: lines in wireframe mode).
+    it('draws a lit, shaded surface, never lines', () => {
+        const material = createOrbitalMaterial(style(), []);
+        expect(material.wireframe).toBe(false);
+        expect(material.roughness).toBeCloseTo(0.45);
     });
 
-    it('keeps the psi-sign vertex colours in both modes', () => {
-        for (const mode of ['solid', 'wireframe'] as const) {
-            const material = createOrbitalMaterial(style({ mode }), []);
-            expect(material.vertexColors).toBe(true);
-            expect(material.side).toBe(THREE.DoubleSide);
-        }
+    it('keeps the psi-sign vertex colours', () => {
+        const material = createOrbitalMaterial(style(), []);
+        expect(material.vertexColors).toBe(true);
+        expect(material.side).toBe(THREE.DoubleSide);
     });
 
     it('is opaque at full opacity and translucent below it', () => {
@@ -49,11 +49,12 @@ describe('orbital material', () => {
         const originalMaterial = mesh.material;
         const originalGeometry = mesh.geometry;
 
-        applySurfaceStyle(group, style({ mode: 'wireframe', opacity: 0.5 }));
-        expect(material().wireframe).toBe(true);
+        // Owner R25-B1: opacity is what restyles in place now (the solid <-> wireframe switch is gone).
+        applySurfaceStyle(group, style({ opacity: 0.5 }));
+        expect(material().wireframe).toBe(false);
         expect(material().opacity).toBeCloseTo(0.5);
 
-        applySurfaceStyle(group, style({ mode: 'solid', opacity: 1 }));
+        applySurfaceStyle(group, style({ opacity: 1 }));
         expect(material().wireframe).toBe(false);
         expect(material().opacity).toBe(1);
 

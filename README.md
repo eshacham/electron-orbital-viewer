@@ -401,8 +401,6 @@ read off how big it actually is.
   view of it, derived from its own solved profile: the camera back at the
   canonical angle, framed on that atom's own extent, with the cut-away on and
   centred. Opacity and enclosed fraction are yours and are left alone.
-- **Solid or wireframe.** Wireframe is see-through; solid is the only readable
-  option at high resolution, where a wireframe becomes a wall of lines.
 - **Opacity**, so outer shells stop hiding inner ones.
 - **A cut-away plane** along X, Y or Z, positioned with a slider. The cut face is
   capped and shaded by the density it passes through, so a slice through a 7s
@@ -412,7 +410,7 @@ read off how big it actually is.
 - **z up**, the chemistry convention, so 2p_z, 3d_z² and 4f_z³ stand
   upright. The axes are labelled, and orbital surfaces carry a key for the
   sign of ψ.
-- **Bonds reuses the same viewer**, cut plane, opacity, solid/wireframe,
+- **Bonds reuses the same viewer**, cut plane, opacity,
   camera and Share/Export alike — an H₂⁺ state or a molecular orbital is a ψ
   surface, red and blue by sign exactly like Basic Orbitals' own; a density
   surface has no phase to show, so it is drawn in a single neutral grey
@@ -1107,7 +1105,7 @@ nothing in Bonds mode.
 | `src/marching_cubes.ts` | The isosurface algorithm |
 | `src/orbital_visualizer.ts` | three.js scene, camera framing (on the visible contour, not the sampling grid), worker lifecycle |
 | `src/clip_caps.ts` | Stencil-capped cut faces and their density shader |
-| `src/orbital_material.ts` | Surface material: solid/wireframe, opacity, clipping |
+| `src/orbital_material.ts` | Surface material: lit solid, opacity, clipping |
 | `src/radial_distribution.ts` | P(r) = r²R(r)², the box-sizing radius, and the contour for a given enclosed fraction |
 | `src/orbital_names.ts` | Spectroscopic names for the real orbitals |
 | `src/scale_bar.ts` | Bohr-radius scale readout |

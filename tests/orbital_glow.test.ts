@@ -75,7 +75,7 @@ describe('Glow (spec §11.2)', () => {
         const surface = surfaceIn(group);
         const geometry = surface.geometry;
         const extras = () => group.children.filter(child => child.userData.isGlowExtra);
-        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        const options = { radius: 2, clippingPlanes: [], extrasAllowed: true };
 
         attachGlowExtras(group, surface, glowDark, options);
         expect(extras().map(child => child.userData.isGlowExtra).sort()).toEqual(['halo', 'lines']);
@@ -90,8 +90,7 @@ describe('Glow (spec §11.2)', () => {
         expect(extras().map(child => child.userData.isGlowExtra)).toEqual(['lines']);
         attachGlowExtras(group, surface, { ...glowDark, lowPower: true }, options);
         expect(extras()).toHaveLength(0);
-        attachGlowExtras(group, surface, glowDark, { ...options, solid: false });
-        expect(extras()).toHaveLength(0);
+        // Owner R25-B1: the `solid: false` (wireframe) case that stood here went with the Wireframe option.
         // Ruling R22a: the Solid finish (was Classic here) takes the extras away.
         attachGlowExtras(group, surface, INITIAL_APPEARANCE, options);
         expect(extras()).toHaveLength(0);
@@ -125,11 +124,11 @@ describe('Glow (spec §11.2)', () => {
         expect(shader.vertexShader).toContain('vQlPhase = 0.0;');
         const group = new THREE.Group();
         const surface = surfaceIn(group);
-        attachGlowExtras(group, surface, glowDark, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: false });
+        attachGlowExtras(group, surface, glowDark, { radius: 1, clippingPlanes: [], extrasAllowed: false });
         expect(shaderOf(surface.material as THREE.MeshStandardMaterial).vertexShader).not.toContain('phaseSign');
         surface.geometry.setAttribute('phaseSign', new THREE.Float32BufferAttribute([1, -1, 1], 1));
         const phased = new THREE.Mesh(surface.geometry, new THREE.MeshStandardMaterial({ vertexColors: true }));
-        attachGlowExtras(group, phased, glowDark, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: false });
+        attachGlowExtras(group, phased, glowDark, { radius: 1, clippingPlanes: [], extrasAllowed: false });
         expect(shaderOf(phased.material as THREE.MeshStandardMaterial).vertexShader).toContain('vQlPhase = phaseSign;');
     });
 
@@ -154,25 +153,20 @@ describe('Glow (spec §11.2)', () => {
         const group = new THREE.Group();
         const surface = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true }));
         group.add(surface);
-        attachGlowExtras(group, surface, glowDark, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: true });
+        attachGlowExtras(group, surface, glowDark, { radius: 1, clippingPlanes: [], extrasAllowed: true });
         const halo = (group.children.find(child => child.userData.isGlowExtra === 'halo') as THREE.Mesh).material as THREE.ShaderMaterial;
         expect(halo.vertexShader).toContain('position - normal * qlHaloOffset');
         expect(halo.side).toBe(THREE.FrontSide);
     });
 
-    // §11.1 "Material": Wireframe = today's.
-    it('leaves a wireframe surface today\'s material, with no rim', () => {
-        const group = new THREE.Group();
-        const surface = surfaceIn(group);
-        attachGlowExtras(group, surface, glowDark, { radius: 2, clippingPlanes: [], solid: false, extrasAllowed: true });
-        expect((surface.material as THREE.MeshStandardMaterial).userData.glow).toBeFalsy();
-    });
+    // Owner R25-B1: "leaves a wireframe surface today's material" went with the Wireframe option; every surface is
+    // solid, so Glow's own finish test (the Solid finish takes the extras away, above) is the one left.
 
     // Ruling DC3: re-attaching what is already there keeps it (no shader rebuilt per slider tick).
     it('keeps the extras it already has, disposing nothing', () => {
         const group = new THREE.Group();
         const surface = surfaceIn(group);
-        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        const options = { radius: 2, clippingPlanes: [], extrasAllowed: true };
         attachGlowExtras(group, surface, glowDark, options);
         const before = group.children.filter(child => child.userData.isGlowExtra);
         const disposals = before.map(child => jest.spyOn((child as THREE.Mesh).material as THREE.Material, 'dispose'));
@@ -186,7 +180,7 @@ describe('Glow (spec §11.2)', () => {
     it('fades the halo and the lines with their surface, and new extras join at the current fade', () => {
         const group = new THREE.Group();
         const surface = surfaceIn(group);
-        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        const options = { radius: 2, clippingPlanes: [], extrasAllowed: true };
         // Light Clean: lines only.
         attachGlowExtras(group, surface, { ...glowDark, theme: 'light' }, options);
         const haloOpacity = () => ((group.children.find(c => c.userData.isGlowExtra === 'halo') as THREE.Mesh).material as THREE.ShaderMaterial).uniforms.qlHaloOpacity.value;
@@ -270,7 +264,7 @@ describe('Glow (spec §11.2)', () => {
     it('draws the mesh lines in their own phase, whitened, additive in Deep Space and painted in Light Clean', () => {
         const group = new THREE.Group();
         const surface = surfaceIn(group);
-        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        const options = { radius: 2, clippingPlanes: [], extrasAllowed: true };
         attachGlowExtras(group, surface, glowDark, options);
         const lines = group.children.find(c => c.userData.isGlowExtra === 'lines') as THREE.Mesh;
         const material = lines.material as THREE.ShaderMaterial;
@@ -359,9 +353,9 @@ describe('Glow with the viewer\'s own values (Task 16b)', () => {
         expect(glowSettingsFor({ ...glowDark, glow: { ownRimWhiten: 0.3 } })!.ownRimWhiten).toBe(0.3);
         const group = new THREE.Group();
         const surface = surfaceIn(group);
-        attachGlowExtras(group, surface, { ...glowDark, glow: { ownRimWhiten: 0.6 } }, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: false, esp: true });
+        attachGlowExtras(group, surface, { ...glowDark, glow: { ownRimWhiten: 0.6 } }, { radius: 1, clippingPlanes: [], extrasAllowed: false, esp: true });
         expect((surface.material as THREE.MeshStandardMaterial).userData.glowUniforms.qlOwnRimWhiten.value).toBe(0);
-        attachGlowExtras(group, surface, { ...glowDark, glow: { ownRimWhiten: 0.6 } }, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: false });
+        attachGlowExtras(group, surface, { ...glowDark, glow: { ownRimWhiten: 0.6 } }, { radius: 1, clippingPlanes: [], extrasAllowed: false });
         expect((surface.material as THREE.MeshStandardMaterial).userData.glowUniforms.qlOwnRimWhiten.value).toBe(0.6);
     });
 
@@ -371,7 +365,7 @@ describe('Glow with the viewer\'s own values (Task 16b)', () => {
         const group = new THREE.Group();
         const surface = surfaceIn(group);
         const kinds = () => group.children.filter(child => child.userData.isGlowExtra).map(child => child.userData.isGlowExtra).sort();
-        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        const options = { radius: 2, clippingPlanes: [], extrasAllowed: true };
         attachGlowExtras(group, surface, { ...glowDark, glow: { haloOpacity: 0 } }, options);
         expect(kinds()).toEqual(['lines']);
         attachGlowExtras(group, surface, { ...glowDark, glow: { linesOpacity: 0 } }, options);
@@ -385,7 +379,7 @@ describe('Glow with the viewer\'s own values (Task 16b)', () => {
     it('retunes the halo and lines it keeps, in place, and fades them from the viewer\'s strengths', () => {
         const group = new THREE.Group();
         const surface = surfaceIn(group);
-        const options = { radius: 2, clippingPlanes: [], solid: true, extrasAllowed: true };
+        const options = { radius: 2, clippingPlanes: [], extrasAllowed: true };
         attachGlowExtras(group, surface, glowDark, options);
         const [halo, lines] = [extraOf(group, 'halo'), extraOf(group, 'lines')];
         const disposals = [halo, lines].map(material => jest.spyOn(material, 'dispose'));
@@ -405,7 +399,7 @@ describe('Glow with the viewer\'s own values (Task 16b)', () => {
         const tile = (appearance: Appearance) => {
             const group = new THREE.Group();
             const surface = surfaceIn(group);
-            attachGlowExtras(group, surface, appearance, { radius: 1, clippingPlanes: [], solid: true, extrasAllowed: true });
+            attachGlowExtras(group, surface, appearance, { radius: 1, clippingPlanes: [], extrasAllowed: true });
             tuneThumbnailGlow(group, surface, appearance);
             return {
                 rim: (surface.material as THREE.MeshStandardMaterial).userData.glowUniforms.qlRimStrength.value as number,

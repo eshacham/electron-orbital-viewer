@@ -269,7 +269,6 @@ function randomView(rand: () => number, shape: Shape) {
     store.dispatch(setEnclosedFraction(pick(ENCLOSED_FRACTIONS)));
     store.dispatch(setSurfaceStyle({
         opacity: int(1, 20) * 0.05,
-        mode: pick(['solid', 'wireframe'] as const),
         clipAxis: pick(['none', 'x', 'y', 'z'] as const),
         clipPosition: 1 - int(0, 100) / 50,
     }));
@@ -310,7 +309,7 @@ function viewOf(state: RootState) {
         // The contour on screen (final review I1), which a link must reproduce.
         frac: selectShownEnclosedFraction(state),
         opacity: round2(style.opacity),
-        surface: style.mode,
+        // Owner R25-B1: `surface: style.mode` left the promise with the Wireframe option (always solid).
         clipAxis: style.clipAxis,
         clipPosition: style.clipAxis === 'none' ? null : round2(style.clipPosition),
         camera: orbital.cameraAngles,
@@ -334,6 +333,14 @@ describe('built-in URL keys', () => {
             }
         },
     );
+
+    // Owner R25-B1: the Wireframe option is gone. surf stays in the link (always solid, so links stay byte-identical
+    // with the ones before), and an old surf=wire link -- or one naming wireframe, or anything else -- opens solid.
+    it.each(['wire', 'wireframe', 'glass'])('opens an old surf=%s link solid and writes surf=solid back (owner R25-B1)', value => {
+        const store = restore(`mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=none&op=1&surf=${value}`);
+        expect(store.getState().orbital.surfaceStyle).not.toHaveProperty('mode');
+        expect(encodeStateOf(store.getState())).toBe('mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=none&op=1&surf=solid');
+    });
 
     it('restores the spec example: iron 3d_z², cut along x through the nucleus', () => {
         const hash = 'mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=x:0.5&op=1&surf=solid';
@@ -398,7 +405,7 @@ describe('built-in URL keys', () => {
             ['#frac=0.42&op=7&surf=glass&cut=w:0.5&cam=400,0&bogus=1', s => {
                 expect(s.orbital.enclosedFraction).toBe(0.9);
                 // Ruling R20a-2: an unusable op leaves the default, now 0.7 (was 1).
-                expect(s.orbital.surfaceStyle).toMatchObject({ opacity: DEFAULT_OPACITY, mode: 'solid', clipAxis: 'none' });
+                expect(s.orbital.surfaceStyle).toMatchObject({ opacity: DEFAULT_OPACITY, clipAxis: 'none' });
                 expect(s.orbital.cameraAngles).toBeNull();
             }],
             // A well-formed molecule link switches mode and selects the id;
@@ -561,12 +568,13 @@ describe('built-in URL keys', () => {
     // above). So a link missing op/surf, like the spec's own shorthand §4.3
     // example, leaves a non-default tab's opacity and render mode alone;
     // frac and cut, which that link does carry, still apply.
+    // Owner R25-B1: the render mode this test also kept went with the Wireframe option; opacity carries it alone.
     it('a link missing an always-written key leaves that tab setting alone', () => {
         const store = makeStore();
-        store.dispatch(setSurfaceStyle({ opacity: 0.5, mode: 'wireframe' }));
+        store.dispatch(setSurfaceStyle({ opacity: 0.5 }));
         applyStateTo('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&cut=x:0.5&frac=0.9', store.dispatch);
         expect(store.getState().orbital.surfaceStyle).toMatchObject({
-            opacity: 0.5, mode: 'wireframe', clipAxis: 'x', clipPosition: 0,
+            opacity: 0.5, clipAxis: 'x', clipPosition: 0,
         });
         expect(store.getState().orbital.enclosedFraction).toBe(0.9);
     });

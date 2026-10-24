@@ -164,7 +164,9 @@ function encodeViewKeys(state: RootState): Record<string, string> {
         // A cut still waiting for its view is the one the link asked for.
         cut: formatCut(pendingCut ?? surfaceStyle),
         op: String(round2(surfaceStyle.opacity)),
-        surf: surfaceStyle.mode === 'wireframe' ? 'wire' : 'solid',
+        // Owner R25-B1: the surface is always solid (no Wireframe option). The key stays, so a link stays
+        // byte-identical with the ones copied before and an older build reading it draws solid too.
+        surf: 'solid',
     };
     if (cameraAngles) keys.cam = `${cameraAngles.azimuth},${cameraAngles.elevation}`;
     return keys;
@@ -175,8 +177,7 @@ function decodeViewKeys(params: URLSearchParams, dispatch: AppDispatch): void {
     if (fraction !== null && ENCLOSED_FRACTIONS.includes(fraction)) dispatch(setEnclosedFraction(fraction));
     const opacity = parseNumberInRange(params.get('op'), 0.05, 1);
     if (opacity !== null) dispatch(setSurfaceStyle({ opacity: round2(opacity) }));
-    const surface = params.get('surf');
-    if (surface === 'solid' || surface === 'wire') dispatch(setSurfaceStyle({ mode: surface === 'wire' ? 'wireframe' : 'solid' }));
+    // Owner R25-B1: `surf` is not read -- an old surf=wire (Wireframe) link opens on the solid surface, like any other.
     const cut = parseCut(params.get('cut'));
     if (cut) dispatch(requestCut(cut));
     // No cam key means the standard view, so a link always sets the camera.

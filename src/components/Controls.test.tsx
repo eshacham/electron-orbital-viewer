@@ -20,7 +20,7 @@ const baseProps = {
   isoLevel: 1e-5,
   onUpdateOrbital: () => {},
   // Reset View moved to the viewport toolbar (spec §8.5).
-  surfaceStyle: { mode: 'solid' as const, opacity: 1, clipAxis: 'none' as const, clipPosition: 0 },
+  surfaceStyle: { opacity: 1, clipAxis: 'none' as const, clipPosition: 0 },
   onSurfaceStyleChange: () => {},
   isBusy: false,
 };
@@ -41,7 +41,7 @@ describe('Controls', () => {
         isoLevel={1e-5}
         onUpdateOrbital={() => {}}
         // Reset View moved to the viewport toolbar (spec §8.5).
-        surfaceStyle={{ mode: 'solid', opacity: 1, clipAxis: 'none', clipPosition: 0 }}
+        surfaceStyle={{ opacity: 1, clipAxis: 'none', clipPosition: 0 }}
         onSurfaceStyleChange={() => {}}
         isBusy={false}
       />
@@ -82,7 +82,25 @@ describe('Controls', () => {
   it('defaults to Basic Orbitals when mode is omitted: no Element select, unlike atom mode', () => {
     render(<Controls {...baseProps} />);
     expect(screen.queryByRole('combobox', { name: /Element/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('group', { name: /surface style/i })).toBeInTheDocument();
+    // Owner R25-B1: was "and Surface (Solid | Wireframe) is there" -- that control is gone; the opacity slider stands in.
+    expect(screen.getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
+  });
+
+  // Owner R25-B1: the Wireframe option is removed everywhere; Solid alone would be a control that does nothing
+  // (spec §3.5), so Controls has no Surface style in any mode (Atoms' Glow | Solid finish is DisplayControls').
+  it('offers no Surface style (Solid | Wireframe) in any mode (owner R25-B1)', () => {
+    for (const props of [
+      { mode: 'hydrogenic' as const },
+      { mode: 'bonds' as const },
+      { mode: 'molecule' as const },
+      { mode: 'atom' as const, atomLevel: 'orbital' as const, atomZ: 6, onAtomElementChange: () => {} },
+    ]) {
+      const { unmount } = render(<Controls {...baseProps} {...props} />);
+      expect(screen.queryByRole('group', { name: /surface style/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /wireframe|solid surface/i })).toBeNull();
+      expect(screen.queryByText('Wireframe')).toBeNull();
+      unmount();
+    }
   });
 
   // Addendum 2's mode rename: atom mode covers every real element now, so
@@ -150,9 +168,9 @@ describe('Controls', () => {
   // same marching-cubes pipeline hydrogen-like mode always uses -- so the
   // condition is level, not mode.
   describe('control visibility matrix (bug 6): Resolution, Surface and "no cut" only where they do something', () => {
-    it('Basic Orbitals mode (always a marching-cubes mesh): shows Surface and "Off"', () => {
+    // Owner R25-B1: Surface (Solid | Wireframe) is gone in every mode; "Off" is what is left of this row's matrix.
+    it('Basic Orbitals mode (always a marching-cubes mesh): shows "Off"', () => {
       render(<Controls {...baseProps} mode="hydrogenic" />);
-      expect(screen.getByRole('group', { name: /surface style/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /no cut/i })).toBeInTheDocument();
     });
 
@@ -173,9 +191,9 @@ describe('Controls', () => {
       expect(screen.queryByRole('button', { name: /no cut/i })).not.toBeInTheDocument();
     });
 
-    it('atom mode at the orbital level (level 3, a real marching-cubes mesh): shows Surface and "Off" again', () => {
+    // Owner R25-B1: Surface (Solid | Wireframe) is gone; Atoms' Glow | Solid finish is DisplayControls' (its own test).
+    it('atom mode at the orbital level (level 3, a real marching-cubes mesh): shows "Off" again', () => {
       render(<Controls {...baseProps} mode="atom" atomLevel="orbital" atomZ={6} onAtomElementChange={() => {}} />);
-      expect(screen.getByRole('group', { name: /surface style/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /no cut/i })).toBeInTheDocument();
     });
 
@@ -469,10 +487,11 @@ describe('Controls: part', () => {
     expect(screen.queryByRole('slider', { name: 'surface opacity' })).toBeNull();
   });
 
-  it("'view' holds the enclosed fraction, Surface, Opacity and Cut away, in Bonds' order -- no selection", () => {
+  // Owner R25-B1: Surface (Solid | Wireframe) left this order -- the control is gone.
+  it("'view' holds the enclosed fraction, Opacity and Cut away, in Bonds' order -- no selection", () => {
     const { container } = render(
       <Controls {...baseProps} part="view" mode="atom" atomLevel="orbital"
-        surfaceStyle={{ mode: 'solid', opacity: 1, clipAxis: 'x', clipPosition: 0 }} />
+        surfaceStyle={{ opacity: 1, clipAxis: 'x', clipPosition: 0 }} />
     );
     expect(screen.queryByRole('combobox', { name: /Principal \(n\)/i })).toBeNull();
     expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
@@ -480,7 +499,6 @@ describe('Controls: part', () => {
     expect(screen.queryByText(/one electron, Z = 1/i)).toBeNull();
     const order = [
       screen.getByRole('combobox', { name: /electron enclosed/i }),
-      screen.getByRole('group', { name: 'surface style' }),
       screen.getByRole('slider', { name: 'surface opacity' }),
       screen.getByRole('group', { name: 'cut-away axis' }),
       screen.getByRole('slider', { name: /Depth/ }),
@@ -518,8 +536,9 @@ describe('Controls: part', () => {
     render(<Controls {...baseProps} part="view" onSurfaceStyleChange={onSurfaceStyleChange} onEnclosedFractionChange={onEnclosedFractionChange} />);
     fireEvent.keyDown(screen.getByRole('slider', { name: 'surface opacity' }), { key: 'ArrowLeft' });
     expect(onSurfaceStyleChange).toHaveBeenCalledWith({ opacity: 0.95 });
-    fireEvent.click(screen.getByRole('button', { name: 'wireframe surface' }));
-    expect(onSurfaceStyleChange).toHaveBeenCalledWith({ mode: 'wireframe' });
+    // Owner R25-B1: the Wireframe button is gone; the cut-away axis is the other style call the view part sends.
+    fireEvent.click(screen.getByRole('button', { name: 'cut along x' }));
+    expect(onSurfaceStyleChange).toHaveBeenCalledWith({ clipAxis: 'x' });
     fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
     fireEvent.click(within(screen.getByRole('listbox')).getByText('75%'));
     expect(onEnclosedFractionChange).toHaveBeenCalledWith(0.75);

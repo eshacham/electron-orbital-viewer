@@ -206,12 +206,7 @@ describe('visualizer dispatch: levels 1-2 render a shell view, not marching cube
         const cutContext = buildContext({ ...defaultSurfaceStyle, clipAxis: 'z', clipPosition: 0 });
         updateAtomViewInScene(cutContext, atomShellParams());
         expect(cutContext.currentOrbitalGroup!.visible).toBe(true);
-
-        // Wireframe mode has the same "no separate surface" problem 'none'
-        // does -- refreshCaps used to hide the cap outside 'solid' mode too.
-        const wireframeContext = buildContext({ ...defaultSurfaceStyle, mode: 'wireframe' });
-        updateAtomViewInScene(wireframeContext, atomShellParams());
-        expect(wireframeContext.currentOrbitalGroup!.visible).toBe(true);
+        // Owner R25-B1: the wireframe-mode case that stood here went with the Wireframe option (no mode to set).
     });
 
     // The regression test for bug 4's actual mechanism, not just the

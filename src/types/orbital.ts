@@ -1,12 +1,12 @@
-/** How the isosurface is drawn. Purely a view setting: changing it never re-runs the calculation. */
-export type RenderMode = 'solid' | 'wireframe';
-
 /** Axis a cut-away plane is perpendicular to, or 'none' for no cut. */
 export type ClipAxis = 'none' | 'x' | 'y' | 'z';
 
-/** Everything about how the surface looks. None of it affects the calculation. */
+/**
+ * Everything about how the surface looks. None of it affects the calculation.
+ * Owner R25-B1: the surface is always solid -- the Wireframe option (and its
+ * `mode`) is gone; Glow or Solid is the viewer's finish (presentation.ts).
+ */
 export interface SurfaceStyle {
-    mode: RenderMode;
     /** 0 (invisible) to 1 (opaque). Below 1 the shells show through each other. */
     opacity: number;
     clipAxis: ClipAxis;
@@ -27,7 +27,6 @@ export interface SurfaceStyle {
 export const DEFAULT_OPACITY = 0.9;
 
 export const defaultSurfaceStyle: SurfaceStyle = {
-    mode: 'solid',
     opacity: DEFAULT_OPACITY,
     clipAxis: 'none',
     clipPosition: 0

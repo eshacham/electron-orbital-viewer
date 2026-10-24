@@ -1391,7 +1391,6 @@ function App() {
             surfaceStyle={surfaceStyle}
             onSurfaceStyleChange={handleSurfaceStyleChange}
             onOpacityPreview={handleOpacityPreview}
-            hideSurfaceStyle={isAtomMode}
             isBusy={isAtomMode ? showAtomBusy : showBusy}
             fractionNote={isBondsDensity ? FIXED_RHO_NOTE
                 : isMoleculeMode && molecule.surface.kind === 'esp' ? ESP_SURFACE_NOTE
@@ -1400,19 +1399,18 @@ function App() {
             noSurface={isMoleculeMode && molecule.surface.kind === 'none'}
         >
             {isAtomMode ? (
-                <SurfaceStyleControl surfaceMode={surfaceStyle.mode} meshLevel={atomLevel === 'orbital'}
-                    onSurfaceMode={mode => handleSurfaceStyleChange({ mode })} />
+                <SurfaceStyleControl meshLevel={atomLevel === 'orbital'} />
             ) : (moleculeOptions || null)}
         </Controls>
     );
     const controls = renderControls('all');
     // Task 16b (owner R24-adv): Glow's own tuning, folded, at the bottom of every Display section and the
-    // phone's view tab; it shows itself only under the Glow finish, while something drawn can glow -- not a
-    // wireframe, nor Atoms' whole-atom view (a shell picture with ring-glyph tiles).
-    // Task 16d item 12: nor while Molecules draws no surface (surface None, or a request preview) -- as under a
-    // wireframe, sliders whose only effect is a tile 300 ms later would read as broken.
+    // phone's view tab; it shows itself only under the Glow finish, while something drawn can glow -- not
+    // Atoms' whole-atom view (a shell picture with ring-glyph tiles). Owner R25-B1: nor a wireframe went with it.
+    // Task 16d item 12: nor while Molecules draws no surface (surface None, or a request preview) -- sliders
+    // whose only effect is a tile 300 ms later would read as broken.
     const moleculeNoSurface = isMoleculeMode && (molecule.surface.kind === 'none' || requestPreviewShown);
-    const drawsGlow = surfaceStyle.mode !== 'wireframe' && !(isAtomMode && atomLevel === 'atom') && !moleculeNoSurface;
+    const drawsGlow = !(isAtomMode && atomLevel === 'atom') && !moleculeNoSurface;
     // Task 16d item 13: the edge whiteness acts only on a phase-less surface (vQlPhase 0): a molecule's density
     // (never its ESP map, ruling T15-b), the Bonds total density, a shell's composition lobes, a combination overlay.
     const phaselessDrawn = (moleculeKeysShown && molecule.surface.kind === 'density') || isBondsDensity

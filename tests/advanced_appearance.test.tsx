@@ -19,7 +19,8 @@ afterEach(() => { act(() => { themeChoicePref.set('system'); }); window.localSto
 
 // Task 16b ("Advanced appearance", owner R24-adv): Glow's tuning as a folded block in the Display section.
 describe('AdvancedAppearance (Task 16b)', () => {
-    it('is there only under Glow while something drawn glows: not for the Solid finish, nor a wireframe or the whole atom', () => {
+    // Owner R25-B1: "nor a wireframe" left this name with the Wireframe option.
+    it('is there only under Glow while something drawn glows: not for the Solid finish, nor the whole atom', () => {
         const { rerender } = render(<AdvancedAppearance drawsGlow phaselessDrawn lowPower={false} />);
         expect(screen.getByRole('button', { name: 'Advanced appearance' })).toBeInTheDocument();
         rerender(<AdvancedAppearance drawsGlow={false} phaselessDrawn lowPower={false} />);

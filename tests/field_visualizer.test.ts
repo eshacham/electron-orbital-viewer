@@ -173,9 +173,10 @@ describe('updateFieldInScene', () => {
         await pending;
         (createOrbitalWorker as jest.Mock).mockClear();
 
-        setSurfaceStyle(context, { mode: 'wireframe', opacity: 0.4, clipAxis: 'x', clipPosition: 0 });
+        // Owner R25-B1: no render mode any more (was mode: 'wireframe', and the material's lines asserted here).
+        setSurfaceStyle(context, { opacity: 0.4, clipAxis: 'x', clipPosition: 0 });
         const material = (context.currentOrbitalGroup!.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
-        expect(material.wireframe).toBe(true);
+        expect(material.wireframe).toBe(false);
         expect(material.opacity).toBeCloseTo(0.4, 12);
         expect(context.clipPlane.normal.toArray()).toEqual([-1, 0, 0]);
         expect(createOrbitalWorker).not.toHaveBeenCalled();

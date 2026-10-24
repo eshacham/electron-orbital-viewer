@@ -37,9 +37,9 @@ const format = (knob: GlowKnob, value: number) => value.toFixed(decimals(knob));
 
 interface AdvancedAppearanceProps {
     /**
-     * Whether anything drawn can wear Glow: not a wireframe (today's
-     * material), nor Atoms' whole-atom view (a shell picture, its strip ring
-     * glyphs). False hides the block ("real or absent", spec §3.5).
+     * Whether anything drawn can wear Glow: not Atoms' whole-atom view (a
+     * shell picture, its strip ring glyphs), nor Molecules with no surface.
+     * False hides the block ("real or absent", spec §3.5).
      */
     drawsGlow: boolean;
     /** A phone (Appearance.lowPower): Glow's halo and mesh lines are never drawn there. */

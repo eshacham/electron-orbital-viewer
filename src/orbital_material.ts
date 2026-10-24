@@ -4,9 +4,9 @@ import { ClipAxis, SurfaceStyle } from './types/orbital';
 /**
  * Material for the orbital isosurface.
  *
- * Solid shows the surface as a lit shell, which is the only way to read the
- * shape at high resolution — a wireframe that dense turns into a solid block of
- * lines. Wireframe keeps the see-through view.
+ * The surface is a lit, shaded shell (owner R25-B1 removed the Wireframe
+ * option). Glow, when the viewer's finish wears it, is injected into this
+ * same material (orbital_glow.ts).
  *
  * The higher orbitals are nested shells, and an opaque outer shell hides
  * everything inside it. Two ways through that: lower the opacity, or cut the
@@ -28,20 +28,9 @@ export function createOrbitalMaterial(
 }
 
 function applyStyleToMaterial(material: THREE.MeshStandardMaterial, style: SurfaceStyle) {
-    const wireframe = style.mode === 'wireframe';
-
-    // Changing `wireframe` swaps the shader program, so the material has to
-    // be told even though the value is a plain assignment; setMaterialOpacity
-    // below does the equivalent check for `transparent`.
-    const needsRecompile = material.wireframe !== wireframe;
-
-    material.wireframe = wireframe;
-    // A wireframe wants flat, saturated lines rather than shading that dims half
-    // of them; a solid surface wants the shading.
-    material.roughness = wireframe ? 1 : 0.45;
+    // A solid surface wants the shading (the roughness the Wireframe option used to raise to 1, owner R25-B1).
+    material.roughness = 0.45;
     setMaterialOpacity(material, Math.max(0, Math.min(1, style.opacity)));
-
-    if (needsRecompile) material.needsUpdate = true;
 }
 
 /**
@@ -49,7 +38,7 @@ function applyStyleToMaterial(material: THREE.MeshStandardMaterial, style: Surfa
  * consistent with it. Factored out of `applyStyleToMaterial` so the
  * level-transition animation (orbital_visualizer.ts's shell<->orbital
  * cross-fade) can drive opacity every frame without dragging the
- * wireframe/roughness half of that function along for the ride.
+ * roughness half of that function along for the ride.
  */
 export function setMaterialOpacity(material: THREE.MeshStandardMaterial, opacity: number): void {
     const translucent = opacity < 1;
