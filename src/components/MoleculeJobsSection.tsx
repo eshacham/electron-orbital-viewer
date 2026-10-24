@@ -7,7 +7,7 @@ import {
 } from '../store/jobsSlice';
 import { jobsApi, jobsPoller } from '../jobs/client';
 import { approvedBody, retryBody } from '../jobs/request_form';
-import { SESSION_ENDED } from '../jobs/api';
+import { isLocalServerDown, LOCAL_SERVER_COMMAND, LOCAL_SERVER_FROM, SESSION_ENDED } from '../jobs/api';
 import type { AvailableQuoteOption, JobRequest, JobView, Quote } from '../jobs/api_types';
 import type { RequestForm } from '../jobs/request_form';
 import { signInHere } from './OwnerBar';
@@ -53,6 +53,21 @@ export function useRequestPanel() {
     return { isOwner, expired, jobs, open, follow, signIn, panelProps };
 }
 
+/**
+ * Owner R25-A1: on This Mac a job server that is not running is the usual state, not a fault -- one muted line,
+ * with the command folded under "How to start it", rather than a warning-coloured alert.
+ */
+const LocalServerNote: React.FC = () => (
+    <div className="local-server-note">
+        <p className="local-server-line">Computed molecules: the local job server isn’t running.</p>
+        <details className="local-server-how">
+            <summary>How to start it</summary>
+            <p className="local-server-from">From {LOCAL_SERVER_FROM}:</p>
+            <code className="local-server-command">{LOCAL_SERVER_COMMAND}</code>
+        </details>
+    </div>
+);
+
 export interface MoleculeJobsSectionProps {
     /**
      * `entry` (a desktop or tablet's Explore panel, ruling P12): a "Request a new molecule" button that
@@ -94,9 +109,9 @@ const MoleculeJobsSection: React.FC<MoleculeJobsSectionProps> = ({ variant = 'ac
     const requestOpen = jobs.request.open;
     return (
         <div className="molecule-jobs">
-            {isOwner && jobs.computed.error && (
-                <Alert severity="warning">Could not list this month’s computed molecules: {jobs.computed.error}</Alert>
-            )}
+            {isOwner && jobs.computed.error && (isLocalServerDown(jobs.target, jobs.computed.error)
+                ? <LocalServerNote />
+                : <Alert severity="warning">Could not list this month’s computed molecules: {jobs.computed.error}</Alert>)}
             {variant === 'entry' ? (
                 <>
                     <Button ref={entryRef} variant="outlined" className="request-entry" aria-expanded={requestOpen}

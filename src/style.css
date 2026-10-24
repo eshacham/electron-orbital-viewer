@@ -1519,6 +1519,23 @@ html, body, #root {
    in the side panel / Explore tab. */
 .tier-badge { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 8px; background: var(--ql-color-surface-2); color: var(--ql-color-text-1); font-size: 0.8125rem; max-width: 520px; }
 .molecule-jobs { display: flex; flex-direction: column; gap: 8px; }
+/* Owner R25-A1: the local job server not running -- one muted caption line, the command folded under it. */
+.local-server-note {
+  color: var(--ql-color-text-3);
+  font-size: var(--ql-type-caption-size);
+  line-height: var(--ql-type-caption-line);
+}
+.local-server-line { margin: 0; }
+.local-server-how summary { cursor: pointer; color: var(--ql-color-text-2); }
+.local-server-from { margin: 4px 0 2px; }
+.local-server-command {
+  display: block;
+  padding: 4px 6px;
+  border-radius: var(--ql-radius-xs);
+  background: var(--ql-color-surface-3);
+  color: var(--ql-color-text-1);
+  overflow-wrap: anywhere;
+}
 .molecule-jobs .MuiAccordion-root { border-radius: 10px; background: var(--ql-color-surface-1); }
 .provenance-body { display: flex; flex-direction: column; gap: 6px; }
 .provenance-list { margin: 0; padding-left: 18px; font-size: 0.875rem; }

@@ -9,13 +9,24 @@ export class JobsApiError extends Error {
     }
 }
 
+/** Where, and how, the local job server is started (tools/jobs/local_server.py). */
+export const LOCAL_SERVER_FROM = 'tools/';
+export const LOCAL_SERVER_COMMAND = '../tools/molecules/.venv/bin/python -m jobs.local_server';
 export const LOCAL_SERVER_HINT =
-    'The job server on this Mac is not answering. Start it from tools/: ../tools/molecules/.venv/bin/python -m jobs.local_server';
+    `The job server on this Mac is not answering. Start it from ${LOCAL_SERVER_FROM}: ${LOCAL_SERVER_COMMAND}`;
 export const SESSION_ENDED = 'Your owner session has ended. Sign in again to continue.';
 export const SIGN_IN_REQUIRED = 'Sign in as the owner to use the jobs API.';
 export const AWS_NOT_CONFIGURED =
     'AWS jobs are not configured on this dev server: set JOBS_AWS_API_URL (Phase 6B-3 prints it) and restart Vite.';
 export const API_NOT_CONFIGURED = 'The jobs API is not configured in this build (VITE_JOBS_API_URL is unset).';
+
+/**
+ * Owner R25-A1: the failure that is the usual state on This Mac -- the dev server's local job server is simply not
+ * running (unreachable, or the dev proxy's 5xx). Every other failure is a fault, said as one.
+ */
+export function isLocalServerDown(target: JobsTarget, message: string | null): boolean {
+    return target === 'local' && message === LOCAL_SERVER_HINT;
+}
 
 /** Where /v1/... is served: the dev proxy (This Mac or AWS, 6B-1 Task 10), or the deployed execute-api URL. null: nowhere. */
 export function apiBase(target: JobsTarget, env: BuildEnv): string | null {

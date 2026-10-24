@@ -1,5 +1,5 @@
 import {
-    createJobsApi, apiBase, JobsApiError, LOCAL_SERVER_HINT, SESSION_ENDED, SIGN_IN_REQUIRED, AWS_NOT_CONFIGURED, API_NOT_CONFIGURED,
+    createJobsApi, apiBase, isLocalServerDown, JobsApiError, LOCAL_SERVER_HINT, SESSION_ENDED, SIGN_IN_REQUIRED, AWS_NOT_CONFIGURED, API_NOT_CONFIGURED,
 } from '../../src/jobs/api';
 import type { BuildEnv } from '../../src/jobs/build_env';
 import { fixture, jsonResponse, textResponse } from './api_fixtures';
@@ -24,6 +24,24 @@ describe('where the API is', () => {
         expect(apiBase('aws', DEV)).toBe('/api/aws');
         expect(apiBase('aws', PROD)).toBe('https://abc.execute-api.us-east-1.amazonaws.com/api');
         expect(apiBase('aws', { ...PROD, jobsApiUrl: null })).toBeNull();
+    });
+});
+
+// Owner R25-A1: the hint is unchanged word for word (it is the error the panels show); only This Mac's own
+// not-running failure reads as the usual state rather than a fault.
+describe('the local job server not running', () => {
+    it('keeps the hint word for word, and recognises it on This Mac only', () => {
+        expect(LOCAL_SERVER_HINT).toBe(
+            'The job server on this Mac is not answering. Start it from tools/: ../tools/molecules/.venv/bin/python -m jobs.local_server');
+        expect(isLocalServerDown('local', LOCAL_SERVER_HINT)).toBe(true);
+        expect(isLocalServerDown('aws', LOCAL_SERVER_HINT)).toBe(false);
+        expect(isLocalServerDown('local', 'The jobs API answered HTTP 418 without a readable error.')).toBe(false);
+        expect(isLocalServerDown('local', null)).toBe(false);
+    });
+    it('is what an unreachable or 5xx-answering local server becomes on the dev server', async () => {
+        const unreachable = { ...deps([]), fetch: jest.fn(async () => { throw new TypeError('Failed to fetch'); }) };
+        await expect(createJobsApi('local', DEV, unreachable).list('2026-10')).rejects.toMatchObject({ message: LOCAL_SERVER_HINT });
+        await expect(createJobsApi('local', DEV, deps([textResponse(500, '')])).list('2026-10')).rejects.toMatchObject({ message: LOCAL_SERVER_HINT });
     });
 });
 

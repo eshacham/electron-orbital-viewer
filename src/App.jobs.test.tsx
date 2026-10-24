@@ -7,7 +7,7 @@ import { followJob, jobUpdated, sessionChanged, sessionExpired, TARGET_STORAGE_K
 import { BUILD_ENV } from './jobs/build_env';
 import { setOwnerAuthForTests, startOwnerSession } from './jobs/owner_session';
 import { SIGN_IN_FAILED } from './jobs/auth';
-import { SESSION_ENDED } from './jobs/api';
+import { LOCAL_SERVER_HINT, SESSION_ENDED } from './jobs/api';
 import { currentMonth } from './jobs/format';
 import { loadMoleculeIndex, loadMoleculeMeta, MoleculeLoadError, RESULT_NOT_FINISHED } from './molecules/loader';
 import type { MoleculeProvenance } from './molecules/types';
@@ -192,6 +192,48 @@ describe('Molecules mode with on-demand molecules', () => {
         }
         expect(scroll.contains(jobs)).toBe(true);
         expect(scroll.contains(order[order.length - 1])).toBe(false);
+    });
+
+    // Owner R25-A1: on This Mac, a job server that is not running is the usual state, not a fault -- one muted
+    // line says so, with the command folded under "How to start it"; no warning-coloured alert box.
+    it('says in one muted line that the local job server is not running, with how to start it folded (R25-A1)', async () => {
+        BUILD_ENV.dev = true;
+        mockApi.list.mockRejectedValue(new Error(LOCAL_SERVER_HINT));
+        const { store, container } = await enterMolecules(false);
+        await show(store, 'h2o');
+        await flush();
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        expect(within(side).queryByRole('alert')).toBeNull();
+        expect(side.querySelector('.MuiAlert-root')).toBeNull();
+        expect(within(side).queryByText(/Could not list/)).toBeNull();
+        const line = within(side).getByText('Computed molecules: the local job server isn’t running.');
+        const details = line.closest('.local-server-note')!.querySelector('details') as HTMLDetailsElement;
+        expect(details).not.toBeNull();
+        expect(details.open).toBe(false);
+        expect(within(details).getByText('How to start it').tagName).toBe('SUMMARY');
+        expect(within(details).getByText('../tools/molecules/.venv/bin/python -m jobs.local_server').tagName).toBe('CODE');
+        // The request entry is still offered beneath it.
+        expect(within(side).getByRole('button', { name: 'Request a new molecule' })).toBeInTheDocument();
+    });
+
+    // Owner R25-A1: any other failure keeps today's honest alert -- on This Mac (a server that answered badly), on
+    // the AWS target, and for the signed-in owner of a production build.
+    it.each([
+        ['This Mac, a server that answered badly', () => { BUILD_ENV.dev = true; },
+            'The jobs API answered HTTP 418 without a readable error.', false],
+        ['the dev server set to AWS, signed in', () => { BUILD_ENV.dev = true; BUILD_ENV.cognito = COGNITO; window.localStorage.setItem(TARGET_STORAGE_KEY, 'aws'); },
+            'The dev proxy answered HTTP 502. AWS jobs are not configured on this dev server.', true],
+        ['a production build, signed in', () => { BUILD_ENV.cognito = COGNITO; BUILD_ENV.jobsApiUrl = 'https://abc.execute-api.us-east-1.amazonaws.com'; },
+            'The jobs API could not be reached: Failed to fetch', true],
+    ])('keeps the warning alert for any other failure: %s (R25-A1)', async (_label, setUp, message, signIn) => {
+        setUp();
+        mockApi.list.mockRejectedValue(new Error(message));
+        const { store, container } = await enterMolecules(false);
+        if (signIn) act(() => { store.dispatch(sessionChanged({ signedIn: true, email: 'owner@example.com', groups: ['owners'] })); });
+        await flush();
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        expect(side.querySelector('.MuiAlert-standardWarning')).toHaveTextContent(`Could not list this month’s computed molecules: ${message}`);
+        expect(within(side).queryByText(/local job server isn’t running/)).toBeNull();
     });
 
     it("says a computed molecule is computed, on the canvas, and gives the owner its time and cost", async () => {

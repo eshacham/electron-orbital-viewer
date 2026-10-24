@@ -94,6 +94,9 @@ const PAIRS: Pair[] = [
     { selector: '.molecule-jobs .job-status', declares: [`background-color: ${v('surface-1')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.quote-option-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.quote-option-unavailable', declares: [`color: ${v('warning')}`], fg: 'warning', bg: 'surface-1' },
+    // Owner R25-A1: the local job server's muted line, and the command folded under it.
+    { selector: '.local-server-note', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-1' },
+    { selector: '.local-server-command', declares: [`background: ${v('surface-3')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-3' },
 ];
 const ADMIN_PAIRS: Pair[] = [
     { selector: '.eov-admin-dashboard', declares: [`background: ${v('bg-app')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'bg-app' },
