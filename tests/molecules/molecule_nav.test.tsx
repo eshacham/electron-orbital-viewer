@@ -90,6 +90,8 @@ describe('MoleculeOrbitalList', () => {
         const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
             const at = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 100, width: 100, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
             if (this.classList.contains('molecule-orbital-list')) return at(100, 200);
+            // Task 17 fix: the scroll now also keeps the gap note above the HOMO in view, so it is placed where it sits.
+            if (this.classList.contains('molecule-orbital-gap')) return at(480, 36);
             if (this.textContent?.includes('HOMO') && this.tagName === 'BUTTON') return at(520, 30);
             return at(0, 0);
         });
@@ -359,6 +361,26 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(key.compareDocumentPosition(screen.getAllByRole('button')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         const { container: legacy } = list(waterMeta().orbitals, { pointGroup: 'C2v', labelGroup: 'C2v' });
         expect(legacy.querySelector('.molecule-orbital-legend')).toBeNull();
+    });
+    // 6G-2 Task 17 fix (Fail 2): centring the HOMO left the gap note just above it under the sticky key -- water's
+    // Orbitals view clipped the note's first line on a desktop and hid it on a tablet. The list opens with the HOMO
+    // centred unless that would put the note under the key; then the note's top sits at the key's bottom instead.
+    it('opens with the gap note clear of the sticky key when centring the HOMO would hide it (Task 17 fix)', () => {
+        const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            const at = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 100, width: 100, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+            if (this.classList.contains('molecule-orbital-list')) return at(100, 200);
+            if (this.classList.contains('molecule-orbital-legend')) return at(100, 60);
+            if (this.classList.contains('molecule-orbital-gap')) return at(460, 50);
+            if (this.textContent?.includes('HOMO') && this.tagName === 'BUTTON') return at(520, 30);
+            return at(0, 0);
+        });
+        const { container } = list();
+        // Centring the HOMO would scroll 335 px and leave the note's top 25 px under the 60 px key; 300 puts it at the
+        // key's bottom edge, with the HOMO right under the note.
+        const scrollTop = (container.querySelector('.molecule-orbital-list') as HTMLElement).scrollTop;
+        expect(scrollTop).toBe(300);
+        expect(460 - scrollTop).toBeGreaterThanOrEqual(100 + 60);
+        rects.mockRestore();
     });
     // Fix round 1: at the card's 300 px a row with ×3, the LVMO chip and the estimate (silane's constructed t2) overflowed.
     // jsdom has no layout, so this pins the rules that let it fit: the energy column may shrink below its content and

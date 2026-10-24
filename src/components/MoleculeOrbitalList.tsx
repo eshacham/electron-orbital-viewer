@@ -39,6 +39,21 @@ export function centredScrollTop(list: HTMLElement, row: HTMLElement): number {
 }
 
 /**
+ * 6G-2 Task 17 fix: the scrollTop the list opens at -- the HOMO centred
+ * (centredScrollTop), unless that would put `above` (the gap note over the
+ * HOMO) under the sticky key at the list's top; then `above`'s top sits at
+ * the key's bottom edge instead, the HOMO right under it. Water's Orbitals
+ * view had the note's first line clipped (desktop) or hidden (tablet).
+ */
+export function openingScrollTop(list: HTMLElement, row: HTMLElement, above: HTMLElement | null, key: HTMLElement | null): number {
+    const centred = centredScrollTop(list, row);
+    const listTop = list.getBoundingClientRect().top;
+    const keyHeight = key?.getBoundingClientRect().height ?? 0;
+    const clear = list.scrollTop + ((above ?? row).getBoundingClientRect().top - listTop) - keyHeight;
+    return Math.max(0, Math.min(centred, clear));
+}
+
+/**
  * Every shipped orbital, highest first so HOMO and LUMO sit together near
  * the top. This is Molecules' Plot-slot content (ruling D23): MoDiagram
  * groups degeneracy by irrep label and is kept Bonds-only, not generalised
@@ -80,14 +95,19 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, sel
     ].join(' · ');
     const listRef = useRef<HTMLDivElement>(null);
     const homoRef = useRef<HTMLButtonElement>(null);
+    const keyRef = useRef<HTMLParagraphElement>(null);
+    const gapRef = useRef<HTMLDivElement>(null);
     // On opening, and for each new molecule -- not on every pick, which
-    // would snap the list back while it is being browsed.
+    // would snap the list back while it is being browsed. Task 17 fix: the
+    // gap note over the HOMO stays clear of the sticky key.
     useEffect(() => {
-        if (listRef.current && homoRef.current) listRef.current.scrollTop = centredScrollTop(listRef.current, homoRef.current);
+        if (listRef.current && homoRef.current) {
+            listRef.current.scrollTop = openingScrollTop(listRef.current, homoRef.current, gapRef.current, keyRef.current);
+        }
     }, [orbitals]);
     return (
         <div className="molecule-orbital-list" ref={listRef}>
-            {key && <p className="molecule-orbital-legend">{key}</p>}
+            {key && <p className="molecule-orbital-legend" ref={keyRef}>{key}</p>}
             {rows.map((orbital, position) => {
                 const role = orbital.role ? String(orbital.role) : null;
                 const degenerate = counts.get(orbital.index) ?? 1;
@@ -95,7 +115,7 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, sel
                     <React.Fragment key={orbital.index}>
                         {position === firstOccupied && gapText && (
                             // Fix round 1: role="note", not "separator", whose children screen readers skip.
-                            <div role="note" className="molecule-orbital-gap">
+                            <div role="note" className="molecule-orbital-gap" ref={gapRef}>
                                 {gapText}.{' '}
                                 <span className="molecule-orbital-gap-caveat">{GAP_CAVEAT}.</span>
                             </div>
