@@ -1,6 +1,6 @@
 /**
  * One localStorage key behind a tiny external store (spec §6.1, §6.7): the
- * theme, the brand and the presentation preferences live here, outside
+ * theme and the presentation preferences live here, outside
  * Redux, so nothing in them can reach a share link. When storage is
  * unavailable or throws (Safari private mode) the value lasts the session in
  * memory. The `storage` event keeps other tabs and /admin.html in step.

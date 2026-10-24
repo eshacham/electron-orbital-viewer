@@ -5,7 +5,7 @@ import type { OwnerSession } from '../../src/store/jobsSlice';
 
 const session = (over: Partial<OwnerSession> = {}): OwnerSession =>
     ({ configured: true, signedIn: false, email: null, expired: false, error: null, ...over });
-const base = { ownerBar: <div>owner bar</div>, onSignIn: jest.fn(), brandId: 'quantumlab' as const, onBrand: jest.fn() };
+const base = { ownerBar: <div>owner bar</div>, onSignIn: jest.fn() };
 
 describe('AvatarMenu (spec §8.1 item 6, §5)', () => {
     it('is absent for a visitor of a build without sign-in (ruling R14)', () => {
@@ -20,19 +20,21 @@ describe('AvatarMenu (spec §8.1 item 6, §5)', () => {
         expect(onSignIn).toHaveBeenCalled();
     });
 
-    it('shows the owner\'s initials and a menu with the owner bar and the brand preview', () => {
-        const onBrand = jest.fn();
-        render(<AvatarMenu {...base} onBrand={onBrand} session={session({ signedIn: true, email: 'EyalShacham@pcssoft.com' })} isOwner dev={false} />);
+    // Owner R25-B3: the brand preview is gone from the owner's menu ("they are all the same") -- one brand, nothing to pick.
+    it('shows the owner\'s initials and a menu with the owner bar, and no brand preview', () => {
+        render(<AvatarMenu {...base} session={session({ signedIn: true, email: 'EyalShacham@pcssoft.com' })} isOwner dev={false} />);
         const button = screen.getByRole('button', { name: 'Owner menu, signed in as EyalShacham@pcssoft.com' });
         expect(button).toHaveTextContent('ES');
         fireEvent.click(button);
         expect(screen.getByText('owner bar')).toBeInTheDocument();
         expect(screen.getByRole('dialog', { name: 'Owner' })).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('radio', { name: 'NovaLab' }));
-        expect(onBrand).toHaveBeenCalledWith('novalab');
+        expect(screen.queryByRole('radiogroup', { name: 'Brand preview' })).toBeNull();
+        expect(screen.queryAllByRole('radio')).toHaveLength(0);
+        expect(screen.queryByText('Brand preview')).toBeNull();
     });
 
-    it('hides the brand preview from anyone but the owner, and opens a menu on the dev server', () => {
+    // Owner R25-B3: was "hides the brand preview from anyone but the owner" -- there is none for anyone now.
+    it('opens a menu on the dev server for a visitor too, with no brand preview', () => {
         render(<AvatarMenu {...base} session={session({ configured: false })} isOwner={false} dev />);
         fireEvent.click(screen.getByRole('button', { name: 'Owner sign-in' }));
         expect(screen.getByText('owner bar')).toBeInTheDocument();

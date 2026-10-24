@@ -1,13 +1,13 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import HelpDialog from '../../src/shell/HelpDialog';
-import { BRANDS } from '../../src/design/brands';
+import { BRAND } from '../../src/design/brands';
 import { EXPORT_ITEMS } from '../../src/export/run_export';
 import { MOLECULE_DATA_VERSION } from '../../src/molecules/data_version';
 
 describe('HelpDialog (spec §8.1 item 5)', () => {
     it('explains gestures, keys, every export and the app, with no external links', () => {
-        render(<HelpDialog open onClose={jest.fn()} brand={BRANDS[0]} aboutModel={<p>central-field model text</p>} />);
+        render(<HelpDialog open onClose={jest.fn()} brand={BRAND} aboutModel={<p>central-field model text</p>} />);
         const dialog = screen.getByRole('dialog', { name: 'Help' });
         expect(dialog).toHaveTextContent(/drag to rotate/i);
         expect(dialog).toHaveTextContent(/pinch|scroll/i);

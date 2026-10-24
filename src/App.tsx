@@ -147,8 +147,7 @@ import { useDocumentTitle } from './shell/useDocumentTitle';
 import { useFullscreen } from './shell/useFullscreen';
 import ThemeSwitch from './design/ThemeSwitch';
 import { useQuantumTheme } from './design/useQuantumTheme';
-import { useBrand } from './design/useBrand';
-import { brandPref } from './design/brands';
+import { BRAND } from './design/brands';
 import { LAYOUT } from './design/tokens';
 import { usePref } from './design/usePref';
 import { displayPref, renderPref, hintPref, type PlotTabId } from './design/presentation';
@@ -508,9 +507,8 @@ function App() {
     /** A curve, key or swatch in this theme's palette (index identity, §4.2). */
     const themed = useCallback(<T extends { color: string }>(items: T[]): T[] =>
         items.map(item => ({ ...item, color: themeCurveColour(item.color, palette) })), [palette]);
-    const brand = useBrand();
     const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(viewTitle, shallowEqual);
-    useDocumentTitle(`${viewTitleText} · ${brand.name}`);
+    useDocumentTitle(`${viewTitleText} · ${BRAND.name}`);
     const shellRef = useRef<HTMLDivElement>(null);
     const fullscreen = useFullscreen(shellRef);
     const [helpOpen, setHelpOpen] = useState(false);
@@ -1824,8 +1822,6 @@ function App() {
             dev={BUILD_ENV.dev}
             ownerBar={<ConnectedOwnerBar page="/" showError={false} />}
             onSignIn={() => signInHere('/', text => dispatch(sessionFailed(text)))}
-            brandId={brand.id}
-            onBrand={id => brandPref.set(id)}
             extra={isNarrow ? (
                 <div className="avatar-extra">
                     <div className="avatar-extra-row"><ThemeSwitch /><span>Theme</span></div>
@@ -1851,7 +1847,7 @@ function App() {
     }));
     const topBar = (
         <TopBar
-            brand={brand}
+            brand={BRAND}
             mode={themeMode}
             tabs={topBarTabs}
             search={<GlobalSearch sources={searchSources} onPick={handleSearchPick} onWantIndex={wantIndex} />}
@@ -1863,7 +1859,7 @@ function App() {
         />
     );
     const phoneTopBar = (compact: boolean) => (
-        <PhoneTopBar brand={brand} themeMode={themeMode} mode={atomMode} onModeChange={selectMode}
+        <PhoneTopBar brand={BRAND} themeMode={themeMode} mode={atomMode} onModeChange={selectMode}
             onOpenSearch={() => setPhoneSearchOpen(true)} avatar={avatar} compact={compact} />
     );
     // A phone held upright: top bar, then the header line under it. Sideways: one merged 44 px line (spec §7).
@@ -2138,7 +2134,7 @@ function App() {
                 onExpandExplore={() => setExploreCollapsed(false)}
                 fullscreen={fullscreen.active}
             />
-            <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} brand={brand}
+            <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} brand={BRAND}
                 aboutModel={isAtomMode ? <LevelNav {...levelNavProps} variant="about" />
                     : isBasicMode ? <p>{BASIC_ORBITALS_ABOUT}</p> : undefined} />
             {isNarrow && (

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { FormControl, FormControlLabel, FormHelperText, FormLabel, IconButton, Popover, Radio, RadioGroup, Tooltip } from '@mui/material';
+import { IconButton, Popover, Tooltip } from '@mui/material';
 import MoreVert from '@mui/icons-material/MoreVert';
 import PersonOutline from '@mui/icons-material/PersonOutline';
-import { BRANDS, type BrandId } from '../design/brands';
 import type { OwnerSession } from '../store/jobsSlice';
 
 /** "eyal.shacham@…" or "EyalShacham@…" → "ES"; one name → its first two letters. */
@@ -21,8 +20,6 @@ interface AvatarMenuProps {
     /** <ConnectedOwnerBar page="/" showError={false} showDashboardLink />: today's sign-in, sign-out, jobs target and dashboard link. */
     ownerBar: React.ReactNode;
     onSignIn(): void;
-    brandId: BrandId;
-    onBrand(id: BrandId): void;
     /** The phone puts Theme and Help in here too (spec §9.8). */
     extra?: React.ReactNode;
 }
@@ -30,11 +27,11 @@ interface AvatarMenuProps {
 /**
  * The avatar (spec §8.1 item 6). Signed out it is "Owner sign-in", which
  * grants nothing by itself; signed in it shows the owner's initials and a
- * menu with the owner bar and, for the owner only, the brand preview (§5).
- * Absent when it would do nothing: a production build without sign-in
- * (ruling R14).
+ * menu with the owner bar. (Owner R25-B3: the owner's brand preview is gone
+ * -- the app has one brand.) Absent when it would do nothing: a production
+ * build without sign-in (ruling R14).
  */
-const AvatarMenu: React.FC<AvatarMenuProps> = ({ session, isOwner, dev, ownerBar, onSignIn, brandId, onBrand, extra }) => {
+const AvatarMenu: React.FC<AvatarMenuProps> = ({ session, isOwner, dev, ownerBar, onSignIn, extra }) => {
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
     if (!dev && !session.configured && !session.signedIn && !extra) return null;
     const signedIn = session.signedIn;
@@ -69,18 +66,6 @@ const AvatarMenu: React.FC<AvatarMenuProps> = ({ session, isOwner, dev, ownerBar
                 slotProps={{ paper: { className: 'avatar-menu', role: 'dialog', 'aria-label': popoverLabel } as object }}
             >
                 {(signedIn || canSignIn) && ownerBar}
-                {isOwner && (
-                    <FormControl component="fieldset" className="avatar-brand">
-                        <FormLabel component="legend" id="brand-preview-label">Brand preview</FormLabel>
-                        <RadioGroup aria-labelledby="brand-preview-label" value={brandId}
-                            onChange={event => onBrand(event.target.value as BrandId)}>
-                            {BRANDS.map(brand => (
-                                <FormControlLabel key={brand.id} value={brand.id} control={<Radio size="small" />} label={brand.name} />
-                            ))}
-                        </RadioGroup>
-                        <FormHelperText>Previews the name in this browser only; nobody else sees it.</FormHelperText>
-                    </FormControl>
-                )}
                 {extra}
             </Popover>
         </>

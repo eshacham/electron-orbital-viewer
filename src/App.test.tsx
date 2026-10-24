@@ -22,7 +22,6 @@ import { createH2PlusCurveWorker } from './workers/createH2PlusCurveWorker';
 import { resetH2PlusCurveForTests } from './bonds/useH2PlusCurve';
 import { loadScan, loadMoleculeMeta, loadBasis } from './molecules/loader';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from './molecules/types';
-import { brandPref } from './design/brands';
 import { hintPref } from './design/presentation';
 import { MEDIUM_VIEWPORT } from './useMediaQuery';
 import * as downloadModule from './export/download';
@@ -1583,7 +1582,22 @@ describe('App: shell', () => {
         await waitFor(() => expect(store.getState().molecule.index !== null || store.getState().molecule.indexError !== null).toBe(true));
     });
 
-    it('a theme or brand switch leaves the share link byte-identical (Review Focus 1)', async () => {
+    // Owner R25-B3: one brand. A preview choice stored before (eov.brand) is ignored: the bar, the home link and the
+    // document title say QuantumLab whatever it holds.
+    it('shows QuantumLab whatever an old eov.brand holds (owner R25-B3)', () => {
+        window.localStorage.setItem('eov.brand', 'novalab');
+        try {
+            renderWithProvider(<App />);
+            expect(screen.getByRole('link', { name: 'QuantumLab, home' })).toHaveTextContent('QuantumLab');
+            expect(screen.queryByText(/NovaLab/)).toBeNull();
+            expect(document.title).toMatch(/ · QuantumLab$/);
+        } finally {
+            window.localStorage.removeItem('eov.brand');
+        }
+    });
+
+    // Owner R25-B3: the brand switch left with the brand preview; a theme switch is what can still change here.
+    it('a theme switch leaves the share link byte-identical (Review Focus 1)', async () => {
         const writeText = jest.fn().mockResolvedValue(undefined);
         Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
         renderWithProvider(<App />);
@@ -1593,7 +1607,6 @@ describe('App: shell', () => {
         expect(writeText.mock.calls[0][0]).toMatch(/#mode=atom&/);
         fireEvent.click(screen.getByRole('button', { name: /^Theme: / }));
         fireEvent.click(screen.getByRole('menuitemradio', { name: 'Light Clean' }));
-        act(() => { brandPref.set('novalab'); });
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
         await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
         expect(writeText.mock.calls[1][0]).toBe(writeText.mock.calls[0][0]);

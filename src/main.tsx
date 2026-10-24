@@ -16,13 +16,10 @@ import { bindJobsClient } from './jobs/client';
 import { startOwnerSession } from './jobs/owner_session';
 import { migrateLegacyTheme } from './design/theme_storage';
 import { useQuantumTheme } from './design/useQuantumTheme';
-import { BUILD_ENV } from './jobs/build_env';
-import { applyDevBrandParam } from './design/brands';
 
 // The boot script in index.html has already migrated and applied the theme;
 // this repeats the migration for a page served before the script existed.
 try { migrateLegacyTheme(window.localStorage); } catch { /* storage refused: the pref keeps it in memory */ }
-applyDevBrandParam(window.location.search, BUILD_ENV.dev);
 
 /** The theme lives here, above App, so a theme change never remounts the viewer (spec §3.2). */
 function Root() {
