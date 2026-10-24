@@ -313,25 +313,26 @@ function collectMetrics() {
       return { box: { x: Math.round(C.x), y: Math.round(C.y), width: Math.round(C.width), height: Math.round(C.height) },
         insideCell: within(C, V) && within(C, W), keys: keys.length, hidden };
     })(),
-    // 6G-2 Task 17 fix (Fail 2): how much of the MO list's gap note is out of sight -- under the list's sticky key, or
-    // past the list's bottom edge. 0 means the note is whole and readable. Owner R25-A4 moved the note (and the key)
-    // under the list as its caption: then inList is false, nothing in the list may be sticky (stickyInList 0), the
-    // note sits below the list's bottom edge (belowList), and nothing of it can be hidden by the list (hiddenPx 0).
+    // 6G-2 Task 17 fix (Fail 2) measured how much of the gap note the list's sticky key hid. Owner R25-A4 moved the
+    // note (and the key) under the list as its caption, so that measurement no longer applies (R25-A-M2: no hiddenPx).
+    // What is measured now: whether the note sits in the list (inList, must be false) and below its bottom edge
+    // (belowList), how many elements in the list are sticky (stickyInList, must be 0), and -- where the note's centre is
+    // on screen -- whether the element painted there is the note itself (topmostAtCentre; null when off screen).
     orbitalGapNote: (() => {
       const list = document.querySelector('.molecule-orbital-list');
       const note = list?.parentElement?.querySelector('.molecule-orbital-gap');
       if (!list || !note) return null;
       const L = list.getBoundingClientRect(), N = note.getBoundingClientRect();
       if (!(N.height > 0)) return null;
-      const inList = list.contains(note);
-      const stickyInList = [...list.querySelectorAll('*')].filter(e => getComputedStyle(e).position === 'sticky').length;
-      const key = inList ? list.querySelector('.molecule-orbital-legend')?.getBoundingClientRect() : null;
-      const visibleTop = Math.max(L.top, key ? key.bottom : L.top);
-      const hidden = !inList ? 0
-        : Math.max(0, Math.min(N.bottom, visibleTop) - N.top) + Math.max(0, N.bottom - Math.max(N.top, L.bottom));
-      return { hiddenPx: Math.round(hidden), inList, stickyInList, belowList: N.top >= L.bottom - 0.5,
-        noteTop: Math.round(N.top), noteHeight: Math.round(N.height),
-        keyBottom: key ? Math.round(key.bottom) : null, listTop: Math.round(L.top), listBottom: Math.round(L.bottom) };
+      const cx = N.left + N.width / 2, cy = N.top + N.height / 2;
+      const onScreen = cx >= 0 && cy >= 0 && cx < innerWidth && cy < innerHeight;
+      const top = onScreen ? document.elementFromPoint(cx, cy) : null;
+      return {
+        inList: list.contains(note), belowList: N.top >= L.bottom - 0.5,
+        stickyInList: [...list.querySelectorAll('*')].filter(e => getComputedStyle(e).position === 'sticky').length,
+        topmostAtCentre: onScreen ? Boolean(top && note.contains(top)) : null,
+        noteTop: Math.round(N.top), noteHeight: Math.round(N.height), listTop: Math.round(L.top), listBottom: Math.round(L.bottom),
+      };
     })(),
     // Task 16: what has focus (Esc returns it to the entry), and anything in the request workspace wider than it.
     focused: (() => {
