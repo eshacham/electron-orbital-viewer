@@ -49,7 +49,7 @@ import {
     setReferenceRingWidth,
     disposeReferenceRing
 } from './atom/reference_ring';
-import { CPK_COLORS, disposeOverlay } from './molecules/ball_and_stick';
+import { CPK_COLORS, disposeOverlay, overlayExtent } from './molecules/ball_and_stick';
 import { INITIAL_APPEARANCE, type Appearance } from './design/appearance';
 import { axesStyle, curvePalette, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb, phaseColours } from './design/science';
 import {
@@ -204,6 +204,8 @@ export interface VisualizerContext {
      * replaces that group, leaves the structure in place.
      */
     moleculeOverlay?: THREE.Group | null;
+    /** Owner R25-C: the meshes the last field request landed (updateFieldInScene), for what the caller measures off them. */
+    lastFieldMeshes?: MeshData[];
     /** How to draw (spec §6.6), set by OrbitalViewer; INITIAL_APPEARANCE until then. Optional so test doubles need not carry it. */
     appearance?: Appearance;
     /** The scene's three lights, which the finish sets (§11.1 "Lights"). */
@@ -1473,6 +1475,7 @@ export async function updateFieldInScene(
             try {
                 if (e.data.type === 'fieldsSuccess') {
                     const meshes = e.data.meshes;
+                    context.lastFieldMeshes = meshes;
                     if (meshes.length === 1) {
                         updateSceneWithMeshData(context, meshes[0], false,
                             request.densityIsoValue !== undefined ? DENSITY_SURFACE_COLOUR : undefined);
@@ -1481,8 +1484,18 @@ export async function updateFieldInScene(
                     }
                     const surfaceRadius = Math.max(...meshes.map(m => meshRadius(m))) || boxRMax;
                     const centre = request.frameCentre;
-                    frameToSurface(context, surfaceRadius, frameBox, reframe, showAxes,
-                        centre && { centre, radius: Math.max(...meshes.map(m => meshRadius(m, centre))) || surfaceRadius });
+                    let framing = centre && { centre, radius: Math.max(...meshes.map(m => meshRadius(m, centre))) || surfaceRadius };
+                    // Owner R25-C (ruling R25-C-present): a core is sampled in a box far smaller than the
+                    // molecule's, and a first view (a link, a new molecule) fitted to it zoomed in among the
+                    // sticks -- SF₆'s 1a1g at a 0.2 a₀ scale. Where the sampling box is smaller than the frame
+                    // box, the framing never comes closer than the whole structure drawn (frameStructure's own
+                    // measure). A valence orbital's box is never smaller than its frame box: framed as before.
+                    if (boxRMax < frameBox && context.moleculeOverlay) {
+                        const about = centre ?? [0, 0, 0];
+                        const structure = overlayExtent(context.moleculeOverlay, about);
+                        if (structure > (framing?.radius ?? surfaceRadius)) framing = { centre: about, radius: structure };
+                    }
+                    frameToSurface(context, surfaceRadius, frameBox, reframe, showAxes, framing);
                     console.log(`Visualizer: ${request.label} drawn in ${Math.round(performance.now() - startedAt)} ms`);
                     resolve({ status: 'rendered', isoLevel: meshes[0].isoLevel });
                 } else {

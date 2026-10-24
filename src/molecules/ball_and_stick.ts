@@ -111,11 +111,23 @@ function cpkMaterials(): (Z: number) => THREE.MeshStandardMaterial {
     };
 }
 
-/** A sphere per atom, of the given radius (Å), tagged for picking. */
-function addAtomSpheres(group: THREE.Group, atoms: MoleculeAtom[], material: (Z: number) => THREE.Material, radiusAngstrom: (Z: number) => number): void {
+/**
+ * The radius, a₀, of the ball `representation` draws for element `Z` -- ball and stick: ATOM_RADIUS_FACTOR × its
+ * covalent radius; space filling: its van der Waals radius -- or null where it draws none (no structure, or no
+ * tabulated radius). The one measure the builders below draw with and the inside-the-ball note
+ * (inside_ball.ts, owner R25-C) compares a surface with.
+ */
+export function drawnAtomRadiusBohr(representation: Representation, Z: number): number | null {
+    if (representation === 'ball-and-stick') return (ATOM_RADIUS_FACTOR * radius(Z)) / BOHR_TO_ANGSTROM;
+    if (representation === 'space-filling') return VDW_RADII_ANGSTROM[Z] === undefined ? null : VDW_RADII_ANGSTROM[Z] / BOHR_TO_ANGSTROM;
+    return null;
+}
+
+/** A sphere per atom, of the radius `representation` draws it at (drawnAtomRadiusBohr), tagged for picking. */
+function addAtomSpheres(group: THREE.Group, atoms: MoleculeAtom[], material: (Z: number) => THREE.Material, representation: Representation): void {
     atoms.forEach((atom, index) => {
         const sphere = new THREE.Mesh(SPHERE, material(atom.Z));
-        sphere.scale.setScalar(radiusAngstrom(atom.Z) / BOHR_TO_ANGSTROM);
+        sphere.scale.setScalar(drawnAtomRadiusBohr(representation, atom.Z)!);
         sphere.position.copy(vec(atom));
         sphere.userData = { moleculePart: 'atom', index };
         group.add(sphere);
@@ -131,7 +143,7 @@ export function buildBallAndStick(atoms: MoleculeAtom[], bonds: Bond[]): THREE.G
     const group = new THREE.Group();
     group.userData.isBallAndStick = true;
     const material = cpkMaterials();
-    addAtomSpheres(group, atoms, material, Z => ATOM_RADIUS_FACTOR * radius(Z));
+    addAtomSpheres(group, atoms, material, 'ball-and-stick');
     const up = new THREE.Vector3(0, 1, 0);
     bonds.forEach((bond, index) => {
         const [p, q] = [vec(atoms[bond.a]), vec(atoms[bond.b])];
@@ -160,7 +172,7 @@ export function buildSpaceFilling(atoms: MoleculeAtom[]): THREE.Group {
     const reason = spaceFillingUnavailableReason(atoms);
     if (reason) throw new Error(reason);
     const group = new THREE.Group();
-    addAtomSpheres(group, atoms, cpkMaterials(), Z => VDW_RADII_ANGSTROM[Z]);
+    addAtomSpheres(group, atoms, cpkMaterials(), 'space-filling');
     group.updateMatrixWorld(true);
     return group;
 }

@@ -9,6 +9,9 @@
 // then bundles the sweep with the repo's esbuild and runs it with node. Foreground only:
 // Vite is started and stopped inside this run, and never on the owner's ports.
 //   node tools/thumbs/validate_tile_boxes.mjs [--data /tmp/eov-tile-box-data] [--port 5411] [--only c2] [--jobs N] [--skip-main] [--skip-tiles] [--reference-face 0.1]
+// The whole sweep is ~10 min on 8 threads: run it in foreground slices by id prefix, e.g.
+//   for p in a b c e f g h l n o p s; do node tools/thumbs/validate_tile_boxes.mjs --data DIR --only $p; done
+// (each slice prints its own totals and exit code; together they cover every v3 case -- see the .ts header).
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';

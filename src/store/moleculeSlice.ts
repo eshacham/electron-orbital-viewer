@@ -5,6 +5,7 @@ import { setMode } from './atomSlice';
 import { isJobKey } from '../molecules/job_paths';
 import { shortKey } from '../jobs/format';
 import type { Representation } from '../molecules/ball_and_stick';
+import type { AtomReach } from '../molecules/inside_ball';
 import { spaceFillingUnavailableReason } from '../molecules/vdw_radii';
 
 export type { MoleculePick, Representation };
@@ -47,6 +48,12 @@ export interface MoleculeState {
     espRange: [number, number] | null;
     /** Null whenever the canvas is not showing a landed surface: before the first render, while one is in flight, after a failure or a cancel. */
     drawn: MoleculeDrawn | null;
+    /**
+     * Owner R25-C (ruling R25-C-present): the landed MO surface's reach from each atom nearest it
+     * (inside_ball.ts), for the inside-the-ball note. Read only while `drawn` says that surface is the one shown;
+     * absent for any other landing.
+     */
+    surfaceReach?: AtomReach[];
 }
 
 const initialState: MoleculeState = {
@@ -149,11 +156,13 @@ const moleculeSlice = createSlice({
         setPick: (state, action: PayloadAction<MoleculePick | null>) => { state.pick = action.payload; },
         renderStarted: (state, action: PayloadAction<string>) => { state.renderLabel = action.payload; state.renderError = null; state.drawn = null; },
         /** `drawn` is what the landing render was asked for; a landing that does not say records nothing, so nothing can be exported off it. */
-        renderFinished: (state, action: PayloadAction<{ isoLevel: number; espRange?: [number, number]; drawn?: MoleculeDrawn }>) => {
+        renderFinished: (state, action: PayloadAction<{ isoLevel: number; espRange?: [number, number]; drawn?: MoleculeDrawn; surfaceReach?: AtomReach[] }>) => {
             state.renderLabel = null;
             state.isoLevel = action.payload.isoLevel;
             state.espRange = action.payload.espRange ?? null;
             state.drawn = action.payload.drawn ?? null;
+            if (action.payload.surfaceReach) state.surfaceReach = action.payload.surfaceReach;
+            else delete state.surfaceReach;
         },
         renderFailed: (state, action: PayloadAction<string>) => { state.renderLabel = null; state.renderError = action.payload; state.drawn = null; },
         /**

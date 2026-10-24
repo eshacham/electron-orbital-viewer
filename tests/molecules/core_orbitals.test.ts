@@ -83,3 +83,35 @@ describe("a second-row atom's 1s core is drawn whole (owner R25-C)", () => {
         }
     });
 });
+
+/**
+ * Review R25-C-I1. C₂H₆'s C 1s pair (1a1g, 1a2u) weighs 0.180 at a nucleus -- a core the density box's grid
+ * cannot resolve -- but Σc² puts enough on a diffuse s shell to give it an originReach (8.90 a₀) past the box
+ * (8.70). It took the growth branch, the probe did not grow it, and it stayed in the molecule's box: 2.78 voxels
+ * at 90 %, faceted. A core on an atom at the origin, inflated the same way, would have thrown the owner's error.
+ * When growth does not grow the box, the core check still applies.
+ */
+describe("a core whose analytic reach is overstated still gets its compact box (review R25-C-I1)", () => {
+    const ethane: LibraryMoleculeMeta = fixture('c2h6', 'meta.json');
+    const ethaneBasis: MoleculeBasis = { ...fixture('c2h6', 'basis.json'), id: ethane.id };
+    const carbons = ethane.atoms.filter(atom => atom.Z === 6).map(atom => atom.position);
+
+    it.each(['1a1g', '1a2u'])("samples C₂H₆'s C 1s %s in its own compact box, and draws it many voxels across", label => {
+        const index = ethane.orbitals.find(o => o.label === label)!.index;
+        const half = gridHalfWidth(ethane);
+        for (const fraction of [0.9, 0.99]) {
+            const plan = planMoleculeRender(ethane, { kind: 'mo', index }, fraction, ethaneBasis);
+            if (plan.kind !== 'mo') throw new Error('expected an orbital plan');
+            const drawn = plan.request;
+            expect(drawn.sources[0].rMax).toBeLessThanOrEqual(half / 2);
+            expect(drawn.resolution).toBe(MOLECULE_MO_RESOLUTION);
+            expect(drawn.frameBox).toBe(half);
+            registerMoleculeBasis(ethaneBasis);
+            const [mesh] = generateFieldMeshes(drawn);
+            // Each C 1s sphere's radius, about its own nucleus, in voxels of the grid it was drawn on.
+            const step = (2 * drawn.sources[0].rMax) / drawn.resolution;
+            const radius = Math.max(...mesh.positions.map(p => Math.min(...carbons.map(c => Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2])))));
+            expect(radius / step).toBeGreaterThan(8);
+        }
+    });
+});

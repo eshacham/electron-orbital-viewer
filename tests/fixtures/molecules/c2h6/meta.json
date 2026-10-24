@@ -1,0 +1,302 @@
+{
+ "id": "c2h6",
+ "name": "Ethane",
+ "formula": "C2H6",
+ "atoms": [
+  {
+   "Z": 6,
+   "position": [
+    0,
+    0,
+    1.450364800603685
+   ]
+  },
+  {
+   "Z": 6,
+   "position": [
+    0,
+    0,
+    -1.450364800603685
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    1.9274492882195682,
+    0,
+    2.1979731093250856
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    -0.9637246441097838,
+    1.6692200481043804,
+    2.1979731093250856
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    -0.963724644109785,
+    -1.66922004810438,
+    2.1979731093250856
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    0.9637246441097843,
+    1.6692200481043802,
+    -2.1979731093250856
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    -1.9274492882195682,
+    2.3604446013369385e-16,
+    -2.1979731093250856
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    0.9637246441097843,
+    -1.6692200481043802,
+    -2.1979731093250856
+   ]
+  }
+ ],
+ "geometrySource": "experiment (CCCBDB)",
+ "method": {
+  "density": "B3LYP-D3(BJ)/def2-TZVPD",
+  "energies": "B3LYP-D3(BJ)/def2-TZVPD"
+ },
+ "totalEnergyHartree": -79.8695836450685,
+ "dispersion": {
+  "model": "D3(BJ)",
+  "energyHartree": -0.005407966466634712,
+  "backend": "pyscf-dispersion 1.5.0"
+ },
+ "dipoleDebye": 1.81395241677802e-14,
+ "dipoleVectorDebye": [
+  -2.821905393518457e-15,
+  -9.312287798610909e-15,
+  -1.5308836759837628e-14
+ ],
+ "orbitals": [
+  {
+   "index": 0,
+   "label": "1a1g",
+   "energyHartree": -10.16026896841911,
+   "occupation": 2
+  },
+  {
+   "index": 1,
+   "label": "1a2u",
+   "energyHartree": -10.160057409378954,
+   "occupation": 2
+  },
+  {
+   "index": 2,
+   "label": "2a1g",
+   "energyHartree": -0.7526706490276264,
+   "occupation": 2
+  },
+  {
+   "index": 3,
+   "label": "2a2u",
+   "energyHartree": -0.6172448453488878,
+   "occupation": 2
+  },
+  {
+   "index": 4,
+   "label": "1eu",
+   "energyHartree": -0.4362477355750972,
+   "occupation": 2
+  },
+  {
+   "index": 5,
+   "label": "1eu",
+   "energyHartree": -0.43624771167723075,
+   "occupation": 2
+  },
+  {
+   "index": 6,
+   "label": "3a1g",
+   "energyHartree": -0.3691014445404534,
+   "occupation": 2
+  },
+  {
+   "index": 7,
+   "label": "1eg",
+   "energyHartree": -0.34628791764445377,
+   "occupation": 2,
+   "role": "HOMO"
+  },
+  {
+   "index": 8,
+   "label": "1eg",
+   "energyHartree": -0.3462879110795402,
+   "occupation": 2,
+   "role": "HOMO"
+  },
+  {
+   "index": 9,
+   "label": "4a1g",
+   "energyHartree": 0.008744455005116038,
+   "occupation": 0,
+   "role": "LUMO",
+   "valenceCharacter": 0.3839,
+   "class": "diffuse"
+  },
+  {
+   "index": 10,
+   "label": "3a2u",
+   "energyHartree": 0.03308290267702221,
+   "occupation": 0,
+   "valenceCharacter": 0.2619,
+   "class": "diffuse"
+  },
+  {
+   "index": 11,
+   "label": "2eu",
+   "energyHartree": 0.07033298686960313,
+   "occupation": 0,
+   "valenceCharacter": 0.2437,
+   "class": "diffuse"
+  },
+  {
+   "index": 12,
+   "label": "2eu",
+   "energyHartree": 0.07033300945046428,
+   "occupation": 0,
+   "valenceCharacter": 0.2437,
+   "class": "diffuse"
+  },
+  {
+   "index": 13,
+   "label": "2eg",
+   "energyHartree": 0.09456676451828393,
+   "occupation": 0,
+   "valenceCharacter": 0.2818,
+   "class": "diffuse"
+  },
+  {
+   "index": 14,
+   "label": "2eg",
+   "energyHartree": 0.0945670343429393,
+   "occupation": 0,
+   "valenceCharacter": 0.2818,
+   "class": "diffuse"
+  },
+  {
+   "index": 15,
+   "label": "a1g",
+   "energyHartree": 0.29820771825218095,
+   "occupation": 0,
+   "role": "LVMO",
+   "kind": "valence-virtual",
+   "constructed": true,
+   "energyApproximate": true,
+   "note": "constructed from the valence part of the virtual space — not an orbital of this calculation; its energy is an upper estimate (its value within the valence space), typically several eV above this calculation's orbital energies",
+   "valenceCharacter": 1,
+   "class": "valence"
+  }
+ ],
+ "grid": {
+  "shape": [
+   96,
+   96,
+   96
+  ],
+  "origin": [
+   -8.697973109325085,
+   -8.697973109325085,
+   -8.697973109325085
+  ],
+  "spacing": 0.18311522335421232
+ },
+ "espGrid": {
+  "shape": [
+   48,
+   48,
+   48
+  ],
+  "origin": [
+   -8.697973109325085,
+   -8.697973109325085,
+   -8.697973109325085
+  ],
+  "spacing": 0.37012651529042917
+ },
+ "espRangeOnSurface": [
+  -0.003809391759975078,
+  0.012826269247194766
+ ],
+ "electronCount": 18,
+ "densityIntegral": 17.999609425604703,
+ "multiplicity": 1,
+ "symmetry": {
+  "pointGroup": "D3d",
+  "labelGroup": "D3d",
+  "labels": "full-group"
+ },
+ "references": [
+  {
+   "quantity": "bond",
+   "value": 1.535,
+   "unit": "Å",
+   "source": "experiment (CCCBDB)",
+   "tolerance": 0.01,
+   "atoms": [
+    0,
+    1
+   ],
+   "label": "C–C"
+  },
+  {
+   "quantity": "bond",
+   "value": 1.094,
+   "unit": "Å",
+   "source": "experiment (CCCBDB)",
+   "tolerance": 0.01,
+   "atoms": [
+    0,
+    2
+   ],
+   "label": "C–H"
+  },
+  {
+   "quantity": "angle",
+   "value": 111.2,
+   "unit": "deg",
+   "source": "experiment (CCCBDB)",
+   "tolerance": 1,
+   "atoms": [
+    2,
+    0,
+    1
+   ],
+   "label": "H–C–C"
+  },
+  {
+   "quantity": "dipole",
+   "value": 0,
+   "unit": "D",
+   "source": "zero by symmetry",
+   "tolerance": 0.01
+  }
+ ],
+ "generator": {
+  "pyscf": "2.8.0",
+  "numpy": "2.3.5",
+  "scipy": "1.18.1",
+  "python": "3.12.15",
+  "xc": "B3LYP-D3(BJ) (PySCF >= 2.3: VWN-RPA)",
+  "script": "tools/molecules/build_library.py",
+  "commit": "8982f6231f84288ed43430a9b621e14d2a8f5477",
+  "dataVersion": "v3"
+ }
+}

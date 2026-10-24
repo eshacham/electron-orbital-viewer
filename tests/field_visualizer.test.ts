@@ -4,7 +4,9 @@ jest.mock('../src/workers/createOrbitalWorker', () => ({ createOrbitalWorker: je
 jest.mock('../src/orbital_controls_factory', () => ({ createOrbitalControls: jest.fn() }));
 
 import { createOrbitalWorker } from '../src/workers/createOrbitalWorker';
-import { VisualizerContext, updateFieldInScene, setSurfaceStyle, cancelPendingRender, clearScene } from '../src/orbital_visualizer';
+import { VisualizerContext, updateFieldInScene, setSurfaceStyle, cancelPendingRender, clearScene, frameStructure, setMoleculeOverlay } from '../src/orbital_visualizer';
+import { buildBallAndStick, detectBonds, overlayExtent } from '../src/molecules/ball_and_stick';
+import type { MoleculeAtom } from '../src/molecules/library_types';
 import { overlayVertexColors, NEGATIVE_PHASE_SHADE } from '../src/field_overlay_view';
 import { defaultSurfaceStyle, MeshData } from '../src/types/orbital';
 import { FieldRenderRequest } from '../src/field_source';
@@ -122,6 +124,40 @@ describe('updateFieldInScene', () => {
         await land(9.6); // no frame box: keyed on the sampling box, as before -- it changed, so the camera re-frames
         expect(context.framedBox).toBe(9.6);
         expect(context.camera.position).not.toEqual(zoomed);
+    });
+
+    // Owner R25-C, ruling R25-C-present (a): a core is sampled in a box far smaller than the molecule's, and
+    // a link (or any first load) frames the landed surface -- SF₆'s 1a1g put the camera among the S–F sticks at a
+    // 0.2 a₀ scale. Where the orbital's box is smaller than its frame box, the first view never comes closer than
+    // the whole structure drawn; a valence orbital (box = frame box) frames exactly as before.
+    it("frames SF₆'s 1a1g core, opened from a link, no closer than the whole structure; a valence orbital as before", async () => {
+        const fluorine = 2.95;
+        const atoms: MoleculeAtom[] = [
+            { Z: 16, position: [0, 0, 0] },
+            ...[[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].map(([x, y, z]) => ({ Z: 9, position: [x * fluorine, y * fluorine, z * fluorine] as [number, number, number] })),
+        ];
+        const core: MeshData = { ...fakeMesh(0), positions: [[0.17, 0, 0], [0, 0.17, 0], [0, 0, 0.17]] };
+        const land = async (rMax: number, mesh: MeshData) => {
+            const context = buildContext();
+            setMoleculeOverlay(context, buildBallAndStick(atoms, detectBonds(atoms)));
+            const worker = fakeWorker();
+            (createOrbitalWorker as jest.Mock).mockReturnValue(worker);
+            const request: FieldRenderRequest = { ...single, sources: [{ ...single.sources[0], rMax }], frameBox: 9.45, frameCentre: [0, 0, 0] };
+            const pending = updateFieldInScene(context, request);
+            worker.onmessage!({ data: { type: 'fieldsSuccess', meshes: [mesh] } });
+            await pending;
+            return context;
+        };
+        const structureView = buildContext();
+        setMoleculeOverlay(structureView, buildBallAndStick(atoms, detectBonds(atoms)));
+        frameStructure(structureView, overlayExtent(structureView.moleculeOverlay!, [0, 0, 0]), [0, 0, 0]);
+
+        const opened = await land(0.79, core);
+        expect(opened.camera.position.length()).toBeCloseTo(structureView.camera.position.length(), 6);
+        expect(opened.framedBox).toBe(9.45);
+        // A valence orbital is sampled in the frame box itself: it still frames its own surface.
+        const valence = await land(9.45, core);
+        expect(valence.camera.position.length()).toBeLessThan(structureView.camera.position.length() / 5);
     });
 
     it('drops a result a newer request has superseded', async () => {

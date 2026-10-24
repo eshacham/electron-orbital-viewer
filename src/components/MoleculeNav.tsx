@@ -26,6 +26,13 @@ interface MoleculeNavProps {
     onSelectMolecule: (id: string) => void;
     onSurfaceChange: (surface: MoleculeSurface) => void;
     onOpenPicker?: () => void;
+    /**
+     * Owner R25-C (ruling R25-C-present): "<orbital> lies inside the S ball" while the drawn surface is hidden
+     * inside the balls the structure draws (inside_ball.ts insideBallNoteFor), else absent; `onHideStructure`
+     * sets Structure to None. Shown by the orbital list, first among its notes below the rows.
+     */
+    insideBallNote?: string | null;
+    onHideStructure?: () => void;
 }
 
 /** What App may ask of the card (Task 15): the strip's "Orbital list" tile brings the orbital list into view. */
@@ -73,6 +80,7 @@ export function revealScrollTop(panel: HTMLElement, element: HTMLElement): numbe
 
 const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
     variant = 'full', entries, indexError, meta, selectedId, surface, onSelectMolecule, onSurfaceChange, onOpenPicker,
+    insideBallNote, onHideStructure,
 }, ref) => {
     const navRef = useRef<HTMLDivElement>(null);
     const surfaceLabelId = useId();
@@ -161,7 +169,8 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
                     {surface.kind === 'mo' && (
                         <MoleculeOrbitalList orbitals={meta.orbitals} selectedIndex={surface.index}
                             onSelect={index => onSurfaceChange({ kind: 'mo', index })}
-                            method={meta.method.density} symmetry={meta.symmetry} highlightRun={highlightRun} />
+                            method={meta.method.density} symmetry={meta.symmetry} highlightRun={highlightRun}
+                            insideBallNote={insideBallNote} onHideStructure={onHideStructure} />
                     )}
                     <Typography variant="caption" className="molecule-caption">
                         Geometry: {meta.geometrySource}. Density, potential and orbitals: {meta.method.density} (PySCF).

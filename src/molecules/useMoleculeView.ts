@@ -15,6 +15,7 @@ import { buildBallAndStick, buildSpaceFilling, detectBonds, overlayExtent, pickM
 import { dipoleArrow } from './dipole';
 import { gridHalfWidth, moleculeCentre, moleculeGridRequest, planMoleculeRender } from './render_plan';
 import { canonicalToBohr } from '../jobs/structure_projection';
+import { surfaceReachByAtom } from './inside_ball';
 import type { CanonicalAtom } from '../jobs/api_types';
 import type { MoleculeAtom } from './library_types';
 
@@ -151,7 +152,9 @@ export function useMoleculeView(contextRef: React.RefObject<VisualizerContext | 
                     const outcome = await updateFieldInScene(context, withBasis.request, false);
                     if (outcome.status !== 'rendered' || !current()) return;
                     landed = true;
-                    dispatch(renderFinished({ isoLevel: outcome.isoLevel, drawn }));
+                    // Owner R25-C: what the inside-the-ball note compares with the structure's balls.
+                    const positions = context.lastFieldMeshes?.[0]?.positions;
+                    dispatch(renderFinished({ isoLevel: outcome.isoLevel, drawn, ...(positions ? { surfaceReach: surfaceReachByAtom(positions, meta.atoms) } : {}) }));
                     return;
                 }
                 const grid = await getDensityGrid(meta);

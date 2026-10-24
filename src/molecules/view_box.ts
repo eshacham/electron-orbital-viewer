@@ -38,8 +38,10 @@ import { isoLevelForEnclosedFraction } from '../radial_distribution';
  *
  * Orbitals whose originReach is inside the molecule's box are not probed for
  * growth: that reach already holds 99.99 % of every shell that carries them.
- * A core among them that the molecule's grid cannot resolve (CUSP_WEIGHT) is
- * probed for its own compact box instead (compactReach, owner R25-C).
+ * Any orbital the growth probe does not grow -- unprobed, or probed because
+ * an overlap-blind originReach overstated it (review R25-C-I1) -- that the
+ * molecule's grid cannot resolve (CUSP_WEIGHT) gets its own compact box
+ * (compactReach, owner R25-C).
  */
 export const PROBE_RESOLUTION = 24;
 /** Added to the interpolated crossing, in probe steps (see above). */
@@ -145,11 +147,17 @@ export function probedReach(basis: MoleculeBasis, index: number, fraction: numbe
  * Owner R25-C: the share of the orbital one main-view sample at a nucleus
  * would claim -- |ψ(nucleus)|² × step³ -- past which the grid cannot resolve
  * the orbital there, and it is sampled in its own compact box (compactReach).
- * On the shipped data every core the molecule's box drew coarse (a surface
- * piece under two voxels) or refused weighs 0.19–9.3 (H₂S's S 1s: 6.4, eight
- * samples carrying 95 % of the orbital), and every valence orbital at most
- * 0.095 (an O 2s-like cusp, ethanol's 4a'): valence orbitals keep today's box
- * and grid exactly.
+ * Measured on the shipped data: every core the molecule's box drew coarse (a
+ * surface piece under two voxels) or refused weighs 0.19–9.3, C₂H₆'s C 1s
+ * (2.8 voxels) 0.18 (H₂S's S 1s:
+ * 6.4, eight samples carrying 95 % of the orbital), and every valence orbital
+ * at most 0.095 (an O 2s-like cusp, ethanol's 4a'), so on the shipped data
+ * valence orbitals keep today's box and grid exactly. W grows with the box³:
+ * a computed molecule larger than glycine (box over ~14 a₀) can put an O/N
+ * 2s-like valence orbital over the threshold. That orbital is then drawn in
+ * a box that still holds all but the tail, on a finer grid -- not wrong, but
+ * no longer today's grid; tools/thumbs/validate_tile_boxes.mjs belongs on the
+ * data-bump checklist.
  */
 export const CUSP_WEIGHT = 0.15;
 
@@ -168,9 +176,11 @@ export function cuspWeight(basis: MoleculeBasis, index: number, step: number): n
  * than `moleculeBox`.
  *
  * Why. A second-row 1s is tiny: S's 90 % surface is 0.17 a₀ in radius, one
- * voxel of the 95³ grid over the molecule's box. There 8 samples carried 95 %
- * of the sampled orbital, the iso level came out 2–5× off, and the mesh was a
- * speck in the nucleus voxel, which orbital_mesh.ts's R22b guard refuses
+ * voxel of the 95³ grid over the molecule's box. The surface spans 0.9–1.6
+ * voxels and 8 samples carried 95–97 % of the sampled orbital (the iso level
+ * that falls out of them is anywhere from ×0.2 to ×5 of the converged one --
+ * a symptom), and the mesh was a speck in the nucleus voxel, which
+ * orbital_mesh.ts's R22b guard refuses
  * ("Could not resolve this surface": H₂S, PH₃, SF₆, SO₂, SiH₄ 1s; glycine's
  * N 1s and ethanol's C 1s, whose atoms sit at the origin). Sampled in its own
  * box at the same resolution, S's 1s spans 12–19 voxels in radius (90–99 %).
@@ -226,11 +236,17 @@ export function orbitalViewBox(basis: MoleculeBasis, index: number, fraction: nu
     const key = `${basis.id}|${basis.nao}|${index}|${fraction}|${moleculeBox}|${baseResolution}`;
     const cached = cache.get(key);
     if (cached !== undefined) return cached;
-    const box = !basis.orbitals[index] ? moleculeBox // never drawn from this basis: it sets no box
-        : originReach(basis, index) > moleculeBox ? Math.max(moleculeBox, probedReach(basis, index, fraction, moleculeBox))
-            : cuspWeight(basis, index, (2 * moleculeBox) / baseResolution) >= CUSP_WEIGHT
-                ? compactReach(basis, index, fraction, moleculeBox) || moleculeBox
-                : moleculeBox;
+    let box = moleculeBox; // an orbital the basis does not carry is never drawn from it: it sets no box
+    if (basis.orbitals[index]) {
+        // probedReach is 0 unless originReach passes the box. Review R25-C-I1: originReach is Σc²-based and
+        // overstates a core with a diffuse share (C₂H₆'s C 1s: 8.90 a₀ against 8.70), so a probe that does
+        // not actually grow the box falls through to the core check rather than keeping the molecule's box.
+        const grown = probedReach(basis, index, fraction, moleculeBox);
+        if (grown > moleculeBox) box = grown;
+        else if (cuspWeight(basis, index, (2 * moleculeBox) / baseResolution) >= CUSP_WEIGHT) {
+            box = compactReach(basis, index, fraction, moleculeBox) || moleculeBox;
+        }
+    }
     if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value!);
     cache.set(key, box);
     return box;

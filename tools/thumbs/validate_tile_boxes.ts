@@ -35,13 +35,22 @@
 // centre in a box twice as wide (80³). The tile's samples are then an exact subset of the reference's, so:
 //   - left-out density = the reference's share outside the tile box;
 //   - face/iso = as above, on the tile's own 40³ grid and iso level. ≥ 1 is a CUT (exit code 1);
-//   - R25-C: the tile is meshed as the strip meshes it (generateFieldMeshes at 40³); a refusal is UNRESOLVED.
+//   - R25-C: the tile is meshed as the strip meshes it -- the strip's own request (fitToOrbital on the
+//     probe-free main-view request, at 40³) through generateFieldMeshes; a refusal is UNRESOLVED.
 // A tile that keeps its limit box is sampled at 40³ in that box and checked the same way.
 //   node tools/thumbs/validate_tile_boxes.mjs [--data DIR] [--port 5411] [--only c2] [--jobs 8] [--skip-main] [--skip-tiles] [--reference-face 0.1]
+//
+// The whole sweep takes about 10 min on 8 threads (R25-C meshes every case), longer than one 540 s foreground
+// command: split it by id prefix with --only, one foreground run per prefix -- Bonds files are <system>_NN.json,
+// library molecules <id>.meta.json, and --only matches the start of either. These twelve prefixes cover every
+// case of the v3 data, each run well under 540 s: a b c e f g h l n o p s (the totals of the slices add up to
+// the whole: 171 Bonds files and 35 library molecules). Fetch first (one run without --only fetches it all).
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { isMainThread, parentPort, Worker, workerData } from 'worker_threads';
-import { basisCentredOn, orbitalBox, originReach } from '../../src/molecules/orbital_box';
+import { basisCentredOn, fitToOrbital, orbitalBox, originReach } from '../../src/molecules/orbital_box';
+import { BONDS_THUMB_RESOLUTION } from '../../src/thumbs/bonds_strip_items';
+import { MO_THUMB_RESOLUTION } from '../../src/thumbs/strip_items';
 import { registerMoleculeBasis } from '../../src/molecules/basis_registry';
 import { generateFieldMeshes, sampleFieldSource } from '../../src/orbital_mesh';
 import { isoLevelForEnclosedFraction } from '../../src/radial_distribution';
@@ -347,16 +356,12 @@ const newTileTally = (): TileTally => ({
     worstFace: new Map(FRACTIONS.map(f => [f, { value: 0, at: '' }])), cut: [], unresolved: [],
 });
 
-/** R25-C: the strip's request for a tile of `basis.orbitals[index]` in the origin-centred box `rMax` (the basis already moved to its centre). */
-function tileRequest(basis: MoleculeBasis, index: number, rMax: number, fraction: number): FieldRenderRequest {
-    return {
-        sources: [{ kind: 'analytic', id: 'tile', rMax, recipe: { type: 'gaussianMO', moleculeId: basis.id, index } }],
-        colors: ['#ffffff'], memberLabels: ['tile'], resolution: TILE_RESOLUTION, enclosedFraction: fraction, label: 'tile', bases: [basis],
-    };
-}
-
 /** One orbital's tile: `limitFor(f)` is the box fitToOrbital fits within -- the molecule's, or the orbital's originReach where further (ruling T16c-I1). */
-function checkTile(tally: TileTally, name: string, basis: MoleculeBasis, index: number, limitFor: (fraction: number) => number): void {
+function checkTile(
+    tally: TileTally, name: string, basis: MoleculeBasis, index: number, limitFor: (fraction: number) => number,
+    /** R25-C (review M3): the strip's own tile request at this fraction -- fitToOrbital on its probe-free request, at 40³. */
+    tileFor: (fraction: number) => FieldRenderRequest,
+): void {
     const fitted = orbitalBox(basis, index, Infinity);
     let tile: Sampled | null = null;
     const mainBoxTiles = new Map<number, Sampled>();
@@ -364,10 +369,8 @@ function checkTile(tally: TileTally, name: string, basis: MoleculeBasis, index: 
         tally.cases++;
         const limit = limitFor(f);
         let sampled: Sampled;
-        const meshed = fitted.halfWidth >= limit
-            ? tileRequest(basis, index, limit, f)
-            : tileRequest(basisCentredOn(basis, fitted.centre), index, fitted.halfWidth, f);
-        meshed.bases!.forEach(registerMoleculeBasis);
+        const meshed = tileFor(f);
+        meshed.bases?.forEach(registerMoleculeBasis);
         const refusal = meshRefusal(meshed);
         if (refusal) tally.unresolved.push(`${name} at ${pct(f)}: ${refusal}`);
         if (fitted.halfWidth >= limit) {
@@ -416,11 +419,11 @@ function reportTiles(title: string, tally: TileTally): void {
 }
 
 /** Bonds' main-view request for one orbital of a scan point, as App asks for it. */
-function bondsRequest(system: BondsSystemId, point: number, basis: MoleculeBasis, orbital: BasisOrbital, fraction: number): FieldRenderRequest {
+function bondsRequest(system: BondsSystemId, point: number, basis: MoleculeBasis, orbital: BasisOrbital, fraction: number, probe = true): FieldRenderRequest {
     const component = basis.orbitals.filter(o => o.label === orbital.label && o.spin === orbital.spin).indexOf(orbital);
     const state = reducer(reducer(reducer(undefined, selectBondsSystem(system)), setScanPoint({ index: point, RBohr: 1 })),
         setBondsView({ kind: 'mo', label: orbital.label, spin: orbital.spin, component }));
-    const built = bondsFieldRequest(state, basis, fraction);
+    const built = bondsFieldRequest(state, basis, fraction, { probe });
     if (!built || built.note || built.request.sources[0].recipe.type !== 'gaussianMO') throw new Error(`${basis.id} ${orbital.label}: no orbital request`);
     return built.request;
 }
@@ -441,9 +444,12 @@ function sweepBondsFile(dir: string, file: string, { main, tiles }: Options, t: 
     const moleculeBox = Math.max(...basis.atoms.map(atom => Math.hypot(...atom))) + MOLECULE_PADDING;
     if (main) checkMainView(t.bondsMain, basis.id, basis.orbitals, moleculeBox, BONDS_RESOLUTION, basis.nao, requestFor);
     if (!tiles) return;
+    const moved = new Map<string, MoleculeBasis>();
     for (const orbital of basis.orbitals) {
         checkTile(t.bondsTiles, `${basis.id} ${orbital.label}${orbital.spin === 'restricted' ? '' : ` (${orbital.spin})`}`, basis, orbital.index,
-            () => Math.max(moleculeBox, originReach(basis, orbital.index)));
+            () => Math.max(moleculeBox, originReach(basis, orbital.index)),
+            // As bonds_strip_items.ts builds it: the probe-free request, fitted, at the strip's resolution.
+            f => ({ ...fitToOrbital(bondsRequest(system, Number(point), basis, orbital, f, false), basis, moved), resolution: BONDS_THUMB_RESOLUTION }));
     }
 }
 
@@ -461,8 +467,15 @@ function sweepLibraryMolecule(dir: string, id: string, { main, tiles }: Options,
     const orbitals = meta.orbitals.map(o => basis.orbitals[o.index]);
     if (main) checkMainView(t.libraryMain, id, orbitals, gridHalfWidth(meta), MOLECULE_MO_RESOLUTION, basis.nao, requestFor);
     if (!tiles) return;
+    const moved = new Map<string, MoleculeBasis>();
     for (const { role, orbital } of frontierOrbitals(meta.orbitals)) {
-        checkTile(t.libraryTiles, `${id} ${role} ${orbital.label}`, basis, orbital.index, () => Math.max(gridHalfWidth(meta), originReach(basis, orbital.index)));
+        checkTile(t.libraryTiles, `${id} ${role} ${orbital.label}`, basis, orbital.index, () => Math.max(gridHalfWidth(meta), originReach(basis, orbital.index)),
+            // As molecule_strip_items.ts builds it: the probe-free plan at the strip's resolution, fitted.
+            f => {
+                const plan = planMoleculeRender(meta, { kind: 'mo', index: orbital.index }, f, basis, { probe: false });
+                if (plan.kind !== 'mo') throw new Error(`${id}: no orbital plan`);
+                return fitToOrbital({ ...plan.request, resolution: MO_THUMB_RESOLUTION }, basis, moved);
+            });
     }
 }
 

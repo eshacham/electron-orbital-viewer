@@ -93,6 +93,7 @@ import { bondsFieldRequest } from './bonds/bonds_request';
 import { BondsSystemId, systemFormula } from './bonds/systems';
 import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIso, BondsView } from './store/bondsSlice';
 import { selectMolecule, setSurface, setRepresentation, setShowDipole, MoleculeSurface } from './store/moleculeSlice';
+import { insideBallNoteFor } from './molecules/inside_ball';
 import { useMoleculeLoader } from './molecules/useMoleculeLoader';
 import { formatDipole } from './molecules/dipole';
 import { spaceFillingUnavailableReason } from './molecules/vdw_radii';
@@ -1348,6 +1349,9 @@ function App() {
         onSelectMolecule: (id: string) => dispatch(selectMolecule({ id })),
         onSurfaceChange: (surface: MoleculeSurface) => dispatch(setSurface(surface)),
         onOpenPicker: () => setMoleculePickerOpen(true),
+        // Owner R25-C (ruling R25-C-present): a drawn surface hidden inside the structure's balls is said so.
+        insideBallNote: insideBallNoteFor(molecule),
+        onHideStructure: () => dispatch(setRepresentation('none')),
     };
     // Task 12 (ruling P1): Molecules' Explore opens with the header tile (name, formula, "Change ▾" -- a
     // popover on a desktop or tablet, the full-screen picker on a phone). Owner R25-A3: the quick pick that sat

@@ -1284,6 +1284,13 @@ html, body, #root {
   color: var(--ql-color-text-2);
   line-height: 1.35;
 }
+/* Owner R25-C: "1a1 lies inside the S ball — set Structure to None to see it."
+   under the orbital list; its action is a link-styled button inside the
+   sentence (same font, inline), keeping the global focus ring. */
+.molecule-inside-ball-action {
+  font: inherit;
+  vertical-align: baseline;
+}
 .molecule-orbital-list {
   display: flex;
   flex-direction: column;

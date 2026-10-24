@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Chip, Typography } from '@mui/material';
+import { Chip, Link, Typography } from '@mui/material';
 import {
     CONSTRUCTED_LABEL, CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, DIFFUSE_NOTE, GAP_CAVEAT, LVMO_NOTE, UNCLASSIFIED_NOTE,
     VALENCE_THRESHOLD, degeneracyCounts, diffuseDescription, formatOrbitalEnergy, isConstructed, isUpperEstimate, labelNotes,
@@ -18,6 +18,13 @@ interface MoleculeOrbitalListProps {
      * R25-A-M1: an even run adds the replay class, so a second press restarts the fade.
      */
     highlightRun?: number;
+    /**
+     * Owner R25-C (ruling R25-C-present): "<orbital> lies inside the S ball" while the drawn surface is hidden
+     * inside the balls the structure draws (inside_ball.ts insideBallNoteFor), else absent; `onHideStructure`
+     * sets Structure to None. The first of the notes under the list: it is about the orbital drawn.
+     */
+    insideBallNote?: string | null;
+    onHideStructure?: () => void;
 }
 
 const OCCUPANCY: Record<number, string> = { 2: '↑↓', 1: '↑', 0: '' };
@@ -63,7 +70,9 @@ export function centredScrollTop(list: HTMLElement, row: HTMLElement): number {
  * label notes. Older data, with no classes, says its virtuals are
  * unclassified rather than implying either.
  */
-const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, selectedIndex, onSelect, method, symmetry, highlightRun = 0 }) => {
+const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
+    orbitals, selectedIndex, onSelect, method, symmetry, highlightRun = 0, insideBallNote, onHideStructure,
+}) => {
     const rows = useMemo(() => [...orbitals].sort((a, b) => b.energyHartree - a.energyHartree), [orbitals]);
     const counts = useMemo(() => degeneracyCounts(orbitals), [orbitals]);
     // Ruling T16-b: highest first reads like an MO diagram, but puts the
@@ -138,6 +147,18 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({ orbitals, sel
                 })}
             </div>
             <div className="molecule-orbital-notes">
+                {insideBallNote && onHideStructure && (
+                    // Owner R25-C: never over the canvas (R22c); the button is the real action it names -- no
+                    // automatic switch, the structure stays the link's.
+                    <Typography variant="caption" component="p" role="note" aria-label={`${insideBallNote} — set Structure to None to see it.`}
+                        className="molecule-caption molecule-inside-ball-note">
+                        {insideBallNote} —{' '}
+                        <Link component="button" type="button" className="molecule-inside-ball-action" onClick={onHideStructure}>
+                            set Structure to None
+                        </Link>
+                        {' '}to see it.
+                    </Typography>
+                )}
                 {gapText && (
                     // Fix round 1: role="note", not "separator", whose children screen readers skip.
                     <div role="note" className="molecule-orbital-gap">
