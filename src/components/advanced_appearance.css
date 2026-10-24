@@ -1,22 +1,30 @@
 /* src/components/advanced_appearance.css -- Task 16b: the folded "Advanced appearance" block at the
-   bottom of the inspector's Display section (a disclosure inside the section, not a section header). */
+   bottom of the inspector's Display section (a disclosure inside the section, not a section header).
+   Owner R25-B2: styled as Display's own sub-section -- a thin divider inside Display, a lighter caption-sized
+   subheading with a small chevron beside the words (a section header is 14/600 with its chevron at the far
+   right), and the content set on a left rule. */
 .advanced-appearance {
   margin-top: 12px;
   border-top: 1px solid var(--ql-color-border-subtle);
-  padding-top: 4px;
+  padding-top: 8px;
 }
 .advanced-appearance-toggle {
-  display: flex; align-items: center; justify-content: space-between; width: 100%;
-  min-height: var(--ql-size-control-row); padding: 0; margin: 0; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 2px;
+  min-height: var(--ql-size-control-row); padding: 0 2px 0 0; margin: 0; cursor: pointer;
   border: 0; border-radius: var(--ql-radius-xs); background: none;
-  color: var(--ql-color-text-1); text-align: left;
-  font: 600 var(--ql-type-body-size) / var(--ql-type-body-line) var(--ql-font-sans);
+  color: var(--ql-color-text-2); text-align: left;
+  font: 500 var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
 }
-.advanced-appearance-chevron { color: var(--ql-color-text-2); transition: transform var(--ql-motion-hover) ease-out; }
+.advanced-appearance-toggle:hover { color: var(--ql-color-text-1); }
+/* Two classes: above MUI's own fontSize="small" (20 px, a section header's chevron). */
+.advanced-appearance-toggle .advanced-appearance-chevron { font-size: 16px; color: inherit; transition: transform var(--ql-motion-hover) ease-out; }
 /* Ruling R23b-2's disclosure convention: down while folded, up while open. */
 .advanced-appearance-toggle[aria-expanded="true"] .advanced-appearance-chevron { transform: rotate(180deg); }
-.advanced-appearance-toggle:hover .advanced-appearance-chevron { color: var(--ql-color-text-1); }
-.advanced-appearance-body { display: flex; flex-direction: column; padding: 4px 0 8px; }
+.advanced-appearance-body {
+  display: flex; flex-direction: column;
+  margin: 4px 0 0 2px; padding: 0 0 8px 10px;
+  border-left: 2px solid var(--ql-color-border-subtle);
+}
 .advanced-appearance-row { display: flex; flex-direction: column; }
 .advanced-appearance-label {
   display: flex; justify-content: space-between; gap: 8px;

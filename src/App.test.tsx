@@ -1820,6 +1820,21 @@ describe('App: shell', () => {
         }
     });
 
+    // Owner R25-B2: Advanced appearance is Display's own sub-section -- inside its region, gone when Display folds.
+    it('keeps Advanced appearance inside Display, so folding Display folds it too (owner R25-B2)', () => {
+        installMatchMedia(false);
+        const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        act(() => { store.dispatch(drillToShell(1)); });
+        openInspectorSection('Display');
+        const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+        const display = within(inspector).getByRole('region', { name: 'Display' });
+        fireEvent.click(within(display).getByRole('button', { name: 'Advanced appearance' }));
+        expect(within(display).getByRole('slider', { name: 'Edge strength' })).toBeInTheDocument();
+        fireEvent.click(within(inspector).getByRole('button', { name: 'Display', expanded: true }));
+        expect(within(inspector).queryByRole('button', { name: 'Advanced appearance' })).toBeNull();
+        expect(within(inspector).queryByRole('slider', { name: 'Edge strength' })).toBeNull();
+    });
+
     it('in Atoms at medium width, the drawer holds the Display section above Plot and Data', () => {
         window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
             addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;

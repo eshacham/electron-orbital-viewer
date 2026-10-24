@@ -1,4 +1,6 @@
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import AdvancedAppearance from '../src/components/AdvancedAppearance';
 import { renderPref, DEFAULT_RENDER } from '../src/design/presentation';
@@ -114,5 +116,45 @@ describe('AdvancedAppearance (Task 16b)', () => {
         rerender(<AdvancedAppearance drawsGlow phaselessDrawn lowPower={false} extrasSuppressed={false} />);
         expect(screen.queryByText('Off to keep this device smooth')).toBeNull();
         expect(screen.getByRole('slider', { name: 'Halo' })).toBeEnabled();
+    });
+});
+
+// Owner R25-B2: Advanced appearance stays in Display's body but must read as a sub-section of it, not as a section
+// of its own -- the owner took its header (13/600 text-1, a full-width chevron at the right, like Display's) for a
+// panel beside Display. A lighter subheading row, a smaller chevron beside the words, the content on a left rule,
+// and a thin divider above it inside Display.
+describe('Advanced appearance as a sub-section of Display (owner R25-B2)', () => {
+    // Comments out, so every rule follows the closing brace of the one before it.
+    const css = readFileSync(resolve(__dirname, '../src/components/advanced_appearance.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    /** The declarations of the one rule whose selector is exactly `selector`. */
+    const rule = (selector: string): string => {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const found = new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(css);
+        if (!found) throw new Error(`no rule for ${selector}`);
+        return found[1];
+    };
+
+    it('heads it with a lighter caption-sized subheading, not a section header', () => {
+        const toggle = rule('.advanced-appearance-toggle');
+        expect(toggle).toMatch(/font:\s*500 var\(--ql-type-caption-size\)/);
+        expect(toggle).toMatch(/color:\s*var\(--ql-color-text-2\)/);
+        // The chevron sits beside the words, not pushed to the far right as a section header's is.
+        expect(toggle).not.toMatch(/space-between/);
+        expect(toggle).not.toMatch(/width:\s*100%/);
+        render(<AdvancedAppearance drawsGlow phaselessDrawn lowPower={false} />);
+        const button = screen.getByRole('button', { name: 'Advanced appearance' });
+        expect(button.closest('h1, h2, h3, h4, h5, h6')).toBeNull();
+        expect(button).not.toHaveClass('inspector-section-toggle');
+    });
+
+    it('draws its disclosure chevron smaller than a section header\'s', () => {
+        expect(rule('.advanced-appearance-toggle .advanced-appearance-chevron')).toMatch(/font-size:\s*16px/);
+    });
+
+    it('sets its content on a left rule, under a thin divider inside Display', () => {
+        const body = rule('.advanced-appearance-body');
+        expect(body).toMatch(/border-left:\s*2px solid var\(--ql-color-border-subtle\)/);
+        expect(body).toMatch(/padding:\s*\S+ \S+ \S+ 10px/);
+        expect(rule('.advanced-appearance')).toMatch(/border-top:\s*1px solid var\(--ql-color-border-subtle\)/);
     });
 });
