@@ -77,9 +77,9 @@ export function bondsFieldRequest(
     if (orbital) {
         // Rulings T10-mainbox / T16c-I1: the orbital is sampled in its own box, grown past the molecule's where its
         // surface reaches further at this fraction (view_box.ts), at a resolution that keeps the molecule box's
-        // step within the caps (T16c-cap), and framed for the molecule's box -- so neither another orbital nor the
-        // density moves the camera.
-        const box = probe ? orbitalViewBox(basis, orbital.index, enclosedFraction, rMax) : rMax;
+        // step within the caps (T16c-cap), or shrunk round a core this grid cannot resolve (owner R25-C), and
+        // framed for the molecule's box -- so neither another orbital nor the density moves the camera.
+        const box = probe ? orbitalViewBox(basis, orbital.index, enclosedFraction, rMax, BONDS_RESOLUTION) : rMax;
         const source: AnalyticFieldSource = {
             kind: 'analytic', id: `gaussianMO:${basis.id}:${orbital.index}`, rMax: box,
             recipe: { type: 'gaussianMO', moleculeId: basis.id, index: orbital.index },

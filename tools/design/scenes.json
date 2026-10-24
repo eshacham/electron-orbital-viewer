@@ -40,5 +40,19 @@
   "pa-whole": "#mode=atom&Z=91&level=atom",
   "pa-shell-5": "#mode=atom&Z=91&level=shell&n=5",
   "cl-anion": "#mode=atom&Z=17&charge=-1&level=atom",
-  "glycine-esp": "#mode=molecule&id=glycine&show=esp"
+  "glycine-esp": "#mode=molecule&id=glycine&show=esp",
+  "core-h2s": "#mode=molecule&id=h2s&show=mo:0",
+  "core-h2s-95": "#mode=molecule&id=h2s&show=mo:0&frac=0.95",
+  "core-h2s-99": "#mode=molecule&id=h2s&show=mo:0&frac=0.99",
+  "core-ph3": "#mode=molecule&id=ph3&show=mo:0",
+  "core-sf6": "#mode=molecule&id=sf6&show=mo:0",
+  "core-so2": "#mode=molecule&id=so2&show=mo:0",
+  "core-water": "#mode=molecule&id=h2o&show=mo:0",
+  "bonds-f2-1sg": "#mode=bonds&system=f2&state=mo%3Arestricted%3A1%CF%83g%3A0",
+  "core-h2s-bare": "#mode=molecule&id=h2s&show=mo:0&struct=0",
+  "core-h2s-99-bare": "#mode=molecule&id=h2s&show=mo:0&frac=0.99&struct=0",
+  "core-ph3-bare": "#mode=molecule&id=ph3&show=mo:0&struct=0",
+  "core-sf6-bare": "#mode=molecule&id=sf6&show=mo:0&struct=0",
+  "core-so2-95-bare": "#mode=molecule&id=so2&show=mo:0&frac=0.95&struct=0",
+  "core-water-bare": "#mode=molecule&id=h2o&show=mo:0&struct=0"
 }

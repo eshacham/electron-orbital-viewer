@@ -1,0 +1,229 @@
+{
+ "id": "h2s",
+ "name": "Hydrogen sulfide",
+ "formula": "H2S",
+ "atoms": [
+  {
+   "Z": 16,
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    0,
+    1.8176283400428679,
+    1.7522004853605657
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    0,
+    -1.8176283400428679,
+    1.7522004853605657
+   ]
+  }
+ ],
+ "geometrySource": "experiment (CCCBDB)",
+ "method": {
+  "density": "B3LYP-D3(BJ)/def2-TZVPD",
+  "energies": "B3LYP-D3(BJ)/def2-TZVPD"
+ },
+ "totalEnergyHartree": -399.4282362756265,
+ "dispersion": {
+  "model": "D3(BJ)",
+  "energyHartree": -0.0014015217574221887,
+  "backend": "pyscf-dispersion 1.5.0"
+ },
+ "dipoleDebye": 0.9721204489208728,
+ "dipoleVectorDebye": [
+  0,
+  2.0458814103008816e-15,
+  0.9721204489208728
+ ],
+ "orbitals": [
+  {
+   "index": 0,
+   "label": "1a1",
+   "energyHartree": -88.86636339056086,
+   "occupation": 2
+  },
+  {
+   "index": 1,
+   "label": "2a1",
+   "energyHartree": -7.94450326234221,
+   "occupation": 2
+  },
+  {
+   "index": 2,
+   "label": "1b2",
+   "energyHartree": -5.907480636358221,
+   "occupation": 2
+  },
+  {
+   "index": 3,
+   "label": "3a1",
+   "energyHartree": -5.904433223398545,
+   "occupation": 2
+  },
+  {
+   "index": 4,
+   "label": "1b1",
+   "energyHartree": -5.89865224746966,
+   "occupation": 2
+  },
+  {
+   "index": 5,
+   "label": "4a1",
+   "energyHartree": -0.7492581260088559,
+   "occupation": 2
+  },
+  {
+   "index": 6,
+   "label": "2b2",
+   "energyHartree": -0.45110791612139717,
+   "occupation": 2
+  },
+  {
+   "index": 7,
+   "label": "5a1",
+   "energyHartree": -0.3746372178410135,
+   "occupation": 2
+  },
+  {
+   "index": 8,
+   "label": "2b1",
+   "energyHartree": -0.2689109830817046,
+   "occupation": 2,
+   "role": "HOMO"
+  },
+  {
+   "index": 9,
+   "label": "6a1",
+   "energyHartree": -0.00954937840892911,
+   "occupation": 0,
+   "role": "LUMO",
+   "valenceCharacter": 0.4635,
+   "class": "diffuse"
+  },
+  {
+   "index": 10,
+   "label": "3b2",
+   "energyHartree": 0.0049808446543718405,
+   "occupation": 0,
+   "valenceCharacter": 0.7982,
+   "class": "valence",
+   "role": "LVMO"
+  },
+  {
+   "index": 11,
+   "label": "4b2",
+   "energyHartree": 0.03201876093700741,
+   "occupation": 0,
+   "valenceCharacter": 0.0082,
+   "class": "diffuse"
+  },
+  {
+   "index": 12,
+   "label": "7a1",
+   "energyHartree": 0.03848663392043829,
+   "occupation": 0,
+   "valenceCharacter": 0.0061,
+   "class": "diffuse"
+  },
+  {
+   "index": 13,
+   "label": "3b1",
+   "energyHartree": 0.04389978925676437,
+   "occupation": 0,
+   "valenceCharacter": 0,
+   "class": "diffuse"
+  }
+ ],
+ "grid": {
+  "shape": [
+   96,
+   96,
+   96
+  ],
+  "origin": [
+   -8.317628340042868,
+   -8.317628340042868,
+   -8.317628340042868
+  ],
+  "spacing": 0.17510796505353404
+ },
+ "espGrid": {
+  "shape": [
+   48,
+   48,
+   48
+  ],
+  "origin": [
+   -8.317628340042868,
+   -8.317628340042868,
+   -8.317628340042868
+  ],
+  "spacing": 0.35394163149118585
+ },
+ "espRangeOnSurface": [
+  -0.02715230236907029,
+  0.039656526351397936
+ ],
+ "electronCount": 18,
+ "densityIntegral": 17.999822191451454,
+ "multiplicity": 1,
+ "symmetry": {
+  "pointGroup": "C2v",
+  "labelGroup": "C2v",
+  "labels": "full-group"
+ },
+ "references": [
+  {
+   "quantity": "bond",
+   "value": 1.336,
+   "unit": "Å",
+   "source": "experiment (CCCBDB)",
+   "tolerance": 0.01,
+   "atoms": [
+    0,
+    1
+   ],
+   "label": "S–H"
+  },
+  {
+   "quantity": "angle",
+   "value": 92.1,
+   "unit": "deg",
+   "source": "experiment (CCCBDB)",
+   "tolerance": 1,
+   "atoms": [
+    1,
+    0,
+    2
+   ],
+   "label": "H–S–H"
+  },
+  {
+   "quantity": "dipole",
+   "value": 0.97,
+   "unit": "D",
+   "source": "CRC Handbook, via CCCBDB",
+   "tolerance": 0.097
+  }
+ ],
+ "generator": {
+  "pyscf": "2.8.0",
+  "numpy": "2.3.5",
+  "scipy": "1.18.1",
+  "python": "3.12.15",
+  "xc": "B3LYP-D3(BJ) (PySCF >= 2.3: VWN-RPA)",
+  "script": "tools/molecules/build_library.py",
+  "commit": "8982f6231f84288ed43430a9b621e14d2a8f5477",
+  "dataVersion": "v3"
+ }
+}

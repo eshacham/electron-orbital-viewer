@@ -1,6 +1,6 @@
 import type { MoleculeBasis } from './types';
-import { moOnGrid } from './gaussian_basis';
-import { originReach } from './orbital_box';
+import { moEvaluator, moOnGrid } from './gaussian_basis';
+import { carryingAtoms, originReach } from './orbital_box';
 import { isoLevelForEnclosedFraction } from '../radial_distribution';
 
 /**
@@ -18,7 +18,8 @@ import { isoLevelForEnclosedFraction } from '../radial_distribution';
  * It is the orbital's own (ruling T16c-I1): the camera keeps its framing for
  * the molecule's box (FieldRenderRequest.frameBox), so switching orbitals
  * never moves it, and an orbital that fits the molecule's box keeps today's
- * box and grid exactly. Only the drawn orbital is probed, so the cost does
+ * box and grid exactly -- unless it is a core that grid cannot resolve, which
+ * gets its own compact box (owner R25-C). Only the drawn orbital is probed, so the cost does
  * not grow with how many orbitals a molecule lists (a computed molecule's
  * list runs to hundreds).
  *
@@ -35,8 +36,10 @@ import { isoLevelForEnclosedFraction } from '../radial_distribution';
  * no main-view surface crosses its box, and the iso level is checked against
  * a reference that holds everything.
  *
- * Orbitals whose originReach is inside the molecule's box are not probed:
- * that reach already holds 99.99 % of every shell that carries them.
+ * Orbitals whose originReach is inside the molecule's box are not probed for
+ * growth: that reach already holds 99.99 % of every shell that carries them.
+ * A core among them that the molecule's grid cannot resolve (CUSP_WEIGHT) is
+ * probed for its own compact box instead (compactReach, owner R25-C).
  */
 export const PROBE_RESOLUTION = 24;
 /** Added to the interpolated crossing, in probe steps (see above). */
@@ -97,7 +100,7 @@ function affordableResolution(nao: number): number {
     return resolution;
 }
 
-/** One probe evaluates ψ on a 25³ grid; the boxes are kept per (basis, orbital, fraction, molecule box). */
+/** One probe evaluates ψ on a 25³ grid; the boxes are kept per (basis, orbital, fraction, molecule box, base resolution). */
 const CACHE_SIZE = 256;
 const cache = new Map<string, number>();
 
@@ -139,15 +142,95 @@ export function probedReach(basis: MoleculeBasis, index: number, fraction: numbe
 }
 
 /**
- * The main view's sampling half-width, a₀, for `basis.orbitals[index]` at
- * `fraction`: the molecule's box, or the orbital's probed reach where that is
- * further (ruling T16c-I1: its own box; frameBox keeps the camera).
+ * Owner R25-C: the share of the orbital one main-view sample at a nucleus
+ * would claim -- |ψ(nucleus)|² × step³ -- past which the grid cannot resolve
+ * the orbital there, and it is sampled in its own compact box (compactReach).
+ * On the shipped data every core the molecule's box drew coarse (a surface
+ * piece under two voxels) or refused weighs 0.19–9.3 (H₂S's S 1s: 6.4, eight
+ * samples carrying 95 % of the orbital), and every valence orbital at most
+ * 0.095 (an O 2s-like cusp, ethanol's 4a'): valence orbitals keep today's box
+ * and grid exactly.
  */
-export function orbitalViewBox(basis: MoleculeBasis, index: number, fraction: number, moleculeBox: number): number {
-    const key = `${basis.id}|${basis.nao}|${index}|${fraction}|${moleculeBox}`;
+export const CUSP_WEIGHT = 0.15;
+
+/** The largest |ψ|² × `step`³ of `basis.orbitals[index]` at any of the basis's nuclei (see CUSP_WEIGHT). */
+export function cuspWeight(basis: MoleculeBasis, index: number, step: number): number {
+    const psi = moEvaluator(basis, index);
+    let weight = 0;
+    for (const [x, y, z] of basis.atoms) weight = Math.max(weight, psi(x, y, z) ** 2 * step ** 3);
+    return weight;
+}
+
+/**
+ * Owner R25-C: the half-width, a₀, of the smallest origin-centred cube
+ * holding all but PROBE_TAIL × (1 − fraction) of `basis.orbitals[index]`'s
+ * density -- the growth probe's own tail -- or 0 where that is no smaller
+ * than `moleculeBox`.
+ *
+ * Why. A second-row 1s is tiny: S's 90 % surface is 0.17 a₀ in radius, one
+ * voxel of the 95³ grid over the molecule's box. There 8 samples carried 95 %
+ * of the sampled orbital, the iso level came out 2–5× off, and the mesh was a
+ * speck in the nucleus voxel, which orbital_mesh.ts's R22b guard refuses
+ * ("Could not resolve this surface": H₂S, PH₃, SF₆, SO₂, SiH₄ 1s; glycine's
+ * N 1s and ethanol's C 1s, whose atoms sit at the origin). Sampled in its own
+ * box at the same resolution, S's 1s spans 12–19 voxels in radius (90–99 %).
+ *
+ * How. A coarse grid cannot weigh a cusp, but the orbital is normalised, so
+ * the density a cube holds is 1 minus what lies outside it -- and outside a
+ * core's own atoms ψ is smooth. ψ is sampled on PROBE_RESOLUTION³ points over
+ * the molecule's box; Σ ψ² h³ over the samples beyond each cube of k steps is
+ * what that cube leaves out (over-stated beside a cusp, which only widens the
+ * box). The cube is the first that leaves out no more than the tail, reaching
+ * one step past its last sample shell, and never closer than one step round
+ * an atom carrying the orbital (orbital_box.ts carryingAtoms), so a cusp the
+ * probe grid straddles is always inside. originReach cannot size this box: Σ
+ * c² ignores overlap, and def2-TZVPD's diffuse s shells look like 1–9 % of a
+ * core orbital (glycine's N 1s: originReach 10.2 a₀).
+ * tools/thumbs/validate_tile_boxes.mjs checks every shipped orbital so boxed
+ * against an exact-superset reference (the most left out: 0.08 %; iso level
+ * within ×1.034) and that the orbital worker draws it.
+ */
+export function compactReach(basis: MoleculeBasis, index: number, fraction: number, moleculeBox: number): number {
+    const side = PROBE_RESOLUTION + 1;
+    const step = (2 * moleculeBox) / PROBE_RESOLUTION;
+    const samples = moOnGrid(basis, index, { shape: [side, side, side], origin: [-moleculeBox, -moleculeBox, -moleculeBox], spacing: step });
+    const centre = PROBE_RESOLUTION / 2;
+    // shells[k]: Σ ψ² over the samples k steps (max-norm) from the origin.
+    const shells = new Float64Array(centre + 1);
+    let at = 0;
+    for (let i = 0; i < side; i++) for (let j = 0; j < side; j++) for (let k = 0; k < side; k++) {
+        shells[Math.max(Math.abs(i - centre), Math.abs(j - centre), Math.abs(k - centre))] += samples[at++] ** 2;
+    }
+    const allowed = PROBE_TAIL * (1 - fraction);
+    let outside = 0;
+    let steps = centre; // the smallest k whose cube leaves out no more than `allowed`
+    for (let k = centre; k >= 0; k--) {
+        if (outside * step ** 3 > allowed) break;
+        steps = k;
+        outside += shells[k];
+    }
+    const atoms = carryingAtoms(basis, index).map(atom => Math.max(...atom.map(Math.abs)) + step);
+    const reach = Math.max((steps + 1) * step, ...atoms);
+    return reach < moleculeBox ? reach : 0;
+}
+
+/**
+ * The main view's sampling half-width, a₀, for `basis.orbitals[index]` at
+ * `fraction`: the molecule's box (sampled at `baseResolution` today), or the
+ * orbital's probed reach where that is further (ruling T16c-I1: its own box;
+ * frameBox keeps the camera), or -- where one sample at a nucleus would hold
+ * CUSP_WEIGHT of it, a core the molecule's grid cannot resolve -- its own
+ * compact box (owner R25-C).
+ */
+export function orbitalViewBox(basis: MoleculeBasis, index: number, fraction: number, moleculeBox: number, baseResolution: number): number {
+    const key = `${basis.id}|${basis.nao}|${index}|${fraction}|${moleculeBox}|${baseResolution}`;
     const cached = cache.get(key);
     if (cached !== undefined) return cached;
-    const box = Math.max(moleculeBox, probedReach(basis, index, fraction, moleculeBox));
+    const box = !basis.orbitals[index] ? moleculeBox // never drawn from this basis: it sets no box
+        : originReach(basis, index) > moleculeBox ? Math.max(moleculeBox, probedReach(basis, index, fraction, moleculeBox))
+            : cuspWeight(basis, index, (2 * moleculeBox) / baseResolution) >= CUSP_WEIGHT
+                ? compactReach(basis, index, fraction, moleculeBox) || moleculeBox
+                : moleculeBox;
     if (cache.size >= CACHE_SIZE) cache.delete(cache.keys().next().value!);
     cache.set(key, box);
     return box;

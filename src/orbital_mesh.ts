@@ -343,10 +343,12 @@ function withCorrectedNucleusSample(field: SampledField, recipe: HydrogenicRecip
  * (ruling T16-failtile) and OrbitalViewer.tsx's `onOrbitalFailed` already
  * shows as a short, dismissible message instead of an empty canvas.
  *
- * Scoped to the analytic path only (never the grid path a molecule's ESP/MO
- * surface takes): "the nucleus" (the box's own centre) is a meaningful
+ * Scoped to the analytic path only (never the grid path a molecule's density
+ * or ESP surface takes): "the nucleus" (the box's own centre) is a meaningful
  * landmark only when the box is centred on one atom, as every analytic
- * orbital source's is.
+ * orbital source's is. A molecule's MO is analytic too: a core on an atom at
+ * the origin, sampled in the molecule's whole box, met this guard until it
+ * got its own compact box (owner R25-C, molecules/view_box.ts CUSP_WEIGHT).
  */
 const DEGENERATE_SURFACE_VOXELS = 2;
 const MUCH_LARGER_BOX_VOXELS = 10;

@@ -18,7 +18,15 @@
 //     with its factor, and the resolution must be view_box.ts's rule's;
 //   - where the surface comes near a face (face/iso ≥ REFERENCE_FACE), the iso level is compared with an
 //     exact-superset reference (same step and centre, padded by half the grid a side): how much density the
-//     box leaves out.
+//     box leaves out;
+//   - R25-C: the request is meshed exactly as the orbital worker meshes it (generateFieldMeshes). Any case
+//     it refuses -- "Could not resolve this surface" (orbital_mesh.ts's R22b guard) or no surface at all --
+//     is UNRESOLVED (exit code 1). The surface's pieces (the connected sets of samples at or above the iso
+//     level) are also measured: the smallest piece carrying ≥ PIECE_SHARE of the sampled density, as the
+//     radius in voxels of a ball of that many samples, is reported with every case under COARSE_PIECE
+//     voxels (information, not a failure: the R22b guard's own line is 2 voxels round the nucleus);
+//   - a core sampled in its own box, smaller than the molecule's (view_box.ts, R25-C), is always checked
+//     against the exact-superset reference: the density its box leaves out, and its iso level.
 //
 // STRIP TILES (rulings T10-core, Task 15, T16c-I1). Every Bonds orbital and every library molecule's frontier
 // tiles (HOMO, SOMO, LUMO, LVMO -- frontierOrbitals): fitToOrbital fits a tile within the larger of the
@@ -26,7 +34,8 @@
 // the basis moved to the box's centre (basisCentredOn) -- and so is a reference with the SAME step and SAME
 // centre in a box twice as wide (80³). The tile's samples are then an exact subset of the reference's, so:
 //   - left-out density = the reference's share outside the tile box;
-//   - face/iso = as above, on the tile's own 40³ grid and iso level. ≥ 1 is a CUT (exit code 1).
+//   - face/iso = as above, on the tile's own 40³ grid and iso level. ≥ 1 is a CUT (exit code 1);
+//   - R25-C: the tile is meshed as the strip meshes it (generateFieldMeshes at 40³); a refusal is UNRESOLVED.
 // A tile that keeps its limit box is sampled at 40³ in that box and checked the same way.
 //   node tools/thumbs/validate_tile_boxes.mjs [--data DIR] [--port 5411] [--only c2] [--jobs 8] [--skip-main] [--skip-tiles] [--reference-face 0.1]
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
@@ -34,7 +43,7 @@ import { join } from 'path';
 import { isMainThread, parentPort, Worker, workerData } from 'worker_threads';
 import { basisCentredOn, orbitalBox, originReach } from '../../src/molecules/orbital_box';
 import { registerMoleculeBasis } from '../../src/molecules/basis_registry';
-import { sampleFieldSource } from '../../src/orbital_mesh';
+import { generateFieldMeshes, sampleFieldSource } from '../../src/orbital_mesh';
 import { isoLevelForEnclosedFraction } from '../../src/radial_distribution';
 import { BONDS_RESOLUTION, BONDS_SYSTEMS, BondsSystemId, MOLECULE_PADDING } from '../../src/bonds/systems';
 import { bondsFieldRequest } from '../../src/bonds/bonds_request';
@@ -121,6 +130,57 @@ function reachesPast({ samples, side, step, origin }: Sampled, iso: number, box:
     return false;
 }
 
+/** R25-C: a piece of surface carrying less than this share of the sampled density is not measured (a real sliver, e.g. B₂'s rings). */
+const PIECE_SHARE = 0.01;
+/** R25-C: pieces smaller than a ball of this many voxels' radius are listed (information). */
+const COARSE_PIECE = 2;
+
+/**
+ * R25-C: the smallest piece of the surface |ψ|² = iso -- a connected (face-adjacent) set of samples at or
+ * above it -- that carries at least PIECE_SHARE of the sampled density, as the radius, in voxels, of a ball
+ * of that many samples. A 1s core the grid cannot resolve is a piece of 8 samples (radius 1.24).
+ */
+function smallestPiece({ samples, side }: Sampled, iso: number): number {
+    let total = 0;
+    for (let i = 0; i < samples.length; i++) total += samples[i] ** 2;
+    const seen = new Uint8Array(samples.length);
+    const stack: number[] = [];
+    let smallest = Infinity;
+    for (let start = 0; start < samples.length; start++) {
+        if (seen[start] || samples[start] ** 2 < iso) continue;
+        let count = 0, mass = 0;
+        seen[start] = 1;
+        stack.push(start);
+        while (stack.length > 0) {
+            const at = stack.pop()!;
+            count++;
+            mass += samples[at] ** 2;
+            const k = at % side, j = Math.floor(at / side) % side, i = Math.floor(at / (side * side));
+            const neighbours = [
+                i > 0 ? at - side * side : -1, i < side - 1 ? at + side * side : -1,
+                j > 0 ? at - side : -1, j < side - 1 ? at + side : -1, k > 0 ? at - 1 : -1, k < side - 1 ? at + 1 : -1,
+            ];
+            for (const next of neighbours) {
+                if (next < 0 || seen[next] || samples[next] ** 2 < iso) continue;
+                seen[next] = 1;
+                stack.push(next);
+            }
+        }
+        if (mass >= PIECE_SHARE * total) smallest = Math.min(smallest, Math.cbrt((3 * count) / (4 * Math.PI)));
+    }
+    return smallest;
+}
+
+/** R25-C: meshes `request` exactly as the orbital worker does; the reason it refuses, or null when it draws. */
+function meshRefusal(request: FieldRenderRequest): string | null {
+    try {
+        generateFieldMeshes(request);
+        return null;
+    } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+    }
+}
+
 const pct = (f: number) => `${Math.round(f * 100)} %`;
 const list = (lines: string[]) => (lines.length === 0 ? 'none' : `\n    ${lines.join('\n    ')}`);
 
@@ -135,6 +195,12 @@ interface MainTally {
     /** Exact-superset reference checks, where the surface comes near the box (face/iso ≥ REFERENCE_FACE). */
     referenced: number; worstIso: { value: number; at: string }; worstLeft: { value: number; at: string }; isoOff: string[];
     cut: string[];
+    /** R25-C: cases the worker's mesh refuses ("Could not resolve this surface", no surface). */
+    unresolved: string[];
+    /** R25-C: the smallest surface piece, in voxels, and every case whose smallest piece is under COARSE_PIECE. */
+    smallest: { value: number; at: string }; coarse: string[];
+    /** R25-C: compact orbitals sampled in a box smaller than the molecule's; against their exact-superset reference, the most density such a box leaves out and the iso level furthest off. */
+    shrunk: number; shrunkLeft: { value: number; at: string }; shrunkIso: { value: number; at: string }; shrunkIsoOff: string[];
 }
 
 const newMainTally = (): MainTally => ({
@@ -143,6 +209,8 @@ const newMainTally = (): MainTally => ({
     worstFace: new Map(FRACTIONS.map(f => [f, { value: 0, at: '' }])),
     largest: { ratio: 1, box: 0, at: '' }, highest: { resolution: 0, at: '' }, coarsened: [], wrongResolution: [],
     referenced: 0, worstIso: { value: 1, at: '' }, worstLeft: { value: 0, at: '' }, isoOff: [], cut: [],
+    unresolved: [], smallest: { value: Infinity, at: '' }, coarse: [], shrunk: 0, shrunkLeft: { value: 0, at: '' },
+    shrunkIso: { value: 1, at: '' }, shrunkIsoOff: [],
 });
 
 /** Where the surface comes this near the box (face/iso), its iso level is also checked against a reference that holds everything. */
@@ -215,6 +283,21 @@ function checkMainView(
             if (ratio > worst.value) { worst.value = ratio; worst.at = label; }
             if (reachesPast(sampled, iso, oldBox)) tally.pastOld.set(f, tally.pastOld.get(f)! + 1);
             if (ratio >= 1) tally.cut.push(`${label}: box ${box.toFixed(2)} a₀ at ${resolution}, face/iso ${ratio.toFixed(3)}`);
+            const refusal = meshRefusal(request);
+            if (refusal) tally.unresolved.push(`${label}: box ${box.toFixed(2)} a₀ at ${resolution}: ${refusal}`);
+            const piece = smallestPiece(sampled, iso);
+            if (piece < tally.smallest.value) tally.smallest = { value: piece, at: label };
+            if (piece < COARSE_PIECE) tally.coarse.push(`${label}: ${piece.toFixed(2)} voxels (box ${box.toFixed(2)} a₀ at ${resolution})`);
+            if (box < oldBox) {
+                // R25-C: a compact box is always checked against the exact-superset reference (twice its width,
+                // the same step): what it leaves out, and its iso level against one that holds everything.
+                tally.shrunk++;
+                const { isoRatio, left } = againstReference(source, resolution, iso, f);
+                if (left > tally.shrunkLeft.value) tally.shrunkLeft = { value: left, at: label };
+                const off = Math.max(isoRatio, 1 / isoRatio);
+                if (off > tally.shrunkIso.value) tally.shrunkIso = { value: off, at: label };
+                if (off > ISO_TWO_BINS) tally.shrunkIsoOff.push(`${label}: iso view/ref ${isoRatio.toFixed(4)}, left out ${(100 * left).toFixed(4)} %`);
+            }
             if (ratio >= REFERENCE_FACE) {
                 tally.referenced++;
                 const { isoRatio, left } = againstReference(source, resolution, iso, f);
@@ -243,18 +326,34 @@ function reportMain(title: string, tally: MainTally): void {
         + `beyond two histogram bins: ${list(tally.isoOff)}`);
     console.log(`  step coarser than the molecule box's (ruling T16c-cap), ${tally.coarsened.length} cases: ${list(tally.coarsened)}`);
     console.log(`  resolution other than view_box's rule (a bug): ${list(tally.wrongResolution)}`);
+    console.log(`  cores sampled in their own compact box (R25-C), ${tally.shrunk} cases, against an exact-superset reference: `
+        + `most left out ${(100 * tally.shrunkLeft.value).toFixed(4)} % (${tally.shrunkLeft.at || 'none'}), `
+        + `iso furthest off ×${tally.shrunkIso.value.toFixed(4)} (${tally.shrunkIso.at || 'none'}); beyond two histogram bins: ${list(tally.shrunkIsoOff)}`);
+    console.log(`  smallest surface piece carrying ≥ ${100 * PIECE_SHARE} % of the density: ${tally.smallest.value.toFixed(2)} voxels (${tally.smallest.at}); `
+        + `under ${COARSE_PIECE} voxels (information), ${tally.coarse.length} cases: ${list(tally.coarse)}`);
     console.log(`  CUT: ${list(tally.cut)}`);
+    console.log(`  UNRESOLVED: ${list(tally.unresolved)}`);
 }
 
 interface TileTally {
     cases: number; fitted: number; mainBox: number; worstLeft: number; worstLeftAt: string;
     worstFace: Map<number, { value: number; at: string }>; cut: string[];
+    /** R25-C: tiles the worker's mesh refuses. */
+    unresolved: string[];
 }
 
 const newTileTally = (): TileTally => ({
     cases: 0, fitted: 0, mainBox: 0, worstLeft: 0, worstLeftAt: '',
-    worstFace: new Map(FRACTIONS.map(f => [f, { value: 0, at: '' }])), cut: [],
+    worstFace: new Map(FRACTIONS.map(f => [f, { value: 0, at: '' }])), cut: [], unresolved: [],
 });
+
+/** R25-C: the strip's request for a tile of `basis.orbitals[index]` in the origin-centred box `rMax` (the basis already moved to its centre). */
+function tileRequest(basis: MoleculeBasis, index: number, rMax: number, fraction: number): FieldRenderRequest {
+    return {
+        sources: [{ kind: 'analytic', id: 'tile', rMax, recipe: { type: 'gaussianMO', moleculeId: basis.id, index } }],
+        colors: ['#ffffff'], memberLabels: ['tile'], resolution: TILE_RESOLUTION, enclosedFraction: fraction, label: 'tile', bases: [basis],
+    };
+}
 
 /** One orbital's tile: `limitFor(f)` is the box fitToOrbital fits within -- the molecule's, or the orbital's originReach where further (ruling T16c-I1). */
 function checkTile(tally: TileTally, name: string, basis: MoleculeBasis, index: number, limitFor: (fraction: number) => number): void {
@@ -265,6 +364,12 @@ function checkTile(tally: TileTally, name: string, basis: MoleculeBasis, index: 
         tally.cases++;
         const limit = limitFor(f);
         let sampled: Sampled;
+        const meshed = fitted.halfWidth >= limit
+            ? tileRequest(basis, index, limit, f)
+            : tileRequest(basisCentredOn(basis, fitted.centre), index, fitted.halfWidth, f);
+        meshed.bases!.forEach(registerMoleculeBasis);
+        const refusal = meshRefusal(meshed);
+        if (refusal) tally.unresolved.push(`${name} at ${pct(f)}: ${refusal}`);
         if (fitted.halfWidth >= limit) {
             // fitToOrbital keeps the limit box itself.
             tally.mainBox++;
@@ -307,6 +412,7 @@ function reportTiles(title: string, tally: TileTally): void {
     }
     console.log(`  worst left-out density of a fitted tile ${(100 * tally.worstLeft).toFixed(3)} % (${tally.worstLeftAt})`);
     console.log(`  CUT: ${list(tally.cut)}`);
+    console.log(`  UNRESOLVED: ${list(tally.unresolved)}`);
 }
 
 /** Bonds' main-view request for one orbital of a scan point, as App asks for it. */
@@ -380,6 +486,9 @@ function mergeMain(a: MainTally, b: MainTally): MainTally {
         coarsened: [...a.coarsened, ...b.coarsened], wrongResolution: [...a.wrongResolution, ...b.wrongResolution],
         referenced: a.referenced + b.referenced, worstIso: larger(a.worstIso, b.worstIso), worstLeft: larger(a.worstLeft, b.worstLeft),
         isoOff: [...a.isoOff, ...b.isoOff], cut: [...a.cut, ...b.cut],
+        unresolved: [...a.unresolved, ...b.unresolved], smallest: a.smallest.value <= b.smallest.value ? a.smallest : b.smallest,
+        coarse: [...a.coarse, ...b.coarse], shrunk: a.shrunk + b.shrunk, shrunkLeft: larger(a.shrunkLeft, b.shrunkLeft),
+        shrunkIso: larger(a.shrunkIso, b.shrunkIso), shrunkIsoOff: [...a.shrunkIsoOff, ...b.shrunkIsoOff],
     };
 }
 
@@ -388,7 +497,7 @@ function mergeTiles(a: TileTally, b: TileTally): TileTally {
     return {
         cases: a.cases + b.cases, fitted: a.fitted + b.fitted, mainBox: a.mainBox + b.mainBox, worstLeft: left.worstLeft, worstLeftAt: left.worstLeftAt,
         worstFace: new Map(FRACTIONS.map(f => [f, a.worstFace.get(f)!.value >= b.worstFace.get(f)!.value ? a.worstFace.get(f)! : b.worstFace.get(f)!])),
-        cut: [...a.cut, ...b.cut],
+        cut: [...a.cut, ...b.cut], unresolved: [...a.unresolved, ...b.unresolved],
     };
 }
 
@@ -433,8 +542,9 @@ async function main(): Promise<void> {
     if (options.main) reportMain(`Molecules (${molecules} library molecules)`, libraryMain);
     if (options.tiles) reportTiles('Molecules (frontier)', libraryTiles);
     const cuts = bondsMain.cut.length + bondsTiles.cut.length + libraryMain.cut.length + libraryTiles.cut.length;
-    console.log(`${cuts} cut; swept in ${((Date.now() - started) / 1000).toFixed(0)} s on ${threads} thread${threads === 1 ? '' : 's'}`);
-    process.exitCode = cuts > 0 ? 1 : 0;
+    const unresolved = bondsMain.unresolved.length + bondsTiles.unresolved.length + libraryMain.unresolved.length + libraryTiles.unresolved.length;
+    console.log(`${cuts} cut, ${unresolved} unresolved; swept in ${((Date.now() - started) / 1000).toFixed(0)} s on ${threads} thread${threads === 1 ? '' : 's'}`);
+    process.exitCode = cuts + unresolved > 0 ? 1 : 0;
 }
 
 if (isMainThread) main().catch(error => { console.error(error); process.exitCode = 2; });

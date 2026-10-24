@@ -131,10 +131,12 @@ describe('each drawn orbital gets its own box, framed for the molecule (rulings 
         const box = moleculeBox(basis);
         for (const fraction of [0.9, 0.99]) {
             const diffuse = bondsRequest('b2', basis, fraction, { label: '3σu*', spin: 'alpha' });
-            const compact = bondsRequest('b2', basis, fraction, { label: '1σg', spin: 'alpha' });
+            // Owner R25-C: a valence orbital, not the 1σg core, is the one that keeps today's box -- a core
+            // the molecule's grid cannot resolve now gets its own compact box (tests/molecules/core_orbitals.test.ts).
+            const compact = bondsRequest('b2', basis, fraction, { label: '2σg', spin: 'alpha' });
             // B₂'s diffuse 3σu* reaches past the molecule's box (the bug), so its own box grows ...
             expect(diffuse.sources[0].rMax).toBeGreaterThan(box);
-            // ... while the 1σg core keeps today's box and grid exactly,
+            // ... while the valence 2σg keeps today's box and grid exactly,
             expect(compact.sources[0].rMax).toBe(box);
             expect(compact.resolution).toBe(BONDS_RESOLUTION);
             // and both keep their framing for the molecule's box, so switching between them keeps the zoom.
@@ -200,7 +202,8 @@ describe('each drawn orbital gets its own box, framed for the molecule (rulings 
     it("keeps today's box and resolution where no surface reaches past the molecule's box (F₂ at equilibrium)", () => {
         const basis = bondsBasis('f2-07');
         for (const fraction of [0.9, 0.99]) {
-            for (const { orbital, component } of everyView(basis)) {
+            // Owner R25-C: every valence orbital; the 1σg/1σu* F 1s cores now get their own compact box.
+            for (const { orbital, component } of everyView(basis).filter(({ orbital }) => !orbital.label.startsWith('1σ'))) {
                 const request = bondsRequest('f2', basis, fraction, orbital, component);
                 expect(request.sources[0].rMax).toBe(moleculeBox(basis));
                 expect(request.resolution).toBe(BONDS_RESOLUTION);
@@ -210,7 +213,8 @@ describe('each drawn orbital gets its own box, framed for the molecule (rulings 
 
     it('sets no reach for an orbital the basis does not carry', () => {
         const basis = bondsBasis('li2-07');
-        expect(orbitalViewBox(basis, 99, 0.9, 5)).toBe(5);
+        // Owner R25-C: orbitalViewBox also takes the base resolution (the cusp test is at the molecule grid's step).
+        expect(orbitalViewBox(basis, 99, 0.9, 5, BONDS_RESOLUTION)).toBe(5);
     });
 });
 

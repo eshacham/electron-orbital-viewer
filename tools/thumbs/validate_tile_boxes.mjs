@@ -2,7 +2,8 @@
 // Runs validate_tile_boxes.ts (rulings T10-core / T10-core-I2, T10-mainbox): every Bonds molecule × scan
 // point × orbital × {90, 95, 99} % and every library molecule × orbital × fraction, no main-view surface
 // cut by its box (Task 16c); no strip tile cut by its box -- every Bonds orbital and (Task 15) every library
-// molecule's frontier tiles. First fetches every scan point's basis.json, and every
+// molecule's frontier tiles; and (R25-C) none of them unresolved: each is meshed as the orbital worker meshes it,
+// and a refusal ("Could not resolve this surface") fails the run as a cut does. First fetches every scan point's basis.json, and every
 // library molecule's meta.json and basis.json, through its own Vite (the dev server serves the molecule data, from
 // tools/molecules/out when it exists locally, else from the published site) into --data, once;
 // then bundles the sweep with the repo's esbuild and runs it with node. Foreground only:

@@ -115,6 +115,21 @@ export function orbitalBox(basis: MoleculeBasis, index: number, limit: number): 
 }
 
 /**
+ * The atoms (positions, a₀) of the shells carrying at least CENTRE_SHARE of
+ * `basis.orbitals[index]` -- orbitalBox's centring atoms: a core orbital's
+ * own atom (or atoms). The shares ignore overlap, which inflates diffuse
+ * shells but not a core's tight ones, so a core's own atoms are among these.
+ */
+export function carryingAtoms(basis: MoleculeBasis, index: number): Array<[number, number, number]> {
+    const { shares, total } = shellShares(basis, index);
+    const atoms = new Set<number>();
+    basis.shells.forEach((shell, s) => {
+        if (shares[s] >= CENTRE_SHARE * total) atoms.add(shell.atom);
+    });
+    return [...atoms].map(atom => basis.atoms[atom]);
+}
+
+/**
  * Half-width, a₀, of the origin-centred cube round every shell carrying at
  * least REACH_SHARE of `basis.orbitals[index]`, each out to its 99.99 %
  * radius: orbitalBox's reach, about the origin the main view's sampling box

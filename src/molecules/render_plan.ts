@@ -65,10 +65,10 @@ export function planMoleculeRender(
         const label = `Computing ${name}…`;
         // Rulings T10-mainbox / T16c-I1: the orbital's own box, grown past the density's where its surface reaches
         // further at this fraction (view_box.ts), at a resolution that keeps the density box's step within the
-        // caps (T16c-cap), framed for the density's box. It needs the basis; a plan read only for its label
-        // keeps the density's box.
+        // caps (T16c-cap), or shrunk round a core that grid cannot resolve (owner R25-C), framed for the
+        // density's box. It needs the basis; a plan read only for its label keeps the density's box.
         const densityBox = gridHalfWidth(meta);
-        const box = basis && probe ? orbitalViewBox(basis, surface.index, enclosedFraction, densityBox) : densityBox;
+        const box = basis && probe ? orbitalViewBox(basis, surface.index, enclosedFraction, densityBox, MOLECULE_MO_RESOLUTION) : densityBox;
         return {
             kind: 'mo', label,
             request: {
