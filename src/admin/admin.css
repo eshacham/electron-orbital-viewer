@@ -55,7 +55,6 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 .admin-strip-value { font-size: 15px; font-weight: 600; color: var(--ql-color-text-1); }
 .admin-strip-gap { color: var(--ql-color-text-1); font-weight: 500; }
 .admin-strip-billing { flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 4px 12px; white-space: nowrap; }
-.admin-strip-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .admin-strip-more.MuiButton-root { display: none; }
 .admin-strip-why.MuiButton-root { margin: -4px -8px -4px 0; white-space: nowrap; }
 .admin-strip-why .MuiSvgIcon-root { transition: transform var(--ql-motion-panel) ease-out; }
@@ -230,7 +229,8 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   .admin-header-end { gap: 0; }
   .admin-month-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .admin-month-bar { flex-wrap: nowrap; }
-  .admin-strip-more.MuiButton-root { display: inline-flex; margin: -4px -6px -4px 0; white-space: nowrap; }
+  .admin-strip-more.MuiButton-root { display: inline-flex; align-self: flex-start; margin-top: 2px; white-space: nowrap; }
+  .admin-phone-notice.MuiAlert-root { margin: 8px 12px 0; }
   .admin-strip.is-folded .admin-strip-cell:not(.admin-strip-available) { display: none; }
   .admin-strip:not(.is-folded) { grid-template-columns: 1fr 1fr; }
   .admin-strip:not(.is-folded) .admin-strip-available, .admin-strip:not(.is-folded) .admin-strip-billing { grid-column: 1 / -1; }

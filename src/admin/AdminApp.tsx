@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, CssBaseline, IconButton, Popover, Skeleton, TextField, ThemeProvider, Typography } from '@mui/material';
+import { Alert, Badge, Button, CssBaseline, IconButton, Popover, Skeleton, TextField, ThemeProvider, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { useMediaQuery } from '../useMediaQuery';
@@ -11,6 +11,7 @@ import { ConnectedOwnerBar } from '../components/OwnerBar';
 import { jobsApi } from '../jobs/client';
 import { currentMonth } from '../jobs/format';
 import { selectIsOwner, JobsState } from '../store/jobsSlice';
+import { SESSION_ENDED } from '../jobs/api';
 import type { CostsResponse, JobView } from '../jobs/api_types';
 import ThemeSwitch from '../design/ThemeSwitch';
 import { useQuantumTheme } from '../design/useQuantumTheme';
@@ -36,13 +37,14 @@ const LoadingShape: React.FC = () => (
 const PHONE_MENU = 'Jobs target, sign-in and viewer link';
 
 /** A phone's top bar keeps one line: where jobs run, the sign-in and the way back to the viewer fold into this. */
-const PhoneMenu: React.FC = () => {
+const PhoneMenu: React.FC<{ problem: boolean }> = ({ problem }) => {
     const anchor = useRef<HTMLButtonElement | null>(null);
     const [open, setOpen] = useState(false);
     return (
         <>
-            <IconButton ref={anchor} aria-label={PHONE_MENU} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
-                <MoreVertIcon />
+            <IconButton ref={anchor} aria-label={problem ? `${PHONE_MENU}: sign-in problem` : PHONE_MENU} aria-haspopup="dialog"
+                aria-expanded={open} onClick={() => setOpen(true)} className={problem ? 'admin-phone-menu-button has-problem' : 'admin-phone-menu-button'}>
+                <Badge variant="dot" color="error" invisible={!problem} overlap="circular"><MoreVertIcon /></Badge>
             </IconButton>
             <Popover open={open} anchorEl={anchor.current} onClose={() => setOpen(false)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}
@@ -71,6 +73,10 @@ const AdminApp: React.FC = () => {
     const [data, setData] = useState<Loaded | null>(null);
     const [loading, setLoading] = useState(false);
     const phone = useMediaQuery('(max-width: 600px)');
+    // The OwnerBar says these itself; on a phone it lives in the menu, so the page says them outside it too.
+    const session = useSelector((state: { jobs: JobsState }) => state.jobs.session);
+    const signInProblem = session.expired && !session.signedIn ? `${SESSION_ENDED} The menu holds the sign-in.`
+        : session.error ? `${session.error} Open the menu to sign in again.` : null;
 
     useEffect(() => {
         if (!isOwner) {
@@ -106,9 +112,12 @@ const AdminApp: React.FC = () => {
                     {!phone && <a className="admin-back" href="/">Back to the viewer</a>}
                     <span className="admin-header-end">
                         <ThemeSwitch />
-                        {phone ? <PhoneMenu /> : <ConnectedOwnerBar page="/admin.html" showDashboardLink={false} explainUnconfigured />}
+                        {phone ? <PhoneMenu problem={signInProblem !== null} /> : <ConnectedOwnerBar page="/admin.html" showDashboardLink={false} explainUnconfigured />}
                     </span>
                 </header>
+                {phone && signInProblem && (
+                    <Alert severity="error" role="alert" className="admin-phone-notice">{signInProblem}</Alert>
+                )}
                 <div className="admin-body">
                     {!isOwner ? (
                         <Alert severity="info">Sign in as the owner to see jobs and costs.</Alert>

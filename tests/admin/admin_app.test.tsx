@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, act, fireEvent, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import jobsReducer from '../../src/store/jobsSlice';
+import jobsReducer, { sessionExpired, sessionFailed } from '../../src/store/jobsSlice';
 import { BUILD_ENV } from '../../src/jobs/build_env';
 import { currentMonth } from '../../src/jobs/format';
 import { recentMonths } from '../../src/admin/jobs_table';
@@ -17,6 +17,16 @@ const flush = () => act(async () => { await new Promise(r => setTimeout(r, 0)); 
 function renderAdmin() {
     const store = configureStore({ reducer: { jobs: jobsReducer } });
     render(<Provider store={store}><AdminApp /></Provider>);
+    return store;
+}
+function asPhone(): () => void {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+        matches: query.includes('max-width: 600px'), media: query, onchange: null,
+        addEventListener: () => undefined, removeEventListener: () => undefined,
+        addListener: () => undefined, removeListener: () => undefined, dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    return () => { window.matchMedia = original; };
 }
 
 beforeEach(() => {
@@ -70,6 +80,21 @@ describe('/admin.html', () => {
         expect(mockApi.costs).toHaveBeenCalledTimes(2);
         expect(screen.queryByRole('alert')).toBeNull();
         expect(screen.getByRole('region', { name: /^Budget, / })).toBeInTheDocument();
+    });
+    it('on a phone, says a sign-in problem outside the menu, and marks the menu', async () => {
+        const restore = asPhone();
+        try {
+            const store = renderAdmin();
+            await flush();
+            act(() => { store.dispatch(sessionFailed('Sign-in was cancelled.')); });
+            const notice = () => screen.getAllByRole('alert').find(el => el.classList.contains('admin-phone-notice'));
+            expect(notice()).toHaveTextContent('Sign-in was cancelled. Open the menu to sign in again.');
+            expect(screen.getByRole('button', { name: 'Jobs target, sign-in and viewer link: sign-in problem' })).toBeInTheDocument();
+            act(() => { store.dispatch(sessionExpired()); });
+            expect(notice()).toHaveTextContent('Your owner session has ended.');
+        } finally {
+            restore();
+        }
     });
     it('keeps a phone’s top bar to one line: the brand, the theme, and a menu holding where jobs run and the sign-in', async () => {
         BUILD_ENV.dev = true;

@@ -31,22 +31,20 @@ const BudgetStrip: React.FC<{ costs: CostsResponse }> = ({ costs }) => {
         <>
             <section className={`admin-strip ql-tabular${more ? '' : ' is-folded'}`} aria-label={`Budget, ${name}`} id={moreId}>
                 <div className="admin-strip-cell admin-strip-available">
-                    <span className="admin-strip-head">
-                        <span className="admin-strip-line">
-                            <span className="admin-strip-label">Available</span>{' '}
-                            <strong className="admin-strip-value">{formatUsd(costs.remainingUsd)}</strong>{' '}
-                            <span className="admin-strip-label">of {formatUsd(costs.capUsd)}</span>
-                        </span>
-                        <Button size="small" className="admin-strip-more" aria-expanded={more} aria-controls={moreId}
-                            endIcon={<ExpandMoreIcon className={more ? 'is-open' : undefined} fontSize="small" />} onClick={() => setMore(m => !m)}>
-                            Charged, held, projected
-                        </Button>
+                    <span className="admin-strip-line">
+                        <span className="admin-strip-label">Available</span>{' '}
+                        <strong className="admin-strip-value">{formatUsd(costs.remainingUsd)}</strong>{' '}
+                        <span className="admin-strip-label">of {formatUsd(costs.capUsd)}</span>
                     </span>
                     <span className="admin-cap-bar" role="img"
                         aria-label={`Charged ${formatUsd(costs.spentUsd)} and held ${formatUsd(costs.reservedUsd)} of the ${formatUsd(costs.capUsd)} cap`}>
                         <span className="admin-cap-charged" style={{ width: `${charged}%` }} />
                         <span className="admin-cap-held" style={{ left: `${charged}%`, width: `${held}%` }} />
                     </span>
+                    <Button size="small" variant="outlined" className="admin-strip-more" aria-expanded={more} aria-controls={moreId}
+                        endIcon={<ExpandMoreIcon className={more ? 'is-open' : undefined} fontSize="small" />} onClick={() => setMore(m => !m)}>
+                        Charged, held, projected, AWS billed
+                    </Button>
                 </div>
                 <div className="admin-strip-cell">
                     <span className="admin-swatch admin-swatch-charged" aria-hidden="true" />

@@ -13,7 +13,7 @@ import type { JobsState } from '../store/jobsSlice';
 import { useJobPolling } from '../jobs/useJobPolling';
 import { jobLinks, methodSummary } from './jobs_table';
 import { chargedTotal, groupOf, markTone, peakMemory, predictionCheck, runSeconds } from './jobs_month';
-import { compactDuration, localDay, localTime, rowCharge, shortReason, STATUS_SHORT, usdPair } from './job_text';
+import { compactDuration, exactUsd, localDay, localTime, rowCharge, shortReason, STATUS_SHORT, usdPair } from './job_text';
 
 export const COLUMN_COUNT = 6;
 
@@ -168,7 +168,7 @@ function Details({ job, now, id }: { job: JobView; now: number; id: string }) {
                         })}
                     </ul>
                     {chargedTotal(job) !== null && (
-                        <p className="admin-note">Exact: {money('charged', chargedTotal(job)!)} in all{job.ledger.length > 1 ? `, across ${job.ledger.length} attempts` : ''}</p>
+                        <p className="admin-note">Total charged: {exactUsd(chargedTotal(job)!)}{job.ledger.length > 1 ? `, across ${job.ledger.length} attempts` : ''}</p>
                     )}
                     {charged && charged.absorbedUsd > 0 && (
                         <p className="admin-absorbed">{money('billed', charged.costUsd)} by AWS: {money('absorbed', charged.absorbedUsd)} by the app</p>

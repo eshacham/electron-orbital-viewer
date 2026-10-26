@@ -72,7 +72,10 @@ describe('the budget strip', () => {
     });
     it('folds charged, held, projected and billed behind one control on a phone', () => {
         renderPage();
-        const more = screen.getByRole('button', { name: 'Charged, held, projected' });
+        const more = screen.getByRole('button', { name: 'Charged, held, projected, AWS billed' });
+        // Its own line under the figure and its bar, never read as part of the figure.
+        expect(more.closest('.admin-strip-line')).toBeNull();
+        expect(more.previousElementSibling).toHaveClass('admin-cap-bar');
         expect(more).toHaveAttribute('aria-expanded', 'false');
         fireEvent.click(more);
         expect(more).toHaveAttribute('aria-expanded', 'true');
@@ -245,6 +248,8 @@ describe('a row’s details keep everything the old table showed', () => {
         expect(region).toHaveTextContent('Queued');
         expect(within(region).getByRole('link', { name: 'output.log' })).toBeInTheDocument();
         expect(region).toHaveTextContent(job.key);
+        // The total is the meter's own figure, to the micro-dollar, not a rounded one called exact.
+        expect(region).toHaveTextContent('Total charged: $0.002214');
         expect(within(region).getByRole('button', { name: 'Copy job key' })).toBeInTheDocument();
     });
     it('flags what AWS billed past the approved maximum, which the app absorbed', () => {
@@ -253,6 +258,8 @@ describe('a row’s details keep everything the old table showed', () => {
     });
     it('lists one line per settled attempt, each against its own approval (review I2)', () => {
         const region = open(jobFixture('get_retried_aws'));
+        expect(region).toHaveTextContent('Total charged: $0.004834, across 2 attempts');
+        expect(region).not.toHaveTextContent('Exact');
         const ledger = within(region).getByRole('list', { name: 'H3N attempts' });
         expect(within(ledger).getAllByRole('listitem').map(item => item.textContent)).toEqual([
             expect.stringMatching(/^Attempt 1 · Spot: charged \$0\.001508 of up to \$0\.021301/),

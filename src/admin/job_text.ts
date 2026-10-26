@@ -60,3 +60,6 @@ export function shortReason(error: { code: string; message: string }): string {
     }
     return error.message.split(/[.;:(]/)[0].replace(/,$/, '').trim();
 }
+
+/** The meter's own figure, to the micro-dollar it keeps -- no rounding, so it can be called the total. */
+export const exactUsd = (usd: number): string => `$${(Math.round(usd * 1e6) / 1e6).toFixed(6)}`;
