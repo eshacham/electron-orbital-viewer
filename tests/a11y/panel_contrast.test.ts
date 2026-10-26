@@ -100,14 +100,26 @@ const PAIRS: Pair[] = [
     { selector: '.local-server-note', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-1' },
     { selector: '.local-server-command', declares: [`background: ${v('surface-3')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-3' },
 ];
+// Phase 6G-3: the jobs page's text, each on the darkest/lightest surface it sits on (a row's hover and its details
+// are surface-2). The cost panel's .cost-billed and the daily chart's .daily-spend-* went with them.
 const ADMIN_PAIRS: Pair[] = [
     { selector: '.eov-admin-dashboard', declares: [`background: ${v('bg-app')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'bg-app' },
-    { selector: '.admin-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'bg-app' },
-    { selector: '.admin-error', declares: [`color: ${v('danger')}`], fg: 'danger', bg: 'bg-app' },
-    { selector: '.admin-absorbed', declares: [`color: ${v('warning')}`], fg: 'warning', bg: 'bg-app' },
-    { selector: '.cost-billed', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'bg-app' },
-    { selector: '.daily-spend-title', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'bg-app' },
-    { selector: '.daily-spend-label', declares: [`fill: ${v('text-3')}`], fg: 'text-3', bg: 'bg-app' },
+    { selector: '.admin-strip', declares: [`background: ${v('surface-1')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
+    { selector: '.admin-strip-label', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-1' },
+    { selector: '.admin-strip-note', declares: [`color: ${v('text-2')}`, `background: ${v('surface-2')}`], fg: 'text-2', bg: 'surface-2' },
+    { selector: '.admin-band-label', declares: [`fill: ${v('text-3')}`], fg: 'text-3', bg: 'bg-app' },
+    { selector: '.admin-band-legend', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'bg-app' },
+    { selector: '.admin-chip-count', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'bg-app' },
+    { selector: '.admin-list', declares: [`background: ${v('surface-1')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
+    { selector: '.admin-muted', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-2' },
+    { selector: '.admin-molecule-meta', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-2' },
+    { selector: '.admin-over', declares: [`color: ${v('warning')}`], fg: 'warning', bg: 'surface-2' },
+    { selector: '.admin-row-error', declares: [`color: ${v('danger')}`], fg: 'danger', bg: 'surface-2' },
+    { selector: '.admin-detail-title', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-2' },
+    { selector: '.admin-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-2' },
+    { selector: '.admin-error', declares: [`color: ${v('danger')}`], fg: 'danger', bg: 'surface-2' },
+    { selector: '.admin-absorbed', declares: [`color: ${v('warning')}`], fg: 'warning', bg: 'surface-2' },
+    { selector: '.admin-empty', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
 ];
 
 describe('the stylesheets paint with tokens', () => {

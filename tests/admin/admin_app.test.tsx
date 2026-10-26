@@ -41,7 +41,29 @@ describe('/admin.html', () => {
         expect(mockApi.costs).toHaveBeenCalledWith(currentMonth());
         expect(screen.getByRole('heading', { name: 'Owner dashboard' })).toBeInTheDocument();
         expect(within(screen.getByRole('table', { name: 'jobs' })).getAllByRole('row')).toHaveLength(3);
-        expect(screen.getByRole('region', { name: 'costs' })).toBeInTheDocument();
+        // The cost panel became the budget strip above the list (Phase 6G-3), named for its month.
+        expect(screen.getByRole('region', { name: /^Budget, / })).toBeInTheDocument();
+    });
+    it('shows the shape of the page while the first answer is on its way', async () => {
+        BUILD_ENV.dev = true;
+        let answer: (value: unknown) => void = () => undefined;
+        mockApi.list.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+        renderAdmin();
+        await flush();
+        expect(screen.getByLabelText('Loading jobs and costs')).toHaveAttribute('aria-busy', 'true');
+        expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
+        answer(listFixture('list_all'));
+        await flush();
+        expect(screen.queryByLabelText('Loading jobs and costs')).toBeNull();
+        expect(screen.getByRole('table', { name: 'jobs' })).toBeInTheDocument();
+    });
+    it('keeps the jobs when only the costs fail, and says so', async () => {
+        BUILD_ENV.dev = true;
+        mockApi.costs.mockRejectedValueOnce(new Error('Cost Explorer did not answer.'));
+        renderAdmin();
+        await flush();
+        expect(screen.getByRole('alert')).toHaveTextContent('Costs could not be read: Cost Explorer did not answer.');
+        expect(screen.getByRole('table', { name: 'jobs' })).toBeInTheDocument();
     });
     it('reads another month when asked, and says when the API fails', async () => {
         BUILD_ENV.dev = true;
@@ -53,5 +75,10 @@ describe('/admin.html', () => {
         await flush();
         expect(mockApi.list).toHaveBeenLastCalledWith(previous);
         expect(screen.getByRole('alert')).toHaveTextContent('The job server on this Mac is not answering.');
+        mockApi.list.mockResolvedValueOnce(listFixture('list_all'));
+        fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+        await flush();
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(screen.getByRole('table', { name: 'jobs' })).toBeInTheDocument();
     });
 });

@@ -1,22 +1,15 @@
-import type { JobStatus, JobView, Recipe, WorkerSize } from '../jobs/api_types';
+import type { JobStatus, JobView, WorkerSize } from '../jobs/api_types';
 import { xcLabel } from '../jobs/format';
 import { computedResultFiles, jobFileUrl } from '../molecules/job_paths';
+import { chargedTotal } from './jobs_month';
 
 export type SortColumn = 'molecule' | 'recipe' | 'size' | 'capacity' | 'status' | 'submittedAt' | 'time' | 'memory' | 'cost';
 export type SortDirection = 'asc' | 'desc';
-export interface JobFilters { status: JobStatus | 'all'; recipe: Recipe | 'all'; size: WorkerSize | 'all' }
-export const NO_FILTERS: JobFilters = { status: 'all', recipe: 'all', size: 'all' };
 
 const SIZE_ORDER: Record<WorkerSize, number> = { S: 0, M: 1, L: 2, XL: 3 };
 const STATUS_ORDER: Record<JobStatus, number> = { QUEUED: 0, STARTING: 1, RUNNING: 2, DONE: 3, FAILED: 4 };
 
-export function filterJobs(jobs: JobView[], filters: JobFilters): JobView[] {
-    return jobs.filter(job => (filters.status === 'all' || job.status === filters.status)
-        && (filters.recipe === 'all' || job.recipe === filters.recipe)
-        && (filters.size === 'all' || job.sizing.size === filters.size));
-}
-
-/** Time, memory and cost sort by the actual figure (cost: what was charged, or a legacy record's actual cost): what the dashboard is for is setting it against the prediction beside it. */
+/** Time, memory and cost sort by the actual figure (cost: what was charged in all, or a legacy record's actual cost): the same figure the row shows. */
 export function sortValue(job: JobView, column: SortColumn): string | number | null {
     switch (column) {
         case 'molecule': return job.name.toLowerCase();
@@ -27,7 +20,7 @@ export function sortValue(job: JobView, column: SortColumn): string | number | n
         case 'submittedAt': return job.submittedAt;
         case 'time': return job.actual?.wallSeconds ?? null;
         case 'memory': return job.actual?.peakMemoryGB ?? null;
-        case 'cost': return job.charged?.chargedUsd ?? job.actualUsd;
+        case 'cost': return chargedTotal(job);
     }
 }
 

@@ -7,7 +7,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const dist = resolve(process.argv[2] ?? 'dist');
-const MARKERS = ['eov-admin-dashboard', 'Daily spend'];
+// 'Off prediction' is the jobs page's own filter chip (it replaced the old 'Daily spend' chart title).
+const MARKERS = ['eov-admin-dashboard', 'Off prediction'];
 const CHUNK = /["'`(](?:\.\/|\/?assets\/)([\w.-]+\.js)["'`)]/g;
 
 function chunksOf(page) {

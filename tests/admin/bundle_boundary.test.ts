@@ -38,6 +38,7 @@ describe('the dashboard stays out of the main bundle', () => {
     });
     it('the dashboard entry reaches its own code, so the check above is not vacuous', () => {
         const files = reachable(path.join(SRC, 'admin', 'main.tsx'));
-        for (const name of ['AdminApp.tsx', 'JobsTable.tsx', 'CostPanel.tsx']) expect(files.has(path.join(SRC, 'admin', name))).toBe(true);
+        // JobsTable and CostPanel became JobsPage's rows and budget strip (Phase 6G-3).
+        for (const name of ['AdminApp.tsx', 'JobsPage.tsx', 'BudgetStrip.tsx', 'MonthBand.tsx']) expect(files.has(path.join(SRC, 'admin', name))).toBe(true);
     });
 });
