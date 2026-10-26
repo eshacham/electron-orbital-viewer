@@ -108,6 +108,7 @@ const ADMIN_PAIRS: Pair[] = [
     { selector: '.admin-strip-label', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-1' },
     { selector: '.admin-strip-note', declares: [`color: ${v('text-2')}`, `background: ${v('surface-2')}`], fg: 'text-2', bg: 'surface-2' },
     { selector: '.admin-band-label', declares: [`fill: ${v('text-3')}`], fg: 'text-3', bg: 'bg-app' },
+    { selector: '.admin-band-name', declares: [`fill: ${v('text-2')}`], fg: 'text-2', bg: 'bg-app' },
     { selector: '.admin-band-legend', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'bg-app' },
     { selector: '.admin-chip-count', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'bg-app' },
     { selector: '.admin-list', declares: [`background: ${v('surface-1')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },

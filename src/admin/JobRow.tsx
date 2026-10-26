@@ -13,30 +13,38 @@ import type { JobsState } from '../store/jobsSlice';
 import { useJobPolling } from '../jobs/useJobPolling';
 import { jobLinks, methodSummary } from './jobs_table';
 import { chargedTotal, groupOf, markTone, peakMemory, predictionCheck, runSeconds } from './jobs_month';
-import { compactDuration, localDay, localTime, STATUS_SHORT } from './job_text';
+import { compactDuration, localDay, localTime, rowCharge, shortReason, STATUS_SHORT, usdPair } from './job_text';
 
 export const COLUMN_COUNT = 6;
 
 const pct = (value: number) => `${Math.max(0, Math.min(100, value * 100)).toFixed(1)}%`;
 
-/** Run time against prediction: a small bar of the larger of the two, with the prediction's notch on it. */
+/**
+ * Run time against prediction: a small bar of the larger of the two with the
+ * prediction's notch on it, amber past the notch however little (owner
+ * ruling). A failed job leads with a short reason; its message is in the details.
+ */
 function TimeCell({ job, now }: { job: JobView; now: number }) {
-    if (job.status === 'FAILED' && job.error) {
-        return <span className="admin-row-error" title={job.error.message}>{job.error.message}</span>;
-    }
     const predicted = job.sizing.predictedSeconds;
     const seconds = runSeconds(job, now);
-    if (seconds === null) return <span className="admin-muted">not started · {compactDuration(predicted)} predicted</span>;
-    const check = predictionCheck(job, now);
+    const reason = job.status === 'FAILED' && job.error
+        ? <span className="admin-row-error" title={job.error.message}>{shortReason(job.error)}</span>
+        : null;
+    if (seconds === null) return reason ?? <span className="admin-muted">not started · {compactDuration(predicted)} predicted</span>;
+    const over = predictionCheck(job, now).timeOver;
     const scale = Math.max(seconds, predicted);
     return (
         <span className="admin-time">
-            <span className={`admin-gauge${check.timeOver ? ' is-over' : ''}`} aria-hidden="true">
-                <span className="admin-gauge-fill" style={{ width: pct(seconds / scale) }} />
-                <span className="admin-gauge-notch" style={{ left: pct(predicted / scale) }} />
-            </span>
-            <span className={check.timeOver ? 'admin-over' : undefined}>{compactDuration(seconds)}</span>
-            <span className="admin-muted">{job.actual ? '' : ' so far'} of {compactDuration(predicted)}</span>
+            {reason ? <>{reason}<span className="admin-muted"> · </span></> : (
+                <span className={`admin-gauge${over ? ' is-over' : ''}`} aria-hidden="true">
+                    <span className="admin-gauge-fill" style={{ width: pct(Math.min(seconds, predicted) / scale) }} />
+                    {over && <span className="admin-gauge-over" style={{ left: pct(predicted / scale), width: pct((seconds - predicted) / scale) }} />}
+                    <span className="admin-gauge-notch" style={{ left: pct(predicted / scale) }} />
+                </span>
+            )}
+            <span className="admin-figure"><span className={over ? 'admin-over' : undefined}>{compactDuration(seconds)}</span>
+                <span className="admin-muted">{job.actual ? '' : ' so far'}</span></span>{' '}
+            <span className="admin-figure admin-muted">of {compactDuration(predicted)}</span>
         </span>
     );
 }
@@ -59,16 +67,21 @@ function CostCell({ job }: { job: JobView }) {
     if (job.backend === 'local') return <span className="admin-muted">This Mac, free</span>;
     const total = chargedTotal(job);
     if (!job.approvedQuote) {
-        return <>{total === null ? <span className="admin-muted">not settled</span> : formatUsd(total)}<span className="admin-muted"> of {formatUsd(job.reservedUsd)} reserved</span></>;
+        return (
+            <>
+                <span className="admin-figure">{total === null ? <span className="admin-muted">not settled</span> : rowCharge(total)}</span>{' '}
+                <span className="admin-figure admin-muted">of {formatUsd(job.reservedUsd)} reserved</span>
+            </>
+        );
     }
     if (total === null) return <><span className="admin-muted">held</span> {formatUsd(job.reservedUsd || job.approvedQuote.maximumUsd)}</>;
     const absorbed = (job.ledger ?? []).reduce((sum, entry) => sum + (entry.absorbedUsd ?? 0), 0);
     return (
         <>
             <span className={absorbed > 0 ? 'admin-over' : undefined} title={absorbed > 0 ? `${money('absorbed', absorbed)} by the app` : undefined}>
-                {formatUsd(total)}
-            </span>
-            <span className="admin-muted"> of {formatUsd(job.approvedQuote.maximumUsd)}</span>
+                {rowCharge(total)}
+            </span>{' '}
+            <span className="admin-figure admin-muted">of {formatUsd(job.approvedQuote.maximumUsd)}</span>
         </>
     );
 }
@@ -149,9 +162,14 @@ function Details({ job, now, id }: { job: JobView; now: number; id: string }) {
                     <ul className="admin-lines" aria-label={`${job.name} price, line by line`}>
                         {quote.lines.map(line => {
                             const got = settled.get(line.item);
-                            return <li key={line.item}>{line.label}: {money('up to', line.maximumUsd)}{got ? `, ${money('charged', got.chargedUsd)}` : ''}</li>;
+                            if (!got) return <li key={line.item}>{line.label}: {money('up to', line.maximumUsd)}</li>;
+                            const [maximum, chargedText] = usdPair(line.maximumUsd, got.chargedUsd);
+                            return <li key={line.item}>{line.label}: up to {maximum}, charged {chargedText}</li>;
                         })}
                     </ul>
+                    {chargedTotal(job) !== null && (
+                        <p className="admin-note">Exact: {money('charged', chargedTotal(job)!)} in all{job.ledger.length > 1 ? `, across ${job.ledger.length} attempts` : ''}</p>
+                    )}
                     {charged && charged.absorbedUsd > 0 && (
                         <p className="admin-absorbed">{money('billed', charged.costUsd)} by AWS: {money('absorbed', charged.absorbedUsd)} by the app</p>
                     )}
@@ -163,7 +181,8 @@ function Details({ job, now, id }: { job: JobView; now: number; id: string }) {
                         {job.ledger.map((entry, i) => (
                             <li key={`${entry.quoteId ?? 'legacy'}-${i}`}>
                                 {entry.option !== null && entry.quoteId !== null
-                                    ? `Attempt ${i + 1} · ${optionLabel(entry.option)}: ${money('charged', entry.chargedUsd ?? 0)} of ${money('up to', entry.approvedMaximumUsd ?? 0)}`
+                                    ? (([maximum, chargedText]) => `Attempt ${i + 1} · ${optionLabel(entry.option!)}: charged ${chargedText} of up to ${maximum}`)(
+                                        usdPair(entry.approvedMaximumUsd ?? 0, entry.chargedUsd ?? 0))
                                     : `Attempt ${i + 1}: cost ${formatUsd(entry.costUsd)} (before quotes)`}
                                 {(entry.absorbedUsd ?? 0) > 0 && <span className="admin-absorbed"> ({money('absorbed', entry.absorbedUsd ?? 0)} by the app)</span>}
                                 {entry.at && <span className="admin-note"> · {localTime(entry.at)}</span>}
@@ -233,7 +252,7 @@ const JobRow: React.FC<JobRowProps> = ({ job: listed, now, open, linked, onToggl
                     <button type="button" className="admin-disclosure" aria-expanded={open} aria-controls={detailsId} onClick={toggle}>
                         <ChevronRightIcon className="admin-chevron" fontSize="small" aria-hidden="true" />
                         <span className="admin-molecule-name">{job.name}</span>
-                        <span className="admin-molecule-meta">{meta.join(' · ')}</span>
+                        <span className="admin-molecule-meta" title={meta.join(' · ')}>{meta.join(' · ')}</span>
                     </button>
                 </td>
                 <td role="cell" className="admin-cell-status">

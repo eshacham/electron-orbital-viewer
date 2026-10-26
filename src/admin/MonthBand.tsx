@@ -38,7 +38,7 @@ export interface MonthBandProps {
 }
 
 const TICKS = [1, 5, 10, 15, 20, 25];
-const LEGEND = [['success', 'done'], ['warning', 'off prediction or retried'], ['danger', 'failed'], ['accent', 'running or queued']] as const;
+const LEGEND = [['success', 'done'], ['warning', 'over prediction'], ['danger', 'failed'], ['accent', 'running or queued']] as const;
 
 /**
  * The month on one axis: a short bar per job on its day, coloured by what
@@ -51,7 +51,6 @@ const LEGEND = [['success', 'done'], ['warning', 'off prediction or retried'], [
 const MonthBand: React.FC<MonthBandProps> = ({ month, jobs, costs, now, linked, onLink, onPick, shown }) => {
     const [boxRef, width] = useWidth(960);
     const phone = width < 560;
-    const H = phone ? 92 : 120;
     const PAD_L = 62, PAD_R = 14;
     const plotW = Math.max(40, width - PAD_L - PAD_R);
     const days = daysIn(month);
@@ -75,12 +74,16 @@ const MonthBand: React.FC<MonthBandProps> = ({ month, jobs, costs, now, linked, 
         return { series, settled, projection, scale };
     }, [costs, future, through, thisMonth, nowPos]);
 
-    const capY = 9;
-    const lineTop = money && !money.scale.capInside ? 26 : capY;
-    const lineBottom = phone ? 50 : 70;
+    // Rows, top to bottom: the money (cap or scale note, the line), the marks, the running and failed names, the day axis.
+    const capInside = money?.scale.capInside ?? true;
+    const lineTop = capInside ? 9 : 20;
+    const lineBottom = phone ? 44 : 62;
     const y = (usd: number) => lineBottom - (money ? (usd / money.scale.top) * (lineBottom - lineTop) : 0);
-    const laneTop = lineBottom + 7, laneBottom = H - 22;
-    const axisY = laneBottom + 3;
+    const markH = phone ? 10 : 12;
+    const laneTop = lineBottom + (phone ? 4 : 5), laneBottom = laneTop + markH;
+    const nameY = laneBottom + (phone ? 12 : 13);
+    const axisY = nameY + (phone ? 5 : 6);
+    const H = axisY + 20;
 
     const marks = useMemo(() => {
         const sorted = [...jobs].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
@@ -98,6 +101,23 @@ const MonthBand: React.FC<MonthBandProps> = ({ month, jobs, costs, now, linked, 
             return list.map((job, i) => ({ job, day, x: left + i * (barW + 2), w: barW }));
         });
     }, [jobs, month, days, plotW]);
+
+    // Only the jobs that need the owner -- running and failed -- are named on the band, each under its mark,
+    // nudged right past the name before it, and left out rather than drawn over another.
+    const names = useMemo(() => {
+        const placed: Array<{ key: string; text: string; x: number }> = [];
+        let end = -Infinity;
+        for (const { job, x: left } of marks) {
+            if (groupOf(job) === 'done') continue;
+            const w = job.name.length * 6.4 + 2;
+            let at = Math.max(left, end + 8);
+            if (at + w > width - PAD_R) at = width - PAD_R - w;
+            if (at < end + 8 || at < PAD_L) continue;
+            placed.push({ key: job.key, text: job.name, x: at });
+            end = at + w;
+        }
+        return placed;
+    }, [marks, width]);
 
     const [active, setActive] = useState(0);
     const buttons = useRef<Array<HTMLButtonElement | null>>([]);
@@ -135,14 +155,17 @@ const MonthBand: React.FC<MonthBandProps> = ({ month, jobs, costs, now, linked, 
                     ))}
                     {money && (
                         <>
-                            <line className="admin-band-cap" x1={PAD_L} x2={width - PAD_R} y1={capY} y2={capY} />
-                            <text className="admin-band-label" x={PAD_L - 8} y={capY + 4} textAnchor="end">{formatUsd(costs!.capUsd)} cap</text>
-                            {!money.scale.capInside && (
+                            {capInside ? (
                                 <>
-                                    {/* The axis breaks between the month's own scale and the cap above it. */}
-                                    <path className="admin-band-break" d={`M${PAD_L - 4},${capY + 9} l8,-3 M${PAD_L - 4},${capY + 13} l8,-3`} />
-                                    <text className="admin-band-label" x={PAD_L - 8} y={lineTop + 4} textAnchor="end">{formatUsd(money.scale.top)}</text>
+                                    <line className="admin-band-cap" x1={PAD_L} x2={width - PAD_R} y1={lineTop} y2={lineTop} />
+                                    <text className="admin-band-label" x={PAD_L - 8} y={lineTop + 4} textAnchor="end">{formatUsd(costs!.capUsd)} cap</text>
+                                </>
+                            ) : (
+                                <>
+                                    {/* The cap is far above the month's own figures: said in words, never drawn at a false height. */}
+                                    <text className="admin-band-label admin-band-note" x={PAD_L} y={11}>cap {formatUsd(costs!.capUsd)} is above this scale</text>
                                     <line className="admin-band-scale" x1={PAD_L} x2={width - PAD_R} y1={lineTop} y2={lineTop} />
+                                    <text className="admin-band-label admin-band-top" x={PAD_L - 8} y={lineTop + 4} textAnchor="end">{formatUsd(money.scale.top)}</text>
                                 </>
                             )}
                             <text className="admin-band-label" x={PAD_L - 8} y={lineBottom + 4} textAnchor="end">$0</text>
@@ -155,16 +178,19 @@ const MonthBand: React.FC<MonthBandProps> = ({ month, jobs, costs, now, linked, 
                     )}
                     <line className="admin-band-axis" x1={PAD_L} x2={width - PAD_R} y1={axisY} y2={axisY} />
                     {tickDays.map(day => (
-                        <text key={`t${day}`} className="admin-band-label" x={x(day - 0.5)} y={H - 6} textAnchor="middle">
+                        <text key={`t${day}`} className="admin-band-label" x={x(day - 0.5)} y={H - 5} textAnchor="middle">
                             {day === days ? `${day} ${name.slice(0, 3)}` : day}
                         </text>
                     ))}
                     {marks.map(({ job, x: left, w }) => (
                         <rect key={job.key} className={`admin-band-mark tone-${markTone(job, now)}${linked === job.key ? ' is-linked' : ''}${shown.has(job.key) ? '' : ' is-dimmed'}`}
-                            x={left} y={laneTop} width={w} height={laneBottom - laneTop} rx={1.5} />
+                            x={left} y={laneTop} width={w} height={markH} rx={1.5} />
+                    ))}
+                    {names.map(n => (
+                        <text key={`n${n.key}`} className={`admin-band-name${linked === n.key ? ' is-linked' : ''}`} x={n.x} y={nameY}>{n.text}</text>
                     ))}
                     {jobs.length === 0 && (
-                        <text className="admin-band-label" x={PAD_L + plotW / 2} y={(laneTop + laneBottom) / 2 + 4} textAnchor="middle">No jobs this month</text>
+                        <text className="admin-band-label" x={PAD_L + plotW / 2} y={nameY} textAnchor="middle">No jobs this month</text>
                     )}
                 </svg>
                 {marks.length > 0 && (
@@ -172,11 +198,11 @@ const MonthBand: React.FC<MonthBandProps> = ({ month, jobs, costs, now, linked, 
                         {marks.map(({ job, x: left, w }, index) => {
                             const check = predictionCheck(job, now);
                             const label = `${job.name}, ${utcDay(job.submittedAt)}: ${STATUS_SHORT[job.status]}`
-                                + `${check.off ? ', off prediction' : ''}${job.attempt > 1 ? `, ${job.attempt} attempts` : ''}`;
+                                + `${check.off ? ', over prediction' : ''}${job.attempt > 1 ? `, ${job.attempt} attempts` : ''}`;
                             return (
                                 <button key={job.key} type="button" ref={node => { buttons.current[index] = node; }}
                                     className={`admin-band-hit${linked === job.key ? ' is-linked' : ''}`}
-                                    style={{ left: left - 1, width: w + 2, top: laneTop - 4, height: laneBottom - laneTop + 8 }}
+                                    style={{ left: left - 1, width: w + 2, top: laneTop - 4, height: markH + 8 }}
                                     tabIndex={index === Math.min(active, marks.length - 1) ? 0 : -1} aria-label={label} title={label}
                                     onMouseEnter={() => onLink(job.key)} onMouseLeave={() => onLink(null)}
                                     onFocus={() => { setActive(index); onLink(job.key); }} onBlur={() => onLink(null)}
@@ -189,7 +215,7 @@ const MonthBand: React.FC<MonthBandProps> = ({ month, jobs, costs, now, linked, 
             <p className="admin-band-legend">
                 {costs && <span className="admin-legend-item"><span className="admin-key admin-key-line" aria-hidden="true" />charged so far</span>}
                 {costs && thisMonth && <span className="admin-legend-item"><span className="admin-key admin-key-dash" aria-hidden="true" />projected</span>}
-                {costs && <span className="admin-legend-item"><span className="admin-key admin-key-cap" aria-hidden="true" />cap</span>}
+                {costs && money && capInside && <span className="admin-legend-item"><span className="admin-key admin-key-cap" aria-hidden="true" />cap</span>}
                 {LEGEND.map(([tone, text]) => (
                     <span key={tone} className="admin-legend-item"><span className={`admin-key admin-key-mark tone-${tone}`} aria-hidden="true" />{text}</span>
                 ))}

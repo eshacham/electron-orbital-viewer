@@ -27,6 +27,7 @@ function renderPage(jobs: JobView[] = JOBS, costs: CostsResponse | null = SPENT,
 }
 const table = () => screen.getByRole('table', { name: 'jobs' });
 const dataRows = () => within(table()).getAllByRole('row').filter(row => row.classList.contains('admin-row'));
+const legendItems = (root: HTMLElement) => [...root.querySelectorAll('.admin-legend-item')].map(item => item.textContent);
 const rowOf = (name: string) => dataRows().find(row => row.querySelector('.admin-molecule-name')?.textContent === name)!;
 afterEach(() => { jest.clearAllMocks(); setJobsPollerForTests(null); bindJobsClient(null); });
 
@@ -60,10 +61,21 @@ describe('the budget strip', () => {
         expect(note).toHaveTextContent(/does not split the gap further/);
         expect(note).toHaveTextContent('Prices retrieved 2026-10-04 (Fargate, us-east-1, Linux/ARM)');
     });
-    it('says plainly when the costs could not be read, and keeps the jobs', () => {
-        renderPage(JOBS, null, { costsError: 'The job server on this Mac is not answering.' });
-        expect(screen.getByRole('alert')).toHaveTextContent('Costs could not be read: The job server on this Mac is not answering.');
+    it('says plainly when the costs could not be read, names the recovery, and keeps the jobs', () => {
+        const onReload = jest.fn();
+        renderPage(JOBS, null, { costsError: 'The job server on this Mac is not answering.', onReload });
+        const alert = screen.getByRole('alert');
+        expect(alert).toHaveTextContent('Costs could not be read: The job server on this Mac is not answering. Reload to try again.');
+        fireEvent.click(within(alert).getByRole('button', { name: 'Reload' }));
+        expect(onReload).toHaveBeenCalledTimes(1);
         expect(dataRows()).toHaveLength(3);
+    });
+    it('folds charged, held, projected and billed behind one control on a phone', () => {
+        renderPage();
+        const more = screen.getByRole('button', { name: 'Charged, held, projected' });
+        expect(more).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(more);
+        expect(more).toHaveAttribute('aria-expanded', 'true');
     });
 });
 
@@ -74,7 +86,28 @@ describe('the month band', () => {
             .toBeInTheDocument();
         const marks = within(screen.getByRole('group', { name: 'Jobs by day' })).getAllByRole('button');
         expect(marks).toHaveLength(3);
-        expect(marks[0]).toHaveAccessibleName(/^Water, 10 Oct: Done, off prediction/);
+        expect(marks[0]).toHaveAccessibleName(/^Water, 10 Oct: Done, over prediction/);
+    });
+    it('names only the running and failed marks on the band, side by side without overlapping', () => {
+        const { container } = renderPage();
+        const names = [...container.querySelectorAll('.admin-band-name')];
+        expect(names.map(n => n.textContent)).toEqual(['H2O', 'Ethanol']);
+        const [a, b] = names.map(n => Number(n.getAttribute('x')));
+        expect(b - a).toBeGreaterThanOrEqual('H2O'.length * 6);
+    });
+    it('says the cap is above the scale in words, with no cap line, when the month is far below it', () => {
+        const { container } = renderPage();
+        expect(screen.getByText('cap $8.80 is above this scale')).toBeInTheDocument();
+        expect(container.querySelector('.admin-band-cap')).toBeNull();
+        expect(container.querySelector('.admin-band-break')).toBeNull();
+        expect(legendItems(container)).not.toContain('cap');
+        expect(container.querySelector('.admin-band-top')).toHaveTextContent('$1.00');
+    });
+    it('draws the dashed cap line, and keys it, once the month comes near the cap', () => {
+        const { container } = renderPage(JOBS, { ...SPENT, spentUsd: 6, projectionUsd: 7.5, daily: [{ date: '2026-10-06', usd: 6 }] });
+        expect(container.querySelector('.admin-band-cap')).not.toBeNull();
+        expect(screen.queryByText(/is above this scale/)).toBeNull();
+        expect(legendItems(container)).toContain('cap');
     });
     it('links a mark and its row both ways, on hover and on focus', () => {
         renderPage();
@@ -107,16 +140,18 @@ describe('the job list', () => {
         renderPage();
         const chips = screen.getByRole('group', { name: 'Show' });
         expect(within(chips).getAllByRole('button').map(chip => chip.textContent))
-            .toEqual(['All3', 'Running1', 'Failed1', 'Done1', 'Off prediction1']);
+            .toEqual(['All3', 'Running1', 'Failed1', 'Done1', 'Over prediction1']);
         fireEvent.click(within(chips).getByRole('button', { name: /^Failed/ }));
         expect(within(chips).getByRole('button', { name: /^Failed/ })).toHaveAttribute('aria-pressed', 'true');
         expect(dataRows()).toHaveLength(1);
-        expect(dataRows()[0]).toHaveTextContent('SCF did not converge');
+        // The row holds a short reason read from the error code; the full message is in the details.
+        expect(dataRows()[0]).toHaveTextContent('SCF not converged');
+        expect(dataRows()[0]).not.toHaveTextContent('DIIS');
     });
-    it('names the off-prediction threshold on its chip', () => {
+    it('says what its Over prediction chip counts', () => {
         renderPage();
-        expect(screen.getByRole('button', { name: /^Off prediction/ })).toHaveAccessibleDescription(
-            'Run time or peak memory more than 25 % over its prediction');
+        expect(screen.getByRole('button', { name: /^Over prediction/ })).toHaveAccessibleDescription(
+            'Run time or peak memory past its prediction');
     });
     it('searches by name or formula, and offers a way back when nothing matches', () => {
         renderPage();
@@ -139,13 +174,25 @@ describe('the job list', () => {
         expect(screen.getByText(/No jobs in October 2026\./)).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Open the viewer' })).toHaveAttribute('href', '/');
     });
-    it('sets run time and memory against the prediction, flagging what is more than 25 % over', () => {
+    it('sets run time and memory against the prediction, amber past it however little', () => {
         renderPage([done]);
         const row = dataRows()[0];
         expect(row).toHaveTextContent('1m 10s of 16s');
-        expect(row.querySelector('.admin-gauge.is-over')).not.toBeNull();
+        expect(row.querySelector('.admin-gauge.is-over .admin-gauge-over')).not.toBeNull();
         expect(row).toHaveTextContent('0.52 of 0.47 GB');
-        expect(row.querySelector('.admin-memory.is-over')).toBeNull();
+        expect(row.querySelector('.admin-memory.is-over')).not.toBeNull();
+    });
+    it('colours a running job amber once its time so far passes the prediction', () => {
+        renderPage([running], SPENT, { now: Date.parse('2026-10-10T12:00:22Z') });
+        const row = dataRows()[0];
+        expect(row).toHaveTextContent('17s so far of 16s');
+        expect(row.querySelector('.admin-gauge.is-over')).not.toBeNull();
+        expect(row.querySelector('.admin-cell-time .admin-over')).toHaveTextContent('17s');
+    });
+    it('shows a failed job’s run against its prediction beside its short reason', () => {
+        const failedAfterRunning: JobView = { ...failed, actual: { wallSeconds: 600, peakMemoryGB: 0.3, threads: 2 } };
+        renderPage([failedAfterRunning]);
+        expect(dataRows()[0].querySelector('.admin-cell-time')).toHaveTextContent('SCF not converged · 10m 00s of 1m 17s');
     });
 });
 
@@ -190,8 +237,9 @@ describe('a row’s details keep everything the old table showed', () => {
         const job = jobFixture('get_done_aws');
         const region = open(job);
         expect(region).toHaveTextContent('Spot, 3 attempts, time limit 10 min 00 s');
+        // Each line's maximum and charge share one precision, so a charge never looks bigger than its maximum.
         expect(within(region).getByRole('list', { name: 'Water price, line by line' })).toHaveTextContent(
-            'Compute (AWS Fargate): up to $0.02, charged $0.0004970');
+            'Compute (AWS Fargate): up to $0.0178800, charged $0.0004970');
         expect(region).toHaveTextContent('B3LYP-D3(BJ)/def2-TZVPD');
         expect(region).toHaveTextContent('Fargate estimate, sizing v');
         expect(region).toHaveTextContent('Queued');
@@ -207,15 +255,15 @@ describe('a row’s details keep everything the old table showed', () => {
         const region = open(jobFixture('get_retried_aws'));
         const ledger = within(region).getByRole('list', { name: 'H3N attempts' });
         expect(within(ledger).getAllByRole('listitem').map(item => item.textContent)).toEqual([
-            expect.stringMatching(/^Attempt 1 · Spot: charged \$0\.001508 of up to \$0\.02/),
-            expect.stringMatching(/^Attempt 2 · On-demand: charged \$0\.003326 of up to \$0\.02/),
+            expect.stringMatching(/^Attempt 1 · Spot: charged \$0\.001508 of up to \$0\.021301/),
+            expect.stringMatching(/^Attempt 2 · On-demand: charged \$0\.003326 of up to \$0\.022069/),
         ]);
     });
     it('says a record from before quotes is legacy, by its reservation and actual cost', () => {
         const legacy = jobFixture('get_legacy_aws');
         renderPage([legacy]);
         expect(dataRows()[0]).toHaveTextContent('legacy');
-        expect(dataRows()[0]).toHaveTextContent('$0.0004970 of $0.02 reserved');
+        expect(dataRows()[0]).toHaveTextContent('under $0.01 of $0.02 reserved');
     });
     it('shows a This Mac job as free', () => {
         renderPage([done]);

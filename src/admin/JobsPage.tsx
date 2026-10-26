@@ -8,7 +8,7 @@ import BudgetStrip from './BudgetStrip';
 import MonthBand from './MonthBand';
 import JobRow, { COLUMN_COUNT } from './JobRow';
 import { SortColumn, SortDirection, sortJobs } from './jobs_table';
-import { ChipId, CHIPS, chipCounts, matchesChip, matchesSearch, monthLabel, OFF_PREDICTION_TEXT } from './jobs_month';
+import { ChipId, CHIPS, chipCounts, matchesChip, matchesSearch, monthLabel, OVER_PREDICTION_TEXT } from './jobs_month';
 
 const SORTS: Record<string, { label: string; column: SortColumn; direction: SortDirection }> = {
     newest: { label: 'Newest first', column: 'submittedAt', direction: 'desc' },
@@ -28,7 +28,12 @@ export interface JobsPageProps {
     costsError?: string | null;
     /** The clock, for a test; the page reads its own otherwise, ticking while a job runs. */
     now?: number;
+    /** Reads the month again: the costs alert's recovery. */
+    onReload?: () => void;
 }
+
+/** "… not answering." + " Reload to try again." without a doubled full stop. */
+const sentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
 
 /**
  * The owner's month: the budget strip, the month band, then every job on
@@ -36,7 +41,7 @@ export interface JobsPageProps {
  * opens in place. The band and the list light each other's job on hover
  * and focus, and choosing a mark opens its row.
  */
-const JobsPage: React.FC<JobsPageProps> = ({ month, jobs, costs, costsError = null, now: fixedNow }) => {
+const JobsPage: React.FC<JobsPageProps> = ({ month, jobs, costs, costsError = null, now: fixedNow, onReload }) => {
     const ticking = fixedNow === undefined && jobs.some(job => isActive(job.status));
     const clock = useNow(ticking, 5000);
     const now = fixedNow ?? clock;
@@ -78,7 +83,10 @@ const JobsPage: React.FC<JobsPageProps> = ({ month, jobs, costs, costsError = nu
     return (
         <>
             {costs ? <BudgetStrip costs={costs} /> : costsError && (
-                <Alert severity="error" role="alert" className="admin-costs-error">Costs could not be read: {costsError}</Alert>
+                <Alert severity="error" role="alert" className="admin-costs-error"
+                    action={onReload && <Button color="inherit" size="small" onClick={onReload}>Reload</Button>}>
+                    Costs could not be read: {sentence(costsError)} Reload to try again.
+                </Alert>
             )}
             <MonthBand month={month} jobs={jobs} costs={costs} now={now} linked={linked} onLink={setLinked} onPick={pick} shown={shown} />
             <section className="admin-jobs" aria-label="Jobs">
@@ -91,7 +99,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ month, jobs, costs, costsError = nu
                                     label={<>{label}<span className="admin-chip-count">{counts[id]}</span></>} />
                             );
                             return id === 'off'
-                                ? <Tooltip key={id} title={OFF_PREDICTION_TEXT} describeChild>{chipElement}</Tooltip>
+                                ? <Tooltip key={id} title={OVER_PREDICTION_TEXT} describeChild>{chipElement}</Tooltip>
                                 : chipElement;
                         })}
                     </div>

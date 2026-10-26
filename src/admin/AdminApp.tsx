@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, CssBaseline, Skeleton, TextField, ThemeProvider, Typography } from '@mui/material';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Button, CssBaseline, IconButton, Popover, Skeleton, TextField, ThemeProvider, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { useMediaQuery } from '../useMediaQuery';
 import { useSelector } from 'react-redux';
 import JobsPage from './JobsPage';
 import { recentMonths } from './jobs_table';
@@ -31,6 +33,27 @@ const LoadingShape: React.FC = () => (
     </div>
 );
 
+const PHONE_MENU = 'Jobs target, sign-in and viewer link';
+
+/** A phone's top bar keeps one line: where jobs run, the sign-in and the way back to the viewer fold into this. */
+const PhoneMenu: React.FC = () => {
+    const anchor = useRef<HTMLButtonElement | null>(null);
+    const [open, setOpen] = useState(false);
+    return (
+        <>
+            <IconButton ref={anchor} aria-label={PHONE_MENU} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+                <MoreVertIcon />
+            </IconButton>
+            <Popover open={open} anchorEl={anchor.current} onClose={() => setOpen(false)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                slotProps={{ paper: { role: 'dialog', 'aria-label': PHONE_MENU, className: 'admin-phone-menu' } }}>
+                <ConnectedOwnerBar page="/admin.html" showDashboardLink={false} explainUnconfigured />
+                <a className="admin-back" href="/">Back to the viewer</a>
+            </Popover>
+        </>
+    );
+};
+
 /**
  * The owner's dashboard (spec §9.4): every job of a month with predicted
  * against actual, and what the month has cost. Behind the same sign-in as
@@ -47,6 +70,7 @@ const AdminApp: React.FC = () => {
     const [reload, setReload] = useState(0);
     const [data, setData] = useState<Loaded | null>(null);
     const [loading, setLoading] = useState(false);
+    const phone = useMediaQuery('(max-width: 600px)');
 
     useEffect(() => {
         if (!isOwner) {
@@ -78,11 +102,11 @@ const AdminApp: React.FC = () => {
             <main className={ADMIN_ROOT_CLASS}>
                 <header className="admin-header">
                     <span className="admin-brand"><BrandMark size={24} /><Wordmark brand={BRAND} mode={mode} /></span>
-                    <Typography variant="h5" component="h1" className="admin-title">Owner dashboard</Typography>
-                    <a className="admin-back" href="/">Back to the viewer</a>
+                    <Typography variant="h5" component="h1" className={phone ? 'admin-visually-hidden' : 'admin-title'}>Owner dashboard</Typography>
+                    {!phone && <a className="admin-back" href="/">Back to the viewer</a>}
                     <span className="admin-header-end">
                         <ThemeSwitch />
-                        <ConnectedOwnerBar page="/admin.html" showDashboardLink={false} explainUnconfigured />
+                        {phone ? <PhoneMenu /> : <ConnectedOwnerBar page="/admin.html" showDashboardLink={false} explainUnconfigured />}
                     </span>
                 </header>
                 <div className="admin-body">
@@ -108,7 +132,7 @@ const AdminApp: React.FC = () => {
                             )}
                             {loading && !data && <LoadingShape />}
                             {data?.jobs && (
-                                <JobsPage month={data.month} jobs={data.jobs} costs={data.costs} costsError={data.costsError} />
+                                <JobsPage month={data.month} jobs={data.jobs} costs={data.costs} costsError={data.costsError} onReload={() => setReload(n => n + 1)} />
                             )}
                         </>
                     )}

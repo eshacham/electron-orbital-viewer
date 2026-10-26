@@ -17,7 +17,10 @@ const share = (usd: number, cap: number) => (cap > 0 ? Math.min(100, Math.max(0,
  */
 const BudgetStrip: React.FC<{ costs: CostsResponse }> = ({ costs }) => {
     const [open, setOpen] = useState(false);
+    // A phone shows the available figure and its bar; the other figures fold behind this (CSS shows them always above it).
+    const [more, setMore] = useState(false);
     const noteId = useId();
+    const moreId = useId();
     const name = monthLabel(costs.month);
     const gap = billingGap(costs);
     const charged = share(costs.spentUsd, costs.capUsd);
@@ -26,12 +29,18 @@ const BudgetStrip: React.FC<{ costs: CostsResponse }> = ({ costs }) => {
     const noteLabel = gap ? 'Why AWS billed and the meter differ' : 'About these figures';
     return (
         <>
-            <section className="admin-strip ql-tabular" aria-label={`Budget, ${name}`}>
+            <section className={`admin-strip ql-tabular${more ? '' : ' is-folded'}`} aria-label={`Budget, ${name}`} id={moreId}>
                 <div className="admin-strip-cell admin-strip-available">
-                    <span className="admin-strip-line">
-                        <span className="admin-strip-label">Available</span>{' '}
-                        <strong className="admin-strip-value">{formatUsd(costs.remainingUsd)}</strong>{' '}
-                        <span className="admin-strip-label">of {formatUsd(costs.capUsd)}</span>
+                    <span className="admin-strip-head">
+                        <span className="admin-strip-line">
+                            <span className="admin-strip-label">Available</span>{' '}
+                            <strong className="admin-strip-value">{formatUsd(costs.remainingUsd)}</strong>{' '}
+                            <span className="admin-strip-label">of {formatUsd(costs.capUsd)}</span>
+                        </span>
+                        <Button size="small" className="admin-strip-more" aria-expanded={more} aria-controls={moreId}
+                            endIcon={<ExpandMoreIcon className={more ? 'is-open' : undefined} fontSize="small" />} onClick={() => setMore(m => !m)}>
+                            Charged, held, projected
+                        </Button>
                     </span>
                     <span className="admin-cap-bar" role="img"
                         aria-label={`Charged ${formatUsd(costs.spentUsd)} and held ${formatUsd(costs.reservedUsd)} of the ${formatUsd(costs.capUsd)} cap`}>

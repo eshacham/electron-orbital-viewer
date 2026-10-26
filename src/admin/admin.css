@@ -36,6 +36,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   font-weight: var(--ql-type-title-weight); letter-spacing: -0.01em;
 }
 .admin-loading { display: grid; gap: 8px; }
+.admin-phone-menu { display: grid; gap: 12px; padding: 12px 14px; max-width: calc(100vw - 24px); }
 
 /* The budget strip: one line of named figures. */
 .admin-strip {
@@ -54,6 +55,8 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 .admin-strip-value { font-size: 15px; font-weight: 600; color: var(--ql-color-text-1); }
 .admin-strip-gap { color: var(--ql-color-text-1); font-weight: 500; }
 .admin-strip-billing { flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 4px 12px; white-space: nowrap; }
+.admin-strip-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.admin-strip-more.MuiButton-root { display: none; }
 .admin-strip-why.MuiButton-root { margin: -4px -8px -4px 0; white-space: nowrap; }
 .admin-strip-why .MuiSvgIcon-root { transition: transform var(--ql-motion-panel) ease-out; }
 .admin-strip-why .MuiSvgIcon-root.is-open { transform: rotate(180deg); }
@@ -84,6 +87,8 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 .admin-band-now { fill: var(--ql-color-accent); }
 /* §4.3: nothing under 11 px (ruling T10-sub11). */
 .admin-band-label { font-size: var(--ql-type-tick-size); fill: var(--ql-color-text-3); }
+.admin-band-name { font-size: var(--ql-type-tick-size); font-weight: 500; fill: var(--ql-color-text-2); }
+.admin-band-name.is-linked { fill: var(--ql-color-text-1); }
 .admin-band-mark { transition: opacity var(--ql-motion-hover) ease-out; }
 .admin-band-mark.is-dimmed { opacity: 0.3; }
 .admin-band-mark.is-linked { stroke: var(--ql-color-text-1); stroke-width: 1.5; opacity: 1; }
@@ -133,8 +138,8 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   color: var(--ql-color-text-3); background: var(--ql-color-surface-2); border-bottom: 1px solid var(--ql-color-border-subtle);
 }
 .admin-col-status { width: 112px; }
-.admin-col-time { width: 250px; }
-.admin-col-memory { width: 170px; }
+.admin-col-time { width: 300px; }
+.admin-col-memory { width: 190px; }
 .admin-col-cost { width: 200px; }
 .admin-col-action { width: 132px; }
 .admin-list th.admin-col-cost, .admin-cell-cost, .admin-cell-action { text-align: right; }
@@ -165,10 +170,13 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 }
 .admin-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--admin-tone); }
 
-.admin-time { display: inline-flex; align-items: center; gap: 8px; }
-.admin-gauge { position: relative; flex: none; width: 56px; height: 6px; border-radius: var(--ql-radius-pill); background: var(--ql-color-surface-3); }
+/* Figures never break inside; the cell may wrap between them rather than cut one off. */
+.admin-list td.admin-cell-time { white-space: normal; text-overflow: clip; }
+.admin-figure { white-space: nowrap; }
+.admin-gauge { position: relative; display: inline-block; vertical-align: middle; margin: -2px 8px 0 0; width: 56px; height: 6px; border-radius: var(--ql-radius-pill); background: var(--ql-color-surface-3); }
 .admin-gauge-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: var(--ql-radius-pill); background: var(--ql-color-text-3); }
-.admin-gauge.is-over .admin-gauge-fill { background: var(--ql-color-warning); }
+/* Owner ruling: any overrun is amber -- the stretch past the prediction's notch. */
+.admin-gauge-over { position: absolute; top: 0; bottom: 0; border-radius: 0 var(--ql-radius-pill) var(--ql-radius-pill) 0; background: var(--ql-color-warning); }
 .admin-gauge-notch { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ql-color-text-1); }
 .admin-memory.is-over { color: var(--ql-color-warning); font-weight: 500; }
 .admin-row-error { color: var(--ql-color-danger); }
@@ -218,14 +226,24 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 
 /* A phone: the strip stacks, the band thins, each job is a two-line item. */
 @media (max-width: 600px) {
-  .admin-header { padding: 8px 12px; gap: 4px 12px; }
+  .admin-header { flex-wrap: nowrap; padding: 6px 8px 6px 12px; gap: 8px; min-height: var(--ql-size-phone-top-bar); }
+  .admin-header-end { gap: 0; }
+  .admin-month-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .admin-month-bar { flex-wrap: nowrap; }
+  .admin-strip-more.MuiButton-root { display: inline-flex; margin: -4px -6px -4px 0; white-space: nowrap; }
+  .admin-strip.is-folded .admin-strip-cell:not(.admin-strip-available) { display: none; }
+  .admin-strip:not(.is-folded) { grid-template-columns: 1fr 1fr; }
+  .admin-strip:not(.is-folded) .admin-strip-available, .admin-strip:not(.is-folded) .admin-strip-billing { grid-column: 1 / -1; }
+  .admin-list td.admin-cell-molecule { white-space: normal; }
+  .admin-disclosure { flex-wrap: wrap; row-gap: 0; }
+  .admin-molecule-meta { flex-basis: 100%; padding-left: 26px; white-space: normal; }
   .admin-body { padding: 12px 12px 32px; }
   .admin-strip { grid-template-columns: 1fr; }
   .admin-strip-cell { padding: 8px 12px; }
   .admin-strip-cell:not(.admin-strip-available):not(.admin-strip-billing) { white-space: normal; }
   .admin-band-legend { justify-content: flex-start; gap: 2px 12px; }
-  .admin-search { flex: 1 1 100%; width: auto; }
-  .admin-sort { flex: 1 1 100%; width: auto; }
+  .admin-search { flex: 1 1 0; min-width: 0; width: auto; }
+  .admin-sort { flex: 0 0 150px; width: auto; }
   .admin-list, .admin-list tbody, .admin-list tr, .admin-list td { display: block; }
   .admin-list thead { display: none; }
   .admin-list td { padding: 0; border-top: 0; }
@@ -240,8 +258,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   .admin-cell-time { grid-area: time; min-width: 0; }
   .admin-cell-cost { grid-area: cost; }
   .admin-cell-action { grid-area: action; }
-  .admin-gauge { display: none; }
-  .admin-list .admin-row { column-gap: 8px; }
+  .admin-list .admin-row { column-gap: 8px; align-items: start; }
   .admin-action-rest { display: none; }
   .admin-details { grid-template-columns: 1fr; padding: 10px 12px 14px; }
 }

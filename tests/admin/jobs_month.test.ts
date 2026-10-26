@@ -1,29 +1,30 @@
 import {
     bandScale, billingGap, chargedTotal, chipCounts, cumulativeSeries, daysIn, groupOf, markTone, matchesChip,
-    matchesSearch, monotoneSegments, monthLabel, niceCeil, OFF_PREDICTION_RATIO, predictionCheck, segmentsToPath,
+    matchesSearch, monotoneSegments, monthLabel, niceCeil, OVER_PREDICTION_TEXT, predictionCheck, segmentsToPath,
 } from '../../src/admin/jobs_month';
 import type { CostsResponse, JobView } from '../../src/jobs/api_types';
 import { costsFixture, jobFixture } from '../jobs/api_fixtures';
 
-const done = jobFixture('get_done');                 // Water, 70 s against 16.3 s predicted: far over
+const done = jobFixture('get_done');                 // Water, 70 s against 16.3 s predicted, 0.52 of 0.47 GB: both over
 const failed = jobFixture('get_failed');
 const running = jobFixture('get_running');            // started 12:00:05, predicted 16.3 s
 const onTime: JobView = { ...jobFixture('get_done_aws') }; // 15.04 s of 16.3 s, 0.326 of 0.47 GB
-const retried = jobFixture('get_retried_aws');        // two attempts, 20 s of 19.6 s
+const retried = jobFixture('get_retried_aws');        // two attempts, 20 s of 19.6 s: just over
 const legacy = jobFixture('get_legacy_aws');
 const queued: JobView = { ...running, status: 'QUEUED', startedAt: null, peakMemoryGB: null };
 const START = Date.parse('2026-10-10T12:00:05Z');
 
 describe('a job against its prediction', () => {
-    it('is off prediction when its run time or peak memory is more than 25 % over', () => {
-        expect(OFF_PREDICTION_RATIO).toBe(1.25);
-        expect(predictionCheck(done, 0)).toMatchObject({ timeOver: true, memoryOver: false, off: true });
+    // Owner ruling (finish review): any overrun counts -- no hidden tolerance -- so the chip and the amber agree.
+    it('is over prediction when its run time or peak memory passed the prediction at all', () => {
+        expect(OVER_PREDICTION_TEXT).toBe('Run time or peak memory past its prediction');
+        expect(predictionCheck(done, 0)).toMatchObject({ timeOver: true, memoryOver: true, off: true });
         expect(predictionCheck(onTime, 0)).toMatchObject({ timeOver: false, memoryOver: false, off: false });
-        const memoryOnly: JobView = { ...onTime, actual: { ...onTime.actual!, peakMemoryGB: 0.47 * 1.3 } };
+        const memoryOnly: JobView = { ...onTime, actual: { ...onTime.actual!, peakMemoryGB: 0.48 } };
         expect(predictionCheck(memoryOnly, 0)).toMatchObject({ timeOver: false, memoryOver: true, off: true });
-        // Exactly 25 % over is still within the threshold.
-        const atEdge: JobView = { ...onTime, actual: { ...onTime.actual!, wallSeconds: 16.3 * 1.25 } };
+        const atEdge: JobView = { ...onTime, actual: { ...onTime.actual!, wallSeconds: 16.3 } };
         expect(predictionCheck(atEdge, 0).off).toBe(false);
+        expect(predictionCheck({ ...atEdge, actual: { ...atEdge.actual!, wallSeconds: 16.4 } }, 0).timeOver).toBe(true);
     });
     it('reads a running job by its time so far and its last heartbeat memory', () => {
         const early = predictionCheck(running, START + 10_000);
@@ -36,11 +37,12 @@ describe('a job against its prediction', () => {
         expect([queued, running, { ...running, status: 'STARTING' } as JobView, failed, done].map(groupOf))
             .toEqual(['running', 'running', 'running', 'failed', 'done']);
     });
-    it('colours a mark by what happened: failed, running, off prediction or retried, else done', () => {
+    it('colours a mark by what happened: failed, running, over prediction, else done -- a retry alone is not amber', () => {
         expect(markTone(failed, 0)).toBe('danger');
         expect(markTone(running, START + 1000)).toBe('accent');
         expect(markTone(done, 0)).toBe('warning');
         expect(markTone(retried, 0)).toBe('warning');
+        expect(markTone({ ...retried, actual: { ...retried.actual!, wallSeconds: 19 } }, 0)).toBe('success');
         expect(markTone(onTime, 0)).toBe('success');
     });
 });
@@ -48,9 +50,9 @@ describe('a job against its prediction', () => {
 describe('the filter chips', () => {
     const jobs = [done, failed, running, onTime, retried, queued];
     it('count each chip, with Running holding the queued too', () => {
-        expect(chipCounts(jobs, START + 1000)).toEqual({ all: 6, running: 2, failed: 1, done: 3, off: 1 });
+        expect(chipCounts(jobs, START + 1000)).toEqual({ all: 6, running: 2, failed: 1, done: 3, off: 2 });
         expect(jobs.filter(job => matchesChip(job, 'done', 0))).toEqual([done, onTime, retried]);
-        expect(jobs.filter(job => matchesChip(job, 'off', START + 1000))).toEqual([done]);
+        expect(jobs.filter(job => matchesChip(job, 'off', START + 1000))).toEqual([done, retried]);
     });
     it('search by molecule name or formula, case-blind, subscripts or not', () => {
         const caffeine: JobView = { ...onTime, name: 'Caffeine', formula: 'C8H10N4O2' };

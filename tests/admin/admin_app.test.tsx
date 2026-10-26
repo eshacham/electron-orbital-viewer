@@ -62,8 +62,38 @@ describe('/admin.html', () => {
         mockApi.costs.mockRejectedValueOnce(new Error('Cost Explorer did not answer.'));
         renderAdmin();
         await flush();
-        expect(screen.getByRole('alert')).toHaveTextContent('Costs could not be read: Cost Explorer did not answer.');
+        const alert = screen.getByRole('alert');
+        expect(alert).toHaveTextContent('Costs could not be read: Cost Explorer did not answer. Reload to try again.');
         expect(screen.getByRole('table', { name: 'jobs' })).toBeInTheDocument();
+        fireEvent.click(within(alert).getByRole('button', { name: 'Reload' }));
+        await flush();
+        expect(mockApi.costs).toHaveBeenCalledTimes(2);
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(screen.getByRole('region', { name: /^Budget, / })).toBeInTheDocument();
+    });
+    it('keeps a phone’s top bar to one line: the brand, the theme, and a menu holding where jobs run and the sign-in', async () => {
+        BUILD_ENV.dev = true;
+        const original = window.matchMedia;
+        window.matchMedia = ((query: string) => ({
+            matches: query.includes('max-width: 600px'), media: query, onchange: null,
+            addEventListener: () => undefined, removeEventListener: () => undefined,
+            addListener: () => undefined, removeListener: () => undefined, dispatchEvent: () => false,
+        })) as typeof window.matchMedia;
+        try {
+            renderAdmin();
+            await flush();
+            const header = screen.getByRole('banner');
+            expect(within(header).queryByText('Owner sign-in: not configured in this build')).toBeNull();
+            expect(within(header).getByRole('heading', { name: 'Owner dashboard' })).toBeInTheDocument();
+            const menu = within(header).getByRole('button', { name: 'Jobs target, sign-in and viewer link' });
+            fireEvent.click(menu);
+            const panel = screen.getByRole('dialog', { name: 'Jobs target, sign-in and viewer link' });
+            expect(within(panel).getByRole('group', { name: 'where jobs run' })).toBeInTheDocument();
+            expect(within(panel).getByText('Owner sign-in: not configured in this build')).toBeInTheDocument();
+            expect(within(panel).getByRole('link', { name: 'Back to the viewer' })).toHaveAttribute('href', '/');
+        } finally {
+            window.matchMedia = original;
+        }
     });
     it('reads another month when asked, and says when the API fails', async () => {
         BUILD_ENV.dev = true;

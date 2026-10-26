@@ -6,7 +6,13 @@ import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 const { chromium } = await import('/Users/eyalshacham/.npm/_npx/e41f203b7505f1fb/node_modules/playwright/index.mjs');
 const [,, out = '/tmp/admin', port = '5411', page_ = 'admin.html', extra = ''] = process.argv;
-const list = readFileSync('.impeccable/demo/list.json', 'utf8'), costs = readFileSync('.impeccable/demo/costs.json', 'utf8');
+// A running demo job is re-dated to "started 41 minutes ago", so the page shows a plausible elapsed time.
+const listData = JSON.parse(readFileSync('.impeccable/demo/list.json', 'utf8'));
+for (const j of listData.jobs) if (j.status === 'RUNNING' || j.status === 'QUEUED') {
+  const t = Date.now() - 41 * 60 * 1000;
+  j.submittedAt = new Date(t - 40 * 1000).toISOString(); j.startedAt = new Date(t).toISOString(); j.heartbeatAt = new Date(Date.now() - 20 * 1000).toISOString();
+}
+const list = JSON.stringify(listData), costs = readFileSync('.impeccable/demo/costs.json', 'utf8');
 const emptyList = JSON.stringify({ ...JSON.parse(list), jobs: [] });
 const emptyCosts = JSON.stringify({ ...JSON.parse(costs), spentUsd: 0, reservedUsd: 0, remainingUsd: 8.8, projectionUsd: 0, daily: [], billing: null });
 const costsDown = { status: 503, body: JSON.stringify({ error: { code: 'unavailable', message: 'The cost meter did not answer (synthetic failure).' } }) };
@@ -14,7 +20,7 @@ const vite = spawn('node_modules/.bin/vite', ['--port', port, '--strictPort'], {
 await new Promise(r => setTimeout(r, 4000));
 const b = await chromium.launch({ args: ['--use-angle=metal', '--ignore-gpu-blocklist'] });
 
-async function shoot({ scheme, w, h, tag, listBody = list, costsAnswer = { status: 200, body: costs }, act = null }) {
+async function shoot({ scheme, w, h, tag, listBody = list, costsAnswer = { status: 200, body: costs }, act = null, fullPage = true }) {
   const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: scheme, isMobile: w < 500 });
   const p = await ctx.newPage(); const unstubbed = [];
   const jobs = JSON.parse(list).jobs;
@@ -29,7 +35,7 @@ async function shoot({ scheme, w, h, tag, listBody = list, costsAnswer = { statu
   });
   await p.goto(`http://localhost:${port}/${page_}`); await p.waitForTimeout(3500);
   if (act) { await act(p); await p.waitForTimeout(600); }
-  await p.screenshot({ path: `${out}-${scheme}-${tag}.png`, fullPage: true });
+  await p.screenshot({ path: `${out}-${scheme}-${tag}.png`, fullPage });
   console.log(scheme, tag, 'unstubbed', unstubbed.length, 'title', await p.title());
   await ctx.close();
 }
@@ -53,5 +59,11 @@ try {
     await shoot({ scheme: 'dark', w: 1440, h: 900, tag: 'desktop-empty', listBody: emptyList, costsAnswer: { status: 200, body: emptyCosts } });
     await shoot({ scheme: 'dark', w: 1440, h: 900, tag: 'desktop-costserr', costsAnswer: costsDown });
     await shoot({ scheme: 'light', w: 820, h: 1180, tag: 'tablet' });
+    await shoot({ scheme: 'dark', w: 390, h: 844, tag: 'phone-first', fullPage: false });
+    // An hour-scale run, to check the run-time column holds "178h 24m so far of 39m 20s".
+    const long = JSON.parse(list);
+    for (const j of long.jobs) if (j.status === 'RUNNING') j.startedAt = new Date(Date.now() - (178 * 60 + 24) * 60 * 1000).toISOString();
+    await shoot({ scheme: 'dark', w: 1440, h: 900, tag: 'desktop-long', listBody: JSON.stringify(long) });
+    await shoot({ scheme: 'dark', w: 390, h: 844, tag: 'phone-long', listBody: JSON.stringify(long) });
   }
 } finally { await b.close(); vite.kill(); }

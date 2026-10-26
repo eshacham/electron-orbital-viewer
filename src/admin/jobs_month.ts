@@ -7,9 +7,12 @@ import type { CostsResponse, JobView } from '../jobs/api_types';
  * and the month band's cumulative line and scale.
  */
 
-/** A job is off its prediction when its run time or peak memory is more than this many times what was predicted. */
-export const OFF_PREDICTION_RATIO = 1.25;
-export const OFF_PREDICTION_TEXT = 'Run time or peak memory more than 25 % over its prediction';
+/**
+ * A job is over its prediction when its run time or peak memory went past
+ * what was predicted at all (owner ruling): no hidden tolerance, so the Over
+ * prediction chip counts exactly the jobs drawn in amber.
+ */
+export const OVER_PREDICTION_TEXT = 'Run time or peak memory past its prediction';
 
 export type JobGroup = 'running' | 'failed' | 'done';
 
@@ -46,8 +49,8 @@ const ratio = (actual: number | null, predicted: number) => (actual === null || 
 export function predictionCheck(job: JobView, nowMs: number): PredictionCheck {
     const time = ratio(runSeconds(job, nowMs), job.sizing.predictedSeconds);
     const memory = ratio(peakMemory(job), job.sizing.predictedMemoryGB);
-    const timeOver = time !== null && time > OFF_PREDICTION_RATIO;
-    const memoryOver = memory !== null && memory > OFF_PREDICTION_RATIO;
+    const timeOver = time !== null && time > 1;
+    const memoryOver = memory !== null && memory > 1;
     return { time, memory, timeOver, memoryOver, off: timeOver || memoryOver };
 }
 
@@ -57,13 +60,13 @@ export function markTone(job: JobView, nowMs: number): MarkTone {
     const group = groupOf(job);
     if (group === 'failed') return 'danger';
     if (group === 'running') return 'accent';
-    return predictionCheck(job, nowMs).off || job.attempt > 1 ? 'warning' : 'success';
+    return predictionCheck(job, nowMs).off ? 'warning' : 'success';
 }
 
 export type ChipId = 'all' | 'running' | 'failed' | 'done' | 'off';
 export const CHIPS: ReadonlyArray<{ id: ChipId; label: string }> = [
     { id: 'all', label: 'All' }, { id: 'running', label: 'Running' }, { id: 'failed', label: 'Failed' },
-    { id: 'done', label: 'Done' }, { id: 'off', label: 'Off prediction' },
+    { id: 'done', label: 'Done' }, { id: 'off', label: 'Over prediction' },
 ];
 
 export function matchesChip(job: JobView, chip: ChipId, nowMs: number): boolean {
