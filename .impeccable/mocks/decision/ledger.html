@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Jobs — ledger</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden;background:#020F1D;color:#F2F6FA;font:14px/1.45 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.bar{height:56px;background:#010B17;border-bottom:1px solid rgba(110,160,220,.16);display:flex;align-items:center;gap:24px;padding:0 24px}
+.brand{font-weight:600;font-size:18px}.brand b{color:#A78BFA;font-weight:600}
+.bar a{color:#C3CFDB;text-decoration:none}.bar a.on{color:#F2F6FA;border-bottom:2px solid #4C9BFF;padding-bottom:4px}.bar .sp{flex:1}
+.pill{border:1px solid #2B4A6B;border-radius:999px;padding:4px 12px;color:#C3CFDB}
+.wrap{padding:20px 24px}
+.strip{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1.4fr;gap:0;background:#071828;border:1px solid rgba(110,160,220,.16);border-radius:12px}
+.cell{padding:14px 18px;border-left:1px solid rgba(110,160,220,.12)}.cell:first-child{border-left:0}
+.k{color:#93A6BA;font-size:12px}.v{font-size:20px;font-weight:600;margin-top:2px}.v small{font-size:13px;color:#93A6BA;font-weight:500}
+.track{height:8px;border-radius:999px;background:#13263B;margin-top:10px;position:relative;overflow:hidden}
+.track i{position:absolute;left:0;top:0;bottom:0;width:3.7%;background:#2A85F8}.track u{position:absolute;left:3.7%;top:0;bottom:0;width:16.4%;background:#1E5BD8;opacity:.55}
+.tools{display:flex;align-items:center;gap:8px;margin:18px 0 10px}
+.chip{border:1px solid #2B4A6B;border-radius:999px;padding:5px 12px;color:#C3CFDB;font-size:13px}.chip.on{background:#0E3A99;border-color:#1FB6F5;color:#F2F6FA}
+.chip em{font-style:normal;color:#93A6BA;margin-left:4px}.tools .sp{flex:1}
+.search{width:260px;border:1px solid #2B4A6B;border-radius:8px;padding:6px 10px;color:#93A6BA}
+.tbl{background:#071828;border:1px solid rgba(110,160,220,.16);border-radius:12px;overflow:hidden}
+.r{display:grid;grid-template-columns:2fr 120px 1.6fr 1.2fr 140px 120px;gap:14px;align-items:center;padding:10px 18px;border-top:1px solid rgba(110,160,220,.10)}
+.r:first-child{border-top:0}.r.th{background:#0B1C2D;color:#93A6BA;font-size:12px}
+.mol b{font-weight:600}.mol span{color:#93A6BA;margin-left:6px;font-size:13px}
+.st{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:500;width:max-content}
+.s-ok{background:rgba(52,211,153,.12);color:#34D399}.s-run{background:rgba(42,133,248,.15);color:#4C9BFF}.s-bad{background:rgba(248,113,113,.14);color:#F87171}
+.tick{display:flex;align-items:center;gap:10px}.tb{width:120px;height:8px;background:#13263B;border-radius:999px;position:relative}
+.tb b{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:#34D399}.tb i{position:absolute;top:-3px;width:2px;height:14px;background:#F2F6FA}
+.tb.over b{background:#FBBF24}.muted{color:#93A6BA}.num{text-align:right}
+.open{justify-self:end;color:#4C9BFF;border:1px solid #2B4A6B;border-radius:8px;padding:4px 10px;font-weight:500}
+.detail{background:#0B1C2D;padding:14px 18px 16px 48px;border-top:1px solid rgba(110,160,220,.10);display:grid;grid-template-columns:repeat(4,1fr);gap:20px;font-size:13px}
+.detail h4{font-size:12px;color:#93A6BA;font-weight:500;margin-bottom:6px}.detail p{color:#C3CFDB}
+.demo{position:absolute;right:24px;bottom:10px;color:#5B6880;font-size:11px}
+</style></head><body>
+<div class="bar"><div class="brand">Quantum<b>Lab</b></div><a href="#">Viewer</a><a class="on" href="#">Jobs</a><div class="sp"></div><span class="pill">October 2026 ▾</span><span class="pill">Runs on AWS</span></div>
+<div class="wrap">
+<div class="strip">
+ <div class="cell"><div class="k">October budget</div><div class="v">$7.03 <small>available of $8.80</small></div><div class="track"><i></i><u></u></div></div>
+ <div class="cell"><div class="k">Charged</div><div class="v">$0.33</div></div>
+ <div class="cell"><div class="k">Held for running</div><div class="v">$1.44</div></div>
+ <div class="cell"><div class="k">Projected by 31 Oct</div><div class="v">$0.81</div></div>
+ <div class="cell"><div class="k">AWS billed (to 18 Oct)</div><div class="v">$0.62 <small>· meter $0.33 · $0.29 unexplained</small></div></div>
+</div>
+<div class="tools"><span class="chip on">All<em>10</em></span><span class="chip">Running<em>1</em></span><span class="chip">Failed<em>1</em></span><span class="chip">Done<em>8</em></span><span class="chip">Off prediction<em>3</em></span><span class="sp"></span><span class="search">Search molecules…</span></div>
+<div class="tbl">
+ <div class="r th"><span>Molecule</span><span>Status</span><span>Run time vs prediction</span><span>Memory vs prediction</span><span class="num">Charged / approved</span><span></span></div>
+ <div class="r"><span class="mol"><b>Aspirin</b><span>C₉H₈O₄ · optimise · 19 Oct</span></span><span class="st s-run">● Running</span><span class="tick"><span class="tb over"><b style="width:100%"></b><i style="left:95%"></i></span><span>41 m <span class="muted">/ 39 m</span></span></span><span class="muted">1.2 GB so far</span><span class="num muted">held $1.44</span><span class="open">Follow</span></div>
+ <div class="r"><span class="mol"><b>Ferrocene</b><span>C₁₀H₁₀Fe · single · 18 Oct</span></span><span class="st s-bad">● Failed</span><span class="muted">SCF did not converge</span><span class="muted">2.6 GB / 2.4</span><span class="num">$0.031 <span class="muted">/ $0.62</span></span><span class="open">Details</span></div>
+ <div class="r"><span class="mol"><b>Theobromine</b><span>C₇H₈N₄O₂ · single · 16 Oct</span></span><span class="st s-ok">● Done</span><span class="tick"><span class="tb"><b style="width:60%"></b><i style="left:99%"></i></span><span>8 m 02 <span class="muted">/ 13 m 29</span></span></span><span>1.77 <span class="muted">/ 1.82 GB</span></span><span class="num">$0.040 <span class="muted">/ $0.51</span></span><span class="open">Open result</span></div>
+ <div class="detail"><div><h4>Quote</h4><p>Spot, up to 3 attempts, 10 min limit; approved 16 Oct 09:00</p></div><div><h4>Charged lines</h4><p>Compute $0.031 · Storage $0.005 · Delivery $0.004</p></div><div><h4>Sizing</h4><p>v7 · M (2 vCPU, 8 GB) · 748 basis functions</p></div><div><h4>Files</h4><p>input.py · output.log · geometry.xyz · 13 objects</p></div></div>
+ <div class="r"><span class="mol"><b>Caffeine</b><span>C₈H₁₀N₄O₂ · single · 15 Oct</span></span><span class="st s-ok">● Done</span><span class="tick"><span class="tb"><b style="width:90%"></b><i style="left:99%"></i></span><span>12 m 54 <span class="muted">/ 14 m 20</span></span></span><span>1.81 <span class="muted">/ 1.85 GB</span></span><span class="num">$0.039 <span class="muted">/ $0.53</span></span><span class="open">Open result</span></div>
+ <div class="r"><span class="mol"><b>Imidazole</b><span>C₃H₄N₂ · optimise · 14 Oct · 2 attempts</span></span><span class="st s-ok">● Done</span><span class="tick"><span class="tb over"><b style="width:100%"></b><i style="left:82%"></i></span><span>30 m 20 <span class="muted">/ 25 m</span></span></span><span>1.51 <span class="muted">/ 1.30 GB</span></span><span class="num">$0.071 <span class="muted">/ $1.20</span></span><span class="open">Open result</span></div>
+ <div class="r"><span class="mol"><b>Urea</b><span>CH₄N₂O · single · 12 Oct</span></span><span class="st s-ok">● Done</span><span class="tick"><span class="tb"><b style="width:90%"></b><i style="left:99%"></i></span><span>5 m 52 <span class="muted">/ 6 m 30</span></span></span><span>0.98 <span class="muted">/ 1.05 GB</span></span><span class="num">$0.016 <span class="muted">/ $0.33</span></span><span class="open">Open result</span></div>
+ <div class="r"><span class="mol"><b>Benzene</b><span>C₆H₆ · single · 6 Oct · legacy</span></span><span class="st s-ok">● Done</span><span class="tick"><span class="tb over"><b style="width:100%"></b><i style="left:31%"></i></span><span>21 m 52 <span class="muted">/ 6 m 50</span></span></span><span style="color:#FBBF24">6.10 <span class="muted">/ 0.70 GB</span></span><span class="num">$0.061 <span class="muted">/ —</span></span><span class="open">Open result</span></div>
+</div>
+</div>
+<div class="demo">Illustrative data (synthetic month)</div>
+</body></html>

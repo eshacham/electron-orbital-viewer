@@ -1,0 +1,46 @@
+{
+  "title": "Choose the jobs page's structure",
+  "question": "Three ways to organise the owner's jobs page inside QuantumLab's look. Pick one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "statement",
+      "kind": "assigned",
+      "kicker": "THE ROLL",
+      "label": "The month's statement",
+      "lineage": "a bank statement: pending items, dated lines, a running balance",
+      "thesis": "The month reads as an account statement: every job a dated line, a running balance against the cap.",
+      "palette": ["#020F1D", "#071828", "#2A85F8", "#34D399", "#FBBF24", "#F87171"],
+      "materials": ["QuantumLab Deep Space surfaces", "tabular figures", "one running-balance column"],
+      "viewport": "Header: month, cap gauge and billed-vs-metered line. Pending items (running, failed) pinned above dated settled lines; each line opens its receipt.",
+      "risk": "A finance metaphor may underplay results: Open result must stay a first-class action on every line.",
+      "html": ".impeccable/mocks/decision/statement.html"
+    },
+    {
+      "id": "ledger",
+      "kind": "dealt",
+      "label": "Budget strip and one-line rows",
+      "lineage": "a familiar admin list, tightened",
+      "thesis": "One line per job with only the essentials; everything else opens inline under its row.",
+      "palette": ["#020F1D", "#0B1C2D", "#2A85F8", "#34D399", "#FBBF24", "#F87171"],
+      "materials": ["QuantumLab Deep Space surfaces", "status chips", "a predicted-vs-actual tick per row"],
+      "viewport": "A budget strip on top, status filter chips, then single-line rows: molecule, status, runtime vs prediction, charged of maximum, Open result.",
+      "risk": "Closest to the category standard: clean but the least distinctive of the three.",
+      "html": ".impeccable/mocks/decision/ledger.html"
+    },
+    {
+      "id": "timeline",
+      "kind": "dealt",
+      "label": "Month timeline over a list",
+      "lineage": "a run log drawn against the calendar",
+      "thesis": "The month drawn on one axis: each job a bar on its day, the cumulative spend rising toward the cap.",
+      "palette": ["#020F1D", "#071828", "#2A85F8", "#34D399", "#FBBF24", "#F87171"],
+      "materials": ["QuantumLab Deep Space surfaces", "a month axis", "a cumulative spend line"],
+      "viewport": "Top third: the October axis with job bars and the spend line against the $8.80 cap. Below: a compact synced list.",
+      "risk": "The chart can tip into the busy dashboard look you want to avoid; it must stay one quiet band.",
+      "html": ".impeccable/mocks/decision/timeline.html"
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": { "value": "code", "toggle": false }
+}

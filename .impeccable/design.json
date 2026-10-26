@@ -1,0 +1,1287 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-26T22:06:56.210Z",
+  "title": "Design System: QuantumLab",
+  "extensions": {
+    "colorMeta": {
+      "bg-app": {
+        "role": "neutral",
+        "displayName": "Abyss (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(16.4% 0.037 247.8)",
+        "tonalRamp": [
+          "oklch(15% 0.037 247.8)",
+          "oklch(26% 0.037 247.8)",
+          "oklch(38% 0.037 247.8)",
+          "oklch(50% 0.037 247.8)",
+          "oklch(62% 0.037 247.8)",
+          "oklch(74% 0.037 247.8)",
+          "oklch(85% 0.037 247.8)",
+          "oklch(95% 0.037 247.8)"
+        ]
+      },
+      "bg-bar": {
+        "role": "neutral",
+        "displayName": "Bar Night (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(14.5% 0.033 246.3)",
+        "tonalRamp": [
+          "oklch(15% 0.033 246.3)",
+          "oklch(26% 0.033 246.3)",
+          "oklch(38% 0.033 246.3)",
+          "oklch(50% 0.033 246.3)",
+          "oklch(62% 0.033 246.3)",
+          "oklch(74% 0.033 246.3)",
+          "oklch(85% 0.033 246.3)",
+          "oklch(95% 0.033 246.3)"
+        ]
+      },
+      "surface-1": {
+        "role": "neutral",
+        "displayName": "Panel Navy (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(20.4% 0.040 248.7)",
+        "tonalRamp": [
+          "oklch(15% 0.040 248.7)",
+          "oklch(26% 0.040 248.7)",
+          "oklch(38% 0.040 248.7)",
+          "oklch(50% 0.040 248.7)",
+          "oklch(62% 0.040 248.7)",
+          "oklch(74% 0.040 248.7)",
+          "oklch(85% 0.040 248.7)",
+          "oklch(95% 0.040 248.7)"
+        ]
+      },
+      "surface-2": {
+        "role": "neutral",
+        "displayName": "Header Navy (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(22.1% 0.041 250.1)",
+        "tonalRamp": [
+          "oklch(15% 0.041 250.1)",
+          "oklch(26% 0.041 250.1)",
+          "oklch(38% 0.041 250.1)",
+          "oklch(50% 0.041 250.1)",
+          "oklch(62% 0.041 250.1)",
+          "oklch(74% 0.041 250.1)",
+          "oklch(85% 0.041 250.1)",
+          "oklch(95% 0.040 250.1)"
+        ]
+      },
+      "surface-3": {
+        "role": "neutral",
+        "displayName": "Linked Navy (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(26.4% 0.047 252.2)",
+        "tonalRamp": [
+          "oklch(15% 0.047 252.2)",
+          "oklch(26% 0.047 252.2)",
+          "oklch(38% 0.047 252.2)",
+          "oklch(50% 0.047 252.2)",
+          "oklch(62% 0.047 252.2)",
+          "oklch(74% 0.047 252.2)",
+          "oklch(85% 0.047 252.2)",
+          "oklch(95% 0.040 252.2)"
+        ]
+      },
+      "border-subtle": {
+        "role": "neutral",
+        "displayName": "Hairline (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "rgba(110,160,220,.16)"
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Axis Steel (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(40.1% 0.067 251.2)",
+        "tonalRamp": [
+          "oklch(15% 0.067 251.2)",
+          "oklch(26% 0.067 251.2)",
+          "oklch(38% 0.067 251.2)",
+          "oklch(50% 0.067 251.2)",
+          "oklch(62% 0.067 251.2)",
+          "oklch(74% 0.067 251.2)",
+          "oklch(85% 0.067 251.2)",
+          "oklch(95% 0.040 251.2)"
+        ]
+      },
+      "text-1": {
+        "role": "neutral",
+        "displayName": "Ice Ink (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(97.1% 0.007 247.9)",
+        "tonalRamp": [
+          "oklch(15% 0.007 247.9)",
+          "oklch(26% 0.007 247.9)",
+          "oklch(38% 0.007 247.9)",
+          "oklch(50% 0.007 247.9)",
+          "oklch(62% 0.007 247.9)",
+          "oklch(74% 0.007 247.9)",
+          "oklch(85% 0.007 247.9)",
+          "oklch(95% 0.007 247.9)"
+        ]
+      },
+      "text-2": {
+        "role": "neutral",
+        "displayName": "Mist Ink (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(84.9% 0.021 248.1)",
+        "tonalRamp": [
+          "oklch(15% 0.021 248.1)",
+          "oklch(26% 0.021 248.1)",
+          "oklch(38% 0.021 248.1)",
+          "oklch(50% 0.021 248.1)",
+          "oklch(62% 0.021 248.1)",
+          "oklch(74% 0.021 248.1)",
+          "oklch(85% 0.021 248.1)",
+          "oklch(95% 0.021 248.1)"
+        ]
+      },
+      "text-3": {
+        "role": "neutral",
+        "displayName": "Slate Ink (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(71.7% 0.036 249.7)",
+        "tonalRamp": [
+          "oklch(15% 0.036 249.7)",
+          "oklch(26% 0.036 249.7)",
+          "oklch(38% 0.036 249.7)",
+          "oklch(50% 0.036 249.7)",
+          "oklch(62% 0.036 249.7)",
+          "oklch(74% 0.036 249.7)",
+          "oklch(85% 0.036 249.7)",
+          "oklch(95% 0.036 249.7)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Signal Blue (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(62.6% 0.191 256.7)",
+        "tonalRamp": [
+          "oklch(15% 0.191 256.7)",
+          "oklch(26% 0.191 256.7)",
+          "oklch(38% 0.191 256.7)",
+          "oklch(50% 0.191 256.7)",
+          "oklch(62% 0.191 256.7)",
+          "oklch(74% 0.191 256.7)",
+          "oklch(85% 0.191 256.7)",
+          "oklch(95% 0.040 256.7)"
+        ]
+      },
+      "accent-text": {
+        "role": "primary",
+        "displayName": "Link Blue (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(68.7% 0.167 255.6)",
+        "tonalRamp": [
+          "oklch(15% 0.167 255.6)",
+          "oklch(26% 0.167 255.6)",
+          "oklch(38% 0.167 255.6)",
+          "oklch(50% 0.167 255.6)",
+          "oklch(62% 0.167 255.6)",
+          "oklch(74% 0.167 255.6)",
+          "oklch(85% 0.167 255.6)",
+          "oklch(95% 0.040 255.6)"
+        ]
+      },
+      "accent-fill": {
+        "role": "primary",
+        "displayName": "Fill Blue (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(51.3% 0.202 262.3)",
+        "tonalRamp": [
+          "oklch(15% 0.202 262.3)",
+          "oklch(26% 0.202 262.3)",
+          "oklch(38% 0.202 262.3)",
+          "oklch(50% 0.202 262.3)",
+          "oklch(62% 0.202 262.3)",
+          "oklch(74% 0.202 262.3)",
+          "oklch(85% 0.202 262.3)",
+          "oklch(95% 0.040 262.3)"
+        ]
+      },
+      "selected-fill": {
+        "role": "primary",
+        "displayName": "Deep Selection (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(38.7% 0.162 262.7)",
+        "tonalRamp": [
+          "oklch(15% 0.162 262.7)",
+          "oklch(26% 0.162 262.7)",
+          "oklch(38% 0.162 262.7)",
+          "oklch(50% 0.162 262.7)",
+          "oklch(62% 0.162 262.7)",
+          "oklch(74% 0.162 262.7)",
+          "oklch(85% 0.162 262.7)",
+          "oklch(95% 0.040 262.7)"
+        ]
+      },
+      "selected-edge": {
+        "role": "primary",
+        "displayName": "Selection Cyan (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(73.2% 0.146 233.5)",
+        "tonalRamp": [
+          "oklch(15% 0.146 233.5)",
+          "oklch(26% 0.146 233.5)",
+          "oklch(38% 0.146 233.5)",
+          "oklch(50% 0.146 233.5)",
+          "oklch(62% 0.146 233.5)",
+          "oklch(74% 0.146 233.5)",
+          "oklch(85% 0.146 233.5)",
+          "oklch(95% 0.040 233.5)"
+        ]
+      },
+      "focus-ring": {
+        "role": "primary",
+        "displayName": "Focus Cyan (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(73.2% 0.146 233.5)",
+        "tonalRamp": [
+          "oklch(15% 0.146 233.5)",
+          "oklch(26% 0.146 233.5)",
+          "oklch(38% 0.146 233.5)",
+          "oklch(50% 0.146 233.5)",
+          "oklch(62% 0.146 233.5)",
+          "oklch(74% 0.146 233.5)",
+          "oklch(85% 0.146 233.5)",
+          "oklch(95% 0.040 233.5)"
+        ]
+      },
+      "on-fill": {
+        "role": "neutral",
+        "displayName": "On Fill (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(26% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "on-accent": {
+        "role": "neutral",
+        "displayName": "On Accent (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(0.0% 0.000 0.0)",
+        "tonalRamp": [
+          "oklch(15% 0.000 0.0)",
+          "oklch(26% 0.000 0.0)",
+          "oklch(38% 0.000 0.0)",
+          "oklch(50% 0.000 0.0)",
+          "oklch(62% 0.000 0.0)",
+          "oklch(74% 0.000 0.0)",
+          "oklch(85% 0.000 0.0)",
+          "oklch(95% 0.000 0.0)"
+        ]
+      },
+      "success": {
+        "role": "secondary",
+        "displayName": "Done Green (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(77.3% 0.153 163.2)",
+        "tonalRamp": [
+          "oklch(15% 0.153 163.2)",
+          "oklch(26% 0.153 163.2)",
+          "oklch(38% 0.153 163.2)",
+          "oklch(50% 0.153 163.2)",
+          "oklch(62% 0.153 163.2)",
+          "oklch(74% 0.153 163.2)",
+          "oklch(85% 0.153 163.2)",
+          "oklch(95% 0.040 163.2)"
+        ]
+      },
+      "warning": {
+        "role": "secondary",
+        "displayName": "Overrun Amber (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(83.7% 0.164 84.4)",
+        "tonalRamp": [
+          "oklch(15% 0.164 84.4)",
+          "oklch(26% 0.164 84.4)",
+          "oklch(38% 0.164 84.4)",
+          "oklch(50% 0.164 84.4)",
+          "oklch(62% 0.164 84.4)",
+          "oklch(74% 0.164 84.4)",
+          "oklch(85% 0.164 84.4)",
+          "oklch(95% 0.040 84.4)"
+        ]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Failed Red (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(71.1% 0.166 22.2)",
+        "tonalRamp": [
+          "oklch(15% 0.166 22.2)",
+          "oklch(26% 0.166 22.2)",
+          "oklch(38% 0.166 22.2)",
+          "oklch(50% 0.166 22.2)",
+          "oklch(62% 0.166 22.2)",
+          "oklch(74% 0.166 22.2)",
+          "oklch(85% 0.166 22.2)",
+          "oklch(95% 0.040 22.2)"
+        ]
+      },
+      "error-bg": {
+        "role": "secondary",
+        "displayName": "Error Ground (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(25.1% 0.065 12.7)",
+        "tonalRamp": [
+          "oklch(15% 0.065 12.7)",
+          "oklch(26% 0.065 12.7)",
+          "oklch(38% 0.065 12.7)",
+          "oklch(50% 0.065 12.7)",
+          "oklch(62% 0.065 12.7)",
+          "oklch(74% 0.065 12.7)",
+          "oklch(85% 0.065 12.7)",
+          "oklch(95% 0.040 12.7)"
+        ]
+      },
+      "error-text": {
+        "role": "secondary",
+        "displayName": "Error Ink (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(88.5% 0.059 18.3)",
+        "tonalRamp": [
+          "oklch(15% 0.059 18.3)",
+          "oklch(26% 0.059 18.3)",
+          "oklch(38% 0.059 18.3)",
+          "oklch(50% 0.059 18.3)",
+          "oklch(62% 0.059 18.3)",
+          "oklch(74% 0.059 18.3)",
+          "oklch(85% 0.059 18.3)",
+          "oklch(95% 0.040 18.3)"
+        ]
+      },
+      "canvas-solid": {
+        "role": "neutral",
+        "displayName": "Canvas Solid (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(19.1% 0.050 255.7)",
+        "tonalRamp": [
+          "oklch(15% 0.050 255.7)",
+          "oklch(26% 0.050 255.7)",
+          "oklch(38% 0.050 255.7)",
+          "oklch(50% 0.050 255.7)",
+          "oklch(62% 0.050 255.7)",
+          "oklch(74% 0.050 255.7)",
+          "oklch(85% 0.050 255.7)",
+          "oklch(95% 0.040 255.7)"
+        ]
+      },
+      "plot-grid": {
+        "role": "neutral",
+        "displayName": "Plot Grid (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "rgba(150,180,220,.12)"
+      },
+      "plot-axis": {
+        "role": "neutral",
+        "displayName": "Plot Axis (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(71.7% 0.036 249.7)",
+        "tonalRamp": [
+          "oklch(15% 0.036 249.7)",
+          "oklch(26% 0.036 249.7)",
+          "oklch(38% 0.036 249.7)",
+          "oklch(50% 0.036 249.7)",
+          "oklch(62% 0.036 249.7)",
+          "oklch(74% 0.036 249.7)",
+          "oklch(85% 0.036 249.7)",
+          "oklch(95% 0.036 249.7)"
+        ]
+      },
+      "scrim": {
+        "role": "neutral",
+        "displayName": "Title Scrim (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "rgba(4,20,42,0.72)"
+      },
+      "bg-app-light": {
+        "role": "neutral",
+        "displayName": "Abyss (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(97.5% 0.006 255.5)",
+        "tonalRamp": [
+          "oklch(15% 0.006 255.5)",
+          "oklch(26% 0.006 255.5)",
+          "oklch(38% 0.006 255.5)",
+          "oklch(50% 0.006 255.5)",
+          "oklch(62% 0.006 255.5)",
+          "oklch(74% 0.006 255.5)",
+          "oklch(85% 0.006 255.5)",
+          "oklch(95% 0.006 255.5)"
+        ]
+      },
+      "bg-bar-light": {
+        "role": "neutral",
+        "displayName": "Bar Night (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(26% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "surface-1-light": {
+        "role": "neutral",
+        "displayName": "Panel Navy (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(26% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "surface-2-light": {
+        "role": "neutral",
+        "displayName": "Header Navy (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(96.9% 0.008 253.9)",
+        "tonalRamp": [
+          "oklch(15% 0.008 253.9)",
+          "oklch(26% 0.008 253.9)",
+          "oklch(38% 0.008 253.9)",
+          "oklch(50% 0.008 253.9)",
+          "oklch(62% 0.008 253.9)",
+          "oklch(74% 0.008 253.9)",
+          "oklch(85% 0.008 253.9)",
+          "oklch(95% 0.008 253.9)"
+        ]
+      },
+      "surface-3-light": {
+        "role": "neutral",
+        "displayName": "Linked Navy (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(94.6% 0.025 257.6)",
+        "tonalRamp": [
+          "oklch(15% 0.025 257.6)",
+          "oklch(26% 0.025 257.6)",
+          "oklch(38% 0.025 257.6)",
+          "oklch(50% 0.025 257.6)",
+          "oklch(62% 0.025 257.6)",
+          "oklch(74% 0.025 257.6)",
+          "oklch(85% 0.025 257.6)",
+          "oklch(95% 0.025 257.6)"
+        ]
+      },
+      "border-subtle-light": {
+        "role": "neutral",
+        "displayName": "Hairline (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(93.2% 0.014 258.3)",
+        "tonalRamp": [
+          "oklch(15% 0.014 258.3)",
+          "oklch(26% 0.014 258.3)",
+          "oklch(38% 0.014 258.3)",
+          "oklch(50% 0.014 258.3)",
+          "oklch(62% 0.014 258.3)",
+          "oklch(74% 0.014 258.3)",
+          "oklch(85% 0.014 258.3)",
+          "oklch(95% 0.014 258.3)"
+        ]
+      },
+      "border-strong-light": {
+        "role": "neutral",
+        "displayName": "Axis Steel (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(81.7% 0.029 258.4)",
+        "tonalRamp": [
+          "oklch(15% 0.029 258.4)",
+          "oklch(26% 0.029 258.4)",
+          "oklch(38% 0.029 258.4)",
+          "oklch(50% 0.029 258.4)",
+          "oklch(62% 0.029 258.4)",
+          "oklch(74% 0.029 258.4)",
+          "oklch(85% 0.029 258.4)",
+          "oklch(95% 0.029 258.4)"
+        ]
+      },
+      "text-1-light": {
+        "role": "neutral",
+        "displayName": "Ice Ink (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(18.3% 0.031 263.4)",
+        "tonalRamp": [
+          "oklch(15% 0.031 263.4)",
+          "oklch(26% 0.031 263.4)",
+          "oklch(38% 0.031 263.4)",
+          "oklch(50% 0.031 263.4)",
+          "oklch(62% 0.031 263.4)",
+          "oklch(74% 0.031 263.4)",
+          "oklch(85% 0.031 263.4)",
+          "oklch(95% 0.031 263.4)"
+        ]
+      },
+      "text-2-light": {
+        "role": "neutral",
+        "displayName": "Mist Ink (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(44.2% 0.035 257.8)",
+        "tonalRamp": [
+          "oklch(15% 0.035 257.8)",
+          "oklch(26% 0.035 257.8)",
+          "oklch(38% 0.035 257.8)",
+          "oklch(50% 0.035 257.8)",
+          "oklch(62% 0.035 257.8)",
+          "oklch(74% 0.035 257.8)",
+          "oklch(85% 0.035 257.8)",
+          "oklch(95% 0.035 257.8)"
+        ]
+      },
+      "text-3-light": {
+        "role": "neutral",
+        "displayName": "Slate Ink (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(51.6% 0.041 262.6)",
+        "tonalRamp": [
+          "oklch(15% 0.041 262.6)",
+          "oklch(26% 0.041 262.6)",
+          "oklch(38% 0.041 262.6)",
+          "oklch(50% 0.041 262.6)",
+          "oklch(62% 0.041 262.6)",
+          "oklch(74% 0.041 262.6)",
+          "oklch(85% 0.041 262.6)",
+          "oklch(95% 0.040 262.6)"
+        ]
+      },
+      "accent-light": {
+        "role": "primary",
+        "displayName": "Signal Blue (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(53.2% 0.205 260.6)",
+        "tonalRamp": [
+          "oklch(15% 0.205 260.6)",
+          "oklch(26% 0.205 260.6)",
+          "oklch(38% 0.205 260.6)",
+          "oklch(50% 0.205 260.6)",
+          "oklch(62% 0.205 260.6)",
+          "oklch(74% 0.205 260.6)",
+          "oklch(85% 0.205 260.6)",
+          "oklch(95% 0.040 260.6)"
+        ]
+      },
+      "accent-text-light": {
+        "role": "primary",
+        "displayName": "Link Blue (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(50.5% 0.203 261.5)",
+        "tonalRamp": [
+          "oklch(15% 0.203 261.5)",
+          "oklch(26% 0.203 261.5)",
+          "oklch(38% 0.203 261.5)",
+          "oklch(50% 0.203 261.5)",
+          "oklch(62% 0.203 261.5)",
+          "oklch(74% 0.203 261.5)",
+          "oklch(85% 0.203 261.5)",
+          "oklch(95% 0.040 261.5)"
+        ]
+      },
+      "selected-fill-light": {
+        "role": "primary",
+        "displayName": "Deep Selection (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(53.2% 0.205 260.6)",
+        "tonalRamp": [
+          "oklch(15% 0.205 260.6)",
+          "oklch(26% 0.205 260.6)",
+          "oklch(38% 0.205 260.6)",
+          "oklch(50% 0.205 260.6)",
+          "oklch(62% 0.205 260.6)",
+          "oklch(74% 0.205 260.6)",
+          "oklch(85% 0.205 260.6)",
+          "oklch(95% 0.040 260.6)"
+        ]
+      },
+      "selected-edge-light": {
+        "role": "primary",
+        "displayName": "Selection Cyan (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(53.2% 0.205 260.6)",
+        "tonalRamp": [
+          "oklch(15% 0.205 260.6)",
+          "oklch(26% 0.205 260.6)",
+          "oklch(38% 0.205 260.6)",
+          "oklch(50% 0.205 260.6)",
+          "oklch(62% 0.205 260.6)",
+          "oklch(74% 0.205 260.6)",
+          "oklch(85% 0.205 260.6)",
+          "oklch(95% 0.040 260.6)"
+        ]
+      },
+      "focus-ring-light": {
+        "role": "primary",
+        "displayName": "Focus Cyan (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(53.2% 0.205 260.6)",
+        "tonalRamp": [
+          "oklch(15% 0.205 260.6)",
+          "oklch(26% 0.205 260.6)",
+          "oklch(38% 0.205 260.6)",
+          "oklch(50% 0.205 260.6)",
+          "oklch(62% 0.205 260.6)",
+          "oklch(74% 0.205 260.6)",
+          "oklch(85% 0.205 260.6)",
+          "oklch(95% 0.040 260.6)"
+        ]
+      },
+      "on-accent-light": {
+        "role": "neutral",
+        "displayName": "On Accent (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(26% 0.000 89.9)",
+          "oklch(38% 0.000 89.9)",
+          "oklch(50% 0.000 89.9)",
+          "oklch(62% 0.000 89.9)",
+          "oklch(74% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "success-light": {
+        "role": "secondary",
+        "displayName": "Done Green (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(52.7% 0.137 150.1)",
+        "tonalRamp": [
+          "oklch(15% 0.137 150.1)",
+          "oklch(26% 0.137 150.1)",
+          "oklch(38% 0.137 150.1)",
+          "oklch(50% 0.137 150.1)",
+          "oklch(62% 0.137 150.1)",
+          "oklch(74% 0.137 150.1)",
+          "oklch(85% 0.137 150.1)",
+          "oklch(95% 0.040 150.1)"
+        ]
+      },
+      "warning-light": {
+        "role": "secondary",
+        "displayName": "Overrun Amber (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(55.5% 0.146 49.0)",
+        "tonalRamp": [
+          "oklch(15% 0.146 49.0)",
+          "oklch(26% 0.146 49.0)",
+          "oklch(38% 0.146 49.0)",
+          "oklch(50% 0.146 49.0)",
+          "oklch(62% 0.146 49.0)",
+          "oklch(74% 0.146 49.0)",
+          "oklch(85% 0.146 49.0)",
+          "oklch(95% 0.040 49.0)"
+        ]
+      },
+      "danger-light": {
+        "role": "secondary",
+        "displayName": "Failed Red (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(50.0% 0.182 29.5)",
+        "tonalRamp": [
+          "oklch(15% 0.182 29.5)",
+          "oklch(26% 0.182 29.5)",
+          "oklch(38% 0.182 29.5)",
+          "oklch(50% 0.182 29.5)",
+          "oklch(62% 0.182 29.5)",
+          "oklch(74% 0.182 29.5)",
+          "oklch(85% 0.182 29.5)",
+          "oklch(95% 0.040 29.5)"
+        ]
+      },
+      "error-bg-light": {
+        "role": "secondary",
+        "displayName": "Error Ground (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(95.9% 0.017 17.5)",
+        "tonalRamp": [
+          "oklch(15% 0.017 17.5)",
+          "oklch(26% 0.017 17.5)",
+          "oklch(38% 0.017 17.5)",
+          "oklch(50% 0.017 17.5)",
+          "oklch(62% 0.017 17.5)",
+          "oklch(74% 0.017 17.5)",
+          "oklch(85% 0.017 17.5)",
+          "oklch(95% 0.017 17.5)"
+        ]
+      },
+      "error-text-light": {
+        "role": "secondary",
+        "displayName": "Error Ink (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(34.2% 0.091 24.1)",
+        "tonalRamp": [
+          "oklch(15% 0.091 24.1)",
+          "oklch(26% 0.091 24.1)",
+          "oklch(38% 0.091 24.1)",
+          "oklch(50% 0.091 24.1)",
+          "oklch(62% 0.091 24.1)",
+          "oklch(74% 0.091 24.1)",
+          "oklch(85% 0.091 24.1)",
+          "oklch(95% 0.040 24.1)"
+        ]
+      },
+      "canvas-solid-light": {
+        "role": "neutral",
+        "displayName": "Canvas Solid (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(98.1% 0.005 258.3)",
+        "tonalRamp": [
+          "oklch(15% 0.005 258.3)",
+          "oklch(26% 0.005 258.3)",
+          "oklch(38% 0.005 258.3)",
+          "oklch(50% 0.005 258.3)",
+          "oklch(62% 0.005 258.3)",
+          "oklch(74% 0.005 258.3)",
+          "oklch(85% 0.005 258.3)",
+          "oklch(95% 0.005 258.3)"
+        ]
+      },
+      "plot-grid-light": {
+        "role": "neutral",
+        "displayName": "Plot Grid (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(94.1% 0.013 255.5)",
+        "tonalRamp": [
+          "oklch(15% 0.013 255.5)",
+          "oklch(26% 0.013 255.5)",
+          "oklch(38% 0.013 255.5)",
+          "oklch(50% 0.013 255.5)",
+          "oklch(62% 0.013 255.5)",
+          "oklch(74% 0.013 255.5)",
+          "oklch(85% 0.013 255.5)",
+          "oklch(95% 0.013 255.5)"
+        ]
+      },
+      "swatch-ring-light": {
+        "role": "neutral",
+        "displayName": "Swatch Ring (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(51.6% 0.041 262.6)",
+        "tonalRamp": [
+          "oklch(15% 0.041 262.6)",
+          "oklch(26% 0.041 262.6)",
+          "oklch(38% 0.041 262.6)",
+          "oklch(50% 0.041 262.6)",
+          "oklch(62% 0.041 262.6)",
+          "oklch(74% 0.041 262.6)",
+          "oklch(85% 0.041 262.6)",
+          "oklch(95% 0.040 262.6)"
+        ]
+      },
+      "phase-positive": {
+        "role": "tertiary",
+        "displayName": "Phase Orange (ψ > 0)",
+        "theme": "both",
+        "canonical": "oklch(72.5% 0.182 46.0)",
+        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+      },
+      "phase-negative": {
+        "role": "tertiary",
+        "displayName": "Phase Blue (ψ < 0)",
+        "theme": "both",
+        "canonical": "oklch(58.1% 0.229 263.9)",
+        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+      },
+      "rim-positive": {
+        "role": "tertiary",
+        "displayName": "Glow Rim, ψ > 0 (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(86.5% 0.087 57.8)",
+        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+      },
+      "rim-negative": {
+        "role": "tertiary",
+        "displayName": "Glow Rim, ψ < 0 (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(80.9% 0.096 259.7)",
+        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+      },
+      "rim-positive-light": {
+        "role": "tertiary",
+        "displayName": "Glow Rim, ψ > 0 (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(47.0% 0.143 37.3)",
+        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+      },
+      "rim-negative-light": {
+        "role": "tertiary",
+        "displayName": "Glow Rim, ψ < 0 (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(37.9% 0.138 265.5)",
+        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+      },
+      "density-surface": {
+        "role": "tertiary",
+        "displayName": "Density Grey-Blue (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(87.2% 0.029 256.5)",
+        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+      },
+      "density-surface-light": {
+        "role": "tertiary",
+        "displayName": "Density Grey-Blue (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(62.8% 0.038 256.4)",
+        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+      },
+      "brand-violet-start": {
+        "role": "tertiary",
+        "displayName": "Wordmark Violet (start) (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(63.5% 0.209 288.4)",
+        "tonalRamp": [
+          "oklch(15% 0.209 288.4)",
+          "oklch(26% 0.209 288.4)",
+          "oklch(38% 0.209 288.4)",
+          "oklch(50% 0.209 288.4)",
+          "oklch(62% 0.209 288.4)",
+          "oklch(74% 0.209 288.4)",
+          "oklch(85% 0.209 288.4)",
+          "oklch(95% 0.040 288.4)"
+        ]
+      },
+      "brand-violet-end": {
+        "role": "tertiary",
+        "displayName": "Wordmark Violet (end) (Deep Space)",
+        "theme": "Deep Space",
+        "canonical": "oklch(66.0% 0.225 312.6)",
+        "tonalRamp": [
+          "oklch(15% 0.225 312.6)",
+          "oklch(26% 0.225 312.6)",
+          "oklch(38% 0.225 312.6)",
+          "oklch(50% 0.225 312.6)",
+          "oklch(62% 0.225 312.6)",
+          "oklch(74% 0.225 312.6)",
+          "oklch(85% 0.225 312.6)",
+          "oklch(95% 0.040 312.6)"
+        ]
+      },
+      "brand-violet-start-light": {
+        "role": "tertiary",
+        "displayName": "Wordmark Violet (start) (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(50.9% 0.234 270.3)",
+        "tonalRamp": [
+          "oklch(15% 0.234 270.3)",
+          "oklch(26% 0.234 270.3)",
+          "oklch(38% 0.234 270.3)",
+          "oklch(50% 0.234 270.3)",
+          "oklch(62% 0.234 270.3)",
+          "oklch(74% 0.234 270.3)",
+          "oklch(85% 0.234 270.3)",
+          "oklch(95% 0.040 270.3)"
+        ]
+      },
+      "brand-violet-end-light": {
+        "role": "tertiary",
+        "displayName": "Wordmark Violet (end) (Light Clean)",
+        "theme": "Light Clean",
+        "canonical": "oklch(53.8% 0.232 293.7)",
+        "tonalRamp": [
+          "oklch(15% 0.232 293.7)",
+          "oklch(26% 0.232 293.7)",
+          "oklch(38% 0.232 293.7)",
+          "oklch(50% 0.232 293.7)",
+          "oklch(62% 0.232 293.7)",
+          "oklch(74% 0.232 293.7)",
+          "oklch(85% 0.232 293.7)",
+          "oklch(95% 0.040 293.7)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "The QuantumLab lockup in the top bar; \"Lab\" in the brand gradient."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "View and page titles; every MUI heading level."
+      },
+      "section": {
+        "displayName": "Section",
+        "purpose": "Panel and inspector section headings."
+      },
+      "nav": {
+        "displayName": "Nav",
+        "purpose": "Top-bar and panel tabs; 600 when current."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text and table cells on desktop."
+      },
+      "body-phone": {
+        "displayName": "Body (phone)",
+        "purpose": "Body under the phone query (max-width 760, max-height 500, or portrait to 1100)."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "All buttons, sentence case."
+      },
+      "subtitle": {
+        "displayName": "Subtitle",
+        "purpose": "Secondary lines under view titles on the canvas."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Table headers, legends, notes, chip and status text; 12 on a phone too."
+      },
+      "tick": {
+        "displayName": "Tick",
+        "purpose": "Axis labels and band job names; the 11 px floor."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Any comparable number: body with tabular figures (.ql-tabular)."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Job keys and diagnostic logs on the jobs page; literal stack, no token yet."
+      }
+    },
+    "gradients": [
+      {
+        "name": "canvas",
+        "theme": "Deep Space",
+        "value": "radial-gradient(ellipse 70% 60% at 50% 45%, #0A1F3A 0%, #04142A 45%, #020C19 100%)",
+        "purpose": "The 3D view backdrop behind the transparent canvas."
+      },
+      {
+        "name": "canvas",
+        "theme": "Light Clean",
+        "value": "radial-gradient(ellipse 70% 60% at 50% 45%, #FFFFFF 0%, #F6F9FD 60%, #EEF3F9 100%)",
+        "purpose": "The 3D view backdrop behind the transparent canvas."
+      },
+      {
+        "name": "rail-active",
+        "theme": "Deep Space",
+        "value": "linear-gradient(180deg,#123E9C,#0A2A6B)",
+        "purpose": "The mode menu's active item (Light Clean: #E3EEFE)."
+      },
+      {
+        "name": "brand-accent",
+        "theme": "Deep Space",
+        "value": "linear-gradient(90deg,#8A6CFF,#C05CF2)",
+        "purpose": "The wordmark's \"Lab\", as gradient text with a solid fallback."
+      },
+      {
+        "name": "brand-accent",
+        "theme": "Light Clean",
+        "value": "linear-gradient(90deg,#3A4BE8,#7B3FE4)",
+        "purpose": "The wordmark's \"Lab\", as gradient text with a solid fallback."
+      },
+      {
+        "name": "strip-tile",
+        "theme": "both",
+        "value": "radial-gradient(120% 90% at 50% 0%, var(--ql-color-surface-3), var(--ql-color-surface-2) 70%)",
+        "purpose": "A thumbnail tile's subtle lift from the top (Light Clean lifts from surface-1)."
+      }
+    ],
+    "shadows": [
+      {
+        "name": "panel",
+        "theme": "Deep Space",
+        "value": "inset 0 1px 0 rgba(255,255,255,.03)",
+        "purpose": "Docked panels, budget strip, job list: a hairline top highlight, no drop shadow."
+      },
+      {
+        "name": "panel",
+        "theme": "Light Clean",
+        "value": "0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10)",
+        "purpose": "The same containers, lifted softly off the page."
+      },
+      {
+        "name": "popover",
+        "theme": "Deep Space",
+        "value": "0 12px 32px rgba(0,0,0,.45)",
+        "purpose": "Menus, popovers and search results, with a border-subtle hairline."
+      },
+      {
+        "name": "popover",
+        "theme": "Light Clean",
+        "value": "0 12px 24px rgba(16,24,40,.12)",
+        "purpose": "Menus, popovers and search results, with a border-subtle hairline."
+      },
+      {
+        "name": "selected",
+        "theme": "Deep Space",
+        "value": "0 0 0 1px #1FB6F5, 0 0 12px rgba(31,182,245,.35)",
+        "purpose": "A selected control: cyan ring and halo."
+      },
+      {
+        "name": "selected",
+        "theme": "Light Clean",
+        "value": "0 0 0 1px #1662E0",
+        "purpose": "A selected control: accent ring, no glow."
+      },
+      {
+        "name": "selected-tile",
+        "theme": "Deep Space",
+        "value": "0 0 12px 1px rgba(31,182,245,.5)",
+        "purpose": "The selected strip tile, around its inner 2 px selected-edge ring."
+      },
+      {
+        "name": "selected-tile",
+        "theme": "Light Clean",
+        "value": "none",
+        "purpose": "No glow in Light Clean."
+      }
+    ],
+    "focus": {
+      "value": "outline: 2px solid var(--ql-color-focus-ring); outline-offset: 2px",
+      "purpose": "Every interactive element, never removed; outlined inputs use a 2 px focus-ring border instead."
+    },
+    "motion": [
+      {
+        "name": "hover",
+        "value": "120ms ease-out",
+        "purpose": "Colour, background and opacity changes on hover; band marks dimming."
+      },
+      {
+        "name": "panel",
+        "value": "180ms ease-out",
+        "purpose": "Disclosure chevrons, the inspector drawer (16 px slide-in with fade)."
+      },
+      {
+        "name": "reduced",
+        "value": "0ms",
+        "purpose": "prefers-reduced-motion: every transition and animation is instant; static glows stay."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "(max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait)",
+        "purpose": "Viewer phone layout and phone body type (theme.ts PHONE_MEDIA)."
+      },
+      {
+        "name": "medium",
+        "value": "(max-width: 1289px)",
+        "purpose": "Viewer: inspector folds to a 44 px bar and opens as a drawer."
+      },
+      {
+        "name": "wide",
+        "value": "(min-width: 1680px)",
+        "purpose": "Viewer: inspector widens to 320 px."
+      },
+      {
+        "name": "operate-tablet",
+        "value": "(max-width: 1024px)",
+        "purpose": "Jobs page: strip regroups, memory moves into details."
+      },
+      {
+        "name": "operate-phone",
+        "value": "(max-width: 600px)",
+        "purpose": "Jobs page: strip folds, rows become two-line items."
+      }
+    ],
+    "sizes": {
+      "topBar": "56px",
+      "phoneTopBar": "52px",
+      "explore": "315px",
+      "exploreMedium": "300px",
+      "inspector": "290px",
+      "inspectorWide": "320px",
+      "inspectorBar": "44px",
+      "controlRow": "28px",
+      "search": "36px",
+      "touch": "44px",
+      "chip": "32px",
+      "thumb": "72px",
+      "thumbLabel": "16px",
+      "stripHandle": "28px",
+      "toolbarButton": "36px",
+      "operateMaxWidth": "1440px",
+      "bandHeight": "about 120px"
+    },
+    "moneyPrecision": [
+      {
+        "context": "Strip, band, rows",
+        "rule": "Two decimals; a row charge under a cent reads \"under $0.01\"."
+      },
+      {
+        "context": "Other small figures",
+        "rule": "Four significant figures below a cent (formatUsd)."
+      },
+      {
+        "context": "Details: quote lines, attempts, totals",
+        "rule": "The meter's micro-dollars ($0.000000, exactUsd) so lines add up to the total."
+      },
+      {
+        "context": "Everywhere",
+        "rule": "Never bare: each figure carries its word (held, of, estimated, up to, absorbed by the app)."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Contained Button",
+      "kind": "button",
+      "refersTo": "button-contained",
+      "description": "The one primary action in a panel: request, approve, export.",
+      "html": "<button class=\"ds-btn-contained\">Approve up to $0.51</button>",
+      "css": ".ds-btn-contained { background: var(--ql-color-accent, #2A85F8); color: var(--ql-color-on-accent, #000); font: 500 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); padding: 6px 16px; border: 0; border-radius: 8px; cursor: pointer; transition: background-color 120ms ease-out; } .ds-btn-contained:hover { background: color-mix(in srgb, var(--ql-color-accent, #2A85F8) 85%, #000); } .ds-btn-contained:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outlined Row Action",
+      "kind": "button",
+      "refersTo": "button-outlined",
+      "description": "A row's one action: Open result, Follow, Details.",
+      "html": "<button class=\"ds-btn-outlined\">Open result</button>",
+      "css": ".ds-btn-outlined { background: transparent; color: var(--ql-color-accent-text, #4C9BFF); border: 1px solid color-mix(in srgb, var(--ql-color-accent, #2A85F8) 50%, transparent); border-radius: 8px; padding: 3px 9px; font: 500 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); cursor: pointer; transition: background-color 120ms ease-out, border-color 120ms ease-out; } .ds-btn-outlined:hover { background: color-mix(in srgb, var(--ql-color-accent, #2A85F8) 8%, transparent); border-color: var(--ql-color-accent, #2A85F8); } .ds-btn-outlined:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Filter Chips",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "Status filters with counts; the selected chip takes the selection fill and edge.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip is-selected\">All<span class=\"ds-chip-count\">10</span></button><button class=\"ds-chip\">Running<span class=\"ds-chip-count\">1</span></button><button class=\"ds-chip\">Over prediction<span class=\"ds-chip-count\">6</span></button></div>",
+      "css": ".ds-chips { display: flex; gap: 6px; flex-wrap: wrap; } .ds-chip { height: 24px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--ql-color-border-strong, #2B4A6B); background: transparent; color: var(--ql-color-text-1, #F2F6FA); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color 120ms ease-out; } .ds-chip:hover { background: var(--ql-color-surface-2, #0B1C2D); } .ds-chip:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-chip-count { margin-left: 6px; color: var(--ql-color-text-3, #93A6BA); } .ds-chip.is-selected, .ds-chip.is-selected:hover { background: var(--ql-color-selected-fill, #0E3A99); border-color: var(--ql-color-selected-edge, #1FB6F5); color: var(--ql-color-on-fill, #fff); } .ds-chip.is-selected .ds-chip-count { color: var(--ql-color-on-fill, #fff); }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "A job's status: one word and a dot in its tone (amber when done past its prediction).",
+      "html": "<span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-accent, #2A85F8)\"></span>Running</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-warning, #FBBF24)\"></span>Done</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-danger, #F87171)\"></span>Failed</span>",
+      "css": ".ds-status { display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px 1px 7px; font: 500 12px/18px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-1, #F2F6FA); border: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); border-radius: 999px; } .ds-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Outlined search with a leading magnifier; the focused border is the indicator.",
+      "html": "<label class=\"ds-search\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14\"/></svg><input placeholder=\"Name or formula\"></label>",
+      "css": ".ds-search { display: inline-flex; align-items: center; gap: 8px; width: 260px; height: 36px; padding: 0 12px; border: 1px solid var(--ql-color-border-strong, #2B4A6B); border-radius: 8px; color: var(--ql-color-text-2, #C3CFDB); transition: border-color 120ms ease-out; } .ds-search:hover { border-color: var(--ql-color-text-2, #C3CFDB); } .ds-search:focus-within { border: 2px solid var(--ql-color-focus-ring, #1FB6F5); padding: 0 11px; } .ds-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--ql-color-text-1, #F2F6FA); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
+    },
+    {
+      "name": "Top Bar Tabs",
+      "kind": "nav",
+      "refersTo": "top-bar-tab",
+      "description": "The 56 px top bar's destinations: nav type, the current one underlined in selected-edge.",
+      "html": "<nav class=\"ds-topbar\"><a class=\"ds-tab\" aria-current=\"page\" href=\"#\">Orbitals</a><a class=\"ds-tab\" href=\"#\">Atoms</a><a class=\"ds-tab\" href=\"#\">Bonds</a><a class=\"ds-tab\" href=\"#\">Molecules</a></nav>",
+      "css": ".ds-topbar { display: flex; align-items: stretch; gap: 20px; height: 56px; padding: 0 16px; background: var(--ql-color-bg-bar, #010B17); border-bottom: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); } .ds-tab { position: relative; display: inline-flex; align-items: center; color: var(--ql-color-text-2, #C3CFDB); text-decoration: none; font: 500 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); transition: color 120ms ease-out; } .ds-tab:hover { color: var(--ql-color-text-1, #F2F6FA); } .ds-tab:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-tab[aria-current=\"page\"] { color: var(--ql-color-text-1, #F2F6FA); font-weight: 600; } .ds-tab[aria-current=\"page\"]::after { content: \"\"; position: absolute; left: 0; right: 0; bottom: 12px; height: 2px; border-radius: 1px; background: var(--ql-color-selected-edge, #1FB6F5); }"
+    },
+    {
+      "name": "Budget Strip",
+      "kind": "card",
+      "refersTo": "budget-strip",
+      "description": "The month's money on one line of named figures, with a thin charged/held cap bar.",
+      "html": "<section class=\"ds-strip\"><div class=\"ds-cell ds-avail\"><span><span class=\"ds-label\">Available</span> <strong class=\"ds-value\">$7.04</strong> <span class=\"ds-label\">of $8.80</span></span><span class=\"ds-cap\"><span class=\"ds-cap-charged\" style=\"width:4%\"></span><span class=\"ds-cap-held\" style=\"left:4%;width:16%\"></span></span></div><div class=\"ds-cell\"><span class=\"ds-label\">Charged</span> <strong class=\"ds-value\">$0.33</strong></div><div class=\"ds-cell\"><span class=\"ds-label\">Held</span> <strong class=\"ds-value\">$1.44</strong> <span class=\"ds-label\">for running jobs</span></div><div class=\"ds-cell\"><span class=\"ds-label\">Projected</span> <strong class=\"ds-value\">$0.81</strong> <span class=\"ds-label\">by 31 Oct</span></div></section>",
+      "css": ".ds-strip { display: grid; grid-template-columns: minmax(210px, 1fr) auto auto auto; background: var(--ql-color-surface-1, #071828); color: var(--ql-color-text-1, #F2F6FA); border: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); border-radius: 12px; box-shadow: var(--ql-shadow-panel, inset 0 1px 0 rgba(255,255,255,.03)); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; } .ds-cell { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 10px 14px; border-left: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); white-space: nowrap; } .ds-cell:first-child { border-left: 0; } .ds-label { color: var(--ql-color-text-3, #93A6BA); } .ds-value { font-weight: 600; } .ds-cap { position: relative; display: block; height: 4px; border-radius: 999px; background: var(--ql-color-surface-3, #13263B); overflow: hidden; } .ds-cap-charged, .ds-cap-held { position: absolute; top: 0; bottom: 0; left: 0; } .ds-cap-charged { background: var(--ql-color-accent, #2A85F8); } .ds-cap-held { background: color-mix(in srgb, var(--ql-color-accent, #2A85F8) 40%, var(--ql-color-surface-3, #13263B)); }"
+    },
+    {
+      "name": "Job Row with Prediction Gauge",
+      "kind": "custom",
+      "refersTo": "job-row",
+      "description": "One line per job; the run-time gauge notches the prediction and turns amber past it; the row opens in place.",
+      "html": "<table class=\"ds-list\"><tbody><tr class=\"ds-row\"><td><button class=\"ds-disclosure\" aria-expanded=\"false\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z\"/></svg><b>Imidazole</b> <span class=\"ds-muted\">C₃H₄N₂ · optimise · 14 Oct</span></button></td><td><span class=\"ds-gauge\"><span class=\"ds-gauge-fill\" style=\"width:83%\"></span><span class=\"ds-gauge-over\" style=\"left:83%;width:17%\"></span><span class=\"ds-gauge-notch\" style=\"left:83%\"></span></span><span class=\"ds-over\">30m 20s</span> <span class=\"ds-muted\">of 25m 00s</span></td><td class=\"ds-num\">$0.07 <span class=\"ds-muted\">of $1.20</span></td></tr></tbody></table>",
+      "css": ".ds-list { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--ql-color-surface-1, #071828); color: var(--ql-color-text-1, #F2F6FA); border: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); border-radius: 12px; font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; } .ds-list td { padding: 6px 12px; white-space: nowrap; } .ds-row { transition: background-color 120ms ease-out; } .ds-row:hover { background: var(--ql-color-surface-2, #0B1C2D); } .ds-disclosure { display: flex; align-items: center; gap: 6px; padding: 4px; margin: -4px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; cursor: pointer; } .ds-disclosure svg { color: var(--ql-color-text-3, #93A6BA); transition: transform 180ms ease-out; } .ds-disclosure[aria-expanded=\"true\"] svg { transform: rotate(90deg); } .ds-disclosure:hover b { text-decoration: underline; text-underline-offset: 3px; } .ds-disclosure:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-muted { color: var(--ql-color-text-3, #93A6BA); } .ds-num { text-align: right; } .ds-over { color: var(--ql-color-warning, #FBBF24); font-weight: 500; } .ds-gauge { position: relative; display: inline-block; vertical-align: middle; margin: -2px 8px 0 0; width: 56px; height: 6px; border-radius: 999px; background: var(--ql-color-surface-3, #13263B); } .ds-gauge-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--ql-color-text-3, #93A6BA); } .ds-gauge-over { position: absolute; top: 0; bottom: 0; border-radius: 0 999px 999px 0; background: var(--ql-color-warning, #FBBF24); } .ds-gauge-notch { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ql-color-text-1, #F2F6FA); }"
+    },
+    {
+      "name": "Phase Key Chip",
+      "kind": "custom",
+      "refersTo": "key-chip",
+      "description": "The canvas key: science swatches on surface-2, with the swatch-ring outline where a hue is under 3:1.",
+      "html": "<div class=\"ds-key\"><span class=\"ds-key-item\"><span class=\"ds-swatch\" style=\"background:#FF7A2F\"></span>ψ &gt; 0</span><span class=\"ds-key-item\"><span class=\"ds-swatch\" style=\"background:#2F6BFF\"></span>ψ &lt; 0</span></div>",
+      "css": ".ds-key { display: inline-flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--ql-color-surface-2, #0B1C2D); color: var(--ql-color-text-1, #F2F6FA); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-key-item { display: inline-flex; align-items: center; gap: 6px; } .ds-swatch { width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 1px var(--ql-color-swatch-ring, transparent); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Night Instrument",
+    "overview": "QuantumLab is a measuring instrument, not a showcase. A navy room (Deep Space) or a clean daylight bench (Light Clean) holds one lit object: the computed orbital, density or molecule on the canvas, or, on the owner's Operate pages, the month's money and jobs. The chrome is quiet, tonal and dense: surfaces step a few points of lightness apart, borders are hairlines, and the only loud colours on screen are the science colours, which mean something, and the status colours, which also mean something. Accent blue marks what you can act on, what is selected, and the single line of money that matters.\n\nDensity is deliberate. The viewer is a fixed full-window workstation (top bar; Explore, canvas, inspector) at 13 px body text; the Operate surfaces are scrolling documents on the same tokens, built from one budget strip, a compact chart band drawn on the page itself, and one-line rows that open in place. Every figure carries its unit and its word (\"of\", \"held\", \"charged\", \"so far\"), set in tabular figures so columns of money and minutes align.\n\nBoth themes are first-class and share every structural token; only colour, shadow and the canvas backdrop change. The system is MUI 7 driven entirely from `src/design/tokens.ts` (tokens.css is generated from it), so a new surface inherits the world by importing tokens.css and design.css and using the MUI theme from `theme.ts`.",
+    "keyCharacteristics": [
+      "Tonal navy layering in Deep Space; hairline borders and a light lift in Light Clean.",
+      "Science colours untouched in both themes; status colours carry meaning only.",
+      "Inter Variable throughout, a narrow ramp (11 to 20 px), tabular figures for every number.",
+      "Fixed workstation for the viewer; scrolling ledger for Operate pages.",
+      "Short ease-out motion (120 / 180 ms), zero under reduced motion."
+    ],
+    "rules": [
+      {
+        "name": "The Science Is Not Style Rule",
+        "body": "Phase, density and ESP colours are never whitened, tinted, darkened or swapped per theme for a look. Where a phase hue falls under 3:1 on its panel (Light Clean's orange), a `swatch-ring` outline carries the contrast; the hue stays.",
+        "section": "colors"
+      },
+      {
+        "name": "The Meaning-Only Status Rule",
+        "body": "Green, amber, red and the running-blue appear only where they state an outcome, and every use is keyed (a legend, a chip label, or words). Amber means \"past a prediction\" at any overrun, with no tolerance, or \"billed past the approved maximum, absorbed by the app\".",
+        "section": "colors"
+      },
+      {
+        "name": "The One Blue Voice Rule",
+        "body": "Signal Blue marks actions, selection and the one money line; it is never a section tint, a decorative stroke or a background wash.",
+        "section": "colors"
+      },
+      {
+        "name": "The Wordmark Keeps The Violet Rule",
+        "body": "The violet gradient lives only in the \"Lab\" half of the wordmark (solid fallback included); it is not a UI colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every number that can sit above or beside another (money, durations, memory, ticks) is set with `font-variant-numeric: tabular-nums` (`.ql-tabular`).",
+        "section": "typography"
+      },
+      {
+        "name": "The Phone Fourteen Rule",
+        "body": "Body steps to 14 px under the phone query; captions and ticks do not grow.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Shouting Rule",
+        "body": "No uppercase labels, no tracked-out small caps, no size over 20 px in product chrome.",
+        "section": "typography"
+      },
+      {
+        "name": "The Glow Belongs To Deep Space Rule",
+        "body": "Halos and added light exist only in the dark theme; Light Clean expresses the same states with ink rings and darker rims.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Glow Finish Is The Owner's Rule",
+        "body": "The 3D Glow finish (`src/orbital_glow.ts`, GLOW_TUNING) is presentation only and its values were tuned live by the owner; they are recorded there, not here, and are not restyled.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do take every colour, size, radius and duration from `tokens.ts` through `tokens.css` or the MUI theme; add a role there before using a new value.",
+      "Do set every comparable number in tabular figures and pair it with its unit and its word (\"$0.04 of $0.51\", \"1.20 so far of 2.10 GB\").",
+      "Do draw an overrun in amber however small, and key every status tone in a legend or in words.",
+      "Do say an off-scale reference (a cap, a limit) in words rather than drawing it at a false height.",
+      "Do open a record's detail in place under its row, one step away, rather than navigating off the list.",
+      "Do keep a visible 2 px focus ring on every interactive element and honour reduced motion (hover 120 ms, panels 180 ms, ease-out, 0 ms when reduced).",
+      "Do give secondary text a real colour token (`text-2`, `text-3`), never opacity, so contrast tests see the painted colour."
+    ],
+    "donts": [
+      "Don't whiten, tint, darken or swap the phase, density or ESP colours for either theme or any finish.",
+      "Don't use green, amber, red or the running-blue as decoration, section colour or emphasis.",
+      "Don't build KPI-tile grids or wide spreadsheets that push cost off screen on Operate pages; use the strip, the band and one-line rows.",
+      "Don't set anything under 11 px, or uppercase labels and buttons.",
+      "Don't add drop shadows to Deep Space panels or glows to Light Clean.",
+      "Don't let the wordmark's violet gradient leave the wordmark."
+    ]
+  }
+}

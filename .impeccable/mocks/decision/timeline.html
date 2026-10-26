@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Jobs — timeline</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden;background:#020F1D;color:#F2F6FA;font:14px/1.45 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.bar{height:56px;background:#010B17;border-bottom:1px solid rgba(110,160,220,.16);display:flex;align-items:center;gap:24px;padding:0 24px}
+.brand{font-weight:600;font-size:18px}.brand b{color:#A78BFA;font-weight:600}
+.bar a{color:#C3CFDB;text-decoration:none}.bar a.on{color:#F2F6FA;border-bottom:2px solid #4C9BFF;padding-bottom:4px}.bar .sp{flex:1}
+.pill{border:1px solid #2B4A6B;border-radius:999px;padding:4px 12px;color:#C3CFDB}
+.wrap{padding:18px 24px}
+.top{display:flex;align-items:baseline;gap:28px;margin-bottom:12px}.top h1{font-size:24px;font-weight:600}
+.f{color:#93A6BA}.f b{color:#F2F6FA;font-weight:600;margin-left:4px}
+.chart{background:#071828;border:1px solid rgba(110,160,220,.16);border-radius:12px;padding:16px 18px 10px;position:relative;height:280px}
+.plot{position:absolute;left:70px;right:24px;top:22px;height:200px}
+.grid{position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(150,180,220,.08) 0 1px,transparent 1px calc(100%/31))}
+.cap{position:absolute;left:0;right:0;top:0;border-top:1px dashed #F87171}.cap span{position:absolute;right:0;top:-18px;font-size:12px;color:#F87171}
+.ax{position:absolute;left:70px;right:24px;top:228px;display:flex;justify-content:space-between;color:#93A6BA;font-size:12px}
+.yl{position:absolute;left:14px;top:16px;font-size:12px;color:#93A6BA}.yl2{position:absolute;left:14px;top:214px;font-size:12px;color:#93A6BA}
+.jb{position:absolute;height:10px;border-radius:999px}
+.ok{background:#34D399}.run{background:#2A85F8}.bad{background:#F87171}.warn{background:#FBBF24}
+.lab{position:absolute;font-size:12px;color:#C3CFDB;white-space:nowrap}
+svg{position:absolute;inset:0;width:100%;height:100%}
+.legend{position:absolute;right:24px;bottom:10px;display:flex;gap:16px;color:#93A6BA;font-size:12px}.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.list{margin-top:16px;background:#071828;border:1px solid rgba(110,160,220,.16);border-radius:12px;overflow:hidden}
+.r{display:grid;grid-template-columns:70px 2fr 110px 1.4fr 150px 120px;gap:14px;align-items:center;padding:10px 18px;border-top:1px solid rgba(110,160,220,.10)}
+.r:first-child{border-top:0}.r.th{background:#0B1C2D;color:#93A6BA;font-size:12px}.r.sel{background:#0E3A99;box-shadow:inset 3px 0 0 #1FB6F5}
+.mol b{font-weight:600}.mol span{color:#93A6BA;margin-left:6px;font-size:13px}.muted{color:#93A6BA}.num{text-align:right}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:13px}.dot{width:8px;height:8px;border-radius:50%}
+.open{justify-self:end;color:#4C9BFF;border:1px solid #2B4A6B;border-radius:8px;padding:4px 10px;font-weight:500}
+.demo{position:absolute;right:24px;bottom:8px;color:#5B6880;font-size:11px}
+</style></head><body>
+<div class="bar"><div class="brand">Quantum<b>Lab</b></div><a href="#">Viewer</a><a class="on" href="#">Jobs</a><div class="sp"></div><span class="pill">October 2026 ▾</span><span class="pill">Runs on AWS</span></div>
+<div class="wrap">
+<div class="top"><h1>October</h1><span class="f">Charged<b>$0.33</b></span><span class="f">Held<b>$1.44</b></span><span class="f">Available<b>$7.03 of $8.80</b></span><span class="f">Projected<b>$0.81</b></span><span class="f">AWS billed<b>$0.62</b> <span class="muted">(meter $0.33)</span></span></div>
+<div class="chart">
+ <div class="yl">$8.80 cap</div><div class="yl2">$0</div>
+ <div class="plot"><div class="grid"></div><div class="cap"><span>cap $8.80</span></div>
+  <svg viewBox="0 0 1000 200" preserveAspectRatio="none"><polyline fill="none" stroke="#4C9BFF" stroke-width="2" points="0,200 161,200 177,197.6 258,197.5 322,196.9 355,196.6 419,195 452,194.1 484,193.2 548,192.5 580,192.5 613,192.5"/><polyline fill="none" stroke="#4C9BFF" stroke-width="2" stroke-dasharray="5 5" points="613,192.5 1000,181.6"/></svg>
+  <div class="jb ok" style="left:16.6%;top:150px;width:2.2%"></div><div class="lab" style="left:12.6%;top:132px">Benzene · 6.1 GB vs 0.7 predicted</div>
+  <div class="jb ok" style="left:18.5%;top:168px;width:1.6%"></div>
+  <div class="jb ok" style="left:26.4%;top:150px;width:.6%"></div><div class="lab" style="left:25.6%;top:110px">Methane</div>
+  <div class="jb warn" style="left:32.6%;top:150px;width:1.2%"></div><div class="lab" style="left:31.6%;top:110px">Acetic acid · 2 attempts</div>
+  <div class="jb ok" style="left:35.9%;top:168px;width:.8%"></div>
+  <div class="jb warn" style="left:42.2%;top:150px;width:2.4%"></div><div class="lab" style="left:41.2%;top:132px">Imidazole</div>
+  <div class="jb ok" style="left:45.4%;top:168px;width:1.4%"></div>
+  <div class="jb ok" style="left:48.6%;top:150px;width:1.1%"></div><div class="lab" style="left:48%;top:110px">Theobromine</div>
+  <div class="jb bad" style="left:55.1%;top:150px;width:.9%"></div><div class="lab" style="left:54.4%;top:132px">Ferrocene · failed</div>
+  <div class="jb run" style="left:58.4%;top:168px;width:2.6%"></div><div class="lab" style="left:61.6%;top:163px">Aspirin · running</div>
+ </div>
+ <div class="ax"><span>1</span><span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>31 Oct</span></div>
+ <div class="legend"><span><i style="background:#4C9BFF"></i>cumulative charged · projection dashed</span><span><i class="ok"></i>done</span><span><i class="warn"></i>off prediction</span><span><i class="bad"></i>failed</span><span><i class="run"></i>running</span></div>
+</div>
+<div class="list">
+ <div class="r th"><span>Date</span><span>Molecule</span><span>Status</span><span>Time vs prediction</span><span class="num">Charged / approved</span><span></span></div>
+ <div class="r"><span class="muted">19 Oct</span><span class="mol"><b>Aspirin</b><span>C₉H₈O₄ · optimise</span></span><span class="st"><i class="dot run"></i>Running</span><span>41 m <span class="muted">of 39 m · step 6</span></span><span class="num muted">held $1.44</span><span class="open">Follow</span></div>
+ <div class="r"><span class="muted">18 Oct</span><span class="mol"><b>Ferrocene</b><span>C₁₀H₁₀Fe · single</span></span><span class="st"><i class="dot bad"></i>Failed</span><span class="muted">SCF did not converge</span><span class="num">$0.031 <span class="muted">/ $0.62</span></span><span class="open">Details</span></div>
+ <div class="r sel"><span class="muted">16 Oct</span><span class="mol"><b>Theobromine</b><span>C₇H₈N₄O₂ · single</span></span><span class="st"><i class="dot ok"></i>Done</span><span>8 m 02 s <span class="muted">of 13 m 29 s</span></span><span class="num">$0.040 <span class="muted">/ $0.51</span></span><span class="open">Open result</span></div>
+ <div class="r"><span class="muted">15 Oct</span><span class="mol"><b>Caffeine</b><span>C₈H₁₀N₄O₂ · single</span></span><span class="st"><i class="dot ok"></i>Done</span><span>12 m 54 s <span class="muted">of 14 m 20 s</span></span><span class="num">$0.039 <span class="muted">/ $0.53</span></span><span class="open">Open result</span></div>
+</div>
+</div>
+<div class="demo">Illustrative data (synthetic month)</div>
+</body></html>
