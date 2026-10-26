@@ -242,7 +242,7 @@ describe('a row’s details keep everything the old table showed', () => {
         expect(region).toHaveTextContent('Spot, 3 attempts, time limit 10 min 00 s');
         // Each line's maximum and charge share one precision, so a charge never looks bigger than its maximum.
         expect(within(region).getByRole('list', { name: 'Water price, line by line' })).toHaveTextContent(
-            'Compute (AWS Fargate): up to $0.0178800, charged $0.0004970');
+            'Compute (AWS Fargate): up to $0.017880, charged $0.000497');
         expect(region).toHaveTextContent('B3LYP-D3(BJ)/def2-TZVPD');
         expect(region).toHaveTextContent('Fargate estimate, sizing v');
         expect(region).toHaveTextContent('Queued');
@@ -251,6 +251,41 @@ describe('a row’s details keep everything the old table showed', () => {
         // The total is the meter's own figure, to the micro-dollar, not a rounded one called exact.
         expect(region).toHaveTextContent('Total charged: $0.002214');
         expect(within(region).getByRole('button', { name: 'Copy job key' })).toBeInTheDocument();
+    });
+    // Verdict pass 2: the lines are printed to the micro-dollar, like the total under them, so they add up to it exactly.
+    const dollars = (text: string) => Number(text.replace('$', ''));
+    const chargedOf = (list: HTMLElement) => within(list).getAllByRole('listitem')
+        .map(item => dollars(/charged (\$[\d.]+)/.exec(item.textContent ?? '')![1]));
+    const sum = (values: number[]) => Math.round(values.reduce((a, b) => a + b, 0) * 1e6) / 1e6;
+    it('prints charged lines that add up to the total printed under them', () => {
+        const region = open(jobFixture('get_done_aws'));
+        const lines = chargedOf(within(region).getByRole('list', { name: 'Water price, line by line' }));
+        const total = dollars(/Total charged: (\$[\d.]+)/.exec(region.textContent ?? '')![1]);
+        expect(sum(lines)).toBe(total);
+    });
+    it('adds up even when a round maximum sits beside a charge (the Theobromine case)', () => {
+        const base = jobFixture('get_done_aws');
+        const charges = { compute: 0.008979, storage: 0.007913, delivery: 0.023108, platform: 0 };
+        const maxima = { compute: 0.428133, storage: 0.020616, delivery: 0.06, platform: 0 };
+        const job: JobView = {
+            ...base, name: 'Theobromine',
+            approvedQuote: { ...base.approvedQuote!, lines: base.approvedQuote!.lines.map(l => ({ ...l, maximumUsd: maxima[l.item] })) },
+            charged: { ...base.charged!, chargedUsd: 0.04, costUsd: 0.04, lines: base.charged!.lines.map(l => ({ ...l, chargedUsd: charges[l.item], costUsd: charges[l.item] })) },
+            ledger: [{ ...base.ledger[0], chargedUsd: 0.04, costUsd: 0.04 }],
+        };
+        const region = open(job);
+        const lines = chargedOf(within(region).getByRole('list', { name: 'Theobromine price, line by line' }));
+        expect(sum(lines)).toBe(dollars(/Total charged: (\$[\d.]+)/.exec(region.textContent ?? '')![1]));
+        expect(region).toHaveTextContent('Delivery (CloudFront, 10 full downloads): up to $0.060000, charged $0.023108');
+    });
+    it('for a retried job, adds the latest attempt’s lines to its own figure, and the attempts to the total', () => {
+        const region = open(jobFixture('get_retried_aws'));
+        const lines = chargedOf(within(region).getByRole('list', { name: 'H3N price, line by line' }));
+        const latest = dollars(/Latest attempt: (\$[\d.]+)/.exec(region.textContent ?? '')![1]);
+        expect(sum(lines)).toBe(latest);
+        const attempts = chargedOf(within(region).getByRole('list', { name: 'H3N attempts' }));
+        const total = dollars(/Total charged: (\$[\d.]+)/.exec(region.textContent ?? '')![1]);
+        expect(sum(attempts)).toBe(total);
     });
     it('flags what AWS billed past the approved maximum, which the app absorbed', () => {
         expect(open(jobFixture('get_absorbed_aws')).querySelector('.admin-absorbed'))

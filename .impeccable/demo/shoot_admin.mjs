@@ -20,7 +20,7 @@ const vite = spawn('node_modules/.bin/vite', ['--port', port, '--strictPort'], {
 await new Promise(r => setTimeout(r, 4000));
 const b = await chromium.launch({ args: ['--use-angle=metal', '--ignore-gpu-blocklist'] });
 
-async function shoot({ scheme, w, h, tag, listBody = list, costsAnswer = { status: 200, body: costs }, act = null, fullPage = true }) {
+async function shoot({ scheme, w, h, tag, listBody = list, costsAnswer = { status: 200, body: costs }, act = null, fullPage = true, at = port, query = '' }) {
   const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: scheme, isMobile: w < 500 });
   const p = await ctx.newPage(); const unstubbed = [];
   const jobs = JSON.parse(list).jobs;
@@ -33,7 +33,8 @@ async function shoot({ scheme, w, h, tag, listBody = list, costsAnswer = { statu
     if (job) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(job) });
     unstubbed.push(u); return r.abort();
   });
-  await p.goto(`http://localhost:${port}/${page_}`); await p.waitForTimeout(3500);
+  await p.route(/\.invalid\//, r => r.abort());   // the placeholder sign-in host below: never reached
+  await p.goto(`http://localhost:${at}/${page_}${query}`); await p.waitForTimeout(3500);
   if (act) { await act(p); await p.waitForTimeout(600); }
   await p.screenshot({ path: `${out}-${scheme}-${tag}.png`, fullPage });
   console.log(scheme, tag, 'unstubbed', unstubbed.length, 'title', await p.title());
@@ -65,5 +66,14 @@ try {
     for (const j of long.jobs) if (j.status === 'RUNNING') j.startedAt = new Date(Date.now() - (178 * 60 + 24) * 60 * 1000).toISOString();
     await shoot({ scheme: 'dark', w: 1440, h: 900, tag: 'desktop-long', listBody: JSON.stringify(long) });
     await shoot({ scheme: 'dark', w: 390, h: 844, tag: 'phone-long', listBody: JSON.stringify(long) });
+    // A cancelled sign-in, by the app's own path: a build with sign-in settings, opened with ?error= as Cognito's
+    // redirect would (no state, so nothing is exchanged). The settings are placeholders on .invalid: no server exists.
+    const signin = spawn('node_modules/.bin/vite', ['--port', String(Number(port) + 1), '--strictPort'], { stdio: 'ignore', env: {
+      ...process.env, JOBS_LOCAL_API_URL: 'http://127.0.0.1:9', VITE_COGNITO_AUTHORITY: 'https://cognito-idp.invalid/demo-pool',
+      VITE_COGNITO_CLIENT_ID: 'demo-client', VITE_COGNITO_DOMAIN: 'https://auth.invalid' } });
+    await new Promise(r => setTimeout(r, 4000));
+    try {
+      await shoot({ scheme: 'dark', w: 390, h: 844, tag: 'phone-signin', fullPage: false, at: Number(port) + 1, query: '?error=access_denied' });
+    } finally { signin.kill(); }
   }
 } finally { await b.close(); vite.kill(); }

@@ -13,7 +13,7 @@ import type { JobsState } from '../store/jobsSlice';
 import { useJobPolling } from '../jobs/useJobPolling';
 import { jobLinks, methodSummary } from './jobs_table';
 import { chargedTotal, groupOf, markTone, peakMemory, predictionCheck, runSeconds } from './jobs_month';
-import { compactDuration, exactUsd, localDay, localTime, rowCharge, shortReason, STATUS_SHORT, usdPair } from './job_text';
+import { compactDuration, exactUsd, localDay, localTime, rowCharge, shortReason, STATUS_SHORT } from './job_text';
 
 export const COLUMN_COUNT = 6;
 
@@ -163,10 +163,12 @@ function Details({ job, now, id }: { job: JobView; now: number; id: string }) {
                         {quote.lines.map(line => {
                             const got = settled.get(line.item);
                             if (!got) return <li key={line.item}>{line.label}: {money('up to', line.maximumUsd)}</li>;
-                            const [maximum, chargedText] = usdPair(line.maximumUsd, got.chargedUsd);
-                            return <li key={line.item}>{line.label}: up to {maximum}, charged {chargedText}</li>;
+                            // To the micro-dollar, like the total under them: the lines add up to it exactly,
+                            // and a charge never prints above its maximum.
+                            return <li key={line.item}>{line.label}: up to {exactUsd(line.maximumUsd)}, charged {exactUsd(got.chargedUsd)}</li>;
                         })}
                     </ul>
+                    {charged && job.ledger.length > 1 && <p className="admin-note">Latest attempt: {exactUsd(charged.chargedUsd)}</p>}
                     {chargedTotal(job) !== null && (
                         <p className="admin-note">Total charged: {exactUsd(chargedTotal(job)!)}{job.ledger.length > 1 ? `, across ${job.ledger.length} attempts` : ''}</p>
                     )}
@@ -181,8 +183,7 @@ function Details({ job, now, id }: { job: JobView; now: number; id: string }) {
                         {job.ledger.map((entry, i) => (
                             <li key={`${entry.quoteId ?? 'legacy'}-${i}`}>
                                 {entry.option !== null && entry.quoteId !== null
-                                    ? (([maximum, chargedText]) => `Attempt ${i + 1} · ${optionLabel(entry.option!)}: charged ${chargedText} of up to ${maximum}`)(
-                                        usdPair(entry.approvedMaximumUsd ?? 0, entry.chargedUsd ?? 0))
+                                    ? `Attempt ${i + 1} · ${optionLabel(entry.option)}: charged ${exactUsd(entry.chargedUsd ?? 0)} of up to ${exactUsd(entry.approvedMaximumUsd ?? 0)}`
                                     : `Attempt ${i + 1}: cost ${formatUsd(entry.costUsd)} (before quotes)`}
                                 {(entry.absorbedUsd ?? 0) > 0 && <span className="admin-absorbed"> ({money('absorbed', entry.absorbedUsd ?? 0)} by the app)</span>}
                                 {entry.at && <span className="admin-note"> · {localTime(entry.at)}</span>}

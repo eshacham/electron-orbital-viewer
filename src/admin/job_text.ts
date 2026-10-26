@@ -31,20 +31,6 @@ export function rowCharge(usd: number): string {
     return `$${usd.toFixed(2)}`;
 }
 
-/** Decimals that show four significant figures of `usd` (two from a cent up). */
-const decimalsFor = (usd: number): number => (usd >= 0.01 || usd <= 0 ? 2 : 3 - Math.floor(Math.log10(usd)));
-
-/**
- * A maximum and what was charged against it, at one shared precision -- the
- * one the smaller non-zero figure needs -- so rounding can never make a
- * charge look larger than the maximum it was held to.
- */
-export function usdPair(maximum: number, charged: number): [string, string] {
-    const nonZero = [maximum, charged].filter(v => v > 0);
-    const decimals = nonZero.length ? Math.max(...nonZero.map(decimalsFor)) : 2;
-    return [`$${maximum.toFixed(decimals)}`, `$${charged.toFixed(decimals)}`];
-}
-
 const INITIALISMS = new Set(['scf', 'aws', 'oom', 'mp2', 'dft', 'api', 'gpu', 'cpu', 'xyz']);
 
 /**
