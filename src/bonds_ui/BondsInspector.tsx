@@ -14,6 +14,8 @@ interface BondsInspectorProps {
      * inspector: there the sheet's own View tab holds them.
      */
     display?: React.ReactNode;
+    /** Task 4: Info, always open above the sections (Inspector's `info`). App leaves it out of the phone's stacked inspector: there it has its own tab. */
+    info?: React.ReactNode;
     open?: boolean;
     onOpenChange?(open: boolean): void;
     bonds: BondsState;
@@ -32,12 +34,13 @@ interface BondsInspectorProps {
  * returns, moved out of the Explore panel's BondsPanel (ruling P19: that
  * panel chooses what to draw; this is where it came from).
  */
-const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, display, open, onOpenChange, bonds, data, plot, showPlot = true }) => {
+const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, info, display, open, onOpenChange, bonds, data, plot, showPlot = true }) => {
     const [tab, setTab] = useState('plot');
     const { frontier, caveats, captions } = bondsDataLines(bonds, data);
     return (
         <Inspector
             variant={variant}
+            info={info}
             open={open}
             onOpenChange={onOpenChange}
             sections={[

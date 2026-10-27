@@ -1,0 +1,75 @@
+/* src/info/info.css -- Info (always open, top of the right panel) and the (i) buttons beside terms (plan Task 4).
+   Tokens only: Info is a quiet section; an (i) is accent text at rest and Deep Selection when active (owner,
+   2026-10-27), and the heading's topic chip wears the same selected style, so the two read as a pair. */
+
+.info-section { display: flex; flex-direction: column; gap: 6px; padding: 10px var(--ql-size-panel-padding) 12px; }
+/* In the phone's Info tab (and a stacked inspector) the sheet's own padding is the section's. */
+.phone-sheet-body > .info-section, .inspector-stacked .info-section { padding: 0; }
+.info-head { display: flex; flex-direction: column; gap: 2px; }
+.info-heading { display: flex; align-items: center; gap: 8px; min-height: var(--ql-size-control-row); }
+.info-heading:focus-visible { outline-offset: 0; border-radius: var(--ql-radius-xs); }
+.info-topic-chip {
+  display: inline-flex; align-items: center; padding: 1px 8px; border-radius: var(--ql-radius-pill);
+  background: var(--ql-color-selected-fill); color: var(--ql-color-on-fill);
+  box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge);
+  font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); font-weight: 600;
+}
+.info-title {
+  margin: 0; color: var(--ql-color-text-1);
+  font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line); font-weight: 600;
+}
+.info-body { display: flex; flex-direction: column; gap: 6px; }
+.info-body:empty { display: none; }
+.info-text {
+  margin: 0; color: var(--ql-color-text-2);
+  font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line);
+}
+.info-back {
+  align-self: flex-start; padding: 0; margin: 0; border: 0; background: none; cursor: pointer;
+  color: var(--ql-color-accent-text); font: 500 var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
+  min-height: 24px;
+}
+.info-back::before { content: '‹ '; }
+.info-back:hover { text-decoration: underline; }
+
+/* Key facts: label left, value right, tabular figures (DESIGN.md). */
+.info-facts { margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.info-fact { display: flex; justify-content: space-between; gap: 12px; font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line); }
+.info-fact dt { color: var(--ql-color-text-3); }
+.info-fact dd { margin: 0; color: var(--ql-color-text-1); text-align: right; }
+
+/* "How this was computed": folded below Research, open at Research. Its chevron follows the inspector's
+   disclosure convention (ruling R23b-2): down when folded, up when open. */
+.info-computed > summary {
+  display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none;
+  min-height: var(--ql-size-control-row); color: var(--ql-color-accent-text);
+  font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); font-weight: 500;
+}
+.info-computed > summary::-webkit-details-marker { display: none; }
+.info-computed-chevron { transition: transform var(--ql-motion-hover) ease-out; }
+.info-computed[open] > summary .info-computed-chevron { transform: rotate(180deg); }
+.info-computed-body {
+  display: flex; flex-direction: column; gap: 4px; color: var(--ql-color-text-3);
+  font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line);
+}
+
+/* The (i): a 20 px ring, accent text at rest; a 44 px hit area around it (touch), drawn by ::before. */
+.info-button {
+  position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0; margin: 0; box-sizing: border-box; cursor: pointer;
+  border: 1.5px solid currentColor; border-radius: 50%; background: none;
+  color: var(--ql-color-accent-text); vertical-align: middle;
+  transition: background-color var(--ql-motion-hover) ease-out, border-color var(--ql-motion-hover) ease-out, color var(--ql-motion-hover) ease-out;
+}
+.info-button::before { content: ''; position: absolute; inset: -12px; }
+.info-button-glyph { width: 10px; height: 10px; fill: currentColor; }
+.info-button:hover { background: var(--ql-color-surface-2); }
+.info-button.is-active,
+.info-button.is-active:hover {
+  background: var(--ql-color-selected-fill); border-color: var(--ql-color-selected-edge); color: var(--ql-color-on-fill);
+}
+
+/* DESIGN.md's Phone Fourteen Rule: running text steps to 14 px on a phone; captions do not grow. */
+@media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
+  .info-text, .info-title, .info-fact { font-size: 14px; }
+}

@@ -129,6 +129,9 @@ import BasicInspector from './basic_ui/BasicInspector';
 import { plotAriaLabel, plotTabsFor, resolvePlotTab, tabCurves, hydrogenicTabCurves, BASIC_PLOT_TABS } from './atom/plot_tabs';
 import { atomFacts, orbitalFacts, shellFacts, subshellFacts } from './orbital_facts';
 import Inspector, { type InspectorSection } from './shell/Inspector';
+import InfoPanel from './info/InfoPanel';
+import { InfoTopicProvider, useInfoTopic } from './info/useInfoTopic';
+import { infoSelectionKey } from './info/selection_key';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
@@ -528,6 +531,13 @@ function App() {
     const setViewPanelOpen = (update: (open: boolean) => boolean) =>
         setViewPanelChoice({ medium: isMedium, open: update(viewPanelOpen) });
     const isWide = useMediaQuery(WIDE_VIEWPORT) && !isNarrow && !isMedium;
+    // Task 4: Info's topic -- an (i)'s term until the selection changes (ruling PF4: each mode's selection key).
+    const infoTopic = useInfoTopic(useAppSelector(infoSelectionKey));
+    // An (i) brings Info on screen where the layout hides it: the phone's Info tab, the folded drawer.
+    const revealInfo = () => {
+        if (isNarrow) setPhoneTab('info');
+        else if (isMedium && !viewPanelOpen) setViewPanelOpen(() => true);
+    };
     const layout: 'desktop' | 'medium' | 'phone' = isNarrow ? 'phone' : isMedium ? 'medium' : 'desktop';
     // Below 1100 px the top bar's search shrinks to an icon (spec §7); a phone has its own search sheet instead.
     const compactTopBar = useMediaQuery(TOPBAR_COMPACT) && !isNarrow;
@@ -548,6 +558,12 @@ function App() {
         items.map(item => ({ ...item, color: themeCurveColour(item.color, palette) })), [palette]);
     const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(viewTitle, shallowEqual);
     useDocumentTitle(`${viewTitleText} · ${BRAND.name}`);
+    // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab. Until
+    // each mode's builder lands (Tasks 5-7: basicInfo, atomInfo, bondsInfo, moleculeInfo) it names the view only.
+    const infoPanel = (
+        <InfoPanel content={{ title: viewTitleText, plain: null }} topic={infoTopic.topic}
+            onClearTopic={() => infoTopic.setTopic(null)} level={level} />
+    );
     const shellRef = useRef<HTMLDivElement>(null);
     const fullscreen = useFullscreen(shellRef);
     const fullscreenActive = fullscreen.active;
@@ -1560,8 +1576,8 @@ function App() {
     // tile, the n / subshell / orbital chips that draw on selection, and the
     // Combination picker -- replaces the old n/l/mₗ selects and Update
     // Orbital button. One element, reused on the desktop (inside the shared
-    // ExplorePanel below) and on the phone (ahead of the view half, in the
-    // sheet's "Orbital & view" tab), exactly as `bondsExplore` and `controls` are.
+    // ExplorePanel below) and on the phone (the sheet's Explore tab; the view
+    // half is its View tab, Task 4), exactly as `bondsExplore` and `controls` are.
     const basicExplore = (
         <BasicExplore
             selection={{ n, l, ml }}
@@ -1691,12 +1707,13 @@ function App() {
     // Display settings in it, which work before a profile as they did in Explore.
     const atomInspector = (variant: 'docked' | 'drawer' | 'stacked') => (activePlotTab ? (
         <AtomInspector variant={variant} display={variant === 'stacked' ? undefined : atomDisplay}
+            info={variant === 'stacked' ? undefined : infoPanel}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             plotTabs={atomPlotTabs} plotTab={activePlotTab} onPlotTab={handlePlotTab}
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
             facts={atomFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} showPlot={shows('plot')} />
     ) : (
-        <Inspector variant={variant} sections={waitingSections(variant, atomDisplay)}
+        <Inspector variant={variant} sections={waitingSections(variant, atomDisplay)} info={variant === 'stacked' ? undefined : infoPanel}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
@@ -1707,13 +1724,14 @@ function App() {
     // drawer bar in place, with the view controls still in it.
     const basicInspector = (variant: 'docked' | 'drawer' | 'stacked') => ((renderedParams || renderedField) ? (
         <BasicInspector variant={variant} display={variant === 'stacked' ? undefined : basicDisplay}
+            info={variant === 'stacked' ? undefined : infoPanel}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             plotTabs={BASIC_PLOT_TABS} plotTab={basicActivePlotTab} onPlotTab={handlePlotTab}
             combination={Boolean(renderedField)}
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
             facts={basicFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} showPlot={shows('plot')} />
     ) : (
-        <Inspector variant={variant} sections={waitingSections(variant, basicDisplay)}
+        <Inspector variant={variant} sections={waitingSections(variant, basicDisplay)} info={variant === 'stacked' ? undefined : infoPanel}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
@@ -1726,6 +1744,7 @@ function App() {
     // used to sit under the MO diagram in BondsPanel (ruling P19).
     const bondsInspector = (variant: 'docked' | 'drawer' | 'stacked') => (
         <BondsInspector variant={variant} display={variant === 'stacked' ? undefined : displayControls}
+            info={variant === 'stacked' ? undefined : infoPanel}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             bonds={bonds} data={bondsData}
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)} showPlot={shows('plot')} />
@@ -1764,9 +1783,9 @@ function App() {
         ...(moleculeProperties && shows('properties') ? [{ key: 'properties', title: 'Properties', content: moleculeProperties }] : []),
     ];
 
-    // The phone sheet's tabs, one job each. Basic Orbitals has no drill-down,
-    // so its orbital choice and view settings share one tab; Bonds has its
-    // panel, as atom mode has its drill-down.
+    // The phone sheet's tabs, one job each, in every mode Explore · Info · View · Plot (Molecules: Explore · Info ·
+    // View) -- Task 4. Info is the desktop's Info, the same content for the same state and level (Review Focus 5).
+    const phoneInfoTab = { key: 'info', label: 'Info', content: infoPanel };
     const phoneTabs = isMoleculeMode
         ? [
             {
@@ -1792,6 +1811,7 @@ function App() {
                     </>
                 ),
             },
+            phoneInfoTab,
             // Task 12: the view settings, then the inspector's Properties section stacked (as ruling R7 stacks the other modes').
             {
                 key: 'view', label: 'View', content: (
@@ -1819,6 +1839,7 @@ function App() {
                     </>
                 ),
             },
+            phoneInfoTab,
             { key: 'view', label: 'View', content: <>{displayControls}{phoneViewActions}</> },
             // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs. Task 2: from Explore.
             ...(shows('plot') ? [{ key: 'plot', label: 'Plot', content: bondsInspector('stacked') }] : []),
@@ -1842,27 +1863,29 @@ function App() {
                     </>
                 ),
             },
+            phoneInfoTab,
             { key: 'view', label: 'View', content: <>{atomDisplay}{phoneViewActions}</> },
             // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs. Task 2: from Explore.
             ...(shows('plot') ? [{ key: 'plot', label: 'Plot', content: atomInspector('stacked') }] : []),
         ]
         : [
-            // Ruling P3: BasicExplore (the tile, the chips, the Combination picker)
-            // ahead of Controls' view half -- the same split as the desktop's
-            // Explore panel and inspector, in one scrolling tab since there is no
-            // drill-down here to ask for a tab of its own. Task 8: the strip is this
-            // tab's first row, as the Atom strip is Explore's (spec §9.8).
+            // Ruling P3: BasicExplore (the tile, the chips, the Combination picker) in Explore and Controls' view half
+            // in View -- the same split as the desktop's Explore panel and inspector. Task 4 split the one "Orbital &
+            // view" tab so every mode's sheet reads Explore · Info · View · Plot. Task 8: the strip is Explore's first
+            // row, as the Atom strip is (spec §9.8).
             {
-                key: 'view', label: 'Orbital & view', content: (
+                key: 'explore', label: 'Explore', content: (
                     <>
                         {basicStrip.length > 0 && (
                             <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
                                 onSelect={handleBasicPick} variant="sheet" />
                         )}
-                        {basicExplore}{basicDisplay}{phoneViewActions}
+                        {basicExplore}
                     </>
                 ),
             },
+            phoneInfoTab,
+            { key: 'view', label: 'View', content: <>{basicDisplay}{phoneViewActions}</> },
             // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs. Task 2: from Explore.
             ...(shows('plot') ? [{ key: 'plot', label: 'Plot', content: basicInspector('stacked') }] : []),
         ];
@@ -2213,7 +2236,7 @@ function App() {
             )}
             {phoneChrome}
             {isMedium && (isAtomMode ? atomInspector('drawer') : isBasicMode ? basicInspector('drawer') : isBondsMode ? bondsInspector('drawer') : (
-                <Inspector variant="drawer" sections={moleculeSections} defaultOpen="properties" open={viewPanelOpen}
+                <Inspector variant="drawer" sections={moleculeSections} info={infoPanel} defaultOpen="properties" open={viewPanelOpen}
                     onOpenChange={open => setViewPanelOpen(() => open)} />
             ))}
                 {isMoleculeMode && isNarrow && (
@@ -2275,7 +2298,7 @@ function App() {
     );
 
     return (
-        <>
+        <InfoTopicProvider topic={infoTopic.topic} setTopic={infoTopic.setTopic} onReveal={revealInfo}>
             <AppShell
                 layout={layout}
                 wide={isWide}
@@ -2285,7 +2308,7 @@ function App() {
                     <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
                 )}
                 inspector={isAtomMode ? atomInspector('docked') : isBasicMode ? basicInspector('docked') : isBondsMode ? bondsInspector('docked')
-                    : <Inspector variant="docked" sections={moleculeSections} defaultOpen="properties" />}
+                    : <Inspector variant="docked" sections={moleculeSections} info={infoPanel} defaultOpen="properties" />}
                 viewport={viewport}
                 shellRef={shellRef}
                 exploreCollapsed={isMedium && exploreCollapsed}
@@ -2304,7 +2327,7 @@ function App() {
                     </div>
                 </Dialog>
             )}
-        </>
+        </InfoTopicProvider>
     );
 }
 

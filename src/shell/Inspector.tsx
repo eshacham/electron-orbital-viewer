@@ -32,6 +32,12 @@ interface InspectorProps {
      * loaded: its Properties section exists only once there are some).
      */
     defaultOpen?: string;
+    /**
+     * Task 4: Info, always open above the accordion (docked, in the open drawer) or above the stacked sections --
+     * never one of the accordion's sections. It keeps to part of the column and scrolls inside itself
+     * (`.inspector-info`), so a long explanation never pushes the sections' headers away.
+     */
+    info?: React.ReactNode;
     /** Drawer only. */
     open?: boolean;
     onOpenChange?(open: boolean): void;
@@ -98,7 +104,7 @@ const Accordion: React.FC<{ sections: InspectorSection[]; openKey: string | null
  * right edge, non-modal and measured as a camera inset (§7); stacked inside
  * the phone sheet (ruling R7). `.view-panel` stays its class for the tests.
  */
-const Inspector: React.FC<InspectorProps> = ({ variant, sections, defaultOpen, open = false, onOpenChange }) => {
+const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultOpen, open = false, onOpenChange }) => {
     const id = useId();
     const display = usePref(displayPref);
     const keys = sections.map(section => section.key);
@@ -122,11 +128,14 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, defaultOpen, o
         bar?.focus();
     };
 
+    const infoSlot = info ? <div className="inspector-info">{info}</div> : null;
+
     if (variant === 'stacked') {
-        // The phone sheet has its own Explore | View | Plot tabs; here every section is shown, titled, all open,
-        // and a tabbed section's tabs are stacked as sections of their own (ruling R7).
+        // The phone sheet has its own Explore | Info | View | Plot tabs; here every section is shown, titled, all open,
+        // and a tabbed section's tabs are stacked as sections of their own (ruling R7). Info, when given, comes first.
         return (
             <div className="inspector-stacked">
+                {infoSlot}
                 {sections.map(section => (
                     <React.Fragment key={section.key}>
                         <h2 className="ql-section">{section.title}</h2>
@@ -180,12 +189,12 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, defaultOpen, o
                         );
                     })}
                 </div>
-                {open && <div id={drawerPanelId} className="inspector-drawer-panel">{content}</div>}
+                {open && <div id={drawerPanelId} className="inspector-drawer-panel">{infoSlot}{content}</div>}
             </aside>
         );
     }
 
-    return <aside className="inspector view-panel" aria-label="Inspector">{content}</aside>;
+    return <aside className="inspector view-panel" aria-label="Inspector">{infoSlot}{content}</aside>;
 };
 
 export default Inspector;

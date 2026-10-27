@@ -5,6 +5,13 @@
   display: flex; flex-direction: column; gap: var(--ql-size-section-gap);
   padding: var(--ql-size-panel-padding);
 }
+/* Task 4: Info, always open above the accordion. It keeps to at most 45 % of the column and scrolls inside itself, so
+   a long explanation never pushes the accordion's headers (Plot and data) off screen (Review Focus 4). */
+.inspector-info {
+  flex: none; max-height: 45%; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
+  border-bottom: 1px solid var(--ql-color-border-subtle);
+}
+.inspector-stacked .inspector-info { max-height: none; overflow: visible; border-bottom: 0; }
 /* Ruling R24-3: titled accordion sections, one open at a time. Every header stays in view; the open
    section takes the remaining height and scrolls inside itself (its body does not scroll a second time). */
 .inspector-sections { flex: 1; min-height: 0; display: flex; flex-direction: column; }

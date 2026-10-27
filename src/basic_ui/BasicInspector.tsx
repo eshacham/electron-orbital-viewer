@@ -11,9 +11,11 @@ interface BasicInspectorProps {
      * The Display settings (surface style, enclosed fraction, opacity, cut,
      * axes) -- Controls' view half (ruling R20b), heading the inspector
      * above Plot | Data. App leaves it out of the phone's stacked inspector:
-     * there the sheet's own "Orbital & view" tab holds it.
+     * there the sheet's own View tab holds it.
      */
     display?: React.ReactNode;
+    /** Task 4: Info, always open above the sections (Inspector's `info`). App leaves it out of the phone's stacked inspector: there it has its own tab. */
+    info?: React.ReactNode;
     open?: boolean;
     onOpenChange?(open: boolean): void;
     plotTabs: PlotTab[];
@@ -42,7 +44,7 @@ interface BasicInspectorProps {
  * Data-card body (PlotDataTabs) rather than duplicating them.
  */
 const BasicInspector: React.FC<BasicInspectorProps> = ({
-    variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, combination, plot, facts, csvReason, onExportCsv, showPlot = true,
+    variant, info, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, combination, plot, facts, csvReason, onExportCsv, showPlot = true,
 }) => {
     const [tab, setTab] = useState('plot');
     const plotContent = combination
@@ -51,6 +53,7 @@ const BasicInspector: React.FC<BasicInspectorProps> = ({
     return (
         <Inspector
             variant={variant}
+            info={info}
             open={open}
             onOpenChange={onOpenChange}
             sections={[

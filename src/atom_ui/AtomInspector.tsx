@@ -14,6 +14,8 @@ interface AtomInspectorProps {
      * the sheet's View tab holds them.
      */
     display?: React.ReactNode;
+    /** Task 4: Info, always open above the sections (Inspector's `info`). App leaves it out of the phone's stacked inspector: there it has its own tab. */
+    info?: React.ReactNode;
     open?: boolean;
     onOpenChange?(open: boolean): void;
     plotTabs: PlotTab[];
@@ -34,12 +36,13 @@ interface AtomInspectorProps {
  * with its function tabs, and Data -- as titled sections, one open at a time (ruling R24-3).
  */
 const AtomInspector: React.FC<AtomInspectorProps> = ({
-    variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, plot, facts, csvReason, onExportCsv, showPlot = true,
+    variant, info, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, plot, facts, csvReason, onExportCsv, showPlot = true,
 }) => {
     const [tab, setTab] = useState('plot');
     return (
         <Inspector
             variant={variant}
+            info={info}
             open={open}
             onOpenChange={onOpenChange}
             sections={[

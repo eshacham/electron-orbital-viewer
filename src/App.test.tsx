@@ -529,20 +529,36 @@ describe('App', () => {
         });
     });
 
-    // Ruling P3 / plan step 5: the phone sheet reuses BasicExplore itself, ahead of the
-    // view half, in the one "Orbital & view" tab (Basic Orbitals has no drill-down to
-    // give the chips a tab of their own).
-    it('on a phone, puts the chips and the combination picker ahead of the view settings in one "Orbital & view" tab', () => {
+    // Ruling P3 / plan step 5: the phone sheet reuses BasicExplore itself. Task 4 (plan: sheet tabs Explore · Info ·
+    // View · Plot in every mode) splits the old "Orbital & view" tab: the chips and the combination picker in Explore,
+    // the view settings in View.
+    it('on a phone, puts the chips and the combination picker in Explore and the view settings in View', () => {
         installMatchMedia(true);
         renderWithProvider(<App />);
         fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // spec §9.8
         fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
-        fireEvent.click(screen.getByRole('tab', { name: 'Orbital & view' }));
+        expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'Info', 'View', 'Plot']);
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        const explore = screen.getByRole('tabpanel');
+        expect(within(explore).getByRole('group', { name: /energy level/i })).toBeInTheDocument();
+        expect(within(explore).getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
+        expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
+        fireEvent.click(screen.getByRole('tab', { name: 'View' }));
+        const view = screen.getByRole('tabpanel');
+        expect(within(view).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
+        expect(within(view).queryByRole('group', { name: /energy level/i })).toBeNull();
+    });
+
+    // Task 4: Info is the phone sheet's second tab -- Explore · Info · View · Plot -- holding the same Info as the
+    // desktop's inspector (Review Focus 5).
+    it('on a phone, gives Atoms the tabs Explore, Info, View and Plot, Info naming the view', () => {
+        installMatchMedia(true);
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'Info', 'View', 'Plot']);
+        fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
         const panel = screen.getByRole('tabpanel');
-        const chips = within(panel).getByRole('group', { name: /energy level/i });
-        const opacity = within(panel).getByRole('slider', { name: 'surface opacity' });
-        expect(chips.compareDocumentPosition(opacity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(within(panel).getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
+        expect(within(panel).getByRole('heading', { level: 2, name: 'Info' })).toBeInTheDocument();
+        expect(within(panel).getByText('Hydrogen — whole atom')).toBeInTheDocument();
     });
 
     // Plan step 5 / ruling P3: useDrawOnSelection's debounce never fires on mount, so
@@ -1111,13 +1127,14 @@ describe('App', () => {
             }
         });
 
-        it('on a phone: the header names the system and R, and the sheet has Explore, View and Plot', async () => {
+        it('on a phone: the header names the system and R, and the sheet has Explore, Info, View and Plot', async () => {
             installMatchMedia(true);
             const { store } = renderWithProvider(<App />);
             fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // spec §9.8
             // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
             fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
-            expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'View', 'Plot']);
+            // Task 4: Info is the sheet's second tab in every mode.
+            expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'Info', 'View', 'Plot']);
             fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
             chooseSystem('N₂ — Nitrogen');
             await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
@@ -1915,8 +1932,11 @@ describe('App: shell', () => {
         renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
         const check = (mode: string) => {
             const inspector = screen.getByRole('complementary', { name: 'Inspector' });
-            const headers = within(inspector).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent);
+            // Task 4: Info is always open above the accordion, not an accordion section -- so the toggles are read, not every
+            // h2, and Info's own heading is checked separately.
+            const headers = Array.from(inspector.querySelectorAll('.inspector-section-toggle')).map(toggle => toggle.textContent);
             expect([mode, headers]).toEqual([mode, mode === 'molecules' ? ['Display'] : ['Display', 'Plot and data']]);
+            expect([mode, within(inspector).getAllByRole('heading', { level: 2, name: 'Info' }).length]).toEqual([mode, 1]);
             openInspectorSection('Display');
             const display = within(inspector).getByRole('region', { name: 'Display' });
             // R24-3: the header sits just above the region it labels (it used to be inside a labelled section).

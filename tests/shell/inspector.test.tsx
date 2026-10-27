@@ -243,4 +243,39 @@ describe('Inspector sections (ruling R24-3)', () => {
         expect(css).toMatch(/\.inspector-section-toggle\[aria-expanded="true"\]\s*\.inspector-section-chevron\s*\{\s*transform:\s*rotate\(180deg\);\s*\}/);
         expect(css).not.toMatch(/\[aria-expanded="false"\]\s*\.inspector-section-chevron/);
     });
+
+    // Task 4: Info is always open at the top of the inspector -- above the accordion, never one of its toggles.
+    describe('the Info slot (Task 4)', () => {
+        const info = <section aria-label="Info"><h2>Info</h2><p>info body</p></section>;
+        const toggles = () => Array.from(document.querySelectorAll('.inspector-section-toggle')).map(toggle => toggle.textContent);
+        const above = (a: HTMLElement, b: HTMLElement) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+        it('docked: renders Info above the accordion, not as a toggle', () => {
+            render(<Inspector variant="docked" info={info} sections={[displaySection, plotAndData()]} />);
+            const aside = screen.getByRole('complementary', { name: 'Inspector' });
+            expect(within(aside).getByText('info body')).toBeInTheDocument();
+            expect(above(within(aside).getByText('info body'), header('Display'))).toBe(true);
+            expect(toggles()).toEqual(['Display', 'Plot and data']);
+            // Folding every section leaves Info where it is.
+            fireEvent.click(header('Plot and data'));
+            expect(within(aside).getByText('info body')).toBeInTheDocument();
+        });
+
+        it('drawer: renders Info at the top of the open drawer, above the accordion', () => {
+            render(<Inspector variant="drawer" info={info} sections={[displaySection, plotAndData()]} open onOpenChange={jest.fn()} />);
+            expect(above(screen.getByText('info body'), header('Display'))).toBe(true);
+            expect(toggles()).toEqual(['Display', 'Plot and data']);
+        });
+
+        it('stacked: renders Info first, above the stacked sections', () => {
+            render(<Inspector variant="stacked" info={info} sections={[displaySection]} />);
+            expect(above(screen.getByText('info body'), screen.getByRole('heading', { name: 'Display' }))).toBe(true);
+            expect(toggles()).toEqual([]);
+        });
+
+        it('keeps Info compact: it never grows past part of the inspector and scrolls inside itself (Review Focus 4)', () => {
+            const css = readFileSync(resolve(__dirname, '../../src/shell/inspector.css'), 'utf8');
+            expect(css).toMatch(/\.inspector-info\s*\{[^}]*flex:\s*none;[^}]*max-height:\s*45%;[^}]*overflow-y:\s*auto;/);
+        });
+    });
 });

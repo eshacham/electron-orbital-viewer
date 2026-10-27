@@ -170,6 +170,9 @@ describe('Molecules mode', () => {
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
         expect(Array.from(viewPanel.querySelectorAll('.inspector-section-toggle')).map(header => header.textContent))
             .toEqual(['Display', 'Properties']);
+        // Task 4: Info is always open above the accordion, not one of its toggles -- a heading of its own, first.
+        const info = within(viewPanel).getByRole('heading', { level: 2, name: 'Info' });
+        expect(info.compareDocumentPosition(within(viewPanel).getByRole('button', { name: 'Display' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         const display = within(viewPanel).getByRole('button', { name: 'Display' });
         const properties = within(viewPanel).getByRole('button', { name: 'Properties' });
         expect(display.compareDocumentPosition(properties) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -299,6 +302,18 @@ describe('Molecules mode', () => {
         // The compact tile's Change opens the phone's full-screen picker, as the header's name does.
         fireEvent.click(within(tabpanel.querySelector('.molecule-tile') as HTMLElement).getByRole('button', { name: 'Change molecule' }));
         expect(screen.getByRole('button', { name: 'close molecule picker' })).toBeInTheDocument();
+    });
+
+    // Task 4: Molecules' sheet has no Plot tab; Info is its second tab, as in every mode.
+    it('gives a phone the tabs Explore, Info and View, Info naming the molecule', async () => {
+        const { store } = await enterMolecules(true);
+        pickWater(store);
+        await flush(); // the loader's own meta request settles (no act warning)
+        expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'Info', 'View']);
+        fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
+        const tabpanel = screen.getByRole('tabpanel');
+        expect(within(tabpanel).getByRole('heading', { level: 2, name: 'Info' })).toBeInTheDocument();
+        expect(within(tabpanel).getByText(/Water/)).toBeInTheDocument();
     });
 
     it('gives a phone the Properties under the view settings in its View tab', async () => {
