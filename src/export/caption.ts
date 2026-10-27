@@ -13,8 +13,7 @@ import { N2_MAX_FIELD_AU } from '../stark';
 import { RelativityMode, methodStatement as relativityMethodStatement } from '../atom/relativity';
 import { BondsSystemId, isBondsSystemId, systemFormula } from '../bonds/systems';
 import { H2PLUS_CAPTIONS, lengths, multireferenceCaption } from '../bonds/captions';
-import { H2PLUS_LABELS, H2PlusState } from '../bonds/h2plus';
-import { SPIN_SUFFIX } from '../bonds/bonds_request';
+import { H2PlusState } from '../bonds/h2plus';
 import { tierOf, BasisOrbital, MoleculeBasis, MoleculeScan } from '../molecules/types';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { formatFormula } from '../molecules/catalogue';
@@ -22,6 +21,7 @@ import { orbitalEnergyWithEstimate, orbitalNoun, orbitalTag } from '../molecules
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY } from '../molecules/esp_color';
 import { formatDipole, hasDipoleArrow } from '../molecules/dipole';
 import { flatSubscripts } from '../format/sci';
+import { atomOrbitalName, bondsViewName, type BondsNamed } from '../shell/view_names';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
 export const ATOM_METHOD = 'central-field SCF, LDA exchange + VWN5 correlation, non-relativistic, spherically averaged';
@@ -378,6 +378,11 @@ function componentNote(picture: BondsDrawnMo): string {
     return picture.componentCount > 1 ? ` (component ${picture.component + 1} of ${picture.componentCount})` : '';
 }
 
+/** A drawn Bonds picture as view_names' BondsNamed: the one place its name is written (fix round 1, M9). */
+export function bondsPictureNamed(picture: BondsPictureKind): BondsNamed {
+    return picture.kind === 'mo' ? { kind: 'mo', label: picture.orbital.label, spin: picture.orbital.spin } : picture;
+}
+
 function bondsViewDescription(state: RootState): string {
     const drawn = bondsDrawnPicture(state);
     if (!drawn) return systemFormula(state.bonds.system);
@@ -388,10 +393,8 @@ function bondsViewDescription(state: RootState): string {
     // caption names it -- except a density surface, which already states its
     // own fixed ρ and draws at no enclosed fraction at all.
     const percent = `${Math.round(drawn.enclosedFraction * 100)}% contour`;
-    if (picture.kind === 'h2plus') return `${name} ${H2PLUS_LABELS[picture.state]}, ${where}, ${percent}`;
-    if (picture.kind === 'mo') {
-        return `${name} ${picture.orbital.label}${SPIN_SUFFIX[picture.orbital.spin]}${componentNote(picture)}, ${where}, ${percent}`;
-    }
+    if (picture.kind === 'h2plus') return `${name} ${bondsViewName(picture)}, ${where}, ${percent}`;
+    if (picture.kind === 'mo') return `${name} ${bondsViewName(bondsPictureNamed(picture))}${componentNote(picture)}, ${where}, ${percent}`;
     return `${name} total density, surface at ρ = ${picture.isoValue} e/a₀³, ${where}`;
 }
 
@@ -416,14 +419,12 @@ function describeView(state: RootState): string {
     }
     const { Z, level, selectedShell, selectedSubshell, selectedOrbital, profile } = state.atom;
     const levelPart = level === 'orbital' && selectedOrbital
-        ? (selectedOrbital.j === undefined
-            // With spin–orbit the orbital's own crumb names its j-level too
-            // (LevelNav's "6p_z · 6p³⁄₂" pattern) -- the angular shape drawn
-            // is still the l orbital's (spec §3.6); only R(r) is the
-            // j-level's, which jLevelShapeCaption's own line says (the
-            // method line does not).
-            ? orbitalName(selectedOrbital.n, selectedOrbital.l, selectedOrbital.ml)
-            : `${orbitalName(selectedOrbital.n, selectedOrbital.l, selectedOrbital.ml)} · ${subshellLabel(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j)}`)
+        // With spin–orbit the orbital's own crumb names its j-level too
+        // (LevelNav's "6p_z · 6p³⁄₂" pattern) -- the angular shape drawn
+        // is still the l orbital's (spec §3.6); only R(r) is the
+        // j-level's, which jLevelShapeCaption's own line says (the
+        // method line does not). Written once, view_names.ts (fix round 1, M9).
+        ? atomOrbitalName(selectedOrbital, ' · ')
         : level === 'shell' && selectedSubshell
             ? `${subshellLabel(selectedSubshell.n, selectedSubshell.l, selectedSubshell.j)} subshell`
             : level === 'shell' && selectedShell !== null

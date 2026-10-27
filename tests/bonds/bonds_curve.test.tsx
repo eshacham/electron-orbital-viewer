@@ -58,8 +58,9 @@ describe('diatomicCurveSpec', () => {
         const c2 = { ...n2Scan, validity: { ...n2Scan.validity, multireference: true, t1AtRe: 0.0384, t1Limit: 0.0576 } } as MoleculeScan;
         expect(curveNote('c2', c2)).not.toMatch(/multireference|T1/);
         const caption = bondsCaptions('c2', c2).join(' ');
-        expect(caption).toMatch(/Strongly multireference: single-reference CCSD\(T\) is only qualitative here \(T1 = 0\.038 at R_e\)\./);
-        expect(caption).toMatch(/The curve stops at R = 2\.41 a₀ \(1\.273 Å\): at the next point T1 exceeds 1\.5 × its value at R_e \(0\.0576\)/);
+        // Task 8 fix round 1 (I1, M7): plain-text quantities use Unicode, Rₑ and Dₑ, never "_".
+        expect(caption).toMatch(/Strongly multireference: single-reference CCSD\(T\) is only qualitative here \(T1 = 0\.038 at Rₑ\)\./);
+        expect(caption).toMatch(/The curve stops at R = 2\.41 a₀ \(1\.273 Å\): at the next point T1 exceeds 1\.5 × its value at Rₑ \(0\.0576\)/);
         expect(caption).not.toMatch(/not valid beyond/);
     });
 
@@ -80,7 +81,7 @@ describe('diatomicCurveSpec', () => {
     it("names the experiment Li₂'s R_e is compared with", () => {
         const li2 = { ...n2Scan, fit: { ...n2Scan.fit, ReBohr: 5.102 }, reference: { ReAngstrom: null, source: null } } as MoleculeScan;
         // Task 7a: Li₂'s caveat is bondsCaptions' (Info), where the R_e caption has just named the experiment.
-        expect(bondsCaptions('li2', li2).join(' ')).toMatch(/experiment 2\.673 Å \(Huber & Herzberg.*R_e comes out 1\.0 % longer than experiment\./);
+        expect(bondsCaptions('li2', li2).join(' ')).toMatch(/experiment 2\.673 Å \(Huber & Herzberg.*Rₑ comes out 1\.0 % longer than experiment\./);
     });
 
     it('keeps the marker on the plotted range', () => {

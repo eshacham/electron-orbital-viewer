@@ -127,10 +127,11 @@ describe('bondsCaptions', () => {
 
     it('takes D_e from separated atoms, with their method, and R_e with its fit uncertainty', () => {
         const captions = bondsCaptions('n2', n2Scan).join(' ');
-        expect(captions).toMatch(/D_e = 9\.44 eV \(0\.3470 Ha\) from separated atoms, N ⁴S \+ N ⁴S, UCCSD\(T\)\/aug-cc-pVTZ \(UHF reference, frozen core\)/);
+        // Task 8 fix round 1 (I1, M7): plain-text quantities use Unicode, Rₑ and Dₑ, never "_".
+        expect(captions).toMatch(/Dₑ = 9\.44 eV \(0\.3470 Ha\) from separated atoms, N ⁴S \+ N ⁴S, UCCSD\(T\)\/aug-cc-pVTZ \(UHF reference, frozen core\)/);
         // Final review M8: the basis's known underbinding (N₂ 9.44 against 9.91 eV).
         expect(captions).toMatch(/without zero-point energy; aug-cc-pVTZ underbinds by a few % against experiment\./);
-        expect(captions).toMatch(/R_e = 2\.086 a₀ \(1\.104 Å\), fitted to the scan points \(fit uncertainty < 0\.001 a₀\); experiment 1\.098 Å \(Huber & Herzberg/);
+        expect(captions).toMatch(/Rₑ = 2\.086 a₀ \(1\.104 Å\), fitted to the scan points \(fit uncertainty < 0\.001 a₀\); experiment 1\.098 Å \(Huber & Herzberg/);
     });
 
     it('says where single-reference CCSD(T) stops being valid, and why', () => {
@@ -141,21 +142,21 @@ describe('bondsCaptions', () => {
 
     it('marks B₂ and C₂ as strongly multireference', () => {
         expect(bondsCaptions('c2', c2Scan)[0]).toBe(
-            'Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.038 at R_e).');
+            'Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.038 at Rₑ).');
         expect(bondsCaptions('n2', n2Scan).join(' ')).not.toMatch(/multireference/);
     });
 
     // Ruling T4-d: past the single-reference limit from the start, so the stop is a relative one, not "valid until".
     it("says a multireference curve stops where T1 passes 1.5 × its value at R_e", () => {
         const captions = bondsCaptions('c2', c2Scan).join(' ');
-        expect(captions).toMatch(/The curve stops at R = 3\.87 a₀ \(2\.050 Å\): at the next point T1 exceeds 1\.5 × its value at R_e \(0\.0576\) — T1 diagnostic 0\.0589 exceeds 0\.0576 at R = 4\.5786 a₀\./);
+        expect(captions).toMatch(/The curve stops at R = 3\.87 a₀ \(2\.050 Å\): at the next point T1 exceeds 1\.5 × its value at Rₑ \(0\.0576\) — T1 diagnostic 0\.0589 exceeds 0\.0576 at R = 4\.5786 a₀\./);
         expect(captions).not.toMatch(/not valid beyond/);
     });
 
     it("does not let Li₂'s exact valence treatment imply an exact R_e", () => {
         const captions = bondsCaptions('li2', li2Scan).join(' ');
         expect(captions).toMatch(/exact \(full CI\) for the two valence electrons/);
-        expect(captions).toMatch(/R_e = 5\.102 a₀ \(2\.700 Å\), fitted to the scan points \(fit uncertainty < 0\.001 a₀\); experiment 2\.673 Å \(Huber & Herzberg, Constants of Diatomic Molecules \(1979\), via NIST Chemistry WebBook\)\. Exact only for the valence pair: core–valence correlation is frozen out, so R_e comes out 1\.0 % longer than experiment\./);
+        expect(captions).toMatch(/Rₑ = 5\.102 a₀ \(2\.700 Å\), fitted to the scan points \(fit uncertainty < 0\.001 a₀\); experiment 2\.673 Å \(Huber & Herzberg, Constants of Diatomic Molecules \(1979\), via NIST Chemistry WebBook\)\. Exact only for the valence pair: core–valence correlation is frozen out, so Rₑ comes out 1\.0 % longer than experiment\./);
         // The reference is stated once, where the comparison is made.
         expect(captions.match(/2\.673 Å/g)).toHaveLength(1);
         expect(captions).not.toMatch(/not valid beyond/);

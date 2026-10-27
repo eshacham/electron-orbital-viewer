@@ -41,7 +41,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
     const backPressed = useRef(false);
     // The text Info last showed, and what the live region says now (review M5, below).
     const lastShown = useRef<string | null>(null);
-    const lastHadTopic = useRef(false);
+    // The selection's title as last rendered (in the title, or in "Back to …" while a topic is open): a change of it is
+    // a new selection, whether or not a topic was open (fix round 1, M5).
+    const lastSelection = useRef<string | null>(null);
+    const backTitle = useRef<HTMLSpanElement>(null);
     const [announcement, setAnnouncement] = useState('');
     // Review M1: an active (i) names Info's region in aria-controls only while Info is in the DOM.
     const registerInfo = context?.registerInfo;
@@ -57,15 +60,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
         if (focusMoved) heading.current?.focus();
         const chip = heading.current?.querySelector('.info-topic-chip')?.textContent;
         const shown = `Info: ${chip ?? title.current?.textContent ?? ''}`;
+        const selection = (chip === undefined ? title.current : backTitle.current)?.textContent ?? null;
+        const selectionChanged = lastSelection.current !== null && selection !== lastSelection.current;
+        lastSelection.current = selection;
         if (lastShown.current === null || shown === lastShown.current) {
             lastShown.current = shown;
-            lastHadTopic.current = chip !== undefined;
             return;
         }
-        // A new selection: Info named the selection before and still does (no topic either side).
-        const selectionChanged = chip === undefined && !lastHadTopic.current;
         lastShown.current = shown;
-        lastHadTopic.current = chip !== undefined;
+        // A new selection is the phone caption's to say when announceSelection is off; Info still says a topic's change.
         setAnnouncement(focusMoved || (selectionChanged && !announceSelection) ? '' : shown);
     });
 
@@ -91,7 +94,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
             {entry ? (
                 <div className="info-body">
                     <button type="button" className="info-back" onClick={back}>
-                        <span aria-hidden="true">‹</span><span>Back to {content.title}</span>
+                        <span aria-hidden="true">‹</span><span>Back to <span ref={backTitle}>{content.title}</span></span>
                     </button>
                     <p className="info-text">{entry.plain}</p>
                     {technical && <p className="info-text">{entry.technical}</p>}

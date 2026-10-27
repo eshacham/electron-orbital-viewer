@@ -4,7 +4,9 @@
    key column's phone position, viewport.css). Ruling R22c retired the
    molecule legend stack this variable also used to place -- its own tier
    badge now rides in the phone header, and its colour keys in the key
-   column above, so only the one overlay-top offset is left to name. */
+   column above, so only the one overlay-top offset is left to name. Task 8
+   fix round 1 (I2): PhoneHeader overwrites it on the viewport with the
+   header's measured bottom edge; these values are only the first paint's. */
 :root {
   --phone-overlay-top: 112px;
 }
@@ -575,12 +577,6 @@ html, body, #root {
     padding: 0 16px;
   }
 
-  /* Task 8: where the caption sits under a header row (Atoms' element nav,
-     Molecules' molecule nav), the overlays under the header move down by it:
-     top bar 52 + 8, the row 44, the caption 6 + 28, and 6 to spare. Orbitals
-     and Bonds have only the caption there, which ends above the default. */
-  .viewport-cell.caption-under-nav { --phone-overlay-top: 144px; }
-
   /* Small overlays sit just under the header. */
   .scale-readout {
     left: 12px;
@@ -667,12 +663,11 @@ html, body, #root {
     --phone-overlay-top: 60px;
   }
   /* Task 8: the merged line, then the caption on a line of its own under it
-     (a grid: a flex row would put it beside the nav); the overlays under the
-     header move down by it -- 8, the line (up to 52 with the top bar's own
-     buttons), the caption 6 + 28, and 6 to spare. */
+     (a grid: a flex row would put it beside the nav; the 4 px gap above is
+     its row gap too). How far the overlays move down is measured, not
+     budgeted here (PhoneHeader sets --phone-overlay-top, fix round 1, I2). */
   .phone-header { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 4px; }
   .phone-header > .phone-caption { grid-column: 1 / -1; justify-self: start; }
-  .viewport-cell.caption-landscape { --phone-overlay-top: 100px; }
   .phone-sheet {
     top: 8px;
     left: auto;
@@ -1113,7 +1108,9 @@ html, body, #root {
    every mode ("Carbon 2pz · 90 % enclosed") -- one line, its own light chip
    like LevelNav's header, since nothing but the scene sits behind it (it
    replaces Bonds' old "N₂ · R" header line). The name gives way to an
-   ellipsis before the qualifier does. */
+   ellipsis before the qualifier does. 4 + 20 + 4 = 28 px tall, 6 px under a
+   nav row; a subscript must not grow the line box (fix round 1, M1), or the
+   header would jump as Molecules switches from the density to an orbital. */
 .phone-caption {
   display: flex;
   width: fit-content;
@@ -1131,8 +1128,11 @@ html, body, #root {
   white-space: nowrap;
 }
 .phone-header > .phone-caption:first-child { margin-top: 0; }
-.phone-caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The ellipsis' overflow clip reaches 4 px past the line box (padding, taken back by the margin), so a lowered
+   subscript's descender -- the g of 1a<sub>1g</sub> -- is not cut off. */
+.phone-caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-block: 4px; margin-block: -4px; }
 .phone-caption-qualifier { flex: none; color: var(--ql-color-text-2); }
+.phone-caption sub { line-height: 0; }
 
 /* Ruling R22c (owner review 2026-10-14): Task 9's bottom-centre legend stack
    -- a dark prose chip over the 3D view the owner could not scroll while
@@ -1451,8 +1451,10 @@ html, body, #root {
   visibility: hidden;
 }
 /* The phone header's molecule name button and its tier chip, side by side
-   (ruling R22c) -- `.phone-header` itself is only a flex row when sideways
-   (below), so this gives both orientations one row without depending on it. */
+   (ruling R22c) -- `.phone-header` itself is a block upright and a grid
+   sideways (the merged line, then the caption), so this gives both
+   orientations one row without depending on it. A long name wraps it onto a
+   second line; PhoneHeader measures that, so nothing under it is covered. */
 .molecule-phone-header-row {
   display: flex;
   align-items: center;

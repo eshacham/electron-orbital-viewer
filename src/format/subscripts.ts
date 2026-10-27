@@ -15,7 +15,8 @@ export function withSubscripts(text: string): React.ReactNode {
     let last = 0;
     for (const match of subscriptMatches(text)) {
         // Named as it reads, "1b1" or "3dz²", as OrbitalLabel is: a <sub> is no inline run to every accessible-name
-        // computation, which would read "1b 1".
+        // computation, which would read "1b 1". Plain digits, not the flat "1b₁" (ruling M6): screen readers say
+        // Unicode subscript digits inconsistently ("subscript one"), so spoken names keep ASCII.
         const label = React.createElement('span', { 'aria-label': `${match.base}${match.sub}` }, match.base, React.createElement('sub', null, match.sub));
         parts.push(text.slice(last, match.index), label);
         last = match.index + match.length;

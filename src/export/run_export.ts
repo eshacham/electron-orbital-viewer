@@ -567,8 +567,8 @@ function h2plusCurveCsv(curve: H2PlusCurve, shareUrl: string): string {
     const comments = [
         `H2+ potential curve: E(R), both states (${H2PLUS_LABELS['1sigma_g']} gerade, ${H2PLUS_LABELS['1sigma_u']} ungerade).`,
         ...bondsCaptions('h2plus', null),
-        `R_e = ${curve.equilibrium.R.toFixed(3)} a₀ (${(curve.equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), `
-            + `E = ${signed(curve.equilibrium.totalEnergy, 4)} Ha (exact); D_e = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
+        `Rₑ = ${curve.equilibrium.R.toFixed(3)} a₀ (${(curve.equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), `
+            + `E = ${signed(curve.equilibrium.totalEnergy, 4)} Ha (exact); Dₑ = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
         `Zero: H + H+ (${H_PLUS_H_PLUS_HARTREE} Ha).`,
         `view: ${shareUrl}`,
     ];
@@ -659,7 +659,7 @@ function csvFor(context: ExportContext): string {
     // file named after one m_l could otherwise read as if it were specific
     // to that orbital.
     if (state.atom.mode === 'atom' && state.atom.level === 'orbital' && !context.csvQuantity) {
-        comments.push('note: D(r) is the subshell\'s, independent of m_l -- every orbital in this subshell shares the same curve');
+        comments.push('note: D(r) is the subshell\'s, independent of mₗ -- every orbital in this subshell shares the same curve');
     }
     // Task 12b (ruling C7): the same dashed non-relativistic curves the
     // radial plot overlays (Task 12's buildComparisonCurves, extracted so

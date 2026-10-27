@@ -283,7 +283,8 @@ describe('runExport: CSV', () => {
         store.dispatch(drillToOrbital(2, 1, 1));
         const context = { ...baseContext(store.getState()), csvCurves: [{ label: '2p', points: [{ r: 0.1, value: 1 }] }] };
         const text = await readText((await runExport('csv', context)).blob);
-        expect(text).toContain('# note: D(r) is the subshell\'s, independent of m_l');
+        // Task 8 fix round 1 (M7): mₗ, the app's own spelling, never "m_l".
+        expect(text).toContain('# note: D(r) is the subshell\'s, independent of mₗ');
     });
 });
 
@@ -707,13 +708,28 @@ describe('Bonds mode exports (ruling C5, Task 13b)', () => {
         it('writes an equilibrium comment line with R_e, E and D_e to H + H+', async () => {
             const context = { ...baseContext(bondsH2PlusStore().getState()), h2plusCurve: FAKE_H2PLUS_CURVE };
             const text = await readText((await runExport('csv', context)).blob);
-            expect(text).toContain('R_e = 1.997 a₀');
+            // Task 8 fix round 1 (I1, M7): plain-text quantities use Unicode, Rₑ and Dₑ, never "_".
+            expect(text).toContain('Rₑ = 1.997 a₀');
             expect(text).toContain('E = −0.6026 Ha (exact)');
-            expect(text).toMatch(/D_e = \d+\.\d\d eV \(\d+\.\d{4} Ha\) to H \+ H⁺\./);
+            expect(text).toMatch(/Dₑ = \d+\.\d\d eV \(\d+\.\d{4} Ha\) to H \+ H⁺\./);
         });
 
         it('refuses H2+\'s CSV when the live curve has not finished computing (fix round 1, I2)', async () => {
             await expect(runExport('csv', baseContext(bondsH2PlusStore().getState()))).rejects.toThrow(H2PLUS_CURVE_NOT_READY_REASON);
+        });
+
+        // Task 8 fix round 1 (I1): B₂/C₂'s method line carries the multireference caveat "… at Rₑ" -- every plain-text
+        // export (PNG caption line 2, the CSV's comments, the cube description) writes Rₑ, never "R_e" (nor rhenium's "Re").
+        it('writes the multireference caveat with Rₑ, never "_", in the CSV and the cube description', async () => {
+            const multireferenceScan = { ...N2_SCAN, validity: { ...N2_SCAN.validity, multireference: true, t1AtRe: 0.05 } };
+            const context = { ...baseContext(bondsMoleculeStore().getState()), bondsScan: multireferenceScan };
+            const text = await readText((await runExport('csv', context)).blob);
+            const comments = text.split('\n').filter(line => line.startsWith('#') && !line.startsWith('# view:'));
+            expect(comments.join('\n')).toContain('(T1 = 0.050 at Rₑ)');
+            for (const line of comments) expect(line).not.toMatch(/_/);
+            const job = cubeJobFor(bondsMoleculeStore().getState(), { scan: multireferenceScan, meta: N2_META });
+            expect(job.description).toContain('at Rₑ');
+            expect(job.description).not.toMatch(/[A-Za-zσπ]_[A-Za-z]/);
         });
 
         it('writes a diatomic\'s shipped scan points, zero at the separated atoms, with D_e/R_e comments', async () => {
@@ -722,8 +738,8 @@ describe('Bonds mode exports (ruling C5, Task 13b)', () => {
             const lines = text.split('\n');
             expect(lines[0]).toContain('N₂ potential curve');
             expect(text).toContain('# Energies: CCSD(T)/aug-cc-pVTZ (frozen core).');
-            expect(text).toContain('D_e = 8.16 eV');
-            expect(text).toContain('R_e = 2.074 a₀');
+            expect(text).toContain('Dₑ = 8.16 eV');
+            expect(text).toContain('Rₑ = 2.074 a₀');
             expect(lines).toContain('R_bohr,R_angstrom,E_eV,E_Ha');
             // Point 1 (R = 2.074): E relative to the separated atoms is (energyHartree - separatedAtomsHartree) * HARTREE_TO_EV.
             const row = lines.find(line => line.startsWith('2.074,'));

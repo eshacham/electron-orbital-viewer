@@ -217,6 +217,12 @@ describe('InfoPanel (Task 4)', () => {
             fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
             fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
             expect(live()).toHaveTextContent('Info: Carbon — 2s');
+            // Fix round 1 (M5): a topic open, then a new selection (from the header nav) -- Info goes back to the selection
+            // without a word; the caption says it.
+            fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
+            rerender(<PhoneInfo selectionKey="c" title="Carbon — 3s" />);
+            expect(screen.getByText('Carbon — 3s')).toBeInTheDocument();
+            expect(live()).toHaveTextContent(/^$/);
         });
 
         it('going back to an earlier selection does not bring the old topic back', () => {

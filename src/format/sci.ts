@@ -110,14 +110,20 @@ const toSubscriptDigits = (s: string) => s.replace(/[0-9]/g, c => SUBSCRIPT_DIGI
  *   alone (no letter or digit either side); a label with no leading count needs an ASCII digit (a1), which keeps
  *   a₀, the bohr, and words like "eg" or "au" out of it.
  * - "_" before an orbital's subscript, as orbitalName writes it: 3d_z², 2p_x, 4f_z(x²−y²), and the quantities the
- *   data write the same way, R_e, E_el. Never shown: it only marks where the subscript starts.
+ *   data write the same way, R_e, E_el. Never shown: it only marks where the subscript starts. Not inside a word, so an
+ *   identifier (build_library, valence_character) is left alone.
+ *
+ * For names and short prose only -- never paths, hashes, numbers or identifiers (fix round 1, M8): a file name or a
+ * commit is set as <code> and kept away from this parser. Even so, what cannot be an irrep is left as it is: an
+ * irrep's number is one digit (1–2 after e), so an exponent form (1e5, 2e10) or a hex run (89a9328) never matches,
+ * and its count is 1–99 with no leading zero.
  */
 const LABEL_SUBSCRIPT = new RegExp([
     '(\\d*[σπδφ])([gu])(?![A-Za-z])',
     '(?<![A-Za-z0-9_])(\\d+[abet])([0-9₀-₉]+[gu]?|[gu])(?![A-Za-z0-9₀-₉])',
     '(?<![A-Za-z0-9_])([abet])([0-9]+[gu]?)(?![A-Za-z0-9₀-₉])',
     // A parenthesis belongs to the subscript only when it holds a power (f's z(x²−y²)), so "2p_z)/√2" stops at z.
-    '(\\d*[A-Za-zε])_((?:[A-Za-z0-9²³−]|\\([^()]*²[^()]*\\))+)',
+    '(?<![A-Za-z])(\\d*[A-Za-zε])_((?:[A-Za-z0-9²³−]|\\([^()]*²[^()]*\\))+)',
 ].join('|'), 'g');
 
 export interface SubscriptMatch {
@@ -131,9 +137,19 @@ export interface SubscriptMatch {
     flatSub: string;
 }
 
+/** An irrep the broad pattern found, checked: a count of 1–99 with no leading zero, and one digit (1 or 2 after e). */
+function isIrrep(base: string, sub: string): boolean {
+    const count = base.slice(0, -1);
+    const letter = base.slice(-1);
+    const digits = sub.replace(/[gu]$/, '');
+    if (count !== '' && !/^[1-9]\d?$/.test(count)) return false;
+    if (digits.length > 1) return false;
+    return letter !== 'e' || digits === '' || digits === '1' || digits === '2';
+}
+
 /** Every subscript in `text`, in order. */
 export function subscriptMatches(text: string): SubscriptMatch[] {
-    return Array.from(text.matchAll(LABEL_SUBSCRIPT), match => {
+    return Array.from(text.matchAll(LABEL_SUBSCRIPT), (match): SubscriptMatch | null => {
         const [whole, greek, parity, count, irrep, bare, bareSub, letter, markup] = match;
         const at = { index: match.index, length: whole.length };
         if (greek) return { ...at, base: greek, sub: parity, flatSub: parity };
@@ -141,10 +157,11 @@ export function subscriptMatches(text: string): SubscriptMatch[] {
         if (irrepBase) {
             // The number takes a Unicode subscript in flat text; g and u have none, so they stay as they are.
             const sub = toAsciiDigits(irrep ?? bareSub);
+            if (!isIrrep(irrepBase, sub)) return null;
             return { ...at, base: irrepBase, sub, flatSub: toSubscriptDigits(sub) };
         }
         return { ...at, base: letter, sub: markup, flatSub: markup };
-    });
+    }).filter((match): match is SubscriptMatch => match !== null);
 }
 
 /**

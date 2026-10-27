@@ -172,6 +172,7 @@ import { useLevel } from './levels/useLevel';
 import LevelControl from './levels/LevelControl';
 import LevelLine, { type HeldValue } from './levels/LevelLine';
 import PhoneNoticeSlot from './shell/PhoneNoticeSlot';
+import PhoneHeader from './shell/PhoneHeader';
 
 /** §8.6: the inspector's 290 px less its 16 px padding each side. */
 const PLOT_WIDTH = LAYOUT.plotWidth;
@@ -2052,18 +2053,19 @@ function App() {
     // A phone held upright: top bar, then the header line under it. Sideways: one merged 44 px line (spec §7).
     // Task 8: every mode's header ends with the caption naming what is drawn -- under the element or molecule nav, or
     // on its own where the header had nothing else (Orbitals; Bonds, whose "N₂ · R" line it replaces).
+    // Fix round 1 (I2): PhoneHeader measures itself, so the overlays under it move down by its real height.
     const phoneChrome = isNarrow && (
         <>
             {!isPhoneLandscape && phoneTopBar(false)}
             {isAtomMode && (
-                <div className="phone-header">
+                <PhoneHeader>
                     {isPhoneLandscape && phoneTopBar(true)}
                     <LevelNav {...levelNavProps} variant="header" />
                     {phoneCaption}
-                </div>
+                </PhoneHeader>
             )}
             {isMoleculeMode && (
-                <div className="phone-header">
+                <PhoneHeader>
                     {isPhoneLandscape && phoneTopBar(true)}
                     {/* Ruling R22c: a phone has no `TitleBlock` to carry the tier
                         line, so it rides in the phone's own header row instead. */}
@@ -2072,13 +2074,13 @@ function App() {
                         {molecule.meta && <TierBadge meta={molecule.meta} compact />}
                     </div>
                     {phoneCaption}
-                </div>
+                </PhoneHeader>
             )}
             {(isBondsMode || isBasicMode) && (
-                <div className="phone-header">
+                <PhoneHeader>
                     {isPhoneLandscape && phoneTopBar(true)}
                     {phoneCaption}
-                </div>
+                </PhoneHeader>
             )}
             <PhoneSheet tabs={phoneTabs} active={phoneTab} onChange={setPhoneTab} />
         </>
@@ -2104,9 +2106,7 @@ function App() {
     const viewport = (
         <main
             id="canvas-container"
-            className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}${requestWorkspaceOpen ? ' request-open' : ''}${
-                // Task 8: the overlays under a phone's header make room for its caption (style.css).
-                !isNarrow ? '' : isPhoneLandscape ? ' caption-landscape' : isAtomMode || isMoleculeMode ? ' caption-under-nav' : ''}`}
+            className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}${requestWorkspaceOpen ? ' request-open' : ''}`}
             data-busy={isLoading ? 'true' : 'false'}
             aria-label="3D view"
             tabIndex={-1}

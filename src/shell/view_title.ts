@@ -2,22 +2,16 @@ import type { RootState } from '../store';
 import { profileRelativity, speciesOf } from '../store/atomSlice';
 import { selectShownBasicOrbital, selectShownEnclosedFraction } from '../store/orbitalSlice';
 import { speciesTitle } from '../atom/species';
-import { subshellLabel } from '../atom/configurations';
 import type { RelativityMode } from '../atom/relativity';
 import { orbitalName } from '../orbital_names';
 import { combinationTitle, selectionProblem } from '../combinations';
 import { BONDS_SYSTEMS, systemFormula } from '../bonds/systems';
-import { bondsDrawnPicture, moleculeTitle, noSurfaceView, viewDescription } from '../export/caption';
-import { H2PLUS_LABELS } from '../bonds/h2plus';
-import { SPIN_SUFFIX } from '../bonds/bonds_request';
+import { bondsDrawnPicture, bondsPictureNamed, moleculeTitle, noSurfaceView, viewDescription } from '../export/caption';
+import { atomPartName, bondsViewName } from './view_names';
 import { formatFormula } from '../molecules/catalogue';
 
-const SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
-
-/** "L shell": the X-ray letter, as the breadcrumb and the strip name shells. */
-export function shellName(n: number): string {
-    return `${SHELL_LETTERS[n - 1] ?? `n = ${n}`} shell`;
-}
+// Fix round 1 (M9): shellName is written once, with the other names of what is drawn (view_names.ts).
+export { shellName } from './view_names';
 
 /** The drawn profile's method (ruling C9: the picture's mode, not the switch's). */
 const METHOD: Record<RelativityMode, string> = {
@@ -46,13 +40,7 @@ export function viewTitle(state: RootState): ViewTitle {
     const percent = `${Math.round(selectShownEnclosedFraction(state) * 100)} %`;
     const atom = state.atom;
     if (atom.mode === 'atom') {
-        const orbital = atom.selectedOrbital;
-        const subshell = atom.selectedSubshell;
-        const level = atom.level === 'orbital' && orbital
-            ? `${orbitalName(orbital.n, orbital.l, orbital.ml)} orbital${orbital.j === undefined ? '' : ` · ${subshellLabel(orbital.n, orbital.l, orbital.j)}`}`
-            : atom.level === 'shell' && subshell ? subshellLabel(subshell.n, subshell.l, subshell.j)
-            : atom.level === 'shell' && atom.selectedShell !== null ? shellName(atom.selectedShell)
-            : 'whole atom';
+        const level = atomPartName(atom, 'title') ?? 'whole atom';
         const method = METHOD[atom.profile ? profileRelativity(atom.profile) : 'off'];
         const drawn = atom.unbound ? 'nothing is drawn for this species'
             : atom.level === 'orbital' ? `|ψ|² isosurface · ${percent} enclosed`
@@ -110,21 +98,26 @@ export interface ViewCaptionStatus {
 }
 
 const LOADING = 'loading…';
+const ELECTRON_DENSITY = 'electron density';
 const enclosed = (fraction: number) => `${Math.round(fraction * 100)} % enclosed`;
+
+/**
+ * While the view loads, a qualifier that names what is drawn (a kind of surface) stays and "loading…" follows it; one
+ * that measures the picture (an enclosed %, a bond length) gives way to "loading…" -- fix round 1, M3.
+ */
+const loadingAfter = (kind: string) => `${kind} · ${LOADING}`;
 
 function atomCaption(state: RootState, { loading }: ViewCaptionStatus): ViewCaption {
     const atom = state.atom;
-    const orbital = atom.selectedOrbital;
-    const subshell = atom.selectedSubshell;
-    // The whole atom is the species itself; a drill-down names its part after it.
-    const part = atom.level === 'orbital' && orbital
-        ? `${orbitalName(orbital.n, orbital.l, orbital.ml)}${orbital.j === undefined ? '' : ` (${subshellLabel(orbital.n, orbital.l, orbital.j)})`}`
-        : atom.level === 'shell' && subshell ? subshellLabel(subshell.n, subshell.l, subshell.j)
-        : atom.level === 'shell' && atom.selectedShell !== null ? shellName(atom.selectedShell)
-        : null;
+    // The whole atom is the species itself, and what is drawn of it is its electron density (ruling M4); a drill-down
+    // names its part after the species.
+    const part = atomPartName(atom, 'caption');
     const species = speciesTitle(speciesOf(atom));
+    if (!part) {
+        return { name: species, qualifier: atom.unbound ? 'nothing drawn' : loading ? loadingAfter(ELECTRON_DENSITY) : ELECTRON_DENSITY };
+    }
     const qualifier = loading ? LOADING : atom.unbound ? 'nothing drawn' : enclosed(selectShownEnclosedFraction(state));
-    return { name: part ? `${species} ${part}` : species, qualifier };
+    return { name: `${species} ${part}`, qualifier };
 }
 
 function orbitalsCaption(state: RootState, { loading }: ViewCaptionStatus): ViewCaption {
@@ -147,21 +140,14 @@ function bondsCaption(state: RootState, { loading, failed }: ViewCaptionStatus):
     // one loads, or before any has landed -- the one asked for.
     const drawn = loading || failed ? null : bondsDrawnPicture(state);
     if (drawn) {
-        const { picture } = drawn;
-        const what = picture.kind === 'h2plus' ? H2PLUS_LABELS[picture.state]
-            : picture.kind === 'mo' ? `${picture.orbital.label}${SPIN_SUFFIX[picture.orbital.spin]}`
-            : 'electron density';
-        return { name: `${systemFormula(drawn.system)} ${what}`, qualifier: `R = ${drawn.R.toFixed(2)} a₀` };
+        return { name: `${systemFormula(drawn.system)} ${bondsViewName(bondsPictureNamed(drawn.picture))}`, qualifier: `R = ${drawn.R.toFixed(2)} a₀` };
     }
     const { system, view, R } = state.bonds;
-    const what = view.kind === 'h2plus' ? H2PLUS_LABELS[view.state]
-        : view.kind === 'mo' ? `${view.label}${SPIN_SUFFIX[view.spin]}`
-        : 'electron density';
     const qualifier = failed ? 'not loaded' : loading || R === null ? LOADING : `R = ${R.toFixed(2)} a₀`;
-    return { name: `${systemFormula(system)} ${what}`, qualifier };
+    return { name: `${systemFormula(system)} ${bondsViewName(view)}`, qualifier };
 }
 
-const SURFACE_KIND = { density: 'electron density', esp: 'electrostatic potential' } as const;
+const SURFACE_KIND = { density: ELECTRON_DENSITY, esp: 'electrostatic potential' } as const;
 const NO_SURFACE: Record<'structure' | 'dipole', string> = { structure: 'structure only', dipole: 'dipole arrow only' };
 
 function moleculeCaption(state: RootState, { loading }: ViewCaptionStatus): ViewCaption {
@@ -178,18 +164,20 @@ function moleculeCaption(state: RootState, { loading }: ViewCaptionStatus): View
     const surface = molecule.surface;
     if (surface.kind === 'mo') {
         const orbital = meta.orbitals.find(o => o.index === surface.index);
-        const role = orbital?.role ? `${orbital.role}, ` : '';
+        // Fix round 1 (M2): the role says which orbital, so it goes with the name -- "Water 1b1 (HOMO)", as the canvas
+        // subtitle and the export write it.
+        const role = orbital?.role ? ` (${orbital.role})` : '';
         return {
-            name: `${meta.name} ${orbital?.label ?? `orbital ${surface.index}`}`,
-            qualifier: loading ? LOADING : `${role}${enclosed(state.orbital.enclosedFraction)}`,
+            name: `${meta.name} ${orbital?.label ?? `orbital ${surface.index}`}${role}`,
+            qualifier: loading ? LOADING : enclosed(state.orbital.enclosedFraction),
         };
     }
-    if (loading) return { name: meta.name, qualifier: LOADING };
     if (surface.kind === 'none') {
         const shows = noSurfaceView(state)?.shows;
         return { name: meta.name, qualifier: shows ? NO_SURFACE[shows] : 'nothing drawn' };
     }
-    return { name: meta.name, qualifier: SURFACE_KIND[surface.kind] };
+    const kind = SURFACE_KIND[surface.kind];
+    return { name: meta.name, qualifier: loading ? loadingAfter(kind) : kind };
 }
 
 /** The phone caption's two halves for the view on screen (or, while it loads, the view asked for). */

@@ -89,7 +89,10 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
     describe('viewCaption', () => {
         it('names an atom\'s view and its enclosed fraction, and the requested view while it loads', () => {
             const store = neonStore();
-            expect(viewCaption(store.getState(), { loading: false })).toEqual({ name: 'Neon', qualifier: '90 % enclosed' });
+            // Ruling M4 (fix round 1): the whole atom's caption says what is drawn of it, its electron density -- and keeps
+            // saying so while it loads (M3).
+            expect(viewCaption(store.getState(), { loading: false })).toEqual({ name: 'Neon', qualifier: 'electron density' });
+            expect(viewCaption(store.getState(), { loading: true })).toEqual({ name: 'Neon', qualifier: 'electron density · loading…' });
             store.dispatch(drillToShell(2));
             expect(viewCaption(store.getState(), { loading: false }).name).toBe('Neon L shell');
             store.dispatch(drillToSubshell(2, 1));
@@ -134,11 +137,16 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
             store.dispatch(selectMolecule({ id: 'h2o' }));
             expect(viewCaption(store.getState(), { loading: true })).toEqual({ name: 'Water', qualifier: 'loading…' });
             store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
+            // Fix round 1 (M3): a kind of surface is kept while it loads, "loading…" after it.
+            expect(viewCaption(store.getState(), { loading: true })).toEqual({ name: 'Water', qualifier: 'electron density · loading…' });
             expect(viewCaption(store.getState(), { loading: false })).toEqual({ name: 'Water', qualifier: 'electron density' });
             store.dispatch(setSurface({ kind: 'esp' }));
             expect(viewCaption(store.getState(), { loading: false }).qualifier).toBe('electrostatic potential');
+            expect(viewCaption(store.getState(), { loading: true }).qualifier).toBe('electrostatic potential · loading…');
             store.dispatch(setSurface({ kind: 'mo', index: 4 }));
-            expect(viewCaption(store.getState(), { loading: false })).toEqual({ name: 'Water 1b1', qualifier: 'HOMO, 90 % enclosed' });
+            // Fix round 1 (M2): the role names which orbital, so it goes with the name.
+            expect(viewCaption(store.getState(), { loading: false })).toEqual({ name: 'Water 1b1 (HOMO)', qualifier: '90 % enclosed' });
+            expect(viewCaption(store.getState(), { loading: true })).toEqual({ name: 'Water 1b1 (HOMO)', qualifier: 'loading…' });
             store.dispatch(setSurface({ kind: 'mo', index: 3 }));
             expect(viewCaption(store.getState(), { loading: false })).toEqual({ name: 'Water 3a1', qualifier: '90 % enclosed' });
             store.dispatch(setSurface({ kind: 'none' }));

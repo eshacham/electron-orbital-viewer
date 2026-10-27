@@ -63,7 +63,8 @@ const N2_FIRST_ORDER =
 /** "2p" with a real subscript z. */
 const twoPz = () => h(React.Fragment, null, '2p', h('sub', null, 'z'));
 
-/** The n = 2 Stark states, "(2s + 2p_z)/√2" typeset (combinations.ts's STARK_LABEL is the plain-text form). */
+/** The n = 2 Stark states, "(2s + 2p_z)/√2" typeset, for prose (combinations.ts's STARK_LABEL is the same name as
+ * markup, which titles typeset with withSubscripts and plain text writes flat). */
 function starkLabel(state: StarkState): React.ReactNode {
     return h(React.Fragment, null, `(2s ${state === 'lower' ? '+' : '−'} `, twoPz(), ')/√2');
 }

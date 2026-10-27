@@ -255,7 +255,7 @@ describe('export captions', () => {
             const multireferenceScan = { ...N2_SCAN, validity: { ...N2_SCAN.validity, multireference: true, t1AtRe: 0.05 } };
             expect(methodStatement(store.getState(), multireferenceScan)).toBe(
                 'Orbitals and density: B3LYP/def2-TZVP; energies: CCSD(T)/aug-cc-pVTZ (frozen core); '
-                + 'Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.050 at R_e).',
+                + 'Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.050 at Rₑ).',
             );
         });
 

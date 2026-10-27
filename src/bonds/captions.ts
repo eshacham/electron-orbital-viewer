@@ -18,6 +18,12 @@ export function lengths(R: number): string {
     return `R = ${lengthText(R)}`;
 }
 
+/*
+ * Task 8 fix round 1 (I1, M7): these captions are also an export's plain text -- the method line of every B₂/C₂
+ * export, the CSV comments -- so their quantities are written with Unicode, never markup: Rₑ, Dₑ, E(el). Not
+ * through flatSubscripts, which would write R_e as "Re", rhenium.
+ */
+
 /**
  * Captions for H₂⁺, the one system solved here rather than precomputed. The
  * solver's own error (h2plus.ts: doubling both expansions moves no energy on
@@ -26,7 +32,7 @@ export function lengths(R: number): string {
  */
 export const H2PLUS_CAPTIONS: readonly string[] = [
     'Exact within Born–Oppenheimer (nuclei fixed): the separated spheroidal equations are solved to 10⁻¹⁰ Ha, with no basis set.',
-    'E = E_el + 1/R. One electron, so its orbital energy is the exact electronic energy.',
+    'E = E(el) + 1/R. One electron, so its orbital energy is the exact electronic energy.',
     '1σu* has no minimum between 0.5 and 10 a₀; its only well, 0.06 mHa deep at 12.5 a₀, is a polarisation effect outside this range.',
 ];
 
@@ -38,7 +44,7 @@ export const H2PLUS_CAPTIONS: readonly string[] = [
 export function multireferenceCaption(scan: MoleculeScan): string | null {
     if (!scan.validity.multireference) return null;
     const t1 = scan.validity.t1AtRe;
-    return `Strongly multireference: single-reference CCSD(T) is only qualitative here${t1 !== null ? ` (T1 = ${t1.toFixed(3)} at R_e)` : ''}.`;
+    return `Strongly multireference: single-reference CCSD(T) is only qualitative here${t1 !== null ? ` (T1 = ${t1.toFixed(3)} at Rₑ)` : ''}.`;
 }
 
 /**
@@ -53,7 +59,7 @@ export function validityCaption(scan: MoleculeScan): string | null {
         // Ruling T4-d: T1 is past the single-reference limit even at R_e, so
         // the stop is relative -- 1.5 × T1 at R_e -- and the points before it
         // are no more "valid" than the multireference caveat allows.
-        return `The curve stops at ${lengths(validUpToRBohr)}: at the next point T1 exceeds 1.5 × its value at R_e`
+        return `The curve stops at ${lengths(validUpToRBohr)}: at the next point T1 exceeds 1.5 × its value at Rₑ`
             + `${t1Limit !== null ? ` (${t1Limit.toFixed(4)})` : ''}${stopReason ? ` — ${stopReason}` : ''}.`;
     }
     return `Single-reference CCSD(T) is not valid beyond ${lengths(validUpToRBohr)} (the bond breaks into open-shell atoms), `
@@ -82,7 +88,7 @@ function experimentalRe(system: BondsSystemId, scan: MoleculeScan): { ReAngstrom
  */
 export function li2Caveat(scan: MoleculeScan, referenceStated = false): string {
     const longer = ((scan.fit.ReBohr * BOHR_TO_ANGSTROM) / LI2_REFERENCE.ReAngstrom - 1) * 100;
-    return 'Exact only for the valence pair: core–valence correlation is frozen out, so R_e comes out '
+    return 'Exact only for the valence pair: core–valence correlation is frozen out, so Rₑ comes out '
         + `${longer.toFixed(1)} % longer than experiment${referenceStated ? '' : ` (${LI2_REFERENCE.ReAngstrom} Å, ${LI2_REFERENCE.source})`}.`;
 }
 
@@ -122,9 +128,9 @@ function bondCaptions(system: BondsSystemId, scan: MoleculeScan): string[] {
     // H₂ (FCI) 4.71 vs Kołos & Wolniewicz's 4.75, 0.9 %. A triple-zeta basis
     // misses correlation energy that grows with the bond, so it underbinds.
     return [
-        `D_e = ${fit.DeEv.toFixed(2)} eV (${fit.DeHartree.toFixed(4)} Ha) from separated atoms, ${atomsMethod(scan)}: `
-            + 'E(A) + E(B) − E(R_e), without zero-point energy; aug-cc-pVTZ underbinds by a few % against experiment.',
-        `R_e = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted to the scan points `
+        `Dₑ = ${fit.DeEv.toFixed(2)} eV (${fit.DeHartree.toFixed(4)} Ha) from separated atoms, ${atomsMethod(scan)}: `
+            + 'E(A) + E(B) − E(Rₑ), without zero-point energy; aug-cc-pVTZ underbinds by a few % against experiment.',
+        `Rₑ = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted to the scan points `
             + `(fit uncertainty ${uncertainty} a₀)${experiment}.${system === 'li2' ? ` ${li2Caveat(scan, reference !== null)}` : ''}`,
     ];
 }

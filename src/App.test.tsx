@@ -2815,12 +2815,32 @@ describe('App: what is drawn, named (Task 8)', () => {
             expect(caption().textContent).not.toContain('_');
         });
 
+        // Fix round 1 (M11): with the Info tab open, a new selection is the caption's to announce -- Info stays quiet.
+        it('leaves a new selection to the caption while the Info tab is open', () => {
+            const { store } = open('#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0', true);
+            act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+            fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
+            const infoLive = () => document.querySelector('.info-section [aria-live="polite"]') as HTMLElement;
+            act(() => { store.dispatch(drillToOrbital(2, 1, 1)); });
+            expect(caption()).toHaveTextContent(/^Argon 2px · 90 % enclosed$/);
+            expect(document.querySelector('.info-section')).toHaveTextContent('Argon — 2px orbital');
+            expect(infoLive()).toHaveTextContent(/^$/);
+        });
+
+        // Ruling M4 (fix round 1): the whole atom's caption says what is drawn of it.
+        it('names the whole atom by its electron density', () => {
+            const { store } = open('#mode=atom&Z=18&level=atom', true);
+            act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+            expect(caption()).toHaveTextContent(/^Argon · electron density$/);
+        });
+
         it('names the requested atom with "loading…" while it is solved, and the busy label does not announce it again', () => {
             jest.useFakeTimers();
             installMatchMedia(true);
             renderWithProvider(<App />, { Z: 6, isSolving: true });
             act(() => { jest.advanceTimersByTime(500); });
-            expect(caption()).toHaveTextContent(/^Carbon · loading…$/);
+            // Ruling M4 / M3 (fix round 1): the whole atom's electron density, then "loading…".
+            expect(caption()).toHaveTextContent(/^Carbon · electron density · loading…$/);
             const busy = document.querySelector('.canvas-busy')!;
             expect(busy).toHaveTextContent('Solving Carbon…');
             expect(busy).not.toHaveAttribute('aria-live');
@@ -2876,14 +2896,14 @@ describe('App: what is drawn, named (Task 8)', () => {
             expect(title).toHaveTextContent(/^Hydrogen — n = 2 Stark states$/);
             const key = screen.getByLabelText('combination colour key');
             expect(key).toHaveTextContent('(2s + 2pz)/√2, −3F');
-        expect(key.innerHTML).toContain('2p<sub>z</sub>');
+            expect(key.innerHTML).toContain('2p<sub>z</sub>');
             expect(key.textContent).not.toContain('_');
         });
 
         it('typesets a Bonds orbital in the canvas subtitle', async () => {
             open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', false);
             await waitFor(() => expect(document.querySelector('.viewport-subtitle')).toHaveTextContent(/^N₂ 1πu/));
-        expect(document.querySelector('.viewport-subtitle')!.innerHTML).toContain('1π<sub>u</sub>');
+            expect(document.querySelector('.viewport-subtitle')!.innerHTML).toContain('1π<sub>u</sub>');
         });
     });
 });

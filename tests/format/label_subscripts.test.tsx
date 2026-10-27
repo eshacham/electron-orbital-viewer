@@ -45,6 +45,7 @@ describe('withSubscripts: the one typeset-label helper', () => {
     });
 
     // As OrbitalLabel is: the label is named as it reads, so an accessible name never gains a space before the <sub>.
+    // Ruling M6: spoken names keep plain digits -- "1b1", even from the flat "1b₁".
     it('names each typeset label as it reads', () => {
         const { container } = render(<h1>{withSubscripts('Hydrogen — 3d_z² orbital, 1b₁ and 1σu*')}</h1>);
         expect(Array.from(container.querySelectorAll('[aria-label]'), el => el.getAttribute('aria-label'))).toEqual(['3dz²', '1b1', '1σu']);
@@ -56,6 +57,21 @@ describe('withSubscripts: the one typeset-label helper', () => {
         for (const plain of ['a bond at 2.07 a₀', 'e/a₀³', 'B3LYP/def2-TZVP', 'aug-cc-pVTZ', 'C2v', 'Ha/e', 'e.g. a ring', '1e-5']) {
             expect(typeset(plain)).toBe(plain.replace(/&/g, '&amp;'));
         }
+    });
+});
+
+// Fix round 1 (M8): for names and short prose only -- what cannot be an irrep, or is an identifier, is left alone.
+describe('withSubscripts leaves numbers, hashes and identifiers as they are', () => {
+    it.each(['1e5', '2e10 Pa', '6.02e23', 'commit 89a9328', '3a12', '0b1', 'build_library.py', 'valence_character'])(
+        '%s', text => {
+            expect(typeset(text)).toBe(text);
+            expect(flatSubscripts(text)).toBe(text);
+        },
+    );
+
+    it('still typesets the irreps an e carries, and a two-digit count', () => {
+        expect(typeset('1e1g and 2e2u')).toBe('1e<sub>1g</sub> and 2e<sub>2u</sub>');
+        expect(typeset("10a1'")).toBe("10a<sub>1</sub>'");
     });
 });
 

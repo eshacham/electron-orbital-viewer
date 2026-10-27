@@ -143,12 +143,16 @@ describe('bondsInfo (Task 7a)', () => {
         expect(computed.match(/CCSD\(T\)\/aug-cc-pVTZ \(frozen core\)/g)).toHaveLength(1);
     });
 
-    it('never shows an underscore, and sets R_e, D_e and the orbital symmetry labels with a real subscript', () => {
+    // Task 8 fix round 1 (I1, M7): the captions are an export's plain text too, so Rₑ and Dₑ are written with Unicode's
+    // subscript e (one string for both surfaces); the symmetry labels still take a real <sub>.
+    it('never shows an underscore, writes Rₑ and Dₑ, and sets the orbital symmetry labels with a real subscript', () => {
         const content = bondsInfo(stateOf(n2Store()), n2Data, 'research');
         const { container } = rendered(content, 'research');
         expect(container.textContent).not.toContain('_');
+        expect(container.textContent).toContain('Rₑ = 2.086 a₀');
+        expect(container.textContent).toContain('Dₑ = 9.44 eV');
         const subs = [...container.querySelectorAll('sub')].map(sub => sub.textContent);
-        expect(subs).toEqual(expect.arrayContaining(['e', 'g']));
+        expect(subs).toEqual(expect.arrayContaining(['g']));
     });
 
     it('at Advanced reads the MO legend and the fixed-ρ note that sat beside Electron enclosed', () => {
@@ -234,7 +238,8 @@ describe('bondsInfo (Task 7a)', () => {
         // Fix round 1 (M4): the energies, as T4-d's caption says.
         expect(shownAt(content, 'basics')).toContain('The computed energies for C₂ are only a rough guide: no single arrangement of its electrons describes it well, and the methods used here start from one.');
         expect(shownAt(content, 'basics')).not.toMatch(/CCSD|multireference/);
-        expect(computedText(content)).toContain('Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.038 at Re).');
+        // Task 8 fix round 1 (I1): Rₑ in Unicode, the export method line's own words.
+        expect(computedText(content)).toContain('Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.038 at Rₑ).');
     });
 
     // Fix round 1 (I1): Cut away is a Basics control, so what it removes is said from Basics, with its subject -- in

@@ -849,13 +849,28 @@ describe('Molecules mode', () => {
         expect(caption()).toHaveTextContent(/^Water · electron density$/);
         expect(caption()).toHaveAttribute('aria-live', 'polite');
         act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
-        expect(caption()).toHaveTextContent(/^Water 1b1 · HOMO, 90 % enclosed$/);
+        // Fix round 1 (M2): the role goes with the name.
+        expect(caption()).toHaveTextContent(/^Water 1b1 \(HOMO\) · 90 % enclosed$/);
         expect(caption().innerHTML).toContain('1b<sub>1</sub>');
         const { loadMoleculeMeta } = jest.requireMock('../src/molecules/loader') as { loadMoleculeMeta: jest.Mock };
         loadMoleculeMeta.mockImplementationOnce(() => new Promise(() => {}));
         act(() => { store.dispatch(selectMolecule({ id: 'nh3' })); });
         await act(async () => { await new Promise(r => setTimeout(r, 450)); });
         expect(caption()).toHaveTextContent(/^Ammonia · loading…$/);
+    });
+
+    // Fix round 1 (M11): the canvas subtitle reads the export's flat 1b₁ and typesets it again, 1b<sub>1</sub>.
+    it('typesets the drawn orbital\'s irrep in the canvas subtitle', async () => {
+        const { store } = await enterMolecules(false);
+        pickWater(store);
+        act(() => {
+            store.dispatch(setSurface({ kind: 'mo', index: 4 }));
+            store.dispatch(renderFinished({ isoLevel: 0.05, drawn: { id: 'h2o', surface: { kind: 'mo', index: 4 }, enclosedFraction: 0.9 } }));
+        });
+        const subtitle = document.querySelector('.viewport-subtitle')!;
+        expect(subtitle).toHaveTextContent(/^Water \(H₂O\), MO 1b1 \(HOMO\)/);
+        expect(subtitle.innerHTML).toContain('1b<sub>1</sub>');
+        expect(subtitle.textContent).not.toMatch(/[_₁]/);
     });
 
     it('says on the canvas what it is drawing', async () => {
