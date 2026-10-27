@@ -20,9 +20,8 @@ import { SurfaceStyleControl } from '../atom_ui/DisplayControls';
 import { ELEMENTS, elementLabel } from '../elements';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
 import { CombinationSelection, NO_COMBINATION } from '../combinations';
-import { RelativityMode, shortMethodLabel } from '../atom/relativity';
-import type { ValenceSContraction } from '../atom/relativistic_comparison';
-import type { SerialisedAtomProfile } from '../workers/atomWorker';
+import type { RelativityMode } from '../atom/relativity';
+import { cutHelpText } from '../atom/atom_text';
 import { KEEP_CASE } from '../design/mui';
 import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
 import InfoButton from '../info/InfoButton';
@@ -140,29 +139,6 @@ interface ControlsProps {
   level?: LearningLevel;
 }
 
-/**
- * The drawn profile's side of the readout (ruling C9): everything here
- * describes the picture on screen, which during a re-solve is still the old
- * mode's, never the switch's.
- */
-export interface RelativityReadout {
-  /** The mode the drawn profile was solved in. */
-  pictureMode: RelativityMode;
-  /** Its valence-s contraction against the same species' non-relativistic solve, when there is one. */
-  change: ValenceSContraction | null;
-  /** Why a relativistic picture has nothing to compare against (the worker's own words), or null. */
-  comparisonUnavailable: string | null;
-}
-
-/** The readout's facts for a drawn profile (ruling C9): App's Relativity switch and Info (atomInfo) read the same ones. */
-export function relativityReadoutOf(profile: SerialisedAtomProfile): RelativityReadout {
-  return {
-    pictureMode: profile.relativity ?? 'off',
-    change: profile.valenceS ?? null,
-    comparisonUnavailable: profile.comparisonUnavailable ?? null,
-  };
-}
-
 const ISO_MIN = 0.000000001;
 const ISO_MAX = 0.001;
 
@@ -186,141 +162,6 @@ export function cutDepthLabel(clipPosition: number): string {
   if (depth >= 100) return 'everything removed';
   if (depth === 50) return '50% — through the nucleus';
   return `${depth}% — ${depth < 50 ? 'short of' : 'past'} the nucleus`;
-}
-
-/**
- * What a cut does, in words (the Cut away helper). Task 6: Atoms says it in Info (atomInfo), Bonds and Molecules under
- * the control until Task 7 moves theirs; one function, so the two cannot drift.
- */
-export function cutHelpText(clipAxis: ClipAxis, meshLevel: boolean): string {
-  if (clipAxis === 'none') return 'Pick an axis to slice the orbital open.';
-  return meshLevel
-    ? `Removes the part on the +${clipAxis} side of a plane perpendicular to the ${clipAxis} axis.`
-    : `Slices off the +${clipAxis} side to show the shells inside. The atom is round, so X, Y and Z give the same rings, facing a different way.`;
-}
-
-/** What each mode is, in one line; "Default for this element" when it is that element's default (spec §3.1). */
-export function relativityHelp(mode: RelativityMode, isDefault: boolean): string {
-  const base = {
-    off: 'Schrödinger equation — no relativistic effects.',
-    scalar: 'Scalar-relativistic (Koelling–Harmon): mass-velocity and Darwin terms, no spin–orbit.',
-    spinOrbit: 'Dirac equation: each l > 0 subshell splits into j = l − ½ and j = l + ½.',
-  }[mode];
-  return isDefault ? `${base} Default for this element.` : base;
-}
-
-/**
- * A percentage that never rounds a real change to nothing: hydrogen's 1s
- * moves by about a thousandth of a percent, and "0.00 %" would read as no
- * change at all.
- */
-function formatPercent(size: number): string {
-  if (size >= 1) return size.toFixed(1);
-  if (size >= 0.01) return size.toFixed(2);
-  if (size >= 1e-4) return size.toPrecision(2);
-  return size === 0 ? '0' : 'less than 0.0001';
-}
-
-/**
- * Enough decimal places for the two radii to differ where they really do:
- * carbon's 2s moves by 5·10⁻⁴ a₀, which at two places printed as
- * "1.58 → 1.58" beside "contracts by 0.03 %". Two places at least, six at
- * most (hydrogen's 1s moves by a few 10⁻⁵ a₀).
- */
-function radiusDecimals(difference: number): number {
-  if (!(difference > 0)) return 2;
-  return Math.min(6, Math.max(2, Math.ceil(-Math.log10(difference))));
-}
-
-/**
- * The valence-s contraction, with the comparison it is measured against
- * named. Two things a reader could otherwise assume wrongly are said
- * outright (Task 8): the shell is the outermost *occupied* s, which for an
- * excited species is not the neutral's valence (Au 6s → 6p reports 5s), and
- * the value is an LDA one -- ⟨r⟩ of LDA orbitals, smaller than the
- * Dirac–Fock contractions textbooks quote (gold's 6s: 14 % here) -- so the
- * method goes in the same sentence as the number (spec §3.1).
- */
-export function whatChangedText(change: ValenceSContraction, mode: RelativityMode): string {
-  const parts = whatChangedParts(change, mode);
-  return parts.before + parts.radii + parts.after;
-}
-
-/**
- * The same sentence in three pieces, so the readout can keep the radii
- * together: in a 300 px panel "3.31 →" and "2.85 a₀" otherwise land on
- * different lines (fix round 1, M1). ⟨r⟩ is named as the mean radius for a
- * reader who does not know the symbol.
- */
-export interface WhatChangedParts { before: string; radii: string; after: string }
-
-export function whatChangedParts(change: ValenceSContraction, mode: RelativityMode): WhatChangedParts {
-  const size = Math.abs(change.contractionPercent);
-  const verb = change.contractionPercent >= 0 ? 'contracts' : 'expands';
-  const nonRelativistic = change.nonRelativisticMeanRadius;
-  const relativistic = change.relativisticMeanRadius;
-  const digits = radiusDecimals(Math.abs(nonRelativistic - relativistic));
-  const method = shortMethodLabel(mode);
-  return {
-    before: `What changed: ${change.label} ${verb} by ${formatPercent(size)} % (mean radius `,
-    radii: `⟨r⟩ ${nonRelativistic.toFixed(digits)} → ${relativistic.toFixed(digits)} a₀`,
-    // A non-breaking space: a lone "s)." at the start of a line reads as a typo.
-    after: `; the outermost occupied\u00a0s). ${method[0].toUpperCase()}${method.slice(1)} `
-      + 'against the same species\' non-relativistic LDA.',
-  };
-}
-
-/** How the readout names a picture's mode: "still scalar-relativistic". */
-const PICTURE_MODE_WORDS: Record<RelativityMode, string> = {
-  off: 'non-relativistic',
-  scalar: 'scalar-relativistic',
-  spinOrbit: 'the Dirac (spin–orbit) one',
-};
-const SOLVING_WORDS: Record<RelativityMode, string> = {
-  off: 'the non-relativistic picture',
-  scalar: 'the scalar-relativistic picture',
-  spinOrbit: 'the picture with spin–orbit',
-};
-
-/**
- * The readout's text, or null for nothing to say. Ruling C9: it speaks for
- * the picture on screen. While the switch and the picture disagree a new
- * mode is solving, and the old picture's contraction must not sit under a
- * switch that names another method -- so it says what is coming and what is
- * still drawn instead. A non-relativistic picture is its own baseline, so
- * it has nothing to report; a relativistic one without a baseline (Pr–Eu
- * 6s → 4f: LDA does not bind the 4f without relativity) says why.
- */
-export function relativityReadoutText(switchMode: RelativityMode, readout: RelativityReadout | null): string | null {
-  const content = relativityReadoutContent(switchMode, readout);
-  return content === null || typeof content === 'string' ? content : content.before + content.radii + content.after;
-}
-
-/** relativityReadoutText's decision, with a contraction left in pieces for the readout to lay out. */
-function relativityReadoutContent(switchMode: RelativityMode, readout: RelativityReadout | null): string | WhatChangedParts | null {
-  if (!readout) return null;
-  if (readout.pictureMode !== switchMode) {
-    return `Solving ${SOLVING_WORDS[switchMode]}… the picture on screen is still ${PICTURE_MODE_WORDS[readout.pictureMode]}.`;
-  }
-  if (readout.pictureMode === 'off') return null;
-  if (readout.change) return whatChangedParts(readout.change, readout.pictureMode);
-  return readout.comparisonUnavailable;
-}
-
-/**
- * The readout as Info shows it (Task 6: atomInfo), with a contraction's radii held on one line (fix round 1, M1: in a
- * narrow panel "3.31 →" and "2.85 a₀" otherwise land on different lines). Null for nothing to say.
- */
-export function relativityReadoutNode(switchMode: RelativityMode, readout: RelativityReadout | null): React.ReactNode {
-  const content = relativityReadoutContent(switchMode, readout);
-  if (content === null || typeof content === 'string') return content;
-  return (
-    <>
-      {content.before}
-      <span className="relativity-radii" style={{ whiteSpace: 'nowrap' }}>{content.radii}</span>
-      {content.after}
-    </>
-  );
 }
 
 /** Ruling T13-I3: what Opacity and Cut away say while no surface is drawn. */

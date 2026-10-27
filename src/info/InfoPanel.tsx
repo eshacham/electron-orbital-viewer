@@ -89,7 +89,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
             ) : (
                 <div className="info-body">
                     {content.plain && <p className="info-text">{content.plain}</p>}
-                    {technical && content.technical && <p className="info-text">{content.technical}</p>}
+                    {technical && content.technical && (Array.isArray(content.technical)
+                        // Task 6 fix round 1 (M7): short paragraphs, one idea each, never one wall.
+                        ? content.technical.map((paragraph, index) => <p key={index} className="info-text">{paragraph}</p>)
+                        : <p className="info-text">{content.technical}</p>)}
                     {facts.length > 0 && (
                         <dl className="info-facts ql-tabular">
                             {/* Keyed by place: a label may be markup, and a builder lists each fact once. */}

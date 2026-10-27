@@ -13,11 +13,12 @@ import type { LearningLevel } from '../../src/levels/levels';
 import { makeStore } from '../export/fixtures';
 import type { AtomState } from '../../src/store/atomSlice';
 import type { SerialisedAtomProfile, SerialisedSubshell } from '../../src/workers/atomWorker';
-import { aboutModelText, aboutRelativitySentence, relativisticEnergiesSentence } from '../../src/components/LevelNav';
+import { aboutModelText, aboutRelativitySentence, relativisticEnergiesSentence } from '../../src/atom/atom_text';
 import { methodStatement } from '../../src/atom/relativity';
 import { deltaScfMethod } from '../../src/atom/delta_scf';
 import { IE_LIMITATION_NOTE } from '../../src/atom/ie_accuracy';
 import { configurationFor } from '../../src/atom/configurations';
+import { speciesConfiguration } from '../../src/atom/species';
 import { LARGE_COMPONENT_NOTE, RADIAL_FACTOR_NOTE } from '../../src/atom/plot_tabs';
 
 type OrbitalSlice = AtomsInfoState['orbital'];
@@ -58,7 +59,7 @@ const carbon = () => profileOf(6, [sub(1, 0, 2, -9.948), sub(2, 0, 2, -0.501), s
  */
 const protactinium = () => profileOf(91, [sub(7, 0, 2, -0.15)], { relativity: 'off' });
 /**
- * Pa's live ΔSCF ionisation energy, 7.376 eV against NIST's 5.890 eV (docs/quantumlab/checks/6G-2/CHECKLIST.md, "Pa
+ * Pa's live ΔSCF ionisation energy, 7.376 eV against NIST's 5.89 eV (docs/quantumlab/checks/6G-2/CHECKLIST.md, "Pa
  * configuration": the app's own value, read off the running app) -- +25.2 %.
  */
 const paEnergies = { speciesKey: '91', status: 'done' as const, ionisation: { valueEv: 7.376, fromLabel: 'Pa', toLabel: 'Pa⁺' }, excitation: null, message: null };
@@ -96,9 +97,10 @@ describe('atomInfo (Task 6)', () => {
         expect(computed).toContain(deltaScfMethod('off'));
         const shown = shownAt(content, 'research');
         expect(shown).toContain('Ionisation energy (Pa → Pa⁺)7.38 eV');
-        expect(shown).toContain('Measured (NIST)5.890 eV (calculated +25.2 %)');
-        // The limitation note (ruling P15) with it: an open 5f and 6d.
-        expect(shown).toContain(`${IE_LIMITATION_NOTE.charAt(0).toUpperCase()}${IE_LIMITATION_NOTE.slice(1)}.`);
+        // Fix round 1 (M10): NIST's 5.89 as tabulated, not "5.890".
+        expect(shown).toContain('Measured (NIST)5.89 eV (calculated +25.2 %)');
+        // The limitation note (ruling P15) with it: an open 5f and 6d. Fix round 1 (I3): it names its subject.
+        expect(shown).toContain(`Its ionisation energy is ${IE_LIMITATION_NOTE}.`);
         // Opened without rel: drawn non-relativistic, and the heavy element's default is said (the critique's
         // researcher red flag).
         expect(shown).toContain('RelativitySchrödinger equation — no relativistic effects.');
@@ -117,6 +119,17 @@ describe('atomInfo (Task 6)', () => {
         expect(shown).not.toContain(SCALAR_DEFAULT_NOTE);
     });
 
+    // Fix round 1 (M7): the technical band is short paragraphs, one idea each -- never one wall.
+    it('writes the technical band as short paragraphs, one idea each', () => {
+        const { container, unmount } = render(React.createElement(InfoPanel, {
+            content: atomInfo(pa(), 'advanced'), topic: null, onClearTopic: () => {}, level: 'advanced',
+        }));
+        const paragraphs = [...container.querySelectorAll('.info-body > p.info-text')].map(p => flat(p.textContent ?? ''));
+        expect(paragraphs).toContain('Valence 5f² 6d¹ 7s²: open 5f and 6d count as valence.');
+        expect(paragraphs).toContain(`Its ionisation energy is ${IE_LIMITATION_NOTE}.`);
+        unmount();
+    });
+
     it('for Pa at Basics speaks plain words: no LDA, no ΔSCF, no Ha', () => {
         const shown = shownAt(atomInfo(pa(), 'basics'), 'basics');
         expect(shown).not.toContain('LDA');
@@ -124,13 +137,20 @@ describe('atomInfo (Task 6)', () => {
         expect(shown).not.toMatch(/\bHa\b/);
         expect(shown).toContain('Protactinium has 91 electrons in 7 shells. The cut face shows them as rings.');
         expect(shown).toContain('2 electrons in the outer shell and 3 in the open 5f and 6d');
-        // What is drawn is still said at every level: the picture is relativistic.
+        // Relativity is off, and the element's default is said at every level.
         expect(shown).toContain(SCALAR_DEFAULT_NOTE);
     });
 
-    it('keeps the ΔSCF energy, NIST and the relativity mode for Advanced, as the panel does', () => {
-        const explore = shownAt(atomInfo(pa(), 'explore'), 'explore');
-        expect(explore).not.toContain('Ionisation energy');
+    // Fix round 1 ruling: a neutral atom's IE value is a key number from Explore, its label carrying the (i) to the
+    // glossary; NIST, the signed % and the relativity mode stay at Advanced.
+    it('shows a neutral atom\'s IE from Explore, with its (i), and keeps NIST and the relativity mode for Advanced', () => {
+        expect(shownAt(atomInfo(pa(), 'basics'), 'basics')).not.toContain('Ionisation energy');
+        const content = atomInfo(pa(), 'explore');
+        const explore = shownAt(content, 'explore');
+        expect(explore).toContain('Ionisation energy (Pa → Pa⁺)7.38 eV');
+        const { container, unmount } = render(React.createElement(InfoPanel, { content, topic: null, onClearTopic: () => {}, level: 'explore' }));
+        expect(container.querySelector('.info-fact dt button[aria-label="About Ionisation energy"]')).not.toBeNull();
+        unmount();
         expect(explore).not.toContain('NIST');
         expect(explore).not.toContain('Koelling–Harmon');
         const advanced = shownAt(atomInfo(pa(), 'advanced'), 'advanced');
@@ -179,13 +199,30 @@ describe('atomInfo (Task 6)', () => {
         expect(shownAt(atomInfo(atomsState({ Z: 3 }), 'research'), 'research')).toContain('Valence 2s¹: everything inside is core.');
     });
 
+    // Fix round 1 (I2): once a d-block cation (or Pd) has no s beyond its d, the outermost shell is a full s and p around
+    // the d, and the d is what counts -- never "14 electrons in the outer shell" for Fe²⁺.
+    it.each([
+        [26, 2, '6 electrons in the open 3d, outside a full 3s and 3p'], // Fe²⁺
+        [26, 3, '5 electrons in the open 3d, outside a full 3s and 3p'], // Fe³⁺
+        [29, 1, '10 electrons in the full 3d, outside a full 3s and 3p'], // Cu⁺
+        [30, 2, '10 electrons in the full 3d, outside a full 3s and 3p'], // Zn²⁺
+        [46, 0, '10 electrons in the full 4d, outside a full 4s and 4p'], // Pd
+        [22, 2, '2 electrons in the open 3d, outside a full 3s and 3p'], // Ti²⁺
+        [26, 0, '2 electrons in the outer shell and 6 in the open 3d'], // Fe, a neutral transition metal
+        [64, 0, '2 electrons in the outer shell and 8 in the open 4f and 5d'], // Gd, a lanthanide
+        [11, 1, '8 electrons in the outer shell'], // Na⁺, a main-group ion
+    ])('words Z = %i, charge %i\'s valence plainly', (Z, charge, words) => {
+        expect(valencePlainWords(speciesConfiguration({ Z, charge, excitation: null }))).toBe(words);
+    });
+
     it('says the cut-face caption once, for the shell views only', () => {
         const atom = shownAt(atomInfo(atomsState({ Z: 6, profile: carbon() }), 'explore'), 'explore');
         expect(atom.split(CUT_FACE_NOTE)).toHaveLength(2);
         const shell = shownAt(atomInfo(atomsState({ Z: 6, profile: carbon(), level: 'shell', selectedShell: 2 }), 'explore'), 'explore');
         expect(shell).toContain(CUT_FACE_NOTE);
         expect(shell).toContain('The L shell (n=2) holds 4 of Carbon\'s 6 electrons: 2s² 2p².');
-        expect(shell).toContain('L shell (n=2) only — click it again, or the ✕, for the whole atom. Click a subshell to show its orbitals on their own.');
+        // Fix round 1 (M1): no "it" without a referent in Info.
+        expect(shell).toContain('Showing the L shell (n=2) only — click its chip again, or the ✕ on the chip, for the whole atom. Click a subshell to show its orbitals on their own.');
         const orbital = shownAt(atomInfo(atomsState({
             Z: 6, profile: carbon(), level: 'orbital', selectedShell: 2, selectedSubshell: { n: 2, l: 1 }, selectedOrbital: { n: 2, l: 1, ml: 0 },
         }), 'research'), 'research');
@@ -214,7 +251,8 @@ describe('atomInfo (Task 6)', () => {
         expect(explore).toContain('Showing 2p alone — click its chip again for the whole shell.');
         const advanced = shownAt(content, 'advanced');
         // Never an ionisation energy (ruling R19); the |R|² tab's caption, said here.
-        expect(advanced).toContain('Its orbital energy is an eigenvalue of the central-field LDA, never an ionisation energy.');
+        // Fix round 1 (M2): its own subject, and the picture's method.
+        expect(advanced).toContain('The orbital energy is an eigenvalue of the non-relativistic LDA, not an ionisation energy.');
         expect(advanced).toContain(RADIAL_FACTOR_NOTE);
         expect(advanced).toContain("Enclosed90 % of each orbital's probability");
     });
@@ -233,7 +271,8 @@ describe('atomInfo (Task 6)', () => {
         unmount();
         const shown = shownAt(content, 'advanced');
         expect(shown).toContain('One of the 3 p orbitals of 2p, a dumbbell.');
-        expect(shown).toContain('Showing one orbital of 2p — pick another, or Back for the whole subshell.');
+        // Fix round 1 (M1): on a phone Back is a bare arrow, so the words say what it does.
+        expect(shown).toContain('Showing one orbital of 2p — pick another of its orbitals, or go back for the whole subshell.');
         // Not described as a shell once an orbital is selected (moved from level_nav.test).
         expect(shown).not.toMatch(/for the whole atom/);
         expect(shown).toContain('Iso value|ψ|² = 1.23 × 10⁻³ a₀⁻³');
@@ -264,6 +303,22 @@ describe('atomInfo (Task 6)', () => {
             + 'A j-level mixes mₗ with spin, so its own states have other shapes (a p½ state is spherical).');
         expect(shown).toContain(LARGE_COMPONENT_NOTE);
         expect(shown).toContain('6p³⁄₂ holds 1.33 electrons, with room for 4.');
+        // The hint names the j-level (moved from subshell_panel.test, fix round 1 M3).
+        expect(shown).toContain('Showing 6p³⁄₂ alone — click its chip again for the whole shell.');
+        // Its eigenvalue states the Dirac method (spec §3.1).
+        expect(shown).toContain('The orbital energy is an eigenvalue of the Dirac LDA (MacDonald–Vosko exchange), not an ionisation energy.');
+    });
+
+    // Fix round 1 (M3): a j-level has 2j + 1 states, so its orbital is one of the l shapes, sized by the j-level.
+    it('names a j-level orbital as one of the l shapes drawn with the j-level\'s radial function', () => {
+        const lead = profileOf(82, [sub(6, 0, 2, -0.5, 0.5), sub(6, 1, 0.67, -0.15, 0.5), sub(6, 1, 1.33, -0.12, 1.5)], { relativity: 'spinOrbit' });
+        const shown = shownAt(atomInfo(atomsState({
+            Z: 82, relativityOverride: 'spinOrbit', profile: lead, level: 'orbital', selectedShell: 6,
+            selectedSubshell: { n: 6, l: 1, j: 0.5 }, selectedOrbital: { n: 6, l: 1, ml: 0, j: 0.5 },
+        }), 'advanced'), 'advanced');
+        expect(shown).toContain('One of the 3 p orbital shapes, drawn with 6p½\'s own radial function, a dumbbell.');
+        expect(shown).not.toContain('orbitals of 6p½');
+        expect(shown).toContain('Showing one orbital of 6p½ — pick another of its orbitals, or go back for the whole subshell.');
     });
 
     it('compares an ion\'s drawn radius with the neutral atom\'s dashed ring, from Explore', () => {
@@ -272,6 +327,11 @@ describe('atomInfo (Task 6)', () => {
             profile: profileOf(11, [sub(2, 1, 6, -1.8)], { displayRadius, relativity, reference: { displayRadius: referenceRadius, contourRadius: 1.9, framingRadius: referenceRadius } }),
         }), 'explore');
         expect(shownAt(ion(1.6, 3.2), 'explore')).toContain('Dashed ringneutral Na, drawn radius 3.20 a₀ · Na⁺ 1.60 a₀ (−50 %)');
+        // Fix round 1 (M8): a non-relativistic ring note ends at its size -- no "both …" method suffix (moved from
+        // species_controls.test, "leaves a non-relativistic ring note as it was").
+        const offRing = ion(1.6, 3.2).facts!.find(fact => fact.label === 'Dashed ring')!.value as string;
+        expect(offRing).toMatch(/\(−50 %\)$/);
+        expect(offRing).not.toMatch(/both /);
         // M11: a rounded zero reads as a typo; say the sizes are the same.
         const same = shownAt(ion(1.999, 2.0), 'explore');
         expect(same).toContain('≈ same size');
@@ -288,6 +348,16 @@ describe('atomInfo (Task 6)', () => {
         const why = 'No neutral reference ring: Scalar-relativistic SCF for Gold: did not converge.';
         const noRing = atomInfo(atomsState({ Z: 79, charge: 1, profile: profileOf(79, [sub(6, 0, 1, -0.3)], { reference: null, referenceUnavailable: why }) }), 'advanced');
         expect(shownAt(noRing, 'advanced')).toContain(why);
+    });
+
+    // Fix round 1 (M4): "—" means "no such energy"; a failed ΔSCF says it was not computed, and why, as the panel does.
+    it('says why a failed ΔSCF has no energy', () => {
+        const message = 'The spin-polarised SCF did not converge for Na.';
+        const shown = shownAt(atomInfo(atomsState({
+            Z: 11, profile: profileOf(11, [sub(3, 0, 1, -0.1)]),
+            energies: { speciesKey: '11', status: 'failed', ionisation: null, excitation: null, message },
+        }), 'explore'), 'explore');
+        expect(shown).toContain(`Ionisation energy (Na → Na⁺)not computed — ${message}`);
     });
 
     it('gives an excited atom its excitation energy, not an ionisation energy', () => {

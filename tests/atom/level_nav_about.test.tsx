@@ -1,6 +1,8 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import LevelNav, { aboutRelativitySentence, aboutPictureSentence, relativisticEnergiesSentence } from '../../src/components/LevelNav';
+import LevelNav from '../../src/components/LevelNav';
+// Fix round 1: About's text lives in atom_text (shared text helpers live in modules, not components).
+import { aboutRelativitySentence, aboutPictureSentence, relativisticEnergiesSentence } from '../../src/atom/atom_text';
 import { methodStatement, type RelativityMode } from '../../src/atom/relativity';
 
 /**

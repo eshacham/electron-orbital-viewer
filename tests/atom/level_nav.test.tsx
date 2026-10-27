@@ -1,6 +1,8 @@
 import React from 'react';
 import { render, fireEvent, within, screen } from '@testing-library/react';
-import LevelNav, { NavigationTarget, relativisticEnergiesSentence, aboutRelativitySentence, aboutModelText } from '../../src/components/LevelNav';
+import LevelNav, { NavigationTarget } from '../../src/components/LevelNav';
+// Fix round 1: About's text lives in atom_text (shared text helpers live in modules, not components).
+import { relativisticEnergiesSentence, aboutRelativitySentence, aboutModelText } from '../../src/atom/atom_text';
 import { speciesConfiguration } from '../../src/atom/species';
 
 describe('LevelNav', () => {

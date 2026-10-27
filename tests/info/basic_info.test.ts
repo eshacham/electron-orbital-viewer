@@ -66,10 +66,10 @@ describe('basicInfo (Task 5)', () => {
         expect(text).not.toContain('eV');
     });
 
-    it('at Explore adds E = −1/(2n²) as −0.0556 Ha with −1.51 eV beside it, with true minus signs', () => {
+    // Task 6 fix round 1 ruling: eV first, Ha in parentheses, in every mode.
+    it('at Explore adds E = −1/(2n²) as −1.51 eV with −0.0556 Ha beside it, with true minus signs', () => {
         const text = shownAt(basicInfo(orbitalsState().getState(), 'explore'), 'explore');
-        expect(text).toContain('−0.0556 Ha');
-        expect(text).toContain('−1.51 eV');
+        expect(text).toContain('Energy−1.51 eV (−0.0556 Ha)');
         expect(text).not.toMatch(/-\d/);
         // The iso value waits for Advanced.
         expect(text).not.toContain('a₀⁻³');
@@ -139,8 +139,9 @@ describe('basicInfo (Task 5)', () => {
     it('for combo=field (n = 2), gives the Stark shift the app computes, subscripted state names, and no "exact one-electron"', () => {
         const content = basicInfo(orbitalsState(undefined, { kind: 'field', level: 2, field: 0.0039, stark: 'lower' }).getState(), 'explore');
         const text = shownAt(content, 'explore');
-        expect(text).toContain('−0.0117 Ha (−0.32 eV)');
-        expect(text).toContain('−0.125 Ha (−3.40 eV)');
+        // Task 6 fix round 1 ruling: eV first.
+        expect(text).toContain('−0.32 eV (−0.0117 Ha)');
+        expect(text).toContain('−3.40 eV (−0.125 Ha)');
         expect(text).not.toContain('_');
         const computed = computedText(content);
         expect(computed).toContain('first-order');

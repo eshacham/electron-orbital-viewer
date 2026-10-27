@@ -29,7 +29,8 @@ export interface PlotTab {
  * radial factor of |ψ|² -- or, under relativity, of the large component only.
  */
 export const RADIAL_FACTOR_NOTE = '|R(r)|² is the radial factor of |ψ|².';
-export const LARGE_COMPONENT_NOTE = 'R(r) is the large component: |R(r)|² is the large component only, not the whole |ψ|².';
+// Fix round 1 (M5): a square is not a component -- |R|² leaves the small component out.
+export const LARGE_COMPONENT_NOTE = 'Under relativity R(r) is the large component: |R(r)|² leaves out the small component, so it is not the whole radial part of |ψ|².';
 
 const DISTRIBUTION: PlotTab = {
     id: 'distribution', label: 'D(r)', name: 'Radial distribution D(r)', title: 'Radial distribution D(r) = 4πr²ρ(r)', signed: false, csvQuantity: null,

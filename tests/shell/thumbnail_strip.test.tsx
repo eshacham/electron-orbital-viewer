@@ -140,6 +140,8 @@ describe('ThumbnailStrip on a lost WebGL context', () => {
         act(() => { thumbnailService.markLost(); });
         const glyphs = [...container.querySelectorAll('.strip-tile-glyph')].map(glyph => glyph.textContent);
         expect(glyphs).toEqual(['2s', '2py', '2pz', '2px']);
+        // Task 6 fix round 1 (M9): the fallback glyph is the name with a real subscript (OrbitalLabel), not flat text.
+        expect([...container.querySelectorAll('.strip-tile-glyph sub')].map(sub => sub.textContent)).toEqual(['y', 'z', 'x']);
         // The text label under each tile stays, and so does each option's name.
         // Ruling T16-optname (spec §13): options are named "<label> orbital"; the brief pinned the bare label.
         expect(screen.getByRole('option', { name: '2py orbital' })).toHaveTextContent('2py');
@@ -233,6 +235,8 @@ describe('ThumbnailStrip pending tiles (T10-I1)', () => {
             const { container } = render(<ThumbnailStrip items={pending} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
             expect(request).not.toHaveBeenCalled();
             expect([...container.querySelectorAll('.strip-tile-glyph')].map(glyph => glyph.textContent)).toEqual(['2s', '2py', '2pz', '2px']);
+            // Task 6 fix round 1 (M9): a pending tile's glyph has the real subscript too.
+            expect(container.querySelectorAll('.strip-tile-glyph sub')).toHaveLength(3);
             expect([...container.querySelectorAll('canvas.thumb-canvas')].map(canvas => canvas.getAttribute('data-drawn'))).toEqual(['false', 'false', 'false', 'false']);
             expect(screen.getByRole('option', { name: '2pz orbital' })).toHaveAttribute('aria-selected', 'true');
         } finally {

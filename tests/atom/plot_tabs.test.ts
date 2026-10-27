@@ -36,7 +36,8 @@ describe('the inspector\'s plot tabs (spec §9.1, ruling R2)', () => {
         const density = plotTabsFor('orbital', true, true)[1];
         expect(density.id).toBe('density');
         expect(density.title).toBe('Probability density |R(r)|², large component (a₀⁻³)');
-        expect(LARGE_COMPONENT_NOTE).toContain('large component only, not the whole |ψ|²');
+        // Fix round 1 (M5): |R|² leaves the small component out -- a square is not a component.
+        expect(LARGE_COMPONENT_NOTE).toContain('|R(r)|² leaves out the small component, so it is not the whole radial part of |ψ|²');
         expect(LARGE_COMPONENT_NOTE).not.toContain('radial factor');
         expect(density.csvQuantity).toContain('large component');
         expect(RADIAL_FACTOR_NOTE).toContain('radial factor of |ψ|²');

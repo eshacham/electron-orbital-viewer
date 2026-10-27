@@ -33,10 +33,13 @@ import { LARGE_COMPONENT_NOTE, RADIAL_FACTOR_NOTE } from '../atom/plot_tabs';
 import { isoValueText, orbitalEnergyText, shapeWord } from '../orbital_facts';
 import { shellLetter } from '../orbital_names';
 import { shellName as viewShellName } from '../shell/view_title';
-import { aboutModelText, shellName } from '../components/LevelNav';
-import { cutHelpText, relativityHelp, relativityReadoutNode, relativityReadoutOf } from '../components/Controls';
-import { formatElectrons, jLevelNote } from '../components/SubshellPanel';
-import { IE_LEVEL, energyValueText, ionisationLabelOf, ionisationNoValueReason } from '../components/SpeciesControls';
+import {
+    aboutModelText, cutHelpText, energyValueText, formatElectrons, ionisationLabelOf, ionisationNoValueReason, jLevelNote,
+    relativityHelp, relativityReadoutNode, relativityReadoutOf, shellName, subshellCapacity,
+} from '../atom/atom_text';
+import { IE_LEVEL } from '../levels/levels';
+import { listOf, plural } from '../format/text';
+import InfoButton from './InfoButton';
 import { enclosedFact } from './basic_info';
 
 const h = React.createElement;
@@ -53,26 +56,33 @@ export const CUT_FACE_NOTE = 'Cut face shading is scaled to local shell structur
 /**
  * The critique's researcher red flag: a link without `rel` opens a heavy element non-relativistic (ruling C1 -- every
  * link copied before Phase 4 showed the non-relativistic atom, and must again), though scalar is its default from
- * caesium on. Info says so whenever a heavy element is drawn with relativity off.
+ * caesium on. Info says so whenever a heavy element is drawn with relativity off -- naming the state first (fix
+ * round 1, I1), so it never reads as describing a relativistic picture.
  */
-export const SCALAR_DEFAULT_NOTE = 'Scalar relativistic is the default for this element.';
+export const SCALAR_DEFAULT_NOTE = 'Relativity is off here, though scalar relativistic is the default for an element this heavy.';
 
-const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
 const sum = (subshells: SubshellOccupancy[]) => subshells.reduce((total, s) => total + s.electrons, 0);
 const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** "and" between the last two: "5f and 6d", "2s, 2p and 3s". */
-function listOf(items: string[]): string {
-    return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
-}
+const isFull = (s: SubshellOccupancy) => s.electrons === 2 * (2 * s.l + 1);
 
 /**
  * The valence electrons in plain words, from the species' own configuration (ruling P14: an open (n−1)d or (n−2)f
- * counts too): "4 electrons in the outer shell", "2 electrons in the outer shell and 6 in the open 3d".
+ * counts too): "4 electrons in the outer shell", "2 electrons in the outer shell and 6 in the open 3d". Fix round 1
+ * (I2): once a d-block cation (or Pd) has no s beyond its d, the outermost shell is a full s and p around the d, and
+ * the d is what counts: Fe²⁺ "6 electrons in the open 3d, outside a full 3s and 3p".
  */
 export function valencePlainWords(configuration: SubshellOccupancy[]): string {
     const outer = valenceShellOf(configuration);
     const valence = valenceSubshellsOf(configuration);
+    const outerDF = valence.filter(s => s.n === outer && s.l >= 2);
+    const outerSP = valence.filter(s => s.n === outer && s.l < 2);
+    if (outerDF.length > 0 && outerSP.every(isFull)) {
+        const d = sum(outerDF);
+        const kind = outerDF.every(isFull) ? 'full' : 'open';
+        return `${d} ${plural(d, 'electron', 'electrons')} in the ${kind} ${listOf(outerDF.map(s => subshellLabel(s.n, s.l)))}, `
+            + `outside a full ${listOf(outerSP.map(s => subshellLabel(s.n, s.l)))}`;
+    }
     const outerCount = sum(valence.filter(s => s.n === outer));
     const inner = valence.filter(s => s.n < outer);
     const words = `${outerCount} ${plural(outerCount, 'electron', 'electrons')} in the outer shell`;
@@ -99,7 +109,8 @@ function hintSentence(atom: AtomsInfoState['atom'], drill: Drill): string {
         case 'atom':
             return 'Click a ring in the 3D view, or a shell chip, to open it.';
         case 'shell':
-            return `${shellName(atom.selectedShell!)} only — click it again, or the ✕, for the whole atom. `
+            // Fix round 1 (M1): "it" had no referent in Info, which has controls of its own nearby.
+            return `Showing the ${shellName(atom.selectedShell!)} only — click its chip again, or the ✕ on the chip, for the whole atom. `
                 + 'Click a subshell to show its orbitals on their own.';
         case 'subshell': {
             const { n, l, j } = atom.selectedSubshell!;
@@ -107,7 +118,8 @@ function hintSentence(atom: AtomsInfoState['atom'], drill: Drill): string {
         }
         case 'orbital': {
             const { n, l, j } = atom.selectedOrbital!;
-            return `Showing one orbital of ${subshellLabel(n, l, j)} — pick another, or Back for the whole subshell.`;
+            // Fix round 1 (M1): on a phone Back is a bare arrow, so the words say what it does.
+            return `Showing one orbital of ${subshellLabel(n, l, j)} — pick another of its orbitals, or go back for the whole subshell.`;
         }
     }
 }
@@ -153,7 +165,7 @@ function leadSentence(state: AtomsInfoState, drill: Drill, configuration: Subshe
             const { n, l, j } = atom.selectedSubshell!;
             const drawn = atom.profile?.subshells.find(s => s.n === n && s.l === l && s.j === j);
             const held = drawn?.electrons ?? configuration.find(s => s.n === n && s.l === l)?.electrons ?? 0;
-            const capacity = j === undefined ? 2 * (2 * l + 1) : 2 * j + 1;
+            const capacity = subshellCapacity({ l, j });
             return `${subshellLabel(n, l, j)} holds ${formatElectrons(held)} ${plural(held, 'electron', 'electrons')}, with room for ${capacity}.`;
         }
         case 'orbital': {
@@ -162,6 +174,8 @@ function leadSentence(state: AtomsInfoState, drill: Drill, configuration: Subshe
             if (l === 0) return `The one orbital of ${sub}, a sphere.`;
             const shape = shapeWord(l, ml);
             const described = !shape ? '' : /^(six|eight)\b/.test(shape) ? `, with ${shape}` : `, a ${shape}`;
+            // Fix round 1 (M3): a j-level has 2j + 1 states, not 2l + 1 orbitals -- the lobes are the l shapes, sized by it.
+            if (j !== undefined) return `One of the ${2 * l + 1} ${shellLetter(l)} orbital shapes, drawn with ${sub}'s own radial function${described}.`;
             return `One of the ${2 * l + 1} ${shellLetter(l)} orbitals of ${sub}${described}.`;
         }
     }
@@ -187,7 +201,23 @@ function dashedRingText(state: AtomsInfoState): string | null {
 
 interface EnergyFacts { facts: InfoFact[]; limitation: string | null }
 
-/** The ΔSCF energy (Advanced, as the panel's line), and for a neutral atom NIST's measurement with the signed difference. */
+/** "11.77 eV" held together (a no-break space before the unit), so a narrow Info never splits a value from its unit. */
+const keepUnit = (text: string) => text.replace(/(\d) (eV)\b/g, '$1\u00A0$2');
+
+/**
+ * NIST's tabulated value with the precision the table gives, at most three places: Pa's 5.89 stays "5.89", never
+ * "5.890" (fix round 1, M10); C's 11.2602880 reads "11.260".
+ */
+function measuredText(ev: number): string {
+    const places = Math.min(3, (String(ev).split('.')[1] ?? '').length);
+    return ev.toFixed(places);
+}
+
+/**
+ * The ΔSCF energy, and for a neutral atom NIST's measurement with the signed difference. Fix round 1 ruling: a neutral
+ * atom's own IE value is a key number, so it shows from Explore, its label carrying the (i) to the ionisation entry;
+ * NIST, the signed % and the panel line stay at Advanced, as an ion's or excited atom's energy does.
+ */
 function energyFacts(state: AtomsInfoState): EnergyFacts {
     const atom = state.atom;
     if (atom.unbound) return { facts: [], limitation: null };
@@ -196,28 +226,33 @@ function energyFacts(state: AtomsInfoState): EnergyFacts {
     const matches = atom.energies.speciesKey === speciesKey(species);
     const status = matches ? atom.energies.status : 'idle';
     const pictureFailed = atom.error !== null;
+    // Fix round 1 (M4): a failed ΔSCF says why, as the panel does under its line -- "—" means "no such energy".
+    const failed = status === 'failed' && atom.energies.message ? `not computed — ${atom.energies.message}` : null;
     if (species.excitation) {
         const reading = matches ? atom.energies.excitation : null;
         return {
             facts: [{
                 label: `Excitation energy ${excitationLabel(species.excitation)}`,
-                value: energyValueText(reading, status, undefined, pictureFailed, true),
+                value: failed ?? keepUnit(energyValueText(reading, status, undefined, pictureFailed, true)),
                 min: IE_LEVEL,
             }],
             limitation: null,
         };
     }
     const reading = matches ? atom.energies.ionisation : null;
+    const neutral = species.charge === 0;
     const facts: InfoFact[] = [{
-        label: ionisationLabelOf(species, reading),
-        value: energyValueText(reading, status, ionisationNoValueReason(species), pictureFailed),
-        min: IE_LEVEL,
+        label: neutral
+            ? h(React.Fragment, null, ionisationLabelOf(species, reading), h(InfoButton, { topic: 'ionisation', label: 'Ionisation energy' }))
+            : ionisationLabelOf(species, reading),
+        value: failed ?? keepUnit(energyValueText(reading, status, ionisationNoValueReason(species), pictureFailed)),
+        min: neutral ? 'explore' : IE_LEVEL,
     }];
     // Ruling P15: NIST's value is the neutral atom's own first ionisation energy only.
-    const measured = species.charge === 0 ? NIST_FIRST_IONISATION_EV[species.Z] : undefined;
+    const measured = neutral ? NIST_FIRST_IONISATION_EV[species.Z] : undefined;
     if (measured === undefined || !reading) return { facts, limitation: null };
     const percent = signedDifferencePercent(reading.valueEv, measured);
-    facts.push({ label: 'Measured (NIST)', value: `${measured.toFixed(3)} eV (calculated ${formatSignedPercent(percent)})`, min: IE_LEVEL });
+    facts.push({ label: 'Measured (NIST)', value: `${measuredText(measured)}\u00A0eV (calculated ${formatSignedPercent(percent)})`, min: IE_LEVEL });
     return { facts, limitation: ieLimitationNote(species, percent) };
 }
 
@@ -230,6 +265,11 @@ function isoFact(state: AtomsInfoState): InfoFact | null {
         && currentParams.enclosedFraction === enclosedFraction;
     if (!drawn || isLoading || renderFailed || isoLevel === null) return null;
     return { label: 'Iso value', value: isoValueText(isoLevel), min: 'advanced' };
+}
+
+/** Short paragraphs, one idea each (fix round 1, M7: no wall of text), empty ones dropped. */
+function paragraphs(...parts: React.ReactNode[]): React.ReactNode[] {
+    return parts.filter(part => part !== null && part !== undefined && part !== false && part !== '');
 }
 
 /** A paragraph of sentences and nodes, joined by spaces, empty parts dropped. */
@@ -295,14 +335,16 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
             shellView && profile && !atom.unbound && CUT_FACE_NOTE,
             hintSentence(atom, drill),
         ),
-        technical: sentences(
+        technical: paragraphs(
             coreNote && `Valence ${valenceConfigurationLabelOf(configuration)}: ${coreNote}.`,
-            energySubshell && 'Its orbital energy is an eigenvalue of the central-field LDA, never an ionisation energy.',
+            // Fix round 1 (M2): its own subject, and the picture's method (spec §3.1: a relativistic eigenvalue says so).
+            energySubshell && `The orbital energy is an eigenvalue of the ${shortMethodLabel(picture)}, not an ionisation energy.`,
             (drill === 'subshell' || drill === 'orbital') && (picture === 'off' ? RADIAL_FACTOR_NOTE : LARGE_COMPONENT_NOTE),
             jNote,
             readout,
             !ring && profile?.referenceUnavailable,
-            energies.limitation && `${capitalise(energies.limitation)}.`,
+            // Fix round 1 (I3): the note is about the ionisation energy, and says so.
+            energies.limitation && `Its ionisation energy is ${energies.limitation}.`,
             clipAxis !== 'none' && profile && cutHelpText(clipAxis, !shellView),
         ),
         facts,

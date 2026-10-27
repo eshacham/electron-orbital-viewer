@@ -59,6 +59,13 @@ export const CONTROL_LEVEL: Record<ControlId, LearningLevel> = {
     requestWorkspace: 'research',
 };
 
+/**
+ * Task 6: the level from which the panel's ΔSCF energy line, and Info's NIST comparison beside it, appear -- with
+ * Charge and Excite (the spec's Advanced row). Fix round 1 ruling: a neutral atom's own IE value shows in Info from
+ * Explore, as a key number.
+ */
+export const IE_LEVEL: LearningLevel = 'advanced';
+
 /** How a pointer sentence names each control -- lower case; a sentence capitalises the first word. */
 const CONTROL_NAME: Record<ControlId, string> = {
     plot: 'the plot',

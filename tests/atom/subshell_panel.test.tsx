@@ -2,7 +2,9 @@ import React from 'react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { render, fireEvent } from '@testing-library/react';
-import SubshellPanel, { spreadLabels, formatElectrons, jLevelNote } from '../../src/components/SubshellPanel';
+import SubshellPanel, { spreadLabels } from '../../src/components/SubshellPanel';
+// Fix round 1: the subshell text lives in atom_text (shared text helpers live in modules, not components).
+import { formatElectrons, jLevelNote } from '../../src/atom/atom_text';
 import { SerialisedSubshell } from '../../src/workers/atomWorker';
 
 /** A neon-shaped list of subshells: 1s (n=1), 2s and 2p (n=2). */

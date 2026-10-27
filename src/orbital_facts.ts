@@ -4,6 +4,7 @@ import { formatDrawnRadius } from './atom/format_radius';
 import { HARTREE_IN_EV } from './atom/delta_scf';
 import { shellName } from './shell/view_title';
 import { formatSci, minus, orbitalPlainName } from './format/sci';
+import { nb } from './format/text';
 
 /**
  * The inspector's facts card (spec §9.1 "Data"): computed, never typed in.
@@ -26,9 +27,6 @@ export interface OrbitalFacts {
     /** Task 6: the title names this orbital -- the card draws its name with a real subscript (OrbitalLabel). */
     orbital?: { n: number; l: number; ml: number };
 }
-
-/** A formula kept on one line: its spaces become no-break spaces (U+00A0), so it never wraps at an operator. */
-const nb = (formula: string) => formula.replace(/ /g, '\u00A0');
 
 /**
  * Task 6: one iso value text for the Data card and Info, so the two cannot drift: "|ψ|² = 1.23 × 10⁻³ a₀⁻³" -- ×10ⁿ,

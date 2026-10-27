@@ -117,8 +117,9 @@ describe('validation rows', () => {
 // Review I3: one formatter for an n = 2 shift, read by both the picker's readout and Info's fact, so the two never drift.
 describe('starkShiftText', () => {
     it('signs the shift with a true minus, 4 decimals in Ha and 2 in eV, and no sign on zero', () => {
-        expect(starkShiftText(starkShiftHartree('lower', 0.0039))).toBe('−0.0117 Ha (−0.32 eV)');
-        expect(starkShiftText(starkShiftHartree('upper', 0.0039))).toBe('+0.0117 Ha (+0.32 eV)');
-        expect(starkShiftText(0)).toBe('0.0000 Ha (0.00 eV)');
+        // Task 6 fix round 1 ruling: every energy reads eV first, Ha in parentheses.
+        expect(starkShiftText(starkShiftHartree('lower', 0.0039))).toBe('−0.32 eV (−0.0117 Ha)');
+        expect(starkShiftText(starkShiftHartree('upper', 0.0039))).toBe('+0.32 eV (+0.0117 Ha)');
+        expect(starkShiftText(0)).toBe('0.00 eV (0.0000 Ha)');
     });
 });

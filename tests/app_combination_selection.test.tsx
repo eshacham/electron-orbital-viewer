@@ -103,11 +103,12 @@ describe('App: the n = 2 field slider', () => {
         select(field(2, 0.001));
         const drawn = store.getState().orbital.currentField;
         expect(drawn?.sources.map(s => s.id)).toEqual(['stark:n2:lower']);
-        expect(screen.getByText(/ΔE = −3F = −0\.0030 Ha/)).toBeInTheDocument();
+        // Task 6 fix round 1 ruling: the shift reads eV first, Ha in parentheses.
+        expect(screen.getByText(/ΔE = −3F = −0\.08 eV \(−0\.0030 Ha\)/)).toBeInTheDocument();
 
         select(field(2, 0.002));
         expect(store.getState().orbital.currentField).toBe(drawn);
-        expect(screen.getByText(/ΔE = −3F = −0\.0060 Ha/)).toBeInTheDocument();
+        expect(screen.getByText(/ΔE = −3F = −0\.16 eV \(−0\.0060 Ha\)/)).toBeInTheDocument();
     });
 
     it('sends the same picture again after a failed render, even once the message is dismissed', () => {

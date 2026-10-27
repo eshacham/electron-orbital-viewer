@@ -75,11 +75,12 @@ function signedFixed(value: number, digits: number): string {
 }
 
 /**
- * An n = 2 Stark shift as the app prints it, "−0.0117 Ha (−0.32 eV)": 4 decimals in Ha, 2 in eV. One formatter for
- * the picker's readout and Info's fact (Task 5 review I3), so the two always show the same number.
+ * An n = 2 Stark shift as the app prints it, "−0.32 eV (−0.0117 Ha)": 2 decimals in eV, 4 in Ha -- eV first, as every
+ * energy (Task 6 fix round 1 ruling). One formatter for the picker's readout and Info's fact (Task 5 review I3), so
+ * the two always show the same number.
  */
 export function starkShiftText(hartree: number): string {
-    return `${signedFixed(hartree, 4)} Ha (${signedFixed(hartree * EV_PER_HARTREE, 2)} eV)`;
+    return `${signedFixed(hartree * EV_PER_HARTREE, 2)} eV (${signedFixed(hartree, 4)} Ha)`;
 }
 
 /** μ = αF, e·a₀. */

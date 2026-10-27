@@ -2,7 +2,7 @@ import React from 'react';
 import type { SerialisedSubshell } from '../workers/atomWorker';
 import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
 import { shortMethodLabel, type RelativityMode } from '../atom/relativity';
-import { formatElectrons } from '../components/SubshellPanel';
+import { formatElectrons } from '../atom/atom_text';
 import { hartreeText } from '../orbital_facts';
 import './element_tile.css';
 

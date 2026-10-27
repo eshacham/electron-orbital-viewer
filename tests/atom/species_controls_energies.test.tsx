@@ -22,7 +22,8 @@ function infoText(atom: Partial<AtomState>): string {
     const base = makeStore().getState();
     const state: AtomsInfoState = { atom: { ...base.atom, mode: 'atom', ...atom }, orbital: base.orbital };
     const { container, unmount } = render(React.createElement(InfoPanel, { content: atomInfo(state, 'research'), topic: null, onClearTopic: () => {}, level: 'research' }));
-    const text = container.textContent ?? '';
+    // No-break spaces (a value held to its unit) read as plain spaces here.
+    const text = (container.textContent ?? '').replace(/\u00A0/g, ' ');
     unmount();
     return text;
 }
@@ -33,7 +34,8 @@ const done = (key: string, valueEv: number, from: string, to: string): EnergiesS
 describe('Info: energy accuracy (ruling P15, Task 6)', () => {
     it('shows protactinium\'s measured value, its +25.3 % and the limitation note', () => {
         const text = infoText({ Z: 91, energies: done('91', 7.38, 'Pa', 'Pa⁺') });
-        expect(text).toContain('Measured (NIST)5.890 eV (calculated +25.3 %)');
+        // Fix round 1 (M10): NIST's 5.89 as tabulated, not "5.890".
+        expect(text).toContain('Measured (NIST)5.89 eV (calculated +25.3 %)');
         expect(text).toMatch(/open shells; expect larger errors/);
     });
 

@@ -1,7 +1,9 @@
 import React from 'react';
 import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
-import Controls, { cutDepthLabel, relativityHelp, whatChangedText, relativityReadoutText, relativityReadoutNode } from './Controls';
+import Controls, { cutDepthLabel } from './Controls';
+// Fix round 1: the relativity text lives in atom_text (shared text helpers live in modules, not components).
+import { relativityHelp, whatChangedText, relativityReadoutText, relativityReadoutNode } from '../atom/atom_text';
 import { basicOrbitalParams } from '../orbital_presets';
 import BasicExplore from '../basic_ui/BasicExplore';
 import { useDrawOnSelection } from '../basic_ui/useDrawOnSelection';

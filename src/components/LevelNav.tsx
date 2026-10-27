@@ -10,6 +10,7 @@ import { useRovingFocus } from '../shell/useRovingFocus';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { orbitalPlainName } from '../format/sci';
 import InfoButton from '../info/InfoButton';
+import { aboutModelText, shellName } from '../atom/atom_text';
 
 /**
  * Where a breadcrumb segment or shell chip should take the app.
@@ -109,109 +110,6 @@ interface LevelNavProps {
      * picture", whichever mode the switch is in. Defaults to true.
      */
     pictureShown?: boolean;
-}
-
-// Old X-ray shell letters, matching atom_profile.ts's private shellName
-// (not exported from there — this is a UI label, not a physics quantity, so
-// it is simpler to keep its own tiny copy than to export an internal of the
-// solver module just for this).
-const PRINCIPAL_SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
-
-/** "L shell (n=2)": the chips', breadcrumb's and hint's name for a shell (Info's hint says it too, Task 6). */
-export function shellName(n: number): string {
-    return `${PRINCIPAL_SHELL_LETTERS[n - 1] ?? `n=${n}`} shell (n=${n})`;
-}
-
-/**
- * The relativity clause of "About this model" -- the rest of the paragraph
- * (central-field averaging, LDA/VWN, ions and excitations, the
- * spin-restricted picture and its unbound anions, the basis-choice caveat)
- * does not depend on the mode, so only this one sentence changes with it.
- * Phase 3 widened the non-relativistic wording from "neutral … no ions" to
- * "isolated atoms and their ions"; all three variants keep that ions
- * wording and vary only the relativity statement.
- */
-export function aboutRelativitySentence(mode: RelativityMode): string {
-    switch (mode) {
-        case 'off':
-            return 'It is non-relativistic and describes isolated atoms and their ions — no molecules, no spin-orbit coupling.';
-        case 'scalar':
-            return 'Relativity is included at the scalar-relativistic level (Koelling–Harmon: the mass-velocity and Darwin terms), '
-                + 'which captures how heavy atoms’ s and p shells contract, but not spin–orbit splitting. '
-                + 'It describes isolated atoms and their ions — no molecules.';
-        case 'spinOrbit':
-            return 'Relativity is included in full through the radial Dirac equation, so each subshell with l > 0 splits into '
-                + 'j = l ± ½ levels, occupied in proportion to 2j + 1 so the atom stays spherical. '
-                + 'It describes isolated atoms and their ions — no molecules.';
-    }
-}
-
-/**
- * Ruling C6: the ionisation and excitation energies are ΔSCF differences
- * from a non-relativistic spin-polarised LDA in every mode (spin-polarised
- * MacDonald–Vosko exchange is out of scope, and ΔSCF is validated only
- * through argon). With a relativistic picture that has to be said, or a
- * heavy atom's energies read as carrying the relativistic shifts its picture
- * shows. Empty for 'off', which leaves the paragraph as it always was.
- */
-export function relativisticEnergiesSentence(mode: RelativityMode): string {
-    switch (mode) {
-        case 'off':
-            return '';
-        case 'scalar':
-            return ' This picture is scalar-relativistic; the ΔSCF energies are not — they stay non-relativistic, '
-                + 'so for a heavy atom they leave out the relativistic shifts the picture shows.';
-        case 'spinOrbit':
-            return ' This picture includes spin–orbit coupling (Dirac equation); the ΔSCF energies do not — they stay '
-                + 'non-relativistic, so for a heavy atom they leave out the relativistic shifts the picture shows.';
-    }
-}
-
-const PICTURE_WORDS: Record<RelativityMode, string> = {
-    off: 'non-relativistic',
-    scalar: 'scalar-relativistic',
-    spinOrbit: 'the Dirac (spin–orbit) one',
-};
-const SELECTED_WORDS: Record<RelativityMode, string> = {
-    off: 'the non-relativistic one',
-    scalar: 'the scalar-relativistic one',
-    spinOrbit: 'the one with spin–orbit',
-};
-
-/**
- * Ruling P18: when the Relativity switch (`selected`) has moved ahead of
- * what is actually drawn (`picture`) -- a re-solve in flight, most often --
- * About says so explicitly, rather than quietly describing the switch's
- * method as if it were already on screen. Null when the two agree, which
- * is the ordinary case and leaves the paragraph exactly as it was.
- */
-export function aboutPictureSentence(selected: RelativityMode, picture: RelativityMode): string | null {
-    if (selected === picture) return null;
-    return `The picture on screen is still ${PICTURE_WORDS[picture]}; ${SELECTED_WORDS[selected]} is being solved.`;
-}
-
-/**
- * "About this model" as one paragraph of text (Task 6): Info's "How this was computed" (atomInfo) and Help's About
- * (variant 'about') both say it from here, word for word. The relativity clause follows the switch (`selected`, ruling
- * P18), the ΔSCF sentence the drawn picture (`picture`, ruling T2-picturesentence); with no picture, neither speaks of
- * "this picture" (final review M6).
- */
-export function aboutModelText(selected: RelativityMode, picture: RelativityMode, pictureShown: boolean): string {
-    const pictureSentence = pictureShown ? aboutPictureSentence(selected, picture) : null;
-    return 'This is a central-field model: each electron moves in the spherically averaged potential of the nucleus and '
-        + 'every other electron, and open shells are averaged over their sublevels rather than resolved into individual '
-        + 'determinants. Exchange and correlation come from the local density approximation (LDA) with the VWN '
-        + `correlation functional. ${aboutRelativitySentence(selected)}`
-        + (pictureSentence ? ` ${pictureSentence}` : '')
-        + ' An ion or an excited atom uses the same model with its own electron count or one electron moved; ionisation '
-        + 'and excitation energies are ΔSCF differences of total energies from the spin-polarised form of the same LDA, '
-        + 'never orbital eigenvalues. The picture on screen is drawn from a simpler, spin-restricted form of that LDA, '
-        // Task 6: "for their" -- the JSX this replaces dropped the space ("fortheir") at a comment between the lines.
-        + 'and in it most anions — Cl⁻ included — have no bound state for their extra electron at all.'
-        + (pictureShown ? relativisticEnergiesSentence(picture) : '')
-        + ' The individual s/p/d/f lobes you can select below are a basis choice, not separate physical objects: a '
-        + 'partially filled subshell\'s electrons are smeared uniformly over all of it, not sitting in one lobe rather '
-        + 'than another.';
 }
 
 interface Crumb {

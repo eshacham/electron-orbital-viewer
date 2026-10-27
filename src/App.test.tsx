@@ -609,6 +609,24 @@ describe('App', () => {
         expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveTextContent('Argon — whole atom');
     });
 
+    // Task 6 fix round 1 ruling: a neutral atom's IE is a key number at Explore, in Info -- its label's (i) opens the
+    // ionisation entry -- while the panel's line and NIST wait for Advanced.
+    it('at Explore, shows a neutral atom\'s ionisation energy in Info, with an (i) to the ionisation entry', () => {
+        installMatchMedia(false);
+        // Explore, whatever this block's own level is (the stored preference; cleared after each test).
+        window.localStorage.setItem('eov.level', 'explore');
+        const { container } = renderWithProvider(<App />, {
+            Z: 18, profile: argonLikeProfile(),
+            energies: { speciesKey: '18', status: 'done', ionisation: { valueEv: 15.52, fromLabel: 'Ar', toLabel: 'Ar⁺' }, excitation: null, message: null },
+        });
+        const info = container.querySelector('.info-section') as HTMLElement;
+        expect(info).toHaveTextContent('Ionisation energy (Ar → Ar⁺)15.52 eV');
+        expect(info).not.toHaveTextContent('NIST');
+        expect(container.querySelector('.species-energy')).toBeNull();
+        fireEvent.click(within(info).getByRole('button', { name: 'About Ionisation energy' }));
+        expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Ionisation energy');
+    });
+
     // Task 6: the Atoms panels keep controls and short labelled values; their captions are Info's (atomInfo).
     it('in Atoms, the Explore panel has no About, shell hint or isolate hint -- Info says them', () => {
         installMatchMedia(false);
@@ -1284,7 +1302,8 @@ describe('App: opening a shared link', () => {
     it('says scalar is the default when a link opens a heavy element without rel', () => {
         const store = openLink('#mode=atom&Z=79&level=atom');
         expect(store.getState().atom.relativityOverride).toBe('off');
-        expect(document.querySelector('.info-section')).toHaveTextContent('Scalar relativistic is the default for this element.');
+        // Fix round 1 (I1): the note names the state first.
+        expect(document.querySelector('.info-section')).toHaveTextContent('Relativity is off here, though scalar relativistic is the default for an element this heavy.');
     });
 
     it('lands on the linked orbital with no cut, once the solve arrives', () => {
@@ -2327,7 +2346,7 @@ describe('App: relativity', () => {
             expect(within(group).getByRole('button', { name: 'scalar relativistic' })).toHaveAttribute('aria-pressed', 'true');
             // Task 6: what the mode is, and that it is the default, are said in Info (relativityHelp).
             expect(info(container)).toHaveTextContent(/Scalar-relativistic \(Koelling–Harmon\).*Default for this element\./);
-            expect(info(container)).not.toHaveTextContent('Scalar relativistic is the default for this element.');
+            expect(info(container)).not.toHaveTextContent(/Relativity is off here/);
         });
 
         it('is off by default for a light atom', () => {

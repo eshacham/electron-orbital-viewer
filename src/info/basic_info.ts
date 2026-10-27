@@ -15,6 +15,7 @@ import type { LearningLevel } from '../levels/levels';
 import type { InfoContent, InfoFact } from './info_types';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { minus } from '../format/sci';
+import { nb, plural } from '../format/text';
 import { shellLetter } from '../orbital_names';
 import { angularNodeSurfaces, isoValueText, shapeWord } from '../orbital_facts';
 import { RADIAL_FACTOR_NOTE } from '../atom/plot_tabs';
@@ -31,9 +32,6 @@ const h = React.createElement;
 
 /** What the builder reads: the orbital slice alone (fix round 1: App passes exactly this, so its memo deps are honest). */
 export type OrbitalsInfoState = Pick<RootState, 'orbital'>;
-
-/** A formula kept on one line: its spaces become no-break spaces (U+00A0), so "n − l − 1" never wraps at an operator. */
-const nb = (formula: string) => formula.replace(/ /g, '\u00A0');
 
 /** A quantum-number label, the number in italics as physics sets it -- "Subshell l" must not read "Subshell I". */
 const qLabel = (word: string, symbol: string) => h(React.Fragment, null, `${word} `, h('i', null, symbol));
@@ -81,12 +79,12 @@ export function combinationTitleNode(selection: CombinationSelection): React.Rea
 /** x to 3 significant figures in plain decimals, with a true minus: −0.0556, −13.6. */
 const decimal = (x: number) => minus(x.toPrecision(3));
 
-/** "−0.0556 Ha (−1.51 eV)": E = −1/(2n²) Ha, eV beside it. */
+/** "−1.51 eV (−0.0556 Ha)": E = −1/(2n²), eV first and Ha beside it (the formula stays in Ha, in the technical text). */
 function energyText(hartree: number): string {
-    return `${decimal(hartree)} Ha (${decimal(hartree * EV_PER_HARTREE)} eV)`;
+    // Task 6 fix round 1 ruling: every energy fact reads eV first, Ha in parentheses, in every mode.
+    return `${decimal(hartree * EV_PER_HARTREE)} eV (${decimal(hartree)} Ha)`;
 }
 
-const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
 const signedMl = (ml: number) => (ml > 0 ? `+${ml}` : minus(String(ml)));
 
 /**

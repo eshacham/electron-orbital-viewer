@@ -4,9 +4,10 @@ import {
     AtomSpecies, Excitation, SubshellRef, excitationSources, excitationTargets, excitationLabel, speciesSymbol, speciesKey,
 } from '../atom/species';
 import { allowedCharges } from '../atom/ion_configurations';
-import { BELOW_GROUND_NOTE, EnergyReading, ionisedSpeciesOf } from '../atom/delta_scf';
+import type { EnergyReading } from '../atom/delta_scf';
 import type { EnergiesState } from '../store/atomSlice';
-import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
+import { atLeast, CONTROL_LEVEL, IE_LEVEL, LearningLevel } from '../levels/levels';
+import { energyValueText, ionisationLabelOf, ionisationNoValueReason } from '../atom/atom_text';
 import InfoButton from '../info/InfoButton';
 
 interface SpeciesControlsProps {
@@ -25,80 +26,9 @@ interface SpeciesControlsProps {
     level?: LearningLevel;
 }
 
-/** Task 6: the level from which the panel's energy line and Info's energy facts appear (spec: + charge and excite). */
-export const IE_LEVEL: LearningLevel = 'advanced';
-
 const NO_ENERGIES: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
 
 const sameRef = (a: SubshellRef, b: SubshellRef): boolean => a.n === b.n && a.l === b.l;
-
-/**
- * The ground-state → ionised-species label ("Na → Na⁺", "Na⁺ → Na²⁺") that
- * disambiguates *which* ionisation an energy is (ruling M4: without it,
- * every cation's "Ionisation energy" line reads the same as the neutral
- * atom's). Only defined for a ground-state species (an excited one shows its
- * excitation energy instead, never an ionisation energy -- see the caller).
- *
- * Prefers the energy reading's own labels when one has arrived (they are
- * exactly what the ΔSCF calculation used); falls back to deriving the same
- * strings from the species itself via `ionisedSpeciesOf` + `speciesSymbol`
- * so the qualifier is not blank while the reading is still computing.
- * `ionisedSpeciesOf` only identifies *which* species is next -- it is not
- * `ionisationEnergy`, which would trigger a real SCF solve, wrong to do from
- * inside a presentational component.
- */
-function ionisationQualifier(species: AtomSpecies, reading: EnergyReading | null): string | null {
-    if (species.excitation) return null;
-    if (reading) return `${reading.fromLabel} → ${reading.toLabel}`;
-    const ionised = ionisedSpeciesOf(species);
-    if (ionised === null) return null;
-    const toLabel = ionised === 'bare nucleus'
-        ? `${speciesSymbol({ ...species, charge: species.Z, excitation: null })} (bare nucleus)`
-        : speciesSymbol(ionised);
-    return `${speciesSymbol(species)} → ${toLabel}`;
-}
-
-/**
- * What the value slot says. "—" is reserved for an answer the ΔSCF gave --
- * no such energy (Na⁺'s next electron would break the neon core) -- never
- * for one not asked yet: the energies wait for the species' picture (ruling
- * C15), and until then the line says so.
- */
-export function energyValueText(reading: EnergyReading | null, status: EnergiesState['status'], noValueReason?: string, pictureFailed = false, isExcitation = false): string {
-    // Ruling FR-2: "waiting" would wait for ever on a picture that failed.
-    // The picture's error is either an unconverged SCF or a worker failure;
-    // both leave the energies unasked, so say that rather than guess which.
-    if (status === 'idle') return pictureFailed ? 'not computed — the picture\'s solve failed' : 'waiting for the picture…';
-    if (status === 'computing') return 'computing…';
-    if (reading) {
-        const value = `${reading.valueEv.toFixed(2).replace('-', '−')} eV`;
-        // Ruling FR-1's note is about an excited configuration landing below
-        // the ground one; a negative ionisation energy would be another fault.
-        return isExcitation && reading.valueEv < 0 ? `${value} (${BELOW_GROUND_NOTE})` : value;
-    }
-    return noValueReason ? `— (${noValueReason})` : '—';
-}
-
-/**
- * Which ionisation energy a line or fact names (ruling M4: without it every cation's reads the same as the neutral
- * atom's): "Ionisation energy (Na → Na⁺)"; an anion's is an electron affinity (M3). One label for the panel and Info.
- */
-export function ionisationLabelOf(species: AtomSpecies, reading: EnergyReading | null): string {
-    if (species.charge < 0) {
-        // M3: ionising an anion of charge q releases exactly the electron
-        // affinity of the species one charge less negative -- O²⁻ → O⁻ is
-        // the electron affinity of O⁻, not of the neutral O, so the label is
-        // built from species.charge + 1, never a bare element symbol.
-        return `Ionisation energy (= electron affinity of ${speciesSymbol({ ...species, charge: species.charge + 1, excitation: null })})`;
-    }
-    const qualifier = ionisationQualifier(species, reading);
-    return qualifier ? `Ionisation energy (${qualifier})` : 'Ionisation energy';
-}
-
-/** Why there is no ionisation energy to show (final review M6): the app offers no next ion to subtract. */
-export function ionisationNoValueReason(species: AtomSpecies): string | undefined {
-    return ionisedSpeciesOf(species) === null ? 'next ion not offered' : undefined;
-}
 
 /**
  * "Ionisation energy (Na → Na⁺): 5.37 eV" with an (i) -- Task 6: a short labelled value. Its method, NIST measurement,

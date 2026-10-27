@@ -31,7 +31,8 @@ export interface InfoFact {
 export interface InfoContent {
     title: React.ReactNode;
     plain: React.ReactNode;
-    technical?: React.ReactNode;
+    /** One paragraph, or (Task 6 fix round 1, M7) a list of short paragraphs, one idea each. */
+    technical?: React.ReactNode | React.ReactNode[];
     facts?: InfoFact[];
     computed?: React.ReactNode;
 }

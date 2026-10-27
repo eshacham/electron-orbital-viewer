@@ -3,11 +3,11 @@ import { Box, Chip, Typography, Button } from '@mui/material';
 import { SerialisedSubshell } from '../workers/atomWorker';
 import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
 import { RelativityMode, methodStatement, shortMethodLabel } from '../atom/relativity';
-import { shellLetter } from '../orbital_names';
 import { CURVE_COLORS, orbitalShade } from '../curve_colors';
 import { useRovingFocus } from '../shell/useRovingFocus';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { hartreeText } from '../orbital_facts';
+import { formatElectrons, subshellCapacity } from '../atom/atom_text';
 import InfoButton from '../info/InfoButton';
 
 interface SubshellPanelProps {
@@ -66,51 +66,6 @@ const DIAGRAM_PADDING = 6;
 const DIAGRAM_LABEL_WIDTH = 44;
 /** Closest two labels may sit, in px, before they are pushed apart. */
 const LABEL_SPACING = 11;
-
-/**
- * Whole numbers as they are; a fractional j-level share (spin–orbit on an
- * open subshell: lead's 6p² is 2/3 in 6p½ and 4/3 in 6p³⁄₂) to two places.
- */
-export function formatElectrons(electrons: number): string {
-    return Number.isInteger(electrons) ? String(electrons) : electrons.toFixed(2);
-}
-
-/** A subshell's capacity: 2(2l+1), or 2j+1 for one j-level. */
-function capacityOf(subshell: Pick<SerialisedSubshell, 'l' | 'j'>): number {
-    return subshell.j === undefined ? 2 * (2 * subshell.l + 1) : 2 * subshell.j + 1;
-}
-
-/** "a", "a and b", "a, b and c". */
-function listOf(items: string[]): string {
-    return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
-}
-
-/**
- * Task 6: said in Info (atomInfo's technical band), no longer under the chips.
- *
- * Spec §3.6: a j-level is drawn with its own R(r) times the real l
- * orbitals, the renderer's one basis. That is honest about its size but not
- * its shape -- a |j, m_j⟩ state mixes mₗ with spin, and a p½ state's density
- * is spherical -- so say which part of the picture is a basis choice. For the
- * isolated j-level when there is one; otherwise for the whole shell, whose
- * j-levels' lobes overlap. Null when nothing drawn has lobes to qualify: no
- * j-levels (off, scalar), only s½ ones, or an isolated s½, whose sphere is
- * its true shape. The p½ example only where there is a p level.
- */
-export function jLevelNote(shellSubshells: SerialisedSubshell[], active: SerialisedSubshell | null): string | null {
-    const example = (hasP: boolean) => (hasP ? ' (a p½ state is spherical)' : '');
-    if (active) {
-        if (active.j === undefined || active.l === 0) return null;
-        return `The lobes are the ${shellLetter(active.l)} orbitals' shapes, sized by `
-            + `${subshellLabel(active.n, active.l, active.j)}'s own radial function — a basis choice. `
-            + `A j-level mixes mₗ with spin, so its own states have other shapes${example(active.l === 1)}.`;
-    }
-    const levels = shellSubshells.filter(s => s.j !== undefined && s.l > 0);
-    if (levels.length === 0) return null;
-    return 'Each j-level is drawn as its l orbitals\' lobes, sized by its own radial function — a basis choice. '
-        + `${listOf(levels.map(s => subshellLabel(s.n, s.l, s.j)))} overlap here; `
-        + `a j-level's own states have other shapes${example(levels.some(s => s.l === 1))}.`;
-}
 
 /** Same subshell, and with spin–orbit the same j-level (j absent on both otherwise). */
 function sameSubshell(a: { n: number; l: number; j?: number } | null, b: { n: number; l: number; j?: number }): boolean {
@@ -218,7 +173,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                             {shellSubshells.map(subshell => {
                                 const isSelected = sameSubshell(selectedSubshell, subshell);
                                 const electrons = formatElectrons(subshell.electrons);
-                                const capacity = capacityOf(subshell);
+                                const capacity = subshellCapacity(subshell);
                                 const energy = hartreeText(subshell.energy);
                                 return (
                                     <Chip

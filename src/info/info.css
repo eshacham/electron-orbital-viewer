@@ -89,3 +89,5 @@
 .info-beside-centre > .info-button { margin-top: 0; }
 /* "How this was computed" may hold several paragraphs (Atoms: method, the model, the ΔSCF energies). */
 .info-computed-body > p { margin: 0; }
+/* Task 6 fix round 1: a fact's label may carry its (i) -- a neutral atom's ionisation energy, from Explore. */
+.info-fact dt .info-button { margin-left: 6px; }
