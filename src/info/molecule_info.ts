@@ -71,10 +71,16 @@ function paragraphs(...parts: Array<string | null | false | undefined>): React.R
     return parts.filter((part): part is string => Boolean(part)).map(withSubscripts);
 }
 
+/** Orbitals closer than this are one level (degeneracyCounts' own tolerance). */
+const SAME_LEVEL_HARTREE = 1e-4;
+
 /**
  * One orbital in plain words: what it is, how many electrons it holds, its frontier role and what its data flag.
  * Fix round 1 (I3): an open shell's HOMO is the highest *doubly* occupied orbital -- NO₂'s SOMO (6a1) lies above its
  * HOMO (4b2) -- and a SOMO's role says its one electron, so it is not said twice. "Orbital", as the homoLumo glossary says.
+ * Fix round 2 (N1): the clauses come from the energies and occupations, not from one assumed order -- an owner-computed
+ * triplet has two SOMOs, and ROKS energies need not put them above the HOMO. Only an orbital with no occupied orbital
+ * above it is "the highest that holds electrons"; the HOMO says how many SOMOs lie above it, if any do.
  */
 function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: MoleculeOrbitalInfo[]): string {
     const degenerate = degeneracyCounts(orbitals).get(orbital.index) ?? 1;
@@ -85,12 +91,16 @@ function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: M
     const held = orbital.role === 'SOMO' ? null
         : orbital.occupation === 0 ? 'It is empty.'
         : `It holds ${orbital.occupation} ${plural(orbital.occupation, 'electron', 'electrons')}.`;
-    const somo = orbitals.some(o => o.role === 'SOMO');
+    const above = (o: MoleculeOrbitalInfo) => o.energyHartree > orbital.energyHartree + SAME_LEVEL_HARTREE;
+    const highest = !orbitals.some(o => o.occupation > 0 && above(o));
+    const somosAbove = orbitals.filter(o => o.role === 'SOMO' && above(o)).length;
     const role = orbital.role === 'HOMO'
-        ? (somo ? 'It is the HOMO: the highest doubly occupied orbital; the singly occupied SOMO lies above it.'
-            : 'It is the HOMO: the highest orbital that holds electrons.')
+        ? (somosAbove === 1 ? 'It is the HOMO: the highest doubly occupied orbital; the singly occupied SOMO lies above it.'
+            : somosAbove > 1 ? `It is the HOMO: the highest doubly occupied orbital; ${somosAbove} singly occupied SOMOs lie above it.`
+            : highest ? 'It is the HOMO: the highest orbital that holds electrons.'
+            : 'It is the HOMO: the highest doubly occupied orbital.')
         : orbital.role === 'LUMO' ? 'It is the LUMO: the lowest empty orbital.'
-        : orbital.role === 'SOMO' ? 'It is a SOMO: a singly occupied orbital, the highest that holds electrons.'
+        : orbital.role === 'SOMO' ? `It is a SOMO: a singly occupied orbital${highest ? ', the highest that holds electrons' : ''}.`
         : orbital.role === 'LVMO' ? `It is the LVMO: ${LVMO_NOTE}.` : null;
     const diffuse = orbital.class === 'diffuse' ? `${orbital.label} is ${diffuseDescription(orbital)}.` : null;
     return [what, held, role, diffuse].filter(Boolean).join(' ');
@@ -202,8 +212,9 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
         // Ruling T2-I2: while the arrow is drawn its convention is said, at every level.
         molecule.showDipole && hasDipoleArrow(meta) && DIPOLE_CONVENTION,
         surfaceShown && cutAwaySentence(view.surfaceStyle.clipAxis),
-        // Ruling (concern 5): on a phone, the tier line -- its own builder's words -- last, at every level.
-        state.tierLineShown && `${TIER_LABEL[tier]}: ${tierLine(meta)}`,
+        // Ruling (concern 5): on a phone, the tier line -- its own builder's words -- last, at every level. Fix round 2
+        // (N2): the computed line already says "Computed on request", so it goes without the label.
+        state.tierLineShown && (tier === 'computed' ? tierLine(meta) : `${TIER_LABEL[tier]}: ${tierLine(meta)}`),
     );
 
     // --- Key facts, each from the level that reads it.

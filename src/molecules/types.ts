@@ -91,7 +91,8 @@ export interface MoleculeMeta {
     grid?: GridSpec;
     /** Phase 6 adds ESP; diatomics ship none. */
     espGrid?: GridSpec;
-    references: Array<{ quantity: string; value: number; unit: string; source: string }>;
+    /** `label` names a bond or angle by its atoms ("C–C", "H–C–C"), as build_library writes it (Task 7b fix round 2). */
+    references: Array<{ quantity: string; value: number; unit: string; source: string; label?: string }>;
     generator: { pyscf: string; script: string; commit: string; xc?: string; numpy?: string; scipy?: string; python?: string; dataVersion?: string };
     scan?: string;
     tier?: MoleculeTier;

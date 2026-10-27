@@ -21,11 +21,11 @@ function rows(container: HTMLElement) {
     for (const dt of Array.from(list.querySelectorAll('dt'))) {
         const dd = dt.nextElementSibling as HTMLElement;
         expect(dd.tagName).toBe('DD');
-        out.push({
-            term: dt.textContent ?? '',
-            value: dd.querySelector('.molecule-property-value')?.textContent ?? '',
-            caption: dd.querySelector('.molecule-property-caption')?.textContent ?? null,
-        });
+        // Fix round 2 (N5): a caption is whatever the <dd> says beyond its value (the caption class is gone with the
+        // captions, so querying it would find nothing whatever the card printed).
+        const value = dd.querySelector('.molecule-property-value')?.textContent ?? '';
+        const rest = (dd.textContent ?? '').replace(value, '').trim();
+        out.push({ term: dt.textContent ?? '', value, caption: rest || null });
     }
     return out;
 }

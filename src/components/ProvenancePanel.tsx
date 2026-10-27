@@ -149,7 +149,8 @@ function References({ meta }: { meta: LibraryMoleculeMeta }) {
             <ul className="provenance-list">
                 {geometry.length > 0 && (
                     <li>
-                        {geometry.map(r => `${r.quantity} ${valueWithUnit(r.value, r.unit)}`).join(', ')}: the experimental geometry itself, so no test of the method
+                        {/* Fix round 2 (N4): named by the data's own label (C–C, H–C–C) where it has one. */}
+                        {geometry.map(r => `${r.label ?? r.quantity} ${valueWithUnit(r.value, r.unit)}`).join(', ')}: the experimental geometry itself, so no test of the method
                     </li>
                 )}
                 {others.map((reference, index) => (

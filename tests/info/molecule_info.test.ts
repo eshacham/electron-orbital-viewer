@@ -152,7 +152,8 @@ describe('moleculeInfo (Task 7b)', () => {
         const state = moleculeState(waterMeta({ references: REAL_WATER_REFERENCES }));
         const computed = computedText(infoOf(state, 'research'));
         expect(computed).toContain('Checked against published values:');
-        expect(computed).toContain('bond 0.958 Å, angle 104.5°: the experimental geometry itself, so no test of the method');
+        // Fix round 2 (N4): each named by the data's own label.
+        expect(computed).toContain('O–H 0.958 Å, H–O–H 104.5°: the experimental geometry itself, so no test of the method');
         expect(computed).toContain('dipole: 1.855 D — CRC Handbook, via CCCBDB');
         expect(computed).not.toContain('experiment (CCCBDB)');
         expect(computed).not.toContain('geometry from experiment');
@@ -171,7 +172,8 @@ describe('moleculeInfo (Task 7b)', () => {
         const computed = computedText(infoOf(moleculeState(ethane), 'research'));
         expect(computed).toContain('Reference values (none of them tests the method yet):');
         expect(computed).not.toContain('Checked against');
-        expect(computed).toContain('bond 1.535 Å, bond 1.094 Å, angle 111.2°: the experimental geometry itself, so no test of the method');
+        // Fix round 2 (N4): which bond is which, by the data's own labels.
+        expect(computed).toContain('C–C 1.535 Å, C–H 1.094 Å, H–C–C 111.2°: the experimental geometry itself, so no test of the method');
         expect(computed).toContain('dipole: 0 D — zero by symmetry');
     });
 
@@ -378,6 +380,33 @@ describe('moleculeInfo (Task 7b)', () => {
         });
     });
 
+    // Fix round 2 (N1): an owner-computed triplet -- any multiplicity can be requested, and every singly occupied ROKS
+    // orbital is marked SOMO -- with two non-degenerate SOMOs above its HOMO. The clauses follow the energies.
+    describe('a triplet with two SOMOs above its HOMO (synthetic)', () => {
+        const triplet = waterMeta({ id: 'trip', name: 'Triplet', formula: 'XY', multiplicity: 3, orbitals: [
+            { index: 0, label: '1a', energyHartree: -0.50, occupation: 2, role: 'HOMO' },
+            { index: 1, label: '2a', energyHartree: -0.30, occupation: 1, role: 'SOMO' },
+            { index: 2, label: '3a', energyHartree: -0.25, occupation: 1, role: 'SOMO' },
+            { index: 3, label: '4a', energyHartree: 0.05, occupation: 0, role: 'LUMO' },
+        ] });
+        const lead = (index: number) => shownAt(moleculeState(triplet, store => store.dispatch(setSurface({ kind: 'mo', index }))), 'basics');
+        it('says how many SOMOs lie above the HOMO', () => {
+            expect(lead(0)).toContain('It is the HOMO: the highest doubly occupied orbital; 2 singly occupied SOMOs lie above it.');
+        });
+        it('calls only the upper SOMO the highest that holds electrons', () => {
+            expect(lead(1)).toContain('It is a SOMO: a singly occupied orbital.');
+            expect(lead(1)).not.toContain('the highest that holds electrons');
+            expect(lead(2)).toContain('It is a SOMO: a singly occupied orbital, the highest that holds electrons.');
+        });
+        // ROKS energies need not put a SOMO above the HOMO: then the HOMO is the highest, and says so.
+        it('calls a HOMO above every SOMO the highest orbital that holds electrons', () => {
+            const below = waterMeta({ ...triplet, orbitals: triplet.orbitals.map(o => (o.role === 'HOMO' ? { ...o, energyHartree: -0.20 } : o)) });
+            const text = shownAt(moleculeState(below, store => store.dispatch(setSurface({ kind: 'mo', index: 0 }))), 'basics');
+            expect(text).toContain('It is the HOMO: the highest orbital that holds electrons.');
+            expect(text).not.toContain('SOMO');
+        });
+    });
+
     // Re-homed from properties_card.test.tsx (ruling on concern 4): the gaps' one home is Info.
     it('gives the HOMO–LVMO gap too where the LVMO is the calculation\'s own, and none to a constructed LVMO', () => {
         const own = waterMeta({ orbitals: [
@@ -417,7 +446,9 @@ describe('moleculeInfo (Task 7b)', () => {
         }
         expect(shownAt({ ...state, tierLineShown: false }, 'research')).not.toContain('Curated;');
         const computed = { ...moleculeState(computedWater()), tierLineShown: true };
-        expect(shownAt(computed, 'basics')).toContain('Computed: Computed on request by the same method; not benchmarked against experiment.');
+        // Fix round 2 (N2): the computed line already names the tier, so it stands alone -- never "Computed: Computed …".
+        expect(shownAt(computed, 'basics')).toContain('Computed on request by the same method; not benchmarked against experiment.');
+        expect(shownAt(computed, 'basics')).not.toContain('Computed: Computed');
     });
 
     describe('an on-demand computed molecule', () => {
