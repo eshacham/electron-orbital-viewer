@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 import { useAppStore } from './store/hooks';
 import { applyStateTo, encodeStateOf, hasSharedView } from './url_state';
+import { requiredLevel, readLevelParam } from './levels/required_level';
+import { levelPref, raiseForVisit } from './levels/level_pref';
+import { levelRank } from './levels/levels';
 
 /**
  * The address bar always holds the current view, so it is itself the share
@@ -32,7 +35,19 @@ export function useUrlStateSync(target: Window = window, delayMs = 250, onApplyH
         // replaceState does not fire hashchange, so this is only ever a hash
         // the user typed or a link followed within the page.
         const onHashChange = () => {
-            applyStateTo(target.location.hash, store.dispatch);
+            // Captured before applying it: same reasoning as main.tsx's boot
+            // read -- this debounced write() (below) rewrites the hash and
+            // drops `lvl` (never registered for writing), so it must be read
+            // from the raw hash, not a round trip through the store.
+            const hash = target.location.hash;
+            applyStateTo(hash, store.dispatch);
+            // The visit-only raise (spec plan): see main.tsx's boot read for
+            // the full reasoning -- raise only above the stored level, never
+            // lower it, never write it back.
+            const required = requiredLevel(store.getState());
+            const linked = readLevelParam(hash);
+            const nextLevel = linked && levelRank(linked) > levelRank(required) ? linked : required;
+            if (levelRank(nextLevel) > levelRank(levelPref.get())) raiseForVisit(nextLevel);
             if (onApplyHash && hasSharedView(target.location.hash)) onApplyHash();
         };
         target.addEventListener('hashchange', onHashChange);
