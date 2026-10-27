@@ -4,7 +4,8 @@ import { shellLetter } from '../orbital_names';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import InfoButton from '../info/InfoButton';
 import type { InfoTopicId } from '../info/info_types';
-import { CombinationSelection, combinationTitle, selectionProblem } from '../combinations';
+import { CombinationSelection, selectionProblem } from '../combinations';
+import { combinationTitleNode } from '../info/basic_info';
 import CombinationControls from '../components/CombinationControls';
 import { useRovingFocus } from '../shell/useRovingFocus';
 import { BasicSelection } from '../store/orbitalSlice';
@@ -76,8 +77,9 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
     // silently wrong picture), and the three rows stay visible, disabled, so
     // the way back to a single orbital is obvious rather than a control that
     // vanished.
+    // Review I1: the combination's name is the node Info's title uses, typeset (2p<sub>z</sub>), never "2p_z".
     const heading = combinationActive
-        ? `${combinationTitle(combination)}${selectionProblem(combination) ? ' — not drawn' : ''}`
+        ? <>{combinationTitleNode(combination)}{selectionProblem(combination) ? ' — not drawn' : ''}</>
         : <OrbitalLabel n={n} l={l} ml={ml} />;
 
     // Task 5 (critique P2): each row has a visible label that names its group, and an (i) beside it for the term. The

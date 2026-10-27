@@ -119,6 +119,15 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         }
     });
 
+    // Review I1: an n = 2 Stark state's name is typeset in the heading as in Info, never "2p_z".
+    it('typesets an n = 2 Stark state in the heading, with no "_"', () => {
+        render(<Harness combination={{ kind: 'field', level: 2, field: 0.002, stark: 'lower' }} />);
+        const heading = document.getElementById('orbital-name')!;
+        expect(heading).toHaveTextContent('n = 2 Stark state (2s + 2pz)/√2');
+        expect(heading.textContent).not.toContain('_');
+        expect(heading.querySelector('sub')).toHaveTextContent('z');
+    });
+
     it('says "not drawn" when the combination has a problem', () => {
         render(<Harness combination={{ kind: 'hybrid', hybrid: 'sp3', member: 9 }} />);
         expect(screen.getByText(/sp³ hybrid.*— not drawn/)).toBeInTheDocument();

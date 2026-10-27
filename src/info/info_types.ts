@@ -14,9 +14,12 @@ export const INFO_TOPIC_IDS = [
 
 export type InfoTopicId = typeof INFO_TOPIC_IDS[number];
 
-/** One key fact about the selection: a short label and its value with units. Shown from `min` (default: every level). */
+/**
+ * One key fact about the selection: a short label and its value with units. Shown from `min` (default: every level).
+ * The label may carry markup -- an italic quantum number, so "Subshell l" never reads "Subshell I" (Task 5).
+ */
 export interface InfoFact {
-    label: string;
+    label: React.ReactNode;
     value: React.ReactNode;
     min?: LearningLevel;
 }

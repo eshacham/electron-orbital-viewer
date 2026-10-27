@@ -11,7 +11,7 @@ import { HybridKind, HYBRID_NAMES, hybridCount } from '../hybrids';
 import { MAX_FIELD_AU } from '../field_source';
 import { KEEP_CASE } from '../design/mui';
 import {
-  N2_MAX_FIELD_AU, DEBYE_PER_EA0, EV_PER_HARTREE, formatVoltsPerMetre, inducedDipole, starkShiftHartree,
+  N2_MAX_FIELD_AU, DEBYE_PER_EA0, formatVoltsPerMetre, inducedDipole, starkShiftHartree, starkShiftText,
 } from '../stark';
 
 /* Task 5: the captions that stood here -- what a combination is built from, the hybrids' basis-choice note, the
@@ -42,13 +42,6 @@ function selectionFor(choice: Choice, current: CombinationSelection): Combinatio
     return current.kind === 'field' ? current : { kind: 'field', level: 1, field: DEFAULT_FIELD_AU, stark: 'lower' };
   }
   return { kind: 'hybrid', hybrid: choice, member: 'all' };
-}
-
-/** "−0.0117", "+0.0117", "0.0000": with a real minus sign, and none on zero. */
-function signed(value: number, digits: number): string {
-  const text = Math.abs(value).toFixed(digits);
-  if (Number(text) === 0) return text;
-  return `${value < 0 ? '−' : '+'}${text}`;
 }
 
 interface CombinationControlsProps {
@@ -174,10 +167,10 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
                 return (
                   <>
                     <Typography variant="body2" className="combination-readout">
-                      (2s + <TwoPz />)/√2: ΔE = −3F = {signed(lowerShift, 4)} Ha ({signed(lowerShift * EV_PER_HARTREE, 2)} eV)
+                      (2s + <TwoPz />)/√2: ΔE = −3F = {starkShiftText(lowerShift)}
                     </Typography>
                     <Typography variant="body2" className="combination-readout">
-                      (2s − <TwoPz />)/√2: ΔE = +3F = {signed(upperShift, 4)} Ha ({signed(upperShift * EV_PER_HARTREE, 2)} eV)
+                      (2s − <TwoPz />)/√2: ΔE = +3F = {starkShiftText(upperShift)}
                     </Typography>
                   </>
                 );

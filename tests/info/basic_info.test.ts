@@ -28,20 +28,23 @@ function orbitalsState(selection: BasicSelection = { n: 3, l: 2, ml: 0 }, combin
     return store;
 }
 
+/** No-break spaces (formulas, fix round 1) read as plain spaces in these checks; one test pins them on their own. */
+const flat = (text: string) => text.replace(/\u00A0/g, ' ');
+
 /** What Info shows at `level`, outside the folded "How this was computed" (that is checked on its own). */
 function shownAt(content: InfoContent, level: LearningLevel): string {
     const { container, unmount } = render(React.createElement(InfoPanel, { content, topic: null, onClearTopic: () => {}, level }));
     container.querySelector('.info-computed')?.remove();
     const text = container.textContent ?? '';
     unmount();
-    return text;
+    return flat(text);
 }
 
 function computedText(content: InfoContent): string {
     const { container, unmount } = render(React.createElement('div', null, content.computed));
     const text = container.textContent ?? '';
     unmount();
-    return text;
+    return flat(text);
 }
 
 describe('basicInfo (Task 5)', () => {
@@ -142,5 +145,54 @@ describe('basicInfo (Task 5)', () => {
         const computed = computedText(content);
         expect(computed).toContain('first-order');
         expect(`${text} ${computed}`).not.toMatch(/exact one-electron/i);
+        // Review I2: the validity statement and n = 2's own limit moved here from the picker
+        // (combination_controls.test.tsx); n = 1's 0.05 a.u. refusal is not n = 2's.
+        expect(computed).toContain('Valid for F ≪ 1 a.u.; ionisation by tunnelling is ignored.');
+        expect(computed).toMatch(/not bound/);
+        expect(computed).not.toContain('0.05 a.u.');
+    });
+
+    // Fix round 1 (owner-delegated science ruling): for hydrogen a hybrid of the degenerate n = 2 states is still a
+    // stationary state with E₂ -- not "a basis choice rather than a state of the free atom".
+    it('calls a hydrogen hybrid a stationary state with E₂, chosen to describe bonding directions', () => {
+        const computed = computedText(basicInfo(orbitalsState(undefined, { kind: 'hybrid', hybrid: 'sp', member: 'all' }).getState(), 'research'));
+        expect(computed).toContain('for hydrogen still a stationary state with E₂');
+        expect(computed).toContain("it is not the free atom's ground state");
+        expect(computed).not.toMatch(/rather than a state of the free atom/);
+    });
+
+    it('builds sp from "2s and 2p", not "1 × 2p"', () => {
+        const text = shownAt(basicInfo(orbitalsState(undefined, { kind: 'hybrid', hybrid: 'sp', member: 'all' }).getState(), 'explore'), 'explore');
+        expect(text).toContain('Built from2s and 2p');
+        expect(text).not.toContain('1 × 2p');
+    });
+
+    // Review wording fixes (fix round 1).
+    it('says a sphere has its radial nodes, rather than is shaped by them', () => {
+        const text = shownAt(basicInfo(orbitalsState({ n: 2, l: 0, ml: 0 }).getState(), 'basics'), 'basics');
+        expect(text).toContain('A sphere, with 1 node — a surface where the electron is never found: 1 radial (a sphere) and 0 angular.');
+    });
+
+    it('writes cos φ, not cos 1φ, and gives the angular part its verb', () => {
+        const text = shownAt(basicInfo(orbitalsState({ n: 2, l: 1, ml: 1 }).getState(), 'advanced'), 'advanced');
+        expect(text).toContain('(cos φ)');
+        expect(text).toContain('and the angular part has l = 1');
+    });
+
+    it('keeps formulas on one line with no-break spaces around their operators', () => {
+        const content = basicInfo(orbitalsState().getState(), 'advanced');
+        const { container } = render(React.createElement(InfoPanel, { content, topic: null, onClearTopic: () => {}, level: 'advanced' }));
+        const text = container.textContent ?? '';
+        expect(text).toContain('n\u00A0−\u00A0l\u00A0−\u00A01\u00A0=\u00A00');
+        expect(text).toContain('E\u00A0=\u00A0−1/(2n²)\u00A0Ha');
+        expect(text).toContain('|ψ|²\u00A0=\u00A01.23\u00A0×\u00A010⁻³');
+    });
+
+    it('sets the quantum numbers in the fact labels in italics, so "Subshell l" never reads "Subshell I"', () => {
+        const content = basicInfo(orbitalsState().getState(), 'basics');
+        const { container } = render(React.createElement(InfoPanel, { content, topic: null, onClearTopic: () => {}, level: 'basics' }));
+        const labels = Array.from(container.querySelectorAll('.info-fact dt'));
+        expect(labels.map(label => label.textContent).slice(0, 3)).toEqual(['Shell n', 'Subshell l', 'Orbital mₗ']);
+        expect(labels.slice(0, 3).map(label => label.querySelector('i')?.textContent)).toEqual(['n', 'l', 'mₗ']);
     });
 });

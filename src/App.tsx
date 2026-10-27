@@ -559,13 +559,12 @@ function App() {
         items.map(item => ({ ...item, color: themeCurveColour(item.color, palette) })), [palette]);
     const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(viewTitle, shallowEqual);
     useDocumentTitle(`${viewTitleText} · ${BRAND.name}`);
-    // Task 5: Orbitals' Info is basicInfo. It reads the orbital slice alone, so that slice (and the level) is what it is
-    // rebuilt on -- not every store change.
+    // Task 5: Orbitals' Info is basicInfo, built from the orbital slice it reads -- rebuilt when that slice changes,
+    // not on every store change.
     const orbitalSliceNow = useAppSelector(state => state.orbital);
     const basicInfoContent = useMemo(
-        () => (isBasicMode ? basicInfo(store.getState(), level) : null),
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- orbitalSliceNow is the trigger: basicInfo reads it through the store.
-        [isBasicMode, orbitalSliceNow, level, store],
+        () => (isBasicMode ? basicInfo({ orbital: orbitalSliceNow }, level) : null),
+        [isBasicMode, orbitalSliceNow, level],
     );
     // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab. Until
     // the other modes' builders land (Tasks 6-7: atomInfo, bondsInfo, moleculeInfo) it names their view only.

@@ -1,7 +1,7 @@
 import {
     polarized1sSource, starkStateSource, starkShiftHartree, inducedDipole, nextOrderDipoleShare,
     polarizabilityFromDrawnPsi, transitionDipole2s2pz, formatVoltsPerMetre, overTheBarrierField,
-    starkFieldProblem, N2_MAX_FIELD_AU, HYDROGEN_POLARIZABILITY,
+    starkFieldProblem, N2_MAX_FIELD_AU, HYDROGEN_POLARIZABILITY, starkShiftText,
 } from '../src/stark';
 import { hybridSource } from '../src/hybrids';
 import { makeFieldEvaluator, MAX_FIELD_AU } from '../src/field_source';
@@ -111,5 +111,14 @@ describe('validation rows', () => {
 
     it('records |⟨2s|z|2p_z⟩| from the same computation the test asserts', () => {
         expect(row('|⟨2s|z|2p_z⟩|').app).toBe(Math.abs(transitionDipole2s2pz()));
+    });
+});
+
+// Review I3: one formatter for an n = 2 shift, read by both the picker's readout and Info's fact, so the two never drift.
+describe('starkShiftText', () => {
+    it('signs the shift with a true minus, 4 decimals in Ha and 2 in eV, and no sign on zero', () => {
+        expect(starkShiftText(starkShiftHartree('lower', 0.0039))).toBe('−0.0117 Ha (−0.32 eV)');
+        expect(starkShiftText(starkShiftHartree('upper', 0.0039))).toBe('+0.0117 Ha (+0.32 eV)');
+        expect(starkShiftText(0)).toBe('0.0000 Ha (0.00 eV)');
     });
 });

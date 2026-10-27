@@ -90,7 +90,8 @@ export function methodStatement(state: RootState, bondsScan?: MoleculeScan | nul
     // Only 'hydrogenic' is left (Basic Orbitals).
     const combination = state.orbital.combination;
     if (combination.kind === 'hybrid') {
-        return `${BASIC_METHOD}; hybrids are linear combinations of these, a basis choice rather than a state of the free atom (qualitative)`;
+        // Task 5 fix round 1 (science ruling): for hydrogen a mixture of the degenerate n = 2 states is still stationary.
+        return `${BASIC_METHOD}; a hybrid is a linear combination of these degenerate n = 2 states — for hydrogen still a stationary state with E₂ — chosen to describe bonding directions, not the free atom's ground state`;
     }
     if (combination.kind === 'field') {
         // Fix round 1 (I1): the n = 1 case is genuinely valid across the whole

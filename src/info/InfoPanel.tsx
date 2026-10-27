@@ -92,8 +92,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                     {technical && content.technical && <p className="info-text">{content.technical}</p>}
                     {facts.length > 0 && (
                         <dl className="info-facts ql-tabular">
-                            {facts.map(fact => (
-                                <div key={fact.label} className="info-fact">
+                            {/* Keyed by place: a label may be markup, and a builder lists each fact once. */}
+                            {facts.map((fact, index) => (
+                                <div key={index} className="info-fact">
                                     <dt>{fact.label}</dt>
                                     <dd>{fact.value}</dd>
                                 </div>

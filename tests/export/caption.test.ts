@@ -34,6 +34,10 @@ describe('export captions', () => {
         expect(viewDescription(store.getState())).toBe('Hydrogen 3d_z², 90% contour');
         expect(exportFileStem(store.getState())).toBe('orbital-viewer_H_basic_n3_l2_ml0');
         expect(methodStatement(store.getState())).toBe(BASIC_METHOD);
+        // Fix round 1 (science ruling): a hydrogen hybrid is still a stationary state with E2, not "a basis choice rather than a state".
+        store.dispatch(setCombination({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }));
+        expect(methodStatement(store.getState())).toMatch(/for hydrogen still a stationary state with E₂/);
+        expect(methodStatement(store.getState())).not.toMatch(/rather than a state of the free atom/);
         store.dispatch(setCombination({ kind: 'field', level: 1, field: 0.03, stark: 'lower' }));
         expect(methodStatement(store.getState())).toMatch(/first-order perturbation theory/);
         expect(exportFileStem(store.getState())).toBe('orbital-viewer_H_field1');

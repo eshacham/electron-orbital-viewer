@@ -23,10 +23,19 @@ import { MAX_FIELD_AU } from '../field_source';
 import { BASIC_ORBITALS_Z } from '../orbital_presets';
 import {
     DEBYE_PER_EA0, EV_PER_HARTREE, N2_MAX_FIELD_AU, StarkState, formatVoltsPerMetre, inducedDipole,
-    nextOrderDipoleShare, starkShiftHartree,
+    nextOrderDipoleShare, starkShiftHartree, starkShiftText,
 } from '../stark';
 
 const h = React.createElement;
+
+/** What the builder reads: the orbital slice alone (fix round 1: App passes exactly this, so its memo deps are honest). */
+export type OrbitalsInfoState = Pick<RootState, 'orbital'>;
+
+/** A formula kept on one line: its spaces become no-break spaces (U+00A0), so "n − l − 1" never wraps at an operator. */
+const nb = (formula: string) => formula.replace(/ /g, '\u00A0');
+
+/** A quantum-number label, the number in italics as physics sets it -- "Subshell l" must not read "Subshell I". */
+const qLabel = (word: string, symbol: string) => h(React.Fragment, null, `${word} `, h('i', null, symbol));
 
 /**
  * Spec §7's one-electron framing (moved from BasicExplore's tile caption, Task 5). Still exported: App's Help dialog
@@ -57,6 +66,17 @@ function starkLabel(state: StarkState): React.ReactNode {
     return h(React.Fragment, null, `(2s ${state === 'lower' ? '+' : '−'} `, twoPz(), ')/√2');
 }
 
+/**
+ * combinationTitle typeset (review I1): the same words, with 2p<sub>z</sub> where an n = 2 Stark state is named. One
+ * node for Orbitals' Explore heading and Info's title, so the two never disagree.
+ */
+export function combinationTitleNode(selection: CombinationSelection): React.ReactNode {
+    if (selection.kind === 'field' && selection.level === 2 && selection.stark !== 'both') {
+        return h(React.Fragment, null, 'n = 2 Stark state ', starkLabel(selection.stark));
+    }
+    return combinationTitle(selection);
+}
+
 /** x to 3 significant figures in plain decimals, with a true minus: −0.0556, −13.6. */
 const decimal = (x: number) => minus(x.toPrecision(3));
 
@@ -65,40 +85,37 @@ function energyText(hartree: number): string {
     return `${decimal(hartree)} Ha (${decimal(hartree * EV_PER_HARTREE)} eV)`;
 }
 
-/** "−0.0117 Ha (−0.32 eV)": a Stark shift, as the panel's readout prints it (4 and 2 decimals, signed). */
-function signed(value: number, digits: number): string {
-    const text = Math.abs(value).toFixed(digits);
-    if (Number(text) === 0) return text;
-    return `${value < 0 ? '−' : '+'}${text}`;
-}
-const shiftText = (hartree: number) => `${signed(hartree, 4)} Ha (${signed(hartree * EV_PER_HARTREE, 2)} eV)`;
-
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
 const signedMl = (ml: number) => (ml > 0 ? `+${ml}` : minus(String(ml)));
 
-/** The fraction and contour facts, from Advanced -- where the Electron enclosed control is (CONTROL_LEVEL.enclosed). */
-function enclosedFacts(state: RootState, n: number, l: number, ml: number): InfoFact[] {
+/** The enclosed fraction, from Advanced -- where the Electron enclosed control is (CONTROL_LEVEL.enclosed). */
+function enclosedFact(state: OrbitalsInfoState): InfoFact {
+    return { label: 'Enclosed', value: `${Math.round(state.orbital.enclosedFraction * 100)} % of the electron`, min: 'advanced' };
+}
+
+/** The fraction and, once this orbital is drawn, its contour's iso value. */
+function enclosedFacts(state: OrbitalsInfoState, n: number, l: number, ml: number): InfoFact[] {
     const { enclosedFraction, currentParams, isoLevel, isLoading, renderFailed } = state.orbital;
-    const facts: InfoFact[] = [{ label: 'Enclosed', value: `${Math.round(enclosedFraction * 100)} % of the electron`, min: 'advanced' }];
+    const facts: InfoFact[] = [enclosedFact(state)];
     // The iso value is the drawn orbital's: until the selection itself has landed it would be the previous one's.
     const drawn = currentParams && !currentParams.radialSamples && currentParams.Z === BASIC_ORBITALS_Z
         && currentParams.n === n && currentParams.l === l && currentParams.ml === ml
         && currentParams.enclosedFraction === enclosedFraction;
     if (drawn && !isLoading && !renderFailed && isoLevel !== null) {
-        facts.push({ label: 'Iso value', value: `|ψ|² = ${formatSci(isoLevel)} a₀⁻³`, min: 'advanced' });
+        facts.push({ label: 'Iso value', value: nb(`|ψ|² = ${formatSci(isoLevel)} a₀⁻³`), min: 'advanced' });
     }
     return facts;
 }
 
 /** The Cut away helper, moved here: what a cut removes. Nothing while no cut is on. */
-function cutSentence(state: RootState): string | null {
+function cutSentence(state: OrbitalsInfoState): string | null {
     const axis = state.orbital.surfaceStyle.clipAxis;
     return axis === 'none' ? null : `The cut removes the part on the +${axis} side of a plane perpendicular to the ${axis} axis.`;
 }
 
 const joinSentences = (...parts: Array<string | null | false>) => parts.filter(Boolean).join(' ');
 
-function orbitalInfo(state: RootState): InfoContent {
+function orbitalInfo(state: OrbitalsInfoState): InfoContent {
     const { n, l, ml } = state.orbital.basicSelection;
     const radial = n - l - 1;
     const total = n - 1;
@@ -109,26 +126,27 @@ function orbitalInfo(state: RootState): InfoContent {
     // The shape's textbook word (qualitative, orbital_facts.ts) leads; past f there is none, so the letter does.
     const lead = !shape ? `${/^[sfhil]$/.test(letter) ? 'An' : 'A'} ${letter} orbital`
         : /^(six|eight)\b/.test(shape) ? shape.charAt(0).toUpperCase() + shape.slice(1) : `A ${shape}`;
+    // Review: radial nodes alone (l = 0) do not shape a sphere -- it simply has them; angular nodes do shape the lobes.
     const shapeAndNodes = total === 0
         ? `${lead}, with no nodes: there is no surface where the electron is never found.`
-        : `${lead}, shaped by its ${total} ${plural(total, 'node', 'nodes')} — ${plural(total, 'a surface', 'surfaces')} where the electron is never found: `
+        : `${lead}, ${l === 0 ? 'with' : 'shaped by its'} ${total} ${plural(total, 'node', 'nodes')} — ${plural(total, 'a surface', 'surfaces')} where the electron is never found: `
             + `${radial} radial${radial > 0 ? ` (${plural(radial, 'a sphere', 'spheres')})` : ''}`
             + ` and ${l} angular${l > 0 ? ` (${surfaces ?? 'planes or cones through the nucleus'})` : ''}.`;
 
     const realNote = ml === 0 ? ''
         : ` The app draws real orbitals: this one combines the complex states with mₗ = +${Math.abs(ml)} and mₗ = −${Math.abs(ml)} `
-            + `(${ml > 0 ? 'cos' : 'sin'} ${Math.abs(ml)}φ), so it has a definite |mₗ| but no definite angular momentum about z.`;
+            + `(${ml > 0 ? 'cos' : 'sin'} ${Math.abs(ml) === 1 ? '' : Math.abs(ml)}φ), so it has a definite |mₗ| but no definite angular momentum about z.`;
     const energy = -1 / (2 * n * n);
 
     return {
         title: h(React.Fragment, null, 'Hydrogen — ', name, ' orbital'),
         plain: joinSentences(shapeAndNodes, BASIC_ORBITALS_ABOUT, cutSentence(state)),
-        technical: `ψ = Rₙₗ(r) Y(θ, φ): the radial part has n − l − 1 = ${radial} ${plural(radial, 'node', 'nodes')} and the angular part l = ${l}. `
-            + `Its size grows roughly as n². E = −1/(2n²) Ha depends on n alone, so all n² = ${n * n} orbitals of the shell share it.${realNote}`,
+        technical: `${nb('ψ = Rₙₗ(r) Y(θ, φ)')}: the radial part has ${nb(`n − l − 1 = ${radial}`)} ${plural(radial, 'node', 'nodes')} and the angular part has ${nb(`l = ${l}`)}. `
+            + `Its size grows roughly as n². ${nb('E = −1/(2n²) Ha')} depends on n alone, so all ${nb(`n² = ${n * n}`)} orbitals of the shell share it.${realNote}`,
         facts: [
-            { label: 'Shell n', value: String(n) },
-            { label: 'Subshell l', value: `${l} (${letter})` },
-            { label: 'Orbital mₗ', value: signedMl(ml) },
+            { label: qLabel('Shell', 'n'), value: String(n) },
+            { label: qLabel('Subshell', 'l'), value: `${l} (${letter})` },
+            { label: qLabel('Orbital', 'mₗ'), value: signedMl(ml) },
             { label: 'Nodes', value: `${total} (${radial} radial, ${l} angular)` },
             { label: 'Energy', value: energyText(energy), min: 'explore' },
             ...enclosedFacts(state, n, l, ml),
@@ -145,39 +163,40 @@ const HYBRID_GEOMETRY: Record<HybridKind, string> = {
     sp3: 'the 2s with all three 2p into 4 equivalent hybrids pointing to the corners of a tetrahedron, 109.5° apart',
 };
 
-function hybridInfo(state: RootState, selection: Extract<CombinationSelection, { kind: 'hybrid' }>): InfoContent {
+function hybridInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelection, { kind: 'hybrid' }>): InfoContent {
     const k = hybridCount(selection.hybrid) - 1;
     return {
-        title: `Hydrogen — ${combinationTitle(selection)}`,
+        title: h(React.Fragment, null, 'Hydrogen — ', combinationTitleNode(selection)),
         plain: joinSentences(HYBRID_BUILT_FROM, `${HYBRID_NAMES[selection.hybrid]} mixes ${HYBRID_GEOMETRY[selection.hybrid]}.`,
             HYBRID_CAPTION, cutSentence(state)),
-        technical: `hᵢ = −(1/√${k + 1}) ψ₂ₛ + √(${k}/${k + 1}) (dᵢ · p), with dᵢ each hybrid's direction; the 2s enters with a minus sign so each large lobe points along its own dᵢ. `
+        technical: `${nb(`hᵢ = −(1/√${k + 1}) ψ₂ₛ + √(${k}/${k + 1}) (dᵢ · p)`)}, with dᵢ each hybrid's direction; the 2s enters with a minus sign so each large lobe points along its own dᵢ. `
             + 'All n = 2 states share one energy, so the hybrids have it too.',
         facts: [
             { label: 'Hybrids', value: String(k + 1) },
-            { label: 'Built from', value: `2s and ${k} × 2p` },
+            { label: 'Built from', value: k === 1 ? '2s and 2p' : `2s and ${k} × 2p` },
             { label: 'Energy', value: energyText(-1 / 8), min: 'explore' },
-            { label: 'Enclosed', value: `${Math.round(state.orbital.enclosedFraction * 100)} % of the electron`, min: 'advanced' },
+            enclosedFact(state),
         ],
-        computed: 'Exact one-electron solution, Z = 1, for the 2s and 2p; hybrids are linear combinations of these, '
-            + 'a basis choice rather than a state of the free atom (qualitative).',
+        // Fix round 1 (science ruling): for hydrogen a mixture of the degenerate n = 2 states is still stationary.
+        computed: 'Exact one-electron solution, Z = 1, for the 2s and 2p. A hybrid is a linear combination of these degenerate states '
+            + "— for hydrogen still a stationary state with E₂ — chosen to describe bonding directions; it is not the free atom's ground state.",
     };
 }
 
-function fieldInfo(state: RootState, selection: Extract<CombinationSelection, { kind: 'field' }>): InfoContent {
+function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelection, { kind: 'field' }>): InfoContent {
     const field = selection.field;
     const fieldFact: InfoFact = { label: 'Field F', value: `${field.toFixed(selection.level === 1 ? 3 : 4)} a.u. (${formatVoltsPerMetre(field)})` };
-    const enclosed: InfoFact = { label: 'Enclosed', value: `${Math.round(state.orbital.enclosedFraction * 100)} % of the electron`, min: 'advanced' };
+    const enclosed = enclosedFact(state);
 
     if (selection.level === 1) {
         const share = nextOrderDipoleShare(field);
         const dipole = inducedDipole(field);
         return {
-            title: `Hydrogen — ${combinationTitle(selection)}`,
+            title: h(React.Fragment, null, 'Hydrogen — ', combinationTitleNode(selection)),
             plain: joinSentences(FIELD_SETUP,
                 'The cloud shifts a little that way, so the atom gains a small electric dipole; a stronger field shifts it further.',
                 cutSentence(state)),
-            technical: 'α = 9/2 a₀³, exact for hydrogen, so μ = αF. The 1s energy does not change to first order in F, and its radial distribution neither.',
+            technical: `${nb('α = 9/2 a₀³')}, exact for hydrogen, so ${nb('μ = αF')}. The 1s energy does not change to first order in F, nor does its radial distribution.`,
             facts: [
                 fieldFact,
                 { label: 'Induced dipole μ', value: `${dipole.toFixed(3)} e·a₀ (${(dipole * DEBYE_PER_EA0).toFixed(3)} D)`, min: 'explore' },
@@ -194,18 +213,16 @@ function fieldInfo(state: RootState, selection: Extract<CombinationSelection, { 
     const states: StarkState[] = selection.stark === 'both' ? ['lower', 'upper'] : [selection.stark];
     const shiftFacts: InfoFact[] = states.map(stark => ({
         label: selection.stark === 'both' ? `${stark === 'lower' ? 'Lower' : 'Upper'} state ΔE` : 'Stark shift ΔE',
-        value: `${stark === 'lower' ? '−' : '+'}3F = ${shiftText(starkShiftHartree(stark, field))}`,
+        value: nb(`${stark === 'lower' ? '−' : '+'}3F = ${starkShiftText(starkShiftHartree(stark, field))}`),
         min: 'explore',
     }));
-    const title = selection.stark === 'both' ? 'Hydrogen — n = 2 Stark states'
-        : h(React.Fragment, null, 'Hydrogen — n = 2 Stark state ', starkLabel(selection.stark));
     return {
-        title,
+        title: h(React.Fragment, null, 'Hydrogen — ', combinationTitleNode(selection)),
         plain: h(React.Fragment, null,
             `${FIELD_SETUP} At n = 2 it mixes 2s with `, twoPz(), ': in ', starkLabel('lower'),
             ' the electron leans towards −z and its energy falls; in ', starkLabel('upper'), ' it leans towards +z and its energy rises.',
             cutSentence(state) ? ` ${cutSentence(state)}` : ''),
-        technical: h(React.Fragment, null, `${N2_FIRST_ORDER} ΔE = ∓3F, from ⟨2s|z|`, twoPz(), '⟩ = −3 a₀ in this sign convention.'),
+        technical: h(React.Fragment, null, `${N2_FIRST_ORDER} ${nb('ΔE = ∓3F')}, from ⟨2s|z|`, twoPz(), nb('⟩ = −3 a₀'), ' in this sign convention.'),
         facts: [fieldFact, { label: 'Energy at F = 0', value: energyText(-1 / 8), min: 'explore' }, ...shiftFacts, enclosed],
         computed: h(React.Fragment, null,
             'Drawn: the n = 2 Stark states (2s ± ', twoPz(), ')/√2, first-order degenerate perturbation theory. ',
@@ -215,8 +232,8 @@ function fieldInfo(state: RootState, selection: Extract<CombinationSelection, { 
 
 /** Orbitals' Info for the current selection at `level` (InfoPanel filters the facts and bands by level). */
 // `level` is unused for now: every band is written, and InfoPanel shows the ones a level reads. Ruling PF3 keeps it in
-// the signature every mode's builder shares.
-export function basicInfo(state: RootState, level: LearningLevel): InfoContent {
+// the signature every mode's builder shares. `state` is the orbital slice (a whole RootState is one too).
+export function basicInfo(state: OrbitalsInfoState, level: LearningLevel): InfoContent {
     const combination = state.orbital.combination;
     const content = combination.kind === 'hybrid' ? hybridInfo(state, combination)
         : combination.kind === 'field' ? fieldInfo(state, combination)

@@ -67,6 +67,21 @@ export function starkShiftHartree(state: StarkState, field: number): number {
     return (state === 'lower' ? -1 : 1) * STARK_N2_COEFFICIENT * field;
 }
 
+/** "−0.0117", "+0.0117", "0.0000": a true minus sign, and no sign on zero. */
+function signedFixed(value: number, digits: number): string {
+    const text = Math.abs(value).toFixed(digits);
+    if (Number(text) === 0) return text;
+    return `${value < 0 ? '−' : '+'}${text}`;
+}
+
+/**
+ * An n = 2 Stark shift as the app prints it, "−0.0117 Ha (−0.32 eV)": 4 decimals in Ha, 2 in eV. One formatter for
+ * the picker's readout and Info's fact (Task 5 review I3), so the two always show the same number.
+ */
+export function starkShiftText(hartree: number): string {
+    return `${signedFixed(hartree, 4)} Ha (${signedFixed(hartree * EV_PER_HARTREE, 2)} eV)`;
+}
+
 /** μ = αF, e·a₀. */
 export function inducedDipole(field: number): number {
     return HYDROGEN_POLARIZABILITY * field;

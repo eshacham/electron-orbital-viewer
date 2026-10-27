@@ -37,15 +37,15 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         expect(viewTitle(store.getState())).toEqual({ title: 'Molecules', subtitle: 'Choose a molecule' });
     });
 
-    // Task 5 (critique P1): a field view is first-order perturbation theory, so its subtitle never says "exact".
-    it('calls one orbital exact, and a field view first-order Stark, by its method', () => {
+    // Task 5 (critique P1; fix round 1 ruling): a field view is first-order perturbation theory, so its subtitle never says "exact".
+    it('calls one orbital exact, and a field view first-order perturbation theory, by its method', () => {
         const store = neonStore();
         store.dispatch(setMode('hydrogenic'));
         expect(viewTitle(store.getState()).subtitle).toBe('|ψ|² isosurface · 90 % enclosed · exact one-electron solution, Z = 1');
         store.dispatch(setCombination({ kind: 'field', level: 1, field: 0.03, stark: 'lower' }));
-        expect(viewTitle(store.getState()).subtitle).toBe('|ψ|² isosurface · 90 % enclosed · 1s + first-order Stark, Dalgarno–Lewis');
+        expect(viewTitle(store.getState()).subtitle).toBe('|ψ|² isosurface · 90 % enclosed · 1s polarised to first order in F, Dalgarno–Lewis');
         store.dispatch(setCombination({ kind: 'field', level: 2, field: 0.003, stark: 'lower' }));
-        expect(viewTitle(store.getState()).subtitle).toBe('|ψ|² isosurface · 90 % enclosed · n = 2 + first-order Stark, degenerate perturbation theory');
+        expect(viewTitle(store.getState()).subtitle).toBe('|ψ|² isosurface · 90 % enclosed · n = 2 Stark states, first-order degenerate perturbation theory');
     });
 
     // Ruling P8 (spec §9.4): show=none draws the structure alone; the subtitle says so, with where its
