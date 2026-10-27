@@ -78,9 +78,14 @@ export function valencePlainWords(configuration: SubshellOccupancy[]): string {
     const outerDF = valence.filter(s => s.n === outer && s.l >= 2);
     const outerSP = valence.filter(s => s.n === outer && s.l < 2);
     if (outerDF.length > 0 && outerSP.every(isFull)) {
-        const d = sum(outerDF);
-        const kind = outerDF.every(isFull) ? 'full' : 'open';
-        return `${d} ${plural(d, 'electron', 'electrons')} in the ${kind} ${listOf(outerDF.map(s => subshellLabel(s.n, s.l)))}, `
+        // Fix round 3 (N1): every valence d and f counts, an open inner f included -- Gd²⁺ "8 electrons in the open 4f
+        // and 5d", not the 5d's 1 alone. Each is named full or open; one word serves a run of the same kind.
+        const df = valence.filter(s => s.l >= 2);
+        const d = sum(df);
+        const named = df.every(isFull) || df.every(s => !isFull(s))
+            ? `the ${df.every(isFull) ? 'full' : 'open'} ${listOf(df.map(s => subshellLabel(s.n, s.l)))}`
+            : listOf(df.map(s => `the ${isFull(s) ? 'full' : 'open'} ${subshellLabel(s.n, s.l)}`));
+        return `${d} ${plural(d, 'electron', 'electrons')} in ${named}, `
             + `outside a full ${listOf(outerSP.map(s => subshellLabel(s.n, s.l)))}`;
     }
     const outerCount = sum(valence.filter(s => s.n === outer));

@@ -118,8 +118,12 @@ describe('validation rows', () => {
 describe('starkShiftText', () => {
     it('signs the shift with a true minus, 4 decimals in Ha and 2 in eV, and no sign on zero', () => {
         // Task 6 fix round 1 ruling: every energy reads eV first, Ha in parentheses.
-        expect(starkShiftText(starkShiftHartree('lower', 0.0039))).toBe('−0.32 eV (−0.0117 Ha)');
-        expect(starkShiftText(starkShiftHartree('upper', 0.0039))).toBe('+0.32 eV (+0.0117 Ha)');
+        // Fix round 3 (N2): the eV figure to 3 significant figures, so a weak field's shift is still a number.
+        expect(starkShiftText(starkShiftHartree('lower', 0.0039))).toBe('−0.318 eV (−0.0117 Ha)');
+        expect(starkShiftText(starkShiftHartree('upper', 0.0039))).toBe('+0.318 eV (+0.0117 Ha)');
+        expect(starkShiftText(starkShiftHartree('lower', 0.0001))).toBe('−0.00816 eV (−0.0003 Ha)');
+        // Below 0.001 eV, ×10ⁿ (formatSci); the Ha figure keeps its 4 places.
+        expect(starkShiftText(-1e-5)).toBe('−2.72 × 10⁻⁴ eV (0.0000 Ha)');
         expect(starkShiftText(0)).toBe('0.00 eV (0.0000 Ha)');
     });
 });

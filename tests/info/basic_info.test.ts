@@ -140,7 +140,7 @@ describe('basicInfo (Task 5)', () => {
         const content = basicInfo(orbitalsState(undefined, { kind: 'field', level: 2, field: 0.0039, stark: 'lower' }).getState(), 'explore');
         const text = shownAt(content, 'explore');
         // Task 6 fix round 1 ruling: eV first.
-        expect(text).toContain('−0.32 eV (−0.0117 Ha)');
+        expect(text).toContain('−0.318 eV (−0.0117 Ha)');
         expect(text).toContain('−3.40 eV (−0.125 Ha)');
         expect(text).not.toContain('_');
         const computed = computedText(content);

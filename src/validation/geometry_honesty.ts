@@ -5,6 +5,9 @@
  * count them; dipoles and other properties computed at those geometries still count. Light on purpose: the
  * provenance panel imports it, which references.ts (it computes rows at import) must not be.
  */
+// format/text imports nothing, so this module stays light.
+import { listOf } from '../format/text';
+
 export const NOT_A_TEST = 'geometry from experiment (not a test of the method)';
 
 export function countsAsValidation(row: { notATest?: string }): boolean {
@@ -25,7 +28,6 @@ function checkedQuantity(quantity: string, source: string, experimental: boolean
     return quantity.replace(/_/g, ' ');
 }
 
-const and = (items: string[]) => items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 
 /**
  * Final review I2: a library molecule's tier line, from its own references and geometry -- never a fixed
@@ -44,6 +46,6 @@ export function validatedLine(meta: {
     }
     const checks = [...counts].map(([name, n]) => (n > 1 && name.startsWith('bond ') ? `${name}s` : name));
     return checks.length
-        ? `Curated; ${geometry}${and(checks)} checked against published values.`
+        ? `Curated; ${geometry}${listOf(checks)} checked against published values.`
         : `Curated; ${geometry}no property checked against experiment yet.`;
 }

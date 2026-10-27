@@ -79,8 +79,8 @@ describe('CombinationControls', () => {
         const readouts = Array.from(container.querySelectorAll('.combination-readout'));
         expect(readouts.map(readout => readout.textContent)).toEqual([
             // Task 6 fix round 1 ruling: eV first, Ha in parentheses (starkShiftText, shared with Info).
-            '(2s + 2pz)/√2: ΔE = −3F = −0.32 eV (−0.0117 Ha)',
-            '(2s − 2pz)/√2: ΔE = +3F = +0.32 eV (+0.0117 Ha)',
+            '(2s + 2pz)/√2: ΔE = −3F = −0.318 eV (−0.0117 Ha)',
+            '(2s − 2pz)/√2: ΔE = +3F = +0.318 eV (+0.0117 Ha)',
         ]);
         expect(readouts.every(readout => readout.querySelector('sub')?.textContent === 'z')).toBe(true);
         expect(screen.getByRole('slider', { name: /field f/i })).toHaveAttribute('max', '0.0039');

@@ -2,7 +2,7 @@ import { AnalyticFieldSource, CombinationRecipe, fieldProblem } from './field_so
 import { sampleFieldSource } from './orbital_mesh';
 import { overlapIntegral, zMatrixElement } from './field_integrals';
 import { ORBITAL_RESOLUTION, combinationSamplingRadius, n2Recipe } from './orbital_presets';
-import { toSuperscript } from './format/sci';
+import { formatSci, toSuperscript } from './format/sci';
 
 /**
  * Hydrogen in a uniform field F along +z, H′ = +F z (atomic units): the field
@@ -75,12 +75,23 @@ function signedFixed(value: number, digits: number): string {
 }
 
 /**
- * An n = 2 Stark shift as the app prints it, "−0.32 eV (−0.0117 Ha)": 2 decimals in eV, 4 in Ha -- eV first, as every
- * energy (Task 6 fix round 1 ruling). One formatter for the picker's readout and Info's fact (Task 5 review I3), so
- * the two always show the same number.
+ * Three significant figures with a sign: "−0.318", "+0.00816"; formatSci's "× 10ⁿ" below 0.001, where plain decimals
+ * would run long; "0.00" for no shift (no sign on zero).
+ */
+function signedSignificant(value: number): string {
+    if (value === 0) return '0.00';
+    const size = Math.abs(value);
+    return `${value < 0 ? '−' : '+'}${size >= 0.001 ? size.toPrecision(3) : formatSci(size)}`;
+}
+
+/**
+ * An n = 2 Stark shift as the app prints it, "−0.318 eV (−0.0117 Ha)": eV first, as every energy (Task 6 fix round 1
+ * ruling), to 3 significant figures (fix round 3, N2: a weak field's shift is still a number, "−0.00816 eV"), and Ha
+ * to 4 decimals. One formatter for the picker's readout and Info's fact (Task 5 review I3), so the two always show the
+ * same number.
  */
 export function starkShiftText(hartree: number): string {
-    return `${signedFixed(hartree * EV_PER_HARTREE, 2)} eV (${signedFixed(hartree, 4)} Ha)`;
+    return `${signedSignificant(hartree * EV_PER_HARTREE)} eV (${signedFixed(hartree, 4)} Ha)`;
 }
 
 /** μ = αF, e·a₀. */

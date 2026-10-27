@@ -1,3 +1,5 @@
+import { listOf } from '../format/text';
+
 /**
  * The four points along which a feature becomes visible, or an answer goes
  * deeper (spec plan, learning levels). Order matters: it is both the reading
@@ -92,12 +94,6 @@ const PLURAL_NAME: ReadonlySet<ControlId> = new Set<ControlId>([
     'bondLabels', 'orbitalEnergies', 'properties', 'axes', 'combinations', 'allOrbitals', 'exports', 'requestWorkspace',
 ]);
 
-function joinNames(names: string[]): string {
-    if (names.length === 1) return names[0];
-    if (names.length === 2) return `${names[0]} and ${names[1]}`;
-    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
-
 /**
  * The sentence pointing at the next controls `level` still hides among `ids`
  * -- those that appear at the nearest deeper level, named with it, e.g.
@@ -114,7 +110,7 @@ export function levelPointer(ids: ControlId[], level: LearningLevel): string | n
         CONTROL_LEVEL[hidden[0]],
     );
     const named = hidden.filter(id => CONTROL_LEVEL[id] === nextLevel);
-    const joined = joinNames(named.map(id => CONTROL_NAME[id]));
+    const joined = listOf(named.map(id => CONTROL_NAME[id]));
     const sentence = joined.charAt(0).toUpperCase() + joined.slice(1);
     const verb = named.length === 1 && !PLURAL_NAME.has(named[0]) ? 'appears' : 'appear';
     return `${sentence} ${verb} at ${LEVEL_LABEL[nextLevel]}`;

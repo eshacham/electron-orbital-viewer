@@ -211,6 +211,12 @@ describe('atomInfo (Task 6)', () => {
         [26, 0, '2 electrons in the outer shell and 6 in the open 3d'], // Fe, a neutral transition metal
         [64, 0, '2 electrons in the outer shell and 8 in the open 4f and 5d'], // Gd, a lanthanide
         [11, 1, '8 electrons in the outer shell'], // Na⁺, a main-group ion
+        // Fix round 3 (N1): an open inner f counts too (the app's configurations: Ce⁺ 4f¹ 5d², Gd²⁺ 4f⁷ 5d¹,
+        // Th²⁺ 5f¹ 6d¹, Pa²⁺ 5f² 6d¹).
+        [58, 1, '3 electrons in the open 4f and 5d, outside a full 5s and 5p'], // Ce⁺
+        [64, 2, '8 electrons in the open 4f and 5d, outside a full 5s and 5p'], // Gd²⁺
+        [90, 2, '2 electrons in the open 5f and 6d, outside a full 6s and 6p'], // Th²⁺
+        [91, 2, '3 electrons in the open 5f and 6d, outside a full 6s and 6p'], // Pa²⁺
     ])('words Z = %i, charge %i\'s valence plainly', (Z, charge, words) => {
         expect(valencePlainWords(speciesConfiguration({ Z, charge, excitation: null }))).toBe(words);
     });
