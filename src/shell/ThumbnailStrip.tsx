@@ -11,6 +11,7 @@ import { TOKENS } from '../design/tokens';
 import type { StripItem } from '../thumbs/strip_items';
 import { useRovingFocus } from './useRovingFocus';
 import { OrbitalLabel } from '../format/OrbitalLabel';
+import { withSubscripts } from '../format/subscripts';
 import './strip.css';
 
 /**
@@ -126,7 +127,8 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
     }, [contentKey, wanted, status]);
 
     // Task 5: an orbital's name with a real subscript ("3d" + sub "z²"), not the "3d_z²" string the label carries.
-    const labelText = item.orbital ? <OrbitalLabel {...item.orbital} /> : item.label;
+    // Task 8 (addendum 7, 9): an MO tile's label too -- 1π<sub>u</sub>, 1b<sub>1</sub>; words come back as they are.
+    const labelText = item.orbital ? <OrbitalLabel {...item.orbital} /> : withSubscripts(item.label);
     return (
         <div
             role="option"

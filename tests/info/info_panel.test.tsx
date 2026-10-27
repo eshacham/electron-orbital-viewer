@@ -197,6 +197,28 @@ describe('InfoPanel (Task 4)', () => {
             expect(live()).toHaveTextContent(/^$/);
         });
 
+        // Task 8: on a phone the caption under the header (aria-live) names each new selection; Info leaves that to it,
+        // so a reader hears a change once -- but still says what it explains when its topic changes.
+        it('leaves a new selection to the phone caption when told to, and still announces a topic change', () => {
+            const live = () => document.querySelector('.info-section [aria-live="polite"]') as HTMLElement;
+            const PhoneInfo: React.FC<{ selectionKey: string; title: string }> = ({ selectionKey, title }) => {
+                const { topic, setTopic } = useInfoTopic(selectionKey);
+                return (
+                    <InfoTopicProvider topic={topic} setTopic={setTopic}>
+                        <InfoButton topic="subshell" label="Subshell" />
+                        <InfoPanel content={{ ...content, title }} topic={topic} onClearTopic={() => setTopic(null)} level="explore"
+                            announceSelection={false} />
+                    </InfoTopicProvider>
+                );
+            };
+            const { rerender } = render(<PhoneInfo selectionKey="a" title="Carbon — 2p" />);
+            rerender(<PhoneInfo selectionKey="b" title="Carbon — 2s" />);
+            expect(live()).toHaveTextContent(/^$/);
+            fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
+            fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
+            expect(live()).toHaveTextContent('Info: Carbon — 2s');
+        });
+
         it('going back to an earlier selection does not bring the old topic back', () => {
             const { rerender } = render(<Harness selectionKey="a" />);
             fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));

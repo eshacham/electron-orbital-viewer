@@ -95,3 +95,70 @@ export function orbitalPlainName(n: number, l: number, ml: number): string {
     const { base, sub } = orbitalParts(n, l, ml);
     return sub === null ? base : `${base}${sub}`;
 }
+
+/** ₀–₉ as 0–9, and back: a subscript digit the flat form writes is typeset as a plain digit inside <sub>. */
+const toAsciiDigits = (s: string) => s.replace(/[₀-₉]/g, c => String(c.charCodeAt(0) - 0x2080));
+const toSubscriptDigits = (s: string) => s.replace(/[0-9]/g, c => SUBSCRIPT_DIGITS[c]);
+
+/**
+ * Every subscript in a name of what is drawn (Task 8): one parser behind the typeset helper (`withSubscripts`,
+ * src/format/subscripts.ts) and its flat-string twin (`flatSubscripts`, below), so the two never disagree.
+ *
+ * - An MO label's g or u after σ, π, δ or φ: 1σg, 1πu, 1σu*.
+ * - An irrep label's number and g or u after its a, b, e or t: 1b1, 3a1, 1a1g, 1e1g, 2eg, 1t2, 2a1', a1 -- and the
+ *   flat form a plain-text surface wrote, 1b₁. Running text holds them too ("the 3a1 orbital"), so a label stands
+ *   alone (no letter or digit either side); a label with no leading count needs an ASCII digit (a1), which keeps
+ *   a₀, the bohr, and words like "eg" or "au" out of it.
+ * - "_" before an orbital's subscript, as orbitalName writes it: 3d_z², 2p_x, 4f_z(x²−y²), and the quantities the
+ *   data write the same way, R_e, E_el. Never shown: it only marks where the subscript starts.
+ */
+const LABEL_SUBSCRIPT = new RegExp([
+    '(\\d*[σπδφ])([gu])(?![A-Za-z])',
+    '(?<![A-Za-z0-9_])(\\d+[abet])([0-9₀-₉]+[gu]?|[gu])(?![A-Za-z0-9₀-₉])',
+    '(?<![A-Za-z0-9_])([abet])([0-9]+[gu]?)(?![A-Za-z0-9₀-₉])',
+    // A parenthesis belongs to the subscript only when it holds a power (f's z(x²−y²)), so "2p_z)/√2" stops at z.
+    '(\\d*[A-Za-zε])_((?:[A-Za-z0-9²³−]|\\([^()]*²[^()]*\\))+)',
+].join('|'), 'g');
+
+export interface SubscriptMatch {
+    /** Where the match starts in the text, and how long it is. */
+    index: number;
+    length: number;
+    /** The label's text before its subscript -- its count too, "1σ", "1b", "3d" (the "_" dropped) -- the subscript as a
+     * <sub> shows it, and as flat text writes it. */
+    base: string;
+    sub: string;
+    flatSub: string;
+}
+
+/** Every subscript in `text`, in order. */
+export function subscriptMatches(text: string): SubscriptMatch[] {
+    return Array.from(text.matchAll(LABEL_SUBSCRIPT), match => {
+        const [whole, greek, parity, count, irrep, bare, bareSub, letter, markup] = match;
+        const at = { index: match.index, length: whole.length };
+        if (greek) return { ...at, base: greek, sub: parity, flatSub: parity };
+        const irrepBase = count ?? bare;
+        if (irrepBase) {
+            // The number takes a Unicode subscript in flat text; g and u have none, so they stay as they are.
+            const sub = toAsciiDigits(irrep ?? bareSub);
+            return { ...at, base: irrepBase, sub, flatSub: toSubscriptDigits(sub) };
+        }
+        return { ...at, base: letter, sub: markup, flatSub: markup };
+    });
+}
+
+/**
+ * The flat-string twin of `withSubscripts` (Task 8, addendum): `text` for a surface that cannot hold a <sub> --
+ * document.title, an export caption, an accessible name built as a string. An orbital's subscript runs on ("3dz²",
+ * as orbitalPlainName writes it), an irrep's number takes Unicode's subscript digit ("1b₁"), an MO's g or u stays
+ * flat ("1σg"): never a "_".
+ */
+export function flatSubscripts(text: string): string {
+    let flat = '';
+    let last = 0;
+    for (const match of subscriptMatches(text)) {
+        flat += text.slice(last, match.index) + match.base + match.flatSub;
+        last = match.index + match.length;
+    }
+    return flat + text.slice(last);
+}

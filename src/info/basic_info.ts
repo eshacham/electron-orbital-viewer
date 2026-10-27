@@ -16,6 +16,7 @@ import type { InfoContent, InfoFact } from './info_types';
 import { enclosedFact } from './facts';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { minus } from '../format/sci';
+import { withSubscripts } from '../format/subscripts';
 import { nb, plural } from '../format/text';
 import { shellLetter } from '../orbital_names';
 import { angularNodeSurfaces, isoValueText, shapeWord } from '../orbital_facts';
@@ -69,13 +70,11 @@ function starkLabel(state: StarkState): React.ReactNode {
 
 /**
  * combinationTitle typeset (review I1): the same words, with 2p<sub>z</sub> where an n = 2 Stark state is named. One
- * node for Orbitals' Explore heading and Info's title, so the two never disagree.
+ * node for Orbitals' Explore heading and Info's title, so the two never disagree -- and, Task 8, by the one label
+ * helper the canvas title and the phone caption typeset the same markup with.
  */
 export function combinationTitleNode(selection: CombinationSelection): React.ReactNode {
-    if (selection.kind === 'field' && selection.level === 2 && selection.stark !== 'both') {
-        return h(React.Fragment, null, 'n = 2 Stark state ', starkLabel(selection.stark));
-    }
-    return combinationTitle(selection);
+    return withSubscripts(combinationTitle(selection));
 }
 
 /** x to 3 significant figures in plain decimals, with a true minus: −0.0556, −13.6. */

@@ -69,7 +69,8 @@ describe('collectExportSurfaces', () => {
         const component = (ml: number) => ({ n: 2, l: 1, ml, occupancyFraction: 1, colorIndex: 0 });
         const lobe = { positions: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], cells: [[0, 1, 2]] };
         const group = createCompositionLobesGroup([component(1), component(-1)], [lobe, lobe], [], 1);
-        expect(collectExportSurfaces(group).map(s => s.name)).toEqual(['2p_x', '2p_y']);
+        // Task 8: an export's names are plain text (and an STL error says them), so flat -- never "2p_x".
+        expect(collectExportSurfaces(group).map(s => s.name)).toEqual(['2px', '2py']);
     });
 });
 

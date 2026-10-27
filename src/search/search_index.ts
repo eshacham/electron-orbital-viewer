@@ -3,7 +3,7 @@ import { BONDS_SYSTEMS, type BondsSystemId } from '../bonds/systems';
 import { filterMolecules, formatFormula } from '../molecules/catalogue';
 import { LIBRARY_CATEGORIES } from '../molecules/library_types';
 import { COMPUTED_CATEGORY } from '../jobs/computed';
-import { orbitalName } from '../orbital_names';
+import { orbitalPlainName } from '../format/sci';
 import type { MoleculeIndexEntry } from '../molecules/types';
 
 /**
@@ -29,9 +29,12 @@ export const SEARCH_GROUP_LIMIT = 6;
 export interface SearchResult {
     key: string;
     group: SearchGroup;
+    /** Plain text (an orbital's flat "3dz²", Task 8): what is matched and what the option is named. */
     label: string;
     detail: string;
     action: SearchAction;
+    /** An Orbitals result's quantum numbers: the list draws its name with a real subscript (OrbitalLabel). */
+    orbital?: { n: number; l: number; ml: number };
 }
 
 export interface SearchSources {
@@ -99,7 +102,7 @@ const BASIC_ORBITALS = (() => {
     for (let n = 1; n <= 9; n++) {
         for (let l = 0; l < n; l++) {
             for (let ml = -l; ml <= l; ml++) {
-                const name = orbitalName(n, l, ml);
+                const name = orbitalPlainName(n, l, ml);
                 list.push({ n, l, ml, name, key: normaliseQuery(name) });
             }
         }
@@ -111,7 +114,7 @@ function basicResults(q: string): SearchResult[] {
     if (q.length < 2 || !/^[1-9]/.test(q)) return [];
     return BASIC_ORBITALS.filter(orbital => orbital.key.startsWith(q)).map(({ n, l, ml, name }) => ({
         key: `basic-${n}-${l}-${ml}`, group: 'Orbitals', label: name, detail: 'Hydrogen-like, Z = 1 · Orbitals',
-        action: { kind: 'basic', n, l, ml },
+        action: { kind: 'basic', n, l, ml }, orbital: { n, l, ml },
     }));
 }
 

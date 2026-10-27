@@ -4,6 +4,7 @@ import {
 } from '../src/combinations';
 import { ORBITAL_RESOLUTION, OVERLAY_RESOLUTION, combinationSamplingRadius, basicOrbitalParams, computeSamplingRadius } from '../src/orbital_presets';
 import { CURVE_COLORS } from '../src/curve_colors';
+import { flatSubscripts } from '../src/format/sci';
 
 const sp3All: CombinationSelection = { kind: 'hybrid', hybrid: 'sp3', member: 'all' };
 const field = (level: 1 | 2, F: number, stark: 'lower' | 'upper' | 'both' = 'lower'): CombinationSelection =>
@@ -37,7 +38,8 @@ describe('fieldRequestFor', () => {
     it('names each member as the colour key does, so an exported solid carries the same name', () => {
         expect(fieldRequestFor(sp3All, 0.9)!.memberLabels).toEqual(overlayLegend(sp3All)!.map(item => item.label));
         const both = field(2, 0.002, 'both');
-        expect(fieldRequestFor(both, 0.9)!.memberLabels).toEqual(overlayLegend(both)!.map(item => item.label));
+        // Task 8 (addendum 2): the same name, written flat -- an exported solid's name is plain text.
+        expect(fieldRequestFor(both, 0.9)!.memberLabels).toEqual(overlayLegend(both)!.map(item => flatSubscripts(item.label)));
     });
 
     it('draws both n = 2 Stark states together', () => {
@@ -97,7 +99,8 @@ describe('titles and legends', () => {
     it.each<[CombinationSelection, string]>([
         [sp3All, 'sp³ hybrids — all 4'],
         [{ kind: 'hybrid', hybrid: 'sp', member: 1 }, 'sp hybrid h₂'],
-        [field(1, 0.03), 'H 1s in a field, F = 0.030 a.u.'],
+        // Task 8 (addendum 3): the title follows "Hydrogen — ", so it names the element no second time.
+        [field(1, 0.03), '1s in a field, F = 0.030 a.u.'],
         [field(2, 0.002, 'lower'), 'n = 2 Stark state (2s + 2p_z)/√2'],
         [field(2, 0.002, 'both'), 'n = 2 Stark states'],
     ])('names %j "%s"', (selection, title) => {
@@ -109,6 +112,12 @@ describe('titles and legends', () => {
         expect(overlayLegend(field(2, 0.002, 'both'))!.map(item => item.label)).toEqual(['(2s + 2p_z)/√2, −3F', '(2s − 2p_z)/√2, +3F']);
         expect(overlayLegend({ kind: 'hybrid', hybrid: 'sp3', member: 0 })).toBeNull();
         expect(overlayLegend(field(1, 0.03))).toBeNull();
+    });
+
+    // Task 8 (addendum 2): the legend's labels are markup ("2p_z") that the key typesets; the names an exported overlay
+    // gives its solids are plain text, so they are flat -- never "_".
+    it('names an exported overlay\'s solids flat, with no "_"', () => {
+        expect(fieldRequestFor(field(2, 0.002, 'both'), 0.9)!.memberLabels).toEqual(['(2s + 2pz)/√2, −3F', '(2s − 2pz)/√2, +3F']);
     });
 
     it('keeps overlay colours clear of the red and blue that mean the sign of ψ', () => {

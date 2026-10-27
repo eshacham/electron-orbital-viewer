@@ -485,13 +485,14 @@ describe('runExport: PNG caption states the j-level angular-shape caveat (final 
         const store = goldStore('spinOrbit', { j: true });
         store.dispatch(drillToShell(6));
         store.dispatch(drillToSubshell(6, 1, 0.5));
-        expect(await captionOf(store)).toContain('lobes: the p orbitals\' shapes sized by 6p½\'s R(r) — a basis choice; a |j, m_j⟩ state\'s shape differs');
+        // Task 8: mⱼ with Unicode's subscript j in the plain-text caption, never "m_j".
+        expect(await captionOf(store)).toContain('lobes: the p orbitals\' shapes sized by 6p½\'s R(r) — a basis choice; a |j, mⱼ⟩ state\'s shape differs');
     });
 
     it('speaks of each j-level at the shell level, where their lobes overlap', async () => {
         const store = goldStore('spinOrbit', { j: true });
         store.dispatch(drillToShell(6));
-        expect(await captionOf(store)).toContain('lobes: the l orbitals\' shapes sized by each j-level\'s R(r) — a basis choice; a |j, m_j⟩ state\'s shape differs');
+        expect(await captionOf(store)).toContain('lobes: the l orbitals\' shapes sized by each j-level\'s R(r) — a basis choice; a |j, mⱼ⟩ state\'s shape differs');
     });
 
     it('names the orbital\'s j-level at the orbital level', async () => {
@@ -499,7 +500,7 @@ describe('runExport: PNG caption states the j-level angular-shape caveat (final 
         store.dispatch(drillToShell(6));
         store.dispatch(drillToSubshell(6, 1, 1.5));
         store.dispatch(drillToOrbital(6, 1, 0, 1.5));
-        expect(await captionOf(store)).toContain('lobes: the p orbital\'s shape sized by 6p³⁄₂\'s R(r) — a basis choice; a |j, m_j⟩ state\'s shape differs');
+        expect(await captionOf(store)).toContain('lobes: the p orbital\'s shape sized by 6p³⁄₂\'s R(r) — a basis choice; a |j, mⱼ⟩ state\'s shape differs');
     });
 
     it('adds nothing where no j-level lobes are drawn: whole atom, scalar, or a shell with no j-level beyond s', async () => {

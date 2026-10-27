@@ -1259,7 +1259,8 @@ describe('App', () => {
             fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
             chooseSystem('N₂ — Nitrogen');
             await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
-            expect(screen.getByText('N₂ · R = 2.07 a₀')).toBeInTheDocument();
+            // Task 8: the header's "N₂ · R" line folds into the caption, which names what is drawn too -- once it is.
+            await waitFor(() => expect(document.querySelector('.phone-caption')).toHaveTextContent(/^N₂ .+ · R = 2\.07 a₀$/));
             expect(within(screen.getByRole('tabpanel')).getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
             // Task 10 (spec §9.8): the strip is the Explore tab's first row, as in Atoms and Orbitals.
             const sheetStrip = await within(screen.getByRole('tabpanel')).findByRole('listbox', { name: 'orbitals in view' });
@@ -2334,7 +2335,9 @@ describe('App: relativity', () => {
                 profile: spinOrbitArgon(),
             });
             act(() => { jest.advanceTimersByTime(500); });
-            expect(screen.getByText('Computing 2p_z · 2p³⁄₂…')).toBeInTheDocument();
+            // Task 8 (addendum 4): the orbital typeset, 2p<sub>z</sub>, never "2p_z".
+            expect(document.querySelector('.canvas-busy')).toHaveTextContent('Computing 2pz · 2p³⁄₂…');
+            expect(document.querySelector('.canvas-busy')!.innerHTML).toContain('2p<sub>z</sub>');
         } finally {
             jest.useRealTimers();
         }
@@ -2768,5 +2771,119 @@ describe('learning levels (Task 2)', () => {
         const help = screen.getByRole('dialog', { name: 'Help' });
         expect(within(help).getByRole('heading', { name: 'Learning levels' })).toBeInTheDocument();
         expect(help).toHaveTextContent(/Basics.*Explore.*Advanced.*Research/);
+    });
+});
+
+// Task 8: what is drawn is named in real typography everywhere -- the phone's caption under the header, the canvas
+// title, the busy label and the colour keys -- and never with a visible "_".
+describe('App: what is drawn, named (Task 8)', () => {
+    // Why: Stark states and the combination picker are above the default Explore level.
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'research'); });
+    afterEach(() => { window.localStorage.removeItem('eov.level'); });
+    const originalMatchMedia = window.matchMedia;
+    beforeEach(() => {
+        resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerBondsUrlKeys(); clearProfileCacheForTests();
+        (loadScan as jest.Mock).mockReset().mockResolvedValue(n2Scan);
+        (loadMoleculeMeta as jest.Mock).mockReset().mockImplementation(async (id: string) => ({ ...n2Meta, id }));
+        (loadBasis as jest.Mock).mockReset().mockImplementation(async (id: string) => ({ ...n2Basis, id }));
+    });
+    afterEach(() => {
+        window.matchMedia = originalMatchMedia;
+        resetUrlKeysForTests();
+        window.history.replaceState(null, '', '/');
+        jest.useRealTimers();
+    });
+
+    /** The app opened on `hash`, at a phone's width or a desktop's. */
+    const open = (hash: string, narrow: boolean) => {
+        installMatchMedia(narrow);
+        window.history.replaceState(null, '', `/${hash}`);
+        const store = createTestStore();
+        applyStateTo(hash, store.dispatch);
+        const utils = render(<Provider store={store}><App /></Provider>);
+        return { store, ...utils };
+    };
+    const caption = () => document.querySelector('.phone-caption') as HTMLElement;
+
+    describe('phone layout: the caption under the header', () => {
+        it('names an atom\'s orbital, typeset, and its enclosed fraction, in a polite live region', () => {
+            const { store } = open('#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0', true);
+            act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+            expect(caption()).toHaveAttribute('aria-live', 'polite');
+            expect(caption()).toHaveTextContent(/^Argon 2pz · 90 % enclosed$/);
+            expect(caption().innerHTML).toContain('2p<sub>z</sub>');
+            expect(caption().textContent).not.toContain('_');
+        });
+
+        it('names the requested atom with "loading…" while it is solved, and the busy label does not announce it again', () => {
+            jest.useFakeTimers();
+            installMatchMedia(true);
+            renderWithProvider(<App />, { Z: 6, isSolving: true });
+            act(() => { jest.advanceTimersByTime(500); });
+            expect(caption()).toHaveTextContent(/^Carbon · loading…$/);
+            const busy = document.querySelector('.canvas-busy')!;
+            expect(busy).toHaveTextContent('Solving Carbon…');
+            expect(busy).not.toHaveAttribute('aria-live');
+            expect(busy).not.toHaveAttribute('role');
+        });
+
+        it('names a hydrogen orbital, typeset, and "loading…" while it is computed', () => {
+            jest.useFakeTimers();
+            open('#mode=basic&n=3&l=2&ml=0', true);
+            expect(caption()).toHaveTextContent(/^Hydrogen 3dz² · 90 % enclosed$/);
+            expect(caption().innerHTML).toContain('3d<sub>z²</sub>');
+            act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS + 500); });
+            expect(caption()).toHaveTextContent(/^Hydrogen 3dz² · loading…$/);
+        });
+
+        it('names the Bonds orbital drawn and its bond length, folding the old header line into it', async () => {
+            const { container } = open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', true);
+            await waitFor(() => expect(caption()).toHaveTextContent(/^N₂ 1πu · R = \d\.\d\d a₀$/));
+            expect(caption().innerHTML).toContain('1π<sub>u</sub>');
+            expect(container.querySelector('.bonds-header')).toBeNull();
+            expect(container.querySelectorAll('.phone-caption')).toHaveLength(1);
+        });
+
+        it('names the requested Bonds orbital with "loading…" while its files load', async () => {
+            (loadBasis as jest.Mock).mockImplementation(() => new Promise(() => {}));
+            open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', true);
+            await waitFor(() => expect(caption()).toHaveTextContent(/^N₂ 1πu · loading…$/), { timeout: 2000 });
+        });
+    });
+
+    describe('the canvas names what is drawn, typeset (desktop)', () => {
+        it('titles a hydrogen orbital with a real subscript, and the tab with the flat name', () => {
+            open('#mode=basic&n=3&l=2&ml=0', false);
+            const title = screen.getByRole('heading', { level: 1 });
+            expect(title).toHaveTextContent(/^Hydrogen — 3dz² orbital$/);
+            expect(title.innerHTML).toContain('3d<sub>z²</sub>');
+            expect(document.title).toBe('Hydrogen — 3dz² orbital · QuantumLab');
+        });
+
+        it('typesets the busy label of an orbital being computed', () => {
+            jest.useFakeTimers();
+            open('#mode=basic&n=2&l=1&ml=0', false);
+            act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS + 500); });
+            const busy = document.querySelector('.canvas-busy')!;
+            expect(busy).toHaveTextContent('Computing 2pz…');
+            expect(busy.innerHTML).toContain('2p<sub>z</sub>');
+            expect(busy).toHaveAttribute('role', 'status');
+        });
+
+        it('typesets the n = 2 Stark states\' title and colour key', () => {
+            open('#mode=basic&combo=field&level=2&F=0.002&stark=both', false);
+            const title = screen.getByRole('heading', { level: 1 });
+            expect(title).toHaveTextContent(/^Hydrogen — n = 2 Stark states$/);
+            const key = screen.getByLabelText('combination colour key');
+            expect(key).toHaveTextContent('(2s + 2pz)/√2, −3F');
+        expect(key.innerHTML).toContain('2p<sub>z</sub>');
+            expect(key.textContent).not.toContain('_');
+        });
+
+        it('typesets a Bonds orbital in the canvas subtitle', async () => {
+            open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', false);
+            await waitFor(() => expect(document.querySelector('.viewport-subtitle')).toHaveTextContent(/^N₂ 1πu/));
+        expect(document.querySelector('.viewport-subtitle')!.innerHTML).toContain('1π<sub>u</sub>');
+        });
     });
 });

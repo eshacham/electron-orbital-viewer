@@ -27,6 +27,14 @@ describe('PotentialCurvePlot', () => {
         expect(container.querySelectorAll('.radial-plot-note')).toHaveLength(0);
     });
 
+    // Task 8 (addendum 7): the legend names each curve with a real subscript -- 1σ<sub>g</sub>, 1σ<sub>u</sub>* -- not "1σg".
+    it('typesets the legend\'s MO labels', () => {
+        const { container } = render(<PotentialCurvePlot {...props} />);
+        const legend = Array.from(container.querySelectorAll('.radial-plot-legend-item'), item => item.innerHTML);
+        expect(legend[0]).toContain('1σ<sub>g</sub>');
+        expect(legend[1]).toContain('1σ<sub>u</sub></span>*');
+    });
+
     it('marks the current R and only the curve(s) in range there', () => {
         const { container } = render(<PotentialCurvePlot {...props} />);
         const marker = container.querySelector('.potential-marker')!;

@@ -5,6 +5,7 @@ import { StarkState, polarized1sSource, starkFieldProblem, starkStateSource } fr
 import { ORBITAL_RESOLUTION, OVERLAY_RESOLUTION, BASIC_ORBITALS_Z, combinationSamplingRadius } from './orbital_presets';
 import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
 import { CURVE_COLORS } from './curve_colors';
+import { flatSubscripts } from './format/sci';
 
 /** What Basic Orbitals' Combination picker has chosen. */
 export type StarkChoice = StarkState | 'both';
@@ -33,6 +34,8 @@ export function hybridMemberLabel(index: number): string {
     return `h${String(index + 1).split('').map(d => (d === '-' ? '₋' : SUBSCRIPTS[Number(d)])).join('')}`;
 }
 
+/** Markup, as orbitalName writes an orbital (Task 8): "_" marks 2p's subscript, which withSubscripts typesets and
+ * flatSubscripts writes flat. Never shown as it is. */
 const STARK_LABEL: Record<StarkState, string> = { lower: '(2s + 2p_z)/√2', upper: '(2s − 2p_z)/√2' };
 
 /** Why a selection cannot be drawn, or null. A selection may come from elsewhere than the controls (Phase 2's URL state). */
@@ -64,6 +67,10 @@ export function fieldSourcesFor(selection: CombinationSelection): AnalyticFieldS
         : [starkStateSource(selection.stark)];
 }
 
+/**
+ * The combination's name, after "Hydrogen — " in a title (so the 1s in a field names no element of its own: Task 8,
+ * addendum 3). Markup like STARK_LABEL: render it with withSubscripts, write it out with flatSubscripts.
+ */
 export function combinationTitle(selection: CombinationSelection): string {
     switch (selection.kind) {
         case 'none': return '';
@@ -72,7 +79,7 @@ export function combinationTitle(selection: CombinationSelection): string {
                 ? `${HYBRID_NAMES[selection.hybrid]} hybrids — all ${hybridCount(selection.hybrid)}`
                 : `${HYBRID_NAMES[selection.hybrid]} hybrid ${hybridMemberLabel(selection.member)}`;
         case 'field':
-            if (selection.level === 1) return `H 1s in a field, F = ${selection.field.toFixed(3)} a.u.`;
+            if (selection.level === 1) return `1s in a field, F = ${selection.field.toFixed(3)} a.u.`;
             return selection.stark === 'both' ? 'n = 2 Stark states' : `n = 2 Stark state ${STARK_LABEL[selection.stark]}`;
     }
 }
@@ -83,7 +90,8 @@ export function fieldRequestFor(selection: CombinationSelection, enclosedFractio
     return {
         sources,
         colors: sources.map((_, i) => OVERLAY_COLORS[i % OVERLAY_COLORS.length]),
-        memberLabels: overlayLegend(selection)?.map(item => item.label) ?? [combinationTitle(selection)],
+        // An exported overlay names its solids with these: plain text, so flat (Task 8, addendum 2).
+        memberLabels: (overlayLegend(selection)?.map(item => item.label) ?? [combinationTitle(selection)]).map(flatSubscripts),
         resolution: sources.length > 1 ? OVERLAY_RESOLUTION : ORBITAL_RESOLUTION,
         enclosedFraction,
         label: combinationTitle(selection),

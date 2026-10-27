@@ -149,7 +149,9 @@ import { thumbLookKey, thumbTileDevicePx } from './thumbs/thumb_key';
 import { useDevicePixelRatio } from './thumbs/useDevicePixelRatio';
 import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
 import FirstViewHint from './shell/FirstViewHint';
-import { viewTitle } from './shell/view_title';
+import { viewCaption, viewTitle } from './shell/view_title';
+import { withSubscripts } from './format/subscripts';
+import { flatSubscripts } from './format/sci';
 import { useDocumentTitle } from './shell/useDocumentTitle';
 import { useFullscreen } from './shell/useFullscreen';
 import ThemeSwitch from './design/ThemeSwitch';
@@ -548,7 +550,11 @@ function App() {
     const themed = useCallback(<T extends { color: string }>(items: T[]): T[] =>
         items.map(item => ({ ...item, color: themeCurveColour(item.color, palette) })), [palette]);
     const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(viewTitle, shallowEqual);
-    useDocumentTitle(`${viewTitleText} · ${BRAND.name}`);
+    // Task 8 (addendum 1): a tab's title is plain text, so the view's name is written flat ("3dz²", "1b₁"); the canvas
+    // title, its subtitle and Info's stand-in title are the same markup typeset, built once here.
+    useDocumentTitle(`${flatSubscripts(viewTitleText)} · ${BRAND.name}`);
+    const viewTitleNode = useMemo(() => withSubscripts(viewTitleText), [viewTitleText]);
+    const viewSubtitleNode = useMemo(() => withSubscripts(viewSubtitle), [viewSubtitle]);
     // Task 5: Orbitals' Info is basicInfo, built from the orbital slice it reads -- rebuilt when that slice changes,
     // not on every store change.
     const orbitalSliceNow = useAppSelector(state => state.orbital);
@@ -690,8 +696,10 @@ function App() {
     useOwnerJobRecord();
     // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab.
     const infoPanel = (
-        <InfoPanel content={basicInfoContent ?? atomInfoContent ?? bondsInfoContent ?? moleculeInfoContent ?? { title: viewTitleText, plain: null }}
-            topic={infoTopic.topic} onClearTopic={() => infoTopic.setTopic(null)} level={level} />
+        <InfoPanel content={basicInfoContent ?? atomInfoContent ?? bondsInfoContent ?? moleculeInfoContent ?? { title: viewTitleNode, plain: null }}
+            topic={infoTopic.topic} onClearTopic={() => infoTopic.setTopic(null)} level={level}
+            // Task 8: on a phone the caption under the header says each new selection; Info leaves that to it.
+            announceSelection={!isNarrow} />
     );
     // Ruling C7: the exact curves' worker runs only while H₂⁺ is on screen.
     const h2plusCurve = useH2PlusCurve(isBondsMode && bonds.system === 'h2plus');
@@ -1248,6 +1256,18 @@ function App() {
                     ? `Computing ${renderedField.label}…`
                     : renderedParams ? `Computing ${orbitalName(renderedParams.n, renderedParams.l, renderedParams.ml)}…` : null)
                 : null);
+
+    // Task 8: the phone's caption under the header names what is drawn -- or, while the canvas waits (its busy label is
+    // up), the view asked for, "loading…". Typeset by the same helper as the canvas title.
+    const viewCaptionText = useAppSelector(
+        state => viewCaption(state, { loading: canvasBusyLabel !== null, failed: isBondsMode && Boolean(bondsData.error) }), shallowEqual);
+    const phoneCaption = isNarrow && (
+        <p className="phone-caption" aria-live="polite" aria-atomic="true">
+            <span className="phone-caption-name">{withSubscripts(viewCaptionText.name)}</span>
+            {/* A no-break space: a flex item's leading space would collapse. */}
+            <span className="phone-caption-qualifier">{'\u00a0· '}{viewCaptionText.qualifier}</span>
+        </p>
+    );
 
     // A marching-cubes surface is coloured by the sign of ψ, unlike the shell
     // views, which colour by shell or subshell. Say so where it applies.
@@ -2030,6 +2050,8 @@ function App() {
             onOpenSearch={() => setPhoneSearchOpen(true)} avatar={avatar} compact={compact} />
     );
     // A phone held upright: top bar, then the header line under it. Sideways: one merged 44 px line (spec §7).
+    // Task 8: every mode's header ends with the caption naming what is drawn -- under the element or molecule nav, or
+    // on its own where the header had nothing else (Orbitals; Bonds, whose "N₂ · R" line it replaces).
     const phoneChrome = isNarrow && (
         <>
             {!isPhoneLandscape && phoneTopBar(false)}
@@ -2037,6 +2059,7 @@ function App() {
                 <div className="phone-header">
                     {isPhoneLandscape && phoneTopBar(true)}
                     <LevelNav {...levelNavProps} variant="header" />
+                    {phoneCaption}
                 </div>
             )}
             {isMoleculeMode && (
@@ -2048,18 +2071,15 @@ function App() {
                         <MoleculeNav {...moleculeNavProps} variant="header" />
                         {molecule.meta && <TierBadge meta={molecule.meta} compact />}
                     </div>
+                    {phoneCaption}
                 </div>
             )}
-            {isBondsMode && (
+            {(isBondsMode || isBasicMode) && (
                 <div className="phone-header">
                     {isPhoneLandscape && phoneTopBar(true)}
-                    <span className="bonds-header">
-                        {systemFormula(bonds.system)} · {bonds.R !== null ? `R = ${bonds.R.toFixed(2)} a₀`
-                            : bondsData.error ? 'not loaded' : 'loading…'}
-                    </span>
+                    {phoneCaption}
                 </div>
             )}
-            {isBasicMode && isPhoneLandscape && <div className="phone-header">{phoneTopBar(true)}</div>}
             <PhoneSheet tabs={phoneTabs} active={phoneTab} onChange={setPhoneTab} />
         </>
     );
@@ -2084,7 +2104,9 @@ function App() {
     const viewport = (
         <main
             id="canvas-container"
-            className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}${requestWorkspaceOpen ? ' request-open' : ''}`}
+            className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}${requestWorkspaceOpen ? ' request-open' : ''}${
+                // Task 8: the overlays under a phone's header make room for its caption (style.css).
+                !isNarrow ? '' : isPhoneLandscape ? ' caption-landscape' : isAtomMode || isMoleculeMode ? ' caption-under-nav' : ''}`}
             data-busy={isLoading ? 'true' : 'false'}
             aria-label="3D view"
             tabIndex={-1}
@@ -2098,9 +2120,11 @@ function App() {
             {/* Ruling P12: ahead of the title block and toolbar, so the Tab order runs entry → workspace → toolbar. */}
             {isMoleculeMode && requestsShown && <RequestWorkspace returnFocusRef={requestEntryRef} />}
             {canvasBusyLabel && (
-                <div className="canvas-busy" role="status" aria-live="polite">
+                // Task 8: on a phone the caption under the header announces the wait ("… · loading…"), so this label is
+                // for the eye only there -- a reader hears the change once.
+                <div className="canvas-busy" {...(isNarrow ? {} : { role: 'status', 'aria-live': 'polite' })}>
                     <CircularProgress size={22} thickness={5} color="inherit" />
-                    <span>{canvasBusyLabel}</span>
+                    <span>{withSubscripts(canvasBusyLabel)}</span>
                 </div>
             )}
             {/* Ruling T17-hint: not while an anion is unbound -- nothing is drawn and no shell can be opened, so the
@@ -2125,7 +2149,7 @@ function App() {
                 <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
             )}
             {!isNarrow && (
-                <TitleBlock title={viewTitleText} subtitle={viewSubtitle}>
+                <TitleBlock title={viewTitleNode} subtitle={viewSubtitleNode}>
                     {/* Ruling R22c: the library/tier line moves here from the canvas
                         (was `.molecule-legend-stack`'s `TierBadge`) -- same component,
                         same wording, just under the molecule's own description now. */}
@@ -2186,7 +2210,9 @@ function App() {
                         <div className="phase-legend" aria-label="combination colour key">
                             {combinationLegend.map(item => (
                                 <span key={item.label} className="phase-legend-item">
-                                    <span className="phase-legend-swatch" style={{ background: item.color }} />{item.label}
+                                    <span className="phase-legend-swatch" style={{ background: item.color }} />
+                                    {/* One flex item: the item's gap would otherwise open around the <sub>. */}
+                                    <span>{withSubscripts(item.label)}</span>
                                 </span>
                             ))}
                             <span className="phase-legend-item">darker: ψ &lt; 0</span>

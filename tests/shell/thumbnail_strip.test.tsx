@@ -513,6 +513,18 @@ describe('ThumbnailStrip<T> (Task 8): generic over the dispatched target', () =>
         expect(label.querySelector('sub')).toHaveTextContent('z²');
     });
 
+    // Task 8 (addendum 7, 9): a Bonds or Molecules tile named by its MO label typesets it -- 1π<sub>u</sub>, 1b<sub>1</sub>.
+    it('labels MO tiles with real subscripts', () => {
+        const moItems = [
+            { ...items[0], key: 'mo-a', label: '1πu', spoken: '1πu orbital', orbital: undefined },
+            { ...items[0], key: 'mo-b', label: '1b1', spoken: '1b1 orbital', orbital: undefined, selected: false },
+        ];
+        render(<ThumbnailStrip items={moItems} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} />);
+        const label = (name: string) => screen.getByRole('option', { name }).querySelector('.strip-tile-label')!.innerHTML;
+        expect(label('1πu orbital')).toContain('1π<sub>u</sub>');
+        expect(label('1b1 orbital')).toContain('1b<sub>1</sub>');
+    });
+
     // Task 6: the Atom strip's tiles too -- "2p" with a real subscript z, never "2p_z".
     it('labels Atoms\' orbital tiles with real subscripts', () => {
         render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);

@@ -24,14 +24,16 @@ describe('export captions', () => {
         expect(viewDescription(store.getState())).toBe('Neon (Ne, Z = 10), 2p subshell, 90% contour');
         expect(exportFileStem(store.getState())).toBe('orbital-viewer_Ne_subshell_n2_l1');
         store.dispatch(drillToOrbital(2, 1, 1));
-        expect(viewDescription(store.getState())).toBe('Neon (Ne, Z = 10), 2p_x, 90% contour');
+        // Task 8 (addendum 6): a caption is plain text, so the orbital is named flat ("2px"), never "2p_x".
+        expect(viewDescription(store.getState())).toBe('Neon (Ne, Z = 10), 2px, 90% contour');
         expect(exportFileStem(store.getState())).toBe('orbital-viewer_Ne_n2_l1_ml1');
     });
 
     it('names Basic Orbitals and its combinations, saying when a model is qualitative', () => {
         const store = makeStore();
         store.dispatch(setMode('hydrogenic'));
-        expect(viewDescription(store.getState())).toBe('Hydrogen 3d_z², 90% contour');
+        // Task 8 (addendum 6): flat in plain text, never "3d_z²".
+        expect(viewDescription(store.getState())).toBe('Hydrogen 3dz², 90% contour');
         expect(exportFileStem(store.getState())).toBe('orbital-viewer_H_basic_n3_l2_ml0');
         expect(methodStatement(store.getState())).toBe(BASIC_METHOD);
         // Fix round 1 (science ruling): a hydrogen hybrid is still a stationary state with E2, not "a basis choice rather than a state".
@@ -74,9 +76,10 @@ describe('export captions', () => {
         store.dispatch(setMode('hydrogenic'));
         store.dispatch(startOrbitalCalculation(basicOrbitalParams(3, 2, 0, 0.9)));
         store.dispatch(setEnclosedFraction(0.5));
-        expect(viewDescription(store.getState())).toBe('Hydrogen 3d_z², 90% contour');
+        // Task 8 (addendum 6): flat in plain text, never "3d_z²".
+        expect(viewDescription(store.getState())).toBe('Hydrogen 3dz², 90% contour');
         store.dispatch(startOrbitalCalculation(basicOrbitalParams(3, 2, 0, 0.5)));
-        expect(viewDescription(store.getState())).toBe('Hydrogen 3d_z², 50% contour');
+        expect(viewDescription(store.getState())).toBe('Hydrogen 3dz², 50% contour');
 
         store.dispatch(setCombination({ kind: 'hybrid', hybrid: 'sp3', member: 'all' }));
         store.dispatch(setEnclosedFraction(0.75));
@@ -186,7 +189,8 @@ describe('export captions', () => {
         it('names a j-level orbital as its l orbital, with its j-level crumb -- the angular shape is still the l orbital\'s', () => {
             const store = goldStore('spinOrbit', { j: true });
             store.dispatch(drillToOrbital(6, 1, 0, 1.5));
-            expect(viewDescription(store.getState())).toBe('Gold (Au, Z = 79), 6p_z · 6p³⁄₂, with spin–orbit, 90% contour');
+            // Task 8 (addendum 6): plain text, so the orbital is flat, "6pz", never "6p_z".
+            expect(viewDescription(store.getState())).toBe('Gold (Au, Z = 79), 6pz · 6p³⁄₂, with spin–orbit, 90% contour');
         });
 
         // Ruling C6: beside a relativistic picture the CSV's ΔSCF line says

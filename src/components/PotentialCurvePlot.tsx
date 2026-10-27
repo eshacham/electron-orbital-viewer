@@ -188,7 +188,7 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
             <div className="radial-plot-legend">
                 {series.map(s => (
                     <span key={s.key} className="radial-plot-legend-item">
-                        <span className="radial-plot-legend-swatch" style={{ background: s.color }} />{s.label}
+                        <span className="radial-plot-legend-swatch" style={{ background: s.color }} />{withSubscripts(s.label) /* Task 8: 1σ<sub>g</sub> */}
                     </span>
                 ))}
             </div>

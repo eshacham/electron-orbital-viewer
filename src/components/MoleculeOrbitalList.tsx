@@ -5,6 +5,7 @@ import {
     isUpperEstimate, frontierOccupied, orbitalGaps,
 } from '../molecules/orbital_display';
 import { orbitalEnergyText } from '../format/energy';
+import { withSubscripts } from '../format/subscripts';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 // Task 2: the quiet level line's style (.level-line).
 import '../levels/levels.css';
@@ -145,7 +146,8 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
                                 className={`molecule-orbital-row${orbital.index === selectedIndex ? ' selected' : ''}`}
                                 onClick={() => onSelect(orbital.index)}>
                                 <span className="molecule-orbital-label">
-                                    {orbital.label}
+                                    {/* Task 8 (addendum 9): the irrep typeset, 1b<sub>1</sub>. */}
+                                    {withSubscripts(orbital.label)}
                                     {orbital.class === 'diffuse' && (
                                         <span className="molecule-orbital-mark" role="img" aria-label={diffuseDescription(orbital)}
                                             title={diffuseDescription(orbital)}>{DIFFUSE_MARK}</span>

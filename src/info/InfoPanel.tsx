@@ -14,6 +14,12 @@ interface InfoPanelProps {
     /** "Back to <selection>": Info returns to the selection. */
     onClearTopic(): void;
     level: LearningLevel;
+    /**
+     * Whether the live region says a new selection's title (true by default). Task 8: on a phone the caption under the
+     * header names each new selection in its own live region, so Info leaves it to that one and a reader hears the
+     * change once; a topic's change (an (i) pressed again, which moves no focus) is still Info's to say.
+     */
+    announceSelection?: boolean;
 }
 
 /**
@@ -24,7 +30,7 @@ interface InfoPanelProps {
  * <selection>", the active (i) again, or a new selection returns it. A screen reader hears each change once: by
  * focus on the heading after an (i) or Back, otherwise by a polite live region (review M5).
  */
-const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, level }) => {
+const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, level, announceSelection = true }) => {
     const context = useInfoTopicContext();
     const ownId = useId();
     const regionId = context?.regionId ?? `${ownId}-info`;
@@ -35,6 +41,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
     const backPressed = useRef(false);
     // The text Info last showed, and what the live region says now (review M5, below).
     const lastShown = useRef<string | null>(null);
+    const lastHadTopic = useRef(false);
     const [announcement, setAnnouncement] = useState('');
     // Review M1: an active (i) names Info's region in aria-controls only while Info is in the DOM.
     const registerInfo = context?.registerInfo;
@@ -52,10 +59,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
         const shown = `Info: ${chip ?? title.current?.textContent ?? ''}`;
         if (lastShown.current === null || shown === lastShown.current) {
             lastShown.current = shown;
+            lastHadTopic.current = chip !== undefined;
             return;
         }
+        // A new selection: Info named the selection before and still does (no topic either side).
+        const selectionChanged = chip === undefined && !lastHadTopic.current;
         lastShown.current = shown;
-        setAnnouncement(focusMoved ? '' : shown);
+        lastHadTopic.current = chip !== undefined;
+        setAnnouncement(focusMoved || (selectionChanged && !announceSelection) ? '' : shown);
     });
 
     const entry = topic ? glossary[topic] : null;

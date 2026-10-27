@@ -20,7 +20,9 @@ describe('search index (spec §8.3)', () => {
     // the action's 'basic' kind is the internal id and is unchanged.
     it('finds Orbitals by their names, written loosely', () => {
         expect(first('3dz2', 'Orbitals')?.action).toEqual({ kind: 'basic', n: 3, l: 2, ml: 0 });
-        expect(first('3dz2', 'Orbitals')?.label).toBe('3d_z²');
+        // Task 8 (addendum 5): the label is flat ("3dz²", the result's plain text); the list typesets it from `orbital`.
+        expect(first('3dz2', 'Orbitals')?.label).toBe('3dz²');
+        expect(first('3dz2', 'Orbitals')?.orbital).toEqual({ n: 3, l: 2, ml: 0 });
         expect(first('4f xyz', 'Orbitals')?.action).toEqual({ kind: 'basic', n: 4, l: 3, ml: -2 });
     });
 

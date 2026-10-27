@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import SearchIcon from '@mui/icons-material/Search';
 import { searchAll, SEARCH_GROUP_ORDER, type SearchAction, type SearchResult, type SearchSources } from '../search/search_index';
+import { OrbitalLabel } from '../format/OrbitalLabel';
 import './search.css';
 
 interface GlobalSearchProps {
@@ -119,7 +120,8 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ sources, onPick, onWantInde
                                                     onMouseDown={event => event.preventDefault()}
                                                     onClick={() => pick(result)}
                                                 >
-                                                    <span className="global-search-label">{result.label}</span>
+                                                    {/* Task 8 (addendum 5): an orbital's name with a real subscript. */}
+                                                    <span className="global-search-label">{result.orbital ? <OrbitalLabel {...result.orbital} /> : result.label}</span>
                                                     <span className="global-search-detail ql-caption">{result.detail}</span>
                                                 </li>
                                             );

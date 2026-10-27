@@ -21,6 +21,7 @@ import { formatFormula } from '../molecules/catalogue';
 import { orbitalEnergyWithEstimate, orbitalNoun, orbitalTag } from '../molecules/orbital_display';
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY } from '../molecules/esp_color';
 import { formatDipole, hasDipoleArrow } from '../molecules/dipole';
+import { flatSubscripts } from '../format/sci';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
 export const ATOM_METHOD = 'central-field SCF, LDA exchange + VWN5 correlation, non-relativistic, spherically averaged';
@@ -102,7 +103,7 @@ export function methodStatement(state: RootState, bondsScan?: MoleculeScan | nul
         // than borrowing the "<< 1" phrasing, which overstates it ~250x.
         return combination.level === 1
             ? `hydrogen 1s polarised by first-order perturbation theory (Dalgarno-Lewis); valid for F << 1 a.u., tunnelling ignored; drawn only up to F = ${MAX_FIELD_AU} a.u.`
-            : `hydrogen n = 2 Stark states (2s +/- 2p_z)/sqrt 2, first-order degenerate perturbation theory; valid for F well below the n = 2 over-the-barrier field, 1/256 a.u. (≈ ${N2_MAX_FIELD_AU}); tunnelling ignored`;
+            : `hydrogen n = 2 Stark states (2s +/- 2pz)/sqrt 2, first-order degenerate perturbation theory; valid for F well below the n = 2 over-the-barrier field, 1/256 a.u. (≈ ${N2_MAX_FIELD_AU}); tunnelling ignored`;
     }
     return BASIC_METHOD;
 }
@@ -394,7 +395,16 @@ function bondsViewDescription(state: RootState): string {
     return `${name} total density, surface at ρ = ${picture.isoValue} e/a₀³, ${where}`;
 }
 
+/**
+ * What is drawn, in words: an export's caption, a cube's title, a CSV header -- plain text, so written flat (Task 8,
+ * addendum 6 and 9): "Hydrogen 3dz²", "MO 1b₁", never "3d_z²" (flatSubscripts). Bonds and Molecules' canvas
+ * subtitle reads it too, and typesets it again (withSubscripts reads 1b₁ back as 1b<sub>1</sub>).
+ */
 export function viewDescription(state: RootState): string {
+    return flatSubscripts(describeView(state));
+}
+
+function describeView(state: RootState): string {
     if (state.atom.mode === 'bonds') return bondsViewDescription(state);
     if (state.atom.mode === 'molecule') return moleculeViewDescription(state);
     const percent = `${Math.round(selectShownEnclosedFraction(state) * 100)}% contour`;
@@ -572,7 +582,8 @@ export function referenceRingCaption(state: RootState): string | null {
 }
 
 /** The tail every j-level lobe caveat shares: what the drawn shape is not. */
-const J_LEVEL_SHAPE_TAIL = 'a basis choice; a |j, m_j⟩ state\'s shape differs';
+// Task 8: a caption is plain text, so mⱼ takes Unicode's subscript j -- never "m_j".
+const J_LEVEL_SHAPE_TAIL = 'a basis choice; a |j, mⱼ⟩ state\'s shape differs';
 
 /**
  * 'lobes: the p orbitals' shapes sized by 6p½'s R(r) — a basis choice; ...'

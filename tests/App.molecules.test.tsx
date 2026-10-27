@@ -549,7 +549,8 @@ describe('Molecules mode', () => {
         // Owner R25-A4: "None" reads "No surface" now, its name its visible text.
         fireEvent.click(within(surface).getByRole('button', { name: 'No surface' }));
         expect(store.getState().molecule.surface).toEqual({ kind: 'none' });
-        expect(within(container.querySelector('.viewport-title') as HTMLElement).getByText('Structure only · geometry: experiment (CCCBDB)'))
+        // Task 8 (addendum 8): the subtitle no longer names the geometry source -- Info does, once.
+        expect(within(container.querySelector('.viewport-title') as HTMLElement).getByText('Structure only'))
             .toBeInTheDocument();
         // No contour is drawn, so the enclosed fraction applies to nothing: disabled, saying why (never the
         // orbital's "contour of constant |ψ|²" fallback), and no colour key stands for a surface.
@@ -837,6 +838,24 @@ describe('Molecules mode', () => {
         act(() => { desk.store.dispatch(renderFailed('HTTP 404')); });
         expect(desk.container.querySelector('.molecule-error')).toBeNull();
         expect(screen.getByRole('alert')).toHaveTextContent('HTTP 404');
+    });
+
+    // Task 8: a phone names what is drawn in a caption under the header -- the molecule and its surface kind, an
+    // orbital's irrep typeset -- and, while the next molecule loads, that molecule with "loading…".
+    it('on a phone, names the molecule and what is drawn in the caption under the header', async () => {
+        const { store } = await enterMolecules(true);
+        pickWater(store);
+        const caption = () => document.querySelector('.phone-caption') as HTMLElement;
+        expect(caption()).toHaveTextContent(/^Water · electron density$/);
+        expect(caption()).toHaveAttribute('aria-live', 'polite');
+        act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
+        expect(caption()).toHaveTextContent(/^Water 1b1 · HOMO, 90 % enclosed$/);
+        expect(caption().innerHTML).toContain('1b<sub>1</sub>');
+        const { loadMoleculeMeta } = jest.requireMock('../src/molecules/loader') as { loadMoleculeMeta: jest.Mock };
+        loadMoleculeMeta.mockImplementationOnce(() => new Promise(() => {}));
+        act(() => { store.dispatch(selectMolecule({ id: 'nh3' })); });
+        await act(async () => { await new Promise(r => setTimeout(r, 450)); });
+        expect(caption()).toHaveTextContent(/^Ammonia · loading…$/);
     });
 
     it('says on the canvas what it is drawing', async () => {

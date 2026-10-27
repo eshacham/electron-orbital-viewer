@@ -130,6 +130,14 @@ describe('MoleculeOrbitalList', () => {
         expect(container.textContent).not.toMatch(/ionisation|Kohn–Sham|B3LYP/);
         expect(infoText(waterMeta().orbitals)).toContain('Orbital energies here are Kohn–Sham eigenvalues, not ionisation energies.');
     });
+
+    // Task 8 (addendum 9): each row's irrep label is typeset, 1b<sub>1</sub>, not the flat "1b1".
+    it('typesets each orbital\'s irrep label', () => {
+        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}} />);
+        const labels = Array.from(container.querySelectorAll('.molecule-orbital-label')).map(label => label.innerHTML).join(' ');
+        expect(labels).toContain('1b<sub>1</sub>');
+        expect(labels).toContain('4a<sub>1</sub>');
+    });
     // Ruling T16-b: descending order stays (it reads like an MO diagram), so the gap between the last virtual and
     // the HOMO is marked. Owner R25-A4 moved its words below the list; Task 7b moves them into Info (the gap fact, eV
     // first, and the Kohn–Sham caveat, once) -- a plain rule still marks where the occupied orbitals begin.

@@ -36,6 +36,16 @@ describe('GlobalSearch (spec §8.3)', () => {
         expect(input).toHaveAttribute('aria-activedescendant', options[1].id);
     });
 
+    // Task 8 (addendum 5): an orbital result is typeset, 3d<sub>z²</sub>, with no "_" anywhere in the list.
+    it('typesets an orbital result with a real subscript', () => {
+        const { input } = setup();
+        fireEvent.focus(input);
+        fireEvent.change(input, { target: { value: '3dz' } });
+        const option = screen.getByRole('option', { name: /^3dz²/ });
+        expect(option.querySelector('.global-search-label')!.innerHTML).toContain('3d<sub>z²</sub>');
+        expect(screen.getByRole('listbox', { name: 'Search results' }).textContent).not.toContain('_');
+    });
+
     it('opens a molecule with a click', () => {
         const { onPick, input } = setup();
         fireEvent.focus(input);

@@ -49,6 +49,8 @@
   "core-so2": "#mode=molecule&id=so2&show=mo:0",
   "core-water": "#mode=molecule&id=h2o&show=mo:0",
   "bonds-f2-1sg": "#mode=bonds&system=f2&state=mo%3Arestricted%3A1%CF%83g%3A0",
+  "bonds-n2-1pu": "#mode=bonds&system=n2&state=mo%3Arestricted%3A1%CF%80u%3A0",
+  "basic-stark-n2": "#mode=basic&combo=field&level=2&F=0.002&stark=both",
   "core-h2s-bare": "#mode=molecule&id=h2s&show=mo:0&struct=0",
   "core-h2s-99-bare": "#mode=molecule&id=h2s&show=mo:0&frac=0.99&struct=0",
   "core-ph3-bare": "#mode=molecule&id=ph3&show=mo:0&struct=0",

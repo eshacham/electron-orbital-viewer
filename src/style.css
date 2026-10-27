@@ -575,6 +575,12 @@ html, body, #root {
     padding: 0 16px;
   }
 
+  /* Task 8: where the caption sits under a header row (Atoms' element nav,
+     Molecules' molecule nav), the overlays under the header move down by it:
+     top bar 52 + 8, the row 44, the caption 6 + 28, and 6 to spare. Orbitals
+     and Bonds have only the caption there, which ends above the default. */
+  .viewport-cell.caption-under-nav { --phone-overlay-top: 144px; }
+
   /* Small overlays sit just under the header. */
   .scale-readout {
     left: 12px;
@@ -660,6 +666,13 @@ html, body, #root {
   :root {
     --phone-overlay-top: 60px;
   }
+  /* Task 8: the merged line, then the caption on a line of its own under it
+     (a grid: a flex row would put it beside the nav); the overlays under the
+     header move down by it -- 8, the line (up to 52 with the top bar's own
+     buttons), the caption 6 + 28, and 6 to spare. */
+  .phone-header { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 4px; }
+  .phone-header > .phone-caption { grid-column: 1 / -1; justify-self: start; }
+  .viewport-cell.caption-landscape { --phone-overlay-top: 100px; }
   .phone-sheet {
     top: 8px;
     left: auto;
@@ -1096,23 +1109,30 @@ html, body, #root {
 .bonds-note {
   color: var(--ql-color-warning);
 }
-/* The phone header's one line ("N₂ · R = 2.07 a₀"): its own light chip,
-   the same as LevelNav's header, since nothing else sits behind it but the
-   scene. */
-.bonds-header {
-  display: block;
-  min-height: 44px;
+/* Task 8: the phone's caption under the header, naming what is drawn in
+   every mode ("Carbon 2pz · 90 % enclosed") -- one line, its own light chip
+   like LevelNav's header, since nothing but the scene sits behind it (it
+   replaces Bonds' old "N₂ · R" header line). The name gives way to an
+   ellipsis before the qualifier does. */
+.phone-caption {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
   box-sizing: border-box;
-  padding: 12px 12px;
+  margin: 6px 0 0;
+  padding: 4px 10px;
   border-radius: 10px;
   background: var(--ql-color-surface-1);
   box-shadow: var(--ql-shadow-popover);
   font-size: 14px;
+  line-height: 20px;
   color: var(--ql-color-text-1);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
+.phone-header > .phone-caption:first-child { margin-top: 0; }
+.phone-caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.phone-caption-qualifier { flex: none; color: var(--ql-color-text-2); }
 
 /* Ruling R22c (owner review 2026-10-14): Task 9's bottom-centre legend stack
    -- a dark prose chip over the 3D view the owner could not scroll while
