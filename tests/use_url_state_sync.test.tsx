@@ -5,6 +5,7 @@ import { createAppStore } from '../src/store';
 import { setEnclosedFraction } from '../src/store/orbitalSlice';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys } from '../src/url_state';
 import { useUrlStateSync } from '../src/useUrlStateSync';
+import { visitLevel, clearVisit } from '../src/levels/level_pref';
 
 // createAppStore(), not a bare configureStore: it carries production's
 // serializableCheck exceptions, so a store built here stays pristine when a
@@ -16,7 +17,7 @@ const mount = (store: ReturnType<typeof makeStore>) => renderHook(() => useUrlSt
 
 describe('useUrlStateSync', () => {
     beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); window.history.replaceState(null, '', '/'); });
-    afterEach(() => { jest.useRealTimers(); resetUrlKeysForTests(); window.history.replaceState(null, '', '/'); });
+    afterEach(() => { jest.useRealTimers(); resetUrlKeysForTests(); window.history.replaceState(null, '', '/'); clearVisit(); });
 
     it('writes the view into the hash on mount, without a history entry', () => {
         const before = window.history.length;
@@ -44,6 +45,18 @@ describe('useUrlStateSync', () => {
         act(() => { window.location.hash = '#mode=basic&n=2&l=1&ml=0'; });
         await waitFor(() => expect(store.getState().atom.mode).toBe('hydrogenic'));
         expect(store.getState().orbital.basicSelection).toEqual({ n: 2, l: 1, ml: 0 });
+    });
+
+    // Fix round 1: the hashchange handler now goes through the same
+    // applyLevelForHash helper as main.tsx's boot read and Cognito-return
+    // callback (Important #2) -- this confirms the extraction kept its
+    // behaviour, not just its call sites.
+    it('raises the visit level for a typed hash that itself needs Advanced', async () => {
+        const store = makeStore();
+        mount(store);
+        act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
+        await waitFor(() => expect(store.getState().atom.charge).toBe(2));
+        expect(visitLevel()).toBe('advanced');
     });
 
     // Fix round 1, M4: the timer guard (`if (timer === null) ...`) exists

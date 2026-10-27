@@ -16,9 +16,7 @@ import { bindJobsClient } from './jobs/client';
 import { startOwnerSession } from './jobs/owner_session';
 import { migrateLegacyTheme } from './design/theme_storage';
 import { useQuantumTheme } from './design/useQuantumTheme';
-import { requiredLevel, readLevelParam } from './levels/required_level';
-import { levelPref, raiseForVisit } from './levels/level_pref';
-import { levelRank } from './levels/levels';
+import { applyLevelForHash } from './levels/apply_level';
 
 // The boot script in index.html has already migrated and applied the theme;
 // this repeats the migration for a page served before the script existed.
@@ -50,20 +48,21 @@ registerComputedUrlKeys();
 // url_state.ts's encodeStateOf, so a link keeps the recipient's own level).
 const bootHash = window.location.hash;
 applyState(bootHash);
-// The visit-only raise (spec plan): a linked `lvl`, or a value this state
-// already holds that only a higher level's control can set, opens this
-// visit at the higher of the two -- but only when that is actually above
-// the viewer's own stored level; never lower it, and never write it back.
-const bootRequired = requiredLevel(store.getState());
-const bootLinked = readLevelParam(bootHash);
-const bootTarget = bootLinked && levelRank(bootLinked) > levelRank(bootRequired) ? bootLinked : bootRequired;
-if (levelRank(bootTarget) > levelRank(levelPref.get())) raiseForVisit(bootTarget);
+applyLevelForHash(bootHash, () => store.getState());
 // Back from Cognito: the view the owner left travelled in the sign-in state (its hash); restore it.
 // The exchange is a network round trip, so the default view shows until it
 // answers (preflight D23, accepted): holding the first render back instead
 // would leave a blank page for as long as Cognito takes, or for ever.
 void startOwnerSession(store.dispatch, '/').then(back => {
-  if (back) applyState(new URL(back, window.location.origin).hash);
+  if (back) {
+    // Fix round 1, Important #1: this hash can itself need Advanced/Research
+    // (or carry its own `lvl`) just as much as the boot hash above -- the
+    // owner's return from a sign-in redirect must not silently drop the
+    // raise that a direct visit to the same link would have gotten.
+    const backHash = new URL(back, window.location.origin).hash;
+    applyState(backHash);
+    applyLevelForHash(backHash, () => store.getState());
+  }
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
