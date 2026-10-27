@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { DiagramBox, DiagramLevel, buildMoDiagram, spinOrderNote } from '../bonds/mo_diagram';
+import { DiagramBox, DiagramLevel, buildMoDiagram } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
+import { withSubscripts } from '../format/subscripts';
 
 interface MoDiagramProps {
     /** meta.json's `orbitals`, or H₂⁺'s two exact levels (h2plusOrbitals). */
@@ -9,8 +10,6 @@ interface MoDiagramProps {
     selectedIndex: number | null;
     /** The clicked box's orbital index (the α orbital of an unrestricted pair). */
     onSelect?: (index: number) => void;
-    /** Bond order and method, under the diagram. */
-    footer?: string;
     width?: number;
 }
 
@@ -45,11 +44,12 @@ function boxLabel(level: DiagramLevel, box: DiagramBox, index: number): string {
  * The molecular-orbital energy diagram: valence levels to scale, cores in a
  * compressed band under a break (they sit 10+ Ha lower and would flatten
  * everything else). Each box is a native <button> -- keyboard-reachable by
- * Tab, activated by Enter/Space -- that draws that orbital.
+ * Tab, activated by Enter/Space -- that draws that orbital. Task 7a: the bond
+ * order footer and the α/β note under it are Info's (bondsInfo); the labels
+ * carry a real subscript g or u.
  */
-const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect, footer, width = 260 }) => {
+const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect, width = 260 }) => {
     const model = useMemo(() => buildMoDiagram(orbitals), [orbitals]);
-    const note = spinOrderNote(model);
     const valence = model.levels.filter(level => !level.core);
     const core = model.levels.filter(level => level.core);
     const energies = valence.map(level => level.energyHartree);
@@ -82,7 +82,7 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
                     {box.down && <span>↓</span>}
                 </button>
             ))}
-            <span className="mo-label">{level.label}</span>
+            <span className="mo-label">{withSubscripts(level.label)}</span>
         </div>
     );
 
@@ -93,8 +93,6 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
                 {core.length > 0 && <div className="mo-break" style={{ top: HEIGHT - CORE_BAND }}>≈ core</div>}
                 {core.map((level, i) => renderLevel(level, CORE_ROW_Y, i * CORE_COLUMN))}
             </div>
-            {note && <div className="mo-note">{note}</div>}
-            {footer && <div className="mo-footer">{footer}</div>}
         </div>
     );
 };

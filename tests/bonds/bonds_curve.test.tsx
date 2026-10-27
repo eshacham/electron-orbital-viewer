@@ -2,7 +2,8 @@ import React from 'react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { diatomicCurveSpec, h2plusCurveSpec } from '../../src/bonds/curve';
+import { curveNote, diatomicCurveSpec, h2plusCurveSpec } from '../../src/bonds/curve';
+import { bondsCaptions } from '../../src/bonds/captions';
 import BondsCurvePlot from '../../src/components/BondsCurvePlot';
 import reducer, { selectBondsSystem, setScanPoint } from '../../src/store/bondsSlice';
 import { HARTREE_TO_EV } from '../../src/bonds/systems';
@@ -42,16 +43,21 @@ describe('diatomicCurveSpec', () => {
         expect(spec.xRange).toEqual([n2Scan.points[0].RBohr, n2Scan.points[13].RBohr]);
     });
 
-    it('marks the fitted R_e and says where the method stops being valid', () => {
+    // Task 7a: the plot keeps its axis labels and the R_e marker's label; its caption is Info's -- the zero here
+    // (curveNote), the method and the validity stop in bondsCaptions, which Info prints just before it.
+    it('marks the fitted R_e, and leaves the method, its zero and where it stops being valid to Info', () => {
         const spec = diatomicCurveSpec('n2', n2Scan, 2.07);
         expect(spec.referenceR).toEqual({ R: n2Scan.fit.ReBohr, label: 'Dotted line: R_e = 2.086 a₀ (1.104 Å), fitted; D_e = 9.44 eV from separated atoms.' });
-        expect(spec.caption).toMatch(/^CCSD\(T\)\/aug-cc-pVTZ \(frozen core\)\. Zero: N ⁴S \+ N ⁴S, UCCSD\(T\)/);
-        expect(spec.caption).toMatch(/Single-reference CCSD\(T\) is not valid beyond R = 2\.41 a₀ \(1\.273 Å\) \(the bond breaks into open-shell atoms\), so the curve stops there: T1 diagnostic 0\.0214/);
+        expect(spec).not.toHaveProperty('caption');
+        expect(curveNote('n2', n2Scan)).toBe('Plot: E − E(separated atoms), in eV. Zero: N ⁴S + N ⁴S, UCCSD(T)/aug-cc-pVTZ (UHF reference, frozen core), the grey line.');
+        expect(bondsCaptions('n2', n2Scan).join(' ')).toMatch(/Single-reference CCSD\(T\) is not valid beyond R = 2\.41 a₀ \(1\.273 Å\) \(the bond breaks into open-shell atoms\), so the curve stops there: T1 diagnostic 0\.0214/);
     });
 
+    // Task 7a: said once, by bondsCaptions (Info's "How this was computed"); the curve's own note adds only its zero.
     it('adds the multireference caveat for B₂ and C₂', () => {
         const c2 = { ...n2Scan, validity: { ...n2Scan.validity, multireference: true, t1AtRe: 0.0384, t1Limit: 0.0576 } } as MoleculeScan;
-        const caption = diatomicCurveSpec('c2', c2, 2.36).caption;
+        expect(curveNote('c2', c2)).not.toMatch(/multireference|T1/);
+        const caption = bondsCaptions('c2', c2).join(' ');
         expect(caption).toMatch(/Strongly multireference: single-reference CCSD\(T\) is only qualitative here \(T1 = 0\.038 at R_e\)\./);
         expect(caption).toMatch(/The curve stops at R = 2\.41 a₀ \(1\.273 Å\): at the next point T1 exceeds 1\.5 × its value at R_e \(0\.0576\)/);
         expect(caption).not.toMatch(/not valid beyond/);
@@ -65,15 +71,16 @@ describe('diatomicCurveSpec', () => {
         expect(span).toBeGreaterThanOrEqual(1);
         // The well, as a fraction of the plot's height: well under one pixel of a 104 px plot.
         expect((heScan.fit.DeEv / span) * 104).toBeLessThan(0.5);
-        expect(spec.caption).toMatch(/^FCI\/aug-cc-pVTZ \(no counterpoise correction\)\. Zero: He ¹S \+ He ¹S, same method\. /);
-        expect(spec.caption).toMatch(/No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa \(0\.04 mHa\), comparable to this basis' superposition error\. At this scale the well is invisible\./);
-        // Said once, in the method.
-        expect(spec.caption.match(/counterpoise/g)).toHaveLength(1);
+        // Task 7a: the plot's own note says its zero and why the well cannot be seen; the unbound caption and the
+        // method (bondsCaptions) are said with it in Info, and the note does not repeat either.
+        expect(curveNote('he2', heScan)).toBe('Plot: E − E(separated atoms), in eV. Zero: He ¹S + He ¹S, same method, the grey line. At this scale the well is invisible.');
+        expect(curveNote('he2', heScan)).not.toMatch(/counterpoise|No chemical bond/);
     });
 
     it("names the experiment Li₂'s R_e is compared with", () => {
         const li2 = { ...n2Scan, fit: { ...n2Scan.fit, ReBohr: 5.102 }, reference: { ReAngstrom: null, source: null } } as MoleculeScan;
-        expect(diatomicCurveSpec('li2', li2, 5.1).caption).toMatch(/R_e comes out 1\.0 % longer than experiment \(2\.673 Å, Huber & Herzberg/);
+        // Task 7a: Li₂'s caveat is bondsCaptions' (Info), where the R_e caption has just named the experiment.
+        expect(bondsCaptions('li2', li2).join(' ')).toMatch(/experiment 2\.673 Å \(Huber & Herzberg.*R_e comes out 1\.0 % longer than experiment\./);
     });
 
     it('keeps the marker on the plotted range', () => {
@@ -91,7 +98,9 @@ describe('h2plusCurveSpec', () => {
         expect(spec.series[0].points[2].E).toBeCloseTo((-0.6026 + 0.5) * HARTREE_TO_EV, 10);
         expect(spec.series[2].points.map(p => p.E)).toEqual([0, 0]);
         expect(spec.referenceR).toEqual({ R: 1.9971924, label: 'Dotted line: R_e = 1.997 a₀ (1.057 Å), E = −0.6026 Ha; D_e = 2.79 eV (0.1026 Ha) to H + H⁺.' });
-        expect(spec.caption).toMatch(/^Exact within Born–Oppenheimer \(nuclei fixed\)/);
+        // Task 7a: the exact method is H2PLUS_CAPTIONS' (Info); the plot's own note is its zero.
+        expect(spec).not.toHaveProperty('caption');
+        expect(curveNote('h2plus', null)).toBe('Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (−0.5 Ha), the grey line.');
         expect(h2plusCurveSpec(curve, 0.1).markerR).toBe(0.5);
     });
 });

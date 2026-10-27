@@ -58,6 +58,7 @@ import Controls, { RelativityControl } from './components/Controls';
 import BasicExplore from './basic_ui/BasicExplore';
 import { basicInfo, BASIC_ORBITALS_ABOUT } from './info/basic_info';
 import { atomInfo } from './info/atom_info';
+import { bondsInfo, FIXED_RHO_NOTE } from './info/bonds_info';
 import { useDrawOnSelection } from './basic_ui/useDrawOnSelection';
 import { AxesSwitch } from './atom_ui/DisplayControls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
@@ -181,13 +182,6 @@ const SOLVING_SUFFIX: Record<RelativityMode, string> = {
     scalar: ' (scalar-relativistic)',
     spinOrbit: ' (with spin–orbit)',
 };
-
-/**
- * The Electron-enclosed select's note while a molecule's density is drawn
- * (ruling T7-a). Says where ρ is chosen in words that hold in both layouts:
- * the Bonds panel is the left column on a desktop and the Explore tab on a phone.
- */
-const FIXED_RHO_NOTE = 'The density is drawn at a fixed ρ, chosen with the ρ buttons beside the orbitals — not at an enclosed fraction.';
 
 /**
  * The Electron-enclosed select's note while a molecule's ESP map is drawn
@@ -569,12 +563,6 @@ function App() {
         () => (isAtomMode ? atomInfo({ atom: atomSliceNow, orbital: orbitalSliceNow }, level) : null),
         [isAtomMode, atomSliceNow, orbitalSliceNow, level],
     );
-    // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab. Until
-    // the other modes' builders land (Task 7: bondsInfo, moleculeInfo) it names their view only.
-    const infoPanel = (
-        <InfoPanel content={basicInfoContent ?? atomInfoContent ?? { title: viewTitleText, plain: null }} topic={infoTopic.topic}
-            onClearTopic={() => infoTopic.setTopic(null)} level={level} />
-    );
     const shellRef = useRef<HTMLDivElement>(null);
     const fullscreen = useFullscreen(shellRef);
     const fullscreenActive = fullscreen.active;
@@ -672,6 +660,22 @@ function App() {
     // C9): the canvas keeps the picture it had, which is not a failed render.
     const bonds = useAppSelector(state => state.bonds);
     const bondsData = useBondsData();
+    // Task 7a: Bonds' Info is bondsInfo, built from the two slices it reads (the selection, and the orbital slice's
+    // drawn picture, fraction and cut) and the molecule's loaded data -- its parts, as bondsData is a new object on
+    // every render.
+    const { scan: bondsScanNow, meta: bondsMetaNow, basis: bondsBasisNow, loading: bondsLoadingNow, error: bondsErrorNow } = bondsData;
+    const bondsInfoContent = useMemo(
+        () => (isBondsMode ? bondsInfo({ bonds, orbital: orbitalSliceNow }, {
+            scan: bondsScanNow, meta: bondsMetaNow, basis: bondsBasisNow, loading: bondsLoadingNow, error: bondsErrorNow,
+        }, level) : null),
+        [isBondsMode, bonds, orbitalSliceNow, bondsScanNow, bondsMetaNow, bondsBasisNow, bondsLoadingNow, bondsErrorNow, level],
+    );
+    // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab. Until
+    // Molecules' builder lands (Task 7b: moleculeInfo) it names that view only.
+    const infoPanel = (
+        <InfoPanel content={basicInfoContent ?? atomInfoContent ?? bondsInfoContent ?? { title: viewTitleText, plain: null }}
+            topic={infoTopic.topic} onClearTopic={() => infoTopic.setTopic(null)} level={level} />
+    );
     // Ruling C7: the exact curves' worker runs only while H₂⁺ is on screen.
     const h2plusCurve = useH2PlusCurve(isBondsMode && bonds.system === 'h2plus');
     const bondsRender = useMemo(

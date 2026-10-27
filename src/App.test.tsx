@@ -30,6 +30,7 @@ import { DRAW_DEBOUNCE_MS } from './basic_ui/useDrawOnSelection';
 import { thumbnailService } from './thumbs/ThumbnailService';
 import { GLOW_SETTLE_MS } from './design/glow_pref';
 import { clearVisit } from './levels/level_pref';
+import { FIXED_RHO_NOTE } from './info/bonds_info';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -979,12 +980,11 @@ describe('App', () => {
             const inspector = container.querySelector('.view-panel') as HTMLElement;
             expect(within(inspector).getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
             expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ψ > 0');
-            // Phase 6G-2 Task 9 (ruling P19): the methods list ("Exact within
-            // Born–Oppenheimer …") moved out of BondsPanel's Explore column
-            // into the inspector's Data tab -- "where this comes from" data,
-            // not navigation, and never duplicated into the side panel.
-            fireEvent.click(within(inspector).getByRole('tab', { name: 'Data' }));
-            expect(within(inspector).getByText(/Exact within Born–Oppenheimer/)).toBeInTheDocument();
+            // Task 7a: the methods list ("Exact within Born–Oppenheimer …") is Info's "How this was computed" now
+            // (bondsInfo; open at this block's Research level), not the Data tab's -- H₂⁺ has no frontier values, so
+            // no Data tab -- and still never in the side panel.
+            expect(within(inspector).queryByRole('tab', { name: 'Data' })).toBeNull();
+            expect(within(container.querySelector('.info-computed') as HTMLElement).getByText(/Exact within Born–Oppenheimer/)).toBeInTheDocument();
             expect(container.querySelector('.side-panel')?.textContent).not.toMatch(/Exact within Born–Oppenheimer/);
         });
 
@@ -1081,7 +1081,11 @@ describe('App', () => {
             expect(within(screen.getByLabelText('surface colour key')).queryByText('ψ > 0')).not.toBeInTheDocument();
             openInspectorSection('Display');
             expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
-            expect(screen.getByText('The density is drawn at a fixed ρ, chosen with the ρ buttons beside the orbitals — not at an enclosed fraction.')).toBeInTheDocument();
+            // Task 7a: why the fraction is fixed is Info's now (bondsInfo, from Advanced, where the select is), not
+            // helper text under the select.
+            expect(screen.getByRole('combobox', { name: /electron enclosed/i }).closest('.MuiFormControl-root')!
+                .querySelector('.MuiFormHelperText-root')).toBeNull();
+            expect(container.querySelector('.info-section')).toHaveTextContent(FIXED_RHO_NOTE);
             openInspectorSection('Plot and data');
             expect(within(container.querySelector('.view-panel') as HTMLElement)
                 .getByLabelText('potential energy curve')).toBeInTheDocument();
@@ -1101,7 +1105,9 @@ describe('App', () => {
             // A label this geometry does not keep: the density is drawn, and the panel says why.
             act(() => { store.dispatch(setBondsView({ kind: 'mo', label: '4σg', spin: 'restricted', component: 0 })); });
             const note = '4σg is not among the orbitals kept at this geometry; showing the total density.';
-            expect(screen.getByText(note)).toBeInTheDocument();
+            // Task 7a: the note's 4σg has a real subscript g, so its text is split around it -- read the note whole.
+            const panelNote = () => document.querySelector('.side-panel .bonds-note');
+            expect(panelNote()).toHaveTextContent(note);
             const drawn = store.getState().orbital.currentField;
 
             (loadBasis as jest.Mock).mockImplementation(() => new Promise(() => {}));
@@ -1116,7 +1122,7 @@ describe('App', () => {
                 expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
             };
             stillKeyed();
-            expect(screen.getByText(note)).toBeInTheDocument();
+            expect(panelNote()).toHaveTextContent(note);
             expect(await screen.findByText(`Loading N₂ at R = ${n2Scan.points[8].RBohr.toFixed(2)} a₀…`, {}, { timeout: 2000 })).toBeInTheDocument();
 
             (loadScan as jest.Mock).mockRejectedValue(new Error('Could not load /molecules/v1/o2/scan.json (HTTP 403)'));
@@ -1259,6 +1265,50 @@ describe('App', () => {
             expect(sheetStrip.compareDocumentPosition(screen.getByLabelText('molecular orbital energy diagram')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
             fireEvent.click(screen.getByRole('tab', { name: 'Plot' }));
             expect(within(screen.getByRole('tabpanel')).getByLabelText('potential energy curve')).toBeInTheDocument();
+        });
+
+        // Task 7a (plan Step 1): at Basics the Bonds screen names no method -- CCSD(T) and the T1 diagnostic are said
+        // under Info's folded "How this was computed" and nowhere else (the panel's energy line, the plot's caption and
+        // the Data tab's methods list all said them before).
+        it('at Basics, N₂ shows no "CCSD(T)" and no "T1 diagnostic" outside the folded "How this was computed"', async () => {
+            // Basics, whatever this block's own level is (the stored preference; cleared after each test).
+            window.localStorage.setItem('eov.level', 'basics');
+            const { store, container } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+            chooseSystem('N₂ — Nitrogen');
+            await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
+                .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@07' }));
+            const info = container.querySelector('.info-section') as HTMLElement;
+            expect(info).toHaveTextContent('N₂ has 14 electrons');
+            const computed = info.querySelector('details.info-computed') as HTMLDetailsElement;
+            expect(computed.open).toBe(false);
+            expect(computed).toHaveTextContent(/CCSD\(T\)/);
+            const page = container.cloneNode(true) as HTMLElement;
+            page.querySelectorAll('.info-computed').forEach(node => node.remove());
+            expect(page.textContent).not.toMatch(/CCSD\(T\)/);
+            expect(page.textContent).not.toMatch(/T1 diagnostic/);
+        });
+
+        // Task 7a (Task 4 review ruling): a Bonds (i) on a phone switches the sheet to the Info tab on its term; pressing
+        // the active one again clears the term and stays where it is.
+        it('on a phone, a Bonds (i) opens the Info tab on its term, and pressing it again clears the term in place', () => {
+            installMatchMedia(true);
+            renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // spec §9.8
+            fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            fireEvent.click(within(screen.getByRole('tabpanel')).getByRole('button', { name: 'About Molecular orbitals' }));
+            expect(screen.getByRole('tab', { name: 'Info' })).toHaveAttribute('aria-selected', 'true');
+            const info = screen.getByRole('tabpanel');
+            expect(within(info).getByRole('heading', { level: 2, name: /^Info/ }).querySelector('.info-topic-chip')).toHaveTextContent('MO diagram');
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            const diagram = within(screen.getByRole('tabpanel')).getByRole('button', { name: 'About Molecular orbitals' });
+            expect(diagram).toHaveAttribute('aria-pressed', 'true');
+            fireEvent.click(diagram);
+            expect(screen.getByRole('tab', { name: 'Explore' })).toHaveAttribute('aria-selected', 'true');
+            fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
+            expect(document.querySelector('.info-topic-chip')).toBeNull();
+            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveTextContent('H₂⁺ — 1σg orbital');
         });
     });
 

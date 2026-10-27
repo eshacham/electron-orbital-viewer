@@ -283,8 +283,9 @@ describe('cut depth', () => {
   });
 
   // Task 5: Orbitals' cut helper moved to Info (basicInfo); the other modes keep theirs until their own tasks move it.
+  // Task 7a: Bonds' moved too (bondsInfo), so Molecules is the mode that still says it here.
   it('says which side a cut removes', () => {
-    render(<Controls {...baseProps} mode="bonds" surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
+    render(<Controls {...baseProps} mode="molecule" surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
     expect(screen.getByText(/\+y side/)).toBeInTheDocument();
   });
 
@@ -474,20 +475,27 @@ describe('Relativity control', () => {
 describe('Controls: Bonds mode', () => {
   // The Mode toggle left Controls for the rail (spec §8.2); tests/shell/rail.test.tsx pins the names and the dispatch.
 
-  it('has no n/l/mL, no element, no Update Orbital, and says why the fraction is fixed', () => {
-    render(<Controls {...baseProps} mode="bonds" fractionNote="the density is drawn at a fixed ρ" />);
+  // Task 7a: why the fraction is fixed, and the iso value, are Info's now (bondsInfo); the note still disables the select.
+  it('has no n/l/mL, no element, no Update Orbital, and disables the fraction it does not use', () => {
+    const { container } = render(<Controls {...baseProps} mode="bonds" fractionNote="the density is drawn at a fixed ρ"
+      surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
     expect(screen.queryByLabelText('Principal (n)')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
     expect(screen.queryByText(/One electron, Z = 1/)).toBeNull();
     expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
-    expect(screen.getByText('the density is drawn at a fixed ρ')).toBeInTheDocument();
+    expect(screen.queryByText('the density is drawn at a fixed ρ')).toBeNull();
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+    // The cut helper is Info's too.
+    expect(screen.queryByText(/\+y side/)).toBeNull();
+    expect(container.querySelectorAll('.MuiFormHelperText-root')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'About Enclosed fraction' })).toHaveClass('info-button');
   });
 
   it('keeps the enclosed fraction for an orbital, where it does apply', () => {
     render(<Controls {...baseProps} mode="bonds" />);
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).not.toHaveAttribute('aria-disabled');
-    expect(screen.getByText('|ψ|² = 1.00e-5')).toBeInTheDocument();
+    // Task 7a: the iso value is Info's, with its unit (bondsInfo).
+    expect(screen.queryByText(/\|ψ\|² = /)).toBeNull();
   });
 });
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { fireEvent, render, screen, within, act } from '@testing-library/react';
+import { fireEvent, render, screen, act } from '@testing-library/react';
 import BondsInspector from '../../src/bonds_ui/BondsInspector';
 import reducer, { selectBondsSystem, setScanPoint } from '../../src/store/bondsSlice';
 import { bondsCaptions } from '../../src/bonds/captions';
@@ -28,31 +28,37 @@ describe('BondsInspector (spec §9.3, Phase 6G-2 Task 9)', () => {
         expect(screen.queryByText('the curve')).not.toBeInTheDocument();
     });
 
-    // Moved from bonds_panel.test.tsx's "lists the captions and the near-tie
-    // caveat under the diagram" (Phase 6G-2 Task 9, ruling P19): the methods
-    // list and the near-tie caveat are the inspector's Data tab now, not
-    // BondsPanel's -- BondsPanel is navigation (what to draw), the inspector
-    // is where it came from.
-    it('lists the captions and the near-tie caveat in the Data tab', () => {
+    // Task 7a: the methods list and the near-tie caveat moved on again, to Info's "How this was computed" (bondsInfo,
+    // tests/info/bonds_info.test.ts: every bondsCaptions string, typeset); the Data tab keeps the frontier values.
+    it('keeps the frontier values in the Data tab, and leaves the methods and near-tie caveats to Info', () => {
         const meta = { ...n2Meta, orbitals: n2Meta.orbitals.map(o => (o.label === '3σu*'
             ? { ...o, nearTie: { minaoWeight: 0.3484, runnerUpMinaoWeight: 0.316, runnerUpEnergyHartree: 0.2243 } } : o)) };
         render(
             <BondsInspector variant="docked" bonds={n2} data={{ ...empty, scan: n2Scan, meta }} plot={<p>the curve</p>} />,
         );
         fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
-        const list = screen.getByRole('list', { name: 'methods' });
-        expect(within(list).getByText(/not valid beyond R = 2\.41 a₀/)).toBeInTheDocument();
-        expect(screen.getByText(/3σu\*: this orbital's shape mixes with another σ virtual of the same symmetry/)).toBeInTheDocument();
-        // Every string the Data tab shows is exactly what bondsCaptions returns -- nothing paraphrased.
-        bondsCaptions('n2', n2Scan).forEach(caption => expect(within(list).getByText(caption)).toBeInTheDocument());
+        expect(screen.queryByRole('list', { name: 'methods' })).toBeNull();
+        expect(screen.queryByText(/this orbital's shape mixes/)).toBeNull();
+        bondsCaptions('n2', n2Scan).forEach(caption => expect(screen.queryByText(caption)).toBeNull());
     });
 
+    // Task 7a (Task 6 ruling): the frontier energies read eV first, Ha in parentheses; the labels' g/u is a real
+    // subscript, so the line's text is split around them.
     it('names the frontier orbital in the Data tab', () => {
-        render(
+        const { container } = render(
             <BondsInspector variant="docked" bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} plot={<p>the curve</p>} />,
         );
         fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
-        expect(screen.getByText('HOMO 3σg (ε = −0.438 Ha) · LUMO 1πg* (ε = −0.033 Ha)')).toBeInTheDocument();
+        const frontier = container.querySelector('.bonds-frontier')!;
+        expect(frontier).toHaveTextContent('HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
+        expect([...frontier.querySelectorAll('sub')].map(sub => sub.textContent)).toEqual(['g', 'g']);
+    });
+
+    // Task 7a: H₂⁺'s exact levels name no frontier orbital, so Data would be empty -- the section holds the plot alone.
+    it('gives H₂⁺ the plot alone, with no Data tab', () => {
+        render(<BondsInspector variant="docked" bonds={reducer(undefined, { type: '@@init' })} data={empty} plot={<p>the curve</p>} />);
+        expect(screen.getByText('the curve')).toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: 'Data' })).toBeNull();
     });
 
     // Ruling T20b-display-header: the same foldable Display section heads

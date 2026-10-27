@@ -2,6 +2,7 @@ import React from 'react';
 import { Chip } from '@mui/material';
 import BondsPanel, { BondsPanelProps } from '../components/BondsPanel';
 import { BONDS_SYSTEMS, bondOrderSelectText } from '../bonds/systems';
+import InfoButton from '../info/InfoButton';
 import './bonds_explore.css';
 
 /**
@@ -24,7 +25,11 @@ const BondsExplore: React.FC<BondsPanelProps> = props => {
                 <div className="bonds-tile-formula">{system.formula}</div>
                 <div className="bonds-tile-name">{system.name}</div>
                 <div className="bonds-tile-group">{system.group}</div>
-                <div className="bonds-tile-order">{bondOrderSelectText(system.id)}</div>
+                {/* Task 7a: an (i) beside the bond order opens its glossary entry; Info's fact gives the number counted. */}
+                <div className="bonds-tile-order">
+                    <span>{bondOrderSelectText(system.id)}</span>
+                    <InfoButton topic="bondOrder" label="Bond order" />
+                </div>
                 {/* WCAG 2.5.3: the accessible name contains the visible label ("exact"). */}
                 {system.id === 'h2plus' && (
                     <Chip size="small" color="success" label="exact" aria-label="exact solution" className="bonds-tile-chip" />

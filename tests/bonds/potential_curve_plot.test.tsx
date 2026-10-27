@@ -6,7 +6,7 @@ const series: CurveSeries[] = [
     { key: 'g', label: '1σg', color: '#ff0000', points: [{ R: 1, E: -0.4 }, { R: 2, E: -0.6 }, { R: 4, E: -0.55 }] },
     { key: 'u', label: '1σu*', color: '#0000ff', points: [{ R: 1, E: 0.5 }, { R: 2, E: -0.1 }, { R: 4, E: -0.45 }] },
 ];
-const props = { title: 'Potential energy', unit: 'Ha', series, xRange: [0, 4] as [number, number], yRange: [-0.7, -0.3] as [number, number], markerR: 2, caption: 'exact', width: 300 };
+const props = { title: 'Potential energy', unit: 'Ha', series, xRange: [0, 4] as [number, number], yRange: [-0.7, -0.3] as [number, number], markerR: 2, width: 300 };
 
 describe('PotentialCurvePlot', () => {
     it('interpolates linearly and refuses R outside the curve', () => {
@@ -14,7 +14,8 @@ describe('PotentialCurvePlot', () => {
         expect(interpolateEnergy(series[0].points, 5)).toBeNull();
     });
 
-    it('draws one clipped path per series, coloured through style, with the caption', () => {
+    // Task 7a: no caption under the plot -- the method and the zero are Info's (bondsInfo).
+    it('draws one clipped path per series, coloured through style, and no caption', () => {
         const { container } = render(<PotentialCurvePlot {...props} />);
         const paths = container.querySelectorAll('path.radial-plot-line');
         expect(paths).toHaveLength(2);
@@ -23,7 +24,7 @@ describe('PotentialCurvePlot', () => {
         // `stroke`/`fill` -- they read back exactly as set.
         expect((paths[1] as SVGPathElement).style.stroke).toBe('#0000ff');
         expect(container.querySelector('clipPath')).not.toBeNull();
-        expect(screen.getByText('exact')).toBeInTheDocument();
+        expect(container.querySelectorAll('.radial-plot-note')).toHaveLength(0);
     });
 
     it('marks the current R and only the curve(s) in range there', () => {
@@ -118,6 +119,16 @@ describe('PotentialCurvePlot', () => {
         expect(screen.getByText(/CCSD\(T\) not valid beyond R = 3\.00 a₀/)).toBeInTheDocument();
         const refLine = container.querySelector('.potential-reference')!;
         expect(Number(refLine.getAttribute('x1'))).toBeCloseTo(34 + 258 * 0.75, 6);
+    });
+
+    // Task 7a: no "_" shown -- the R_e marker's label sets R_e and D_e with a real subscript.
+    it('sets the R_e marker label with real subscripts', () => {
+        const { container } = render(
+            <PotentialCurvePlot {...props} referenceR={{ R: 2, label: 'Dotted line: R_e = 2.086 a₀ (1.104 Å), fitted; D_e = 9.44 eV from separated atoms.' }} />,
+        );
+        const note = container.querySelector('.potential-reference-note')!;
+        expect(note.textContent).toBe('Dotted line: Re = 2.086 a₀ (1.104 Å), fitted; De = 9.44 eV from separated atoms.');
+        expect([...note.querySelectorAll('sub')].map(sub => sub.textContent)).toEqual(['e', 'e']);
     });
 
     it('has an accessible role and label describing what it plots', () => {

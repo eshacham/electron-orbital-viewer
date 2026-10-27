@@ -1,14 +1,20 @@
 import { MoleculeMeta, MoleculeOrbitalInfo, MoleculeScan } from '../molecules/types';
 import { BOHR_TO_ANGSTROM, BondsSystemId, HARTREE_TO_EV, openingScanIndex } from './systems';
+import { orbitalEnergyText } from '../format/energy';
 
 /** A signed number as the panel prints it: a true minus sign (U+2212), not a hyphen. */
 export function signed(value: number, digits: number): string {
     return value.toFixed(digits).replace('-', '−');
 }
 
-/** R in a₀ with Å beside it (atomic units in code, Å only at display and always beside them). */
+/** R's value in a₀ with Å beside it (atomic units in code, Å only at display and always beside them): "2.07 a₀ (1.098 Å)". */
+export function lengthText(R: number): string {
+    return `${R.toFixed(2)} a₀ (${(R * BOHR_TO_ANGSTROM).toFixed(3)} Å)`;
+}
+
+/** "R = 2.07 a₀ (1.098 Å)". */
 export function lengths(R: number): string {
-    return `R = ${R.toFixed(2)} a₀ (${(R * BOHR_TO_ANGSTROM).toFixed(3)} Å)`;
+    return `R = ${lengthText(R)}`;
 }
 
 /**
@@ -161,9 +167,11 @@ const ROLE_ORDER = ['HOMO', 'SOMO', 'LUMO'] as const;
 
 /**
  * The frontier orbitals the data name (meta.json's `role`), one entry per
- * degenerate set: "HOMO 3σg (ε = −0.438 Ha) · LUMO 1πg* (ε = −0.033 Ha)".
- * ε is the Kohn–Sham eigenvalue the diagram draws. Null when none is named
- * (H₂⁺'s exact levels carry no role).
+ * degenerate set: "HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε =
+ * −0.91 eV (−0.033 Ha)". ε is the Kohn–Sham eigenvalue the diagram draws,
+ * eV first with Ha in parentheses (Task 6 ruling, every mode; Task 7a: the
+ * Data tab and Info share this one text). Null when none is named (H₂⁺'s
+ * exact levels carry no role).
  */
 export function frontierText(orbitals: readonly MoleculeOrbitalInfo[]): string | null {
     const groups = new Map<string, { role: string; orbital: MoleculeOrbitalInfo; count: number }>();
@@ -177,7 +185,7 @@ export function frontierText(orbitals: readonly MoleculeOrbitalInfo[]): string |
     const parts = [...groups.values()]
         .sort((a, b) => ROLE_ORDER.indexOf(a.role as typeof ROLE_ORDER[number]) - ROLE_ORDER.indexOf(b.role as typeof ROLE_ORDER[number]))
         .map(({ role, orbital, count }) => `${role} ${orbital.label}${SPIN_MARK[orbital.spin ?? 'restricted']}`
-            + `${count > 1 ? ` ×${count}` : ''} (ε = ${signed(orbital.energyHartree, 3)} Ha)`);
+            + `${count > 1 ? ` ×${count}` : ''}: ε = ${orbitalEnergyText(orbital.energyHartree)}`);
     return parts.length > 0 ? parts.join(' · ') : null;
 }
 

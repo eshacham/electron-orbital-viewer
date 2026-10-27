@@ -6,6 +6,7 @@ import BondsPanel from '../../src/components/BondsPanel';
 import reducer, { selectBondsSystem, setBondsView, setScanPoint } from '../../src/store/bondsSlice';
 import { bondsCaptions, densitySurfaceText, frontierText, orbitalCaveats } from '../../src/bonds/captions';
 import { bondAxisMinimumDensity } from '../../src/bonds/bond_density';
+import { bondOrderFooter } from '../../src/bonds/mo_diagram';
 import { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
 
 const handlers = { onSelectSystem: jest.fn(), onCommitH2PlusR: jest.fn(), onScanIndex: jest.fn(), onView: jest.fn(), onDensityIso: jest.fn() };
@@ -163,8 +164,10 @@ describe('bondsCaptions', () => {
 });
 
 describe('frontierText and orbitalCaveats', () => {
+    // Task 7a (Task 6 ruling: energies read eV first, Ha in parentheses, in every mode): the one frontier text the Data
+    // tab and Info share.
     it('names the HOMO and LUMO, once per degenerate set', () => {
-        expect(frontierText(n2Meta.orbitals)).toBe('HOMO 3σg (ε = −0.438 Ha) · LUMO 1πg* (ε = −0.033 Ha)');
+        expect(frontierText(n2Meta.orbitals)).toBe('HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
     });
 
     it("names O₂'s singly occupied pair", () => {
@@ -173,7 +176,8 @@ describe('frontierText and orbitalCaveats', () => {
             { index: 1, label: '1πg*', energyHartree: -0.4, occupation: 1, spin: 'alpha', role: 'SOMO' },
             { index: 2, label: '1πg*', energyHartree: -0.2, occupation: 0, spin: 'beta', role: 'LUMO' },
         ] as MoleculeMeta['orbitals'];
-        expect(frontierText(orbitals)).toBe('SOMO 1πg* α ×2 (ε = −0.400 Ha) · LUMO 1πg* β (ε = −0.200 Ha)');
+        // Task 7a: eV first (see above).
+        expect(frontierText(orbitals)).toBe('SOMO 1πg* α ×2: ε = −10.88 eV (−0.400 Ha) · LUMO 1πg* β: ε = −5.44 eV (−0.200 Ha)');
     });
 
     it('says when a kept orbital shape is a near tie with another virtual', () => {
@@ -215,19 +219,26 @@ describe('BondsPanel', () => {
         fireEvent.click(screen.getByRole('button', { name: '1σu* (antibonding)' }));
         expect(handlers.onView).toHaveBeenCalledWith({ kind: 'h2plus', state: '1sigma_u' });
         expect(screen.getByText(/R = 2\.00 a₀ \(1\.058 Å\)/)).toBeInTheDocument();
-        expect(screen.getByText(/E = −0\.60263 Ha \(exact, Born–Oppenheimer\)/)).toBeInTheDocument();
+        // Task 7a: the energy line is Info's now (E − E(H + H⁺) from Explore, the total at Research: bonds_info.test.ts).
+        expect(screen.queryByText(/E = −0\.60263 Ha/)).toBeNull();
         expect(screen.getByRole('slider', { name: 'Internuclear distance R' })).toHaveAttribute('aria-valuetext', 'R = 2.00 a₀ (1.058 Å)');
+        // Task 7a: the states' g/u is a real subscript, in one span with its word (a flex button drops a space between items).
+        const bonding = screen.getByRole('button', { name: '1σg (bonding)' });
+        expect(bonding.querySelector('span sub')).toHaveTextContent('g');
+        expect(bonding.querySelector('span')).toHaveTextContent(/^1σg bonding$/);
     });
 
-    it("shows He2's zero bond order and the density choices, each labelled with its ρ", () => {
+    // Task 7a: the bond-order footer ("Bond order 0 — no bond"), the density label and the energy line with its method
+    // are Info's now (bonds_info.test.ts); the panel keeps the choices.
+    it("shows He2's density choices, each labelled with its ρ, and its diagram", () => {
         render(<BondsPanel bonds={he2} data={{ ...empty, scan: heScan, meta: heMeta }} note={null} {...handlers} />);
-        expect(screen.getByText(/Bond order 0 — no bond/)).toBeInTheDocument();
-        expect(screen.getByText(/surface at ρ = 0\.002 e\/a₀³, the conventional molecular outline/)).toBeInTheDocument();
+        expect(screen.queryByText(/Bond order 0 — no bond/)).toBeNull();
+        expect(screen.queryByText(/surface at ρ = 0\.002 e\/a₀³/)).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'ρ = 0.05 e/a₀³' }));
         expect(handlers.onDensityIso).toHaveBeenCalledWith(0.05);
         fireEvent.click(screen.getByRole('button', { name: /1σu\* \(1 of 1\)/ }));
         expect(handlers.onView).toHaveBeenCalledWith({ kind: 'mo', label: '1σu*', spin: 'restricted', component: 0 });
-        expect(screen.getByText(/E = −5\.80000 Ha, FCI\/aug-cc-pVTZ \(no counterpoise correction\)/)).toBeInTheDocument();
+        expect(screen.queryByText(/FCI\/aug-cc-pVTZ/)).toBeNull();
         // The frontier line ("HOMO 1σu* …") moved to BondsInspector's Data tab
         // (Phase 6G-2 Task 9, ruling P19): BondsPanel is navigation now, not
         // "where this comes from" data. See bonds_inspector.test.tsx.
@@ -257,10 +268,13 @@ describe('BondsPanel', () => {
         expect(handlers.onScanIndex).toHaveBeenCalledTimes(2);
     });
 
-    it('says, from the loaded basis, that N₂ at ρ = 0.2 is one envelope', () => {
+    // Task 7a: what the surface at this ρ shows is Info's now (bondsInfo, read off the same basis); the panel keeps the
+    // ρ buttons, with the chosen one pressed.
+    it('keeps the ρ buttons, the chosen one pressed, and leaves what the surface shows to Info', () => {
         const dense = { ...n2, densityIso: 0.2 };
         render(<BondsPanel bonds={dense} data={{ ...empty, scan: n2Scan, meta: n2Meta, basis: n2Basis }} note={null} {...handlers} />);
-        expect(screen.getByText(/surface at ρ = 0\.2 e\/a₀³, a higher-density contour, closer to the nuclei: one envelope around both nuclei here/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'ρ = 0.2 e/a₀³' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.queryByText(/one envelope around both nuclei/)).toBeNull();
     });
 
     it('lets an orbital view return to the total density', () => {
@@ -290,8 +304,11 @@ describe('BondsPanel', () => {
     });
 
     it('shows why the picture differs from the selection', () => {
-        render(<BondsPanel bonds={he2} data={{ ...empty, scan: heScan, meta: heMeta }} note="3σu* is not among the orbitals kept at this geometry; showing the total density." {...handlers} />);
-        expect(screen.getByText(/3σu\* is not among the orbitals kept/)).toBeInTheDocument();
+        const { container } = render(<BondsPanel bonds={he2} data={{ ...empty, scan: heScan, meta: heMeta }} note="3σu* is not among the orbitals kept at this geometry; showing the total density." {...handlers} />);
+        // Task 7a: the orbital's g/u is a real subscript, so the note's text is split around it.
+        const note = container.querySelector('.bonds-note')!;
+        expect(note).toHaveTextContent('3σu* is not among the orbitals kept at this geometry; showing the total density.');
+        expect(note.querySelector('sub')).toHaveTextContent('u');
     });
 
     // The methods list and the near-tie caveat moved to BondsInspector's Data
@@ -346,11 +363,13 @@ describe('BondsPanel', () => {
     // toggle, so it reads as a real two-way switch (owner: "Is Total density a
     // button?"), and the list below it gets a title and a legend.
     describe('the Show switch and the titled orbital list', () => {
-        it('titles the molecular-orbital list and explains its labels', () => {
+        // Task 7a: the heading stays short, with an (i) to the MO diagram's entry; the legend is Info's (bondsInfo, from
+        // Advanced: MO_LEGEND).
+        it('titles the molecular-orbital list, with an (i), and leaves the legend to Info', () => {
             render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
-            expect(screen.getByText('Molecular orbitals (lowest energy at the bottom)')).toBeInTheDocument();
-            expect(screen.getByText(/σ\/π: symmetry about the bond axis; g\/u: even\/odd through the centre; \* antibonding/))
-                .toBeInTheDocument();
+            expect(screen.getByText('Molecular orbitals')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'About Molecular orbitals' })).toHaveClass('info-button');
+            expect(screen.queryByText(/σ\/π: symmetry about the bond axis/)).toBeNull();
         });
 
         it('shows Total density selected by default, and One orbital disabled until orbitals are known', () => {
@@ -390,24 +409,29 @@ describe('BondsPanel', () => {
     // defined by g/u counting" for CO/HF, while the System select (ruling R23e) shows a real
     // number for them -- a contradiction inside the same panel. Both now read
     // systems.ts' TEXTBOOK_BOND_ORDER (see tests/bonds/systems.test.ts for the cross-check).
+    // Task 7a: the footer is Info's now (bondsInfo: the Bond order fact, and this sentence where it says more), built
+    // by bondOrderFooter, which BondsPanel's own logic moved into -- the same words, tested here on the function.
     describe('the heteronuclear footer', () => {
         it('states CO’s bond order and why g/u counting does not reach it', () => {
-            const co = reducer(undefined, selectBondsSystem('co'));
-            render(<BondsPanel bonds={co} data={{ ...empty, meta: coMeta }} note={null} {...handlers} />);
-            expect(screen.getByText("Bond order 3 — counted from the valence orbitals' bonding/antibonding character; "
-                + "g/u labels don't apply to a heteronuclear molecule.")).toBeInTheDocument();
+            expect(bondOrderFooter('co', coMeta)).toBe("Bond order 3 — counted from the valence orbitals' bonding/antibonding character; "
+                + "g/u labels don't apply to a heteronuclear molecule.");
         });
 
         it('states the same for HF, from the real shipped fixture', () => {
-            const hf = reducer(undefined, selectBondsSystem('hf'));
-            render(<BondsPanel bonds={hf} data={{ ...empty, meta: hfMeta }} note={null} {...handlers} />);
-            expect(screen.getByText("Bond order 1 — counted from the valence orbitals' bonding/antibonding character; "
-                + "g/u labels don't apply to a heteronuclear molecule.")).toBeInTheDocument();
+            expect(bondOrderFooter('hf', hfMeta)).toBe("Bond order 1 — counted from the valence orbitals' bonding/antibonding character; "
+                + "g/u labels don't apply to a heteronuclear molecule.");
         });
 
-        it("leaves a homonuclear molecule's footer as it was", () => {
-            render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
-            expect(screen.getByText('Bond order 3.')).toBeInTheDocument();
+        it("leaves a homonuclear molecule's footer as it was, and H₂⁺'s exact", () => {
+            expect(bondOrderFooter('n2', n2Meta)).toBe('Bond order 3.');
+            expect(bondOrderFooter('h2plus', null)).toBe('Bond order ½. One electron, exact energies.');
+        });
+
+        it('is no longer printed under the diagram', () => {
+            const co = reducer(undefined, selectBondsSystem('co'));
+            render(<BondsPanel bonds={co} data={{ ...empty, meta: coMeta }} note={null} {...handlers} />);
+            expect(screen.getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
+            expect(screen.queryByText(/Bond order/)).toBeNull();
         });
     });
 });

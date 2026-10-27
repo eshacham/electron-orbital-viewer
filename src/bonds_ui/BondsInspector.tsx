@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Typography } from '@mui/material';
 import Inspector from '../shell/Inspector';
-import { bondsDataLines } from '../components/BondsPanel';
 import { BondsState } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
+import { frontierText } from '../bonds/captions';
+import { withSubscripts } from '../format/subscripts';
 
 interface BondsInspectorProps {
     variant: 'docked' | 'drawer' | 'stacked';
@@ -29,14 +30,15 @@ interface BondsInspectorProps {
 /**
  * Bonds mode's inspector (spec §9.3, Phase 6G-2 Task 9): Display on top,
  * then "Plot and data" (titled sections, one open at a time, ruling R24-3):
- * Plot (the potential curve, unchanged) and Data -- the frontier
- * orbital(s), any near-tie caveat and the method captions `bondsCaptions`
- * returns, moved out of the Explore panel's BondsPanel (ruling P19: that
- * panel chooses what to draw; this is where it came from).
+ * Plot (the potential curve) and Data -- the frontier orbital(s) with their
+ * energies. Task 7a: the method captions and near-tie caveats are Info's
+ * "How this was computed" (bondsInfo); Data keeps the values. H₂⁺'s exact
+ * levels name no frontier orbital, so it has Plot alone.
  */
 const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, info, display, open, onOpenChange, bonds, data, plot, showPlot = true }) => {
     const [tab, setTab] = useState('plot');
-    const { frontier, caveats, captions } = bondsDataLines(bonds, data);
+    const molecule = bonds.system !== 'h2plus';
+    const frontier = molecule && data.meta ? frontierText(data.meta.orbitals) : null;
     return (
         <Inspector
             variant={variant}
@@ -45,28 +47,21 @@ const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, info, display,
             onOpenChange={onOpenChange}
             sections={[
                 ...(display ? [{ key: 'display', title: 'Display', content: display }] : []),
-                ...(!showPlot ? [] : [{
+                ...(!showPlot ? [] : [molecule ? {
                     key: 'plot',
                     title: 'Plot and data',
                     activeTab: tab,
                     onTab: setTab,
                     tabs: [
                         { key: 'plot', label: 'Plot', content: plot },
+                        // The Data tab stays while the next scan point loads; its values follow once they land.
                         {
                             key: 'data',
                             label: 'Data',
-                            content: (
-                                <>
-                                    {frontier && <Typography variant="caption" className="bonds-frontier">{frontier}</Typography>}
-                                    {caveats.map(caveat => <Typography key={caveat} variant="caption" className="bonds-note">{caveat}</Typography>)}
-                                    <ul className="bonds-captions" aria-label="methods">
-                                        {captions.map(caption => <li key={caption}>{caption}</li>)}
-                                    </ul>
-                                </>
-                            ),
+                            content: frontier && <Typography variant="caption" className="bonds-frontier">{withSubscripts(frontier)}</Typography>,
                         },
                     ],
-                }]),
+                } : { key: 'plot', title: 'Plot and data', content: plot }]),
             ]}
         />
     );

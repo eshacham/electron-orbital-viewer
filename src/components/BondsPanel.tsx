@@ -2,36 +2,19 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, FormControl, InputLabel, LinearProgress, ListSubheader, MenuItem, Select, Slider, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { BondsState, BondsView } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
-import { BOND_GROUP_ORDER, BONDS_SYSTEMS, BondsSystemId, DENSITY_ISO_VALUES, TEXTBOOK_BOND_ORDER, bondOrderSelectText, nearestScanIndex, systemFormula } from '../bonds/systems';
-import { H2PLUS_R_RANGE, h2plusTotalEnergy } from '../bonds/h2plus';
-import { bondsCaptions, densitySurfaceText, frontierText, lengths, orbitalCaveats, signed } from '../bonds/captions';
-import { bondAxisMinimumDensity } from '../bonds/bond_density';
-import { bondOrderText, h2plusOrbitals, heteronuclearBondOrderText } from '../bonds/mo_diagram';
+import { BOND_GROUP_ORDER, BONDS_SYSTEMS, BondsSystemId, DENSITY_ISO_VALUES, bondOrderSelectText, nearestScanIndex, systemFormula } from '../bonds/systems';
+import { H2PLUS_R_RANGE } from '../bonds/h2plus';
+import { lengths } from '../bonds/captions';
+import { h2plusOrbitals } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
 import { frontierOccupied } from '../molecules/orbital_display';
+import { withSubscripts } from '../format/subscripts';
+import InfoButton from '../info/InfoButton';
 import MoDiagram from './MoDiagram';
 
 /** The orbital "One orbital" opens onto when none is picked yet: the HOMO, or the SOMO if open-shell (preflight D8's shared resolver). */
 function frontierOccupiedIndex(orbitals: readonly MoleculeOrbitalInfo[]): number | null {
     return frontierOccupied(orbitals)?.index ?? null;
-}
-
-/**
- * The frontier line, the near-tie caveats and the method captions -- Bonds
- * mode's "where this comes from" data (spec §3.1), read by BondsInspector's
- * Data tab (Phase 6G-2 Task 9). Pulled out of the panel itself so the
- * Explore column (this file) stays navigation -- what to draw -- and the
- * inspector holds how it was computed, the same split every other mode's
- * Plot | Data inspector keeps.
- */
-export function bondsDataLines(bonds: Pick<BondsState, 'system'>, data: BondsData): { frontier: string | null; caveats: string[]; captions: string[] } {
-    const isExact = bonds.system === 'h2plus';
-    const { scan, meta } = data;
-    return {
-        frontier: !isExact && meta ? frontierText(meta.orbitals) : null,
-        caveats: isExact ? [] : orbitalCaveats(meta),
-        captions: bondsCaptions(bonds.system, scan),
-    };
 }
 
 export interface BondsPanelProps {
@@ -46,12 +29,12 @@ export interface BondsPanelProps {
     onDensityIso: (value: number) => void;
 }
 
-const withFullStop = (text: string) => (text.endsWith('.') ? text : `${text}.`);
-
 /**
- * Bonds mode's navigation: system, geometry, what to draw, the diagram, and
- * every method (spec §3.1). The potential curve is not here: the layout
- * contract puts it in the view column and the phone's Plot tab (BondsCurvePlot).
+ * Bonds mode's navigation: system, geometry, what to draw and the diagram.
+ * The potential curve is not here: the layout contract puts it in the view
+ * column and the phone's Plot tab (BondsCurvePlot). Task 7a: the panel keeps
+ * controls and short labels -- the energy line, the density label, the MO
+ * legend and the bond-order footer are Info's (bondsInfo), with every method.
  */
 const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSystem, onCommitH2PlusR, onScanIndex, onView, onDensityIso }) => {
     const isExact = bonds.system === 'h2plus';
@@ -83,23 +66,6 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
 
     // The readout follows the thumb while it is dragged, for a molecule too.
     const shownR = isExact || bonds.R !== null ? draftR : null;
-    const energy = isExact
-        ? `E = ${signed(h2plusTotalEnergy(draftR, view.kind === 'h2plus' ? view.state : '1sigma_g'), 5)} Ha (exact, Born–Oppenheimer)`
-        : meta ? `E = ${signed(meta.totalEnergyHartree, 5)} Ha, ${meta.method.energies}` : null;
-    // Ruling T23e-COHF (fix round 1): meta.bondOrder is null for a heteronuclear molecule by
-    // design (g/u counting does not apply to it, MoleculeMeta's own doc comment) -- the select
-    // still shows a number there (ruling R23e, from TEXTBOOK_BOND_ORDER), so the footer must
-    // read the same constant instead of only saying the method doesn't reach one, or the two
-    // would contradict each other in the same panel.
-    const footer = isExact
-        ? `${withFullStop(bondOrderText(0.5))} One electron, exact energies.`
-        : meta && meta.bondOrder === null
-            ? withFullStop(heteronuclearBondOrderText(TEXTBOOK_BOND_ORDER[bonds.system]))
-            : withFullStop(bondOrderText(meta?.bondOrder));
-    const densityMethod = scan?.densityMethod ?? meta?.method.density ?? null;
-    // Whether a surface is one envelope or splits around each nucleus, read
-    // off the density drawn (≈ 200 basis evaluations, once per point).
-    const minOnAxis = useMemo(() => (data.basis ? bondAxisMinimumDensity(data.basis) : null), [data.basis]);
 
     const status = data.loading ? `Loading ${formula}…`
         : !isExact && meta && bonds.R !== null ? `${formula} at R = ${bonds.R.toFixed(2)} a₀ loaded.` : '';
@@ -164,13 +130,13 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                         onScanIndex(index);
                     } } }} />
             )}
-            {energy && <Typography variant="body2" className="bonds-energy">{energy}</Typography>}
 
             {isExact ? (
                 <ToggleButtonGroup exclusive size="small" fullWidth aria-label="H₂⁺ state" value={view.kind === 'h2plus' ? view.state : null}
                     onChange={(_, state) => state && onView({ kind: 'h2plus', state })}>
-                    <ToggleButton value="1sigma_g" aria-label="1σg (bonding)">1σg bonding</ToggleButton>
-                    <ToggleButton value="1sigma_u" aria-label="1σu* (antibonding)">1σu* antibonding</ToggleButton>
+                    {/* One span each: a ToggleButton lays out as flex, which would drop the space after the <sub>. */}
+                    <ToggleButton value="1sigma_g" aria-label="1σg (bonding)"><span>{withSubscripts('1σg')} bonding</span></ToggleButton>
+                    <ToggleButton value="1sigma_u" aria-label="1σu* (antibonding)"><span>{withSubscripts('1σu*')} antibonding</span></ToggleButton>
                 </ToggleButtonGroup>
             ) : (
                 <>
@@ -190,29 +156,25 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                         <ToggleButton value="density" aria-label="Total electron density">Total density</ToggleButton>
                         <ToggleButton value="orbital" aria-label="One orbital" disabled={!orbitals || orbitals.length === 0}>One orbital</ToggleButton>
                     </ToggleButtonGroup>
+                    {/* Task 7a: what the surface at this ρ shows is Info's (bondsInfo), with no method in it. */}
                     {view.kind === 'density' && (
-                        <>
-                            <ToggleButtonGroup exclusive size="small" fullWidth aria-label="Density surface" value={bonds.densityIso}
-                                onChange={(_, v) => v !== null && onDensityIso(v)}>
-                                {DENSITY_ISO_VALUES.map(v => <ToggleButton key={v} value={v} aria-label={`ρ = ${v} e/a₀³`}>ρ = {v}</ToggleButton>)}
-                            </ToggleButtonGroup>
-                            <Typography variant="caption" className="bonds-density-label">
-                                {densitySurfaceText(bonds.densityIso, densityMethod, minOnAxis)}
-                            </Typography>
-                        </>
+                        <ToggleButtonGroup exclusive size="small" fullWidth aria-label="Density surface" value={bonds.densityIso}
+                            onChange={(_, v) => v !== null && onDensityIso(v)}>
+                            {DENSITY_ISO_VALUES.map(v => <ToggleButton key={v} value={v} aria-label={`ρ = ${v} e/a₀³`}>ρ = {v}</ToggleButton>)}
+                        </ToggleButtonGroup>
                     )}
                 </>
             )}
-            {note && <Typography variant="caption" className="bonds-note">{note}</Typography>}
+            {note && <Typography variant="caption" className="bonds-note">{withSubscripts(note)}</Typography>}
 
             {orbitals && orbitals.length > 0 && (
                 <div className="mo-section">
-                    <Typography variant="subtitle2" className="mo-heading">Molecular orbitals (lowest energy at the bottom)</Typography>
-                    <Typography variant="caption" className="mo-legend">
-                        σ/π: symmetry about the bond axis; g/u: even/odd through the centre; * antibonding; numbers count orbitals of
-                        that symmetry from the lowest; arrows show electrons.
-                    </Typography>
-                    <MoDiagram orbitals={orbitals} selectedIndex={selectedIndex} footer={footer}
+                    {/* Task 7a: a short heading with an (i); the legend, the bond-order footer and the α/β note are Info's. */}
+                    <div className="mo-heading-row">
+                        <Typography variant="subtitle2" className="mo-heading">Molecular orbitals</Typography>
+                        <InfoButton topic="moDiagram" label="Molecular orbitals" />
+                    </div>
+                    <MoDiagram orbitals={orbitals} selectedIndex={selectedIndex}
                         onSelect={index => onView(viewForIndex(index))} />
                 </div>
             )}

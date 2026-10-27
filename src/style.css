@@ -1039,6 +1039,12 @@ html, body, #root {
   color: var(--ql-color-text-1);
   font-weight: 600;
 }
+/* Task 7a: the short heading and its (i) on one line. */
+.mo-heading-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .mo-legend {
   display: block;
   color: var(--ql-color-text-2);

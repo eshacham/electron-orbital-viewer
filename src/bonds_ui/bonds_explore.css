@@ -34,6 +34,11 @@
   line-height: 16px;
   color: var(--ql-color-text-2);
 }
+.bonds-tile-order {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .bonds-tile-chip {
   align-self: flex-start;
   margin-top: 4px;

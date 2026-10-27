@@ -1,10 +1,10 @@
 import { shellLetter } from './orbital_names';
 import { subshellLabel } from './atom/configurations';
 import { formatDrawnRadius } from './atom/format_radius';
-import { HARTREE_IN_EV } from './atom/delta_scf';
 import { shellName } from './shell/view_title';
-import { formatSci, minus, orbitalPlainName } from './format/sci';
+import { formatSci, orbitalPlainName } from './format/sci';
 import { nb } from './format/text';
+import { hartreeText, orbitalEnergyText } from './format/energy';
 
 /**
  * The inspector's facts card (spec §9.1 "Data"): computed, never typed in.
@@ -36,18 +36,8 @@ export function isoValueText(isoLevel: number): string {
     return nb(`|ψ|² = ${formatSci(isoLevel)} a₀⁻³`);
 }
 
-/** An orbital energy in hartree as every Atoms panel prints it: "−0.199 Ha", three places, a true minus. */
-export function hartreeText(hartree: number): string {
-    return `${minus(hartree.toFixed(3))} Ha`;
-}
-
-/**
- * Task 6: one orbital-energy text for Info and the Data card -- eV first, then Ha: "−5.41 eV (−0.199 Ha)". It is an
- * eigenvalue (ruling R19), which the caller says beside it; never an ionisation energy.
- */
-export function orbitalEnergyText(hartree: number): string {
-    return `${minus((hartree * HARTREE_IN_EV).toFixed(2))} eV (${hartreeText(hartree)})`;
-}
+// Task 7a: the energy texts live in format/energy.ts (bonds/captions.ts uses them too); still exported from here.
+export { hartreeText, orbitalEnergyText };
 
 const NODE_SURFACES: Record<string, string> = {
     '1:-1': 'the xz plane', '1:0': 'the xy plane', '1:1': 'the yz plane',

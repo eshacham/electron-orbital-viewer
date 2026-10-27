@@ -151,9 +151,13 @@ describe('spinOrderNote', () => {
 });
 
 describe('MoDiagram', () => {
-    it("captions O2's α/β order swap under the diagram", () => {
-        render(<MoDiagram orbitals={fixtureOrbitals('o2')} selectedIndex={null} />);
-        expect(screen.getByText(/in β — and in photoelectron spectra — 3σg lies below 1πu/)).toBeInTheDocument();
+    // Task 7a: O₂'s α/β note is Info's now (bondsInfo, from Advanced: tests/info/bonds_info.test.ts); spinOrderNote,
+    // above, still writes it. The diagram keeps its levels, with the labels' g/u as a real subscript.
+    it("leaves O2's α/β note to Info, and subscripts its labels' g/u", () => {
+        const { container } = render(<MoDiagram orbitals={fixtureOrbitals('o2')} selectedIndex={null} />);
+        expect(screen.queryByText(/photoelectron spectra/)).toBeNull();
+        const label = [...container.querySelectorAll('.mo-label')].find(span => span.textContent === '3σg')!;
+        expect(label.querySelector('sub')).toHaveTextContent('g');
     });
 
     // Final review M9: aria-label on a bare div is not reliably announced; a
@@ -170,13 +174,14 @@ describe('MoDiagram', () => {
 
     it('draws arrows and selects a box on click', () => {
         const onSelect = jest.fn();
-        render(<MoDiagram orbitals={n2} selectedIndex={6} onSelect={onSelect} footer="Bond order 3" />);
+        // Task 7a: no footer -- the bond order is Info's (bondsInfo).
+        render(<MoDiagram orbitals={n2} selectedIndex={6} onSelect={onSelect} />);
         expect(screen.getAllByText('↑')).toHaveLength(7);
         expect(screen.getAllByText('↓')).toHaveLength(7);
         fireEvent.click(screen.getByRole('button', { name: /1πg\* \(2 of 2\)/ }));
         expect(onSelect).toHaveBeenCalledWith(8);
         expect(screen.getByRole('button', { name: /3σg \(1 of 1\)/ })).toHaveClass('selected');
-        expect(screen.getByText('Bond order 3')).toBeInTheDocument();
+        expect(screen.queryByText(/Bond order/)).toBeNull();
     });
 
     // Accessibility: a level's box states its energy, occupation and spin, and

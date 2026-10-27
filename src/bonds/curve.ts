@@ -1,12 +1,15 @@
 import type { CurveSeries } from '../components/PotentialCurvePlot';
 import { CURVE_COLORS } from '../curve_colors';
 import { MoleculeScan } from '../molecules/types';
-import { atomsMethod, li2Caveat, multireferenceCaption, signed, unboundCaption, validityCaption, wellMilliHartree } from './captions';
+import { atomsMethod, signed } from './captions';
 import { H2PLUS_LABELS, H2PLUS_R_RANGE } from './h2plus';
-import { BOHR_TO_ANGSTROM, DiatomicId, HARTREE_TO_EV, systemFormula } from './systems';
+import { BOHR_TO_ANGSTROM, BondsSystemId, DiatomicId, HARTREE_TO_EV, systemFormula } from './systems';
 import type { H2PlusCurve } from './useH2PlusCurve';
 
-/** Everything PotentialCurvePlot draws for a Bonds system, bar its width and click handler. */
+/**
+ * Everything PotentialCurvePlot draws for a Bonds system, bar its width and click handler. Task 7a: the plot keeps its
+ * axis labels and the Rₑ marker's label; what its caption said is Info's (curveNote, after bondsCaptions).
+ */
 export interface CurvePlotSpec {
     title: string;
     unit: string;
@@ -16,7 +19,22 @@ export interface CurvePlotSpec {
     markerR: number | null;
     snapRs: number[];
     referenceR: { R: number; label: string } | null;
-    caption: string;
+}
+
+/** The plots' titles: what E means on each (zero is the separated atoms, or H + H⁺). */
+const DIATOMIC_TITLE = 'E − E(separated atoms)';
+const H2PLUS_TITLE = 'E − E(H + H⁺)';
+
+/**
+ * Task 7a: what the plot's caption said that bondsCaptions does not -- what the curve is relative to, and for an
+ * unbound pair that its well cannot be seen at this scale. The rest of the old caption (the energy method, the
+ * multireference caveat, the unbound caption, the validity stop, Li₂'s caveat) is bondsCaptions' too, and Info says it
+ * once, there. Null before a molecule's scan has loaded.
+ */
+export function curveNote(system: BondsSystemId, scan: MoleculeScan | null): string | null {
+    if (system === 'h2plus') return `Plot: ${H2PLUS_TITLE}, in eV. Zero: H + H⁺ (−0.5 Ha), the grey line.`;
+    if (!scan) return null;
+    return `Plot: ${DIATOMIC_TITLE}, in eV. Zero: ${atomsMethod(scan)}, the grey line.${scan.fit.bound ? '' : ' At this scale the well is invisible.'}`;
 }
 
 /** The asymptote lines' grey: a reference, not a state. */
@@ -52,16 +70,8 @@ export function diatomicCurveSpec(system: DiatomicId, scan: MoleculeScan, R: num
     const pad = 0.05 * span;
     const yRange: [number, number] = [lo - pad, lo + span + pad];
 
-    const parts = [`${scan.energyMethod}. Zero: ${atomsMethod(scan)}.`];
-    const multireference = multireferenceCaption(scan);
-    if (multireference) parts.push(multireference);
-    if (!fit.bound) parts.push(`${unboundCaption(wellMilliHartree(scan), /counterpoise/.test(scan.energyMethod))} At this scale the well is invisible.`);
-    const validity = validityCaption(scan);
-    if (validity) parts.push(validity);
-    if (system === 'li2') parts.push(li2Caveat(scan));
-
     return {
-        title: 'E − E(separated atoms)',
+        title: DIATOMIC_TITLE,
         unit: 'eV',
         series: [
             { key: 'e', label: systemFormula(system), color: CURVE_COLORS[0], points },
@@ -75,7 +85,6 @@ export function diatomicCurveSpec(system: DiatomicId, scan: MoleculeScan, R: num
         referenceR: fit.bound && fit.ReBohr >= xRange[0] && fit.ReBohr <= xRange[1]
             ? { R: fit.ReBohr, label: `Dotted line: R_e = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted; D_e = ${fit.DeEv.toFixed(2)} eV from separated atoms.` }
             : null,
-        caption: parts.join(' '),
     };
 }
 
@@ -94,7 +103,7 @@ export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null): CurvePlot
     const { equilibrium } = curve;
     const De = H_PLUS_H_PLUS_HARTREE - equilibrium.totalEnergy;
     return {
-        title: 'E − E(H + H⁺)',
+        title: H2PLUS_TITLE,
         unit: 'eV',
         series: [
             { key: 'g', label: H2PLUS_LABELS['1sigma_g'], color: CURVE_COLORS[0], points: along(curve.sigmaG) },
@@ -111,6 +120,5 @@ export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null): CurvePlot
             label: `Dotted line: R_e = ${equilibrium.R.toFixed(3)} a₀ (${(equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), `
                 + `E = ${signed(equilibrium.totalEnergy, 4)} Ha; D_e = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
         },
-        caption: 'Exact within Born–Oppenheimer (nuclei fixed). Zero: H + H⁺ (−0.5 Ha), the grey line. 1σu* has no minimum on this range.',
     };
 }

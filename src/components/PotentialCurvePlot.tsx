@@ -1,11 +1,14 @@
 import React, { useId } from 'react';
 import { BOHR_TO_ANGSTROM, HARTREE_TO_EV } from '../bonds/systems';
+import { withSubscripts } from '../format/subscripts';
 
 /**
  * Energy against internuclear distance, with the geometry on screen marked.
- * Presentational: the caller chooses what E means (absolute Ha for H₂⁺,
- * E − E_min in eV for a scan) and says so in `unit` and `caption` -- this
- * component never guesses a method, a bond, or a scale of its own.
+ * Presentational: the caller chooses what E means (E − E(separated atoms)
+ * in eV, say) and says so in `title` and `unit` -- this component never
+ * guesses a method, a bond, or a scale of its own. Task 7a: it keeps its
+ * axis labels and the reference rule's label; the method and the zero are
+ * said in Info (bondsInfo), not under the plot.
  */
 export interface CurveSeries {
     key: string;
@@ -24,7 +27,6 @@ interface PotentialCurvePlotProps {
     /** Scan geometries, ticked on the axis: the keyboard slider steps over these, one point per press. */
     snapRs?: number[];
     referenceR?: { R: number; label: string } | null;
-    caption: string;
     width: number;
     onSelectR?: (R: number) => void;
 }
@@ -67,7 +69,7 @@ function nearestIndex(sorted: number[], R: number): number {
 const axisR = (R: number) => String(Number(R.toFixed(2)));
 
 const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
-    title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, caption, width, onSelectR,
+    title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, width, onSelectR,
 }) => {
     const clipId = useId();
     const plotWidth = width - PAD.left - PAD.right;
@@ -193,12 +195,12 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                 <span>{axisR(xRange[0])}</span>
                 <span>R ({axisR(xRange[1])} a₀ · {(xRange[1] * BOHR_TO_ANGSTROM).toFixed(2)} Å)</span>
             </div>
-            <div className="radial-plot-note">{caption}</div>
             {/* The validity stop / R_e / D_e reference a caller passes is
                 drawn as a rule above; its label is plain text here rather
                 than an SVG <title> (a pointing-device-only tooltip), so it
-                reads for everyone, not just a mouse hovering the rule. */}
-            {referenceR && <div className="radial-plot-note potential-reference-note">{referenceR.label}</div>}
+                reads for everyone, not just a mouse hovering the rule.
+                Task 7a: R_e and D_e with a real subscript, never "_". */}
+            {referenceR && <div className="radial-plot-note potential-reference-note">{withSubscripts(referenceR.label)}</div>}
             {/* The text alternative to the pixels: the current geometry and
                 each curve's value there (series without a value, or whose
                 value falls outside the plotted range, are read as "no value

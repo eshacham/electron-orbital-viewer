@@ -122,7 +122,8 @@ interface ControlsProps {
    * When set, the enclosed fraction does not apply to what is drawn, and this
    * says why: Bonds mode draws a molecule's density at a fixed ρ (ruling
    * T7-a), so the select is disabled rather than left offering a choice that
-   * changes nothing.
+   * changes nothing. Task 7a: in Bonds the why is Info's (bondsInfo), so the
+   * note only disables the select there; Molecules still prints it under it.
    */
   fractionNote?: string;
   /**
@@ -328,7 +329,8 @@ const Controls: React.FC<ControlsProps> = ({
           of the electron enclosed is. The density that achieves it is derived
           per orbital and reported back below. */}
       {/* Task 5: an (i) beside the select explains the enclosed fraction; in Orbitals the helper under it (the iso
-          value) is Info's now, with its unit (basicInfo). Task 6: in Atoms too (atomInfo). */}
+          value) is Info's now, with its unit (basicInfo). Task 6: in Atoms too (atomInfo). Task 7a: in Bonds too
+          (bondsInfo: the iso value, or why a density is drawn at a fixed ρ). */}
       {showView && atLeast(level, CONTROL_LEVEL.enclosed) && (
         <div className="info-beside-select">
           <FormControl fullWidth margin="normal" size="small">
@@ -347,7 +349,7 @@ const Controls: React.FC<ControlsProps> = ({
                 </MenuItem>
               ))}
             </Select>
-            {!isBasicMode && !isAtomMode && <FormHelperText>
+            {mode === 'molecule' && <FormHelperText>
               {fractionNote
                 ? fractionNote
                 : isoNote
@@ -459,9 +461,9 @@ const Controls: React.FC<ControlsProps> = ({
               <ToggleButton value="y" aria-label="cut along y">Y</ToggleButton>
               <ToggleButton value="z" aria-label="cut along z">Z</ToggleButton>
             </ToggleButtonGroup>
-            {/* Task 5: in Orbitals what a cut removes is Info's now (basicInfo); Task 6: in Atoms too (atomInfo). A
-                disabled cut still says why. */}
-            {(noSurface || !(isBasicMode || isAtomMode)) && <FormHelperText className="cut-help" sx={{ mx: 0 }}>
+            {/* Task 5: in Orbitals what a cut removes is Info's now (basicInfo); Task 6: in Atoms too (atomInfo); Task 7a:
+                in Bonds too (bondsInfo). A disabled cut still says why. */}
+            {(noSurface || mode === 'molecule') && <FormHelperText className="cut-help" sx={{ mx: 0 }}>
               {noSurface ? NO_SURFACE_NOTES.cut : cutHelpText(surfaceStyle.clipAxis, isMeshLevel)}
             </FormHelperText>}
             {surfaceStyle.clipAxis !== 'none' && (
