@@ -34,8 +34,8 @@ describe("bondOrderSelectText's paramagnetic marker (ruling T23e-B2)", () => {
 });
 
 /**
- * Ruling T23e-COHF: the System select and the footer (BondsPanel.tsx,
- * mo_diagram.ts' bondOrderText/heteronuclearBondOrderText) now read the same
+ * Ruling T23e-COHF: the System select and Info's bond order (bonds_info.ts,
+ * mo_diagram.ts' bondOrderText/bondOrderNote) now read the same
  * TEXTBOOK_BOND_ORDER, so they cannot state two different numbers for the
  * same molecule. For the eight homonuclear systems this is also a real,
  * independent check: `bondOrderFromOrbitals` over the shipped data's own
@@ -67,7 +67,7 @@ describe('the select and the footer cannot disagree', () => {
 
     // CO and HF: bondOrderFromOrbitals returns null for both (no antibonding star in their
     // labels), so there is no independent source beyond TEXTBOOK_BOND_ORDER; this just pins
-    // the select to it, the same constant the footer reads (BondsPanel.tsx, heteronuclearBondOrderText).
+    // the select to it, the same constant Info's bond order reads (bonds_info.ts, bondOrderNote).
     it.each(['co', 'hf'] as const)('%s has no independent occupations to check, so both read TEXTBOOK_BOND_ORDER directly', id => {
         expect(bondOrderSelectText(id)).toContain(`order ${TEXTBOOK_BOND_ORDER[id]}`);
     });

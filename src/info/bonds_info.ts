@@ -170,7 +170,7 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
         ? `The computed energies for ${formula} are only a rough guide: no single arrangement of its electrons describes it well, and the methods used here start from one.`
         : null;
     // He₂: the footer said "no bond" to every level, under the diagram; it does here.
-    const noBond = !exact && meta && order === 0 ? `${bondOrderText(0)}.` : null;
+    const noBond = !exact && meta && order === 0 ? bondOrderText(0) : null;
 
     // --- Key facts, each from the level that reads it.
     const facts: InfoFact[] = [];

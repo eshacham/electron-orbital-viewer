@@ -270,6 +270,7 @@ describe('bondsInfo (Task 7a)', () => {
         it('says at Basics that there is no bond, with a bond order of 0', () => {
             const shown = shownAt(he2(), 'basics');
             expect(shown).toContain('Bond order 0 — no bond: the antibonding electrons cancel the bonding ones.');
+            expect(shown).not.toContain('..');
             expect(shown).toContain('Bond order0');
         });
 
