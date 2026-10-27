@@ -20,8 +20,13 @@ export const BASIC_ORBITALS_ABOUT = 'One electron, Z = 1 — the exact solution,
 
 export interface BasicExploreProps {
     selection: BasicSelection;
-    /** Dispatches setBasicSelection, as App's old setN/setL/setMl did. */
+    /** Dispatches setBasicSelection, as App's old setN/setL/setMl did. The rows' own corrections use it. */
     onChange(change: Partial<BasicSelection>): void;
+    /**
+     * A chip pressed (ruling T2-I1): App's way back from a combination held below Advanced -- it leaves the
+     * combination, then selects. Defaults to `onChange`.
+     */
+    onPick?(change: Partial<BasicSelection>): void;
     combination: CombinationSelection;
     onCombinationChange(selection: CombinationSelection): void;
     /** Task 2: the learning level in use -- the Combination picker appears at Advanced. Omitted, everything shows. */
@@ -37,9 +42,12 @@ const N_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
  * Replaces the n/l/mₗ selects and the "Update Orbital" button that used to
  * live in `Controls.tsx`'s selection half.
  */
-const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, combination, onCombinationChange, level = 'research' }) => {
+const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick = onChange, combination, onCombinationChange, level = 'research' }) => {
     const { n, l, ml } = selection;
     const combinationActive = combination.kind !== 'none';
+    // Ruling T2-I1: below Advanced the Combination picker is hidden, so the chips stay live -- a press is the way
+    // back to one orbital (App's onPick leaves the combination first). At Advanced they wait, disabled, as before.
+    const chipsFrozen = combinationActive && atLeast(level, CONTROL_LEVEL.combinations);
 
     const lOptions = React.useMemo(() => Array.from({ length: n }, (_, i) => i), [n]);
     const mlOptions = React.useMemo(() => Array.from({ length: 2 * l + 1 }, (_, i) => i - l), [l]);
@@ -100,8 +108,8 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, combin
                         className={`basic-chip${value === n ? ' selected' : ''}`}
                         label={`n = ${value}`}
                         aria-pressed={value === n}
-                        disabled={combinationActive}
-                        onClick={() => onChange({ n: value })}
+                        disabled={chipsFrozen}
+                        onClick={() => onPick({ n: value })}
                     />
                 ))}
             </Box>
@@ -113,8 +121,8 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, combin
                         className={`basic-chip${value === l ? ' selected' : ''}`}
                         label={`${n}${shellLetter(value)} subshell`}
                         aria-pressed={value === l}
-                        disabled={combinationActive}
-                        onClick={() => onChange({ l: value })}
+                        disabled={chipsFrozen}
+                        onClick={() => onPick({ l: value })}
                     />
                 ))}
             </Box>
@@ -126,8 +134,8 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, combin
                         className={`basic-chip${value === ml ? ' selected' : ''}`}
                         label={`${orbitalName(n, l, value)} orbital`}
                         aria-pressed={value === ml}
-                        disabled={combinationActive}
-                        onClick={() => onChange({ ml: value })}
+                        disabled={chipsFrozen}
+                        onClick={() => onPick({ ml: value })}
                     />
                 ))}
             </Box>

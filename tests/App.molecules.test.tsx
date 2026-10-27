@@ -1144,3 +1144,47 @@ describe('Molecules mode', () => {
         });
     });
 });
+
+describe('Molecules at Basics (Task 2, fix round 1)', () => {
+    // Task 2: these tests read Molecules at the Basics level.
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'basics'); });
+    afterEach(() => { window.localStorage.removeItem('eov.level'); window.localStorage.removeItem('eov.display'); });
+    const originalMatchMedia = window.matchMedia;
+    afterEach(() => { window.matchMedia = originalMatchMedia; });
+
+    // Ruling T2-I2: the switch is Explore's, but the arrow drawn keeps its value, caveat and sign convention.
+    it('keeps the dipole arrow\'s value, caveat and convention beside it, with no switch', async () => {
+        const { store, container } = await enterMolecules(false);
+        act(() => {
+            store.dispatch(selectMolecule({ id: 'o3' }));
+            store.dispatch(metaLoaded({ id: 'o3', meta: waterMeta({ id: 'o3', name: 'Ozone', caveat: 'Ozone has strong multireference character.' }) }));
+        });
+        const viewPanel = container.querySelector('.view-panel') as HTMLElement;
+        expect(within(viewPanel).queryByRole('checkbox', { name: 'Dipole arrow' })).toBeNull();
+        expect(within(viewPanel).getByText(/μ = 1\.86 D .*Ozone has strong multireference character\./)).toBeInTheDocument();
+        expect(within(viewPanel).getByText(/The arrow points from − to \+ \(the physics convention\)/)).toBeInTheDocument();
+    });
+
+    // Ruling T2-energies: orbital energies are Explore's; the list keeps names, occupancy and the frontier chips.
+    it('lists the orbitals without their energies', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
+        const list = container.querySelector('.molecule-orbital-list') as HTMLElement;
+        expect(list.querySelector('.molecule-orbital-energy')).toBeNull();
+        expect(list).not.toHaveTextContent(/Ha/);
+        expect(within(list).getByRole('button', { name: /1b1.*HOMO/ })).toBeInTheDocument();
+        expect(list).toHaveTextContent('↑↓');
+    });
+
+    // Ruling T2-M7: structure options are Explore's, so the strip offers no Space filling tile at Basics.
+    it('leaves the Space filling tile out of the strip', async () => {
+        const { store } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        const strip = screen.getByRole('listbox', { name: 'views of this molecule' });
+        expect(within(strip).getByRole('option', { name: 'Ball and stick structure' })).toBeInTheDocument();
+        expect(within(strip).queryByRole('option', { name: 'Space filling structure' })).toBeNull();
+    });
+});

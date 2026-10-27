@@ -155,7 +155,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({
                 <Divider />
                 {/* Flat, not a nested group: MUI's MenuList moves focus over its own children only. Each
                     radio's name says what it chooses ("Opens at Basics"), holding its visible label. */}
-                <ListSubheader className="share-menu-heading">Opens at</ListSubheader>
+                <ListSubheader>Opens at</ListSubheader>
                 {OPENS_AT.map(option => {
                     const checked = option.value === opensAt;
                     return (
@@ -252,7 +252,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({
             <Dialog open={manualUrl !== null} onClose={() => setManualUrl(null)} fullWidth>
                 <DialogTitle>Copy this link</DialogTitle>
                 <DialogContent>
-                    {copiedAt && <p className="ql-caption share-opens-at">Opens at {LEVEL_LABEL[copiedAt]}</p>}
+                    {copiedAt && <p className="ql-caption">Opens at {LEVEL_LABEL[copiedAt]}</p>}
                     <TextField
                         value={manualUrl ?? ''}
                         fullWidth

@@ -1,4 +1,4 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Button, Popover } from '@mui/material';
 import { LEVELS, LEVEL_LABEL, LearningLevel } from './levels';
 import { useLevel } from './useLevel';
@@ -25,28 +25,38 @@ const LevelControl: React.FC<LevelControlProps> = ({ variant }) => {
     return <LevelRadios variant={variant} />;
 };
 
-/** Below 1024 px: "Explore ▾" opens the four levels as the phone's list does. Label in name: "Learning level: Explore". */
+/**
+ * Below 1024 px: "Explore ▾" opens the four levels as the phone's list does, in a dialog (fix round 1, M4: named so,
+ * with focus on the level in use as it opens). Label in name: "Learning level: Explore".
+ */
 const CompactLevelControl: React.FC = () => {
     const { level } = useLevel();
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
     return (
         <>
             <Button size="small" className="level-control-button" aria-label={`Learning level: ${LEVEL_LABEL[level]}`}
-                aria-haspopup="true" aria-expanded={anchor !== null} onClick={event => setAnchor(event.currentTarget)}>
+                aria-haspopup="dialog" aria-expanded={anchor !== null} onClick={event => setAnchor(event.currentTarget)}>
                 {LEVEL_LABEL[level]} ▾
             </Button>
             <Popover open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} slotProps={{ paper: { className: 'level-control-popover' } }}>
-                <LevelRadios variant="menu" />
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                slotProps={{ paper: { className: 'level-control-popover', role: 'dialog', 'aria-label': 'Learning level' } as object }}>
+                <LevelRadios variant="menu" focusChecked />
             </Popover>
         </>
     );
 };
 
-const LevelRadios: React.FC<{ variant: 'segmented' | 'menu' }> = ({ variant }) => {
+/** `focusChecked`: on mount, focus goes to the checked level (the compact dialog's first stop). */
+const LevelRadios: React.FC<{ variant: 'segmented' | 'menu'; focusChecked?: boolean }> = ({ variant, focusChecked = false }) => {
     const { level, setLevel } = useLevel();
     const labelId = useId();
     const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+    // Runs before the Popover's own focus trap, which then leaves focus where it is (inside it).
+    useEffect(() => {
+        if (focusChecked) buttons.current[LEVELS.indexOf(level)]?.focus();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [focusChecked]);
 
     const choose = (index: number) => {
         setLevel(LEVELS[index]);

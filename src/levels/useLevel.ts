@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { usePref } from '../design/usePref';
-import { clearVisit, levelPref, subscribeVisit, visitLevel } from './level_pref';
+import { clearVisit, levelPref, subscribeVisit, visitId, visitLevel } from './level_pref';
 import { levelRank, LearningLevel } from './levels';
 
 export interface LevelState {
@@ -10,6 +10,8 @@ export interface LevelState {
     stored: LearningLevel;
     /** This visit shows more than the stored level -- the visit notice says so. */
     raised: boolean;
+    /** Which link raised it (level_pref.ts `visitId`): a notice dismissed for one link shows again for the next. */
+    visitId: number;
     /** The viewer's choice: stored, and it ends any visit raise (the choice is now theirs). */
     setLevel(level: LearningLevel): void;
 }
@@ -21,10 +23,11 @@ export interface LevelState {
 export function useLevel(): LevelState {
     const stored = usePref(levelPref);
     const visit = useSyncExternalStore(subscribeVisit, visitLevel, visitLevel);
+    const link = useSyncExternalStore(subscribeVisit, visitId, visitId);
     const raised = visit !== null && levelRank(visit) > levelRank(stored);
     const setLevel = useCallback((level: LearningLevel) => {
         levelPref.set(level);
         clearVisit();
     }, []);
-    return { level: raised ? visit : stored, stored, raised, setLevel };
+    return { level: raised ? visit : stored, stored, raised, visitId: link, setLevel };
 }

@@ -63,6 +63,28 @@ describe('MoleculeOrbitalList', () => {
             expect(labels()).toEqual(['o9', 'o8', 'o7', 'o6', 'o5', 'o4', 'o3', 'o2', 'o0']);
         });
 
+        // Ruling T2-M9: a degenerate pair at either edge of the window comes in whole (benzene's e1g/e2u pattern).
+        it('widens the window rather than split a degenerate pair at its edge', () => {
+            const paired = ladder.map(o => ({ ...o }));
+            // o1/o2 (HOMO−4/HOMO−3) and o9/o10 (LUMO+3/LUMO+4) become degenerate pairs.
+            paired[1].energyHartree = paired[2].energyHartree;
+            paired[10].energyHartree = paired[9].energyHartree;
+            render(<MoleculeOrbitalList orbitals={paired} selectedIndex={null} onSelect={() => {}} allOrbitals={false}
+                method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+            expect(labels()).toEqual(expect.arrayContaining(['o10', 'o9', 'o2', 'o1']));
+            expect(labels()).not.toContain('o0');
+            expect(labels()).not.toContain('o11');
+        });
+
+        // Ruling T2-energies: below Explore the rows keep their names, occupancy and chips, not their energies.
+        it('drops the energy column when energies are hidden', () => {
+            const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
+                showEnergies={false} method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+            expect(container.querySelector('.molecule-orbital-energy')).toBeNull();
+            expect(screen.getAllByRole('button')[1]).toHaveTextContent('HOMO');
+            expect(container.querySelector('.molecule-orbital-gap')).toBeNull();
+        });
+
         it('says nothing when the window already holds every orbital', () => {
             // Four occupied and four virtual: exactly the window.
             render(<MoleculeOrbitalList orbitals={ladder.slice(2, 10)} selectedIndex={null} onSelect={() => {}} allOrbitals={false}

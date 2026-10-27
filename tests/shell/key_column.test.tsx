@@ -97,7 +97,8 @@ describe('the compact (phone) key wraps rather than running off screen (ruling T
         expect(rule(viewport, '.key-column')).toMatch(/max-width:\s*220px;/);
         const style = strip('../../src/style.css');
         // DB6/DX7: style.css holds the single phone top rule, keyed on --phone-overlay-top; nothing else re-sets it.
-        expect(style.match(/\.key-column\.compact\s*\{[^}]*top:\s*calc\(var\(--phone-overlay-top\) \+ 2px\)/g)).toHaveLength(1);
+        // Task 2 fix round 1 (M2): the same one rule, plus the visit notice's room while it shows (PhoneNoticeSlot).
+        expect(style.match(/\.key-column\.compact\s*\{[^}]*top:\s*calc\(var\(--phone-overlay-top\) \+ var\(--phone-notice-offset, 0px\) \+ 2px\)/g)).toHaveLength(1);
         expect(viewport).not.toMatch(/\.key-column\.compact\s*\{[^}]*top:/);
     });
 

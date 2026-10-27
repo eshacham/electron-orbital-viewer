@@ -70,6 +70,15 @@ describe('LevelControl (Task 2: the level switch)', () => {
 });
 
 describe('LevelControl, compact (below 1024 px)', () => {
+    // Fix round 1 (M4): it opens a dialog holding the radios, and focus lands on the level in use.
+    it('says it opens a dialog, and puts focus on the checked level when it does', () => {
+        render(<LevelControl variant="compact" />);
+        const button = screen.getByRole('button', { name: 'Learning level: Explore' });
+        expect(button).toHaveAttribute('aria-haspopup', 'dialog');
+        fireEvent.click(button);
+        expect(screen.getByRole('radio', { name: 'Explore' })).toHaveFocus();
+    });
+
     it('is one button naming the level, opening the four radios', () => {
         render(<LevelControl variant="compact" />);
         const button = screen.getByRole('button', { name: 'Learning level: Explore' });

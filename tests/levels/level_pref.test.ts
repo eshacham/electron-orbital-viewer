@@ -1,5 +1,5 @@
 import { LEVEL_KEY, levelPref } from '../../src/levels/level_pref';
-import { visitLevel, raiseForVisit, clearVisit, subscribeVisit } from '../../src/levels/level_pref';
+import { visitLevel, raiseForVisit, clearVisit, subscribeVisit, visitId } from '../../src/levels/level_pref';
 
 afterEach(() => {
     window.localStorage.clear();
@@ -57,6 +57,19 @@ describe('the visit raise (in-memory only)', () => {
         raiseForVisit('advanced');
         clearVisit();
         expect(visitLevel()).toBeNull();
+    });
+
+    // Task 2 fix round 1 (M5): the visit notice is dismissed per link, so each link asking for a raise is counted --
+    // a second link to the level already in place too, though the level itself does not move.
+    it('visitId counts every link that asks for a raise, and tells its listeners', () => {
+        const before = visitId();
+        const heard: number[] = [];
+        const unsubscribe = subscribeVisit(() => heard.push(visitId()));
+        raiseForVisit('advanced');
+        raiseForVisit('advanced');
+        unsubscribe();
+        expect(visitLevel()).toBe('advanced');
+        expect(heard).toEqual([before + 1, before + 2]);
     });
 
     it('subscribeVisit fires on a raise and a clear, and unsubscribes cleanly', () => {

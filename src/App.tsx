@@ -163,6 +163,7 @@ import { atLeast, CONTROL_LEVEL, LEVEL_LABEL, type ControlId, type LearningLevel
 import { useLevel } from './levels/useLevel';
 import LevelControl from './levels/LevelControl';
 import LevelLine, { type HeldValue } from './levels/LevelLine';
+import PhoneNoticeSlot from './shell/PhoneNoticeSlot';
 
 /** §8.6: the inspector's 290 px less its 16 px padding each side. */
 const PLOT_WIDTH = LAYOUT.plotWidth;
@@ -252,7 +253,7 @@ function App() {
 
     // Task 2: the learning level in use (stored, or raised for this visit by a link) decides which controls render:
     // a control above it is hidden, not greyed, and one line says where it appears (LevelLine).
-    const { level, stored: storedLevel, raised: levelRaised, setLevel } = useLevel();
+    const { level, stored: storedLevel, raised: levelRaised, visitId, setLevel } = useLevel();
     const shows = useCallback((id: ControlId) => atLeast(level, CONTROL_LEVEL[id]), [level]);
 
     // The Relativity switch shows the effective mode -- the user's choice, or
@@ -289,6 +290,21 @@ function App() {
         (change: Partial<BasicSelection>) => dispatch(setBasicSelection(change)),
         [dispatch]
     );
+    // Ruling T2-I1: a chip pressed or a strip tile chosen while a combination is held below Advanced (its picker
+    // hidden) leaves the combination first, as the ⌘K search's pick does, so the reader always has a way back to
+    // one orbital. The selection is completed and corrected here (l < n, |mₗ| ≤ l), so the redraw that leaving the
+    // combination triggers is already of a valid orbital. (No row correction calls this: they use the one above.)
+    const handleBasicPick = useCallback((change: Partial<BasicSelection>) => {
+        if (combination.kind === 'none' || atLeast(level, CONTROL_LEVEL.combinations)) {
+            dispatch(setBasicSelection(change));
+            return;
+        }
+        const next = { n, l, ml, ...change };
+        if (next.l >= next.n) { next.l = 0; next.ml = 0; }
+        if (Math.abs(next.ml) > next.l) next.ml = 0;
+        dispatch(setBasicSelection(next));
+        dispatch(setCombination(NO_COMBINATION));
+    }, [combination.kind, level, n, l, ml, dispatch]);
     const handleEnclosedFractionChange = useCallback((value: number) => dispatch(setEnclosedFraction(value)), [dispatch]);
     const handleCombinationChange = useCallback((value: CombinationSelection) => dispatch(setCombination(value)), [dispatch]);
     const renderedField = useAppSelector(state => state.orbital.currentField);
@@ -537,8 +553,8 @@ function App() {
     const fullscreenActive = fullscreen.active;
     const toggleFullscreen = fullscreen.toggle;
     const [helpOpen, setHelpOpen] = useState(false);
-    // Task 2: the visit notice, dismissed for the level it was about (a later link raising further says so again).
-    const [visitNoticeDismissed, setVisitNoticeDismissed] = useState<LearningLevel | null>(null);
+    // Task 2: the visit notice, dismissed for the link it was about (fix round 1, M5: every later link says so again).
+    const [visitNoticeDismissed, setVisitNoticeDismissed] = useState<number | null>(null);
     const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
     // The molecule index loads when Molecules opens -- or when someone starts a search (spec §8.3).
     const [searchWantsIndex, setSearchWantsIndex] = useState(false);
@@ -922,13 +938,17 @@ function App() {
     const [lastMoleculeStrip, setLastMoleculeStrip] = useState<MoleculeStripItem[] | null>(null);
     if (builtMoleculeStrip.length > 0 && lastMoleculeStrip !== builtMoleculeStrip) setLastMoleculeStrip(builtMoleculeStrip);
     const moleculeMetaLoading = molecule.isLoadingMeta;
+    // Ruling T2-M7: structure options are Explore's, so at Basics the strip has no Space filling tile (Ball and stick,
+    // the default, stays: it is the bare structure's view).
+    const structureShown = shows('structure');
     const moleculeStrip = useMemo(() => {
-        if (builtMoleculeStrip.length > 0) return builtMoleculeStrip;
-        if (isMoleculeMode && moleculeMetaLoading && lastMoleculeStrip) {
-            return pendingMoleculeStripItems(lastMoleculeStrip, molecule.surface, molecule.representation);
-        }
-        return [];
-    }, [builtMoleculeStrip, isMoleculeMode, moleculeMetaLoading, lastMoleculeStrip, molecule.surface, molecule.representation]);
+        const items = builtMoleculeStrip.length > 0 ? builtMoleculeStrip
+            : isMoleculeMode && moleculeMetaLoading && lastMoleculeStrip
+                ? pendingMoleculeStripItems(lastMoleculeStrip, molecule.surface, molecule.representation)
+                : [];
+        return structureShown ? items
+            : items.filter(item => !('representation' in item.target && item.target.representation === 'space-filling'));
+    }, [builtMoleculeStrip, isMoleculeMode, moleculeMetaLoading, lastMoleculeStrip, molecule.surface, molecule.representation, structureShown]);
     const moleculeNavRef = useRef<MoleculeNavHandle>(null);
     // R25-A-I1: when the "Orbital list" tile was pressed in full screen (where Explore is not shown), the time it
     // asked; the list is revealed once full screen has gone -- the native exit lands a little later, on its own event.
@@ -1302,7 +1322,7 @@ function App() {
     // Task 2: under Configuration, where Charge, Excite and Relativity appear (Advanced) -- or, while one of them
     // still holds a value off its default (a link's Fe²⁺), what the picture keeps showing (ruling PF1).
     const configurationLine = isAtomMode && (
-        <LevelLine level={level} ids={['charge', 'relativity']} held={[
+        <LevelLine level={level} ids={['charge', 'excite', 'relativity']} held={[
             !isNeutralGround(species) && {
                 id: species.charge !== 0 ? 'charge' : 'excite', control: species.charge !== 0 ? 'charge' : 'excitation',
                 what: speciesSymbol(species),
@@ -1398,6 +1418,8 @@ function App() {
         onHideStructure: () => dispatch(setRepresentation('none')),
         // Task 2: below Advanced the list keeps HOMO−3…LUMO+3 and says where the rest are.
         allOrbitals: shows('allOrbitals'),
+        // Ruling T2-energies: and below Explore it lists them without their energies.
+        showEnergies: shows('orbitalEnergies'),
     };
     // Task 12 (ruling P1): Molecules' Explore opens with the header tile (name, formula, "Change ▾" -- a
     // popover on a desktop or tablet, the full-screen picker on a phone). Owner R25-A3: the quick pick that sat
@@ -1502,12 +1524,13 @@ function App() {
     if (render.finish === 'glow' && drawsGlow) displayIds.push('advancedAppearance');
     const displayHeld: (HeldValue | false)[] = [
         isMoleculeMode && molecule.representation !== 'ball-and-stick' && {
-            id: 'structure', control: 'structure', what: molecule.representation === 'none' ? 'no structure' : 'space filling',
+            id: 'structure', control: 'structure',
+            what: molecule.representation === 'none' ? 'the surface without its structure' : 'the space-filling structure',
         },
         isMoleculeMode && display.moleculeLabels && { id: 'bondLabels', control: 'bond-label', what: 'bond lengths and angles' },
         // The arrow is on by default (moleculeSlice), so the value held is its absence.
-        isMoleculeMode && !molecule.showDipole && { id: 'dipole', control: 'dipole', what: 'no dipole arrow' },
-        isAtomMode && !display.showAxes && { id: 'axes', control: 'axes', what: 'no axes' },
+        isMoleculeMode && !molecule.showDipole && { id: 'dipole', control: 'dipole', what: 'the molecule without its dipole arrow' },
+        isAtomMode && !display.showAxes && { id: 'axes', control: 'axes', what: 'the view without axes' },
         enclosedFraction !== DEFAULT_ENCLOSED_FRACTION && {
             id: 'enclosed', control: 'enclosed-fraction', what: `a ${Math.round(enclosedFraction * 100)} % contour`,
         },
@@ -1543,6 +1566,7 @@ function App() {
         <BasicExplore
             selection={{ n, l, ml }}
             onChange={handleBasicSelectionChange}
+            onPick={handleBasicPick}
             combination={combination}
             onCombinationChange={handleCombinationChange}
             level={level}
@@ -1833,7 +1857,7 @@ function App() {
                     <>
                         {basicStrip.length > 0 && (
                             <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
-                                onSelect={handleBasicSelectionChange} variant="sheet" />
+                                onSelect={handleBasicPick} variant="sheet" />
                         )}
                         {basicExplore}{basicDisplay}{phoneViewActions}
                     </>
@@ -2012,12 +2036,13 @@ function App() {
 
     // Task 2 (Review Focus 1): a link that needed a higher level raised it for this visit only, and says so -- with
     // the way to keep it. Its own row under the top bar (AppShell), so it covers neither panels nor title.
-    const visitNotice = levelRaised && visitNoticeDismissed !== level && (
-        <Alert severity="info" className="level-visit-notice"
+    // Fix round 1 (M5): role="status" -- it informs, it does not interrupt (MUI's Alert defaults to an assertive alert).
+    const visitNotice = levelRaised && visitNoticeDismissed !== visitId && (
+        <Alert severity="info" role="status" className="level-visit-notice"
             action={(
                 <>
                     <Button color="inherit" size="small" onClick={() => setLevel(level)}>Keep {LEVEL_LABEL[level]}</Button>
-                    <IconButton color="inherit" size="small" aria-label="Dismiss" onClick={() => setVisitNoticeDismissed(level)}>
+                    <IconButton color="inherit" size="small" aria-label="Dismiss" onClick={() => setVisitNoticeDismissed(visitId)}>
                         <Close fontSize="small" />
                     </IconButton>
                 </>
@@ -2099,7 +2124,7 @@ function App() {
                 covers them -- unlike Atoms, no second "Orbital tiles" heading here. */}
             {isBasicMode && !isNarrow && basicStrip.length > 0 && (
                 <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
-                    onSelect={handleBasicSelectionChange} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
+                    onSelect={handleBasicPick} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
             )}
             {/* Task 10: Bonds' strip -- the total density and every orbital, or H₂⁺'s two states. */}
             {isBondsMode && !isNarrow && bondsStrip.length > 0 && (
@@ -2221,8 +2246,9 @@ function App() {
                     {atomError}
                 </Alert>
             )}
-            {/* Task 2: a phone has no notice row under its top bar; the notice sits under its header instead. */}
-            {isNarrow && visitNotice}
+            {/* Task 2: a phone has no notice row under its top bar; the notice takes its own room under the header,
+                moving the overlays there down (fix round 1, M2). */}
+            {isNarrow && visitNotice && <PhoneNoticeSlot>{visitNotice}</PhoneNoticeSlot>}
             {/* Final review I3: Cognito comes back to / with no hash, so a
                 failed sign-in can land on any mode -- by default atom
                 mode, which has no owner corner -- and is said here,

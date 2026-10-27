@@ -25,8 +25,9 @@ interface MoleculeViewOptionsProps {
      */
     caveat?: string | null;
     /**
-     * Task 2: the learning level in use. Structure, the bond labels switch and the dipole arrow (with its
-     * value) appear at Explore -- hidden at Basics, where App's line says so. Omitted, everything shows.
+     * Task 2: the learning level in use. Structure, the bond labels switch and the Dipole arrow switch appear at
+     * Explore -- hidden at Basics, where App's line says so. Ruling T2-I2: while the arrow is drawn, its value, the
+     * caveat and the sign convention stay at every level. Omitted, everything shows.
      */
     level?: LearningLevel;
 }
@@ -58,7 +59,9 @@ const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
     const showStructure = atLeast(level, CONTROL_LEVEL.structure);
     const showLabels = atLeast(level, CONTROL_LEVEL.bondLabels);
     const showDipoleControl = atLeast(level, CONTROL_LEVEL.dipole);
-    if (!showStructure && !showLabels && !showDipoleControl) return null;
+    // Ruling T2-I2: the arrow is never on screen without what it means (and ozone's caveat, ruling T7-O3).
+    const showDipoleText = showDipoleControl || showDipole;
+    if (!showStructure && !showLabels && !showDipoleText) return null;
     return (
         <FormGroup className="molecule-view-options">
             {showStructure && (
@@ -96,8 +99,10 @@ const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
                 </>
             )}
             {showDipoleControl && (
+                <FormControlLabel control={<Switch size="small" checked={showDipole} onChange={e => onShowDipole(e.target.checked)} />} label="Dipole arrow" />
+            )}
+            {showDipoleText && (
                 <>
-                    <FormControlLabel control={<Switch size="small" checked={showDipole} onChange={e => onShowDipole(e.target.checked)} />} label="Dipole arrow" />
                     {dipoleText && (
                         <Typography variant="body2">
                             {dipoleText}{caveat ? ` — ${caveat}` : ''}

@@ -26,18 +26,26 @@ export const levelPref = createPref<LearningLevel>(LEVEL_KEY, { decode: decodeLe
  * without ever touching `levelPref` -- a level is a preference, never
  * something a link sets permanently. In memory only: a reload starts over
  * at the stored level, and `raiseForVisit` never lowers a raise already in
- * place (it is a raise, not an assignment).
+ * place (it is a raise, not an assignment) -- though each call is a new link,
+ * counted by `visitId`.
  */
 let visit: LearningLevel | null = null;
+/** How many links have asked for a raise this session (Task 2 fix round 1: the notice is dismissed per link). */
+let visitSerial = 0;
 const visitListeners = new Set<() => void>();
 
 export function visitLevel(): LearningLevel | null {
     return visit;
 }
 
+/** Which link's raise is in place: a new one each time a link asks, even for the level already raised to. */
+export function visitId(): number {
+    return visitSerial;
+}
+
 export function raiseForVisit(level: LearningLevel): void {
-    if (visit !== null && levelRank(visit) >= levelRank(level)) return;
-    visit = level;
+    visitSerial += 1;
+    if (visit === null || levelRank(visit) < levelRank(level)) visit = level;
     visitListeners.forEach(listener => listener());
 }
 

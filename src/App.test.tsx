@@ -2341,17 +2341,17 @@ describe('learning levels (Task 2)', () => {
         act(() => clearVisit());
     });
 
-    it('at Explore, Atoms hides Charge and relativity and says where they appear; Advanced shows them', () => {
+    it('at Explore, Atoms hides Charge, Excite and relativity and says where they appear; Advanced shows them', () => {
         renderWithProvider(<App />, { Z: 11 });
         expect(screen.queryByRole('button', { name: 'increase charge' })).toBeNull();
         expect(screen.queryByText('Charge')).toBeNull();
         expect(screen.queryByRole('group', { name: 'relativity treatment' })).toBeNull();
-        expect(screen.getByText('Charge and relativity appear at Advanced')).toBeInTheDocument();
+        expect(screen.getByText('Charge, excitation and relativity appear at Advanced')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('radio', { name: 'Advanced' }));
         expect(screen.getByRole('button', { name: 'increase charge' })).toBeInTheDocument();
         expect(screen.getByRole('group', { name: 'relativity treatment' })).toBeInTheDocument();
-        expect(screen.queryByText('Charge and relativity appear at Advanced')).toBeNull();
+        expect(screen.queryByText('Charge, excitation and relativity appear at Advanced')).toBeNull();
     });
 
     it('the level switch sits in the top bar, between the mode tabs and the search', () => {
@@ -2399,6 +2399,66 @@ describe('learning levels (Task 2)', () => {
         expect(screen.getByText('Showing Fe²⁺ — charge controls appear at Advanced')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'increase charge' })).toBeNull();
         expect(screen.queryByText(/Opened at Advanced/)).toBeNull();
+    });
+
+    // Fix round 1 (M5): an informational notice, heard politely; its dismissal belongs to the one link.
+    it('says the raise politely, and a later link to the same level says so again after a dismissal', async () => {
+        const { store } = renderWithProvider(<App />);
+        act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
+        await waitFor(() => expect(store.getState().atom.charge).toBe(2));
+        const notice = screen.getByText('Opened at Advanced for this link — your level stays Explore.').closest('.level-visit-notice')!;
+        expect(notice).toHaveAttribute('role', 'status');
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        expect(screen.queryByText(/Opened at Advanced/)).toBeNull();
+        act(() => { window.location.hash = '#mode=atom&Z=11&charge=1'; });
+        await waitFor(() => expect(store.getState().atom.Z).toBe(11));
+        expect(screen.getByText('Opened at Advanced for this link — your level stays Explore.')).toBeInTheDocument();
+    });
+
+    // Fix round 1 (M2): on a phone the notice takes its own room under the header, and the overlays there move down.
+    it('on a phone, makes room for the notice rather than covering the scale bar and key', async () => {
+        installMatchMedia(true);
+        try {
+            const { store, container } = renderWithProvider(<App />);
+            const viewport = container.querySelector('#canvas-container') as HTMLElement;
+            expect(viewport.style.getPropertyValue('--phone-notice-offset')).toBe('');
+            act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
+            await waitFor(() => expect(store.getState().atom.charge).toBe(2));
+            const slot = container.querySelector('.phone-notice-slot') as HTMLElement;
+            expect(slot).toContainElement(screen.getByText(/Opened at Advanced/));
+            expect(viewport.style.getPropertyValue('--phone-notice-offset')).toMatch(/px$/);
+            fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+            expect(viewport.style.getPropertyValue('--phone-notice-offset')).toBe('');
+        } finally {
+            window.matchMedia = originalMatchMediaForLevels;
+        }
+    });
+
+    // Ruling T2-I1: below Advanced the combination picker is hidden, so a chip press is the way back to one orbital.
+    it('below Advanced, a chip press leaves a held combination and draws the single orbital', () => {
+        window.localStorage.setItem('eov.level', 'research');
+        const { store } = renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
+        fireEvent.click(within(screen.getByRole('listbox')).getByText('sp³'));
+        expect(store.getState().orbital.combination.kind).toBe('hybrid');
+        fireEvent.click(screen.getByRole('radio', { name: 'Explore' }));
+        expect(screen.getByText('Showing hybrid orbitals — combination controls appear at Advanced')).toBeInTheDocument();
+        const chip = screen.getByRole('button', { name: 'n = 2' });
+        expect(chip).not.toHaveAttribute('aria-disabled', 'true');
+        fireEvent.click(chip);
+        expect(store.getState().orbital.combination.kind).toBe('none');
+        expect(store.getState().orbital.currentField).toBeNull();
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, Z: 1 });
+        expect(window.localStorage.getItem('eov.level')).toBeNull();
+    });
+
+    // Fix round 1 (M8): a held value reads as what is on screen.
+    it('says the axes are hidden, in plain words, where the axes switch would be', () => {
+        window.localStorage.setItem('eov.level', 'basics');
+        window.localStorage.setItem('eov.display', JSON.stringify({ showAxes: false }));
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        expect(screen.getByText('Showing the view without axes — axes controls appear at Explore')).toBeInTheDocument();
     });
 
     it('Keep <level> stores the raised level and ends the notice', async () => {
