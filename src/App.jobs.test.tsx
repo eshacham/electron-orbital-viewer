@@ -101,7 +101,10 @@ describe('Molecules mode with on-demand molecules', () => {
         const { store, container } = await enterMolecules(false);
         await show(store, 'h2o');
         const side = container.querySelector('.side-panel') as HTMLElement;
-        expect(within(side).getByRole('button', { name: 'How this was computed' })).toBeInTheDocument();
+        // Ruling PF5 (Task 7b): "How this was computed" is Info's (the right panel), open at this file's Research.
+        const computed = container.querySelector('.view-panel .info-section details.info-computed') as HTMLDetailsElement;
+        expect(computed.open).toBe(true);
+        expect(computed).toHaveTextContent('Method: B3LYP/def2-TZVP');
         // Task 16 (ruling P12): on a desktop the request's entry is a button that opens the workspace.
         expect(within(side).queryByRole('button', { name: 'Request a new molecule' })).toBeNull();
         // Ruling R22c: the tier line moved from the canvas's legend stack into the title block.
@@ -138,8 +141,10 @@ describe('Molecules mode with on-demand molecules', () => {
         // Anyone may open a computed molecule's link, and is told what it is.
         // Ruling R22c: the tier line moved from the canvas's legend stack into the title block.
         expect(container.querySelector('.viewport-title')).toHaveTextContent('Computed');
-        fireEvent.click(within(side).getByRole('button', { name: 'How this was computed' }));
+        // Ruling PF5 (Task 7b): "How this was computed" is Info's, open at Research -- the computed molecule's recipe,
+        // and no owner time or cost for a visitor.
         await flush();
+        expect(container.querySelector('.view-panel details.info-computed')).toHaveTextContent('Ran on This Mac');
         expect(screen.queryByText(/Owner only/)).toBeNull();
         expect(screen.queryByText(/Cost:/)).toBeNull();
     });
@@ -171,8 +176,8 @@ describe('Molecules mode with on-demand molecules', () => {
     });
 
     // Review M4 (Task 12): the owner's jobs section is part of the Explore order -- header tile, the surface
-    // switch, Selection, then jobs -- inside the part that scrolls, with the footer pinned below it. (Owner R25-A3
-    // removed the quick pick from after the tile.)
+    // switch, Selection, then jobs -- inside the part that scrolls. (Owner R25-A3 removed the quick pick from after
+    // the tile; ruling PF5, Task 7b, the footer pinned below it -- "How this was computed" is Info's.)
     it('puts the owner\'s jobs after Selection, inside the scrolling part of Explore', async () => {
         BUILD_ENV.dev = true;
         const { store, container } = await enterMolecules(false);
@@ -187,13 +192,12 @@ describe('Molecules mode with on-demand molecules', () => {
             within(side).getByRole('group', { name: 'Surface' }) /* R25-A4: named by its visible label */,
             within(side).getByText('Selection'),
             jobs,
-            side.querySelector('.molecule-provenance-footer') as HTMLElement,
         ];
         for (let i = 1; i < order.length; i++) {
             expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         }
         expect(scroll.contains(jobs)).toBe(true);
-        expect(scroll.contains(order[order.length - 1])).toBe(false);
+        expect(side.querySelector('.molecule-provenance-footer')).toBeNull();
     });
 
     // Owner R25-A1: on This Mac, a job server that is not running is the usual state, not a fault -- one muted
@@ -244,9 +248,10 @@ describe('Molecules mode with on-demand molecules', () => {
         await show(store, KEY);
         // Ruling R22c: the tier line moved from the canvas's legend stack into the title block.
         expect(container.querySelector('.viewport-title')).toHaveTextContent('Computed');
-        fireEvent.click(screen.getByRole('button', { name: 'How this was computed' }));
+        // Ruling PF5 (Task 7b): Info's "How this was computed" (open at Research) gives the owner its time and cost; App
+        // fetches the record now that the pinned footer that did is gone.
         await flush();
-        expect(screen.getByText(/Cost: spent \$0\.00 \(This Mac\)\./)).toBeInTheDocument();
+        expect(container.querySelector('.view-panel details.info-computed')).toHaveTextContent(/Cost: spent \$0\.00 \(This Mac\)\./);
     });
 
     // Preflight D12: spec §9.1's "always visible" -- with the structure off
@@ -279,14 +284,17 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(container.querySelector('.tier-badge')).toBeNull();
     });
 
-    it("puts the owner's panels in the phone's Explore tab", async () => {
+    // Ruling PF5 (Task 7b): "How this was computed" is the phone's Info tab's, not the Explore tab's.
+    it("puts the owner's panels in the phone's Explore tab, and how a molecule was computed in its Info tab", async () => {
         BUILD_ENV.dev = true;
         const { store } = await enterMolecules(true);
         await show(store, 'h2o');
         fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
         const sheet = screen.getByRole('tabpanel');
-        expect(within(sheet).getByRole('button', { name: 'How this was computed' })).toBeInTheDocument();
+        expect(within(sheet).queryByText('How this was computed')).toBeNull();
         expect(within(sheet).getByRole('button', { name: 'Request a molecule' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
+        expect(screen.getByRole('tabpanel').querySelector('details.info-computed')).toHaveTextContent('Method: B3LYP/def2-TZVP');
     });
 
     // Final review I2: tapping the open Explore tab folds the sheet and

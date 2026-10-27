@@ -34,5 +34,11 @@ export interface InfoContent {
     /** One paragraph, or (Task 6 fix round 1, M7) a list of short paragraphs, one idea each. */
     technical?: React.ReactNode | React.ReactNode[];
     facts?: InfoFact[];
+    /**
+     * Task 7b: short notes read at every level, after the facts -- what qualifies the numbers or the picture (Molecules'
+     * Kohn–Sham caveat, what the sticks show, the arrow's convention), kept out of `plain` so the facts stay above
+     * Info's fold. A builder decides by level which notes concern what the level shows.
+     */
+    notes?: React.ReactNode;
     computed?: React.ReactNode;
 }

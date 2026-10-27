@@ -21,7 +21,6 @@ import { ELEMENTS, elementLabel } from '../elements';
 import { ViewMode, ViewLevel } from '../store/atomSlice';
 import { CombinationSelection, NO_COMBINATION } from '../combinations';
 import type { RelativityMode } from '../atom/relativity';
-import { cutHelpText } from '../atom/atom_text';
 import { KEEP_CASE } from '../design/mui';
 import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
 import InfoButton from '../info/InfoButton';
@@ -73,8 +72,6 @@ interface ControlsProps {
   combination?: CombinationSelection;
   initialEnclosedFraction: number;
   onEnclosedFractionChange: (value: number) => void;
-  /** The density contour the last render actually used, or null before one. */
-  isoLevel: number | null;
   onUpdateOrbital: (params: OrbitalParams) => void;
   surfaceStyle: SurfaceStyle;
   onSurfaceStyleChange: (change: Partial<SurfaceStyle>) => void;
@@ -123,16 +120,12 @@ interface ControlsProps {
    * says why: Bonds mode draws a molecule's density at a fixed ρ (ruling
    * T7-a), so the select is disabled rather than left offering a choice that
    * changes nothing. Task 7a: in Bonds the why is Info's (bondsInfo), so the
-   * note only disables the select there; Molecules still prints it under it.
+   * note only disables the select there; Task 7b: in Molecules too (an ESP map's
+   * fixed surface, moleculeInfo), except with no surface drawn (`noSurface`),
+   * where it stays under the select beside Opacity's and Cut away's own reasons.
+   * The contour a fraction produced (ruling D22's old isoNote) is Info's.
    */
   fractionNote?: string;
-  /**
-   * Replaces the helper text under the enclosed fraction *without* disabling
-   * it (ruling D22): Molecules mode still draws its density and orbitals at
-   * a fraction, and says which contour that produced -- ρ in e/a₀³ for a
-   * density, which the |ψ|² wording would misname.
-   */
-  isoNote?: string;
   /**
    * Task 2: the learning level in use. The Electron enclosed select and the Surface style finish appear at
    * Advanced -- hidden below it, not greyed (App says where they appear). Omitted, everything shows.
@@ -221,7 +214,6 @@ const Controls: React.FC<ControlsProps> = ({
   initialMl,
   combination = NO_COMBINATION,
   initialEnclosedFraction, onEnclosedFractionChange,
-  isoLevel,
   onUpdateOrbital,
   surfaceStyle,
   onSurfaceStyleChange,
@@ -234,7 +226,6 @@ const Controls: React.FC<ControlsProps> = ({
   relativity,
   onRelativityChange,
   fractionNote,
-  isoNote,
   level = 'research',
 }) => {
   const isAtomMode = mode === 'atom';
@@ -349,15 +340,9 @@ const Controls: React.FC<ControlsProps> = ({
                 </MenuItem>
               ))}
             </Select>
-            {mode === 'molecule' && <FormHelperText>
-              {fractionNote
-                ? fractionNote
-                : isoNote
-                ? isoNote
-                : isoLevel === null
-                    ? 'contour of constant |ψ|²'
-                    : `|ψ|² = ${isoLevel.toExponential(2)}`}
-            </FormHelperText>}
+            {/* Task 7b: in Molecules too the contour's value and the ESP map's fixed surface are Info's (moleculeInfo);
+                with no surface drawn the select is disabled and says why here, as Opacity and Cut away do. */}
+            {noSurface && fractionNote && <FormHelperText>{fractionNote}</FormHelperText>}
           </FormControl>
           <InfoButton topic="enclosed" label="Enclosed fraction" />
         </div>
@@ -462,10 +447,8 @@ const Controls: React.FC<ControlsProps> = ({
               <ToggleButton value="z" aria-label="cut along z">Z</ToggleButton>
             </ToggleButtonGroup>
             {/* Task 5: in Orbitals what a cut removes is Info's now (basicInfo); Task 6: in Atoms too (atomInfo); Task 7a:
-                in Bonds too (bondsInfo). A disabled cut still says why. */}
-            {(noSurface || mode === 'molecule') && <FormHelperText className="cut-help" sx={{ mx: 0 }}>
-              {noSurface ? NO_SURFACE_NOTES.cut : cutHelpText(surfaceStyle.clipAxis, isMeshLevel)}
-            </FormHelperText>}
+                in Bonds too (bondsInfo); Task 7b: in Molecules too (moleculeInfo). A disabled cut still says why. */}
+            {noSurface && <FormHelperText className="cut-help" sx={{ mx: 0 }}>{NO_SURFACE_NOTES.cut}</FormHelperText>}
             {surfaceStyle.clipAxis !== 'none' && (
               <>
                 <FormLabel sx={{ mt: 1.5, fontSize: '0.75rem' }} id="cut-depth-label">

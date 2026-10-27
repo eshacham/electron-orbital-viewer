@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { FormControl, FormControlLabel, FormGroup, FormLabel, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { FormControl, FormControlLabel, FormGroup, FormLabel, Switch, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import type { Representation } from '../molecules/ball_and_stick';
 import { KEEP_CASE } from '../design/mui';
 import { displayPref } from '../design/presentation';
@@ -12,22 +12,13 @@ interface MoleculeViewOptionsProps {
     onRepresentationChange: (representation: Representation) => void;
     /** Why this molecule cannot be drawn space-filling (ruling P8b: no tabulated radius for one of its elements), or null. */
     spaceFillingUnavailable: string | null;
-    /** A surface is drawn under the structure -- space filling's spheres can then hide it (ruling T13-M). */
-    surfaceShown: boolean;
     showDipole: boolean;
     onShowDipole: (on: boolean) => void;
-    dipoleText: string | null;
-    /**
-     * Ruling T7-O3: a documented exception to "every number states its
-     * method" (ozone's multireference dipole, from `meta.caveat`). When
-     * given alongside `dipoleText`, it is shown right beside it -- the
-     * dipole is never shown without it.
-     */
-    caveat?: string | null;
     /**
      * Task 2: the learning level in use. Structure, the bond labels switch and the Dipole arrow switch appear at
-     * Explore -- hidden at Basics, where App's line says so. Ruling T2-I2: while the arrow is drawn, its value, the
-     * caveat and the sign convention stay at every level. Omitted, everything shows.
+     * Explore -- hidden at Basics, where App's line says so. Omitted, everything shows. Task 7b: the dipole's value
+     * (with ozone's caveat beside it, ruling T7-O3) and the arrow's sign convention are Info's (moleculeInfo), at every
+     * level while the arrow is drawn (ruling T2-I2).
      */
     level?: LearningLevel;
 }
@@ -43,25 +34,22 @@ const SEGMENTS = [KEEP_CASE, { '& .MuiToggleButton-root': { height: LAYOUT.chip,
  * Molecule-only view settings, shown inside Controls in the right-hand column / View tab: the structure
  * (ruling P8, spec §9.4 View: Ball and stick | Space filling | None), the on-model lengths and angles
  * (ruling P9, a presentation preference read here) and the dipole arrow. Each segment's
- * name holds its visible label (WCAG 2.5.3).
+ * name holds its visible label (WCAG 2.5.3). Task 7b: the notes that stood under them -- what the spheres can hide,
+ * why Space filling is unavailable, what the labels can show, the dipole and its convention -- are Info's; a disabled
+ * control keeps its reason as its accessible description (and Space filling its tooltip).
  */
 const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
-    representation, onRepresentationChange, spaceFillingUnavailable, surfaceShown, showDipole, onShowDipole, dipoleText, caveat,
-    level = 'research',
+    representation, onRepresentationChange, spaceFillingUnavailable, showDipole, onShowDipole, level = 'research',
 }) => {
     const reasonId = useId();
     const labelsNoteId = useId();
     const display = usePref(displayPref);
-    // Ruling P9: what the labels switch draws depends on the structure (bond_labels.ts modelLabels).
-    const labelsNote = representation === 'none' ? 'No structure is drawn, so there is nothing to label.'
-        : representation === 'space-filling' && display.moleculeLabels ? 'Space filling draws no bonds, so only angles are labelled.'
-        : null;
+    // The labels switch is disabled with no structure: its reason, for a screen reader (the words are Info's).
+    const labelsDisabledReason = representation === 'none' ? 'No structure is drawn, so there is nothing to label.' : null;
     const showStructure = atLeast(level, CONTROL_LEVEL.structure);
     const showLabels = atLeast(level, CONTROL_LEVEL.bondLabels);
     const showDipoleControl = atLeast(level, CONTROL_LEVEL.dipole);
-    // Ruling T2-I2: the arrow is never on screen without what it means (and ozone's caveat, ruling T7-O3).
-    const showDipoleText = showDipoleControl || showDipole;
-    if (!showStructure && !showLabels && !showDipoleText) return null;
+    if (!showStructure && !showLabels && !showDipoleControl) return null;
     return (
         <FormGroup className="molecule-view-options">
             {showStructure && (
@@ -79,13 +67,8 @@ const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
                         </span>
                         <ToggleButton value="none" aria-label="None (no structure)">None</ToggleButton>
                     </ToggleButtonGroup>
-                    {representation === 'space-filling' && surfaceShown && (
-                        <Typography variant="caption" className="molecule-caption">The spheres can hide the surface inside them.</Typography>
-                    )}
                     {spaceFillingUnavailable && (
-                        <Typography id={reasonId} variant="caption" className="molecule-caption">
-                            Space filling is unavailable: {spaceFillingUnavailable}
-                        </Typography>
+                        <span id={reasonId} className="visually-hidden">Space filling is unavailable: {spaceFillingUnavailable}</span>
                     )}
                 </FormControl>
             )}
@@ -93,25 +76,13 @@ const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
             {showLabels && (
                 <>
                     <FormControlLabel label="Show bond lengths and angles" disabled={representation === 'none'}
-                        control={<Switch size="small" checked={display.moleculeLabels} inputProps={{ 'aria-describedby': labelsNote ? labelsNoteId : undefined }}
+                        control={<Switch size="small" checked={display.moleculeLabels} inputProps={{ 'aria-describedby': labelsDisabledReason ? labelsNoteId : undefined }}
                             onChange={e => displayPref.set({ ...displayPref.get(), moleculeLabels: e.target.checked })} />} />
-                    {labelsNote && <Typography id={labelsNoteId} variant="caption" className="molecule-caption">{labelsNote}</Typography>}
+                    {labelsDisabledReason && <span id={labelsNoteId} className="visually-hidden">{labelsDisabledReason}</span>}
                 </>
             )}
             {showDipoleControl && (
                 <FormControlLabel control={<Switch size="small" checked={showDipole} onChange={e => onShowDipole(e.target.checked)} />} label="Dipole arrow" />
-            )}
-            {showDipoleText && (
-                <>
-                    {dipoleText && (
-                        <Typography variant="body2">
-                            {dipoleText}{caveat ? ` — ${caveat}` : ''}
-                        </Typography>
-                    )}
-                    <Typography variant="caption" className="molecule-caption">
-                        The arrow points from − to + (the physics convention), 1 a₀ per debye; many chemistry texts draw it the other way.
-                    </Typography>
-                </>
             )}
         </FormGroup>
     );

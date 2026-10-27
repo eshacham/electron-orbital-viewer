@@ -6,10 +6,11 @@ import { fireEvent, render, within } from '@testing-library/react';
 import MoleculePropertiesCard from '../../src/molecule_ui/MoleculePropertiesCard';
 // Task 16d item 7: one import from catalogue (it was imported twice).
 import { formatFormula, multiplicityText } from '../../src/molecules/catalogue';
-import { formatDipole } from '../../src/molecules/dipole';
-import { formatOrbitalEnergy, formatPointGroup, gapTerm, orbitalGaps, GAP_CAVEAT } from '../../src/molecules/orbital_display';
-import { validatedLine } from '../../src/validation/geometry_honesty';
-import { COMPUTED_LINE, TIER_LABEL } from '../../src/components/TierBadge';
+import { dipoleFactText } from '../../src/molecules/dipole';
+import { formatPointGroup, gapTerm, orbitalGaps } from '../../src/molecules/orbital_display';
+import { orbitalEnergyText } from '../../src/format/energy';
+import { nb } from '../../src/format/text';
+import { TIER_LABEL } from '../../src/components/TierBadge';
 import { glycineAtoms, methaneMeta, waterMeta } from '../molecules/fixtures';
 import PreviewDetails from '../../src/components/PreviewDetails';
 import { previewFixture } from '../jobs/api_fixtures';
@@ -34,8 +35,13 @@ function rows(container: HTMLElement) {
 }
 const row = (container: HTMLElement, term: string) => rows(container).find(r => r.term === term);
 
+/** A gap's value as the card (and Info) print it: eV first, Ha in parentheses, held on one line (Task 7b). */
+const gapValue = (hartree: number) => nb(orbitalEnergyText(hartree));
+
 describe('MoleculePropertiesCard (spec §9.4 Properties, ruling P10)', () => {
-    it('gives water\'s rows, in order, with the strings the rest of the app already uses', () => {
+    // Task 7b: values only -- the captions (the gap's Kohn–Sham caveat, the geometry's tier line, the point group's
+    // label note) are Info's, each said once; the gap reads eV first and the dipole in Info's own wording.
+    it('gives water\'s rows, in order, with the strings the rest of the app already uses, and no captions', () => {
         const meta = waterMeta();
         const { container } = render(<MoleculePropertiesCard meta={meta} />);
         const [gap] = orbitalGaps(meta.orbitals);
@@ -44,14 +50,15 @@ describe('MoleculePropertiesCard (spec §9.4 Properties, ruling P10)', () => {
             { term: 'Point group', value: formatPointGroup(meta.symmetry.pointGroup), caption: null },
             { term: 'Electrons', value: String(meta.electronCount), caption: null },
             { term: 'Multiplicity', value: multiplicityText(meta.multiplicity), caption: null },
-            { term: 'Dipole', value: formatDipole(meta), caption: null },
-            { term: gapTerm(gap), value: formatOrbitalEnergy(gap.hartree), caption: GAP_CAVEAT },
-            { term: 'Geometry', value: meta.geometrySource, caption: validatedLine(meta) },
-            // Ruling T12-dup: the tier's name only -- its line is the Geometry caption above (and the title block's).
+            { term: 'Dipole', value: dipoleFactText(meta), caption: null },
+            { term: gapTerm(gap), value: gapValue(gap.hartree), caption: null },
+            { term: 'Geometry', value: meta.geometrySource, caption: null },
+            // Ruling T12-dup: the tier's name only -- its line is the title block's.
             { term: 'Data tier', value: TIER_LABEL.validated, caption: null },
         ]);
-        // The label is the one the orbital list gives the same gap.
+        // The label is the one Info gives the same gap; eV first.
         expect(gapTerm(gap)).toBe('HOMO–LUMO gap');
+        expect(gapValue(gap.hartree).replace(/\u00A0/g, ' ')).toBe('8.71 eV (0.320 Ha)');
     });
 
     it('is a description list with tabular numerals (spec §4.3)', () => {
@@ -59,20 +66,24 @@ describe('MoleculePropertiesCard (spec §9.4 Properties, ruling P10)', () => {
         expect(container.querySelector('dl')).toHaveClass('ql-tabular');
     });
 
-    it('captions the point group with the symmetry\'s label note when there is one', () => {
+    // Task 7b: the point group is typeset (<PointGroupLabel>, ruling T3-pg); its label note is Info's (labelsSentence).
+    it('typesets the point group, with no caption', () => {
         const meta = waterMeta({ symmetry: { pointGroup: 'Dooh', labelGroup: 'D2h', labels: 'subgroup', labelNote: 'labelled in D2h, the subgroup PySCF uses' } });
         const { container } = render(<MoleculePropertiesCard meta={meta} />);
-        expect(row(container, 'Point group')).toEqual({ term: 'Point group', value: formatPointGroup('Dooh'), caption: meta.symmetry.labelNote });
+        expect(row(container, 'Point group')).toEqual({ term: 'Point group', value: formatPointGroup('Dooh'), caption: null });
+        const value = [...container.querySelectorAll('dt')].find(dt => dt.textContent === 'Point group')!.nextElementSibling as HTMLElement;
+        expect(value.querySelector('sub')).toHaveTextContent('∞h');
+        expect(container.textContent).not.toContain(meta.symmetry.labelNote);
     });
 
     it('puts a documented caveat beside the dipole, unseparated (T7-O3, ozone)', () => {
         const caveat = 'Ozone has strong multireference character.';
         const meta = waterMeta({ id: 'o3', name: 'Ozone', caveat });
         const { container } = render(<MoleculePropertiesCard meta={meta} />);
-        expect(row(container, 'Dipole')?.value).toBe(`${formatDipole(meta)} — ${caveat}`);
+        expect(row(container, 'Dipole')?.value).toBe(`${dipoleFactText(meta)} — ${caveat}`);
     });
 
-    it('gives the HOMO–LVMO gap too, captioned, where the LVMO is one of the calculation\'s own orbitals', () => {
+    it('gives the HOMO–LVMO gap too where the LVMO is one of the calculation\'s own orbitals', () => {
         const meta = waterMeta({
             orbitals: [
                 { index: 0, label: '1πg', energyHartree: -0.30, occupation: 2, role: 'HOMO' },
@@ -84,7 +95,8 @@ describe('MoleculePropertiesCard (spec §9.4 Properties, ruling P10)', () => {
         expect(gaps).toHaveLength(2);
         const { container } = render(<MoleculePropertiesCard meta={meta} />);
         for (const gap of gaps) {
-            expect(row(container, gapTerm(gap))).toEqual({ term: gapTerm(gap), value: formatOrbitalEnergy(gap.hartree), caption: GAP_CAVEAT });
+            // Task 7b: no caption -- the Kohn–Sham caveat is Info's, said once.
+            expect(row(container, gapTerm(gap))).toEqual({ term: gapTerm(gap), value: gapValue(gap.hartree), caption: null });
         }
         expect(gaps.map(gapTerm)).toEqual(['HOMO–LUMO gap', 'HOMO–LVMO gap']);
     });
@@ -113,14 +125,15 @@ describe('MoleculePropertiesCard (spec §9.4 Properties, ruling P10)', () => {
             ],
         });
         const { container } = render(<MoleculePropertiesCard meta={meta} />);
-        expect(row(container, 'SOMO–LUMO gap')?.value).toBe(formatOrbitalEnergy(orbitalGaps(meta.orbitals)[0].hartree));
+        expect(row(container, 'SOMO–LUMO gap')?.value).toBe(gapValue(orbitalGaps(meta.orbitals)[0].hartree));
         expect(row(container, 'Multiplicity')?.value).toBe(multiplicityText(2));
     });
 
-    it('captions a computed molecule\'s geometry with the computed line, and its tier row names the tier', () => {
+    // Task 7b: the computed line that captioned the geometry is the title block's (TierBadge), not repeated here.
+    it('gives a computed molecule\'s geometry, and its tier row names the tier', () => {
         const meta: Meta = waterMeta({ tier: 'computed', geometrySource: 'optimised (B3LYP-D3(BJ)/def2-SVP)' });
         const { container } = render(<MoleculePropertiesCard meta={meta} />);
-        expect(row(container, 'Geometry')).toEqual({ term: 'Geometry', value: meta.geometrySource, caption: COMPUTED_LINE });
+        expect(row(container, 'Geometry')).toEqual({ term: 'Geometry', value: meta.geometrySource, caption: null });
         expect(row(container, 'Data tier')?.value).toBe(TIER_LABEL.computed);
     });
 

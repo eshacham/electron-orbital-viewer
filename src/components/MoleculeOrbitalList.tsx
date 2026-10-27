@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Chip, Link, Typography } from '@mui/material';
 import {
-    CONSTRUCTED_LABEL, CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, DIFFUSE_NOTE, GAP_CAVEAT, LVMO_NOTE, UNCLASSIFIED_NOTE,
-    VALENCE_THRESHOLD, degeneracyCounts, diffuseDescription, formatOrbitalEnergy, isConstructed, isUpperEstimate, labelNotes,
-    frontierOccupied, gapTerm, labelsSentence, orbitalGaps,
+    CONSTRUCTED_LABEL, CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, degeneracyCounts, diffuseDescription, isConstructed,
+    isUpperEstimate, frontierOccupied, orbitalGaps,
 } from '../molecules/orbital_display';
+import { orbitalEnergyText } from '../format/energy';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 // Task 2: the quiet level line's style (.level-line).
 import '../levels/levels.css';
@@ -13,8 +13,6 @@ interface MoleculeOrbitalListProps {
     orbitals: LibraryMoleculeMeta['orbitals'];
     selectedIndex: number | null;
     onSelect: (index: number) => void;
-    method: string;
-    symmetry: LibraryMoleculeMeta['symmetry'];
     /**
      * Owner R25-A2: non-zero for a moment after the strip's "Orbital list" tile brings the list into view (style.css);
      * R25-A-M1: an even run adds the replay class, so a second press restarts the fade.
@@ -51,10 +49,13 @@ const OCCUPANCY: Record<number, string> = { 2: '↑↓', 1: '↑', 0: '' };
  * LVMO chip); the key explains it, and the accessible name keeps the full words. Never "≈" (Ruling D4-energy). */
 const UPPER_SHORT = 'upper est.';
 
-/** "0.190 Ha (5.17 eV)" as two pieces that each stay whole, so a narrow row wraps between them, not inside one. */
+/**
+ * "5.17 eV (0.190 Ha)" as two pieces that each stay whole, so a narrow row wraps between them, not inside one. Task 7b:
+ * eV first, Ha in parentheses -- the Task 6 ruling, and Info's own orbital energy (format/energy.ts orbitalEnergyText).
+ */
 function EnergyParts({ energyHartree }: { energyHartree: number }) {
-    const [ha, ev] = formatOrbitalEnergy(energyHartree).split(' (');
-    return <><span className="molecule-orbital-energy-part">{ha}</span> <span className="molecule-orbital-energy-part">({ev}</span></>;
+    const [ev, ha] = orbitalEnergyText(energyHartree).split(' (');
+    return <><span className="molecule-orbital-energy-part">{ev}</span> <span className="molecule-orbital-energy-part">({ha}</span></>;
 }
 
 /**
@@ -82,15 +83,15 @@ export function centredScrollTop(list: HTMLElement, row: HTMLElement): number {
  * own mark, and its energy reads "upper estimate", never "≈": it is the
  * orbital's value within the valence space, several eV above the canonical
  * virtuals (Ruling D4-energy). A plain rule marks where the occupied
- * orbitals begin. Owner R25-A4: the rows come first and every note is the
- * list's caption, under it -- the gap note (the HOMO–LUMO gap, and the
- * HOMO–LVMO gap too where the LVMO is one of the calculation's own orbitals,
- * with the Kohn–Sham caveat), the key to the marks, then the method and
- * label notes. Older data, with no classes, says its virtuals are
- * unclassified rather than implying either.
+ * orbitals begin. Owner R25-A4: the rows come first and every note is
+ * under them. Task 7b: those notes -- the gaps with the Kohn–Sham caveat, the
+ * key to the marks, the method, the labels and the virtuals' classes -- are
+ * Info's now (moleculeInfo), each said once; the gaps are Info's and the
+ * Properties card's values. Under the rows stay only the inside-ball note,
+ * which carries its action, and the level line.
  */
 const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
-    orbitals, selectedIndex, onSelect, method, symmetry, highlightRun = 0, insideBallNote, onHideStructure, allOrbitals = true,
+    orbitals, selectedIndex, onSelect, highlightRun = 0, insideBallNote, onHideStructure, allOrbitals = true,
     showEnergies = true,
 }) => {
     const sorted = useMemo(() => [...orbitals].sort((a, b) => b.energyHartree - a.energyHartree), [orbitals]);
@@ -113,21 +114,10 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
     // virtuals on top -- so the gap is marked where the occupied orbitals
     // begin, and the list opens with the HOMO in view.
     const firstOccupied = rows.findIndex(o => o.occupation > 0);
-    const gaps = orbitalGaps(orbitals);
-    const gapText = showEnergies && gaps.length ? gaps.map(g => `${gapTerm(g)} ${formatOrbitalEnergy(g.hartree)}`).join(' · ') : null;
+    // The rule stands where the energies are shown and there is a gap to mark (Task 7b: its words are Info's).
+    const gapRule = showEnergies && orbitalGaps(orbitals).length > 0;
     // Preflight D8 / Task 16d: the shared resolver (an open shell's SOMO, else the HOMO); older data, the highest occupied row.
     const homoIndex = (frontierOccupied(orbitals) ?? rows[firstOccupied])?.index;
-    const diffuse = orbitals.filter(o => o.class === 'diffuse');
-    const lvmo = orbitals.some(o => o.role === 'LVMO');
-    const constructed = orbitals.some(isConstructed);
-    const unclassified = orbitals.some(o => !(o.occupation > 0)) && !orbitals.some(o => o.class !== undefined);
-    const notes = labelNotes(orbitals);
-    // Fix round 1's key to the marks, in the caption since owner R25-A4 (it was held at the top of the list).
-    const key = [
-        ...(diffuse.length ? [`${DIFFUSE_MARK} partly diffuse virtual (under ${Math.round(VALENCE_THRESHOLD * 100)} % valence)`] : []),
-        ...(constructed ? [`${CONSTRUCTED_MARK} constructed LVMO, not an orbital of this calculation`] : []),
-        ...(showEnergies && orbitals.some(isUpperEstimate) ? [`${UPPER_SHORT}: its energy is an upper estimate`] : []),
-    ].join(' · ');
     const listRef = useRef<HTMLDivElement>(null);
     const homoRef = useRef<HTMLButtonElement>(null);
     // On opening, and for each new molecule -- not on every pick, which
@@ -148,8 +138,8 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
                     const degenerate = counts.get(orbital.index) ?? 1;
                     return (
                         <React.Fragment key={orbital.index}>
-                            {/* Ruling T16-b: where the occupied orbitals begin; its words are the caption's gap note (R25-A4). */}
-                            {position === firstOccupied && gapText && <div className="molecule-orbital-gap-rule" aria-hidden="true" />}
+                            {/* Ruling T16-b: where the occupied orbitals begin; its words, the gap, are Info's (Task 7b). */}
+                            {position === firstOccupied && gapRule && <div className="molecule-orbital-gap-rule" aria-hidden="true" />}
                             <button type="button" aria-pressed={orbital.index === selectedIndex}
                                 ref={orbital.index === homoIndex ? homoRef : undefined}
                                 className={`molecule-orbital-row${orbital.index === selectedIndex ? ' selected' : ''}`}
@@ -196,26 +186,6 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
                     </Typography>
                 )}
                 {trimmed && <p className="ql-caption level-line">{ALL_ORBITALS_POINTER}</p>}
-                {gapText && (
-                    // Fix round 1: role="note", not "separator", whose children screen readers skip.
-                    <div role="note" className="molecule-orbital-gap">
-                        {gapText}.{' '}
-                        <span className="molecule-orbital-gap-caveat">{GAP_CAVEAT}.</span>
-                    </div>
-                )}
-                {key && <p className="molecule-orbital-legend">{key}</p>}
-                <Typography variant="caption" className="molecule-caption">
-                    Kohn–Sham orbital energies, {method}. Not ionisation energies.
-                    {' '}{labelsSentence(symmetry)}
-                    {diffuse.length > 0 && <>
-                        {' '}{DIFFUSE_MARK} partly diffuse virtual (under {Math.round(VALENCE_THRESHOLD * 100)} % valence): {DIFFUSE_NOTE}.
-                        {diffuse.some(o => o.energyHartree > 0) && ' Those at positive energy are unbound, basis-set dependent states, not bound orbitals.'}
-                    </>}
-                    {lvmo && <>{' '}LVMO: {LVMO_NOTE}.</>}
-                    {constructed && <>{' '}{CONSTRUCTED_MARK} LVMO {CONSTRUCTED_NOTE}.</>}
-                    {unclassified && <>{' '}{UNCLASSIFIED_NOTE}</>}
-                    {notes.map(note => <React.Fragment key={note}>{' '}{note}</React.Fragment>)}
-                </Typography>
             </div>
         </div>
     );

@@ -44,7 +44,8 @@ function Harness({ context, readout = false, contextRef }: {
     return (
         <>
             <MoleculeLabels contextRef={contextRef ?? own} snapshotRef={snapshotRef} />
-            {readout && meta && <MoleculeReadout atoms={meta.atoms} pick={pick} geometrySource="test" touch={false} />}
+            {/* Task 7b: no geometrySource -- the readout's geometry line is the Properties row's now. */}
+            {readout && meta && <MoleculeReadout atoms={meta.atoms} pick={pick} touch={false} />}
         </>
     );
 }

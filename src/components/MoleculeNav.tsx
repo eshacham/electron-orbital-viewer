@@ -172,14 +172,12 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
                         captions, so restating it here would only repeat it. */}
                     {surface.kind === 'mo' && (
                         <MoleculeOrbitalList orbitals={meta.orbitals} selectedIndex={surface.index}
-                            onSelect={index => onSurfaceChange({ kind: 'mo', index })}
-                            method={meta.method.density} symmetry={meta.symmetry} highlightRun={highlightRun}
+                            onSelect={index => onSurfaceChange({ kind: 'mo', index })} highlightRun={highlightRun}
                             insideBallNote={insideBallNote} onHideStructure={onHideStructure} allOrbitals={allOrbitals}
                             showEnergies={showEnergies} />
                     )}
-                    <Typography variant="caption" className="molecule-caption">
-                        Geometry: {meta.geometrySource}. Density, potential and orbitals: {meta.method.density} (PySCF).
-                    </Typography>
+                    {/* Task 7b: the geometry and method caption that stood here is Info's -- the geometry source is the
+                        Properties row's, the method "How this was computed"'s, each said once. */}
                 </>
             )}
             {variant === 'body' && (

@@ -87,6 +87,26 @@ export function espRangeNote(range: [number, number]): string {
     const saturated = range[0] < -ESP_LIMIT_HARTREE || range[1] > ESP_LIMIT_HARTREE;
     return `this molecule: ${formatEsp(range[0])} to ${formatEsp(range[1])} Ha/e${saturated ? ', saturated beyond the scale' : ''}`;
 }
+/**
+ * Task 7b: the key's notes as Info's sentences -- the same colours, scale, surface and range the key's own notes give
+ * (and the PNG export's key still prints, above), said in words. The key keeps its bar, its scale and its two ends.
+ */
+const ESP_KCAL = Math.round(ESP_LIMIT_HARTREE * HARTREE_TO_KCAL_PER_MOL);
+/** What the colours mean (ESP_STOPS: red where the potential is negative), on the one scale every molecule shares. */
+export const ESP_COLOURS_SENTENCE = 'The surface is coloured by the electrostatic potential: red where it is negative (electron-rich), '
+    + `blue where it is positive (electron-poor). Every molecule is drawn on the same scale, ±${ESP_LIMIT_HARTREE} Ha/e `
+    + `(±${ESP_KCAL} kcal/mol), so maps can be compared.`;
+/** Ruling D4: the surface the map is drawn on is a fixed density, never an enclosed fraction (App's old helper). */
+export const ESP_SURFACE_SENTENCE = `The map is drawn on the surface ρ = ${ESP_SURFACE_DENSITY} e/a₀³, the one ESP maps are conventionally `
+    + 'drawn on — not at an enclosed fraction, so Electron enclosed does not apply to it.';
+/** This molecule's own range on the drawn surface: "−0.061 to +0.071 Ha/e". */
+export const espRangeText = (range: [number, number]): string => `${formatEsp(range[0])} to ${formatEsp(range[1])} Ha/e`;
+/** Said only when the range runs past the fixed scale (espRangeNote's "saturated beyond the scale"). */
+export function espSaturatedSentence(range: [number, number]): string | null {
+    return range[0] < -ESP_LIMIT_HARTREE || range[1] > ESP_LIMIT_HARTREE
+        ? 'This molecule\'s potential runs beyond the scale, so its strongest regions show the end colours (saturated).'
+        : null;
+}
 export const ESP_TICKS: [string, string, string] = [`−${ESP_LIMIT_HARTREE}`, '0', `+${ESP_LIMIT_HARTREE} Ha/e`];
 
 /**

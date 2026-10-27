@@ -43,3 +43,18 @@ export function formatDipole(meta: LibraryMoleculeMeta): string {
     const experiment = reference ? ` · experiment ${reference.value} D` : '';
     return `μ = ${magnitude.toFixed(2)} D (${method})${experiment}`;
 }
+
+/**
+ * Task 7b: the dipole as Info's fact -- computed against experiment, both in debye, with the measurement's source;
+ * a symmetric molecule's zero by symmetry; and, where no measured value is listed (an on-demand computed molecule), it
+ * says so rather than leave a gap. The method is under "How this was computed" (formatDipole names it, for exports).
+ */
+export function dipoleFactText(meta: LibraryMoleculeMeta): string {
+    const reference = meta.references.find(r => r.quantity === 'dipole');
+    const magnitude = new THREE.Vector3(...meta.dipoleVectorDebye).length().toFixed(2);
+    if (reference && reference.value === 0) return `0 D by symmetry (computed ${magnitude} D)`;
+    const computed = `${magnitude} D computed`;
+    return reference
+        ? `${computed} · ${reference.value} ${reference.unit} experiment (${reference.source})`
+        : `${computed} · no measured value listed`;
+}

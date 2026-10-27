@@ -1122,7 +1122,8 @@ html, body, #root {
    standalone `^.selector {` rule); the tier line moved into the title block
    and the pick readout into the Explore panel (`.molecule-selection` below). */
 .esp-legend {
-  padding: 6px 12px;
+  position: relative;
+  padding: 6px 34px 6px 12px;
   border-radius: 8px;
   background: var(--ql-color-surface-2);
   border: 1px solid var(--ql-color-border-subtle);
@@ -1142,39 +1143,41 @@ html, body, #root {
   width: 240px;
   margin: 0 auto;
 }
-.esp-legend-note {
+/* Task 7b: the bar's two ends in words -- electron-rich at the negative (red) end, electron-poor at the positive
+   (blue) end -- under the ticks; the key's notes are Info's now. (Was `.esp-legend-note`, the notes' class.) */
+.esp-legend-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 240px;
+  margin: 0 auto;
   color: var(--ql-color-text-2);
+  font-size: var(--ql-type-caption-size);
+  line-height: var(--ql-type-caption-line);
 }
-/* Ruling T16-c: the sideways phone's compact key -- a thinner, shorter bar
-   and its scale, the notes behind the ⓘ toggle at its right. */
-.esp-legend.compact {
-  position: relative;
-  padding-right: 28px;
-}
+.esp-legend-ends > :first-child { text-align: left; }
+.esp-legend-ends > :last-child { text-align: right; }
+/* Ruling T16-c: the compact key -- a thinner bar and its scale. Task 7b: they fill the room left of the (i), up to
+   180 px, so a key column narrower than that never runs the scale under the (i). */
 .esp-legend.compact .esp-legend-bar {
   height: 6px;
-  width: 180px;
+  width: 100%;
+  max-width: 180px;
 }
-.esp-legend.compact .esp-legend-ticks {
-  width: 180px;
+.esp-legend.compact .esp-legend-ticks,
+.esp-legend.compact .esp-legend-ends {
+  width: 100%;
+  max-width: 180px;
 }
+/* Task 7b: the (i) on the map's term, at the key's right (where its ⓘ notes toggle was); the key column takes no
+   pointer, so the (i) takes it back. */
 .esp-legend-info {
   position: absolute;
   top: 50%;
-  right: 6px;
+  right: 8px;
   transform: translateY(-50%);
-  padding: 2px;
-  border: 0;
-  background: none;
-  color: var(--ql-color-text-1);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
+  display: flex;
   pointer-events: auto;
-}
-.esp-legend.compact .esp-legend-info[aria-expanded="true"] {
-  top: 4px;
-  transform: none;
 }
 
 /* Task 13: the molecule picker, inline in the navigation column and full
@@ -1481,13 +1484,12 @@ html, body, #root {
 /* Ruling R23f: the Explore panel's own content, split into a scrolling part
    (MoleculeNav -- picker, surface switch and, under it, the orbital list
    that used to be Task 16's `.molecule-orbital-card` in the plot slot --
-   the Selection section and the owner's job tools) and, pinned below it, the
-   provenance footer (next rule): `.molecule-explore` fills the Explore
-   panel's own body (`.explore-body` already gives that a definite height,
-   app_shell.css/explore.css), so distributing it between a flexible
-   scrolling child and an auto-height pinned one actually has room to work
-   with. On a phone this wrapper is not used (phoneTabs composes the same
-   pieces directly;  MoleculeProvenanceFooter renders unpinned, in flow). */
+   the Selection section and the owner's job tools). Ruling PF5 (Task 7b): the
+   provenance footer once pinned below it is Info's "How this was computed"
+   now. `.molecule-explore` fills the Explore panel's own body
+   (`.explore-body` already gives that a definite height, app_shell.css/
+   explore.css), so its scrolling child has room to work with. On a phone
+   this wrapper is not used (phoneTabs composes the same pieces directly). */
 .molecule-explore {
   display: flex;
   flex-direction: column;
@@ -1505,49 +1507,6 @@ html, body, #root {
   flex-direction: column;
   gap: var(--ql-size-section-gap);
 }
-/* Ruling R23f-2 (owner): "How this was computed" pinned to the Explore
-   panel's bottom edge -- this footer is the last flex item of
-   `.molecule-explore` above, sized to its own content while collapsed (just
-   the trigger's own height), so it never scrolls with
-   `.molecule-explore-scroll` and never moves regardless of how tall the
-   Selection section (or anything else above it) grows. Opening it must not
-   resize the footer or shrink the scroll area above (a true overlay, "so
-   nothing above moves" -- not even the scroll area's own size or scroll
-   position): the explanation (`.provenance-body`, AccordionDetails) is
-   taken out of flow and anchored to the footer's own top edge, growing
-   upward over the scrolling content instead of displacing it, capped near
-   70% of the panel's own height (the Explore panel fills most of the
-   window, so a viewport fraction approximates that without measuring it)
-   and scrolling inside past that. The trigger -- the footer's only in-flow
-   content -- stays exactly where it is either way. */
-.molecule-provenance-footer {
-  position: relative;
-  flex: 0 0 auto;
-}
-.molecule-provenance-footer .provenance-body {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  z-index: 1;
-  max-height: calc(70vh - 60px);
-  overflow-y: auto;
-  margin-bottom: 4px;
-  border-radius: var(--ql-radius-md);
-  background-color: var(--ql-color-surface-1);
-  box-shadow: var(--ql-shadow-panel);
-}
-/* MUI's Collapse wrapper (slotProps.transition) measures its child's natural
-   height to animate the reveal; an absolutely positioned child (above) has
-   none in flow, so the wrapper itself would otherwise collapse to 0 and hide
-   it. It is not part of the panel's own flow either way (the absolutely
-   positioned child inside it is what paints), so letting it size and
-   overflow freely costs nothing. */
-.molecule-provenance-footer .MuiCollapse-root {
-  overflow: visible;
-  height: auto !important;
-}
-
 /* Ruling R22c (fix round 1, review Minor 3's class, now self-positioned):
    a failed surface's alert, under the phone header rather than at
    `.atom-error`'s top: 80px, which the header itself covers there. The
@@ -1605,37 +1564,8 @@ html, body, #root {
   overflow-wrap: anywhere;
 }
 .molecule-jobs .MuiAccordion-root { border-radius: 10px; background: var(--ql-color-surface-1); }
-.provenance-body { display: flex; flex-direction: column; gap: 6px; }
-.provenance-list { margin: 0; padding-left: 18px; font-size: 0.875rem; }
-/* Ruling R23c-3: "How this was computed" reads as a text link -- accent
-   colour, underline on hover/focus, a trailing arrow -- rather than a full-
-   width accordion bar. It is still MUI's AccordionSummary (ButtonBase), so
-   the global focus ring (theme.ts's MuiButtonBase override) is untouched;
-   this only repaints it and shrinks its hit area to the label's own width.
-   Qualified by the Accordion's own `.provenance-panel` (as `.molecule-jobs
-   .MuiAccordion-root` above already does): MUI's emotion styles and this
-   plain stylesheet tie at one class of specificity, so a bare `.provenance-
-   trigger` lost the cascade to MUI's own generated class in practice. */
-.provenance-panel .provenance-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  width: auto;
-  flex-grow: 0;
-  min-height: 0;
-  padding: 4px 0;
-  margin: 4px 0;
-  background: none;
-  color: var(--ql-color-accent-text);
-  font-size: var(--ql-type-body-size);
-  font-weight: 600;
-}
-.provenance-panel .provenance-trigger:hover, .provenance-panel .provenance-trigger.Mui-focusVisible {
-  text-decoration: underline;
-  background: none;
-}
-.provenance-panel .provenance-trigger .MuiAccordionSummary-content { flex-grow: 0; margin: 0; }
-.provenance-panel .provenance-trigger-arrow { font-weight: 400; }
+/* "How this was computed" (Info's, Task 7b): the caveats, result files and references, at Info's caption size. */
+.provenance-list { margin: 0; padding-left: 18px; }
 
 /* Phase 6B-2 Task 10: the request panel and its preview. */
 .request-panel, .job-status { display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem; }

@@ -1,11 +1,12 @@
 import React from 'react';
-import { Accordion, AccordionDetails, AccordionSummary, Link, Typography } from '@mui/material';
+import { Link } from '@mui/material';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { DISPERSION_COMPUTE_VERSION, tierOf, MoleculeProvenance } from '../molecules/types';
 import { computedResultFiles, jobFileUrl } from '../molecules/job_paths';
 import { capacityLabel, formatDuration, formatGB, money, predictionNote, quotedCost } from '../jobs/format';
 import type { JobView } from '../jobs/api_types';
 import { NOT_A_TEST, isExperimentalGeometry } from '../validation/geometry_honesty';
+import { withSubscripts } from '../format/subscripts';
 
 export const PUBCHEM_COMPOUND_URL = 'https://pubchem.ncbi.nlm.nih.gov/compound/';
 const EXTERNAL = { target: '_blank', rel: 'noopener noreferrer' } as const;
@@ -27,20 +28,20 @@ function Geometry({ provenance, steps, resumedFrom }: { provenance: MoleculeProv
     const origin = source.kind === 'pubchem'
         ? <>PubChem CID <Link href={`${PUBCHEM_COMPOUND_URL}${source.cid}`} {...EXTERNAL}>{source.cid}</Link> ({source.title}), its computed 3D conformer, retrieved {source.retrievedAt}</>
         : <>pasted XYZ coordinates</>;
-    if (provenance.recipe === 'single') return <Typography variant="body2">Geometry: {origin}, not optimised.</Typography>;
+    if (provenance.recipe === 'single') return <p>Geometry: {origin}, not optimised.</p>;
     // M5: a resumed attempt's step count is this attempt's, said once, beside the resumption.
     if (resumedFrom !== null) {
         return (
-            <Typography variant="body2">
+            <p>
                 Geometry: optimised at {geometryMethod(provenance)} with geomeTRIC, starting from {origin}, resumed from attempt {resumedFrom}’s last frame
                 {steps !== null ? ` (${steps} steps in this attempt)` : ''}.
-            </Typography>
+            </p>
         );
     }
     return (
-        <Typography variant="body2">
+        <p>
             Geometry: optimised at {geometryMethod(provenance)} with geomeTRIC{steps !== null ? ` in ${steps} steps` : ''}, starting from {origin}.
-        </Typography>
+        </p>
     );
 }
 
@@ -49,10 +50,10 @@ function Dispersion({ meta }: { meta: LibraryMoleculeMeta }) {
     const d = meta.dispersion;
     if (!d) return null;
     return (
-        <Typography variant="body2">
+        <p>
             Dispersion: Grimme {d.model} (Becke–Johnson damping), computed with {d.backend}. It changes energies and forces only, not the orbitals, density or potential.
             {' '}Total energy {hartree(meta.totalEnergyHartree)} Ha, including {hartree(d.energyHartree)} Ha of {d.model}.
-        </Typography>
+        </p>
     );
 }
 
@@ -74,23 +75,23 @@ function StructureChecks({ meta, provenance }: { meta: LibraryMoleculeMeta; prov
     return (
         <>
             {optimisation?.stoppedBy === 'time-limit' && (
-                <Typography variant="body2">
+                <p>
                     The optimisation stopped at its time limit, not converged (max force, the largest Cartesian gradient component: {optimisation.maxGradient?.toExponential(1)} Ha/bohr).
-                </Typography>
+                </p>
             )}
             {check && (
-                <Typography variant="body2">
+                <p>
                     Frequency check{check.method ? ` (${check.method})` : ''}: {check.summary}{zpeText}.
-                </Typography>
+                </p>
             )}
             {shell && (
-                <Typography variant="body2">
+                <p>
                     Open shell: {shell.methods}.
                     {' '}{shell.note ? `${shell.note}.` : spins.length ? `UKS ⟨S²⟩ ${spins.join(' and ')}, against S(S+1) = ${shell.expectedS2.toFixed(3)}.` : ''}
-                </Typography>
+                </p>
             )}
-            {provenance.finalGeometry?.summary && <Typography variant="body2">Final geometry: {provenance.finalGeometry.summary}.</Typography>}
-            {provenance.finalScf && <Typography variant="body2">Final SCF: {provenance.finalScf.summary}.</Typography>}
+            {provenance.finalGeometry?.summary && <p>Final geometry: {provenance.finalGeometry.summary}.</p>}
+            {provenance.finalScf && <p>Final SCF: {provenance.finalScf.summary}.</p>}
         </>
     );
 }
@@ -99,10 +100,10 @@ function StructureChecks({ meta, provenance }: { meta: LibraryMoleculeMeta; prov
 function Legacy({ meta, provenance }: { meta: LibraryMoleculeMeta; provenance: MoleculeProvenance }) {
     if (provenance.computeVersion >= DISPERSION_COMPUTE_VERSION) return null;
     return (
-        <Typography variant="body2" className="provenance-legacy">
+        <p className="provenance-legacy">
             Computed before dispersion was added (compute version {provenance.computeVersion}): {meta.method.density} without D3(BJ)
             {provenance.recipe === 'optimise' ? ', and its optimised structure was not checked for imaginary frequencies' : ''}.
-        </Typography>
+        </p>
     );
 }
 
@@ -114,11 +115,40 @@ function OwnerFacts({ job }: { job: JobView }) {
     const quoted = job.backend === 'local' ? null : quotedCost(job);
     const cost = quoted ?? (job.actualUsd === null ? `${money('reserved', job.reservedUsd)}, not settled yet` : money('spent', job.actualUsd));
     return (
-        <Typography variant="body2" className="provenance-owner">
+        <p className="provenance-owner">
             Owner only: {actual ? `${formatDuration(actual.wallSeconds)} of wall time, peak memory ${formatGB(actual.peakMemoryGB)}` : 'no timings recorded'}
             {' '}(predicted {formatDuration(sizing.predictedSeconds)} and {formatGB(sizing.predictedMemoryGB)}, {predictionNote(sizing.version)}).
             {' '}Cost: {cost}{job.backend === 'local' ? ' (This Mac)' : ''}.
-        </Typography>
+        </p>
+    );
+}
+
+/** A reference's value with its unit: "1.855 D", "0.958 Å", and an angle in degrees as "104.5°". */
+const valueWithUnit = (value: number, unit: string) => (unit === 'deg' ? `${value}°` : `${value}\u00A0${unit}`);
+
+/**
+ * What a library molecule was checked against (its references), an experimental geometry's own bond and angle marked
+ * as no test of the method; or, where none is listed (an on-demand computed molecule, or a library one with none),
+ * that nothing is -- never an invented comparison (Task 7b).
+ */
+function References({ meta }: { meta: LibraryMoleculeMeta }) {
+    if (meta.references.length === 0) {
+        return <p>No reference values are listed for this molecule, so nothing here is checked against experiment.</p>;
+    }
+    const experimental = isExperimentalGeometry(meta.geometrySource);
+    return (
+        <>
+            <p>Checked against published values:</p>
+            <ul className="provenance-list">
+                {meta.references.map((reference, index) => (
+                    <li key={index}>
+                        {/* Task 7b: a quantity such as R_e is typeset (Rₑ), never shown with its "_". */}
+                        {withSubscripts(reference.quantity)}: {valueWithUnit(reference.value, reference.unit)} — {reference.source}
+                        {experimental && (reference.quantity === 'bond' || reference.quantity === 'angle') ? `; ${NOT_A_TEST}` : ''}
+                    </li>
+                ))}
+            </ul>
+        </>
     );
 }
 
@@ -130,6 +160,11 @@ function OwnerFacts({ job }: { job: JobView }) {
  * term, the frequency check and a time-limit stop, says when a job predates
  * them, and marks an experimental geometry's own bond and angle as no test
  * of the method.
+ *
+ * Task 7b (ruling PF5): this is Info's "How this was computed" now -- folded below Research, open at Research --
+ * not an accordion pinned under Explore, so it renders its paragraphs and lists alone, for Info's own <details>.
+ * A library molecule's geometry source is the Properties row's (said once); a computed molecule's recipe -- how its
+ * geometry was reached -- is said here, as before.
  */
 const ProvenancePanel: React.FC<ProvenancePanelProps> = ({ meta, ownerJob, ownerJobError = null }) => {
     const provenance = tierOf(meta) === 'computed' ? meta.provenance ?? null : null;
@@ -138,58 +173,40 @@ const ProvenancePanel: React.FC<ProvenancePanelProps> = ({ meta, ownerJob, owner
     const resumedFrom = meta.geometryOptimisation?.resumedFrom ?? null;
     // input.py writes frequencies.json whenever the check ran: never for 'not-run'.
     const frequencies = Boolean(meta.frequencyCheck && meta.frequencyCheck.result !== 'not-run');
-    const experimental = isExperimentalGeometry(meta.geometrySource);
     const timeLimit = provenance?.timeLimitSeconds;
     return (
-        <Accordion disableGutters className="provenance-panel" slotProps={{ transition: { unmountOnExit: true } }}>
-            {/* Ruling R23c-3: styled as a text link (style.css's .provenance-trigger) --
-                same accordion, role and accessible name, just not painted as a bar. The
-                arrow is decorative (aria-hidden), so the name stays "How this was computed". */}
-            <AccordionSummary aria-controls="provenance-body" id="provenance-head" className="provenance-trigger">
-                How this was computed
-                <span aria-hidden="true" className="provenance-trigger-arrow">→</span>
-            </AccordionSummary>
-            {/* m5: MUI gives the details' region the summary's aria-controls id itself. */}
-            <AccordionDetails className="provenance-body">
-                <Typography variant="body2">Method: {meta.method.density}, PySCF {provenance?.pyscfVersion ?? meta.generator.pyscf}.</Typography>
-                <Dispersion meta={meta} />
-                {provenance ? (
-                    <>
-                        <Legacy meta={meta} provenance={provenance} />
-                        <Geometry provenance={provenance} steps={steps} resumedFrom={resumedFrom} />
-                        <StructureChecks meta={meta} provenance={provenance} />
-                        <Typography variant="subtitle2">Caveats</Typography>
-                        <ul className="provenance-list">{provenance.caveats.map(caveat => <li key={caveat}>{caveat}</li>)}</ul>
-                        <Typography variant="subtitle2">Files</Typography>
-                        <ul className="provenance-list">
-                            {computedResultFiles(provenance.recipe, { frequencies }).map(name => (
-                                <li key={name}><Link href={jobFileUrl(provenance.jobKey, name)} {...EXTERNAL}>{name}</Link></li>
-                            ))}
-                        </ul>
-                        <Typography variant="body2">
-                            Ran on {capacityLabel(provenance.capacity)}{provenance.capacity === 'local' ? '' : `, worker size ${provenance.size}`}:
-                            {' '}{formatDuration(provenance.wallSeconds)} of wall time. Generator commit {provenance.generatorCommit.slice(0, 7)}; sized by sizing rule v{provenance.sizingVersion}{typeof timeLimit === 'number' ? `; time limit ${formatDuration(timeLimit)}` : ''}.
-                        </Typography>
-                        {ownerJob && <OwnerFacts job={ownerJob} />}
-                        {ownerJobError && <Typography variant="caption" role="alert">The job record could not be read: {ownerJobError}</Typography>}
-                    </>
-                ) : (
-                    <>
-                        <Typography variant="body2">Geometry: {meta.geometrySource}.</Typography>
-                        <Typography variant="subtitle2">Checked against</Typography>
-                        <ul className="provenance-list">
-                            {meta.references.map((reference, index) => (
-                                <li key={index}>
-                                    {reference.quantity}: {reference.value} {reference.unit} — {reference.source}
-                                    {experimental && (reference.quantity === 'bond' || reference.quantity === 'angle') ? `; ${NOT_A_TEST}` : ''}
-                                </li>
-                            ))}
-                        </ul>
-                        <Typography variant="body2">Generated by {meta.generator.script} at commit {meta.generator.commit.slice(0, 7)}.</Typography>
-                    </>
-                )}
-            </AccordionDetails>
-        </Accordion>
+        <>
+            <p>Method: {meta.method.density}, PySCF {provenance?.pyscfVersion ?? meta.generator.pyscf}.</p>
+            <Dispersion meta={meta} />
+            {provenance && (
+                <>
+                    <Legacy meta={meta} provenance={provenance} />
+                    <Geometry provenance={provenance} steps={steps} resumedFrom={resumedFrom} />
+                    <StructureChecks meta={meta} provenance={provenance} />
+                </>
+            )}
+            <References meta={meta} />
+            {provenance ? (
+                <>
+                    <p>Caveats:</p>
+                    <ul className="provenance-list">{provenance.caveats.map(caveat => <li key={caveat}>{caveat}</li>)}</ul>
+                    <p>Result files (input.py runs it again):</p>
+                    <ul className="provenance-list">
+                        {computedResultFiles(provenance.recipe, { frequencies }).map(name => (
+                            <li key={name}><Link href={jobFileUrl(provenance.jobKey, name)} {...EXTERNAL}>{name}</Link></li>
+                        ))}
+                    </ul>
+                    <p>
+                        Ran on {capacityLabel(provenance.capacity)}{provenance.capacity === 'local' ? '' : `, worker size ${provenance.size}`}:
+                        {' '}{formatDuration(provenance.wallSeconds)} of wall time. Generator commit {provenance.generatorCommit.slice(0, 7)}; sized by sizing rule v{provenance.sizingVersion}{typeof timeLimit === 'number' ? `; time limit ${formatDuration(timeLimit)}` : ''}.
+                    </p>
+                    {ownerJob && <OwnerFacts job={ownerJob} />}
+                    {ownerJobError && <p role="alert">The job record could not be read: {ownerJobError}</p>}
+                </>
+            ) : (
+                <p>Generated by {meta.generator.script} at commit {meta.generator.commit.slice(0, 7)}.</p>
+            )}
+        </>
     );
 };
 

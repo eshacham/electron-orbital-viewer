@@ -377,11 +377,13 @@ describe('CSV: the orbital table', () => {
             '# Ozone (O₃): molecular orbitals',
             '# method: B3LYP/def2-TZVPD (PySCF); geometry: experiment (CCCBDB)',
             `# ${OZONE_CAVEAT}`,
-            '# energies in hartree (Ha) and electronvolts (eV), 1 Ha = 27.211386 eV',
+            // Task 7b: the header prints the app's one Ha→eV factor (format/energy.ts, CODATA 2018), no longer a rounding of it.
+            '# energies in hartree (Ha) and electronvolts (eV), 1 Ha = 27.211386245988 eV',
             '# view: http://x/#mode=molecule&id=o3',
         ]);
         expect(lines[5]).toBe('index,label,role,occupation,energy_Ha,energy_eV,class,valence_character,kind');
-        expect(lines[6]).toBe('0,1a1,,2,-19.13,-520.55381,,,');
+        // Task 7b: −19.13 Ha at the full CODATA factor is −520.553819 eV (it was −520.553814 at 27.211386).
+        expect(lines[6]).toBe('0,1a1,,2,-19.13,-520.55382,,,');
         expect(lines[10]).toBe('4,1b1,HOMO,2,-0.31,-8.4355297,,,');
         expect(lines[11]).toBe('5,4a1,LUMO,0,0.01,0.27211386,,,');
         expect(lines).toHaveLength(13);
@@ -410,7 +412,8 @@ describe('CSV: the orbital table', () => {
         // Ruling LVMO-wording: LVMO_NOTE is the whole description now (not every LVMO is antibonding).
         expect(lines.some(l => l.startsWith(`# LVMO: ${LVMO_NOTE}; kind valence-virtual: `))).toBe(true);
         expect(lines).toContain('5,4a1,LUMO,0,-0.01,-0.27211386,diffuse,0.55,');
-        expect(lines).toContain('6,a1,LVMO,0,0.19,5.1701633,valence,1,valence-virtual');
+        // Task 7b: 0.19 Ha at the full CODATA factor is 5.17016339 eV (it was 5.17016334 at 27.211386).
+        expect(lines).toContain('6,a1,LVMO,0,0.19,5.1701634,valence,1,valence-virtual');
     });
 
     it('is labelled "Orbital table (CSV)" in Molecules mode; STL/glTF say the structure is left out', () => {

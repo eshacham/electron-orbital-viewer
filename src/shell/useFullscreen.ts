@@ -19,8 +19,8 @@ export function useFullscreen(target: React.RefObject<HTMLElement | null>): { ac
         if (!focusMode) return undefined;
         // Final review B, M7: this listener is on document, so an Esc meant for
         // something else (the search popover, a disclosure) must not also exit
-        // focus mode -- consistent with the inspector drawer and provenance
-        // footer's own document/local Escape listeners.
+        // focus mode -- consistent with the inspector drawer's own
+        // document/local Escape listener.
         const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) setFocusMode(false); };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);

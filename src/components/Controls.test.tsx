@@ -20,7 +20,7 @@ const baseProps = {
   initialMl: 0,
   initialEnclosedFraction: 0.9,
   onEnclosedFractionChange: () => {},
-  isoLevel: 1e-5,
+  // Task 7b: no isoLevel -- the contour a fraction produced is Info's in every mode, so Controls takes none.
   onUpdateOrbital: () => {},
   // Reset View moved to the viewport toolbar (spec §8.5).
   surfaceStyle: { opacity: 1, clipAxis: 'none' as const, clipPosition: 0 },
@@ -53,7 +53,6 @@ describe('Controls', () => {
         initialMl={0}
         initialEnclosedFraction={0.9}
         onEnclosedFractionChange={() => {}}
-        isoLevel={1e-5}
         onUpdateOrbital={() => {}}
         // Reset View moved to the viewport toolbar (spec §8.5).
         surfaceStyle={{ opacity: 1, clipAxis: 'none', clipPosition: 0 }}
@@ -282,11 +281,13 @@ describe('cut depth', () => {
     expect(onSurfaceStyleChange).toHaveBeenCalledWith({ clipPosition: -0.5 });
   });
 
-  // Task 5: Orbitals' cut helper moved to Info (basicInfo); the other modes keep theirs until their own tasks move it.
-  // Task 7a: Bonds' moved too (bondsInfo), so Molecules is the mode that still says it here.
-  it('says which side a cut removes', () => {
-    render(<Controls {...baseProps} mode="molecule" surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
-    expect(screen.getByText(/\+y side/)).toBeInTheDocument();
+  // Task 5: Orbitals' cut helper moved to Info (basicInfo); Task 7a: Bonds' too (bondsInfo); Task 7b: Molecules' last
+  // (moleculeInfo, tests/info/molecule_info.test.ts) -- a disabled cut alone still says why, under the toggle.
+  it('says which side a cut removes in no mode, and why a cut is disabled with no surface', () => {
+    const { rerender } = render(<Controls {...baseProps} mode="molecule" surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
+    expect(screen.queryByText(/\+y side/)).toBeNull();
+    rerender(<Controls {...baseProps} mode="molecule" noSurface surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
+    expect(screen.getByText('No surface is drawn to cut; the structure is never cut.')).toBeInTheDocument();
   });
 
   // Task 5: in Orbitals the Electron enclosed and Cut away helpers are Info's now -- the iso value with its unit and
@@ -305,7 +306,7 @@ describe('cut depth', () => {
   // are Info's (tests/info/atom_info.test.ts), at every drill level.
   it.each(['atom', 'shell', 'orbital'] as const)('in Atoms at the %s level, keeps the enclosed and cut controls with no helper text under them', atomLevel => {
     const { container } = render(<Controls {...baseProps} mode="atom" atomLevel={atomLevel} atomZ={6} showElementPicker={false}
-      isoLevel={1.2e-3} surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
+      surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
     expect(screen.queryByText(/\+y side|contour enclosing|\|ψ\|² = /)).toBeNull();
     expect(container.querySelectorAll('.MuiFormHelperText-root')).toHaveLength(0);
@@ -501,14 +502,15 @@ describe('Controls: Bonds mode', () => {
 
 // Phase 6: Molecules is the fourth mode. Like Bonds it has no Basic
 // Orbitals controls; it does take children (the structure and dipole
-// switches), and its density keeps the fraction, with the helper stating
-// the ρ that fraction produced (ruling D22's isoNote, which never disables).
+// switches), and its density keeps the fraction. Task 7b: the ρ or |ψ|² that
+// fraction produced (ruling D22's old isoNote) and why an ESP map's fraction is
+// fixed are Info's (moleculeInfo); with no surface the select says why under it.
 describe('Controls: Molecules mode', () => {
   // The Mode toggle left Controls for the rail (spec §8.2); tests/shell/rail.test.tsx pins the names and the dispatch.
 
-  it('has no Basic Orbitals controls, shows its children, and states ρ without disabling the fraction', () => {
-    render(
-      <Controls {...baseProps} mode="molecule" isoNote="ρ = 2.34e-3 e/a₀³">
+  it('has no Basic Orbitals controls, shows its children, and keeps the fraction live with no helper under it', () => {
+    const { container } = render(
+      <Controls {...baseProps} mode="molecule">
         <span>structure switches</span>
       </Controls>
     );
@@ -516,15 +518,17 @@ describe('Controls: Molecules mode', () => {
     expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
     expect(screen.queryByText(/One electron, Z = 1/)).toBeNull();
     expect(screen.getByText('structure switches')).toBeInTheDocument();
-    expect(screen.getByText('ρ = 2.34e-3 e/a₀³')).toBeInTheDocument();
-    expect(screen.queryByText(/\|ψ\|² =/)).toBeNull();
+    expect(screen.queryByText(/\|ψ\|² =|contour of constant/)).toBeNull();
+    expect(container.querySelectorAll('.MuiFormHelperText-root')).toHaveLength(0);
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).not.toHaveAttribute('aria-disabled');
   });
 
-  it('lets fractionNote win over isoNote, and disable the select', () => {
-    render(<Controls {...baseProps} mode="molecule" fractionNote="fixed" isoNote="ρ = 1e-3" />);
-    expect(screen.getByText('fixed')).toBeInTheDocument();
-    expect(screen.queryByText('ρ = 1e-3')).toBeNull();
+  it('disables the select for a fixed surface (the why is Info\'s), and says why under it with no surface drawn', () => {
+    const { rerender } = render(<Controls {...baseProps} mode="molecule" fractionNote="fixed" />);
+    expect(screen.queryByText('fixed')).toBeNull();
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+    rerender(<Controls {...baseProps} mode="molecule" fractionNote="No surface is drawn, so no contour applies" noSurface />);
+    expect(screen.getByText('No surface is drawn, so no contour applies')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
   });
 });

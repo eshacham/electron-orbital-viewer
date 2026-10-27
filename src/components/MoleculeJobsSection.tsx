@@ -83,9 +83,8 @@ export interface MoleculeJobsSectionProps {
  * Molecules mode's job tools, under the navigation card (the desktop side
  * panel and the phone's Explore tab, spec §9.7): the way into the owner's
  * request and the followed job's status. "How this was computed" (everyone's
- * own provenance) moved out to MoleculeProvenanceFooter (ruling R23f-2), so a
- * desktop/medium layout can pin it below this section instead of above it;
- * this component has nothing to show anyone else.
+ * own provenance) moved out of it (ruling R23f-2) and, since Task 7b (ruling
+ * PF5), is Info's; this component has nothing to show anyone else.
  */
 const MoleculeJobsSection: React.FC<MoleculeJobsSectionProps> = ({ variant = 'accordion', entryRef }) => {
     const dispatch = useAppDispatch();

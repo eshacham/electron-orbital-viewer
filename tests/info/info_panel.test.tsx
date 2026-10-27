@@ -68,6 +68,17 @@ describe('InfoPanel (Task 4)', () => {
         expect(technical.compareDocumentPosition(computed()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
+    // Task 7b: notes (what qualifies the numbers) follow the facts at every level, before the technical text.
+    it('puts the notes after the facts and before the technical text, at every level', () => {
+        const withNotes = { ...content, notes: 'A note on the numbers.' };
+        const { rerender } = render(<InfoPanel content={withNotes} topic={null} onClearTopic={() => {}} level="research" />);
+        const notes = screen.getByText('A note on the numbers.');
+        expect(screen.getByText('Electrons').closest('dl')!.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(notes.compareDocumentPosition(screen.getByText(content.technical as string)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        rerender(<InfoPanel content={withNotes} topic={null} onClearTopic={() => {}} level="basics" />);
+        expect(screen.getByText('A note on the numbers.')).toBeInTheDocument();
+    });
+
     it('at Research opens "How this was computed"', () => {
         renderAt('research');
         expect(computed().open).toBe(true);

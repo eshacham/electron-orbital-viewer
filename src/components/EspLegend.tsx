@@ -1,55 +1,40 @@
-import React, { useState } from 'react';
-import { ESP_SIGN_NOTE, ESP_TICKS, espLegendGradient, espRangeNote, espSurfaceNote } from '../molecules/esp_color';
+import React from 'react';
+import { ESP_TICKS, espLegendGradient } from '../molecules/esp_color';
+import InfoButton from '../info/InfoButton';
 
 interface EspLegendProps {
-    /** ESP range on the drawn vertices, Ha/e; null until the surface lands. */
-    range: [number, number] | null;
-    method: string;
     /**
-     * Ruling T16-c: a sideways phone has under 400 px of height, and the
-     * full key covered the molecule. Compact keeps the bar and its scale;
-     * the notes -- the method among them -- are behind an info toggle.
+     * Ruling T16-c: a sideways phone has under 400 px of height; compact is the thinner, shorter bar. Ruling R22c: the
+     * key column is a narrow strip on every viewport, so App always asks for it.
      */
     compact?: boolean;
 }
 
 /**
- * The ESP map's key: states the fixed scale, the 0.001 surface (ruling D4:
- * exact, not an enclosed fraction) and the method, and -- once a surface is
- * drawn -- this molecule's own range, flagging when it runs past the fixed
- * scale. Ruling R22c (owner review 2026-10-14): sits in the right-hand key
- * column every mode uses (`KeyColumn`), always `compact` there -- the column
- * is a narrow strip on any viewport, and the brief's own "colour keys ...
- * compact, no prose" -- so the notes stay behind the info toggle rather than
- * printed beside the bar.
+ * The ESP map's key: the bar on its fixed scale, its two ends named -- electron-rich where the potential is negative
+ * (red, ESP_STOPS), electron-poor where it is positive (blue) -- and an (i) on the map's term. Task 7b: the notes the
+ * key kept behind its own ⓘ (the colours and scale, the fixed ρ = 0.001 surface and the method, this molecule's range)
+ * are Info's sentences now (moleculeInfo); the PNG export's key still prints them (esp_color.ts). Ruling R22c (owner
+ * review 2026-10-14): sits in the right-hand key column every mode uses (`KeyColumn`).
  */
-const EspLegend: React.FC<EspLegendProps> = ({ range, method, compact = false }) => {
-    const [notesOpen, setNotesOpen] = useState(false);
-    const showNotes = !compact || notesOpen;
-    return (
-        <div className={compact ? 'esp-legend compact' : 'esp-legend'} aria-label="electrostatic potential colour key">
-            <div
-                className="esp-legend-bar"
-                data-gradient={espLegendGradient()}
-                style={{ backgroundImage: espLegendGradient() }}
-            />
-            <div className="esp-legend-ticks">
-                {ESP_TICKS.map(tick => <span key={tick}>{tick}</span>)}
-            </div>
-            {compact && (
-                <button type="button" className="esp-legend-info" aria-label="about this colour key"
-                    aria-expanded={notesOpen} onClick={() => setNotesOpen(open => !open)}>ⓘ</button>
-            )}
-            {showNotes && (
-                <>
-                    {/* Worded in esp_color.ts, shared with the PNG export's key (Task 16b). */}
-                    <div className="esp-legend-note">{ESP_SIGN_NOTE}</div>
-                    <div className="esp-legend-note">{espSurfaceNote(method)}</div>
-                    {range && <div className="esp-legend-note">{espRangeNote(range)}</div>}
-                </>
-            )}
+const EspLegend: React.FC<EspLegendProps> = ({ compact = false }) => (
+    <div className={compact ? 'esp-legend compact' : 'esp-legend'} aria-label="electrostatic potential colour key">
+        <div
+            className="esp-legend-bar"
+            data-gradient={espLegendGradient()}
+            style={{ backgroundImage: espLegendGradient() }}
+        />
+        <div className="esp-legend-ticks">
+            {ESP_TICKS.map(tick => <span key={tick}>{tick}</span>)}
         </div>
-    );
-};
+        <div className="esp-legend-ends">
+            <span>electron-rich</span>
+            <span>electron-poor</span>
+        </div>
+        <span className="esp-legend-info">
+            <InfoButton topic="esp" label="Electrostatic potential" place="legend" />
+        </span>
+    </div>
+);
 
 export default EspLegend;

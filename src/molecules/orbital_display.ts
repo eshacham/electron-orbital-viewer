@@ -1,10 +1,21 @@
 import type { MoleculeOrbitalInfo } from './types';
+import { HARTREE_IN_EV } from '../format/energy';
 
-export const HARTREE_TO_EV = 27.211386;
+/**
+ * Task 7b: the one Ha→eV factor (format/energy.ts, CODATA 2018), under the name the Molecules CSV export prints in its
+ * header ("1 Ha = 27.211386245988 eV"). Not a copy: it was 27.211386 here, a second rounding of the same constant. A
+ * re-export, a live binding: format/energy imports format/sci, which imports this module, so a `const` copied at load
+ * could read the factor before format/energy has set it.
+ */
+export { HARTREE_IN_EV as HARTREE_TO_EV } from '../format/energy';
 const signed = (v: number, digits: number) => `${v < 0 ? '−' : ''}${Math.abs(v).toFixed(digits)}`;
 
+/**
+ * Ha first, then eV: what an exported caption says of an orbital's energy (export/caption.ts, Task 8's). Every panel
+ * and Info read eV first (format/energy.ts orbitalEnergyText, Task 6 ruling).
+ */
 export function formatOrbitalEnergy(energyHartree: number): string {
-    return `${signed(energyHartree, 3)} Ha (${signed(energyHartree * HARTREE_TO_EV, 2)} eV)`;
+    return `${signed(energyHartree, 3)} Ha (${signed(energyHartree * HARTREE_IN_EV, 2)} eV)`;
 }
 
 /** Size of each orbital's degenerate set (|ΔE| below tol, chained through energy order), keyed by orbital index. */
@@ -36,6 +47,21 @@ export function formatPointGroup(group: string): string {
 export const VALENCE_THRESHOLD = 0.75;
 /** Spec §5: wherever a HOMO–LUMO (or HOMO–LVMO) gap is shown. */
 export const GAP_CAVEAT = 'Kohn–Sham orbital gap — neither the optical gap (absorption) nor the fundamental gap (IP − EA)';
+
+/**
+ * Task 7b: the Kohn–Sham caveat, stated once for every energy Molecules shows (the orbital list's energies, the gaps,
+ * Info's orbital energy): the orbital list's old caption ("Kohn–Sham orbital energies … Not ionisation energies.") and
+ * GAP_CAVEAT, one sentence each. The gap sentence names the molecule's own gaps; none without a virtual.
+ */
+export function kohnShamNote(orbitals: MoleculeOrbitalInfo[]): string {
+    const gaps = orbitalGaps(orbitals);
+    const energies = 'Orbital energies here are Kohn–Sham eigenvalues, not ionisation energies.';
+    if (gaps.length === 0) return energies;
+    // "The HOMO–LUMO gap is a Kohn–Sham orbital gap — …"; two: "The HOMO–LUMO and HOMO–LVMO gaps are Kohn–Sham orbital gaps — …".
+    return gaps.length === 1
+        ? `${energies} The ${gapTerm(gaps[0])} is a ${GAP_CAVEAT}.`
+        : `${energies} The ${gaps.map(gap => gap.name).join(' and ')} gaps are Kohn–Sham orbital gaps — ${GAP_CAVEAT.split(' — ')[1]}.`;
+}
 /** Ruling D4: what a virtual under VALENCE_THRESHOLD is, whatever its energy -- water's 4a1 (55 %) lies below zero,
  * and silane's 3t2 (68 %) is not "unbound". */
 export const DIFFUSE_NOTE = 'its shape depends on the basis';

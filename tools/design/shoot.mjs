@@ -14,6 +14,10 @@
 //   --jobs-stub      every /api/... request the page makes is answered from tests/jobs/fixtures/api (the recorded
 //                    responses tests/jobs/api_fixtures.ts reads) or aborted and reported as an error -- a submit
 //                    (POST /v1/jobs) always is. metrics.api counts what was seen, answered, refused.
+//   --computed-meta <file>  (with --jobs-stub; Task 7b of the levels plan) a computed molecule to look at: its job's
+//                    done.json and meta.json (/molecules/jobs/<meta.id>/...) are answered from this local meta file,
+//                    so `#mode=molecule&job=<meta.id>` loads it; every other job file stays blocked (no grids: shoot it
+//                    with show=none). Nothing is fetched from a real job's results.
 //   --jobs-down      (with --jobs-stub; owner R25-A1) the stub answers every /api request as Vite's proxy does when
 //                    the local job server is not running: HTTP 500, empty body. Still nothing leaves the browser.
 //   Every run (Task 16d): Vite's /api proxy points at a closed port and has no AWS route, so nothing -- stubbed or
@@ -98,6 +102,9 @@ const ownerSession = process.argv.includes('--owner-session');
 const jobsStub = process.argv.includes('--jobs-stub');
 const previewFixture = arg('preview-fixture', 'preview_ok');
 const jobsDown = process.argv.includes('--jobs-down');
+const computedMetaFile = arg('computed-meta', null);
+const computedMeta = computedMetaFile ? JSON.parse(readFileSync(resolve(computedMetaFile), 'utf8')) : null;
+if (computedMeta && !jobsStub) throw new Error('--computed-meta is a mode of --jobs-stub');
 // A preview whose molecule is already on record: the preview fixture with a recorded job as its `existing`
 // (what tests/jobs/request_panel.test.tsx composes), e.g. --preview-existing get_done → "Already computed — open it".
 const previewExisting = arg('preview-existing', null);
@@ -139,7 +146,15 @@ async function installJobsStub(context, log) {
   // A computed molecule's result files (/molecules/jobs/<key>/...) are a job's output, not the library: never
   // fetched under the stub (no CDN, no local results folder) -- the page says it could not load them.
   await context.route('**/molecules/jobs/**', route => {
-    log.blockedResults.push(new URL(route.request().url()).pathname);
+    const path = new URL(route.request().url()).pathname;
+    // --computed-meta: that one job's done.json and meta.json, from the local file; nothing else.
+    if (computedMeta && path === `/molecules/jobs/${computedMeta.id}/done.json`) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: { 'meta.json': 'stub' } }) });
+    }
+    if (computedMeta && path === `/molecules/jobs/${computedMeta.id}/meta.json`) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(computedMeta) });
+    }
+    log.blockedResults.push(path);
     return route.abort('blockedbyclient');
   });
   await context.route('**/api/**', async route => {

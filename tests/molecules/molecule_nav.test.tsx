@@ -12,6 +12,31 @@ import {
     labelsSentence, AXES_NOTE, GAP_CAVEAT, CONSTRUCTED_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, UNLABELLED_NOTE, VALENCE_VIRTUAL_NOTE,
 } from '../../src/molecules/orbital_display';
 import { LIBRARY_INDEX, waterMeta, waterAtoms } from './fixtures';
+import { moleculeInfo } from '../../src/info/molecule_info';
+import InfoPanel from '../../src/info/InfoPanel';
+import { makeStore } from '../export/fixtures';
+import { setMode } from '../../src/store/atomSlice';
+import { metaLoaded, selectMolecule, setSurface } from '../../src/store/moleculeSlice';
+import { kohnShamNote } from '../../src/molecules/orbital_display';
+import { DIPOLE_CONVENTION } from '../../src/info/molecule_info';
+
+/**
+ * Task 7b: what Info says (every band, at Research) with `orbitals` drawn in Molecules -- the orbital list's caption
+ * wall (the gap note and Kohn–Sham caveat, the key to the marks, the method, the labels and the virtuals' classes)
+ * moved there. No-break spaces read as plain spaces.
+ */
+function infoText(orbitals: ReturnType<typeof waterMeta>['orbitals'], symmetry: Parameters<typeof labelsSentence>[0] = { pointGroup: 'C2v', labelGroup: 'C2v' }): string {
+    const meta = waterMeta({ orbitals, symmetry });
+    const store = makeStore();
+    store.dispatch(setMode('molecule'));
+    store.dispatch(selectMolecule({ id: meta.id }));
+    store.dispatch(metaLoaded({ id: meta.id, meta }));
+    store.dispatch(setSurface({ kind: 'mo', index: orbitals[0].index }));
+    const { container, unmount } = render(<InfoPanel content={moleculeInfo(store.getState(), meta, 'research')} topic={null} onClearTopic={() => {}} level="research" />);
+    const text = (container.textContent ?? '').replace(/\u00A0/g, ' ');
+    unmount();
+    return text;
+}
 
 const navProps = {
     entries: LIBRARY_INDEX, indexError: null, meta: waterMeta(), selectedId: 'h2o', isLoading: false,
@@ -51,15 +76,13 @@ describe('MoleculeOrbitalList', () => {
         const labels = () => screen.getAllByRole('button').map(row => row.textContent?.match(/^o\d+/)?.[0]);
 
         it('lists LUMO+3 down to HOMO−3, and says where the rest are', () => {
-            render(<MoleculeOrbitalList orbitals={ladder} selectedIndex={null} onSelect={() => {}} allOrbitals={false}
-                method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+            render(<MoleculeOrbitalList orbitals={ladder} selectedIndex={null} onSelect={() => {}} allOrbitals={false} />);
             expect(labels()).toEqual(['o9', 'o8', 'o7', 'o6', 'o5', 'o4', 'o3', 'o2']);
             expect(screen.getByText('Show all orbitals at Advanced')).toBeInTheDocument();
         });
 
         it('keeps the orbital drawn listed, even outside the window', () => {
-            render(<MoleculeOrbitalList orbitals={ladder} selectedIndex={0} onSelect={() => {}} allOrbitals={false}
-                method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+            render(<MoleculeOrbitalList orbitals={ladder} selectedIndex={0} onSelect={() => {}} allOrbitals={false} />);
             expect(labels()).toEqual(['o9', 'o8', 'o7', 'o6', 'o5', 'o4', 'o3', 'o2', 'o0']);
         });
 
@@ -69,8 +92,7 @@ describe('MoleculeOrbitalList', () => {
             // o1/o2 (HOMO−4/HOMO−3) and o9/o10 (LUMO+3/LUMO+4) become degenerate pairs.
             paired[1].energyHartree = paired[2].energyHartree;
             paired[10].energyHartree = paired[9].energyHartree;
-            render(<MoleculeOrbitalList orbitals={paired} selectedIndex={null} onSelect={() => {}} allOrbitals={false}
-                method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+            render(<MoleculeOrbitalList orbitals={paired} selectedIndex={null} onSelect={() => {}} allOrbitals={false} />);
             expect(labels()).toEqual(expect.arrayContaining(['o10', 'o9', 'o2', 'o1']));
             expect(labels()).not.toContain('o0');
             expect(labels()).not.toContain('o11');
@@ -79,7 +101,7 @@ describe('MoleculeOrbitalList', () => {
         // Ruling T2-energies: below Explore the rows keep their names, occupancy and chips, not their energies.
         it('drops the energy column when energies are hidden', () => {
             const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
-                showEnergies={false} method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+                showEnergies={false} />);
             expect(container.querySelector('.molecule-orbital-energy')).toBeNull();
             expect(screen.getAllByRole('button')[1]).toHaveTextContent('HOMO');
             expect(container.querySelector('.molecule-orbital-gap')).toBeNull();
@@ -87,16 +109,15 @@ describe('MoleculeOrbitalList', () => {
 
         it('says nothing when the window already holds every orbital', () => {
             // Four occupied and four virtual: exactly the window.
-            render(<MoleculeOrbitalList orbitals={ladder.slice(2, 10)} selectedIndex={null} onSelect={() => {}} allOrbitals={false}
-                method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+            render(<MoleculeOrbitalList orbitals={ladder.slice(2, 10)} selectedIndex={null} onSelect={() => {}} allOrbitals={false} />);
             expect(screen.queryByText('Show all orbitals at Advanced')).toBeNull();
         });
     });
 
-    it('lists highest first, marks HOMO and LUMO, states the method and that energies are not ionisation energies', () => {
+    // Task 7b: the list states neither the method nor the Kohn–Sham caveat any more -- Info does, once (kohnShamNote).
+    it('lists highest first and marks HOMO and LUMO, leaving the method and the Kohn–Sham caveat to Info', () => {
         const onSelect = jest.fn();
-        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={4} onSelect={onSelect}
-            method="B3LYP/def2-TZVP" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={4} onSelect={onSelect} />);
         const rows = screen.getAllByRole('button');
         expect(rows[0]).toHaveTextContent('4a1');
         expect(rows[1]).toHaveTextContent('1b1');
@@ -105,28 +126,24 @@ describe('MoleculeOrbitalList', () => {
         expect(rows[0]).toHaveTextContent('LUMO');
         fireEvent.click(rows[2]);
         expect(onSelect).toHaveBeenCalledWith(3);
-        expect(container.textContent).toMatch(/Kohn–Sham orbital energies, B3LYP\/def2-TZVP\. Not ionisation energies\./);
+        expect(container.textContent).not.toMatch(/ionisation|Kohn–Sham|B3LYP/);
+        expect(infoText(waterMeta().orbitals)).toContain('Orbital energies here are Kohn–Sham eigenvalues, not ionisation energies.');
     });
     // Ruling T16-b: descending order stays (it reads like an MO diagram), so the gap between the last virtual and
-    // the HOMO is marked. Owner R25-A4 moves its words -- the gap and the Kohn–Sham caveat -- below the list as its
-    // caption (they sat between the rows, over the HOMO); a plain rule still marks where the occupied orbitals begin.
-    it('marks the HOMO–LUMO gap with a rule between the virtuals and the occupied orbitals, and says it under the list (R25-A4)', () => {
-        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
-            method="B3LYP/def2-TZVP" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
-        // Fix round 1: a note, not a separator -- screen readers skip a separator's children, so the gap and its
-        // caveat would go unannounced.
-        const note = screen.getByRole('note');
-        expect(note.textContent).toBe(`HOMO–LUMO gap 0.320 Ha (8.71 eV). ${GAP_CAVEAT}.`);
+    // the HOMO is marked. Owner R25-A4 moved its words below the list; Task 7b moves them into Info (the gap fact, eV
+    // first, and the Kohn–Sham caveat, once) -- a plain rule still marks where the occupied orbitals begin.
+    it('marks the HOMO–LUMO gap with a rule between the virtuals and the occupied orbitals, its words in Info (Task 7b)', () => {
+        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}} />);
+        expect(screen.queryByRole('note')).toBeNull();
         expect(screen.queryByRole('separator')).toBeNull();
+        const info = infoText(waterMeta().orbitals);
+        expect(info).toContain('HOMO–LUMO gap8.71 eV (0.320 Ha)');
+        expect(info).toContain(`The HOMO–LUMO gap is a ${GAP_CAVEAT}.`);
         const [lumo, homo] = screen.getAllByRole('button');
         const rule = container.querySelector('.molecule-orbital-gap-rule') as HTMLElement;
         expect(rule).toHaveAttribute('aria-hidden', 'true');
         expect(lumo.compareDocumentPosition(rule) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(rule.compareDocumentPosition(homo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        // The words follow every row, outside the part that scrolls.
-        const rows = screen.getAllByRole('button');
-        expect(rows[rows.length - 1].compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect((container.querySelector('.molecule-orbital-list') as HTMLElement).contains(note)).toBe(false);
     });
     // Final review M6: open-shell NO₂ (ROKS) has a singly occupied orbital
     // between the HOMO and the LUMO, so its divider spans SOMO -> LUMO.
@@ -136,10 +153,11 @@ describe('MoleculeOrbitalList', () => {
             { index: 11, label: '6a1', energyHartree: -0.30, occupation: 1, role: 'SOMO' },
             { index: 12, label: '2b1', energyHartree: -0.10, occupation: 0, role: 'LUMO' },
         ] as ReturnType<typeof waterMeta>['orbitals'];
-        render(<MoleculeOrbitalList orbitals={orbitals} selectedIndex={null} onSelect={() => {}}
-            method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
-        expect(screen.getByRole('note').textContent).toBe(`SOMO–LUMO gap 0.200 Ha (5.44 eV). ${GAP_CAVEAT}.`);
-        expect(screen.queryByText(/HOMO–LUMO gap/)).toBeNull();
+        // Task 7b: the gap's name and value are Info's (the fact, eV first) and its caveat names it.
+        const info = infoText(orbitals);
+        expect(info).toContain('SOMO–LUMO gap5.44 eV (0.200 Ha)');
+        expect(info).toContain(`The SOMO–LUMO gap is a ${GAP_CAVEAT}.`);
+        expect(info).not.toMatch(/HOMO–LUMO gap/);
     });
     // Ruling T16-b: the list opens scrolled so the HOMO is in view -- by
     // scrolling the list itself, so a desktop's right-hand column does not
@@ -152,20 +170,18 @@ describe('MoleculeOrbitalList', () => {
             if (this.textContent?.includes('HOMO') && this.tagName === 'BUTTON') return at(520, 30);
             return at(0, 0);
         });
-        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
-            method="B3LYP/def2-TZVP" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}} />);
         // The row's top sits 420 px below the list's; centring a 30 px row in 200 px leaves 85 px above it.
         expect((container.querySelector('.molecule-orbital-list') as HTMLElement).scrollTop).toBe(335);
         rects.mockRestore();
     });
-    // D34: the linear-molecule caption names D∞h/C∞v, never PySCF's raw Dooh/Coov.
+    // D34: the linear-molecule caption names D∞h/C∞v, never PySCF's raw Dooh/Coov. Task 7b: the caption is Info's.
     it('shows the conventional symbol for a linear molecule\'s point group (D34)', () => {
-        const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={null} onSelect={() => {}}
-            method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'Dooh', labelGroup: 'Coov' }} />);
-        expect(container.textContent).toMatch(/D∞h/);
-        expect(container.textContent).toMatch(/C∞v/);
-        expect(container.textContent).not.toMatch(/Dooh/);
-        expect(container.textContent).not.toMatch(/Coov/);
+        const info = infoText(waterMeta().orbitals, { pointGroup: 'Dooh', labelGroup: 'Coov' });
+        expect(info).toMatch(/D∞h/);
+        expect(info).toMatch(/C∞v/);
+        expect(info).not.toMatch(/Dooh/);
+        expect(info).not.toMatch(/Coov/);
     });
 });
 
@@ -351,10 +367,12 @@ describe('MoleculeNav', () => {
         expect(revealScrollTop(panel(300), box(20, 100))).toBe(212);
         expect(revealScrollTop(panel(10), box(20, 100))).toBe(0);
     });
-    it('states where the geometry and the density come from', () => {
+    // Task 7b: the geometry source is the Properties row's and the method "How this was computed"'s (Info), each said
+    // once -- MoleculeNav no longer captions either (tests/info/molecule_info.test.ts, properties_card.test.tsx).
+    it('leaves where the geometry and the density come from to Properties and Info', () => {
         const { container } = render(<MoleculeNav {...navProps} />);
-        expect(container.textContent).toMatch(/Geometry: experiment \(CCCBDB\)/);
-        expect(container.textContent).toMatch(/Density, potential and orbitals: B3LYP\/def2-TZVP \(PySCF\)/);
+        expect(container.textContent).not.toMatch(/Geometry:|experiment \(CCCBDB\)/);
+        expect(container.textContent).not.toMatch(/B3LYP|PySCF/);
     });
 });
 
@@ -382,12 +400,17 @@ const COMPUTED_LVMO = [
     { index: 2, label: '2πu', energyHartree: 0.20, occupation: 0, role: 'LVMO', valenceCharacter: 0.97, class: 'valence' },
 ] as Orbitals;
 const V3_SYMMETRY = { pointGroup: 'C2v', labelGroup: 'C2v', labels: 'full-group' as const };
-const list = (orbitals: Orbitals = WATER_V3, symmetry: Parameters<typeof labelsSentence>[0] = V3_SYMMETRY) => render(
-    <MoleculeOrbitalList orbitals={orbitals} selectedIndex={null} onSelect={() => {}} method="B3LYP-D3(BJ)/def2-TZVPD" symmetry={symmetry} />);
+/** The list for `orbitals`, and (Task 7b) what Info says of them -- the list's old caption is Info's. */
+const list = (orbitals: Orbitals = WATER_V3, symmetry: Parameters<typeof labelsSentence>[0] = V3_SYMMETRY) => ({
+    ...render(<MoleculeOrbitalList orbitals={orbitals} selectedIndex={null} onSelect={() => {}} />),
+    info: infoText(orbitals, symmetry),
+});
 
+// Task 7b: each test's caption checks now read Info (`info`, the list's old caption moved there); the rows' own marks,
+// names and energies are still the list's. The key reads "◌ marks …" and the gaps eV first, as Info words them.
 describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
     it('marks the diffuse virtuals and says "unbound" only of one at positive energy (Ruling D4)', () => {
-        const { container } = list();
+        const { info } = list();
         const lumo = screen.getByRole('button', { name: /4a1/ });
         expect(within(lumo).getByRole('img', { name: 'partly diffuse (55 % valence): its shape depends on the basis' })).toHaveTextContent('◌');
         expect(lumo.textContent).not.toMatch(/unbound/);
@@ -395,62 +418,69 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(within(second).getByRole('img', {
             name: 'partly diffuse (27 % valence): its shape depends on the basis; positive energy: an unbound state, not a bound orbital' }))
             .toHaveTextContent('◌');
-        expect(container.textContent).toContain('◌ partly diffuse virtual (under 75 % valence): its shape depends on the basis.');
-        expect(container.textContent).toContain('Those at positive energy are unbound, basis-set dependent states, not bound orbitals.');
+        expect(info).toContain('◌ marks a partly diffuse virtual (under 75 % valence): its shape depends on the basis.');
+        expect(info).toContain('Those at positive energy are unbound, basis-set dependent states, not bound orbitals.');
     });
     it('makes no "unbound" claim when no diffuse virtual lies above zero', () => {
-        const { container } = list(WATER_V3.filter(o => o.index !== 6));
-        expect(container.textContent).toContain('◌ partly diffuse virtual');
+        const { container, info } = list(WATER_V3.filter(o => o.index !== 6));
+        expect(info).toContain('◌ marks a partly diffuse virtual');
+        expect(info).not.toMatch(/unbound/);
         expect(container.textContent).not.toMatch(/unbound/);
     });
     it('shows a constructed LVMO\'s energy as an upper estimate, never ≈, and says what it is (Ruling D4-energy)', () => {
-        const { container } = list();
+        const { container, info } = list();
         const lvmo = screen.getByRole('button', { name: /LVMO/ });
-        expect(lvmo).toHaveTextContent('0.190 Ha (5.17 eV)');
+        // Task 7b: eV first, Ha in parentheses (the Task 6 ruling), as Info's orbital energy reads.
+        expect(lvmo).toHaveTextContent('5.17 eV (0.190 Ha)');
         // Fix round 1: the row shows the short "upper est." (the legend explains it); the accessible name has it in full.
         expect(within(lvmo).getByText('upper est.')).toHaveAttribute('aria-hidden', 'true');
-        expect(screen.getByRole('button', { name: /0\.190 Ha \(5\.17 eV\) upper estimate LVMO/ })).toBe(lvmo);
+        expect(screen.getByRole('button', { name: /5\.17 eV \(0\.190 Ha\) upper estimate LVMO/ })).toBe(lvmo);
         expect(within(lvmo).getByRole('img', { name: 'constructed: not an orbital of this calculation' })).toHaveTextContent('◇');
         // Task 16d item 6 (T15-M3): the row's own name says it is constructed, as the strip tile's does.
         expect(lvmo).toHaveAccessibleName(expect.stringContaining('constructed: not an orbital of this calculation'));
         expect(container.textContent).not.toContain('≈');
-        expect(container.textContent).toContain(`◇ LVMO ${CONSTRUCTED_NOTE}.`);
+        expect(info).not.toContain('≈');
+        expect(info).toContain(`◇ LVMO ${CONSTRUCTED_NOTE}.`);
         // Ruling LVMO-wording: not every LVMO is antibonding (BF3's is boron's empty 2p).
-        expect(container.textContent).toContain(
+        expect(info).toContain(
             "LVMO: the lowest empty valence orbital — the one textbooks draw (antibonding, or an empty valence orbital such as boron's 2p in BF3).");
-        expect(container.textContent).not.toMatch(/antibonding orbital textbooks draw/);
-        expect(container.textContent).toContain('Labels: irreducible representations of C2v, numbered in energy order within each, core included.');
+        expect(info).not.toMatch(/antibonding orbital textbooks draw/);
+        expect(info).toContain('Labels: irreducible representations of C2v, numbered in energy order within each, core included.');
     });
     it('gives only the Kohn–Sham HOMO–LUMO gap, with its caveat, when the LVMO is constructed', () => {
-        const { container } = list();
-        expect(screen.getByRole('note').textContent).toBe(`HOMO–LUMO gap 0.300 Ha (8.16 eV). ${GAP_CAVEAT}.`);
-        expect(container.textContent).not.toMatch(/HOMO–LVMO/);
+        const { info } = list();
+        expect(info).toContain('HOMO–LUMO gap8.16 eV (0.300 Ha)');
+        expect(info).toContain(`The HOMO–LUMO gap is a ${GAP_CAVEAT}.`);
+        expect(info).not.toMatch(/HOMO–LVMO/);
     });
     it('gives both gaps, labelled, when the LVMO is one of the calculation\'s own orbitals', () => {
-        const { container } = list(COMPUTED_LVMO, { pointGroup: 'Dooh', labelGroup: 'Dooh', labels: 'full-group' });
-        expect(screen.getByRole('note').textContent).toBe(
-            `HOMO–LUMO gap 0.290 Ha (7.89 eV) · HOMO–LVMO gap 0.500 Ha (13.61 eV). ${GAP_CAVEAT}.`);
+        const { container, info } = list(COMPUTED_LVMO, { pointGroup: 'Dooh', labelGroup: 'Dooh', labels: 'full-group' });
+        expect(info).toContain('HOMO–LUMO gap7.89 eV (0.290 Ha)HOMO–LVMO gap13.61 eV (0.500 Ha)');
+        expect(info).toContain(kohnShamNote(COMPUTED_LVMO));
+        expect(kohnShamNote(COMPUTED_LVMO)).toContain('The HOMO–LUMO and HOMO–LVMO gaps are Kohn–Sham orbital gaps — neither the optical gap');
         const lvmo = screen.getByRole('button', { name: /LVMO/ });
         expect(lvmo).not.toHaveTextContent(/upper est/);
         expect(within(lvmo).queryByRole('img')).toBeNull();
         expect(container.textContent).not.toContain('◇');
-        expect(container.textContent).toContain('Labels: irreducible representations of D∞h, numbered in energy order within each, core included.');
+        expect(info).not.toContain('◇');
+        expect(info).toContain('Labels: irreducible representations of D∞h, numbered in energy order within each, core included.');
     });
     it('renders v2-shaped orbitals as before, and says their virtuals are unclassified (Review Focus 5)', () => {
-        const { container } = list(waterMeta().orbitals, { pointGroup: 'C2v', labelGroup: 'C2v' });
+        const { container, info } = list(waterMeta().orbitals, { pointGroup: 'C2v', labelGroup: 'C2v' });
         expect(screen.queryByRole('img')).toBeNull();
         expect(screen.queryByText('LVMO')).toBeNull();
         expect(container.textContent).not.toMatch(/upper estimate|unbound|◌|◇/);
-        expect(container.textContent).toContain(UNCLASSIFIED_NOTE);
-        expect(container.textContent).toContain('Labels: irreducible representations of C2v.');
+        expect(info).not.toMatch(/upper estimate|unbound|◌|◇/);
+        expect(info).toContain(UNCLASSIFIED_NOTE);
+        expect(info).toContain('Labels: irreducible representations of C2v.');
     });
     it('names a subgroup fallback, an unlabelled set, a geometry-labelled set and an unlabelled molecule in the caption', () => {
         const orbitals = [{ index: 0, label: '?', energyHartree: -0.5, occupation: 2, role: 'HOMO',
             labelNote: 'characters (2.00, -1.00) match no single irrep of Td: an accidental degeneracy or numerical noise, so left unlabelled' }] as Orbitals;
-        const { container, unmount } = list(orbitals, { pointGroup: 'D2d', labelGroup: 'D2', labels: 'subgroup',
+        const { info, unmount } = list(orbitals, { pointGroup: 'D2d', labelGroup: 'D2', labels: 'subgroup',
             labelNote: 'irreducible representations of D2, a subgroup of D2d: full-group labels are not available for D2d' });
-        expect(container.textContent).toContain('Labels: irreducible representations of D2, a subgroup of D2d: full-group labels are not available for D2d.');
-        expect(container.textContent).toContain('?: characters (2.00, -1.00) match no single irrep of Td');
+        expect(info).toContain('Labels: irreducible representations of D2, a subgroup of D2d: full-group labels are not available for D2d.');
+        expect(info).toContain('?: characters (2.00, -1.00) match no single irrep of Td');
         unmount();
         expect(labelsSentence({ pointGroup: 'C2v', labelGroup: 'C2v', labels: 'full-group',
             labelNote: 'the SCF ran without point-group symmetry: labelled from the geometry\'s own point group, by character projection' }))
@@ -531,33 +561,31 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
             { index: 4, label: '1a2″', energyHartree: -0.33, occupation: 2, role: 'HOMO' },
             { index: 5, label: '2a2″', energyHartree: -0.05, occupation: 0, role: 'LUMO', valenceCharacter: 0.9, class: 'valence' },
         ] as Orbitals;
-        const { container, unmount } = list(bf3, { pointGroup: 'D3h', labelGroup: 'D3h', labels: 'full-group' });
-        expect(container.textContent).toContain(`1a1′+1e′: ${combined}.`);
-        expect(container.textContent!.split(combined).length - 1).toBe(1);
-        expect(container.textContent).not.toContain('?:');
+        // Task 7b: the label notes are Info's (its technical band), still one per label.
+        const { info, unmount } = list(bf3, { pointGroup: 'D3h', labelGroup: 'D3h', labels: 'full-group' });
+        expect(info).toContain(`1a1′+1e′: ${combined}.`);
+        expect(info.split(combined).length - 1).toBe(1);
+        expect(info).not.toContain('?:');
         unmount();
         const both = [...bf3, ...[6, 7].map(index => ({ index, label: '?', energyHartree: 0.3, occupation: 0, labelNote: unknown }))] as Orbitals;
         const second = list(both, { pointGroup: 'D3h', labelGroup: 'D3h', labels: 'full-group' });
-        expect(second.container.textContent).toContain(`1a1′+1e′: ${combined}.`);
-        expect(second.container.textContent).toContain(`?: ${unknown}.`);
+        expect(second.info).toContain(`1a1′+1e′: ${combined}.`);
+        expect(second.info).toContain(`?: ${unknown}.`);
         second.unmount();
         const silent = [...bf3.slice(3), { index: 6, label: '?', energyHartree: 0.3, occupation: 0, role: 'LVMO', kind: 'valence-virtual',
             constructed: true, valenceCharacter: 1, class: 'valence' }] as Orbitals;
         const third = list(silent, { pointGroup: 'D3h', labelGroup: 'D3h', labels: 'full-group' });
-        expect(third.container.textContent).toContain(`?: ${UNLABELLED_NOTE}.`);
+        expect(third.info).toContain(`?: ${UNLABELLED_NOTE}.`);
     });
-    // Fix round 1 keyed the marks at the top of the list, held there as it scrolled. Owner R25-A4: the list comes
-    // first; the key is part of its caption under the last row, beside the gap note it now sits with.
-    it('keys the marks under the list, after every row (R25-A4)', () => {
-        const { container } = list();
-        const key = container.querySelector('.molecule-orbital-legend')!;
-        expect(key.textContent).toBe('◌ partly diffuse virtual (under 75 % valence) · '
-            + '◇ constructed LVMO, not an orbital of this calculation · upper est.: its energy is an upper estimate');
-        const rows = screen.getAllByRole('button');
-        expect(rows[rows.length - 1].compareDocumentPosition(key) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect((container.querySelector('.molecule-orbital-list') as HTMLElement).contains(key)).toBe(false);
-        const { container: legacy } = list(waterMeta().orbitals, { pointGroup: 'C2v', labelGroup: 'C2v' });
-        expect(legacy.querySelector('.molecule-orbital-legend')).toBeNull();
+    // Fix round 1 keyed the marks at the top of the list, held there as it scrolled. Owner R25-A4 moved the key under
+    // the last row; Task 7b moves it into Info, which keys only the marks the list shows (none for older data).
+    it('keys the marks in Info, not under the list (Task 7b)', () => {
+        const { container, info } = list();
+        expect(container.querySelector('.molecule-orbital-legend')).toBeNull();
+        expect(info).toContain('◌ marks a partly diffuse virtual (under 75 % valence): its shape depends on the basis. '
+            + '◇ marks a constructed LVMO, not an orbital of this calculation. “upper est.” marks an energy that is an upper estimate.');
+        const legacy = list(waterMeta().orbitals, { pointGroup: 'C2v', labelGroup: 'C2v' });
+        expect(legacy.info).not.toMatch(/marks a|◌|◇/);
     });
     // 6G-2 Task 17 fix (Fail 2) kept the gap note clear of the sticky key with an opening scroll of its own. Owner
     // R25-A4 moved both under the list, so that rule is gone (the list opens with the HOMO centred, above) and this
@@ -571,8 +599,10 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         }
         const notes = container.querySelector('.molecule-orbital-notes') as HTMLElement;
         expect(scrolling.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(notes.querySelector('.molecule-orbital-legend')).not.toBeNull();
-        expect(within(notes).getByRole('note')).toBeInTheDocument();
+        // Task 7b: the key and the gap note are Info's now; what stays under the rows (the inside-ball note, the level
+        // line) is still outside the part that scrolls.
+        expect(notes.querySelector('.molecule-orbital-legend')).toBeNull();
+        expect(within(notes).queryByRole('note')).toBeNull();
         const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
         const rules = css.match(/^\.molecule-orbital[^{]*\{[^}]*\}/gm) ?? [];
         expect(rules.length).toBeGreaterThan(5);
@@ -598,49 +628,62 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         list(silane, { pointGroup: 'Td', labelGroup: 'Td', labels: 'full-group' });
         const row = screen.getAllByRole('button', { name: /LVMO/ })[0];
         const parts = row.querySelectorAll('.molecule-orbital-energy-part');
-        expect([...parts].map(p => p.textContent)).toEqual(['0.163 Ha', '(4.44 eV)']);
+        // Task 7b: eV first, Ha in parentheses.
+        expect([...parts].map(p => p.textContent)).toEqual(['4.44 eV', '(0.163 Ha)']);
         expect(row).toHaveTextContent('×3');
     });
 });
 
 describe('readout and view options', () => {
+    // Task 7b: the readout's "geometry: … · sticks show connectivity" line is gone -- the geometry source is the
+    // Properties row's and what the sticks show is Info's (tests/info/molecule_info.test.ts), each said once.
     it('reads out a pick, or says how to get one', () => {
-        const { rerender, container } = render(<MoleculeReadout atoms={waterAtoms()} pick={{ kind: 'atom', index: 0 }} geometrySource="experiment (CCCBDB)" touch={false} />);
+        const { rerender, container } = render(<MoleculeReadout atoms={waterAtoms()} pick={{ kind: 'atom', index: 0 }} touch={false} />);
         expect(container.textContent).toMatch(/∠H–O–H 104\.5°/);
-        expect(container.textContent).toMatch(/geometry: experiment \(CCCBDB\)/);
-        rerender(<MoleculeReadout atoms={waterAtoms()} pick={null} geometrySource="experiment (CCCBDB)" touch />);
+        expect(container.textContent).not.toMatch(/geometry:|connectivity/);
+        rerender(<MoleculeReadout atoms={waterAtoms()} pick={null} touch />);
         expect(container.textContent).toMatch(/Tap an atom or bond/);
     });
     // Ruling T13-I4: a phone's hint under space filling offers atoms only -- there are no bonds to tap.
     it('offers only atoms to tap under space filling', () => {
-        const { container } = render(<MoleculeReadout atoms={waterAtoms()} pick={null} geometrySource="experiment (CCCBDB)" touch spaceFilling />);
+        const { container } = render(<MoleculeReadout atoms={waterAtoms()} pick={null} touch spaceFilling />);
         expect(container.textContent).toMatch(/Tap an atom for its angles and neighbours/);
         expect(container.textContent).not.toMatch(/bond/);
     });
     // Ruling R23c-3: on a desktop (not `touch`) the hint moves to a viewport-corner
-    // caption (App.tsx), so the Explore-panel readout says nothing extra while
-    // unpicked -- just the always-on geometry/connectivity note.
-    it('says nothing extra on a desktop while unpicked, leaving the hint to the viewport caption', () => {
-        const { container } = render(<MoleculeReadout atoms={waterAtoms()} pick={null} geometrySource="experiment (CCCBDB)" touch={false} />);
-        expect(container.textContent).not.toMatch(/hover|tap/i);
-        expect(container.textContent).toMatch(/geometry: experiment \(CCCBDB\)/);
+    // caption (App.tsx), so the Explore-panel readout says nothing while unpicked
+    // (Task 7b: its geometry/connectivity note is Properties' and Info's now).
+    it('says nothing on a desktop while unpicked, leaving the hint to the viewport caption', () => {
+        const { container } = render(<MoleculeReadout atoms={waterAtoms()} pick={null} touch={false} />);
+        expect(container.textContent).toBe('');
     });
-    it('toggles structure and dipole and states the arrow convention', () => {
+    // Task 7b: the arrow's convention is Info's (DIPOLE_CONVENTION, at every level while the arrow is drawn).
+    it('toggles structure and dipole, leaving the arrow convention to Info', () => {
         const onShowDipole = jest.fn();
         // Task 13 (ruling P8): the structure is a representation now (the switch became the Structure segments).
-        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null} surfaceShown
-            showDipole onShowDipole={onShowDipole} dipoleText="μ = 1.86 D" />);
+        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null}
+            showDipole onShowDipole={onShowDipole} />);
         fireEvent.click(screen.getByLabelText('Dipole arrow'));   // role is checkbox or switch depending on the MUI minor
         expect(onShowDipole).toHaveBeenCalledWith(false);
-        expect(container.textContent).toMatch(/points from − to \+/);
+        expect(container.textContent).not.toMatch(/points from − to \+/);
+        expect(DIPOLE_CONVENTION).toMatch(/^The arrow points from − to \+ \(the physics convention\), 1 a₀ per debye/);
     });
-    // Ruling T7-O3: ozone's dipole carries meta.caveat beside it, never shown alone.
-    it('shows the caveat beside the dipole when the molecule carries one (T7-O3, ozone)', () => {
+    // Ruling T7-O3: ozone's dipole carries meta.caveat beside it, never shown alone. Task 7b: the dipole's value and
+    // its caveat are Info's fact and the Properties row's (tests/info/molecule_info.test.ts, properties_card.test.tsx);
+    // the view options show neither, so neither can stand alone here.
+    it('shows no dipole value, so never one without ozone\'s caveat (T7-O3)', () => {
         // Task 13 (ruling P8): representation props in place of the old showStructure switch's.
-        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null} surfaceShown
-            showDipole onShowDipole={() => {}}
-            dipoleText="μ = 0.65 D" caveat="Ozone has strong multireference character: single-reference B3LYP overestimates its dipole moment." />);
-        expect(container.textContent).toMatch(/μ = 0\.65 D/);
-        expect(container.textContent).toMatch(/Ozone has strong multireference character: single-reference B3LYP overestimates its dipole moment\./);
+        const { container } = render(<MoleculeViewOptions representation="ball-and-stick" onRepresentationChange={() => {}} spaceFillingUnavailable={null}
+            showDipole onShowDipole={() => {}} />);
+        expect(container.textContent).not.toMatch(/μ =|\bD\b/);
+    });
+    // Task 7b: a disabled control keeps its reason as its accessible description; the visible words are Info's.
+    it('describes a disabled Space filling and a disabled labels switch, for a screen reader', () => {
+        const reason = 'no van der Waals radius tabulated for Fe (Bondi 1964 / Mantina 2009)';
+        const { container } = render(<MoleculeViewOptions representation="none" onRepresentationChange={() => {}} spaceFillingUnavailable={reason}
+            showDipole onShowDipole={() => {}} />);
+        expect(screen.getByRole('button', { name: /space-filling structure/ })).toHaveAccessibleDescription(`Space filling is unavailable: ${reason}`);
+        expect(screen.getByRole('checkbox', { name: 'Show bond lengths and angles' })).toHaveAccessibleDescription('No structure is drawn, so there is nothing to label.');
+        expect(container.querySelector('.molecule-caption')).toBeNull();
     });
 });

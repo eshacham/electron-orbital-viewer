@@ -1,48 +1,49 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import EspLegend from '../../src/components/EspLegend';
+import { ESP_STOPS, espRangeNote, espSurfaceNote, ESP_SIGN_NOTE } from '../../src/molecules/esp_color';
 
 describe('EspLegend', () => {
-    it('states the scale, units, the fixed surface and method, and when this molecule saturates it', () => {
-        const { container } = render(<EspLegend range={[-0.061, 0.071]} method="B3LYP/def2-TZVP" />);
+    // Task 7b: the key keeps its bar, its fixed scale and units, and names its two ends; the notes it printed (or kept
+    // behind its ⓘ) -- the colours, the fixed ρ = 0.001 surface, the method, this molecule's range -- are Info's
+    // sentences now (tests/info/molecule_info.test.ts).
+    it('states the scale and its units, and names its ends electron-rich and electron-poor', () => {
+        const { container } = render(<EspLegend />);
         expect(screen.getByText('−0.05')).toBeInTheDocument();
         expect(screen.getByText('+0.05 Ha/e')).toBeInTheDocument();
-        expect(container.textContent).toMatch(/±31 kcal\/mol/);
-        // Ruling D4: the surface is fixed, not an enclosed fraction -- the
-        // legend says so rather than implying a search over the grid.
-        expect(container.textContent).toMatch(/fixed at ρ = 0\.001 e\/a₀³ \(not an enclosed fraction\) · B3LYP\/def2-TZVP/);
-        expect(container.textContent).toMatch(/this molecule: −0\.061 to \+0\.071 Ha\/e, saturated beyond the scale/);
+        const ends = container.querySelector('.esp-legend-ends') as HTMLElement;
+        expect([...ends.children].map(end => end.textContent)).toEqual(['electron-rich', 'electron-poor']);
         expect(container.querySelector('[data-gradient]')?.getAttribute('data-gradient')).toMatch(/^linear-gradient/);
+        expect(container.textContent).not.toMatch(/kcal|fixed at|this molecule/);
     });
 
-    it('does not claim saturation for a weakly polar molecule', () => {
-        const { container } = render(<EspLegend range={[-0.02, 0.019]} method="B3LYP/def2-TZVP" />);
-        expect(container.textContent).not.toMatch(/saturated/);
+    // The ends' words follow the colours: the negative (left) end is red, ESP_STOPS' first stop.
+    it('puts electron-rich at the negative, red end of the bar', () => {
+        expect(ESP_STOPS[0]).toEqual({ t: -1, hex: '#b2182b' });
+        render(<EspLegend />);
+        expect(screen.getByText('−0.05').compareDocumentPosition(screen.getByText('+0.05 Ha/e')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.getByText('electron-rich').compareDocumentPosition(screen.getByText('electron-poor')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('still states the scale and surface before a molecule has drawn one', () => {
-        const { container } = render(<EspLegend range={null} method="B3LYP/def2-TZVP" />);
-        expect(container.textContent).toMatch(/fixed at ρ = 0\.001 e\/a₀³ \(not an enclosed fraction\)/);
-        expect(container.textContent).not.toMatch(/this molecule:/);
-    });
-
-    // Ruling T16-c: on a sideways phone the key is the bar and its scale;
-    // the notes -- the method among them -- are one tap away, not gone.
-    it('compact: shows the bar and scale, with the notes behind an info toggle', () => {
-        const { container } = render(<EspLegend range={[-0.061, 0.071]} method="B3LYP/def2-TZVP" compact />);
-        expect(container.querySelector('.esp-legend.compact')).not.toBeNull();
-        expect(screen.getByText('+0.05 Ha/e')).toBeInTheDocument();
-        expect(container.textContent).not.toMatch(/B3LYP/);
-        const toggle = screen.getByRole('button', { name: 'about this colour key' });
-        expect(toggle).toHaveAttribute('aria-expanded', 'false');
-        fireEvent.click(toggle);
-        expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        expect(container.textContent).toMatch(/fixed at ρ = 0\.001 e\/a₀³ \(not an enclosed fraction\) · B3LYP\/def2-TZVP/);
-        expect(container.textContent).toMatch(/this molecule: −0\.061 to \+0\.071 Ha\/e/);
-    });
-
-    it('is not compact, and has no toggle, by default', () => {
-        render(<EspLegend range={null} method="B3LYP/def2-TZVP" />);
+    // Task 7b: the ⓘ toggle that showed the notes is an (i) on the map's term, which opens Info on it.
+    it('has an (i) on the electrostatic potential, and no notes toggle', () => {
+        render(<EspLegend compact />);
+        expect(screen.getByRole('button', { name: 'About Electrostatic potential' })).toHaveClass('info-button');
         expect(screen.queryByRole('button', { name: 'about this colour key' })).toBeNull();
+    });
+
+    it('is compact on request', () => {
+        const { container, rerender } = render(<EspLegend />);
+        expect(container.querySelector('.esp-legend.compact')).toBeNull();
+        rerender(<EspLegend compact />);
+        expect(container.querySelector('.esp-legend.compact')).not.toBeNull();
+    });
+
+    // The PNG export's key still prints the notes, word for word (export/run_export.ts reads these).
+    it('leaves the export key\'s notes as they were', () => {
+        expect(ESP_SIGN_NOTE).toBe('red: negative, electron-rich · blue: positive, electron-poor · ±31 kcal/mol');
+        expect(espSurfaceNote('B3LYP/def2-TZVP')).toBe('fixed at ρ = 0.001 e/a₀³ (not an enclosed fraction) · B3LYP/def2-TZVP');
+        expect(espRangeNote([-0.061, 0.071])).toBe('this molecule: −0.061 to +0.071 Ha/e, saturated beyond the scale');
+        expect(espRangeNote([-0.02, 0.019])).toBe('this molecule: −0.020 to +0.019 Ha/e');
     });
 });

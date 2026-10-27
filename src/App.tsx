@@ -59,6 +59,8 @@ import BasicExplore from './basic_ui/BasicExplore';
 import { basicInfo, BASIC_ORBITALS_ABOUT } from './info/basic_info';
 import { atomInfo } from './info/atom_info';
 import { bondsInfo, FIXED_RHO_NOTE } from './info/bonds_info';
+import { moleculeInfo } from './info/molecule_info';
+import { ownerJobRecordOf, useOwnerJobRecord } from './jobs/owner_job_record';
 import { useDrawOnSelection } from './basic_ui/useDrawOnSelection';
 import { AxesSwitch } from './atom_ui/DisplayControls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
@@ -98,7 +100,6 @@ import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIs
 import { selectMolecule, setSurface, setRepresentation, setShowDipole, MoleculeSurface } from './store/moleculeSlice';
 import { insideBallNoteFor } from './molecules/inside_ball';
 import { useMoleculeLoader } from './molecules/useMoleculeLoader';
-import { formatDipole } from './molecules/dipole';
 import { spaceFillingUnavailableReason } from './molecules/vdw_radii';
 import MoleculeNav, { type MoleculeNavHandle } from './components/MoleculeNav';
 import MoleculePickerDialog from './components/MoleculePickerDialog';
@@ -107,7 +108,6 @@ import MoleculeViewOptions from './components/MoleculeViewOptions';
 import EspLegend from './components/EspLegend';
 import MoleculeJobsSection from './components/MoleculeJobsSection';
 import RequestWorkspace, { useRequestWorkspaceOpen } from './components/RequestWorkspace';
-import MoleculeProvenanceFooter from './components/MoleculeProvenanceFooter';
 import MoleculeHeader from './molecule_ui/MoleculeHeader';
 import MoleculePropertiesCard from './molecule_ui/MoleculePropertiesCard';
 import TierBadge from './components/TierBadge';
@@ -670,10 +670,24 @@ function App() {
         }, level) : null),
         [isBondsMode, bonds, orbitalSliceNow, bondsScanNow, bondsMetaNow, bondsBasisNow, bondsLoadingNow, bondsErrorNow, level],
     );
-    // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab. Until
-    // Molecules' builder lands (Task 7b: moleculeInfo) it names that view only.
+    // Task 7b: Molecules' Info is moleculeInfo, built from the two slices it reads (the selection and drawn surface, the
+    // orbital slice's fraction and cut), the owner's record of a computed molecule and the bond-label preference.
+    const moleculeSliceNow = useAppSelector(state => state.molecule);
+    // The owner's record of a computed molecule, not the whole jobs slice: App re-renders for nothing else in it.
+    const ownerRecordNow = useAppSelector(ownerJobRecordOf, shallowEqual);
+    const moleculeLabelsNow = usePref(displayPref).moleculeLabels;
+    const moleculeInfoContent = useMemo(
+        () => (isMoleculeMode ? moleculeInfo({
+            molecule: moleculeSliceNow, orbital: orbitalSliceNow, ...ownerRecordNow, moleculeLabels: moleculeLabelsNow,
+        }, moleculeSliceNow.meta, level) : null),
+        [isMoleculeMode, moleculeSliceNow, orbitalSliceNow, ownerRecordNow, moleculeLabelsNow, level],
+    );
+    // Ruling PF5: the owner's time and cost for a computed molecule ("How this was computed") are fetched here now that
+    // the pinned footer that fetched them is gone -- once, whether or not Info is on screen.
+    useOwnerJobRecord();
+    // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab.
     const infoPanel = (
-        <InfoPanel content={basicInfoContent ?? atomInfoContent ?? bondsInfoContent ?? { title: viewTitleText, plain: null }}
+        <InfoPanel content={basicInfoContent ?? atomInfoContent ?? bondsInfoContent ?? moleculeInfoContent ?? { title: viewTitleText, plain: null }}
             topic={infoTopic.topic} onClearTopic={() => infoTopic.setTopic(null)} level={level} />
     );
     // Ruling C7: the exact curves' worker runs only while H₂⁺ is on screen.
@@ -1468,23 +1482,15 @@ function App() {
         )
         : <p className="molecule-properties-status">This molecule did not load.</p>);
     // The structure segments and the dipole switch belong with the view settings
-    // (Controls' children slot), with the dipole's value and -- for ozone --
-    // the caveat that must never be separated from it (ruling T7-O3).
+    // (Controls' children slot). Task 7b: the dipole's value, with ozone's caveat
+    // beside it (ruling T7-O3), is Info's fact (moleculeInfo) and the Properties row's.
     const moleculeOptions = isMoleculeMode && molecule.meta && (
         <MoleculeViewOptions representation={molecule.representation} onRepresentationChange={r => dispatch(setRepresentation(r))}
-            spaceFillingUnavailable={spaceFillingUnavailableReason(molecule.meta.atoms)} surfaceShown={molecule.surface.kind !== 'none'}
-            showDipole={molecule.showDipole} onShowDipole={on => dispatch(setShowDipole(on))}
-            dipoleText={formatDipole(molecule.meta)} caveat={molecule.meta.caveat ?? null} level={level} />
+            spaceFillingUnavailable={spaceFillingUnavailableReason(molecule.meta.atoms)}
+            showDipole={molecule.showDipole} onShowDipole={on => dispatch(setShowDipole(on))} level={level} />
     );
-    // What the enclosed fraction produced, under its select (ruling D22).
-    // Only once the surface asked for has landed: while the next one
-    // computes, the last contour belongs to the surface being left, and a
-    // density's ρ must not be read as an orbital's |ψ|².
-    const moleculeSurfaceLanded = molecule.renderLabel === null && molecule.renderError === null && molecule.isoLevel !== null;
-    const moleculeIsoNote = !isMoleculeMode || molecule.surface.kind === 'esp' ? undefined
-        : !moleculeSurfaceLanded ? (molecule.surface.kind === 'density' ? 'contour of constant ρ' : undefined)
-        : molecule.surface.kind === 'mo' ? `|ψ|² = ${molecule.isoLevel!.toExponential(2)}`
-        : `ρ = ${molecule.isoLevel!.toExponential(2)} e/a₀³`;
+    // Task 7b: what the enclosed fraction produced (ruling D22's helper under the select) is Info's iso value now
+    // (moleculeInfo), with the same rule: only once the surface asked for has landed.
 
     // One Controls, drawn whole or in halves (ruling R20b): Basic Orbitals'
     // selection goes to Explore and its view half to the inspector; every
@@ -1503,7 +1509,6 @@ function App() {
             initialEnclosedFraction={enclosedFraction}
             onEnclosedFractionChange={handleEnclosedFractionChange}
             combination={combination}
-            isoLevel={isoLevel}
             onUpdateOrbital={handleOrbitalParamsChange}
             surfaceStyle={surfaceStyle}
             onSurfaceStyleChange={handleSurfaceStyleChange}
@@ -1512,7 +1517,6 @@ function App() {
             fractionNote={isBondsDensity ? FIXED_RHO_NOTE
                 : isMoleculeMode && molecule.surface.kind === 'esp' ? ESP_SURFACE_NOTE
                 : isMoleculeMode && molecule.surface.kind === 'none' ? NO_SURFACE_NOTE : undefined}
-            isoNote={moleculeIsoNote}
             noSurface={isMoleculeMode && molecule.surface.kind === 'none'}
             level={level}
         >
@@ -1766,7 +1770,7 @@ function App() {
         <div className="molecule-selection">
             <Typography variant="subtitle2" className="molecule-selection-heading">Selection</Typography>
             <MoleculeReadout atoms={molecule.meta.atoms} pick={molecule.pick}
-                geometrySource={molecule.meta.geometrySource} touch={isNarrow} spaceFilling={molecule.representation === 'space-filling'} />
+                touch={isNarrow} spaceFilling={molecule.representation === 'space-filling'} />
         </div>
     );
 
@@ -1811,7 +1815,6 @@ function App() {
                         {moleculeHeader(true)}
                         {moleculeSelectionSection}
                         <MoleculeNav {...moleculeNavProps} variant="body" ref={moleculeNavRef} />
-                        <MoleculeProvenanceFooter />
                         {requestsShown ? <MoleculeJobsSection /> : isOwner && <LevelLine level={level} ids={['requestWorkspace']} />}
                     </>
                 ),
@@ -1952,12 +1955,10 @@ function App() {
 
     const exploreContent = isBondsMode ? bondsExplore
         // Ruling R22c: the readout's section sits under the navigator (the
-        // brief's own placement). Ruling R23f-2: "How this was computed"
-        // (MoleculeProvenanceFooter, pinned) sits outside the scrolling part
-        // -- the panel's own footer, below everything else -- so it never
-        // scrolls out of reach and the Selection section above it (inside
-        // the scroll) is free to show its full text (Task 23c's fixed
-        // 140 px readout height is dropped, style.css).
+        // brief's own placement). Ruling PF5 (Task 7b) supersedes R23f-2:
+        // "How this was computed" is Info's, at the top of the right panel
+        // (folded below Research, open at Research), no longer a footer
+        // pinned under this column.
         : isMoleculeMode ? (
             <div className="molecule-explore">
                 <div className="molecule-explore-scroll">
@@ -1970,7 +1971,6 @@ function App() {
                     {requestsShown ? <MoleculeJobsSection variant="entry" entryRef={requestEntryRef} />
                         : isOwner && <LevelLine level={level} ids={['requestWorkspace']} />}
                 </div>
-                <MoleculeProvenanceFooter pinned />
             </div>
         )
         // Basic Orbitals: its header tile and chips (ruling P3) -- BasicExplore.
@@ -2195,15 +2195,15 @@ function App() {
             {/* Ruling R22c (owner review 2026-10-14): Molecules' canvas keeps
                 only the colour keys §3.3 requires -- the ESP/phase key, in
                 the same right-hand key column every other mode uses, compact
-                and without their prose notes (the notes stay a tap away
-                behind EspLegend's own info toggle). The tier line and the
+                and without their prose notes (Task 7b: the notes are Info's,
+                and the key's (i) opens its term there). The tier line and the
                 pick readout, which used to share this bottom-centre stack,
                 are prose and moved off the canvas entirely: the tier into the
                 title block, the readout into the Explore panel. */}
             {isMoleculeMode && molecule.meta && ((moleculeKeysShown && molecule.surface.kind === 'esp') || showPhaseLegend || moleculeTileKey || moleculeCaptionZone) && (
                 <KeyColumn compact={isNarrow}>
                     {moleculeKeysShown && molecule.surface.kind === 'esp' && (
-                        <EspLegend range={molecule.espRange} method={molecule.meta.method.density} compact />
+                        <EspLegend compact />
                     )}
                     {showPhaseLegend && <PhaseKey positive={phase.positive} negative={phase.negative} />}
                     {moleculeTileKey && (

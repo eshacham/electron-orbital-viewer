@@ -109,8 +109,8 @@ describe('Molecules mode', () => {
         expect(within(container.querySelector('.view-panel') as HTMLElement).getByText(/Opacity/)).toBeInTheDocument();
     });
 
-    // Task 12 (ruling P1): Explore reads header tile → the surface switch (and its list) → Selection → jobs, with
-    // "How this was computed" pinned below. Owner R25-A3 removed the quick pick from between the tile and the switch.
+    // Task 12 (ruling P1): Explore reads header tile → the surface switch (and its list) → Selection → jobs. Owner
+    // R25-A3 removed the quick pick from between the tile and the switch; ruling PF5 the footer pinned below.
     it('heads Explore with the molecule tile, above the surface switch and Selection (desktop)', async () => {
         const { store, container } = await enterMolecules(false);
         pickWater(store);
@@ -129,11 +129,10 @@ describe('Molecules mode', () => {
         expect(within(side.querySelector('.molecule-tile') as HTMLElement).getByText('Water')).toBeInTheDocument();
         // The tier is said once, in the title block (R22c), not again in the tile.
         expect((side.querySelector('.molecule-tile') as HTMLElement).querySelector('.tier-badge')).toBeNull();
-        // The footer stays outside (and after) the part that scrolls.
+        // Ruling PF5 (Task 7b): no footer is pinned under the part that scrolls -- "How this was computed" is Info's.
         const scroll = side.querySelector('.molecule-explore-scroll') as HTMLElement;
         expect(scroll.contains(side.querySelector('.molecule-tile'))).toBe(true);
-        expect(scroll.compareDocumentPosition(side.querySelector('.molecule-provenance-footer') as HTMLElement)
-            & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(side.querySelector('.molecule-provenance-footer')).toBeNull();
     });
 
     // Owner R25-A3: the second choice was a quick-pick tile; with the quick pick gone, it is the popover again, whose
@@ -313,7 +312,8 @@ describe('Molecules mode', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
         const tabpanel = screen.getByRole('tabpanel');
         expect(within(tabpanel).getByRole('heading', { level: 2, name: 'Info' })).toBeInTheDocument();
-        expect(within(tabpanel).getByText(/Water/)).toBeInTheDocument();
+        // Task 7b: Info explains the molecule (its plain text names it too), titled by moleculeTitle and the surface.
+        expect(tabpanel.querySelector('.info-title')).toHaveTextContent('Water (H₂O) — electron density');
     });
 
     it('gives a phone the Properties under the view settings in its View tab', async () => {
@@ -370,7 +370,8 @@ describe('Molecules mode', () => {
         pickWater(store);
         openDisplay(container); // Task 12: Properties is the section open by default
         act(() => { store.dispatch(setSurface({ kind: 'esp' })); store.dispatch(renderFinished({ isoLevel: 0.001, espRange: [-0.06, 0.07] })); });
-        expect(container.textContent).toMatch(/Fixed at ρ = 0\.001 e\/a₀³/);
+        // Task 7b: why the fraction is locked is Info's (ESP_SURFACE_SENTENCE); the select is still disabled.
+        expect(container.querySelector('.info-section')).toHaveTextContent(/The map is drawn on the surface ρ = 0\.001 e\/a₀³.*not at an enclosed fraction, so Electron enclosed does not apply to it/);
         expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
         expect(screen.getByLabelText('electrostatic potential colour key')).toBeInTheDocument();
         expect(screen.queryByLabelText('surface colour key')).toBeNull();
@@ -379,20 +380,23 @@ describe('Molecules mode', () => {
         expect(screen.queryByLabelText('electrostatic potential colour key')).toBeNull();
     });
 
-    // D22: the density and an MO keep the enclosed fraction, and the helper
-    // states the contour it produced -- without disabling the select.
+    // D22: the density and an MO keep the enclosed fraction, and the contour it produced is stated -- without
+    // disabling the select. Task 7b: stated by Info's iso value fact (with its unit), not a helper under the select.
     it('states the drawn ρ for the density and |ψ|² for an orbital, leaving the fraction live', async () => {
         const { store, container } = await enterMolecules(false);
         pickWater(store);
+        await flush(); // Task 7b: the loader's own meta request settles (Info re-renders on it; no act warning)
         openDisplay(container); // Task 12: Properties is the section open by default
         act(() => { store.dispatch(renderFinished({ isoLevel: 0.00234 })); });
-        expect(screen.getByText('ρ = 2.34e-3 e/a₀³')).toBeInTheDocument();
+        const info = () => (container.querySelector('.info-section')?.textContent ?? '').replace(/\u00A0/g, ' ');
+        expect(info()).toContain('Iso valueρ = 2.34 × 10⁻³ e/a₀³');
         expect(screen.getByRole('combobox', { name: /electron enclosed/i })).not.toHaveAttribute('aria-disabled');
         act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); store.dispatch(renderStarted('Computing 1b1…')); });
         // Mid-render the last contour belongs to the density, so it is not labelled as |ψ|².
-        expect(screen.queryByText(/2\.34e-3/)).toBeNull();
+        expect(info()).not.toMatch(/2\.34 × 10/);
+        expect(info()).not.toContain('Iso value');
         act(() => { store.dispatch(renderFinished({ isoLevel: 0.0005 })); });
-        expect(screen.getByText('|ψ|² = 5.00e-4')).toBeInTheDocument();
+        expect(info()).toContain('Iso value|ψ|² = 5.00 × 10⁻⁴ a₀⁻³');
     });
 
     // Ruling D23 put the energy-sorted orbital list (not MoDiagram) where the
@@ -415,7 +419,7 @@ describe('Molecules mode', () => {
         expect(store.getState().molecule.surface).toEqual({ kind: 'mo', index: 4 });
     });
 
-    it('puts the structure and dipole switches, and ozone\'s caveat, in the view settings', async () => {
+    it('puts the structure and dipole switches in the view settings, and ozone\'s caveat beside its dipole in Info', async () => {
         const { store, container } = await enterMolecules(false);
         act(() => {
             store.dispatch(selectMolecule({ id: 'o3' }));
@@ -425,7 +429,10 @@ describe('Molecules mode', () => {
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
         // Task 13 (ruling P8): the "Ball-and-stick" switch is now the Structure segmented control's first segment.
         expect(within(viewPanel).getByRole('button', { name: /ball-and-stick structure/ })).toHaveAttribute('aria-pressed', 'true');
-        expect(within(viewPanel).getByText(/μ = 1\.86 D .*Ozone has strong multireference character\./)).toBeInTheDocument();
+        // Task 7b: the dipole's value, with ozone's caveat beside it (T7-O3), is Info's fact (and the Properties row's).
+        const dipole = [...(viewPanel.querySelectorAll('.info-fact') as NodeListOf<HTMLElement>)].find(row => row.textContent?.startsWith('Dipole μ'))!;
+        expect(dipole).toHaveTextContent(/1\.86 D computed .*Ozone has strong multireference character\./);
+        expect(within(viewPanel).getByRole('checkbox', { name: 'Dipole arrow' })).toBeInTheDocument();
     });
 
     // Ruling P8 (spec §9.4 View): Structure is Ball and stick | Space filling | None, each name holding its
@@ -439,21 +446,23 @@ describe('Molecules mode', () => {
         const group = within(viewPanel).getByRole('group', { name: 'Structure' });
         expect(within(group).getAllByRole('button').map(b => b.textContent)).toEqual(['Ball and stick', 'Space filling', 'None']);
         const side = container.querySelector('.side-panel') as HTMLElement;
-        const readoutNote = () => (within(side).getByRole('status') as HTMLElement).textContent;
+        // Task 7b: what the sticks or spheres show, and what the spheres can hide, are Info's (the readout's note and
+        // the Structure control's caption moved there).
+        const info = () => (viewPanel.querySelector('.info-section') as HTMLElement).textContent;
         const hoverCaption = () => container.querySelector('#canvas-container .molecule-hover-caption');
-        expect(readoutNote()).toMatch(/sticks show connectivity, not bond order/);
+        expect(info()).toMatch(/Sticks show connectivity, not bond order\./);
         expect(hoverCaption()).toHaveTextContent(/^Hover or tap an atom or bond$/);
         fireEvent.click(within(group).getByRole('button', { name: 'Space filling (space-filling structure)' }));
         expect(store.getState().molecule.representation).toBe('space-filling');
         expect(within(side).getByText('Selection')).toBeInTheDocument();
         // Ruling T13-I4: space filling draws no sticks and no bonds to pick, so neither text says it does.
-        expect(readoutNote()).toMatch(/geometry: experiment \(CCCBDB\) · van der Waals spheres \(Bondi 1964 \/ Mantina 2009\)/);
-        expect(readoutNote()).not.toMatch(/sticks|bond order/);
+        expect(info()).toMatch(/The spheres are van der Waals spheres \(Bondi 1964 \/ Mantina 2009\)\./);
+        expect(info()).not.toMatch(/Sticks|bond order/);
         expect(hoverCaption()).toHaveTextContent(/^Hover or tap an atom$/);
-        // Ruling T13-M: over a surface the spheres can hide it, and the Structure control says so.
-        expect(within(viewPanel).getByText('The spheres can hide the surface inside them.')).toBeInTheDocument();
+        // Ruling T13-M: over a surface the spheres can hide it, and Info says so.
+        expect(info()).toContain('The spheres can hide the surface inside them.');
         act(() => { store.dispatch(setSurface({ kind: 'none' })); });
-        expect(within(viewPanel).queryByText('The spheres can hide the surface inside them.')).toBeNull();
+        expect(info()).not.toContain('The spheres can hide the surface inside them.');
         act(() => { store.dispatch(setSurface({ kind: 'density' })); });
         fireEvent.click(within(group).getByRole('button', { name: 'None (no structure)' }));
         expect(store.getState().molecule.representation).toBe('none');
@@ -491,11 +500,15 @@ describe('Molecules mode', () => {
         await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
         expect(writeText.mock.calls[1][0]).toBe(writeText.mock.calls[0][0]);
         // Space filling draws no bonds, so only angles are labelled; with no structure there is nothing to label.
+        // Task 7b: said by Info (the switch keeps the disabled reason as its description).
+        const info = viewPanel.querySelector('.info-section') as HTMLElement;
         fireEvent.click(within(viewPanel).getByRole('button', { name: 'Space filling (space-filling structure)' }));
-        expect(within(viewPanel).getByText('Space filling draws no bonds, so only angles are labelled.')).toBeInTheDocument();
+        expect(info).toHaveTextContent('Space filling draws no bonds, so only angles are labelled.');
         fireEvent.click(within(viewPanel).getByRole('button', { name: 'None (no structure)' }));
         expect(within(viewPanel).getByRole('checkbox', { name: 'Show bond lengths and angles' })).toBeDisabled();
-        expect(within(viewPanel).getByText('No structure is drawn, so there is nothing to label.')).toBeInTheDocument();
+        expect(info).toHaveTextContent('No structure is drawn, so there is nothing to label.');
+        expect(within(viewPanel).getByRole('checkbox', { name: 'Show bond lengths and angles' }))
+            .toHaveAccessibleDescription('No structure is drawn, so there is nothing to label.');
         resetUrlKeysForTests();
     });
 
@@ -514,7 +527,9 @@ describe('Molecules mode', () => {
         expect(space).toBeDisabled();
         const reason = 'no van der Waals radius tabulated for Fe (Bondi 1964 / Mantina 2009)';
         expect(space.closest('[title]')).toHaveAttribute('title', reason);
-        expect(within(container.querySelector('.view-panel') as HTMLElement).getByText(`Space filling is unavailable: ${reason}`)).toBeInTheDocument();
+        // Task 7b: the reason is Info's words, and the button's description for a screen reader.
+        expect(container.querySelector('.view-panel .info-section')).toHaveTextContent(`Space filling is unavailable: ${reason}.`);
+        expect(space).toHaveAccessibleDescription(`Space filling is unavailable: ${reason}`);
     });
 
     // Ruling P8: the surface switch gains None -- structure only -- which clears the surface (show=none).
@@ -549,11 +564,12 @@ describe('Molecules mode', () => {
         expect(container.textContent).not.toMatch(/contour of constant/);
         expect(screen.queryByLabelText('surface colour key')).toBeNull();
         expect(screen.queryByLabelText('electrostatic potential colour key')).toBeNull();
-        // A surface again: all live, the cut's own help back.
+        // A surface again: all live. Task 7b: what a cut removes is Info's once a cut is chosen (none here), so no
+        // help comes back under the toggle.
         fireEvent.click(within(surface).getByRole('button', { name: 'Density' }));
         expect(within(viewPanel).getByRole('slider', { name: 'surface opacity' })).not.toBeDisabled();
         expect(within(viewPanel).getByRole('button', { name: 'cut along x' })).not.toBeDisabled();
-        expect(viewPanel.textContent).toMatch(/slice the orbital open/);
+        expect(within(viewPanel).queryByText('No surface is drawn to cut; the structure is never cut.')).toBeNull();
     });
 
     // Ruling R22c (brief requirement 5): the hover/pick readout lives in the
@@ -640,19 +656,13 @@ describe('Molecules mode', () => {
         expect(scrollRule).toMatch(/overflow-y:\s*auto/);
     });
 
-    // Ruling R23f-2: pins the overlay mechanism itself, not just its visible
-    // effect -- a future change back to resizing/re-scrolling the panel
-    // above (rather than a true, out-of-flow overlay) would fail here even
-    // before it reached a live check. `/tmp/check_overlay.mjs` (this task's
-    // own live check, not committed) confirmed `.molecule-explore-scroll`'s
-    // height/scrollTop/scrollHeight are unaffected by opening the overlay.
-    it('positions the provenance overlay out of flow, scrolling inside its own cap', () => {
+    // Ruling R23f-2 pinned "How this was computed" as an overlay over the Explore column; ruling PF5 (Task 7b) moves it
+    // into Info, so the overlay's rules are gone with it (the replacement: 'puts "How this was computed" in Info, with
+    // no footer pinned under Explore', below).
+    it('keeps no provenance overlay rule in the stylesheet', () => {
         const css = readFileSync(resolve(__dirname, '../src/style.css'), 'utf8');
-        const start = css.indexOf('.molecule-provenance-footer .provenance-body {');
-        const rule = css.slice(start, css.indexOf('}', start));
-        expect(rule).toMatch(/position:\s*absolute/);
-        expect(rule).toMatch(/bottom:\s*100%/);
-        expect(rule).toMatch(/overflow-y:\s*auto/);
+        expect(css).not.toMatch(/^\.molecule-provenance-footer/m);
+        expect(css).not.toMatch(/^\.provenance-panel/m);
     });
 
     it('does not start a hydrogen calculation, and lowers an untouched full opacity so the structure shows', async () => {
@@ -769,40 +779,19 @@ describe('Molecules mode', () => {
             .getByRole('button', { name: /1b1/ })).toHaveAttribute('aria-pressed', 'true');
     });
 
-    // Ruling R23f-2 (owner): "How this was computed" pinned to the Explore
-    // panel's bottom edge, outside the part that scrolls, so it is never
-    // out of reach and the Selection section above it keeps its full text.
-    it('pins "How this was computed" below the scrolling part of the Explore panel', async () => {
-        const { store, container } = await enterMolecules(false);
-        pickWater(store); // MoleculeProvenanceFooter renders nothing until a molecule is loaded
-        const side = container.querySelector('.side-panel') as HTMLElement;
-        const explore = side.querySelector('.molecule-explore') as HTMLElement;
-        expect(explore).not.toBeNull();
-        const scroll = explore.querySelector('.molecule-explore-scroll') as HTMLElement;
-        const footer = explore.querySelector('.molecule-provenance-footer') as HTMLElement;
-        expect(scroll).not.toBeNull();
-        expect(footer).not.toBeNull();
-        // Siblings, not one inside the other: the footer is not part of what scrolls.
-        expect(scroll.contains(footer)).toBe(false);
-        expect(footer.contains(scroll)).toBe(false);
-        expect(within(footer).getByRole('button', { name: 'How this was computed' })).toBeInTheDocument();
-        // The orbital list and the owner's job tools are the part that scrolls, not the footer.
-        expect(scroll.querySelector('.molecule-nav')).not.toBeNull();
-    });
-
-    // Ruling R23f-2: pinned, the explanation is an overlay -- Esc closes it
-    // too, the same as the link itself (MoleculeProvenanceFooter's onKeyDown,
-    // the same find-the-expanded-trigger-and-click-it pattern
-    // Inspector.tsx's drawer uses for its own Esc).
-    it('closes the pinned "How this was computed" overlay on Esc', async () => {
+    // Ruling R23f-2 (owner) pinned "How this was computed" below the scrolling part of the Explore column, and closed
+    // its overlay on Esc. Ruling PF5 (Task 7b) supersedes both: it is Info's, folded below Research and open at
+    // Research, at the top of the right panel -- 'puts "How this was computed" in Info, with no footer pinned under
+    // Explore' (the "Molecules Info (Task 7b)" block) is their replacement; Info's <details> needs no Esc of its own.
+    it('keeps the Explore column one scrolling part, with nothing pinned below it', async () => {
         const { store, container } = await enterMolecules(false);
         pickWater(store);
-        const footer = container.querySelector('.molecule-provenance-footer') as HTMLElement;
-        const trigger = within(footer).getByRole('button', { name: 'How this was computed' });
-        fireEvent.click(trigger);
-        expect(trigger).toHaveAttribute('aria-expanded', 'true');
-        fireEvent.keyDown(footer, { key: 'Escape' });
-        expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        await flush();
+        const explore = container.querySelector('.side-panel .molecule-explore') as HTMLElement;
+        const scroll = explore.querySelector('.molecule-explore-scroll') as HTMLElement;
+        expect([...explore.children]).toEqual([scroll]);
+        expect(scroll.querySelector('.molecule-nav')).not.toBeNull();
+        expect(within(explore).queryByText('How this was computed')).toBeNull();
     });
 
     // Ruling R22c: the ESP key now lives in the right-hand key column on
@@ -1167,8 +1156,9 @@ describe('Molecules at Basics (Task 2, fix round 1)', () => {
     const originalMatchMedia = window.matchMedia;
     afterEach(() => { window.matchMedia = originalMatchMedia; });
 
-    // Ruling T2-I2: the switch is Explore's, but the arrow drawn keeps its value, caveat and sign convention.
-    it('keeps the dipole arrow\'s value, caveat and convention beside it, with no switch', async () => {
+    // Ruling T2-I2: the switch is Explore's, but the arrow drawn keeps its value, caveat and sign convention -- Task 7b:
+    // in Info, which every level reads.
+    it('keeps the dipole arrow\'s value, caveat and convention in Info, with no switch', async () => {
         const { store, container } = await enterMolecules(false);
         act(() => {
             store.dispatch(selectMolecule({ id: 'o3' }));
@@ -1176,8 +1166,9 @@ describe('Molecules at Basics (Task 2, fix round 1)', () => {
         });
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
         expect(within(viewPanel).queryByRole('checkbox', { name: 'Dipole arrow' })).toBeNull();
-        expect(within(viewPanel).getByText(/μ = 1\.86 D .*Ozone has strong multireference character\./)).toBeInTheDocument();
-        expect(within(viewPanel).getByText(/The arrow points from − to \+ \(the physics convention\)/)).toBeInTheDocument();
+        const info = viewPanel.querySelector('.info-section') as HTMLElement;
+        expect(info).toHaveTextContent(/Dipole μ1\.86 D computed .*Ozone has strong multireference character\./);
+        expect(info).toHaveTextContent(/The arrow points from − to \+ \(the physics convention\)/);
     });
 
     // Ruling T2-energies: orbital energies are Explore's; the list keeps names, occupancy and the frontier chips.
@@ -1201,5 +1192,66 @@ describe('Molecules at Basics (Task 2, fix round 1)', () => {
         const strip = screen.getByRole('listbox', { name: 'views of this molecule' });
         expect(within(strip).getByRole('option', { name: 'Ball and stick structure' })).toBeInTheDocument();
         expect(within(strip).queryByRole('option', { name: 'Space filling structure' })).toBeNull();
+    });
+});
+
+// Task 7b: Info owns Molecules' explanations; the geometry source and the Kohn–Sham caveat are each said once.
+describe('Molecules Info (Task 7b)', () => {
+    // Each test sets its own level (the stored preference), cleared after it.
+    afterEach(() => { window.localStorage.removeItem('eov.level'); window.localStorage.removeItem('eov.display'); });
+    const originalMatchMedia = window.matchMedia;
+    afterEach(() => { window.matchMedia = originalMatchMedia; });
+
+    /** How often `text` occurs in what the page says. */
+    const occurrences = (container: HTMLElement, text: string) => (container.textContent ?? '').split(text).length - 1;
+
+    it.each(['explore', 'research'])('on water\'s desktop view at %s, says the geometry source once and the Kohn–Sham caveat at most once', async level => {
+        window.localStorage.setItem('eov.level', level);
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        expect(occurrences(container, 'experiment (CCCBDB)')).toBe(1);
+        act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
+        expect(container.querySelector('.molecule-orbital-list')).not.toBeNull();
+        expect(occurrences(container, 'experiment (CCCBDB)')).toBe(1);
+        const text = container.textContent ?? '';
+        expect(text.match(/ionisation energ/gi)?.length ?? 0).toBeLessThanOrEqual(1);
+        expect(text.match(/neither the optical gap/g)?.length ?? 0).toBeLessThanOrEqual(1);
+    });
+
+    it('reads the ESP key\'s ends as "electron-rich" and "electron-poor"', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush(); // the loader's own meta request settles (no act warning)
+        act(() => { store.dispatch(setSurface({ kind: 'esp' })); });
+        const key = within(container).getByLabelText('electrostatic potential colour key');
+        const ends = key.querySelector('.esp-legend-ends') as HTMLElement;
+        expect([...ends.children].map(end => end.textContent)).toEqual(['electron-rich', 'electron-poor']);
+    });
+
+    it('puts "How this was computed" in Info, with no footer pinned under Explore (ruling PF5)', async () => {
+        window.localStorage.setItem('eov.level', 'research');
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        expect(container.querySelector('.molecule-provenance-footer')).toBeNull();
+        const info = container.querySelector('.view-panel .info-section') as HTMLElement;
+        const computed = info.querySelector('details.info-computed') as HTMLDetailsElement;
+        expect(computed.open).toBe(true);
+        expect(computed).toHaveTextContent('dipole: 1.855 D — CRC Handbook, via CCCBDB');
+    });
+
+    // Task 4 review ruling: a Molecules (i) on a phone switches the sheet to the Info tab on its term.
+    it('on a phone, the ESP key\'s (i) opens the Info tab on its term', async () => {
+        const { store } = await enterMolecules(true);
+        pickWater(store);
+        await flush();
+        act(() => { store.dispatch(setSurface({ kind: 'esp' })); });
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        fireEvent.click(screen.getByRole('button', { name: 'About Electrostatic potential' }));
+        expect(screen.getByRole('tab', { name: 'Info' })).toHaveAttribute('aria-selected', 'true');
+        const info = screen.getByRole('tabpanel');
+        expect(within(info).getByRole('heading', { level: 2, name: /^Info/ }).querySelector('.info-topic-chip'))
+            .toHaveTextContent('Electrostatic potential');
     });
 });

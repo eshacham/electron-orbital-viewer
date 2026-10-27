@@ -67,7 +67,8 @@ const PAIRS: Pair[] = [
     { selector: '.bonds-frontier', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.bonds-note', declares: [`color: ${v('warning')}`], fg: 'warning', bg: 'surface-1' },
     { selector: '.esp-legend', declares: [`background: ${v('surface-2')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
-    { selector: '.esp-legend-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-2' },
+    // Task 7b: the ESP key's notes moved into Info; the key names its two ends instead, in the notes' colour.
+    { selector: '.esp-legend-ends', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-2' },
     { selector: '.molecule-picker-name', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.molecule-picker-status', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-1' },
     { selector: '.molecule-readout', declares: [`background: ${v('surface-2')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
