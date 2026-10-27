@@ -54,6 +54,12 @@ export const MEDIUM_VIEWPORT = '(max-width: 1289px)';
 export const TOPBAR_COMPACT = '(max-width: 1099px)';
 
 /**
+ * Task 2: below 1024 px the top bar has no room for the Learning level's four segments beside the mode tabs;
+ * the switch folds to one button that opens them as a list (LevelControl's 'compact' variant).
+ */
+export const TOPBAR_LEVEL_COMPACT = '(max-width: 1023px)';
+
+/**
  * Wide desktop (spec §7): at 1680 px and over, the docked inspector widens
  * to 320 px (app_shell.css `.wide`). Only meaningful when neither
  * NARROW_VIEWPORT nor MEDIUM_VIEWPORT matches. (R23a: the rail is gone --

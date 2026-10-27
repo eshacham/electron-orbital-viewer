@@ -21,7 +21,14 @@
   content: ''; position: absolute; left: 0; right: 0; bottom: 12px;
   height: 2px; border-radius: 1px; background: var(--ql-color-selected-edge);
 }
+.app-topbar-level { display: flex; align-items: center; }
 .app-topbar-search { margin-left: auto; width: clamp(320px, 28vw, 400px); }
+/* Task 2: between 1100 and 1290 px the Learning level switch takes the room the search had, and the bar's
+   gaps close a little, so nothing overflows at 1100. */
+@media (min-width: 1100px) and (max-width: 1290px) {
+  .app-topbar { gap: 16px; }
+  .app-topbar-search { width: clamp(180px, 18vw, 232px); }
+}
 .app-topbar-search.compact { width: auto; }
 .search-popover { width: 360px; padding: 8px; overflow: visible; }
 .app-topbar-actions { display: flex; align-items: center; gap: 4px; }

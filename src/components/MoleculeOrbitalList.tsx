@@ -6,6 +6,8 @@ import {
     frontierOccupied, gapTerm, labelsSentence, orbitalGaps,
 } from '../molecules/orbital_display';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
+// Task 2: the quiet level line's style (.level-line).
+import '../levels/levels.css';
 
 interface MoleculeOrbitalListProps {
     orbitals: LibraryMoleculeMeta['orbitals'];
@@ -25,7 +27,17 @@ interface MoleculeOrbitalListProps {
      */
     insideBallNote?: string | null;
     onHideStructure?: () => void;
+    /**
+     * Task 2: every row (Advanced and above). False (below Advanced) keeps the frontier window, HOMO−3 to LUMO+3,
+     * and the orbital drawn wherever it is, with a line saying the rest are at Advanced. Default true.
+     */
+    allOrbitals?: boolean;
 }
+
+/** How many orbitals either side of the HOMO/LUMO boundary a list below Advanced keeps: HOMO−3…LUMO+3. */
+const FRONTIER_WINDOW = 4;
+/** Task 2's line where the rest of the list would be (the brief's own words). */
+export const ALL_ORBITALS_POINTER = 'Show all orbitals at Advanced';
 
 const OCCUPANCY: Record<number, string> = { 2: '↑↓', 1: '↑', 0: '' };
 /** The row's short form of "upper estimate" (fix round 1: the full words overflowed a 300 px card beside ×3 and the
@@ -71,9 +83,18 @@ export function centredScrollTop(list: HTMLElement, row: HTMLElement): number {
  * unclassified rather than implying either.
  */
 const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
-    orbitals, selectedIndex, onSelect, method, symmetry, highlightRun = 0, insideBallNote, onHideStructure,
+    orbitals, selectedIndex, onSelect, method, symmetry, highlightRun = 0, insideBallNote, onHideStructure, allOrbitals = true,
 }) => {
-    const rows = useMemo(() => [...orbitals].sort((a, b) => b.energyHartree - a.energyHartree), [orbitals]);
+    const sorted = useMemo(() => [...orbitals].sort((a, b) => b.energyHartree - a.energyHartree), [orbitals]);
+    // Below Advanced: the four highest occupied and the four lowest virtual orbitals, plus the one drawn (a link's
+    // choice stays listed -- lowering the level never changes what is drawn, Review Focus 2).
+    const rows = useMemo(() => {
+        const boundary = sorted.findIndex(o => o.occupation > 0);
+        if (allOrbitals || boundary < 0) return sorted;
+        return sorted.filter((orbital, position) =>
+            (position >= boundary - FRONTIER_WINDOW && position < boundary + FRONTIER_WINDOW) || orbital.index === selectedIndex);
+    }, [allOrbitals, sorted, selectedIndex]);
+    const trimmed = rows.length < sorted.length;
     const counts = useMemo(() => degeneracyCounts(orbitals), [orbitals]);
     // Ruling T16-b: highest first reads like an MO diagram, but puts the
     // virtuals on top -- so the gap is marked where the occupied orbitals
@@ -159,6 +180,7 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
                         {' '}to see it.
                     </Typography>
                 )}
+                {trimmed && <p className="ql-caption level-line molecule-orbital-more">{ALL_ORBITALS_POINTER}</p>}
                 {gapText && (
                     // Fix round 1: role="note", not "separator", whose children screen readers skip.
                     <div role="note" className="molecule-orbital-gap">

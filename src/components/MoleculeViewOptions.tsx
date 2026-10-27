@@ -5,6 +5,7 @@ import { KEEP_CASE } from '../design/mui';
 import { displayPref } from '../design/presentation';
 import { usePref } from '../design/usePref';
 import { LAYOUT, TYPE } from '../design/tokens';
+import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
 
 interface MoleculeViewOptionsProps {
     representation: Representation;
@@ -23,6 +24,11 @@ interface MoleculeViewOptionsProps {
      * dipole is never shown without it.
      */
     caveat?: string | null;
+    /**
+     * Task 2: the learning level in use. Structure, the bond labels switch and the dipole arrow (with its
+     * value) appear at Explore -- hidden at Basics, where App's line says so. Omitted, everything shows.
+     */
+    level?: LearningLevel;
 }
 
 /**
@@ -40,6 +46,7 @@ const SEGMENTS = [KEEP_CASE, { '& .MuiToggleButton-root': { height: LAYOUT.chip,
  */
 const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
     representation, onRepresentationChange, spaceFillingUnavailable, surfaceShown, showDipole, onShowDipole, dipoleText, caveat,
+    level = 'research',
 }) => {
     const reasonId = useId();
     const labelsNoteId = useId();
@@ -48,45 +55,59 @@ const MoleculeViewOptions: React.FC<MoleculeViewOptionsProps> = ({
     const labelsNote = representation === 'none' ? 'No structure is drawn, so there is nothing to label.'
         : representation === 'space-filling' && display.moleculeLabels ? 'Space filling draws no bonds, so only angles are labelled.'
         : null;
+    const showStructure = atLeast(level, CONTROL_LEVEL.structure);
+    const showLabels = atLeast(level, CONTROL_LEVEL.bondLabels);
+    const showDipoleControl = atLeast(level, CONTROL_LEVEL.dipole);
+    if (!showStructure && !showLabels && !showDipoleControl) return null;
     return (
         <FormGroup className="molecule-view-options">
-            <FormControl component="fieldset" margin="dense" fullWidth className="molecule-structure-controls">
-                <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Structure</FormLabel>
-                <ToggleButtonGroup value={representation} exclusive size="small" fullWidth aria-label="structure" sx={SEGMENTS}
-                    onChange={(_event, next: Representation | null) => { if (next) onRepresentationChange(next); }}>
-                    <ToggleButton value="ball-and-stick" aria-label="Ball and stick (ball-and-stick structure)">Ball and stick</ToggleButton>
-                    {/* A disabled button takes no pointer, so the reason's tooltip hangs on this wrapper. */}
-                    <span className="molecule-structure-segment" title={spaceFillingUnavailable ?? undefined}>
-                        <ToggleButton value="space-filling" aria-label="Space filling (space-filling structure)"
-                            disabled={spaceFillingUnavailable !== null} aria-describedby={spaceFillingUnavailable ? reasonId : undefined}>
-                            Space filling
-                        </ToggleButton>
-                    </span>
-                    <ToggleButton value="none" aria-label="None (no structure)">None</ToggleButton>
-                </ToggleButtonGroup>
-                {representation === 'space-filling' && surfaceShown && (
-                    <Typography variant="caption" className="molecule-caption">The spheres can hide the surface inside them.</Typography>
-                )}
-                {spaceFillingUnavailable && (
-                    <Typography id={reasonId} variant="caption" className="molecule-caption">
-                        Space filling is unavailable: {spaceFillingUnavailable}
-                    </Typography>
-                )}
-            </FormControl>
-            {/* Ruling P9 (spec §9.4.1): a display preference, never in a link. */}
-            <FormControlLabel label="Show bond lengths and angles" disabled={representation === 'none'}
-                control={<Switch size="small" checked={display.moleculeLabels} inputProps={{ 'aria-describedby': labelsNote ? labelsNoteId : undefined }}
-                    onChange={e => displayPref.set({ ...displayPref.get(), moleculeLabels: e.target.checked })} />} />
-            {labelsNote && <Typography id={labelsNoteId} variant="caption" className="molecule-caption">{labelsNote}</Typography>}
-            <FormControlLabel control={<Switch size="small" checked={showDipole} onChange={e => onShowDipole(e.target.checked)} />} label="Dipole arrow" />
-            {dipoleText && (
-                <Typography variant="body2">
-                    {dipoleText}{caveat ? ` — ${caveat}` : ''}
-                </Typography>
+            {showStructure && (
+                <FormControl component="fieldset" margin="dense" fullWidth className="molecule-structure-controls">
+                    <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Structure</FormLabel>
+                    <ToggleButtonGroup value={representation} exclusive size="small" fullWidth aria-label="structure" sx={SEGMENTS}
+                        onChange={(_event, next: Representation | null) => { if (next) onRepresentationChange(next); }}>
+                        <ToggleButton value="ball-and-stick" aria-label="Ball and stick (ball-and-stick structure)">Ball and stick</ToggleButton>
+                        {/* A disabled button takes no pointer, so the reason's tooltip hangs on this wrapper. */}
+                        <span className="molecule-structure-segment" title={spaceFillingUnavailable ?? undefined}>
+                            <ToggleButton value="space-filling" aria-label="Space filling (space-filling structure)"
+                                disabled={spaceFillingUnavailable !== null} aria-describedby={spaceFillingUnavailable ? reasonId : undefined}>
+                                Space filling
+                            </ToggleButton>
+                        </span>
+                        <ToggleButton value="none" aria-label="None (no structure)">None</ToggleButton>
+                    </ToggleButtonGroup>
+                    {representation === 'space-filling' && surfaceShown && (
+                        <Typography variant="caption" className="molecule-caption">The spheres can hide the surface inside them.</Typography>
+                    )}
+                    {spaceFillingUnavailable && (
+                        <Typography id={reasonId} variant="caption" className="molecule-caption">
+                            Space filling is unavailable: {spaceFillingUnavailable}
+                        </Typography>
+                    )}
+                </FormControl>
             )}
-            <Typography variant="caption" className="molecule-caption">
-                The arrow points from − to + (the physics convention), 1 a₀ per debye; many chemistry texts draw it the other way.
-            </Typography>
+            {/* Ruling P9 (spec §9.4.1): a display preference, never in a link. */}
+            {showLabels && (
+                <>
+                    <FormControlLabel label="Show bond lengths and angles" disabled={representation === 'none'}
+                        control={<Switch size="small" checked={display.moleculeLabels} inputProps={{ 'aria-describedby': labelsNote ? labelsNoteId : undefined }}
+                            onChange={e => displayPref.set({ ...displayPref.get(), moleculeLabels: e.target.checked })} />} />
+                    {labelsNote && <Typography id={labelsNoteId} variant="caption" className="molecule-caption">{labelsNote}</Typography>}
+                </>
+            )}
+            {showDipoleControl && (
+                <>
+                    <FormControlLabel control={<Switch size="small" checked={showDipole} onChange={e => onShowDipole(e.target.checked)} />} label="Dipole arrow" />
+                    {dipoleText && (
+                        <Typography variant="body2">
+                            {dipoleText}{caveat ? ` — ${caveat}` : ''}
+                        </Typography>
+                    )}
+                    <Typography variant="caption" className="molecule-caption">
+                        The arrow points from − to + (the physics convention), 1 a₀ per debye; many chemistry texts draw it the other way.
+                    </Typography>
+                </>
+            )}
         </FormGroup>
     );
 };

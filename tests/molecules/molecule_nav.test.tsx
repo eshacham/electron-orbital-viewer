@@ -43,6 +43,34 @@ describe('orbital display', () => {
 });
 
 describe('MoleculeOrbitalList', () => {
+    // Task 2: below Advanced the list keeps the frontier, HOMO−3…LUMO+3, the orbital drawn wherever it is, and one line.
+    describe('below Advanced', () => {
+        const ladder = Array.from({ length: 12 }, (_, i) => ({
+            index: i, label: `o${i}`, energyHartree: -1.2 + 0.1 * i, occupation: i < 6 ? 2 : 0,
+        })) as ReturnType<typeof waterMeta>['orbitals'];
+        const labels = () => screen.getAllByRole('button').map(row => row.textContent?.match(/^o\d+/)?.[0]);
+
+        it('lists LUMO+3 down to HOMO−3, and says where the rest are', () => {
+            render(<MoleculeOrbitalList orbitals={ladder} selectedIndex={null} onSelect={() => {}} allOrbitals={false}
+                method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+            expect(labels()).toEqual(['o9', 'o8', 'o7', 'o6', 'o5', 'o4', 'o3', 'o2']);
+            expect(screen.getByText('Show all orbitals at Advanced')).toBeInTheDocument();
+        });
+
+        it('keeps the orbital drawn listed, even outside the window', () => {
+            render(<MoleculeOrbitalList orbitals={ladder} selectedIndex={0} onSelect={() => {}} allOrbitals={false}
+                method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+            expect(labels()).toEqual(['o9', 'o8', 'o7', 'o6', 'o5', 'o4', 'o3', 'o2', 'o0']);
+        });
+
+        it('says nothing when the window already holds every orbital', () => {
+            // Four occupied and four virtual: exactly the window.
+            render(<MoleculeOrbitalList orbitals={ladder.slice(2, 10)} selectedIndex={null} onSelect={() => {}} allOrbitals={false}
+                method="B3LYP/def2-TZVPD" symmetry={{ pointGroup: 'C2v', labelGroup: 'C2v' }} />);
+            expect(screen.queryByText('Show all orbitals at Advanced')).toBeNull();
+        });
+    });
+
     it('lists highest first, marks HOMO and LUMO, states the method and that energies are not ionisation energies', () => {
         const onSelect = jest.fn();
         const { container } = render(<MoleculeOrbitalList orbitals={waterMeta().orbitals} selectedIndex={4} onSelect={onSelect}

@@ -6,6 +6,11 @@ interface AppShellProps {
     /** ≥ 1680 px (spec §7). */
     wide?: boolean;
     topBar?: React.ReactNode;
+    /**
+     * Task 2: a notice for the whole screen (the visit level's), in its own row under the top bar, so it covers
+     * neither the panels nor the view's title and toolbar. A phone has no such row: App puts it in the viewport.
+     */
+    notice?: React.ReactNode;
     explore?: React.ReactNode;
     /** Docked on a desktop; at medium width App renders it inside the viewport as a drawer instead. */
     inspector?: React.ReactNode;
@@ -31,7 +36,7 @@ function skipTo(event: React.MouseEvent<HTMLAnchorElement>, id: string): void {
  * effects and passes these slots; the viewport cell never remounts when the
  * layout changes (spec §3.2), because it is always this element's child.
  */
-const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, explore, inspector, viewport, exploreCollapsed = false, onExpandExplore, fullscreen = false, shellRef }) => {
+const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, notice, explore, inspector, viewport, exploreCollapsed = false, onExpandExplore, fullscreen = false, shellRef }) => {
     const classes = ['app-shell', layout, wide && 'wide', exploreCollapsed && 'explore-collapsed', fullscreen && 'is-fullscreen'].filter(Boolean).join(' ');
     return (
         <div ref={shellRef} className={classes}>
@@ -40,6 +45,7 @@ const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, explo
                     <a className="skip-link" href="#canvas-container" onClick={event => skipTo(event, 'canvas-container')}>Skip to 3D view</a>
                     <a className="skip-link" href="#explore-panel" onClick={event => skipTo(event, 'explore-panel')}>Skip to controls</a>
                     {topBar}
+                    {notice && <div className="app-notice">{notice}</div>}
                 </>
             )}
             <div className="app-workspace">

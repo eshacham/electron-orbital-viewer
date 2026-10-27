@@ -6,15 +6,78 @@ import { EXPORT_ITEMS, ExportAvailability } from '../src/export/run_export';
 describe('ShareExportBar: Share', () => {
     it('says the link was copied', async () => {
         render(<ShareExportBar onShare={async () => ({ kind: 'copied' })} />);
+        // Task 2: Share is a menu now (Copy link, Opens at); the copy is its first item.
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
         expect(await screen.findByText(/link copied/i)).toBeInTheDocument();
     });
 
     // Review Focus 5.
     it('shows the link to copy by hand when the clipboard is refused', async () => {
         render(<ShareExportBar onShare={async () => ({ kind: 'manual', url: 'http://x/#mode=atom&Z=26' })} />);
+        // Task 2: Share is a menu now (Copy link, Opens at); the copy is its first item.
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
         expect(await screen.findByRole('textbox', { name: /link to this view/i })).toHaveValue('http://x/#mode=atom&Z=26');
+    });
+});
+
+describe('ShareExportBar: Opens at (Task 2)', () => {
+    it('opens a menu with Copy link and the Opens at choices, the recipient\'s own level chosen', () => {
+        render(<ShareExportBar onShare={jest.fn()} />);
+        const button = screen.getByRole('button', { name: 'Share' });
+        expect(button).toHaveAttribute('aria-haspopup', 'menu');
+        fireEvent.click(button);
+        expect(screen.getByRole('menuitem', { name: 'Copy link' })).toBeInTheDocument();
+        expect(screen.getByText('Opens at')).toBeInTheDocument();
+        const radios = screen.getAllByRole('menuitemradio').map(item => item.textContent);
+        expect(radios).toEqual(['Recipient’s level', 'Basics', 'Explore', 'Advanced', 'Research']);
+        expect(screen.getByRole('menuitemradio', { name: 'Opens at Recipient’s level' })).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('Copy link shares at the recipient\'s own level', async () => {
+        const onShare = jest.fn().mockResolvedValue({ kind: 'copied' });
+        render(<ShareExportBar onShare={onShare} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+        await waitFor(() => expect(onShare).toHaveBeenCalledWith(undefined));
+        expect(await screen.findByText('Link copied — it opens this exact view.')).toBeInTheDocument();
+    });
+
+    it('a chosen Opens at level is kept, and the next copy opens at it', async () => {
+        const onShare = jest.fn().mockResolvedValue({ kind: 'copied' });
+        render(<ShareExportBar onShare={onShare} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Opens at Basics' }));
+        // A radio chooses; it does not copy, and the menu stays open for Copy link.
+        expect(onShare).not.toHaveBeenCalled();
+        expect(screen.getByRole('menuitemradio', { name: 'Opens at Basics' })).toHaveAttribute('aria-checked', 'true');
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+        await waitFor(() => expect(onShare).toHaveBeenCalledWith('basics'));
+        expect(await screen.findByText('Link copied — it opens this exact view, at Basics.')).toBeInTheDocument();
+    });
+
+    it('the copy-by-hand dialog names the level the link opens at', async () => {
+        render(<ShareExportBar onShare={async () => ({ kind: 'manual', url: 'http://x/#mode=atom&Z=26&lvl=advanced' })} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Opens at Advanced' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+        await screen.findByRole('textbox', { name: /link to this view/i });
+        expect(screen.getByText('Opens at Advanced')).toBeInTheDocument();
+    });
+
+    it('below Advanced it hides Snapshot and Export, and the Share menu says where they appear', () => {
+        render(<ShareExportBar variant="toolbar" level="explore" onShare={jest.fn()} onExport={jest.fn()} availability={allAvailable()} />);
+        expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Snapshot' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        expect(screen.getByText('Exports appear at Advanced')).toBeInTheDocument();
+    });
+
+    it('at Advanced it shows Snapshot and Export', () => {
+        render(<ShareExportBar variant="toolbar" level="advanced" onShare={jest.fn()} onExport={jest.fn()} availability={allAvailable()} />);
+        expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Snapshot' })).toBeInTheDocument();
     });
 });
 

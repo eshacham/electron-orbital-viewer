@@ -5,10 +5,12 @@
 .app-shell {
   position: relative; display: grid; width: 100%; height: 100dvh; overflow: hidden;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: var(--ql-size-top-bar) minmax(0, 1fr);
-  grid-template-areas: 'topbar' 'workspace';
+  /* Task 2: the notice row is empty (0 px) unless a notice is shown. */
+  grid-template-rows: var(--ql-size-top-bar) auto minmax(0, 1fr);
+  grid-template-areas: 'topbar' 'notice' 'workspace';
   background: var(--ql-color-bg-app); color: var(--ql-color-text-1);
 }
+.app-notice { grid-area: notice; padding: var(--ql-size-gutter) var(--ql-size-gutter) 0; }
 .app-workspace {
   grid-area: workspace; display: grid; min-width: 0; min-height: 0;
   gap: var(--ql-size-gutter); padding: var(--ql-size-gutter);
@@ -44,6 +46,7 @@
 .app-shell.phone #canvas-container.viewport-cell { height: 100%; border-radius: 0; }
 /* §8.5 Fullscreen: the top bar, Explore and inspector hide; the viewport takes the screen. */
 .app-shell.is-fullscreen { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: 'workspace'; }
+.app-shell.is-fullscreen .app-notice,
 .app-shell.is-fullscreen .app-topbar,
 .app-shell.is-fullscreen .explore-panel, .app-shell.is-fullscreen .inspector { display: none; }
 .app-shell.is-fullscreen .app-workspace { grid-template-columns: minmax(0, 1fr); padding: 0; }

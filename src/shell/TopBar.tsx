@@ -26,6 +26,8 @@ interface TopBarProps {
     mode: ThemeMode;
     tabs: TopBarTab[];
     search: React.ReactNode;
+    /** Task 2: the Learning level switch, between the mode tabs and the search. */
+    levelControl?: React.ReactNode;
     avatar: React.ReactNode;
     onHelp(): void;
     /** Today's session-ended line (ruling R15), beside the avatar. */
@@ -43,8 +45,8 @@ interface TopBarProps {
     searchPickSignal?: number;
 }
 
-/** The 56 px top bar (spec §8.1): brand, area tabs, search, theme, help, avatar. */
-const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, avatar, onHelp, sessionNote, compactSearch, searchPickSignal }) => {
+/** The 56 px top bar (spec §8.1): brand, area tabs, the Learning level (Task 2), search, theme, help, avatar. */
+const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, levelControl, avatar, onHelp, sessionNote, compactSearch, searchPickSignal }) => {
     const [searchAnchor, setSearchAnchor] = useState<HTMLElement | null>(null);
     const searchButtonRef = useRef<HTMLButtonElement | null>(null);
     const lastPickSignalRef = useRef(searchPickSignal);
@@ -114,6 +116,7 @@ const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, avatar, onHe
                     ))}
                 </nav>
             )}
+            {levelControl && <div className="app-topbar-level">{levelControl}</div>}
             {compactSearch ? (
                 <div className="app-topbar-search compact">
                     <IconButton ref={searchButtonRef} className="ql-icon-button" aria-label="Search" onClick={event => setSearchAnchor(event.currentTarget)}>

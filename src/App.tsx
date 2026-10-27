@@ -69,10 +69,10 @@ import PeriodicTable from './components/PeriodicTable';
 import ElementPickerDialog from './components/ElementPickerDialog';
 import { orbitalName } from './orbital_names';
 import { CombinationSelection, fieldRequestFor, combinationCurves, overlayLegend, samePicture } from './combinations';
-import { basicOrbitalParams, BASIC_ORBITALS_Z, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
+import { basicOrbitalParams, BASIC_ORBITALS_Z, DEFAULT_ENCLOSED_FRACTION, ORBITAL_RESOLUTION, SHELL_VIEW_CUT_AXIS } from './orbital_presets';
 import { DEFAULT_OPACITY, OrbitalParams, SurfaceStyle } from './types/orbital';
 import { useDelayedFlag } from './useDelayedFlag';
-import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT, PHONE_LANDSCAPE, WIDE_VIEWPORT, TOPBAR_COMPACT } from './useMediaQuery';
+import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT, PHONE_LANDSCAPE, WIDE_VIEWPORT, TOPBAR_COMPACT, TOPBAR_LEVEL_COMPACT } from './useMediaQuery';
 import { CURVE_COLORS } from './curve_colors';
 import { buildComparisonCurves, radialPlotRange } from './atom/comparison_curves';
 import { useUrlStateSync } from './useUrlStateSync';
@@ -112,7 +112,7 @@ import { ConnectedOwnerBar, signInHere } from './components/OwnerBar';
 import { useComputedList } from './jobs/useComputedList';
 import { useFollowedJob } from './jobs/useFollowedJob';
 import { withComputed } from './jobs/computed';
-import { selectIsOwner, sessionErrorDismissed, sessionFailed } from './store/jobsSlice';
+import { requestOpened, selectIsOwner, sessionErrorDismissed, sessionFailed } from './store/jobsSlice';
 import AppShell from './shell/AppShell';
 import TopBar, { TopBarTab } from './shell/TopBar';
 import { MODE_ITEMS, MODE_LABEL } from './shell/Rail';
@@ -151,7 +151,7 @@ import { useQuantumTheme } from './design/useQuantumTheme';
 import { BRAND } from './design/brands';
 import { LAYOUT } from './design/tokens';
 import { usePref } from './design/usePref';
-import { displayPref, renderPref, hintPref, type PlotTabId } from './design/presentation';
+import { displayPref, renderPref, hintPref, DEFAULT_RENDER, type PlotTabId } from './design/presentation';
 import { glowOverridesOf, settledGlowPref } from './design/glow_pref';
 import AdvancedAppearance from './components/AdvancedAppearance';
 import { curvePalette, densitySurfaceHex, phaseColours, themeCurveColour } from './design/science';
@@ -159,6 +159,10 @@ import { BUILD_ENV } from './jobs/build_env';
 import { SESSION_ENDED } from './jobs/api';
 import { NO_COMBINATION } from './combinations';
 import type { SearchAction } from './search/search_index';
+import { atLeast, CONTROL_LEVEL, LEVEL_LABEL, type ControlId, type LearningLevel } from './levels/levels';
+import { useLevel } from './levels/useLevel';
+import LevelControl from './levels/LevelControl';
+import LevelLine, { type HeldValue } from './levels/LevelLine';
 
 /** §8.6: the inspector's 290 px less its 16 px padding each side. */
 const PLOT_WIDTH = LAYOUT.plotWidth;
@@ -194,6 +198,13 @@ const REVEAL_AFTER_FULLSCREEN_MS = 2000;
 const SURFACE_NAME: Record<MoleculeSurface['kind'], string> = {
     // `none` draws nothing, so it never fails (the slice clears a failure when it is chosen).
     density: 'the density', esp: 'the electrostatic potential', mo: 'the orbital', none: 'no surface',
+};
+
+/** Task 2: a hidden Relativity switch's non-default choice, as its line names it ("Showing the … picture"). */
+const RELATIVITY_SHOWN: Record<RelativityMode, string> = {
+    off: 'the non-relativistic picture',
+    scalar: 'the scalar-relativistic picture',
+    spinOrbit: 'the picture with spin–orbit',
 };
 
 /** How long a render has to take before the viewer is told it is working. */
@@ -238,6 +249,11 @@ function App() {
     const isBasicMode = atomMode === 'hydrogenic';
     const isBondsMode = atomMode === 'bonds';
     const isMoleculeMode = atomMode === 'molecule';
+
+    // Task 2: the learning level in use (stored, or raised for this visit by a link) decides which controls render:
+    // a control above it is hidden, not greyed, and one line says where it appears (LevelLine).
+    const { level, stored: storedLevel, raised: levelRaised, setLevel } = useLevel();
+    const shows = useCallback((id: ControlId) => atLeast(level, CONTROL_LEVEL[id]), [level]);
 
     // The Relativity switch shows the effective mode -- the user's choice, or
     // the element's default -- since that is what is being solved for.
@@ -341,8 +357,10 @@ function App() {
         if (angles) store.dispatch(cameraMoved(angles, exportHandleRef.current?.standardAxis() ?? 'none'));
         return store.getState();
     }, [store]);
-    const handleShare = useCallback(async (): Promise<ShareOutcome> => {
-        const url = shareUrlFor(encodeStateOf(stateNow()));
+    // Task 2: only Share's "Opens at" writes `lvl` -- encodeStateOf never does -- so a plain link keeps the
+    // recipient's own level, and one copied "Opens at Basics" ends `&lvl=basics`.
+    const handleShare = useCallback(async (opensAt?: LearningLevel): Promise<ShareOutcome> => {
+        const url = shareUrlFor(encodeStateOf(stateNow())) + (opensAt ? `&lvl=${opensAt}` : '');
         return (await copyText(url)) ? { kind: 'copied' } : { kind: 'manual', url };
     }, [stateNow]);
 
@@ -497,6 +515,8 @@ function App() {
     const layout: 'desktop' | 'medium' | 'phone' = isNarrow ? 'phone' : isMedium ? 'medium' : 'desktop';
     // Below 1100 px the top bar's search shrinks to an icon (spec §7); a phone has its own search sheet instead.
     const compactTopBar = useMediaQuery(TOPBAR_COMPACT) && !isNarrow;
+    // Task 2: and below 1024 px the Learning level folds to one button.
+    const compactLevel = useMediaQuery(TOPBAR_LEVEL_COMPACT) && !isNarrow;
     // Medium width only: Explore starts open and can be folded to the rail, and back, on request.
     const [exploreCollapsed, setExploreCollapsed] = useState(false);
     const { mode: themeMode } = useQuantumTheme();
@@ -517,6 +537,8 @@ function App() {
     const fullscreenActive = fullscreen.active;
     const toggleFullscreen = fullscreen.toggle;
     const [helpOpen, setHelpOpen] = useState(false);
+    // Task 2: the visit notice, dismissed for the level it was about (a later link raising further says so again).
+    const [visitNoticeDismissed, setVisitNoticeDismissed] = useState<LearningLevel | null>(null);
     const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
     // The molecule index loads when Molecules opens -- or when someone starts a search (spec §8.3).
     const [searchWantsIndex, setSearchWantsIndex] = useState(false);
@@ -659,9 +681,17 @@ function App() {
     // Ruling P12: the owner's request workspace in the viewport cell, and the preview it puts on the canvas
     // (useMoleculeView draws it). While it is open the strip and the hover caption, which describe the
     // molecule, step aside; while its preview is drawn so do the surface keys and the library line.
-    const requestWorkspaceOpen = useRequestWorkspaceOpen();
+    // Task 2: the request workspace is the owner's at Research; below it, it is not open (the effect below closes it).
+    const requestWorkspaceOpen = useRequestWorkspaceOpen() && shows('requestWorkspace');
     const requestPreviewShown = useAppSelector(state => state.jobs.request.previewAtoms !== null) && isMoleculeMode;
     const requestEntryRef = useRef<HTMLButtonElement>(null);
+    // Task 2: lowering the level below Research closes an open request, and so takes its preview off the canvas --
+    // a preview with no workspace beside it would be a picture nothing on screen explains.
+    const requestIsOpen = useAppSelector(state => state.jobs.request.open);
+    const requestsShown = shows('requestWorkspace');
+    useEffect(() => {
+        if (requestIsOpen && !requestsShown) dispatch(requestOpened(false));
+    }, [requestIsOpen, requestsShown, dispatch]);
     const signInError = useAppSelector(state => state.jobs.session.error);
     const computedJobs = useAppSelector(state => state.jobs.computed.jobs);
     useComputedList(isMoleculeMode);
@@ -1213,6 +1243,8 @@ function App() {
         selectedOrbital: atomSelectedOrbital, onSelectSubshell: handleSelectSubshell, onSelectOrbital: handleSelectOrbital,
         // Ruling C9: the drawn profile's mode, not the switch's.
         relativity: atomProfile.relativity ?? 'off',
+        // Task 2: a chip's orbital energy is Explore's, as the diagram is.
+        showEnergies: shows('orbitalEnergies'),
     } : null;
     const showSubshells = atomLevel === 'shell' || atomLevel === 'orbital';
     const subshellPanel = showSubshells && subshellPanelProps ? <SubshellPanel {...subshellPanelProps} palette={palette} /> : null;
@@ -1236,6 +1268,7 @@ function App() {
             unbound={atomUnbound}
             pictureFailed={atomError !== null}
             pictureRelativity={pictureRelativity}
+            level={level}
         />
     );
 
@@ -1262,9 +1295,20 @@ function App() {
     // The Relativity switch chooses the model, so it sits with the
     // configuration: Explore › Configuration on a desktop, the phone's
     // Explore tab (spec §9.1, §9.8).
-    const relativityControl = isAtomMode && (
+    const relativityControl = isAtomMode && shows('relativity') && (
         <RelativityControl relativity={relativity} relativityIsDefault={relativityIsDefault}
             onRelativityChange={handleRelativityChange} relativityReadout={relativityReadout} />
+    );
+    // Task 2: under Configuration, where Charge, Excite and Relativity appear (Advanced) -- or, while one of them
+    // still holds a value off its default (a link's Fe²⁺), what the picture keeps showing (ruling PF1).
+    const configurationLine = isAtomMode && (
+        <LevelLine level={level} ids={['charge', 'relativity']} held={[
+            !isNeutralGround(species) && {
+                id: species.charge !== 0 ? 'charge' : 'excite', control: species.charge !== 0 ? 'charge' : 'excitation',
+                what: speciesSymbol(species),
+            },
+            !relativityIsDefault && { id: 'relativity', control: 'relativity', what: RELATIVITY_SHOWN[relativity] },
+        ]} />
     );
 
     // Fix round 1 (I1): in Bonds mode, exportAvailability also needs
@@ -1327,17 +1371,17 @@ function App() {
         () => (
             <ShareExportBar
                 onShare={handleShare} onExport={handleExport} availability={availability} stlSolids={stlSolids}
-                items={exportItemsFor(atomMode, exportLook)}
+                items={exportItemsFor(atomMode, exportLook)} level={level}
             />
         ),
-        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook]
+        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook, level]
     );
     const shareExportToolbar = useMemo(
         () => (
             <ShareExportBar variant="toolbar" onShare={handleShare} onExport={handleExport} availability={availability}
-                stlSolids={stlSolids} items={exportItemsFor(atomMode, exportLook)} />
+                stlSolids={stlSolids} items={exportItemsFor(atomMode, exportLook)} level={level} />
         ),
-        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook]
+        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook, level]
     );
 
     // Molecules mode's navigation (layout contract §3.8): the whole card in
@@ -1352,6 +1396,8 @@ function App() {
         // Owner R25-C (ruling R25-C-present): a drawn surface hidden inside the structure's balls is said so.
         insideBallNote: insideBallNoteFor(molecule),
         onHideStructure: () => dispatch(setRepresentation('none')),
+        // Task 2: below Advanced the list keeps HOMO−3…LUMO+3 and says where the rest are.
+        allOrbitals: shows('allOrbitals'),
     };
     // Task 12 (ruling P1): Molecules' Explore opens with the header tile (name, formula, "Change ▾" -- a
     // popover on a desktop or tablet, the full-screen picker on a phone). Owner R25-A3: the quick pick that sat
@@ -1382,7 +1428,7 @@ function App() {
         <MoleculeViewOptions representation={molecule.representation} onRepresentationChange={r => dispatch(setRepresentation(r))}
             spaceFillingUnavailable={spaceFillingUnavailableReason(molecule.meta.atoms)} surfaceShown={molecule.surface.kind !== 'none'}
             showDipole={molecule.showDipole} onShowDipole={on => dispatch(setShowDipole(on))}
-            dipoleText={formatDipole(molecule.meta)} caveat={molecule.meta.caveat ?? null} />
+            dipoleText={formatDipole(molecule.meta)} caveat={molecule.meta.caveat ?? null} level={level} />
     );
     // What the enclosed fraction produced, under its select (ruling D22).
     // Only once the surface asked for has landed: while the next one
@@ -1422,6 +1468,7 @@ function App() {
                 : isMoleculeMode && molecule.surface.kind === 'none' ? NO_SURFACE_NOTE : undefined}
             isoNote={moleculeIsoNote}
             noSurface={isMoleculeMode && molecule.surface.kind === 'none'}
+            level={level}
         >
             {/* Molecules' structure and dipole options. Ruling R25-finish: the Glow | Solid finish Atoms passed here
                 is Controls' own now, in every mode. */}
@@ -1440,9 +1487,34 @@ function App() {
     // (never its ESP map, ruling T15-b), the Bonds total density, a shell's composition lobes, a combination overlay.
     const phaselessDrawn = (moleculeKeysShown && molecule.surface.kind === 'density') || isBondsDensity
         || (isAtomMode && atomLevel === 'shell') || combinationLegend !== null;
-    const advancedAppearance = <AdvancedAppearance drawsGlow={drawsGlow} lowPower={isNarrow} phaselessDrawn={phaselessDrawn}
-        extrasSuppressed={glowExtrasSuppressed} />;
-    const displayControls = <>{controls}{advancedAppearance}</>;
+    // Task 2: Advanced's, as the enclosed fraction and the finish inside Controls are.
+    const advancedAppearance = shows('advancedAppearance') && (
+        <AdvancedAppearance drawsGlow={drawsGlow} lowPower={isNarrow} phaselessDrawn={phaselessDrawn}
+            extrasSuppressed={glowExtrasSuppressed} />
+    );
+    // Task 2: the one line at the foot of every Display section -- what this mode's view settings and its other
+    // sections (Plot and data, Properties) still hide, or a hidden one's value the picture keeps (ruling PF1).
+    // Only what this view would show: the finish is a mesh's (isOrbitalView, not a shell view's), its tuning Glow's.
+    const displayIds: ControlId[] = isMoleculeMode ? ['structure', 'bondLabels', 'dipole', 'properties'] : ['plot'];
+    if (isAtomMode) displayIds.push('axes');
+    displayIds.push('enclosed');
+    if (isOrbitalView) displayIds.push('surfaceStyle');
+    if (render.finish === 'glow' && drawsGlow) displayIds.push('advancedAppearance');
+    const displayHeld: (HeldValue | false)[] = [
+        isMoleculeMode && molecule.representation !== 'ball-and-stick' && {
+            id: 'structure', control: 'structure', what: molecule.representation === 'none' ? 'no structure' : 'space filling',
+        },
+        isMoleculeMode && display.moleculeLabels && { id: 'bondLabels', control: 'bond-label', what: 'bond lengths and angles' },
+        // The arrow is on by default (moleculeSlice), so the value held is its absence.
+        isMoleculeMode && !molecule.showDipole && { id: 'dipole', control: 'dipole', what: 'no dipole arrow' },
+        isAtomMode && !display.showAxes && { id: 'axes', control: 'axes', what: 'no axes' },
+        enclosedFraction !== DEFAULT_ENCLOSED_FRACTION && {
+            id: 'enclosed', control: 'enclosed-fraction', what: `a ${Math.round(enclosedFraction * 100)} % contour`,
+        },
+        isOrbitalView && render.finish !== DEFAULT_RENDER.finish && { id: 'surfaceStyle', control: 'surface-style', what: 'the solid surface' },
+    ];
+    const displayLine = <LevelLine level={level} ids={displayIds} held={displayHeld} />;
+    const displayControls = <>{controls}{advancedAppearance}{displayLine}</>;
 
     // Bonds mode's navigation (layout contract §3.8): the desktop's left
     // column, the phone's Explore tab. The curve is not in it -- it goes
@@ -1473,6 +1545,7 @@ function App() {
             onChange={handleBasicSelectionChange}
             combination={combination}
             onCombinationChange={handleCombinationChange}
+            level={level}
         />
     );
 
@@ -1575,13 +1648,16 @@ function App() {
     // The Atom screen's Display settings head its inspector, docked and in
     // the drawer (ruling R20b-atoms); on a phone the sheet's View tab holds
     // them, so the stacked inspector has none.
-    const atomDisplay = <>{controls}<AxesSwitch />{advancedAppearance}</>;
+    const atomDisplay = <>{controls}{shows('axes') && <AxesSwitch />}{advancedAppearance}{displayLine}</>;
+    // Basic Orbitals' Display: Controls' view half (ruling R20b), headed the same way.
+    const basicDisplay = <>{renderControls('view')}{advancedAppearance}{displayLine}</>;
     // Ruling R24-3: before there is anything to plot, the inspector keeps its
     // titled sections -- Display, and an empty "Plot and data" -- so its
     // headers do not move (nor the open one change) when the plot arrives.
+    // Task 2: no Plot and data below Explore, waiting or not.
     const waitingSections = (variant: 'docked' | 'drawer' | 'stacked', display: React.ReactNode): InspectorSection[] => [
         ...(variant === 'stacked' ? [] : [{ key: 'display', title: 'Display', content: display }]),
-        { key: 'plot', title: 'Plot and data', content: null },
+        ...(shows('plot') ? [{ key: 'plot', title: 'Plot and data', content: null }] : []),
     ];
 
     // The Atom screen's inspector (spec §9.1): docked on a desktop, a drawer
@@ -1594,7 +1670,7 @@ function App() {
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             plotTabs={atomPlotTabs} plotTab={activePlotTab} onPlotTab={handlePlotTab}
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
-            facts={atomFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} />
+            facts={atomFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} showPlot={shows('plot')} />
     ) : (
         <Inspector variant={variant} sections={waitingSections(variant, atomDisplay)}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
@@ -1606,14 +1682,14 @@ function App() {
     // entering the mode) it is the plain inspector, holding the column and
     // drawer bar in place, with the view controls still in it.
     const basicInspector = (variant: 'docked' | 'drawer' | 'stacked') => ((renderedParams || renderedField) ? (
-        <BasicInspector variant={variant} display={variant === 'stacked' ? undefined : <>{renderControls('view')}{advancedAppearance}</>}
+        <BasicInspector variant={variant} display={variant === 'stacked' ? undefined : basicDisplay}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             plotTabs={BASIC_PLOT_TABS} plotTab={basicActivePlotTab} onPlotTab={handlePlotTab}
             combination={Boolean(renderedField)}
             plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
-            facts={basicFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} />
+            facts={basicFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} showPlot={shows('plot')} />
     ) : (
-        <Inspector variant={variant} sections={waitingSections(variant, <>{renderControls('view')}{advancedAppearance}</>)}
+        <Inspector variant={variant} sections={waitingSections(variant, basicDisplay)}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
@@ -1628,7 +1704,7 @@ function App() {
         <BondsInspector variant={variant} display={variant === 'stacked' ? undefined : displayControls}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             bonds={bonds} data={bondsData}
-            plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)} />
+            plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)} showPlot={shows('plot')} />
     );
 
     // Ruling R22c (owner review 2026-10-14): the hover/pick readout moves off
@@ -1660,7 +1736,8 @@ function App() {
     // The phone's View tab stacks the Properties section (below).
     const moleculeSections: InspectorSection[] = [
         { key: 'display', title: 'Display', content: displayControls },
-        ...(moleculeProperties ? [{ key: 'properties', title: 'Properties', content: moleculeProperties }] : []),
+        // Task 2: Properties from Explore.
+        ...(moleculeProperties && shows('properties') ? [{ key: 'properties', title: 'Properties', content: moleculeProperties }] : []),
     ];
 
     // The phone sheet's tabs, one job each. Basic Orbitals has no drill-down,
@@ -1687,7 +1764,7 @@ function App() {
                         {moleculeSelectionSection}
                         <MoleculeNav {...moleculeNavProps} variant="body" ref={moleculeNavRef} />
                         <MoleculeProvenanceFooter />
-                        <MoleculeJobsSection />
+                        {requestsShown ? <MoleculeJobsSection /> : isOwner && <LevelLine level={level} ids={['requestWorkspace']} />}
                     </>
                 ),
             },
@@ -1719,8 +1796,8 @@ function App() {
                 ),
             },
             { key: 'view', label: 'View', content: <>{displayControls}{phoneViewActions}</> },
-            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
-            { key: 'plot', label: 'Plot', content: bondsInspector('stacked') },
+            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs. Task 2: from Explore.
+            ...(shows('plot') ? [{ key: 'plot', label: 'Plot', content: bondsInspector('stacked') }] : []),
         ]
         : isAtomMode
         ? [
@@ -1737,12 +1814,13 @@ function App() {
                         )}
                         <LevelNav {...levelNavProps} variant="body">{subshellPanel}</LevelNav>
                         {relativityControl}
+                        {configurationLine}
                     </>
                 ),
             },
             { key: 'view', label: 'View', content: <>{atomDisplay}{phoneViewActions}</> },
-            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
-            { key: 'plot', label: 'Plot', content: atomInspector('stacked') },
+            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs. Task 2: from Explore.
+            ...(shows('plot') ? [{ key: 'plot', label: 'Plot', content: atomInspector('stacked') }] : []),
         ]
         : [
             // Ruling P3: BasicExplore (the tile, the chips, the Combination picker)
@@ -1757,12 +1835,12 @@ function App() {
                             <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
                                 onSelect={handleBasicSelectionChange} variant="sheet" />
                         )}
-                        {basicExplore}{renderControls('view')}{advancedAppearance}{phoneViewActions}
+                        {basicExplore}{basicDisplay}{phoneViewActions}
                     </>
                 ),
             },
-            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs.
-            { key: 'plot', label: 'Plot', content: basicInspector('stacked') },
+            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs. Task 2: from Explore.
+            ...(shows('plot') ? [{ key: 'plot', label: 'Plot', content: basicInspector('stacked') }] : []),
         ];
 
     // A molecule that did not load, or a surface that did not draw (spec
@@ -1798,18 +1876,21 @@ function App() {
                     </LevelNav>
                     {speciesControls}
                     {relativityControl}
+                    {configurationLine}
                 </>
             )}
             orbitals={(
                 <>
-                    {atomProfile && (
+                    {/* Task 2: the energy diagram and table are Explore's; at Basics one line says so. */}
+                    {atomProfile && shows('orbitalEnergies') && (
                         // At the whole atom no shell is open, so none is picked out (ruling T10-wholeatom).
                         <SubshellPanel subshells={atomProfile.subshells} shellN={atomSelectedShell}
                             selectedSubshell={atomSelectedSubshell} selectedOrbital={atomSelectedOrbital}
                             onSelectSubshell={handleSelectSubshell} onSelectOrbital={handleSelectOrbital}
                             relativity={atomProfile.relativity ?? 'off'} part="diagram" palette={palette} />
                     )}
-                    {atomProfile && <OrbitalEnergyList subshells={atomProfile.subshells} relativity={pictureRelativity} />}
+                    {atomProfile && shows('orbitalEnergies') && <OrbitalEnergyList subshells={atomProfile.subshells} relativity={pictureRelativity} />}
+                    <LevelLine level={level} ids={['orbitalEnergies']} />
                     <LevelNav {...levelNavProps} variant="about" />
                 </>
             )}
@@ -1833,7 +1914,9 @@ function App() {
                     <MoleculeNav {...moleculeNavProps} ref={moleculeNavRef} />
                     {moleculeSelectionSection}
                     {/* Ruling P12: on a desktop or tablet the request opens as a workspace in the viewport cell. */}
-                    <MoleculeJobsSection variant="entry" entryRef={requestEntryRef} />
+                    {/* Task 2: the owner's request is Research's; below it, one line says so (to the owner only). */}
+                    {requestsShown ? <MoleculeJobsSection variant="entry" entryRef={requestEntryRef} />
+                        : isOwner && <LevelLine level={level} ids={['requestWorkspace']} />}
                 </div>
                 <MoleculeProvenanceFooter pinned />
             </div>
@@ -1851,6 +1934,8 @@ function App() {
             onSignIn={() => signInHere('/', text => dispatch(sessionFailed(text)))}
             extra={isNarrow ? (
                 <div className="avatar-extra">
+                    {/* Task 2: a phone's top bar has no room for the switch; it heads this menu. */}
+                    <LevelControl variant="menu" />
                     <div className="avatar-extra-row"><ThemeSwitch /><span>Theme</span></div>
                     <Button size="small" startIcon={<HelpOutline fontSize="small" />} onClick={() => setHelpOpen(true)}>Help</Button>
                 </div>
@@ -1878,6 +1963,7 @@ function App() {
             mode={themeMode}
             tabs={topBarTabs}
             search={<GlobalSearch sources={searchSources} onPick={handleSearchPick} onWantIndex={wantIndex} />}
+            levelControl={<LevelControl variant={compactLevel ? 'compact' : 'segmented'} />}
             avatar={avatar}
             onHelp={() => setHelpOpen(true)}
             sessionNote={session.expired && !session.signedIn ? SESSION_ENDED : null}
@@ -1924,6 +2010,22 @@ function App() {
         </>
     );
 
+    // Task 2 (Review Focus 1): a link that needed a higher level raised it for this visit only, and says so -- with
+    // the way to keep it. Its own row under the top bar (AppShell), so it covers neither panels nor title.
+    const visitNotice = levelRaised && visitNoticeDismissed !== level && (
+        <Alert severity="info" className="level-visit-notice"
+            action={(
+                <>
+                    <Button color="inherit" size="small" onClick={() => setLevel(level)}>Keep {LEVEL_LABEL[level]}</Button>
+                    <IconButton color="inherit" size="small" aria-label="Dismiss" onClick={() => setVisitNoticeDismissed(level)}>
+                        <Close fontSize="small" />
+                    </IconButton>
+                </>
+            )}>
+            Opened at {LEVEL_LABEL[level]} for this link — your level stays {LEVEL_LABEL[storedLevel]}.
+        </Alert>
+    );
+
     const viewport = (
         <main
             id="canvas-container"
@@ -1939,7 +2041,7 @@ function App() {
                 exportHandleRef={exportHandleRef}
             />
             {/* Ruling P12: ahead of the title block and toolbar, so the Tab order runs entry → workspace → toolbar. */}
-            {isMoleculeMode && <RequestWorkspace returnFocusRef={requestEntryRef} />}
+            {isMoleculeMode && requestsShown && <RequestWorkspace returnFocusRef={requestEntryRef} />}
             {canvasBusyLabel && (
                 <div className="canvas-busy" role="status" aria-live="polite">
                     <CircularProgress size={22} thickness={5} color="inherit" />
@@ -2119,6 +2221,8 @@ function App() {
                     {atomError}
                 </Alert>
             )}
+            {/* Task 2: a phone has no notice row under its top bar; the notice sits under its header instead. */}
+            {isNarrow && visitNotice}
             {/* Final review I3: Cognito comes back to / with no hash, so a
                 failed sign-in can land on any mode -- by default atom
                 mode, which has no owner corner -- and is said here,
@@ -2150,6 +2254,7 @@ function App() {
                 layout={layout}
                 wide={isWide}
                 topBar={topBar}
+                notice={visitNotice || undefined}
                 explore={isAtomMode ? atomExplore : (
                     <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
                 )}

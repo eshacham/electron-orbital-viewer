@@ -49,6 +49,11 @@ interface SubshellPanelProps {
     part?: 'all' | 'chips' | 'diagram';
     /** The theme's curve palette (science.ts curvePalette); CURVE_COLORS by default. */
     palette?: readonly string[];
+    /**
+     * Task 2: orbital energies appear at Explore. False (Basics) drops each chip's energy, from its text and
+     * its spoken name, and the whole-atom diagram; the chips, the hint and the mₗ row stay. Default true.
+     */
+    showEnergies?: boolean;
 }
 
 const DIAGRAM_WIDTH = 220;
@@ -171,7 +176,7 @@ function ruleY(energy: number, minEnergy: number, maxEnergy: number): number {
  */
 const SubshellPanel: React.FC<SubshellPanelProps> = ({
     subshells, shellN, selectedSubshell, selectedOrbital = null, onSelectSubshell, onSelectOrbital, relativity = 'off',
-    part = 'all', palette = CURVE_COLORS,
+    part = 'all', palette = CURVE_COLORS, showEnergies = true,
 }) => {
     const shellSubshells = subshells.filter(s => s.n === shellN);
 
@@ -198,7 +203,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
     // Keyed on the profile's own subshells, so it follows the drawn mode (ruling C9).
     const jNote = jLevelNote(shellSubshells, activeSubshell);
     const showChips = part !== 'diagram';
-    const showDiagram = part !== 'chips';
+    const showDiagram = part !== 'chips' && showEnergies;
     // What the lobes do and do not say about a j-level (see jLevelNote).
     const jNoteText = jNote && (
         <Typography variant="caption" className="subshell-j-note" display="block">
@@ -232,8 +237,8 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                     // only as a hover title, so it names the method
                                     // too (spec §3.1, final review M8).
                                     aria-label={subshell.j === undefined ? undefined
-                                        : `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons, `
-                                            + `${energy} Ha orbital energy (${shortMethodLabel(relativity)})`}
+                                        : `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons`
+                                            + (showEnergies ? `, ${energy} Ha orbital energy (${shortMethodLabel(relativity)})` : '')}
                                     color={isSelected ? 'primary' : 'default'}
                                     // A toggle, not a one-way selection: pressed means
                                     // this subshell's orbitals are isolated in the 3D
@@ -263,12 +268,14 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                                 its own line (.subshell-chip-energy's flex-basis: 100%) instead
                                                 of truncating in a narrow inspector, and the line break reads
                                                 as the separator. */}
-                                            <span
-                                                className="subshell-chip-energy"
-                                                title={relativity === 'off' ? undefined : `orbital energy (eigenvalue): ${methodStatement(relativity)}`}
-                                            >
-                                                {energy} Ha (orbital energy)
-                                            </span>
+                                            {showEnergies && (
+                                                <span
+                                                    className="subshell-chip-energy"
+                                                    title={relativity === 'off' ? undefined : `orbital energy (eigenvalue): ${methodStatement(relativity)}`}
+                                                >
+                                                    {energy} Ha (orbital energy)
+                                                </span>
+                                            )}
                                         </span>
                                     }
                                 />

@@ -24,6 +24,7 @@ import { CombinationSelection, NO_COMBINATION } from '../combinations';
 import { RelativityMode, shortMethodLabel } from '../atom/relativity';
 import type { ValenceSContraction } from '../atom/relativistic_comparison';
 import { KEEP_CASE } from '../design/mui';
+import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
 
 interface ControlsProps {
   /**
@@ -135,6 +136,11 @@ interface ControlsProps {
    * density, which the |ψ|² wording would misname.
    */
   isoNote?: string;
+  /**
+   * Task 2: the learning level in use. The Electron enclosed select and the Surface style finish appear at
+   * Advanced -- hidden below it, not greyed (App says where they appear). Omitted, everything shows.
+   */
+  level?: LearningLevel;
 }
 
 /**
@@ -370,6 +376,7 @@ const Controls: React.FC<ControlsProps> = ({
   relativityReadout = null,
   fractionNote,
   isoNote,
+  level = 'research',
 }) => {
   const isAtomMode = mode === 'atom';
   // Basic Orbitals' chosen fraction still redraws through this component
@@ -463,7 +470,7 @@ const Controls: React.FC<ControlsProps> = ({
       {/* A raw density threshold is not comparable between orbitals; the share
           of the electron enclosed is. The density that achieves it is derived
           per orbital and reported back below. */}
-      {showView && (
+      {showView && atLeast(level, CONTROL_LEVEL.enclosed) && (
         <FormControl fullWidth margin="normal" size="small">
           <InputLabel id="enclosed-select-label">Electron enclosed</InputLabel>
           <Select
@@ -541,7 +548,7 @@ const Controls: React.FC<ControlsProps> = ({
               link) stands here instead in every mode -- the one shared control, shown
               wherever the surface is a mesh (a shell view has none) and disabled with
               its note while no surface is drawn (T13-I3). */}
-          <SurfaceStyleControl meshLevel={isMeshLevel} disabled={noSurface} />
+          {atLeast(level, CONTROL_LEVEL.surfaceStyle) && <SurfaceStyleControl meshLevel={isMeshLevel} disabled={noSurface} />}
 
           <FormControl component="fieldset" margin="normal" fullWidth>
             <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>

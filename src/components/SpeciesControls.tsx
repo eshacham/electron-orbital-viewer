@@ -11,6 +11,7 @@ import { signedDifferencePercent, formatSignedPercent, ieLimitationNote } from '
 import { formatDrawnRadius } from '../atom/format_radius';
 import type { EnergiesState } from '../store/atomSlice';
 import type { ReferenceRadii } from '../workers/atomWorker';
+import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
 
 interface SpeciesControlsProps {
     species: AtomSpecies;
@@ -34,6 +35,11 @@ interface SpeciesControlsProps {
      * default, leaves both exactly as they were.
      */
     pictureRelativity?: RelativityMode;
+    /**
+     * Task 2: the learning level in use. The Charge and Excite rows appear at Advanced -- hidden below it;
+     * the energies and the size comparison stay, describing the species drawn. Omitted, everything shows.
+     */
+    level?: LearningLevel;
 }
 
 const NO_ENERGIES: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
@@ -151,6 +157,7 @@ const EnergyLine: React.FC<{
  */
 const SpeciesControls: React.FC<SpeciesControlsProps> = ({
     species, onChargeChange, onExcitationChange, energies, radii, unbound, pictureFailed = false, pictureRelativity = 'off',
+    level = 'research',
 }) => {
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const decreaseRef = useRef<HTMLButtonElement>(null);
@@ -219,56 +226,60 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
 
     return (
         <Box className="species-controls" role="group" aria-label="ion and excitation">
-            <Box className="species-charge-row">
-                <Typography variant="body2" component="span">Charge</Typography>
-                {/* No ripple: the theme's MuiButtonBase ring (focus-ring token, §13) shows keyboard focus. */}
-                <Button ref={decreaseRef} size="small" disableRipple aria-label="decrease charge" disabled={species.charge <= charges[0]}
-                    onClick={handleDecrease}>−</Button>
-                <span className="species-charge-value" aria-label="charge" role="status">
-                    {species.charge === 0 ? `${neutralSymbol} (neutral)` : speciesSymbol({ ...species, excitation: null })}
-                </span>
-                <Button ref={increaseRef} size="small" disableRipple aria-label="increase charge" disabled={species.charge >= charges[charges.length - 1]}
-                    onClick={handleIncrease}>+</Button>
-            </Box>
+            {atLeast(level, CONTROL_LEVEL.charge) && (
+                <Box className="species-charge-row">
+                    <Typography variant="body2" component="span">Charge</Typography>
+                    {/* No ripple: the theme's MuiButtonBase ring (focus-ring token, §13) shows keyboard focus. */}
+                    <Button ref={decreaseRef} size="small" disableRipple aria-label="decrease charge" disabled={species.charge <= charges[0]}
+                        onClick={handleDecrease}>−</Button>
+                    <span className="species-charge-value" aria-label="charge" role="status">
+                        {species.charge === 0 ? `${neutralSymbol} (neutral)` : speciesSymbol({ ...species, excitation: null })}
+                    </span>
+                    <Button ref={increaseRef} size="small" disableRipple aria-label="increase charge" disabled={species.charge >= charges[charges.length - 1]}
+                        onClick={handleIncrease}>+</Button>
+                </Box>
+            )}
 
-            <Box className="species-excite-row">
-                {/* No aria-label here (WCAG 2.5.3, Label in Name): the
-                    accessible name must contain the visible label, and the
-                    visible label already says everything a hidden one would
-                    duplicate. */}
-                <Button
-                    id="species-excite-button"
-                    size="small"
-                    variant="outlined"
-                    disabled={options.length === 0}
-                    aria-haspopup="menu"
-                    aria-expanded={excitePopupOpen}
-                    aria-controls={excitePopupOpen ? 'species-excite-menu' : undefined}
-                    onClick={event => setMenuAnchor(event.currentTarget)}
-                >
-                    {species.excitation ? `Excited ${excitationLabel(species.excitation)} ▾` : 'Excite: promote one electron to… ▾'}
-                </Button>
-                <Menu
-                    anchorEl={menuAnchor}
-                    open={excitePopupOpen}
-                    onClose={() => setMenuAnchor(null)}
-                    MenuListProps={{ id: 'species-excite-menu', 'aria-label': 'Promote one electron to…' }}
-                >
-                    {options.map(option => (
-                        <MenuItem
-                            key={excitationLabel(option)}
-                            selected={isCurrentOption(option)}
-                            aria-current={isCurrentOption(option) ? 'true' : undefined}
-                            onClick={() => { setMenuAnchor(null); onExcitationChange(option); }}
-                        >
-                            {excitationLabel(option)}
-                        </MenuItem>
-                    ))}
-                    {species.excitation && (
-                        <MenuItem onClick={() => { setMenuAnchor(null); onExcitationChange(null); }}>Back to the ground state</MenuItem>
-                    )}
-                </Menu>
-            </Box>
+            {atLeast(level, CONTROL_LEVEL.excite) && (
+                <Box className="species-excite-row">
+                    {/* No aria-label here (WCAG 2.5.3, Label in Name): the
+                        accessible name must contain the visible label, and the
+                        visible label already says everything a hidden one would
+                        duplicate. */}
+                    <Button
+                        id="species-excite-button"
+                        size="small"
+                        variant="outlined"
+                        disabled={options.length === 0}
+                        aria-haspopup="menu"
+                        aria-expanded={excitePopupOpen}
+                        aria-controls={excitePopupOpen ? 'species-excite-menu' : undefined}
+                        onClick={event => setMenuAnchor(event.currentTarget)}
+                    >
+                        {species.excitation ? `Excited ${excitationLabel(species.excitation)} ▾` : 'Excite: promote one electron to… ▾'}
+                    </Button>
+                    <Menu
+                        anchorEl={menuAnchor}
+                        open={excitePopupOpen}
+                        onClose={() => setMenuAnchor(null)}
+                        MenuListProps={{ id: 'species-excite-menu', 'aria-label': 'Promote one electron to…' }}
+                    >
+                        {options.map(option => (
+                            <MenuItem
+                                key={excitationLabel(option)}
+                                selected={isCurrentOption(option)}
+                                aria-current={isCurrentOption(option) ? 'true' : undefined}
+                                onClick={() => { setMenuAnchor(null); onExcitationChange(option); }}
+                            >
+                                {excitationLabel(option)}
+                            </MenuItem>
+                        ))}
+                        {species.excitation && (
+                            <MenuItem onClick={() => { setMenuAnchor(null); onExcitationChange(null); }}>Back to the ground state</MenuItem>
+                        )}
+                    </Menu>
+                </Box>
+            )}
 
             {unbound ? (
                 <Alert severity="warning" role="alert" className="species-unbound">{unbound}</Alert>

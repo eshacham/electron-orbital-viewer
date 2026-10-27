@@ -64,7 +64,7 @@ const CONTROL_NAME: Record<ControlId, string> = {
     plot: 'the plot',
     structure: 'structure',
     bondLabels: 'bond labels',
-    dipole: 'dipole',
+    dipole: 'the dipole arrow',
     orbitalEnergies: 'orbital energies',
     properties: 'properties',
     axes: 'axes',
@@ -77,8 +77,13 @@ const CONTROL_NAME: Record<ControlId, string> = {
     exports: 'exports',
     advancedAppearance: 'advanced appearance',
     surfaceStyle: 'surface style',
-    requestWorkspace: 'workspace requests',
+    requestWorkspace: 'molecule requests',
 };
+
+/** Names that take a plural verb on their own: "Orbital energies appear", not "appears". */
+const PLURAL_NAME: ReadonlySet<ControlId> = new Set<ControlId>([
+    'bondLabels', 'orbitalEnergies', 'properties', 'axes', 'combinations', 'allOrbitals', 'exports', 'requestWorkspace',
+]);
 
 function joinNames(names: string[]): string {
     if (names.length === 1) return names[0];
@@ -87,19 +92,33 @@ function joinNames(names: string[]): string {
 }
 
 /**
- * The sentence pointing at what `level` still hides among `ids`, naming the
- * level where the deepest of them appears -- e.g. "Charge and relativity
- * appear at Advanced". Null when none of `ids` is hidden at `level`.
+ * The sentence pointing at the next controls `level` still hides among `ids`
+ * -- those that appear at the nearest deeper level, named with it, e.g.
+ * "Charge and relativity appear at Advanced". Only the nearest level's: a
+ * line saying "Axes and surface style appear at Advanced" would be wrong about
+ * the axes, which appear at Explore (Task 2: one step away, one line). Null
+ * when none of `ids` is hidden at `level`.
  */
 export function levelPointer(ids: ControlId[], level: LearningLevel): string | null {
     const hidden = ids.filter(id => !atLeast(level, CONTROL_LEVEL[id]));
     if (hidden.length === 0) return null;
-    const joined = joinNames(hidden.map(id => CONTROL_NAME[id]));
-    const sentence = joined.charAt(0).toUpperCase() + joined.slice(1);
-    const verb = hidden.length === 1 ? 'appears' : 'appear';
-    const neededLevel = hidden.reduce<LearningLevel>(
-        (max, id) => (levelRank(CONTROL_LEVEL[id]) > levelRank(max) ? CONTROL_LEVEL[id] : max),
+    const nextLevel = hidden.reduce<LearningLevel>(
+        (min, id) => (levelRank(CONTROL_LEVEL[id]) < levelRank(min) ? CONTROL_LEVEL[id] : min),
         CONTROL_LEVEL[hidden[0]],
     );
-    return `${sentence} ${verb} at ${LEVEL_LABEL[neededLevel]}`;
+    const named = hidden.filter(id => CONTROL_LEVEL[id] === nextLevel);
+    const joined = joinNames(named.map(id => CONTROL_NAME[id]));
+    const sentence = joined.charAt(0).toUpperCase() + joined.slice(1);
+    const verb = named.length === 1 && !PLURAL_NAME.has(named[0]) ? 'appears' : 'appear';
+    return `${sentence} ${verb} at ${LEVEL_LABEL[nextLevel]}`;
+}
+
+/**
+ * Ruling PF1: the line for a hidden control that still holds a value off its
+ * default -- lowering the level never changes what is drawn (Review Focus 2),
+ * so the picture keeps it and this says why, and where its control is:
+ * "Showing Fe²⁺ — charge controls appear at Advanced".
+ */
+export function hiddenValueNote(what: string, control: string, level: LearningLevel): string {
+    return `Showing ${what} — ${control} controls appear at ${LEVEL_LABEL[level]}`;
 }

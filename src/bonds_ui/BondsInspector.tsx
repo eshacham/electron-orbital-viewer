@@ -20,6 +20,8 @@ interface BondsInspectorProps {
     data: BondsData;
     /** BondsCurvePlot, built by App exactly as it was before this task. */
     plot: React.ReactNode;
+    /** Task 2: false below Explore -- no "Plot and data" section at all (the Display line says where it appears). Default true. */
+    showPlot?: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ interface BondsInspectorProps {
  * returns, moved out of the Explore panel's BondsPanel (ruling P19: that
  * panel chooses what to draw; this is where it came from).
  */
-const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, display, open, onOpenChange, bonds, data, plot }) => {
+const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, display, open, onOpenChange, bonds, data, plot, showPlot = true }) => {
     const [tab, setTab] = useState('plot');
     const { frontier, caveats, captions } = bondsDataLines(bonds, data);
     return (
@@ -40,7 +42,7 @@ const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, display, open,
             onOpenChange={onOpenChange}
             sections={[
                 ...(display ? [{ key: 'display', title: 'Display', content: display }] : []),
-                {
+                ...(!showPlot ? [] : [{
                     key: 'plot',
                     title: 'Plot and data',
                     activeTab: tab,
@@ -61,7 +63,7 @@ const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, display, open,
                             ),
                         },
                     ],
-                },
+                }]),
             ]}
         />
     );

@@ -95,6 +95,8 @@ beforeEach(() => {
 afterEach(() => { resetBuildEnv(); jest.clearAllMocks(); window.localStorage.clear(); });
 
 describe('Molecules mode with on-demand molecules', () => {
+    // Task 2: the owner's request workspace and job panels appear at Research (the file's afterEach clears it).
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'research'); });
     it('a visitor sees how a molecule was computed and its tier, but no request panel, no Computed category and no cost', async () => {
         const { store, container } = await enterMolecules(false);
         await show(store, 'h2o');

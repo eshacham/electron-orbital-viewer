@@ -56,6 +56,9 @@ const field = (level: 1 | 2, F: number, stark: 'lower' | 'upper' | 'both' = 'low
     ({ kind: 'field', level, field: F, stark });
 
 describe('App: a refused combination', () => {
+    // Task 2: these tests work controls above the default Explore level (the Combination picker).
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'research'); });
+    afterEach(() => { window.localStorage.removeItem('eov.level'); });
     // Final review (spec §3.5): never a silently wrong picture.
     it('takes the previous picture down, says it is not drawn, and keeps the reason', () => {
         const store = renderBasicOrbitals();
@@ -88,6 +91,9 @@ describe('App: a refused combination', () => {
 });
 
 describe('App: the n = 2 field slider', () => {
+    // Task 2: these tests work controls above the default Explore level (the Combination picker, the enclosed fraction).
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'research'); });
+    afterEach(() => { window.localStorage.removeItem('eov.level'); });
     // Ruling R24-3 / fix round 1 (R24-M3): opening Display stores it (eov.display); reset even if a test fails.
     afterEach(() => { window.localStorage.removeItem('eov.display'); });
     // Final review: at n = 2 the drawn shapes do not depend on F, so a new

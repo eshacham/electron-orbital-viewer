@@ -5,6 +5,8 @@ import { CombinationSelection, combinationTitle, selectionProblem } from '../com
 import CombinationControls from '../components/CombinationControls';
 import { useRovingFocus } from '../shell/useRovingFocus';
 import { BasicSelection } from '../store/orbitalSlice';
+import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
+import LevelLine from '../levels/LevelLine';
 import './basic_explore.css';
 
 /**
@@ -22,6 +24,8 @@ export interface BasicExploreProps {
     onChange(change: Partial<BasicSelection>): void;
     combination: CombinationSelection;
     onCombinationChange(selection: CombinationSelection): void;
+    /** Task 2: the learning level in use -- the Combination picker appears at Advanced. Omitted, everything shows. */
+    level?: LearningLevel;
 }
 
 const N_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -33,7 +37,7 @@ const N_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
  * Replaces the n/l/mₗ selects and the "Update Orbital" button that used to
  * live in `Controls.tsx`'s selection half.
  */
-const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, combination, onCombinationChange }) => {
+const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, combination, onCombinationChange, level = 'research' }) => {
     const { n, l, ml } = selection;
     const combinationActive = combination.kind !== 'none';
 
@@ -129,8 +133,14 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, combin
             </Box>
 
             {/* Next to the chips (spec §5 Phase 1). While a combination is drawn the
-                three rows stay in view, disabled, so the way back is obvious. */}
-            <CombinationControls selection={combination} onChange={onCombinationChange} />
+                three rows stay in view, disabled, so the way back is obvious. Task 2: from
+                Advanced; below it, one line says so -- or, while a link's combination is
+                still drawn, that it is (Review Focus 2). */}
+            {atLeast(level, CONTROL_LEVEL.combinations) && <CombinationControls selection={combination} onChange={onCombinationChange} />}
+            <LevelLine level={level} ids={['combinations']} held={[combinationActive && {
+                id: 'combinations', control: 'combination',
+                what: combination.kind === 'hybrid' ? 'hybrid orbitals' : 'an orbital in an electric field',
+            }]} />
         </div>
     );
 };

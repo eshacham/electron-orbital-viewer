@@ -23,7 +23,7 @@ interface PhoneTopBarProps {
 /**
  * The phone's 52 px top bar (spec §9.8): brand, the mode menu ("Atoms ▾"
  * opens the rail's destinations), search, and the avatar, whose menu also
- * holds Theme and Help.
+ * holds Theme, Help and the Learning level (Task 2).
  */
 const PhoneTopBar: React.FC<PhoneTopBarProps> = ({ brand, themeMode, mode, onModeChange, onOpenSearch, avatar, compact = false }) => {
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);

@@ -29,6 +29,7 @@ import { readBlob } from '../tests/export/fixtures';
 import { DRAW_DEBOUNCE_MS } from './basic_ui/useDrawOnSelection';
 import { thumbnailService } from './thumbs/ThumbnailService';
 import { GLOW_SETTLE_MS } from './design/glow_pref';
+import { clearVisit } from './levels/level_pref';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -227,9 +228,13 @@ const openInspectorSection = (name: 'Display' | 'Plot and data') => {
 };
 
 // Ruling R24-3: the open inspector section is remembered in eov.display; start every test from the default.
-afterEach(() => { window.localStorage.removeItem('eov.display'); });
+// Task 2: a pasted link's hashchange can raise the level for the visit (module state); no test inherits one.
+afterEach(() => { window.localStorage.removeItem('eov.display'); act(() => clearVisit()); });
 
 describe('App', () => {
+    // Task 2: these tests work controls above the default Explore level (charge, combinations, the enclosed fraction, the finish).
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'research'); });
+    afterEach(() => { window.localStorage.removeItem('eov.level'); });
     const originalMatchMedia = window.matchMedia;
     afterEach(() => { window.matchMedia = originalMatchMedia; });
     beforeEach(() => {
@@ -1162,6 +1167,9 @@ describe('App', () => {
 });
 
 describe('App: opening a shared link', () => {
+    // Task 2: these tests work controls above the default Explore level (the finish, Advanced appearance).
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'research'); });
+    afterEach(() => { window.localStorage.removeItem('eov.level'); });
     beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); clearProfileCacheForTests(); });
     // The hook writes the hash, and jsdom keeps it between tests: clean up so
     // later tests still open with the periodic table.
@@ -1355,6 +1363,8 @@ describe('App: Share', () => {
         expect(store.getState().atom.pendingView).toMatchObject({ level: 'orbital', shell: 2, subshell: { n: 2, l: 1 }, orbital: { n: 2, l: 1, ml: 0 } });
 
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
 
         await waitFor(() => expect(writeText).toHaveBeenCalled());
         const url = writeText.mock.calls[0][0] as string;
@@ -1375,6 +1385,8 @@ describe('App: Share', () => {
             const { store } = renderWithProvider(<App />);
             expect(store.getState().orbital.cameraAngles).toBeNull();
             fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+            // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+            fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
             await waitFor(() => expect(writeText).toHaveBeenCalled());
             expect(writeText.mock.calls[0][0]).toMatch(/&cam=40,20$/);
             expect(store.getState().orbital.cameraAngles).toEqual({ azimuth: 40, elevation: 20 });
@@ -1400,6 +1412,8 @@ describe('App: Share', () => {
             store.dispatch(setBondsView({ kind: 'h2plus', state: '1sigma_u' }));
         });
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
         await waitFor(() => expect(writeText).toHaveBeenCalled());
         const url = writeText.mock.calls[0][0] as string;
         expect(url).toMatch(/#mode=bonds&system=h2plus&R=3\.500&state=1sigma_u&frac=/);
@@ -1422,6 +1436,8 @@ describe('App: Share', () => {
 
         renderWithProvider(<App />);
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
 
         const linkField = await screen.findByRole('textbox', { name: /link to this view/i });
         expect((linkField as HTMLInputElement).value).toMatch(/^https?:\/\/.*#mode=atom&Z=1&level=atom&/);
@@ -1492,12 +1508,16 @@ describe('App: the first-view hint (Task 5, ruling P17)', () => {
             renderWithProvider(<App />);
 
             fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+            // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+            fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
             await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
 
             fireEvent.click(screen.getByRole('button', { name: 'Dismiss hint' }));
             expect(screen.queryByRole('note')).not.toBeInTheDocument();
 
             fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+            // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+            fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
             await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
 
             expect(writeText.mock.calls[1][0]).toBe(writeText.mock.calls[0][0]);
@@ -1508,6 +1528,9 @@ describe('App: the first-view hint (Task 5, ruling P17)', () => {
 });
 
 describe('App: shell', () => {
+    // Task 2: these tests work controls above the default Explore level (the finish, Advanced appearance, the Combination picker).
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'research'); });
+    afterEach(() => { window.localStorage.removeItem('eov.level'); });
     const originalMatchMedia = window.matchMedia;
     // Ruling DB1: the URL keys registered as in 'App: Share', so the share link carries real state and the
     // Review Focus 1 comparison below can fail.
@@ -1615,12 +1638,16 @@ describe('App: shell', () => {
         Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
         renderWithProvider(<App />);
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
         await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
         // Ruling DB1: the link carries the view's state, so an equal second link means something.
         expect(writeText.mock.calls[0][0]).toMatch(/#mode=atom&/);
         fireEvent.click(screen.getByRole('button', { name: /^Theme: / }));
         fireEvent.click(screen.getByRole('menuitemradio', { name: 'Light Clean' }));
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
         await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
         expect(writeText.mock.calls[1][0]).toBe(writeText.mock.calls[0][0]);
     });
@@ -2024,6 +2051,9 @@ describe('App: shell', () => {
 });
 
 describe('App: relativity', () => {
+    // Task 2: these tests work controls above the default Explore level (the Relativity switch).
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'research'); });
+    afterEach(() => { window.localStorage.removeItem('eov.level'); });
     beforeEach(() => { clearProfileCacheForTests(); });
     // Fix round 1, I1: with spin–orbit a level-3 orbital is drawn with its
     // own j-level's R(r) and sampling box, not the first (n, l) found.
@@ -2292,5 +2322,144 @@ describe('App: relativity', () => {
             fireEvent.click(screen.getByRole('tab', { name: 'Orbitals' })); // About is expanded inline in Explore › Orbitals (spec §9.1)
             expect(container.querySelector('.level-nav-about')!.textContent).toMatch(/This picture is scalar-relativistic; the ΔSCF energies are not/);
         });
+    });
+});
+
+describe('learning levels (Task 2)', () => {
+    const originalMatchMediaForLevels = window.matchMedia;
+    beforeEach(() => {
+        resetUrlKeysForTests(); registerBuiltInUrlKeys(); registerBondsUrlKeys(); clearProfileCacheForTests();
+        window.localStorage.removeItem('eov.level');
+        clearVisit();
+    });
+    afterEach(() => {
+        resetUrlKeysForTests();
+        window.history.replaceState(null, '', '/');
+        Reflect.deleteProperty(navigator, 'clipboard');
+        window.localStorage.removeItem('eov.level');
+        // In act: the App is still mounted here (cleanup unmounts it after), and hears the raise end.
+        act(() => clearVisit());
+    });
+
+    it('at Explore, Atoms hides Charge and relativity and says where they appear; Advanced shows them', () => {
+        renderWithProvider(<App />, { Z: 11 });
+        expect(screen.queryByRole('button', { name: 'increase charge' })).toBeNull();
+        expect(screen.queryByText('Charge')).toBeNull();
+        expect(screen.queryByRole('group', { name: 'relativity treatment' })).toBeNull();
+        expect(screen.getByText('Charge and relativity appear at Advanced')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('radio', { name: 'Advanced' }));
+        expect(screen.getByRole('button', { name: 'increase charge' })).toBeInTheDocument();
+        expect(screen.getByRole('group', { name: 'relativity treatment' })).toBeInTheDocument();
+        expect(screen.queryByText('Charge and relativity appear at Advanced')).toBeNull();
+    });
+
+    it('the level switch sits in the top bar, between the mode tabs and the search', () => {
+        const { container } = renderWithProvider(<App />);
+        const bar = container.querySelector('.app-topbar')!;
+        const order = Array.from(bar.children).map(child => child.className);
+        const tabs = order.findIndex(name => name.includes('app-topbar-tabs'));
+        const level = order.findIndex(name => name.includes('app-topbar-level'));
+        const search = order.findIndex(name => name.includes('app-topbar-search'));
+        expect(tabs).toBeLessThan(level);
+        expect(level).toBeLessThan(search);
+        expect(within(bar as HTMLElement).getByRole('radiogroup', { name: 'Learning level' })).toBeInTheDocument();
+    });
+
+    it('on a phone the level is chosen in the menu', () => {
+        installMatchMedia(true);
+        try {
+            renderWithProvider(<App />);
+            expect(screen.queryByRole('radiogroup', { name: 'Learning level' })).toBeNull();
+            fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+            fireEvent.click(screen.getByRole('radio', { name: 'Research' }));
+            expect(window.localStorage.getItem('eov.level')).toBe('research');
+        } finally {
+            window.matchMedia = originalMatchMediaForLevels;
+        }
+    });
+
+    // Review Focus 1 and 2: a link to an Advanced view opens at Advanced for the visit, and lowering the level
+    // never changes what is drawn.
+    it('a link to Fe²⁺ opens at Advanced for the visit, and choosing Explore keeps Fe²⁺ drawn, saying so', async () => {
+        const { store } = renderWithProvider(<App />);
+        // jsdom fires 'hashchange' asynchronously, not within the assignment.
+        act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
+        await waitFor(() => expect(store.getState().atom.charge).toBe(2));
+
+        expect(screen.getByText('Opened at Advanced for this link — your level stays Explore.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Keep Advanced' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fe²⁺');
+        expect(screen.getByRole('button', { name: 'increase charge' })).toBeInTheDocument();
+        expect(window.localStorage.getItem('eov.level')).toBeNull();
+
+        fireEvent.click(screen.getByRole('radio', { name: 'Explore' }));
+        expect(store.getState().atom.charge).toBe(2);
+        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fe²⁺');
+        expect(screen.getByText('Showing Fe²⁺ — charge controls appear at Advanced')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'increase charge' })).toBeNull();
+        expect(screen.queryByText(/Opened at Advanced/)).toBeNull();
+    });
+
+    it('Keep <level> stores the raised level and ends the notice', async () => {
+        const { store } = renderWithProvider(<App />);
+        act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
+        await waitFor(() => expect(store.getState().atom.charge).toBe(2));
+        fireEvent.click(screen.getByRole('button', { name: 'Keep Advanced' }));
+        expect(window.localStorage.getItem('eov.level')).toBe('advanced');
+        expect(screen.queryByText(/Opened at Advanced/)).toBeNull();
+        expect(screen.getByRole('radio', { name: 'Advanced' })).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('the notice can be dismissed, leaving the visit at Advanced', async () => {
+        const { store } = renderWithProvider(<App />);
+        act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
+        await waitFor(() => expect(store.getState().atom.charge).toBe(2));
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        expect(screen.queryByText(/Opened at Advanced/)).toBeNull();
+        expect(screen.getByRole('radio', { name: 'Advanced' })).toHaveAttribute('aria-checked', 'true');
+        expect(window.localStorage.getItem('eov.level')).toBeNull();
+    });
+
+    it('Share copies a link at the recipient\'s level, or at the level chosen under Opens at', async () => {
+        const writeText = jest.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+        renderWithProvider(<App />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+        expect(writeText.mock.calls[0][0]).not.toMatch(/[#&]lvl=/);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Opens at Basics' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+        expect(writeText.mock.calls[1][0]).toMatch(/#mode=atom&.*&lvl=basics$/);
+    });
+
+    it('at Basics the inspector drops Plot and data and says where it appears', () => {
+        window.localStorage.setItem('eov.level', 'basics');
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        expect(screen.queryByRole('button', { name: 'Plot and data' })).toBeNull();
+        expect(screen.getByText('The plot and axes appear at Explore')).toBeInTheDocument();
+    });
+
+    it('at Basics, Atoms\' Orbitals tab keeps the energies back, and Orbitals mode its combinations', () => {
+        window.localStorage.setItem('eov.level', 'basics');
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        fireEvent.click(screen.getByRole('tab', { name: 'Orbitals' }));
+        expect(screen.queryByRole('table', { name: /orbital energies/ })).toBeNull();
+        expect(screen.getByText('Orbital energies appear at Explore')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+        expect(screen.getByText('Combinations appear at Advanced')).toBeInTheDocument();
+    });
+
+    it('Help names the four levels', () => {
+        renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('button', { name: 'Help' }));
+        const help = screen.getByRole('dialog', { name: 'Help' });
+        expect(within(help).getByRole('heading', { name: 'Learning levels' })).toBeInTheDocument();
+        expect(help).toHaveTextContent(/Basics.*Explore.*Advanced.*Research/);
     });
 });

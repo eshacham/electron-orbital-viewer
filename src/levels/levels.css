@@ -1,0 +1,56 @@
+/* src/levels/levels.css -- the Learning level switch, its pointer lines and the visit notice (Task 2). */
+
+/* The top bar's segmented switch: one bordered row of four, the level in use in Deep Selection. */
+.level-control-segmented {
+  display: inline-flex; flex: 0 0 auto;
+  height: var(--ql-size-chip); box-sizing: border-box;
+  border: 1px solid var(--ql-color-border-strong); border-radius: var(--ql-radius-sm);
+  overflow: hidden;
+}
+.level-control-option {
+  appearance: none; margin: 0; border: 0; cursor: pointer;
+  padding: 0 10px; background: none; color: var(--ql-color-text-2);
+  font: var(--ql-type-caption-weight) var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
+  white-space: nowrap;
+  transition: color var(--ql-motion-hover) ease-out, background-color var(--ql-motion-hover) ease-out;
+}
+.level-control-segmented .level-control-option + .level-control-option { border-left: 1px solid var(--ql-color-border-subtle); }
+.level-control-option:hover { color: var(--ql-color-text-1); background: var(--ql-color-surface-2); }
+.level-control-option.checked,
+.level-control-option.checked:hover {
+  color: var(--ql-color-on-fill); background: var(--ql-color-selected-fill); font-weight: 600;
+}
+.level-control-segmented .level-control-option.checked { box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge); }
+/* Inside the clipped row the outline would be cut off; draw it inside. */
+.level-control-segmented .level-control-option:focus-visible { outline-offset: -3px; }
+
+/* The phone's menu: a titled list, one 44 px row per level (touch size). */
+.level-control-menu { display: flex; flex-direction: column; gap: 2px; }
+.level-control-title {
+  color: var(--ql-color-text-2);
+  font: var(--ql-type-caption-weight) var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
+  margin-bottom: 2px;
+}
+.level-control-menu .level-control-option {
+  min-height: var(--ql-size-touch); padding: 0 12px; text-align: left;
+  border-radius: var(--ql-radius-sm); font-size: 14px;
+}
+
+/* Below 1024 px: one button in the top bar, the list in a popover. */
+.level-control-button.MuiButton-root { min-height: var(--ql-size-chip); color: var(--ql-color-text-1); font-weight: 600; white-space: nowrap; }
+.level-control-popover { padding: 8px; min-width: 200px; }
+
+/* The quiet line where hidden controls would be. */
+.level-line { margin: 4px 0 0; color: var(--ql-color-text-3); }
+
+/* The visit notice (an MUI info Alert): its own row under the top bar (AppShell's notice slot); on a phone,
+   over the top of the view, under the header. */
+.level-visit-notice.MuiAlert-root { padding-top: 0; padding-bottom: 0; align-items: center; }
+.level-visit-notice .MuiAlert-action { padding-top: 0; align-items: center; gap: 4px; }
+.level-visit-notice .MuiButton-root { white-space: nowrap; }
+.app-shell.phone .level-visit-notice {
+  position: absolute; z-index: 29; top: calc(var(--phone-overlay-top) + 8px); left: 12px; right: 12px;
+}
+
+/* The Share menu's own line for the exports it would hold (ShareExportBar), set in as the items are. */
+.share-menu-note { list-style: none; padding: 4px 16px 6px; }

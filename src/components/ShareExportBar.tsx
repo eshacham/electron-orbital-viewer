@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import {
-    Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, IconButton, InputLabel,
-    ListItemText, Menu, MenuItem, Select, Snackbar, TextField, Tooltip,
+    Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControl, FormHelperText, IconButton, InputLabel,
+    ListItemIcon, ListItemText, ListSubheader, Menu, MenuItem, Select, Snackbar, TextField, Tooltip,
 } from '@mui/material';
+import Check from '@mui/icons-material/Check';
 import CameraAltOutlined from '@mui/icons-material/CameraAltOutlined';
 import LinkOutlined from '@mui/icons-material/LinkOutlined';
 import FileDownloadOutlined from '@mui/icons-material/FileDownloadOutlined';
 import { EXPORT_ITEMS, ExportAvailability, ExportItem, ExportKind, ExportOptions } from '../export/run_export';
+import { atLeast, CONTROL_LEVEL, LEVELS, LEVEL_LABEL, levelPointer, LearningLevel } from '../levels/levels';
+// Task 2: the quiet level line's style (.level-line).
+import '../levels/levels.css';
 
 /** The longest side of a print, offered as a choice (a desk model to a display piece). */
 const PRINT_SIZES_MM = [30, 50, 80, 120];
@@ -14,7 +18,11 @@ const PRINT_SIZES_MM = [30, 50, 80, 120];
 export type ShareOutcome = { kind: 'copied' } | { kind: 'manual'; url: string };
 
 interface ShareExportBarProps {
-    onShare: () => Promise<ShareOutcome>;
+    /**
+     * Copies a link to this view. Task 2: `opensAt` is the Share menu's "Opens at" choice -- the link then
+     * carries `lvl`, raising the recipient's level for that visit; undefined keeps the recipient's own level.
+     */
+    onShare: (opensAt?: LearningLevel) => Promise<ShareOutcome>;
     /** The menu shows only when this is given (Task 8: not every caller exports yet). */
     onExport?: (kind: ExportKind, options: ExportOptions) => Promise<void>;
     availability?: ExportAvailability;
@@ -24,14 +32,28 @@ interface ShareExportBarProps {
     items?: ExportItem[];
     /** 'toolbar' is the viewport's icon row (spec §8.5): Snapshot, Share, Export; 'bar' is today's text buttons (the phone's View tab). */
     variant?: 'bar' | 'toolbar';
+    /** Task 2: the learning level in use -- Snapshot and Export appear at Advanced. Omitted, everything shows. */
+    level?: LearningLevel;
 }
+
+/** The Share menu's "Opens at" choices: the recipient's own level (no `lvl`), then each level. */
+const OPENS_AT: { value: LearningLevel | null; label: string }[] = [
+    { value: null, label: 'Recipient’s level' },
+    ...LEVELS.map(value => ({ value, label: LEVEL_LABEL[value] })),
+];
 
 /**
  * Share and Export, under Reset View. It lives inside Controls, so it is in
  * the right-hand panel on a desktop and in the View tab on a phone: no new
  * panel over the canvas (spec §3.8).
  */
-const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, availability, stlSolids, items = EXPORT_ITEMS, variant = 'bar' }) => {
+const ShareExportBar: React.FC<ShareExportBarProps> = ({
+    onShare, onExport: exportHandler, availability, stlSolids, items = EXPORT_ITEMS, variant = 'bar', level = 'research',
+}) => {
+    // Task 2: below Advanced there is no Snapshot or Export at all -- hidden, not greyed; the Share menu says where.
+    const exportsShown = atLeast(level, CONTROL_LEVEL.exports);
+    const onExport = exportsShown ? exportHandler : undefined;
+    const exportsPointer = exportHandler ? levelPointer(['exports'], level) : null;
     const [notice, setNotice] = useState<string | null>(null);
     // Fix round 1 (M6): MUI's Snackbar starts its auto-hide timer once, when
     // `open` first turns true, and does not notice a later change to
@@ -46,6 +68,11 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
     };
     const [manualUrl, setManualUrl] = useState<string | null>(null);
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+    const [shareAnchor, setShareAnchor] = useState<HTMLElement | null>(null);
+    // Task 2: the Share menu's "Opens at" -- kept while the bar is mounted, so a second copy opens at the same level.
+    const [opensAt, setOpensAt] = useState<LearningLevel | null>(null);
+    // The level the link on screen (copied, or in the copy-by-hand dialog) opens at.
+    const [copiedAt, setCopiedAt] = useState<LearningLevel | null>(null);
     const [stlOpen, setStlOpen] = useState(false);
     const [printSize, setPrintSize] = useState(50);
     const [solidCount, setSolidCount] = useState(0);
@@ -56,9 +83,19 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
     const [exporting, setExporting] = useState(false);
 
     const handleShare = async () => {
-        const outcome = await onShare();
-        if (outcome.kind === 'copied') showNotice('Link copied — it opens this exact view.');
+        setShareAnchor(null);
+        const at = opensAt;
+        const outcome = await onShare(at ?? undefined);
+        setCopiedAt(at);
+        if (outcome.kind === 'copied') showNotice(at ? `Link copied — it opens this exact view, at ${LEVEL_LABEL[at]}.` : 'Link copied — it opens this exact view.');
         else setManualUrl(outcome.url);
+    };
+    const shareButtonProps = {
+        id: 'share-view',
+        'aria-haspopup': 'menu' as const,
+        'aria-controls': shareAnchor ? 'share-menu' : undefined,
+        'aria-expanded': shareAnchor !== null,
+        onClick: (event: React.MouseEvent<HTMLElement>) => setShareAnchor(event.currentTarget),
     };
 
     const runKind = async (kind: ExportKind, options: ExportOptions = {}) => {
@@ -102,11 +139,35 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
             )}
             {variant === 'toolbar' ? (
                 <Tooltip title="Share link">
-                    <IconButton id="share-view" className="viewport-tool" aria-label="Share" onClick={handleShare}><LinkOutlined fontSize="small" /></IconButton>
+                    <IconButton className="viewport-tool" aria-label="Share" {...shareButtonProps}><LinkOutlined fontSize="small" /></IconButton>
                 </Tooltip>
             ) : (
-                <Button id="share-view" variant="outlined" onClick={handleShare}>Share</Button>
+                <Button variant="outlined" {...shareButtonProps}>Share</Button>
             )}
+            {/* Task 2: Copy link, then where the link opens -- the recipient's own level unless chosen here.
+                A radio chooses and keeps the menu open; Copy link copies at the level chosen. */}
+            <Menu id="share-menu" anchorEl={shareAnchor} open={shareAnchor !== null} onClose={() => setShareAnchor(null)}
+                slotProps={{ list: { 'aria-label': 'Share' } }}>
+                <MenuItem onClick={() => { void handleShare(); }}>
+                    <ListItemIcon><LinkOutlined fontSize="small" /></ListItemIcon>
+                    <ListItemText primary="Copy link" />
+                </MenuItem>
+                <Divider />
+                {/* Flat, not a nested group: MUI's MenuList moves focus over its own children only. Each
+                    radio's name says what it chooses ("Opens at Basics"), holding its visible label. */}
+                <ListSubheader className="share-menu-heading">Opens at</ListSubheader>
+                {OPENS_AT.map(option => {
+                    const checked = option.value === opensAt;
+                    return (
+                        <MenuItem key={option.label} role="menuitemradio" aria-checked={checked} aria-label={`Opens at ${option.label}`}
+                            onClick={() => setOpensAt(option.value)}>
+                            <ListItemIcon>{checked && <Check fontSize="small" />}</ListItemIcon>
+                            <ListItemText primary={option.label} />
+                        </MenuItem>
+                    );
+                })}
+                {exportsPointer && <li role="none" className="ql-caption level-line share-menu-note">{exportsPointer}</li>}
+            </Menu>
             {onExport && (
                 <>
                     {variant === 'toolbar' ? (
@@ -191,6 +252,7 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({ onShare, onExport, avai
             <Dialog open={manualUrl !== null} onClose={() => setManualUrl(null)} fullWidth>
                 <DialogTitle>Copy this link</DialogTitle>
                 <DialogContent>
+                    {copiedAt && <p className="ql-caption share-opens-at">Opens at {LEVEL_LABEL[copiedAt]}</p>}
                     <TextField
                         value={manualUrl ?? ''}
                         fullWidth

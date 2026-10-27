@@ -25,13 +25,17 @@ interface AtomInspectorProps {
     /** Why the CSV cannot be exported now (exportAvailability), or null. */
     csvReason: string | null;
     onExportCsv(): void;
+    /** Task 2: false below Explore -- no "Plot and data" section at all (the Display line says where it appears). Default true. */
+    showPlot?: boolean;
 }
 
 /**
  * The Atom screen's inspector (spec §9.1): Display on top (ruling R20b-atoms), then "Plot and data" -- Plot,
  * with its function tabs, and Data -- as titled sections, one open at a time (ruling R24-3).
  */
-const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, plot, facts, csvReason, onExportCsv }) => {
+const AtomInspector: React.FC<AtomInspectorProps> = ({
+    variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, plot, facts, csvReason, onExportCsv, showPlot = true,
+}) => {
     const [tab, setTab] = useState('plot');
     return (
         <Inspector
@@ -40,7 +44,7 @@ const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, display, open, o
             onOpenChange={onOpenChange}
             sections={[
                 ...(display ? [{ key: 'display', title: 'Display', content: display }] : []),
-                {
+                ...(!showPlot ? [] : [{
                     key: 'plot',
                     title: 'Plot and data',
                     activeTab: tab,
@@ -49,7 +53,7 @@ const AtomInspector: React.FC<AtomInspectorProps> = ({ variant, display, open, o
                         { key: 'plot', label: 'Plot', content: <PlotTabRow plotTabs={plotTabs} plotTab={plotTab} onPlotTab={onPlotTab} plot={plot} /> },
                         { key: 'data', label: 'Data', content: <DataTabBody facts={facts} csvReason={csvReason} onExportCsv={onExportCsv} /> },
                     ],
-                },
+                }]),
             ]}
         />
     );

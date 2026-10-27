@@ -88,6 +88,9 @@ function pickWater(store: ReturnType<typeof makeStore>, meta = waterMeta()) {
 }
 
 describe('Molecules mode', () => {
+    // Task 2: these tests work controls above the default Explore level (the enclosed fraction, Advanced appearance).
+    beforeEach(() => { window.localStorage.setItem('eov.level', 'research'); });
+    afterEach(() => { window.localStorage.removeItem('eov.level'); });
     const originalMatchMedia = window.matchMedia;
     // The open inspector section is a stored preference (R24-3); each test starts from none.
     afterEach(() => { window.matchMedia = originalMatchMedia; window.localStorage.removeItem('eov.display'); });
@@ -460,12 +463,16 @@ describe('Molecules mode', () => {
         const toggle = within(viewPanel).getByRole('checkbox', { name: 'Show bond lengths and angles' });
         expect(toggle).not.toBeChecked();
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
         await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
         expect(writeText.mock.calls[0][0]).toMatch(/#mode=molecule&.*id=h2o/);
         fireEvent.click(toggle);
         expect(toggle).toBeChecked();
         expect(JSON.parse(window.localStorage.getItem('eov.display')!)).toMatchObject({ moleculeLabels: true });
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        // Task 2: Share opens a menu now; Copy link is the copy it used to make.
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
         await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
         expect(writeText.mock.calls[1][0]).toBe(writeText.mock.calls[0][0]);
         // Space filling draws no bonds, so only angles are labelled; with no structure there is nothing to label.

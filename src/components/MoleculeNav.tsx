@@ -33,6 +33,8 @@ interface MoleculeNavProps {
      */
     insideBallNote?: string | null;
     onHideStructure?: () => void;
+    /** Task 2: the orbital list's every row (Advanced); false shows HOMO−3…LUMO+3 (MoleculeOrbitalList). Default true. */
+    allOrbitals?: boolean;
 }
 
 /** What App may ask of the card (Task 15): the strip's "Orbital list" tile brings the orbital list into view. */
@@ -80,7 +82,7 @@ export function revealScrollTop(panel: HTMLElement, element: HTMLElement): numbe
 
 const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
     variant = 'full', entries, indexError, meta, selectedId, surface, onSelectMolecule, onSurfaceChange, onOpenPicker,
-    insideBallNote, onHideStructure,
+    insideBallNote, onHideStructure, allOrbitals = true,
 }, ref) => {
     const navRef = useRef<HTMLDivElement>(null);
     const surfaceLabelId = useId();
@@ -170,7 +172,7 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
                         <MoleculeOrbitalList orbitals={meta.orbitals} selectedIndex={surface.index}
                             onSelect={index => onSurfaceChange({ kind: 'mo', index })}
                             method={meta.method.density} symmetry={meta.symmetry} highlightRun={highlightRun}
-                            insideBallNote={insideBallNote} onHideStructure={onHideStructure} />
+                            insideBallNote={insideBallNote} onHideStructure={onHideStructure} allOrbitals={allOrbitals} />
                     )}
                     <Typography variant="caption" className="molecule-caption">
                         Geometry: {meta.geometrySource}. Density, potential and orbitals: {meta.method.density} (PySCF).

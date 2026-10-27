@@ -32,6 +32,8 @@ interface BasicInspectorProps {
     /** Why the CSV cannot be exported now (exportAvailability), or null. */
     csvReason: string | null;
     onExportCsv(): void;
+    /** Task 2: false below Explore -- no "Plot and data" section at all (the Display line says where it appears). Default true. */
+    showPlot?: boolean;
 }
 
 /**
@@ -40,7 +42,7 @@ interface BasicInspectorProps {
  * Data-card body (PlotDataTabs) rather than duplicating them.
  */
 const BasicInspector: React.FC<BasicInspectorProps> = ({
-    variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, combination, plot, facts, csvReason, onExportCsv,
+    variant, display, open, onOpenChange, plotTabs, plotTab, onPlotTab, combination, plot, facts, csvReason, onExportCsv, showPlot = true,
 }) => {
     const [tab, setTab] = useState('plot');
     const plotContent = combination
@@ -54,7 +56,7 @@ const BasicInspector: React.FC<BasicInspectorProps> = ({
             sections={[
                 // Ruling R24-3: titled sections, one open at a time.
                 ...(display ? [{ key: 'display', title: 'Display', content: display }] : []),
-                {
+                ...(!showPlot ? [] : [{
                     key: 'plot',
                     title: 'Plot and data',
                     activeTab: tab,
@@ -63,7 +65,7 @@ const BasicInspector: React.FC<BasicInspectorProps> = ({
                         { key: 'plot', label: 'Plot', content: plotContent },
                         { key: 'data', label: 'Data', content: <DataTabBody facts={facts} csvReason={csvReason} onExportCsv={onExportCsv} /> },
                     ],
-                },
+                }]),
             ]}
         />
     );
