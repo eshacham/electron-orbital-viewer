@@ -107,7 +107,7 @@ const previewFixture = arg('preview-fixture', 'preview_ok');
 const jobsDown = process.argv.includes('--jobs-down');
 if (process.argv.includes('--computed-meta') && !jobsStub) throw new Error('--computed-meta is a mode of --jobs-stub');
 // Fix round 2 (N3): opt-in again -- a default --jobs-stub run answers no job file; a bare flag takes the committed fixture.
-const computedMetaArg = process.argv.includes('--computed-meta') ? arg('computed-meta', null) : undefined;
+const computedMetaArg = process.argv.includes('--computed-meta') ? (arg('computed-meta', null) ?? null) : undefined; // ?? : a bare last flag has no next token
 const computedMetaFile = computedMetaArg === undefined ? null
   : computedMetaArg && !computedMetaArg.startsWith('--') ? computedMetaArg
   : resolve(DEFAULT_ROOT, 'tools/design/computed_water_meta.json');
