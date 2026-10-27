@@ -17,6 +17,7 @@
 - Links keep the recipient's own level; only the Share "Opens at" choice writes `lvl`. A `lvl` or a view that needs a higher level raises the level **for that visit only** and says so; it never writes `eov.level`.
 - Controls above the level are **hidden, not greyed**; one quiet line says where they appear, e.g. "Charge and relativity appear at Advanced".
 - Info: always open at the top of the right panel; explains the current selection (name, short plain explanation, key facts at the level); (i) beside a term switches the topic; a new selection returns to it; "How this was computed ›" holds method, references, validity — folded below Research, open at Research; compact, scrolls inside itself.
+- One (i) is active at a time and is visibly linked to Info (owner, 2026-10-27): the active (i) takes the app's selected style (`selected-fill` + `selected-edge`, DESIGN.md Deep Selection); Info's heading shows the topic as a chip in the same style; when Info shows the selection, no (i) is active. Active (i) has `aria-pressed="true"` and `aria-controls` = the Info region id.
 - Text bands: **plain** (Basics, Explore) · **technical** (Advanced) · **full** (Research). Each explanation is written once per band.
 - Typography as text moves: real subscripts (3d<sub>z²</sub>, not `3d_z²`), U+2212 minus, units on every value, ×10ⁿ not `e-2`, typeset point groups (C₂ᵥ).
 - Phone: a one-line caption under the header naming what is drawn, in every mode; sheet tabs **Explore · Info · View · Plot** (Molecules: Explore · Info · View).
@@ -126,7 +127,7 @@
 **Files:**
 - Create: `src/info/info_types.ts`, `src/info/glossary.ts`, `src/info/InfoPanel.tsx`, `src/info/InfoButton.tsx`, `src/info/info.css`, `src/info/useInfoTopic.ts`
 - Modify: `src/shell/Inspector.tsx` (prop `info?: React.ReactNode`, rendered before the accordion at docked 188, drawer 183, stacked 130), `src/shell/inspector.css` (Info `flex: none; max-height: 45%; overflow: auto`), `src/App.tsx` (phone tabs: insert Info second; split Orbitals "Orbital & view" into Explore and View)
-- Test: `tests/info/info_panel.test.tsx`, `tests/info/glossary.test.ts`, `tests/shell/inspector.test.tsx`, `src/App.test.tsx:1892`, `tests/App.molecules.test.tsx:168-169`
+- Test: `tests/info/info_panel.test.tsx`, `tests/info/info_button.test.tsx`, `tests/info/glossary.test.ts`, `tests/shell/inspector.test.tsx`, `src/App.test.tsx:1892`, `tests/App.molecules.test.tsx:168-169`
 
 **Interfaces:**
 - Consumes: Task 2 `useLevel`, Task 3 helpers.
@@ -137,8 +138,10 @@
   - `glossary: Record<InfoTopicId, { title: string; plain: string; technical: string; full?: string }>`.
   - `useInfoTopic(selectionKey: string): { topic: InfoTopicId|null; setTopic(t): void }` — resets to null when `selectionKey` changes.
   - `<InfoPanel content={InfoContent} topic={InfoTopicId|null} onClearTopic level />` — shows `plain` at Basics/Explore, `plain`+`technical` at Advanced, all at Research; facts filtered by `min`; `computed` in a disclosure "How this was computed" folded below Research, open at Research; heading in `aria-live="polite"`; when a topic is set, shows the glossary entry and a "Back to <selection>" button.
-  - `<InfoButton topic label />` — 20×20 visual, 44×44 hit area, `aria-label="About <label>"`, accent-text colour, sets the topic and moves focus to Info's heading.
+  - `<InfoButton topic label />` — 20×20 visual, 44×44 hit area, `aria-label="About <label>"`, accent-text colour at rest; when its topic is the active one it renders in the selected style (`selected-fill` + `selected-edge`) with `aria-pressed="true"` and `aria-controls` = Info's region id; clicking it sets the topic (clicking the active one returns Info to the selection) and moves focus to Info's heading.
+  - Info's heading, while a topic is set, shows a topic chip (`<span class="info-topic-chip">`) in the same selected style naming the term, so the pressed (i) and the open explanation read as a pair.
 - [ ] **Step 1: Failing tests**
+  - `info_button.test.tsx`: with two (i) buttons (Shell, Orbital), clicking Shell gives it `aria-pressed="true"` and the class `is-active`, the other `aria-pressed="false"`; clicking Orbital moves the active state; clicking the active Orbital again clears all (`aria-pressed="false"` on both) and Info shows the selection; Info's heading shows a chip with text `Shell` while Shell is active; a new selection clears the active (i).
   - `info_panel.test.tsx`: at `basics` only `plain` renders; at `advanced` `technical` renders; at `research` "How this was computed" is expanded; facts with `min:'advanced'` hidden at `explore`; (i) click shows the glossary title and "Back to Carbon — 2p" restores; a new `selectionKey` resets the topic (Review Focus 3).
   - `glossary.test.ts`: every `InfoTopicId` has non-empty `plain` and `technical`; no entry contains `_` or a hyphen-minus before a digit.
   - Inspector: `info` renders above the accordion in docked, drawer and stacked variants and is not one of the accordion toggles.
