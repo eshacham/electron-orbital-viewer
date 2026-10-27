@@ -10,6 +10,7 @@ import { CPK_COLORS } from '../molecules/ball_and_stick';
 import { TOKENS } from '../design/tokens';
 import type { StripItem } from '../thumbs/strip_items';
 import { useRovingFocus } from './useRovingFocus';
+import { OrbitalLabel } from '../format/OrbitalLabel';
 import './strip.css';
 
 /**
@@ -124,6 +125,8 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
         return () => { observer?.disconnect(); unsubscribe(); };
     }, [contentKey, wanted, status]);
 
+    // Task 5: an orbital's name with a real subscript ("3d" + sub "z²"), not the "3d_z²" string the label carries.
+    const labelText = item.orbital ? <OrbitalLabel {...item.orbital} /> : item.label;
     return (
         <div
             role="option"
@@ -157,9 +160,9 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
                         data-drawn={!pending && (thumb.kind !== 'orbital' || drawn === wanted) ? 'true' : 'false'}
                         style={showGlyph ? { visibility: 'hidden' } : undefined} />
                 )}
-                {showGlyph && <span className="strip-tile-glyph" aria-hidden="true">{item.glyph ?? item.label}</span>}
+                {showGlyph && <span className="strip-tile-glyph" aria-hidden="true">{item.glyph ?? labelText}</span>}
             </span>
-            <span className="strip-tile-label" aria-hidden="true">{item.label}</span>
+            <span className="strip-tile-label" aria-hidden="true">{labelText}</span>
         </div>
     );
 }

@@ -58,7 +58,13 @@ export function viewTitle(state: RootState): ViewTitle {
         const title = combination.kind !== 'none'
             ? `Hydrogen — ${combinationTitle(combination)}`
             : `Hydrogen — ${orbitalName(shown.n, shown.l, shown.ml)} orbital`;
-        return { title, subtitle: `|ψ|² isosurface · ${percent} enclosed · exact one-electron solution, Z = 1` };
+        // Task 5 (critique P1): a field view is first-order perturbation theory, not the exact solution -- n = 1's
+        // polarised 1s by Dalgarno–Lewis, n = 2's Stark states by degenerate perturbation theory. A hybrid mixes
+        // exact, degenerate n = 2 states, so it stays exact.
+        const method = combination.kind !== 'field' ? 'exact one-electron solution, Z = 1'
+            : combination.level === 1 ? '1s + first-order Stark, Dalgarno–Lewis'
+            : 'n = 2 + first-order Stark, degenerate perturbation theory';
+        return { title, subtitle: `|ψ|² isosurface · ${percent} enclosed · ${method}` };
     }
     if (atom.mode === 'bonds') {
         const system = BONDS_SYSTEMS.find(entry => entry.id === state.bonds.system);

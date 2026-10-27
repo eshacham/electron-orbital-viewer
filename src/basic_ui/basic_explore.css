@@ -32,9 +32,17 @@
   font-size: var(--ql-type-caption-size);
   line-height: 16px;
 }
-.basic-tile-caption {
-  display: block;
-  margin-top: 8px;
+/* Task 5: each chip row's visible label (it names the row's group) and the (i) beside it. */
+.basic-row-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.basic-row-label {
+  font-size: var(--ql-type-caption-size);
+  line-height: var(--ql-type-caption-line);
+  font-weight: 500;
   color: var(--ql-color-text-2);
 }
 

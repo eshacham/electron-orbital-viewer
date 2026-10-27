@@ -280,9 +280,22 @@ describe('cut depth', () => {
     expect(onSurfaceStyleChange).toHaveBeenCalledWith({ clipPosition: -0.5 });
   });
 
+  // Task 5: Orbitals' cut helper moved to Info (basicInfo); the other modes keep theirs until their own tasks move it.
   it('says which side a cut removes', () => {
-    render(<Controls {...baseProps} surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
+    render(<Controls {...baseProps} mode="bonds" surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
     expect(screen.getByText(/\+y side/)).toBeInTheDocument();
+  });
+
+  // Task 5: in Orbitals the Electron enclosed and Cut away helpers are Info's now -- the iso value with its unit and
+  // the side a cut removes (tests/info/basic_info.test.ts) -- and the panel keeps the select and toggle labels.
+  it('in Orbitals, keeps the enclosed and cut controls with no helper text under them, and an (i) beside Enclosed', () => {
+    const { container } = render(<Controls {...baseProps} mode="hydrogenic" surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'cut-away axis' })).toBeInTheDocument();
+    expect(screen.queryByText(/\+y side/)).toBeNull();
+    expect(screen.queryByText(/\|ψ\|² = /)).toBeNull();
+    expect(container.querySelectorAll('.MuiFormHelperText-root')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'About Enclosed fraction' })).toHaveClass('info-button');
   });
 
   // The whole-atom view is nothing but its slice; at depth 0 or 100 % the
@@ -633,7 +646,7 @@ describe('Controls: part', () => {
         render(<BasicDrawHarness draw={draw} />);
         fireEvent.click(screen.getByRole('button', { name: 'n = 4' }));
         fireEvent.click(screen.getByRole('button', { name: '4p subshell' }));
-        fireEvent.click(screen.getByRole('button', { name: '4p_x orbital' }));
+        fireEvent.click(screen.getByRole('button', { name: '4px orbital' })); // Task 5: the chip's name has a real subscript
         expect(draw).not.toHaveBeenCalled();
         act(() => { jest.advanceTimersByTime(150); });
         expect(draw).toHaveBeenCalledTimes(1);

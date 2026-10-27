@@ -25,6 +25,7 @@ import { RelativityMode, shortMethodLabel } from '../atom/relativity';
 import type { ValenceSContraction } from '../atom/relativistic_comparison';
 import { KEEP_CASE } from '../design/mui';
 import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
+import InfoButton from '../info/InfoButton';
 
 interface ControlsProps {
   /**
@@ -470,41 +471,46 @@ const Controls: React.FC<ControlsProps> = ({
       {/* A raw density threshold is not comparable between orbitals; the share
           of the electron enclosed is. The density that achieves it is derived
           per orbital and reported back below. */}
+      {/* Task 5: an (i) beside the select explains the enclosed fraction; in Orbitals the helper under it (the iso
+          value) is Info's now, with its unit (basicInfo). */}
       {showView && atLeast(level, CONTROL_LEVEL.enclosed) && (
-        <FormControl fullWidth margin="normal" size="small">
-          <InputLabel id="enclosed-select-label">Electron enclosed</InputLabel>
-          <Select
-            labelId="enclosed-select-label"
-            id="enclosed-select"
-            value={initialEnclosedFraction.toString()}
-            label="Electron enclosed"
-            onChange={(e: SelectChangeEvent<string>) => handleEnclosedFraction(parseFloat(e.target.value))}
-            disabled={Boolean(fractionNote)}
-          >
-            {ENCLOSED_FRACTIONS.map(fraction => (
-              <MenuItem key={fraction} value={fraction.toString()}>
-                {Math.round(fraction * 100)}%
-              </MenuItem>
-            ))}
-          </Select>
-          <FormHelperText>
-            {/* Levels 1-2's contour encloses a share of the electron *count*,
-                not a |ψ|² threshold -- there is no isosurface for a
-                spherically symmetric shell view (see shell_view.ts), so the
-                marching-cubes wording below would be a claim this view never
-                makes. Level 3 in atom mode *does* go through marching cubes
-                (a numerical R(r) override), so it keeps the usual wording. */}
-            {fractionNote
-              ? fractionNote
-              : isoNote
-              ? isoNote
-              : isAtomMode && atomLevel !== 'orbital'
-                ? 'contour enclosing this fraction of the electron density'
-                : isoLevel === null
-                  ? 'contour of constant |ψ|²'
-                  : `|ψ|² = ${isoLevel.toExponential(2)}`}
-          </FormHelperText>
-        </FormControl>
+        <div className="info-beside-select">
+          <FormControl fullWidth margin="normal" size="small">
+            <InputLabel id="enclosed-select-label">Electron enclosed</InputLabel>
+            <Select
+              labelId="enclosed-select-label"
+              id="enclosed-select"
+              value={initialEnclosedFraction.toString()}
+              label="Electron enclosed"
+              onChange={(e: SelectChangeEvent<string>) => handleEnclosedFraction(parseFloat(e.target.value))}
+              disabled={Boolean(fractionNote)}
+            >
+              {ENCLOSED_FRACTIONS.map(fraction => (
+                <MenuItem key={fraction} value={fraction.toString()}>
+                  {Math.round(fraction * 100)}%
+                </MenuItem>
+              ))}
+            </Select>
+            {!isBasicMode && <FormHelperText>
+              {/* Levels 1-2's contour encloses a share of the electron *count*,
+                  not a |ψ|² threshold -- there is no isosurface for a
+                  spherically symmetric shell view (see shell_view.ts), so the
+                  marching-cubes wording below would be a claim this view never
+                  makes. Level 3 in atom mode *does* go through marching cubes
+                  (a numerical R(r) override), so it keeps the usual wording. */}
+              {fractionNote
+                ? fractionNote
+                : isoNote
+                ? isoNote
+                : isAtomMode && atomLevel !== 'orbital'
+                  ? 'contour enclosing this fraction of the electron density'
+                  : isoLevel === null
+                    ? 'contour of constant |ψ|²'
+                    : `|ψ|² = ${isoLevel.toExponential(2)}`}
+            </FormHelperText>}
+          </FormControl>
+          <InfoButton topic="enclosed" label="Enclosed fraction" />
+        </div>
       )}
 
       {showSelection && (isAtomMode ? (showElementPicker && (
@@ -605,13 +611,14 @@ const Controls: React.FC<ControlsProps> = ({
               <ToggleButton value="y" aria-label="cut along y">Y</ToggleButton>
               <ToggleButton value="z" aria-label="cut along z">Z</ToggleButton>
             </ToggleButtonGroup>
-            <FormHelperText className="cut-help" sx={{ mx: 0 }}>
+            {/* Task 5: in Orbitals what a cut removes is Info's now (basicInfo); a disabled cut still says why. */}
+            {(noSurface || !isBasicMode) && <FormHelperText className="cut-help" sx={{ mx: 0 }}>
               {noSurface ? NO_SURFACE_NOTES.cut : surfaceStyle.clipAxis === 'none'
                 ? 'Pick an axis to slice the orbital open.'
                 : isMeshLevel
                   ? `Removes the part on the +${surfaceStyle.clipAxis} side of a plane perpendicular to the ${surfaceStyle.clipAxis} axis.`
                   : `Slices off the +${surfaceStyle.clipAxis} side to show the shells inside. The atom is round, so X, Y and Z give the same rings, facing a different way.`}
-            </FormHelperText>
+            </FormHelperText>}
             {surfaceStyle.clipAxis !== 'none' && (
               <>
                 <FormLabel sx={{ mt: 1.5, fontSize: '0.75rem' }} id="cut-depth-label">

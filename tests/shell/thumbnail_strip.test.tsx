@@ -498,6 +498,15 @@ describe('ThumbnailStrip<T> (Task 8): generic over the dispatched target', () =>
         fireEvent.click(screen.getByRole('option', { name: '3p_x orbital' }));
         expect(onSelect).toHaveBeenCalledWith({ n: 3, l: 1, ml: 1 });
     });
+
+    // Task 5: Orbitals' tiles print the orbital's name with a real subscript (OrbitalLabel), not "3d_z²".
+    it('labels Orbitals\' tiles with real subscripts', () => {
+        const basicItems = basicStripItems({ selection: { n: 3, l: 2, ml: 0 }, enclosedFraction: 0.9 });
+        render(<ThumbnailStrip items={basicItems} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} />);
+        const label = screen.getByRole('option', { name: '3d_z² orbital' }).querySelector('.strip-tile-label')!;
+        expect(label).toHaveTextContent(/^3dz²$/);
+        expect(label.querySelector('sub')).toHaveTextContent('z²');
+    });
 });
 
 // Controller preflight D15/Step 1: §12 "only tiles in view are requested" --

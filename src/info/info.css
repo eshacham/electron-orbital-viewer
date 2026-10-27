@@ -74,3 +74,8 @@
   /* Review M4: the way back is a touch target like the (i) beside it. */
   .info-back { min-height: var(--ql-size-touch); }
 }
+
+/* Task 5: a select with its (i) beside it (Electron enclosed): the (i) sits level with the select's box, below the
+   FormControl's normal top margin (16 px) -- centred on the 40 px small select, whatever helper text follows it. */
+.info-beside-select { display: flex; align-items: flex-start; gap: 8px; }
+.info-beside-select > .info-button { margin-top: 26px; }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
-import BasicExplore, { BASIC_ORBITALS_ABOUT } from '../../src/basic_ui/BasicExplore';
+import BasicExplore from '../../src/basic_ui/BasicExplore';
+import { BASIC_ORBITALS_ABOUT } from '../../src/info/basic_info';
 import type { BasicSelection } from '../../src/store/orbitalSlice';
 import { NO_COMBINATION, CombinationSelection } from '../../src/combinations';
 
@@ -21,19 +22,35 @@ function Harness({ initial = { n: 3, l: 2, ml: 0 } as BasicSelection, combinatio
 }
 
 describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () => {
-    it('shows the tile fixed at Z = 1, Hydrogen-like, with the one-electron caption', () => {
-        render(<Harness />);
+    // Task 5: the one-electron caption moved to Info (basicInfo); the panel keeps the tile and short labels only.
+    it('shows the tile fixed at Z = 1, Hydrogen-like, with no caption under it', () => {
+        const { container } = render(<Harness />);
         const tile = document.querySelector('.basic-tile')!;
         expect(tile).not.toBeNull();
         expect(within(tile as HTMLElement).getByText('Z = 1')).toBeInTheDocument();
         expect(within(tile as HTMLElement).getByText('H')).toBeInTheDocument();
         expect(within(tile as HTMLElement).getByText('Hydrogen-like')).toBeInTheDocument();
-        expect(screen.getByText(BASIC_ORBITALS_ABOUT)).toBeInTheDocument();
+        expect(container.querySelector('.basic-tile-caption')).toBeNull();
+        expect(container.textContent).not.toContain(BASIC_ORBITALS_ABOUT);
+    });
+
+    // Task 5 (critique P2: unlabeled n/l/mₗ rows): each row has a visible label, which names its group, and an (i)
+    // beside it; there is no paragraph text left in the panel.
+    it('labels the rows "Shell n", "Subshell l" and "Orbital mₗ", each with an (i), and holds no paragraph text', () => {
+        const { container } = render(<Harness />);
+        expect(screen.getByRole('group', { name: 'Shell n' })).toHaveClass('basic-chip-row');
+        expect(screen.getByRole('group', { name: 'Subshell l' })).toHaveClass('basic-chip-row');
+        expect(screen.getByRole('group', { name: 'Orbital mₗ' })).toHaveClass('basic-chip-row');
+        for (const term of ['Shell', 'Subshell', 'Orbital']) {
+            expect(screen.getByRole('button', { name: `About ${term}` })).toHaveClass('info-button');
+        }
+        expect(container.querySelectorAll('p, .MuiFormHelperText-root, .MuiTypography-caption')).toHaveLength(0);
     });
 
     it('renders 9 n-chips, 3 subshell chips and 5 orbital chips for {n:3,l:2,ml:0}, the current ones pressed', () => {
         render(<Harness />);
-        const nRow = screen.getByRole('group', { name: /energy level/i });
+        // Task 5: the rows are named by their visible labels (Shell n, Subshell l, Orbital mₗ).
+        const nRow = screen.getByRole('group', { name: /^shell n/i });
         expect(within(nRow).getAllByRole('button')).toHaveLength(9);
         expect(within(nRow).getByRole('button', { name: 'n = 3' })).toHaveAttribute('aria-pressed', 'true');
 
@@ -43,14 +60,16 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
 
         const orbitalRow = screen.getByRole('group', { name: /^orbital/i });
         expect(within(orbitalRow).getAllByRole('button')).toHaveLength(5); // ml -2..2
-        expect(within(orbitalRow).getByRole('button', { name: '3d_z² orbital' })).toHaveAttribute('aria-pressed', 'true');
+        // Task 5: orbital names carry a real subscript, read as "3dz²" (OrbitalLabel), not "3d_z²".
+        expect(within(orbitalRow).getByRole('button', { name: '3dz² orbital' })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(orbitalRow).getByRole('button', { name: '3dz² orbital' }).querySelector('sub')).toHaveTextContent('z²');
     });
 
     it('names chips with the label inside the accessible name (WCAG 2.5.3)', () => {
         render(<Harness initial={{ n: 4, l: 1, ml: 1 }} />);
         expect(screen.getByRole('button', { name: 'n = 4' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '4p subshell' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '4p_x orbital' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '4px orbital' })).toBeInTheDocument(); // Task 5: a real subscript
     });
 
     it('clicking a chip reports the change', () => {
@@ -70,7 +89,7 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         fireEvent.click(screen.getByRole('button', { name: '3p subshell' }));
         const orbitalRow = screen.getByRole('group', { name: /^orbital/i });
         expect(within(orbitalRow).getAllByRole('button')).toHaveLength(3); // p: ml -1..1
-        expect(within(orbitalRow).getByRole('button', { name: '3p_z orbital' })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(orbitalRow).getByRole('button', { name: '3pz orbital' })).toHaveAttribute('aria-pressed', 'true'); // Task 5: a real subscript
     });
 
     it('resets l and ml together when a new n leaves l out of range', () => {
@@ -83,15 +102,18 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         expect(within(orbitalRow).getByRole('button', { name: '2s orbital' })).toHaveAttribute('aria-pressed', 'true');
     });
 
+    // Task 5: the heading names the orbital with a real subscript (OrbitalLabel), never "3d_z²".
     it('reads the orbital name when no combination is active', () => {
         render(<Harness initial={{ n: 3, l: 2, ml: 0 }} />);
-        expect(screen.getByText('3d_z²')).toBeInTheDocument();
+        const heading = document.getElementById('orbital-name')!;
+        expect(heading).toHaveTextContent(/^3dz²$/);
+        expect(heading.querySelector('sub')).toHaveTextContent('z²');
     });
 
     it('while a combination is active, disables the chip rows and the heading reads the combination instead', () => {
         render(<Harness combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} />);
         expect(screen.getByText('sp³ hybrids — all 4')).toBeInTheDocument();
-        expect(screen.queryByText('3d_z²')).toBeNull();
+        expect(document.getElementById('orbital-name')).not.toHaveTextContent('3dz²'); // Task 5: OrbitalLabel's text
         for (const button of screen.getAllByRole('button').filter(b => b.className.includes('basic-chip'))) {
             expect(button).toHaveAttribute('aria-disabled', 'true');
         }
@@ -116,7 +138,7 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
     // Reuse of tests/shell/roving_focus.test.tsx's pattern: arrow keys move focus within one row.
     it('moves focus within a row with the arrow keys (spec §13)', () => {
         render(<Harness />);
-        const nRow = screen.getByRole('group', { name: /energy level/i });
+        const nRow = screen.getByRole('group', { name: /^shell n/i }); // Task 5: named by its visible label
         const chips = within(nRow).getAllByRole('button');
         const current = within(nRow).getByRole('button', { name: 'n = 3' });
         act(() => { current.focus(); });

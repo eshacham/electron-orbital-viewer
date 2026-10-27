@@ -278,14 +278,15 @@ describe('App', () => {
 
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
 
-        expect(screen.getByRole('group', { name: /energy level/i })).toBeInTheDocument();
+        expect(screen.getByRole('group', { name: /^shell n/i })).toBeInTheDocument(); // Task 5: named by its visible label
         expect(screen.getByRole('group', { name: /^subshell/i })).toBeInTheDocument();
         // Addendum 2's mode rename: no second element control, Z fixed at 1
         // -- but the one-electron framing still stated outright (spec §7).
         expect(screen.queryByRole('combobox', { name: /Nucleus/i })).not.toBeInTheDocument();
         // Anchored: the top bar's search combobox is "Search elements, …" (spec §8.3); this pins the old Element select.
         expect(screen.queryByRole('combobox', { name: /^Element/i })).not.toBeInTheDocument();
-        expect(screen.getByText(/one electron, Z = 1/i)).toBeInTheDocument();
+        // Task 5: the framing moved from the Explore panel into Info (basicInfo), where it is still said outright.
+        expect(within(screen.getByRole('region', { name: /^Info/ })).getByText(/one electron, Z = 1/i)).toBeInTheDocument();
         // LevelNav is atom-mode only.
         expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).not.toBeInTheDocument();
     });
@@ -540,13 +541,39 @@ describe('App', () => {
         expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'Info', 'View', 'Plot']);
         fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
         const explore = screen.getByRole('tabpanel');
-        expect(within(explore).getByRole('group', { name: /energy level/i })).toBeInTheDocument();
+        expect(within(explore).getByRole('group', { name: /^shell n/i })).toBeInTheDocument(); // Task 5: named by its visible label
         expect(within(explore).getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
         expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         fireEvent.click(screen.getByRole('tab', { name: 'View' }));
         const view = screen.getByRole('tabpanel');
         expect(within(view).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
-        expect(within(view).queryByRole('group', { name: /energy level/i })).toBeNull();
+        expect(within(view).queryByRole('group', { name: /^shell n/i })).toBeNull();
+    });
+
+    // Task 5 (Task 4 review ruling): the first real (i) in the app. On a phone, pressing one switches the sheet to the
+    // Info tab, showing the term; pressing the active (i) again returns Info to the selection without switching tabs.
+    it('on a phone, an Orbitals (i) opens the Info tab on its term, and pressing it again clears the term in place', () => {
+        installMatchMedia(true);
+        renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('button', { name: /^Mode: / }));
+        fireEvent.click(screen.getByRole('button', { name: /basic orbitals mode/i }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        fireEvent.click(within(screen.getByRole('tabpanel')).getByRole('button', { name: 'About Shell' }));
+        // (a) the sheet is on Info, and Info names the term.
+        expect(screen.getByRole('tab', { name: 'Info' })).toHaveAttribute('aria-selected', 'true');
+        const info = screen.getByRole('tabpanel');
+        expect(within(info).getByRole('heading', { level: 2, name: /^Info/ }).querySelector('.info-topic-chip')).toHaveTextContent('Shell');
+        // (c) back on Explore the (i) is still the active one; pressing it clears the term and stays on Explore.
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        const shell = within(screen.getByRole('tabpanel')).getByRole('button', { name: 'About Shell' });
+        expect(shell).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(shell);
+        expect(screen.getByRole('tab', { name: 'Explore' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('tab', { name: 'Info' })).toHaveAttribute('aria-selected', 'false');
+        expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: 'About Shell' })).toHaveAttribute('aria-pressed', 'false');
+        fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
+        expect(document.querySelector('.info-topic-chip')).toBeNull();
+        expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveTextContent('Hydrogen — 3dz² orbital');
     });
 
     // Task 4: Info is the phone sheet's second tab -- Explore · Info · View · Plot -- holding the same Info as the
@@ -1669,6 +1696,32 @@ describe('App: shell', () => {
         expect(writeText.mock.calls[1][0]).toBe(writeText.mock.calls[0][0]);
     });
 
+    // Task 5 (Task 4 review ruling): at medium width, with the drawer folded, an Orbitals (i) opens the drawer on Info's
+    // term; pressing the active (i) again clears the term and opens nothing -- the drawer, folded again, stays folded.
+    it('at medium width, an Orbitals (i) opens the folded drawer on its term, and pressing it again opens nothing', () => {
+        window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
+            addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+        const { container } = renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+        const drawer = () => container.querySelector('#canvas-container .view-panel')!;
+        expect(drawer()).toHaveClass('folded');
+        const explore = screen.getByRole('complementary', { name: 'Explore' });
+        const shell = within(explore).getByRole('button', { name: 'About Shell' });
+        // (b) the drawer opens, with Info on the term.
+        fireEvent.click(shell);
+        expect(drawer()).toHaveClass('open');
+        const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+        expect(within(inspector).getByRole('heading', { level: 2, name: /^Info/ }).querySelector('.info-topic-chip')).toHaveTextContent('Shell');
+        // (c) fold the drawer, then press the active (i): the term clears and the drawer stays folded.
+        fireEvent.keyDown(within(inspector).getByRole('heading', { level: 2, name: /^Info/ }), { key: 'Escape' });
+        expect(drawer()).toHaveClass('folded');
+        expect(shell).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(shell);
+        expect(shell).toHaveAttribute('aria-pressed', 'false');
+        expect(drawer()).toHaveClass('folded');
+        expect(container.querySelector('.info-topic-chip')).toBeNull();
+    });
+
     it('at medium width the inspector is a drawer over the viewport, folded until asked, and Esc closes it', () => {
         window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
             addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
@@ -1788,14 +1841,16 @@ describe('App: shell', () => {
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         const explore = screen.getByRole('complementary', { name: 'Explore' });
         const inspector = screen.getByRole('complementary', { name: 'Inspector' });
-        for (const name of [/energy level/i, /^subshell/i, /^orbital/i]) {
+        for (const name of [/^shell n/i, /^subshell/i, /^orbital/i]) { // Task 5: rows named by their visible labels
             expect(within(explore).getByRole('group', { name })).toBeInTheDocument();
             expect(within(inspector).queryByRole('group', { name })).toBeNull();
         }
         expect(within(explore).getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
         expect(within(inspector).queryByRole('combobox', { name: /combination/i })).toBeNull();
         expect(within(explore).queryByRole('button', { name: 'Update Orbital' })).toBeNull();
-        expect(within(explore).getByText(/one electron, Z = 1/i)).toBeInTheDocument();
+        // Task 5: the one-electron framing is Info's now (basicInfo), not the Explore panel's.
+        expect(within(explore).queryByText(/one electron, Z = 1/i)).toBeNull();
+        expect(within(inspector).getByText(/one electron, Z = 1/i)).toBeInTheDocument();
         // Ruling R24-3: the plot's section is open by default; the settings are in the Display section above it.
         expect(inspector.querySelector('.radial-plot')).not.toBeNull();
         openInspectorSection('Display');

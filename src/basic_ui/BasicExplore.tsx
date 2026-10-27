@@ -1,6 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { Box, Chip, Typography } from '@mui/material';
-import { orbitalName, shellLetter } from '../orbital_names';
+import { shellLetter } from '../orbital_names';
+import { OrbitalLabel } from '../format/OrbitalLabel';
+import InfoButton from '../info/InfoButton';
+import type { InfoTopicId } from '../info/info_types';
 import { CombinationSelection, combinationTitle, selectionProblem } from '../combinations';
 import CombinationControls from '../components/CombinationControls';
 import { useRovingFocus } from '../shell/useRovingFocus';
@@ -8,15 +11,6 @@ import { BasicSelection } from '../store/orbitalSlice';
 import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
 import LevelLine from '../levels/LevelLine';
 import './basic_explore.css';
-
-/**
- * Spec §7's one-electron framing, said under the chips and in Help. Moved
- * here from `Controls.tsx` (Phase 6G-2 Task 6, ruling P3): Basic Orbitals'
- * whole selection moved to Explore, and this caption went with it. Still
- * exported -- `App.tsx`'s Help dialog quotes it too.
- */
-export const BASIC_ORBITALS_ABOUT = 'One electron, Z = 1 — the exact solution, and the idealised shape every multi-electron orbital '
-    + 'is a distortion of. Pick an element in Atom mode for a real, many-electron atom.';
 
 export interface BasicExploreProps {
     selection: BasicSelection;
@@ -84,7 +78,17 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
     // vanished.
     const heading = combinationActive
         ? `${combinationTitle(combination)}${selectionProblem(combination) ? ' — not drawn' : ''}`
-        : orbitalName(n, l, ml);
+        : <OrbitalLabel n={n} l={l} ml={ml} />;
+
+    // Task 5 (critique P2): each row has a visible label that names its group, and an (i) beside it for the term. The
+    // quantum number is italic, as physics sets it -- which also keeps "l" from reading as a capital I.
+    const rowId = useId();
+    const rowLabel = (key: string, label: React.ReactNode, topic: InfoTopicId, term: string) => (
+        <div className="basic-row-head">
+            <span id={`${rowId}-${key}`} className="basic-row-label">{label}</span>
+            <InfoButton topic={topic} label={term} />
+        </div>
+    );
 
     return (
         <div className="basic-explore">
@@ -93,15 +97,14 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
                 <span className="basic-tile-symbol">H</span>
                 <span className="basic-tile-name">Hydrogen-like</span>
             </div>
-            <Typography variant="caption" className="basic-tile-caption" display="block">
-                {BASIC_ORBITALS_ABOUT}
-            </Typography>
+            {/* Task 5: the one-electron caption that stood here is Info's now (basicInfo). */}
 
             <Typography id="orbital-name" variant="h6" className="basic-heading">
                 {heading}
             </Typography>
 
-            <Box ref={nRowRef} role="group" aria-label="energy level (n)" className="basic-chip-row">
+            {rowLabel('n', <>Shell <i>n</i></>, 'shell', 'Shell')}
+            <Box ref={nRowRef} role="group" aria-labelledby={`${rowId}-n`} className="basic-chip-row">
                 {N_OPTIONS.map(value => (
                     <Chip
                         key={value}
@@ -114,7 +117,8 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
                 ))}
             </Box>
 
-            <Box ref={subshellRowRef} role="group" aria-label="subshell (l)" className="basic-chip-row">
+            {rowLabel('l', <>Subshell <i>l</i></>, 'subshell', 'Subshell')}
+            <Box ref={subshellRowRef} role="group" aria-labelledby={`${rowId}-l`} className="basic-chip-row">
                 {lOptions.map(value => (
                     <Chip
                         key={value}
@@ -127,12 +131,13 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
                 ))}
             </Box>
 
-            <Box ref={orbitalRowRef} role="group" aria-label="orbital (mₗ)" className="basic-chip-row">
+            {rowLabel('ml', <>Orbital <i>mₗ</i></>, 'orbital', 'Orbital')}
+            <Box ref={orbitalRowRef} role="group" aria-labelledby={`${rowId}-ml`} className="basic-chip-row">
                 {mlOptions.map(value => (
                     <Chip
                         key={value}
                         className={`basic-chip${value === ml ? ' selected' : ''}`}
-                        label={`${orbitalName(n, l, value)} orbital`}
+                        label={<><OrbitalLabel n={n} l={l} ml={value} /> orbital</>}
                         aria-pressed={value === ml}
                         disabled={chipsFrozen}
                         onClick={() => onPick({ ml: value })}

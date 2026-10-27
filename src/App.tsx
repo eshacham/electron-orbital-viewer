@@ -55,7 +55,8 @@ import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidE
 import { allowedCharges } from './atom/ion_configurations';
 import SpeciesControls from './components/SpeciesControls';
 import Controls, { RelativityReadout, RelativityControl } from './components/Controls';
-import BasicExplore, { BASIC_ORBITALS_ABOUT } from './basic_ui/BasicExplore';
+import BasicExplore from './basic_ui/BasicExplore';
+import { basicInfo, BASIC_ORBITALS_ABOUT } from './info/basic_info';
 import { useDrawOnSelection } from './basic_ui/useDrawOnSelection';
 import { AxesSwitch } from './atom_ui/DisplayControls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
@@ -558,10 +559,18 @@ function App() {
         items.map(item => ({ ...item, color: themeCurveColour(item.color, palette) })), [palette]);
     const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(viewTitle, shallowEqual);
     useDocumentTitle(`${viewTitleText} · ${BRAND.name}`);
+    // Task 5: Orbitals' Info is basicInfo. It reads the orbital slice alone, so that slice (and the level) is what it is
+    // rebuilt on -- not every store change.
+    const orbitalSliceNow = useAppSelector(state => state.orbital);
+    const basicInfoContent = useMemo(
+        () => (isBasicMode ? basicInfo(store.getState(), level) : null),
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- orbitalSliceNow is the trigger: basicInfo reads it through the store.
+        [isBasicMode, orbitalSliceNow, level, store],
+    );
     // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab. Until
-    // each mode's builder lands (Tasks 5-7: basicInfo, atomInfo, bondsInfo, moleculeInfo) it names the view only.
+    // the other modes' builders land (Tasks 6-7: atomInfo, bondsInfo, moleculeInfo) it names their view only.
     const infoPanel = (
-        <InfoPanel content={{ title: viewTitleText, plain: null }} topic={infoTopic.topic}
+        <InfoPanel content={basicInfoContent ?? { title: viewTitleText, plain: null }} topic={infoTopic.topic}
             onClearTopic={() => infoTopic.setTopic(null)} level={level} />
     );
     const shellRef = useRef<HTMLDivElement>(null);

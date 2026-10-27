@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert, FormControl, FormHelperText, FormLabel, InputLabel, MenuItem, Select, SelectChangeEvent,
+  Alert, FormControl, FormLabel, InputLabel, MenuItem, Select, SelectChangeEvent,
   Slider, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import {
@@ -11,18 +11,15 @@ import { HybridKind, HYBRID_NAMES, hybridCount } from '../hybrids';
 import { MAX_FIELD_AU } from '../field_source';
 import { KEEP_CASE } from '../design/mui';
 import {
-  N2_MAX_FIELD_AU, DEBYE_PER_EA0, EV_PER_HARTREE, formatVoltsPerMetre, inducedDipole,
-  nextOrderDipoleShare, starkShiftHartree,
+  N2_MAX_FIELD_AU, DEBYE_PER_EA0, EV_PER_HARTREE, formatVoltsPerMetre, inducedDipole, starkShiftHartree,
 } from '../stark';
 
-export const HYBRID_CAPTION =
-  "A basis choice for one atom — hybrids describe bonding directions, not a free atom's ground state.";
-/** Both levels' validity statement; the refusal threshold that follows it is each level's own. */
-const FIELD_VALIDITY = 'Valid for F ≪ 1 a.u.; ionisation by tunnelling is ignored.';
-export const FIELD_CAPTION =
-  `${FIELD_VALIDITY} Fields above 0.05 a.u. are refused (the n = 1 electron goes over the barrier at 0.0625 a.u.).`;
-const N2_FIELD_CAPTION =
-  `${FIELD_VALIDITY} Above ${N2_MAX_FIELD_AU} a.u. an n = 2 electron is not bound: the field lowers the barrier below its energy (F = E²/4, E = −1/8 Ha), so stronger fields are refused here. First-order (degenerate) perturbation theory: the field picks these two combinations out of the four n = 2 states. They are the sp hybrid shapes, and they do not change with F; only their energies do.`;
+/* Task 5: the captions that stood here -- what a combination is built from, the hybrids' basis-choice note, the
+   field's method and validity -- are Info's now (src/info/basic_info.ts). The picker keeps its controls and the
+   short labelled readouts (the field, the induced dipole, the n = 2 shifts). */
+
+/** "2p" with a real subscript z (Task 5), in the n = 2 readouts' state names. */
+const TwoPz = () => <>2p<sub>z</sub></>;
 
 type Choice = 'none' | HybridKind | 'field';
 
@@ -84,13 +81,6 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
         >
           {CHOICES.map(choice => <MenuItem key={choice.value} value={choice.value}>{choice.label}</MenuItem>)}
         </Select>
-        {selection.kind !== 'none' && (
-          <FormHelperText>
-            {selection.kind === 'hybrid'
-              ? "Built from hydrogen's exact 2s and 2p (Z = 1)."
-              : 'Hydrogen (Z = 1) in a uniform field along +z, which pulls the electron towards −z.'}
-          </FormHelperText>
-        )}
       </FormControl>
 
       {selection.kind === 'hybrid' && (
@@ -115,7 +105,6 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
               </ToggleButton>
             ))}
           </ToggleButtonGroup>
-          <FormHelperText className="combination-caption" sx={{ mx: 0 }}>{HYBRID_CAPTION}</FormHelperText>
         </FormControl>
       )}
 
@@ -161,15 +150,6 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
               <Typography variant="body2" className="combination-readout">
                 Induced dipole μ = αF = {inducedDipole(draftField).toFixed(3)} e·a₀ ({(inducedDipole(draftField) * DEBYE_PER_EA0).toFixed(3)} D)
               </Typography>
-              <FormHelperText sx={{ mx: 0 }}>
-                α = 9/2 a₀³, exact for hydrogen. Drawn: ψ = ψ₁ₛ − F z (1 + r/2) ψ₁ₛ, first-order perturbation theory (Dalgarno–Lewis).
-              </FormHelperText>
-              <FormHelperText className="combination-caption" sx={{ mx: 0 }}>
-                {FIELD_CAPTION}
-                {nextOrderDipoleShare(draftField) >= 0.01
-                  ? ` At this field the next-order (hyperpolarisability) term would change μ by about ${Math.round(nextOrderDipoleShare(draftField) * 100)} %.`
-                  : ''}
-              </FormHelperText>
             </>
           ) : (
             <>
@@ -194,15 +174,14 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
                 return (
                   <>
                     <Typography variant="body2" className="combination-readout">
-                      (2s + 2p_z)/√2: ΔE = −3F = {signed(lowerShift, 4)} Ha ({signed(lowerShift * EV_PER_HARTREE, 2)} eV)
+                      (2s + <TwoPz />)/√2: ΔE = −3F = {signed(lowerShift, 4)} Ha ({signed(lowerShift * EV_PER_HARTREE, 2)} eV)
                     </Typography>
                     <Typography variant="body2" className="combination-readout">
-                      (2s − 2p_z)/√2: ΔE = +3F = {signed(upperShift, 4)} Ha ({signed(upperShift * EV_PER_HARTREE, 2)} eV)
+                      (2s − <TwoPz />)/√2: ΔE = +3F = {signed(upperShift, 4)} Ha ({signed(upperShift * EV_PER_HARTREE, 2)} eV)
                     </Typography>
                   </>
                 );
               })()}
-              <FormHelperText className="combination-caption" sx={{ mx: 0 }}>{N2_FIELD_CAPTION}</FormHelperText>
             </>
           )}
         </FormControl>

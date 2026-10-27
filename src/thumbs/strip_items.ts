@@ -54,6 +54,8 @@ export interface StripItem<T = NavigationTarget> {
     thumb: StripThumb;
     /** What the tile's glyph says (a pending tile, a lost context) when the label is too long for it; the label by default. */
     glyph?: string;
+    /** Task 5: an orbital tile's quantum numbers -- its label and glyph are then drawn with a real subscript (OrbitalLabel). */
+    orbital?: { n: number; l: number; ml: number };
 }
 
 interface StripArgs {
@@ -148,6 +150,7 @@ export function basicStripItems(args: { selection: BasicSelection; enclosedFract
             items.push({
                 key: `basic-${n}-${l}-${ml}`,
                 label: name,
+                orbital: { n, l, ml },
                 // Ruling T16-optname (spec §13): "3p_x orbital".
                 spoken: `${name} orbital`,
                 group,

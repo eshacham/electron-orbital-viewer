@@ -47,18 +47,22 @@ describe('CombinationControls', () => {
         expect(onChange).toHaveBeenCalledWith({ kind: 'hybrid', hybrid: 'sp3', member: 1 });
     });
 
-    it('captions hybrids as a basis choice', () => {
-        renderWith({ kind: 'hybrid', hybrid: 'sp2', member: 'all' });
-        expect(screen.getByText(/a basis choice for one atom — hybrids describe bonding directions, not a free atom's ground state/i)).toBeInTheDocument();
+    // Task 5: the basis-choice caption moved to Info (basicInfo, tests/info/basic_info.test.ts); the picker keeps controls.
+    it('leaves the hybrids\' basis-choice caption to Info', () => {
+        const { container } = render(<CombinationControls selection={{ kind: 'hybrid', hybrid: 'sp2', member: 'all' }} onChange={() => {}} />);
+        expect(screen.queryByText(/a basis choice for one atom/i)).toBeNull();
+        expect(container.querySelectorAll('.MuiFormHelperText-root')).toHaveLength(0);
     });
 
-    it('shows the field in a.u. and V/m, the dipole with its method, and the validity', () => {
-        renderWith(fieldAt(1, 0.03));
+    // Task 5: the method and validity captions moved to Info (basicInfo); the field and dipole readouts stay here as
+    // short labelled values.
+    it('shows the field in a.u. and V/m and the dipole readout, and leaves the method and validity to Info', () => {
+        const { container } = render(<CombinationControls selection={fieldAt(1, 0.03)} onChange={() => {}} />);
         expect(screen.getByText(/F = 0\.030 a\.u\. \(1\.54 × 10¹⁰ V\/m\)/)).toBeInTheDocument();
         expect(screen.getByText(/μ = αF = 0\.135 e·a₀ \(0\.343 D\)/)).toBeInTheDocument();
-        expect(screen.getByText(/first-order perturbation theory/i)).toBeInTheDocument();
-        expect(screen.getByText(/F ≪ 1 a\.u\.; ionisation by tunnelling is ignored/)).toBeInTheDocument();
-        expect(screen.getByText(/about 4 %/)).toBeInTheDocument();
+        expect(screen.queryByText(/first-order perturbation theory/i)).toBeNull();
+        expect(screen.queryByText(/F ≪ 1 a\.u\./)).toBeNull();
+        expect(container.querySelectorAll('.MuiFormHelperText-root')).toHaveLength(0);
     });
 
     it('slides from 0 to 0.05 a.u. and commits the value', () => {
@@ -70,19 +74,23 @@ describe('CombinationControls', () => {
     });
 
     it('labels the n = 2 shifts ±3F, and caps the field where n = 2 stays bound', () => {
-        renderWith(fieldAt(2, 0.0039));
-        expect(screen.getByText(/\(2s \+ 2p_z\)\/√2: ΔE = −3F = −0\.0117 Ha \(−0\.32 eV\)/)).toBeInTheDocument();
-        expect(screen.getByText(/\(2s − 2p_z\)\/√2: ΔE = \+3F = \+0\.0117 Ha \(\+0\.32 eV\)/)).toBeInTheDocument();
+        const { container } = render(<CombinationControls selection={fieldAt(2, 0.0039)} onChange={() => {}} />);
+        // Task 5: the state names carry a real subscript, 2p<sub>z</sub>, not "2p_z".
+        const readouts = Array.from(container.querySelectorAll('.combination-readout'));
+        expect(readouts.map(readout => readout.textContent)).toEqual([
+            '(2s + 2pz)/√2: ΔE = −3F = −0.0117 Ha (−0.32 eV)',
+            '(2s − 2pz)/√2: ΔE = +3F = +0.0117 Ha (+0.32 eV)',
+        ]);
+        expect(readouts.every(readout => readout.querySelector('sub')?.textContent === 'z')).toBe(true);
         expect(screen.getByRole('slider', { name: /field f/i })).toHaveAttribute('max', '0.0039');
     });
 
-    // Final review: the validity statement belongs on the field view at both
-    // levels; only the 0.05 a.u. refusal is n = 1's alone.
-    it('states the validity at n = 2 too, without n = 1\'s refusal threshold', () => {
+    // Final review: the validity statement belongs on the field view at both levels; only the 0.05 a.u. refusal is
+    // n = 1's alone. Task 5: both now live in Info -- tests/info/basic_info.test.ts pins them; here, none is left.
+    it('leaves n = 2\'s validity and first-order caption to Info', () => {
         renderWith(fieldAt(2, 0.002));
-        const caption = screen.getByText(/F ≪ 1 a\.u\.; ionisation by tunnelling is ignored/);
-        expect(caption).toHaveTextContent(/not bound/);
-        expect(caption).not.toHaveTextContent(/0\.05 a\.u\./);
+        expect(screen.queryByText(/F ≪ 1 a\.u\./)).toBeNull();
+        expect(screen.queryByText(/not bound/)).toBeNull();
     });
 
     it('brings the field down into range when switching to n = 2', () => {
