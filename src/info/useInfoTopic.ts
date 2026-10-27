@@ -36,6 +36,10 @@ interface InfoTopicContextValue extends InfoTopicState {
     takeFocusRequest(): boolean;
     /** Bring Info on screen where the layout can hide it (the phone's Info tab, the folded drawer). */
     reveal(): void;
+    /** Info is in the DOM now -- only then may an active (i) name its region in aria-controls (review M1). */
+    infoMounted: boolean;
+    /** Info's side of `infoMounted`: call on mount; the returned function on unmount. */
+    registerInfo(): () => void;
 }
 
 const InfoTopicContext = createContext<InfoTopicContextValue | null>(null);
@@ -45,6 +49,13 @@ export const InfoTopicProvider: React.FC<InfoTopicState & { onReveal?(): void; c
 }) => {
     const id = useId();
     const pendingFocus = useRef(false);
+    // A count, not a flag: an unmount and the next mount can land in either order within one commit.
+    const [mountedInfo, setMountedInfo] = useState(0);
+    // Stable, so Info's mount effect runs once per mount, not on every count change.
+    const registerInfo = useCallback(() => {
+        setMountedInfo(count => count + 1);
+        return () => setMountedInfo(count => count - 1);
+    }, []);
     // The layout's latest reveal, read at click time, so a new callback each App render does not churn the context.
     const revealRef = useRef(onReveal);
     useLayoutEffect(() => { revealRef.current = onReveal; });
@@ -60,7 +71,9 @@ export const InfoTopicProvider: React.FC<InfoTopicState & { onReveal?(): void; c
             return pending;
         },
         reveal: () => revealRef.current?.(),
-    }), [topic, setTopic, id]);
+        infoMounted: mountedInfo > 0,
+        registerInfo,
+    }), [topic, setTopic, id, mountedInfo, registerInfo]);
     return React.createElement(InfoTopicContext.Provider, { value }, children);
 };
 

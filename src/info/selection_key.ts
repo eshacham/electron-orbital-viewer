@@ -4,7 +4,7 @@ import type { RootState } from '../store';
  * What counts as "a new selection" for Info (ruling PF4): when this string changes, Info returns from an (i)'s term
  * to the selection. Per mode -- Orbitals n|l|ml|combo|member; Atoms Z|charge|excite|level|n|l|ml|j; Bonds
  * system|R|state; Molecules id|surface|orbital -- prefixed by the mode, so a mode switch is one too. View settings
- * (opacity, the cut, the enclosed fraction, a field's strength) are not part of it.
+ * (opacity, the cut, the enclosed fraction, a field's strength) are not part of it; a field's level and Stark states are.
  */
 export function infoSelectionKey(state: RootState): string {
     const atom = state.atom;
@@ -13,7 +13,10 @@ export function infoSelectionKey(state: RootState): string {
             const { n, l, ml } = state.orbital.basicSelection;
             const combination = state.orbital.combination;
             const combo = combination.kind === 'hybrid' ? combination.hybrid : combination.kind;
-            const member = combination.kind === 'hybrid' ? String(combination.member) : '';
+            // Review M2: a field view's drawn state (polarised 1s or n = 2, and which Stark states) is part of the
+            // selection; its strength is not.
+            const member = combination.kind === 'hybrid' ? String(combination.member)
+                : combination.kind === 'field' ? `${combination.level}:${combination.stark}` : '';
             return ['orbitals', n, l, ml, combo, member].join('|');
         }
         case 'atom': {

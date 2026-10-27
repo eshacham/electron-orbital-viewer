@@ -3,6 +3,8 @@
 // is folded below Research and open at Research; an (i) shows a glossary term and a new selection returns to the
 // selection (Review Focus 3); the heading is in a polite live region.
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import InfoPanel from '../../src/info/InfoPanel';
 import InfoButton from '../../src/info/InfoButton';
@@ -74,11 +76,16 @@ describe('InfoPanel (Task 4)', () => {
         expect(screen.queryByText('How this was computed')).toBeNull();
     });
 
-    it('puts its "Info" heading in a polite live region, and is a region named by it', () => {
+    // Review M5: the heading takes focus after an (i) or Back, so it sits outside the live region -- a reader hears
+    // each change once, by focus or by the live region, never both.
+    it('is a region named by its "Info" heading, which is not inside the polite live region', () => {
         renderAt('explore');
         const heading = screen.getByRole('heading', { level: 2, name: 'Info' });
-        expect(heading.closest('[aria-live="polite"]')).not.toBeNull();
         expect(screen.getByRole('region', { name: 'Info' })).toContainElement(heading);
+        expect(heading.closest('[aria-live]')).toBeNull();
+        const live = document.querySelector('[aria-live="polite"]');
+        expect(live).not.toBeNull();
+        expect(live).toHaveTextContent(/^$/);
     });
 
     it('shows a topic\'s glossary bands at the reader\'s level', () => {
@@ -113,7 +120,10 @@ describe('InfoPanel (Task 4)', () => {
             expect(within(region).getByText(glossary.subshell.title)).toBeInTheDocument();
             expect(within(region).getByText(glossary.subshell.plain)).toBeInTheDocument();
             expect(within(region).queryByText(content.plain as string)).toBeNull();
-            fireEvent.click(within(region).getByRole('button', { name: 'Back to Carbon — 2p' }));
+            // Review M3: the "‹" is decoration, hidden from the button's accessible name.
+            const back = within(region).getByRole('button', { name: 'Back to Carbon — 2p' });
+            expect(back.querySelector('[aria-hidden="true"]')).toHaveTextContent('‹');
+            fireEvent.click(back);
             expect(within(region).getByText(content.plain as string)).toBeInTheDocument();
             expect(within(region).queryByText(glossary.subshell.plain)).toBeNull();
             // The way back puts focus on the heading, not on the page.
@@ -129,6 +139,37 @@ describe('InfoPanel (Task 4)', () => {
             expect(screen.getByText(content.plain as string)).toBeInTheDocument();
         });
 
+        // Review M5: one announcement per change -- the live region for a change focus does not carry.
+        it('announces a new selection and a cleared (i) in the live region, and stays quiet when focus moves', () => {
+            const live = () => document.querySelector('[aria-live="polite"]') as HTMLElement;
+            const DynamicTitle: React.FC<{ selectionKey: string; title: string }> = ({ selectionKey, title }) => {
+                const { topic, setTopic } = useInfoTopic(selectionKey);
+                return (
+                    <InfoTopicProvider topic={topic} setTopic={setTopic}>
+                        <InfoButton topic="subshell" label="Subshell" />
+                        <InfoPanel content={{ ...content, title }} topic={topic} onClearTopic={() => setTopic(null)} level="explore" />
+                    </InfoTopicProvider>
+                );
+            };
+            const { rerender } = render(<DynamicTitle selectionKey="a" title="Carbon — 2p" />);
+            expect(live()).toHaveTextContent(/^$/);
+            // The (i) moves focus to the heading, which reads the change: the live region stays quiet.
+            fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
+            expect(screen.getByRole('heading', { level: 2 })).toHaveFocus();
+            expect(live()).toHaveTextContent(/^$/);
+            // Pressing the active (i) again keeps focus there, so the live region says what Info explains now.
+            fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
+            expect(live()).toHaveTextContent('Info: Carbon — 2p');
+            // A new selection: no focus move, announced.
+            rerender(<DynamicTitle selectionKey="b" title="Carbon — 2s" />);
+            expect(live()).toHaveTextContent('Info: Carbon — 2s');
+            // Back moves focus to the heading: quiet again.
+            fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Back to Carbon — 2s' }));
+            expect(screen.getByRole('heading', { level: 2, name: 'Info' })).toHaveFocus();
+            expect(live()).toHaveTextContent(/^$/);
+        });
+
         it('going back to an earlier selection does not bring the old topic back', () => {
             const { rerender } = render(<Harness selectionKey="a" />);
             fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
@@ -137,5 +178,13 @@ describe('InfoPanel (Task 4)', () => {
             expect(screen.queryByText(glossary.subshell.plain)).toBeNull();
             expect(screen.getByRole('button', { name: 'About Subshell' })).toHaveAttribute('aria-pressed', 'false');
         });
+    });
+
+    // Review M4: on a phone the way back is a 44 px touch target, like the (i) beside it.
+    it('gives "Back to …" a 44 px touch target under the phone query', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
+        const phone = css.slice(css.indexOf('@media (max-width: 760px)'));
+        expect(phone).toMatch(/\.info-back\s*\{[^}]*min-height:\s*var\(--ql-size-touch\)/);
+        expect(css).not.toMatch(/\.info-back::before/);
     });
 });

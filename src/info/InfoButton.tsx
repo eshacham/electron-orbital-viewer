@@ -11,9 +11,11 @@ interface InfoButtonProps {
 
 /**
  * An (i) beside a term (plan Task 4): a 20 px mark in the accent text colour, with a 44 px hit area. Pressing it
- * switches Info to the term and moves focus to Info's heading; pressing the active one returns Info to the selection.
+ * switches Info to the term, brings Info on screen and moves focus to its heading; pressing the active one returns
+ * Info to the selection and keeps focus on the (i).
  * Owner, 2026-10-27: one (i) is active at a time, drawn in the app's selected style (Deep Selection: selected-fill,
- * selected-edge) with aria-pressed and aria-controls pointing at Info, whose heading names the term in a matching chip.
+ * selected-edge) with aria-pressed, and aria-controls pointing at Info while Info is in the DOM; Info's heading names
+ * the term in a matching chip.
  * A native button, so Enter and Space press it.
  */
 const InfoButton: React.FC<InfoButtonProps> = ({ topic, label }) => {
@@ -25,10 +27,16 @@ const InfoButton: React.FC<InfoButtonProps> = ({ topic, label }) => {
             className={`info-button${active ? ' is-active' : ''}`}
             aria-label={`About ${label}`}
             aria-pressed={active}
-            aria-controls={active ? context.regionId : undefined}
+            aria-controls={active && context.infoMounted ? context.regionId : undefined}
             onClick={() => {
                 if (!context) return;
-                context.setTopic(active ? null : topic);
+                // Review I4 (WAI-ARIA toggle button): pressing the active (i) returns Info to the selection and keeps
+                // focus here -- no focus move, no reveal (on a phone that would pull the sheet over to Info).
+                if (active) {
+                    context.setTopic(null);
+                    return;
+                }
+                context.setTopic(topic);
                 context.requestFocus();
                 context.reveal();
             }}

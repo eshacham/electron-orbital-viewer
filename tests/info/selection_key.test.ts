@@ -42,7 +42,7 @@ describe('infoSelectionKey (ruling PF4)', () => {
         expect(infoSelectionKey(after)).toBe(infoSelectionKey(before));
     });
 
-    it('Orbitals: n, l, mₗ, the combination and its member each make a new selection; the field strength does not', () => {
+    it('Orbitals: n, l, mₗ, the combination, its member, a field level and its Stark states each make a new selection; the field strength does not', () => {
         allDistinct([
             orbitals({ basicSelection: { n: 3, l: 2, ml: 0 } }),
             orbitals({ basicSelection: { n: 2, l: 1, ml: 0 } }),
@@ -51,6 +51,10 @@ describe('infoSelectionKey (ruling PF4)', () => {
             orbitals({ combination: { kind: 'hybrid', hybrid: 'sp3', member: 0 } }),
             orbitals({ combination: { kind: 'hybrid', hybrid: 'sp2', member: 0 } }),
             orbitals({ combination: { kind: 'field', level: 1, field: 0.03, stark: 'lower' } }),
+            // Review M2: the field view's level and Stark states are what is drawn, so each is a new selection.
+            orbitals({ combination: { kind: 'field', level: 2, field: 0.03, stark: 'lower' } }),
+            orbitals({ combination: { kind: 'field', level: 2, field: 0.03, stark: 'upper' } }),
+            orbitals({ combination: { kind: 'field', level: 2, field: 0.03, stark: 'both' } }),
         ]);
         expect(infoSelectionKey(orbitals({ combination: { kind: 'field', level: 1, field: 0.05, stark: 'lower' } })))
             .toBe(infoSelectionKey(orbitals({ combination: { kind: 'field', level: 1, field: 0.03, stark: 'lower' } })));

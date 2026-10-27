@@ -17,41 +17,42 @@ export interface GlossaryEntry {
 export const glossary: Record<InfoTopicId, GlossaryEntry> = {
     shell: {
         title: 'Shell',
-        plain: 'A shell is a group of electrons at about the same distance from the nucleus. Shells are numbered n = 1, 2, 3 … from the nucleus outwards, and also lettered K, L, M and so on.',
+        plain: 'A shell is a set of orbitals at about the same distance from the nucleus. Shells are numbered n = 1, 2, 3 … from the nucleus outwards, and also lettered K, L, M and so on.',
         technical: 'All orbitals with the same principal quantum number n form a shell, which holds at most 2n² electrons. '
             + 'In hydrogen every orbital of a shell has the same energy; in a many-electron atom its subshells separate. '
             + 'In the atom\'s radial distribution D(r) the shells show as peaks, clearest for the inner ones.',
     },
     subshell: {
         title: 'Subshell',
-        plain: 'A subshell is the part of a shell whose orbitals share one shape, named s, p, d or f. It holds up to 2, 6, 10 or 14 electrons.',
+        plain: 'A subshell groups the orbitals of a shell of one kind, named s, p, d or f. It holds up to 2, 6, 10 or 14 electrons.',
         technical: 'The orbitals of a shell with the same angular momentum quantum number l (0, 1, 2, 3 for s, p, d, f) form a subshell '
             + 'of 2l + 1 orbitals and up to 2(2l + 1) electrons, named by n and the letter, as in 2p or 3d. '
             + 'With spin–orbit coupling a subshell with l > 0 splits into two levels, j = l − ½ and j = l + ½.',
         full: 'In Atoms the model is a central field: a partly filled subshell\'s electrons are spread evenly over all its orbitals, '
-            + 'so the subshell is the physical object, and its separate s, p, d or f lobes are a choice of basis.',
+            + 'so the subshell is the physical object, and its separate p, d or f orbitals are a choice of basis.',
     },
     orbital: {
         title: 'Orbital',
-        plain: 'An orbital is one allowed state of an electron, drawn as the cloud where that electron is likely to be found. Each orbital holds at most two electrons.',
+        plain: 'An orbital is one allowed wave pattern for an electron, drawn as the cloud where that electron is likely to be found. Each orbital holds at most two electrons, of opposite spin.',
         technical: 'An orbital is a one-electron wave function ψ, labelled in an atom by n, l and mₗ; |ψ|² is the probability density. '
             + 'The app draws real orbitals, named by their axes (as in 2pₓ), which are combinations of the complex functions with +mₗ and −mₗ.',
-        full: 'In Orbitals each one is an exact solution for hydrogen (Z = 1). In Atoms it is a central-field (LDA) solution, with one radial '
+        full: 'In Orbitals each is an exact solution for hydrogen (Z = 1), or a mixture of them (the hybrids); the field view adds a first-order Stark correction, an approximation. In Atoms it is a central-field (LDA) solution, with one radial '
             + 'function for every mₗ of a subshell. In Bonds and Molecules the orbitals are Kohn–Sham orbitals, except H₂⁺\'s, which are exact.',
     },
     enclosed: {
         title: 'Enclosed fraction',
         plain: 'A cloud has no edge, so the app draws a surface that holds a chosen share of the electron, 90 % unless you change it. A larger share draws a larger surface.',
         technical: 'The surface is a contour of constant |ψ|² (or of the density ρ), its value found for each orbital so that the region inside '
-            + 'holds the chosen fraction: 50, 75, 90, 95 or 99 %. A fixed density value would not compare orbitals fairly; an enclosed fraction does.',
-        full: 'The electrostatic potential map is the exception: its surface is fixed at ρ = 0.001 e/a₀³, a common convention, not an enclosed fraction.',
+            + 'holds the chosen fraction: 50, 75, 90, 95 or 99 %. For orbitals a fixed |ψ|² value would not compare them fairly; an enclosed fraction does.',
+        full: 'Two surfaces are drawn at a fixed density instead: the Bonds total density, at the ρ you choose (0.002 e/a₀³, the conventional molecular outline, by default), '
+            + 'and the electrostatic potential map, on ρ = 0.001 e/a₀³.',
     },
     node: {
         title: 'Node',
         plain: 'A node is a surface where the wave function is zero, so the chance of finding the electron there is zero. Across a node the wave function changes sign, and the colours swap.',
         technical: 'An orbital with quantum numbers n and l has n − l − 1 radial nodes (spheres) and l angular nodes (planes or cones), n − 1 in all. '
             + 'For the same l, more nodes mean a higher energy.',
-        full: 'Molecular orbitals have nodal surfaces too: an antibonding orbital, marked * in Bonds, has one between the nuclei, '
+        full: 'Molecular orbitals have nodal surfaces too: an antibonding orbital, marked * in Bonds\' homonuclear molecules, has one between the nuclei, '
             + 'which is why its electrons weaken the bond.',
     },
     phase: {
@@ -69,7 +70,7 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
             + 'It is positive everywhere and integrates to the number of electrons. '
             + 'Unlike ψ, it can be measured, for example by X-ray diffraction.',
         full: 'In Atoms it is the spherically averaged density of the central-field calculation; in Bonds and Molecules it is the Kohn–Sham density '
-            + 'of the calculation named under "How this was computed".',
+            + 'of the calculation named under "How this was computed" (H₂⁺\'s is exact).',
     },
     esp: {
         title: 'Electrostatic potential',
@@ -100,8 +101,8 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
         plain: 'In heavy atoms the inner electrons move fast enough that relativity matters: some shells pull in, others spread out. The app can include it or leave it out.',
         technical: 'Off solves the Schrödinger equation; Scalar adds the mass-velocity and Darwin terms (Koelling–Harmon, no spin–orbit); '
             + 'With spin–orbit solves the radial Dirac equation, splitting each subshell with l > 0 into j = l ± ½ levels. '
-            + 'Scalar is the default from caesium (Z = 55) on, where the relativistic error passes a few percent. '
-            + 'Relativistic s and p shells contract, and d and f shells expand, more strongly screened by them.',
+            + 'Scalar is the default from caesium (Z = 55) on, where leaving relativity out changes the results by more than a few percent. '
+            + 'Relativity contracts the s and p₁/₂ shells (p₃/₂ much less); the d and f shells, screened more strongly by them, expand.',
         full: 'The relativistic settings also apply the MacDonald–Vosko correction to LDA exchange, as NIST\'s relativistic reference tables do. '
             + 'The ΔSCF ionisation and excitation energies stay non-relativistic, so for a heavy atom they leave out the shifts the picture shows.',
     },
@@ -109,8 +110,8 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
         title: 'Ionisation energy',
         plain: 'The ionisation energy is the energy needed to pull one electron off an atom. It is small for metals such as sodium and large for noble gases such as neon.',
         technical: 'The app computes it by ΔSCF: the total energy with one electron removed minus the total energy before, both from spin-polarised LDA, never from an orbital energy. '
-            + 'It is given in eV beside the NIST measurement, with the signed difference.',
-        full: 'Open shells are spherically averaged, so expect larger errors for d- and f-block elements.',
+            + 'It is given in eV and, for a neutral atom, beside NIST\'s measured value, with the signed difference.',
+        full: 'Open shells are spherically averaged; expect larger errors for d- and f-block elements, above all where ionisation changes the d or f occupancy.',
     },
     bondOrder: {
         title: 'Bond order',
@@ -123,7 +124,7 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
     potentialCurve: {
         title: 'Potential energy curve',
         plain: 'The curve shows the molecule\'s energy as its two atoms are moved closer together or further apart. Its lowest point is the bond length the molecule settles at, and its depth is how strongly the atoms are bound.',
-        technical: 'E(R) is the energy with the nuclei held fixed (Born–Oppenheimer) as a function of the bond length R, plotted in eV relative to the separated atoms. '
+        technical: 'E(R) is the energy with the nuclei held fixed (Born–Oppenheimer) as a function of the internuclear distance R, plotted in eV relative to the separated atoms. '
             + 'Its minimum is at the equilibrium length Rₑ; the well depth Dₑ is the energy needed to separate the atoms from there, without zero-point energy.',
         full: 'Energies are coupled cluster, CCSD(T) with the aug-cc-pVTZ basis (full CI for H₂ and He₂), at precomputed bond lengths; H₂⁺ is solved exactly here. '
             + 'A curve stops where single-reference CCSD(T) is no longer valid, as the bond breaks into open-shell atoms.',
@@ -133,7 +134,7 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
         plain: 'The diagram shows the molecule\'s orbitals as levels, lowest energy at the bottom, with an arrow for each electron. Levels marked * are antibonding: electrons there weaken the bond.',
         technical: 'Each level is a molecular orbital labelled by its symmetry (σ or π, g or u), placed at its orbital energy ε in Ha; '
             + 'the valence levels are to scale, and the core levels, far lower, sit in a band under a break. '
-            + 'For molecules the energies are Kohn–Sham eigenvalues; for H₂⁺ they are the exact electronic energies.',
+            + 'For every system but H₂⁺ the energies are Kohn–Sham eigenvalues; for H₂⁺ they are the exact electronic energies.',
         full: 'In an open-shell molecule the α and β orbitals differ, and the levels are drawn at the α energies.',
     },
     pointGroup: {
@@ -144,7 +145,7 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
     },
     dipole: {
         title: 'Dipole moment',
-        plain: 'A dipole moment measures how unevenly a molecule\'s charge is shared, one end slightly negative and the other slightly positive. Symmetric molecules such as CO₂ have none.',
+        plain: 'A dipole moment measures how unevenly a molecule\'s charge is shared, one end slightly negative and the other slightly positive. Molecules whose symmetry cancels it, such as CO₂ or methane, have none; water\'s bent shape leaves it one.',
         technical: 'μ is the sum of every charge times its position, nuclei and electrons, in debye (D). '
             + 'The arrow points from − to + (the physics and IUPAC convention), 1 a₀ per debye; many chemistry texts draw it the other way. '
             + 'It is not drawn below 0.05 D, where its direction is noise.',
@@ -153,8 +154,7 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
     tier: {
         title: 'Data tier',
         plain: 'Library molecules are curated: chosen, prepared and checked against published values where those exist. Computed molecules were calculated on request by the same method and are not checked against experiment.',
-        technical: 'Both tiers are computed by the same method. '
-            + 'A Library molecule\'s line says which of its properties were checked against published values and whether its geometry is from experiment or optimised. '
+        technical: 'A Library molecule\'s line says which of its properties were checked against published values and whether its geometry is from experiment or optimised. '
             + 'A Computed molecule is not benchmarked against experiment.',
     },
 };

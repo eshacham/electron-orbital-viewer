@@ -61,19 +61,52 @@ describe('InfoButton (Task 4)', () => {
         expect(screen.getByText('Carbon — 2p')).toBeInTheDocument();
     });
 
-    it('moves focus to Info\'s heading when pressed', () => {
+    // Review I4 (WAI-ARIA toggle button): opening a topic moves focus to Info's heading; pressing the active (i) to
+    // return Info to the selection keeps focus on the (i).
+    it('moves focus to Info\'s heading when it opens a topic, and keeps focus on itself when it clears one', () => {
         render(<Harness />);
+        shell().focus();
         fireEvent.click(shell());
         expect(infoHeading()).toHaveFocus();
+        shell().focus();
         fireEvent.click(shell());
-        expect(infoHeading()).toHaveFocus();
+        expect(shell()).toHaveFocus();
+        expect(chip()).toBeNull();
     });
 
-    it('asks the layout to reveal Info (the phone tab, the drawer) when pressed', () => {
+    // Review I4: un-pressing the active (i) must not pull the phone sheet over to Info (or open the drawer).
+    it('asks the layout to reveal Info (the phone tab, the drawer) when it opens a topic, never when it clears one', () => {
         const onReveal = jest.fn();
         render(<Harness onReveal={onReveal} />);
         fireEvent.click(shell());
         expect(onReveal).toHaveBeenCalledTimes(1);
+        fireEvent.click(shell());
+        expect(onReveal).toHaveBeenCalledTimes(1);
+    });
+
+    // Review M1: on a phone the (i) is in the Explore tab while Info's tab is not mounted -- aria-controls names
+    // Info's region only while that region is in the DOM.
+    it('names Info in aria-controls only while Info is in the DOM', () => {
+        const Buttons: React.FC<{ withInfo: boolean }> = ({ withInfo }) => {
+            const { topic, setTopic } = useInfoTopic('a');
+            return (
+                <InfoTopicProvider topic={topic} setTopic={setTopic}>
+                    <InfoButton topic="shell" label="Shell" />
+                    {withInfo && <InfoPanel content={{ title: 'Carbon — 2p', plain: null }} topic={topic}
+                        onClearTopic={() => setTopic(null)} level="explore" />}
+                </InfoTopicProvider>
+            );
+        };
+        const { rerender } = render(<Buttons withInfo={false} />);
+        fireEvent.click(shell());
+        expect(shell()).toHaveAttribute('aria-pressed', 'true');
+        expect(shell()).not.toHaveAttribute('aria-controls');
+        rerender(<Buttons withInfo />);
+        const id = shell().getAttribute('aria-controls');
+        expect(id).not.toBeNull();
+        expect(document.getElementById(id!)).toContainElement(infoHeading());
+        rerender(<Buttons withInfo={false} />);
+        expect(shell()).not.toHaveAttribute('aria-controls');
     });
 
     it('clears the active (i) when the selection changes', () => {

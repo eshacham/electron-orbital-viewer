@@ -1,4 +1,4 @@
-import React, { useId, useLayoutEffect, useRef } from 'react';
+import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { atLeast, type LearningLevel } from '../levels/levels';
 import { glossary } from './glossary';
@@ -21,8 +21,8 @@ interface InfoPanelProps {
  * level -- `plain` at Basics and Explore, `technical` added at Advanced, everything at Research -- with the key facts
  * each level asks for, and "How this was computed" folded below Research, open at Research. An (i) switches it to a
  * glossary term (shown in the same bands), named by a chip in the heading in the (i)'s own selected style; "Back to
- * <selection>", the active (i) again, or a new selection returns it. The heading and the title under it sit in a
- * polite live region, so a screen reader hears what Info now explains.
+ * <selection>", the active (i) again, or a new selection returns it. A screen reader hears each change once: by
+ * focus on the heading after an (i) or Back, otherwise by a polite live region (review M5).
  */
 const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, level }) => {
     const context = useInfoTopicContext();
@@ -30,9 +30,32 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
     const regionId = context?.regionId ?? `${ownId}-info`;
     const headingId = context?.headingId ?? `${ownId}-info-heading`;
     const heading = useRef<HTMLHeadingElement>(null);
-    // An (i) asked for focus; Info may only now be on screen (the phone's tab, the drawer), hence after every render.
+    const title = useRef<HTMLParagraphElement>(null);
+    // "Back to …" asks for focus on the heading the same way an (i) does (the Back button itself unmounts).
+    const backPressed = useRef(false);
+    // The text Info last showed, and what the live region says now (review M5, below).
+    const lastShown = useRef<string | null>(null);
+    const [announcement, setAnnouncement] = useState('');
+    // Review M1: an active (i) names Info's region in aria-controls only while Info is in the DOM.
+    const registerInfo = context?.registerInfo;
+    useLayoutEffect(() => registerInfo?.(), [registerInfo]);
+    // After every render: an (i) or Back asked for focus (Info may only now be on screen -- the phone's tab, the
+    // drawer), and the live region hears a change that focus did not already announce. Review M5: the focus target
+    // is outside the live region, so a reader never hears the same change twice; a change with no focus move (a new
+    // selection, the active (i) pressed again) is announced once, by the live region. Info's first appearance is not
+    // a change.
     useLayoutEffect(() => {
-        if (context?.takeFocusRequest()) heading.current?.focus();
+        const focusMoved = Boolean(context?.takeFocusRequest()) || backPressed.current;
+        backPressed.current = false;
+        if (focusMoved) heading.current?.focus();
+        const chip = heading.current?.querySelector('.info-topic-chip')?.textContent;
+        const shown = `Info: ${chip ?? title.current?.textContent ?? ''}`;
+        if (lastShown.current === null || shown === lastShown.current) {
+            lastShown.current = shown;
+            return;
+        }
+        lastShown.current = shown;
+        setAnnouncement(focusMoved ? '' : shown);
     });
 
     const entry = topic ? glossary[topic] : null;
@@ -40,22 +63,25 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
     const research = atLeast(level, 'research');
     const facts = (content.facts ?? []).filter(fact => !fact.min || atLeast(level, fact.min));
     const back = () => {
+        backPressed.current = true;
         onClearTopic();
-        heading.current?.focus();
     };
 
     return (
         <section id={regionId} className="info-section" aria-labelledby={headingId}>
-            <div className="info-head" aria-live="polite">
+            <p className="visually-hidden" aria-live="polite" aria-atomic="true">{announcement}</p>
+            <div className="info-head">
                 <h2 id={headingId} ref={heading} className="ql-section info-heading" tabIndex={-1}>
                     Info
                     {entry && <>{' '}<span className="info-topic-chip">{entry.title}</span></>}
                 </h2>
-                {!entry && <p className="info-title">{content.title}</p>}
+                {!entry && <p ref={title} className="info-title">{content.title}</p>}
             </div>
             {entry ? (
                 <div className="info-body">
-                    <button type="button" className="info-back" onClick={back}>Back to {content.title}</button>
+                    <button type="button" className="info-back" onClick={back}>
+                        <span aria-hidden="true">‹</span><span>Back to {content.title}</span>
+                    </button>
                     <p className="info-text">{entry.plain}</p>
                     {technical && <p className="info-text">{entry.technical}</p>}
                     {research && entry.full && <p className="info-text">{entry.full}</p>}
