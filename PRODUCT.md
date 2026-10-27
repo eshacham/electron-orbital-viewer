@@ -53,6 +53,10 @@ demand by an owner-approved, metered job pipeline with a hard spending cap.
   delta; make the jobs table scannable (keep molecule, status, runtime, cost and an obvious "Open result" in the row;
   move files and diagnostics into details; budget summary above the history); show prediction quality per sizing
   version.
+- Learning levels (owner-confirmed 2026-10-27, being built): Basics · Explore · Advanced · Research, a personal
+  preference (first visit Explore); shared links keep the recipient's level unless the sender chooses "Opens at";
+  controls above the level are hidden with a one-line pointer; every explanation lives once in the right panel's
+  Info section, written for the level, with method/reference/validity detail on request.
 - Undecided: anything about paying users (accounts, pricing, quotas, per-user privacy of jobs).
 
 ## Brand Commitments

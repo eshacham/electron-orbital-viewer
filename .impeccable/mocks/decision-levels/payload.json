@@ -1,0 +1,46 @@
+{
+  "title": "Choose how levels and Info work",
+  "question": "Three ways to add learning levels and an Info area on the right, sketched on the Atoms view. Pick one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "live-explainer",
+      "kind": "assigned",
+      "kicker": "THE ROLL",
+      "label": "Info follows what you point at",
+      "lineage": "a museum audio guide: point at the exhibit, hear about it",
+      "thesis": "Info explains whatever you hover, focus or select — a ring, a chip, a number — and a pin keeps it.",
+      "palette": ["#020F1D", "#071828", "#2A85F8", "#1FB6F5", "#F2F6FA"],
+      "materials": ["QuantumLab Deep Space surfaces", "Info section at the top of the right panel", "a level control in the top bar"],
+      "viewport": "Top bar: Learning level Basics · Explore · Advanced · Research. Left: build (element, shells). Bottom: strip. Right: Info (live, pinnable) above Display and Plot.",
+      "risk": "Hover-driven text can flicker on desktop; on phone and keyboard it must follow taps and focus instead.",
+      "html": ".impeccable/mocks/decision-levels/live-explainer.html"
+    },
+    {
+      "id": "info-tab",
+      "kind": "dealt",
+      "label": "Right panel: Info | Display & data",
+      "lineage": "a two-tab inspector",
+      "thesis": "The right panel has two tabs; learners land on Info, researchers on Display & data.",
+      "palette": ["#020F1D", "#0B1C2D", "#2A85F8", "#1FB6F5", "#F2F6FA"],
+      "materials": ["QuantumLab Deep Space surfaces", "a two-tab right panel", "level chip in the top bar"],
+      "viewport": "Top bar level chip. Right panel tabs Info | Display & data; Info holds 'What you're looking at', the plain explanation, and how it was computed per level.",
+      "risk": "Info and the plot never show together; switching tabs is a step.",
+      "html": ".impeccable/mocks/decision-levels/info-tab.html"
+    },
+    {
+      "id": "info-top",
+      "kind": "dealt",
+      "label": "Info always open, (i) buttons point to it",
+      "lineage": "a field guide's facing page",
+      "thesis": "Info sits open at the top of the right panel and explains the current selection; small (i) buttons beside labels switch it to that topic.",
+      "palette": ["#020F1D", "#071828", "#2A85F8", "#1FB6F5", "#F2F6FA"],
+      "materials": ["QuantumLab Deep Space surfaces", "(i) buttons beside labels", "level segmented control in the top bar"],
+      "viewport": "Top bar level control. Left: build with small (i) buttons. Right: Info (selection + topic) above Display and Plot and data.",
+      "risk": "Many (i) buttons can become visual noise of their own; they must be quiet and only where a term needs explaining.",
+      "html": ".impeccable/mocks/decision-levels/info-top.html"
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": { "value": "code", "toggle": false }
+}
