@@ -56,6 +56,18 @@ describe('InfoPanel (Task 4)', () => {
         expect(computed().open).toBe(false);
     });
 
+    // Task 7a fix round 1 (ruling, every mode): the spec orders Info as name, plain explanation, key facts at the level --
+    // so the facts sit straight after the plain text and before the technical text, and never fall below the fold.
+    it('puts the facts after the plain text and before the technical text', () => {
+        renderAt('research');
+        const plain = screen.getByText(content.plain as string);
+        const facts = screen.getByText('Electrons').closest('dl')!;
+        const technical = screen.getByText(content.technical as string);
+        expect(plain.compareDocumentPosition(facts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(facts.compareDocumentPosition(technical) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(technical.compareDocumentPosition(computed()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('at Research opens "How this was computed"', () => {
         renderAt('research');
         expect(computed().open).toBe(true);

@@ -1,5 +1,7 @@
 import { MoleculeMeta, MoleculeOrbitalInfo, OrbitalSpin } from '../molecules/types';
-import { H2PLUS_LABELS, H2PLUS_STATES, h2plusElectronicEnergy } from './h2plus';
+import { H2PLUS_LABELS, H2PLUS_STATES, H2PlusState, h2plusElectronicEnergy } from './h2plus';
+import { orbitalEnergyText } from '../format/energy';
+import { nb } from '../format/text';
 import { BondsSystemId, TEXTBOOK_BOND_ORDER } from './systems';
 
 export interface DiagramBox { orbitalIndex: number; up: boolean; down: boolean }
@@ -141,41 +143,35 @@ export function bondOrderText(order: number | null | undefined): string {
 }
 
 /**
- * Ruling T23e-COHF (fix round 1): a heteronuclear molecule's footer used to
- * say only that bond order "is not defined by g/u counting" -- true of the
- * g/u-counting method, but left the panel silently disagreeing with the
- * System select, which (ruling R23e) shows CO and HF's textbook bond order
- * (systems.ts' TEXTBOOK_BOND_ORDER, the same source this takes `order`
- * from). This states the number and why g/u counting doesn't reach it,
- * instead of only the latter.
- */
-export function heteronuclearBondOrderText(order: number): string {
-    return `Bond order ${formatBondOrderNumber(order)} — counted from the valence orbitals' bonding/antibonding character; `
-        + "g/u labels don't apply to a heteronuclear molecule.";
-}
-
-/**
  * The bond order a system's view states (Task 7a: Info's fact): H₂⁺'s ½; a homonuclear molecule's own, counted from
  * its MO occupations (meta.json's `bondOrder`); for CO and HF, whose `bondOrder` is null by design, and before a
- * molecule's data has loaded, the textbook value the System select shows (ruling R23e, T23e-COHF).
+ * molecule's data has loaded, the textbook value the System select shows (ruling R23e, T23e-COHF). For H₂⁺ this is the
+ * ground state's: Info names it so in the 1σu* view (bondOrderNote).
  */
 export function bondOrderOf(system: BondsSystemId, meta: Pick<MoleculeMeta, 'bondOrder'> | null): number {
     if (system === 'h2plus') return 0.5;
     return meta?.bondOrder ?? TEXTBOOK_BOND_ORDER[system];
 }
 
-const withFullStop = (text: string) => (text.endsWith('.') ? text : `${text}.`);
+/**
+ * Ruling T23e-COHF: a heteronuclear molecule's bond order is the textbook number (the System select's), and this says
+ * why g/u counting does not reach it -- so the two never contradict each other.
+ */
+export const HETERONUCLEAR_BOND_ORDER_NOTE =
+    "Counted from the valence orbitals' bonding or antibonding character; g/u labels do not apply to a heteronuclear molecule.";
 
 /**
- * The sentence that used to stand under the MO diagram (BondsPanel's footer, before Task 7a moved it into Info): the
- * bond order and how it was counted. H₂⁺'s is exact; a heteronuclear molecule's states the textbook number and why g/u
- * counting does not reach it, so it never contradicts the System select (ruling T23e-COHF). Only for a view whose
- * orbitals are known -- H₂⁺, or a molecule once `meta` has loaded.
+ * What the old footer under the MO diagram said beyond the number (Task 7a fix round 1, M5: Info's Bond order fact
+ * gives the number; this is only the why). H₂⁺ is exact -- and in its 1σu* view, the ½ is the ground state's (I2);
+ * CO and HF are counted another way; a homonuclear molecule's count needs no note. Null where there is nothing to add.
  */
-export function bondOrderFooter(system: BondsSystemId, meta: Pick<MoleculeMeta, 'bondOrder'> | null): string {
-    if (system === 'h2plus') return `${withFullStop(bondOrderText(0.5))} One electron, exact energies.`;
-    if (meta && meta.bondOrder === null) return withFullStop(heteronuclearBondOrderText(TEXTBOOK_BOND_ORDER[system]));
-    return withFullStop(bondOrderText(meta?.bondOrder));
+export function bondOrderNote(system: BondsSystemId, meta: Pick<MoleculeMeta, 'bondOrder'> | null, h2plusState: H2PlusState = '1sigma_g'): string | null {
+    if (system === 'h2plus') {
+        return h2plusState === '1sigma_u'
+            ? 'In the ground state (electron in 1σg) the bond order is ½; with the electron in 1σu* there is no bond. One electron, so the energies are exact.'
+            : 'One electron, so the energies are exact.';
+    }
+    return meta && meta.bondOrder === null ? HETERONUCLEAR_BOND_ORDER_NOTE : null;
 }
 
 /** H₂⁺'s one electron: each level's energy is the exact E_el of that state, a Born–Oppenheimer eigenvalue, not a Kohn–Sham one. */
@@ -184,4 +180,13 @@ export function h2plusOrbitals(R: number): MoleculeOrbitalInfo[] {
         index, label: H2PLUS_LABELS[state], energyHartree: h2plusElectronicEnergy(R, state),
         occupation: index === 0 ? 1 : 0, spin: 'restricted' as const,
     }));
+}
+
+/**
+ * Task 7a fix round 1 (ruling I5): H₂⁺'s Data values -- its two exact levels at R, eV first, each held on one line:
+ * "1σg E_el = −30.00 eV (−1.103 Ha) · 1σu* E_el = −18.16 eV (−0.668 Ha)" (at R = 2 a₀). The analogue of a molecule's
+ * frontier line; the caller typesets E_el and the labels.
+ */
+export function h2plusLevelsText(R: number): string {
+    return h2plusOrbitals(R).map(level => nb(`${level.label} E_el = ${orbitalEnergyText(level.energyHartree)}`)).join(' · ');
 }

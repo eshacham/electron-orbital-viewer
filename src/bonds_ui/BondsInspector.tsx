@@ -5,6 +5,8 @@ import { BondsState } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
 import { frontierText } from '../bonds/captions';
 import { withSubscripts } from '../format/subscripts';
+import { h2plusLevelsText } from '../bonds/mo_diagram';
+import InfoButton from '../info/InfoButton';
 
 interface BondsInspectorProps {
     variant: 'docked' | 'drawer' | 'stacked';
@@ -30,15 +32,28 @@ interface BondsInspectorProps {
 /**
  * Bonds mode's inspector (spec §9.3, Phase 6G-2 Task 9): Display on top,
  * then "Plot and data" (titled sections, one open at a time, ruling R24-3):
- * Plot (the potential curve) and Data -- the frontier orbital(s) with their
- * energies. Task 7a: the method captions and near-tie caveats are Info's
- * "How this was computed" (bondsInfo); Data keeps the values. H₂⁺'s exact
- * levels name no frontier orbital, so it has Plot alone.
+ * Plot (the potential curve) and Data -- the values: a molecule's frontier
+ * orbital(s) with their Kohn–Sham energies, H₂⁺'s two exact levels. Task 7a:
+ * the method captions and near-tie caveats are Info's "How this was
+ * computed" (bondsInfo); Data keeps the values. Fix round 1 (I3): the
+ * frontier energies say they are Kohn–Sham eigenvalues, with that (i), right
+ * beside them (ruling R19); (ruling I5) H₂⁺ keeps a Data tab, so the medium
+ * drawer keeps its one-press Plot button.
  */
 const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, info, display, open, onOpenChange, bonds, data, plot, showPlot = true }) => {
     const [tab, setTab] = useState('plot');
-    const molecule = bonds.system !== 'h2plus';
-    const frontier = molecule && data.meta ? frontierText(data.meta.orbitals) : null;
+    const frontier = bonds.system !== 'h2plus' && data.meta ? frontierText(data.meta.orbitals) : null;
+    const values = bonds.system === 'h2plus'
+        ? bonds.R !== null && (
+            <Typography variant="caption" className="bonds-frontier">{withSubscripts(`Exact levels — ${h2plusLevelsText(bonds.R)}`)}</Typography>
+        )
+        // While the next scan point loads there are no values yet; they follow once its files land.
+        : frontier && (
+            <div className="bonds-data-line">
+                <Typography variant="caption" className="bonds-frontier">{withSubscripts(`Kohn–Sham orbital energies — ${frontier}`)}</Typography>
+                <InfoButton topic="kohnSham" label="Kohn–Sham orbitals" place="data" />
+            </div>
+        );
     return (
         <Inspector
             variant={variant}
@@ -47,21 +62,16 @@ const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, info, display,
             onOpenChange={onOpenChange}
             sections={[
                 ...(display ? [{ key: 'display', title: 'Display', content: display }] : []),
-                ...(!showPlot ? [] : [molecule ? {
+                ...(!showPlot ? [] : [{
                     key: 'plot',
                     title: 'Plot and data',
                     activeTab: tab,
                     onTab: setTab,
                     tabs: [
                         { key: 'plot', label: 'Plot', content: plot },
-                        // The Data tab stays while the next scan point loads; its values follow once they land.
-                        {
-                            key: 'data',
-                            label: 'Data',
-                            content: frontier && <Typography variant="caption" className="bonds-frontier">{withSubscripts(frontier)}</Typography>,
-                        },
+                        { key: 'data', label: 'Data', content: values },
                     ],
-                } : { key: 'plot', title: 'Plot and data', content: plot }]),
+                }]),
             ]}
         />
     );

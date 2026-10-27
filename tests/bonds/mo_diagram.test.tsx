@@ -188,15 +188,17 @@ describe('MoDiagram', () => {
     // marks the one on screen with aria-pressed (not colour alone).
     it('marks the selected box and names each one fully for assistive tech', () => {
         render(<MoDiagram orbitals={n2} selectedIndex={6} onSelect={jest.fn()} />);
-        const selected = screen.getByRole('button', { name: /3σg \(1 of 1\), -0\.380 Ha, occupation 2/ });
+        // Task 7a fix round 1 (M9): the energies read with a true minus (U+2212), in the name and the tooltip.
+        const selected = screen.getByRole('button', { name: /3σg \(1 of 1\), −0\.380 Ha, occupation 2/ });
+        expect(selected).toHaveAttribute('title', '3σg: ε = −0.3800 Ha');
         expect(selected).toHaveAttribute('aria-pressed', 'true');
-        const other = screen.getByRole('button', { name: /2σg \(1 of 1\), -1\.100 Ha, occupation 2/ });
+        const other = screen.getByRole('button', { name: /2σg \(1 of 1\), −1\.100 Ha, occupation 2/ });
         expect(other).toHaveAttribute('aria-pressed', 'false');
     });
 
     it("names O2's alpha levels with their spin", () => {
         render(<MoDiagram orbitals={o2} selectedIndex={null} onSelect={jest.fn()} />);
-        expect(screen.getByRole('button', { name: /1πg\* \(1 of 2\), -0\.350 Ha, occupation 1, alpha spin/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /1πg\* \(1 of 2\), −0\.350 Ha, occupation 1, alpha spin/ })).toBeInTheDocument();
     });
 
     // Found live (Task 13, N₂): the "≈ core" break was drawn across the 1σg

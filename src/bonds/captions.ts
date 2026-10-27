@@ -1,6 +1,7 @@
 import { MoleculeMeta, MoleculeOrbitalInfo, MoleculeScan } from '../molecules/types';
 import { BOHR_TO_ANGSTROM, BondsSystemId, HARTREE_TO_EV, openingScanIndex } from './systems';
 import { orbitalEnergyText } from '../format/energy';
+import { nb } from '../format/text';
 
 /** A signed number as the panel prints it: a true minus sign (U+2212), not a hyphen. */
 export function signed(value: number, digits: number): string {
@@ -142,7 +143,8 @@ export function bondsCaptions(system: BondsSystemId, scan: MoleculeScan | null):
     if (scan.fit.bound) {
         captions.push(...bondCaptions(system, scan));
     } else {
-        captions.push(unboundCaption(`${wellMilliHartree(scan)} below the separated atoms, ${atomsMethod(scan)}`));
+        // Fix round 1 (M6): "no counterpoise correction" is said once -- in the method, when the method says it.
+        captions.push(unboundCaption(`${wellMilliHartree(scan)} below the separated atoms, ${atomsMethod(scan)}`, /counterpoise/.test(scan.energyMethod)));
         const opening = scan.points[openingScanIndex(scan)];
         if (opening) captions.push(`The view opens at ${lengths(opening.RBohr)}, the lowest energy on the scan: van der Waals contact, not a bond.`);
     }
@@ -184,8 +186,9 @@ export function frontierText(orbitals: readonly MoleculeOrbitalInfo[]): string |
     }
     const parts = [...groups.values()]
         .sort((a, b) => ROLE_ORDER.indexOf(a.role as typeof ROLE_ORDER[number]) - ROLE_ORDER.indexOf(b.role as typeof ROLE_ORDER[number]))
-        .map(({ role, orbital, count }) => `${role} ${orbital.label}${SPIN_MARK[orbital.spin ?? 'restricted']}`
-            + `${count > 1 ? ` ×${count}` : ''}: ε = ${orbitalEnergyText(orbital.energyHartree)}`);
+        // Fix round 1 (M8): each entry held on one line, so a value never parts from its unit.
+        .map(({ role, orbital, count }) => nb(`${role} ${orbital.label}${SPIN_MARK[orbital.spin ?? 'restricted']}`
+            + `${count > 1 ? ` ×${count}` : ''}: ε = ${orbitalEnergyText(orbital.energyHartree)}`));
     return parts.length > 0 ? parts.join(' · ') : null;
 }
 

@@ -981,9 +981,11 @@ describe('App', () => {
             expect(within(inspector).getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
             expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ψ > 0');
             // Task 7a: the methods list ("Exact within Born–Oppenheimer …") is Info's "How this was computed" now
-            // (bondsInfo; open at this block's Research level), not the Data tab's -- H₂⁺ has no frontier values, so
-            // no Data tab -- and still never in the side panel.
-            expect(within(inspector).queryByRole('tab', { name: 'Data' })).toBeNull();
+            // (bondsInfo; open at this block's Research level), not the Data tab's -- fix round 1 (ruling I5): H₂⁺'s
+            // Data tab holds its exact levels instead -- and still never in the side panel.
+            fireEvent.click(within(inspector).getByRole('tab', { name: 'Data' }));
+            expect(within(inspector).getByText(/Exact levels/)).toBeInTheDocument();
+            expect(inspector.querySelector('.bonds-frontier')).not.toHaveTextContent(/Born–Oppenheimer/);
             expect(within(container.querySelector('.info-computed') as HTMLElement).getByText(/Exact within Born–Oppenheimer/)).toBeInTheDocument();
             expect(container.querySelector('.side-panel')?.textContent).not.toMatch(/Exact within Born–Oppenheimer/);
         });
@@ -1287,6 +1289,21 @@ describe('App', () => {
             page.querySelectorAll('.info-computed').forEach(node => node.remove());
             expect(page.textContent).not.toMatch(/CCSD\(T\)/);
             expect(page.textContent).not.toMatch(/T1 diagnostic/);
+        });
+
+        // Task 7a fix round 1 (ruling I5): H₂⁺, Bonds' opening view, keeps a Data tab, so the medium-width drawer keeps
+        // its one-press Plot button (the bar names a tabbed section's tabs; with none it would be "View settings" alone).
+        it('at medium width, offers H₂⁺ the drawer\'s Plot panel button, which opens it on the curve', () => {
+            window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
+                addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+            const { container } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+            expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('folded');
+            expect(screen.getByRole('button', { name: 'Data panel' })).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: 'Plot panel' }));
+            expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('open');
+            expect(screen.getByRole('tab', { name: 'Plot' })).toHaveAttribute('aria-selected', 'true');
+            expect(screen.getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
         });
 
         // Task 7a (Task 4 review ruling): a Bonds (i) on a phone switches the sheet to the Info tab on its term; pressing

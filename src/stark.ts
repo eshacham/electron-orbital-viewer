@@ -3,6 +3,7 @@ import { sampleFieldSource } from './orbital_mesh';
 import { overlapIntegral, zMatrixElement } from './field_integrals';
 import { ORBITAL_RESOLUTION, combinationSamplingRadius, n2Recipe } from './orbital_presets';
 import { formatSci, toSuperscript } from './format/sci';
+import { HARTREE_IN_EV } from './format/energy';
 
 /**
  * Hydrogen in a uniform field F along +z, H′ = +F z (atomic units): the field
@@ -19,7 +20,8 @@ export const HYDROGEN_POLARIZABILITY = 4.5;
 export const HYDROGEN_HYPERPOLARIZABILITY = 10665 / 8;
 export const STARK_N2_COEFFICIENT = 3;
 export const VOLTS_PER_METRE_PER_AU = 5.14220675e11;
-export const EV_PER_HARTREE = 27.211386;
+/** Task 7a fix round 1 (M7): the one Ha→eV factor (format/energy.ts, CODATA 2018), under this module's name. */
+export const EV_PER_HARTREE = HARTREE_IN_EV;
 export const DEBYE_PER_EA0 = 2.541746;
 /** Where α is measured: small enough that normalising the first-order ψ costs 0.05 %. */
 export const VALIDATION_FIELD_AU = 0.01;

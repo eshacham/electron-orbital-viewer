@@ -1,6 +1,7 @@
 import React, { useId } from 'react';
 import { BOHR_TO_ANGSTROM, HARTREE_TO_EV } from '../bonds/systems';
 import { withSubscripts } from '../format/subscripts';
+import { minus } from '../format/sci';
 
 /**
  * Energy against internuclear distance, with the geometry on screen marked.
@@ -50,8 +51,9 @@ function formatR(R: number): string {
 
 /** E in whichever unit the caller states, with the other beside it -- same constraint, for energy. Unrecognised units are shown bare rather than guessed at. */
 function formatEnergy(E: number, unit: string): string {
-    if (unit === 'Ha') return `${E.toFixed(4)} Ha (${(E * HARTREE_TO_EV).toFixed(2)} eV)`;
-    if (unit === 'eV') return `${E.toFixed(2)} eV (${(E / HARTREE_TO_EV).toFixed(4)} Ha)`;
+    // Task 7a fix round 1 (M9): a true minus (U+2212), not a hyphen.
+    if (unit === 'Ha') return minus(`${E.toFixed(4)} Ha (${(E * HARTREE_TO_EV).toFixed(2)} eV)`);
+    if (unit === 'eV') return minus(`${E.toFixed(2)} eV (${(E / HARTREE_TO_EV).toFixed(4)} Ha)`);
     return `${E} ${unit}`;
 }
 
@@ -142,8 +144,8 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                         ))}
                     </>
                 )}
-                <text x={2} y={PAD.top + 8} className="potential-axis-label">{yRange[1].toPrecision(3)}</text>
-                <text x={2} y={PAD.top + plotHeight} className="potential-axis-label">{yRange[0].toPrecision(3)}</text>
+                <text x={2} y={PAD.top + 8} className="potential-axis-label">{minus(yRange[1].toPrecision(3))}</text>
+                <text x={2} y={PAD.top + plotHeight} className="potential-axis-label">{minus(yRange[0].toPrecision(3))}</text>
             </svg>
             {/*
                 A native range input, visually hidden, gives Tab + arrow-key

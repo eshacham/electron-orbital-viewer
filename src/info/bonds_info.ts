@@ -7,8 +7,8 @@
  * keeps the frontier values. Ruling PF3: no topic parameter; an (i)'s term is InfoPanel's (from the glossary).
  *
  * Science, stated once and never rewritten here: the sentences come from the builders that already said them
- * (bondsCaptions, frontierText, orbitalCaveats, densitySurfaceText, spinOrderNote, bondOrderText and the curve's
- * zero). H₂⁺ is exact within Born–Oppenheimer; every other energy is the scan's method, and every orbital energy a
+ * (bondsCaptions, frontierText, orbitalCaveats, densitySurfaceText, spinOrderNote, bondOrderText, bondOrderNote and
+ * the curve's zero). H₂⁺ is exact within Born–Oppenheimer; every other energy is the scan's method, and every orbital energy a
  * Kohn–Sham eigenvalue -- never an ionisation energy. The bond order is the app's own count (bondOrderOf).
  */
 import React from 'react';
@@ -18,17 +18,18 @@ import type { InfoContent, InfoFact } from './info_types';
 import type { BondsData } from '../bonds/useBondsData';
 import type { BondsView } from '../store/bondsSlice';
 import type { MoleculeBasis, MoleculeMeta, MoleculeOrbitalInfo } from '../molecules/types';
-import { HARTREE_TO_EV, systemFormula } from '../bonds/systems';
+import { systemFormula } from '../bonds/systems';
 import { bondsCaptions, densitySurfaceText, frontierText, lengthText, orbitalCaveats } from '../bonds/captions';
 import { bondAxisMinimumDensity } from '../bonds/bond_density';
-import { bondOrderFooter, bondOrderOf, buildMoDiagram, formatBondOrderNumber, h2plusOrbitals, spinOrderNote } from '../bonds/mo_diagram';
+import {
+    bondOrderNote, bondOrderOf, bondOrderText, buildMoDiagram, formatBondOrderNumber, h2plusOrbitals, spinOrderNote,
+} from '../bonds/mo_diagram';
 import { H2PLUS_LABELS, h2plusElectronicEnergy, h2plusTotalEnergy } from '../bonds/h2plus';
 import { H_PLUS_H_PLUS_HARTREE, curveNote } from '../bonds/curve';
 import { SPIN_SUFFIX, bondsFieldRequest } from '../bonds/bonds_request';
-import { cutHelpText } from '../atom/atom_text';
+import { cutAwaySentence } from '../atom/atom_text';
 import { isoValueText } from '../orbital_facts';
-import { energyDifferenceText, orbitalEnergyText } from '../format/energy';
-import { minus } from '../format/sci';
+import { absoluteEnergyText, energyDifferenceText, orbitalEnergyText } from '../format/energy';
 import { nb, plural } from '../format/text';
 import { withSubscripts } from '../format/subscripts';
 import InfoButton from './InfoButton';
@@ -118,9 +119,6 @@ const kohnShamLabel = (text: string) => h(React.Fragment, null, text, h(InfoButt
 /** The potential curve's (i) on its quantity: what E − E(atoms) is, and where its minimum and depth are. */
 const curveLabel = (text: string) => h(React.Fragment, null, text, h(InfoButton, { topic: 'potentialCurve', label: 'Potential energy curve', place: 'info' }));
 
-/** An absolute energy, eV first, then Ha to the five places the panel printed (−109.38074 Ha). */
-const totalEnergyText = (hartree: number) => nb(`${minus((hartree * HARTREE_TO_EV).toFixed(2))} eV (${minus(hartree.toFixed(5))} Ha)`);
-
 /** Bonds' Info for the current selection (InfoPanel filters the facts and bands by level). */
 // `level` is unused for now: every band is written, and InfoPanel shows the ones a level reads. Ruling PF3 keeps it in
 // the signature every mode's builder shares. `state` is the bonds and orbital slices (a whole RootState is one too).
@@ -148,28 +146,31 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
     if (exact) {
         const label = H2PLUS_LABELS[h2plusState];
         title = h(React.Fragment, null, `${formula} — `, withSubscripts(label), ' orbital');
-        lead = `${formula} is two protons sharing one electron: the simplest chemical bond, solved exactly here. `
+        // Fix round 1 (M2, M1): "for nuclei held in place" is Born–Oppenheimer in plain words; the node is the wavefunction's.
+        lead = `${formula} is two protons sharing one electron: the simplest chemical bond, and one solved exactly here for nuclei held in place. `
             + (h2plusState === '1sigma_g'
                 ? `In ${label}, the bonding orbital, the electron gathers between the nuclei and holds them together.`
-                : `In ${label}, the antibonding orbital, the electron has a node midway between the nuclei, and this state does not hold them together.`);
+                : `In ${label}, the antibonding orbital, the wavefunction has a nodal plane midway between the nuclei, so the electron is kept out of the region between them, and this state does not hold them together.`);
     } else if (density) {
         title = `${formula} — total electron density`;
         const electrons = meta ? electronsIn(meta.orbitals) : null;
-        lead = `${electrons !== null ? `${formula} has ${electrons} electrons; the` : 'The'} surface shows where they are likely to be found, all orbitals together. `
-            + densitySurfaceText(bonds.densityIso, null, minOnAxisOf(data.basis));
+        // Fix round 1 (M3): plain words only -- what the surface at this ρ shows, with its numbers, is technical.
+        lead = electrons !== null
+            ? `${formula} has ${electrons} electrons; the surface shows where they are likely to be found, all orbitals together.`
+            : 'The surface shows where the electrons are likely to be found, all orbitals together.';
     } else {
         const mo = view as Extract<BondsView, { kind: 'mo' }>;
         title = h(React.Fragment, null, `${formula} — `, withSubscripts(mo.label), `${SPIN_SUFFIX[mo.spin]} orbital`);
         lead = chosen && meta ? orbitalWords(formula, meta, chosen.orbital, chosen.group)
             : `${mo.label} is one of ${formula}'s molecular orbitals.`;
     }
-    // Ruling T4-d: B₂ and C₂'s numbers are qualitative -- said plainly here, and in the method's words under "How this
-    // was computed" (bondsCaptions' first caption).
+    // Ruling T4-d: B₂ and C₂'s energies are a rough guide -- said plainly here (fix round 1, M4: the energies, as T4-d's
+    // caption says), and in the method's words under "How this was computed" (bondsCaptions' first caption).
     const qualitative = scan?.validity.multireference
-        ? `The computed numbers for ${formula} are only qualitative: no single arrangement of its electrons describes it well, and the method starts from one.`
+        ? `The computed energies for ${formula} are only a rough guide: no single arrangement of its electrons describes it well, and the methods used here start from one.`
         : null;
     // He₂: the footer said "no bond" to every level, under the diagram; it does here.
-    const noBond = !exact && meta && order === 0 ? bondOrderFooter(system, meta) : null;
+    const noBond = !exact && meta && order === 0 ? `${bondOrderText(0)}.` : null;
 
     // --- Key facts, each from the level that reads it.
     const facts: InfoFact[] = [];
@@ -178,12 +179,14 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
     if (exact && R !== null) {
         const total = h2plusTotalEnergy(R, h2plusState);
         facts.push({ label: curveLabel('E − E(H + H⁺)'), value: energyDifferenceText(total - H_PLUS_H_PLUS_HARTREE), min: 'explore' });
-        facts.push({ label: 'Total energy', value: totalEnergyText(total), min: 'research' });
+        facts.push({ label: 'Total energy', value: absoluteEnergyText(total), min: 'research' });
     } else if (point && scan) {
         facts.push({ label: curveLabel('E − E(atoms)'), value: energyDifferenceText(point.energyHartree - scan.fit.separatedAtomsHartree), min: 'explore' });
-        facts.push({ label: 'Total energy', value: totalEnergyText(point.energyHartree), min: 'research' });
+        facts.push({ label: 'Total energy', value: absoluteEnergyText(point.energyHartree), min: 'research' });
     }
-    facts.push({ label: 'Bond order', value: formatBondOrderNumber(order) });
+    // Fix round 1 (I2): with H₂⁺'s electron in 1σu* there is no bond; the ½ is the ground state's, and says so.
+    const excited = exact && h2plusState === '1sigma_u';
+    facts.push({ label: excited ? 'Ground-state bond order' : 'Bond order', value: formatBondOrderNumber(order) });
     if (exact && R !== null) {
         // H₂⁺'s one electron: its orbital energy is the exact electronic energy (H2PLUS_CAPTIONS).
         facts.push({ label: 'Orbital energy', value: nb(orbitalEnergyText(h2plusElectronicEnergy(R, h2plusState))), min: 'explore' });
@@ -191,7 +194,8 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
         facts.push({ label: kohnShamLabel('Orbital energy'), value: nb(orbitalEnergyText(chosen.orbital.energyHartree)), min: 'explore' });
     }
     if (!density) {
-        facts.push(enclosedFact(fraction));
+        // Fix round 1 (M10): a molecular orbital may hold two electrons, so its surface encloses a share of |ψ|².
+        facts.push(exact ? enclosedFact(fraction) : enclosedFact(fraction, "of the orbital's |ψ|²"));
         // The iso value is the drawn orbital's: only once the picture asked for is the one on screen.
         const asked = bondsFieldRequest(bonds, data.basis, fraction, { probe: false });
         const field = drawn.currentField;
@@ -200,14 +204,14 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
         if (landed) facts.push({ label: 'Iso value', value: isoValueText(drawn.isoLevel!), min: 'advanced' });
     }
 
-    // --- The technical band: the diagram's key and notes, and the view settings' helpers.
-    const footer = exact || (meta && meta.bondOrder === null) ? bondOrderFooter(system, meta) : null;
+    // --- The technical band: what the density surface shows, the diagram's key and notes, the bond order's why.
     const technical = paragraphs(
+        density && densitySurfaceText(bonds.densityIso, null, minOnAxisOf(data.basis)),
         orbitals && orbitals.length > 0 && MO_LEGEND,
         orbitals && spinOrderNote(buildMoDiagram(orbitals)),
-        footer,
+        // Fix round 1 (M5): the fact gives the number; this adds only the why.
+        bondOrderNote(system, meta, h2plusState),
         density && FIXED_RHO_NOTE,
-        clipAxis !== 'none' && cutHelpText(clipAxis, true),
     );
 
     // --- How this was computed: every method, said once.
@@ -216,13 +220,14 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
         ...paragraphs(
             ...bondsCaptions(system, scan),
             ...(exact ? [] : orbitalCaveats(meta)),
-            frontier && `Frontier orbitals: ${frontier}`,
+            frontier && `Frontier orbitals — ${frontier}`,
             curveNote(system, scan),
         ).map(paragraph => h('p', null, paragraph)));
 
     return {
         title,
-        plain: sentences(lead, qualitative, noBond),
+        // Fix round 1 (I1): Cut away is on screen from Basics, so what it removes is said in the plain band.
+        plain: sentences(lead, qualitative, noBond, cutAwaySentence(clipAxis)),
         technical,
         facts,
         computed,

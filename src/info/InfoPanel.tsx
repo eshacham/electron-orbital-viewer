@@ -89,10 +89,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
             ) : (
                 <div className="info-body">
                     {content.plain && <p className="info-text">{content.plain}</p>}
-                    {technical && content.technical && (Array.isArray(content.technical)
-                        // Task 6 fix round 1 (M7): short paragraphs, one idea each, never one wall.
-                        ? content.technical.map((paragraph, index) => <p key={index} className="info-text">{paragraph}</p>)
-                        : <p className="info-text">{content.technical}</p>)}
+                    {/* Task 7a fix round 1 (ruling, every mode): the key facts follow the plain text and come before the
+                        technical text -- the spec's order (name, plain explanation, key facts at the level), so the
+                        numbers never fall below Info's fold at Advanced and Research. */}
                     {facts.length > 0 && (
                         <dl className="info-facts ql-tabular">
                             {/* Keyed by place: a label may be markup, and a builder lists each fact once. */}
@@ -104,6 +103,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                             ))}
                         </dl>
                     )}
+                    {technical && content.technical && (Array.isArray(content.technical)
+                        // Task 6 fix round 1 (M7): short paragraphs, one idea each, never one wall.
+                        ? content.technical.map((paragraph, index) => <p key={index} className="info-text">{paragraph}</p>)
+                        : <p className="info-text">{content.technical}</p>)}
                     {content.computed && (
                         // Keyed by whether it starts open, so crossing Research folds or opens it again; in between
                         // the reader's own toggle stands.

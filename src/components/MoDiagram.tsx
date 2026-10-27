@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { DiagramBox, DiagramLevel, buildMoDiagram } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
 import { withSubscripts } from '../format/subscripts';
+import { minus } from '../format/sci';
 
 interface MoDiagramProps {
     /** meta.json's `orbitals`, or H₂⁺'s two exact levels (h2plusOrbitals). */
@@ -36,7 +37,8 @@ const SPIN_WORD: Record<string, string> = { alpha: ', alpha spin', beta: ', beta
  */
 function boxLabel(level: DiagramLevel, box: DiagramBox, index: number): string {
     const occupation = (box.up ? 1 : 0) + (box.down ? 1 : 0);
-    return `${level.label} (${index + 1} of ${level.boxes.length}), ${level.energyHartree.toFixed(3)} Ha, `
+    // Task 7a fix round 1 (M9): a true minus.
+    return `${level.label} (${index + 1} of ${level.boxes.length}), ${minus(level.energyHartree.toFixed(3))} Ha, `
         + `occupation ${occupation}${SPIN_WORD[level.spin]}`;
 }
 
@@ -75,7 +77,7 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
                     style={{ width: BOX }}
                     aria-label={boxLabel(level, box, i)}
                     aria-pressed={box.orbitalIndex === selectedIndex}
-                    title={`${level.label}: ε = ${level.energyHartree.toFixed(4)} Ha`}
+                    title={`${level.label}: ε = ${minus(level.energyHartree.toFixed(4))} Ha`}
                     onClick={() => onSelect?.(box.orbitalIndex)}
                 >
                     {box.up && <span>↑</span>}

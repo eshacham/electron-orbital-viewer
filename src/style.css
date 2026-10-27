@@ -1085,6 +1085,12 @@ html, body, #root {
 .bonds-frontier {
   color: var(--ql-color-text-2);
 }
+/* Task 7a fix round 1: the Data line with its Kohn–Sham (i) beside it. */
+.bonds-data-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
 /* Why the picture differs from the selection, and orbital caveats: a
    warning colour, but dark enough to read as body text on the light card. */
 .bonds-note {

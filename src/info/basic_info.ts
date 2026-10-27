@@ -19,6 +19,7 @@ import { nb, plural } from '../format/text';
 import { shellLetter } from '../orbital_names';
 import { angularNodeSurfaces, isoValueText, shapeWord } from '../orbital_facts';
 import { RADIAL_FACTOR_NOTE } from '../atom/plot_tabs';
+import { cutAwaySentence } from '../atom/atom_text';
 import { CombinationSelection, combinationTitle, selectionProblem } from '../combinations';
 import { HybridKind, HYBRID_NAMES, hybridCount } from '../hybrids';
 import { MAX_FIELD_AU } from '../field_source';
@@ -109,10 +110,9 @@ function enclosedFacts(state: OrbitalsInfoState, n: number, l: number, ml: numbe
     return facts;
 }
 
-/** The Cut away helper, moved here: what a cut removes. Nothing while no cut is on. */
+/** The Cut away helper, moved here: what a cut removes (cutAwaySentence, shared with Bonds). Nothing while no cut is on. */
 function cutSentence(state: OrbitalsInfoState): string | null {
-    const axis = state.orbital.surfaceStyle.clipAxis;
-    return axis === 'none' ? null : `The cut removes the part on the +${axis} side of a plane perpendicular to the ${axis} axis.`;
+    return cutAwaySentence(state.orbital.surfaceStyle.clipAxis);
 }
 
 const joinSentences = (...parts: Array<string | null | false>) => parts.filter(Boolean).join(' ');

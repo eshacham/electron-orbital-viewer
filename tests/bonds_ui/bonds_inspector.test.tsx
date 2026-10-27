@@ -5,6 +5,8 @@ import { fireEvent, render, screen, act } from '@testing-library/react';
 import BondsInspector from '../../src/bonds_ui/BondsInspector';
 import reducer, { selectBondsSystem, setScanPoint } from '../../src/store/bondsSlice';
 import { bondsCaptions } from '../../src/bonds/captions';
+import { h2plusOrbitals } from '../../src/bonds/mo_diagram';
+import { orbitalEnergyText } from '../../src/format/energy';
 import { MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
 
 const empty = { scan: null, meta: null, basis: null, loading: false, error: null };
@@ -50,15 +52,24 @@ describe('BondsInspector (spec §9.3, Phase 6G-2 Task 9)', () => {
         );
         fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
         const frontier = container.querySelector('.bonds-frontier')!;
-        expect(frontier).toHaveTextContent('HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
+        // Fix round 1 (I3, ruling R19): the values say they are Kohn–Sham eigenvalues, with that (i) beside them.
+        expect(frontier).toHaveTextContent('Kohn–Sham orbital energies — HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
         expect([...frontier.querySelectorAll('sub')].map(sub => sub.textContent)).toEqual(['g', 'g']);
+        expect(screen.getByRole('button', { name: 'About Kohn–Sham orbitals' })).toHaveClass('info-button');
     });
 
-    // Task 7a: H₂⁺'s exact levels name no frontier orbital, so Data would be empty -- the section holds the plot alone.
-    it('gives H₂⁺ the plot alone, with no Data tab', () => {
-        render(<BondsInspector variant="docked" bonds={reducer(undefined, { type: '@@init' })} data={empty} plot={<p>the curve</p>} />);
-        expect(screen.getByText('the curve')).toBeInTheDocument();
-        expect(screen.queryByRole('tab', { name: 'Data' })).toBeNull();
+    // Task 7a fix round 1 (ruling I5): H₂⁺ keeps its Data tab, holding its two exact levels, eV first, typeset.
+    it("gives H₂⁺ a Data tab with its two exact levels", () => {
+        const bonds = reducer(undefined, { type: '@@init' });
+        const { container } = render(<BondsInspector variant="docked" bonds={bonds} data={empty} plot={<p>the curve</p>} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
+        const levels = container.querySelector('.bonds-frontier')!;
+        const [g, u] = h2plusOrbitals(bonds.R!);
+        expect(levels).toHaveTextContent(`Exact levels — 1σg Eel = ${orbitalEnergyText(g.energyHartree)} · 1σu* Eel = ${orbitalEnergyText(u.energyHartree)}`);
+        // At R = 2 a₀ (the reviewer's figures).
+        expect(levels).toHaveTextContent('1σg Eel = −30.00 eV (−1.103 Ha) · 1σu* Eel = −18.16 eV (−0.668 Ha)');
+        expect([...levels.querySelectorAll('sub')].map(sub => sub.textContent)).toEqual(['g', 'el', 'u', 'el']);
+        expect(levels.textContent).not.toContain('_');
     });
 
     // Ruling T20b-display-header: the same foldable Display section heads

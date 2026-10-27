@@ -107,9 +107,17 @@ describe('PotentialCurvePlot', () => {
         // Å beside the atomic-unit value (global constraint): 2 a0 = 1.058 Å.
         expect(alt.textContent).toMatch(/1\.06\s*Å/);
         expect(alt.textContent).toContain('1σg');
-        expect(alt.textContent).toContain('-0.6000 Ha');
+        // Task 7a fix round 1 (M9): a true minus (U+2212), not a hyphen.
+        expect(alt.textContent).toContain('−0.6000 Ha');
         // eV beside Ha, the same constraint applied to energy.
-        expect(alt.textContent).toMatch(/-16\.33\s*eV/);
+        expect(alt.textContent).toMatch(/−16\.33\s*eV/);
+        expect(alt.textContent).not.toMatch(/-\d/);
+    });
+
+    // Task 7a fix round 1 (M9): the energy axis's ends read with a true minus.
+    it('labels the energy axis ends with a true minus', () => {
+        const { container } = render(<PotentialCurvePlot {...props} />);
+        expect([...container.querySelectorAll('.potential-axis-label')].map(t => t.textContent)).toEqual(['−0.300', '−0.700']);
     });
 
     it('shows a reference point (e.g. where the fitted curve stops, or R_e/D_e) as visible text, not only a hover title', () => {

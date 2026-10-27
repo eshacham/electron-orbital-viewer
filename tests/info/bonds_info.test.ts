@@ -96,17 +96,30 @@ describe('bondsInfo (Task 7a)', () => {
         const title = render(React.createElement('div', null, content.title)).container.textContent;
         expect(title).toBe('N₂ — total electron density');
         const shown = shownAt(content, 'basics');
-        expect(shown).toContain('N₂ has 14 electrons');
-        // The density label that sat under the ρ buttons, without its method (that is under "How this was computed").
-        const minOnAxis = bondAxisMinimumDensity(n2Basis)!;
-        expect(shown).toContain(`Total electron density, surface at ρ = 0.002 e/a₀³, the conventional molecular outline: one envelope around both nuclei here (ρ stays above ${minOnAxis.toPrecision(2)} e/a₀³ along the bond).`);
-        expect(shown).not.toMatch(/B3LYP/);
+        expect(shown).toContain('N₂ has 14 electrons; the surface shows where they are likely to be found, all orbitals together.');
+        // Fix round 1 (M3): plain words at Basics -- no ρ values, and the title's words are not repeated.
+        expect(shown).not.toMatch(/e\/a₀³|Total electron density,/);
         expect(shown).toContain('Bond order3');
+        // The density label that sat under the ρ buttons, without its method (that is under "How this was computed"),
+        // is technical: from Advanced.
+        const minOnAxis = bondAxisMinimumDensity(n2Basis)!;
+        const advanced = shownAt(content, 'advanced');
+        expect(advanced).toContain(`Total electron density, surface at ρ = 0.002 e/a₀³, the conventional molecular outline: one envelope around both nuclei here (ρ stays above ${minOnAxis.toPrecision(2)} e/a₀³ along the bond).`);
+        expect(advanced).not.toMatch(/B3LYP/);
+    });
+
+    // Fix round 1 (M3): before the molecule's data lands, "they" has an antecedent.
+    it('names the electrons before their count is known', () => {
+        const content = bondsInfo(stateOf(n2Store()), NOTHING, 'basics');
+        expect(shownAt(content, 'basics')).toContain('The surface shows where the electrons are likely to be found, all orbitals together.');
     });
 
     it('at Explore adds E − E(atoms), eV first with Ha in parentheses, and keeps the absolute energy for Research', () => {
         const content = bondsInfo(stateOf(n2Store()), n2Data, 'explore');
         const explore = shownAt(content, 'explore');
+        // Ruling (fix round 1): the facts come straight after the plain text, before the technical text.
+        const advanced = shownAt(content, 'advanced');
+        expect(advanced.indexOf('Bond order3')).toBeLessThan(advanced.indexOf(MO_LEGEND));
         expect(explore).toContain('Bond length R2.07 a₀ (1.098 Å)');
         expect(explore).toContain('E − E(atoms)−9.44 eV (−0.347 Ha)');
         expect(explore).not.toContain('Total energy');
@@ -120,7 +133,8 @@ describe('bondsInfo (Task 7a)', () => {
         const computed = computedText(content);
         bondsCaptions('n2', n2Scan).forEach(caption => expect(computed).toContain(typeset(caption)));
         orbitalCaveats(meta).forEach(caveat => expect(computed).toContain(caveat));
-        expect(computed).toContain('HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
+        // Fix round 1 (M8): one colon, a dash before the entries.
+        expect(computed).toContain('Frontier orbitals — HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
         // The curve's caption, less what the captions above already say: its zero.
         expect(computed).toContain('Plot: E − E(separated atoms), in eV. Zero: N ⁴S + N ⁴S, UCCSD(T)/aug-cc-pVTZ (UHF reference, frozen core), the grey line.');
         // Said once: the energy method is not repeated by the curve's note.
@@ -161,7 +175,8 @@ describe('bondsInfo (Task 7a)', () => {
         expect(basics).not.toContain('Orbital energy');
         const advanced = shownAt(content, 'advanced');
         expect(advanced).toContain('Orbital energy−11.92 eV (−0.438 Ha)');
-        expect(advanced).toContain('Enclosed90 % of the electron');
+        // Fix round 1 (M10): a molecular orbital may hold two electrons; the surface encloses a share of its |ψ|².
+        expect(advanced).toContain("Enclosed90 % of the orbital's |ψ|²");
         expect(advanced).toContain('Iso value|ψ|² = 2.50 × 10⁻³ a₀⁻³');
     });
 
@@ -201,27 +216,67 @@ describe('bondsInfo (Task 7a)', () => {
         const content = bondsInfo(stateOf(store), { ...NOTHING, meta: hfMeta }, 'advanced');
         const advanced = shownAt(content, 'advanced');
         expect(advanced).toContain('Bond order1');
-        expect(advanced).toContain("Bond order 1 — counted from the valence orbitals' bonding/antibonding character; g/u labels don't apply to a heteronuclear molecule.");
+        // Fix round 1 (M5): the fact gives the number; the technical text only the why.
+        expect(advanced).toContain("Counted from the valence orbitals' bonding or antibonding character; g/u labels do not apply to a heteronuclear molecule.");
+        expect(advanced.match(/Bond order/g)).toHaveLength(1);
     });
 
     // Ruling T4-d: C₂'s numbers are qualitative -- said plainly at every level, and in the method's words (bondsCaptions'
     // first caption) under "How this was computed".
-    it('says plainly that a multireference molecule\'s numbers are only qualitative', () => {
+    it('says plainly that a multireference molecule\'s energies are only a rough guide', () => {
         const store = makeStore();
         store.dispatch(setMode('bonds'));
         store.dispatch(selectBondsSystem('c2'));
         const c2Scan = { ...n2Scan, id: 'c2', formula: 'C₂', validity: { ...n2Scan.validity, multireference: true, t1AtRe: 0.0384, t1Limit: 0.0576 } } as MoleculeScan;
         const content = bondsInfo(stateOf(store), { ...NOTHING, scan: c2Scan }, 'basics');
-        expect(shownAt(content, 'basics')).toContain('The computed numbers for C₂ are only qualitative');
+        // Fix round 1 (M4): the energies, as T4-d's caption says.
+        expect(shownAt(content, 'basics')).toContain('The computed energies for C₂ are only a rough guide: no single arrangement of its electrons describes it well, and the methods used here start from one.');
         expect(shownAt(content, 'basics')).not.toMatch(/CCSD|multireference/);
         expect(computedText(content)).toContain('Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.038 at Re).');
     });
 
-    it('carries the cut helper that used to sit under Cut away', () => {
+    // Fix round 1 (I1): Cut away is a Basics control, so what it removes is said from Basics, with its subject -- in
+    // Orbitals' words (one function, cutAwaySentence).
+    it('carries the cut helper that used to sit under Cut away, from Basics', () => {
         const store = n2Store();
         store.dispatch(setSurfaceStyle({ clipAxis: 'y', clipPosition: 0 }));
-        expect(shownAt(bondsInfo(stateOf(store), n2Data, 'advanced'), 'advanced'))
-            .toContain('Removes the part on the +y side of a plane perpendicular to the y axis.');
+        expect(shownAt(bondsInfo(stateOf(store), n2Data, 'basics'), 'basics'))
+            .toContain('The cut removes the part on the +y side of a plane perpendicular to the y axis.');
+    });
+
+    // Fix round 1 (I4): He₂'s no-bond sentence, said under the diagram to every level before, is Info's plain text now.
+    describe('He₂', () => {
+        const heScan = fixture('n2', 'scan.json') as MoleculeScan;
+        const he2Scan = {
+            ...heScan, id: 'he2', formula: 'He₂', energyMethod: 'FCI/aug-cc-pVTZ (no counterpoise correction)',
+            fit: { ...heScan.fit, bound: false, DeHartree: 3.9e-5, DeEv: 0.00107,
+                separatedAtomsMethod: 'He ¹S + He ¹S, FCI/aug-cc-pVTZ (no counterpoise correction)' },
+            validity: { ...heScan.validity, stoppedAtRBohr: null, stopReason: null },
+            note: null, reference: { ReAngstrom: null, source: null },
+        } as MoleculeScan;
+        const heMeta = {
+            ...n2Meta, id: 'he2@01', bondOrder: 0,
+            orbitals: [
+                { index: 0, label: '1σg', energyHartree: -0.57, occupation: 2, spin: 'restricted' },
+                { index: 1, label: '1σu*', energyHartree: -0.55, occupation: 2, spin: 'restricted', role: 'HOMO' }],
+        } as unknown as MoleculeMeta;
+        const he2 = () => {
+            const store = makeStore();
+            store.dispatch(setMode('bonds'));
+            store.dispatch(selectBondsSystem('he2'));
+            return bondsInfo(stateOf(store), { ...NOTHING, scan: he2Scan, meta: heMeta }, 'basics');
+        };
+
+        it('says at Basics that there is no bond, with a bond order of 0', () => {
+            const shown = shownAt(he2(), 'basics');
+            expect(shown).toContain('Bond order 0 — no bond: the antibonding electrons cancel the bonding ones.');
+            expect(shown).toContain('Bond order0');
+        });
+
+        // Fix round 1 (M6): "no counterpoise correction" is said once in "How this was computed".
+        it('says "no counterpoise correction" once', () => {
+            expect(computedText(he2()).match(/counterpoise/g)).toHaveLength(1);
+        });
     });
 
     describe('H₂⁺', () => {
@@ -230,10 +285,15 @@ describe('bondsInfo (Task 7a)', () => {
             const title = render(React.createElement('div', null, content.title)).container.textContent;
             expect(title).toBe('H₂⁺ — 1σg orbital');
             const shown = shownAt(content, 'research');
-            expect(shown).toContain('H₂⁺ is two protons sharing one electron');
+            // Fix round 1 (M2): Born–Oppenheimer in plain words.
+            expect(shown).toContain('H₂⁺ is two protons sharing one electron: the simplest chemical bond, and one solved exactly here for nuclei held in place.');
             expect(shown).toContain('E − E(H + H⁺)−2.79 eV (−0.103 Ha)');
+            // Fix round 1 (I4): the panel's old "E = −0.60263 Ha", at Research, eV first.
+            expect(shown).toContain('Total energy−16.40 eV (−0.60263 Ha)');
             expect(shown).toContain('Bond order½');
-            expect(shown).toContain('Bond order ½. One electron, exact energies.');
+            // Fix round 1 (M5): the why, not the number again.
+            expect(shown).toContain('One electron, so the energies are exact.');
+            expect(shown.match(/Bond order/g)).toHaveLength(1);
             const computed = computedText(content);
             bondsCaptions('h2plus', null).forEach(caption => expect(computed).toContain(typeset(caption)));
             expect(computed).toContain('Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (−0.5 Ha), the grey line.');
@@ -244,8 +304,21 @@ describe('bondsInfo (Task 7a)', () => {
         it('says plainly that 1σu* is antibonding and does not bind', () => {
             const store = h2plusStore();
             store.dispatch(setBondsView({ kind: 'h2plus', state: '1sigma_u' }));
+            // Fix round 1 (M1): the node is the wavefunction's.
             const shown = shownAt(bondsInfo(stateOf(store), NOTHING, 'basics'), 'basics');
-            expect(shown).toContain('In 1σu*, the antibonding orbital, the electron has a node midway between the nuclei, and this state does not hold them together.');
+            expect(shown).toContain('In 1σu*, the antibonding orbital, the wavefunction has a nodal plane midway between the nuclei, so the electron is kept out of the region between them, and this state does not hold them together.');
+        });
+
+        // Fix round 1 (I2): beside 1σu*'s own repulsive energy, the ½ is named as the ground state's.
+        it('in the 1σu* view, names the ½ as the ground state\'s bond order and says this state has no bond', () => {
+            const store = h2plusStore();
+            store.dispatch(setBondsView({ kind: 'h2plus', state: '1sigma_u' }));
+            const content = bondsInfo(stateOf(store), NOTHING, 'advanced');
+            const shown = shownAt(content, 'advanced');
+            expect(shown).toContain('Ground-state bond order½');
+            expect(shown).toContain('In the ground state (electron in 1σg) the bond order is ½; with the electron in 1σu* there is no bond. One electron, so the energies are exact.');
+            // Fix round 1 (M11): above the limit, with its sign.
+            expect(shown).toMatch(/E − E\(H \+ H⁺\)\+\d+\.\d+ eV \(\+0\.\d+ Ha\)/);
         });
 
         it('at Basics has no energies and no method', () => {

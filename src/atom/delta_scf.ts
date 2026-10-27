@@ -13,8 +13,10 @@ import { AtomSpecies, speciesConfiguration, speciesKey, speciesSymbol, speciesTi
 import { allowedCharges } from './ion_configurations';
 import { solvePolarised } from './spin_scf';
 import { RelativityMode, shortMethodLabel } from './relativity';
+import { HARTREE_IN_EV } from '../format/energy';
 
-export const HARTREE_IN_EV = 27.211386245988;
+// Task 7a fix round 1 (M7): the one Ha→eV factor lives in format/energy.ts; this module's name for it stays.
+export { HARTREE_IN_EV };
 export const DELTA_SCF_LABEL = 'ΔSCF, LDA';
 const DELTA_SCF_HEAD =
     'ΔSCF: the difference of two self-consistent total energies, each from a central-field, spin-polarised ' +

@@ -6,7 +6,10 @@ import BondsPanel from '../../src/components/BondsPanel';
 import reducer, { selectBondsSystem, setBondsView, setScanPoint } from '../../src/store/bondsSlice';
 import { bondsCaptions, densitySurfaceText, frontierText, orbitalCaveats } from '../../src/bonds/captions';
 import { bondAxisMinimumDensity } from '../../src/bonds/bond_density';
-import { bondOrderFooter } from '../../src/bonds/mo_diagram';
+import { bondOrderNote, bondOrderOf } from '../../src/bonds/mo_diagram';
+
+/** No-break spaces read as plain spaces. */
+const flat = (text: string) => text.replace(/\u00A0/g, ' ');
 import { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
 
 const handlers = { onSelectSystem: jest.fn(), onCommitH2PlusR: jest.fn(), onScanIndex: jest.fn(), onView: jest.fn(), onDensityIso: jest.fn() };
@@ -106,9 +109,11 @@ describe('bondsCaptions', () => {
         expect(he).toMatch(/Energies: FCI\/aug-cc-pVTZ/);
         expect(he).toMatch(/orbital energies are B3LYP\/def2-TZVP Kohn–Sham eigenvalues — not ionisation energies/);
         const unbound = bondsCaptions('he2', heScan).find(c => c.startsWith('No chemical bond'));
+        // Task 7a fix round 1 (M6): "no counterpoise correction" is said once, by the method ("Energies: FCI/… (no
+        // counterpoise correction)."), not again here.
         expect(unbound).toBe("No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa "
-            + "(0.04 mHa below the separated atoms, He ¹S + He ¹S, same method), comparable to this basis' superposition error, "
-            + 'with no counterpoise correction.');
+            + "(0.04 mHa below the separated atoms, He ¹S + He ¹S, same method), comparable to this basis' superposition error.");
+        expect(he.match(/counterpoise/g)).toHaveLength(1);
         // He₂ has no bond, so it has no R_e or D_e to state.
         expect(he).not.toMatch(/D_e|R_e =/);
     });
@@ -167,7 +172,9 @@ describe('frontierText and orbitalCaveats', () => {
     // Task 7a (Task 6 ruling: energies read eV first, Ha in parentheses, in every mode): the one frontier text the Data
     // tab and Info share.
     it('names the HOMO and LUMO, once per degenerate set', () => {
-        expect(frontierText(n2Meta.orbitals)).toBe('HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
+        // Fix round 1 (M8): each entry is held on one line (no-break spaces); read here as plain spaces.
+        expect(flat(frontierText(n2Meta.orbitals)!)).toBe('HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
+        expect(frontierText(n2Meta.orbitals)).toContain('−11.92\u00A0eV');
     });
 
     it("names O₂'s singly occupied pair", () => {
@@ -177,7 +184,7 @@ describe('frontierText and orbitalCaveats', () => {
             { index: 2, label: '1πg*', energyHartree: -0.2, occupation: 0, spin: 'beta', role: 'LUMO' },
         ] as MoleculeMeta['orbitals'];
         // Task 7a: eV first (see above).
-        expect(frontierText(orbitals)).toBe('SOMO 1πg* α ×2: ε = −10.88 eV (−0.400 Ha) · LUMO 1πg* β: ε = −5.44 eV (−0.200 Ha)');
+        expect(flat(frontierText(orbitals)!)).toBe('SOMO 1πg* α ×2: ε = −10.88 eV (−0.400 Ha) · LUMO 1πg* β: ε = −5.44 eV (−0.200 Ha)');
     });
 
     it('says when a kept orbital shape is a near tie with another virtual', () => {
@@ -409,22 +416,28 @@ describe('BondsPanel', () => {
     // defined by g/u counting" for CO/HF, while the System select (ruling R23e) shows a real
     // number for them -- a contradiction inside the same panel. Both now read
     // systems.ts' TEXTBOOK_BOND_ORDER (see tests/bonds/systems.test.ts for the cross-check).
-    // Task 7a: the footer is Info's now (bondsInfo: the Bond order fact, and this sentence where it says more), built
-    // by bondOrderFooter, which BondsPanel's own logic moved into -- the same words, tested here on the function.
+    // Task 7a: the footer is Info's now. Fix round 1 (M5): Info's Bond order fact gives the number, and bondOrderNote
+    // only the why -- tested here on the function; I2: H₂⁺'s 1σu* view says the ½ is the ground state's.
     describe('the heteronuclear footer', () => {
-        it('states CO’s bond order and why g/u counting does not reach it', () => {
-            expect(bondOrderFooter('co', coMeta)).toBe("Bond order 3 — counted from the valence orbitals' bonding/antibonding character; "
-                + "g/u labels don't apply to a heteronuclear molecule.");
+        it('says why g/u counting does not reach CO or HF, without repeating the number', () => {
+            const why = "Counted from the valence orbitals' bonding or antibonding character; g/u labels do not apply to a heteronuclear molecule.";
+            expect(bondOrderNote('co', coMeta)).toBe(why);
+            expect(bondOrderNote('hf', hfMeta)).toBe(why);
+            // Ruling T23e-COHF: the number is the System select's own.
+            expect(bondOrderOf('co', coMeta)).toBe(3);
+            expect(bondOrderOf('hf', hfMeta)).toBe(1);
         });
 
-        it('states the same for HF, from the real shipped fixture', () => {
-            expect(bondOrderFooter('hf', hfMeta)).toBe("Bond order 1 — counted from the valence orbitals' bonding/antibonding character; "
-                + "g/u labels don't apply to a heteronuclear molecule.");
-        });
-
-        it("leaves a homonuclear molecule's footer as it was, and H₂⁺'s exact", () => {
-            expect(bondOrderFooter('n2', n2Meta)).toBe('Bond order 3.');
-            expect(bondOrderFooter('h2plus', null)).toBe('Bond order ½. One electron, exact energies.');
+        it("adds nothing to a homonuclear molecule's own count, and says H₂⁺ is exact", () => {
+            expect(bondOrderNote('n2', n2Meta)).toBeNull();
+            expect(bondOrderOf('n2', n2Meta)).toBe(3);
+            expect(bondOrderOf('he2', heMeta)).toBe(0);
+            // Before a molecule's data lands, the textbook value.
+            expect(bondOrderOf('o2', null)).toBe(2);
+            expect(bondOrderOf('h2plus', null)).toBe(0.5);
+            expect(bondOrderNote('h2plus', null)).toBe('One electron, so the energies are exact.');
+            expect(bondOrderNote('h2plus', null, '1sigma_u')).toBe(
+                'In the ground state (electron in 1σg) the bond order is ½; with the electron in 1σu* there is no bond. One electron, so the energies are exact.');
         });
 
         it('is no longer printed under the diagram', () => {

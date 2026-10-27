@@ -150,14 +150,23 @@ export function relativityReadoutOf(profile: SerialisedAtomProfile): RelativityR
 }
 
 /**
- * What a cut does, in words (the Cut away helper). Task 6: Atoms says it in Info (atomInfo), Bonds and Molecules under
- * the control until Task 7 moves theirs; one function, so the two cannot drift.
+ * What a cut does, in words (the Cut away helper). Task 6: Atoms says it in Info (atomInfo); Molecules still says it
+ * under the control (Task 7b moves it); one function, so the two cannot drift. Orbitals and Bonds say it in their plain
+ * band with cutAwaySentence (Task 7a fix round 1, M13).
  */
 export function cutHelpText(clipAxis: ClipAxis, meshLevel: boolean): string {
     if (clipAxis === 'none') return 'Pick an axis to slice the orbital open.';
     return meshLevel
         ? `Removes the part on the +${clipAxis} side of a plane perpendicular to the ${clipAxis} axis.`
         : `Slices off the +${clipAxis} side to show the shells inside. The atom is round, so X, Y and Z give the same rings, facing a different way.`;
+}
+
+/**
+ * What a cut removes, as Info's plain band says it while a mesh view is cut (Orbitals, Bonds -- Task 7a fix round 1,
+ * I1: Cut away is on screen from Basics, so its sentence is too, with its subject). Null with no cut.
+ */
+export function cutAwaySentence(clipAxis: ClipAxis): string | null {
+    return clipAxis === 'none' ? null : `The cut removes the part on the +${clipAxis} side of a plane perpendicular to the ${clipAxis} axis.`;
 }
 
 /** What each mode is, in one line; "Default for this element" when it is that element's default (spec §3.1). */

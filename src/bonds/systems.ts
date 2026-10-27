@@ -1,5 +1,6 @@
 import type { MoleculeScan, ScanPoint } from '../molecules/types';
 import { H2PLUS_R_RANGE } from './h2plus';
+import { HARTREE_IN_EV } from '../format/energy';
 
 /**
  * The systems Bonds mode offers. H₂⁺ is solved exactly in the browser at any
@@ -114,7 +115,8 @@ export function systemFormula(id: BondsSystemId): string {
 
 /** CODATA 2018, the factors the global constraints fix for display. */
 export const BOHR_TO_ANGSTROM = 0.529177210903;
-export const HARTREE_TO_EV = 27.211386245988;
+/** Task 7a fix round 1 (M7): the one Ha→eV factor (format/energy.ts), under this module's name. */
+export const HARTREE_TO_EV = HARTREE_IN_EV;
 /**
  * Bonds meshes sample 97³ points. Timed on an M2 Pro and scaled by
  * single-core benchmarks to a 2020 laptop: an H₂⁺ mesh about 0.5–0.7 s, and
