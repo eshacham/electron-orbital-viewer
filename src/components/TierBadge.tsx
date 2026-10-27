@@ -1,18 +1,13 @@
 import React, { useId } from 'react';
 import { Chip } from '@mui/material';
 import { tierOf, type MoleculeTier } from '../molecules/types';
-import { validatedLine } from '../validation/geometry_honesty';
+import { tierLine, TIER_LABEL, validatedLine } from '../validation/geometry_honesty';
 
-export const TIER_LABEL: Record<MoleculeTier, string> = { validated: 'Library', computed: 'Computed' };
-export const COMPUTED_LINE = 'Computed on request by the same method; not benchmarked against experiment.';
+// Task 7b fix round 1: the tier's name and line are worded in validation/geometry_honesty.ts (Info says the line on a
+// phone); still exported from here for the callers that read them beside the badge.
+export { COMPUTED_LINE, TIER_LABEL, tierLine } from '../validation/geometry_honesty';
 
 type BadgeMeta = Parameters<typeof validatedLine>[0] & { tier?: MoleculeTier };
-
-/** The badge's second line: a computed molecule's is fixed; a library molecule's says what its own
- * references check (final review I2), never a claim the data do not carry. */
-export function tierLine(meta: BadgeMeta): string {
-    return tierOf(meta) === 'computed' ? COMPUTED_LINE : validatedLine(meta);
-}
 
 /**
  * Spec §9.1: which tier a molecule belongs to is always on screen with it,

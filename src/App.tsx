@@ -672,15 +672,18 @@ function App() {
     );
     // Task 7b: Molecules' Info is moleculeInfo, built from the two slices it reads (the selection and drawn surface, the
     // orbital slice's fraction and cut), the owner's record of a computed molecule and the bond-label preference.
-    const moleculeSliceNow = useAppSelector(state => state.molecule);
+    // Fix round 1 (M11): the one Molecules selector, read here first and by the mode's wiring below.
+    const molecule = useAppSelector(state => state.molecule);
     // The owner's record of a computed molecule, not the whole jobs slice: App re-renders for nothing else in it.
     const ownerRecordNow = useAppSelector(ownerJobRecordOf, shallowEqual);
     const moleculeLabelsNow = usePref(displayPref).moleculeLabels;
     const moleculeInfoContent = useMemo(
         () => (isMoleculeMode ? moleculeInfo({
-            molecule: moleculeSliceNow, orbital: orbitalSliceNow, ...ownerRecordNow, moleculeLabels: moleculeLabelsNow,
-        }, moleculeSliceNow.meta, level) : null),
-        [isMoleculeMode, moleculeSliceNow, orbitalSliceNow, ownerRecordNow, moleculeLabelsNow, level],
+            molecule, orbital: orbitalSliceNow, ...ownerRecordNow, moleculeLabels: moleculeLabelsNow,
+            // Ruling (concern 5): a phone's tier chip is compact (its line a tooltip touch never shows), so Info says it.
+            tierLineShown: isNarrow,
+        }, molecule.meta, level) : null),
+        [isMoleculeMode, molecule, orbitalSliceNow, ownerRecordNow, moleculeLabelsNow, isNarrow, level],
     );
     // Ruling PF5: the owner's time and cost for a computed molecule ("How this was computed") are fetched here now that
     // the pinned footer that fetched them is gone -- once, whether or not Info is on screen.
@@ -733,8 +736,7 @@ function App() {
     // moleculeSlice; the index loads when the mode opens and a molecule's
     // files when it is picked (spec §4.2), and OrbitalViewer's
     // useMoleculeView draws them. Nothing here starts a hydrogen render:
-    // the Basic Orbitals effects above ask for that mode by name.
-    const molecule = useAppSelector(state => state.molecule);
+    // the Basic Orbitals effects above ask for that mode by name. (The molecule slice is read above, for Info.)
     // Outside Molecules a search wants the index alone, not a molecule's files (ruling DB4).
     useMoleculeLoader(isMoleculeMode, { indexOnly: searchWantsIndex });
     // The owner's computed molecules join the picker as a Computed category; nobody else's picker changes.

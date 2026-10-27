@@ -97,8 +97,8 @@ export const ESP_COLOURS_SENTENCE = 'The surface is coloured by the electrostati
     + `blue where it is positive (electron-poor). Every molecule is drawn on the same scale, ±${ESP_LIMIT_HARTREE} Ha/e `
     + `(±${ESP_KCAL} kcal/mol), so maps can be compared.`;
 /** Ruling D4: the surface the map is drawn on is a fixed density, never an enclosed fraction (App's old helper). */
-export const ESP_SURFACE_SENTENCE = `The map is drawn on the surface ρ = ${ESP_SURFACE_DENSITY} e/a₀³, the one ESP maps are conventionally `
-    + 'drawn on — not at an enclosed fraction, so Electron enclosed does not apply to it.';
+export const ESP_SURFACE_SENTENCE = `The map is drawn on the surface ρ = ${ESP_SURFACE_DENSITY} e/a₀³, a common convention (Bader's) `
+    + 'for a molecule\'s outer surface — not at an enclosed fraction, so Electron enclosed does not apply to it.';
 /** This molecule's own range on the drawn surface: "−0.061 to +0.071 Ha/e". */
 export const espRangeText = (range: [number, number]): string => `${formatEsp(range[0])} to ${formatEsp(range[1])} Ha/e`;
 /** Said only when the range runs past the fixed scale (espRangeNote's "saturated beyond the scale"). */

@@ -1,40 +1,26 @@
 import React, { useMemo } from 'react';
-import { formatFormula, multiplicityText } from '../molecules/catalogue';
-import { dipoleFactText } from '../molecules/dipole';
-import { gapTerm, orbitalGaps } from '../molecules/orbital_display';
+import { multiplicityText } from '../molecules/catalogue';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { tierOf } from '../molecules/types';
 import { detectBonds } from '../molecules/ball_and_stick';
 import { structureRows } from '../molecules/bond_labels';
-import { TIER_LABEL } from '../components/TierBadge';
-import { orbitalEnergyText } from '../format/energy';
-import { nb } from '../format/text';
-import { PointGroupLabel } from '../format/PointGroupLabel';
+import { TIER_LABEL } from '../validation/geometry_honesty';
 import './molecule_explore.css';
 
 interface PropertyRow { term: string; value: React.ReactNode }
 
 /**
  * The rows of spec §9.4 Properties, each from the function the rest of the app already uses for it (ruling P10).
- * Task 7b: values only -- the captions that stood under them (the point group's label note, the gap's Kohn–Sham
- * caveat, the geometry's tier line) are Info's, each said once; the point group is typeset (<PointGroupLabel>) and the
- * gaps read eV first, as Info's do.
+ * Task 7b fix round 1 (ruling on concern 4): each molecule number has one home, Info -- the point group, electrons,
+ * dipole (with ozone's caveat) and gaps are its facts, beside their (i)s and the Kohn–Sham caveat, and the title names
+ * the formula. The card keeps what Info does not show: the multiplicity, where the geometry comes from (said once on
+ * screen), the data tier, and the structure tables below.
  */
 function propertyRows(meta: LibraryMoleculeMeta): PropertyRow[] {
     return [
-        { term: 'Formula', value: formatFormula(meta.formula) },
-        { term: 'Point group', value: <PointGroupLabel pg={meta.symmetry.pointGroup} /> },
-        { term: 'Electrons', value: String(meta.electronCount) },
         { term: 'Multiplicity', value: multiplicityText(meta.multiplicity) },
-        // Ruling T7-O3: a documented caveat stays beside the number it qualifies. Task 7b: Info's own wording (computed
-        // against experiment, with its source); the method is "How this was computed"'s.
-        { term: 'Dipole', value: `${dipoleFactText(meta)}${meta.caveat ? ` — ${meta.caveat}` : ''}` },
-        // The orbital list's own gaps: HOMO–LUMO (SOMO–LUMO for an open shell) and HOMO–LVMO where the LVMO is
-        // one of the calculation's orbitals -- none to a constructed LVMO (Ruling D4-energy), none without a virtual.
-        ...orbitalGaps(meta.orbitals).map(gap => ({ term: gapTerm(gap), value: nb(orbitalEnergyText(gap.hartree)) })),
-        // The geometry source, said once on screen (Task 7b): the tier line that captioned it is the title block's.
         { term: 'Geometry', value: meta.geometrySource },
-        // Ruling T12-dup: the tier's name only; its line is the title block's.
+        // Ruling T12-dup: the tier's name only; its line is the title block's (and, on a phone, Info's last note).
         { term: 'Data tier', value: TIER_LABEL[tierOf(meta)] },
     ];
 }

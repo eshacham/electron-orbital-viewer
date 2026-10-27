@@ -8,7 +8,7 @@ import MoleculeOrbitalList from '../../src/components/MoleculeOrbitalList';
 import MoleculeReadout from '../../src/components/MoleculeReadout';
 import MoleculeViewOptions from '../../src/components/MoleculeViewOptions';
 import {
-    formatOrbitalEnergy, degeneracyCounts, formatPointGroup, orbitalGaps, orbitalTag, orbitalEnergyText, isConstructed, textbookLumo,
+    degeneracyCounts, orbitalEnergyWithEstimate, formatPointGroup, orbitalGaps, orbitalTag, isConstructed, textbookLumo,
     labelsSentence, AXES_NOTE, GAP_CAVEAT, CONSTRUCTED_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, UNLABELLED_NOTE, VALENCE_VIRTUAL_NOTE,
 } from '../../src/molecules/orbital_display';
 import { LIBRARY_INDEX, waterMeta, waterAtoms } from './fixtures';
@@ -44,8 +44,9 @@ const navProps = {
 };
 
 describe('orbital display', () => {
-    it('formats energies in Ha with eV beside', () => {
-        expect(formatOrbitalEnergy(-0.4913)).toBe('−0.491 Ha (−13.37 eV)');
+    // Task 7b fix round 1 (M8): one orbital-energy formatter, eV first (format/energy.ts); the Ha-first copy is gone.
+    it('formats energies in eV with Ha beside, and an upper estimate as one', () => {
+        expect(orbitalEnergyWithEstimate({ energyHartree: -0.4913 })).toBe('−13.37 eV (−0.491 Ha)');
     });
     it('counts degenerate sets', () => {
         const counts = degeneracyCounts([{ index: 2, energyHartree: -0.5 }, { index: 3, energyHartree: -0.50001 }, { index: 4, energyHartree: -0.5 + 1e-5 }, { index: 5, energyHartree: 0.1 }]);
@@ -418,8 +419,11 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(within(second).getByRole('img', {
             name: 'partly diffuse (27 % valence): its shape depends on the basis; positive energy: an unbound state, not a bound orbital' }))
             .toHaveTextContent('◌');
-        expect(info).toContain('◌ marks a partly diffuse virtual (under 75 % valence): its shape depends on the basis.');
-        expect(info).toContain('Those at positive energy are unbound, basis-set dependent states, not bound orbitals.');
+        // Task 7b fix round 1 (M2, M1): the key says what the mark means; the technical band what a diffuse virtual is,
+        // and that those at positive energy are unbound, each with its own subject.
+        expect(info).toContain('◌ marks a partly diffuse virtual (under 75 % valence).');
+        expect(info).toContain('A partly diffuse virtual (◌): its shape depends on the basis.');
+        expect(info).toContain('Diffuse virtuals at positive energy are unbound, basis-set dependent states, not bound orbitals.');
     });
     it('makes no "unbound" claim when no diffuse virtual lies above zero', () => {
         const { container, info } = list(WATER_V3.filter(o => o.index !== 6));
@@ -445,7 +449,8 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(info).toContain(
             "LVMO: the lowest empty valence orbital — the one textbooks draw (antibonding, or an empty valence orbital such as boron's 2p in BF3).");
         expect(info).not.toMatch(/antibonding orbital textbooks draw/);
-        expect(info).toContain('Labels: irreducible representations of C2v, numbered in energy order within each, core included.');
+        // Task 7b fix round 1 (M3): the labels sentence types its point group (C₂ᵥ), as Info's fact does.
+        expect(info).toContain('Labels: irreducible representations of C₂ᵥ, numbered in energy order within each, core included.');
     });
     it('gives only the Kohn–Sham HOMO–LUMO gap, with its caveat, when the LVMO is constructed', () => {
         const { info } = list();
@@ -472,7 +477,8 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(container.textContent).not.toMatch(/upper estimate|unbound|◌|◇/);
         expect(info).not.toMatch(/upper estimate|unbound|◌|◇/);
         expect(info).toContain(UNCLASSIFIED_NOTE);
-        expect(info).toContain('Labels: irreducible representations of C2v.');
+        // Task 7b fix round 1 (M3): the labels sentence types its point group (C₂ᵥ), as Info's fact does.
+        expect(info).toContain('Labels: irreducible representations of C₂ᵥ.');
     });
     it('names a subgroup fallback, an unlabelled set, a geometry-labelled set and an unlabelled molecule in the caption', () => {
         const orbitals = [{ index: 0, label: '?', energyHartree: -0.5, occupation: 2, role: 'HOMO',
@@ -484,7 +490,8 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         unmount();
         expect(labelsSentence({ pointGroup: 'C2v', labelGroup: 'C2v', labels: 'full-group',
             labelNote: 'the SCF ran without point-group symmetry: labelled from the geometry\'s own point group, by character projection' }))
-            .toBe('Labels: irreducible representations of C2v, numbered in energy order within each, core included; '
+            // Task 7b fix round 1 (M3): the labels sentence types its point group (C₂ᵥ), as Info's fact does.
+            .toBe('Labels: irreducible representations of C₂ᵥ, numbered in energy order within each, core included; '
                 + 'the SCF ran without point-group symmetry: labelled from the geometry\'s own point group, by character projection. '
                 + AXES_NOTE);
         expect(labelsSentence({ pointGroup: 'SO3', labelGroup: null, labels: 'none', labelNote: 'the SCF ran without point-group symmetry' }))
@@ -519,9 +526,10 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
         expect(isConstructed({ kind: 'valence-virtual' })).toBe(true);
         expect(isConstructed({ constructed: true })).toBe(true);
         expect(isConstructed({})).toBe(false);
-        expect(orbitalEnergyText(WATER_V3[7])).toBe('0.190 Ha (5.17 eV), upper estimate');
-        expect(orbitalEnergyText({ energyHartree: 0.19, energyApproximate: true })).toBe('0.190 Ha (5.17 eV), upper estimate');
-        expect(orbitalEnergyText(WATER_V3[5])).toBe('−0.010 Ha (−0.27 eV)');
+        // Task 7b fix round 1 (M8): eV first, the one formatter's order.
+        expect(orbitalEnergyWithEstimate(WATER_V3[7])).toBe('5.17 eV (0.190 Ha), upper estimate');
+        expect(orbitalEnergyWithEstimate({ energyHartree: 0.19, energyApproximate: true })).toBe('5.17 eV (0.190 Ha), upper estimate');
+        expect(orbitalEnergyWithEstimate(WATER_V3[5])).toBe('−0.27 eV (−0.010 Ha)');
         expect(orbitalGaps(WATER_V3).map(g => g.name)).toEqual(['HOMO–LUMO']);
         expect(orbitalGaps(COMPUTED_LVMO).map(g => [g.name, g.hartree.toFixed(3)])).toEqual([['HOMO–LUMO', '0.290'], ['HOMO–LVMO', '0.500']]);
         expect(orbitalGaps(waterMeta().orbitals).map(g => g.name)).toEqual(['HOMO–LUMO']);
@@ -582,7 +590,8 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
     it('keys the marks in Info, not under the list (Task 7b)', () => {
         const { container, info } = list();
         expect(container.querySelector('.molecule-orbital-legend')).toBeNull();
-        expect(info).toContain('◌ marks a partly diffuse virtual (under 75 % valence): its shape depends on the basis. '
+        // Task 7b fix round 1 (M2): only what each mark means.
+        expect(info).toContain('◌ marks a partly diffuse virtual (under 75 % valence). '
             + '◇ marks a constructed LVMO, not an orbital of this calculation. “upper est.” marks an energy that is an upper estimate.');
         const legacy = list(waterMeta().orbitals, { pointGroup: 'C2v', labelGroup: 'C2v' });
         expect(legacy.info).not.toMatch(/marks a|◌|◇/);

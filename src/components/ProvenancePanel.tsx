@@ -5,7 +5,7 @@ import { DISPERSION_COMPUTE_VERSION, tierOf, MoleculeProvenance } from '../molec
 import { computedResultFiles, jobFileUrl } from '../molecules/job_paths';
 import { capacityLabel, formatDuration, formatGB, money, predictionNote, quotedCost } from '../jobs/format';
 import type { JobView } from '../jobs/api_types';
-import { NOT_A_TEST, isExperimentalGeometry } from '../validation/geometry_honesty';
+import { countsAsCheck, isExperimentalGeometry } from '../validation/geometry_honesty';
 import { withSubscripts } from '../format/subscripts';
 
 export const PUBCHEM_COMPOUND_URL = 'https://pubchem.ncbi.nlm.nih.gov/compound/';
@@ -127,24 +127,35 @@ function OwnerFacts({ job }: { job: JobView }) {
 const valueWithUnit = (value: number, unit: string) => (unit === 'deg' ? `${value}°` : `${value}\u00A0${unit}`);
 
 /**
- * What a library molecule was checked against (its references), an experimental geometry's own bond and angle marked
- * as no test of the method; or, where none is listed (an on-demand computed molecule, or a library one with none),
- * that nothing is -- never an invented comparison (Task 7b).
+ * What a library molecule's references are, decided by the tier line's own rule (geometry_honesty countsAsCheck, Task 7b
+ * fix round 1, I2): "Checked against published values:" only when one of them tests the method, else "Reference values
+ * (none of them tests the method yet):" -- as the tier line says "no property checked against experiment yet". An
+ * experimental geometry's own bonds and angles are one item, naming neither the source nor "geometry from experiment"
+ * again (I1: the Properties row and the tier line say them); every other row keeps its source. Where none is listed
+ * (an on-demand computed molecule, or a library one with none) it says so -- never an invented comparison.
  */
 function References({ meta }: { meta: LibraryMoleculeMeta }) {
-    if (meta.references.length === 0) {
+    const references = meta.references;
+    if (references.length === 0) {
         return <p>No reference values are listed for this molecule, so nothing here is checked against experiment.</p>;
     }
     const experimental = isExperimentalGeometry(meta.geometrySource);
+    const geometry = experimental ? references.filter(r => r.quantity === 'bond' || r.quantity === 'angle') : [];
+    const others = references.filter(r => !geometry.includes(r));
+    const checked = references.some(r => countsAsCheck(r, meta.geometrySource));
     return (
         <>
-            <p>Checked against published values:</p>
+            <p>{checked ? 'Checked against published values:' : 'Reference values (none of them tests the method yet):'}</p>
             <ul className="provenance-list">
-                {meta.references.map((reference, index) => (
+                {geometry.length > 0 && (
+                    <li>
+                        {geometry.map(r => `${r.quantity} ${valueWithUnit(r.value, r.unit)}`).join(', ')}: the experimental geometry itself, so no test of the method
+                    </li>
+                )}
+                {others.map((reference, index) => (
                     <li key={index}>
                         {/* Task 7b: a quantity such as R_e is typeset (Rₑ), never shown with its "_". */}
                         {withSubscripts(reference.quantity)}: {valueWithUnit(reference.value, reference.unit)} — {reference.source}
-                        {experimental && (reference.quantity === 'bond' || reference.quantity === 'angle') ? `; ${NOT_A_TEST}` : ''}
                     </li>
                 ))}
             </ul>

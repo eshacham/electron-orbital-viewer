@@ -1340,8 +1340,9 @@ html, body, #root {
 .molecule-orbital-degeneracy {
   color: var(--ql-color-text-3);
 }
-/* Owner R25-A4: the list first, its notes under it as its caption (the gap note, the key to the marks, the
-   method and label notes) -- nothing sits over a row, so nothing needs an opening scroll to clear it. */
+/* Owner R25-A4: the list first, its notes under it -- nothing sits over a row, so nothing needs an opening scroll to
+   clear it. Task 7b: the caption's words (the gap, the key to the marks, the method and labels) are Info's; under the
+   rows stay the inside-ball note and the level line. */
 .molecule-orbital-block {
   display: flex;
   flex-direction: column;
@@ -1355,28 +1356,17 @@ html, body, #root {
   padding-top: 6px;
   border-top: 1px solid var(--ql-color-border-subtle);
 }
+/* Task 7b fix round 1: with neither note to give, no hairline under the list. */
+.molecule-orbital-notes:empty { display: none; }
 /* Ruling T16-b: where the virtuals end and the occupied orbitals begin -- a plain rule between the rows; its
-   words are the caption's gap note (R25-A4). */
+   words, the gap, are Info's (Task 7b). */
 .molecule-orbital-gap-rule {
   flex: none;
   margin: 2px 0;
   border-top: 1px dashed var(--ql-color-border-strong);
 }
-/* The gap note, first line of the caption (R25-A4; it was the labelled divider between the rows). */
-.molecule-orbital-gap {
-  color: var(--ql-color-text-2);
-  font-size: var(--ql-type-caption-size);
-  line-height: 1.35;
-}
-/* Phase 6D: the gap divider's Kohn–Sham caveat, on its own line in the divider's own colour. */
-.molecule-orbital-gap-caveat {
-  display: block;
-  color: var(--ql-color-text-2);
-  /* §4.3: nothing under 11 px (ruling T10-sub11); a caption. */
-  font-size: var(--ql-type-caption-size);
-}
 /* Phase 6D: the mark beside a diffuse virtual's (◌) or a constructed LVMO's (◇) label, in the row's own colour;
-   its role="img" and accessible name carry the meaning, and the caption is its legend. */
+   its role="img" and accessible name carry the meaning, and Info keys it (Task 7b). */
 .molecule-orbital-mark {
   margin-left: 3px;
 }
@@ -1387,13 +1377,6 @@ html, body, #root {
 /* Ruling D4-energy: "upper est." under a constructed LVMO's energy, on its own line (the key explains it). */
 .molecule-orbital-estimate {
   display: block;
-  font-size: 11px;
-}
-/* Fix round 1: the key to the ◌/◇ marks and "upper est."; in the caption under the list since owner R25-A4 (it
-   was held, sticky and opaque, at the top of the list, over the rows). */
-.molecule-orbital-legend {
-  margin: 0;
-  color: var(--ql-color-text-2);
   font-size: 11px;
 }
 /* Ruling R22c: no longer a chip floating over the canvas -- it lives in a

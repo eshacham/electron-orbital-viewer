@@ -215,8 +215,23 @@ describe('ProvenancePanel', () => {
         render(<ProvenancePanel meta={waterMeta({ method: TZVPD, references: [
             { quantity: 'bond', value: 0.958, unit: 'Å', source: 'experiment (CCCBDB)', tolerance: 0.01 },
             { quantity: 'dipole', value: 1.855, unit: 'D', source: 'CRC Handbook, via CCCBDB', tolerance: 0.1855 }] })} ownerJob={null} />);
-        expect(screen.getByText('bond: 0.958 Å — experiment (CCCBDB); geometry from experiment (not a test of the method)')).toBeInTheDocument();
+        // Task 7b fix round 1 (I1): one item for the geometry's own rows, naming neither its source nor "geometry from
+        // experiment" again (the Properties row and the tier line say them); the dipole, a real test, keeps its source.
+        expect(screen.getByText('bond 0.958 Å: the experimental geometry itself, so no test of the method')).toBeInTheDocument();
+        expect(screen.queryByText(/experiment \(CCCBDB\)|geometry from experiment/)).toBeNull();
+        expect(screen.getByText('Checked against published values:')).toBeInTheDocument();
         expect(screen.getByText('dipole: 1.855 D — CRC Handbook, via CCCBDB')).toBeInTheDocument();
+    });
+    // Task 7b fix round 1 (I2): nothing in the list tests the method (ethane: an experimental geometry, a dipole zero by
+    // symmetry), so the header says so -- the tier line's own rule (geometry_honesty countsAsCheck).
+    it('heads a list in which nothing tests the method as such', () => {
+        render(<ProvenancePanel meta={waterMeta({ method: TZVPD, references: [
+            { quantity: 'bond', value: 1.535, unit: 'Å', source: 'experiment (CCCBDB)', tolerance: 0.01 },
+            { quantity: 'angle', value: 111.2, unit: 'deg', source: 'experiment (CCCBDB)', tolerance: 1 },
+            { quantity: 'dipole', value: 0, unit: 'D', source: 'zero by symmetry', tolerance: 0.01 }] })} ownerJob={null} />);
+        expect(screen.getByText('Reference values (none of them tests the method yet):')).toBeInTheDocument();
+        expect(screen.queryByText(/Checked against/)).toBeNull();
+        expect(screen.getByText('bond 1.535 Å, angle 111.2°: the experimental geometry itself, so no test of the method')).toBeInTheDocument();
     });
 
     // Beyond the brief: the rest of what compute version 2 records, said where the method is.

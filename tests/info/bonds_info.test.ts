@@ -96,7 +96,8 @@ describe('bondsInfo (Task 7a)', () => {
         const title = render(React.createElement('div', null, content.title)).container.textContent;
         expect(title).toBe('N₂ — total electron density');
         const shown = shownAt(content, 'basics');
-        expect(shown).toContain('N₂ has 14 electrons; the surface shows where they are likely to be found, all orbitals together.');
+        // Task 7b fix round 1 (M6): "occupied" -- the empty orbitals hold none of the density.
+        expect(shown).toContain('N₂ has 14 electrons; the surface shows where they are likely to be found, all its occupied orbitals together.');
         // Fix round 1 (M3): plain words at Basics -- no ρ values, and the title's words are not repeated.
         expect(shown).not.toMatch(/e\/a₀³|Total electron density,/);
         expect(shown).toContain('Bond order3');
@@ -111,7 +112,8 @@ describe('bondsInfo (Task 7a)', () => {
     // Fix round 1 (M3): before the molecule's data lands, "they" has an antecedent.
     it('names the electrons before their count is known', () => {
         const content = bondsInfo(stateOf(n2Store()), NOTHING, 'basics');
-        expect(shownAt(content, 'basics')).toContain('The surface shows where the electrons are likely to be found, all orbitals together.');
+        // Task 7b fix round 1 (M6): "occupied", as above.
+        expect(shownAt(content, 'basics')).toContain('The surface shows where the electrons are likely to be found, all the occupied orbitals together.');
     });
 
     it('at Explore adds E − E(atoms), eV first with Ha in parentheses, and keeps the absolute energy for Research', () => {

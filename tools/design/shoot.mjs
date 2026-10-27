@@ -17,7 +17,9 @@
 //   --computed-meta <file>  (with --jobs-stub; Task 7b of the levels plan) a computed molecule to look at: its job's
 //                    done.json and meta.json (/molecules/jobs/<meta.id>/...) are answered from this local meta file,
 //                    so `#mode=molecule&job=<meta.id>` loads it; every other job file stays blocked (no grids: shoot it
-//                    with show=none). Nothing is fetched from a real job's results.
+//                    with show=none). Nothing is fetched from a real job's results. Default, under --jobs-stub:
+//                    tools/design/computed_water_meta.json (water as a computed job: a PubChem single point, no
+//                    references), the meta the `computed-water-structure` scene names.
 //   --jobs-down      (with --jobs-stub; owner R25-A1) the stub answers every /api request as Vite's proxy does when
 //                    the local job server is not running: HTTP 500, empty body. Still nothing leaves the browser.
 //   Every run (Task 16d): Vite's /api proxy points at a closed port and has no AWS route, so nothing -- stubbed or
@@ -102,9 +104,9 @@ const ownerSession = process.argv.includes('--owner-session');
 const jobsStub = process.argv.includes('--jobs-stub');
 const previewFixture = arg('preview-fixture', 'preview_ok');
 const jobsDown = process.argv.includes('--jobs-down');
-const computedMetaFile = arg('computed-meta', null);
+if (process.argv.includes('--computed-meta') && !jobsStub) throw new Error('--computed-meta is a mode of --jobs-stub');
+const computedMetaFile = jobsStub ? arg('computed-meta', resolve(DEFAULT_ROOT, 'tools/design/computed_water_meta.json')) : null;
 const computedMeta = computedMetaFile ? JSON.parse(readFileSync(resolve(computedMetaFile), 'utf8')) : null;
-if (computedMeta && !jobsStub) throw new Error('--computed-meta is a mode of --jobs-stub');
 // A preview whose molecule is already on record: the preview fixture with a recorded job as its `existing`
 // (what tests/jobs/request_panel.test.tsx composes), e.g. --preview-existing get_done → "Already computed — open it".
 const previewExisting = arg('preview-existing', null);

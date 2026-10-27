@@ -135,7 +135,8 @@ describe('captions and file stems', () => {
 
     it('water, an MO: its label, role and energy', () => {
         const state = drawnStore({ kind: 'mo', index: 4 }).getState();
-        expect(viewDescription(state)).toBe('Water (H₂O), MO 1b1 (HOMO), −0.310 Ha (−8.44 eV), 90 % enclosed');
+        // Task 7b fix round 1 (M8): one orbital-energy formatter in the app, eV first (Task 6 ruling) -- captions too.
+        expect(viewDescription(state)).toBe('Water (H₂O), MO 1b1 (HOMO), −8.44 eV (−0.310 Ha), 90 % enclosed');
         expect(exportFileStem(state)).toBe('orbital-viewer_H2O_mo4-1b1');
     });
 
@@ -154,9 +155,10 @@ describe('captions and file stems', () => {
         // Deferred minor (Task 11): the tag is its own clause, as MoleculeNav's "Showing" line has it -- inside the
         // role's brackets it nested a second pair. Final review M5: a constructed orbital is never called an "MO".
         expect(viewDescription(drawnStore({ kind: 'mo', index: 5 }, V3()).getState()))
-            .toBe('Water (H₂O), MO 4a1 (LUMO), −0.010 Ha (−0.27 eV), 90 % enclosed; 4a1 is partly diffuse (55 % valence): its shape depends on the basis');
+            // Task 7b fix round 1 (M8): eV first, as above.
+            .toBe('Water (H₂O), MO 4a1 (LUMO), −0.27 eV (−0.010 Ha), 90 % enclosed; 4a1 is partly diffuse (55 % valence): its shape depends on the basis');
         expect(viewDescription(drawnStore({ kind: 'mo', index: 6 }, V3()).getState())).toBe('Water (H₂O), constructed valence virtual orbital '
-            + 'a1 (LVMO), 0.190 Ha (5.17 eV), upper estimate, 90 % enclosed; a1 is constructed from the valence part of the virtual space — '
+            + 'a1 (LVMO), 5.17 eV (0.190 Ha), upper estimate, 90 % enclosed; a1 is constructed from the valence part of the virtual space — '
             + 'not an orbital of this calculation');
         expect(exportFileStem(drawnStore({ kind: 'mo', index: 6 }, V3()).getState())).toBe('orbital-viewer_H2O_mo6-a1');
     });
@@ -166,7 +168,8 @@ describe('captions and file stems', () => {
     it('keeps a combined label exact in the caption and readable in the file stem', () => {
         const meta = water({ orbitals: [{ index: 0, label: "1a1'+1e'", energyHartree: -0.5, occupation: 2, role: 'HOMO' }] });
         const state = drawnStore({ kind: 'mo', index: 0 }, meta).getState();
-        expect(viewDescription(state)).toBe('Water (H₂O), MO 1a1\'+1e\' (HOMO), −0.500 Ha (−13.61 eV), 90 % enclosed');
+        // Task 7b fix round 1 (M8): eV first, as above.
+        expect(viewDescription(state)).toBe('Water (H₂O), MO 1a1\'+1e\' (HOMO), −13.61 eV (−0.500 Ha), 90 % enclosed');
         expect(exportFileStem(state)).toBe('orbital-viewer_H2O_mo0-1a1p-plus-1ep');
     });
 

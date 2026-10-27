@@ -37,8 +37,9 @@ export interface InfoContent {
     /**
      * Task 7b: short notes read at every level, after the facts -- what qualifies the numbers or the picture (Molecules'
      * Kohn–Sham caveat, what the sticks show, the arrow's convention), kept out of `plain` so the facts stay above
-     * Info's fold. A builder decides by level which notes concern what the level shows.
+     * Info's fold. A builder decides by level which notes concern what the level shows. Fix round 1 (I6): a list, one
+     * idea a paragraph, never one wall (ruling T6-M7's rule for `technical`).
      */
-    notes?: React.ReactNode;
+    notes?: React.ReactNode[];
     computed?: React.ReactNode;
 }

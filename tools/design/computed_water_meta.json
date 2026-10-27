@@ -1,0 +1,208 @@
+{
+ "id": "4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216",
+ "name": "Water",
+ "formula": "H2O",
+ "atoms": [
+  {
+   "Z": 8,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    0.0,
+    1.4314309006801056,
+    1.10833222249563
+   ]
+  },
+  {
+   "Z": 1,
+   "position": [
+    0.0,
+    -1.4314309006801056,
+    1.10833222249563
+   ]
+  }
+ ],
+ "geometrySource": "PubChem CID 962 (computed 3D conformer, not optimised)",
+ "method": {
+  "density": "B3LYP-D3(BJ)/def2-TZVPD",
+  "energies": "B3LYP-D3(BJ)/def2-TZVPD"
+ },
+ "totalEnergyHartree": -76.46731132438696,
+ "dispersion": {
+  "model": "D3(BJ)",
+  "energyHartree": -0.0005738743351121453,
+  "backend": "pyscf-dispersion 1.5.0"
+ },
+ "dipoleDebye": 1.8578197264127292,
+ "dipoleVectorDebye": [
+  0.0,
+  -7.936608919270661e-16,
+  1.8578197264127292
+ ],
+ "orbitals": [
+  {
+   "index": 0,
+   "label": "1a1",
+   "energyHartree": -19.137513324448737,
+   "occupation": 2.0
+  },
+  {
+   "index": 1,
+   "label": "2a1",
+   "energyHartree": -1.0226978224829155,
+   "occupation": 2.0
+  },
+  {
+   "index": 2,
+   "label": "1b2",
+   "energyHartree": -0.5414404677201563,
+   "occupation": 2.0
+  },
+  {
+   "index": 3,
+   "label": "3a1",
+   "energyHartree": -0.4003110319209548,
+   "occupation": 2.0
+  },
+  {
+   "index": 4,
+   "label": "1b1",
+   "energyHartree": -0.3243148883140911,
+   "occupation": 2.0,
+   "role": "HOMO"
+  },
+  {
+   "index": 5,
+   "label": "4a1",
+   "energyHartree": -0.0101593725725232,
+   "occupation": 0.0,
+   "role": "LUMO",
+   "valenceCharacter": 0.5498,
+   "class": "diffuse"
+  },
+  {
+   "index": 6,
+   "label": "2b2",
+   "energyHartree": 0.04779219443832252,
+   "occupation": 0.0,
+   "valenceCharacter": 0.2699,
+   "class": "diffuse"
+  },
+  {
+   "index": 7,
+   "label": "2b1",
+   "energyHartree": 0.07668404883074201,
+   "occupation": 0.0,
+   "valenceCharacter": 0.0,
+   "class": "diffuse"
+  },
+  {
+   "index": 8,
+   "label": "5a1",
+   "energyHartree": 0.07908927415731919,
+   "occupation": 0.0,
+   "valenceCharacter": 0.0086,
+   "class": "diffuse"
+  },
+  {
+   "index": 9,
+   "label": "3b2",
+   "energyHartree": 0.13652521352185398,
+   "occupation": 0.0,
+   "valenceCharacter": 0.2417,
+   "class": "diffuse"
+  },
+  {
+   "index": 10,
+   "label": "a1",
+   "energyHartree": 0.1838441306531231,
+   "occupation": 0.0,
+   "role": "LVMO",
+   "kind": "valence-virtual",
+   "constructed": true,
+   "energyApproximate": true,
+   "note": "constructed from the valence part of the virtual space — not an orbital of this calculation; its energy is an upper estimate (its value within the valence space), typically several eV above this calculation's orbital energies",
+   "valenceCharacter": 1.0,
+   "class": "valence"
+  }
+ ],
+ "grid": {
+  "shape": [
+   96,
+   96,
+   96
+  ],
+  "origin": [
+   -7.931430900680105,
+   -7.931430900680105,
+   -7.931430900680105
+  ],
+  "spacing": 0.16697749264589695
+ },
+ "espGrid": {
+  "shape": [
+   48,
+   48,
+   48
+  ],
+  "origin": [
+   -7.931430900680105,
+   -7.931430900680105,
+   -7.931430900680105
+  ],
+  "spacing": 0.3375076979012811
+ },
+ "espRangeOnSurface": [
+  -0.052643506606969925,
+  0.06921059286848319
+ ],
+ "electronCount": 10,
+ "densityIntegral": 10.000196565969485,
+ "multiplicity": 1,
+ "symmetry": {
+  "pointGroup": "C2v",
+  "labelGroup": "C2v",
+  "labels": "full-group"
+ },
+ "references": [],
+ "generator": {
+  "pyscf": "2.8.0",
+  "numpy": "2.3.5",
+  "scipy": "1.18.1",
+  "python": "3.12.15",
+  "xc": "B3LYP-D3(BJ) (PySCF >= 2.3: VWN-RPA)",
+  "script": "tools/molecules/build_library.py",
+  "commit": "8982f6231f84288ed43430a9b621e14d2a8f5477",
+  "dataVersion": "v3"
+ },
+ "tier": "computed",
+ "provenance": {
+  "jobKey": "4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216",
+  "computeVersion": 2,
+  "recipe": "single",
+  "geometrySource": {
+   "kind": "pubchem",
+   "cid": 962,
+   "title": "Water",
+   "query": "water",
+   "retrievedAt": "2026-10-10"
+  },
+  "caveats": [
+   "The geometry is not optimised: it is PubChem's computed 3D conformer or as pasted."
+  ],
+  "generatorCommit": "abc1234def567",
+  "imageDigest": "local",
+  "pyscfVersion": "2.8.0",
+  "sizingVersion": 1,
+  "size": "S",
+  "capacity": "local",
+  "wallSeconds": 70.2,
+  "costUsd": null
+ }
+}

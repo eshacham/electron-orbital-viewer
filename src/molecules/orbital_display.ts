@@ -1,5 +1,6 @@
 import type { MoleculeOrbitalInfo } from './types';
-import { HARTREE_IN_EV } from '../format/energy';
+import { orbitalEnergyText } from '../format/energy';
+import { typedPointGroup } from '../format/sci';
 
 /**
  * Task 7b: the one Ha→eV factor (format/energy.ts, CODATA 2018), under the name the Molecules CSV export prints in its
@@ -8,15 +9,6 @@ import { HARTREE_IN_EV } from '../format/energy';
  * could read the factor before format/energy has set it.
  */
 export { HARTREE_IN_EV as HARTREE_TO_EV } from '../format/energy';
-const signed = (v: number, digits: number) => `${v < 0 ? '−' : ''}${Math.abs(v).toFixed(digits)}`;
-
-/**
- * Ha first, then eV: what an exported caption says of an orbital's energy (export/caption.ts, Task 8's). Every panel
- * and Info read eV first (format/energy.ts orbitalEnergyText, Task 6 ruling).
- */
-export function formatOrbitalEnergy(energyHartree: number): string {
-    return `${signed(energyHartree, 3)} Ha (${signed(energyHartree * HARTREE_IN_EV, 2)} eV)`;
-}
 
 /** Size of each orbital's degenerate set (|ΔE| below tol, chained through energy order), keyed by orbital index. */
 export function degeneracyCounts(orbitals: Array<{ index: number; energyHartree: number }>, tol = 1e-4): Map<number, number> {
@@ -101,9 +93,13 @@ export const orbitalNoun = (o: Flags, short = false): string =>
 
 export const isUpperEstimate = (o: Flags): boolean => isConstructed(o) || o.energyApproximate === true;
 
-/** An orbital's energy as the list and captions show it: "…, upper estimate" for a constructed row, never "≈". */
-export function orbitalEnergyText(o: Flags & { energyHartree: number }): string {
-    return `${formatOrbitalEnergy(o.energyHartree)}${isUpperEstimate(o) ? ', upper estimate' : ''}`;
+/**
+ * An orbital's energy as Info and the export caption say it: format/energy's one orbitalEnergyText (eV first, Ha in
+ * parentheses -- Task 6 ruling; Task 7b fix round 1, M8: the Ha-first copy that stood here is gone), with "…, upper
+ * estimate" for a constructed row, never "≈".
+ */
+export function orbitalEnergyWithEstimate(o: Flags & { energyHartree: number }): string {
+    return `${orbitalEnergyText(o.energyHartree)}${isUpperEstimate(o) ? ', upper estimate' : ''}`;
 }
 
 /** Ruling D4: "partly diffuse (55 % valence): its shape depends on the basis", adding that it is unbound only above zero. */
@@ -204,7 +200,8 @@ export function labelsSentence(symmetry: { pointGroup: string; labelGroup: strin
 }
 
 function labelsSentenceAlone(symmetry: { pointGroup: string; labelGroup: string | null; labels?: string; labelNote?: string }): string {
-    const pointGroup = formatPointGroup(symmetry.pointGroup);
+    // Task 7b fix round 1 (M3): typed, as the point group fact beside it (C₂ᵥ, not C2v); text only, so typedPointGroup.
+    const pointGroup = typedPointGroup(symmetry.pointGroup);
     const note = symmetry.labelNote;
     if (symmetry.labels === 'full-group' && symmetry.labelGroup === 'SO3') {
         // Final review M1: an atom's orbitals read 1s, 2s, 2p … (point_group.atom_labels), not SO3's irreps.
@@ -217,7 +214,7 @@ function labelsSentenceAlone(symmetry: { pointGroup: string; labelGroup: string 
     if (symmetry.labels === 'none' || symmetry.labelGroup === null) {
         return `Labels: ψ, numbered in energy order (no symmetry labels${note ? `: ${note}` : ''}).`;
     }
-    const labelGroup = formatPointGroup(symmetry.labelGroup);
+    const labelGroup = typedPointGroup(symmetry.labelGroup);
     return `Labels: irreducible representations of ${labelGroup}${symmetry.labelGroup !== symmetry.pointGroup ? `, the subgroup of ${pointGroup} the calculation uses` : ''}.`;
 }
 

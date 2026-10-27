@@ -77,11 +77,8 @@ const PAIRS: Pair[] = [
     // Ruling R23f: the orbital list moved from its own right-column card
     // (`.molecule-orbital-card`, removed from style.css) into the Explore
     // panel's `.molecule-nav`, whose own pairing already covers its text.
-    { selector: '.molecule-orbital-gap', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
-    { selector: '.molecule-orbital-gap-caveat', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
-    // Owner R25-A4: the key is in the caption under the list now, no longer an opaque sticky band over the rows, so it
-    // declares no background of its own; it sits on the panel's surface-1.
-    { selector: '.molecule-orbital-legend', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
+    // Task 7b fix round 1: the list's gap note, its caveat and its key moved into Info (info.css's own pairs), so their
+    // rules -- `.molecule-orbital-gap`, `-gap-caveat`, `.molecule-orbital-legend` -- are gone and are not paired here.
     // Ruling R23f: the "Showing <orbital> -- pick another ... on the right"
     // summary (`.molecule-nav-orbital`) is retired along with the move --
     // the list itself, now beside the switch, already names the orbital drawn.

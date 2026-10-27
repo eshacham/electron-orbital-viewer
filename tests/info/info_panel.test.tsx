@@ -68,15 +68,19 @@ describe('InfoPanel (Task 4)', () => {
         expect(technical.compareDocumentPosition(computed()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    // Task 7b: notes (what qualifies the numbers) follow the facts at every level, before the technical text.
-    it('puts the notes after the facts and before the technical text, at every level', () => {
-        const withNotes = { ...content, notes: 'A note on the numbers.' };
+    // Task 7b: notes (what qualifies the numbers) follow the facts at every level, before the technical text; fix round 1
+    // (I6): one paragraph per note, never one wall.
+    it('puts the notes after the facts and before the technical text, one paragraph each, at every level', () => {
+        const withNotes = { ...content, notes: ['A note on the numbers.', 'A note on the picture.'] };
         const { rerender } = render(<InfoPanel content={withNotes} topic={null} onClearTopic={() => {}} level="research" />);
-        const notes = screen.getByText('A note on the numbers.');
-        expect(screen.getByText('Electrons').closest('dl')!.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(notes.compareDocumentPosition(screen.getByText(content.technical as string)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        const [first, second] = [screen.getByText('A note on the numbers.'), screen.getByText('A note on the picture.')];
+        expect(first.tagName).toBe('P');
+        expect(first).not.toBe(second);
+        expect(screen.getByText('Electrons').closest('dl')!.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(second.compareDocumentPosition(screen.getByText(content.technical as string)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         rerender(<InfoPanel content={withNotes} topic={null} onClearTopic={() => {}} level="basics" />);
-        expect(screen.getByText('A note on the numbers.')).toBeInTheDocument();
+        expect(screen.getByText('A note on the picture.')).toBeInTheDocument();
     });
 
     it('at Research opens "How this was computed"', () => {

@@ -13,6 +13,7 @@ import React from 'react';
 import type { RootState } from '../store';
 import type { LearningLevel } from '../levels/levels';
 import type { InfoContent, InfoFact } from './info_types';
+import { enclosedFact } from './facts';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { minus } from '../format/sci';
 import { nb, plural } from '../format/text';
@@ -88,13 +89,6 @@ function energyText(hartree: number): string {
 
 const signedMl = (ml: number) => (ml > 0 ? `+${ml}` : minus(String(ml)));
 
-/**
- * The enclosed fraction, from Advanced -- where the Electron enclosed control is (CONTROL_LEVEL.enclosed). `of` says what
- * the share is of: one orbital's electron by default; Atoms' shell views enclose a share of the density (Task 6).
- */
-export function enclosedFact(fraction: number, of = 'of the electron'): InfoFact {
-    return { label: 'Enclosed', value: `${Math.round(fraction * 100)} % ${of}`, min: 'advanced' };
-}
 
 /** The fraction and, once this orbital is drawn, its contour's iso value. */
 function enclosedFacts(state: OrbitalsInfoState, n: number, l: number, ml: number): InfoFact[] {

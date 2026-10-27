@@ -104,7 +104,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                         </dl>
                     )}
                     {/* Task 7b: notes on the numbers and the picture, at every level, after the facts they qualify. */}
-                    {content.notes && <p className="info-text info-notes">{content.notes}</p>}
+                    {content.notes?.map((note, index) => <p key={index} className="info-text info-notes">{note}</p>)}
                     {technical && content.technical && (Array.isArray(content.technical)
                         // Task 6 fix round 1 (M7): short paragraphs, one idea each, never one wall.
                         ? content.technical.map((paragraph, index) => <p key={index} className="info-text">{paragraph}</p>)

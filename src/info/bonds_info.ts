@@ -33,7 +33,7 @@ import { absoluteEnergyText, energyDifferenceText, orbitalEnergyText } from '../
 import { nb, plural } from '../format/text';
 import { withSubscripts } from '../format/subscripts';
 import InfoButton from './InfoButton';
-import { enclosedFact } from './basic_info';
+import { enclosedFact } from './facts';
 
 const h = React.createElement;
 
@@ -154,10 +154,11 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
     } else if (density) {
         title = `${formula} — total electron density`;
         const electrons = meta ? electronsIn(meta.orbitals) : null;
-        // Fix round 1 (M3): plain words only -- what the surface at this ρ shows, with its numbers, is technical.
+        // Fix round 1 (M3): plain words only -- what the surface at this ρ shows, with its numbers, is technical. Task 7b
+        // fix round 1 (M6): "occupied" -- the empty orbitals hold none of the density (one wording with Molecules).
         lead = electrons !== null
-            ? `${formula} has ${electrons} electrons; the surface shows where they are likely to be found, all orbitals together.`
-            : 'The surface shows where the electrons are likely to be found, all orbitals together.';
+            ? `${formula} has ${electrons} electrons; the surface shows where they are likely to be found, all its occupied orbitals together.`
+            : 'The surface shows where the electrons are likely to be found, all the occupied orbitals together.';
     } else {
         const mo = view as Extract<BondsView, { kind: 'mo' }>;
         title = h(React.Fragment, null, `${formula} — `, withSubscripts(mo.label), `${SPIN_SUFFIX[mo.spin]} orbital`);

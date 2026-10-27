@@ -40,7 +40,7 @@ import {
 import { IE_LEVEL } from '../levels/levels';
 import { listOf, plural } from '../format/text';
 import InfoButton from './InfoButton';
-import { enclosedFact } from './basic_info';
+import { enclosedFact } from './facts';
 
 const h = React.createElement;
 

@@ -22,6 +22,7 @@ import type { LibraryMoleculeMeta } from '../../src/molecules/library_types';
 import type { MoleculeProvenance } from '../../src/molecules/types';
 import { labelsSentence, LVMO_NOTE } from '../../src/molecules/orbital_display';
 import { BUILD_ENV } from '../../src/jobs/build_env';
+import { validatedLine } from '../../src/validation/geometry_honesty';
 import { resetBuildEnv } from '../jobs/build_env_stub';
 import { waterMeta } from '../molecules/fixtures';
 import { jobFixture } from '../jobs/api_fixtures';
@@ -72,6 +73,12 @@ const PROVENANCE: MoleculeProvenance = {
     generatorCommit: 'abc1234def567', imageDigest: 'local', pyscfVersion: '2.8.0', sizingVersion: 1, size: 'S',
     capacity: 'local', wallSeconds: 70.2, costUsd: null,
 };
+/** Real water's references, as the shipped library data has them (tests/fixtures/molecules/h2o/meta.json). */
+const REAL_WATER_REFERENCES = [
+    { quantity: 'bond', value: 0.958, unit: 'Å', source: 'experiment (CCCBDB)', tolerance: 0.01, atoms: [0, 1], label: 'O–H' },
+    { quantity: 'angle', value: 104.5, unit: 'deg', source: 'experiment (CCCBDB)', tolerance: 1.0, atoms: [1, 0, 2], label: 'H–O–H' },
+    { quantity: 'dipole', value: 1.855, unit: 'D', source: 'CRC Handbook, via CCCBDB', tolerance: 0.1855 },
+];
 const computedWater = () => waterMeta({
     id: KEY, tier: 'computed', provenance: PROVENANCE, references: [], geometrySource: 'PubChem CID 962 (not optimised)',
 });
@@ -85,13 +92,15 @@ describe('moleculeInfo (Task 7b)', () => {
         const { container, unmount } = rendered(content, 'basics');
         expect(container.querySelector('.info-title')).toHaveTextContent('Water (H₂O) — electron density');
         unmount();
-        expect(shownAt(state, 'basics')).toContain('Water has 10 electrons; the surface shows where they are likely to be found, all orbitals together.');
+        // Fix round 1 (M6): "its occupied orbitals" -- the empty ones hold none of the density.
+        expect(shownAt(state, 'basics')).toContain('Water has 10 electrons; the surface shows where they are likely to be found, all its occupied orbitals together.');
     });
 
-    it('gives the formula, the typed point group, the electrons and the dipole at every level, the gap from Explore, eV first', () => {
+    // Fix round 1 (ruling on concern 4): Info is each number's one home; no Formula fact, the title has it.
+    it('gives the typed point group, the electrons and the dipole at every level, the gap from Explore, eV first -- no Formula fact', () => {
         const state = moleculeState();
         const basics = shownAt(state, 'basics');
-        expect(basics).toContain('FormulaH₂O');
+        expect(basics).not.toContain('Formula');
         expect(basics).toContain('Electrons10');
         // Computed against experiment, both in debye, with the measurement's source.
         expect(basics).toContain('Dipole μ1.86 D computed · 1.855 D experiment (CRC Handbook, via CCCBDB)');
@@ -123,8 +132,9 @@ describe('moleculeInfo (Task 7b)', () => {
         folded.unmount();
     });
 
+    // Fix round 1 (I1): with an optimised geometry, an angle is a test and keeps its own source; R_e is typeset.
     it('typesets a reference quantity such as R_e, and an angle in degrees', () => {
-        const meta = waterMeta({ references: [
+        const meta = waterMeta({ geometrySource: 'B3LYP-D3(BJ)/def2-TZVP optimised (PySCF + geomeTRIC)', references: [
             { quantity: 'R_e', value: 1.098, unit: 'Å', source: 'Huber & Herzberg' },
             { quantity: 'angle', value: 104.5, unit: 'deg', source: 'experiment (CCCBDB)', tolerance: 1 }] });
         const { container, unmount } = render(React.createElement('div', null, infoOf(moleculeState(meta), 'research').computed));
@@ -133,6 +143,36 @@ describe('moleculeInfo (Task 7b)', () => {
         expect(items[0].querySelector('sub')).toHaveTextContent('e');
         expect(items[1]).toHaveTextContent('angle: 104.5° — experiment (CCCBDB)');
         unmount();
+    });
+
+    // Fix round 1 (I1): real water's references (tests/fixtures/molecules/h2o/meta.json). Its geometry is experiment's,
+    // so its own bond and angle are one item that names neither the source nor "geometry from experiment" again -- the
+    // Properties row and the tier line say those; the dipole keeps its source.
+    it('gathers an experimental geometry\'s own bond and angle into one item, with no source', () => {
+        const state = moleculeState(waterMeta({ references: REAL_WATER_REFERENCES }));
+        const computed = computedText(infoOf(state, 'research'));
+        expect(computed).toContain('Checked against published values:');
+        expect(computed).toContain('bond 0.958 Å, angle 104.5°: the experimental geometry itself, so no test of the method');
+        expect(computed).toContain('dipole: 1.855 D — CRC Handbook, via CCCBDB');
+        expect(computed).not.toContain('experiment (CCCBDB)');
+        expect(computed).not.toContain('geometry from experiment');
+    });
+
+    // Fix round 1 (I2): the header follows the tier line's own rule (geometry_honesty countsAsCheck). Ethane's own data
+    // (tests/fixtures/molecules/c2h6/meta.json): an experimental geometry and a dipole zero by symmetry -- nothing counts,
+    // as its tier line says ("no property checked against experiment yet").
+    it('heads a list in which nothing tests the method as such (ethane)', () => {
+        const ethane = waterMeta({ id: 'c2h6', name: 'Ethane', formula: 'C2H6', dipoleVectorDebye: [0, 0, 0], references: [
+            { quantity: 'bond', value: 1.535, unit: 'Å', source: 'experiment (CCCBDB)', tolerance: 0.01, atoms: [0, 1], label: 'C–C' },
+            { quantity: 'bond', value: 1.094, unit: 'Å', source: 'experiment (CCCBDB)', tolerance: 0.01, atoms: [0, 2], label: 'C–H' },
+            { quantity: 'angle', value: 111.2, unit: 'deg', source: 'experiment (CCCBDB)', tolerance: 1, atoms: [2, 0, 1], label: 'H–C–C' },
+            { quantity: 'dipole', value: 0, unit: 'D', source: 'zero by symmetry', tolerance: 0.01 }] });
+        expect(validatedLine(ethane)).toBe('Curated; geometry from experiment; no property checked against experiment yet.');
+        const computed = computedText(infoOf(moleculeState(ethane), 'research'));
+        expect(computed).toContain('Reference values (none of them tests the method yet):');
+        expect(computed).not.toContain('Checked against');
+        expect(computed).toContain('bond 1.535 Å, bond 1.094 Å, angle 111.2°: the experimental geometry itself, so no test of the method');
+        expect(computed).toContain('dipole: 0 D — zero by symmetry');
     });
 
     it('leaves the geometry source to the Properties row: Info does not repeat it', () => {
@@ -159,14 +199,15 @@ describe('moleculeInfo (Task 7b)', () => {
     it('puts the facts straight after the lead, and the Kohn–Sham caveat and view notes after the facts', () => {
         const state = moleculeState(waterMeta(), store => store.dispatch(setSurface({ kind: 'mo', index: 4 })));
         const { container, unmount } = rendered(infoOf(state, 'explore'), 'explore');
-        const [lead, notes] = [...container.querySelectorAll('.info-body > p.info-text')] as HTMLElement[];
+        const [lead, ...notes] = [...container.querySelectorAll('.info-body > p.info-text')] as HTMLElement[];
         const facts = container.querySelector('.info-facts') as HTMLElement;
         expect(lead.textContent).toMatch(/^1b1 is one of H₂O's molecular orbitals\./);
         expect(lead.textContent).not.toMatch(/Kohn–Sham|Sticks/);
         expect(lead.compareDocumentPosition(facts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(facts.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(notes.textContent).toMatch(/^Orbital energies here are Kohn–Sham eigenvalues/);
-        expect(notes.textContent).toContain('Sticks show connectivity, not bond order.');
+        expect(facts.compareDocumentPosition(notes[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // Fix round 1 (I6): one idea a paragraph -- the caveat, what the sticks show, the arrow's convention.
+        expect(notes.map(note => note.textContent?.slice(0, 24))).toEqual([
+            'Orbital energies here ar', 'Sticks show connectivity', 'The arrow points from − ']);
         unmount();
     });
 
@@ -179,7 +220,8 @@ describe('moleculeInfo (Task 7b)', () => {
         expect(container.querySelector('.info-title')).toHaveTextContent('Water (H₂O) — 1b1 orbital');
         unmount();
         const basics = shownAt(state, 'basics');
-        expect(basics).toContain('1b1 is one of H₂O\'s molecular orbitals. It holds 2 electrons. It is the HOMO: the highest level that holds electrons.');
+        // Fix round 1 (I3): "orbital", as the homoLumo glossary says.
+        expect(basics).toContain('1b1 is one of H₂O\'s molecular orbitals. It holds 2 electrons. It is the HOMO: the highest orbital that holds electrons.');
         expect(basics).not.toContain('Orbital energy');
         expect(shownAt(state, 'explore')).toContain('Orbital energy−8.44 eV (−0.310 Ha)');
         expect(shownAt(state, 'explore')).not.toContain('Iso value');
@@ -271,11 +313,17 @@ describe('moleculeInfo (Task 7b)', () => {
         const state = moleculeState(meta, store => store.dispatch(setSurface({ kind: 'mo', index: 1 })));
         const explore = shownAt(state, 'explore');
         expect(explore).toContain('5σg is partly diffuse (40 % valence): its shape depends on the basis.');
-        expect(explore).toContain('◌ marks a partly diffuse virtual (under 75 % valence): its shape depends on the basis.');
+        // Fix round 1 (M2): the key says only what a mark means; "its shape depends on the basis" is the lead's, once.
+        expect(explore).toContain('◌ marks a partly diffuse virtual (under 75 % valence).');
+        expect(explore.match(/its shape depends on the basis/g)).toHaveLength(1);
         const advanced = shownAt(state, 'advanced');
         expect(advanced).toContain(labelsSentence(symmetry));
-        expect(advanced).toContain('Those at positive energy are unbound, basis-set dependent states, not bound orbitals.');
+        // Fix round 1 (M3): the labels sentence's point group is typed, as the fact beside it.
+        expect(advanced).toContain('irreducible representations of D∞h');
+        // Fix round 1 (M1): its own subject, now that the diffuse key it followed is a note.
+        expect(advanced).toContain('Diffuse virtuals at positive energy are unbound, basis-set dependent states, not bound orbitals.');
         expect(advanced).toContain(`LVMO: ${LVMO_NOTE}.`);
+        expect(advanced.match(/its shape depends on the basis/g)).toHaveLength(1);
         // Not while the density is drawn: the list is not on screen.
         expect(shownAt(moleculeState(meta), 'advanced')).not.toContain('Labels:');
         // Two gaps, one caveat sentence for both.
@@ -285,6 +333,91 @@ describe('moleculeInfo (Task 7b)', () => {
         const { container, unmount } = rendered(infoOf(state, 'research'), 'research');
         expect(container.querySelector('.info-title sub')).toHaveTextContent('g');
         unmount();
+    });
+
+    // Fix round 1 (M2): what the lead says of the drawn orbital (the LVMO, constructed) is not said again in technical.
+    it('says a constructed LVMO\'s note once, in the lead, when it is drawn', () => {
+        const orbitals = [
+            { index: 0, label: '1b1', energyHartree: -0.31, occupation: 2, role: 'HOMO' },
+            { index: 1, label: '4a1', energyHartree: -0.01, occupation: 0, role: 'LUMO', valenceCharacter: 0.55, class: 'diffuse' },
+            { index: 2, label: 'a1', energyHartree: 0.19, occupation: 0, role: 'LVMO', valenceCharacter: 1, class: 'valence',
+                kind: 'valence-virtual', constructed: true, energyApproximate: true },
+        ];
+        const state = moleculeState(waterMeta({ orbitals, symmetry: { pointGroup: 'C2v', labelGroup: 'C2v', labels: 'full-group' } }),
+            store => store.dispatch(setSurface({ kind: 'mo', index: 2 })));
+        const research = shownAt(state, 'research');
+        expect(research.match(/constructed from the valence part of the virtual space/g)).toHaveLength(1);
+        expect(research.match(/the lowest empty valence orbital/g)).toHaveLength(1);
+        expect(research).toContain('◇ marks a constructed LVMO, not an orbital of this calculation.');
+        // Its energy: eV first, an upper estimate (orbital_display's orbitalEnergyWithEstimate, M8).
+        expect(research).toContain('Orbital energy5.17 eV (0.190 Ha), upper estimate');
+    });
+
+    // Fix round 1 (I3): real NO₂ (tests/fixtures/molecules/no2/meta.json) -- its SOMO 6a1 (−0.230 Ha) lies above its
+    // doubly occupied HOMO 4b2 (−0.377 Ha), so the HOMO is not "the highest that holds electrons".
+    describe('an open shell whose SOMO lies above its HOMO (NO₂)', () => {
+        const no2 = waterMeta({ id: 'no2', name: 'Nitrogen dioxide', formula: 'NO2', multiplicity: 2, orbitals: [
+            { index: 10, label: '4b2', energyHartree: -0.376611437839857, occupation: 2, role: 'HOMO' },
+            { index: 11, label: '6a1', energyHartree: -0.22981787731206157, occupation: 1, role: 'SOMO' },
+            { index: 12, label: '2b1', energyHartree: -0.0937485104125987, occupation: 0, role: 'LUMO' },
+        ] });
+        it('calls the HOMO the highest doubly occupied orbital, below the SOMO', () => {
+            const state = moleculeState(no2, store => store.dispatch(setSurface({ kind: 'mo', index: 10 })));
+            expect(shownAt(state, 'basics')).toContain('4b2 is one of NO₂\'s molecular orbitals. It holds 2 electrons. '
+                + 'It is the HOMO: the highest doubly occupied orbital; the singly occupied SOMO lies above it.');
+        });
+        it('says the SOMO\'s one electron once, as its role', () => {
+            const state = moleculeState(no2, store => store.dispatch(setSurface({ kind: 'mo', index: 11 })));
+            const basics = shownAt(state, 'basics');
+            expect(basics).toContain('6a1 is one of NO₂\'s molecular orbitals. It is a SOMO: a singly occupied orbital, the highest that holds electrons.');
+            expect(basics).not.toContain('It holds 1 electron');
+        });
+        // Re-homed from properties_card.test.tsx (ruling on concern 4): an open shell's gap is named from its SOMO.
+        it('names the gap from the SOMO', () => {
+            expect(shownAt(moleculeState(no2), 'explore')).toContain('SOMO–LUMO gap3.70 eV (0.136 Ha)');
+        });
+    });
+
+    // Re-homed from properties_card.test.tsx (ruling on concern 4): the gaps' one home is Info.
+    it('gives the HOMO–LVMO gap too where the LVMO is the calculation\'s own, and none to a constructed LVMO', () => {
+        const own = waterMeta({ orbitals: [
+            { index: 0, label: '1πg', energyHartree: -0.30, occupation: 2, role: 'HOMO' },
+            { index: 1, label: '5σg', energyHartree: -0.01, occupation: 0, role: 'LUMO', valenceCharacter: 0.4, class: 'diffuse' },
+            { index: 2, label: '2πu', energyHartree: 0.20, occupation: 0, role: 'LVMO', valenceCharacter: 0.97, class: 'valence' }] });
+        const explore = shownAt(moleculeState(own), 'explore');
+        expect(explore).toContain('HOMO–LUMO gap7.89 eV (0.290 Ha)');
+        expect(explore).toContain('HOMO–LVMO gap13.61 eV (0.500 Ha)');
+        const constructed = waterMeta({ orbitals: [...waterMeta().orbitals,
+            { index: 6, label: 'a1', energyHartree: 0.19, occupation: 0, role: 'LVMO', kind: 'valence-virtual', constructed: true, energyApproximate: true }] });
+        expect(shownAt(moleculeState(constructed), 'explore')).not.toContain('HOMO–LVMO');
+        const occupiedOnly = waterMeta({ orbitals: waterMeta().orbitals.filter(o => o.occupation > 0) });
+        expect(shownAt(moleculeState(occupiedOnly), 'research')).not.toMatch(/gap\d/);
+    });
+
+    // Fix round 1 (M7): re-homed from esp_legend.test.tsx -- a weakly polar molecule's map is not called saturated.
+    it('does not call a weakly polar molecule\'s map saturated', () => {
+        const state = moleculeState(waterMeta(), store => {
+            store.dispatch(setSurface({ kind: 'esp' }));
+            store.dispatch(renderFinished({ isoLevel: 0.001, espRange: [-0.02, 0.019] }));
+        });
+        const explore = shownAt(state, 'explore');
+        expect(explore).toContain('Potential range−0.020 to +0.019 Ha/e');
+        expect(explore).not.toContain('beyond the scale');
+    });
+
+    // Fix round 1 (ruling on concern 5): on a phone the tier chip is compact, so Info states the tier line -- its own
+    // builder's words -- as its last note, at every level; App sets tierLineShown on phones only.
+    it('states the tier line as the last note when asked (a phone), at every level, and not otherwise', () => {
+        const state = { ...moleculeState(waterMeta({ references: REAL_WATER_REFERENCES })), tierLineShown: true };
+        for (const level of ['basics', 'research'] as const) {
+            const { container, unmount } = rendered(infoOf(state, level), level);
+            const notes = [...container.querySelectorAll('.info-notes')];
+            expect(notes[notes.length - 1]).toHaveTextContent('Library: Curated; geometry from experiment; dipole checked against published values.');
+            unmount();
+        }
+        expect(shownAt({ ...state, tierLineShown: false }, 'research')).not.toContain('Curated;');
+        const computed = { ...moleculeState(computedWater()), tierLineShown: true };
+        expect(shownAt(computed, 'basics')).toContain('Computed: Computed on request by the same method; not benchmarked against experiment.');
     });
 
     describe('an on-demand computed molecule', () => {

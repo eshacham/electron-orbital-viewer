@@ -98,11 +98,6 @@
   color: var(--ql-color-text-1);
   overflow-wrap: anywhere;
 }
-.molecule-property-caption {
-  font-size: var(--ql-type-caption-size);
-  line-height: var(--ql-type-caption-line);
-  color: var(--ql-color-text-3);
-}
 /* Ruling T14-I2: the Structure tables -- every bond and two-bond angle, folded under a counting summary. */
 .molecule-structure {
   margin-top: 12px;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { LibraryMoleculeMeta } from './library_types';
+import { nb } from '../format/text';
 
 export const DIPOLE_BOHR_PER_DEBYE = 1;
 /** Below this the computed direction of a symmetric molecule's (zero) dipole is numerical noise. */
@@ -51,10 +52,11 @@ export function formatDipole(meta: LibraryMoleculeMeta): string {
  */
 export function dipoleFactText(meta: LibraryMoleculeMeta): string {
     const reference = meta.references.find(r => r.quantity === 'dipole');
-    const magnitude = new THREE.Vector3(...meta.dipoleVectorDebye).length().toFixed(2);
-    if (reference && reference.value === 0) return `0 D by symmetry (computed ${magnitude} D)`;
-    const computed = `${magnitude} D computed`;
+    // Fix round 1 (M4): each number held to its unit by a no-break space.
+    const magnitude = nb(`${new THREE.Vector3(...meta.dipoleVectorDebye).length().toFixed(2)} D`);
+    if (reference && reference.value === 0) return `${nb('0 D')} by symmetry (computed ${magnitude})`;
+    const computed = `${magnitude} computed`;
     return reference
-        ? `${computed} · ${reference.value} ${reference.unit} experiment (${reference.source})`
+        ? `${computed} · ${nb(`${reference.value} ${reference.unit}`)} experiment (${reference.source})`
         : `${computed} · no measured value listed`;
 }

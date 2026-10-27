@@ -178,8 +178,12 @@ describe('Molecules mode', () => {
         expect(properties).toHaveAttribute('aria-expanded', 'true');
         expect(display).toHaveAttribute('aria-expanded', 'false');
         const region = within(viewPanel).getByRole('region', { name: 'Properties' });
-        expect(within(region).getByText('Point group')).toBeInTheDocument();
-        expect(within(region).getByText('HOMO–LUMO gap')).toBeInTheDocument();
+        // Task 7b fix round 1 (ruling on concern 4): the point group and the gap are Info's facts; the card keeps what
+        // Info does not show.
+        expect(within(region).getByText('Multiplicity')).toBeInTheDocument();
+        expect(within(region).getByText('Data tier')).toBeInTheDocument();
+        expect(within(region).queryByText('Point group')).toBeNull();
+        expect(within(region).queryByText('HOMO–LUMO gap')).toBeNull();
     });
 
     // Ruling T12-I1: while a molecule is chosen, Properties stays a section -- "Loading…" until its meta arrives --
@@ -202,11 +206,13 @@ describe('Molecules mode', () => {
         expect(within(viewPanel).getByRole('button', { name: 'Display' })).toHaveAttribute('aria-expanded', 'false');
         const region = () => within(viewPanel).getByRole('region', { name: 'Properties' });
         expect(region()).toHaveTextContent('Loading…');
-        await act(async () => { land(waterMeta({ id: 'nh3', name: 'Ammonia', formula: 'NH3' })); });
+        // Task 7b fix round 1 (ruling on concern 4): the card no longer repeats the formula (Info's title has it), so the
+        // filled card is told by its own geometry row.
+        await act(async () => { land(waterMeta({ id: 'nh3', name: 'Ammonia', formula: 'NH3', geometrySource: 'experiment (NIST)' })); });
         await flush();
         expect(properties()).toHaveAttribute('aria-expanded', 'true');
         expect(region()).not.toHaveTextContent('Loading…');
-        expect(within(region()).getByText('NH₃')).toBeInTheDocument();
+        expect(within(region()).getByText('experiment (NIST)')).toBeInTheDocument();
     });
 
     // Task 16d item 7 (T12 re-review minor): a molecule whose meta failed keeps its Properties section, and says so
@@ -326,7 +332,8 @@ describe('Molecules mode', () => {
         // Review M3: the inspector's own stacked section, as the other modes' phone sheets use.
         expect(heading.closest('.inspector-stacked')).not.toBeNull();
         expect(within(tabpanel).getByText(/Opacity/).compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(within(tabpanel).getByText('Point group')).toBeInTheDocument();
+        // Task 7b fix round 1 (ruling on concern 4): the card's rows are those Info does not show.
+        expect(within(tabpanel).getByText('Multiplicity')).toBeInTheDocument();
     });
 
     it('offers the picker from the phone header and in the Explore tab', async () => {
@@ -1202,15 +1209,29 @@ describe('Molecules Info (Task 7b)', () => {
     const originalMatchMedia = window.matchMedia;
     afterEach(() => { window.matchMedia = originalMatchMedia; });
 
+    /** Water with its shipped references: bond and angle from the experimental geometry, and the dipole. */
+    const realWater = () => waterMeta({ references: [
+        { quantity: 'bond', value: 0.958, unit: 'Å', source: 'experiment (CCCBDB)', tolerance: 0.01, atoms: [0, 1], label: 'O–H' },
+        { quantity: 'angle', value: 104.5, unit: 'deg', source: 'experiment (CCCBDB)', tolerance: 1.0, atoms: [1, 0, 2], label: 'H–O–H' },
+        { quantity: 'dipole', value: 1.855, unit: 'D', source: 'CRC Handbook, via CCCBDB', tolerance: 0.1855 }] });
+
     /** How often `text` occurs in what the page says. */
     const occurrences = (container: HTMLElement, text: string) => (container.textContent ?? '').split(text).length - 1;
 
+    // Fix round 1 (I1): real water's references -- its bond and angle sourced "experiment (CCCBDB)", as the shipped data
+    // has them (tests/fixtures/molecules/h2o/meta.json) -- so the open "How this was computed" at Research is counted too.
     it.each(['explore', 'research'])('on water\'s desktop view at %s, says the geometry source once and the Kohn–Sham caveat at most once', async level => {
         window.localStorage.setItem('eov.level', level);
+        const water = realWater();
+        (jest.requireMock('../src/molecules/loader') as { loadMoleculeMeta: jest.Mock }).loadMoleculeMeta.mockResolvedValueOnce(water);
         const { store, container } = await enterMolecules(false);
-        pickWater(store);
+        pickWater(store, water);
         await flush();
+        expect(store.getState().molecule.meta?.references).toHaveLength(3);
+        if (level === 'research') expect((container.querySelector('details.info-computed') as HTMLDetailsElement).open).toBe(true);
         expect(occurrences(container, 'experiment (CCCBDB)')).toBe(1);
+        // The tier line (title block) says "geometry from experiment", once.
+        expect(occurrences(container, 'geometry from experiment')).toBe(1);
         act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
         expect(container.querySelector('.molecule-orbital-list')).not.toBeNull();
         expect(occurrences(container, 'experiment (CCCBDB)')).toBe(1);
@@ -1239,6 +1260,27 @@ describe('Molecules Info (Task 7b)', () => {
         const computed = info.querySelector('details.info-computed') as HTMLDetailsElement;
         expect(computed.open).toBe(true);
         expect(computed).toHaveTextContent('dipole: 1.855 D — CRC Handbook, via CCCBDB');
+    });
+
+    // Fix round 1 (ruling on concern 5): a phone's tier chip is compact (its line a tooltip no touch screen shows), so
+    // Info states the line as its last note; a desktop says it once, in the title block, and Info does not repeat it.
+    it('states the tier line as Info\'s last note on a phone, and not on a desktop', async () => {
+        const line = 'Library: Curated; geometry from experiment; dipole checked against published values.';
+        const loader = jest.requireMock('../src/molecules/loader') as { loadMoleculeMeta: jest.Mock };
+        loader.loadMoleculeMeta.mockResolvedValueOnce(realWater());
+        const phone = await enterMolecules(true);
+        pickWater(phone.store, realWater());
+        await flush();
+        fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
+        const notes = [...screen.getByRole('tabpanel').querySelectorAll('.info-notes')];
+        expect(notes[notes.length - 1]).toHaveTextContent(line);
+        phone.unmount();
+        loader.loadMoleculeMeta.mockResolvedValueOnce(realWater());
+        const desk = await enterMolecules(false);
+        pickWater(desk.store, realWater());
+        await flush();
+        expect(desk.container.querySelector('.view-panel .info-section')).not.toHaveTextContent('Library: Curated');
+        expect(desk.container.querySelector('.viewport-title')).toHaveTextContent('Curated; geometry from experiment; dipole checked against published values.');
     });
 
     // Task 4 review ruling: a Molecules (i) on a phone switches the sheet to the Info tab on its term.

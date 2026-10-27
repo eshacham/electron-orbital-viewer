@@ -18,7 +18,7 @@ import { SPIN_SUFFIX } from '../bonds/bonds_request';
 import { tierOf, BasisOrbital, MoleculeBasis, MoleculeScan } from '../molecules/types';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import { formatFormula } from '../molecules/catalogue';
-import { orbitalEnergyText, orbitalNoun, orbitalTag } from '../molecules/orbital_display';
+import { orbitalEnergyWithEstimate, orbitalNoun, orbitalTag } from '../molecules/orbital_display';
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY } from '../molecules/esp_color';
 import { formatDipole, hasDipoleArrow } from '../molecules/dipole';
 
@@ -131,7 +131,7 @@ function moleculeMethodStatement(state: RootState): string {
 
 export type MoleculeDrawnSurface = 'density' | 'esp' | {
     mo: number; label: string; role?: string; tag?: string; energyHartree: number;
-    /** Phase 6D: carried through from the orbital so orbitalEnergyText can read "upper estimate" off a
+    /** Phase 6D: carried through from the orbital so orbitalEnergyWithEstimate can read "upper estimate" off a
      * constructed row wherever a picture's energy is named (title, PNG caption, share link text). */
     kind?: 'valence-virtual'; constructed?: boolean; energyApproximate?: boolean;
 };
@@ -171,7 +171,7 @@ export function moleculeDrawnPicture(state: RootState): MoleculeDrawnPicture | n
         const orbital = meta.orbitals.find(o => o.index === index);
         if (!orbital) return null;
         // Phase 6D: a diffuse virtual or the LVMO says so wherever the picture travels (spec §4); the
-        // constructed/kind/energyApproximate flags travel too, so orbitalEnergyText reads "upper estimate" here.
+        // constructed/kind/energyApproximate flags travel too, so orbitalEnergyWithEstimate reads "upper estimate" here.
         const tag = orbitalTag(orbital);
         surface = {
             mo: index, label: orbital.label, ...(orbital.role ? { role: orbital.role } : {}), ...(tag ? { tag } : {}),
@@ -233,7 +233,7 @@ function moleculeViewDescription(state: RootState): string {
     // second pair ("(LUMO; partly diffuse (55 % valence) …)", deferred minor, Task 11).
     const role = surface.role ? ` (${surface.role})` : '';
     const tag = surface.tag ? `; ${surface.label} is ${surface.tag}` : '';
-    return `${moleculeTitle(meta)}, ${orbitalNoun(surface, true)} ${surface.label}${role}, ${orbitalEnergyText(surface)}, `
+    return `${moleculeTitle(meta)}, ${orbitalNoun(surface, true)} ${surface.label}${role}, ${orbitalEnergyWithEstimate(surface)}, `
         + `${enclosedText(fraction)}${tag}`;
 }
 

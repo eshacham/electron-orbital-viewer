@@ -26,13 +26,15 @@ import { moleculeTitle } from '../export/caption';
 import {
     CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, DIFFUSE_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, VALENCE_THRESHOLD,
     degeneracyCounts, diffuseDescription, gapTerm, isConstructed, isUpperEstimate, kohnShamNote, labelNotes,
-    labelsSentence, orbitalGaps,
+    labelsSentence, orbitalEnergyWithEstimate, orbitalGaps,
 } from '../molecules/orbital_display';
 import {
     ESP_COLOURS_SENTENCE, ESP_SURFACE_DENSITY, ESP_SURFACE_SENTENCE, espRangeText, espSaturatedSentence,
 } from '../molecules/esp_color';
 import { dipoleFactText, hasDipoleArrow } from '../molecules/dipole';
 import { spaceFillingUnavailableReason } from '../molecules/vdw_radii';
+import { tierOf } from '../molecules/types';
+import { TIER_LABEL, tierLine } from '../validation/geometry_honesty';
 import type { OwnerJobRecord } from '../jobs/owner_job_record';
 import { cutAwaySentence } from '../atom/atom_text';
 import { isoValueText } from '../orbital_facts';
@@ -43,17 +45,19 @@ import { withSubscripts } from '../format/subscripts';
 import { PointGroupLabel } from '../format/PointGroupLabel';
 import ProvenancePanel from '../components/ProvenancePanel';
 import InfoButton from './InfoButton';
-import { enclosedFact } from './basic_info';
+import { enclosedFact } from './facts';
 
 const h = React.createElement;
 
 /**
  * What the builder reads: the Molecules selection and drawn surface, and the orbital slice's enclosed fraction and cut;
- * the owner's record of a computed molecule (jobs/owner_job_record.ts ownerJobRecordOf -- absent for anyone else); and
- * `moleculeLabels`, the display preference's bond-label switch (eov.display, never in the store). App passes the last
- * two in.
+ * the owner's record of a computed molecule (jobs/owner_job_record.ts ownerJobRecordOf -- absent for anyone else);
+ * `moleculeLabels`, the display preference's bond-label switch (eov.display, never in the store); and `tierLineShown`,
+ * set on a phone, where the tier chip is compact and its line would be a tooltip no touch screen shows (fix round 1,
+ * ruling on concern 5). App passes the last three in.
  */
-export type MoleculeInfoState = Pick<RootState, 'molecule' | 'orbital'> & Partial<OwnerJobRecord> & { moleculeLabels?: boolean };
+export type MoleculeInfoState = Pick<RootState, 'molecule' | 'orbital'> & Partial<OwnerJobRecord>
+    & { moleculeLabels?: boolean; tierLineShown?: boolean };
 
 /** The dipole arrow's sign convention (MoleculeViewOptions, before Task 7b), word for word. */
 export const DIPOLE_CONVENTION = 'The arrow points from − to + (the physics convention), 1 a₀ per debye; many chemistry texts draw it the other way.';
@@ -62,56 +66,67 @@ export const DIPOLE_CONVENTION = 'The arrow points from − to + (the physics co
 const withInfo = (text: string, topic: InfoTopicId, label: string) =>
     h(React.Fragment, null, text, h(InfoButton, { topic, label, place: 'info' }));
 
-/** A paragraph of plain sentences, typeset (a σg or πu label gets a real <sub>); empty parts dropped. */
-function sentences(...parts: Array<string | null | false | undefined>): React.ReactNode {
-    const kept = parts.filter((part): part is string => Boolean(part));
-    return kept.length === 0 ? null : withSubscripts(kept.join(' '));
-}
-
 /** Short paragraphs, one idea each, typeset; empty ones dropped. */
 function paragraphs(...parts: Array<string | null | false | undefined>): React.ReactNode[] {
     return parts.filter((part): part is string => Boolean(part)).map(withSubscripts);
 }
 
-/** One orbital in plain words: what it is, how many electrons it holds, its frontier role and what its data flag. */
+/**
+ * One orbital in plain words: what it is, how many electrons it holds, its frontier role and what its data flag.
+ * Fix round 1 (I3): an open shell's HOMO is the highest *doubly* occupied orbital -- NO₂'s SOMO (6a1) lies above its
+ * HOMO (4b2) -- and a SOMO's role says its one electron, so it is not said twice. "Orbital", as the homoLumo glossary says.
+ */
 function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: MoleculeOrbitalInfo[]): string {
     const degenerate = degeneracyCounts(orbitals).get(orbital.index) ?? 1;
     const others = degenerate > 1 ? `, one of ${degenerate} with the same energy` : '';
     const what = isConstructed(orbital)
         ? `${orbital.label} is not one of ${formula}'s computed orbitals${others}: it is ${CONSTRUCTED_NOTE}.`
         : `${orbital.label} is one of ${formula}'s molecular orbitals${others}.`;
-    const held = orbital.occupation === 0 ? 'It is empty.'
+    const held = orbital.role === 'SOMO' ? null
+        : orbital.occupation === 0 ? 'It is empty.'
         : `It holds ${orbital.occupation} ${plural(orbital.occupation, 'electron', 'electrons')}.`;
-    const role = orbital.role === 'HOMO' ? 'It is the HOMO: the highest level that holds electrons.'
-        : orbital.role === 'LUMO' ? 'It is the LUMO: the lowest empty level.'
-        : orbital.role === 'SOMO' ? 'It is singly occupied: a SOMO.'
+    const somo = orbitals.some(o => o.role === 'SOMO');
+    const role = orbital.role === 'HOMO'
+        ? (somo ? 'It is the HOMO: the highest doubly occupied orbital; the singly occupied SOMO lies above it.'
+            : 'It is the HOMO: the highest orbital that holds electrons.')
+        : orbital.role === 'LUMO' ? 'It is the LUMO: the lowest empty orbital.'
+        : orbital.role === 'SOMO' ? 'It is a SOMO: a singly occupied orbital, the highest that holds electrons.'
         : orbital.role === 'LVMO' ? `It is the LVMO: ${LVMO_NOTE}.` : null;
     const diffuse = orbital.class === 'diffuse' ? `${orbital.label} is ${diffuseDescription(orbital)}.` : null;
     return [what, held, role, diffuse].filter(Boolean).join(' ');
 }
 
-/** The key to the list's marks (MoleculeOrbitalList's legend, before Task 7b): only the marks the list shows. */
+/**
+ * The key to the list's marks (MoleculeOrbitalList's legend, before Task 7b): only the marks the list shows, and only
+ * what each means (fix round 1, M2: what a diffuse or constructed orbital is is the lead's, or the technical band's).
+ */
 function marksKey(orbitals: MoleculeOrbitalInfo[], energiesShown: boolean): string | null {
     const keys = [
         orbitals.some(o => o.class === 'diffuse')
-            && `${DIFFUSE_MARK} marks a partly diffuse virtual (under ${Math.round(VALENCE_THRESHOLD * 100)} % valence): ${DIFFUSE_NOTE}.`,
+            && `${DIFFUSE_MARK} marks a partly diffuse virtual (under ${nb(`${Math.round(VALENCE_THRESHOLD * 100)} %`)} valence).`,
         orbitals.some(isConstructed) && `${CONSTRUCTED_MARK} marks a constructed LVMO, not an orbital of this calculation.`,
         energiesShown && orbitals.some(isUpperEstimate) && '“upper est.” marks an energy that is an upper estimate.',
     ].filter((key): key is string => Boolean(key));
     return keys.length ? keys.join(' ') : null;
 }
 
-/** What the orbital labels are, and the virtuals' classes (the list's caption, before Task 7b): technical. */
-function listNotes(meta: LibraryMoleculeMeta): Array<string | false> {
+/**
+ * What the orbital labels are, and the virtuals' classes (the list's caption, before Task 7b): technical. Fix round 1
+ * (M2): what the lead already says of the drawn orbital (diffuse, the LVMO, constructed) is not said again here.
+ */
+function listNotes(meta: LibraryMoleculeMeta, chosen: MoleculeOrbitalInfo | null): Array<string | false> {
     const { orbitals } = meta;
     const diffuse = orbitals.filter(o => o.class === 'diffuse');
     const unclassified = orbitals.some(o => !(o.occupation > 0)) && !orbitals.some(o => o.class !== undefined);
+    const lvmo = orbitals.find(o => o.role === 'LVMO');
     return [
         labelsSentence(meta.symmetry),
         ...labelNotes(orbitals),
-        diffuse.some(o => o.energyHartree > 0) && 'Those at positive energy are unbound, basis-set dependent states, not bound orbitals.',
-        orbitals.some(o => o.role === 'LVMO') && `LVMO: ${LVMO_NOTE}.`,
-        orbitals.some(isConstructed) && `${CONSTRUCTED_MARK} LVMO ${CONSTRUCTED_NOTE}.`,
+        diffuse.length > 0 && chosen?.class !== 'diffuse' && `A partly diffuse virtual (${DIFFUSE_MARK}): ${DIFFUSE_NOTE}.`,
+        // Fix round 1 (M1): its own subject, now that the diffuse key it followed is a note.
+        diffuse.some(o => o.energyHartree > 0) && 'Diffuse virtuals at positive energy are unbound, basis-set dependent states, not bound orbitals.',
+        lvmo !== undefined && chosen?.role !== 'LVMO' && `LVMO: ${LVMO_NOTE}.`,
+        orbitals.some(isConstructed) && !(chosen && isConstructed(chosen)) && `${CONSTRUCTED_MARK} LVMO ${CONSTRUCTED_NOTE}.`,
         unclassified && UNCLASSIFIED_NOTE,
     ];
 }
@@ -148,7 +163,8 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     let lead: string;
     if (surface.kind === 'density') {
         title = `${moleculeTitle(meta)} — electron density`;
-        lead = `${meta.name} has ${meta.electronCount} electrons; the surface shows where they are likely to be found, all orbitals together.`;
+        // Fix round 1 (M6): the occupied orbitals -- the empty ones hold none of the density.
+        lead = `${meta.name} has ${meta.electronCount} electrons; the surface shows where they are likely to be found, all its occupied orbitals together.`;
     } else if (surface.kind === 'esp') {
         title = `${moleculeTitle(meta)} — electrostatic potential`;
         lead = ESP_COLOURS_SENTENCE;
@@ -169,27 +185,31 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     const labelsControl = atLeast(level, CONTROL_LEVEL.bondLabels);
     const unavailable = spaceFillingUnavailableReason(meta.atoms);
     // The lead says what is drawn; the facts follow it, and then these notes on the numbers and the picture -- after
-    // the facts, so the numbers stay above Info's fold (InfoContent.notes).
-    const plain = sentences(lead);
-    const notes = sentences(
+    // the facts, so the numbers stay above Info's fold (InfoContent.notes), one idea a paragraph (fix round 1, I6).
+    const plain = withSubscripts(lead);
+    const tier = tierOf(meta);
+    const notes = paragraphs(
         // Ruling T7-O3 sits on the dipole fact; the energies' caveat, once, wherever an energy is on screen (Explore).
         explore && kohnShamNote(meta.orbitals),
         surface.kind === 'mo' && marksKey(meta.orbitals, explore),
         explore && espRange && espSaturatedSentence(espRange),
         representation === 'ball-and-stick' && 'Sticks show connectivity, not bond order.',
-        representation === 'space-filling' && 'The spheres are van der Waals spheres (Bondi 1964 / Mantina 2009).',
-        representation === 'space-filling' && surfaceShown && 'The spheres can hide the surface inside them.',
+        representation === 'space-filling' && ['The spheres are van der Waals spheres (Bondi 1964 / Mantina 2009).',
+            surfaceShown ? 'The spheres can hide the surface inside them.' : ''].join(' ').trim(),
         labelsControl && representation === 'none' && 'No structure is drawn, so there is nothing to label.',
         labelsControl && representation === 'space-filling' && state.moleculeLabels && 'Space filling draws no bonds, so only angles are labelled.',
         structureControls && unavailable && `Space filling is unavailable: ${unavailable}.`,
         // Ruling T2-I2: while the arrow is drawn its convention is said, at every level.
         molecule.showDipole && hasDipoleArrow(meta) && DIPOLE_CONVENTION,
         surfaceShown && cutAwaySentence(view.surfaceStyle.clipAxis),
+        // Ruling (concern 5): on a phone, the tier line -- its own builder's words -- last, at every level.
+        state.tierLineShown && `${TIER_LABEL[tier]}: ${tierLine(meta)}`,
     );
 
     // --- Key facts, each from the level that reads it.
+    // Ruling (concern 4): each number has one home, Info; the Properties card keeps what Info does not show. No Formula
+    // fact: the title says it ("Water (H₂O)").
     const facts: InfoFact[] = [
-        { label: 'Formula', value: formula },
         { label: withInfo('Point group', 'pointGroup', 'Point group'), value: h(PointGroupLabel, { pg: meta.symmetry.pointGroup }) },
         { label: 'Electrons', value: String(meta.electronCount) },
         // Ruling T7-O3: a documented caveat stays beside the number it qualifies.
@@ -202,7 +222,7 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     if (chosen) {
         facts.push({
             label: withInfo('Orbital energy', 'kohnSham', 'Kohn–Sham orbitals'),
-            value: nb(`${orbitalEnergyText(chosen.energyHartree)}${isUpperEstimate(chosen) ? ', upper estimate' : ''}`), min: 'explore',
+            value: nb(orbitalEnergyWithEstimate(chosen)), min: 'explore',
         });
     }
     if (espRange) facts.push({ label: 'Potential range', value: nb(espRangeText(espRange)), min: 'explore' });
@@ -223,7 +243,7 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
         surface.kind === 'density' && 'The surface is a contour of constant density ρ, at the value that encloses the chosen fraction of the electrons.',
         surface.kind === 'mo' && 'The surface is a contour of constant |ψ|², at the value that encloses the chosen fraction of the orbital.',
         surface.kind === 'esp' && ESP_SURFACE_SENTENCE,
-        ...(surface.kind === 'mo' ? listNotes(meta) : []),
+        ...(surface.kind === 'mo' ? listNotes(meta, chosen) : []),
     );
 
     // --- How this was computed: the provenance, said once (and the owner's time and cost, to the owner alone).
