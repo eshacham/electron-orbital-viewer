@@ -1,46 +1,32 @@
 import React, { useRef, useState } from 'react';
-import { Box, Button, Menu, MenuItem, Typography, Alert, Tooltip } from '@mui/material';
+import { Box, Button, Menu, MenuItem, Typography, Alert } from '@mui/material';
 import {
     AtomSpecies, Excitation, SubshellRef, excitationSources, excitationTargets, excitationLabel, speciesSymbol, speciesKey,
 } from '../atom/species';
 import { allowedCharges } from '../atom/ion_configurations';
-import { BELOW_GROUND_NOTE, DELTA_SCF_LABEL, EnergyReading, deltaScfMethod, ionisedSpeciesOf } from '../atom/delta_scf';
-import { RelativityMode, shortMethodLabel } from '../atom/relativity';
-import { NIST_FIRST_IONISATION_EV } from '../atom/ionisation_references';
-import { signedDifferencePercent, formatSignedPercent, ieLimitationNote } from '../atom/ie_accuracy';
-import { formatDrawnRadius } from '../atom/format_radius';
+import { BELOW_GROUND_NOTE, EnergyReading, ionisedSpeciesOf } from '../atom/delta_scf';
 import type { EnergiesState } from '../store/atomSlice';
-import type { ReferenceRadii } from '../workers/atomWorker';
 import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
+import InfoButton from '../info/InfoButton';
 
 interface SpeciesControlsProps {
     species: AtomSpecies;
     onChargeChange: (charge: number) => void;
     onExcitationChange: (excitation: Excitation | null) => void;
     energies: EnergiesState;
-    /**
-     * The drawn radius of what is on screen and of the neutral reference,
-     * when both are known; `referenceUnavailable` is why there is no
-     * reference when the neutral atom failed in the species' mode.
-     */
-    radii: { displayRadius: number; reference: ReferenceRadii | null; referenceUnavailable?: string | null } | null;
     unbound: string | null;
     /** The species' picture solve failed, so the energies, which wait for it (ruling C15), will never start. */
     pictureFailed?: boolean;
     /**
-     * The mode the picture on screen was solved in (ruling C9: the drawn
-     * profile's). The ΔSCF energies are non-relativistic whatever it is
-     * (ruling C6), and their tooltip says so when it differs; the ring
-     * note's radii are the picture's, so they state its method. 'off', the
-     * default, leaves both exactly as they were.
-     */
-    pictureRelativity?: RelativityMode;
-    /**
-     * Task 2: the learning level in use. The Charge and Excite rows appear at Advanced -- hidden below it;
-     * the energies and the size comparison stay, describing the species drawn. Omitted, everything shows.
+     * Task 2: the learning level in use. The Charge and Excite rows appear at Advanced -- hidden below it. Task 6:
+     * so does the energy line, a short labelled value (IE_LEVEL); its method, NIST comparison, limitation note and
+     * the size comparison are Info's. Omitted, everything shows.
      */
     level?: LearningLevel;
 }
+
+/** Task 6: the level from which the panel's energy line and Info's energy facts appear (spec: + charge and excite). */
+export const IE_LEVEL: LearningLevel = 'advanced';
 
 const NO_ENERGIES: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
 
@@ -78,7 +64,7 @@ function ionisationQualifier(species: AtomSpecies, reading: EnergyReading | null
  * for one not asked yet: the energies wait for the species' picture (ruling
  * C15), and until then the line says so.
  */
-function energyValueText(reading: EnergyReading | null, status: EnergiesState['status'], noValueReason?: string, pictureFailed = false, isExcitation = false): string {
+export function energyValueText(reading: EnergyReading | null, status: EnergiesState['status'], noValueReason?: string, pictureFailed = false, isExcitation = false): string {
     // Ruling FR-2: "waiting" would wait for ever on a picture that failed.
     // The picture's error is either an unconverged SCF or a worker failure;
     // both leave the energies unasked, so say that rather than guess which.
@@ -94,70 +80,52 @@ function energyValueText(reading: EnergyReading | null, status: EnergiesState['s
 }
 
 /**
- * "ΔSCF, LDA", with the full method one hover, focus or tap away (spec
- * §3.1; final review M4). A `title` alone reached only a mouse: the label is
- * focusable, and focus or a tap opens the same tooltip a hover does, which
- * the label carries as its accessible description while open.
+ * Which ionisation energy a line or fact names (ruling M4: without it every cation's reads the same as the neutral
+ * atom's): "Ionisation energy (Na → Na⁺)"; an anion's is an electron affinity (M3). One label for the panel and Info.
  */
-const MethodLabel: React.FC<{ method: string }> = ({ method }) => {
-    const [open, setOpen] = useState(false);
-    return (
-        <Tooltip title={method} describeChild open={open} onOpen={() => setOpen(true)} onClose={() => setOpen(false)}>
-            <span
-                className="species-method"
-                tabIndex={0}
-                onFocus={() => setOpen(true)}
-                onBlur={() => setOpen(false)}
-                onClick={() => setOpen(true)}
-            >
-                {DELTA_SCF_LABEL}
-            </span>
-        </Tooltip>
-    );
-};
+export function ionisationLabelOf(species: AtomSpecies, reading: EnergyReading | null): string {
+    if (species.charge < 0) {
+        // M3: ionising an anion of charge q releases exactly the electron
+        // affinity of the species one charge less negative -- O²⁻ → O⁻ is
+        // the electron affinity of O⁻, not of the neutral O, so the label is
+        // built from species.charge + 1, never a bare element symbol.
+        return `Ionisation energy (= electron affinity of ${speciesSymbol({ ...species, charge: species.charge + 1, excitation: null })})`;
+    }
+    const qualifier = ionisationQualifier(species, reading);
+    return qualifier ? `Ionisation energy (${qualifier})` : 'Ionisation energy';
+}
+
+/** Why there is no ionisation energy to show (final review M6): the app offers no next ion to subtract. */
+export function ionisationNoValueReason(species: AtomSpecies): string | undefined {
+    return ionisedSpeciesOf(species) === null ? 'next ion not offered' : undefined;
+}
 
 /**
- * "5.37 eV  ΔSCF, LDA", the method one hover away (spec §3.1), and -- for a
- * neutral atom's ionisation energy (ruling P15) -- its NIST measurement,
- * the signed percent difference, and, when the gap is large or the species
- * has an open d/f subshell, the one-line limitation note explaining why.
+ * "Ionisation energy (Na → Na⁺): 5.37 eV" with an (i) -- Task 6: a short labelled value. Its method, NIST measurement,
+ * signed difference and limitation note are said in Info (atomInfo), from the same reading.
  */
 const EnergyLine: React.FC<{
-    label: string; reading: EnergyReading | null; status: EnergiesState['status']; measuredEv?: number; noValueReason?: string; pictureFailed?: boolean; isExcitation?: boolean;
-    method: string; limitationNote?: string | null;
+    label: string; reading: EnergyReading | null; status: EnergiesState['status']; noValueReason?: string; pictureFailed?: boolean; isExcitation?: boolean;
 }> =
-    ({ label, reading, status, measuredEv, noValueReason, pictureFailed, isExcitation, method, limitationNote }) => {
-        const percent = measuredEv !== undefined && reading ? signedDifferencePercent(reading.valueEv, measuredEv) : null;
-        return (
-            <>
-                <Typography variant="body2" className="species-energy">
-                    {label}:{' '}
-                    {energyValueText(reading, status, noValueReason, pictureFailed, isExcitation)}
-                    {' '}<MethodLabel method={method} />
-                    {measuredEv !== undefined && reading && (
-                        <span className="species-measured">
-                            {' '}· measured {measuredEv.toFixed(3)} eV (NIST)
-                            {percent !== null && (
-                                <span aria-label="difference from measured"> · {formatSignedPercent(percent)}</span>
-                            )}
-                        </span>
-                    )}
-                </Typography>
-                {limitationNote && (
-                    <Typography variant="caption" display="block" className="species-limitation">{limitationNote}</Typography>
-                )}
-            </>
-        );
-    };
+    ({ label, reading, status, noValueReason, pictureFailed, isExcitation }) => (
+        <Typography variant="body2" component="div" className="species-energy">
+            <span>
+                {label}:{' '}
+                {energyValueText(reading, status, noValueReason, pictureFailed, isExcitation)}
+            </span>
+            {!isExcitation && <InfoButton topic="ionisation" label="Ionisation energy" />}
+        </Typography>
+    );
 
 /**
- * Charge and excitation for atom mode (spec §5 Phase 3), with the energies
- * that describe them and the size comparison against the neutral atom.
- * Presentational: every change goes out through a callback.
+ * Charge and excitation for atom mode (spec §5 Phase 3), with the energy
+ * that describes them as a short labelled value. Task 6: the energy's method
+ * (ΔSCF), its NIST comparison and limitation note, and the size comparison
+ * against the neutral atom are said in Info (atomInfo). Presentational:
+ * every change goes out through a callback.
  */
 const SpeciesControls: React.FC<SpeciesControlsProps> = ({
-    species, onChargeChange, onExcitationChange, energies, radii, unbound, pictureFailed = false, pictureRelativity = 'off',
-    level = 'research',
+    species, onChargeChange, onExcitationChange, energies, unbound, pictureFailed = false, level = 'research',
 }) => {
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const decreaseRef = useRef<HTMLButtonElement>(null);
@@ -166,9 +134,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
     const neutralSymbol = speciesSymbol({ Z: species.Z, charge: 0, excitation: null });
     const sources = excitationSources(species.Z, species.charge);
     const options = sources.flatMap(from => excitationTargets(species.Z, species.charge, from).map(to => ({ from, to })));
-    const isAnion = species.charge < 0;
-    const reference = radii?.reference ?? null;
-    const energyMethod = deltaScfMethod(pictureRelativity);
+    const showEnergy = atLeast(level, IE_LEVEL);
 
     // Ruling C5: a reply already in flight (or left behind by a fast
     // stepper) can describe a species no longer selected -- SpeciesControls
@@ -179,19 +145,6 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
     const energiesMatch = energies.speciesKey === speciesKey(species);
     const effectiveEnergies = energiesMatch ? energies : NO_ENERGIES;
     const reading = species.excitation ? effectiveEnergies.excitation : effectiveEnergies.ionisation;
-
-    // Ruling P15 overrides C15's display gate: the "measured" comparison
-    // used to stop at Z = 18 because that was as far as the spec's 10 %
-    // validation reached, but R-accuracy wants every calculated ionisation
-    // energy shown beside its NIST value, signed difference and (where the
-    // method is known to be weaker) a limitation note -- the inaccuracy
-    // itself is exactly what P15 wants visible, not hidden past Z = 18.
-    // Still only for the neutral atom's own first ionisation energy (not a
-    // cation's, not an anion's): NIST_FIRST_IONISATION_EV only has that one
-    // reading per element.
-    const measuredEv = species.charge === 0 ? NIST_FIRST_IONISATION_EV[species.Z] : undefined;
-    const ionisationPercent = measuredEv !== undefined && reading ? signedDifferencePercent(reading.valueEv, measuredEv) : null;
-    const limitationNote = measuredEv !== undefined && reading ? ieLimitationNote(species, ionisationPercent) : null;
 
     const excitePopupOpen = menuAnchor !== null;
     const isCurrentOption = (option: Excitation) =>
@@ -212,17 +165,6 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
         onChargeChange(next);
         if (next >= charges[charges.length - 1]) decreaseRef.current?.focus();
     };
-
-    const qualifier = ionisationQualifier(species, reading);
-    const ionisationLabel = isAnion
-        // M3: ionising an anion of charge q releases exactly the electron
-        // affinity of the species one charge less negative -- O²⁻ → O⁻ is
-        // the electron affinity of O⁻, not of the neutral O, so the label is
-        // built from species.charge + 1, never a bare element symbol.
-        ? `Ionisation energy (= electron affinity of ${speciesSymbol({ ...species, charge: species.charge + 1, excitation: null })})`
-        : qualifier
-            ? `Ionisation energy (${qualifier})`
-            : 'Ionisation energy';
 
     return (
         <Box className="species-controls" role="group" aria-label="ion and excitation">
@@ -285,60 +227,32 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
                 <Alert severity="warning" role="alert" className="species-unbound">{unbound}</Alert>
             ) : (
                 <>
-                    {species.excitation ? (
+                    {showEnergy && (species.excitation ? (
                         <EnergyLine
                             label={`Excitation energy ${excitationLabel(species.excitation)}`}
                             isExcitation
-                            method={energyMethod}
                             reading={reading}
                             status={effectiveEnergies.status}
                             pictureFailed={pictureFailed}
                         />
                     ) : (
                         <EnergyLine
-                            label={ionisationLabel}
-                            method={energyMethod}
+                            label={ionisationLabelOf(species, reading)}
                             reading={reading}
                             status={effectiveEnergies.status}
-                            measuredEv={measuredEv}
-                            limitationNote={limitationNote}
                             pictureFailed={pictureFailed}
                             // Final review M6: Na⁺'s next electron would
                             // break the neon core, and nothing past Z = 108
                             // has a tabulated ion -- either way the app
                             // offers no next ion, so there is nothing to
                             // subtract, and the line says so.
-                            noValueReason={ionisedSpeciesOf(species) === null ? 'next ion not offered' : undefined}
+                            noValueReason={ionisationNoValueReason(species)}
                         />
-                    )}
-                    {effectiveEnergies.status === 'failed' && effectiveEnergies.message && (
+                    ))}
+                    {showEnergy && effectiveEnergies.status === 'failed' && effectiveEnergies.message && (
                         <Typography variant="caption" display="block" className="species-energy-failed">{effectiveEnergies.message}</Typography>
                     )}
-                    {radii && reference && (() => {
-                        const ratio = radii.displayRadius / reference.displayRadius;
-                        const percent = Math.abs(ratio - 1) * 100;
-                        // M11: a rounded 0 % reads as a typo ("−0 %"), not as
-                        // "these are the same size" -- say that plainly
-                        // instead of showing a signed near-zero.
-                        const sizeNote = percent < 0.5 ? '≈ same size' : `${ratio < 1 ? '−' : '+'}${Math.round(percent)} %`;
-                        return (
-                            <Typography variant="caption" display="block" className="species-compare" aria-label="size compared with the neutral atom">
-                                <span className="species-compare-swatch" aria-hidden="true" />
-                                dashed ring: neutral {neutralSymbol}, drawn radius {formatDrawnRadius(reference.displayRadius)} a₀ ·{' '}
-                                {speciesSymbol(species)} {formatDrawnRadius(radii.displayRadius)} a₀ ({sizeNote})
-                                {/* Spec §3.1: both radii come from the picture's own mode (ruling C4). */}
-                                {pictureRelativity !== 'off' && ` · both ${shortMethodLabel(pictureRelativity)}`}
-                            </Typography>
-                        );
-                    })()}
-                    {/* Task 8 carry: the neutral atom failed in this mode, so
-                        there is no ring (and no camera floor) -- the place
-                        the ring is described says why. */}
-                    {radii && !reference && radii.referenceUnavailable && (
-                        <Typography variant="caption" display="block" className="species-compare">
-                            {radii.referenceUnavailable}
-                        </Typography>
-                    )}
+                    {/* Task 6: the dashed ring's size comparison (or why there is no ring) is Info's (atomInfo). */}
                 </>
             )}
         </Box>

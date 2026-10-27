@@ -1,7 +1,7 @@
 import React from 'react';
 import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
-import Controls, { cutDepthLabel, relativityHelp, whatChangedText, relativityReadoutText } from './Controls';
+import Controls, { cutDepthLabel, relativityHelp, whatChangedText, relativityReadoutText, relativityReadoutNode } from './Controls';
 import { basicOrbitalParams } from '../orbital_presets';
 import BasicExplore from '../basic_ui/BasicExplore';
 import { useDrawOnSelection } from '../basic_ui/useDrawOnSelection';
@@ -298,6 +298,17 @@ describe('cut depth', () => {
     expect(screen.getByRole('button', { name: 'About Enclosed fraction' })).toHaveClass('info-button');
   });
 
+  // Task 6: in Atoms too -- the fraction's contour (density or |ψ|², with the iso value's unit) and what a cut removes
+  // are Info's (tests/info/atom_info.test.ts), at every drill level.
+  it.each(['atom', 'shell', 'orbital'] as const)('in Atoms at the %s level, keeps the enclosed and cut controls with no helper text under them', atomLevel => {
+    const { container } = render(<Controls {...baseProps} mode="atom" atomLevel={atomLevel} atomZ={6} showElementPicker={false}
+      isoLevel={1.2e-3} surfaceStyle={{ ...baseProps.surfaceStyle, clipAxis: 'y', clipPosition: 0 }} />);
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toBeInTheDocument();
+    expect(screen.queryByText(/\+y side|contour enclosing|\|ψ\|² = /)).toBeNull();
+    expect(container.querySelectorAll('.MuiFormHelperText-root')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'About Enclosed fraction' })).toBeInTheDocument();
+  });
+
   // The whole-atom view is nothing but its slice; at depth 0 or 100 % the
   // slice is a point and the atom vanished.
   it('keeps the whole-atom slice inside the atom', () => {
@@ -339,15 +350,16 @@ describe('Relativity control', () => {
   // are both groups, so the group is queried by its own, distinct name.
   it('offers Off / Scalar / With spin–orbit in atom mode and reports the choice', () => {
     const onRelativityChange = jest.fn();
-    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="scalar" relativityIsDefault
+    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="scalar"
       onRelativityChange={onRelativityChange} />);
     const group = screen.getByRole('group', { name: 'relativity treatment' });
     expect(within(group).getByRole('button', { name: /relativity off/i })).toHaveTextContent('Off');
     expect(within(group).getByRole('button', { name: /scalar relativistic/i })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(within(group).getByRole('button', { name: /with spin–orbit/i }));
     expect(onRelativityChange).toHaveBeenCalledWith('spinOrbit');
-    expect(screen.getByText(/Koelling–Harmon/)).toBeInTheDocument();
-    expect(screen.getByText(/default for this element/i)).toBeInTheDocument();
+    // Task 6: what each mode is (relativityHelp) is said in Info (atomInfo); an (i) beside the switch explains the term.
+    expect(screen.queryByText(/Koelling–Harmon/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'About Relativity' })).toBeInTheDocument();
   });
 
   // Final review I3: clicking the mode already shown is choosing it again
@@ -374,34 +386,27 @@ describe('Relativity control', () => {
     expect(screen.queryByRole('group', { name: 'Relativity' })).toBeNull();
   });
 
-  it('shows what changed, with its method, in a polite status region', () => {
-    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="scalar"
-      onRelativityChange={() => {}} relativityReadout={scalarGold} />);
-    const status = screen.getByRole('status');
-    expect(status).toHaveClass('relativity-what-changed');
-    expect(status).toHaveTextContent(/6s contracts by 17\.1 %/);
-    expect(status).toHaveTextContent(/3\.21 → 2\.66 a₀/);
-    expect(status).toHaveTextContent(/Scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
+  // Task 6: the readout (what changed in the drawn picture) is said in Info (atomInfo) -- nothing under the switch.
+  it('has no readout under the switch', () => {
+    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="scalar" onRelativityChange={() => {}} />);
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(document.querySelector('.relativity-help')).toBeNull();
   });
 
   // Fix round 1, M1: the readout wrapped mid-number ("3.31 →" / "2.85 a₀")
-  // in the 300 px panel, and "⟨r⟩" alone is a symbol many readers will not know.
+  // in a 300 px panel, and "⟨r⟩" alone is a symbol many readers will not know.
+  // Task 6: Info shows it (relativityReadoutNode), still with the radii on one line.
   it('names the mean radius and keeps its two values on one line', () => {
-    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="scalar"
-      onRelativityChange={() => {}} relativityReadout={scalarGold} />);
-    const status = screen.getByRole('status');
-    expect(status).toHaveTextContent(/mean radius ⟨r⟩ 3\.21 → 2\.66 a₀/);
-    const radii = status.querySelector('.relativity-radii') as HTMLElement;
+    const { container } = render(<p>{relativityReadoutNode('scalar', scalarGold)}</p>);
+    expect(container).toHaveTextContent(/6s contracts by 17\.1 %/);
+    expect(container).toHaveTextContent(/Scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
+    expect(container).toHaveTextContent(/mean radius ⟨r⟩ 3\.21 → 2\.66 a₀/);
+    const radii = container.querySelector('.relativity-radii') as HTMLElement;
     expect(radii).toHaveTextContent(/^⟨r⟩ 3\.21 → 2\.66 a₀$/);
     expect(radii.style.whiteSpace).toBe('nowrap');
-    expect(status.textContent).toBe(whatChangedText(gold, 'scalar'));
-  });
-
-  // A live region inserted together with its text is not reliably
-  // announced, so the region is there, empty, before there is anything to say.
-  it('keeps the status region mounted while there is nothing to report', () => {
-    render(<Controls {...baseProps} mode="atom" atomLevel="atom" relativity="off" onRelativityChange={() => {}} relativityReadout={null} />);
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(container.textContent).toBe(whatChangedText(gold, 'scalar'));
+    // Nothing to report: nothing at all.
+    expect(relativityReadoutNode('off', null)).toBeNull();
   });
 
   it('words the helper and readout honestly at the edges', () => {

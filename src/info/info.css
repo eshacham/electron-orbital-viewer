@@ -79,3 +79,13 @@
    FormControl's normal top margin (16 px) -- centred on the 40 px small select, whatever helper text follows it. */
 .info-beside-select { display: flex; align-items: flex-start; gap: 8px; }
 .info-beside-select > .info-button { margin-top: 26px; }
+
+/* Task 6: a row of chips (or a toggle group) with its (i) at the end -- the chips take the width, the (i) sits level
+   with the first line; .info-beside-centre centres it on a one-line control instead. */
+.info-beside-row { display: flex; align-items: flex-start; gap: 8px; }
+.info-beside-row > :first-child { flex: 1 1 auto; min-width: 0; }
+.info-beside-row > .info-button { margin-top: 6px; }
+.info-beside-centre { align-items: center; }
+.info-beside-centre > .info-button { margin-top: 0; }
+/* "How this was computed" may hold several paragraphs (Atoms: method, the model, the ΔSCF energies). */
+.info-computed-body > p { margin: 0; }

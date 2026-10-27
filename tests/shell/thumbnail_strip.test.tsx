@@ -24,13 +24,14 @@ const profile = neonProfile();
 const rGrid = Array.from({ length: profile.size }, (_, j) => profile.rMin * Math.exp(j * profile.dx));
 const items = atomStripItems({ profile, level: 'orbital', selectedShell: 2, selectedOrbital: { n: 2, l: 1, ml: 0 }, enclosedFraction: 0.9, palette: CURVE_COLORS });
 
+// Task 6 (ruling): orbital names are flat ("2pz orbital"), never "2p_z" -- a screen reader reads the underscore aloud.
 describe('ThumbnailStrip (spec §9.1, §13)', () => {
     it('is a listbox of labelled options, grouped by subshell, the shown orbital selected', () => {
         render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
         const list = screen.getByRole('listbox', { name: 'orbitals in view' });
         expect(screen.getByRole('group', { name: '2p' })).toBeInTheDocument();
         // Ruling T16-optname (spec §13): options are named "<label> orbital"; the brief pinned the bare label.
-        expect(screen.getByRole('option', { name: '2p_z orbital' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('option', { name: '2pz orbital' })).toHaveAttribute('aria-selected', 'true');
         // Every tile but the back tile (an arrow) draws into its own 2D canvas -- never a WebGL one.
         expect(list.querySelectorAll('canvas.thumb-canvas')).toHaveLength(items.length - 1);
     });
@@ -40,12 +41,12 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
         const onCollapsedChange = jest.fn();
         render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={onSelect} onCollapsedChange={onCollapsedChange} />);
         // Ruling T16-optname (spec §13): options are named "<label> orbital"; the brief pinned the bare label.
-        fireEvent.click(screen.getByRole('option', { name: '2p_x orbital' }));
+        fireEvent.click(screen.getByRole('option', { name: '2px orbital' }));
         expect(onSelect).toHaveBeenCalledWith({ level: 'orbital', n: 2, l: 1, ml: 1 });
-        const selected = screen.getByRole('option', { name: '2p_z orbital' });
+        const selected = screen.getByRole('option', { name: '2pz orbital' });
         selected.focus();
         fireEvent.keyDown(selected, { key: 'ArrowRight' });
-        expect(document.activeElement).toBe(screen.getByRole('option', { name: '2p_x orbital' }));
+        expect(document.activeElement).toBe(screen.getByRole('option', { name: '2px orbital' }));
         fireEvent.keyDown(document.activeElement!, { key: 'Enter' });
         expect(onSelect).toHaveBeenLastCalledWith({ level: 'orbital', n: 2, l: 1, ml: 1 });
         // Ruling R23b-3: the handle's name is now "Hide orbitals" / "Show orbitals" (was "Hide/Show the orbital strip").
@@ -76,11 +77,11 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Show orbitals' }));
         const options = screen.getAllByRole('option');
         // Ruling T16-optname (spec §13): options are named "<label> orbital"; the brief pinned the bare label.
-        expect(options.filter(option => option.tabIndex === 0)).toEqual([screen.getByRole('option', { name: '2p_z orbital' })]);
-        const selected = screen.getByRole('option', { name: '2p_z orbital' });
+        expect(options.filter(option => option.tabIndex === 0)).toEqual([screen.getByRole('option', { name: '2pz orbital' })]);
+        const selected = screen.getByRole('option', { name: '2pz orbital' });
         selected.focus();
         fireEvent.keyDown(selected, { key: 'ArrowRight' });
-        expect(document.activeElement).toBe(screen.getByRole('option', { name: '2p_x orbital' }));
+        expect(document.activeElement).toBe(screen.getByRole('option', { name: '2px orbital' }));
     });
 
     // Task 18's keyboard walk: Chrome moves its sequential focus starting point to
@@ -138,10 +139,10 @@ describe('ThumbnailStrip on a lost WebGL context', () => {
 
         act(() => { thumbnailService.markLost(); });
         const glyphs = [...container.querySelectorAll('.strip-tile-glyph')].map(glyph => glyph.textContent);
-        expect(glyphs).toEqual(['2s', '2p_y', '2p_z', '2p_x']);
+        expect(glyphs).toEqual(['2s', '2py', '2pz', '2px']);
         // The text label under each tile stays, and so does each option's name.
         // Ruling T16-optname (spec §13): options are named "<label> orbital"; the brief pinned the bare label.
-        expect(screen.getByRole('option', { name: '2p_y orbital' })).toHaveTextContent('2p_y');
+        expect(screen.getByRole('option', { name: '2py orbital' })).toHaveTextContent('2py');
     });
 });
 
@@ -231,9 +232,9 @@ describe('ThumbnailStrip pending tiles (T10-I1)', () => {
             const pending = items.slice(1).map(item => ({ ...item, thumb: { kind: 'pending' as const } }));
             const { container } = render(<ThumbnailStrip items={pending} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
             expect(request).not.toHaveBeenCalled();
-            expect([...container.querySelectorAll('.strip-tile-glyph')].map(glyph => glyph.textContent)).toEqual(['2s', '2p_y', '2p_z', '2p_x']);
+            expect([...container.querySelectorAll('.strip-tile-glyph')].map(glyph => glyph.textContent)).toEqual(['2s', '2py', '2pz', '2px']);
             expect([...container.querySelectorAll('canvas.thumb-canvas')].map(canvas => canvas.getAttribute('data-drawn'))).toEqual(['false', 'false', 'false', 'false']);
-            expect(screen.getByRole('option', { name: '2p_z orbital' })).toHaveAttribute('aria-selected', 'true');
+            expect(screen.getByRole('option', { name: '2pz orbital' })).toHaveAttribute('aria-selected', 'true');
         } finally {
             request.mockRestore();
         }
@@ -255,11 +256,11 @@ describe('ThumbnailStrip under spin–orbit (bismuth)', () => {
         const threeHalves = screen.getByRole('group', { name: '6p j = 3/2' });
         expect(half).toHaveTextContent(subshellLabel(6, 1, 0.5));
         expect(threeHalves).toHaveTextContent(subshellLabel(6, 1, 1.5));
-        expect(screen.getByRole('option', { name: '6p_z orbital of 6p j = 3/2' })).toHaveAttribute('aria-selected', 'true');
-        expect(screen.getByRole('option', { name: '6p_z orbital of 6p j = 1/2' })).toHaveAttribute('aria-selected', 'false');
-        fireEvent.click(screen.getByRole('option', { name: '6p_x orbital of 6p j = 1/2' }));
+        expect(screen.getByRole('option', { name: '6pz orbital of 6p j = 3/2' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('option', { name: '6pz orbital of 6p j = 1/2' })).toHaveAttribute('aria-selected', 'false');
+        fireEvent.click(screen.getByRole('option', { name: '6px orbital of 6p j = 1/2' }));
         expect(onSelect).toHaveBeenCalledWith({ level: 'orbital', n: 6, l: 1, ml: 1, j: 0.5 });
-        const tile = biItems.find(item => item.spoken === '6p_x orbital of 6p j = 1/2')!;
+        const tile = biItems.find(item => item.spoken === '6px orbital of 6p j = 1/2')!;
         expect(tile.thumb.kind === 'orbital' && tile.thumb.request.contentKey).toBe('83|spinOrbit|6|1|1|0.5|0.9');
     });
 });
@@ -494,8 +495,8 @@ describe('ThumbnailStrip<T> (Task 8): generic over the dispatched target', () =>
         render(<ThumbnailStrip items={basicItems} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={onSelect} />);
         expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBeInTheDocument();
         expect(screen.getByRole('group', { name: '3d' })).toBeInTheDocument();
-        expect(screen.getByRole('option', { name: '3d_z² orbital' })).toHaveAttribute('aria-selected', 'true');
-        fireEvent.click(screen.getByRole('option', { name: '3p_x orbital' }));
+        expect(screen.getByRole('option', { name: '3dz² orbital' })).toHaveAttribute('aria-selected', 'true');
+        fireEvent.click(screen.getByRole('option', { name: '3px orbital' }));
         expect(onSelect).toHaveBeenCalledWith({ n: 3, l: 1, ml: 1 });
     });
 
@@ -503,9 +504,18 @@ describe('ThumbnailStrip<T> (Task 8): generic over the dispatched target', () =>
     it('labels Orbitals\' tiles with real subscripts', () => {
         const basicItems = basicStripItems({ selection: { n: 3, l: 2, ml: 0 }, enclosedFraction: 0.9 });
         render(<ThumbnailStrip items={basicItems} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} />);
-        const label = screen.getByRole('option', { name: '3d_z² orbital' }).querySelector('.strip-tile-label')!;
+        const label = screen.getByRole('option', { name: '3dz² orbital' }).querySelector('.strip-tile-label')!;
         expect(label).toHaveTextContent(/^3dz²$/);
         expect(label.querySelector('sub')).toHaveTextContent('z²');
+    });
+
+    // Task 6: the Atom strip's tiles too -- "2p" with a real subscript z, never "2p_z".
+    it('labels Atoms\' orbital tiles with real subscripts', () => {
+        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
+        const label = screen.getByRole('option', { name: '2pz orbital' }).querySelector('.strip-tile-label')!;
+        expect(label).toHaveTextContent(/^2pz$/);
+        expect(label.querySelector('sub')).toHaveTextContent('z');
+        expect(screen.getByRole('listbox').textContent).not.toContain('_');
     });
 });
 

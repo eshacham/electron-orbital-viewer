@@ -55,11 +55,9 @@
    transform (the column no longer centres vertically), so there is nothing
    left for `.compact` to undo. */
 /* Ruling T17-key (§3.3): the compact row wraps inside the column's 220 px rather than running off the screen (Pa's
-   seven shell rings and its caption did, on a phone), and the cut-face caption takes a line of its own. */
+   seven shell rings did, on a phone). Task 6: the cut-face caption is Info's now (atomInfo). */
 .key-column.compact .phase-legend { flex-direction: row; flex-wrap: wrap; padding: 4px 8px; font-size: var(--ql-type-caption-size); }
-.key-column.compact .key-caption { flex-basis: 100%; max-width: none; }
 .key-column .shell-ring-key {
   padding: 8px 10px; border-radius: var(--ql-radius-md); background: var(--ql-color-surface-2); color: var(--ql-color-text-1);
 }
 .key-heading { font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); font-weight: 600; color: var(--ql-color-text-2); }
-.key-caption { display: block; max-width: 180px; color: var(--ql-color-text-2); font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); }

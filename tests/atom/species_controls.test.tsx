@@ -3,7 +3,6 @@ import { render, fireEvent, screen, within, act } from '@testing-library/react';
 import SpeciesControls from '../../src/components/SpeciesControls';
 import { EnergiesState } from '../../src/store/atomSlice';
 import { UnboundAnionError } from '../../src/atom/scf_shared';
-import { DELTA_SCF_METHOD, deltaScfMethod } from '../../src/atom/delta_scf';
 
 const idle: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
 const renderControls = (overrides: Partial<React.ComponentProps<typeof SpeciesControls>> = {}) => {
@@ -12,7 +11,6 @@ const renderControls = (overrides: Partial<React.ComponentProps<typeof SpeciesCo
         onChargeChange: jest.fn(),
         onExcitationChange: jest.fn(),
         energies: idle,
-        radii: null,
         unbound: null,
         ...overrides,
     };
@@ -91,15 +89,27 @@ describe('SpeciesControls', () => {
         expect(props.onExcitationChange).toHaveBeenCalledWith(null);
     });
 
-    it('labels every energy with its method, and never shows an eigenvalue', () => {
+    // Task 6: a short labelled value with an (i); its method (ΔSCF), NIST comparison and limitation note are Info's
+    // (tests/info/atom_info.test.ts pins them there).
+    it('shows the energy as a short labelled value with an (i), never an eigenvalue', () => {
         renderControls({
             energies: { speciesKey: '11', status: 'done', ionisation: { valueEv: 5.368, fromLabel: 'Na', toLabel: 'Na⁺' }, excitation: null, message: null },
         });
         const line = screen.getByText(/Ionisation energy/).closest('.species-energy')!;
-        expect(line).toHaveTextContent('5.37 eV');
-        expect(line).toHaveTextContent('ΔSCF, LDA');
-        expect(line).toHaveTextContent('measured 5.139 eV');
-        expect(line.querySelector('[title]')!.getAttribute('title')).toMatch(/difference of two self-consistent total energies/);
+        expect(line).toHaveTextContent(/^Ionisation energy \(Na → Na⁺\): 5\.37 eV$/);
+        expect(within(line as HTMLElement).getByRole('button', { name: 'About Ionisation energy' })).toBeInTheDocument();
+        expect(screen.queryByText('ΔSCF, LDA')).toBeNull();
+        expect(screen.queryByText(/measured/)).toBeNull();
+        expect(line.querySelector('[title]')).toBeNull();
+    });
+
+    // Task 6: the energy line is Advanced's, with Charge and Excite; below it the panel holds no energy at all.
+    it('hides the energy line below Advanced', () => {
+        renderControls({
+            level: 'explore',
+            energies: { speciesKey: '11', status: 'done', ionisation: { valueEv: 5.368, fromLabel: 'Na', toLabel: 'Na⁺' }, excitation: null, message: null },
+        });
+        expect(screen.queryByText(/Ionisation energy/)).toBeNull();
     });
 
     // M4: without the "(Na⁺ → Na²⁺)" qualifier, a cation's own ionisation
@@ -143,14 +153,14 @@ describe('SpeciesControls', () => {
         expect(line).toHaveTextContent('waiting for the picture…');
     });
 
-    it('shows the excitation energy\'s own method label', () => {
+    // Task 6: the method is Info's; the line is the label and the value.
+    it('shows the excitation energy as a labelled value', () => {
         renderControls({
             species: { Z: 11, charge: 0, excitation: { from: { n: 3, l: 0 }, to: { n: 3, l: 1 } } },
             energies: { speciesKey: '11:3s>3p', status: 'done', ionisation: null, excitation: { valueEv: 2.19, fromLabel: 'Na', toLabel: 'Na 3s → 3p' }, message: null },
         });
         const line = screen.getByText(/Excitation energy/).closest('.species-energy')!;
-        expect(line).toHaveTextContent('2.19 eV');
-        expect(line).toHaveTextContent('ΔSCF, LDA');
+        expect(line).toHaveTextContent(/^Excitation energy 3s → 3p: 2\.19 eV$/);
     });
 
     // Fix round 1, M3: "—" means "not defined" (Na⁺ has no ionisation the
@@ -181,19 +191,12 @@ describe('SpeciesControls', () => {
         expect(screen.getByText(/Ionisation energy/).closest('.species-energy')).toHaveTextContent('Ionisation energy: — (next ion not offered)');
     });
 
-    // Final review M4: the full method was only a `title`, which neither a
-    // keyboard nor a touch screen can reach.
-    it('shows the full ΔSCF method on keyboard focus and on tap', () => {
+    // Final review M4 wanted the full method reachable by keyboard and touch, not a `title` alone. Task 6: it is
+    // Info's "How this was computed" (atomInfo's computed, pinned in atom_info.test.ts) -- text, not a tooltip.
+    it('carries no method tooltip of its own', () => {
         renderControls({ energies: { speciesKey: '11', status: 'done', ionisation: { valueEv: 5.37, fromLabel: 'Na', toLabel: 'Na⁺' }, excitation: null, message: null } });
-        const label = screen.getByText('ΔSCF, LDA');
-        expect(label).toHaveAttribute('tabindex', '0');
+        expect(screen.queryByText('ΔSCF, LDA')).toBeNull();
         expect(screen.queryByRole('tooltip')).toBeNull();
-        act(() => { label.focus(); });
-        expect(screen.getByRole('tooltip')).toHaveTextContent(DELTA_SCF_METHOD);
-        expect(label).toHaveAccessibleDescription(DELTA_SCF_METHOD);
-        act(() => { label.blur(); });
-        fireEvent.click(label);
-        expect(screen.getByRole('tooltip')).toHaveTextContent(DELTA_SCF_METHOD);
     });
 
     // Ruling FR-1: LDA puts some s → d excited configurations below the
@@ -257,89 +260,16 @@ describe('SpeciesControls', () => {
         expect(screen.queryByText(/measured/)).toBeNull();
     });
 
-    // D6 (preflight): ruling P15 overrides C15's old Z ≤ 18 display gate --
-    // the inaccuracy past argon is exactly what R-accuracy wants shown, not
-    // hidden. K (Z = 19, no open d/f) gets the measured value and its signed
-    // difference but no limitation note; Fe (Z = 26, open 3d) gets the note
-    // too, even though its own error is small.
-    it('shows measured, the signed difference and (for a d/f-block element) the note past Z = 18', () => {
-        renderControls({
-            species: { Z: 19, charge: 0, excitation: null }, // K
-            energies: { speciesKey: '19', status: 'done', ionisation: { valueEv: 4.34, fromLabel: 'K', toLabel: 'K⁺' }, excitation: null, message: null },
-        });
-        const line = screen.getByText(/Ionisation energy/).closest('.species-energy')!;
-        expect(line).toHaveTextContent('measured 4.341 eV (NIST)');
-        expect(line).toHaveTextContent('0.0 %');
-        expect(screen.queryByText(/open shells/)).toBeNull();
-    });
-
-    it('notes the limitation for a d-block element past Z = 18, even with a small error', () => {
+    // Task 6: the NIST comparison and limitation note (ruling P15, D6), the dashed-ring comparison (M9, M11, spec
+    // §3.1) and the ΔSCF method worded for the picture (C6) moved to Info -- tests/info/atom_info.test.ts and
+    // tests/atom/species_controls_energies.test.tsx pin them there. The panel says none of them.
+    it('leaves the NIST comparison, the limitation note and the dashed-ring comparison to Info', () => {
         renderControls({
             species: { Z: 26, charge: 0, excitation: null }, // Fe
             energies: { speciesKey: '26', status: 'done', ionisation: { valueEv: 8.042, fromLabel: 'Fe', toLabel: 'Fe⁺' }, excitation: null, message: null },
         });
-        expect(screen.getByText(/open shells; expect larger errors/)).toBeInTheDocument();
-    });
-
-    it('compares the drawn radius with the neutral atom\'s, naming the dashed ring', () => {
-        renderControls({ species: { Z: 11, charge: 1, excitation: null }, radii: { displayRadius: 1.6, reference: { displayRadius: 3.2, contourRadius: 1.94, framingRadius: 3.2 } } });
-        const compare = screen.getByLabelText('size compared with the neutral atom');
-        expect(compare).toHaveTextContent('dashed ring: neutral Na, drawn radius 3.20 a₀');
-        expect(compare).toHaveTextContent('Na⁺ 1.60 a₀ (−50 %)');
-    });
-
-    // Final review M9: the exports print three significant figures; the
-    // screen must print the same number for the same ring.
-    it('prints radii to three significant figures, as the exports do', () => {
-        renderControls({ species: { Z: 55, charge: 0, excitation: { from: { n: 6, l: 0 }, to: { n: 6, l: 1 } } }, radii: { displayRadius: 12.34, reference: { displayRadius: 19.96, contourRadius: 5, framingRadius: 19.96 } } });
-        const compare = screen.getByLabelText('size compared with the neutral atom');
-        expect(compare).toHaveTextContent('drawn radius 20.0 a₀');
-        expect(compare).toHaveTextContent('Cs* 12.3 a₀');
-    });
-
-    // M11: a rounded 0 % reads as a typo ("−0 %"); say plainly that the
-    // sizes are indistinguishable instead.
-    it('says sizes are indistinguishable rather than showing a signed near-zero', () => {
-        renderControls({ species: { Z: 11, charge: 1, excitation: null }, radii: { displayRadius: 1.999, reference: { displayRadius: 2.0, contourRadius: 1.2, framingRadius: 2.0 } } });
-        const compare = screen.getByLabelText('size compared with the neutral atom');
-        expect(compare).toHaveTextContent('≈ same size');
-        expect(compare).not.toHaveTextContent('−0 %');
-        expect(compare).not.toHaveTextContent('+0 %');
-    });
-
-    // Ruling C6: with a relativistic picture the tooltip says the energies
-    // beside it are not relativistic.
-    it('words the ΔSCF method for the picture on screen', () => {
-        renderControls({
-            species: { Z: 79, charge: 0, excitation: null }, pictureRelativity: 'scalar',
-            energies: { speciesKey: '79', status: 'done', ionisation: { valueEv: 9.1, fromLabel: 'Au', toLabel: 'Au⁺' }, excitation: null, message: null },
-        });
-        const label = screen.getByText('ΔSCF, LDA');
-        act(() => { label.focus(); });
-        expect(screen.getByRole('tooltip')).toHaveTextContent(deltaScfMethod('scalar'));
-        expect(label).toHaveAccessibleDescription(deltaScfMethod('scalar'));
-    });
-
-    // Spec §3.1: the radii of a relativistic picture are relativistic numbers.
-    it('states the method of a relativistic picture\'s radii', () => {
-        renderControls({
-            species: { Z: 79, charge: 1, excitation: null }, pictureRelativity: 'spinOrbit',
-            radii: { displayRadius: 2.9, reference: { displayRadius: 3.1, contourRadius: 2, framingRadius: 3.1 } },
-        });
-        expect(screen.getByLabelText('size compared with the neutral atom')).toHaveTextContent(/both Dirac LDA \(MacDonald–Vosko exchange\)$/);
-    });
-
-    it('leaves a non-relativistic ring note as it was', () => {
-        renderControls({ species: { Z: 11, charge: 1, excitation: null }, radii: { displayRadius: 1.6, reference: { displayRadius: 3.2, contourRadius: 1.94, framingRadius: 3.2 } } });
-        expect(screen.getByLabelText('size compared with the neutral atom')).toHaveTextContent(/\(−50 %\)$/);
-    });
-
-    // Task 8 carry: when the neutral atom fails in the species' mode there is
-    // no ring, and the place it would be noted says why.
-    it('says why there is no reference ring', () => {
-        const why = 'No neutral reference ring: Scalar-relativistic SCF for Gold: did not converge.';
-        renderControls({ species: { Z: 79, charge: 1, excitation: null }, radii: { displayRadius: 2.9, reference: null, referenceUnavailable: why } });
-        expect(screen.getByText(why)).toHaveClass('species-compare');
+        expect(screen.queryByText(/measured|NIST|open shells; expect larger errors/)).toBeNull();
+        expect(screen.queryByLabelText('size compared with the neutral atom')).toBeNull();
     });
 
     it('states an unbound anion plainly, with the solver\'s own message', () => {

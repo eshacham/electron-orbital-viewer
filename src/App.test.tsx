@@ -588,6 +588,54 @@ describe('App', () => {
         expect(within(panel).getByText('Hydrogen — whole atom')).toBeInTheDocument();
     });
 
+    // Task 6 (Task 4 review ruling): an Atoms (i) on a phone switches the sheet to the Info tab on its term; pressing
+    // the active one again clears the term and stays where it is.
+    it('on a phone, an Atoms (i) opens the Info tab on its term, and pressing it again clears the term in place', () => {
+        installMatchMedia(true);
+        renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile() });
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        fireEvent.click(within(screen.getByRole('tabpanel')).getByRole('button', { name: 'About Shell' }));
+        expect(screen.getByRole('tab', { name: 'Info' })).toHaveAttribute('aria-selected', 'true');
+        const info = screen.getByRole('tabpanel');
+        expect(within(info).getByRole('heading', { level: 2, name: /^Info/ }).querySelector('.info-topic-chip')).toHaveTextContent('Shell');
+        expect(info).toHaveTextContent(/A shell is a set of orbitals/);
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        const shell = within(screen.getByRole('tabpanel')).getByRole('button', { name: 'About Shell' });
+        expect(shell).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(shell);
+        expect(screen.getByRole('tab', { name: 'Explore' })).toHaveAttribute('aria-selected', 'true');
+        fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
+        expect(document.querySelector('.info-topic-chip')).toBeNull();
+        expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveTextContent('Argon — whole atom');
+    });
+
+    // Task 6: the Atoms panels keep controls and short labelled values; their captions are Info's (atomInfo).
+    it('in Atoms, the Explore panel has no About, shell hint or isolate hint -- Info says them', () => {
+        installMatchMedia(false);
+        const { container } = renderWithProvider(<App />, {
+            Z: 18, profile: argonLikeProfile(), level: 'shell', selectedShell: 2, selectedSubshell: { n: 2, l: 1 },
+        });
+        const explore = container.querySelector('.explore-panel')!;
+        expect(explore).not.toBeNull();
+        for (const caption of ['.level-nav-about', '.level-nav-method', '.level-nav-shell-hint', '.subshell-isolate-hint', '.level-nav-valence-note']) {
+            expect(explore.querySelector(caption)).toBeNull();
+        }
+        fireEvent.click(within(explore as HTMLElement).getByRole('tab', { name: 'Orbitals' }));
+        expect(container.querySelector('.explore-panel .level-nav-about')).toBeNull();
+        expect(container.querySelector('.info-section')).toHaveTextContent('Showing 2p alone — click its chip again for the whole shell.');
+        expect(container.querySelector('.info-section .info-title')).toHaveTextContent('Argon — 2p');
+    });
+
+    // Task 6: the cut face's shading caveat was printed twice, under the plot and in the key column; Info says it once.
+    it('in Atoms, says the cut-face caption exactly once on screen, in Info', () => {
+        installMatchMedia(false);
+        const { container } = renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile() });
+        expect(container.querySelector('.shell-ring-key')).not.toBeNull();
+        const text = document.body.textContent ?? '';
+        expect(text.match(/cut face shading is scaled to local shell structure/gi)).toHaveLength(1);
+        expect(container.querySelector('.info-section')).toHaveTextContent(/Cut face shading is scaled to local shell structure\./);
+    });
+
     // Plan step 5 / ruling P3: useDrawOnSelection's debounce never fires on mount, so
     // entering the mode (the nonce effect's own draw) must not be followed by a second,
     // redundant draw 150 ms later for the very same, unchanged selection.
@@ -834,7 +882,9 @@ describe('App', () => {
             act(() => {
                 energies.onmessage({ data: { type: 'energies', speciesKey: '11+1', ionisation: { valueEv: 47.1, fromLabel: 'Na⁺', toLabel: 'Na²⁺' }, excitation: null, requestId } });
             });
-            expect(screen.getByText(/47\.10 eV/)).toBeInTheDocument();
+            // Task 6: the panel's labelled value, and Info's fact beside it (both Advanced) -- one reading, one text.
+            expect(document.querySelector('.species-energy')).toHaveTextContent(/47\.10 eV/);
+            expect(document.querySelector('.info-section')).toHaveTextContent(/47\.10 eV/);
         });
 
         it('names the ion in the phone header and puts the controls in the Explore tab', () => {
@@ -1195,9 +1245,10 @@ describe('App', () => {
             // DEFAULT_BASIC_SELECTION is n = 3, l = 2, mₗ = 0: 9 tiles (3s, 3p×3, 3d×5).
             const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
             expect(within(strip).getAllByRole('option')).toHaveLength(9);
-            expect(within(strip).getByRole('option', { name: '3d_z² orbital' })).toHaveAttribute('aria-selected', 'true');
+            // Task 6 (ruling): options are named flat ("3dz² orbital") -- the underscore was read aloud.
+            expect(within(strip).getByRole('option', { name: '3dz² orbital' })).toHaveAttribute('aria-selected', 'true');
 
-            fireEvent.click(within(strip).getByRole('option', { name: '3p_x orbital' }));
+            fireEvent.click(within(strip).getByRole('option', { name: '3px orbital' }));
             expect(store.getState().orbital.basicSelection).toEqual({ n: 3, l: 1, ml: 1 });
             // Not drawn yet -- the debounce has not elapsed.
             expect(store.getState().orbital.currentParams).toBeNull();
@@ -1227,6 +1278,14 @@ describe('App: opening a shared link', () => {
         act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
         return store;
     };
+
+    // Task 6 (the critique's researcher red flag): a link without rel opens gold non-relativistic (ruling C1), and
+    // Info says scalar is this element's default.
+    it('says scalar is the default when a link opens a heavy element without rel', () => {
+        const store = openLink('#mode=atom&Z=79&level=atom');
+        expect(store.getState().atom.relativityOverride).toBe('off');
+        expect(document.querySelector('.info-section')).toHaveTextContent('Scalar relativistic is the default for this element.');
+    });
 
     it('lands on the linked orbital with no cut, once the solve arrives', () => {
         const store = openLink('#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0&frac=0.9&cut=none&op=1&surf=solid');
@@ -2104,7 +2163,8 @@ describe('App: shell', () => {
         const card = screen.getByRole('region', { name: 'orbital facts' });
         expect(card).toHaveTextContent('Iso value…computing');
         act(() => { store.dispatch(finishOrbitalCalculation({ isoLevel: 1.234e-3 })); });
-        expect(card).toHaveTextContent('Iso value|ψ|² = 1.23e-3');
+        // Task 6: ×10ⁿ and its unit (isoValueText, shared with Info).
+        expect(card).toHaveTextContent('Iso value|ψ|² = 1.23 × 10⁻³ a₀⁻³');
         expect(card).not.toHaveTextContent('computing');
     });
 
@@ -2220,7 +2280,8 @@ describe('App: relativity', () => {
         expect(store.getState().atom.selectedSubshell).toEqual({ n: 2, l: 1, j: 1.5 });
         // The radial plot isolates the same j-level.
         expect(legend()).toEqual(['2p³⁄₂']);
-        fireEvent.click(screen.getByRole('button', { name: '2p_x' }));
+        // Task 6: the mₗ button is named flat ("2px"), drawn with a real subscript.
+        fireEvent.click(screen.getByRole('button', { name: '2px' }));
         expect(store.getState().atom.level).toBe('orbital');
         expect(store.getState().atom.selectedOrbital).toEqual({ n: 2, l: 1, ml: 1, j: 1.5 });
         fireEvent.click(screen.getByRole('button', { name: 'Back to 2p j = 3/2' }));
@@ -2255,7 +2316,8 @@ describe('App: relativity', () => {
             return { ...argonLikeProfile(), Z: 79, speciesKey: '79', relativity: 'scalar', valenceS: goldChange, nonRelativistic: null, comparisonUnavailable: null };
         }
         const switchIn = (root: HTMLElement = document.body) => within(root).getByRole('group', { name: 'relativity treatment' });
-        const readout = (container: HTMLElement) => container.querySelector('.relativity-what-changed')!;
+        // Task 6: the readout and About are said in Info (atomInfo), docked at the top of the right panel.
+        const info = (container: HTMLElement) => container.querySelector('.info-section')!;
 
         // Spec §9.1: Relativity is in Explore › Configuration, no longer the right-hand view panel.
         it('sits in Explore › Configuration, at scalar by default for gold', () => {
@@ -2263,7 +2325,9 @@ describe('App: relativity', () => {
             const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79 });
             const group = switchIn(container.querySelector('.side-panel') as HTMLElement);
             expect(within(group).getByRole('button', { name: 'scalar relativistic' })).toHaveAttribute('aria-pressed', 'true');
-            expect(screen.getByText(/Default for this element/)).toBeInTheDocument();
+            // Task 6: what the mode is, and that it is the default, are said in Info (relativityHelp).
+            expect(info(container)).toHaveTextContent(/Scalar-relativistic \(Koelling–Harmon\).*Default for this element\./);
+            expect(info(container)).not.toHaveTextContent('Scalar relativistic is the default for this element.');
         });
 
         it('is off by default for a light atom', () => {
@@ -2309,12 +2373,13 @@ describe('App: relativity', () => {
         // still names the method being solved for, but nothing is drawn in it.
         it('says nothing about "this picture" in About when the verdict left none', () => {
             installMatchMedia(false);
-            renderWithProvider(<App />, {
+            const { container } = renderWithProvider(<App />, {
                 mode: 'atom', Z: 85, charge: -1,
                 unbound: 'Scalar-relativistic SCF for Astatine ion At⁻: LDA does not bind this anion: its 6p electron is not bound by 10⁻⁴ Ha or more.',
             });
-            fireEvent.click(screen.getByRole('tab', { name: 'Orbitals' })); // About is expanded inline in Explore › Orbitals (spec §9.1)
-            expect(document.querySelector('.level-nav-about')!.textContent).not.toMatch(/This picture/);
+            // Task 6: About is Info's "How this was computed" (open at Research), no longer in Explore › Orbitals.
+            expect(info(container).querySelector('.info-computed')).toHaveTextContent(/central-field model/);
+            expect(info(container).textContent).not.toMatch(/This picture/);
         });
 
         it('names the mode it is solving in', () => {
@@ -2332,9 +2397,9 @@ describe('App: relativity', () => {
         it('says what changed for the drawn picture, with its method', () => {
             installMatchMedia(false);
             const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
-            expect(readout(container)).toHaveAttribute('role', 'status');
-            expect(readout(container)).toHaveTextContent('What changed: 6s contracts by 14.1 % (mean radius ⟨r⟩ 3.21 → 2.76 a₀');
-            expect(readout(container)).toHaveTextContent(/Scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
+            expect(info(container)).toHaveTextContent('What changed: 6s contracts by 14.1 % (mean radius ⟨r⟩ 3.21 → 2.76 a₀');
+            expect(info(container)).toHaveTextContent(/Scalar-relativistic LDA \(MacDonald–Vosko exchange\)/);
+            expect(container.querySelector('.side-panel')).not.toHaveTextContent(/What changed/);
         });
 
         // Ruling C9: while spin–orbit solves, the scalar picture is still up,
@@ -2344,7 +2409,7 @@ describe('App: relativity', () => {
             const { container } = renderWithProvider(<App />, {
                 mode: 'atom', Z: 79, relativityOverride: 'spinOrbit', isSolving: true, profile: scalarGold(),
             });
-            expect(readout(container)).toHaveTextContent('Solving the picture with spin–orbit… the picture on screen is still scalar-relativistic.');
+            expect(info(container)).toHaveTextContent('Solving the picture with spin–orbit… the picture on screen is still scalar-relativistic.');
         });
 
         // Ruling P18 (D13): Help's About text (LevelNav variant="about") is
@@ -2376,7 +2441,7 @@ describe('App: relativity', () => {
             const { container } = renderWithProvider(<App />, {
                 mode: 'atom', Z: 79, profile: { ...scalarGold(), valenceS: null, comparisonUnavailable: why },
             });
-            expect(readout(container)).toHaveTextContent(why);
+            expect(info(container)).toHaveTextContent(why);
         });
 
         // Spec §9.8: the phone's Explore tab holds the left panel's tabs as sections, Relativity included.
@@ -2386,16 +2451,19 @@ describe('App: relativity', () => {
             expect(screen.queryByRole('group', { name: 'relativity treatment' })).toBeNull();
             fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
             expect(switchIn(screen.getByRole('tabpanel'))).toBeInTheDocument();
-            expect(within(screen.getByRole('tabpanel')).getByText(/6s contracts by 14\.1 %/)).toBeInTheDocument();
+            // Task 6: what changed is said in Info -- the phone's Info tab.
+            fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
+            expect(screen.getByRole('tabpanel')).toHaveTextContent(/6s contracts by 14\.1 %/);
         });
 
         // Ruling C6: the ΔSCF energies stay non-relativistic; with a
         // relativistic picture, the About text says the two differ.
-        it('says in About this model that a relativistic picture\'s energies are not', () => {
+        it('says in About this model (Info) that a relativistic picture\'s energies are not', () => {
             installMatchMedia(false);
             const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
-            fireEvent.click(screen.getByRole('tab', { name: 'Orbitals' })); // About is expanded inline in Explore › Orbitals (spec §9.1)
-            expect(container.querySelector('.level-nav-about')!.textContent).toMatch(/This picture is scalar-relativistic; the ΔSCF energies are not/);
+            // Task 6: About is Info's "How this was computed", no longer expanded in Explore › Orbitals.
+            expect(container.querySelector('.level-nav-about')).toBeNull();
+            expect(info(container).querySelector('.info-computed')!.textContent).toMatch(/This picture is scalar-relativistic; the ΔSCF energies are not/);
         });
     });
 });

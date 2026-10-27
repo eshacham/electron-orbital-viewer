@@ -1,16 +1,17 @@
 import React from 'react';
 import { render, fireEvent, within, screen } from '@testing-library/react';
-import LevelNav, { NavigationTarget, relativisticEnergiesSentence, aboutRelativitySentence } from '../../src/components/LevelNav';
+import LevelNav, { NavigationTarget, relativisticEnergiesSentence, aboutRelativitySentence, aboutModelText } from '../../src/components/LevelNav';
 import { speciesConfiguration } from '../../src/atom/species';
 
 describe('LevelNav', () => {
-    it('does not claim a core for a one-shell atom', () => {
-        const render1 = (Z: number) => render(
-            <LevelNav Z={Z} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+    // Task 6: the valence line keeps its short labelled value; the core note is Info's (atomInfo, whose tests
+    // pin that a one-shell atom claims no core).
+    it('keeps the valence line a short labelled value, with no note beside it', () => {
+        const { container } = render(
+            <LevelNav Z={3} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
         );
-        expect(render1(1).container.textContent).not.toMatch(/inside is core/);
-        expect(render1(2).container.textContent).not.toMatch(/inside is core/);
-        expect(render1(3).container.textContent).toMatch(/inside is core/);
+        expect(container.querySelector('.level-nav-valence')).toHaveTextContent(/^Valence: 2s¹$/);
+        expect(container.textContent).not.toMatch(/inside is core/);
     });
 
     it('offers an element button only when given somewhere to send it', () => {
@@ -27,7 +28,8 @@ describe('LevelNav', () => {
         expect(onChangeElement).toHaveBeenCalled();
     });
 
-    it('shows the element name, configuration label and method statement', () => {
+    // Task 6: the method statement is Info's ("How this was computed", atomInfo).
+    it('shows the element name and configuration label, and leaves the method to Info', () => {
         const { getByText } = render(
             <LevelNav
                 Z={6}
@@ -39,7 +41,7 @@ describe('LevelNav', () => {
         );
         expect(getByText('Carbon')).toBeInTheDocument();
         expect(getByText('1s² 2s² 2p²')).toBeInTheDocument();
-        expect(getByText(/central-field SCF, LDA exchange with VWN correlation, spherically averaged/)).toBeInTheDocument();
+        expect(screen.queryByText(/central-field SCF/)).toBeNull();
     });
 
     it('builds a breadcrumb trail down to whatever is selected, and each segment is clickable', () => {
@@ -80,7 +82,10 @@ describe('LevelNav', () => {
             />
         );
         const crumbs = within(getByRole('navigation', { name: /breadcrumb/i }));
-        expect(crumbs.getByText('2p_x')).toBeInTheDocument();
+        // Task 6: a real subscript, spoken flat ("2px"), never "2p_x".
+        const orbital = crumbs.getByRole('button', { name: '2px' });
+        expect(orbital.querySelector('sub')).toHaveTextContent('x');
+        expect(getByRole('navigation', { name: /breadcrumb/i }).textContent).not.toContain('_');
     });
 
     // Ruling R26 regression: iron has 4 occupied shells (K, L, M, N) but its
@@ -207,8 +212,9 @@ describe('LevelNav', () => {
             expect(onNavigate).toHaveBeenCalledWith({ level: 'atom' } as NavigationTarget);
         });
 
-        it('does not describe the view as a shell once an orbital is selected', () => {
-            const { getByText, queryByText } = render(
+        // Task 6: the hint on where you are is Info's (atomInfo); the panel keeps Back and the breadcrumb.
+        it('leaves the hint on where you are to Info', () => {
+            const { container, queryByText } = render(
                 <LevelNav
                     Z={26}
                     selectedShell={3}
@@ -217,28 +223,26 @@ describe('LevelNav', () => {
                     onNavigate={() => {}}
                 />
             );
-            expect(getByText(/one orbital of 3d/i)).toBeInTheDocument();
-            expect(queryByText(/for the whole atom/i)).toBeNull();
+            expect(container.querySelector('.level-nav-shell-hint')).toBeNull();
+            expect(queryByText(/one orbital of 3d/i)).toBeNull();
         });
     });
 
     // Discoverability: the rings on the cut face are clickable now
     // (orbital_visualizer.ts's onPickRadius), and nothing about a ring says
-    // so on its own.
-    it('says the rings are clickable, and how to get back out once one is open', () => {
-        const { getByText, rerender } = render(
+    // so on its own. Task 6: Info says so (atomInfo's hint); the shells carry an (i).
+    it('leaves the click hint to Info, and offers an (i) beside the shells', () => {
+        const { getByRole, container } = render(
             <LevelNav Z={18} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
         );
-        expect(getByText(/click a ring in the 3d view/i)).toBeInTheDocument();
-
-        rerender(
-            <LevelNav Z={18} selectedShell={2} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
-        );
-        expect(getByText(/for the whole atom/i)).toBeInTheDocument();
+        expect(container.textContent).not.toMatch(/click a ring/i);
+        expect(getByRole('button', { name: 'About Shell' })).toBeInTheDocument();
     });
 
-    it('has a collapsed "About this model" section stating the approximations plainly', () => {
-        const { getByRole, getByText } = render(
+    // Task 6: About is Info's ("How this was computed", atomInfo) -- no toggle in the panel; Help quotes it
+    // (variant 'about'). The text itself is aboutModelText, pinned here as it was.
+    it('states the approximations of "About this model" plainly, and has no toggle for it in the panel', () => {
+        const { queryByRole } = render(
             <LevelNav
                 Z={6}
                 selectedShell={null}
@@ -247,13 +251,9 @@ describe('LevelNav', () => {
                 onNavigate={() => {}}
             />
         );
-        const toggle = getByRole('button', { name: /about this model/i });
-        expect(toggle).toHaveAttribute('aria-expanded', 'false');
-
-        fireEvent.click(toggle);
-
-        expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        const about = getByText(/central-field/i, { selector: '.level-nav-about' });
+        expect(queryByRole('button', { name: /about this model/i })).toBeNull();
+        const about = { textContent: aboutModelText('off', 'off', true) };
+        expect(about.textContent).toMatch(/central-field/i);
         expect(about.textContent).toMatch(/spherically averaged/i);
         expect(about.textContent).toMatch(/LDA/);
         expect(about.textContent).toMatch(/VWN/);
@@ -277,6 +277,8 @@ describe('LevelNav', () => {
         expect(about.textContent).toMatch(/Cl⁻/);
         // Final review M7: UI copy uses real dashes, never a typed "--".
         expect(about.textContent).not.toContain('--');
+        // Task 6: the JSX this replaces lost the space at a comment ("fortheir").
+        expect(about.textContent).toContain('no bound state for their extra electron');
     });
 });
 
@@ -320,9 +322,10 @@ describe('LevelNav for a species', () => {
         expect(container.querySelector('.level-nav-configuration')!.compareDocumentPosition(probe) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     });
 
+    // Task 6: About is Help's (variant 'about') and Info's, from aboutModelText.
     it('no longer claims to describe neutral atoms only', () => {
         const { container } = render(
-            <LevelNav Z={6} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+            <LevelNav Z={6} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} variant="about" />
         );
         expect(container.textContent).not.toMatch(/no ions/);
         expect(container.textContent).toMatch(/isolated atoms and their ions/);
@@ -347,7 +350,8 @@ describe('LevelNav for a species', () => {
         expect(onNavigate).not.toHaveBeenCalled();
         expect(container.querySelector('.level-nav-configuration')).toHaveTextContent('1s² 2s² 2p⁶ 3s² 3p⁶');
         expect(container.querySelector('.level-nav-valence')).toHaveTextContent('3s² 3p⁶');
-        expect(container.querySelector('.level-nav-shell-hint')).toHaveTextContent(/nothing is drawn/i);
+        // Task 6: why there is no shell to open is said in Info (atomInfo).
+        expect(container.querySelector('.level-nav-shell-hint')).toBeNull();
     });
     it('names j-levels in the breadcrumb and navigates with j', () => {
         const onNavigate = jest.fn();
@@ -368,11 +372,14 @@ describe('LevelNav for a species', () => {
         const crumbs = within(getByRole('navigation', { name: 'breadcrumb' }));
         fireEvent.click(crumbs.getByRole('button', { name: '6p j = 1/2' }));
         expect(onNavigate).toHaveBeenLastCalledWith({ level: 'subshell', n: 6, l: 1, j: 0.5 });
-        fireEvent.click(crumbs.getByRole('button', { name: '6p_x of 6p j = 1/2' }));
+        // Task 6: the orbital's name is spoken flat ("6px"), drawn with a real subscript.
+        fireEvent.click(crumbs.getByRole('button', { name: '6px of 6p j = 1/2' }));
         expect(onNavigate).toHaveBeenLastCalledWith({ level: 'orbital', n: 6, l: 1, ml: 1, j: 0.5 });
-        expect(crumbs.getByText('6p_x · 6p½')).toBeTruthy();
+        const orbitalCrumb = crumbs.getByRole('button', { name: '6px of 6p j = 1/2' });
+        expect(orbitalCrumb).toHaveTextContent(/^6px · 6p½$/);
+        expect(orbitalCrumb.querySelector('sub')).toHaveTextContent('x');
         expect(getByRole('button', { name: 'Back to 6p j = 1/2' })).toBeTruthy();
-        expect(container.querySelector('.level-nav-shell-hint')).toHaveTextContent('One orbital of 6p½');
+        expect(container.querySelector('.level-nav-shell-hint')).toBeNull();
     });
 
     it('says j-levels aloud in the phone header too', () => {
@@ -397,18 +404,19 @@ describe('LevelNav for a species', () => {
         expect(getByText('← Back to 3p').getAttribute('aria-label')).toBeNull();
         const crumbs = getByRole('navigation', { name: 'breadcrumb' });
         expect(Array.from(crumbs.querySelectorAll('button')).map(b => [b.textContent, b.getAttribute('aria-label')]))
-            .toEqual([['Argon', null], ['M shell (n=3)', null], ['3p', null], ['3p_z', null]]);
+            // Task 6: the orbital crumb reads "3pz" (a real subscript), never "3p_z".
+            .toEqual([['Argon', null], ['M shell (n=3)', null], ['3p', null], ['3pz', null]]);
         expect(container.querySelector('.visually-hidden')).toBeNull();
     });
 
     // Ruling C6: ΔSCF stays non-relativistic in every mode; with a
     // relativistic picture the About text has to say the two differ.
     describe('the energies against a relativistic picture', () => {
+        // Task 6: About is Help's (variant 'about') and Info's; the panel has no toggle for it any more.
         const aboutText = (relativity?: 'off' | 'scalar' | 'spinOrbit') => {
-            const { getByRole, container, unmount } = render(
-                <LevelNav Z={79} relativity={relativity} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+            const { container, unmount } = render(
+                <LevelNav Z={79} relativity={relativity} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} variant="about" />
             );
-            fireEvent.click(getByRole('button', { name: /about this model/i }));
             const text = container.querySelector('.level-nav-about')!.textContent!;
             unmount();
             return text;
@@ -434,10 +442,9 @@ describe('LevelNav for a species', () => {
         // failed solve) there is no "this picture" to describe -- the
         // paragraph reads as off's does at that point, whatever the switch says.
         it('says nothing about "this picture" when there is none', () => {
-            const { getByRole, container } = render(
-                <LevelNav Z={85} relativity="scalar" pictureShown={false} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+            const { container } = render(
+                <LevelNav Z={85} relativity="scalar" pictureShown={false} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} variant="about" />
             );
-            fireEvent.click(getByRole('button', { name: /about this model/i }));
             const text = container.querySelector('.level-nav-about')!.textContent!;
             expect(text).not.toMatch(/This picture/);
             expect(text).toContain('extra electron at all. The individual s/p/d/f');
@@ -454,10 +461,9 @@ describe('LevelNav for a species', () => {
             ['scalar', /Koelling–Harmon/, /scalar-relativistic/],
             ['spinOrbit', /Dirac/, /j = l ± ½/],
         ] as const)('states the %s method in About this model', (mode, methodPattern, sentencePattern) => {
-            const { getByRole, container } = render(
-                <LevelNav Z={79} relativity={mode} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+            const { container } = render(
+                <LevelNav Z={79} relativity={mode} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} variant="about" />
             );
-            fireEvent.click(getByRole('button', { name: /about this model/i }));
             expect(container.querySelector('.level-nav-method')!.textContent).toMatch(methodPattern);
             expect(container.querySelector('.level-nav-about')!.textContent).toMatch(sentencePattern);
             expect(container.querySelector('.level-nav-about')!.textContent).not.toMatch(/It is non-relativistic/);

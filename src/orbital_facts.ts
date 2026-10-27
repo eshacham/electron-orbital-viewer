@@ -1,7 +1,9 @@
-import { orbitalName, shellLetter } from './orbital_names';
+import { shellLetter } from './orbital_names';
 import { subshellLabel } from './atom/configurations';
 import { formatDrawnRadius } from './atom/format_radius';
+import { HARTREE_IN_EV } from './atom/delta_scf';
 import { shellName } from './shell/view_title';
+import { formatSci, minus, orbitalPlainName } from './format/sci';
 
 /**
  * The inspector's facts card (spec §9.1 "Data"): computed, never typed in.
@@ -12,10 +14,42 @@ import { shellName } from './shell/view_title';
 export interface FactRow {
     term: string;
     value: string;
+    /** Task 6: the value is this orbital's name -- the card draws it with a real subscript (OrbitalLabel). */
+    orbital?: { n: number; l: number; ml: number };
     /** What a screen reader says instead of `value`, when the visible value is a mark (e.g. "…" → "computing"). */
     spokenValue?: string;
 }
-export interface OrbitalFacts { title: string; rows: FactRow[]; notes: string[] }
+export interface OrbitalFacts {
+    title: string;
+    rows: FactRow[];
+    notes: string[];
+    /** Task 6: the title names this orbital -- the card draws its name with a real subscript (OrbitalLabel). */
+    orbital?: { n: number; l: number; ml: number };
+}
+
+/** A formula kept on one line: its spaces become no-break spaces (U+00A0), so it never wraps at an operator. */
+const nb = (formula: string) => formula.replace(/ /g, '\u00A0');
+
+/**
+ * Task 6: one iso value text for the Data card and Info, so the two cannot drift: "|ψ|² = 1.23 × 10⁻³ a₀⁻³" -- ×10ⁿ,
+ * a true minus, its unit, held on one line.
+ */
+export function isoValueText(isoLevel: number): string {
+    return nb(`|ψ|² = ${formatSci(isoLevel)} a₀⁻³`);
+}
+
+/** An orbital energy in hartree as every Atoms panel prints it: "−0.199 Ha", three places, a true minus. */
+export function hartreeText(hartree: number): string {
+    return `${minus(hartree.toFixed(3))} Ha`;
+}
+
+/**
+ * Task 6: one orbital-energy text for Info and the Data card -- eV first, then Ha: "−5.41 eV (−0.199 Ha)". It is an
+ * eigenvalue (ruling R19), which the caller says beside it; never an ionisation energy.
+ */
+export function orbitalEnergyText(hartree: number): string {
+    return `${minus((hartree * HARTREE_IN_EV).toFixed(2))} eV (${hartreeText(hartree)})`;
+}
 
 const NODE_SURFACES: Record<string, string> = {
     '1:-1': 'the xz plane', '1:0': 'the xy plane', '1:1': 'the yz plane',
@@ -49,8 +83,7 @@ const radialNodes = (n: number, l: number) => {
     const count = n - l - 1;
     return count === 0 ? '0' : `${count} (${count === 1 ? 'a sphere' : 'spheres'})`;
 };
-const energyText = (energy: number, method: string) =>
-    `${energy < 0 ? '−' : ''}${Math.abs(energy).toFixed(3)} Ha (eigenvalue, ${method})`;
+const energyText = (energy: number, method: string) => `${orbitalEnergyText(energy)} · eigenvalue, ${method}`;
 
 interface Extras {
     enclosedFraction: number;
@@ -63,7 +96,7 @@ interface Extras {
 
 function isoRow(extras: Extras): FactRow {
     if (extras.isoPending) return { term: 'Iso value', value: '…', spokenValue: 'computing' };
-    return { term: 'Iso value', value: extras.isoLevel === null ? '—' : `|ψ|² = ${extras.isoLevel.toExponential(2)}` };
+    return { term: 'Iso value', value: extras.isoLevel === null ? '—' : isoValueText(extras.isoLevel) };
 }
 
 export function orbitalFacts(o: { n: number; l: number; ml: number; j?: number }, extras: Extras): OrbitalFacts {
@@ -72,7 +105,7 @@ export function orbitalFacts(o: { n: number; l: number; ml: number; j?: number }
         { term: 'n', value: String(o.n) },
         { term: 'l', value: `${o.l} (${shellLetter(o.l)})` },
         { term: 'mₗ', value: o.ml > 0 ? `+${o.ml}` : signed(o.ml) },
-        { term: 'Real orbital', value: orbitalName(o.n, o.l, o.ml) },
+        { term: 'Real orbital', value: orbitalPlainName(o.n, o.l, o.ml), orbital: { n: o.n, l: o.l, ml: o.ml } },
         ...(o.j === undefined ? [] : [{ term: 'j', value: `${o.j * 2}/2` }]),
         { term: 'Radial nodes', value: radialNodes(o.n, o.l) },
         { term: 'Angular nodes', value: surfaces ? `${o.l} — ${surfaces}` : String(o.l) },
@@ -82,7 +115,7 @@ export function orbitalFacts(o: { n: number; l: number; ml: number; j?: number }
     ];
     const shape = shapeWord(o.l, o.ml);
     const notes = ['ψ changes sign across every node.', ...(shape ? [`Shape: ${shape} (qualitative).`] : [])];
-    return { title: `${orbitalName(o.n, o.l, o.ml)} orbital`, rows, notes };
+    return { title: `${orbitalPlainName(o.n, o.l, o.ml)} orbital`, rows, notes, orbital: { n: o.n, l: o.l, ml: o.ml } };
 }
 
 export function subshellFacts(

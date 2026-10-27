@@ -54,9 +54,10 @@ import { useDeltaScfEnergies } from './atom/useDeltaScfEnergies';
 import { Excitation, speciesConfiguration, speciesSymbol, speciesTitle, isValidExcitation, isNeutralGround } from './atom/species';
 import { allowedCharges } from './atom/ion_configurations';
 import SpeciesControls from './components/SpeciesControls';
-import Controls, { RelativityReadout, RelativityControl } from './components/Controls';
+import Controls, { RelativityControl } from './components/Controls';
 import BasicExplore from './basic_ui/BasicExplore';
 import { basicInfo, BASIC_ORBITALS_ABOUT } from './info/basic_info';
+import { atomInfo } from './info/atom_info';
 import { useDrawOnSelection } from './basic_ui/useDrawOnSelection';
 import { AxesSwitch } from './atom_ui/DisplayControls';
 import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
@@ -268,15 +269,10 @@ function App() {
     const relativity = useAppSelector(state => effectiveRelativity(state.atom));
     // Whether the mode shown is this element's default, whoever chose it
     // (final review I3): Scalar chosen on carbon persists onto gold, where it
-    // is the default, and the helper says so.
+    // is the default. Task 2's level line reads it.
     const relativityIsDefault = useAppSelector(state => effectiveRelativity(state.atom) === defaultRelativityFor(state.atom.Z));
     const pictureRelativity: RelativityMode = atomProfile ? profileRelativity(atomProfile) : relativity;
-    // Memoised: Controls is React.memo, and a fresh object every render would defeat it.
-    const relativityReadout = useMemo<RelativityReadout | null>(() => atomProfile && {
-        pictureMode: profileRelativity(atomProfile),
-        change: atomProfile.valenceS ?? null,
-        comparisonUnavailable: atomProfile.comparisonUnavailable ?? null,
-    }, [atomProfile]);
+    // Task 6: the Relativity readout (what changed in the drawn picture) is Info's now (atomInfo).
 
     // Basic Orbitals' view state -- n/l/mₗ, the enclosed fraction, and Phase
     // 1's combination -- lives in the store, not in App: a shared link's URL
@@ -566,10 +562,17 @@ function App() {
         () => (isBasicMode ? basicInfo({ orbital: orbitalSliceNow }, level) : null),
         [isBasicMode, orbitalSliceNow, level],
     );
+    // Task 6: Atoms' Info is atomInfo, built from the two slices it reads (the atom, and the orbital slice's enclosed
+    // fraction, iso value and cut) -- rebuilt when either changes.
+    const atomSliceNow = useAppSelector(state => state.atom);
+    const atomInfoContent = useMemo(
+        () => (isAtomMode ? atomInfo({ atom: atomSliceNow, orbital: orbitalSliceNow }, level) : null),
+        [isAtomMode, atomSliceNow, orbitalSliceNow, level],
+    );
     // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab. Until
-    // the other modes' builders land (Tasks 6-7: atomInfo, bondsInfo, moleculeInfo) it names their view only.
+    // the other modes' builders land (Task 7: bondsInfo, moleculeInfo) it names their view only.
     const infoPanel = (
-        <InfoPanel content={basicInfoContent ?? { title: viewTitleText, plain: null }} topic={infoTopic.topic}
+        <InfoPanel content={basicInfoContent ?? atomInfoContent ?? { title: viewTitleText, plain: null }} topic={infoTopic.topic}
             onClearTopic={() => infoTopic.setTopic(null)} level={level} />
     );
     const shellRef = useRef<HTMLDivElement>(null);
@@ -1304,14 +1307,8 @@ function App() {
             onChargeChange={handleChargeChange}
             onExcitationChange={handleExcitationChange}
             energies={atomEnergies}
-            radii={atomProfile ? {
-                displayRadius: atomProfile.displayRadius,
-                reference: atomProfile.reference ?? null,
-                referenceUnavailable: atomProfile.referenceUnavailable ?? null,
-            } : null}
             unbound={atomUnbound}
             pictureFailed={atomError !== null}
-            pictureRelativity={pictureRelativity}
             level={level}
         />
     );
@@ -1340,8 +1337,7 @@ function App() {
     // configuration: Explore › Configuration on a desktop, the phone's
     // Explore tab (spec §9.1, §9.8).
     const relativityControl = isAtomMode && shows('relativity') && (
-        <RelativityControl relativity={relativity} relativityIsDefault={relativityIsDefault}
-            onRelativityChange={handleRelativityChange} relativityReadout={relativityReadout} />
+        <RelativityControl relativity={relativity} onRelativityChange={handleRelativityChange} />
     );
     // Task 2: under Configuration, where Charge, Excite and Relativity appear (Advanced) -- or, while one of them
     // still holds a value off its default (a link's Fe²⁺), what the picture keeps showing (ruling PF1).
@@ -1658,7 +1654,6 @@ function App() {
                     collapsible={collapsible}
                     curves={themed(basicTabCurves)}
                     title={basicActivePlotTab.title}
-                    caption={basicActivePlotTab.caption}
                     signed={basicActivePlotTab.signed}
                     ariaLabel={plotAriaLabel(basicActivePlotTab)}
                 />
@@ -1681,12 +1676,10 @@ function App() {
                 collapsible={collapsible}
                 curves={themed(distributionTab ? [...atomCurves, ...comparisonCurves] : atomTabCurves)}
                 title={activePlotTab.title}
-                caption={activePlotTab.caption}
                 signed={activePlotTab.signed}
                 ariaLabel={plotAriaLabel(activePlotTab)}
                 comparisonNote={distributionTab ? comparisonNote : null}
                 peaks={distributionTab ? Array.from(atomProfile.shellPeaks) : undefined}
-                cutFaceNote={atomLevel !== 'orbital'}
                 hoverRadius={atomHoverRadius}
                 onHoverRadius={handleAtomHoverRadius}
             />
@@ -1913,7 +1906,7 @@ function App() {
 
     // The Atom screen's Explore panel (spec §9.1): the element tile and the
     // breadcrumb, then Configuration (the drill-down, Charge/Excite and the
-    // Relativity switch) and Orbitals (the whole atom's energies and About).
+    // Relativity switch) and Orbitals (the whole atom's energies; About is Info's, Task 6).
     // The view controls are the inspector's Display section (ruling R20b-atoms).
     const atomExplore = (
         <AtomExplore
@@ -1946,7 +1939,7 @@ function App() {
                     )}
                     {atomProfile && shows('orbitalEnergies') && <OrbitalEnergyList subshells={atomProfile.subshells} relativity={pictureRelativity} />}
                     <LevelLine level={level} ids={['orbitalEnergies']} />
-                    <LevelNav {...levelNavProps} variant="about" />
+                    {/* Task 6: the method and "About this model" are Info's ("How this was computed", atomInfo). */}
                 </>
             )}
             onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined}

@@ -3,6 +3,7 @@ import type { SerialisedSubshell } from '../workers/atomWorker';
 import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
 import { shortMethodLabel, type RelativityMode } from '../atom/relativity';
 import { formatElectrons } from '../components/SubshellPanel';
+import { hartreeText } from '../orbital_facts';
 import './element_tile.css';
 
 /**
@@ -24,7 +25,8 @@ const OrbitalEnergyList: React.FC<{ subshells: SerialisedSubshell[]; relativity:
                         {subshell.j !== undefined && <span className="visually-hidden">{subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}</span>}
                     </th>
                     <td>{formatElectrons(subshell.electrons)} of {subshell.j === undefined ? 2 * (2 * subshell.l + 1) : 2 * subshell.j + 1}</td>
-                    <td>{subshell.energy.toFixed(3)} Ha</td>
+                    {/* Task 6: the chips' and Info's own Ha text -- a true minus (U+2212). */}
+                    <td>{hartreeText(subshell.energy)}</td>
                 </tr>
             ))}
         </tbody>

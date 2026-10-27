@@ -13,7 +13,6 @@ import {
   FormHelperText,
   LinearProgress,
   Slider,
-  Typography,
 } from '@mui/material';
 import { OrbitalParams, ClipAxis, SurfaceStyle } from '@/types/orbital';
 import { basicOrbitalParams, ENCLOSED_FRACTIONS } from '../orbital_presets';
@@ -23,6 +22,7 @@ import { ViewMode, ViewLevel } from '../store/atomSlice';
 import { CombinationSelection, NO_COMBINATION } from '../combinations';
 import { RelativityMode, shortMethodLabel } from '../atom/relativity';
 import type { ValenceSContraction } from '../atom/relativistic_comparison';
+import type { SerialisedAtomProfile } from '../workers/atomWorker';
 import { KEEP_CASE } from '../design/mui';
 import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
 import InfoButton from '../info/InfoButton';
@@ -39,7 +39,7 @@ interface ControlsProps {
    * persisted in no fewer than three places.
    */
   mode?: ViewMode;
-  /** Which drill-down level is current, only so the enclosed-fraction helper text can stay honest (see below); irrelevant in Basic Orbitals mode. */
+  /** Which drill-down level is current: a shell view has no uncut state and a whole-atom slice its own depth range (below); irrelevant in Basic Orbitals mode. */
   atomLevel?: ViewLevel;
   /** The element driving the SCF in atom mode. Basic Orbitals mode has no element control of its own any more (Addendum 2's mode rename) -- it is fixed at BASIC_ORBITALS_Z. */
   atomZ?: number;
@@ -115,14 +115,10 @@ interface ControlsProps {
    * the phone's Explore tab (§9.8), and passes none of these. The
    * *effective* mode -- the user's choice, or the element's default -- so
    * the switch shows what is being solved for. Atom mode only; omitted, the
-   * panel is exactly as it was.
+   * panel is exactly as it was. Task 6: its helper and readout are Info's.
    */
   relativity?: RelativityMode;
-  /** `relativity` is this element's default (scalar from Cs, off below), whoever chose it -- a choice carried over from another element can be. */
-  relativityIsDefault?: boolean;
   onRelativityChange?: (mode: RelativityMode) => void;
-  /** What the picture on screen says about relativity, for the readout under the switch; null with no picture. */
-  relativityReadout?: RelativityReadout | null;
   /**
    * When set, the enclosed fraction does not apply to what is drawn, and this
    * says why: Bonds mode draws a molecule's density at a fixed ρ (ruling
@@ -158,6 +154,15 @@ export interface RelativityReadout {
   comparisonUnavailable: string | null;
 }
 
+/** The readout's facts for a drawn profile (ruling C9): App's Relativity switch and Info (atomInfo) read the same ones. */
+export function relativityReadoutOf(profile: SerialisedAtomProfile): RelativityReadout {
+  return {
+    pictureMode: profile.relativity ?? 'off',
+    change: profile.valenceS ?? null,
+    comparisonUnavailable: profile.comparisonUnavailable ?? null,
+  };
+}
+
 const ISO_MIN = 0.000000001;
 const ISO_MAX = 0.001;
 
@@ -181,6 +186,17 @@ export function cutDepthLabel(clipPosition: number): string {
   if (depth >= 100) return 'everything removed';
   if (depth === 50) return '50% — through the nucleus';
   return `${depth}% — ${depth < 50 ? 'short of' : 'past'} the nucleus`;
+}
+
+/**
+ * What a cut does, in words (the Cut away helper). Task 6: Atoms says it in Info (atomInfo), Bonds and Molecules under
+ * the control until Task 7 moves theirs; one function, so the two cannot drift.
+ */
+export function cutHelpText(clipAxis: ClipAxis, meshLevel: boolean): string {
+  if (clipAxis === 'none') return 'Pick an axis to slice the orbital open.';
+  return meshLevel
+    ? `Removes the part on the +${clipAxis} side of a plane perpendicular to the ${clipAxis} axis.`
+    : `Slices off the +${clipAxis} side to show the shells inside. The atom is round, so X, Y and Z give the same rings, facing a different way.`;
 }
 
 /** What each mode is, in one line; "Default for this element" when it is that element's default (spec §3.1). */
@@ -291,9 +307,13 @@ function relativityReadoutContent(switchMode: RelativityMode, readout: Relativit
   return readout.comparisonUnavailable;
 }
 
-/** The readout's content, with a contraction's radii held on one line. */
-const ReadoutContent: React.FC<{ content: string | WhatChangedParts | null }> = ({ content }) => {
-  if (content === null || typeof content === 'string') return <>{content}</>;
+/**
+ * The readout as Info shows it (Task 6: atomInfo), with a contraction's radii held on one line (fix round 1, M1: in a
+ * narrow panel "3.31 →" and "2.85 a₀" otherwise land on different lines). Null for nothing to say.
+ */
+export function relativityReadoutNode(switchMode: RelativityMode, readout: RelativityReadout | null): React.ReactNode {
+  const content = relativityReadoutContent(switchMode, readout);
+  if (content === null || typeof content === 'string') return content;
   return (
     <>
       {content.before}
@@ -301,7 +321,7 @@ const ReadoutContent: React.FC<{ content: string | WhatChangedParts | null }> = 
       {content.after}
     </>
   );
-};
+}
 
 /** Ruling T13-I3: what Opacity and Cut away say while no surface is drawn. */
 const NO_SURFACE_NOTES = {
@@ -311,41 +331,39 @@ const NO_SURFACE_NOTES = {
 
 export interface RelativityControlProps {
   relativity: RelativityMode;
-  relativityIsDefault: boolean;
   onRelativityChange(mode: RelativityMode): void;
-  relativityReadout: RelativityReadout | null;
 }
 
-/** The Relativity switch (spec §5 Phase 4) -- Explore › Configuration in the Atom screen (spec §9.1); today's markup. */
-export const RelativityControl: React.FC<RelativityControlProps> = ({ relativity, relativityIsDefault, onRelativityChange, relativityReadout }) => (
+/**
+ * The Relativity switch (spec §5 Phase 4) -- Explore › Configuration in the Atom screen (spec §9.1). Task 6: what each
+ * mode is (relativityHelp) and what changed in the drawn picture (relativityReadoutText) are said in Info (atomInfo); an
+ * (i) beside the switch explains the term.
+ */
+export const RelativityControl: React.FC<RelativityControlProps> = ({ relativity, onRelativityChange }) => (
   <FormControl component="fieldset" margin="normal" fullWidth className="relativity-controls">
     <FormLabel component="legend" sx={{ mb: 0.5, fontSize: '0.75rem' }}>Relativity</FormLabel>
-    <ToggleButtonGroup
-      value={relativity}
-      exclusive
-      onChange={(event: React.MouseEvent<HTMLElement>, value: RelativityMode | null) => {
-        // An exclusive toggle reports a click on the selected button
-        // as null: that is choosing the shown mode again, which the
-        // store reads as following the default when it is the
-        // element's default (final review I3), so pass it on.
-        onRelativityChange(value ?? relativity);
-      }}
-      aria-label="relativity treatment"
-      size="small"
-      fullWidth
-      sx={KEEP_CASE}
-    >
-      <ToggleButton value="off" aria-label="relativity off">Off</ToggleButton>
-      <ToggleButton value="scalar" aria-label="scalar relativistic">Scalar</ToggleButton>
-      <ToggleButton value="spinOrbit" aria-label="with spin–orbit">With spin–orbit</ToggleButton>
-    </ToggleButtonGroup>
-    <FormHelperText className="relativity-help" sx={{ mx: 0 }}>
-      {relativityHelp(relativity, relativityIsDefault)}
-    </FormHelperText>
-    <Typography variant="body2" component="div" role="status" className="relativity-what-changed"
-      sx={{ mt: 0.75, fontSize: '0.75rem', lineHeight: 1.35 }}>
-      <ReadoutContent content={relativityReadoutContent(relativity, relativityReadout)} />
-    </Typography>
+    <div className="info-beside-row info-beside-centre">
+      <ToggleButtonGroup
+        value={relativity}
+        exclusive
+        onChange={(event: React.MouseEvent<HTMLElement>, value: RelativityMode | null) => {
+          // An exclusive toggle reports a click on the selected button
+          // as null: that is choosing the shown mode again, which the
+          // store reads as following the default when it is the
+          // element's default (final review I3), so pass it on.
+          onRelativityChange(value ?? relativity);
+        }}
+        aria-label="relativity treatment"
+        size="small"
+        fullWidth
+        sx={KEEP_CASE}
+      >
+        <ToggleButton value="off" aria-label="relativity off">Off</ToggleButton>
+        <ToggleButton value="scalar" aria-label="scalar relativistic">Scalar</ToggleButton>
+        <ToggleButton value="spinOrbit" aria-label="with spin–orbit">With spin–orbit</ToggleButton>
+      </ToggleButtonGroup>
+      <InfoButton topic="relativity" label="Relativity" />
+    </div>
   </FormControl>
 );
 
@@ -372,9 +390,7 @@ const Controls: React.FC<ControlsProps> = ({
   open = true,
   compact = false,
   relativity,
-  relativityIsDefault = false,
   onRelativityChange,
-  relativityReadout = null,
   fractionNote,
   isoNote,
   level = 'research',
@@ -459,8 +475,7 @@ const Controls: React.FC<ControlsProps> = ({
           the switch is, so a new contraction is announced when it lands
           (a region inserted together with its text often is not). */}
       {showSelection && isAtomMode && onRelativityChange && relativity && (
-        <RelativityControl relativity={relativity} relativityIsDefault={relativityIsDefault}
-          onRelativityChange={onRelativityChange} relativityReadout={relativityReadout} />
+        <RelativityControl relativity={relativity} onRelativityChange={onRelativityChange} />
       )}
 
       {/* Basic Orbitals' whole selection -- the orbital-name heading, the
@@ -472,7 +487,7 @@ const Controls: React.FC<ControlsProps> = ({
           of the electron enclosed is. The density that achieves it is derived
           per orbital and reported back below. */}
       {/* Task 5: an (i) beside the select explains the enclosed fraction; in Orbitals the helper under it (the iso
-          value) is Info's now, with its unit (basicInfo). */}
+          value) is Info's now, with its unit (basicInfo). Task 6: in Atoms too (atomInfo). */}
       {showView && atLeast(level, CONTROL_LEVEL.enclosed) && (
         <div className="info-beside-select">
           <FormControl fullWidth margin="normal" size="small">
@@ -491,20 +506,12 @@ const Controls: React.FC<ControlsProps> = ({
                 </MenuItem>
               ))}
             </Select>
-            {!isBasicMode && <FormHelperText>
-              {/* Levels 1-2's contour encloses a share of the electron *count*,
-                  not a |ψ|² threshold -- there is no isosurface for a
-                  spherically symmetric shell view (see shell_view.ts), so the
-                  marching-cubes wording below would be a claim this view never
-                  makes. Level 3 in atom mode *does* go through marching cubes
-                  (a numerical R(r) override), so it keeps the usual wording. */}
+            {!isBasicMode && !isAtomMode && <FormHelperText>
               {fractionNote
                 ? fractionNote
                 : isoNote
                 ? isoNote
-                : isAtomMode && atomLevel !== 'orbital'
-                  ? 'contour enclosing this fraction of the electron density'
-                  : isoLevel === null
+                : isoLevel === null
                     ? 'contour of constant |ψ|²'
                     : `|ψ|² = ${isoLevel.toExponential(2)}`}
             </FormHelperText>}
@@ -611,13 +618,10 @@ const Controls: React.FC<ControlsProps> = ({
               <ToggleButton value="y" aria-label="cut along y">Y</ToggleButton>
               <ToggleButton value="z" aria-label="cut along z">Z</ToggleButton>
             </ToggleButtonGroup>
-            {/* Task 5: in Orbitals what a cut removes is Info's now (basicInfo); a disabled cut still says why. */}
-            {(noSurface || !isBasicMode) && <FormHelperText className="cut-help" sx={{ mx: 0 }}>
-              {noSurface ? NO_SURFACE_NOTES.cut : surfaceStyle.clipAxis === 'none'
-                ? 'Pick an axis to slice the orbital open.'
-                : isMeshLevel
-                  ? `Removes the part on the +${surfaceStyle.clipAxis} side of a plane perpendicular to the ${surfaceStyle.clipAxis} axis.`
-                  : `Slices off the +${surfaceStyle.clipAxis} side to show the shells inside. The atom is round, so X, Y and Z give the same rings, facing a different way.`}
+            {/* Task 5: in Orbitals what a cut removes is Info's now (basicInfo); Task 6: in Atoms too (atomInfo). A
+                disabled cut still says why. */}
+            {(noSurface || !(isBasicMode || isAtomMode)) && <FormHelperText className="cut-help" sx={{ mx: 0 }}>
+              {noSurface ? NO_SURFACE_NOTES.cut : cutHelpText(surfaceStyle.clipAxis, isMeshLevel)}
             </FormHelperText>}
             {surfaceStyle.clipAxis !== 'none' && (
               <>

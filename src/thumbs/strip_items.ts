@@ -1,7 +1,7 @@
 import type { SerialisedAtomProfile } from '../workers/atomWorker';
 import type { ViewLevel } from '../store/atomSlice';
 import type { NavigationTarget } from '../components/LevelNav';
-import { orbitalName } from '../orbital_names';
+import { orbitalPlainName } from '../format/sci';
 import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
 import type { ThumbRequest } from './ThumbnailService';
 import type { RingLayer } from './ring_glyph';
@@ -102,12 +102,15 @@ export function atomStripItems(args: StripArgs): StripItem[] {
         const group = subshellLabel(subshell.n, subshell.l, subshell.j);
         const groupSpoken = subshellSpokenLabel(subshell.n, subshell.l, subshell.j);
         for (let ml = -subshell.l; ml <= subshell.l; ml++) {
-            const name = orbitalName(subshell.n, subshell.l, ml);
+            // Task 6: the flat name ("2pz"), never "2p_z" -- a screen reader reads the underscore aloud; the tile draws
+            // the name with a real subscript (orbital, OrbitalLabel).
+            const name = orbitalPlainName(subshell.n, subshell.l, ml);
             const j = subshell.j;
             items.push({
                 key: `orbital-${subshell.n}-${subshell.l}-${j ?? ''}-${ml}`,
                 label: name,
-                // Ruling T16-optname (spec §13): "2p_z orbital"; under spin–orbit, which j-level too.
+                orbital: { n: subshell.n, l: subshell.l, ml },
+                // Ruling T16-optname (spec §13): "2pz orbital"; under spin–orbit, which j-level too.
                 spoken: j === undefined ? `${name} orbital` : `${name} orbital of ${groupSpoken}`,
                 group,
                 groupSpoken,
@@ -146,12 +149,13 @@ export function basicStripItems(args: { selection: BasicSelection; enclosedFract
         const group = subshellLabel(n, l);
         const groupSpoken = subshellSpokenLabel(n, l);
         for (let ml = -l; ml <= l; ml++) {
-            const name = orbitalName(n, l, ml);
+            // Task 6: the flat name, as the Atom strip's (the underscore is read aloud).
+            const name = orbitalPlainName(n, l, ml);
             items.push({
                 key: `basic-${n}-${l}-${ml}`,
                 label: name,
                 orbital: { n, l, ml },
-                // Ruling T16-optname (spec §13): "3p_x orbital".
+                // Ruling T16-optname (spec §13): "3px orbital".
                 spoken: `${name} orbital`,
                 group,
                 groupSpoken,

@@ -156,10 +156,9 @@ describe('RadialPlot', () => {
         expect(readoutBackToIdle?.textContent).toBe(' ');
     });
 
-    it('names the cut-face scaling only where there is a cut face', () => {
-        const { container, rerender } = render(<RadialPlot n={1} l={0} Z={18} rMax={5} curves={twoCurves()} cutFaceNote />);
-        expect(container.textContent).toMatch(/cut face shading is scaled/);
-        rerender(<RadialPlot n={1} l={0} Z={18} rMax={5} curves={twoCurves()} cutFaceNote={false} />);
+    // Task 6: the cut-face caption is said once, in Info (atomInfo) -- the plot no longer prints it.
+    it('says nothing about the cut face itself', () => {
+        const { container } = render(<RadialPlot n={1} l={0} Z={18} rMax={5} curves={twoCurves()} />);
         expect(container.textContent).not.toMatch(/cut face/);
     });
 

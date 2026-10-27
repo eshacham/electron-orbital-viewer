@@ -74,13 +74,6 @@ interface RadialPlotProps {
     /** Reports the radius under the pointer, or null when it leaves the plot. */
     onHoverRadius?: (r: number | null) => void;
     /**
-     * The 3D view beside the plot has a cut face shaded from these curves
-     * (atom levels 1-2), scaled to local shell structure rather than
-     * plotted honestly -- which has to be said, but only where a cut face
-     * exists. At the orbital level there is none.
-     */
-    cutFaceNote?: boolean;
-    /**
      * States why a dashed comparison curve's height is less than "the
      * whole subshell" -- an isolated j-level, scaled to just the electrons
      * it shows (App.tsx's `buildComparisonCurves`). Absent whenever no
@@ -156,7 +149,7 @@ function dominantCurveLabelAt(curves: RadialCurve[], r: number): string | null {
  */
 const RadialPlot: React.FC<RadialPlotProps> = ({
     n, l, Z, rMax, compact = false,
-    curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear', cutFaceNote = false, comparisonNote = null,
+    curves, peaks, hoverRadius = null, onHoverRadius, scale = 'linear', comparisonNote = null,
     width, collapsible = false, lineColour = CURVE_COLORS[0],
     title: titleOverride, caption = null, signed = false, ariaLabel,
 }) => {
@@ -299,13 +292,8 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                 ) : title}
             </div>
             {caption && <div className="radial-plot-note">{caption}</div>}
-            {/* The 3D cut face this plot is linked to colours the *same* D(r)
-                but scaled to local structure so shells stay visible across
-                the atom's full range -- said so that scaling is never
-                mistaken for the honest, unscaled D(r) plotted below. */}
-            {isMultiCurve && cutFaceNote && (
-                <div className="radial-plot-note">cut face shading is scaled to local shell structure</div>
-            )}
+            {/* Task 6: the cut-face caption (the 3D cut face shades this D(r) scaled to local shell structure) is
+                said once, in Info (atomInfo) -- not here and again in the key column. */}
             <svg
                 width={WIDTH}
                 height={HEIGHT}

@@ -1,13 +1,15 @@
-import React, { useRef, useState } from 'react';
-import { Box, Breadcrumbs, Link, Chip, Typography, Collapse, Button } from '@mui/material';
+import React, { useRef } from 'react';
+import { Box, Breadcrumbs, Link, Chip, Typography, Button } from '@mui/material';
 import { elementFor } from '../elements';
 import {
     SubshellOccupancy, configurationFor, shellsOf, configurationLabelOf, subshellLabel, subshellSpokenLabel,
-    valenceShellsOf, valenceConfigurationLabelOf, valenceNote,
+    valenceShellsOf, valenceConfigurationLabelOf,
 } from '../atom/configurations';
-import { orbitalName } from '../orbital_names';
 import { methodStatement, type RelativityMode } from '../atom/relativity';
 import { useRovingFocus } from '../shell/useRovingFocus';
+import { OrbitalLabel } from '../format/OrbitalLabel';
+import { orbitalPlainName } from '../format/sci';
+import InfoButton from '../info/InfoButton';
 
 /**
  * Where a breadcrumb segment or shell chip should take the app.
@@ -55,7 +57,8 @@ interface LevelNavProps {
      * the back step and the breadcrumb under the element tile;
      * `configuration` is the configuration, valence and shell chips, with
      * `children` (the subshell chips) after them; `about` is the method and
-     * the About text, expanded.
+     * the About text, expanded -- Help quotes it; Task 6 moved it out of the
+     * panels into Info (atomInfo), as it did the valence note and the hints.
      */
     variant?: 'full' | 'header' | 'body' | 'crumbs' | 'configuration' | 'about';
     /**
@@ -114,7 +117,8 @@ interface LevelNavProps {
 // solver module just for this).
 const PRINCIPAL_SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
 
-function shellName(n: number): string {
+/** "L shell (n=2)": the chips', breadcrumb's and hint's name for a shell (Info's hint says it too, Task 6). */
+export function shellName(n: number): string {
     return `${PRINCIPAL_SHELL_LETTERS[n - 1] ?? `n=${n}`} shell (n=${n})`;
 }
 
@@ -186,9 +190,36 @@ export function aboutPictureSentence(selected: RelativityMode, picture: Relativi
     return `The picture on screen is still ${PICTURE_WORDS[picture]}; ${SELECTED_WORDS[selected]} is being solved.`;
 }
 
+/**
+ * "About this model" as one paragraph of text (Task 6): Info's "How this was computed" (atomInfo) and Help's About
+ * (variant 'about') both say it from here, word for word. The relativity clause follows the switch (`selected`, ruling
+ * P18), the ΔSCF sentence the drawn picture (`picture`, ruling T2-picturesentence); with no picture, neither speaks of
+ * "this picture" (final review M6).
+ */
+export function aboutModelText(selected: RelativityMode, picture: RelativityMode, pictureShown: boolean): string {
+    const pictureSentence = pictureShown ? aboutPictureSentence(selected, picture) : null;
+    return 'This is a central-field model: each electron moves in the spherically averaged potential of the nucleus and '
+        + 'every other electron, and open shells are averaged over their sublevels rather than resolved into individual '
+        + 'determinants. Exchange and correlation come from the local density approximation (LDA) with the VWN '
+        + `correlation functional. ${aboutRelativitySentence(selected)}`
+        + (pictureSentence ? ` ${pictureSentence}` : '')
+        + ' An ion or an excited atom uses the same model with its own electron count or one electron moved; ionisation '
+        + 'and excitation energies are ΔSCF differences of total energies from the spin-polarised form of the same LDA, '
+        + 'never orbital eigenvalues. The picture on screen is drawn from a simpler, spin-restricted form of that LDA, '
+        // Task 6: "for their" -- the JSX this replaces dropped the space ("fortheir") at a comment between the lines.
+        + 'and in it most anions — Cl⁻ included — have no bound state for their extra electron at all.'
+        + (pictureShown ? relativisticEnergiesSentence(picture) : '')
+        + ' The individual s/p/d/f lobes you can select below are a basis choice, not separate physical objects: a '
+        + 'partially filled subshell\'s electrons are smeared uniformly over all of it, not sitting in one lobe rather '
+        + 'than another.';
+}
+
 interface Crumb {
     key: string;
+    /** The visible name as flat text (the phone header joins these). */
     label: string;
+    /** Task 6: what is drawn for it when that is more than text -- an orbital's name with a real subscript. */
+    node?: React.ReactNode;
     /**
      * What a screen reader should say instead, when that differs: "6p³⁄₂"
      * is read as superscripts and a fraction slash, so a j-level crumb says
@@ -232,7 +263,6 @@ const LevelNav: React.FC<LevelNavProps> = ({
     // P18: what the switch is solving for. Ordinarily the same mode as
     // `relativity` (the picture actually drawn) -- it only differs mid re-solve.
     const effectiveSelectedRelativity = selectedRelativity ?? relativity;
-    const [aboutOpen, setAboutOpen] = useState(false);
     // §13: the shells are one Tab stop with the arrow keys inside. Here, before
     // any early return, so the hook order never changes.
     const shellsRef = useRef<HTMLDivElement>(null);
@@ -260,7 +290,6 @@ const LevelNav: React.FC<LevelNavProps> = ({
     // lanthanide/actinide's partly filled (n-1)d or (n-2)f is just as live
     // chemically, so it counts as valence too (see valenceShellsOf).
     const valenceShells = valenceShellsOf(speciesConfiguration);
-    const openValenceNote = valenceNote(speciesConfiguration);
 
     const crumbs: Crumb[] = [
         { key: 'atom', label: rootLabel, target: { level: 'atom' } },
@@ -312,19 +341,25 @@ const LevelNav: React.FC<LevelNavProps> = ({
     if (selectedOrbital) {
         const { n, l, ml, j } = selectedOrbital;
         // A j-level's orbital is the real l orbital drawn with that j-level's
-        // R(r) (spec §3.6), so both halves of its name matter: 6p_x · 6p½.
+        // R(r) (spec §3.6), so both halves of its name matter: 6px · 6p½.
+        // Task 6: drawn with a real subscript, spoken flat ("6px"), never "6p_x".
+        const name = orbitalPlainName(n, l, ml);
         crumbs.push({
             key: 'orbital',
-            label: j === undefined ? orbitalName(n, l, ml) : `${orbitalName(n, l, ml)} · ${subshellLabel(n, l, j)}`,
-            spoken: j === undefined ? undefined : `${orbitalName(n, l, ml)} of ${subshellSpokenLabel(n, l, j)}`,
+            label: j === undefined ? name : `${name} · ${subshellLabel(n, l, j)}`,
+            node: <><OrbitalLabel n={n} l={l} ml={ml} />{j === undefined ? '' : ` · ${subshellLabel(n, l, j)}`}</>,
+            spoken: j === undefined ? undefined : `${name} of ${subshellSpokenLabel(n, l, j)}`,
             target: { level: 'orbital', ...selectedOrbital },
         });
     }
 
     if (variant === 'header') {
         // Where you are, past the element the button already names.
-        const location = crumbs.slice(1).map(crumb => crumb.label).join(' · ');
-        const spokenLocation = crumbs.slice(1).map(crumb => crumb.spoken ?? crumb.label).join(' · ');
+        const located = crumbs.slice(1);
+        const spokenLocation = located.map(crumb => crumb.spoken ?? crumb.label).join(' · ');
+        const location = located.map((crumb, i) => (
+            <React.Fragment key={crumb.key}>{i > 0 && ' · '}{crumb.node ?? crumb.label}</React.Fragment>
+        ));
         return (
             <Box className="level-nav level-nav-header" aria-label="level navigation">
                 {parent && (
@@ -348,9 +383,9 @@ const LevelNav: React.FC<LevelNavProps> = ({
                         {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
                     </Button>
                 )}
-                {location && (
+                {located.length > 0 && (
                     <span className="level-nav-location">
-                        {spokenLocation === location ? location : (
+                        {located.every(crumb => crumb.spoken === undefined) ? location : (
                             // Plain text has no accessible name to set, so a
                             // j-level's spoken form rides along, hidden from
                             // sight, with the visible one hidden from readers.
@@ -388,7 +423,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     aria-label={crumb.spoken}
                     onClick={() => onNavigate(crumb.target)}
                 >
-                    {crumb.label}
+                    {crumb.node ?? crumb.label}
                 </Link>
             ))}
         </Breadcrumbs>
@@ -398,110 +433,55 @@ const LevelNav: React.FC<LevelNavProps> = ({
             <Typography variant="body2" className="level-nav-configuration">
                 {configurationLabelOf(speciesConfiguration)}
             </Typography>
+            {/* Task 6: the valence line keeps its short labelled value; what counts as valence and that everything
+                inside is core (ruling P14's note) are said in Info (atomInfo), with the hint on what to click. */}
             <Typography variant="body2" className="level-nav-valence">
                 Valence: {valenceConfigurationLabelOf(speciesConfiguration)}
-                {/* Ruling P14: when an open d/f subshell below the outermost
-                    shell is itself counted as valence, that is what the note
-                    says instead -- "everything inside is core" would now be
-                    wrong. Hydrogen and helium have one shell and so no core
-                    at all, with or without a note. */}
-                {openValenceNote ? (
-                    <span className="level-nav-valence-note"> · {openValenceNote}</span>
-                ) : shells.length > 1 && (
-                    <span className="level-nav-valence-note"> · everything inside is core</span>
-                )}
             </Typography>
 
-            <Box ref={shellsRef} className="level-nav-shells" role="group" aria-label="shells">
-                {shells.map(shell => {
-                    const isSelected = selectedShell === shell.n;
-                    const isValence = valenceShells.has(shell.n);
-                    return (
-                        <Chip
-                            key={shell.n}
-                            className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isValence ? ' valence' : ' core'}`}
-                            label={`${shellName(shell.n)}${isValence ? ' · valence' : ''}`}
-                            color={isSelected ? 'primary' : 'default'}
-                            disabled={shellsUnavailable}
-                            // Addendum 2's "is there a way to unselect one?".
-                            // Three ways now, because testing showed one
-                            // buried in a breadcrumb was not enough: the ✕ on
-                            // the selected chip, clicking that chip again,
-                            // and the breadcrumb that was already there.
-                            aria-pressed={isSelected}
-                            onDelete={isSelected ? () => onNavigate({ level: 'atom' }) : undefined}
-                            // Still a (disabled) button while unavailable, so it is
-                            // announced as one; the guard is what actually refuses
-                            // the click, since a disabled Chip only stops pointers.
-                            onClick={() => {
-                                if (shellsUnavailable) return;
-                                onNavigate(isSelected ? { level: 'atom' } : { level: 'shell', n: shell.n });
-                            }}
-                        />
-                    );
-                })}
-            </Box>
-
-            {/* Discoverability, not decoration: the rings are the obvious
-                thing to click and were inert until now, so the view has to
-                say that they are not. Phrased for the state you are in --
-                once a shell is open, the useful next move is getting back
-                out of it. */}
-            <Typography variant="caption" className="level-nav-shell-hint" display="block">
-                {shellsUnavailable
-                    ? 'Nothing is drawn for this species, so there is no shell to open'
-                    : selectedOrbital
-                        // At the orbital level the shell chips are context,
-                        // not the current subject -- saying "M shell only"
-                        // here would describe a view you are no longer
-                        // looking at.
-                        ? `One orbital of ${subshellLabel(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j)} — Back steps out one level at a time`
-                        : selectedShell === null
-                            ? 'Click a ring in the 3D view, or a shell above, to open it'
-                            : `${shellName(selectedShell)} only — click it again, or the ✕, for the whole atom`}
-            </Typography>
+            <div className="info-beside-row">
+                <Box ref={shellsRef} className="level-nav-shells" role="group" aria-label="shells">
+                    {shells.map(shell => {
+                        const isSelected = selectedShell === shell.n;
+                        const isValence = valenceShells.has(shell.n);
+                        return (
+                            <Chip
+                                key={shell.n}
+                                className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isValence ? ' valence' : ' core'}`}
+                                label={`${shellName(shell.n)}${isValence ? ' · valence' : ''}`}
+                                color={isSelected ? 'primary' : 'default'}
+                                disabled={shellsUnavailable}
+                                // Addendum 2's "is there a way to unselect one?".
+                                // Three ways now, because testing showed one
+                                // buried in a breadcrumb was not enough: the ✕ on
+                                // the selected chip, clicking that chip again,
+                                // and the breadcrumb that was already there.
+                                aria-pressed={isSelected}
+                                onDelete={isSelected ? () => onNavigate({ level: 'atom' }) : undefined}
+                                // Still a (disabled) button while unavailable, so it is
+                                // announced as one; the guard is what actually refuses
+                                // the click, since a disabled Chip only stops pointers.
+                                onClick={() => {
+                                    if (shellsUnavailable) return;
+                                    onNavigate(isSelected ? { level: 'atom' } : { level: 'shell', n: shell.n });
+                                }}
+                            />
+                        );
+                    })}
+                </Box>
+                {/* Task 6: an (i) beside the shells explains the term in Info. */}
+                <InfoButton topic="shell" label="Shell" />
+            </div>
         </>
     );
-    // P18: null while the switch and the drawn picture agree (the ordinary
-    // case), or while there is no picture to describe (ruling M6).
-    const pictureSentence = pictureShown ? aboutPictureSentence(effectiveSelectedRelativity, relativity) : null;
+    // Help's About (variant 'about'): the method line and the paragraph, both as Info says them (aboutModelText).
     const aboutText = (
         <>
-            {/* The one-line method statement lives here with the rest of
-                the model's framing rather than on the card face, which
-                it made tall enough to push the controls below it under
-                the fold. */}
             <Typography variant="caption" className="level-nav-method" display="block">
                 {methodStatement(effectiveSelectedRelativity)}
             </Typography>
             <Typography variant="body2" className="level-nav-about">
-                This is a central-field model: each electron moves in the
-                spherically averaged potential of the nucleus and every
-                other electron, and open shells are averaged over their
-                sublevels rather than resolved into individual
-                determinants. Exchange and correlation come from the
-                local density approximation (LDA) with the VWN
-                correlation functional. {aboutRelativitySentence(effectiveSelectedRelativity)}
-                {pictureSentence ? ` ${pictureSentence}` : ''} An ion or an excited atom uses
-                the same model with its own electron count or one
-                electron moved; ionisation and excitation energies are
-                ΔSCF differences of total energies from the
-                spin-polarised form of the same LDA, never orbital
-                eigenvalues. The picture on screen is drawn from a
-                simpler, spin-restricted form of that LDA, and in it
-                most anions — Cl⁻ included — have no bound state for
-                {/* Ruling T2-picturesentence: this sentence is "This picture
-                    is/includes…", describing the sphere actually drawn, so it
-                    reads `relativity` (the drawn picture's mode) -- never the
-                    selected mode, or it would contradict aboutPictureSentence
-                    above while a re-solve is in flight (selected spin-orbit,
-                    drawn scalar: "still scalar-relativistic" followed by
-                    "This picture includes spin-orbit" is self-contradictory). */}
-                their extra electron at all.{pictureShown ? relativisticEnergiesSentence(relativity) : ''} The individual s/p/d/f
-                lobes you can select below are a basis choice, not
-                separate physical objects: a partially filled subshell's
-                electrons are smeared uniformly over all of it, not
-                sitting in one lobe rather than another.
+                {aboutModelText(effectiveSelectedRelativity, relativity, pictureShown)}
             </Typography>
         </>
     );
@@ -551,18 +531,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
             {configurationLines}
 
             {children}
-
-            <Button
-                size="small"
-                className="level-nav-about-toggle"
-                onClick={() => setAboutOpen(open => !open)}
-                aria-expanded={aboutOpen}
-            >
-                About this model
-            </Button>
-            <Collapse in={aboutOpen}>
-                {aboutText}
-            </Collapse>
+            {/* Task 6: "About this model" is Info's now ("How this was computed", atomInfo). */}
         </Box>
     );
 };

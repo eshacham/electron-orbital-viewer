@@ -38,12 +38,13 @@ describe('the Atom screen\'s keys (spec §11.5)', () => {
         expect(screen.queryByLabelText('shell colour key')).toBeNull();
     });
 
-    it('keys a shell view by its rings, with the cut-face caption', () => {
+    // Task 6: the cut-face caption is said once, in Info (atomInfo) -- not here and again under the plot.
+    it('keys a shell view by its rings, with no caption of its own', () => {
         render(<KeyColumn><AtomKeys level="atom" phase={phase} shellItems={shellItems} /></KeyColumn>);
         expect(screen.queryByLabelText('surface colour key')).toBeNull();
         const key = screen.getByLabelText('shell colour key');
         expect(key).toHaveTextContent('n=2 valence');
-        expect(key).toHaveTextContent('cut face shading is scaled to local shell structure');
+        expect(key).not.toHaveTextContent(/cut face/i);
     });
 
     // Ruling T16-tilekey (§3.3): at shell level the strip shows ψ-coloured orbital
@@ -88,8 +89,9 @@ describe('the compact (phone) key wraps rather than running off screen (ruling T
         expect(row).toMatch(/flex-wrap:\s*wrap;/);
     });
 
-    it('gives the cut-face caption a line of its own in the compact key, never squeezed beside the swatches', () => {
-        expect(rule(viewport, '.key-column.compact .key-caption')).toMatch(/flex-basis:\s*100%;/);
+    // Task 6: the caption this rule laid out left the key (atomInfo says it), and the rule with it.
+    it('keeps no rule for a key caption that is no longer there', () => {
+        expect(viewport).not.toMatch(/\.key-caption/);
     });
 
     it('keeps the phone key column inside the screen: right 12 px, at most 220 px, under the header (one rule for its top)', () => {
@@ -102,10 +104,11 @@ describe('the compact (phone) key wraps rather than running off screen (ruling T
         expect(viewport).not.toMatch(/\.key-column\.compact\s*\{[^}]*top:/);
     });
 
-    it('renders every one of seven rings and the caption as its own item (Pa, Z = 91)', () => {
+    // Task 6: the caption is Info's now, so seven rings are all the key holds.
+    it('renders every one of seven rings as its own item (Pa, Z = 91)', () => {
         const rings = [1, 2, 3, 4, 5, 6, 7].map(n => ({ label: n >= 5 ? `n=${n} valence` : `n=${n}`, colour: '#4da3ff' }));
         const { container } = render(<KeyColumn compact><ShellRingKey items={rings} /></KeyColumn>);
         expect(container.querySelectorAll('.phase-legend-item')).toHaveLength(7);
-        expect(container.querySelector('.key-caption')).toHaveTextContent('cut face shading is scaled to local shell structure');
+        expect(container.querySelector('.key-caption')).toBeNull();
     });
 });

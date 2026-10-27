@@ -1,6 +1,6 @@
 import { solveAtom } from '../../src/atom/scf';
 import { buildSerialisedAtomProfile } from '../../src/workers/atomWorker';
-import { plotTabsFor, resolvePlotTab, tabCurves, hydrogenicTabCurves, BASIC_PLOT_TABS } from '../../src/atom/plot_tabs';
+import { plotTabsFor, resolvePlotTab, tabCurves, hydrogenicTabCurves, BASIC_PLOT_TABS, LARGE_COMPONENT_NOTE, RADIAL_FACTOR_NOTE } from '../../src/atom/plot_tabs';
 import { radialProfile, PLOT_SAMPLE_COUNT } from '../../src/radial_distribution';
 
 const gridOf = (p: { rMin: number; dx: number; size: number }) => Array.from({ length: p.size }, (_, j) => p.rMin * Math.exp(j * p.dx));
@@ -22,7 +22,8 @@ describe('the inspector\'s plot tabs (spec §9.1, ruling R2)', () => {
         const [wave, density, distribution] = plotTabsFor('orbital', true, false);
         expect(wave.title).toBe('Wave function R(r) (a₀⁻³ᐟ²)');
         expect(density.title).toBe('Probability density |R(r)|² (a₀⁻³)');
-        expect(density.caption).toBe('radial factor of |ψ|²');
+        // Task 6: the caption ("radial factor of |ψ|²") is Info's now (RADIAL_FACTOR_NOTE); the tab carries none.
+        expect(density).not.toHaveProperty('caption');
         expect(distribution.title).toBe('Radial distribution D(r) = 4πr²ρ(r)');
         expect(distribution.csvQuantity).toBeNull();
         expect(plotTabsFor('orbital', true, true)[0].title).toBe('Wave function R(r), large component (a₀⁻³ᐟ²)');
@@ -30,14 +31,15 @@ describe('the inspector\'s plot tabs (spec §9.1, ruling R2)', () => {
     });
 
     // Ruling T13-relR2: under relativity |R|² is the large component's square too, not the radial factor of |ψ|².
-    it('says "large component" on the |R|² tab under relativity, in its title, caption and CSV quantity', () => {
+    // Task 6: the caption moved to Info, word for word (LARGE_COMPONENT_NOTE vs RADIAL_FACTOR_NOTE).
+    it('says "large component" on the |R|² tab under relativity, in its title and CSV quantity, and Info says why', () => {
         const density = plotTabsFor('orbital', true, true)[1];
         expect(density.id).toBe('density');
         expect(density.title).toBe('Probability density |R(r)|², large component (a₀⁻³)');
-        expect(density.caption).toBe('large component only, not the whole |ψ|²');
-        expect(density.caption).not.toContain('radial factor');
+        expect(LARGE_COMPONENT_NOTE).toContain('large component only, not the whole |ψ|²');
+        expect(LARGE_COMPONENT_NOTE).not.toContain('radial factor');
         expect(density.csvQuantity).toContain('large component');
-        expect(plotTabsFor('orbital', true, false)[1].caption).toBe('radial factor of |ψ|²');
+        expect(RADIAL_FACTOR_NOTE).toContain('radial factor of |ψ|²');
     });
 
     // Ruling T13-tablabels: symbols on the tabs so the row fits one line; each name contains its label (WCAG 2.5.3).

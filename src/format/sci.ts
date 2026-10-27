@@ -86,3 +86,12 @@ export function orbitalParts(n: number, l: number, ml: number): { base: string; 
     if (sep === -1) return { base: name, sub: null };
     return { base: name.slice(0, sep), sub: name.slice(sep + 1) };
 }
+
+/**
+ * An orbital's name as flat text, for places that cannot hold a <sub> -- an accessible name, a tab title: "3dz²",
+ * never "3d_z²", whose underscore a screen reader reads aloud (Task 6 ruling). `<OrbitalLabel>` speaks this form.
+ */
+export function orbitalPlainName(n: number, l: number, ml: number): string {
+    const { base, sub } = orbitalParts(n, l, ml);
+    return sub === null ? base : `${base}${sub}`;
+}

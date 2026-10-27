@@ -32,7 +32,9 @@ describe('AtomInspector (spec §8.6, §9.1)', () => {
         expect(onPlotTab).toHaveBeenCalledWith('wave');
         expect(screen.getByRole('tab', { name: 'Wave function R(r)' })).toHaveTextContent(/^R\(r\)$/);
         fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
-        expect(screen.getByRole('region', { name: 'orbital facts' })).toHaveTextContent('2p_z orbital');
+        // Task 6: the Data card draws the name with a real <sub>, so its text reads flat, never with "_".
+        expect(screen.getByRole('region', { name: 'orbital facts' })).toHaveTextContent('2pz orbital');
+        expect(screen.getByRole('region', { name: 'orbital facts' }).querySelector('h2 sub')).toHaveTextContent('z');
         fireEvent.click(screen.getByRole('button', { name: 'Export CSV of this plot' }));
         expect(onExportCsv).toHaveBeenCalled();
     });

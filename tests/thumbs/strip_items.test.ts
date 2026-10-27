@@ -14,13 +14,16 @@ describe('the atom strip (spec §9.1 "Strip")', () => {
         expect(items.every(item => item.thumb.kind === 'rings')).toBe(true);
     });
 
+    // Task 6 (ruling): labels and spoken names are flat ("2pz"); the tile draws the subscript from `orbital`.
     it('lists every occupied orbital of the open shell, grouped by subshell, after a back tile', () => {
         const items = atomStripItems({ ...base, level: 'orbital', selectedShell: 2, selectedOrbital: { n: 2, l: 1, ml: 0 } });
-        expect(items.map(item => item.label)).toEqual(['Whole atom', '2s', '2p_y', '2p_z', '2p_x']);
+        expect(items.map(item => item.label)).toEqual(['Whole atom', '2s', '2py', '2pz', '2px']);
         expect(items.map(item => item.group)).toEqual([null, '2s', '2p', '2p', '2p']);
         expect(items[0].thumb.kind).toBe('back');
-        expect(items.find(item => item.selected)?.label).toBe('2p_z');
+        expect(items.find(item => item.selected)?.label).toBe('2pz');
         expect(items[3].target).toEqual({ level: 'orbital', n: 2, l: 1, ml: 0 });
+        expect(items[3].orbital).toEqual({ n: 2, l: 1, ml: 0 });
+        expect(items[3].spoken).toBe('2pz orbital');
         const thumb = items[3].thumb;
         // Task 10: a tile's request is a union now (orbital | field | grid); an Atom tile's is the orbital kind, with params.
         expect(thumb.kind === 'orbital' && 'params' in thumb.request && thumb.request.params).toMatchObject({ n: 2, l: 1, ml: 0, Z: 10, resolution: THUMB_RESOLUTION });
@@ -67,10 +70,10 @@ describe('the Basic Orbitals strip (spec §9.2 "Strip", Task 8): n² tiles group
         }
     });
 
-    // Ruling T16-optname (spec §13): "<label> orbital".
+    // Ruling T16-optname (spec §13): "<label> orbital". Task 6: the label is flat ("3px"), never "3p_x".
     it('names every option "<label> orbital"', () => {
         const items = basicStripItems({ selection: { n: 3, l: 2, ml: 0 }, enclosedFraction: 0.9 });
         for (const item of items) expect(item.spoken).toBe(`${item.label} orbital`);
-        expect(items.map(item => item.label)).toContain('3p_x');
+        expect(items.map(item => item.label)).toContain('3px');
     });
 });

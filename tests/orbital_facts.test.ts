@@ -1,4 +1,6 @@
-import { angularNodeSurfaces, atomFacts, orbitalFacts, shapeWord, shellFacts, subshellFacts } from '../src/orbital_facts';
+import {
+    angularNodeSurfaces, atomFacts, hartreeText, isoValueText, orbitalEnergyText, orbitalFacts, shapeWord, shellFacts, subshellFacts,
+} from '../src/orbital_facts';
 
 const extras = { enclosedFraction: 0.9, isoLevel: 1.234e-3, energy: -0.433, method: 'non-relativistic LDA' };
 const value = (facts: ReturnType<typeof orbitalFacts>, term: string) => facts.rows.find(row => row.term === term)?.value;
@@ -12,18 +14,30 @@ describe('orbital facts (spec §9.1 "Data")', () => {
         expect(angularNodeSurfaces(4, 0)).toBeNull();
     });
 
-    it('states n, l, mₗ, the real orbital, its nodes, the contour and the energy for 2p_z', () => {
+    // Task 6: the name is flat text ("2pz", the card draws its <sub> from `orbital`), the iso value has ×10ⁿ and its
+    // unit, and the energy reads eV first, then Ha -- the texts Info uses too.
+    it('states n, l, mₗ, the real orbital, its nodes, the contour and the energy for 2pz', () => {
         const facts = orbitalFacts({ n: 2, l: 1, ml: 0 }, extras);
-        expect(facts.title).toBe('2p_z orbital');
+        expect(facts.title).toBe('2pz orbital');
+        expect(facts.orbital).toEqual({ n: 2, l: 1, ml: 0 });
+        expect(facts.rows.find(row => row.term === 'Real orbital')).toMatchObject({ value: '2pz', orbital: { n: 2, l: 1, ml: 0 } });
         expect(value(facts, 'n')).toBe('2');
         expect(value(facts, 'l')).toBe('1 (p)');
         expect(value(facts, 'mₗ')).toBe('0');
         expect(value(facts, 'Radial nodes')).toBe('0');
         expect(value(facts, 'Angular nodes')).toBe('1 — the xy plane');
         expect(value(facts, 'Enclosed')).toBe('90 % of the electron');
-        expect(value(facts, 'Iso value')).toBe('|ψ|² = 1.23e-3');
-        expect(value(facts, 'Orbital energy')).toBe('−0.433 Ha (eigenvalue, non-relativistic LDA)');
+        expect(value(facts, 'Iso value')).toBe(isoValueText(1.234e-3));
+        expect(value(facts, 'Orbital energy')).toBe('−11.78 eV (−0.433 Ha) · eigenvalue, non-relativistic LDA');
         expect(facts.notes).toEqual(['ψ changes sign across every node.', 'Shape: dumbbell (qualitative).']);
+    });
+
+    // Task 6: one text per value for the Data card, the chips, the energy table and Info, so they cannot drift.
+    it('writes the iso value with ×10ⁿ and a₀⁻³ on one line, and an orbital energy eV first with true minus signs', () => {
+        expect(isoValueText(1.234e-3)).toBe('|ψ|²\u00A0=\u00A01.23\u00A0×\u00A010⁻³\u00A0a₀⁻³');
+        expect(hartreeText(-0.2)).toBe('−0.200 Ha');
+        expect(orbitalEnergyText(-0.2)).toBe('−5.44 eV (−0.200 Ha)');
+        expect(orbitalEnergyText(-3600.5)).not.toMatch(/-/);
     });
 
     it('counts radial nodes as n − l − 1 spheres', () => {

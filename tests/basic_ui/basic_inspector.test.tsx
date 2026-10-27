@@ -34,7 +34,8 @@ describe('BasicInspector (spec §9.2: "Plot tabs as §9.1")', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Wave function R(r)' }));
         expect(onPlotTab).toHaveBeenCalledWith('wave');
         fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
-        expect(screen.getByRole('region', { name: 'orbital facts' })).toHaveTextContent('3d_z² orbital');
+        // Task 6: the Data card draws the name with a real <sub>, so its text reads flat, never with "_".
+        expect(screen.getByRole('region', { name: 'orbital facts' })).toHaveTextContent('3dz² orbital');
         fireEvent.click(screen.getByRole('button', { name: 'Export CSV of this plot' }));
         expect(onExportCsv).toHaveBeenCalled();
     });

@@ -1,6 +1,5 @@
 import React from 'react';
-import { orbitalName } from '../orbital_names';
-import { orbitalParts } from './sci';
+import { orbitalParts, orbitalPlainName } from './sci';
 
 /**
  * An orbital name with a real <sub> element instead of today's "_" separator, e.g. (3, 2, 0)
@@ -9,7 +8,7 @@ import { orbitalParts } from './sci';
  */
 export function OrbitalLabel({ n, l, ml }: { n: number; l: number; ml: number }): React.JSX.Element {
     const { base, sub } = orbitalParts(n, l, ml);
-    const ariaLabel = orbitalName(n, l, ml).replace('_', '');
+    const ariaLabel = orbitalPlainName(n, l, ml);
 
     return (
         <span aria-label={ariaLabel}>

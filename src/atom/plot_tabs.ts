@@ -19,34 +19,40 @@ export interface PlotTab {
     /** The tab's accessible name, which contains the visible label (WCAG 2.5.3). */
     name: string;
     title: string;
-    caption: string | null;
     signed: boolean;
     /** The CSV's quantity line; null keeps today's D(r) statement. */
     csvQuantity: string | null;
 }
 
+/**
+ * Task 6: what the |R|² tab's caption said, now Info's (atomInfo, basicInfo): the square of the radial function is the
+ * radial factor of |ψ|² -- or, under relativity, of the large component only.
+ */
+export const RADIAL_FACTOR_NOTE = '|R(r)|² is the radial factor of |ψ|².';
+export const LARGE_COMPONENT_NOTE = 'R(r) is the large component: |R(r)|² is the large component only, not the whole |ψ|².';
+
 const DISTRIBUTION: PlotTab = {
-    id: 'distribution', label: 'D(r)', name: 'Radial distribution D(r)', title: 'Radial distribution D(r) = 4πr²ρ(r)', caption: null, signed: false, csvQuantity: null,
+    id: 'distribution', label: 'D(r)', name: 'Radial distribution D(r)', title: 'Radial distribution D(r) = 4πr²ρ(r)', signed: false, csvQuantity: null,
 };
 
 export function plotTabsFor(level: ViewLevel, isolatedSubshell: boolean, relativistic: boolean): PlotTab[] {
     if (level === 'orbital' || (level === 'shell' && isolatedSubshell)) {
         return [
             {
-                id: 'wave', label: 'R(r)', name: 'Wave function R(r)', signed: true, caption: null,
+                id: 'wave', label: 'R(r)', name: 'Wave function R(r)', signed: true,
                 title: relativistic ? 'Wave function R(r), large component (a₀⁻³ᐟ²)' : 'Wave function R(r) (a₀⁻³ᐟ²)',
                 csvQuantity: relativistic ? 'R(r), the radial wave function (large component), bohr^-3/2' : 'R(r), the radial wave function, bohr^-3/2',
             },
             // Under relativity R is the large component, so its square is not
             // the radial factor of |ψ|² (the small component is left out) and
-            // says so, as the wave function tab does (ruling T13-relR2).
+            // says so, as the wave function tab does (ruling T13-relR2). Task 6:
+            // the tabs' captions moved to Info (RADIAL_FACTOR_NOTE, LARGE_COMPONENT_NOTE).
             relativistic ? {
                 id: 'density', label: '|R|²', name: 'Probability density |R|²', signed: false,
-                caption: 'large component only, not the whole |ψ|²',
                 title: 'Probability density |R(r)|², large component (a₀⁻³)',
                 csvQuantity: '|R(r)|^2 of the large component (the small component is not included), bohr^-3',
             } : {
-                id: 'density', label: '|R|²', name: 'Probability density |R|²', signed: false, caption: 'radial factor of |ψ|²',
+                id: 'density', label: '|R|²', name: 'Probability density |R|²', signed: false,
                 title: 'Probability density |R(r)|² (a₀⁻³)', csvQuantity: '|R(r)|^2, the radial factor of |psi|^2, bohr^-3',
             },
             DISTRIBUTION,
@@ -54,7 +60,7 @@ export function plotTabsFor(level: ViewLevel, isolatedSubshell: boolean, relativ
     }
     return [
         {
-            id: 'rho', label: 'ρ(r)', name: 'Density ρ(r)', signed: false, caption: null, title: 'Density ρ(r) = D(r)/4πr² (e/a₀³)',
+            id: 'rho', label: 'ρ(r)', name: 'Density ρ(r)', signed: false, title: 'Density ρ(r) = D(r)/4πr² (e/a₀³)',
             csvQuantity: 'rho(r) = D(r)/(4*pi*r^2), electrons per bohr^3',
         },
         DISTRIBUTION,

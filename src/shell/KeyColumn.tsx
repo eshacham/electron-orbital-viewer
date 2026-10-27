@@ -28,7 +28,10 @@ export const PhaseKey: React.FC<{ positive: string; negative: string; heading?: 
 
 export interface ShellRingItem { label: string; colour: string; spoken?: string }
 
-/** Atom and shell level (§11.5): one swatch per ring, matching the plot, with today's cut-face caption. */
+/**
+ * Atom and shell level (§11.5): one swatch per ring, matching the plot. Task 6: the cut-face caption it carried is said
+ * once, in Info (atomInfo), not here and again under the plot.
+ */
 export const ShellRingKey: React.FC<{ items: ShellRingItem[] }> = ({ items }) => (
     <div className="phase-legend shell-ring-key" aria-label="shell colour key">
         {items.map(item => (
@@ -38,7 +41,6 @@ export const ShellRingKey: React.FC<{ items: ShellRingItem[] }> = ({ items }) =>
                 {item.spoken && <span className="visually-hidden">{item.spoken}</span>}
             </span>
         ))}
-        <span className="key-caption">cut face shading is scaled to local shell structure</span>
     </div>
 );
 

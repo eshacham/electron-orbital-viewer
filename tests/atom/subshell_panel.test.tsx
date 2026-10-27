@@ -2,7 +2,7 @@ import React from 'react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { render, fireEvent } from '@testing-library/react';
-import SubshellPanel, { spreadLabels, formatElectrons } from '../../src/components/SubshellPanel';
+import SubshellPanel, { spreadLabels, formatElectrons, jLevelNote } from '../../src/components/SubshellPanel';
 import { SerialisedSubshell } from '../../src/workers/atomWorker';
 
 /** A neon-shaped list of subshells: 1s (n=1), 2s and 2p (n=2). */
@@ -43,8 +43,9 @@ describe('SubshellPanel', () => {
         expect(text).toMatch(/2p/);
         expect(text).toMatch(/2 of 2 e⁻/); // 2s occupancy: full, 2 of its own 2-electron capacity
         expect(text).toMatch(/6 of 6 e⁻/); // 2p occupancy: full, 6 of its own 6-electron capacity
-        expect(text).toMatch(/-1\.300 Ha/);
-        expect(text).toMatch(/-0\.500 Ha/);
+        // Task 6: a true minus (U+2212), the shared hartreeText.
+        expect(text).toMatch(/−1\.300 Ha/);
+        expect(text).toMatch(/−0\.500 Ha/);
         expect(text).toMatch(/orbital energy/i);
     });
 
@@ -71,7 +72,7 @@ describe('SubshellPanel', () => {
             expect(content.lastElementChild).toBe(energy);
             expect(energy!.previousSibling?.textContent ?? '').not.toMatch(/·/);
         }
-        expect(container.textContent ?? '').toMatch(/-0\.500 Ha \(orbital energy\)/);
+        expect(container.textContent ?? '').toMatch(/−0\.500 Ha \(orbital energy\)/);
 
         const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
         expect(css).toMatch(/\.subshell-chip-energy\s*\{\s*flex-basis:\s*100%;?\s*\}/);
@@ -144,6 +145,7 @@ describe('SubshellPanel', () => {
         expect(onSelectSubshell).toHaveBeenCalledWith(2, 1);
     });
 
+    // Task 6 (ruling): the buttons draw the name with a real subscript and are named flat ("2pz"), never "2p_z".
     it('shows 2l+1 mₗ buttons named via orbitalName once a subshell is selected', () => {
         const onSelectOrbital = jest.fn();
         const { getByRole } = render(
@@ -155,12 +157,13 @@ describe('SubshellPanel', () => {
                 onSelectOrbital={onSelectOrbital}
             />
         );
-        // orbitalName(2, 1, ml): ml=-1 -> 2p_y, ml=0 -> 2p_z, ml=+1 -> 2p_x.
-        expect(getByRole('button', { name: '2p_y' })).toBeInTheDocument();
-        expect(getByRole('button', { name: '2p_z' })).toBeInTheDocument();
-        expect(getByRole('button', { name: '2p_x' })).toBeInTheDocument();
+        // orbitalName(2, 1, ml): ml=-1 -> 2p_y, ml=0 -> 2p_z, ml=+1 -> 2p_x; spoken 2py, 2pz, 2px.
+        expect(getByRole('button', { name: '2py' })).toBeInTheDocument();
+        expect(getByRole('button', { name: '2pz' }).querySelector('sub')).toHaveTextContent('z');
+        expect(getByRole('button', { name: '2px' })).toBeInTheDocument();
+        expect(getByRole('group', { name: 'magnetic quantum number' }).textContent).not.toContain('_');
 
-        fireEvent.click(getByRole('button', { name: '2p_x' }));
+        fireEvent.click(getByRole('button', { name: '2px' }));
         expect(onSelectOrbital).toHaveBeenCalledWith(2, 1, 1);
     });
 
@@ -221,12 +224,14 @@ describe('SubshellPanel', () => {
             const { container } = renderAtOrbital(0);
             const pressed = container.querySelectorAll('.subshell-ml-button[aria-pressed="true"]');
             expect(pressed).toHaveLength(1);
-            expect(pressed[0].textContent).toMatch(/2p_z/i);
+            expect(pressed[0].textContent).toBe('2pz');
         });
 
-        it('says what is on screen, not what was on screen a level ago', () => {
-            const { getByText } = renderAtOrbital(0);
-            expect(getByText(/showing one orbital of 2p/i)).toBeInTheDocument();
+        // Task 6: what is on screen ("Showing one orbital of 2p …") is said in Info now (atomInfo's hint).
+        it('leaves the hint on what is on screen to Info', () => {
+            const { container } = renderAtOrbital(0);
+            expect(container.querySelector('.subshell-isolate-hint')).toBeNull();
+            expect(container.textContent).not.toMatch(/showing one orbital/i);
         });
     });
 });
@@ -285,12 +290,12 @@ describe('SubshellPanel with spin–orbit', () => {
         expect(chips[2].getAttribute('aria-pressed')).toBe('true');
         fireEvent.click(chips[1]);
         expect(onSelectSubshell).toHaveBeenCalledWith(6, 1, 0.5);
-        // The lobes drawn for a j-level are the l basis; say so (spec §3.3).
-        expect(container.textContent).toMatch(/j-level/);
-        expect(container.querySelector('.subshell-j-note')!.textContent)
+        // The lobes drawn for a j-level are the l basis; say so (spec §3.3). Task 6: Info says it (atomInfo), not the panel.
+        expect(container.querySelector('.subshell-j-note')).toBeNull();
+        const shell = leadLikeSpinOrbit().filter(s => s.n === 6);
+        expect(jLevelNote(shell, shell[2]))
             .toBe('The lobes are the p orbitals\' shapes, sized by 6p³⁄₂\'s own radial function — a basis choice. '
                 + 'A j-level mixes mₗ with spin, so its own states have other shapes (a p½ state is spherical).');
-        expect(container.querySelector('.subshell-isolate-hint')!.textContent).toMatch(/Showing 6p³⁄₂ alone/);
     });
 
     it('drills into an orbital of the chosen j-level, and marks it only for that j-level', () => {
@@ -305,7 +310,6 @@ describe('SubshellPanel with spin–orbit', () => {
         expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
         fireEvent.click(buttons[2]);
         expect(onSelectOrbital).toHaveBeenCalledWith(6, 1, 1, 0.5);
-        expect(container.querySelector('.subshell-isolate-hint')!.textContent).toMatch(/one orbital of 6p½/);
         // An orbital of the other j-level is not this row's current one.
         rerender(
             <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={{ n: 6, l: 1, j: 0.5 }}
@@ -316,13 +320,9 @@ describe('SubshellPanel with spin–orbit', () => {
     });
 
     // Fix round 1, I1: the unisolated shell draws every j-level's l lobes
-    // overlapping, which needs the same caveat as an isolated one.
+    // overlapping, which needs the same caveat as an isolated one. Task 6: in Info (jLevelNote, read by atomInfo).
     it('gives the basis caveat for the whole shell too, naming its j-levels', () => {
-        const { container } = render(
-            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={null}
-                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
-        );
-        expect(container.querySelector('.subshell-j-note')!.textContent)
+        expect(jLevelNote(leadLikeSpinOrbit(), null))
             .toBe('Each j-level is drawn as its l orbitals\' lobes, sized by its own radial function — a basis choice. '
                 + '6p½ and 6p³⁄₂ overlap here; a j-level\'s own states have other shapes (a p½ state is spherical).');
     });
@@ -333,40 +333,21 @@ describe('SubshellPanel with spin–orbit', () => {
         const level = (l: number, j: number, electrons: number, energy: number): SerialisedSubshell =>
             ({ n: 5, l, j, electrons, energy, curve: a(), R: a(), samplingRadius: 5, compositeSamplingRadius: 5 });
         const fifthShell = [level(0, 0.5, 2, -3), level(1, 0.5, 2, -2), level(1, 1.5, 4, -1.8), level(2, 1.5, 4, -0.6), level(2, 2.5, 6, -0.5)];
-        const { container, rerender } = render(
-            <SubshellPanel subshells={fifthShell} shellN={5} selectedSubshell={null}
-                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
-        );
-        expect(container.querySelector('.subshell-j-note')!.textContent)
+        // Task 6: the note is Info's (atomInfo reads jLevelNote); the words are unchanged.
+        expect(jLevelNote(fifthShell, null))
             .toMatch(/ 5p½, 5p³⁄₂, 5d³⁄₂ and 5d⁵⁄₂ overlap here; .*\(a p½ state is spherical\)\.$/);
-        rerender(
-            <SubshellPanel subshells={fifthShell} shellN={5} selectedSubshell={{ n: 5, l: 2, j: 2.5 }}
-                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
-        );
-        expect(container.querySelector('.subshell-j-note')!.textContent)
+        expect(jLevelNote(fifthShell, fifthShell[4]))
             .toBe('The lobes are the d orbitals\' shapes, sized by 5d⁵⁄₂\'s own radial function — a basis choice. '
                 + 'A j-level mixes mₗ with spin, so its own states have other shapes.');
         // A shell with only d levels: no p½ example either.
-        rerender(
-            <SubshellPanel subshells={fifthShell.filter(s => s.l !== 1)} shellN={5} selectedSubshell={null}
-                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
-        );
-        expect(container.querySelector('.subshell-j-note')!.textContent)
+        expect(jLevelNote(fifthShell.filter(s => s.l !== 1), null))
             .toMatch(/ 5d³⁄₂ and 5d⁵⁄₂ overlap here; a j-level's own states have other shapes\.$/);
     });
 
+    // Task 6: jLevelNote is Info's (atomInfo); null where nothing drawn has lobes to qualify.
     it('gives no caveat for a shell of s½ levels only', () => {
-        const { container } = render(
-            <SubshellPanel subshells={leadLikeSpinOrbit()} shellN={6} selectedSubshell={null}
-                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
-        );
-        expect(container.querySelector('.subshell-j-note')).not.toBeNull();
-        const sOnly = leadLikeSpinOrbit().filter(s => s.l === 0);
-        const { container: sContainer } = render(
-            <SubshellPanel subshells={sOnly} shellN={6} selectedSubshell={null}
-                relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
-        );
-        expect(sContainer.querySelector('.subshell-j-note')).toBeNull();
+        expect(jLevelNote(leadLikeSpinOrbit(), null)).not.toBeNull();
+        expect(jLevelNote(leadLikeSpinOrbit().filter(s => s.l === 0), null)).toBeNull();
     });
 
     it('does not claim an s½ level looks different from its sphere', () => {
@@ -385,7 +366,8 @@ describe('SubshellPanel with spin–orbit', () => {
                 relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
         );
         expect(getByRole('button', {
-            name: /^6p j = 3\/2, 1\.33 of 4 electrons, -0\.120 Ha orbital energy \(Dirac LDA \(MacDonald–Vosko exchange\)\)$/,
+            // Task 6: a true minus in the spoken energy too (hartreeText).
+            name: /^6p j = 3\/2, 1\.33 of 4 electrons, −0\.120 Ha orbital energy \(Dirac LDA \(MacDonald–Vosko exchange\)\)$/,
         })).toBeTruthy();
         expect(getByRole('button', { name: /^6p j = 1\/2,/ })).toBeTruthy();
         expect(getByRole('button', { name: /^6s j = 1\/2,/ })).toBeTruthy();
@@ -442,9 +424,11 @@ describe('SubshellPanel parts (spec §9.1: chips in Configuration, the diagram i
     const props = () => ({
         subshells: neonLikeSubshells(), shellN: 2, selectedSubshell: null, onSelectSubshell: () => {}, onSelectOrbital: () => {},
     });
-    it('chips: the chip row and the hint, no diagram', () => {
+    // Task 6: the hint is Info's now; the chips part keeps the chip row and its (i).
+    it('chips: the chip row and its (i), no diagram', () => {
         const { container } = render(<SubshellPanel {...props()} part="chips" />);
         expect(container.querySelector('.subshell-chip-row')).not.toBeNull();
+        expect(container.querySelector('button[aria-label="About Subshell"]')).not.toBeNull();
         expect(container.querySelector('.subshell-energy-diagram')).toBeNull();
     });
     // Controller ruling T10-wholeatom: with no shell open (the whole atom)
@@ -452,9 +436,8 @@ describe('SubshellPanel parts (spec §9.1: chips in Configuration, the diagram i
     // which would describe lobes the 3D view's shell rings do not draw.
     it('diagram with no shell open: no picked-out rules, labels or j-level note, even under spin–orbit', () => {
         const lead = leadLikeSpinOrbitSubshells();
-        const open = render(<SubshellPanel {...props()} subshells={lead} shellN={6} relativity="spinOrbit" part="diagram" />);
-        expect(open.container.querySelector('.subshell-j-note')).not.toBeNull(); // the fixture does trigger the note
-        open.unmount();
+        // Task 6: the note itself is Info's (atomInfo, which gives none with no shell open); the fixture triggers it.
+        expect(jLevelNote(lead.filter(s => s.n === 6), null)).not.toBeNull();
         const { container } = render(<SubshellPanel {...props()} subshells={lead} shellN={null} relativity="spinOrbit" part="diagram" />);
         expect(container.querySelector('.subshell-energy-diagram')).not.toBeNull();
         expect(container.querySelectorAll('.subshell-energy-rule')).toHaveLength(lead.length);

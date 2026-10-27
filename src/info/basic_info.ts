@@ -14,9 +14,10 @@ import type { RootState } from '../store';
 import type { LearningLevel } from '../levels/levels';
 import type { InfoContent, InfoFact } from './info_types';
 import { OrbitalLabel } from '../format/OrbitalLabel';
-import { formatSci, minus } from '../format/sci';
+import { minus } from '../format/sci';
 import { shellLetter } from '../orbital_names';
-import { angularNodeSurfaces, shapeWord } from '../orbital_facts';
+import { angularNodeSurfaces, isoValueText, shapeWord } from '../orbital_facts';
+import { RADIAL_FACTOR_NOTE } from '../atom/plot_tabs';
 import { CombinationSelection, combinationTitle, selectionProblem } from '../combinations';
 import { HybridKind, HYBRID_NAMES, hybridCount } from '../hybrids';
 import { MAX_FIELD_AU } from '../field_source';
@@ -88,21 +89,24 @@ function energyText(hartree: number): string {
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
 const signedMl = (ml: number) => (ml > 0 ? `+${ml}` : minus(String(ml)));
 
-/** The enclosed fraction, from Advanced -- where the Electron enclosed control is (CONTROL_LEVEL.enclosed). */
-function enclosedFact(state: OrbitalsInfoState): InfoFact {
-    return { label: 'Enclosed', value: `${Math.round(state.orbital.enclosedFraction * 100)} % of the electron`, min: 'advanced' };
+/**
+ * The enclosed fraction, from Advanced -- where the Electron enclosed control is (CONTROL_LEVEL.enclosed). `of` says what
+ * the share is of: one orbital's electron by default; Atoms' shell views enclose a share of the density (Task 6).
+ */
+export function enclosedFact(fraction: number, of = 'of the electron'): InfoFact {
+    return { label: 'Enclosed', value: `${Math.round(fraction * 100)} % ${of}`, min: 'advanced' };
 }
 
 /** The fraction and, once this orbital is drawn, its contour's iso value. */
 function enclosedFacts(state: OrbitalsInfoState, n: number, l: number, ml: number): InfoFact[] {
     const { enclosedFraction, currentParams, isoLevel, isLoading, renderFailed } = state.orbital;
-    const facts: InfoFact[] = [enclosedFact(state)];
+    const facts: InfoFact[] = [enclosedFact(enclosedFraction)];
     // The iso value is the drawn orbital's: until the selection itself has landed it would be the previous one's.
     const drawn = currentParams && !currentParams.radialSamples && currentParams.Z === BASIC_ORBITALS_Z
         && currentParams.n === n && currentParams.l === l && currentParams.ml === ml
         && currentParams.enclosedFraction === enclosedFraction;
     if (drawn && !isLoading && !renderFailed && isoLevel !== null) {
-        facts.push({ label: 'Iso value', value: nb(`|ψ|² = ${formatSci(isoLevel)} a₀⁻³`), min: 'advanced' });
+        facts.push({ label: 'Iso value', value: isoValueText(isoLevel), min: 'advanced' });
     }
     return facts;
 }
@@ -142,7 +146,9 @@ function orbitalInfo(state: OrbitalsInfoState): InfoContent {
         title: h(React.Fragment, null, 'Hydrogen — ', name, ' orbital'),
         plain: joinSentences(shapeAndNodes, BASIC_ORBITALS_ABOUT, cutSentence(state)),
         technical: `${nb('ψ = Rₙₗ(r) Y(θ, φ)')}: the radial part has ${nb(`n − l − 1 = ${radial}`)} ${plural(radial, 'node', 'nodes')} and the angular part has ${nb(`l = ${l}`)}. `
-            + `Its size grows roughly as n². ${nb('E = −1/(2n²) Ha')} depends on n alone, so all ${nb(`n² = ${n * n}`)} orbitals of the shell share it.${realNote}`,
+            + `Its size grows roughly as n². ${nb('E = −1/(2n²) Ha')} depends on n alone, so all ${nb(`n² = ${n * n}`)} orbitals of the shell share it.${realNote}`
+            // Task 6: the |R|² plot tab's caption, said here once (plot_tabs.ts).
+            + ` ${RADIAL_FACTOR_NOTE}`,
         facts: [
             { label: qLabel('Shell', 'n'), value: String(n) },
             { label: qLabel('Subshell', 'l'), value: `${l} (${letter})` },
@@ -175,7 +181,7 @@ function hybridInfo(state: OrbitalsInfoState, selection: Extract<CombinationSele
             { label: 'Hybrids', value: String(k + 1) },
             { label: 'Built from', value: k === 1 ? '2s and 2p' : `2s and ${k} × 2p` },
             { label: 'Energy', value: energyText(-1 / 8), min: 'explore' },
-            enclosedFact(state),
+            enclosedFact(state.orbital.enclosedFraction),
         ],
         // Fix round 1 (science ruling): for hydrogen a mixture of the degenerate n = 2 states is still stationary.
         computed: 'Exact one-electron solution, Z = 1, for the 2s and 2p. A hybrid is a linear combination of these degenerate states '
@@ -186,7 +192,7 @@ function hybridInfo(state: OrbitalsInfoState, selection: Extract<CombinationSele
 function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelection, { kind: 'field' }>): InfoContent {
     const field = selection.field;
     const fieldFact: InfoFact = { label: 'Field F', value: `${field.toFixed(selection.level === 1 ? 3 : 4)} a.u. (${formatVoltsPerMetre(field)})` };
-    const enclosed = enclosedFact(state);
+    const enclosed = enclosedFact(state.orbital.enclosedFraction);
 
     if (selection.level === 1) {
         const share = nextOrderDipoleShare(field);
