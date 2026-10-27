@@ -2,6 +2,7 @@ import { AnalyticFieldSource, CombinationRecipe, fieldProblem } from './field_so
 import { sampleFieldSource } from './orbital_mesh';
 import { overlapIntegral, zMatrixElement } from './field_integrals';
 import { ORBITAL_RESOLUTION, combinationSamplingRadius, n2Recipe } from './orbital_presets';
+import { toSuperscript } from './format/sci';
 
 /**
  * Hydrogen in a uniform field F along +z, H′ = +F z (atomic units): the field
@@ -91,11 +92,8 @@ export function transitionDipole2s2pz(resolution: number = ORBITAL_RESOLUTION): 
     return zMatrixElement(s, pz);
 }
 
-const SUPERSCRIPT: Record<string, string> = {
-    '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
-};
-
-/** "1.54 × 10¹⁰ V/m". */
+/** "1.54 × 10¹⁰ V/m". The superscript digits are src/format/sci.ts's toSuperscript, shared so
+ * this doesn't keep its own copy of the digit table. */
 export function formatVoltsPerMetre(field: number): string {
     const voltsPerMetre = field * VOLTS_PER_METRE_PER_AU;
     if (!(voltsPerMetre > 0)) return '0 V/m';
@@ -105,6 +103,5 @@ export function formatVoltsPerMetre(field: number): string {
         exponent += 1;
         mantissa = '1.00';
     }
-    const power = String(exponent).split('').map(c => SUPERSCRIPT[c]).join('');
-    return `${mantissa} × 10${power} V/m`;
+    return `${mantissa} × 10${toSuperscript(exponent)} V/m`;
 }
