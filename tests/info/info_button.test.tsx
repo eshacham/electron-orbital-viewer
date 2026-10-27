@@ -120,3 +120,82 @@ describe('InfoButton (Task 4)', () => {
         expect(within(screen.getByRole('region', { name: 'Info' })).getByText('Carbon — 2p')).toBeInTheDocument();
     });
 });
+
+// Task 6 fix round 2 (owner: only one (i) is ever shown pressed): two (i) for one term -- Atoms' ionisation energy has
+// one on the panel's line and one on Info's fact -- light only the one pressed.
+describe('InfoButton: two (i) for one term (Task 6 fix round 2)', () => {
+    const TwoForOneTerm: React.FC<{ selectionKey?: string }> = ({ selectionKey = 'a' }) => {
+        const { topic, setTopic } = useInfoTopic(selectionKey);
+        return (
+            <InfoTopicProvider topic={topic} setTopic={setTopic}>
+                <div data-testid="panel"><InfoButton topic="ionisation" label="Ionisation energy" /></div>
+                <div data-testid="facts"><InfoButton topic="ionisation" label="Ionisation energy" place="info" /></div>
+                <InfoPanel content={{ title: 'Carbon — whole atom', plain: 'Carbon has 6 electrons in 2 shells.' }}
+                    topic={topic} onClearTopic={() => setTopic(null)} level="explore" />
+            </InfoTopicProvider>
+        );
+    };
+    const inPanel = () => within(screen.getByTestId('panel')).getByRole('button', { name: 'About Ionisation energy' });
+    const inFacts = () => within(screen.getByTestId('facts')).getByRole('button', { name: 'About Ionisation energy' });
+
+    it('lights only the pressed one, aria-pressed and aria-controls included', () => {
+        render(<TwoForOneTerm />);
+        fireEvent.click(inPanel());
+        expect(inPanel()).toHaveAttribute('aria-pressed', 'true');
+        expect(inPanel()).toHaveClass('is-active');
+        expect(inPanel()).toHaveAttribute('aria-controls');
+        expect(inFacts()).toHaveAttribute('aria-pressed', 'false');
+        expect(inFacts()).not.toHaveClass('is-active');
+        expect(inFacts()).not.toHaveAttribute('aria-controls');
+        expect(chip()).toHaveTextContent('Ionisation energy');
+    });
+
+    it('moves the active state to the other one with the topic unchanged, and pressing the active one clears it', () => {
+        render(<TwoForOneTerm />);
+        fireEvent.click(inPanel());
+        fireEvent.click(inFacts());
+        expect(inFacts()).toHaveAttribute('aria-pressed', 'true');
+        expect(inPanel()).toHaveAttribute('aria-pressed', 'false');
+        expect(chip()).toHaveTextContent('Ionisation energy');
+        fireEvent.click(inFacts());
+        expect(inFacts()).toHaveAttribute('aria-pressed', 'false');
+        expect(inPanel()).toHaveAttribute('aria-pressed', 'false');
+        expect(chip()).toBeNull();
+    });
+
+    // The pressed (i) is known by its place, so it is still the pressed one after its tab unmounts and remounts it.
+    it('keeps the pressed (i) pressed across an unmount and remount', () => {
+        const Toggle: React.FC = () => {
+            const { topic, setTopic } = useInfoTopic('a');
+            const [shown, setShown] = React.useState(true);
+            return (
+                <InfoTopicProvider topic={topic} setTopic={setTopic}>
+                    <button type="button" onClick={() => setShown(value => !value)}>toggle</button>
+                    {shown && <InfoButton topic="ionisation" label="Ionisation energy" />}
+                    <InfoButton topic="ionisation" label="Ionisation energy" place="info" />
+                </InfoTopicProvider>
+            );
+        };
+        render(<Toggle />);
+        const panelButton = () => screen.getAllByRole('button', { name: 'About Ionisation energy' })[0];
+        fireEvent.click(panelButton());
+        fireEvent.click(screen.getByRole('button', { name: 'toggle' }));
+        fireEvent.click(screen.getByRole('button', { name: 'toggle' }));
+        const [panel, info] = screen.getAllByRole('button', { name: 'About Ionisation energy' });
+        expect(panel).toHaveAttribute('aria-pressed', 'true');
+        expect(info).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('leaves no (i) pressed once Back or a new selection clears the topic, nor when the term comes back', () => {
+        const { rerender } = render(<TwoForOneTerm />);
+        fireEvent.click(inPanel());
+        fireEvent.click(screen.getByRole('button', { name: /^Back to/ }));
+        expect(inPanel()).toHaveAttribute('aria-pressed', 'false');
+        expect(inFacts()).toHaveAttribute('aria-pressed', 'false');
+        fireEvent.click(inFacts());
+        rerender(<TwoForOneTerm selectionKey="b" />);
+        expect(chip()).toBeNull();
+        expect(inPanel()).toHaveAttribute('aria-pressed', 'false');
+        expect(inFacts()).toHaveAttribute('aria-pressed', 'false');
+    });
+});

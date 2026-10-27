@@ -7,6 +7,13 @@ interface InfoButtonProps {
     topic: InfoTopicId;
     /** The term as the row beside it names it: the button is "About <label>". */
     label: string;
+    /**
+     * Task 6 fix round 2: where this (i) sits, when a term has another (i) elsewhere -- Atoms' ionisation energy has one
+     * on the panel's line ('panel', the default) and one on Info's fact ('info'). With the topic it names this (i), so
+     * only the pressed one lights. A place, not a React useId: an (i) unmounts and remounts with its tab or drawer (a
+     * phone's Explore tab after the press switched to Info), and must still be the pressed one when it comes back.
+     */
+    place?: string;
 }
 
 /**
@@ -17,10 +24,13 @@ interface InfoButtonProps {
  * selected-edge) with aria-pressed, and aria-controls pointing at Info while Info is in the DOM; Info's heading names
  * the term in a matching chip.
  * A native button, so Enter and Space press it.
+ * Task 6 fix round 2: active means this very (i) set the topic -- a second (i) for the same term (Atoms' ionisation
+ * energy in the panel and in Info) stays unpressed, so only one (i) is ever shown pressed (owner).
  */
-const InfoButton: React.FC<InfoButtonProps> = ({ topic, label }) => {
+const InfoButton: React.FC<InfoButtonProps> = ({ topic, label, place = 'panel' }) => {
     const context = useInfoTopicContext();
-    const active = context !== null && context.topic === topic;
+    const buttonId = `${place}:${topic}`;
+    const active = context !== null && context.topic === topic && context.activeButtonId === buttonId;
     return (
         <button
             type="button"
@@ -36,7 +46,7 @@ const InfoButton: React.FC<InfoButtonProps> = ({ topic, label }) => {
                     context.setTopic(null);
                     return;
                 }
-                context.setTopic(topic);
+                context.press(topic, buttonId);
                 context.requestFocus();
                 context.reveal();
             }}

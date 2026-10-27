@@ -26,6 +26,14 @@ export function useInfoTopic(selectionKey: string): InfoTopicState {
 }
 
 interface InfoTopicContextValue extends InfoTopicState {
+    /**
+     * Task 6 fix round 2 (owner: only one (i) is ever shown pressed): the (i) whose press set the current topic, by its
+     * id (InfoButton: its place and topic, stable across a remount) -- a topic can have more than one (i) on screen (Atoms' ionisation energy: the panel's line and Info's
+     * fact). Null when no (i) set it: no topic, or a topic left by Back or a new selection.
+     */
+    activeButtonId: string | null;
+    /** An (i) pressed: Info shows `topic`, and the (i) with `buttonId` is the active one. */
+    press(topic: InfoTopicId, buttonId: string): void;
     /** Info's region: what an active (i) controls. */
     regionId: string;
     /** Info's heading, the focus target after an (i) or Back is pressed. */
@@ -49,6 +57,13 @@ export const InfoTopicProvider: React.FC<InfoTopicState & { onReveal?(): void; c
 }) => {
     const id = useId();
     const pendingFocus = useRef(false);
+    // Fix round 2: which (i) set the topic. Any other change of topic -- Back or a new selection clearing it -- forgets
+    // the presser during the render that sees it (the same pattern as useInfoTopic's reset), so no (i) stays pressed
+    // and a later topic set another way never lights a stale one. Only an (i) sets a topic; Back and a new selection
+    // only clear it.
+    const [pressed, setPressed] = useState<{ topic: InfoTopicId; buttonId: string } | null>(null);
+    if (pressed && pressed.topic !== topic) setPressed(null);
+    const activeButtonId = pressed && pressed.topic === topic ? pressed.buttonId : null;
     // A count, not a flag: an unmount and the next mount can land in either order within one commit.
     const [mountedInfo, setMountedInfo] = useState(0);
     // Stable, so Info's mount effect runs once per mount, not on every count change.
@@ -62,6 +77,11 @@ export const InfoTopicProvider: React.FC<InfoTopicState & { onReveal?(): void; c
     const value = useMemo<InfoTopicContextValue>(() => ({
         topic,
         setTopic,
+        activeButtonId,
+        press: (next: InfoTopicId, buttonId: string) => {
+            setPressed({ topic: next, buttonId });
+            setTopic(next);
+        },
         regionId: `${id}-info`,
         headingId: `${id}-info-heading`,
         requestFocus: () => { pendingFocus.current = true; },
@@ -73,7 +93,7 @@ export const InfoTopicProvider: React.FC<InfoTopicState & { onReveal?(): void; c
         reveal: () => revealRef.current?.(),
         infoMounted: mountedInfo > 0,
         registerInfo,
-    }), [topic, setTopic, id, mountedInfo, registerInfo]);
+    }), [topic, setTopic, activeButtonId, id, mountedInfo, registerInfo]);
     return React.createElement(InfoTopicContext.Provider, { value }, children);
 };
 

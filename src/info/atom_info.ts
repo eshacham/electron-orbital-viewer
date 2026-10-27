@@ -243,7 +243,7 @@ function energyFacts(state: AtomsInfoState): EnergyFacts {
     const neutral = species.charge === 0;
     const facts: InfoFact[] = [{
         label: neutral
-            ? h(React.Fragment, null, ionisationLabelOf(species, reading), h(InfoButton, { topic: 'ionisation', label: 'Ionisation energy' }))
+            ? h(React.Fragment, null, ionisationLabelOf(species, reading), h(InfoButton, { topic: 'ionisation', label: 'Ionisation energy', place: 'info' }))
             : ionisationLabelOf(species, reading),
         value: failed ?? keepUnit(energyValueText(reading, status, ionisationNoValueReason(species), pictureFailed)),
         min: neutral ? 'explore' : IE_LEVEL,

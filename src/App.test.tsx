@@ -627,6 +627,24 @@ describe('App', () => {
         expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Ionisation energy');
     });
 
+    // Task 6 fix round 2 (owner: only one (i) is ever shown pressed): the ionisation energy has an (i) on the panel's line
+    // and one on Info's fact; pressing Info's lights it alone.
+    it('in Atoms, lights only the ionisation (i) that was pressed', () => {
+        installMatchMedia(false);
+        const { container } = renderWithProvider(<App />, {
+            Z: 18, profile: argonLikeProfile(),
+            energies: { speciesKey: '18', status: 'done', ionisation: { valueEv: 15.52, fromLabel: 'Ar', toLabel: 'Ar⁺' }, excitation: null, message: null },
+        });
+        const panelLine = () => within(container.querySelector('.species-energy') as HTMLElement).getByRole('button', { name: 'About Ionisation energy' });
+        fireEvent.click(within(container.querySelector('.info-section') as HTMLElement).getByRole('button', { name: 'About Ionisation energy' }));
+        expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Ionisation energy');
+        expect(panelLine()).toHaveAttribute('aria-pressed', 'false');
+        expect(container.querySelectorAll('.info-button.is-active')).toHaveLength(0);
+        fireEvent.click(panelLine());
+        expect(panelLine()).toHaveAttribute('aria-pressed', 'true');
+        expect(container.querySelectorAll('.info-button.is-active')).toHaveLength(1);
+    });
+
     // Task 6: the Atoms panels keep controls and short labelled values; their captions are Info's (atomInfo).
     it('in Atoms, the Explore panel has no About, shell hint or isolate hint -- Info says them', () => {
         installMatchMedia(false);
