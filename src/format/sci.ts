@@ -18,10 +18,13 @@ export function toSuperscript(exponent: number): string {
     return String(exponent).split('').map(c => SUPERSCRIPT_CHARS[c] ?? c).join('');
 }
 
-/** Hyphen-minus immediately before a digit becomes U+2212, e.g. "-5" -> "−5". For strings
- * already built with toFixed()/toString(), which only ever produce the ASCII hyphen. */
+/** Hyphen-minus becomes U+2212 only where it reads as a sign: at the start of the string, or
+ * right after whitespace, "(" or "=", with a digit immediately after it. Never between two
+ * digits, so a numeral range ("100-200 K") or a compact subtraction ("2-5") is left alone
+ * rather than misread as a single negative number (Ruling T3-minus). For strings already built
+ * with toFixed()/toString(), which only ever produce the ASCII hyphen. */
 export function minus(s: string): string {
-    return s.replace(/-(?=\d)/g, '−');
+    return s.replace(/(^|[\s(=])-(?=\d)/g, (_match, before: string) => `${before}−`);
 }
 
 /**
@@ -54,6 +57,12 @@ const SUBSCRIPT_LETTERS: Record<string, string> = { v: 'ᵥ', h: 'ₕ', s: 'ₛ'
  * A point group's order and suffix as subscript, e.g. C2v -> C₂ᵥ, D6h -> D₆ₕ, Cs -> Cₛ. Reuses
  * formatPointGroup for the Dooh/Coov -> D∞h/C∞v spelling first; ∞ has no subscript glyph, so the
  * infinite groups come back unchanged (D∞h, not D∞ₕ).
+ *
+ * Unicode has no subscript glyph for every letter either (no d, f, g, q, w, y, z) — Td and D3d,
+ * both in the shipped molecule library, come back partly or fully untyped ("Td", "D₃d"). This is
+ * fine for text-only contexts (aria-labels, CSV/caption exports, plain-text titles) that can't
+ * hold a DOM element, but for visual rendering use `<PointGroupLabel>` instead, which puts every
+ * character past the first letter in a real <sub> and so handles any suffix losslessly.
  */
 export function typedPointGroup(pg: string): string {
     const normalized = formatPointGroup(pg);

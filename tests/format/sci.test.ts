@@ -40,6 +40,20 @@ describe('minus', () => {
     it('converts every qualifying hyphen in the string', () => {
         expect(minus('-5 to -3')).toBe('−5 to −3');
     });
+
+    // Ruling T3-minus: a hyphen is a sign only at the start of the string, after whitespace,
+    // '(' or '=', with a digit after it — never between two digits, so a numeral range is left
+    // alone rather than misread as a single negative number or a subtraction.
+    it('never converts a hyphen between two digits (a range, not a sign)', () => {
+        expect(minus('2-5')).toBe('2-5');
+        expect(minus('100-200 K')).toBe('100-200 K');
+    });
+
+    it('converts a hyphen after whitespace, "(" or "="', () => {
+        expect(minus('x = -0.5')).toBe('x = −0.5');
+        expect(minus('(-3)')).toBe('(−3)');
+        expect(minus('-0.199 Ha')).toBe('−0.199 Ha');
+    });
 });
 
 describe('typedPointGroup', () => {
