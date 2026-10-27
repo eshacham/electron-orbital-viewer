@@ -36,7 +36,7 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
         plain: 'An orbital is one allowed wave pattern for an electron, drawn as the cloud where that electron is likely to be found. Each orbital holds at most two electrons, of opposite spin.',
         technical: 'An orbital is a one-electron wave function ψ, labelled in an atom by n, l and mₗ; |ψ|² is the probability density. '
             + 'The app draws real orbitals, named by their axes (as in 2pₓ), which are combinations of the complex functions with +mₗ and −mₗ.',
-        full: 'In Orbitals each is an exact solution for hydrogen (Z = 1), or a mixture of them (the hybrids); the field view adds a first-order Stark correction, an approximation. In Atoms it is a central-field (LDA) solution, with one radial '
+        full: 'In Orbitals each is an exact solution for hydrogen (Z = 1), or a mixture of them (the hybrids); the field view is first-order perturbation theory, an approximation (1s polarised by the field, or the n = 2 Stark states). In Atoms it is a central-field (LDA) solution, with one radial '
             + 'function for every mₗ of a subshell. In Bonds and Molecules the orbitals are Kohn–Sham orbitals, except H₂⁺\'s, which are exact.',
     },
     enclosed: {
