@@ -235,6 +235,24 @@ describe('InfoPanel (Task 4)', () => {
         });
     });
 
+    // Task 9 (addendum item 3): live, a long label's (i) dropped under the label on desktop ("Ionisation energy (C → C⁺)",
+    // "E − E(atoms)", "Orbital energy"), because label and value both shrank. A label carrying an (i) must not shrink,
+    // so the (i) stays beside it; the value wraps below instead. jsdom has no layout: the rule is pinned here, the
+    // layout is measured live (tools/design/shoot.mjs metrics.info.factButtons).
+    it('keeps a fact\'s (i) beside its label: that label never shrinks, the value wraps below it', () => {
+        render(
+            <InfoPanel
+                content={{ ...content, facts: [{ label: <>Ionisation energy (C → C⁺)<InfoButton topic="ionisation" label="Ionisation energy" place="info" /></>, value: '11.77 eV' }] }}
+                topic={null} onClearTopic={() => {}} level="explore"
+            />,
+        );
+        const button = screen.getByRole('button', { name: 'About Ionisation energy' });
+        expect(button.closest('dt')?.parentElement).toHaveClass('info-fact');
+        const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
+        expect(css).toMatch(/\.info-fact:has\(> dt \.info-button\)\s*\{[^}]*flex-wrap:\s*wrap;/);
+        expect(css).toMatch(/\.info-fact:has\(> dt \.info-button\) > dt\s*\{[^}]*flex:\s*none;/);
+    });
+
     // Review M4: on a phone the way back is a 44 px touch target, like the (i) beside it.
     it('gives "Back to …" a 44 px touch target under the phone query', () => {
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
