@@ -25,6 +25,8 @@
   "benzene-nostruct": "#mode=molecule&id=benzene&struct=0",
   "benzene-structure": "#mode=molecule&id=benzene&show=none",
   "molecule-complex": "#mode=molecule&id=glycine",
+  "glycine": "#mode=molecule&id=glycine",
+  "sf6": "#mode=molecule&id=sf6",
   "water-orbitals": "#mode=molecule&id=h2o&show=mo:4",
   "water-esp": "#mode=molecule&id=h2o&show=esp",
   "c2h2-deep": "#mode=molecule&id=c2h2&show=mo:5&struct=space",

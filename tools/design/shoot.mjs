@@ -36,6 +36,18 @@
 //   /v1/jobs whatever happens.
 // (--run defaults to a timestamp, so a second invocation for the same --task never overwrites
 // the first run's aggregated metrics -- final review B-I2).
+//
+// Task 9 of the levels plan:
+//   --level <basics|explore|advanced|research>  writes eov.level before the page loads (as the theme is), so a shot
+//                    is at that learning level; omitted, the app's own default (Explore) applies. A checkout without
+//                    levels (the `main` baseline) ignores the key, so the same flag shoots both sides of a diff.
+//   --sweep          after the shot, reads the science text of every state the panels can show without changing
+//                    what is drawn: each inspector section and each tab (Plot/Data, R(r)/|R|²/D(r), the Explore
+//                    tabs, the phone sheet's tabs) is opened in turn and its text blocks collected into
+//                    metrics.scienceText -- the "moved, not changed" input of science_diff.mjs.
+//   Every shot also measures Info (metrics.info: height, its share of the inspector, whether it scrolls inside, where
+//   "How this was computed" sits, whether a fact's (i) wrapped under its label) and metrics.plotHeaderVisible (the
+//   "Plot and data" header on screen and on top: Review Focus 4); infoHeightPx is metrics.info.heightPx.
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -115,6 +127,11 @@ const computedMeta = computedMetaFile ? JSON.parse(readFileSync(resolve(computed
 // A preview whose molecule is already on record: the preview fixture with a recorded job as its `existing`
 // (what tests/jobs/request_panel.test.tsx composes), e.g. --preview-existing get_done → "Already computed — open it".
 const previewExisting = arg('preview-existing', null);
+// Task 9 (levels): the learning level, written as eov.level before load; null leaves the app's default.
+const LEVELS = ['basics', 'explore', 'advanced', 'research'];
+const level = arg('level', null);
+if (level !== null && !LEVELS.includes(level)) throw new Error(`unknown --level ${level} (${LEVELS.join(' | ')})`);
+const sweep = process.argv.includes('--sweep');
 // The scripted steps, in argv order.
 const steps = [];
 for (let i = 2; i < process.argv.length; i++) {
@@ -287,12 +304,16 @@ function collectMetrics() {
     return { family: s.fontFamily, size: s.fontSize, weight: s.fontWeight, line: s.lineHeight };
   };
   const canvases = [...document.querySelectorAll('canvas')];
+  // An Info fact's value by its label's text (an (i) in the label adds no text), or null.
+  const infoFact = label => [...document.querySelectorAll('.info-section .info-fact')]
+    .find(f => f.querySelector('dt')?.textContent.trim() === label)?.querySelector('dd')?.textContent ?? null;
   return {
     theme: document.documentElement.dataset.theme ?? null,
     title: document.title,
     boxes: Object.fromEntries(['.app-topbar', '.app-rail', '.explore-panel', '#canvas-container', '.inspector', '.thumbnail-strip',
       '.viewport-title', '.viewport-toolbar', '.key-column', '.phone-topbar', '.phone-header', '.phone-sheet',
-      '.element-tile', '.periodic-table-mini', '.request-workspace', '.scale-readout', '.first-view-hint'].map(s => [s, box(s)])),
+      '.element-tile', '.periodic-table-mini', '.request-workspace', '.scale-readout', '.first-view-hint',
+      '.inspector-info', '.info-section', '.phone-caption'].map(s => [s, box(s)])),
     // 6G-2 Task 17 fix: overlap (w × h px, 0 when clear, null when either is absent) of what must never cover
     // another zone. `hint`: the first-view hint against every overlay zone (Fail 1, scale readout); `strip`: the
     // strip against the folded drawer bar at medium width (Fail 3).
@@ -314,7 +335,83 @@ function collectMetrics() {
           '.inspector-drawer .inspector-bar', '.canvas-busy', '.canvas-unbound', '.phone-topbar', '.phone-header', '.phone-sheet']
           .map(s => [s, overlap('.first-view-hint', s)])),
         strip: { '.inspector-drawer .inspector-bar': overlap('.thumbnail-strip.overlay', '.inspector-drawer .inspector-bar') },
+        // Levels Task 9 (addendum item 5): the phone caption under the header against what shares the canvas's top.
+        caption: Object.fromEntries(['.scale-readout', '.key-column', '.viewport-toolbar', '.phone-topbar', '.phone-header',
+          '.first-view-hint', '.canvas-busy'].map(s => [s, overlap('.phone-caption', s)])),
       };
+    })(),
+    // Levels Task 9: Info as laid out. heightPx is the plan's infoHeightPx. `share` is its height over the inspector
+    // column's (docked or drawer; addendum item 1: at most 0.45); `scrolls` says it scrolls inside itself, and
+    // `scrollbarPx` whether a classic scrollbar shows it. `computed` places the "How this was computed" summary against
+    // Info's visible bottom (addendum item 2: `cut` when it is below the fold or straddles it). `factButtons` lists every
+    // fact label carrying an (i) and whether the (i) sits on a later line than the label's first (addendum item 3), and
+    // whether the value went below the label. `lastNote` is the last note's place against the visible scroller (item 4).
+    info: (() => {
+      const section = document.querySelector('.info-section');
+      if (!section) return null;
+      const round = n => Math.round(n);
+      // What scrolls Info: the docked/drawer slot, else the phone sheet's body (or a stacked inspector's scroller).
+      const scrollerOf = el => {
+        for (let e = el.parentElement; e; e = e.parentElement) {
+          const s = getComputedStyle(e);
+          if (/(auto|scroll)/.test(s.overflowY) && e.scrollHeight > 0) return e;
+        }
+        return null;
+      };
+      const slot = section.closest('.inspector-info');
+      const scroller = slot ?? scrollerOf(section);
+      const S = (scroller ?? section).getBoundingClientRect();
+      const visibleBottom = Math.min(S.bottom, innerHeight);
+      const column = section.closest('.inspector-drawer-panel, .inspector');
+      const summary = section.querySelector('.info-computed > summary');
+      const place = el => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { top: round(r.top), bottom: round(r.bottom), belowFold: r.top >= visibleBottom - 0.5, cut: r.top < visibleBottom - 0.5 && r.bottom > visibleBottom + 0.5 };
+      };
+      const fade = scroller ? getComputedStyle(scroller) : null;
+      const notes = section.querySelectorAll('.info-notes');
+      return {
+        heightPx: round(section.closest('.inspector-info')?.getBoundingClientRect().height ?? section.getBoundingClientRect().height),
+        columnPx: column ? round(column.getBoundingClientRect().height) : null,
+        share: slot && column ? Number((slot.getBoundingClientRect().height / column.getBoundingClientRect().height).toFixed(3)) : null,
+        scroller: scroller ? scroller.className : null,
+        scrolls: scroller ? scroller.scrollHeight > scroller.clientHeight + 1 : false,
+        scrollHeight: scroller?.scrollHeight ?? null, clientHeight: scroller?.clientHeight ?? null,
+        scrollbarPx: scroller ? scroller.offsetWidth - scroller.clientWidth : null,
+        // Anything drawn to say there is more: a mask/fade on the scroller, or a shadow.
+        moreCue: fade ? { mask: fade.maskImage ?? fade.webkitMaskImage ?? 'none', webkitMask: fade.webkitMaskImage ?? 'none', shadow: fade.boxShadow } : null,
+        visibleBottom: round(visibleBottom),
+        computed: summary ? { ...place(summary), open: summary.parentElement.open } : null,
+        lastNote: notes.length ? { text: notes[notes.length - 1].textContent, ...place(notes[notes.length - 1]) } : null,
+        title: section.querySelector('.info-title')?.textContent ?? null,
+        topicChip: section.querySelector('.info-topic-chip')?.textContent ?? null,
+        facts: [...section.querySelectorAll('.info-fact')].map(f => [f.querySelector('dt')?.textContent ?? '', f.querySelector('dd')?.textContent ?? '']),
+        factButtons: [...section.querySelectorAll('.info-fact dt')].filter(dt => dt.querySelector('.info-button')).map(dt => {
+          const button = dt.querySelector('.info-button').getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(dt);
+          const firstLine = range.getClientRects()[0];
+          const value = dt.parentElement.querySelector('dd')?.getBoundingClientRect();
+          return {
+            label: dt.textContent,
+            wrapped: Boolean(firstLine) && button.top >= firstLine.bottom - 1,
+            labelLines: new Set([...range.getClientRects()].map(r => round(r.top))).size,
+            valueBelow: Boolean(value) && value.top >= dt.getBoundingClientRect().bottom - 1,
+          };
+        }),
+        text: [...section.querySelectorAll('.info-text')].map(e => e.textContent),
+        computedText: section.querySelector('.info-computed-body')?.textContent ?? null,
+      };
+    })(),
+    // Levels Task 9, Review Focus 4: the "Plot and data" header is on screen and is what is painted at its centre.
+    plotHeaderVisible: (() => {
+      const header = [...document.querySelectorAll('.inspector-section-toggle')].find(e => e.textContent.trim() === 'Plot and data');
+      if (!header) return null;
+      const r = header.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0) || r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) return false;
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return Boolean(top && header.contains(top));
     })(),
     // 6G-2 Task 17 round 2 (ruling T17-key, spec §3.3): the key column inside the canvas cell and on screen, and every
     // key in it whole -- a swatch item, heading or caption that runs past the column, the cell or the window, or is
@@ -411,9 +508,12 @@ function collectMetrics() {
       enclosed: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.textContent ?? null,
       phaseKey: [...document.querySelectorAll('[aria-label="surface colour key"]')].map(e => e.textContent),
       plotLegend: [...document.querySelectorAll('.radial-plot-legend-item')].map(e => e.textContent),
-      enclosedNote: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent ?? null,
+      // Levels Task 9: the ★ texts Tasks 5-7 moved into Info are read there when their old place is gone -- the
+      // enclosed note's contour value is Info's "Iso value" fact, the configuration its "Configuration" fact.
+      enclosedNote: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent
+        ?? infoFact('Iso value'),
       subshellChips: [...document.querySelectorAll('.subshell-chip')].map(e => e.textContent),
-      configuration: document.querySelector('.level-nav-configuration')?.textContent ?? null,
+      configuration: document.querySelector('.level-nav-configuration')?.textContent ?? infoFact('Configuration'),
       // Task 14: the on-model labels shown (placed by a frame), and the large-molecule hint.
       modelLabels: [...document.querySelectorAll('.model-label')].filter(e => getComputedStyle(e).visibility === 'visible').map(e => e.textContent),
       modelLabelHint: document.querySelector('.model-label-hint')?.textContent ?? null,
@@ -421,6 +521,67 @@ function collectMetrics() {
       modelLabelOverlap: document.querySelector('.model-label-overlap:not([hidden])')?.textContent ?? null,
     },
   };
+}
+
+/**
+ * Levels Task 9 (--sweep): the text blocks of the panels, the canvas's title and key, the strip and the phone's caption
+ * and sheet -- each the text of the nearest non-inline element around a text node, whitespace collapsed. A live region
+ * kept for screen readers (.visually-hidden), SVG (plot axes) and aria-hidden decoration are left out; titles and
+ * aria-labels are read too.
+ */
+function scienceBlocks() {
+  const roots = [...document.querySelectorAll('.explore-panel, .inspector, .viewport-title, .key-column, .thumbnail-strip, .phone-header, .phone-caption, .phone-sheet')];
+  const outer = roots.filter(r => !roots.some(o => o !== r && o.contains(r)));
+  const inline = el => ['inline', 'contents'].includes(getComputedStyle(el).display);
+  const blocks = new Set();
+  for (const root of outer) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.nodeValue.trim()) continue;
+      if (node.parentElement.closest('.visually-hidden, svg, [aria-hidden="true"], style, script')) continue;
+      let block = node.parentElement;
+      while (block !== root && inline(block)) block = block.parentElement;
+      blocks.add(block);
+    }
+  }
+  const texts = [...blocks].map(b => b.textContent.replace(/\s+/g, ' ').trim());
+  // A tooltip's or an icon's text lives in its title or aria-label (main kept the ΔSCF method in a tooltip).
+  for (const root of outer) {
+    for (const el of [root, ...root.querySelectorAll('[title], [aria-label]')]) {
+      if (el.closest('[aria-hidden="true"]')) continue;
+      for (const name of ['title', 'aria-label']) if (el.getAttribute(name)?.trim()) texts.push(el.getAttribute(name).replace(/\s+/g, ' ').trim());
+    }
+  }
+  return texts.filter(Boolean);
+}
+
+/**
+ * Opens, one at a time, every tab and inspector section the page offers without changing what is drawn, collecting
+ * scienceBlocks() in each state. Tabs go first, last in the document first, so a tab row nested under a tab (R(r) |
+ * |R|² | D(r) under Plot) is read before its parent row moves on; then the folded sections and (on main) the
+ * "How this was computed" disclosure. At most 40 presses.
+ */
+async function sweepText(page) {
+  const texts = new Set(await page.evaluate(scienceBlocks));
+  const visited = new Set();
+  // .provenance-trigger: main's "How this was computed" disclosure (Info's own is open at Research).
+  const SELECTOR = '.explore-panel [role="tab"], .inspector [role="tab"], .phone-sheet [role="tab"], .inspector-section-toggle, .provenance-trigger';
+  for (let presses = 0; presses < 40; presses++) {
+    const candidates = await page.evaluate(selector => [...document.querySelectorAll(selector)].map((el, index) => ({
+      index,
+      key: `${el.closest('.explore-panel') ? 'explore' : el.closest('.phone-sheet') ? 'sheet' : 'inspector'}|${el.getAttribute('role') ?? 'section'}|${el.textContent.trim()}`,
+      on: el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-expanded') === 'true',
+      tab: el.getAttribute('role') === 'tab',
+    })), SELECTOR);
+    for (const c of candidates) if (c.on) visited.add(c.key);
+    const next = [...candidates.filter(c => c.tab).reverse(), ...candidates.filter(c => !c.tab)].find(c => !visited.has(c.key));
+    if (!next) break;
+    visited.add(next.key);
+    await page.locator(SELECTOR).nth(next.index).click();
+    await page.waitForTimeout(400);
+    for (const text of await page.evaluate(scienceBlocks)) texts.add(text);
+  }
+  return [...texts];
 }
 
 // Final review B-I2: 'zoom' (720 CSS px) used to fall into the 'desktop' bucket by elimination
@@ -489,13 +650,14 @@ try {
           viewport: { width: spec.width, height: spec.height }, isMobile: Boolean(spec.mobile), hasTouch: Boolean(spec.mobile),
           deviceScaleFactor: dpr, reducedMotion: 'reduce',
         });
-        await context.addInitScript(({ choice, prefs, display }) => {
+        await context.addInitScript(({ choice, prefs, display, learning }) => {
           try {
             window.localStorage.setItem('eov.theme', choice);
             if (prefs) window.localStorage.setItem('eov.render', prefs);
             if (display) window.localStorage.setItem('eov.display', display);
+            if (learning) window.localStorage.setItem('eov.level', learning);
           } catch { /* storage refused: the app keeps its defaults */ }
-        }, { choice: theme, prefs: renderPrefs, display: displayPrefs });
+        }, { choice: theme, prefs: renderPrefs, display: displayPrefs, learning: level });
         // DC9/DC9b: count WebGL contexts, not canvases by class name. Wraps
         // getContext before any page script runs, and keeps a canvas ->
         // context map for every canvas that receives a context whose type
@@ -543,8 +705,12 @@ try {
         // Display-tab pass (DX3/DC5) is gone. At medium width the inspector
         // is a folded drawer: open it to read the note, then fold it again
         // unless `--drawer open` asked to shoot it open.
+        // Levels Task 9: where the select has no note any more, the contour value is Info's "Iso value" fact (Info is
+        // in the drawer at medium width, so it is read here, while the drawer is open).
         const readNote = () => page.evaluate(() =>
-          document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent ?? null);
+          document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent
+            ?? [...document.querySelectorAll('.info-section .info-fact')].find(f => f.querySelector('dt')?.textContent.trim() === 'Iso value')
+              ?.querySelector('dd')?.textContent ?? null);
         const drawerBar = page.locator('.inspector-drawer.folded .inspector-bar-button').first();
         let enclosedNote;
         if (await drawerBar.count()) {
@@ -596,7 +762,15 @@ try {
         await page.addStyleTag({ content: '#orbital-canvas-host canvas { visibility: hidden !important; }' });
         await page.waitForTimeout(150);
         const off = await sampleColours(page, await page.screenshot(), size);
-        results.push({ scene, theme, size, file, cropFile, settled, metrics, colours: judge(on, off, theme), errors });
+        // Levels Task 9: last, because it opens sections and tabs (the shot, metrics and colours are already taken).
+        if (sweep) {
+          try {
+            metrics.scienceText = await sweepText(page);
+          } catch (error) {
+            errors.push(`sweep failed: ${error.message}`);
+          }
+        }
+        results.push({ scene, theme, size, level, file, cropFile, settled, metrics, colours: judge(on, off, theme), errors });
         console.log(`${file}  settled=${settled}  webgl=${metrics.webglCanvases}  webglCreated=${metrics.webglContextsCreated}  errors=${errors.length}${cropFile ? `  crop=${cropFile}` : ''}${jobsStub ? `  api seen=${api.seen.length} stubbed=${api.stubbed.length} refused=${api.refused.length}` : ''}`);
         await context.close();
       }
