@@ -122,7 +122,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                 {!entry && (
                     <p ref={title} className="info-title">
                         {content.title}
-                        {content.titleTopic && <>{' '}<InfoButton topic={content.titleTopic.topic} label={content.titleTopic.label} place="info-title" /></>}
+                        {content.titleTopic && <span className="info-title-topic"><InfoButton topic={content.titleTopic.topic} label={content.titleTopic.label} place="info-title" /></span>}
                     </p>
                 )}
             </div>

@@ -52,7 +52,7 @@ try {
       const ring = getComputedStyle(probe).color;
       probe.remove();
       const role = element.getAttribute('role') ?? element.tagName.toLowerCase();
-      const name = (element.getAttribute('aria-label') ?? element.textContent ?? '').trim().slice(0, 60);
+      const name = (element.getAttribute('aria-label') ?? (() => { const c = element.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach(n => n.remove()); return c.textContent; })() ?? '').trim().slice(0, 60);
       // Ruling R23b-1: an outlined input/Select (OutlinedInput/Select/TextField/
       // Autocomplete) carries its focus ring as its own fieldset border
       // (theme.ts), not the global outline this walk checks for everything

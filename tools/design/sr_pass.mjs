@@ -83,10 +83,12 @@ function watchSpeech() {
   const log = [];
   const last = new Map();
   window.__srLog = log;
+  // Final re-review N1: text as seen, without the aria-hidden visual copies' twins doubled in.
+  const seen = el => { const c = el.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach(n => n.remove()); return c.textContent ?? ''; };
   const label = el => el.getAttribute('aria-label') || `${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).join('.')}`;
   const scan = () => {
     for (const el of document.querySelectorAll('[aria-live]:not([aria-live="off"]), [role="status"], [role="alert"], [role="log"]')) {
-      const text = el.textContent.replace(/\s+/g, ' ').trim();
+      const text = seen(el).replace(/\s+/g, ' ').trim();
       const hidden = Boolean(el.closest('[aria-hidden="true"], [hidden]'));
       if (!last.has(el)) {
         last.set(el, text);
@@ -103,8 +105,8 @@ function watchSpeech() {
   document.addEventListener('focusin', event => {
     const el = event.target;
     const describedBy = (el.getAttribute?.('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
-      .map(id => document.getElementById(id)?.textContent ?? '').join(' ').trim();
-    const name = (el.getAttribute?.('aria-label') || el.textContent || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 90);
+      .map(id => (document.getElementById(id) ? seen(document.getElementById(id)) : '')).join(' ').trim();
+    const name = (el.getAttribute?.('aria-label') || seen(el) || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 90);
     const text = describedBy ? `${name} (described: ${describedBy})` : name;
     log.push({ t: Math.round(performance.now()), kind: 'focus', region: `${el.tagName.toLowerCase()}${el.getAttribute?.('role') ? `[${el.getAttribute('role')}]` : ''}`, text });
   });

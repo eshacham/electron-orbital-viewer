@@ -46,7 +46,7 @@ const LevelLine: React.FC<LevelLineProps> = ({ level, ids, held = [] }) => {
         <>
             {lines.map(({ line, action }) => (
                 <p key={line} className="ql-caption level-line">
-                    {action ? <span>{line}</span> : line}
+                    {action ? <span>{line}.</span> : line}
                     {action && <>{' '}<button type="button" className="level-line-action" onClick={action.onPress}>{action.label}</button></>}
                 </p>
             ))}

@@ -121,3 +121,6 @@
   font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); font-weight: 500;
   color: var(--ql-color-text-2);
 }
+
+/* Final re-review N2: the title's (i) is spaced by margin, not a text space, so the title's text has no trailing space. */
+.info-title-topic { margin-left: 0.3em; }

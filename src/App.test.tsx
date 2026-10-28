@@ -2729,7 +2729,8 @@ describe('learning levels (Task 2)', () => {
         fireEvent.click(screen.getByRole('radio', { name: 'Explore' }));
         expect(store.getState().atom.charge).toBe(2);
         expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fe²⁺');
-        expect(screen.getByText('Showing Fe²⁺ — charge controls appear at Advanced')).toBeInTheDocument();
+        // Final re-review N3: the held line now ends with a full stop before its way-back action.
+        expect(screen.getByText('Showing Fe²⁺ — charge controls appear at Advanced.')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'increase charge' })).toBeNull();
         expect(screen.queryByText(/Opened at Advanced/)).toBeNull();
     });
@@ -2744,6 +2745,8 @@ describe('learning levels (Task 2)', () => {
         expect(screen.queryByRole('button', { name: 'Show the neutral atom' })).toBeNull();
         fireEvent.click(screen.getByRole('radio', { name: 'Basics' }));
         expect(screen.getByText(/Showing Fe²⁺ — charge controls appear at Advanced/)).toBeInTheDocument();
+        // Final re-review N3: the sentence ends before its action, so it never reads "…Advanced Show the neutral atom".
+        expect(screen.getByText(/Showing Fe²⁺ — charge controls appear at Advanced\.$/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Show the neutral atom' }));
         expect(store.getState().atom).toMatchObject({ Z: 26, charge: 0, excitation: null });
         expect(screen.queryByText(/Showing Fe²⁺/)).toBeNull();
