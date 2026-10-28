@@ -329,12 +329,16 @@ describe('InfoPanel (Task 4)', () => {
     // Task 9b (finish review, fix 8): the facts read as a table -- a label never breaks ("Total / energy", "Measured /
     // (NIST)", "HOMO–LUMO / gap"); the value takes the rest of the row and wraps there. Task 9's rule for a label with
     // its (i) still holds: that label keeps its width and its (i), and the value goes below when it no longer fits.
-    it('keeps every fact label on one line, with a minimum width, and lets the value wrap', () => {
+    // Task 9b review I2/M3: a label takes its one-line width but never more than the row -- "Ionisation energy (=
+    // electron affinity of Br)" overflowed it under nowrap -- so it wraps only when it alone cannot fit; no minimum
+    // width, which only took room from the value (right-aligned, it drew no column) and orphaned its last word.
+    it('keeps every fact label on one line while it fits the row, and lets the value wrap', () => {
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
         const rule = (selector: RegExp) => css.match(new RegExp(`${selector.source}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
         const dt = rule(/\n\.info-fact dt/);
-        expect(dt).toMatch(/white-space:\s*nowrap/);
-        expect(dt).toMatch(/min-width:\s*[\d.]+em/);
+        expect(dt).toMatch(/width:\s*max-content/);
+        expect(dt).toMatch(/max-width:\s*100%/);
+        expect(dt).not.toMatch(/white-space:\s*nowrap|min-width/);
         expect(dt).toMatch(/flex:\s*none/);
         // The value takes the rest of the row (basis 0, growing) and wraps at its own breaks; its minimum stays its longest
         // unbreakable run (no min-width: 0, no break-anywhere), so a value held on one line ("−2976.40 eV (−109.38074 Ha)")
@@ -351,8 +355,23 @@ describe('InfoPanel (Task 4)', () => {
     it('gives the pressed (i) the Deep Space selection halo, in dark only', () => {
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
         expect(css).toMatch(/\.info-button\.is-active,\s*\.info-button\.is-active:hover\s*\{[^}]*box-shadow:\s*var\(--ql-shadow-selected-halo\)/);
-        expect(SHADOWS.dark['selected-halo']).toBe('0 0 0 2px rgba(31,182,245,.35)');
+        // Task 9b review M7 (ruling): the strip tile's own soft, blurred glow -- DESIGN.md's Deep Selection halo -- not
+        // the hard 2 px ring 9b gave it.
+        expect(SHADOWS.dark['selected-halo']).toBe(SHADOWS.dark['selected-tile']);
+        expect(SHADOWS.dark['selected-halo']).toBe('0 0 12px 1px rgba(31,182,245,.5)');
         expect(SHADOWS.light['selected-halo']).toBe('none');
+    });
+
+    // Task 9c: a long "‹ Back to …" wrapped centred, with the chevron alone on its line. The chevron is held to "Back" by a
+    // no-break space inside the one wrapping label, and the label is left-aligned.
+    it('keeps the way back\'s chevron with its first word, and a wrapped label left-aligned', () => {
+        render(<InfoPanel content={{ ...content, title: 'Water (H₂O) — electrostatic potential' }} topic="esp" onClearTopic={() => {}} level="explore" />);
+        const back = screen.getByRole('button', { name: /^Back to / });
+        expect(back.children).toHaveLength(1);
+        expect(back.textContent).toBe('‹\u00A0Back to Water (H₂O) — electrostatic potential');
+        expect(back.querySelector('[aria-hidden="true"]')).toHaveTextContent('‹');
+        const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
+        expect(css).toMatch(/\.info-back\s*\{[^}]*text-align:\s*left/);
     });
 });
 

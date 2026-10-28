@@ -105,7 +105,7 @@
   --ql-shadow-popover: 0 12px 32px rgba(0,0,0,.45);
   --ql-shadow-selected: 0 0 0 1px #1FB6F5, 0 0 12px rgba(31,182,245,.35);
   --ql-shadow-selected-tile: 0 0 12px 1px rgba(31,182,245,.5);
-  --ql-shadow-selected-halo: 0 0 0 2px rgba(31,182,245,.35);
+  --ql-shadow-selected-halo: 0 0 12px 1px rgba(31,182,245,.5);
 }
 :root[data-theme="light"] {
   color-scheme: light;

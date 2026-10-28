@@ -199,11 +199,12 @@ function dashedRingText(state: AtomsInfoState): string | null {
     const ratio = profile.displayRadius / reference.displayRadius;
     const percent = Math.abs(ratio - 1) * 100;
     // M11: a rounded 0 % reads as a typo ("−0 %"), not as "these are the same size" -- say that plainly.
-    const sizeNote = percent < 0.5 ? '≈ same size' : `${ratio < 1 ? '−' : '+'}${Math.round(percent)} %`;
+    // Task 9b review M3: no-break spaces keep "%" and each "a₀" with its number when the fact wraps.
+    const sizeNote = percent < 0.5 ? '≈ same size' : `${ratio < 1 ? '−' : '+'}${Math.round(percent)}\u00A0%`;
     const picture = profileRelativity(profile);
     // Spec §3.1: both radii come from the picture's own mode (ruling C4), so a relativistic one says which.
-    return `neutral ${neutral}, drawn radius ${formatDrawnRadius(reference.displayRadius)} a₀ · `
-        + `${speciesSymbol(species)} ${formatDrawnRadius(profile.displayRadius)} a₀ (${sizeNote})`
+    return `neutral ${neutral}, drawn radius ${formatDrawnRadius(reference.displayRadius)}\u00A0a₀ · `
+        + `${speciesSymbol(species)} ${formatDrawnRadius(profile.displayRadius)}\u00A0a₀ (${sizeNote})`
         + (picture !== 'off' ? ` · both ${shortMethodLabel(picture)}` : '');
 }
 

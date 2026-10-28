@@ -83,13 +83,17 @@ describe('the "more below" cue on Info\'s scroller (Task 9b)', () => {
             return css.slice(at, css.indexOf('}', at));
         };
 
+        // Task 9b review I1: a mask covers the border box, so Info's fade keeps its last pixel -- the hairline under Info --
+        // opaque; the phone sheet's body has no border and fades to its edge.
+        const FADE_TO_EDGE = '[^,]+ calc\\(100% - 24px\\), transparent\\)';
+        const FADE_ABOVE_HAIRLINE = '[^,]+ calc\\(100% - 25px\\), transparent calc\\(100% - 1px\\), [^,]+ calc\\(100% - 1px\\)\\)';
         it.each([
-            ['src/shell/inspector.css', `.inspector-info.${MORE_BELOW}`],
-            ['src/style.css', `.phone-sheet-body.${MORE_BELOW}`],
-        ])('%s %s fades its bottom 24 px with a mask, tonal only', (path, selector) => {
+            ['src/shell/inspector.css', `.inspector-info.${MORE_BELOW}`, FADE_ABOVE_HAIRLINE],
+            ['src/style.css', `.phone-sheet-body.${MORE_BELOW}`, FADE_TO_EDGE],
+        ])('%s %s fades its bottom 24 px with a mask, tonal only', (path, selector, stops) => {
             const rule = ruleFor(sheet(path), selector);
-            expect(rule).toMatch(/(^|[^-])mask-image: linear-gradient\(to bottom, [^,]+ calc\(100% - 24px\), transparent\)/);
-            expect(rule).toMatch(/-webkit-mask-image: linear-gradient\(to bottom, [^,]+ calc\(100% - 24px\), transparent\)/);
+            expect(rule).toMatch(new RegExp(`(^|[^-])mask-image: linear-gradient\\(to bottom, ${stops}`));
+            expect(rule).toMatch(new RegExp(`-webkit-mask-image: linear-gradient\\(to bottom, ${stops}`));
             expect(rule).not.toMatch(/shadow|transition|animation|content:/);
             // No colour of its own: the mask only needs an opaque stop (the text colour) to fade to transparent.
             expect(rule).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);

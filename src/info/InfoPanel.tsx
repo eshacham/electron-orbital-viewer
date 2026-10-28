@@ -118,7 +118,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
             {entry ? (
                 <div className="info-body">
                     <button type="button" className="info-back" onClick={back} aria-label={`Back to ${spokenTitle}`}>
-                        <span aria-hidden="true">‹</span><span>Back to <span ref={backTitle}>{content.title}</span></span>
+                        <span><span aria-hidden="true">‹</span>{'\u00A0'}Back to <span ref={backTitle}>{content.title}</span></span>
                     </button>
                     <p className="info-text">{entry.plain}</p>
                     {technical && <p className="info-text">{entry.technical}</p>}

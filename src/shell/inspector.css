@@ -15,10 +15,11 @@
 /* Task 9b (finish review, fix 4): while more of Info is below its bottom edge (useMoreBelow's class), the last ~24 px
    fade out -- a tonal cue (DESIGN.md: depth is tonal first), the same in both themes: no shadow (none on Deep Space
    panels), no glow (none in Light Clean), no arrow or "More". The mask only needs an opaque stop, the text colour; it
-   is never animated, so reduced motion has nothing to stop. */
+   is never animated, so reduced motion has nothing to stop. Task 9b review I1: a mask covers the border box, so the
+   last pixel -- the hairline between Info and the accordion -- stays opaque, and the fade ends just above it. */
 .inspector-info.has-more-below {
-  -webkit-mask-image: linear-gradient(to bottom, currentColor calc(100% - 24px), transparent);
-  mask-image: linear-gradient(to bottom, currentColor calc(100% - 24px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, currentColor calc(100% - 25px), transparent calc(100% - 1px), currentColor calc(100% - 1px));
+  mask-image: linear-gradient(to bottom, currentColor calc(100% - 25px), transparent calc(100% - 1px), currentColor calc(100% - 1px));
 }
 /* Ruling R24-3: titled accordion sections, one open at a time. Every header stays in view; the open
    section takes the remaining height and scrolls inside itself (its body does not scroll a second time). */

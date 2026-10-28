@@ -24,23 +24,28 @@
   margin: 0; color: var(--ql-color-text-2);
   font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line);
 }
+/* Task 9c: one label inside -- the chevron held to "Back" by a no-break space -- so a long "‹ Back to …" wraps from the
+   left like the text around it, never centred and never leaving the chevron alone on its line. */
 .info-back {
   align-self: flex-start; padding: 0; margin: 0; border: 0; background: none; cursor: pointer;
   color: var(--ql-color-accent-text); font: 500 var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
-  min-height: 24px; display: inline-flex; align-items: center; gap: 4px;
+  min-height: 24px; display: inline-flex; align-items: center; text-align: left;
 }
 .info-back:hover { text-decoration: underline; }
 
 /* Key facts: label left, value right, tabular figures (DESIGN.md). Task 9b (finish review, fix 8): read as a table -- a
-   label never breaks ("Total energy", "Measured (NIST)", "HOMO–LUMO gap") and keeps a minimum width; the value takes
-   the rest of the row and wraps at its own spaces. Its minimum stays its longest unbreakable run (a flex item's own
-   min-content), so a value held on one line that cannot fit beside the label goes below it, whole, at the right. */
+   label keeps to one line ("Total energy", "Measured (NIST)", "HOMO–LUMO gap"); the value takes the rest of the row
+   and wraps at its own spaces. Its minimum stays its longest unbreakable run (a flex item's own min-content), so a
+   value held on one line that cannot fit beside the label goes below it, whole, at the right. Task 9b review I2/M3: the
+   label is as wide as its one line but never wider than the row, so it wraps only when it alone cannot fit ("Ionisation
+   energy (= electron affinity of Br)" ran out of the row under nowrap); no minimum width -- the value is right-aligned,
+   so a minimum drew no column and only took room from the value. */
 .info-facts { margin: 0; display: flex; flex-direction: column; gap: 2px; }
 .info-fact {
   display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 12px; row-gap: 0;
   font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line);
 }
-.info-fact dt { color: var(--ql-color-text-3); flex: none; white-space: nowrap; min-width: 5.5em; }
+.info-fact dt { color: var(--ql-color-text-3); flex: none; width: max-content; max-width: 100%; }
 .info-fact dd { margin: 0; color: var(--ql-color-text-1); text-align: right; flex: 1 1 0; }
 
 /* "How this was computed": folded below Research, open at Research. Its chevron follows the inspector's
@@ -70,7 +75,7 @@
 .info-button-glyph { width: 10px; height: 10px; fill: currentColor; }
 .info-button:hover { background: var(--ql-color-surface-2); }
 /* Task 9b (finish review, fix 6): pressed, it also wears Deep Space's selection halo (a token: none in Light Clean), so the
-   one pressed (i) among several resting ones is found at a glance. */
+   one pressed (i) among several resting ones is found at a glance -- the strip tile's soft glow (Task 9b review M7). */
 .info-button.is-active,
 .info-button.is-active:hover {
   background: var(--ql-color-selected-fill); border-color: var(--ql-color-selected-edge); color: var(--ql-color-on-fill);

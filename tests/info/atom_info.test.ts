@@ -355,7 +355,9 @@ describe('atomInfo (Task 6)', () => {
         // Fix round 1 (M8): a non-relativistic ring note ends at its size -- no "both …" method suffix (moved from
         // species_controls.test, "leaves a non-relativistic ring note as it was").
         const offRing = ion(1.6, 3.2).facts!.find(fact => fact.label === 'Dashed ring')!.value as string;
-        expect(offRing).toMatch(/\(−50 %\)$/);
+        // Task 9b review M3: the size change keeps its "%" (and each radius its unit), so a narrow Info never splits them.
+        expect(offRing).toMatch(/\(−50\u00A0%\)$/);
+        expect(offRing).toContain('3.20\u00A0a₀ · Na⁺ 1.60\u00A0a₀');
         expect(offRing).not.toMatch(/both /);
         // M11: a rounded zero reads as a typo; say the sizes are the same.
         const same = shownAt(ion(1.999, 2.0), 'explore');
