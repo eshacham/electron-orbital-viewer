@@ -33,7 +33,8 @@ const computed = () => screen.getByText('How this was computed').closest('detail
 describe('InfoPanel (Task 4)', () => {
     it('at Basics shows the title and the plain band only; facts from Explore hidden; computed folded', () => {
         renderAt('basics');
-        expect(screen.getByText('Carbon — 2p')).toBeInTheDocument();
+        // Task 9 review I3: the heading's hidden description repeats the title, so the visible title is the one asked for.
+        expect(screen.getByText('Carbon — 2p', { selector: '.info-title' })).toBeInTheDocument();
         expect(screen.getByText(content.plain as string)).toBeInTheDocument();
         expect(screen.queryByText(content.technical as string)).toBeNull();
         expect(screen.getByText('Electrons')).toBeInTheDocument();
@@ -222,7 +223,8 @@ describe('InfoPanel (Task 4)', () => {
             // without a word; the caption says it.
             fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));
             rerender(<PhoneInfo selectionKey="c" title="Carbon — 3s" />);
-            expect(screen.getByText('Carbon — 3s')).toBeInTheDocument();
+            // Task 9 review I3: the heading's hidden description repeats the title, so the visible title is the one asked for.
+            expect(screen.getByText('Carbon — 3s', { selector: '.info-title' })).toBeInTheDocument();
             expect(live()).toHaveTextContent(/^$/);
         });
 
@@ -262,6 +264,30 @@ describe('InfoPanel (Task 4)', () => {
             render(<Water />);
             fireEvent.click(screen.getByRole('button', { name: 'About Point group' }));
             expect(screen.getByRole('button', { name: 'Back to Water (H2O) — electron density' })).toBeInTheDocument();
+        });
+
+        // Task 9 review I3 (ruling 193): Back moves focus to Info's heading, so the heading must say what it is back to --
+        // its accessible description is the selection's title, with plain digits, while no topic is open.
+        it('lands Back on a heading that names the selection', () => {
+            const Water: React.FC = () => {
+                const { topic, setTopic } = useInfoTopic('water');
+                return (
+                    <InfoTopicProvider topic={topic} setTopic={setTopic}>
+                        <InfoButton topic="pointGroup" label="Point group" />
+                        <InfoPanel content={{ ...content, title: 'Water (H₂O) — 1b₁ orbital' }} topic={topic}
+                            onClearTopic={() => setTopic(null)} level="explore" />
+                    </InfoTopicProvider>
+                );
+            };
+            render(<Water />);
+            fireEvent.click(screen.getByRole('button', { name: 'About Point group' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Back to Water (H2O) — 1b1 orbital' }));
+            const heading = screen.getByRole('heading', { level: 2, name: 'Info' });
+            expect(heading).toHaveFocus();
+            expect(heading).toHaveAccessibleDescription('Water (H2O) — 1b1 orbital');
+            // While a topic is open the heading's chip names it, and the description is not the selection's.
+            fireEvent.click(screen.getByRole('button', { name: 'About Point group' }));
+            expect(screen.getByRole('heading', { level: 2 })).not.toHaveAttribute('aria-describedby');
         });
 
         it('going back to an earlier selection does not bring the old topic back', () => {

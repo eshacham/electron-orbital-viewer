@@ -20,17 +20,29 @@ export function useSettledText(settled: string | null): string {
 
 /**
  * A line said only when `text` changes while `key` stays the same (Atoms' relativity, keyed by the drawn species: a
- * new element's own default is not a change of relativity). The first text for a key is taken silently; null leaves
- * the line as it is.
+ * new element's own default is not a change of relativity). The first text for a key is taken silently.
+ *
+ * Task 9 review I1: a new key, or no text, empties the line. An emptied region says nothing, and the next change is
+ * then a real change of its text even when the words repeat (Scalar on gold, then Scalar on carbon) -- setting the
+ * same string again is a no-op React never renders. It also keeps a virtual cursor from finding the last element's
+ * relativity under the new one.
  */
 export function useChangeAnnouncement(text: string | null, key: string | null): string {
     const [spoken, setSpoken] = useState('');
     const last = useRef<{ key: string | null; text: string } | null>(null);
     useEffect(() => {
-        if (text === null) return;
         const previous = last.current;
+        if (text === null) {
+            // The last picture is still what the next one is compared with (a failed mode switch drops the profile).
+            setSpoken('');
+            return;
+        }
         last.current = { key, text };
-        if (previous && previous.key === key && previous.text !== text) setSpoken(text);
+        if (previous && previous.key === key) {
+            if (previous.text !== text) setSpoken(text);
+        } else {
+            setSpoken('');
+        }
     }, [text, key]);
     return spoken;
 }

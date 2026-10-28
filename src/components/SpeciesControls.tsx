@@ -16,6 +16,12 @@ interface SpeciesControlsProps {
      * everything shows.
      */
     level?: LearningLevel;
+    /**
+     * Task 9 review I2: whether the charge value is a polite status (true by default, as on a desktop). App turns it
+     * off on a phone, where the caption under the header names the new species once it is drawn -- the BondsPanel
+     * precedent -- so a charge change is heard once. The value stays visible either way.
+     */
+    announceStatus?: boolean;
 }
 
 const sameRef = (a: SubshellRef, b: SubshellRef): boolean => a.n === b.n && a.l === b.l;
@@ -26,7 +32,7 @@ const sameRef = (a: SubshellRef, b: SubshellRef): boolean => a.n === b.n && a.l 
  * (atomInfo) alone. Presentational: every change goes out through a callback.
  */
 const SpeciesControls: React.FC<SpeciesControlsProps> = ({
-    species, onChargeChange, onExcitationChange, unbound, level = 'research',
+    species, onChargeChange, onExcitationChange, unbound, level = 'research', announceStatus = true,
 }) => {
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const decreaseRef = useRef<HTMLButtonElement>(null);
@@ -64,7 +70,8 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
                     {/* No ripple: the theme's MuiButtonBase ring (focus-ring token, §13) shows keyboard focus. */}
                     <Button ref={decreaseRef} size="small" disableRipple aria-label="decrease charge" disabled={species.charge <= charges[0]}
                         onClick={handleDecrease}>−</Button>
-                    <span className="species-charge-value" aria-label="charge" role="status">
+                    {/* A generic span takes no name, so the label goes with the role. */}
+                    <span className="species-charge-value" {...(announceStatus ? { 'aria-label': 'charge', role: 'status' } : {})}>
                         {species.charge === 0 ? `${neutralSymbol} (neutral)` : speciesSymbol({ ...species, excitation: null })}
                     </span>
                     <Button ref={increaseRef} size="small" disableRipple aria-label="increase charge" disabled={species.charge >= charges[charges.length - 1]}

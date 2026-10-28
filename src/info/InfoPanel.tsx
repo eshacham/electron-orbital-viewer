@@ -46,11 +46,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
     // a new selection, whether or not a topic was open (fix round 1, M5).
     const lastSelection = useRef<string | null>(null);
     const backTitle = useRef<HTMLSpanElement>(null);
-    const backButton = useRef<HTMLButtonElement>(null);
     // Task 9 fix round 1: a provisional title (the selection still loading) was shown, and the real one has not yet been.
     const waitedFor = useRef(false);
     const provisional = Boolean(content.provisional) && !topic;
     const [announcement, setAnnouncement] = useState('');
+    // The selection's title as a reader is given it (plain digits, Task 8 ruling M6), read from the rendered title.
+    // Task 9 review I3/M5: it names the way back, and describes the heading that Back lands on.
+    const [spokenTitle, setSpokenTitle] = useState('');
+    const spokenTitleId = `${headingId}-selection`;
     // Review M1: an active (i) names Info's region in aria-controls only while Info is in the DOM.
     const registerInfo = context?.registerInfo;
     useLayoutEffect(() => registerInfo?.(), [registerInfo]);
@@ -64,8 +67,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
         backPressed.current = false;
         if (focusMoved) heading.current?.focus();
         // Task 9 fix round 1: the way back is named after the selection it returns to, with plain digits ("Back to Water
-        // (H2O) — electron density"); its visible text keeps the typeset title.
-        if (backButton.current) backButton.current.setAttribute('aria-label', `Back to ${spokenText(backTitle.current?.textContent ?? '')}`);
+        // (H2O) — electron density"); its visible text keeps the typeset title. Review I3: the heading Back lands on is
+        // described by the same words, so the reader hears what they came back to.
+        const selectionTitle = spokenText((title.current ?? backTitle.current)?.textContent ?? '');
+        if (selectionTitle !== spokenTitle) setSpokenTitle(selectionTitle);
         // Task 9 fix round 1: a stand-in title while the selection loads is never said, and the real one after it is said
         // once -- the screen-reader pass heard a molecule's first load as "Info: Water", then "Info: Water (H₂O) — …".
         if (provisional) {
@@ -101,15 +106,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
         <section id={regionId} className="info-section" aria-labelledby={headingId}>
             <p className="visually-hidden" aria-live="polite" aria-atomic="true">{announcement}</p>
             <div className="info-head">
-                <h2 id={headingId} ref={heading} className="ql-section info-heading" tabIndex={-1}>
+                <h2 id={headingId} ref={heading} className="ql-section info-heading" tabIndex={-1}
+                    aria-describedby={entry ? undefined : spokenTitleId}>
                     Info
                     {entry && <>{' '}<span className="info-topic-chip">{entry.title}</span></>}
                 </h2>
+                {/* Hidden, yet read as the heading's description: the visible title below holds Unicode subscripts. */}
+                {!entry && <span id={spokenTitleId} hidden>{spokenTitle}</span>}
                 {!entry && <p ref={title} className="info-title">{content.title}</p>}
             </div>
             {entry ? (
                 <div className="info-body">
-                    <button ref={backButton} type="button" className="info-back" onClick={back}>
+                    <button type="button" className="info-back" onClick={back} aria-label={`Back to ${spokenTitle}`}>
                         <span aria-hidden="true">‹</span><span>Back to <span ref={backTitle}>{content.title}</span></span>
                     </button>
                     <p className="info-text">{entry.plain}</p>

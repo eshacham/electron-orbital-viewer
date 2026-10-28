@@ -586,7 +586,8 @@ describe('App', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
         const panel = screen.getByRole('tabpanel');
         expect(within(panel).getByRole('heading', { level: 2, name: 'Info' })).toBeInTheDocument();
-        expect(within(panel).getByText('Hydrogen — whole atom')).toBeInTheDocument();
+        // Task 9 review I3: the heading's hidden description repeats the title, so the visible title is the one asked for.
+        expect(within(panel).getByText('Hydrogen — whole atom', { selector: '.info-title' })).toBeInTheDocument();
     });
 
     // Task 6 (Task 4 review ruling): an Atoms (i) on a phone switches the sheet to the Info tab on its term; pressing
@@ -2540,10 +2541,33 @@ describe('App: relativity', () => {
             expect(live).toHaveTextContent(/^Relativity: with spin–orbit$/);
             // The caption's spoken copy did not change: the change is heard once.
             expect(container.querySelector('.phone-caption-live')!.textContent).toBe(caption);
-            // Another element is not a relativity change (its own default): the line stays as it was.
+            // Another element is not a relativity change (its own default), so nothing is said -- and the line is cleared
+            // (Task 9 review I1: a virtual cursor must not find "with spin–orbit" under argon's non-relativistic picture).
             act(() => { store.dispatch(setElement(18)); });
             act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
-            expect(live).toHaveTextContent(/^Relativity: with spin–orbit$/);
+            expect(container.querySelector('.relativity-live')).toBe(live);
+            expect(live).toHaveTextContent(/^$/);
+        });
+
+        // Task 9 review I1: the same words on a new element are still a change. Off → Scalar on gold, then carbon (its own
+        // default, off: silent), then Scalar on carbon -- "Relativity: scalar relativistic" again, and it must be heard.
+        it('says Scalar on carbon after Scalar on gold: a new element starts its line afresh', () => {
+            installMatchMedia(false);
+            const offGold = (): SerialisedAtomProfile => ({ ...scalarGold(), relativity: 'off' });
+            const carbon = (relativity: 'off' | 'scalar'): SerialisedAtomProfile => ({ ...argonLikeProfile(), Z: 6, speciesKey: '6', relativity });
+            const { container, store } = renderWithProvider(<App />, {
+                mode: 'atom', Z: 79, relativityOverride: 'off', profile: offGold(),
+            });
+            const live = container.querySelector('.relativity-live')!;
+            expect(live).toHaveTextContent(/^$/);
+            act(() => { store.dispatch(solveSucceeded(scalarGold())); });
+            expect(live).toHaveTextContent(/^Relativity: scalar relativistic$/);
+            act(() => { store.dispatch(setElement(6)); });
+            act(() => { store.dispatch(solveSucceeded(carbon('off'))); });
+            expect(live).toHaveTextContent(/^$/);
+            act(() => { store.dispatch(solveSucceeded(carbon('scalar'))); });
+            expect(container.querySelector('.relativity-live')).toBe(live);
+            expect(live).toHaveTextContent(/^Relativity: scalar relativistic$/);
         });
 
         it('has the one spoken line on a desktop too, quiet on first load; Info shows the readout', () => {
@@ -2865,6 +2889,22 @@ describe('App: what is drawn, named (Task 8)', () => {
             expect(caption()).toHaveTextContent(/^Argon 2px · 90 % enclosed$/);
             expect(document.querySelector('.info-section')).toHaveTextContent('Argon — 2px orbital');
             expect(infoLive()).toHaveTextContent(/^$/);
+        });
+
+        // Task 9 review I2: on a phone a charge change is the caption's to say, once. The stepper's value stays visible
+        // but is not a second status region (Task 8's caption made it a double: "C⁺", then the caption).
+        it('says a charge change once on a phone: from the caption, not the charge stepper', () => {
+            const { store } = open('#mode=atom&Z=6&level=atom', true);
+            const carbon = (charge: number): SerialisedAtomProfile =>
+                ({ ...argonLikeProfile(), Z: 6, speciesKey: charge ? `6+${charge}` : '6' });
+            act(() => { store.dispatch(solveSucceeded(carbon(0))); });
+            fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+            fireEvent.click(screen.getByRole('button', { name: 'increase charge' }));
+            act(() => { store.dispatch(solveSucceeded(carbon(1))); });
+            expect(document.querySelector('.species-charge-value')).toHaveTextContent('C⁺');
+            expect(document.querySelector('.species-charge-value')).not.toHaveAttribute('role');
+            expect(document.querySelector('[aria-label="charge"][role="status"]')).toBeNull();
+            expect(spoken()).toHaveTextContent(/^Carbon ion C⁺ · electron density$/);
         });
 
         // Ruling M4 (fix round 1): the whole atom's caption says what is drawn of it.

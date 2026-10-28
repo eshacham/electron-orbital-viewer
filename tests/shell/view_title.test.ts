@@ -1,6 +1,6 @@
 import { drillToOrbital, drillToShell, drillToSubshell, setMode } from '../../src/store/atomSlice';
 import { setCombination, setEnclosedFraction } from '../../src/store/orbitalSlice';
-import { viewCaption, viewTitle } from '../../src/shell/view_title';
+import { captionIsLoading, viewCaption, viewTitle } from '../../src/shell/view_title';
 import { selectBondsSystem, setBondsView } from '../../src/store/bondsSlice';
 import { indexLoaded } from '../../src/store/moleculeSlice';
 import { selectMolecule, metaLoaded, setSurface, setRepresentation, setShowDipole, renderStarted, renderFinished } from '../../src/store/moleculeSlice';
@@ -104,6 +104,21 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
             store.dispatch(drillToOrbital(2, 1, 0));
             expect(viewCaption(store.getState(), { loading: false })).toEqual({ name: 'Neon 2p_z', qualifier: '90 % enclosed' });
             expect(viewCaption(store.getState(), { loading: true })).toEqual({ name: 'Neon 2p_z', qualifier: 'loading…' });
+        });
+
+        // Task 9 review M3: whether a caption waits for its view is the caption module's to say, not a match on its words
+        // in App -- a qualifier that keeps its kind ("electron density · loading…") waits too; "not loaded" does not.
+        it('says whether a caption is waiting for its view', () => {
+            const store = neonStore();
+            expect(captionIsLoading(viewCaption(store.getState(), { loading: true }))).toBe(true);
+            expect(captionIsLoading(viewCaption(store.getState(), { loading: false }))).toBe(false);
+            store.dispatch(setMode('molecule'));
+            store.dispatch(indexLoaded([{ id: 'h2o', name: 'Water', formula: 'H2O', category: 'small' } as never]));
+            store.dispatch(selectMolecule({ id: 'h2o' }));
+            // A molecule whose meta has not landed waits, whatever the canvas says.
+            expect(captionIsLoading(viewCaption(store.getState(), { loading: false }))).toBe(true);
+            store.dispatch(setMode('bonds'));
+            expect(captionIsLoading(viewCaption(store.getState(), { loading: false, failed: true }))).toBe(false);
         });
 
         it('names an ion as its species', () => {

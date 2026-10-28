@@ -58,7 +58,8 @@ describe('InfoButton (Task 4)', () => {
         expect(orbital()).toHaveAttribute('aria-pressed', 'false');
         expect(shell()).toHaveAttribute('aria-pressed', 'false');
         expect(chip()).toBeNull();
-        expect(screen.getByText('Carbon — 2p')).toBeInTheDocument();
+        // Task 9 review I3: the heading's hidden description repeats the title, so the visible title is the one asked for.
+        expect(screen.getByText('Carbon — 2p', { selector: '.info-title' })).toBeInTheDocument();
     });
 
     // Review I4 (WAI-ARIA toggle button): opening a topic moves focus to Info's heading; pressing the active (i) to
@@ -117,7 +118,8 @@ describe('InfoButton (Task 4)', () => {
         expect(shell()).toHaveAttribute('aria-pressed', 'false');
         expect(orbital()).toHaveAttribute('aria-pressed', 'false');
         expect(chip()).toBeNull();
-        expect(within(screen.getByRole('region', { name: 'Info' })).getByText('Carbon — 2p')).toBeInTheDocument();
+        // Task 9 review I3: the heading's hidden description repeats the title, so the visible title is the one asked for.
+        expect(within(screen.getByRole('region', { name: 'Info' })).getByText('Carbon — 2p', { selector: '.info-title' })).toBeInTheDocument();
     });
 });
 

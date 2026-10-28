@@ -221,6 +221,14 @@ function moleculeCaption(state: RootState, { loading }: ViewCaptionStatus): View
     return { name: meta.name, qualifier: loading ? loadingAfter(kind) : kind };
 }
 
+/**
+ * Whether a caption names a view still being waited for ("loading…", alone or after the kind of surface) -- Task 9
+ * review M3: App's spoken copy holds the last view that is not, and asks here rather than matching the words.
+ */
+export function captionIsLoading(caption: ViewCaption): boolean {
+    return caption.qualifier === LOADING || caption.qualifier.endsWith(` · ${LOADING}`);
+}
+
 /** The phone caption's two halves for the view on screen (or, while it loads, the view asked for). */
 export function viewCaption(state: RootState, status: ViewCaptionStatus): ViewCaption {
     switch (state.atom.mode) {

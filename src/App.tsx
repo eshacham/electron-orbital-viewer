@@ -150,7 +150,7 @@ import { thumbLookKey, thumbTileDevicePx } from './thumbs/thumb_key';
 import { useDevicePixelRatio } from './thumbs/useDevicePixelRatio';
 import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
 import FirstViewHint from './shell/FirstViewHint';
-import { viewCaption, viewTitle } from './shell/view_title';
+import { captionIsLoading, viewCaption, viewTitle } from './shell/view_title';
 import { withSubscripts } from './format/subscripts';
 import { flatSubscripts, spokenText } from './format/sci';
 import { useDocumentTitle } from './shell/useDocumentTitle';
@@ -1265,11 +1265,13 @@ function App() {
     // up), the view asked for, "loading…". Typeset by the same helper as the canvas title.
     const viewCaptionText = useAppSelector(
         state => viewCaption(state, { loading: canvasBusyLabel !== null, failed: isBondsMode && Boolean(bondsData.error) }), shallowEqual);
-    // Task 9 fix round 1 (the screen-reader pass): the caption is seen at once, "loading…" included, but said once a view
-    // has settled -- a load used to be heard up to four times ("Molecule · loading…", the molecule, "· loading…", the
-    // molecule) and a relativity re-solve twice. The visible caption is hidden from the tree; its spoken copy, a polite
-    // region mounted with the caption, holds the last settled view, the name with plain digits (Task 8 ruling M6).
-    const captionSettled = /loading…/.test(viewCaptionText.qualifier) ? null
+    // Task 9 fix round 1 (the screen-reader pass): the caption is seen at once, "loading…" included, but said only when
+    // it is not waiting -- a load used to be heard up to four times ("Molecule · loading…", the molecule, "· loading…",
+    // the molecule) and a relativity re-solve twice. The visible caption is hidden from the tree; its spoken copy, a
+    // polite region mounted with the caption, holds the last caption not waiting, the name with plain digits (Task 8
+    // ruling M6). Review M3: "not waiting" is the canvas's busy label being down, so in the short debounce before it goes
+    // up a new selection's caption is said once, just before its picture is drawn; it is still said once.
+    const captionSettled = captionIsLoading(viewCaptionText) ? null
         : `${spokenText(viewCaptionText.name)} · ${viewCaptionText.qualifier}`;
     const captionSpoken = useSettledText(captionSettled);
     const phoneCaption = isNarrow && (
@@ -1360,6 +1362,7 @@ function App() {
             onExcitationChange={handleExcitationChange}
             unbound={atomUnbound}
             level={level}
+            announceStatus={!isNarrow}
         />
     );
 
