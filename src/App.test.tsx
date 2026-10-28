@@ -2710,6 +2710,31 @@ describe('learning levels (Task 2)', () => {
         expect(screen.queryByText(/Opened at Advanced/)).toBeNull();
     });
 
+    // Final review (unverified item, checked): below Advanced a held charge or excitation has no control on screen;
+    // the held-value line carries a one-press way back to the neutral ground state, as Ruling T2-I1 gave combinations.
+    it('below Advanced, a held ion\'s line offers the neutral atom, and one press shows it', async () => {
+        const { store } = renderWithProvider(<App />);
+        act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
+        await waitFor(() => expect(store.getState().atom.charge).toBe(2));
+        // At Advanced its controls are on screen, so there is no held-value line and no extra way back.
+        expect(screen.queryByRole('button', { name: 'Show the neutral atom' })).toBeNull();
+        fireEvent.click(screen.getByRole('radio', { name: 'Basics' }));
+        expect(screen.getByText(/Showing Fe²⁺ — charge controls appear at Advanced/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Show the neutral atom' }));
+        expect(store.getState().atom).toMatchObject({ Z: 26, charge: 0, excitation: null });
+        expect(screen.queryByText(/Showing Fe²⁺/)).toBeNull();
+        expect(screen.getByText('Charge, excitation and relativity appear at Advanced')).toBeInTheDocument();
+    });
+
+    it('below Advanced, a held excitation\'s line offers the ground state, and one press shows it', async () => {
+        const { store } = renderWithProvider(<App />);
+        act(() => { window.location.hash = '#mode=atom&Z=11&excite=3s-3p'; });
+        await waitFor(() => expect(store.getState().atom.excitation).not.toBeNull());
+        fireEvent.click(screen.getByRole('radio', { name: 'Explore' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Show the ground state' }));
+        expect(store.getState().atom).toMatchObject({ Z: 11, charge: 0, excitation: null });
+    });
+
     // Fix round 1 (M5): an informational notice, heard politely; its dismissal belongs to the one link.
     it('says the raise politely, and a later link to the same level says so again after a dismissal', async () => {
         const { store } = renderWithProvider(<App />);

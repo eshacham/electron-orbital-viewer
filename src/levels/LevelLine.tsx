@@ -9,6 +9,11 @@ export interface HeldValue {
     what: string;
     /** The controls it is set with, in "<control> controls appear at …". */
     control: string;
+    /**
+     * A one-press way back to the default while its control is hidden (final review; Ruling T2-I1 gave combinations
+     * theirs): Atoms' held charge or excitation offers the neutral ground state.
+     */
+    action?: { label: string; onPress(): void };
 }
 
 interface LevelLineProps {
@@ -33,10 +38,20 @@ const LevelLine: React.FC<LevelLineProps> = ({ level, ids, held = [] }) => {
     const notes = held
         .filter((value): value is HeldValue => Boolean(value))
         .filter(value => !atLeast(level, CONTROL_LEVEL[value.id]))
-        .map(value => hiddenValueNote(value.what, value.control, CONTROL_LEVEL[value.id]));
-    const lines = notes.length > 0 ? notes : [levelPointer(ids, level)].filter((line): line is string => line !== null);
+        .map(value => ({ line: hiddenValueNote(value.what, value.control, CONTROL_LEVEL[value.id]), action: value.action }));
+    const pointer = levelPointer(ids, level);
+    const lines = notes.length > 0 ? notes : pointer ? [{ line: pointer, action: undefined }] : [];
     if (lines.length === 0) return null;
-    return <>{lines.map(line => <p key={line} className="ql-caption level-line">{line}</p>)}</>;
+    return (
+        <>
+            {lines.map(({ line, action }) => (
+                <p key={line} className="ql-caption level-line">
+                    {action ? <span>{line}</span> : line}
+                    {action && <>{' '}<button type="button" className="level-line-action" onClick={action.onPress}>{action.label}</button></>}
+                </p>
+            ))}
+        </>
+    );
 };
 
 export default LevelLine;

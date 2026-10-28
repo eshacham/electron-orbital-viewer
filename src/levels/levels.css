@@ -42,6 +42,12 @@
 
 /* The quiet line where hidden controls would be. */
 .level-line { margin: 4px 0 0; color: var(--ql-color-text-3); }
+/* Its way back to the default (Atoms' held ion: "Show the neutral atom") -- a text action in the accent, as Info's Back. */
+.level-line-action {
+  padding: 0; margin: 0; border: 0; background: none; cursor: pointer;
+  color: var(--ql-color-accent-text); font: inherit; font-weight: 500; text-align: left;
+}
+.level-line-action:hover { text-decoration: underline; }
 
 /* The visit notice (an MUI info Alert): its own row under the top bar (AppShell's notice slot); on a phone, its
    own room under the header (PhoneNoticeSlot), the overlays there moved down below it. */

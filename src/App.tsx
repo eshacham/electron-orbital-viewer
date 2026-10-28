@@ -1431,11 +1431,17 @@ function App() {
     );
     // Task 2: under Configuration, where Charge, Excite and Relativity appear (Advanced) -- or, while one of them
     // still holds a value off its default (a link's Fe²⁺), what the picture keeps showing (ruling PF1).
+    // Final review (unverified item, checked): re-picking the element was the only way back to the neutral ground state
+    // below Advanced, and nothing said so -- the line carries it, one press, as Ruling T2-I1's chips do for combinations.
     const configurationLine = isAtomMode && (
         <LevelLine level={level} ids={['charge', 'excite', 'relativity']} held={[
             !isNeutralGround(species) && {
                 id: species.charge !== 0 ? 'charge' : 'excite', control: species.charge !== 0 ? 'charge' : 'excitation',
                 what: speciesSymbol(species),
+                // A charge step to 0 also clears an excitation (atomSlice.setCharge).
+                action: species.charge !== 0
+                    ? { label: 'Show the neutral atom', onPress: () => handleChargeChange(0) }
+                    : { label: 'Show the ground state', onPress: () => handleExcitationChange(null) },
             },
             !relativityIsDefault && { id: 'relativity', control: 'relativity', what: RELATIVITY_SHOWN[relativity] },
         ]} />
