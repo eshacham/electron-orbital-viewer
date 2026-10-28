@@ -514,7 +514,13 @@ Every sentence is classified below. A sentence shared by several scenes is liste
   main-side auto entries "|ψ|² = 1.22e-3" and the like are not counted here: they gained a unit, so they are (b) (Task 9
   review M1).
 - **(b):** 112 main-only and 232 branch-only, plus those 8. Each is in the table, or in the three Bonds changes below.
-- **(c): 9** (5 main-only and 4 branch-only), in three findings. They are listed under (c) and reported, not fixed.
+- **(c): 0 after fix round 1.** The first classification found 9 lines in 3 findings (5 main-only, 4 branch-only).
+  The controller ruled on all three (ledger 231–233). Fix round 1 then fixed two of them and re-ran the diff for the
+  four scenes involved. See "(c) and fix round 1" below.
+  - Net change: the 3 combination iso values are now found on the branch with their unit. The script lists them as
+    auto-(a), and they are (b) here, like the other 8.
+  - The 4 ΔSCF lines are gone.
+  - The 2 Cl⁻ cut lines are (b) by ruling.
 
 ### (a) Typography
 - **Auto (354):**
@@ -616,7 +622,29 @@ then ruled them (retroactive ruling, ledger lines 185–189). He₂'s and H₂�
    - Dropping "beside the orbitals" is the position-word rule (task-6-review.md:189).
    - The clause is ruled at line 188: it is the enclosed helper's move.
 
-### (c) Unexplained — reported, not fixed (9 lines, 3 findings)
+### (c) and fix round 1 — **(c) = 0**
+The first classification reported the three findings below. The controller ruled on each:
+- ruling c1 is ledger 231;
+- ruling c2 is ledger 232;
+- ruling c3 is ledger 233.
+
+Fix round 1 (`3f9d2d6`) then re-ran `science_diff.mjs` for the four scenes involved: basic-stark-n2, basic-field-n1,
+basic-sp3 and cl-anion. That run was dark, desktop and phone, at Research, 16 shots, 0 errors (`/tmp/lv9cr1-scidiff.txt`).
+- **1 → (b), fixed.** The field and hybrid views now give Info's "Iso value" fact from Advanced. The value is the one
+  the picture is drawn at, once that combination has landed.
+  - The re-run reads "|ψ|² = 8.15 × 10⁻⁵ a₀⁻³", "1.55 × 10⁻³ a₀⁻³" and "8.85 × 10⁻⁵ a₀⁻³", the same values main shows,
+    now with their unit.
+  - The ★ `enclosedNote` field reads them too.
+  - Basis: ruling c1 (ledger 231), and the unit (ledger 74).
+- **2 → (b), accepted.** With nothing drawn, there is nothing to cut. Ruling c2 (ledger 232). The two main-only lines
+  remain in the re-run, as ruled.
+- **3 → fixed.** With nothing drawn, the ΔSCF paragraph appears only if Info shows an energy it explains. Cl⁻ shows
+  none, so the paragraph is gone, and none of its 4 lines is in the re-run. When there is no picture and an energy is
+  shown, the wording names the method alone (`deltaScfMethod(null)`). Ruling c3 (ledger 233).
+
+Every other line of the re-run is a row above, unchanged.
+
+The first report's three findings, as they stood:
 1. **A combination's iso value has no home** (3 main-only lines).
    - Main shows the contour's value under Electron enclosed in the field and hybrid views: "|ψ|² = 8.15e-5"
      (basic-stark-n2), "|ψ|² = 1.55e-3" (basic-field-n1) and "|ψ|² = 8.85e-5" (basic-sp3).
