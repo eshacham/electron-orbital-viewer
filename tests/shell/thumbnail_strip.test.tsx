@@ -85,6 +85,17 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
         expect(document.activeElement).toBe(screen.getByRole('option', { name: '2px orbital' }));
     });
 
+    // M6 (Task 1 review): `collapsible={false}` (Orbitals) had no unit test of its own, only through App --
+    // the listbox always shows, and no handle renders, even while `collapsed` is true and `onCollapsedChange` is
+    // given (the shared preference some other mode may have set, which Orbitals must still ignore).
+    it('with collapsible={false}, the listbox always shows and no handle renders, even while collapsed', () => {
+        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()}
+            collapsible={false} collapsed onCollapsedChange={jest.fn()} />);
+        expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Hide orbitals' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Show orbitals' })).not.toBeInTheDocument();
+    });
+
     // Task 18's keyboard walk: Chrome moves its sequential focus starting point to
     // whatever scrollIntoView scrolls to, so the first Tab on a fresh page (and after
     // every pick) skipped the top bar, rail and Explore and landed after the strip.
@@ -112,6 +123,79 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
             rects.mockRestore();
             width.mockRestore();
             Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+            Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
+        }
+    });
+
+    // Task 2 (picture control), opt-in: `groupScroll` (Orbitals only) adds the sideways scroll-snap classes and
+    // the tonal cue's has-more-before/has-more-after (useMoreSideways); every other strip (Atoms, Bonds,
+    // Molecules) never passes it, so none of these classes may appear there.
+    it('with groupScroll, the list gets has-more-before/has-more-after and groups get strip-group-snap; without it, neither appears', () => {
+        const { rerender } = render(
+            <ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} groupScroll />
+        );
+        const list = screen.getByRole('listbox', { name: 'orbitals in view' });
+        expect(list).toHaveClass('group-scroll');
+        expect(list).not.toHaveClass('has-more-before');
+        expect(list).not.toHaveClass('has-more-after');
+        for (const group of screen.getAllByRole('group')) expect(group).toHaveClass('strip-group-snap');
+
+        Object.defineProperty(list, 'scrollWidth', { configurable: true, get: () => 800 });
+        Object.defineProperty(list, 'clientWidth', { configurable: true, get: () => 300 });
+        list.scrollLeft = 0;
+        fireEvent.scroll(list);
+        expect(list).toHaveClass('has-more-after');
+        expect(list).not.toHaveClass('has-more-before');
+
+        // Without groupScroll (every other strip): none of these classes appear, even with the same overflow.
+        rerender(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
+        const plain = screen.getByRole('listbox', { name: 'orbitals in view' });
+        expect(plain).not.toHaveClass('group-scroll');
+        Object.defineProperty(plain, 'scrollWidth', { configurable: true, get: () => 800 });
+        Object.defineProperty(plain, 'clientWidth', { configurable: true, get: () => 300 });
+        plain.scrollLeft = 0;
+        fireEvent.scroll(plain);
+        expect(plain).not.toHaveClass('has-more-before');
+        expect(plain).not.toHaveClass('has-more-after');
+        expect(screen.getAllByRole('group').some(group => group.classList.contains('strip-group-snap'))).toBe(false);
+    });
+
+    // Review Focus 2: n = 9 is 81 tiles (basicStripItems). The selected tile (here the very last one) must still
+    // scroll into view (the existing effect above, unaffected by groupScroll) and the arrow keys and End must
+    // still reach it.
+    it('Review Focus 2: n = 9 (81 tiles), the selected last tile scrolls into view, and ArrowRight/End reach it', () => {
+        const scrollTo = jest.fn();
+        Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo });
+        const width = jest.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+            return this.getAttribute('role') === 'listbox' ? 300 : 0;
+        });
+        const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            const at = (left: number, width: number) => ({ left, width, right: left + width, top: 0, bottom: 72, height: 72, x: left, y: 0, toJSON: () => ({}) }) as DOMRect;
+            if (this.getAttribute('role') === 'listbox') return at(0, 300);
+            if (this.getAttribute('aria-selected') === 'true') return at(6000, 72);
+            return at(0, 0);
+        });
+        try {
+            // Last in iteration order: n = 9, l = 8 (the highest subshell), mₗ = 8 (the highest within it).
+            const n9 = basicStripItems({ selection: { n: 9, l: 8, ml: 8 }, enclosedFraction: 0.9 });
+            expect(n9).toHaveLength(81);
+            render(<ThumbnailStrip items={n9} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} groupScroll />);
+            expect(scrollTo).toHaveBeenCalled();
+            const [{ left }] = scrollTo.mock.calls.at(-1)!;
+            expect(left).toBeGreaterThan(0);
+
+            const options = screen.getAllByRole('option');
+            expect(options).toHaveLength(81);
+            options[0].focus();
+            fireEvent.keyDown(options[0], { key: 'End' });
+            expect(document.activeElement).toBe(options[options.length - 1]);
+
+            options[options.length - 2].focus();
+            fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
+            expect(document.activeElement).toBe(options[options.length - 1]);
+        } finally {
+            rects.mockRestore();
+            width.mockRestore();
             Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
         }
     });

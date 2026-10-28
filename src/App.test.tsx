@@ -1411,14 +1411,24 @@ describe('App', () => {
         expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Hide orbitals' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Show orbitals' })).not.toBeInTheDocument();
+
+        // M5 (Task 1 review): the shared preference itself is untouched by the visit -- switching back to Atoms
+        // finds its strip exactly as it was left, still collapsed, not reopened by Orbitals never reading it.
+        fireEvent.click(screen.getByRole('link', { name: /atom mode/i }));
+        expect(screen.queryByRole('listbox', { name: 'orbitals in view' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Show orbitals' })).toBeInTheDocument();
     });
 
     // Review Focus 3: at Advanced, the Subshell/Orbital chips used to be the only other picker, and they wait
     // disabled while a combination is drawn (chipsFrozen) -- so a chip press could never reach this case. The strip
     // is never frozen, so it is now the one way a pick can land while a combination is active at Advanced+, and it
     // must leave the combination exactly as a below-Advanced chip press did (ruling T2-I1), not draw over it.
-    it('Review Focus 3: at Advanced, a strip pick while an n = 2 Stark combination is active clears it and selects {n:2, l:1, ml:1}', () => {
-        const { store } = renderWithProvider(<App />); // The outer describe's beforeEach sets eov.level to research (Advanced+).
+    // M4 (Task 1 review): runs at Advanced itself (not Research, which the outer describe sets by default), and
+    // asserts the orbital is actually drawn (currentField cleared, currentParams the picked orbital), as the
+    // T2-I1 test (below Advanced) does -- not state alone.
+    it('Review Focus 3: at Advanced, a strip pick while an n = 2 Stark combination is active clears it, selects {n:2, l:1, ml:1} and draws it', () => {
+        window.localStorage.setItem('eov.level', 'advanced');
+        const { store } = renderWithProvider(<App />);
         act(() => { store.dispatch(setBasicSelection({ n: 2, l: 0, ml: 0 })); });
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
 
@@ -1428,9 +1438,15 @@ describe('App', () => {
         expect(store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
 
         const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
+        // M3 (Task 1 review, ruled): while the combination is drawn, no tile in the strip shows selected -- the
+        // combination is what is drawn, not any one orbital.
+        expect(within(strip).queryAllByRole('option', { selected: true })).toHaveLength(0);
+
         fireEvent.click(within(strip).getByRole('option', { name: '2px orbital' }));
         expect(store.getState().orbital.combination.kind).toBe('none');
         expect(store.getState().orbital.basicSelection).toEqual({ n: 2, l: 1, ml: 1 });
+        expect(store.getState().orbital.currentField).toBeNull();
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
     });
 });
 

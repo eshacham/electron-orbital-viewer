@@ -10,6 +10,7 @@ import { CPK_COLORS } from '../molecules/ball_and_stick';
 import { TOKENS } from '../design/tokens';
 import type { StripItem } from '../thumbs/strip_items';
 import { useRovingFocus } from './useRovingFocus';
+import { useMoreSideways } from './useMoreSideways';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { withSubscripts } from '../format/subscripts';
 import './strip.css';
@@ -42,6 +43,13 @@ interface ThumbnailStripProps<T = NavigationTarget> {
     handleNoun?: string;
     /** Labels that are words ("Electrostatic potential", Task 15) wrap to two centred lines, as the phone sheet's do. */
     wrapLabels?: boolean;
+    /**
+     * Task 2 (picture control), opt-in: the list scrolls one subshell group at a time -- `scroll-snap-type: x
+     * proximity` on the list, `scroll-snap-align: start` on each group (strip.css) -- with a sideways tonal cue
+     * (DESIGN.md "Tonal Scroll Cue Rule", turned sideways; useMoreSideways) on whichever edge has more off
+     * screen. Orbitals passes it; default `false` leaves Atoms, Bonds and Molecules exactly as they were.
+     */
+    groupScroll?: boolean;
 }
 
 /**
@@ -179,14 +187,16 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
 /**
  * The thumbnail strip (spec §8.5 bottom zone, §9.1 "Strip", §13): a
  * listbox of labelled options, grouped by subshell, arrow keys inside and
- * Tab out, collapsible to a 28 px handle.
+ * Tab out, collapsible to a 28 px handle -- unless `collapsible={false}`
+ * (Orbitals, Task 1), which shows no handle and is never collapsed. Task 2,
+ * opt-in: `groupScroll` scrolls by subshell group with a sideways cue.
  */
 // A plain generic function (not React.FC<...>, which cannot carry a type
 // parameter): T is whatever StripItem<T> the caller's items are in -- the
 // Atom strip's NavigationTarget (the default) or Basic Orbitals' BasicSelection.
 function ThumbnailStrip<T = NavigationTarget>({
     items, label, rGrid, themeKey, onSelect, variant = 'overlay', collapsed = false, onCollapsedChange, collapsible = true,
-    handleNoun = 'orbitals', wrapLabels = false,
+    handleNoun = 'orbitals', wrapLabels = false, groupScroll = false,
 }: ThumbnailStripProps<T>) {
     const listRef = useRef<HTMLDivElement>(null);
     const listId = useId();
@@ -195,6 +205,8 @@ function ThumbnailStrip<T = NavigationTarget>({
     const effectiveCollapsed = collapsible && collapsed;
     // Ruling DX2: the listbox mounts only while expanded, so `collapsed` re-attaches the roving focus to it.
     useRovingFocus(listRef, { selector: '[role="option"]', orientation: 'horizontal' }, effectiveCollapsed);
+    // Task 2: always called (hooks run unconditionally); its classes only reach the DOM while `groupScroll` is on.
+    const { before, after } = useMoreSideways(listRef);
     const px = variant === 'sheet' ? 56 : 72;
 
     // Bring the shown orbital into view (instant under reduced motion: §4.7)
@@ -234,9 +246,11 @@ function ThumbnailStrip<T = NavigationTarget>({
                 </button>
             )}
             {!effectiveCollapsed && (
-                <div id={listId} ref={listRef} className="strip-list" role="listbox" aria-label={label} aria-orientation="horizontal">
+                <div id={listId} ref={listRef} role="listbox" aria-label={label} aria-orientation="horizontal"
+                    className={`strip-list${groupScroll ? ' group-scroll' : ''}${groupScroll && before ? ' has-more-before' : ''}${groupScroll && after ? ' has-more-after' : ''}`}>
                     {groups.map((group, index) => (group.label ? (
-                        <div key={`${group.label}-${index}`} role="group" aria-label={group.spoken ?? group.label} className="strip-group">
+                        <div key={`${group.label}-${index}`} role="group" aria-label={group.spoken ?? group.label}
+                            className={`strip-group${groupScroll ? ' strip-group-snap' : ''}`}>
                             <span className="strip-group-label" aria-hidden="true">{group.label}</span>
                             <div className="strip-group-tiles">{group.items.map(tile)}</div>
                         </div>

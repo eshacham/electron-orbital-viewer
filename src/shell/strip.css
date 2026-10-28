@@ -20,6 +20,26 @@
   scrollbar-width: thin;
 }
 @media (prefers-reduced-motion: no-preference) { .strip-list { scroll-behavior: smooth; } }
+/* Task 2 (picture control), opt-in (ThumbnailStrip's `groupScroll`, Orbitals only): the list scrolls one subshell
+   group at a time -- proximity, not mandatory, so a drag can still stop between groups -- and each group snaps to
+   its start edge. Native snap, not an animation, so reduced motion has nothing to stop. */
+.strip-list.group-scroll { scroll-snap-type: x proximity; }
+.strip-group.strip-group-snap { scroll-snap-align: start; }
+/* The sideways twin of the Tonal Scroll Cue Rule (DESIGN.md): the ~24 px edge with more tiles off screen fades,
+   tonal only -- no shadow, arrow or "More" label -- set from useMoreSideways's has-more-before/has-more-after,
+   the list's own scroll position. Never animated, so reduced motion has nothing to stop; the same in both themes. */
+.strip-list.group-scroll.has-more-after:not(.has-more-before) {
+  -webkit-mask-image: linear-gradient(to right, currentColor calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, currentColor calc(100% - 24px), transparent);
+}
+.strip-list.group-scroll.has-more-before:not(.has-more-after) {
+  -webkit-mask-image: linear-gradient(to left, currentColor calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to left, currentColor calc(100% - 24px), transparent);
+}
+.strip-list.group-scroll.has-more-before.has-more-after {
+  -webkit-mask-image: linear-gradient(to right, transparent, currentColor 24px, currentColor calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, transparent, currentColor 24px, currentColor calc(100% - 24px), transparent);
+}
 .strip-group { display: flex; flex-direction: column; gap: 2px; }
 .strip-group-label { font: 500 11px / 14px var(--ql-font-sans); color: var(--ql-color-text-3); padding-left: 2px; }
 .strip-group-tiles { display: flex; gap: 8px; }

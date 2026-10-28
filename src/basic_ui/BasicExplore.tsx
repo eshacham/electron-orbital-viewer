@@ -17,8 +17,8 @@ export interface BasicExploreProps {
     /** Dispatches setBasicSelection, as App's old setN/setL/setMl did. The row's own correction effects use it. */
     onChange(change: Partial<BasicSelection>): void;
     /**
-     * A chip pressed (ruling T2-I1): App's way back from a combination held below Advanced -- it leaves the
-     * combination, then selects. Defaults to `onChange`.
+     * A chip pressed (ruling T2-I1, extended by ruling T1 M2): leaves a held combination, then selects -- at
+     * every level, the same as a strip pick. Defaults to `onChange`.
      */
     onPick?(change: Partial<BasicSelection>): void;
     combination: CombinationSelection;
@@ -42,9 +42,9 @@ const N_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick = onChange, combination, onCombinationChange, level = 'research' }) => {
     const { n, l, ml } = selection;
     const combinationActive = combination.kind !== 'none';
-    // Ruling T2-I1: below Advanced the Combination picker is hidden, so the chips stay live -- a press is the way
-    // back to one orbital (App's onPick leaves the combination first). At Advanced they wait, disabled, as before.
-    const chipsFrozen = combinationActive && atLeast(level, CONTROL_LEVEL.combinations);
+    // Ruling T1 M2: the n chips stay enabled at every level, combination or not -- a press is always a way back
+    // to one orbital (App's onPick leaves the combination first), the same as a strip pick. They used to wait,
+    // disabled, at Advanced+ (ruling T2-I1); two pickers with different rules would confuse readers.
 
     // The Controls-style correction (pre-T6 `Controls.tsx` lines 395-402),
     // moved here: a new n or l can leave l or mₗ out of range (e.g. n drops
@@ -67,8 +67,8 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
 
     // Ruling R20b carry: while a combination is drawn the heading names it
     // instead (" — not drawn" when it has a problem -- spec §3.5, never a
-    // silently wrong picture), and the row stays visible, disabled, so
-    // the way back to a single orbital is obvious rather than a control that
+    // silently wrong picture), and the row stays visible and live (ruling T1 M2), so
+    // the way back to a single orbital is a press away, not a control that
     // vanished. Task 1 (picture control): the Subshell and Orbital rows are gone -- the strip
     // under the picture is the picker for l and mₗ now (App.tsx's basicStrip/handleBasicPick).
     // Review I1: the combination's name is the node Info's title uses, typeset (2p<sub>z</sub>), never "2p_z".
@@ -107,16 +107,15 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
                         className={`basic-chip${value === n ? ' selected' : ''}`}
                         label={`n = ${value}`}
                         aria-pressed={value === n}
-                        disabled={chipsFrozen}
                         onClick={() => onPick({ n: value })}
                     />
                 ))}
             </Box>
 
-            {/* Next to the chip (spec §5 Phase 1). While a combination is drawn the
-                row stays in view, disabled, so the way back is obvious. Task 2: from
-                Advanced; below it, one line says so -- or, while a link's combination is
-                still drawn, that it is (Review Focus 2). */}
+            {/* Next to the chip (spec §5 Phase 1). While a combination is drawn the chip
+                row stays in view and live (ruling T1 M2), so the way back is a press away.
+                Task 2: from Advanced; below it, one line says so -- or, while a link's
+                combination is still drawn, that it is (Review Focus 2). */}
             {atLeast(level, CONTROL_LEVEL.combinations) && <CombinationControls selection={combination} onChange={onCombinationChange} />}
             <LevelLine level={level} ids={['combinations']} held={[combinationActive && {
                 id: 'combinations', control: 'combination',

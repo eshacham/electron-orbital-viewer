@@ -979,9 +979,15 @@ function App() {
             : []),
         [atomProfile, atomUnbound, atomLevel, atomSelectedShell, atomSelectedOrbital, enclosedFraction, palette],
     );
+    // Ruling (T1 M3): at Advanced, while a combination is drawn, no tile shows selected -- the combination is what
+    // is drawn, not any single orbital. `l: -1` matches no subshell (basicStripItems' l starts at 0), so every
+    // tile's `selected` comes back false without a second code path in strip_items.ts.
     const basicStrip = useMemo(
-        () => (isBasicMode ? basicStripItems({ selection: { n, l, ml }, enclosedFraction }) : []),
-        [isBasicMode, n, l, ml, enclosedFraction],
+        () => (isBasicMode ? basicStripItems({
+            selection: combination.kind === 'none' ? { n, l, ml } : { n, l: -1, ml },
+            enclosedFraction,
+        }) : []),
+        [isBasicMode, n, l, ml, enclosedFraction, combination.kind],
     );
     // Task 10 (spec §9.3 "Strip"): Bonds' total density and every orbital the
     // diagram lists, or H₂⁺'s two states -- nothing until this point's basis has
@@ -1979,7 +1985,7 @@ function App() {
                     <>
                         {basicStrip.length > 0 && (
                             <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
-                                onSelect={handleBasicPick} variant="sheet" collapsible={false} />
+                                onSelect={handleBasicPick} variant="sheet" collapsible={false} groupScroll />
                         )}
                         {basicExplore}
                     </>
@@ -2259,9 +2265,10 @@ function App() {
                 surface itself always is too, so the key column's plain PhaseKey below already
                 covers them -- unlike Atoms, no second "Orbital tiles" heading here. */}
             {isBasicMode && !isNarrow && basicStrip.length > 0 && (
+                // M1 (Task 1 review): no `collapsed`/`onCollapsedChange` here -- `collapsible={false}` means the
+                // strip never reads or writes the shared preference, so passing them was dead.
                 <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
-                    onSelect={handleBasicPick} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed}
-                    collapsible={false} />
+                    onSelect={handleBasicPick} variant="overlay" collapsible={false} groupScroll />
             )}
             {/* Task 10: Bonds' strip -- the total density and every orbital, or H₂⁺'s two states. */}
             {isBondsMode && !isNarrow && bondsStrip.length > 0 && (

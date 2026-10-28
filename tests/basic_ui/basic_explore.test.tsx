@@ -7,16 +7,26 @@ import { BASIC_ORBITALS_ABOUT } from '../../src/info/basic_info';
 import type { BasicSelection } from '../../src/store/orbitalSlice';
 import { NO_COMBINATION, CombinationSelection } from '../../src/combinations';
 
-/** A stateful wrapper, the way App drives BasicExplore through setBasicSelection/setCombination. */
-function Harness({ initial = { n: 3, l: 2, ml: 0 } as BasicSelection, combination: initialCombination = NO_COMBINATION }: {
-    initial?: BasicSelection; combination?: CombinationSelection;
+/**
+ * A stateful wrapper, the way App drives BasicExplore through setBasicSelection/setCombination. `withPick` wires
+ * `onPick` the way App's `handleBasicPick` does (ruling T1 M2, T2-I1): it leaves whatever combination is held,
+ * then selects -- for tests that need to see a chip press do both, not just the default `onChange` (which only
+ * selects, like the row's own n/l corrections).
+ */
+function Harness({
+    initial = { n: 3, l: 2, ml: 0 } as BasicSelection, combination: initialCombination = NO_COMBINATION, withPick = false,
+}: {
+    initial?: BasicSelection; combination?: CombinationSelection; withPick?: boolean;
 }) {
     const [selection, setSelection] = useState(initial);
     const [combination, setCombination] = useState(initialCombination);
+    const onChange = (change: Partial<BasicSelection>) => setSelection(s => ({ ...s, ...change }));
+    const onPick = withPick ? (change: Partial<BasicSelection>) => { onChange(change); setCombination(NO_COMBINATION); } : undefined;
     return (
         <BasicExplore
             selection={selection}
-            onChange={change => setSelection(s => ({ ...s, ...change }))}
+            onChange={onChange}
+            onPick={onPick}
             combination={combination}
             onCombinationChange={setCombination}
         />
@@ -95,7 +105,8 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         render(<Harness initial={{ n: 4, l: 3, ml: 0 }} />);
         fireEvent.click(screen.getByRole('button', { name: 'n = 2' }));
         const heading = document.getElementById('orbital-name')!;
-        expect(heading).toHaveSeenText('2s');
+        // M7 (Task 1 review): anchored, as the sibling test below is -- an unanchored match would also pass for "2sp" etc.
+        expect(heading).toHaveSeenText(/^2s$/);
     });
 
     // Task 5: the heading names the orbital with a real subscript (OrbitalLabel), never "3d_z²".
@@ -107,13 +118,26 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         expect(heading.querySelector('sub')).toHaveTextContent('z²');
     });
 
-    it('while a combination is active, disables the chip rows and the heading reads the combination instead', () => {
+    it('while a combination is active, the heading reads the combination instead, but the n chips stay live', () => {
         render(<Harness combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} />);
         expect(screen.getByText('sp³ hybrids — all 4')).toBeInTheDocument();
         expect(document.getElementById('orbital-name')).not.toHaveTextContent('3dz²'); // Task 5: OrbitalLabel's text
+        // Ruling T1 M2: the n chips are never frozen now -- a press is always a way back to one orbital, the same
+        // as a strip pick (was disabled at Advanced+ under ruling T2-I1).
         for (const button of screen.getAllByRole('button').filter(b => b.className.includes('basic-chip'))) {
-            expect(button).toHaveAttribute('aria-disabled', 'true');
+            expect(button).not.toHaveAttribute('aria-disabled', 'true');
+            expect(button).not.toBeDisabled();
         }
+    });
+
+    // Ruling T1 M2: a chip press leaves a held combination, exactly as a strip pick does (Review Focus 3).
+    it('ruling T1 M2: pressing n while a combination is active leaves it and selects', () => {
+        render(<Harness initial={{ n: 3, l: 2, ml: 0 }} combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} withPick />);
+        fireEvent.click(screen.getByRole('button', { name: 'n = 4' }));
+        expect(screen.queryByText('sp³ hybrids — all 4')).not.toBeInTheDocument();
+        // n: 3 -> 4 keeps l = 2, ml = 0 in range (unchanged by the row's own correction effects): "4dz²".
+        const heading = document.getElementById('orbital-name')!;
+        expect(heading).toHaveSeenText(/^4dz²$/);
     });
 
     // Review I1: an n = 2 Stark state's name is typeset in the heading as in Info, never "2p_z".
