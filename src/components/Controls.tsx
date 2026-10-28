@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import {
   Box,
   FormControl,
@@ -236,6 +236,9 @@ const Controls: React.FC<ControlsProps> = ({
   const isBasicMode = mode === 'hydrogenic';
   const showSelection = part !== 'view';
   const showView = part !== 'selection';
+  // Final review M4: the disabled Electron enclosed select is described by its reason -- under it with no surface drawn,
+  // otherwise visually hidden (Info's technical band says it on screen), as MoleculeViewOptions does for its controls.
+  const enclosedReasonId = useId();
   // Bug fix (task 22, bug 6): levels 1-2 in atom mode render a spherical
   // shell view straight from the shader (orbital_visualizer.ts's
   // updateAtomViewInScene / shell_view.ts) rather than a marching-cubes
@@ -333,6 +336,7 @@ const Controls: React.FC<ControlsProps> = ({
               label="Electron enclosed"
               onChange={(e: SelectChangeEvent<string>) => handleEnclosedFraction(parseFloat(e.target.value))}
               disabled={Boolean(fractionNote)}
+              aria-describedby={fractionNote ? enclosedReasonId : undefined}
             >
               {ENCLOSED_FRACTIONS.map(fraction => (
                 <MenuItem key={fraction} value={fraction.toString()}>
@@ -342,7 +346,9 @@ const Controls: React.FC<ControlsProps> = ({
             </Select>
             {/* Task 7b: in Molecules too the contour's value and the ESP map's fixed surface are Info's (moleculeInfo);
                 with no surface drawn the select is disabled and says why here, as Opacity and Cut away do. */}
-            {noSurface && fractionNote && <FormHelperText>{fractionNote}</FormHelperText>}
+            {fractionNote && (noSurface
+              ? <FormHelperText id={enclosedReasonId}>{fractionNote}</FormHelperText>
+              : <span id={enclosedReasonId} className="visually-hidden">{fractionNote}</span>)}
           </FormControl>
           <InfoButton topic="enclosed" label="Enclosed fraction" />
         </div>

@@ -484,8 +484,10 @@ describe('Controls: Bonds mode', () => {
     expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
     expect(screen.queryByText(/One electron, Z = 1/)).toBeNull();
     expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
-    expect(screen.queryByText('the density is drawn at a fixed ρ')).toBeNull();
+    // Final review M4: the reason is not shown (Info says it), but the disabled select is described by it, hidden.
+    expect(screen.getByText('the density is drawn at a fixed ρ')).toHaveClass('visually-hidden');
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAccessibleDescription('the density is drawn at a fixed ρ');
     // The cut helper is Info's too.
     expect(screen.queryByText(/\+y side/)).toBeNull();
     expect(container.querySelectorAll('.MuiFormHelperText-root')).toHaveLength(0);
@@ -495,6 +497,8 @@ describe('Controls: Bonds mode', () => {
   it('keeps the enclosed fraction for an orbital, where it does apply', () => {
     render(<Controls {...baseProps} mode="bonds" />);
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).not.toHaveAttribute('aria-disabled');
+    // Final review M4: an enabled select has no reason to be described by.
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).not.toHaveAttribute('aria-describedby');
     // Task 7a: the iso value is Info's, with its unit (bondsInfo).
     expect(screen.queryByText(/\|ψ\|² = /)).toBeNull();
   });
@@ -525,11 +529,14 @@ describe('Controls: Molecules mode', () => {
 
   it('disables the select for a fixed surface (the why is Info\'s), and says why under it with no surface drawn', () => {
     const { rerender } = render(<Controls {...baseProps} mode="molecule" fractionNote="fixed" />);
-    expect(screen.queryByText('fixed')).toBeNull();
+    // Final review M4: not shown (Info says it), but the disabled select is described by it, visually hidden.
+    expect(screen.getByText('fixed')).toHaveClass('visually-hidden');
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAccessibleDescription('fixed');
     rerender(<Controls {...baseProps} mode="molecule" fractionNote="No surface is drawn, so no contour applies" noSurface />);
     expect(screen.getByText('No surface is drawn, so no contour applies')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAccessibleDescription('No surface is drawn, so no contour applies');
   });
 });
 
