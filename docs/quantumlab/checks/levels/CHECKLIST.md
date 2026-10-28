@@ -24,16 +24,29 @@ pruned afterwards.
   still shows "loading…".
 - **The dipole arrow at Basics** (Task 9c ruling). It is still drawn at Basics. The Display section's line says so,
   "Showing the dipole arrow — Display controls appear at Explore", and Info gives the arrow's convention whenever it is
-  drawn (`fix9c-dipole-held-basics-water-dark-desktop.png`). If this reads wrong, the fallback is to hide the arrow at
-  Basics.
+  drawn (`fix9c-dipole-held-basics-water-dark-desktop.png`). **In that shot the arrow itself cannot be seen: it is not
+  distinguishable inside water's 90 % density in a headless render** (task-9c-report.md, concern 2). To see it on your
+  own test, lower the Display opacity (or raise the enclosed fraction) until the surface is translucent enough to show
+  the arrow from O toward the midpoint of the two O–H bonds. Please confirm on a real GPU that the arrow is visible at
+  Basics; if it reads wrong, the fallback is to hide the arrow at Basics.
 - **Info has no Configuration fact** (Task 9c ruling). The panel's configuration line, which labels the drill-down, is
-  its one home at every level.
-- **VoiceOver spot check** (Task 9 review M7). `sr_pass.mjs` cannot tell whether a status region inserted together
-  with its text is read, because that depends on the screen reader and browser. It counts such regions apart, as
-  "uncertain". With VoiceOver, please check two events in Atoms on a desktop:
-  - a relativity change, e.g. carbon Off → Scalar: the busy label "Solving … (scalar-relativistic)…" is inserted with
-    its text; then "Relativity: scalar relativistic";
-  - a charge step: "C⁺".
+  its one home at every level. The finish reviewer's verdict pass noted no capture after round 2 showed this on
+  screen; `finish-atoms-research-facts-dark-desktop.png` (Atoms, Research, carbon, whole atom; task 9 cleanup) now
+  shows the default facts with no Configuration row: Valence, Ionisation energy, Measured (NIST), Relativity and
+  Enclosed only.
+- **VoiceOver spot check** (Task 9 review M7; task-9c-review.md M1). `sr_pass.mjs` cannot tell whether a status region
+  inserted together with its text is read, because that depends on the screen reader and browser. It counts such
+  regions apart, as "uncertain", and also cannot tell whether an `aria-describedby` description is spoken, since
+  VoiceOver speaks a description as a delayed hint rather than logging it as an attribute read. With VoiceOver, please
+  check:
+  - in Atoms on a desktop, a relativity change, e.g. carbon Off → Scalar: the busy label "Solving … (scalar-
+    relativistic)…" is inserted with its text; then "Relativity: scalar relativistic";
+  - in Atoms on a desktop, a charge step: "C⁺";
+  - **in Molecules on a phone**, opening the Explore tab: the readout "Tap an atom or bond for angles and lengths" is
+    inserted with its text (the second "uncertain" region; levels-sr-9c.txt);
+  - **after pressing "Back to …"**, whether the heading's description is spoken once focus lands on "Info" (I3) — the
+    heading's accessible name stays "Info", but it is described by the selection's title (e.g. "Water (H2O) — 1b1
+    orbital") via `aria-describedby`.
 
   Then check that each is heard once.
 
@@ -57,9 +70,10 @@ phone. Every shot settled with 0 page errors. Molecules saw 2 `/api` requests, b
 | Atoms Research, carbon 2pz: the panel | `finish-before-research-c-2pz-dark-desktop.png` | `finish-after-research-c-2pz-dark-desktop.png` |
 
 What changed in them:
-- **Molecules Basics:** Info has no point group, the dipole reads "1.86 D", and the arrow's convention is gone. Info
-  now fits without scrolling. The subtitle reads "electron density · 90 % enclosed", with no e-notation ρ and no
-  repeat of the title.
+- **Molecules Basics:** Info has no point group, the dipole reads "1.86 D", and (in this shot) the arrow's convention
+  is gone. Info now fits without scrolling. The subtitle reads "electron density · 90 % enclosed", with no e-notation ρ
+  and no repeat of the title. **Task 9c reverses this:** the convention now shows at Basics too, whenever the arrow is
+  drawn; see "Last fix round" and the dipole owner flag above.
 - **Orbitals Explore:** the lead is 3 lines, and "How this was computed" is above the fold (before, it was cut).
 - **Bonds Research:** the subtitle is "electron density", with no R and no ρ. The canvas key and Info hold those, and
   the R slider keeps its readout. "Total energy" stays on one line, and its value drops below it whole.
@@ -75,6 +89,12 @@ What changed in them:
   pressed (i) on the canvas key and the chip in the Info tab are in one shot.
 - In dark, the pressed (i) wears the cyan halo (`--ql-shadow-selected-halo`). Task 9c made it the strip tile's soft
   glow; see "Last fix round". In light, it is the solid accent with no glow.
+- **Re-shot (task 9 cleanup):** the finish reviewer's verdict pass flagged that two of these dark, phone shots
+  predated Task 9c's glow and still showed the 9b hard ring: `finish-pressed-atoms-i-c-whole-dark-phone.png`
+  (`--click Explore --click "About Shell" --click Explore`, level explore, scene c-whole) and
+  `finish-pressed-esp-water-esp-dark-phone.png` (`--click "About Electrostatic potential"`, level explore, scene
+  water-esp), both `--port 5413 --gl metal --jobs-stub --sizes phone`. Both are replaced under the same names and now
+  show the soft glow. The light phone shots already showed the correct solid accent and were left as they were.
 
 **The scroll cue** (a tonal 24 px bottom fade, only while more is below):
 - **Showing:** `finish-cue-on-bonds-n2-{dark,light}-desktop-crop.png` (Research, N₂) and
@@ -572,11 +592,12 @@ Each row cites the ruling's ledger line (W/progress.md), or the review finding a
 | — | Hybrid: "Hybrids 2s and 3 × 2p", "hᵢ = −(1/√4) ψ₂ₛ + √(3/4) (dᵢ · p), …", "All n = 2 states share one energy, …", "Exact one-electron solution, Z = 1, for the 2s and 2p.", "A hybrid is a linear combination of these degenerate states — for hydrogen still a stationary state with E₂ — …" | Plan Task 5 (hybridInfo); ledger 78 |
 | "H 1s in a field, F = 0.030 a.u."; "Hydrogen — H 1s in a field, …" | "Hydrogen — 1s in a field, F = 0.030 a.u." | The double naming: ledger 79 (Task 8) |
 | "E = −109.38074 Ha, CCSD(T)/aug-cc-pVTZ (frozen core)" (and CO, H₂⁺'s "E = −0.60263 Ha (exact, Born–Oppenheimer)", He₂'s "E = −5.80123 Ha, FCI/…") | "Total energy −2976.40 eV (−109.38074 Ha)" + "Energies: CCSD(T)/aug-cc-pVTZ (frozen core)." | ledger 131, 100 |
+| — | Bonds facts at the current R: N₂'s "E − E(atoms) −9.44 eV (−0.347 Ha)", He₂'s "E − E(atoms) −8.58 × 10⁻⁴ eV (−3.15 × 10⁻⁵ Ha)", H₂⁺'s "E − E(atoms) −2.79 eV (−0.103 Ha)" and H₂⁺'s "Total energy −16.40 eV (−0.60263 Ha)" | Plan Task 7; ledger 131, 100 (eV first, one home); task-7a-review.md:49 (N₂'s E − E(atoms), checked), :53 (H₂⁺'s E − E(atoms), checked) and :115/:118 (H₂⁺'s total energy, asked for and matching −0.60263 Ha × 27.211386) |
 | "Molecular orbitals (lowest energy at the bottom)" | "Molecular orbitals" + (i) (the glossary says "lowest energy at the bottom") | Plan Task 7 ("heading stays short"); task-7a-review.md:17 |
 | "Bond order 3." (and H₂⁺'s "Bond order ½. One electron, exact energies.") | "Bond order 3" fact; H₂⁺ "One electron, so the energies are exact." | task-7a-review.md:148 (M5); task-7a-review.md:98 and :150 (the H₂⁺ wording) |
 | "Bond order 3 — counted from the valence orbitals' bonding/antibonding character; g/u labels don't apply …" | Fact + "Counted from the valence orbitals' bonding or antibonding character; g/u labels do not apply …" | task-7a-review.md:148 (M5 wording) |
 | "HOMO 3σg (ε = −0.438 Ha) · LUMO 1πg* (ε = −0.033 Ha)" (and CO's, He₂'s) | "Frontier orbitals — HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · …"; Data "Kohn–Sham orbital energies — …" | ledger 100 and 131 (eV first); task-7a-review.md:100 (I3, the Kohn–Sham qualifier) |
-| "methods" (aria of main's Data captions) | gone; the captions are in "How this was computed" | Plan Task 7 |
+| "methods" (aria of main's Data captions) | gone; the captions are in "How this was computed" | Plan Task 7; task-7a-review.md:19 (spec compliance: "Data keeps only the frontier values") |
 | H₂⁺ curve caption "Exact within Born–Oppenheimer (nuclei fixed). Zero: … 1σu* has no minimum on this range." | Its parts, each kept: "Exact within Born–Oppenheimer (nuclei fixed): the separated spheroidal equations …" and "1σu* has no minimum between 0.5 and 10 a₀; …" in "How this was computed"; "Plot: E − E(H + H⁺), in eV. Zero: …, the grey line." | task-7a-review.md:29-36 (every part of the old curve caption has a home); ledger 187 |
 | — | H₂⁺: "H₂⁺ is two protons sharing one electron: …", "In 1σg, the bonding orbital, …", "It is solved exactly here for nuclei held in place.", "Exact levels — 1σg Eel = …" | Plan Task 7 (bondsInfo); task-7a-review.md:130-133 (M1, M2); ledger 135 (the exact levels); finish fix 5 (the lead split) |
 | He₂ "No chemical bond: … (0.04 mHa below …), comparable to this basis' superposition error, with no counterpoise correction."; the curve's "(0.04 mHa)" form | "… comparable to this basis' superposition error." "No counterpoise correction" is said once, in "Energies: FCI/aug-cc-pVTZ (no counterpoise correction)." | task-7a-review.md:154 (M6, said once) |
