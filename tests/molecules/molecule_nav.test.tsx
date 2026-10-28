@@ -128,7 +128,8 @@ describe('MoleculeOrbitalList', () => {
         fireEvent.click(rows[2]);
         expect(onSelect).toHaveBeenCalledWith(3);
         expect(container.textContent).not.toMatch(/ionisation|Kohn–Sham|B3LYP/);
-        expect(infoText(waterMeta().orbitals)).toContain('Orbital energies here are Kohn–Sham eigenvalues, not ionisation energies.');
+        // Task 9b: the caveat is one sentence, "here" cut in the merge.
+        expect(infoText(waterMeta().orbitals)).toContain('Orbital energies are Kohn–Sham eigenvalues, not ionisation energies, and');
     });
 
     // Task 8 (addendum 9): each row's irrep label is typeset, 1b<sub>1</sub>, not the flat "1b1".
@@ -147,7 +148,8 @@ describe('MoleculeOrbitalList', () => {
         expect(screen.queryByRole('separator')).toBeNull();
         const info = infoText(waterMeta().orbitals);
         expect(info).toContain('HOMO–LUMO gap8.71 eV (0.320 Ha)');
-        expect(info).toContain(`The HOMO–LUMO gap is a ${GAP_CAVEAT}.`);
+        // Task 9b: the gap's clause follows the energies' in one sentence.
+        expect(info).toContain(`, and the HOMO–LUMO gap is a ${GAP_CAVEAT}.`);
         const [lumo, homo] = screen.getAllByRole('button');
         const rule = container.querySelector('.molecule-orbital-gap-rule') as HTMLElement;
         expect(rule).toHaveAttribute('aria-hidden', 'true');
@@ -165,7 +167,8 @@ describe('MoleculeOrbitalList', () => {
         // Task 7b: the gap's name and value are Info's (the fact, eV first) and its caveat names it.
         const info = infoText(orbitals);
         expect(info).toContain('SOMO–LUMO gap5.44 eV (0.200 Ha)');
-        expect(info).toContain(`The SOMO–LUMO gap is a ${GAP_CAVEAT}.`);
+        // Task 9b: the gap's clause follows the energies' in one sentence.
+        expect(info).toContain(`, and the SOMO–LUMO gap is a ${GAP_CAVEAT}.`);
         expect(info).not.toMatch(/HOMO–LUMO gap/);
     });
     // Ruling T16-b: the list opens scrolled so the HOMO is in view -- by
@@ -463,14 +466,16 @@ describe('Phase 6D: honest virtuals, the gaps, full-group labels', () => {
     it('gives only the Kohn–Sham HOMO–LUMO gap, with its caveat, when the LVMO is constructed', () => {
         const { info } = list();
         expect(info).toContain('HOMO–LUMO gap8.16 eV (0.300 Ha)');
-        expect(info).toContain(`The HOMO–LUMO gap is a ${GAP_CAVEAT}.`);
+        // Task 9b: the gap's clause follows the energies' in one sentence.
+        expect(info).toContain(`, and the HOMO–LUMO gap is a ${GAP_CAVEAT}.`);
         expect(info).not.toMatch(/HOMO–LVMO/);
     });
     it('gives both gaps, labelled, when the LVMO is one of the calculation\'s own orbitals', () => {
         const { container, info } = list(COMPUTED_LVMO, { pointGroup: 'Dooh', labelGroup: 'Dooh', labels: 'full-group' });
         expect(info).toContain('HOMO–LUMO gap7.89 eV (0.290 Ha)HOMO–LVMO gap13.61 eV (0.500 Ha)');
         expect(info).toContain(kohnShamNote(COMPUTED_LVMO));
-        expect(kohnShamNote(COMPUTED_LVMO)).toContain('The HOMO–LUMO and HOMO–LVMO gaps are Kohn–Sham orbital gaps — neither the optical gap');
+        // Task 9b: one sentence, the gaps' clause joined to the energies'.
+        expect(kohnShamNote(COMPUTED_LVMO)).toContain('and the HOMO–LUMO and HOMO–LVMO gaps are Kohn–Sham orbital gaps — neither the optical gap');
         const lvmo = screen.getByRole('button', { name: /LVMO/ });
         expect(lvmo).not.toHaveTextContent(/upper est/);
         expect(within(lvmo).queryByRole('img')).toBeNull();

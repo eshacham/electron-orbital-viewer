@@ -1,4 +1,5 @@
 import React from 'react';
+import { useMoreBelow } from '../shell/useMoreBelow';
 
 export interface PhoneSheetTab {
     key: string;
@@ -27,6 +28,8 @@ interface PhoneSheetProps {
  */
 const PhoneSheet: React.FC<PhoneSheetProps> = ({ tabs, active, onChange }) => {
     const current = tabs.find(tab => tab.key === active) ?? null;
+    // Task 9b (finish review, fix 4): the body fades its bottom edge while more of the tab is below (useMoreBelow).
+    const moreBelow = useMoreBelow();
     return (
         <div className={`phone-sheet${current ? ' open' : ''}`}>
             <div className="phone-sheet-tabs" role="tablist" aria-label="panels">
@@ -52,6 +55,7 @@ const PhoneSheet: React.FC<PhoneSheetProps> = ({ tabs, active, onChange }) => {
                 // DOM -- sits visually above the body (spec §9.8).
                 <React.Fragment key={current.key}>
                     <div
+                        ref={moreBelow}
                         className="phone-sheet-body"
                         id="phone-sheet-body"
                         role="tabpanel"

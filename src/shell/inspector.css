@@ -12,6 +12,14 @@
   border-bottom: 1px solid var(--ql-color-border-subtle);
 }
 .inspector-stacked .inspector-info { max-height: none; overflow: visible; border-bottom: 0; }
+/* Task 9b (finish review, fix 4): while more of Info is below its bottom edge (useMoreBelow's class), the last ~24 px
+   fade out -- a tonal cue (DESIGN.md: depth is tonal first), the same in both themes: no shadow (none on Deep Space
+   panels), no glow (none in Light Clean), no arrow or "More". The mask only needs an opaque stop, the text colour; it
+   is never animated, so reduced motion has nothing to stop. */
+.inspector-info.has-more-below {
+  -webkit-mask-image: linear-gradient(to bottom, currentColor calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to bottom, currentColor calc(100% - 24px), transparent);
+}
 /* Ruling R24-3: titled accordion sections, one open at a time. Every header stays in view; the open
    section takes the remaining height and scrolls inside itself (its body does not scroll a second time). */
 .inspector-sections { flex: 1; min-height: 0; display: flex; flex-direction: column; }

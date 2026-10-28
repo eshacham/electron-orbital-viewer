@@ -4,6 +4,7 @@ import TabRow, { type TabItem } from './TabRow';
 import { displayPref, INSPECTOR_ALL_FOLDED } from '../design/presentation';
 import { usePref } from '../design/usePref';
 import './inspector.css';
+import { useMoreBelow } from './useMoreBelow';
 
 export interface InspectorTab extends TabItem { content: React.ReactNode }
 
@@ -106,6 +107,7 @@ const Accordion: React.FC<{ sections: InspectorSection[]; openKey: string | null
  */
 const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultOpen, open = false, onOpenChange }) => {
     const id = useId();
+    const moreBelow = useMoreBelow();
     const display = usePref(displayPref);
     const keys = sections.map(section => section.key);
     const fallback = defaultOpen && keys.includes(defaultOpen) ? defaultOpen : keys[keys.length - 1] ?? null;
@@ -128,7 +130,8 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
         bar?.focus();
     };
 
-    const infoSlot = info ? <div className="inspector-info">{info}</div> : null;
+    // Task 9b (finish review, fix 4): the slot fades its bottom edge while more of Info is below (useMoreBelow).
+    const infoSlot = info ? <div ref={moreBelow} className="inspector-info">{info}</div> : null;
 
     if (variant === 'stacked') {
         // The phone sheet has its own Explore | Info | View | Plot tabs; here every section is shown, titled, all open,

@@ -337,39 +337,41 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 Valence: {valenceConfigurationLabelOf(speciesConfiguration)}
             </Typography>
 
-            <div className="info-beside-row">
-                <Box ref={shellsRef} className="level-nav-shells" role="group" aria-label="shells">
-                    {shells.map(shell => {
-                        const isSelected = selectedShell === shell.n;
-                        const isValence = valenceShells.has(shell.n);
-                        return (
-                            <Chip
-                                key={shell.n}
-                                className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isValence ? ' valence' : ' core'}`}
-                                label={`${shellName(shell.n)}${isValence ? ' · valence' : ''}`}
-                                color={isSelected ? 'primary' : 'default'}
-                                disabled={shellsUnavailable}
-                                // Addendum 2's "is there a way to unselect one?".
-                                // Three ways now, because testing showed one
-                                // buried in a breadcrumb was not enough: the ✕ on
-                                // the selected chip, clicking that chip again,
-                                // and the breadcrumb that was already there.
-                                aria-pressed={isSelected}
-                                onDelete={isSelected ? () => onNavigate({ level: 'atom' }) : undefined}
-                                // Still a (disabled) button while unavailable, so it is
-                                // announced as one; the guard is what actually refuses
-                                // the click, since a disabled Chip only stops pointers.
-                                onClick={() => {
-                                    if (shellsUnavailable) return;
-                                    onNavigate(isSelected ? { level: 'atom' } : { level: 'shell', n: shell.n });
-                                }}
-                            />
-                        );
-                    })}
-                </Box>
-                {/* Task 6: an (i) beside the shells explains the term in Info. */}
+            {/* Task 9b (finish review, fix 7): the (i) sits beside the word it explains -- a short label naming the row, as
+                Orbitals' "Shell n (i)" -- not at the far end of the chips. */}
+            <div className="info-term">
+                <span className="info-term-label">Shells</span>
                 <InfoButton topic="shell" label="Shell" />
             </div>
+            <Box ref={shellsRef} className="level-nav-shells" role="group" aria-label="shells">
+                {shells.map(shell => {
+                    const isSelected = selectedShell === shell.n;
+                    const isValence = valenceShells.has(shell.n);
+                    return (
+                        <Chip
+                            key={shell.n}
+                            className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isValence ? ' valence' : ' core'}`}
+                            label={`${shellName(shell.n)}${isValence ? ' · valence' : ''}`}
+                            color={isSelected ? 'primary' : 'default'}
+                            disabled={shellsUnavailable}
+                            // Addendum 2's "is there a way to unselect one?".
+                            // Three ways now, because testing showed one
+                            // buried in a breadcrumb was not enough: the ✕ on
+                            // the selected chip, clicking that chip again,
+                            // and the breadcrumb that was already there.
+                            aria-pressed={isSelected}
+                            onDelete={isSelected ? () => onNavigate({ level: 'atom' }) : undefined}
+                            // Still a (disabled) button while unavailable, so it is
+                            // announced as one; the guard is what actually refuses
+                            // the click, since a disabled Chip only stops pointers.
+                            onClick={() => {
+                                if (shellsUnavailable) return;
+                                onNavigate(isSelected ? { level: 'atom' } : { level: 'shell', n: shell.n });
+                            }}
+                        />
+                    );
+                })}
+            </Box>
         </>
     );
     // Help's About (variant 'about'): the method line and the paragraph, both as Info says them (aboutModelText).

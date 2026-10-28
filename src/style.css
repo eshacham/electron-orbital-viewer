@@ -548,6 +548,12 @@ html, body, #root {
     -webkit-overflow-scrolling: touch;
     padding: 10px 16px 12px;
   }
+  /* Task 9b (finish review, fix 4): the same tonal cue as Info's docked slot (inspector.css) -- the last ~24 px fade
+     while more of the tab is below; no shadow, glow, arrow or label, never animated. */
+  .phone-sheet-body.has-more-below {
+    -webkit-mask-image: linear-gradient(to bottom, currentColor calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to bottom, currentColor calc(100% - 24px), transparent);
+  }
   /* The desktop cards' chrome does not belong inside the sheet. */
   .phone-sheet-body #controls {
     position: static;

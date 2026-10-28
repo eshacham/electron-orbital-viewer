@@ -31,11 +31,17 @@
 }
 .info-back:hover { text-decoration: underline; }
 
-/* Key facts: label left, value right, tabular figures (DESIGN.md). */
+/* Key facts: label left, value right, tabular figures (DESIGN.md). Task 9b (finish review, fix 8): read as a table -- a
+   label never breaks ("Total energy", "Measured (NIST)", "HOMO–LUMO gap") and keeps a minimum width; the value takes
+   the rest of the row and wraps at its own spaces. Its minimum stays its longest unbreakable run (a flex item's own
+   min-content), so a value held on one line that cannot fit beside the label goes below it, whole, at the right. */
 .info-facts { margin: 0; display: flex; flex-direction: column; gap: 2px; }
-.info-fact { display: flex; justify-content: space-between; gap: 12px; font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line); }
-.info-fact dt { color: var(--ql-color-text-3); }
-.info-fact dd { margin: 0; color: var(--ql-color-text-1); text-align: right; }
+.info-fact {
+  display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 12px; row-gap: 0;
+  font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line);
+}
+.info-fact dt { color: var(--ql-color-text-3); flex: none; white-space: nowrap; min-width: 5.5em; }
+.info-fact dd { margin: 0; color: var(--ql-color-text-1); text-align: right; flex: 1 1 0; }
 
 /* "How this was computed": folded below Research, open at Research. Its chevron follows the inspector's
    disclosure convention (ruling R23b-2): down when folded, up when open. */
@@ -63,9 +69,12 @@
 .info-button::before { content: ''; position: absolute; inset: -12px; }
 .info-button-glyph { width: 10px; height: 10px; fill: currentColor; }
 .info-button:hover { background: var(--ql-color-surface-2); }
+/* Task 9b (finish review, fix 6): pressed, it also wears Deep Space's selection halo (a token: none in Light Clean), so the
+   one pressed (i) among several resting ones is found at a glance. */
 .info-button.is-active,
 .info-button.is-active:hover {
   background: var(--ql-color-selected-fill); border-color: var(--ql-color-selected-edge); color: var(--ql-color-on-fill);
+  box-shadow: var(--ql-shadow-selected-halo);
 }
 
 /* DESIGN.md's Phone Fourteen Rule: running text steps to 14 px on a phone; captions do not grow. */
@@ -96,4 +105,12 @@
    no longer fits beside them it wraps below, still at the right. Facts without an (i) are laid out as before. */
 .info-fact:has(> dt .info-button) { flex-wrap: wrap; row-gap: 0; }
 .info-fact:has(> dt .info-button) > dt { flex: none; max-width: 100%; }
-.info-fact:has(> dt .info-button) > dd { margin-left: auto; }
+/* Task 9b: such a value keeps its own width (not fix 8's share of the row), so it still goes below when it cannot fit. */
+.info-fact:has(> dt .info-button) > dd { margin-left: auto; flex: 0 1 auto; }
+/* Task 9b (finish review, fix 7): a short label naming a row of chips, with the (i) for its term right beside the word
+   (Atoms' "Shells (i)" and "Subshells (i)", as Orbitals' "Shell n (i)") -- never at the far end of the chips. */
+.info-term { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.info-term-label {
+  font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); font-weight: 500;
+  color: var(--ql-color-text-2);
+}

@@ -29,9 +29,9 @@ import {
     labelsSentence, orbitalEnergyWithEstimate, orbitalGaps,
 } from '../molecules/orbital_display';
 import {
-    ESP_COLOURS_SENTENCE, ESP_SURFACE_DENSITY, ESP_SURFACE_SENTENCE, espRangeText, espSaturatedSentence,
+    ESP_COLOURS_SENTENCE, ESP_SCALE_SENTENCE, ESP_SURFACE_DENSITY, ESP_SURFACE_SENTENCE, espRangeText, espSaturatedSentence,
 } from '../molecules/esp_color';
-import { dipoleFactText, hasDipoleArrow } from '../molecules/dipole';
+import { dipoleFactText, dipoleValueText, hasDipoleArrow } from '../molecules/dipole';
 import { spaceFillingUnavailableReason } from '../molecules/vdw_radii';
 import { tierOf } from '../molecules/types';
 import { TIER_LABEL, tierLine } from '../validation/geometry_honesty';
@@ -82,12 +82,16 @@ const SAME_LEVEL_HARTREE = 1e-4;
  * triplet has two SOMOs, and ROKS energies need not put them above the HOMO. Only an orbital with no occupied orbital
  * above it is "the highest that holds electrons"; the HOMO says how many SOMOs lie above it, if any do.
  */
-function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: MoleculeOrbitalInfo[]): string {
+function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: MoleculeOrbitalInfo[]): { lead: string; more: string } {
     const degenerate = degeneracyCounts(orbitals).get(orbital.index) ?? 1;
     const others = degenerate > 1 ? `, one of ${degenerate} with the same energy` : '';
+    // Task 9b (finish review, fix 5): the lead keeps to three lines -- what the orbital is. What a constructed one is, how
+    // full it is, its role and what its data flag follow the facts (the first note): a Basics strip tile (HOMO, LUMO,
+    // LVMO) opened a lead of up to ten lines.
     const what = isConstructed(orbital)
-        ? `${orbital.label} is not one of ${formula}'s computed orbitals${others}: it is ${CONSTRUCTED_NOTE}.`
+        ? `${orbital.label} is not one of ${formula}'s computed orbitals${others}.`
         : `${orbital.label} is one of ${formula}'s molecular orbitals${others}.`;
+    const constructed = isConstructed(orbital) ? `It is ${CONSTRUCTED_NOTE}.` : null;
     const held = orbital.role === 'SOMO' ? null
         : orbital.occupation === 0 ? 'It is empty.'
         : `It holds ${orbital.occupation} ${plural(orbital.occupation, 'electron', 'electrons')}.`;
@@ -103,7 +107,7 @@ function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: M
         : orbital.role === 'SOMO' ? `It is a SOMO: a singly occupied orbital${highest ? ', the highest that holds electrons' : ''}.`
         : orbital.role === 'LVMO' ? `It is the LVMO: ${LVMO_NOTE}.` : null;
     const diffuse = orbital.class === 'diffuse' ? `${orbital.label} is ${diffuseDescription(orbital)}.` : null;
-    return [what, held, role, diffuse].filter(Boolean).join(' ');
+    return { lead: what, more: [constructed, held, role, diffuse].filter(Boolean).join(' ') };
 }
 
 /**
@@ -173,17 +177,22 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     // --- What it is, in plain words.
     let title: React.ReactNode = moleculeTitle(meta);
     let lead: string;
+    // Task 9b: an orbital's electrons, role and flags, the first note after the facts (orbitalWords).
+    let orbitalMore: string | null = null;
     if (surface.kind === 'density') {
         title = `${moleculeTitle(meta)} — electron density`;
-        // Fix round 1 (M6): the occupied orbitals -- the empty ones hold none of the density.
-        lead = `${meta.name} has ${meta.electronCount} electrons; the surface shows where they are likely to be found, all its occupied orbitals together.`;
+        // Task 9b (finish review, fix 5): the lead keeps to three lines -- that the density is all the occupied orbitals
+        // together is the density glossary entry's (technical band: the sum of |ψ|² over the occupied orbitals).
+        lead = `${meta.name} has ${meta.electronCount} electrons; the surface shows where they are likely to be found.`;
     } else if (surface.kind === 'esp') {
         title = `${moleculeTitle(meta)} — electrostatic potential`;
         lead = ESP_COLOURS_SENTENCE;
     } else if (surface.kind === 'mo') {
         const label = chosen?.label ?? `orbital ${surface.index}`;
         title = h(React.Fragment, null, `${moleculeTitle(meta)} — `, withSubscripts(label), ' orbital');
-        lead = chosen ? orbitalWords(formula, chosen, meta.orbitals) : `${label} is one of ${formula}'s molecular orbitals.`;
+        const words = chosen ? orbitalWords(formula, chosen, meta.orbitals) : null;
+        lead = words?.lead ?? `${label} is one of ${formula}'s molecular orbitals.`;
+        orbitalMore = words?.more || null;
     } else {
         const arrow = molecule.showDipole && hasDipoleArrow(meta);
         lead = representation !== 'none' ? 'No surface is drawn: the view shows the structure alone.'
@@ -195,12 +204,14 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     // The structure options are Explore's (CONTROL_LEVEL): what they cannot do is said where they are on screen.
     const structureControls = atLeast(level, CONTROL_LEVEL.structure);
     const labelsControl = atLeast(level, CONTROL_LEVEL.bondLabels);
+    const dipoleControl = atLeast(level, CONTROL_LEVEL.dipole);
     const unavailable = spaceFillingUnavailableReason(meta.atoms);
     // The lead says what is drawn; the facts follow it, and then these notes on the numbers and the picture -- after
     // the facts, so the numbers stay above Info's fold (InfoContent.notes), one idea a paragraph (fix round 1, I6).
     const plain = withSubscripts(lead);
     const tier = tierOf(meta);
     const notes = paragraphs(
+        orbitalMore,
         // Ruling T7-O3 sits on the dipole fact; the energies' caveat, once, wherever an energy is on screen (Explore).
         explore && kohnShamNote(meta.orbitals),
         surface.kind === 'mo' && marksKey(meta.orbitals, explore),
@@ -211,8 +222,10 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
         labelsControl && representation === 'none' && 'No structure is drawn, so there is nothing to label.',
         labelsControl && representation === 'space-filling' && state.moleculeLabels && 'Space filling draws no bonds, so only angles are labelled.',
         structureControls && unavailable && `Space filling is unavailable: ${unavailable}.`,
-        // Ruling T2-I2: while the arrow is drawn its convention is said, at every level.
-        molecule.showDipole && hasDipoleArrow(meta) && DIPOLE_CONVENTION,
+        // Ruling T2-I2: while the arrow is drawn its convention is said -- Task 9b (finish review, fix 1): from the level
+        // its switch is on screen (Explore), so Info never explains it where the pointer says "the dipole arrow … appear
+        // at Explore".
+        dipoleControl && molecule.showDipole && hasDipoleArrow(meta) && DIPOLE_CONVENTION,
         surfaceShown && cutAwaySentence(view.surfaceStyle.clipAxis),
         // Ruling (concern 5): on a phone, the tier line -- its own builder's words -- last, at every level. Fix round 2
         // (N2): the computed line already says "Computed on request", so it goes without the label.
@@ -222,11 +235,14 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     // --- Key facts, each from the level that reads it.
     // Ruling (concern 4): each number has one home, Info; the Properties card keeps what Info does not show. No Formula
     // fact: the title says it ("Water (H₂O)").
+    // Task 9b (finish review, fix 1): the point group is a scientific term with an (i) -- Advanced's band; the dipole
+    // shows its value with units below Research, and the experiment and its reference at Research.
+    const dipole = atLeast(level, 'research') ? dipoleFactText(meta) : dipoleValueText(meta);
     const facts: InfoFact[] = [
-        { label: withInfo('Point group', 'pointGroup', 'Point group'), value: h(PointGroupLabel, { pg: meta.symmetry.pointGroup }) },
+        { label: withInfo('Point group', 'pointGroup', 'Point group'), value: h(PointGroupLabel, { pg: meta.symmetry.pointGroup }), min: 'advanced' },
         { label: 'Electrons', value: String(meta.electronCount) },
         // Ruling T7-O3: a documented caveat stays beside the number it qualifies.
-        { label: withInfo('Dipole μ', 'dipole', 'Dipole moment'), value: `${dipoleFactText(meta)}${meta.caveat ? ` — ${meta.caveat}` : ''}` },
+        { label: withInfo('Dipole μ', 'dipole', 'Dipole moment'), value: `${dipole}${meta.caveat ? ` — ${meta.caveat}` : ''}` },
         ...orbitalGaps(meta.orbitals).map((gap, index): InfoFact => ({
             label: index === 0 ? withInfo(gapTerm(gap), 'homoLumo', 'HOMO and LUMO') : gapTerm(gap),
             value: nb(orbitalEnergyText(gap.hartree)), min: 'explore',
@@ -255,6 +271,7 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     const technical = paragraphs(
         surface.kind === 'density' && 'The surface is a contour of constant density ρ, at the value that encloses the chosen fraction of the electrons.',
         surface.kind === 'mo' && 'The surface is a contour of constant |ψ|², at the value that encloses the chosen fraction of the orbital.',
+        surface.kind === 'esp' && ESP_SCALE_SENTENCE,
         surface.kind === 'esp' && ESP_SURFACE_SENTENCE,
         ...(surface.kind === 'mo' ? listNotes(meta, chosen) : []),
     );

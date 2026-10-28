@@ -75,12 +75,6 @@ const electronsIn = (orbitals: readonly MoleculeOrbitalInfo[]) => orbitals.reduc
 /** "a σ", "an antibonding π". */
 const withArticle = (words: string) => `${/^[aeiou]/.test(words) ? 'an' : 'a'} ${words}`;
 
-/** A paragraph of plain sentences, typeset (orbital labels, R_e and the like get a real <sub>); empty parts dropped. */
-function sentences(...parts: Array<string | null | false | undefined>): React.ReactNode {
-    const kept = parts.filter((part): part is string => Boolean(part));
-    return kept.length === 0 ? null : withSubscripts(kept.join(' '));
-}
-
 /** Short paragraphs, one idea each, typeset; empty ones dropped. */
 function paragraphs(...parts: Array<string | null | false | undefined>): React.ReactNode[] {
     return parts.filter((part): part is string => Boolean(part)).map(withSubscripts);
@@ -91,7 +85,7 @@ function paragraphs(...parts: Array<string | null | false | undefined>): React.R
  * the data's own label, occupation and role. Bonding and antibonding are named only where the labels mark them (a
  * homonuclear molecule's g/u labels, * antibonding: the rule the bond order counts by); a core level is named as one.
  */
-function orbitalWords(formula: string, meta: MoleculeMeta, orbital: MoleculeOrbitalInfo, group: MoleculeOrbitalInfo[]): string {
+function orbitalWords(formula: string, meta: MoleculeMeta, orbital: MoleculeOrbitalInfo, group: MoleculeOrbitalInfo[]): { lead: string; more: string; shape: string | null } {
     const spin = orbital.spin ?? 'restricted';
     const name = `${orbital.label}${SPIN_SUFFIX[spin]}`;
     const core = buildMoDiagram(meta.orbitals).levels.find(level => level.label === orbital.label && level.spin === spin)?.core ?? false;
@@ -111,7 +105,9 @@ function orbitalWords(formula: string, meta: MoleculeMeta, orbital: MoleculeOrbi
     const frontier = role === 'HOMO' ? 'It is the HOMO: the highest level that holds electrons.'
         : role === 'LUMO' ? 'It is the LUMO: the lowest empty level.'
         : role === 'SOMO' ? 'It is singly occupied: a SOMO.' : null;
-    return [what, shape, held, frontier].filter(Boolean).join(' ');
+    // Task 9b (finish review, fix 5): the lead keeps to three lines -- what the orbital is; how full it is and its role
+    // follow the facts (the first note), as in Molecules; the shape about the bond axis is technical.
+    return { lead: what, more: [held, frontier].filter(Boolean).join(' '), shape };
 }
 
 /** Kohn–Sham's (i) on an orbital energy: that ε is the model's eigenvalue, not the energy to remove an electron. */
@@ -143,27 +139,35 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
     // --- What it is, in plain words.
     let title: React.ReactNode;
     let lead: string;
+    // Task 9b (finish review, fix 5): the lead keeps to three lines. What H₂⁺'s orbital does, or how full an MO is and its
+    // role, follows the facts (the first note); that H₂⁺ is solved exactly, and an MO's shape, are technical.
+    let picture: string | null = null;
+    let exactSentence: string | null = null;
+    let shape: string | null = null;
     if (exact) {
         const label = H2PLUS_LABELS[h2plusState];
         title = h(React.Fragment, null, `${formula} — `, withSubscripts(label), ' orbital');
         // Fix round 1 (M2, M1): "for nuclei held in place" is Born–Oppenheimer in plain words; the node is the wavefunction's.
-        lead = `${formula} is two protons sharing one electron: the simplest chemical bond, and one solved exactly here for nuclei held in place. `
-            + (h2plusState === '1sigma_g'
-                ? `In ${label}, the bonding orbital, the electron gathers between the nuclei and holds them together.`
-                : `In ${label}, the antibonding orbital, the wavefunction has a nodal plane midway between the nuclei, so the electron is kept out of the region between them, and this state does not hold them together.`);
+        lead = `${formula} is two protons sharing one electron: the simplest chemical bond.`;
+        exactSentence = 'It is solved exactly here for nuclei held in place.';
+        picture = h2plusState === '1sigma_g'
+            ? `In ${label}, the bonding orbital, the electron gathers between the nuclei and holds them together.`
+            : `In ${label}, the antibonding orbital, the wavefunction has a nodal plane midway between the nuclei, so the electron is kept out of the region between them, and this state does not hold them together.`;
     } else if (density) {
         title = `${formula} — total electron density`;
         const electrons = meta ? electronsIn(meta.orbitals) : null;
-        // Fix round 1 (M3): plain words only -- what the surface at this ρ shows, with its numbers, is technical. Task 7b
-        // fix round 1 (M6): "occupied" -- the empty orbitals hold none of the density (one wording with Molecules).
+        // Fix round 1 (M3): plain words only -- what the surface at this ρ shows, with its numbers, is technical. Task 9b:
+        // that the density is all the occupied orbitals together is the density glossary entry's (one wording with Molecules).
         lead = electrons !== null
-            ? `${formula} has ${electrons} electrons; the surface shows where they are likely to be found, all its occupied orbitals together.`
-            : 'The surface shows where the electrons are likely to be found, all the occupied orbitals together.';
+            ? `${formula} has ${electrons} electrons; the surface shows where they are likely to be found.`
+            : 'The surface shows where the electrons are likely to be found.';
     } else {
         const mo = view as Extract<BondsView, { kind: 'mo' }>;
         title = h(React.Fragment, null, `${formula} — `, withSubscripts(mo.label), `${SPIN_SUFFIX[mo.spin]} orbital`);
-        lead = chosen && meta ? orbitalWords(formula, meta, chosen.orbital, chosen.group)
-            : `${mo.label} is one of ${formula}'s molecular orbitals.`;
+        const words = chosen && meta ? orbitalWords(formula, meta, chosen.orbital, chosen.group) : null;
+        lead = words?.lead ?? `${mo.label} is one of ${formula}'s molecular orbitals.`;
+        picture = words?.more || null;
+        shape = words?.shape ?? null;
     }
     // Ruling T4-d: B₂ and C₂'s energies are a rough guide -- said plainly here (fix round 1, M4: the energies, as T4-d's
     // caption says), and in the method's words under "How this was computed" (bondsCaptions' first caption).
@@ -207,6 +211,8 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
 
     // --- The technical band: what the density surface shows, the diagram's key and notes, the bond order's why.
     const technical = paragraphs(
+        exactSentence,
+        shape,
         density && densitySurfaceText(bonds.densityIso, null, minOnAxisOf(data.basis)),
         orbitals && orbitals.length > 0 && MO_LEGEND,
         orbitals && spinOrderNote(buildMoDiagram(orbitals)),
@@ -227,8 +233,10 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
 
     return {
         title,
-        // Fix round 1 (I1): Cut away is on screen from Basics, so what it removes is said in the plain band.
-        plain: sentences(lead, qualitative, noBond, cutAwaySentence(clipAxis)),
+        plain: withSubscripts(lead),
+        // Task 9b (fix 5): after the facts, at every level -- what H₂⁺'s orbital does (or an MO's electrons and role), B₂
+        // and C₂'s rough guide, He₂'s "no bond", and (fix round 1, I1: Cut away is on screen from Basics) what a cut removes.
+        notes: paragraphs(picture, qualitative, noBond, cutAwaySentence(clipAxis)),
         technical,
         facts,
         computed,

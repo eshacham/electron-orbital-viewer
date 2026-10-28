@@ -454,3 +454,18 @@ describe('SubshellPanel parts (spec §9.1: chips in Configuration, the diagram i
         expect(container.querySelector('.subshell-chip-row')).toBeNull();
     });
 });
+
+// Task 9b (finish review, fix 7): the subshells' (i) follows a "Subshells" label, not the far end of the chip row.
+describe('SubshellPanel: the subshells\' (i) beside its term (Task 9b)', () => {
+    it('puts the (i) right after a "Subshells" label, outside the chip row', () => {
+        const { container } = render(<SubshellPanel subshells={neonLikeSubshells()} shellN={2} selectedSubshell={null}
+            onSelectSubshell={() => {}} onSelectOrbital={() => {}} part="chips" />);
+        const button = container.querySelector('button[aria-label="About Subshell"]')!;
+        const term = button.closest('.info-term')!;
+        expect(term).not.toBeNull();
+        expect(button.previousElementSibling).toHaveTextContent(/^Subshells$/);
+        expect(term.querySelector('.subshell-chip-row')).toBeNull();
+        expect(container.querySelector('.subshell-chip-row')!.previousElementSibling).toBe(term);
+    });
+});
+

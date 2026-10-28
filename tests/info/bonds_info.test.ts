@@ -96,8 +96,8 @@ describe('bondsInfo (Task 7a)', () => {
         const title = render(React.createElement('div', null, content.title)).container.textContent;
         expect(title).toBe('N₂ — total electron density');
         const shown = shownAt(content, 'basics');
-        // Task 7b fix round 1 (M6): "occupied" -- the empty orbitals hold none of the density.
-        expect(shown).toContain('N₂ has 14 electrons; the surface shows where they are likely to be found, all its occupied orbitals together.');
+        // Task 9b (fix 5): the lead keeps to three lines; "all the occupied orbitals together" is the density glossary's.
+        expect(shown).toContain('N₂ has 14 electrons; the surface shows where they are likely to be found.');
         // Fix round 1 (M3): plain words at Basics -- no ρ values, and the title's words are not repeated.
         expect(shown).not.toMatch(/e\/a₀³|Total electron density,/);
         expect(shown).toContain('Bond order3');
@@ -112,8 +112,8 @@ describe('bondsInfo (Task 7a)', () => {
     // Fix round 1 (M3): before the molecule's data lands, "they" has an antecedent.
     it('names the electrons before their count is known', () => {
         const content = bondsInfo(stateOf(n2Store()), NOTHING, 'basics');
-        // Task 7b fix round 1 (M6): "occupied", as above.
-        expect(shownAt(content, 'basics')).toContain('The surface shows where the electrons are likely to be found, all the occupied orbitals together.');
+        // Task 9b (fix 5): cut as above.
+        expect(shownAt(content, 'basics')).toContain('The surface shows where the electrons are likely to be found.');
     });
 
     it('at Explore adds E − E(atoms), eV first with Ha in parentheses, and keeps the absolute energy for Research', () => {
@@ -293,8 +293,9 @@ describe('bondsInfo (Task 7a)', () => {
             const title = render(React.createElement('div', null, content.title)).container.textContent;
             expect(title).toBe('H₂⁺ — 1σg orbital');
             const shown = shownAt(content, 'research');
-            // Fix round 1 (M2): Born–Oppenheimer in plain words.
-            expect(shown).toContain('H₂⁺ is two protons sharing one electron: the simplest chemical bond, and one solved exactly here for nuclei held in place.');
+            // Fix round 1 (M2): Born–Oppenheimer in plain words -- Task 9b (fix 5): its own sentence in the technical band.
+            expect(shown).toContain('H₂⁺ is two protons sharing one electron: the simplest chemical bond.');
+            expect(shown).toContain('It is solved exactly here for nuclei held in place.');
             expect(shown).toContain('E − E(H + H⁺)−2.79 eV (−0.103 Ha)');
             // Fix round 1 (I4): the panel's old "E = −0.60263 Ha", at Research, eV first.
             expect(shown).toContain('Total energy−16.40 eV (−0.60263 Ha)');
@@ -335,3 +336,41 @@ describe('bondsInfo (Task 7a)', () => {
         });
     });
 });
+
+/** The lead: Info's first paragraph, as rendered at `level`. */
+function leadAt(content: InfoContent, level: LearningLevel): string {
+    const { container, unmount } = render(React.createElement(InfoPanel, { content, topic: null, onClearTopic: () => {}, level }));
+    const lead = (container.querySelector('.info-body > p.info-text')?.textContent ?? '').replace(/\u00A0/g, ' ');
+    unmount();
+    return lead;
+}
+
+// Task 9b (finish review, fix 5): Bonds' leads are three lines at most. What H₂⁺'s orbital does and an MO's shape follow
+// the facts, or join the technical band; "all the occupied orbitals together" is the density glossary entry's.
+describe('the Bonds lead (Task 9b)', () => {
+    it('keeps the density lead to what the surface shows', () => {
+        expect(leadAt(bondsInfo(stateOf(n2Store()), n2Data, 'explore'), 'explore'))
+            .toBe('N₂ has 14 electrons; the surface shows where they are likely to be found.');
+    });
+
+    it('says what an MO is in the lead, how full and its role after the facts; its shape is technical', () => {
+        const store = n2Store();
+        store.dispatch(setBondsView({ kind: 'mo', label: '3σg', spin: 'restricted', component: 0 }));
+        const content = bondsInfo(stateOf(store), n2Data, 'explore');
+        expect(leadAt(content, 'explore')).toBe('3σg is a bonding σ orbital of N₂.');
+        // How full it is and its frontier role follow the facts, first.
+        expect(shownAt(content, 'explore')).toContain('It holds 2 electrons. It is the HOMO: the highest level that holds electrons.');
+        expect(shownAt(content, 'explore')).not.toContain('symmetric around the bond axis');
+        expect(shownAt(content, 'advanced')).toContain('It is symmetric around the bond axis.');
+    });
+
+    it('says what H₂⁺ is in the lead, what its orbital does after the facts, and that it is exact in the technical band', () => {
+        const content = bondsInfo(stateOf(h2plusStore()), NOTHING, 'basics');
+        expect(leadAt(content, 'basics')).toBe('H₂⁺ is two protons sharing one electron: the simplest chemical bond.');
+        const basics = shownAt(content, 'basics');
+        expect(basics).toContain('In 1σg, the bonding orbital, the electron gathers between the nuclei and holds them together.');
+        expect(basics).not.toContain('solved exactly');
+        expect(shownAt(content, 'advanced')).toContain('It is solved exactly here for nuclei held in place.');
+    });
+});
+

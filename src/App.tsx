@@ -239,7 +239,6 @@ function App() {
     const atomCharge = useAppSelector(state => state.atom.charge);
     const atomExcitation = useAppSelector(state => state.atom.excitation);
     const atomUnbound = useAppSelector(state => state.atom.unbound);
-    const atomEnergies = useAppSelector(state => state.atom.energies);
     const species = useMemo(
         () => speciesOf({ Z: atomZ, charge: atomCharge, excitation: atomExcitation }),
         [atomZ, atomCharge, atomExcitation]
@@ -551,7 +550,7 @@ function App() {
     /** A curve, key or swatch in this theme's palette (index identity, §4.2). */
     const themed = useCallback(<T extends { color: string }>(items: T[]): T[] =>
         items.map(item => ({ ...item, color: themeCurveColour(item.color, palette) })), [palette]);
-    const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(viewTitle, shallowEqual);
+    const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(state => viewTitle(state, level), shallowEqual);
     // Task 8 (addendum 1): a tab's title is plain text, so the view's name is written flat ("3dz²", "1b₁"); the canvas
     // title, its subtitle and Info's stand-in title are the same markup typeset, built once here.
     useDocumentTitle(`${flatSubscripts(viewTitleText)} · ${BRAND.name}`);
@@ -1353,17 +1352,13 @@ function App() {
 
     // One element for both layouts: LevelNav places it under the element
     // button on a desktop and at the top of the phone's Explore tab, and the
-    // phone header's LevelNav leaves it out (layout contract, §3.8). The
-    // energies go in unfiltered: SpeciesControls makes the species-key check
-    // itself (ruling C5).
+    // phone header's LevelNav leaves it out (layout contract, §3.8). Task 9b: the energies are Info's alone (atomInfo).
     const speciesControls = (
         <SpeciesControls
             species={species}
             onChargeChange={handleChargeChange}
             onExcitationChange={handleExcitationChange}
-            energies={atomEnergies}
             unbound={atomUnbound}
-            pictureFailed={atomError !== null}
             level={level}
         />
     );

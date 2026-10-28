@@ -60,3 +60,14 @@ export function dipoleFactText(meta: LibraryMoleculeMeta): string {
         ? `${computed} · ${nb(`${reference.value} ${reference.unit}`)} experiment (${reference.source})`
         : `${computed} · no measured value listed`;
 }
+
+/**
+ * Task 9b (finish review, fix 1): the dipole below Research -- its value with units alone, cut from dipoleFactText: the
+ * computed magnitude ("1.86 D"), or a symmetric molecule's "0 D by symmetry". The experiment and its reference are
+ * Research's (the spec's level table: references at Research).
+ */
+export function dipoleValueText(meta: LibraryMoleculeMeta): string {
+    const reference = meta.references.find(r => r.quantity === 'dipole');
+    if (reference && reference.value === 0) return `${nb('0 D')} by symmetry`;
+    return nb(`${new THREE.Vector3(...meta.dipoleVectorDebye).length().toFixed(2)} D`);
+}

@@ -4,6 +4,7 @@
 // selection (Review Focus 3); the heading is in a polite live region.
 import React from 'react';
 import { readFileSync } from 'fs';
+import { SHADOWS } from '../../src/design/tokens';
 import { resolve } from 'path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import InfoPanel from '../../src/info/InfoPanel';
@@ -298,4 +299,34 @@ describe('InfoPanel (Task 4)', () => {
         expect(phone).toMatch(/\.info-back\s*\{[^}]*min-height:\s*var\(--ql-size-touch\)/);
         expect(css).not.toMatch(/\.info-back::before/);
     });
+
+    // Task 9b (finish review, fix 8): the facts read as a table -- a label never breaks ("Total / energy", "Measured /
+    // (NIST)", "HOMO–LUMO / gap"); the value takes the rest of the row and wraps there. Task 9's rule for a label with
+    // its (i) still holds: that label keeps its width and its (i), and the value goes below when it no longer fits.
+    it('keeps every fact label on one line, with a minimum width, and lets the value wrap', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+        const rule = (selector: RegExp) => css.match(new RegExp(`${selector.source}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+        const dt = rule(/\n\.info-fact dt/);
+        expect(dt).toMatch(/white-space:\s*nowrap/);
+        expect(dt).toMatch(/min-width:\s*[\d.]+em/);
+        expect(dt).toMatch(/flex:\s*none/);
+        // The value takes the rest of the row (basis 0, growing) and wraps at its own breaks; its minimum stays its longest
+        // unbreakable run (no min-width: 0, no break-anywhere), so a value held on one line ("−2976.40 eV (−109.38074 Ha)")
+        // that cannot fit beside its label goes below it whole rather than splitting a number.
+        const dd = rule(/\n\.info-fact dd/);
+        expect(dd).toMatch(/flex:\s*1 1 0/);
+        expect(dd).not.toMatch(/min-width|overflow-wrap|word-break/);
+        expect(rule(/\n\.info-fact/)).toMatch(/flex-wrap:\s*wrap/);
+        expect(css).toMatch(/\.info-fact:has\(> dt \.info-button\) > dd\s*\{[^}]*flex:\s*0 1 auto;/);
+    });
+
+    // Task 9b (finish review, fix 6): the pressed (i) wears Deep Space's selection halo, as the strip's selected tile
+    // does -- in dark only; Light Clean has no glow (DESIGN.md), its solid accent already reads.
+    it('gives the pressed (i) the Deep Space selection halo, in dark only', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
+        expect(css).toMatch(/\.info-button\.is-active,\s*\.info-button\.is-active:hover\s*\{[^}]*box-shadow:\s*var\(--ql-shadow-selected-halo\)/);
+        expect(SHADOWS.dark['selected-halo']).toBe('0 0 0 2px rgba(31,182,245,.35)');
+        expect(SHADOWS.light['selected-halo']).toBe('none');
+    });
 });
+

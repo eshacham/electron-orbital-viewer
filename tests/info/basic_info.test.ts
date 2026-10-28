@@ -60,8 +60,9 @@ describe('basicInfo (Task 5)', () => {
     it('at Basics says what the shape is and counts its nodes in words, with no energy in Ha', () => {
         const text = shownAt(basicInfo(orbitalsState().getState(), 'basics'), 'basics');
         expect(text).toContain('A dumbbell with a ring, shaped by its 2 nodes');
-        expect(text).toContain('0 radial and 2 angular (two cones)');
-        expect(text).toContain(BASIC_ORBITALS_ABOUT);
+        // Task 9b (fix 5): the count by kind is the Nodes fact's; the surfaces' kinds and the one-electron framing are
+        // technical, and the pointer to Atom mode is Help's ('the Orbitals lead (Task 9b)' pins where each went).
+        expect(text).toContain('Nodes2 (0 radial, 2 angular)');
         expect(text).not.toMatch(/Ha\b/);
         expect(text).not.toContain('eV');
     });
@@ -171,7 +172,8 @@ describe('basicInfo (Task 5)', () => {
     // Review wording fixes (fix round 1).
     it('says a sphere has its radial nodes, rather than is shaped by them', () => {
         const text = shownAt(basicInfo(orbitalsState({ n: 2, l: 0, ml: 0 }).getState(), 'basics'), 'basics');
-        expect(text).toContain('A sphere, with 1 node — a surface where the electron is never found: 1 radial (a sphere) and 0 angular.');
+        // Task 9b (fix 5): the count by kind is the Nodes fact's; "(a sphere)" joins the radial part in the technical band.
+        expect(text).toContain('A sphere, with 1 node — a surface where the electron is never found.');
     });
 
     it('writes cos φ, not cos 1φ, and gives the angular part its verb', () => {
@@ -197,3 +199,45 @@ describe('basicInfo (Task 5)', () => {
         expect(labels.slice(0, 3).map(label => label.querySelector('i')?.textContent)).toEqual(['n', 'l', 'mₗ']);
     });
 });
+
+/** The lead: Info's first paragraph, as rendered at `level`. */
+function leadAt(content: InfoContent, level: LearningLevel): string {
+    const { container, unmount } = render(React.createElement(InfoPanel, { content, topic: null, onClearTopic: () => {}, level }));
+    const lead = (container.querySelector('.info-body > p.info-text')?.textContent ?? '').replace(/\u00A0/g, ' ');
+    unmount();
+    return lead;
+}
+
+// Task 9b (finish review, fix 5): the Basics and Explore lead is three lines at most -- what the orbital is and that its
+// nodes shape it. The node count by kind is the Nodes fact's; the surfaces' kinds and the one-electron framing are the
+// technical band's; the pointer to Atom mode (navigation) leaves Info, as Help still says it.
+describe('the Orbitals lead (Task 9b)', () => {
+    it('says what the orbital is and that its nodes shape it, and no more', () => {
+        expect(leadAt(basicInfo(orbitalsState().getState(), 'explore'), 'explore'))
+            .toBe('A dumbbell with a ring, shaped by its 2 nodes — surfaces where the electron is never found.');
+        expect(leadAt(basicInfo(orbitalsState({ n: 1, l: 0, ml: 0 }).getState(), 'basics'), 'basics'))
+            .toBe('A sphere, with no nodes: there is no surface where the electron is never found.');
+    });
+
+    it('moves the surfaces\' kinds and the one-electron framing to the technical band, and the pointer out of Info', () => {
+        const content = basicInfo(orbitalsState().getState(), 'advanced');
+        const advanced = shownAt(content, 'advanced');
+        expect(advanced).toContain('the angular part has l = 2 (two cones)');
+        expect(advanced).toContain('One electron, Z = 1 — the exact solution, and the idealised shape every multi-electron orbital is a distortion of.');
+        for (const level of ['basics', 'explore', 'advanced', 'research'] as const) {
+            expect(shownAt(content, level)).not.toContain('Pick an element in Atom mode');
+        }
+        expect(BASIC_ORBITALS_ABOUT).toContain('Pick an element in Atom mode');
+        const n4 = shownAt(basicInfo(orbitalsState({ n: 4, l: 2, ml: 1 }).getState(), 'advanced'), 'advanced');
+        expect(n4).toContain('n − l − 1 = 1 node (a sphere)');
+    });
+
+    it('says what a cut removes after the facts, not in the lead', () => {
+        const store = orbitalsState();
+        store.dispatch(setSurfaceStyle({ ...store.getState().orbital.surfaceStyle, clipAxis: 'x' }));
+        const content = basicInfo(store.getState(), 'explore');
+        expect(leadAt(content, 'explore')).not.toMatch(/cut/i);
+        expect(shownAt(content, 'explore')).toMatch(/cut/i);
+    });
+});
+

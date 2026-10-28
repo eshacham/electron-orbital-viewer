@@ -865,7 +865,8 @@ describe('Molecules mode', () => {
         expect(spoken()).toHaveTextContent(/^Water 1b1 \(HOMO\) · 90 % enclosed$/);
     });
 
-    // Fix round 1 (M11): the canvas subtitle reads the export's flat 1b₁ and typesets it again, 1b<sub>1</sub>.
+    // Fix round 1 (M11): the canvas subtitle typesets the irrep, 1b<sub>1</sub>. Task 9b: the subtitle names the drawn
+    // orbital without the title it used to repeat ("Water (H₂O), MO …") or its energy (Info's fact).
     it('typesets the drawn orbital\'s irrep in the canvas subtitle', async () => {
         const { store } = await enterMolecules(false);
         pickWater(store);
@@ -874,7 +875,8 @@ describe('Molecules mode', () => {
             store.dispatch(renderFinished({ isoLevel: 0.05, drawn: { id: 'h2o', surface: { kind: 'mo', index: 4 }, enclosedFraction: 0.9 } }));
         });
         const subtitle = document.querySelector('.viewport-subtitle')!;
-        expect(subtitle).toHaveTextContent(/^Water \(H₂O\), MO 1b1 \(HOMO\)/);
+        expect(subtitle).toHaveTextContent(/^1b1 orbital \(HOMO\)/);
+        expect(subtitle.textContent).not.toMatch(/Water|eV|Ha\b/);
         expect(subtitle.innerHTML).toContain('1b<sub>1</sub>');
         expect(subtitle.textContent).not.toMatch(/[_₁]/);
     });
@@ -1203,9 +1205,10 @@ describe('Molecules at Basics (Task 2, fix round 1)', () => {
     const originalMatchMedia = window.matchMedia;
     afterEach(() => { window.matchMedia = originalMatchMedia; });
 
-    // Ruling T2-I2: the switch is Explore's, but the arrow drawn keeps its value, caveat and sign convention -- Task 7b:
-    // in Info, which every level reads.
-    it('keeps the dipole arrow\'s value, caveat and convention in Info, with no switch', async () => {
+    // Ruling T2-I2: the switch is Explore's, but the arrow drawn keeps its value and caveat -- Task 7b: in Info, which
+    // every level reads. Task 9b (fix 1): at Basics the value alone with its units (the experiment and its reference are
+    // Research's), and no sign convention -- the pointer says the dipole arrow appears at Explore.
+    it('keeps the dipole\'s value and caveat in Info, with no switch and no convention', async () => {
         const { store, container } = await enterMolecules(false);
         act(() => {
             store.dispatch(selectMolecule({ id: 'o3' }));
@@ -1214,8 +1217,8 @@ describe('Molecules at Basics (Task 2, fix round 1)', () => {
         const viewPanel = container.querySelector('.view-panel') as HTMLElement;
         expect(within(viewPanel).queryByRole('checkbox', { name: 'Dipole arrow' })).toBeNull();
         const info = viewPanel.querySelector('.info-section') as HTMLElement;
-        expect(info).toHaveTextContent(/Dipole μ1\.86 D computed .*Ozone has strong multireference character\./);
-        expect(info).toHaveTextContent(/The arrow points from − to \+ \(the physics convention\)/);
+        expect(info).toHaveTextContent(/Dipole μ1\.86 D — Ozone has strong multireference character\./);
+        expect(info).not.toHaveTextContent(/The arrow points from − to \+/);
     });
 
     // Ruling T2-energies: orbital energies are Explore's; the list keeps names, occupancy and the frontier chips.

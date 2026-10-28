@@ -180,7 +180,8 @@ describe('atomInfo (Task 6)', () => {
         const content = atomInfo(atomsState({ Z: 6, profile: carbon() }), 'explore');
         expect(textOf(content.title)).toBe('Carbon — whole atom');
         const shown = shownAt(content, 'explore');
-        expect(shown).toContain('Configuration1s² 2s² 2p²');
+        // Task 9b (fix 2): the configuration fact is Advanced's -- below it the panel's line is its one home.
+        expect(shownAt(content, 'advanced')).toContain('Configuration1s² 2s² 2p²');
         expect(shown).toContain('Valence4 electrons in the outer shell');
         expect(shown).toContain('Click a ring in the 3D view, or a shell chip, to open it.');
         // Ruling P14's note moved here from the valence line, in the technical band.
@@ -221,10 +222,11 @@ describe('atomInfo (Task 6)', () => {
         expect(valencePlainWords(speciesConfiguration({ Z, charge, excitation: null }))).toBe(words);
     });
 
+    // Task 9b (fix 5): the caption is technical now -- the lead keeps to what the selection is -- so it is read from Advanced.
     it('says the cut-face caption once, for the shell views only', () => {
-        const atom = shownAt(atomInfo(atomsState({ Z: 6, profile: carbon() }), 'explore'), 'explore');
+        const atom = shownAt(atomInfo(atomsState({ Z: 6, profile: carbon() }), 'advanced'), 'advanced');
         expect(atom.split(CUT_FACE_NOTE)).toHaveLength(2);
-        const shell = shownAt(atomInfo(atomsState({ Z: 6, profile: carbon(), level: 'shell', selectedShell: 2 }), 'explore'), 'explore');
+        const shell = shownAt(atomInfo(atomsState({ Z: 6, profile: carbon(), level: 'shell', selectedShell: 2 }), 'advanced'), 'advanced');
         expect(shell).toContain(CUT_FACE_NOTE);
         expect(shell).toContain('The L shell (n=2) holds 4 of Carbon\'s 6 electrons: 2s² 2p².');
         // Fix round 1 (M1): no "it" without a referent in Info.
@@ -402,5 +404,107 @@ describe('atomInfo (Task 6)', () => {
         expect(shown).not.toContain(CUT_FACE_NOTE);
         expect(shown).not.toContain('Ionisation energy');
         expect(textOf(content.computed)).not.toMatch(/This picture/);
+    });
+
+    // Task 9b (finish review, fixes 2 and 5).
+    describe('one home per number, and a short lead (Task 9b)', () => {
+        const leadOf = (content: InfoContent, level: LearningLevel) => {
+            const { container, unmount } = render(React.createElement(InfoPanel, { content, topic: null, onClearTopic: () => {}, level }));
+            const lead = flat(container.querySelector('.info-body > p.info-text')?.textContent ?? '');
+            unmount();
+            return lead;
+        };
+
+        it('leaves the configuration to the panel\'s line below Advanced, where both would show it', () => {
+            const content = atomInfo(atomsState({ Z: 6, profile: carbon() }), 'explore');
+            expect(shownAt(content, 'basics')).not.toContain('Configuration');
+            expect(shownAt(content, 'explore')).not.toContain('Configuration');
+            expect(shownAt(content, 'advanced')).toContain('Configuration1s² 2s² 2p²');
+        });
+
+        it('keeps the lead to what the selection is; the hint on what to click follows the facts, the cut-face note is technical', () => {
+            const whole = atomInfo(atomsState({ Z: 6, profile: carbon() }), 'explore');
+            expect(leadOf(whole, 'explore')).toBe('Carbon has 6 electrons in 2 shells. The cut face shows them as rings.');
+            expect(shownAt(whole, 'explore')).toContain('Click a ring in the 3D view, or a shell chip, to open it.');
+            expect(shownAt(whole, 'explore')).not.toContain(CUT_FACE_NOTE);
+            expect(shownAt(whole, 'advanced')).toContain(CUT_FACE_NOTE);
+            const orbital = atomInfo(atomsState({
+                Z: 6, profile: carbon(), level: 'orbital', selectedShell: 2, selectedSubshell: { n: 2, l: 1 }, selectedOrbital: { n: 2, l: 1, ml: 0 },
+            }), 'explore');
+            expect(leadOf(orbital, 'explore')).toBe('One of the 3 p orbitals of 2p, a dumbbell.');
+        });
+
+        it('says the scalar default after the facts, not in the lead', () => {
+            const content = atomInfo(pa(), 'explore');
+            expect(leadOf(content, 'explore')).not.toContain(SCALAR_DEFAULT_NOTE);
+            expect(shownAt(content, 'explore')).toContain(SCALAR_DEFAULT_NOTE);
+        });
+
+        // The panel's energy line is gone (Info's fact is the energy's one home); what it pinned, Info's fact pins now.
+        describe('the energy fact says what the panel line said', () => {
+            const ionShown = (Z: number, charge: number, key: string, ionisation: { valueEv: number; fromLabel: string; toLabel: string } | null,
+                status: 'done' | 'idle' = 'done') => shownAt(atomInfo(atomsState({
+                Z, charge, profile: profileOf(Z, [sub(2, 1, 6, -1.8)], { speciesKey: key }),
+                energies: { speciesKey: key, status, ionisation, excitation: null, message: null },
+            }), 'advanced'), 'advanced');
+
+            it('names an anion\'s ionisation energy as the electron affinity of the neutral, or of the -1 anion', () => {
+                expect(ionShown(35, -1, '35-1', { valueEv: 3.1, fromLabel: 'Br⁻', toLabel: 'Br' })).toMatch(/electron affinity of Br/);
+                expect(ionShown(8, -2, '8-2', { valueEv: 1.9, fromLabel: 'O²⁻', toLabel: 'O⁻' })).toMatch(/electron affinity of O⁻/);
+            });
+
+            it('says why there is no ionisation energy when the next ion is not offered', () => {
+                expect(ionShown(11, 1, '11+1', null)).toContain('— (next ion not offered)');
+            });
+
+            const excitedShown = (Z: number, excitation: { from: { n: number; l: number }; to: { n: number; l: number } }, key: string,
+                energies: Partial<AtomState['energies']>, extra: Partial<AtomState> = {}) => shownAt(atomInfo(atomsState({
+                Z, excitation, profile: profileOf(Z, [sub(4, 0, 1, -0.1)], { speciesKey: key }),
+                energies: { speciesKey: key, status: 'done', ionisation: null, excitation: null, message: null, ...energies }, ...extra,
+            }), 'advanced'), 'advanced');
+
+            it('qualifies a cation\'s ionisation energy with which ionisation it is, and never says "measured" for it', () => {
+                const shown = ionShown(11, 1, '11+1', { valueEv: 47.3, fromLabel: 'Na⁺', toLabel: 'Na²⁺' });
+                expect(shown).toContain('Ionisation energy (Na⁺ → Na²⁺)');
+                expect(shown).not.toMatch(/measured|Measured/);
+            });
+
+            // Ruling FR-1: LDA puts some s → d excited configurations below the ground one.
+            it('notes a negative excitation energy as LDA ordering the configurations wrongly, and only that', () => {
+                expect(excitedShown(28, { from: { n: 4, l: 0 }, to: { n: 3, l: 2 } }, '28:4s>3d',
+                    { excitation: { valueEv: -1.572, fromLabel: 'Ni', toLabel: 'Ni 4s → 3d' } }))
+                    .toContain('−1.57 eV (below the ground configuration in LDA — a known LDA error for s→d transfer)');
+                expect(excitedShown(11, { from: { n: 3, l: 0 }, to: { n: 3, l: 1 } }, '11:3s>3p',
+                    { excitation: { valueEv: 2.19, fromLabel: 'Na', toLabel: 'Na 3s → 3p' } })).not.toContain('below the ground configuration');
+                expect(ionShown(35, -1, '35-1', { valueEv: -0.2, fromLabel: 'Br⁻', toLabel: 'Br' })).not.toContain('below the ground configuration');
+            });
+
+            // Ruling FR-2: a picture that never lands must not leave the energies "waiting" for ever.
+            it('says the energies were not computed when the picture\'s SCF did not converge', () => {
+                const shown = excitedShown(19, { from: { n: 4, l: 0 }, to: { n: 4, l: 2 } }, '19:4s>4d', { status: 'idle' }, { error: 'SCF did not converge' });
+                expect(shown).toContain('not computed — the picture\'s solve failed');
+                expect(shown).not.toContain('waiting');
+            });
+
+            it('says it is waiting for the picture, then computing, and "—" only once the ΔSCF has said there is no value', () => {
+                const at = (status: 'idle' | 'computing') => shownAt(atomInfo(atomsState({
+                    Z: 11, profile: profileOf(11, [sub(3, 0, 1, -0.1)]),
+                    energies: { speciesKey: status === 'idle' ? null : '11', status, ionisation: null, excitation: null, message: null },
+                }), 'explore'), 'explore');
+                expect(at('idle')).toContain('Ionisation energy (Na → Na⁺)waiting for the picture…');
+                expect(at('computing')).toMatch(/computing/);
+                const none = ionShown(11, 1, '11+1', null);
+                expect(none).toContain('—');
+                expect(none).not.toContain('waiting');
+            });
+
+            it('never shows another species\' energies (ruling C5)', () => {
+                const shown = shownAt(atomInfo(atomsState({
+                    Z: 11, profile: profileOf(11, [sub(3, 0, 1, -0.1)]),
+                    energies: { speciesKey: '11+1', status: 'done', ionisation: { valueEv: 47.3, fromLabel: 'Na⁺', toLabel: 'Na²⁺' }, excitation: null, message: null },
+                }), 'advanced'), 'advanced');
+                expect(shown).not.toContain('47.3');
+            });
+        });
     });
 });

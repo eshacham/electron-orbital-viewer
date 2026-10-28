@@ -628,22 +628,22 @@ describe('App', () => {
         expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Ionisation energy');
     });
 
-    // Task 6 fix round 2 (owner: only one (i) is ever shown pressed): the ionisation energy has an (i) on the panel's line
-    // and one on Info's fact; pressing Info's lights it alone.
-    it('in Atoms, lights only the ionisation (i) that was pressed', () => {
+    // Task 6 fix round 2 (owner: only one (i) is ever shown pressed) had a second ionisation (i) on the panel's line.
+    // Task 9b (fix 2): that line is gone -- Info's fact is the energy's one home -- so its (i) is the only one, and
+    // pressing it opens the entry (Info then shows the entry, not the fact). The per-instance rule itself is pinned in
+    // tests/info/info_button.test.tsx.
+    it('in Atoms, gives the ionisation energy one (i), Info\'s', () => {
         installMatchMedia(false);
         const { container } = renderWithProvider(<App />, {
             Z: 18, profile: argonLikeProfile(),
             energies: { speciesKey: '18', status: 'done', ionisation: { valueEv: 15.52, fromLabel: 'Ar', toLabel: 'Ar⁺' }, excitation: null, message: null },
         });
-        const panelLine = () => within(container.querySelector('.species-energy') as HTMLElement).getByRole('button', { name: 'About Ionisation energy' });
-        fireEvent.click(within(container.querySelector('.info-section') as HTMLElement).getByRole('button', { name: 'About Ionisation energy' }));
+        expect(container.querySelector('.species-energy')).toBeNull();
+        expect(screen.getAllByRole('button', { name: 'About Ionisation energy' })).toHaveLength(1);
+        const infoButton = within(container.querySelector('.info-section') as HTMLElement).getByRole('button', { name: 'About Ionisation energy' });
+        fireEvent.click(infoButton);
         expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Ionisation energy');
-        expect(panelLine()).toHaveAttribute('aria-pressed', 'false');
-        expect(container.querySelectorAll('.info-button.is-active')).toHaveLength(0);
-        fireEvent.click(panelLine());
-        expect(panelLine()).toHaveAttribute('aria-pressed', 'true');
-        expect(container.querySelectorAll('.info-button.is-active')).toHaveLength(1);
+        expect(screen.queryAllByRole('button', { name: 'About Ionisation energy' })).toHaveLength(0);
     });
 
     // Task 6: the Atoms panels keep controls and short labelled values; their captions are Info's (atomInfo).
@@ -919,8 +919,8 @@ describe('App', () => {
             act(() => {
                 energies.onmessage({ data: { type: 'energies', speciesKey: '11+1', ionisation: { valueEv: 47.1, fromLabel: 'Na⁺', toLabel: 'Na²⁺' }, excitation: null, requestId } });
             });
-            // Task 6: the panel's labelled value, and Info's fact beside it (both Advanced) -- one reading, one text.
-            expect(document.querySelector('.species-energy')).toHaveTextContent(/47\.10 eV/);
+            // Task 9b (fix 2): Info's fact is the energy's one home; the panel has no line for it.
+            expect(document.querySelector('.species-energy')).toBeNull();
             expect(document.querySelector('.info-section')).toHaveTextContent(/47\.10 eV/);
         });
 
@@ -2952,7 +2952,8 @@ describe('App: what is drawn, named (Task 8)', () => {
 
         it('typesets a Bonds orbital in the canvas subtitle', async () => {
             open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', false);
-            await waitFor(() => expect(document.querySelector('.viewport-subtitle')).toHaveTextContent(/^N₂ 1πu/));
+            // Task 9b: the subtitle names the drawn orbital without repeating the title's N₂, or R (the slider and Info's).
+            await waitFor(() => expect(document.querySelector('.viewport-subtitle')).toHaveTextContent(/^1πu orbital/));
             expect(document.querySelector('.viewport-subtitle')!.innerHTML).toContain('1π<sub>u</sub>');
         });
     });

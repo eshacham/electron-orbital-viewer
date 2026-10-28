@@ -167,76 +167,78 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
         <Box className="subshell-panel" aria-label={part === 'diagram' ? 'orbital energies' : 'subshells'}>
             {showChips && (
                 <>
-                    {/* Task 6: an (i) beside the subshells explains the term in Info. */}
-                    <div className="info-beside-row">
-                        <Box ref={chipRowRef} className="subshell-chip-row" role="group" aria-label="subshells in this shell">
-                            {shellSubshells.map(subshell => {
-                                const isSelected = sameSubshell(selectedSubshell, subshell);
-                                const electrons = formatElectrons(subshell.electrons);
-                                const capacity = subshellCapacity(subshell);
-                                const energy = hartreeText(subshell.energy);
-                                return (
-                                    <Chip
-                                        key={subshellKey(subshell)}
-                                        className={`subshell-chip${isSelected ? ' selected' : ''}`}
-                                        data-n={subshell.n}
-                                        data-l={subshell.l}
-                                        data-j={subshell.j}
-                                        // "6p³⁄₂" is read aloud as superscripts and a
-                                        // fraction slash; a j-level chip says "6p j = 3/2"
-                                        // instead. Without j the visible text already
-                                        // reads well and stays the name. The name replaces
-                                        // the visible text, whose energy states its method
-                                        // only as a hover title, so it names the method
-                                        // too (spec §3.1, final review M8).
-                                        aria-label={subshell.j === undefined ? undefined
-                                            : `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons`
-                                                + (showEnergies ? `, ${energy} orbital energy (${shortMethodLabel(relativity)})` : '')}
-                                        color={isSelected ? 'primary' : 'default'}
-                                        // A toggle, not a one-way selection: pressed means
-                                        // this subshell's orbitals are isolated in the 3D
-                                        // composition view, and clicking it again returns to
-                                        // the overlapping view (Addendum 2's readability
-                                        // follow-up -- see App.tsx's handleSelectSubshell).
-                                        aria-pressed={isSelected}
-                                        // j only for a j-level, so without spin–orbit the
-                                        // call is exactly the (n, l) it always was.
-                                        onClick={() => (subshell.j === undefined
-                                            ? onSelectSubshell(subshell.n, subshell.l)
-                                            : onSelectSubshell(subshell.n, subshell.l, subshell.j))}
-                                        label={
-                                            <span className="subshell-chip-content">
-                                                <span className="subshell-chip-label">{subshellLabel(subshell.n, subshell.l, subshell.j)}</span>
-                                                {' · '}
-                                                {/* Addendum 2's explicit occupancy readout ("2p: 2 of 6") -- carbon's
-                                                    2p2 and neon's 2p6 look identical as a bare electron count, but
-                                                    "2 of 6" vs "6 of 6" says outright which one is full. Capacity is
-                                                    2*(2l+1): two spins in each of the 2l+1 real orbitals -- or 2j+1
-                                                    for a j-level, whose share of an open subshell is fractional. */}
-                                                <span className="subshell-chip-occupancy">
-                                                    {electrons} of {capacity} e⁻
-                                                </span>
-                                                {/* Spec §3.1: a relativistic eigenvalue states its method. No
-                                                    ' · ' separator here (Phase 6G-2, P16): the energy wraps onto
-                                                    its own line (.subshell-chip-energy's flex-basis: 100%) instead
-                                                    of truncating in a narrow inspector, and the line break reads
-                                                    as the separator. */}
-                                                {showEnergies && (
-                                                    <span
-                                                        className="subshell-chip-energy"
-                                                        title={relativity === 'off' ? undefined : `orbital energy (eigenvalue): ${methodStatement(relativity)}`}
-                                                    >
-                                                        {energy} (orbital energy)
-                                                    </span>
-                                                )}
-                                            </span>
-                                        }
-                                    />
-                                );
-                            })}
-                        </Box>
+                    {/* Task 9b (finish review, fix 7): the (i) sits beside the word it explains -- a short label naming the row, as
+                        Orbitals' "Shell n (i)" -- not at the far end of the chips. */}
+                    <div className="info-term">
+                        <span className="info-term-label">Subshells</span>
                         <InfoButton topic="subshell" label="Subshell" />
                     </div>
+                    <Box ref={chipRowRef} className="subshell-chip-row" role="group" aria-label="subshells in this shell">
+                        {shellSubshells.map(subshell => {
+                            const isSelected = sameSubshell(selectedSubshell, subshell);
+                            const electrons = formatElectrons(subshell.electrons);
+                            const capacity = subshellCapacity(subshell);
+                            const energy = hartreeText(subshell.energy);
+                            return (
+                                <Chip
+                                    key={subshellKey(subshell)}
+                                    className={`subshell-chip${isSelected ? ' selected' : ''}`}
+                                    data-n={subshell.n}
+                                    data-l={subshell.l}
+                                    data-j={subshell.j}
+                                    // "6p³⁄₂" is read aloud as superscripts and a
+                                    // fraction slash; a j-level chip says "6p j = 3/2"
+                                    // instead. Without j the visible text already
+                                    // reads well and stays the name. The name replaces
+                                    // the visible text, whose energy states its method
+                                    // only as a hover title, so it names the method
+                                    // too (spec §3.1, final review M8).
+                                    aria-label={subshell.j === undefined ? undefined
+                                        : `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons`
+                                            + (showEnergies ? `, ${energy} orbital energy (${shortMethodLabel(relativity)})` : '')}
+                                    color={isSelected ? 'primary' : 'default'}
+                                    // A toggle, not a one-way selection: pressed means
+                                    // this subshell's orbitals are isolated in the 3D
+                                    // composition view, and clicking it again returns to
+                                    // the overlapping view (Addendum 2's readability
+                                    // follow-up -- see App.tsx's handleSelectSubshell).
+                                    aria-pressed={isSelected}
+                                    // j only for a j-level, so without spin–orbit the
+                                    // call is exactly the (n, l) it always was.
+                                    onClick={() => (subshell.j === undefined
+                                        ? onSelectSubshell(subshell.n, subshell.l)
+                                        : onSelectSubshell(subshell.n, subshell.l, subshell.j))}
+                                    label={
+                                        <span className="subshell-chip-content">
+                                            <span className="subshell-chip-label">{subshellLabel(subshell.n, subshell.l, subshell.j)}</span>
+                                            {' · '}
+                                            {/* Addendum 2's explicit occupancy readout ("2p: 2 of 6") -- carbon's
+                                                2p2 and neon's 2p6 look identical as a bare electron count, but
+                                                "2 of 6" vs "6 of 6" says outright which one is full. Capacity is
+                                                2*(2l+1): two spins in each of the 2l+1 real orbitals -- or 2j+1
+                                                for a j-level, whose share of an open subshell is fractional. */}
+                                            <span className="subshell-chip-occupancy">
+                                                {electrons} of {capacity} e⁻
+                                            </span>
+                                            {/* Spec §3.1: a relativistic eigenvalue states its method. No
+                                                ' · ' separator here (Phase 6G-2, P16): the energy wraps onto
+                                                its own line (.subshell-chip-energy's flex-basis: 100%) instead
+                                                of truncating in a narrow inspector, and the line break reads
+                                                as the separator. */}
+                                            {showEnergies && (
+                                                <span
+                                                    className="subshell-chip-energy"
+                                                    title={relativity === 'off' ? undefined : `orbital energy (eigenvalue): ${methodStatement(relativity)}`}
+                                                >
+                                                    {energy} (orbital energy)
+                                                </span>
+                                            )}
+                                        </span>
+                                    }
+                                />
+                            );
+                        })}
+                    </Box>
 
                     {/* Task 6: the isolate hint (Addendum 2's readability follow-up -- isolating a subshell is how
                         you read iron's five overlapping 3d orbitals apart) and the j-level note are said in Info. */}

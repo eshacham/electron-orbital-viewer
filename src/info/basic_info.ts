@@ -43,8 +43,9 @@ const qLabel = (word: string, symbol: string) => h(React.Fragment, null, `${word
  * Spec §7's one-electron framing (moved from BasicExplore's tile caption, Task 5). Still exported: App's Help dialog
  * quotes it. A single orbital's Info says it; a field view does not -- it is not the exact solution.
  */
-export const BASIC_ORBITALS_ABOUT = 'One electron, Z = 1 — the exact solution, and the idealised shape every multi-electron orbital '
-    + 'is a distortion of. Pick an element in Atom mode for a real, many-electron atom.';
+export const BASIC_ORBITALS_FRAMING = 'One electron, Z = 1 — the exact solution, and the idealised shape every multi-electron orbital '
+    + 'is a distortion of.';
+export const BASIC_ORBITALS_ABOUT = `${BASIC_ORBITALS_FRAMING} Pick an element in Atom mode for a real, many-electron atom.`;
 
 /* The Combination picker's captions (CombinationControls, before Task 5), word for word. */
 const HYBRID_BUILT_FROM = "Built from hydrogen's exact 2s and 2p (Z = 1).";
@@ -110,6 +111,8 @@ function cutSentence(state: OrbitalsInfoState): string | null {
 }
 
 const joinSentences = (...parts: Array<string | null | false>) => parts.filter(Boolean).join(' ');
+/** Task 9b: what a cut removes, as a note after the facts (InfoContent.notes) -- never part of the lead. */
+const notesOf = (cut: string | null) => (cut ? [cut] : undefined);
 
 function orbitalInfo(state: OrbitalsInfoState): InfoContent {
     const { n, l, ml } = state.orbital.basicSelection;
@@ -123,11 +126,13 @@ function orbitalInfo(state: OrbitalsInfoState): InfoContent {
     const lead = !shape ? `${/^[sfhil]$/.test(letter) ? 'An' : 'A'} ${letter} orbital`
         : /^(six|eight)\b/.test(shape) ? shape.charAt(0).toUpperCase() + shape.slice(1) : `A ${shape}`;
     // Review: radial nodes alone (l = 0) do not shape a sphere -- it simply has them; angular nodes do shape the lobes.
+    // Task 9b (finish review, fix 5): the lead keeps to three lines -- the count by kind is the Nodes fact's, and what
+    // the surfaces are (spheres, planes, cones) is said with the radial and angular parts in the technical band.
     const shapeAndNodes = total === 0
         ? `${lead}, with no nodes: there is no surface where the electron is never found.`
-        : `${lead}, ${l === 0 ? 'with' : 'shaped by its'} ${total} ${plural(total, 'node', 'nodes')} — ${plural(total, 'a surface', 'surfaces')} where the electron is never found: `
-            + `${radial} radial${radial > 0 ? ` (${plural(radial, 'a sphere', 'spheres')})` : ''}`
-            + ` and ${l} angular${l > 0 ? ` (${surfaces ?? 'planes or cones through the nucleus'})` : ''}.`;
+        : `${lead}, ${l === 0 ? 'with' : 'shaped by its'} ${total} ${plural(total, 'node', 'nodes')} — ${plural(total, 'a surface', 'surfaces')} where the electron is never found.`;
+    const radialSurfaces = radial > 0 ? ` (${plural(radial, 'a sphere', 'spheres')})` : '';
+    const angularSurfaces = l > 0 ? ` (${surfaces ?? 'planes or cones through the nucleus'})` : '';
 
     const realNote = ml === 0 ? ''
         : ` The app draws real orbitals: this one combines the complex states with mₗ = +${Math.abs(ml)} and mₗ = −${Math.abs(ml)} `
@@ -136,11 +141,17 @@ function orbitalInfo(state: OrbitalsInfoState): InfoContent {
 
     return {
         title: h(React.Fragment, null, 'Hydrogen — ', name, ' orbital'),
-        plain: joinSentences(shapeAndNodes, BASIC_ORBITALS_ABOUT, cutSentence(state)),
-        technical: `${nb('ψ = Rₙₗ(r) Y(θ, φ)')}: the radial part has ${nb(`n − l − 1 = ${radial}`)} ${plural(radial, 'node', 'nodes')} and the angular part has ${nb(`l = ${l}`)}. `
-            + `Its size grows roughly as n². ${nb('E = −1/(2n²) Ha')} depends on n alone, so all ${nb(`n² = ${n * n}`)} orbitals of the shell share it.${realNote}`
-            // Task 6: the |R|² plot tab's caption, said here once (plot_tabs.ts).
-            + ` ${RADIAL_FACTOR_NOTE}`,
+        // Task 9b (fix 5): the lead alone; the one-electron framing is technical, the pointer to Atom mode is Help's
+        // (BASIC_ORBITALS_ABOUT), and what a cut removes follows the facts.
+        plain: shapeAndNodes,
+        notes: notesOf(cutSentence(state)),
+        technical: [
+            BASIC_ORBITALS_FRAMING,
+            `${nb('ψ = Rₙₗ(r) Y(θ, φ)')}: the radial part has ${nb(`n − l − 1 = ${radial}`)} ${plural(radial, 'node', 'nodes')}${radialSurfaces} and the angular part has ${nb(`l = ${l}`)}${angularSurfaces}. `
+                + `Its size grows roughly as n². ${nb('E = −1/(2n²) Ha')} depends on n alone, so all ${nb(`n² = ${n * n}`)} orbitals of the shell share it.${realNote}`
+                // Task 6: the |R|² plot tab's caption, said here once (plot_tabs.ts).
+                + ` ${RADIAL_FACTOR_NOTE}`,
+        ],
         facts: [
             { label: qLabel('Shell', 'n'), value: String(n) },
             { label: qLabel('Subshell', 'l'), value: `${l} (${letter})` },
@@ -166,7 +177,8 @@ function hybridInfo(state: OrbitalsInfoState, selection: Extract<CombinationSele
     return {
         title: h(React.Fragment, null, 'Hydrogen — ', combinationTitleNode(selection)),
         plain: joinSentences(HYBRID_BUILT_FROM, `${HYBRID_NAMES[selection.hybrid]} mixes ${HYBRID_GEOMETRY[selection.hybrid]}.`,
-            HYBRID_CAPTION, cutSentence(state)),
+            HYBRID_CAPTION),
+        notes: notesOf(cutSentence(state)),
         technical: `${nb(`hᵢ = −(1/√${k + 1}) ψ₂ₛ + √(${k}/${k + 1}) (dᵢ · p)`)}, with dᵢ each hybrid's direction; the 2s enters with a minus sign so each large lobe points along its own dᵢ. `
             + 'All n = 2 states share one energy, so the hybrids have it too.',
         facts: [
@@ -192,8 +204,8 @@ function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelec
         return {
             title: h(React.Fragment, null, 'Hydrogen — ', combinationTitleNode(selection)),
             plain: joinSentences(FIELD_SETUP,
-                'The cloud shifts a little that way, so the atom gains a small electric dipole; a stronger field shifts it further.',
-                cutSentence(state)),
+                'The cloud shifts a little that way, so the atom gains a small electric dipole; a stronger field shifts it further.'),
+            notes: notesOf(cutSentence(state)),
             technical: `${nb('α = 9/2 a₀³')}, exact for hydrogen, so ${nb('μ = αF')}. The 1s energy does not change to first order in F, nor does its radial distribution.`,
             facts: [
                 fieldFact,
@@ -218,8 +230,8 @@ function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelec
         title: h(React.Fragment, null, 'Hydrogen — ', combinationTitleNode(selection)),
         plain: h(React.Fragment, null,
             `${FIELD_SETUP} At n = 2 it mixes 2s with `, twoPz(), ': in ', starkLabel('lower'),
-            ' the electron leans towards −z and its energy falls; in ', starkLabel('upper'), ' it leans towards +z and its energy rises.',
-            cutSentence(state) ? ` ${cutSentence(state)}` : ''),
+            ' the electron leans towards −z and its energy falls; in ', starkLabel('upper'), ' it leans towards +z and its energy rises.'),
+        notes: notesOf(cutSentence(state)),
         technical: h(React.Fragment, null, `${N2_FIRST_ORDER} ${nb('ΔE = ∓3F')}, from ⟨2s|z|`, twoPz(), nb('⟩ = −3 a₀'), ' in this sign convention.'),
         facts: [fieldFact, { label: 'Energy at F = 0', value: energyText(-1 / 8), min: 'explore' }, ...shiftFacts, enclosed],
         computed: h(React.Fragment, null,

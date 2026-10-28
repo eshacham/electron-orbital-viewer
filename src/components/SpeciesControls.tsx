@@ -1,61 +1,32 @@
 import React, { useRef, useState } from 'react';
 import { Box, Button, Menu, MenuItem, Typography, Alert } from '@mui/material';
 import {
-    AtomSpecies, Excitation, SubshellRef, excitationSources, excitationTargets, excitationLabel, speciesSymbol, speciesKey,
+    AtomSpecies, Excitation, SubshellRef, excitationSources, excitationTargets, excitationLabel, speciesSymbol,
 } from '../atom/species';
 import { allowedCharges } from '../atom/ion_configurations';
-import type { EnergyReading } from '../atom/delta_scf';
-import type { EnergiesState } from '../store/atomSlice';
-import { atLeast, CONTROL_LEVEL, IE_LEVEL, LearningLevel } from '../levels/levels';
-import { energyValueText, ionisationLabelOf, ionisationNoValueReason } from '../atom/atom_text';
-import InfoButton from '../info/InfoButton';
+import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
 
 interface SpeciesControlsProps {
     species: AtomSpecies;
     onChargeChange: (charge: number) => void;
     onExcitationChange: (excitation: Excitation | null) => void;
-    energies: EnergiesState;
     unbound: string | null;
-    /** The species' picture solve failed, so the energies, which wait for it (ruling C15), will never start. */
-    pictureFailed?: boolean;
     /**
-     * Task 2: the learning level in use. The Charge and Excite rows appear at Advanced -- hidden below it. Task 6:
-     * so does the energy line, a short labelled value (IE_LEVEL); its method, NIST comparison, limitation note and
-     * the size comparison are Info's. Omitted, everything shows.
+     * Task 2: the learning level in use. The Charge and Excite rows appear at Advanced -- hidden below it. Omitted,
+     * everything shows.
      */
     level?: LearningLevel;
 }
 
-const NO_ENERGIES: EnergiesState = { speciesKey: null, status: 'idle', ionisation: null, excitation: null, message: null };
-
 const sameRef = (a: SubshellRef, b: SubshellRef): boolean => a.n === b.n && a.l === b.l;
 
 /**
- * "Ionisation energy (Na → Na⁺): 5.37 eV" with an (i) -- Task 6: a short labelled value. Its method, NIST measurement,
- * signed difference and limitation note are said in Info (atomInfo), from the same reading.
- */
-const EnergyLine: React.FC<{
-    label: string; reading: EnergyReading | null; status: EnergiesState['status']; noValueReason?: string; pictureFailed?: boolean; isExcitation?: boolean;
-}> =
-    ({ label, reading, status, noValueReason, pictureFailed, isExcitation }) => (
-        <Typography variant="body2" component="div" className="species-energy">
-            <span>
-                {label}:{' '}
-                {energyValueText(reading, status, noValueReason, pictureFailed, isExcitation)}
-            </span>
-            {!isExcitation && <InfoButton topic="ionisation" label="Ionisation energy" />}
-        </Typography>
-    );
-
-/**
- * Charge and excitation for atom mode (spec §5 Phase 3), with the energy
- * that describes them as a short labelled value. Task 6: the energy's method
- * (ΔSCF), its NIST comparison and limitation note, and the size comparison
- * against the neutral atom are said in Info (atomInfo). Presentational:
- * every change goes out through a callback.
+ * Charge and excitation for atom mode (spec §5 Phase 3). Task 9b: the energy that describes them, with its method
+ * (ΔSCF), NIST comparison and limitation note, and the size comparison against the neutral atom, is said in Info
+ * (atomInfo) alone. Presentational: every change goes out through a callback.
  */
 const SpeciesControls: React.FC<SpeciesControlsProps> = ({
-    species, onChargeChange, onExcitationChange, energies, unbound, pictureFailed = false, level = 'research',
+    species, onChargeChange, onExcitationChange, unbound, level = 'research',
 }) => {
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const decreaseRef = useRef<HTMLButtonElement>(null);
@@ -64,17 +35,6 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
     const neutralSymbol = speciesSymbol({ Z: species.Z, charge: 0, excitation: null });
     const sources = excitationSources(species.Z, species.charge);
     const options = sources.flatMap(from => excitationTargets(species.Z, species.charge, from).map(to => ({ from, to })));
-    const showEnergy = atLeast(level, IE_LEVEL);
-
-    // Ruling C5: a reply already in flight (or left behind by a fast
-    // stepper) can describe a species no longer selected -- SpeciesControls
-    // guards this itself, the same check `selectSpeciesEnergies` makes at
-    // the store boundary, rather than trusting every future caller to pass
-    // a pre-filtered `energies` (Task 12 wires the store; this component
-    // must still be correct if it is ever handed the raw slice).
-    const energiesMatch = energies.speciesKey === speciesKey(species);
-    const effectiveEnergies = energiesMatch ? energies : NO_ENERGIES;
-    const reading = species.excitation ? effectiveEnergies.excitation : effectiveEnergies.ionisation;
 
     const excitePopupOpen = menuAnchor !== null;
     const isCurrentOption = (option: Excitation) =>
@@ -153,38 +113,9 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
                 </Box>
             )}
 
-            {unbound ? (
-                <Alert severity="warning" role="alert" className="species-unbound">{unbound}</Alert>
-            ) : (
-                <>
-                    {showEnergy && (species.excitation ? (
-                        <EnergyLine
-                            label={`Excitation energy ${excitationLabel(species.excitation)}`}
-                            isExcitation
-                            reading={reading}
-                            status={effectiveEnergies.status}
-                            pictureFailed={pictureFailed}
-                        />
-                    ) : (
-                        <EnergyLine
-                            label={ionisationLabelOf(species, reading)}
-                            reading={reading}
-                            status={effectiveEnergies.status}
-                            pictureFailed={pictureFailed}
-                            // Final review M6: Na⁺'s next electron would
-                            // break the neon core, and nothing past Z = 108
-                            // has a tabulated ion -- either way the app
-                            // offers no next ion, so there is nothing to
-                            // subtract, and the line says so.
-                            noValueReason={ionisationNoValueReason(species)}
-                        />
-                    ))}
-                    {showEnergy && effectiveEnergies.status === 'failed' && effectiveEnergies.message && (
-                        <Typography variant="caption" display="block" className="species-energy-failed">{effectiveEnergies.message}</Typography>
-                    )}
-                    {/* Task 6: the dashed ring's size comparison (or why there is no ring) is Info's (atomInfo). */}
-                </>
-            )}
+            {/* Task 9b (finish review, fix 2): the energy -- ionisation or excitation, its value, its failure -- has one
+                home, Info's fact (atomInfo); the panel keeps the controls. */}
+            {unbound && <Alert severity="warning" role="alert" className="species-unbound">{unbound}</Alert>}
         </Box>
     );
 };

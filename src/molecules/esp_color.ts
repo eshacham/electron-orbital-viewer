@@ -93,9 +93,12 @@ export function espRangeNote(range: [number, number]): string {
  */
 const ESP_KCAL = Math.round(ESP_LIMIT_HARTREE * HARTREE_TO_KCAL_PER_MOL);
 /** What the colours mean (ESP_STOPS: red where the potential is negative), on the one scale every molecule shares. */
-export const ESP_COLOURS_SENTENCE = 'The surface is coloured by the electrostatic potential: red where it is negative (electron-rich), '
-    + `blue where it is positive (electron-poor). Every molecule is drawn on the same scale, ±${ESP_LIMIT_HARTREE} Ha/e `
-    + `(±${ESP_KCAL} kcal/mol), so maps can be compared.`;
+/**
+ * Task 9b (finish review, fix 5): Info's ESP lead, three lines at most -- what the colours mean (the title names the
+ * electrostatic potential). The shared scale is ESP_SCALE_SENTENCE, in the technical band.
+ */
+export const ESP_COLOURS_SENTENCE = 'Red where the potential is negative (electron-rich), blue where it is positive (electron-poor).';
+export const ESP_SCALE_SENTENCE = `Every molecule is drawn on the same scale, ±${ESP_LIMIT_HARTREE} Ha/e (±${ESP_KCAL} kcal/mol), so maps can be compared.`;
 /** Ruling D4: the surface the map is drawn on is a fixed density, never an enclosed fraction (App's old helper). */
 export const ESP_SURFACE_SENTENCE = `The map is drawn on the surface ρ = ${ESP_SURFACE_DENSITY} e/a₀³, a common convention (Bader's) `
     + 'for a molecule\'s outer surface — not at an enclosed fraction, so Electron enclosed does not apply to it.';

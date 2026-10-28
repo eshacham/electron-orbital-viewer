@@ -92,24 +92,27 @@ describe('moleculeInfo (Task 7b)', () => {
         const { container, unmount } = rendered(content, 'basics');
         expect(container.querySelector('.info-title')).toHaveTextContent('Water (H₂O) — electron density');
         unmount();
-        // Fix round 1 (M6): "its occupied orbitals" -- the empty ones hold none of the density.
-        expect(shownAt(state, 'basics')).toContain('Water has 10 electrons; the surface shows where they are likely to be found, all its occupied orbitals together.');
+        // Task 9b (finish review, fix 5): the lead keeps to three lines; "all its occupied orbitals together" is the density
+        // glossary entry's (the sum of |ψ|² over the occupied orbitals).
+        expect(shownAt(state, 'basics')).toContain('Water has 10 electrons; the surface shows where they are likely to be found.');
     });
 
     // Fix round 1 (ruling on concern 4): Info is each number's one home; no Formula fact, the title has it.
-    it('gives the typed point group, the electrons and the dipole at every level, the gap from Explore, eV first -- no Formula fact', () => {
+    it('gives the electrons and the dipole at every level, the gap from Explore, eV first, the typed point group -- no Formula fact', () => {
         const state = moleculeState();
         const basics = shownAt(state, 'basics');
         expect(basics).not.toContain('Formula');
         expect(basics).toContain('Electrons10');
-        // Computed against experiment, both in debye, with the measurement's source.
-        expect(basics).toContain('Dipole μ1.86 D computed · 1.855 D experiment (CRC Handbook, via CCCBDB)');
+        // Task 9b (fix 1): below Research the dipole is its value with units; computed against experiment, with the
+        // measurement's source, is Research's (checked in 'the level bands (Task 9b)').
+        expect(basics).toContain('Dipole μ1.86 D');
         expect(basics).not.toMatch(/gap/);
         expect(basics).not.toMatch(/eV|Ha\b/);
         const explore = shownAt(state, 'explore');
         expect(explore).toContain('HOMO–LUMO gap8.71 eV (0.320 Ha)');
-        // The point group is typeset: everything past its first letter in a real <sub>.
-        const { container, unmount } = rendered(infoOf(state, 'explore'), 'explore');
+        // The point group is typeset: everything past its first letter in a real <sub>. Task 9b (fix 1): it shows from
+        // Advanced, a scientific term with its (i).
+        const { container, unmount } = rendered(infoOf(state, 'advanced'), 'advanced');
         const pointGroup = [...container.querySelectorAll('.info-fact')].find(row => row.textContent?.startsWith('Point group'))!;
         expect(pointGroup.querySelector('sub')).toHaveTextContent('2v');
         unmount();
@@ -191,8 +194,9 @@ describe('moleculeInfo (Task 7b)', () => {
         unmount();
         expect(count(text, /ionisation energ/i)).toBe(1);
         expect(count(text, /neither the optical gap/)).toBe(1);
-        expect(text).toContain('Orbital energies here are Kohn–Sham eigenvalues, not ionisation energies. '
-            + 'The HOMO–LUMO gap is a Kohn–Sham orbital gap — neither the optical gap (absorption) nor the fundamental gap (IP − EA).');
+        // Task 9b (fix 5): the caveat is one sentence now, its two clauses joined.
+        expect(text).toContain('Orbital energies are Kohn–Sham eigenvalues, not ionisation energies, '
+            + 'and the HOMO–LUMO gap is a Kohn–Sham orbital gap — neither the optical gap (absorption) nor the fundamental gap (IP − EA).');
         expect(shownAt(state, 'basics')).not.toMatch(/Kohn–Sham|ionisation/);
     });
 
@@ -208,8 +212,10 @@ describe('moleculeInfo (Task 7b)', () => {
         expect(lead.compareDocumentPosition(facts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(facts.compareDocumentPosition(notes[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         // Fix round 1 (I6): one idea a paragraph -- the caveat, what the sticks show, the arrow's convention.
+        // Task 9b: the caveat's first words lost "here" in its merge into one sentence, and the orbital's electrons and
+        // role, out of the lead, come first.
         expect(notes.map(note => note.textContent?.slice(0, 24))).toEqual([
-            'Orbital energies here ar', 'Sticks show connectivity', 'The arrow points from − ']);
+            'It holds 2 electrons. It', 'Orbital energies are Koh', 'Sticks show connectivity', 'The arrow points from − ']);
         unmount();
     });
 
@@ -222,8 +228,10 @@ describe('moleculeInfo (Task 7b)', () => {
         expect(container.querySelector('.info-title')).toHaveTextContent('Water (H₂O) — 1b1 orbital');
         unmount();
         const basics = shownAt(state, 'basics');
-        // Fix round 1 (I3): "orbital", as the homoLumo glossary says.
-        expect(basics).toContain('1b1 is one of H₂O\'s molecular orbitals. It holds 2 electrons. It is the HOMO: the highest orbital that holds electrons.');
+        // Fix round 1 (I3): "orbital", as the homoLumo glossary says. Task 9b (fix 5): the lead says what it is; its electrons
+        // and role are the first note, after the facts.
+        expect(basics).toContain('1b1 is one of H₂O\'s molecular orbitals.');
+        expect(basics).toContain('It holds 2 electrons. It is the HOMO: the highest orbital that holds electrons.');
         expect(basics).not.toContain('Orbital energy');
         expect(shownAt(state, 'explore')).toContain('Orbital energy−8.44 eV (−0.310 Ha)');
         expect(shownAt(state, 'explore')).not.toContain('Iso value');
@@ -250,8 +258,9 @@ describe('moleculeInfo (Task 7b)', () => {
             store.dispatch(renderFinished({ isoLevel: 0.001, espRange: [-0.061, 0.071] }));
         });
         const basics = shownAt(state, 'basics');
-        expect(basics).toContain('red where it is negative (electron-rich), blue where it is positive (electron-poor)');
-        expect(basics).toContain('±0.05 Ha/e (±31 kcal/mol)');
+        // Task 9b (fix 5): the lead keeps to three lines -- the colours' meaning; the shared scale is technical.
+        expect(basics).toContain('Red where the potential is negative (electron-rich), blue where it is positive (electron-poor).');
+        expect(shownAt(state, 'advanced')).toContain('±0.05 Ha/e (±31 kcal/mol)');
         expect(basics).not.toContain('Enclosed');
         const explore = shownAt(state, 'explore');
         expect(explore).toContain('Potential range−0.061 to +0.071 Ha/e');
@@ -266,19 +275,26 @@ describe('moleculeInfo (Task 7b)', () => {
     it('keeps ozone\'s caveat beside its dipole (T7-O3)', () => {
         const caveat = 'Ozone has strong multireference character.';
         const state = moleculeState(waterMeta({ id: 'o3', name: 'Ozone', formula: 'O3', caveat }));
-        expect(shownAt(state, 'basics')).toContain(`Dipole μ1.86 D computed · 1.855 D experiment (CRC Handbook, via CCCBDB) — ${caveat}`);
+        expect(shownAt(state, 'research')).toContain(`Dipole μ1.86 D computed · 1.855 D experiment (CRC Handbook, via CCCBDB) — ${caveat}`);
+        // Task 9b (fix 1): below Research the value stands alone with its units -- the caveat still beside it.
+        expect(shownAt(state, 'basics')).toContain(`Dipole μ1.86 D — ${caveat}`);
     });
 
-    it('says the arrow\'s sign convention while the arrow is drawn, at every level (ruling T2-I2)', () => {
+    // Task 9b (fix 1) narrows ruling T2-I2: from Explore, where the arrow's switch is (never below it, where the pointer
+    // says the dipole arrow appears at Explore).
+    it('says the arrow\'s sign convention while the arrow is drawn, from Explore (ruling T2-I2, Task 9b)', () => {
         const convention = 'The arrow points from − to + (the physics convention), 1 a₀ per debye; many chemistry texts draw it the other way.';
-        expect(shownAt(moleculeState(), 'basics')).toContain(convention);
+        expect(shownAt(moleculeState(), 'explore')).toContain(convention);
         expect(shownAt(moleculeState(waterMeta(), store => store.dispatch(setShowDipole(false))), 'research')).not.toContain(convention);
     });
 
     it('says a symmetric molecule\'s dipole is zero by symmetry', () => {
         const methane = waterMeta({ id: 'ch4', name: 'Methane', formula: 'CH4', dipoleVectorDebye: [0.0004, 0, 0],
             references: [{ quantity: 'dipole', value: 0, unit: 'D', source: 'zero by symmetry', tolerance: 0.01 }] });
-        expect(shownAt(moleculeState(methane), 'basics')).toContain('Dipole μ0 D by symmetry (computed 0.00 D)');
+        expect(shownAt(moleculeState(methane), 'research')).toContain('Dipole μ0 D by symmetry (computed 0.00 D)');
+        // Task 9b (fix 1): below Research, the value alone -- cut from the same line.
+        expect(shownAt(moleculeState(methane), 'basics')).toContain('Dipole μ0 D by symmetry');
+        expect(shownAt(moleculeState(methane), 'basics')).not.toContain('computed');
     });
 
     it('says what the structure shows, and what the structure options cannot do', () => {
@@ -328,8 +344,8 @@ describe('moleculeInfo (Task 7b)', () => {
         expect(advanced.match(/its shape depends on the basis/g)).toHaveLength(1);
         // Not while the density is drawn: the list is not on screen.
         expect(shownAt(moleculeState(meta), 'advanced')).not.toContain('Labels:');
-        // Two gaps, one caveat sentence for both.
-        expect(shownAt(state, 'explore')).toContain('The HOMO–LUMO and HOMO–LVMO gaps are Kohn–Sham orbital gaps — neither the optical gap');
+        // Two gaps, one caveat sentence for both (Task 9b: one sentence with the energies' clause too).
+        expect(shownAt(state, 'explore')).toContain('and the HOMO–LUMO and HOMO–LVMO gaps are Kohn–Sham orbital gaps — neither the optical gap');
         // No "_" outside the file names of "How this was computed", and the g/u of σ and π are real subscripts.
         expect(shownAt(state, 'research')).not.toContain('_');
         const { container, unmount } = rendered(infoOf(state, 'research'), 'research');
@@ -338,7 +354,8 @@ describe('moleculeInfo (Task 7b)', () => {
     });
 
     // Fix round 1 (M2): what the lead says of the drawn orbital (the LVMO, constructed) is not said again in technical.
-    it('says a constructed LVMO\'s note once, in the lead, when it is drawn', () => {
+    // Task 9b (fix 5): said in the lead and the first note after the facts, which the lead now hands it to.
+    it('says a constructed LVMO\'s note once, in the lead and its first note, when it is drawn', () => {
         const orbitals = [
             { index: 0, label: '1b1', energyHartree: -0.31, occupation: 2, role: 'HOMO' },
             { index: 1, label: '4a1', energyHartree: -0.01, occupation: 0, role: 'LUMO', valenceCharacter: 0.55, class: 'diffuse' },
@@ -365,13 +382,17 @@ describe('moleculeInfo (Task 7b)', () => {
         ] });
         it('calls the HOMO the highest doubly occupied orbital, below the SOMO', () => {
             const state = moleculeState(no2, store => store.dispatch(setSurface({ kind: 'mo', index: 10 })));
-            expect(shownAt(state, 'basics')).toContain('4b2 is one of NO₂\'s molecular orbitals. It holds 2 electrons. '
+            // Task 9b (fix 5): the lead, then (after the facts) its electrons and role.
+            expect(shownAt(state, 'basics')).toContain('4b2 is one of NO₂\'s molecular orbitals.');
+            expect(shownAt(state, 'basics')).toContain('It holds 2 electrons. '
                 + 'It is the HOMO: the highest doubly occupied orbital; the singly occupied SOMO lies above it.');
         });
         it('says the SOMO\'s one electron once, as its role', () => {
             const state = moleculeState(no2, store => store.dispatch(setSurface({ kind: 'mo', index: 11 })));
             const basics = shownAt(state, 'basics');
-            expect(basics).toContain('6a1 is one of NO₂\'s molecular orbitals. It is a SOMO: a singly occupied orbital, the highest that holds electrons.');
+            // Task 9b (fix 5): the role is the first note now, after the facts.
+            expect(basics).toContain('6a1 is one of NO₂\'s molecular orbitals.');
+            expect(basics).toContain('It is a SOMO: a singly occupied orbital, the highest that holds electrons.');
             expect(basics).not.toContain('It holds 1 electron');
         });
         // Re-homed from properties_card.test.tsx (ruling on concern 4): an open shell's gap is named from its SOMO.
@@ -454,7 +475,8 @@ describe('moleculeInfo (Task 7b)', () => {
     describe('an on-demand computed molecule', () => {
         it('states its provenance, and says what it lacks: no reference values, no measured dipole', () => {
             const state = moleculeState(computedWater());
-            expect(shownAt(state, 'basics')).toContain('Dipole μ1.86 D computed · no measured value listed');
+            // Task 9b (fix 1): what it lacks against experiment is Research's, with the references.
+            expect(shownAt(state, 'research')).toContain('Dipole μ1.86 D computed · no measured value listed');
             const content = infoOf(state, 'research');
             const computed = computedText(content);
             expect(computed).toContain('Method: B3LYP/def2-TZVP, PySCF 2.8.0.');
@@ -477,6 +499,87 @@ describe('moleculeInfo (Task 7b)', () => {
             expect(owned.ownerJob).not.toBeNull();
             expect(computedText(infoOf(owned, 'research'))).toMatch(/Owner only: 1 min 10 s of wall time.*Cost: spent \$0\.00 \(This Mac\)\./);
             expect(computedText(infoOf(state, 'research'))).not.toMatch(/Owner only/);
+        });
+    });
+
+    // Task 9b (finish review, fix 1): the Basics band leaked a scientific term with its (i) and a reference.
+    describe('the level bands (Task 9b)', () => {
+        it('shows the point group, a scientific term with an (i), from Advanced only', () => {
+            const state = moleculeState();
+            expect(shownAt(state, 'basics')).not.toContain('Point group');
+            expect(shownAt(state, 'explore')).not.toContain('Point group');
+            expect(shownAt(state, 'advanced')).toContain('Point group');
+        });
+
+        it('gives the dipole as its value with units below Research, and the experiment and its reference at Research', () => {
+            const state = moleculeState();
+            for (const level of ['basics', 'explore', 'advanced'] as const) {
+                const shown = shownAt(state, level);
+                expect(shown).toContain('Dipole μ1.86 D');
+                expect(shown).not.toMatch(/CRC Handbook|CCCBDB|experiment|computed/);
+            }
+            expect(shownAt(state, 'research')).toContain('Dipole μ1.86 D computed · 1.855 D experiment (CRC Handbook, via CCCBDB)');
+        });
+
+        it('says the arrow\'s convention only where the arrow and its switch are on screen -- never below Explore', () => {
+            const convention = 'The arrow points from − to +';
+            // The pointer at Basics says "the dipole arrow … appear(s) at Explore"; Info must not explain it there.
+            expect(shownAt(moleculeState(), 'basics')).not.toContain(convention);
+            expect(shownAt(moleculeState(), 'explore')).toContain(convention);
+        });
+
+        it('states the Kohn–Sham caveat as one sentence', () => {
+            const state = moleculeState(waterMeta(), store => store.dispatch(setSurface({ kind: 'mo', index: 4 })));
+            const { container, unmount } = rendered(infoOf(state, 'explore'), 'explore');
+            const caveat = [...container.querySelectorAll('.info-notes')].map(note => flat(note.textContent ?? '')).find(text => /Kohn–Sham/.test(text))!;
+            unmount();
+            expect(caveat).toBe('Orbital energies are Kohn–Sham eigenvalues, not ionisation energies, and the HOMO–LUMO gap is a '
+                + 'Kohn–Sham orbital gap — neither the optical gap (absorption) nor the fundamental gap (IP − EA).');
+            expect(caveat.match(/\. /g)).toBeNull();
+        });
+
+        it('keeps the ESP lead to what the colours mean; the shared scale is technical', () => {
+            const state = moleculeState(waterMeta(), store => store.dispatch(setSurface({ kind: 'esp' })));
+            const { container, unmount } = rendered(infoOf(state, 'explore'), 'explore');
+            expect(flat(container.querySelector('.info-body > p.info-text')?.textContent ?? ''))
+                .toBe('Red where the potential is negative (electron-rich), blue where it is positive (electron-poor).');
+            unmount();
+            expect(shownAt(state, 'explore')).not.toContain('same scale');
+            expect(shownAt(state, 'advanced')).toContain('Every molecule is drawn on the same scale, ±0.05 Ha/e (±31 kcal/mol), so maps can be compared.');
+        });
+
+        // A strip tile at Basics (HOMO, LUMO, LVMO) opens an orbital whose lead ran to ten lines (a constructed LVMO). The
+        // lead says what the orbital is; how full it is, its role and what its data flag follow the facts, first.
+        it('keeps an orbital\'s lead to what it is; its electrons, role and flags are the first note', () => {
+            const orbitals = [
+                { index: 0, label: '1b1', energyHartree: -0.31, occupation: 2, role: 'HOMO' },
+                { index: 1, label: '4a1', energyHartree: -0.01, occupation: 0, role: 'LUMO', valenceCharacter: 0.55, class: 'diffuse' },
+                { index: 2, label: 'a1', energyHartree: 0.19, occupation: 0, role: 'LVMO', valenceCharacter: 1, class: 'valence',
+                    kind: 'valence-virtual', constructed: true, energyApproximate: true },
+            ];
+            const meta = waterMeta({ orbitals, symmetry: { pointGroup: 'C2v', labelGroup: 'C2v', labels: 'full-group' } });
+            const parts = (index: number) => {
+                const state = moleculeState(meta, store => store.dispatch(setSurface({ kind: 'mo', index })));
+                const { container, unmount } = rendered(infoOf(state, 'basics'), 'basics');
+                const lead = flat(container.querySelector('.info-body > p.info-text')?.textContent ?? '');
+                const note = flat(container.querySelector('.info-notes')?.textContent ?? '');
+                unmount();
+                return { lead, note };
+            };
+            expect(parts(0)).toEqual({ lead: '1b1 is one of H₂O\'s molecular orbitals.',
+                note: 'It holds 2 electrons. It is the HOMO: the highest orbital that holds electrons.' });
+            expect(parts(1).lead).toBe('4a1 is one of H₂O\'s molecular orbitals.');
+            expect(parts(1).note).toMatch(/^It is empty\. It is the LUMO: the lowest empty orbital\. 4a1 is partly diffuse/);
+            expect(parts(2).lead).toBe('a1 is not one of H₂O\'s computed orbitals.');
+            expect(parts(2).note).toMatch(/^It is constructed from the valence part of the virtual space — not an orbital of this calculation; /);
+        });
+
+        it('keeps the density lead to what the surface shows; the occupied orbitals are the glossary\'s', () => {
+            const state = moleculeState();
+            const { container, unmount } = rendered(infoOf(state, 'explore'), 'explore');
+            expect(flat(container.querySelector('.info-body > p.info-text')?.textContent ?? ''))
+                .toBe('Water has 10 electrons; the surface shows where they are likely to be found.');
+            unmount();
         });
     });
 

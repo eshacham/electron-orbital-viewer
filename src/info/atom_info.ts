@@ -280,13 +280,6 @@ function paragraphs(...parts: React.ReactNode[]): React.ReactNode[] {
     return parts.filter(part => part !== null && part !== undefined && part !== false && part !== '');
 }
 
-/** A paragraph of sentences and nodes, joined by spaces, empty parts dropped. */
-function sentences(...parts: React.ReactNode[]): React.ReactNode {
-    const kept = parts.filter(part => part !== null && part !== undefined && part !== false && part !== '');
-    if (kept.length === 0) return null;
-    return h(React.Fragment, null, ...kept.flatMap((part, i) => (i === 0 ? [part] : [' ', part])));
-}
-
 /** Atoms' Info for the current selection (InfoPanel filters the facts and bands by level). */
 // Every band is written, and InfoPanel shows the ones a level reads; `level` only decides `announce` (Task 9), which no
 // band filters. Ruling PF3 keeps it in the signature every mode's builder shares. `state` is the atom and orbital slices
@@ -324,7 +317,9 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
     const readout = profile ? relativityReadoutNode(selected, relativityReadoutOf(profile)) : null;
 
     const facts: InfoFact[] = [
-        { label: 'Configuration', value: configurationLabelOf(configuration) },
+        // Task 9b (finish review, fix 2): the panel's configuration line -- the drill-down's label -- shows it at every
+        // level, so Info's fact waits for Advanced rather than repeat it.
+        { label: 'Configuration', value: configurationLabelOf(configuration), min: 'advanced' },
         { label: 'Valence', value: valencePlainWords(configuration) },
         ...(energySubshell ? [{ label: 'Orbital energy', value: orbitalEnergyText(energySubshell.energy), min: 'explore' as const }] : []),
         ...energies.facts,
@@ -338,13 +333,15 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
 
     return {
         title: titleOf(atom, drill, speciesTitle(species)),
-        plain: sentences(
-            leadSentence(state, drill, configuration),
+        // Task 9b (finish review, fix 5): the lead says what the selection is, in three lines at most. The scalar-default
+        // note and the hint on what to click follow the facts (notes); the cut-face note is technical.
+        plain: leadSentence(state, drill, configuration),
+        notes: paragraphs(
             scalarDefault && SCALAR_DEFAULT_NOTE,
-            shellView && profile && !atom.unbound && CUT_FACE_NOTE,
             hintSentence(atom, drill),
         ),
         technical: paragraphs(
+            shellView && profile && !atom.unbound && CUT_FACE_NOTE,
             coreNote && `Valence ${valenceConfigurationLabelOf(configuration)}: ${coreNote}.`,
             // Fix round 1 (M2): its own subject, and the picture's method (spec §3.1: a relativistic eigenvalue says so).
             energySubshell && `The orbital energy is an eigenvalue of the ${shortMethodLabel(picture)}, not an ionisation energy.`,

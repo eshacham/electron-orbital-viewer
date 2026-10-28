@@ -516,3 +516,20 @@ describe('LevelNav parts for the Explore panel (spec §9.1)', () => {
         expect(screen.queryByRole('button', { name: /about this model/i })).toBeNull();
     });
 });
+
+// Task 9b (finish review, fix 7): an (i) sits beside the word it explains. The shells' (i) floated at the panel's right
+// edge, beside no term; it now follows a short label naming the row, as Orbitals' "Shell n (i)" does.
+describe('LevelNav: the shells\' (i) beside its term (Task 9b)', () => {
+    it('puts the (i) right after a "Shells" label, outside the chip row', () => {
+        const { getByRole, container } = render(
+            <LevelNav Z={18} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+        );
+        const button = getByRole('button', { name: 'About Shell' });
+        const term = button.closest('.info-term')!;
+        expect(term).not.toBeNull();
+        expect(button.previousElementSibling).toHaveTextContent(/^Shells$/);
+        expect(term.querySelector('.level-nav-shells')).toBeNull();
+        expect(container.querySelector('.level-nav-shells')!.previousElementSibling).toBe(term);
+    });
+});
+

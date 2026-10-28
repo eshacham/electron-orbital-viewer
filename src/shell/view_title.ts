@@ -6,9 +6,10 @@ import type { RelativityMode } from '../atom/relativity';
 import { orbitalName } from '../orbital_names';
 import { combinationTitle, selectionProblem } from '../combinations';
 import { BONDS_SYSTEMS, systemFormula } from '../bonds/systems';
-import { bondsDrawnPicture, bondsPictureNamed, moleculeTitle, noSurfaceView, viewDescription } from '../export/caption';
+import { bondsDrawnPicture, bondsPictureNamed, moleculeDrawnPicture, moleculeTitle, noSurfaceView } from '../export/caption';
 import { atomPartName, bondsViewName } from './view_names';
 import { formatFormula } from '../molecules/catalogue';
+import { atLeast, type LearningLevel } from '../levels/levels';
 
 // Fix round 1 (M9): shellName is written once, with the other names of what is drawn (view_names.ts).
 export { shellName } from './view_names';
@@ -30,22 +31,40 @@ export interface ViewTitle {
     subtitle: string;
 }
 
+const ELECTRON_DENSITY = 'electron density';
+const SURFACE_KIND = { density: ELECTRON_DENSITY, esp: 'electrostatic potential' } as const;
+
+/** Task 9b: what an orbital's surface is, in plain words below Advanced (the glossary's "cloud where that electron is
+ * likely to be found") and in the technical band's from Advanced. */
+const ORBITAL_SURFACE = { plain: 'electron cloud', technical: '|ψ|² isosurface' } as const;
+
+/** "<what is drawn> · <its share or its method>", parts left out when empty. */
+const line = (...parts: Array<string | null | false>) => parts.filter(Boolean).join(' · ');
+
 /**
- * The viewport's title block (spec §8.5, §9.1): "<Species> — <level>", and a
- * subtitle that says what is drawn, at which enclosed fraction, by which
- * method. Basic, Bonds and Molecules get an honest title from the state they
- * already show; their re-composed titles are 6G-2's.
+ * The viewport's title block (spec §8.5, §9.1): "<Species> — <level>", and one plain subtitle that says what is drawn.
+ * Basic, Bonds and Molecules get an honest title from the state they already show; their re-composed titles are 6G-2's.
+ *
+ * Task 9b (finish review, fixes 2 and 3): the subtitle is banded by the learning level. Below Advanced it is plain
+ * words and the enclosed share ("electron density · 90 % enclosed"); from Advanced the method may join it ("|ψ|²
+ * isosurface · LDA, non-relativistic"), and the share is Info's Enclosed fact's -- which appears at Advanced, beside
+ * the control that sets it -- so each number has one home. It never restates the title, nor a number Info states:
+ * Bonds' R and ρ (the slider, the key and Info's fact hold them), a molecule's contour ρ, orbital energy or dipole.
+ * Export captions are not this line: viewDescription keeps the whole recipe at every level (Product principle 1).
  */
-export function viewTitle(state: RootState): ViewTitle {
-    const percent = `${Math.round(selectShownEnclosedFraction(state) * 100)} %`;
+export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
+    const technical = atLeast(level, 'advanced');
+    const fraction = Math.round(selectShownEnclosedFraction(state) * 100);
+    // The enclosed share below Advanced only (above, Info's Enclosed fact states it).
+    const share = !technical && `${fraction} % enclosed`;
+    const orbitalSurface = technical ? ORBITAL_SURFACE.technical : ORBITAL_SURFACE.plain;
     const atom = state.atom;
     if (atom.mode === 'atom') {
-        const level = atomPartName(atom, 'title') ?? 'whole atom';
-        const method = METHOD[atom.profile ? profileRelativity(atom.profile) : 'off'];
-        const drawn = atom.unbound ? 'nothing is drawn for this species'
-            : atom.level === 'orbital' ? `|ψ|² isosurface · ${percent} enclosed`
-            : `${percent} of the electron density enclosed`;
-        return { title: `${speciesTitle(speciesOf(atom))} — ${level}`, subtitle: `${drawn} · ${method}` };
+        const part = atomPartName(atom, 'title') ?? 'whole atom';
+        const method = technical && METHOD[atom.profile ? profileRelativity(atom.profile) : 'off'];
+        const subtitle = atom.unbound ? line('nothing is drawn for this species', method)
+            : line(atom.level === 'orbital' ? orbitalSurface : ELECTRON_DENSITY, share, method);
+        return { title: `${speciesTitle(speciesOf(atom))} — ${part}`, subtitle };
     }
     if (atom.mode === 'hydrogenic') {
         const combination = state.orbital.combination;
@@ -57,14 +76,24 @@ export function viewTitle(state: RootState): ViewTitle {
         // polarised 1s by Dalgarno–Lewis, n = 2's Stark states by degenerate perturbation theory. Ruling (fix round 1):
         // not "first-order Stark" for 1s, whose linear Stark shift is zero. A hybrid mixes exact, degenerate n = 2
         // states, so it stays exact.
-        const method = combination.kind !== 'field' ? 'exact one-electron solution, Z = 1'
+        const method = technical && (combination.kind !== 'field' ? 'exact one-electron solution, Z = 1'
             : combination.level === 1 ? '1s polarised to first order in F, Dalgarno–Lewis'
-            : 'n = 2 Stark states, first-order degenerate perturbation theory';
-        return { title, subtitle: `|ψ|² isosurface · ${percent} enclosed · ${method}` };
+            : 'n = 2 Stark states, first-order degenerate perturbation theory');
+        return { title, subtitle: line(orbitalSurface, share, method) };
     }
     if (atom.mode === 'bonds') {
         const system = BONDS_SYSTEMS.find(entry => entry.id === state.bonds.system);
-        return { title: system ? `${system.formula} — ${system.name}` : 'Bonds', subtitle: viewDescription(state) };
+        // The picture on screen (none while the next one loads: then the busy label speaks, and the subtitle waits).
+        const drawn = bondsDrawnPicture(state);
+        const picture = drawn?.picture;
+        const component = picture?.kind === 'mo' && picture.componentCount > 1
+            ? ` (component ${picture.component + 1} of ${picture.componentCount})` : '';
+        const subtitle = !picture ? ''
+            : picture.kind === 'density' ? ELECTRON_DENSITY
+            : line(`${bondsViewName(bondsPictureNamed(picture))} orbital${component}`,
+                // The drawn contour's share, not one the panel has asked for and not yet drawn.
+                (share && `${Math.round(drawn!.enclosedFraction * 100)} % enclosed`) || ORBITAL_SURFACE.technical);
+        return { title: system ? `${system.formula} — ${system.name}` : 'Bonds', subtitle };
     }
     // Ruling P12: the request workspace's preview is what the canvas shows meanwhile -- named as one, by the
     // preview response's own formula (fix round 1, T16-M4: the one its resolved facts show).
@@ -72,12 +101,26 @@ export function viewTitle(state: RootState): ViewTitle {
     if (previewAtoms) return { title: `Preview — ${formatFormula(previewFormula ?? '')}`, subtitle: 'resolved structure, not yet computed' };
     const meta = state.molecule.meta;
     if (!meta) return { title: 'Molecules', subtitle: 'Choose a molecule' };
-    // Ruling P8 / T13-M: no surface (show=none) -- the line says what is drawn instead. Task 8 (addendum 8): not where
-    // a structure's geometry came from -- Info owns the geometry source, so the view said it twice. (A PNG's caption
-    // keeps noSurfaceView's whole line: there the file has no Info beside it.)
+    return { title: moleculeTitle(meta), subtitle: moleculeSubtitle(state, share) };
+}
+
+/**
+ * Molecules' subtitle (Task 9b): the surface that landed, by kind -- "electron density · 90 % enclosed", "electrostatic
+ * potential", "1b1 orbital (HOMO) · 90 % enclosed" -- with no contour ρ, energy or dipole value: Info's facts hold them.
+ * Ruling P8 / T13-M: no surface (show=none) says what is drawn instead; Task 8 (addendum 8): not where a structure's
+ * geometry came from, and Task 9b: not the dipole's numbers either -- a PNG's caption keeps noSurfaceView's whole line.
+ */
+function moleculeSubtitle(state: RootState, share: string | false): string {
     const noSurface = noSurfaceView(state);
-    const subtitle = noSurface ? (noSurface.shows === 'structure' ? 'Structure only' : noSurface.line) : viewDescription(state);
-    return { title: moleculeTitle(meta), subtitle };
+    if (noSurface) return noSurface.shows === 'structure' ? 'Structure only' : noSurface.shows === 'dipole' ? 'Dipole arrow only' : noSurface.line;
+    const drawn = moleculeDrawnPicture(state);
+    if (!drawn) return '';
+    const { surface } = drawn;
+    const drawnShare = share && `${Math.round((drawn.enclosedFraction ?? 0) * 100)} % enclosed`;
+    if (surface === 'esp') return SURFACE_KIND.esp;
+    if (surface === 'density') return line(ELECTRON_DENSITY, drawnShare);
+    const role = surface.role ? ` (${surface.role})` : '';
+    return line(`${surface.label} orbital${role}`, drawnShare || ORBITAL_SURFACE.technical);
 }
 
 /**
@@ -98,7 +141,6 @@ export interface ViewCaptionStatus {
 }
 
 const LOADING = 'loading…';
-const ELECTRON_DENSITY = 'electron density';
 const enclosed = (fraction: number) => `${Math.round(fraction * 100)} % enclosed`;
 
 /**
@@ -147,7 +189,6 @@ function bondsCaption(state: RootState, { loading, failed }: ViewCaptionStatus):
     return { name: `${systemFormula(system)} ${bondsViewName(view)}`, qualifier };
 }
 
-const SURFACE_KIND = { density: ELECTRON_DENSITY, esp: 'electrostatic potential' } as const;
 const NO_SURFACE: Record<'structure' | 'dipole', string> = { structure: 'structure only', dipole: 'dipole arrow only' };
 
 function moleculeCaption(state: RootState, { loading }: ViewCaptionStatus): ViewCaption {

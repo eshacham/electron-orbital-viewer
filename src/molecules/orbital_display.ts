@@ -43,16 +43,17 @@ export const GAP_CAVEAT = 'Kohn–Sham orbital gap — neither the optical gap (
 /**
  * Task 7b: the Kohn–Sham caveat, stated once for every energy Molecules shows (the orbital list's energies, the gaps,
  * Info's orbital energy): the orbital list's old caption ("Kohn–Sham orbital energies … Not ionisation energies.") and
- * GAP_CAVEAT, one sentence each. The gap sentence names the molecule's own gaps; none without a virtual.
+ * GAP_CAVEAT, joined into one sentence (Task 9b). The gap clause names the molecule's own gaps; none without a virtual.
  */
 export function kohnShamNote(orbitals: MoleculeOrbitalInfo[]): string {
     const gaps = orbitalGaps(orbitals);
-    const energies = 'Orbital energies here are Kohn–Sham eigenvalues, not ionisation energies.';
-    if (gaps.length === 0) return energies;
-    // "The HOMO–LUMO gap is a Kohn–Sham orbital gap — …"; two: "The HOMO–LUMO and HOMO–LVMO gaps are Kohn–Sham orbital gaps — …".
+    // Task 9b (finish review, fix 5): one sentence, the two clauses joined -- the finish review read two as a wall.
+    const energies = 'Orbital energies are Kohn–Sham eigenvalues, not ionisation energies';
+    if (gaps.length === 0) return `${energies}.`;
+    // "… and the HOMO–LUMO gap is a Kohn–Sham orbital gap — …"; two: "… and the HOMO–LUMO and HOMO–LVMO gaps are Kohn–Sham orbital gaps — …".
     return gaps.length === 1
-        ? `${energies} The ${gapTerm(gaps[0])} is a ${GAP_CAVEAT}.`
-        : `${energies} The ${gaps.map(gap => gap.name).join(' and ')} gaps are Kohn–Sham orbital gaps — ${GAP_CAVEAT.split(' — ')[1]}.`;
+        ? `${energies}, and the ${gapTerm(gaps[0])} is a ${GAP_CAVEAT}.`
+        : `${energies}, and the ${gaps.map(gap => gap.name).join(' and ')} gaps are Kohn–Sham orbital gaps — ${GAP_CAVEAT.split(' — ')[1]}.`;
 }
 /** Ruling D4: what a virtual under VALENCE_THRESHOLD is, whatever its energy -- water's 4a1 (55 %) lies below zero,
  * and silane's 3t2 (68 %) is not "unbound". */
