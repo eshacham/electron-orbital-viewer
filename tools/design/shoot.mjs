@@ -422,6 +422,20 @@ function collectMetrics() {
         }),
         // Fix 4: the scroll cue's class on whatever scrolls Info (shown only while more is below).
         moreBelow: scroller ? scroller.classList.contains('has-more-below') : null,
+        // Task 9b review I2: nothing in Info runs out sideways. `scrollerX` is the scroller's horizontal overflow (px);
+        // `factRows` lists each fact whose row, or its label or value, is wider than the row's box -- a dt or dd edge past
+        // the row's, or the row's own scrollWidth past its clientWidth. Both [] / 0 is the pass. (factLabelLines counts a
+        // label's lines; under nowrap that count was 1 by construction, so it could not see a label overflow.)
+        overflow: {
+          scrollerX: scroller ? Math.max(0, scroller.scrollWidth - scroller.clientWidth) : null,
+          factRows: [...section.querySelectorAll('.info-fact')].map(row => {
+            const R = row.getBoundingClientRect();
+            const past = el => (el ? Math.max(0, round(el.getBoundingClientRect().right - R.right), round(R.left - el.getBoundingClientRect().left)) : 0);
+            const dt = row.querySelector('dt');
+            const dd = row.querySelector('dd');
+            return { label: dt?.textContent ?? '', dt: past(dt), dd: past(dd), scroll: Math.max(0, row.scrollWidth - row.clientWidth) };
+          }).filter(r => r.dt > 0 || r.dd > 0 || r.scroll > 0),
+        },
       };
     })(),
     // Levels Task 9, Review Focus 4: the "Plot and data" header is on screen and is what is painted at its centre.

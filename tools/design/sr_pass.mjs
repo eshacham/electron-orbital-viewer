@@ -7,20 +7,21 @@
 // printed, so "announced exactly once" can be judged per event. Its own Vite and headless Chromium, as shoot.mjs; the
 // /api proxy points at a dead port and every /api request is refused in the browser, so no job can be sent.
 //   node tools/design/sr_pass.mjs [--root <checkout>] [--port 5413] [--level research] [--sizes desktop,phone] [--out /tmp/levels-sr.json]
-// A region that appears with its text already in it is logged as `region-added`: screen readers generally do not
-// announce a live region's first content, only later changes to it.
+// A region that appears with its text already in it is logged as `region-added`. Whether it is heard depends on the
+// screen reader and browser (VoiceOver often reads an inserted role="status", NVDA with Chrome often does not), so this
+// tool cannot count it either way: each event's tally keeps it apart as "uncertain" (Task 9 review M7), and the owner's
+// local test spot-checks it with VoiceOver. A focus move logs the element's name and, Task 9 review I3, its description.
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const arg0 = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
+const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
 // --root runs another checkout's app (the `main` baseline: what main announced) with this tool's scenarios.
-const ROOT = resolve(arg0('root', resolve(dirname(fileURLToPath(import.meta.url)), '../..')));
+const ROOT = resolve(arg('root', resolve(dirname(fileURLToPath(import.meta.url)), '../..')));
 const PLAYWRIGHT = process.env.PLAYWRIGHT_DIR ?? '/Users/eyalshacham/.npm/_npx/e41f203b7505f1fb/node_modules/';
 const { chromium } = createRequire(PLAYWRIGHT)('playwright');
-const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
 const port = Number(arg('port', '5413'));
 if ([5173, 5174, 5391, 5416, 5419, 8787].includes(port)) throw new Error(`port ${port} is not this tool's; use 5411-5415`);
 const level = arg('level', 'research');
@@ -101,7 +102,10 @@ function watchSpeech() {
   new MutationObserver(scan).observe(document, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-live', 'role', 'aria-hidden', 'hidden'] });
   document.addEventListener('focusin', event => {
     const el = event.target;
-    const text = (el.getAttribute?.('aria-label') || el.textContent || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 90);
+    const describedBy = (el.getAttribute?.('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+      .map(id => document.getElementById(id)?.textContent ?? '').join(' ').trim();
+    const name = (el.getAttribute?.('aria-label') || el.textContent || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 90);
+    const text = describedBy ? `${name} (described: ${describedBy})` : name;
     log.push({ t: Math.round(performance.now()), kind: 'focus', region: `${el.tagName.toLowerCase()}${el.getAttribute?.('role') ? `[${el.getAttribute('role')}]` : ''}`, text });
   });
 }
@@ -171,7 +175,15 @@ try {
       console.log(`  live regions: ${regions.join('; ')}`);
       console.log(`  on load: ${load.map(e => `[${e.kind} ${e.region}] ${JSON.stringify(e.text)}`).join(' · ') || '(nothing)'}`);
       for (const e of events) {
-        console.log(`  ${e.event}:`);
+        // What the page tells a reader about the event: each live text change, and each focus move the page makes (onto
+        // an element nobody operates, e.g. Info's heading) -- not the focus of the control the reader pressed, nor an
+        // emptied region, which says nothing. A region inserted with its text is uncertain (see the header), so it is
+        // counted apart and never folded into the told count.
+        const operated = /^(button|input|select|textarea|a|div\[button\]|button\[tab\])/;
+        const live = e.said.filter(s => s.kind === 'live' && !s.hidden && s.text).length;
+        const moved = e.said.filter(s => s.kind === 'focus' && !operated.test(s.region)).length;
+        e.tally = { told: live + moved, uncertain: e.said.filter(s => s.kind === 'region-added' && !s.hidden).length };
+        console.log(`  ${e.event}:  told ${e.tally.told}${e.tally.uncertain ? ` · uncertain (inserted with text) ${e.tally.uncertain}` : ''}`);
         for (const s of e.said) console.log(`    ${s.kind.padEnd(12)} ${s.region.padEnd(28)} ${JSON.stringify(s.text)}${s.hidden ? '  (hidden)' : ''}`);
         if (!e.said.length) console.log('    (nothing)');
       }

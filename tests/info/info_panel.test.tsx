@@ -332,6 +332,8 @@ describe('InfoPanel (Task 4)', () => {
     // Task 9b review I2/M3: a label takes its one-line width but never more than the row -- "Ionisation energy (=
     // electron affinity of Br)" overflowed it under nowrap -- so it wraps only when it alone cannot fit; no minimum
     // width, which only took room from the value (right-aligned, it drew no column) and orphaned its last word.
+    // jsdom has no layout, so this pins the rule; the layout is measured live (shoot.mjs metrics.info.overflow and
+    // factLabelLines -- Task 9 review M10).
     it('keeps every fact label on one line while it fits the row, and lets the value wrap', () => {
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
         const rule = (selector: RegExp) => css.match(new RegExp(`${selector.source}\\s*\\{([^}]*)\\}`))?.[1] ?? '';

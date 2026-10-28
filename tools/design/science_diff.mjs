@@ -15,10 +15,13 @@
 // Exits 1 when any difference other than typography is left.
 import { readFileSync } from 'node:fs';
 
-const files = process.argv.slice(2).filter(a => !a.startsWith('--') && !/^[a-z,-]+$/.test(a));
+// Task 9 review M9: options are parsed by name, so a file is any other argument (no guessing from its spelling).
+const args = process.argv.slice(2);
+const sizesAt = args.indexOf('--sizes');
+const sizes = (sizesAt >= 0 ? args[sizesAt + 1] : 'desktop').split(',');
+const files = args.filter((a, i) => !a.startsWith('--') && !(sizesAt >= 0 && i === sizesAt + 1));
+if (files.length !== 2) throw new Error('usage: science_diff.mjs <main-metrics.json> <branch-metrics.json> [--sizes desktop,phone]');
 const [mainFile, branchFile] = files;
-const sizesArg = process.argv.includes('--sizes') ? process.argv[process.argv.indexOf('--sizes') + 1] : 'desktop';
-const sizes = sizesArg.split(',');
 const load = file => JSON.parse(readFileSync(file, 'utf8'));
 const mainShots = load(mainFile).filter(s => s.theme === 'dark');
 const branchShots = load(branchFile).filter(s => s.theme === 'dark');
@@ -32,8 +35,9 @@ let differences = 0;
 let typography = 0;
 
 const MINUS = new RegExp(String.fromCharCode(0x2212), 'g');
-/** The typography rules of the levels plan, applied to both sides before comparing. */
-export function flat(text) {
+/** The typography rules of the levels plan, applied to both sides before comparing. (Not exported: this file is a CLI
+ * that runs on import -- Task 9 review M9.) */
+function flat(text) {
   return String(text)
     .normalize('NFKC')                                     // ₂ → 2, ᵥ → v, ₑ → e, ⁻³ → U+2212 3, nbsp → space
     .replace(MINUS, '-')                                   // after NFKC, which makes a superscript minus U+2212
