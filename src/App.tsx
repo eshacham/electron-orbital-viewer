@@ -290,12 +290,15 @@ function App() {
         (change: Partial<BasicSelection>) => dispatch(setBasicSelection(change)),
         [dispatch]
     );
-    // Ruling T2-I1: a chip pressed or a strip tile chosen while a combination is held below Advanced (its picker
-    // hidden) leaves the combination first, as the ⌘K search's pick does, so the reader always has a way back to
-    // one orbital. The selection is completed and corrected here (l < n, |mₗ| ≤ l), so the redraw that leaving the
+    // Ruling T2-I1, and Review Focus 3 (Task 1, picture control): a chip pressed or a strip tile chosen while a
+    // combination is held leaves the combination first, as the ⌘K search's pick does, so the reader always has a way
+    // back to one orbital -- at every level. Below Advanced the chips are the only way to reach this (the picker is
+    // hidden); at Advanced+ the chips wait disabled while a combination is drawn, so the strip is the only picker
+    // left standing, and it must leave a stale combination exactly as a below-Advanced chip press did, not just draw
+    // over it. The selection is completed and corrected here (l < n, |mₗ| ≤ l), so the redraw that leaving the
     // combination triggers is already of a valid orbital. (No row correction calls this: they use the one above.)
     const handleBasicPick = useCallback((change: Partial<BasicSelection>) => {
-        if (combination.kind === 'none' || atLeast(level, CONTROL_LEVEL.combinations)) {
+        if (combination.kind === 'none') {
             dispatch(setBasicSelection(change));
             return;
         }
@@ -304,7 +307,7 @@ function App() {
         if (Math.abs(next.ml) > next.l) next.ml = 0;
         dispatch(setBasicSelection(next));
         dispatch(setCombination(NO_COMBINATION));
-    }, [combination.kind, level, n, l, ml, dispatch]);
+    }, [combination.kind, n, l, ml, dispatch]);
     const handleEnclosedFractionChange = useCallback((value: number) => dispatch(setEnclosedFraction(value)), [dispatch]);
     const handleCombinationChange = useCallback((value: CombinationSelection) => dispatch(setCombination(value)), [dispatch]);
     const renderedField = useAppSelector(state => state.orbital.currentField);
@@ -1976,7 +1979,7 @@ function App() {
                     <>
                         {basicStrip.length > 0 && (
                             <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
-                                onSelect={handleBasicPick} variant="sheet" />
+                                onSelect={handleBasicPick} variant="sheet" collapsible={false} />
                         )}
                         {basicExplore}
                     </>
@@ -2257,7 +2260,8 @@ function App() {
                 covers them -- unlike Atoms, no second "Orbital tiles" heading here. */}
             {isBasicMode && !isNarrow && basicStrip.length > 0 && (
                 <ThumbnailStrip items={basicStrip} label="orbitals in view" rGrid={[]} themeKey={stripThemeKey}
-                    onSelect={handleBasicPick} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed} />
+                    onSelect={handleBasicPick} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed}
+                    collapsible={false} />
             )}
             {/* Task 10: Bonds' strip -- the total density and every orbital, or H₂⁺'s two states. */}
             {isBondsMode && !isNarrow && bondsStrip.length > 0 && (

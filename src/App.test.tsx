@@ -272,15 +272,15 @@ describe('App', () => {
         expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
     });
 
-    // Ruling P3: chips draw on selection; Update Orbital is gone. The n/l/mL selects
-    // became BasicExplore's chip rows (Phase 6G-2 Task 6).
-    it('switching to Basic Orbitals restores the n / subshell / orbital chips, with no element control of its own', () => {
+    // Ruling P3: the chip draws on selection; Update Orbital is gone. The n/l/mL selects
+    // became BasicExplore's chip row (Phase 6G-2 Task 6; Task 1 picture control: Shell n is
+    // the only one left -- the strip picks l and mₗ now, tested in "the strip holds every orbital of n").
+    it('switching to Basic Orbitals restores the Shell n chips, with no element control of its own', () => {
         renderWithProvider(<App />);
 
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
 
         expect(screen.getByRole('group', { name: /^shell n/i })).toBeInTheDocument(); // Task 5: named by its visible label
-        expect(screen.getByRole('group', { name: /^subshell/i })).toBeInTheDocument();
         // Addendum 2's mode rename: no second element control, Z fixed at 1
         // -- but the one-electron framing still stated outright (spec §7).
         expect(screen.queryByRole('combobox', { name: /Nucleus/i })).not.toBeInTheDocument();
@@ -1386,6 +1386,52 @@ describe('App', () => {
             jest.useRealTimers();
         }
     });
+
+    // Task 1 (picture control): the strip is Orbitals' only picker for l and mₗ now -- the Subshell and Orbital chip
+    // rows are gone from BasicExplore. Picking a tile within the current shell's own group (3d, not 3p as above)
+    // sets the full selection in one dispatch, at desktop width (the overlay strip, not the phone sheet).
+    it('at desktop width, pressing the strip option "3dxz" sets orbital.selection to {n:3, l:2, ml:1}', () => {
+        const { store } = renderWithProvider(<App />, { mode: 'hydrogenic' });
+        // DEFAULT_BASIC_SELECTION is n = 3, l = 2, mₗ = 0: the strip already holds the 3d group.
+        const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
+        fireEvent.click(within(strip).getByRole('option', { name: '3dxz orbital' }));
+        expect(store.getState().orbital.basicSelection).toEqual({ n: 3, l: 2, ml: 1 });
+    });
+
+    // Review Focus 1: `stripCollapsed` is one boolean shared across every mode's strip, so Orbitals can be entered
+    // with it already set from Atoms. Orbitals' strip is its only picker, so it must show regardless, with no handle
+    // offering to hide it (ThumbnailStrip's `collapsible={false}`).
+    it('Review Focus 1: a strip collapsed in Atoms does not carry into Orbitals, which offers no way to hide its strip', () => {
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Hide orbitals' }));
+        expect(screen.queryByRole('listbox', { name: 'orbitals in view' })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+        expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Hide orbitals' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Show orbitals' })).not.toBeInTheDocument();
+    });
+
+    // Review Focus 3: at Advanced, the Subshell/Orbital chips used to be the only other picker, and they wait
+    // disabled while a combination is drawn (chipsFrozen) -- so a chip press could never reach this case. The strip
+    // is never frozen, so it is now the one way a pick can land while a combination is active at Advanced+, and it
+    // must leave the combination exactly as a below-Advanced chip press did (ruling T2-I1), not draw over it.
+    it('Review Focus 3: at Advanced, a strip pick while an n = 2 Stark combination is active clears it and selects {n:2, l:1, ml:1}', () => {
+        const { store } = renderWithProvider(<App />); // The outer describe's beforeEach sets eov.level to research (Advanced+).
+        act(() => { store.dispatch(setBasicSelection({ n: 2, l: 0, ml: 0 })); });
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+
+        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
+        fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
+        fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
+        expect(store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
+
+        const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
+        fireEvent.click(within(strip).getByRole('option', { name: '2px orbital' }));
+        expect(store.getState().orbital.combination.kind).toBe('none');
+        expect(store.getState().orbital.basicSelection).toEqual({ n: 2, l: 1, ml: 1 });
+    });
 });
 
 describe('App: opening a shared link', () => {
@@ -2021,15 +2067,16 @@ describe('App: shell', () => {
 
     // Ruling R20b (owner decision): Basic Orbitals keeps its choice of orbital in Explore and puts its view
     // settings in the inspector, above the plot -- where Bonds and Molecules have theirs.
-    // Ruling P3: chips draw on selection; Update Orbital is gone. BasicExplore's chips
+    // Ruling P3: the chip draws on selection; Update Orbital is gone. BasicExplore's Shell n chip
     // (and the combination picker it now renders itself) replace the old n/l/mₗ selects
-    // and Update Orbital button in Explore; the view settings stay in the inspector.
-    it('in Basic Orbitals, puts the n / subshell / orbital chips and the combination picker in Explore, and the view settings in the inspector', () => {
+    // and Update Orbital button in Explore; the view settings stay in the inspector. Task 1 (picture
+    // control): Subshell and Orbital are gone -- the strip under the picture picks them now.
+    it('in Basic Orbitals, puts the Shell n chip and the combination picker in Explore, and the view settings in the inspector', () => {
         const { container } = renderWithProvider(<App />);
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
         const explore = screen.getByRole('complementary', { name: 'Explore' });
         const inspector = screen.getByRole('complementary', { name: 'Inspector' });
-        for (const name of [/^shell n/i, /^subshell/i, /^orbital/i]) { // Task 5: rows named by their visible labels
+        for (const name of [/^shell n/i]) { // Task 5: the row is named by its visible label
             expect(within(explore).getByRole('group', { name })).toBeInTheDocument();
             expect(within(inspector).queryByRole('group', { name })).toBeNull();
         }

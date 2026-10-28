@@ -3,7 +3,7 @@
 // level: plain words and node counts at Basics, the energy from Explore, the iso value with its unit from Advanced, and
 // the method under "How this was computed" -- exact for one orbital, first-order perturbation theory for a field.
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { basicInfo, BASIC_ORBITALS_ABOUT } from '../../src/info/basic_info';
 import InfoPanel from '../../src/info/InfoPanel';
 import type { InfoContent } from '../../src/info/info_types';
@@ -229,6 +229,20 @@ describe('basicInfo (Task 5)', () => {
         const labels = Array.from(container.querySelectorAll('.info-fact dt'));
         expect(labels.map(label => label.textContent).slice(0, 3)).toEqual(['Shell n', 'Subshell l', 'Orbital mₗ']);
         expect(labels.slice(0, 3).map(label => label.querySelector('i')?.textContent)).toEqual(['n', 'l', 'mₗ']);
+    });
+
+    // Task 1 (picture control): the Subshell and Orbital rows left BasicExplore -- the strip is the picker now -- so
+    // each fact label carries the (i) that used to sit on its row (the shared fact-label pattern from
+    // atom_info/bonds_info, place 'info'), keeping their glossary entries reachable. Shell n keeps its own row and
+    // its (i) there, so its fact stays plain, with no second (i).
+    it('gives the Subshell and Orbital facts an (i) (place: info), so their glossary entries stay reachable once the rows are gone', () => {
+        const content = basicInfo(orbitalsState().getState(), 'basics');
+        const { container } = render(React.createElement(InfoPanel, { content, topic: null, onClearTopic: () => {}, level: 'basics' }));
+        const labels = Array.from(container.querySelectorAll('.info-fact dt'));
+        const [shellLabel, subshellLabel, orbitalLabel] = labels;
+        expect(within(shellLabel as HTMLElement).queryByRole('button')).not.toBeInTheDocument();
+        expect(within(subshellLabel as HTMLElement).getByRole('button', { name: 'About Subshell' })).toHaveClass('info-button');
+        expect(within(orbitalLabel as HTMLElement).getByRole('button', { name: 'About Orbital' })).toHaveClass('info-button');
     });
 });
 

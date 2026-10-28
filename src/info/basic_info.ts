@@ -14,6 +14,7 @@ import type { RootState } from '../store';
 import type { LearningLevel } from '../levels/levels';
 import type { InfoContent, InfoFact } from './info_types';
 import { enclosedFact, labelWithInfo } from './facts';
+import InfoButton from './InfoButton';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { minus } from '../format/sci';
 import { withSubscripts } from '../format/subscripts';
@@ -38,6 +39,16 @@ export type OrbitalsInfoState = Pick<RootState, 'orbital'>;
 
 /** A quantum-number label, the number in italics as physics sets it -- "Subshell l" must not read "Subshell I". */
 const qLabel = (word: string, symbol: string) => h(React.Fragment, null, `${word} `, h('i', null, symbol));
+
+/**
+ * Task 1 (picture control): the Subshell and Orbital rows left BasicExplore -- the strip is the picker now -- so
+ * their fact labels carry the (i) that used to sit on the row (place 'info', the shared fact-label pattern from
+ * atom_info/bonds_info's own kohnShamLabel/curveLabel: the topic is written out at each call, not passed through a
+ * shared parameter, so the glossary reachability check (tests/info/glossary.test.ts) finds it by source text).
+ * Shell n keeps its own row and its (i) there, so its fact stays plain (`qLabel`).
+ */
+const subshellFactLabel = h(React.Fragment, null, 'Subshell ', h('i', null, 'l'), h(InfoButton, { topic: 'subshell', label: 'Subshell', place: 'info' }));
+const orbitalFactLabel = h(React.Fragment, null, 'Orbital ', h('i', null, 'mₗ'), h(InfoButton, { topic: 'orbital', label: 'Orbital', place: 'info' }));
 
 /**
  * Spec §7's one-electron framing (moved from BasicExplore's tile caption, Task 5). Still exported: App's Help dialog
@@ -171,8 +182,8 @@ function orbitalInfo(state: OrbitalsInfoState): InfoContent {
         ],
         facts: [
             { label: qLabel('Shell', 'n'), value: String(n) },
-            { label: qLabel('Subshell', 'l'), value: `${l} (${letter})` },
-            { label: qLabel('Orbital', 'mₗ'), value: signedMl(ml) },
+            { label: subshellFactLabel, value: `${l} (${letter})` },
+            { label: orbitalFactLabel, value: signedMl(ml) },
             // Final review M3: the Nodes fact is where "node" is on screen, so its (i) opens the Node entry.
             { label: labelWithInfo('Nodes', 'node', 'Nodes'), value: `${total} (${radial} radial, ${l} angular)` },
             { label: 'Energy', value: energyText(energy), min: 'explore' },

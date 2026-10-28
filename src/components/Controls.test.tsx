@@ -648,9 +648,12 @@ describe('Controls: part', () => {
     expect(onUpdateOrbital).not.toHaveBeenCalled();
   });
 
-  // Review Focus 1: three chip clicks within 150 ms (n, then l, then mₗ) draw once,
-  // for the final selection -- through BasicExplore's own chips and useDrawOnSelection's
-  // debounce, exactly as a real App render wires them (App.tsx, beside the nonce effect).
+  // Review Focus 1: three chip clicks within 150 ms draw once, for the final selection -- through
+  // BasicExplore's own chip and useDrawOnSelection's debounce, exactly as a real App render wires
+  // them (App.tsx, beside the nonce effect). Task 1 (picture control) left Shell n as the only chip
+  // in BasicExplore -- l and mₗ changes now come from the strip (tested directly, with the hook
+  // alone, in tests/basic_ui/use_draw_on_selection.test.tsx's own "three quick changes" case), so
+  // this exercises three quick n clicks instead of n/l/mₗ ones.
   describe('Review Focus 1: three quick chip changes', () => {
     function BasicDrawHarness({ draw }: { draw: (s: BasicSelection) => void }) {
       const [selection, setSelection] = React.useState<BasicSelection>({ n: 3, l: 2, ml: 0 });
@@ -671,12 +674,12 @@ describe('Controls: part', () => {
         const draw = jest.fn();
         render(<BasicDrawHarness draw={draw} />);
         fireEvent.click(screen.getByRole('button', { name: 'n = 4' }));
-        fireEvent.click(screen.getByRole('button', { name: '4p subshell' }));
-        fireEvent.click(screen.getByRole('button', { name: '4px orbital' })); // Task 5: the chip's name has a real subscript
+        fireEvent.click(screen.getByRole('button', { name: 'n = 5' }));
+        fireEvent.click(screen.getByRole('button', { name: 'n = 6' }));
         expect(draw).not.toHaveBeenCalled();
         act(() => { jest.advanceTimersByTime(150); });
         expect(draw).toHaveBeenCalledTimes(1);
-        expect(draw).toHaveBeenCalledWith({ n: 4, l: 1, ml: 1 });
+        expect(draw).toHaveBeenCalledWith({ n: 6, l: 2, ml: 0 });
       } finally {
         jest.useRealTimers();
       }

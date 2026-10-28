@@ -51,42 +51,31 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         expect(rule('.basic-tile-name')).toMatch(/white-space:\s*nowrap/);
     });
 
-    // Task 5 (critique P2: unlabeled n/l/mₗ rows): each row has a visible label, which names its group, and an (i)
-    // beside it; there is no paragraph text left in the panel.
-    it('labels the rows "Shell n", "Subshell l" and "Orbital mₗ", each with an (i), and holds no paragraph text', () => {
+    // Task 1 (picture control): the Subshell l and Orbital mₗ rows are gone -- the thumbnail strip under the picture
+    // is the picker for them now (their own tests moved to src/App.test.tsx, "in Basic Orbitals mode the strip...").
+    // Only Shell n keeps a row here, with its own (i); there is no paragraph text left in the panel.
+    it('labels the n row "Shell n" with an (i), and renders no Subshell or Orbital row', () => {
         const { container } = render(<Harness />);
         expect(screen.getByRole('group', { name: 'Shell n' })).toHaveClass('basic-chip-row');
-        expect(screen.getByRole('group', { name: 'Subshell l' })).toHaveClass('basic-chip-row');
-        expect(screen.getByRole('group', { name: 'Orbital mₗ' })).toHaveClass('basic-chip-row');
-        for (const term of ['Shell', 'Subshell', 'Orbital']) {
-            expect(screen.getByRole('button', { name: `About ${term}` })).toHaveClass('info-button');
-        }
+        expect(screen.getByRole('button', { name: 'About Shell' })).toHaveClass('info-button');
+        expect(screen.queryByRole('group', { name: 'Subshell l' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('group', { name: 'Orbital mₗ' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'About Subshell' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'About Orbital' })).not.toBeInTheDocument();
         expect(container.querySelectorAll('p, .MuiFormHelperText-root, .MuiTypography-caption')).toHaveLength(0);
     });
 
-    it('renders 9 n-chips, 3 subshell chips and 5 orbital chips for {n:3,l:2,ml:0}, the current ones pressed', () => {
+    it('renders 9 n-chips for {n:3,l:2,ml:0}, the current one pressed', () => {
         render(<Harness />);
-        // Task 5: the rows are named by their visible labels (Shell n, Subshell l, Orbital mₗ).
+        // Task 5: the row is named by its visible label (Shell n).
         const nRow = screen.getByRole('group', { name: /^shell n/i });
         expect(within(nRow).getAllByRole('button')).toHaveLength(9);
         expect(within(nRow).getByRole('button', { name: 'n = 3' })).toHaveAttribute('aria-pressed', 'true');
-
-        const subshellRow = screen.getByRole('group', { name: /^subshell/i });
-        expect(within(subshellRow).getAllByRole('button')).toHaveLength(3); // s, p, d (l < 3)
-        expect(within(subshellRow).getByRole('button', { name: '3d subshell' })).toHaveAttribute('aria-pressed', 'true');
-
-        const orbitalRow = screen.getByRole('group', { name: /^orbital/i });
-        expect(within(orbitalRow).getAllByRole('button')).toHaveLength(5); // ml -2..2
-        // Task 5: orbital names carry a real subscript, read as "3dz²" (OrbitalLabel), not "3d_z²".
-        expect(within(orbitalRow).getByRole('button', { name: '3dz² orbital' })).toHaveAttribute('aria-pressed', 'true');
-        expect(within(orbitalRow).getByRole('button', { name: '3dz² orbital' }).querySelector('sub')).toHaveTextContent('z²');
     });
 
     it('names chips with the label inside the accessible name (WCAG 2.5.3)', () => {
         render(<Harness initial={{ n: 4, l: 1, ml: 1 }} />);
         expect(screen.getByRole('button', { name: 'n = 4' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '4p subshell' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '4px orbital' })).toBeInTheDocument(); // Task 5: a real subscript
     });
 
     it('clicking a chip reports the change', () => {
@@ -99,24 +88,14 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         expect(onChange).toHaveBeenCalledWith({ n: 4 });
     });
 
-    // The existing Controls-style correction (lines 395-402 pre-T6), now in BasicExplore:
-    // an l no longer valid for n resets both l and ml together; an out-of-range ml alone resets just ml.
-    it('clicking a subshell chip reports l, and the orbital row re-derives (ml resets to 0)', () => {
-        render(<Harness initial={{ n: 3, l: 2, ml: 0 }} />);
-        fireEvent.click(screen.getByRole('button', { name: '3p subshell' }));
-        const orbitalRow = screen.getByRole('group', { name: /^orbital/i });
-        expect(within(orbitalRow).getAllByRole('button')).toHaveLength(3); // p: ml -1..1
-        expect(within(orbitalRow).getByRole('button', { name: '3pz orbital' })).toHaveAttribute('aria-pressed', 'true'); // Task 5: a real subscript
-    });
-
-    it('resets l and ml together when a new n leaves l out of range', () => {
+    // The existing Controls-style correction (lines 395-402 pre-T6), still in BasicExplore: an l no longer valid for n
+    // resets both l and ml together. The Subshell/Orbital rows that used to show this are gone (Task 1), so this is
+    // observed through the heading, which renders the corrected orbital (OrbitalLabel n, l, ml).
+    it('resets l and ml together when a new n leaves l out of range, shown in the heading', () => {
         render(<Harness initial={{ n: 4, l: 3, ml: 0 }} />);
         fireEvent.click(screen.getByRole('button', { name: 'n = 2' }));
-        const subshellRow = screen.getByRole('group', { name: /^subshell/i });
-        expect(within(subshellRow).getByRole('button', { name: '2s subshell' })).toHaveAttribute('aria-pressed', 'true');
-        const orbitalRow = screen.getByRole('group', { name: /^orbital/i });
-        expect(within(orbitalRow).getAllByRole('button')).toHaveLength(1);
-        expect(within(orbitalRow).getByRole('button', { name: '2s orbital' })).toHaveAttribute('aria-pressed', 'true');
+        const heading = document.getElementById('orbital-name')!;
+        expect(heading).toHaveSeenText('2s');
     });
 
     // Task 5: the heading names the orbital with a real subscript (OrbitalLabel), never "3d_z²".

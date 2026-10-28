@@ -31,6 +31,13 @@ interface ThumbnailStripProps<T = NavigationTarget> {
     variant?: 'overlay' | 'sheet';
     collapsed?: boolean;
     onCollapsedChange?(collapsed: boolean): void;
+    /**
+     * Task 1 (picture control), opt-in: `false` makes the strip always expanded, with no collapse handle -- Orbitals
+     * passes it, because the strip is its only picker and must never hide itself (Review Focus 1: `collapsed` is a
+     * shared mode-wide preference, so Orbitals must not inherit a collapse set in Atoms, Bonds or Molecules). Default
+     * `true` keeps every other strip's existing behaviour unchanged.
+     */
+    collapsible?: boolean;
     /** What the handle says it shows or hides (ruling R23b-3): "orbitals" (the default), or Molecules' "views". */
     handleNoun?: string;
     /** Labels that are words ("Electrostatic potential", Task 15) wrap to two centred lines, as the phone sheet's do. */
@@ -178,12 +185,16 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
 // parameter): T is whatever StripItem<T> the caller's items are in -- the
 // Atom strip's NavigationTarget (the default) or Basic Orbitals' BasicSelection.
 function ThumbnailStrip<T = NavigationTarget>({
-    items, label, rGrid, themeKey, onSelect, variant = 'overlay', collapsed = false, onCollapsedChange, handleNoun = 'orbitals', wrapLabels = false,
+    items, label, rGrid, themeKey, onSelect, variant = 'overlay', collapsed = false, onCollapsedChange, collapsible = true,
+    handleNoun = 'orbitals', wrapLabels = false,
 }: ThumbnailStripProps<T>) {
     const listRef = useRef<HTMLDivElement>(null);
     const listId = useId();
+    // `collapsible={false}` (Task 1) ignores whatever `collapsed` carries over from another mode -- the strip is
+    // always expanded, and offers no handle to hide it.
+    const effectiveCollapsed = collapsible && collapsed;
     // Ruling DX2: the listbox mounts only while expanded, so `collapsed` re-attaches the roving focus to it.
-    useRovingFocus(listRef, { selector: '[role="option"]', orientation: 'horizontal' }, collapsed);
+    useRovingFocus(listRef, { selector: '[role="option"]', orientation: 'horizontal' }, effectiveCollapsed);
     const px = variant === 'sheet' ? 56 : 72;
 
     // Bring the shown orbital into view (instant under reduced motion: §4.7)
@@ -200,7 +211,7 @@ function ThumbnailStrip<T = NavigationTarget>({
         const left = Math.max(0, list.scrollLeft + (tileRect.left - listRect.left) - (list.clientWidth - tileRect.width) / 2);
         if (typeof list.scrollTo === 'function') list.scrollTo({ left, behavior: reduce ? 'auto' : 'smooth' });
         else list.scrollLeft = left;
-    }, [items, collapsed]);
+    }, [items, effectiveCollapsed]);
 
     const groups: Array<{ label: string | null; spoken: string | null; items: StripItem<T>[] }> = [];
     for (const item of items) {
@@ -211,18 +222,18 @@ function ThumbnailStrip<T = NavigationTarget>({
     const tile = (item: StripItem<T>) => <Tile key={item.key} item={item} px={px} rGrid={rGrid} themeKey={themeKey} onSelect={onSelect} />;
 
     return (
-        <div className={`thumbnail-strip ${variant}${collapsed ? ' collapsed' : ''}${wrapLabels ? ' wrap-labels' : ''}`}>
-            {onCollapsedChange && (
+        <div className={`thumbnail-strip ${variant}${effectiveCollapsed ? ' collapsed' : ''}${wrapLabels ? ' wrap-labels' : ''}`}>
+            {collapsible && onCollapsedChange && (
                 // Ruling R23b-3: the handle names what it opens -- "Orbitals" plus the
                 // action. The chevron stays aria-hidden (a bare glyph reads poorly), so
                 // the accessible name is exactly the visible label, with no aria-label.
-                <button type="button" className="strip-handle" aria-expanded={!collapsed} aria-controls={collapsed ? undefined : listId}
+                <button type="button" className="strip-handle" aria-expanded={!effectiveCollapsed} aria-controls={effectiveCollapsed ? undefined : listId}
                     onClick={() => onCollapsedChange(!collapsed)}>
-                    <span className="strip-handle-label">{collapsed ? `Show ${handleNoun}` : `Hide ${handleNoun}`}</span>
-                    <span aria-hidden="true">{collapsed ? '▴' : '▾'}</span>
+                    <span className="strip-handle-label">{effectiveCollapsed ? `Show ${handleNoun}` : `Hide ${handleNoun}`}</span>
+                    <span aria-hidden="true">{effectiveCollapsed ? '▴' : '▾'}</span>
                 </button>
             )}
-            {!collapsed && (
+            {!effectiveCollapsed && (
                 <div id={listId} ref={listRef} className="strip-list" role="listbox" aria-label={label} aria-orientation="horizontal">
                     {groups.map((group, index) => (group.label ? (
                         <div key={`${group.label}-${index}`} role="group" aria-label={group.spoken ?? group.label} className="strip-group">
