@@ -6,6 +6,7 @@ import SubshellPanel, { spreadLabels } from '../../src/components/SubshellPanel'
 // Fix round 1: the subshell text lives in atom_text (shared text helpers live in modules, not components).
 import { formatElectrons, jLevelNote } from '../../src/atom/atom_text';
 import { SerialisedSubshell } from '../../src/workers/atomWorker';
+import { seenText } from '../seen_text';
 
 /** A neon-shaped list of subshells: 1s (n=1), 2s and 2p (n=2). */
 function neonLikeSubshells(): SerialisedSubshell[] {
@@ -226,7 +227,8 @@ describe('SubshellPanel', () => {
             const { container } = renderAtOrbital(0);
             const pressed = container.querySelectorAll('.subshell-ml-button[aria-pressed="true"]');
             expect(pressed).toHaveLength(1);
-            expect(pressed[0].textContent).toBe('2pz');
+            // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+            expect(seenText(pressed[0])).toBe('2pz');
         });
 
         // Task 6: what is on screen ("Showing one orbital of 2p …") is said in Info now (atomInfo's hint).

@@ -19,6 +19,7 @@ import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 import { useDevicePixelRatio } from '../../src/thumbs/useDevicePixelRatio';
 import { usePref } from '../../src/design/usePref';
 import { GLOW_SETTLE_MS, glowOverridesOf, setGlowKnob, settledGlowPref } from '../../src/design/glow_pref';
+import { seenText } from '../seen_text';
 
 const profile = neonProfile();
 const rGrid = Array.from({ length: profile.size }, (_, j) => profile.rMin * Math.exp(j * profile.dx));
@@ -138,7 +139,8 @@ describe('ThumbnailStrip on a lost WebGL context', () => {
         expect(container.querySelectorAll('.strip-tile-glyph')).toHaveLength(0);
 
         act(() => { thumbnailService.markLost(); });
-        const glyphs = [...container.querySelectorAll('.strip-tile-glyph')].map(glyph => glyph.textContent);
+        // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+        const glyphs = [...container.querySelectorAll('.strip-tile-glyph')].map(glyph => seenText(glyph));
         expect(glyphs).toEqual(['2s', '2py', '2pz', '2px']);
         // Task 6 fix round 1 (M9): the fallback glyph is the name with a real subscript (OrbitalLabel), not flat text.
         expect([...container.querySelectorAll('.strip-tile-glyph sub')].map(sub => sub.textContent)).toEqual(['y', 'z', 'x']);
@@ -234,7 +236,8 @@ describe('ThumbnailStrip pending tiles (T10-I1)', () => {
             const pending = items.slice(1).map(item => ({ ...item, thumb: { kind: 'pending' as const } }));
             const { container } = render(<ThumbnailStrip items={pending} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
             expect(request).not.toHaveBeenCalled();
-            expect([...container.querySelectorAll('.strip-tile-glyph')].map(glyph => glyph.textContent)).toEqual(['2s', '2py', '2pz', '2px']);
+            // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+            expect([...container.querySelectorAll('.strip-tile-glyph')].map(glyph => seenText(glyph))).toEqual(['2s', '2py', '2pz', '2px']);
             // Task 6 fix round 1 (M9): a pending tile's glyph has the real subscript too.
             expect(container.querySelectorAll('.strip-tile-glyph sub')).toHaveLength(3);
             expect([...container.querySelectorAll('canvas.thumb-canvas')].map(canvas => canvas.getAttribute('data-drawn'))).toEqual(['false', 'false', 'false', 'false']);
@@ -509,7 +512,8 @@ describe('ThumbnailStrip<T> (Task 8): generic over the dispatched target', () =>
         const basicItems = basicStripItems({ selection: { n: 3, l: 2, ml: 0 }, enclosedFraction: 0.9 });
         render(<ThumbnailStrip items={basicItems} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} />);
         const label = screen.getByRole('option', { name: '3dz² orbital' }).querySelector('.strip-tile-label')!;
-        expect(label).toHaveTextContent(/^3dz²$/);
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(label).toHaveSeenText(/^3dz²$/);
         expect(label.querySelector('sub')).toHaveTextContent('z²');
     });
 
@@ -529,7 +533,8 @@ describe('ThumbnailStrip<T> (Task 8): generic over the dispatched target', () =>
     it('labels Atoms\' orbital tiles with real subscripts', () => {
         render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
         const label = screen.getByRole('option', { name: '2pz orbital' }).querySelector('.strip-tile-label')!;
-        expect(label).toHaveTextContent(/^2pz$/);
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(label).toHaveSeenText(/^2pz$/);
         expect(label.querySelector('sub')).toHaveTextContent('z');
         expect(screen.getByRole('listbox').textContent).not.toContain('_');
     });

@@ -20,6 +20,7 @@ import { bondsCaptions, orbitalCaveats } from '../../src/bonds/captions';
 import { bondAxisMinimumDensity } from '../../src/bonds/bond_density';
 import type { BondsData } from '../../src/bonds/useBondsData';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
+import { seenText } from '../seen_text';
 
 const fixture = (system: string, file: string) => JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules', system, file), 'utf8'));
 /** The committed N₂ fixtures, generate.py's own output (the same ones bonds_panel.test.tsx reads). */
@@ -63,14 +64,16 @@ function rendered(content: InfoContent, level: LearningLevel) {
 function shownAt(content: InfoContent, level: LearningLevel): string {
     const { container, unmount } = rendered(content, level);
     container.querySelector('.info-computed')?.remove();
-    const text = container.textContent ?? '';
+    // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+    const text = seenText(container);
     unmount();
     return flat(text);
 }
 
 function computedText(content: InfoContent): string {
     const { container, unmount } = render(React.createElement('div', null, content.computed));
-    const text = container.textContent ?? '';
+    // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+    const text = seenText(container);
     unmount();
     return flat(text);
 }
@@ -93,7 +96,7 @@ describe('bondsInfo (Task 7a)', () => {
 
     it('titles the view and, for the density, says what the surface is from the loaded basis, with no method', () => {
         const content = bondsInfo(stateOf(n2Store()), n2Data, 'basics');
-        const title = render(React.createElement('div', null, content.title)).container.textContent;
+        const title = seenText(render(React.createElement('div', null, content.title)).container);
         expect(title).toBe('N₂ — total electron density');
         const shown = shownAt(content, 'basics');
         // Task 9b (fix 5): the lead keeps to three lines; "all the occupied orbitals together" is technical (review I3).
@@ -172,7 +175,8 @@ describe('bondsInfo (Task 7a)', () => {
         store.dispatch(finishOrbitalCalculation({ isoLevel: 2.5e-3 }));
         const content = bondsInfo(stateOf(store), n2Data, 'advanced');
         const { container } = render(React.createElement('div', null, content.title));
-        expect(container.textContent).toBe('N₂ — 3σg orbital');
+        // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+        expect(seenText(container)).toBe('N₂ — 3σg orbital');
         expect(container.querySelector('sub')).toHaveTextContent('g');
         const basics = shownAt(content, 'basics');
         expect(basics).toContain('3σg is a bonding σ orbital of N₂');
@@ -290,7 +294,8 @@ describe('bondsInfo (Task 7a)', () => {
     describe('H₂⁺', () => {
         it('is exact: its captions, its energy relative to H + H⁺, and its bond order of ½', () => {
             const content = bondsInfo(stateOf(h2plusStore()), NOTHING, 'research');
-            const title = render(React.createElement('div', null, content.title)).container.textContent;
+            // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+            const title = seenText(render(React.createElement('div', null, content.title)).container);
             expect(title).toBe('H₂⁺ — 1σg orbital');
             const shown = shownAt(content, 'research');
             // Fix round 1 (M2): Born–Oppenheimer in plain words -- Task 9b (fix 5): its own sentence in the technical band.
@@ -340,7 +345,8 @@ describe('bondsInfo (Task 7a)', () => {
 /** The lead: Info's first paragraph, as rendered at `level`. */
 function leadAt(content: InfoContent, level: LearningLevel): string {
     const { container, unmount } = render(React.createElement(InfoPanel, { content, topic: null, onClearTopic: () => {}, level }));
-    const lead = (container.querySelector('.info-body > p.info-text')?.textContent ?? '').replace(/\u00A0/g, ' ');
+    // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+    const lead = seenText(container.querySelector('.info-body > p.info-text')).replace(/\u00A0/g, ' ');
     unmount();
     return lead;
 }

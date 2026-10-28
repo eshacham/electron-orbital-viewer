@@ -19,6 +19,7 @@ import { setMode } from '../../src/store/atomSlice';
 import { metaLoaded, selectMolecule, setSurface } from '../../src/store/moleculeSlice';
 import { kohnShamNote } from '../../src/molecules/orbital_display';
 import { DIPOLE_CONVENTION } from '../../src/info/molecule_info';
+import { seenText } from '../seen_text';
 
 /**
  * Task 7b: what Info says (every band, at Research) with `orbitals` drawn in Molecules -- the orbital list's caption
@@ -33,7 +34,8 @@ function infoText(orbitals: ReturnType<typeof waterMeta>['orbitals'], symmetry: 
     store.dispatch(metaLoaded({ id: meta.id, meta }));
     store.dispatch(setSurface({ kind: 'mo', index: orbitals[0].index }));
     const { container, unmount } = render(<InfoPanel content={moleculeInfo(store.getState(), meta, 'research')} topic={null} onClearTopic={() => {}} level="research" />);
-    const text = (container.textContent ?? '').replace(/\u00A0/g, ' ');
+    // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+    const text = seenText(container).replace(/\u00A0/g, ' ');
     unmount();
     return text;
 }

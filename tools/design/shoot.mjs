@@ -291,6 +291,14 @@ async function settle(page) {
 }
 
 function collectMetrics() {
+  // Final review: a typeset label is its aria-hidden visual beside a visually hidden plain copy (subscripts.ts
+  // typesetLabel); text is read as the eye reads it, the copies left out.
+  const seen = el => {
+    if (!el) return null;
+    const copy = el.cloneNode(true);
+    copy.querySelectorAll('.typeset-label > .visually-hidden').forEach(n => n.remove());
+    return copy.textContent;
+  };
   const box = selector => {
     const el = document.querySelector(selector);
     if (!el) return null;
@@ -306,7 +314,8 @@ function collectMetrics() {
   const canvases = [...document.querySelectorAll('canvas')];
   // An Info fact's value by its label's text (an (i) in the label adds no text), or null.
   const infoFact = label => [...document.querySelectorAll('.info-section .info-fact')]
-    .find(f => f.querySelector('dt')?.textContent.trim() === label)?.querySelector('dd')?.textContent ?? null;
+    .find(f => seen(f.querySelector('dt'))?.trim() === label)?.querySelector('dd') ?? null;
+  const infoFactText = label => seen(infoFact(label));
   return {
     theme: document.documentElement.dataset.theme ?? null,
     title: document.title,
@@ -383,10 +392,10 @@ function collectMetrics() {
         moreCue: fade ? { mask: fade.maskImage ?? fade.webkitMaskImage ?? 'none', webkitMask: fade.webkitMaskImage ?? 'none', shadow: fade.boxShadow } : null,
         visibleBottom: round(visibleBottom),
         computed: summary ? { ...place(summary), open: summary.parentElement.open } : null,
-        lastNote: notes.length ? { text: notes[notes.length - 1].textContent, ...place(notes[notes.length - 1]) } : null,
-        title: section.querySelector('.info-title')?.textContent ?? null,
+        lastNote: notes.length ? { text: seen(notes[notes.length - 1]), ...place(notes[notes.length - 1]) } : null,
+        title: seen(section.querySelector('.info-title')),
         topicChip: section.querySelector('.info-topic-chip')?.textContent ?? null,
-        facts: [...section.querySelectorAll('.info-fact')].map(f => [f.querySelector('dt')?.textContent ?? '', f.querySelector('dd')?.textContent ?? '']),
+        facts: [...section.querySelectorAll('.info-fact')].map(f => [seen(f.querySelector('dt')) ?? '', seen(f.querySelector('dd')) ?? '']),
         factButtons: [...section.querySelectorAll('.info-fact dt')].filter(dt => dt.querySelector('.info-button')).map(dt => {
           const button = dt.querySelector('.info-button').getBoundingClientRect();
           const range = document.createRange();
@@ -394,14 +403,14 @@ function collectMetrics() {
           const firstLine = range.getClientRects()[0];
           const value = dt.parentElement.querySelector('dd')?.getBoundingClientRect();
           return {
-            label: dt.textContent,
+            label: seen(dt),
             wrapped: Boolean(firstLine) && button.top >= firstLine.bottom - 1,
             labelLines: new Set([...range.getClientRects()].map(r => round(r.top))).size,
             valueBelow: Boolean(value) && value.top >= dt.getBoundingClientRect().bottom - 1,
           };
         }),
-        text: [...section.querySelectorAll('.info-text')].map(e => e.textContent),
-        computedText: section.querySelector('.info-computed-body')?.textContent ?? null,
+        text: [...section.querySelectorAll('.info-text')].map(seen),
+        computedText: seen(section.querySelector('.info-computed-body')),
         // Task 9b (finish review, fix 5): the lead's laid-out lines (Basics and Explore: 3 at most at the inspector's
         // width), counted as the distinct tops of its text's line boxes; and every fact label's lines (fix 8: one each).
         // Lines are the box's height over its line height (a subscript's or an (i)'s own box would count twice by tops).
@@ -537,17 +546,17 @@ function collectMetrics() {
     webglContextsCreated: window.__eovWebglContextsCreated ?? 0,
     insets: window.__eovInsets ?? null,
     text: {
-      title: document.querySelector('.viewport-title')?.textContent ?? null,
-      keys: document.querySelector('.key-column')?.textContent ?? null,
-      enclosed: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.textContent ?? null,
-      phaseKey: [...document.querySelectorAll('[aria-label="surface colour key"]')].map(e => e.textContent),
-      plotLegend: [...document.querySelectorAll('.radial-plot-legend-item')].map(e => e.textContent),
+      title: seen(document.querySelector('.viewport-title')),
+      keys: seen(document.querySelector('.key-column')),
+      enclosed: seen(document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')),
+      phaseKey: [...document.querySelectorAll('[aria-label="surface colour key"]')].map(seen),
+      plotLegend: [...document.querySelectorAll('.radial-plot-legend-item')].map(seen),
       // Levels Task 9: the ★ texts Tasks 5-7 moved into Info are read there when their old place is gone -- the
       // enclosed note's contour value is Info's "Iso value" fact, the configuration its "Configuration" fact.
       enclosedNote: document.querySelector('#enclosed-select')?.closest('.MuiFormControl-root')?.querySelector('.MuiFormHelperText-root')?.textContent
-        ?? infoFact('Iso value'),
+        ?? infoFactText('Iso value'),
       subshellChips: [...document.querySelectorAll('.subshell-chip')].map(e => e.textContent),
-      configuration: document.querySelector('.level-nav-configuration')?.textContent ?? infoFact('Configuration'),
+      configuration: document.querySelector('.level-nav-configuration')?.textContent ?? infoFactText('Configuration'),
       // Task 14: the on-model labels shown (placed by a frame), and the large-molecule hint.
       modelLabels: [...document.querySelectorAll('.model-label')].filter(e => getComputedStyle(e).visibility === 'visible').map(e => e.textContent),
       modelLabelHint: document.querySelector('.model-label-hint')?.textContent ?? null,
@@ -578,7 +587,13 @@ function scienceBlocks() {
       blocks.add(block);
     }
   }
-  const texts = [...blocks].map(b => b.textContent.replace(/\s+/g, ' ').trim());
+  // Final review: a typeset label's visually hidden plain copy (typesetLabel) is for the ear; the block reads as seen.
+  const seen = el => {
+    const copy = el.cloneNode(true);
+    copy.querySelectorAll('.typeset-label > .visually-hidden').forEach(n => n.remove());
+    return copy.textContent;
+  };
+  const texts = [...blocks].map(b => seen(b).replace(/\s+/g, ' ').trim());
   // A tooltip's or an icon's text lives in its title or aria-label (main kept the ΔSCF method in a tooltip).
   for (const root of outer) {
     for (const el of [root, ...root.querySelectorAll('[title], [aria-label]')]) {

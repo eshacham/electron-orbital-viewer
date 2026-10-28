@@ -576,7 +576,8 @@ describe('App', () => {
         expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: 'About Shell' })).toHaveAttribute('aria-pressed', 'false');
         fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
         expect(document.querySelector('.info-topic-chip')).toBeNull();
-        expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveTextContent('Hydrogen — 3dz² orbital');
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('Hydrogen — 3dz² orbital');
     });
 
     // Task 4: Info is the phone sheet's second tab -- Explore · Info · View · Plot -- holding the same Info as the
@@ -1347,7 +1348,8 @@ describe('App', () => {
             expect(screen.getByRole('tab', { name: 'Explore' })).toHaveAttribute('aria-selected', 'true');
             fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
             expect(document.querySelector('.info-topic-chip')).toBeNull();
-            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveTextContent('H₂⁺ — 1σg orbital');
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('H₂⁺ — 1σg orbital');
         });
     });
 
@@ -2358,7 +2360,8 @@ describe('App: relativity', () => {
             });
             act(() => { jest.advanceTimersByTime(500); });
             // Task 8 (addendum 4): the orbital typeset, 2p<sub>z</sub>, never "2p_z".
-            expect(document.querySelector('.canvas-busy')).toHaveTextContent('Computing 2pz · 2p³⁄₂…');
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            expect(document.querySelector('.canvas-busy')).toHaveSeenText('Computing 2pz · 2p³⁄₂…');
             expect(document.querySelector('.canvas-busy')!.innerHTML).toContain('2p<sub>z</sub>');
         } finally {
             jest.useRealTimers();
@@ -3006,7 +3009,8 @@ describe('App: what is drawn, named (Task 8)', () => {
             // the view once it has settled, so each change is heard once (the SR pass heard loading/done flicker).
             expect(caption()).not.toHaveAttribute('aria-live');
             expect(spoken()).toHaveAttribute('aria-live', 'polite');
-            expect(caption()).toHaveTextContent(/^Argon 2pz · 90 % enclosed$/);
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            expect(caption()).toHaveSeenText(/^Argon 2pz · 90 % enclosed$/);
             expect(spoken()).toHaveTextContent(/^Argon 2pz · 90 % enclosed$/);
             expect(caption().innerHTML).toContain('2p<sub>z</sub>');
             expect(caption().textContent).not.toContain('_');
@@ -3019,7 +3023,8 @@ describe('App: what is drawn, named (Task 8)', () => {
             fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
             const infoLive = () => document.querySelector('.info-section [aria-live="polite"]') as HTMLElement;
             act(() => { store.dispatch(drillToOrbital(2, 1, 1)); });
-            expect(caption()).toHaveTextContent(/^Argon 2px · 90 % enclosed$/);
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            expect(caption()).toHaveSeenText(/^Argon 2px · 90 % enclosed$/);
             expect(document.querySelector('.info-section')).toHaveTextContent('Argon — 2px orbital');
             expect(infoLive()).toHaveTextContent(/^$/);
         });
@@ -3065,18 +3070,21 @@ describe('App: what is drawn, named (Task 8)', () => {
         it('names a hydrogen orbital, typeset, and "loading…" while it is computed', () => {
             jest.useFakeTimers();
             open('#mode=basic&n=3&l=2&ml=0', true);
-            expect(caption()).toHaveTextContent(/^Hydrogen 3dz² · 90 % enclosed$/);
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            expect(caption()).toHaveSeenText(/^Hydrogen 3dz² · 90 % enclosed$/);
             expect(caption().innerHTML).toContain('3d<sub>z²</sub>');
             expect(spoken()).toHaveTextContent(/^Hydrogen 3dz² · 90 % enclosed$/);
             act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS + 500); });
-            expect(caption()).toHaveTextContent(/^Hydrogen 3dz² · loading…$/);
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            expect(caption()).toHaveSeenText(/^Hydrogen 3dz² · loading…$/);
             // Task 9 fix round 1: "loading…" is not said; the settled view is, once it settles.
             expect(spoken()).toHaveTextContent(/^Hydrogen 3dz² · 90 % enclosed$/);
         });
 
         it('names the Bonds orbital drawn and its bond length, folding the old header line into it', async () => {
             const { container } = open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', true);
-            await waitFor(() => expect(caption()).toHaveTextContent(/^N₂ 1πu · R = \d\.\d\d a₀$/));
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            await waitFor(() => expect(caption()).toHaveSeenText(/^N₂ 1πu · R = \d\.\d\d a₀$/));
             expect(caption().innerHTML).toContain('1π<sub>u</sub>');
             expect(container.querySelector('.bonds-header')).toBeNull();
             expect(container.querySelectorAll('.phone-caption')).toHaveLength(1);
@@ -3090,7 +3098,8 @@ describe('App: what is drawn, named (Task 8)', () => {
         it('names the requested Bonds orbital with "loading…" while its files load', async () => {
             (loadBasis as jest.Mock).mockImplementation(() => new Promise(() => {}));
             open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', true);
-            await waitFor(() => expect(caption()).toHaveTextContent(/^N₂ 1πu · loading…$/), { timeout: 2000 });
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            await waitFor(() => expect(caption()).toHaveSeenText(/^N₂ 1πu · loading…$/), { timeout: 2000 });
         });
     });
 
@@ -3098,7 +3107,8 @@ describe('App: what is drawn, named (Task 8)', () => {
         it('titles a hydrogen orbital with a real subscript, and the tab with the flat name', () => {
             open('#mode=basic&n=3&l=2&ml=0', false);
             const title = screen.getByRole('heading', { level: 1 });
-            expect(title).toHaveTextContent(/^Hydrogen — 3dz² orbital$/);
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            expect(title).toHaveSeenText(/^Hydrogen — 3dz² orbital$/);
             expect(title.innerHTML).toContain('3d<sub>z²</sub>');
             expect(document.title).toBe('Hydrogen — 3dz² orbital · QuantumLab');
         });
@@ -3108,7 +3118,8 @@ describe('App: what is drawn, named (Task 8)', () => {
             open('#mode=basic&n=2&l=1&ml=0', false);
             act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS + 500); });
             const busy = document.querySelector('.canvas-busy')!;
-            expect(busy).toHaveTextContent('Computing 2pz…');
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            expect(busy).toHaveSeenText('Computing 2pz…');
             expect(busy.innerHTML).toContain('2p<sub>z</sub>');
             expect(busy).toHaveAttribute('role', 'status');
         });
@@ -3118,7 +3129,8 @@ describe('App: what is drawn, named (Task 8)', () => {
             const title = screen.getByRole('heading', { level: 1 });
             expect(title).toHaveTextContent(/^Hydrogen — n = 2 Stark states$/);
             const key = screen.getByLabelText('combination colour key');
-            expect(key).toHaveTextContent('(2s + 2pz)/√2, −3F');
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            expect(key).toHaveSeenText('(2s + 2pz)/√2, −3F');
             expect(key.innerHTML).toContain('2p<sub>z</sub>');
             expect(key.textContent).not.toContain('_');
         });
@@ -3126,7 +3138,8 @@ describe('App: what is drawn, named (Task 8)', () => {
         it('typesets a Bonds orbital in the canvas subtitle', async () => {
             open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', false);
             // Task 9b: the subtitle names the drawn orbital without repeating the title's N₂, or R (the slider and Info's).
-            await waitFor(() => expect(document.querySelector('.viewport-subtitle')).toHaveTextContent(/^1πu orbital/));
+            // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+            await waitFor(() => expect(document.querySelector('.viewport-subtitle')).toHaveSeenText(/^1πu orbital/));
             expect(document.querySelector('.viewport-subtitle')!.innerHTML).toContain('1π<sub>u</sub>');
         });
     });

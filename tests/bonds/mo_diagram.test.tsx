@@ -6,6 +6,7 @@ import { bondOrderFromOrbitals, buildMoDiagram, bondOrderText, h2plusOrbitals, s
 import { BondsSystemId, TEXTBOOK_BOND_ORDER } from '../../src/bonds/systems';
 import MoDiagram from '../../src/components/MoDiagram';
 import { MoleculeMeta, MoleculeOrbitalInfo } from '../../src/molecules/types';
+import { seenText } from '../seen_text';
 
 /** The generated v1 meta.json (tests/fixtures/molecules: copies of what is published). */
 const fixtureOrbitals = (id: string): MoleculeOrbitalInfo[] =>
@@ -156,7 +157,8 @@ describe('MoDiagram', () => {
     it("leaves O2's α/β note to Info, and subscripts its labels' g/u", () => {
         const { container } = render(<MoDiagram orbitals={fixtureOrbitals('o2')} selectedIndex={null} />);
         expect(screen.queryByText(/photoelectron spectra/)).toBeNull();
-        const label = [...container.querySelectorAll('.mo-label')].find(span => span.textContent === '3σg')!;
+        // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+        const label = [...container.querySelectorAll('.mo-label')].find(span => seenText(span) === '3σg')!;
         expect(label.querySelector('sub')).toHaveTextContent('g');
     });
 

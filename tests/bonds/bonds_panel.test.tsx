@@ -233,7 +233,8 @@ describe('BondsPanel', () => {
         // Task 7a: the states' g/u is a real subscript, in one span with its word (a flex button drops a space between items).
         const bonding = screen.getByRole('button', { name: '1σg (bonding)' });
         expect(bonding.querySelector('span sub')).toHaveTextContent('g');
-        expect(bonding.querySelector('span')).toHaveTextContent(/^1σg bonding$/);
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(bonding.querySelector('span')).toHaveSeenText(/^1σg bonding$/);
     });
 
     // Task 7a: the bond-order footer ("Bond order 0 — no bond"), the density label and the energy line with its method

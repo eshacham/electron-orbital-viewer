@@ -1,13 +1,15 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { withSubscripts } from '../../src/format/subscripts';
 import { flatSubscripts } from '../../src/format/sci';
 
-/** The rendered markup of `text` through the one label helper, with each <sub> written out (each label's named
- * wrapper left out: the test below reads those names). */
+/** The rendered markup of `text` through the one label helper, with each <sub> written out (each label's wrapper,
+ * aria-hidden visual and plain copy left out: the test below reads those -- final review, typesetLabel). */
 function typeset(text: string): string {
     const { container } = render(<p>{withSubscripts(text)}</p>);
-    return container.querySelector('p')!.innerHTML.replace(/<span aria-label="[^"]*">|<\/span>/g, '');
+    return container.querySelector('p')!.innerHTML
+        .replace(/<span class="visually-hidden">[^<]*<\/span>/g, '')
+        .replace(/<span class="typeset-label">|<span aria-hidden="true">|<\/span>/g, '');
 }
 
 // Task 8 (addendum, "How to work"): one typeset-label helper for every name of what is drawn -- MO symmetry labels,
@@ -44,11 +46,18 @@ describe('withSubscripts: the one typeset-label helper', () => {
         expect(typeset(text)).not.toContain('_');
     });
 
-    // As OrbitalLabel is: the label is named as it reads, so an accessible name never gains a space before the <sub>.
-    // Ruling M6: spoken names keep plain digits -- "1b1", even from the flat "1b₁".
-    it('names each typeset label as it reads', () => {
+    // Final review (unverified item, checked): an aria-label on a role-less <span> is prohibited (ARIA 1.2) and not reliably
+    // read, and a name computed from the content can split at the <sub> ("1b 1") -- so the visual is aria-hidden and a
+    // visually hidden plain copy is read instead (typesetLabel), as OrbitalLabel's is. Ruling M6: spoken names keep plain
+    // digits -- "1b1", even from the flat "1b₁".
+    it('reads each typeset label as it reads, from a plain copy beside its hidden visual', () => {
         const { container } = render(<h1>{withSubscripts('Hydrogen — 3d_z² orbital, 1b₁ and 1σu*')}</h1>);
-        expect(Array.from(container.querySelectorAll('[aria-label]'), el => el.getAttribute('aria-label'))).toEqual(['3dz²', '1b1', '1σu']);
+        expect(container.querySelectorAll('[aria-label]')).toHaveLength(0);
+        expect(Array.from(container.querySelectorAll('.typeset-label > .visually-hidden'), el => el.textContent)).toEqual(['3dz²', '1b1', '1σu']);
+        expect(Array.from(container.querySelectorAll('.typeset-label > [aria-hidden="true"]'), el => el.innerHTML))
+            .toEqual(['3d<sub>z²</sub>', '1b<sub>1</sub>', '1σ<sub>u</sub>']);
+        // Each label is read whole ("1b1", never "1b 1"); jsdom gives the copy no display, so it may set it off by a space.
+        expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleName(/^Hydrogen — 3dz² orbital, 1b1 and 1σu ?\*$/);
     });
 
     it('typesets a label inside running text, and leaves words, units and point groups alone', () => {

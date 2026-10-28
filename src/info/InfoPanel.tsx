@@ -3,6 +3,7 @@ import InfoButton from './InfoButton';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { atLeast, type LearningLevel } from '../levels/levels';
 import { spokenText } from '../format/sci';
+import { spokenTextOf } from '../format/subscripts';
 import { glossary } from './glossary';
 import type { InfoContent, InfoTopicId } from './info_types';
 import { useInfoTopicContext } from './useInfoTopic';
@@ -70,7 +71,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
         // Task 9 fix round 1: the way back is named after the selection it returns to, with plain digits ("Back to Water
         // (H2O) — electron density"); its visible text keeps the typeset title. Review I3: the heading Back lands on is
         // described by the same words, so the reader hears what they came back to.
-        const selectionTitle = spokenText((title.current ?? backTitle.current)?.textContent ?? '');
+        // Final review: read as heard -- a typeset label's visual is aria-hidden beside its plain copy (typesetLabel).
+        const selectionTitle = spokenText(spokenTextOf(title.current ?? backTitle.current));
         if (selectionTitle !== spokenTitle) setSpokenTitle(selectionTitle);
         // Task 9 fix round 1: a stand-in title while the selection loads is never said, and the real one after it is said
         // once -- the screen-reader pass heard a molecule's first load as "Info: Water", then "Info: Water (H₂O) — …".
@@ -81,8 +83,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
         const waited = waitedFor.current;
         waitedFor.current = false;
         const chip = heading.current?.querySelector('.info-topic-chip')?.textContent;
-        const shown = `Info: ${spokenText(chip ?? title.current?.textContent ?? '')}`;
-        const selection = (chip === undefined ? title.current : backTitle.current)?.textContent ?? null;
+        const shown = `Info: ${spokenText(chip ?? spokenTextOf(title.current))}`;
+        const selectionNode = chip === undefined ? title.current : backTitle.current;
+        const selection = selectionNode ? spokenTextOf(selectionNode) : null;
         const selectionChanged = waited || (lastSelection.current !== null && selection !== lastSelection.current);
         lastSelection.current = selection;
         if (shown === lastShown.current || (lastShown.current === null && !waited)) {

@@ -9,15 +9,38 @@
 import React from 'react';
 import { subscriptMatches } from './sci';
 
+/**
+ * A typeset label as a reader hears it (final review, unverified item, checked): the visual, with its <sub>, hidden from
+ * assistive technology, and beside it a visually hidden plain copy -- "1b1", "3dz²", "C2v" -- that is read instead,
+ * as a j-level's "6p j = 3/2" already is beside its "6p³⁄₂" (LevelNav). An aria-label on the role-less span did not do
+ * it: ARIA 1.2 prohibits naming a generic element, so it is not reliably read, and a name computed from the content
+ * can read a <sub> as a separate run ("C 2v"). The copy cannot be selected, so copied text reads once ("1b1").
+ */
+export function typesetLabel(visual: React.ReactNode[], spoken: string): React.ReactElement {
+    return React.createElement('span', { className: 'typeset-label' },
+        React.createElement('span', { 'aria-hidden': true }, ...visual),
+        React.createElement('span', { className: 'visually-hidden' }, spoken));
+}
+
+/**
+ * The text a reader hears in `node`: what is hidden from assistive technology (aria-hidden) left out, so a typeset
+ * label reads once, as its plain copy (`typesetLabel`). InfoPanel reads its titles with it.
+ */
+export function spokenTextOf(node: Node | null | undefined): string {
+    if (!node) return '';
+    if (node.nodeType === Node.TEXT_NODE) return node.nodeValue ?? '';
+    if (node instanceof Element && node.getAttribute('aria-hidden') === 'true') return '';
+    return Array.from(node.childNodes, spokenTextOf).join('');
+}
+
 /** `text` with its subscripts typeset; a string with none comes back as it is. */
 export function withSubscripts(text: string): React.ReactNode {
     const parts: React.ReactNode[] = [];
     let last = 0;
     for (const match of subscriptMatches(text)) {
-        // Named as it reads, "1b1" or "3dz²", as OrbitalLabel is: a <sub> is no inline run to every accessible-name
-        // computation, which would read "1b 1". Plain digits, not the flat "1b₁" (ruling M6): screen readers say
-        // Unicode subscript digits inconsistently ("subscript one"), so spoken names keep ASCII.
-        const label = React.createElement('span', { 'aria-label': `${match.base}${match.sub}` }, match.base, React.createElement('sub', null, match.sub));
+        // Read as it reads, "1b1" or "3dz²" (typesetLabel). Plain digits, not the flat "1b₁" (ruling M6): screen readers
+        // say Unicode subscript digits inconsistently ("subscript one"), so spoken names keep ASCII.
+        const label = typesetLabel([match.base, React.createElement('sub', { key: 'sub' }, match.sub)], `${match.base}${match.sub}`);
         parts.push(text.slice(last, match.index), label);
         last = match.index + match.length;
     }

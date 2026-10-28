@@ -4,6 +4,7 @@ import LevelNav, { NavigationTarget } from '../../src/components/LevelNav';
 // Fix round 1: About's text lives in atom_text (shared text helpers live in modules, not components).
 import { relativisticEnergiesSentence, aboutRelativitySentence, aboutModelText } from '../../src/atom/atom_text';
 import { speciesConfiguration } from '../../src/atom/species';
+import { seenText } from '../seen_text';
 
 describe('LevelNav', () => {
     // Task 6: the valence line keeps its short labelled value; the core note is Info's (atomInfo, whose tests
@@ -383,7 +384,8 @@ describe('LevelNav for a species', () => {
         fireEvent.click(crumbs.getByRole('button', { name: '6px of 6p j = 1/2' }));
         expect(onNavigate).toHaveBeenLastCalledWith({ level: 'orbital', n: 6, l: 1, ml: 1, j: 0.5 });
         const orbitalCrumb = crumbs.getByRole('button', { name: '6px of 6p j = 1/2' });
-        expect(orbitalCrumb).toHaveTextContent(/^6px · 6p½$/);
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(orbitalCrumb).toHaveSeenText(/^6px · 6p½$/);
         expect(orbitalCrumb.querySelector('sub')).toHaveTextContent('x');
         expect(getByRole('button', { name: 'Back to 6p j = 1/2' })).toBeTruthy();
         expect(container.querySelector('.level-nav-shell-hint')).toBeNull();
@@ -413,11 +415,13 @@ describe('LevelNav for a species', () => {
         expect(onNavigate).toHaveBeenCalledWith({ level: 'subshell', n: 3, l: 1 });
         expect(getByText('← Back to 3p').getAttribute('aria-label')).toBeNull();
         const crumbs = getByRole('navigation', { name: 'breadcrumb' });
-        expect(Array.from(crumbs.querySelectorAll('button')).map(b => [b.textContent, b.getAttribute('aria-label')]))
+        // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+        expect(Array.from(crumbs.querySelectorAll('button')).map(b => [seenText(b), b.getAttribute('aria-label')]))
             // Task 6: the orbital crumb reads "3pz" (a real subscript), never "3p_z".
             // Final review M2: shell names are spaced, "L shell (n = 2)".
             .toEqual([['Argon', null], ['M shell (n = 3)', null], ['3p', null], ['3pz', null]]);
-        expect(container.querySelector('.visually-hidden')).toBeNull();
+        // Final review: a typeset label's own plain copy (typesetLabel) is not a j-level's spoken name.
+        expect(container.querySelector(':not(.typeset-label) > .visually-hidden')).toBeNull();
     });
 
     // Ruling C6: ΔSCF stays non-relativistic in every mode; with a

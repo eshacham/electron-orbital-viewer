@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import ViewportToolbar from '../../src/shell/ViewportToolbar';
 import TitleBlock from '../../src/shell/TitleBlock';
 import { withSubscripts } from '../../src/format/subscripts';
+import { seenText } from '../seen_text';
 
 describe('the viewport frame (spec §8.5)', () => {
     // Task 8 (addendum 1): the title is typeset -- App hands it the node built once from the view's title -- so the
@@ -11,7 +12,8 @@ describe('the viewport frame (spec §8.5)', () => {
         render(<TitleBlock title={withSubscripts('Carbon — 2p_z orbital')} subtitle="|ψ|² isosurface · 90 % enclosed · LDA, non-relativistic" />);
         const heading = screen.getByRole('heading', { level: 1, name: 'Carbon — 2pz orbital' });
         expect(heading.innerHTML).toContain('2p<sub>z</sub>');
-        expect(heading.textContent).toBe('Carbon — 2pz orbital');
+        // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+        expect(seenText(heading)).toBe('Carbon — 2pz orbital');
         expect(screen.getByText('|ψ|² isosurface · 90 % enclosed · LDA, non-relativistic')).toHaveClass('viewport-subtitle');
     });
 

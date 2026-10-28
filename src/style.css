@@ -830,6 +830,8 @@ html, body, #root {
   white-space: nowrap;
   border: 0;
 }
+/* Final review: a typeset label's plain copy (subscripts.ts typesetLabel) is for the ear -- copied text takes the visual. */
+.typeset-label > .visually-hidden { user-select: none; }
 .subshell-energy-diagram {
   display: block;
 }

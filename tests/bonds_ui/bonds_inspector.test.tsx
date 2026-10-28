@@ -53,7 +53,8 @@ describe('BondsInspector (spec §9.3, Phase 6G-2 Task 9)', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
         const frontier = container.querySelector('.bonds-frontier')!;
         // Fix round 1 (I3, ruling R19): the values say they are Kohn–Sham eigenvalues, with that (i) beside them.
-        expect(frontier).toHaveTextContent('Kohn–Sham orbital energies — HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(frontier).toHaveSeenText('Kohn–Sham orbital energies — HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)');
         expect([...frontier.querySelectorAll('sub')].map(sub => sub.textContent)).toEqual(['g', 'g']);
         expect(screen.getByRole('button', { name: 'About Kohn–Sham orbitals' })).toHaveClass('info-button');
     });
@@ -65,9 +66,11 @@ describe('BondsInspector (spec §9.3, Phase 6G-2 Task 9)', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
         const levels = container.querySelector('.bonds-frontier')!;
         const [g, u] = h2plusOrbitals(bonds.R!);
-        expect(levels).toHaveTextContent(`Exact levels — 1σg Eel = ${orbitalEnergyText(g.energyHartree)} · 1σu* Eel = ${orbitalEnergyText(u.energyHartree)}`);
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(levels).toHaveSeenText(`Exact levels — 1σg Eel = ${orbitalEnergyText(g.energyHartree)} · 1σu* Eel = ${orbitalEnergyText(u.energyHartree)}`);
         // At R = 2 a₀ (the reviewer's figures).
-        expect(levels).toHaveTextContent('1σg Eel = −30.00 eV (−1.103 Ha) · 1σu* Eel = −18.16 eV (−0.668 Ha)');
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(levels).toHaveSeenText('1σg Eel = −30.00 eV (−1.103 Ha) · 1σu* Eel = −18.16 eV (−0.668 Ha)');
         expect([...levels.querySelectorAll('sub')].map(sub => sub.textContent)).toEqual(['g', 'el', 'u', 'el']);
         expect(levels.textContent).not.toContain('_');
     });

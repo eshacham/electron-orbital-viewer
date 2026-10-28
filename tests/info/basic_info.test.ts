@@ -83,7 +83,8 @@ describe('basicInfo (Task 5)', () => {
         const content = basicInfo(orbitalsState().getState(), 'explore');
         render(React.createElement('h3', null, content.title));
         const title = screen.getByRole('heading');
-        expect(title).toHaveTextContent('Hydrogen — 3dz² orbital');
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(title).toHaveSeenText('Hydrogen — 3dz² orbital');
         expect(title.querySelector('sub')).toHaveTextContent('z²');
         expect(title.textContent).not.toContain('_');
     });

@@ -106,7 +106,8 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
     it('reads the orbital name when no combination is active', () => {
         render(<Harness initial={{ n: 3, l: 2, ml: 0 }} />);
         const heading = document.getElementById('orbital-name')!;
-        expect(heading).toHaveTextContent(/^3dz²$/);
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(heading).toHaveSeenText(/^3dz²$/);
         expect(heading.querySelector('sub')).toHaveTextContent('z²');
     });
 
@@ -123,7 +124,8 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
     it('typesets an n = 2 Stark state in the heading, with no "_"', () => {
         render(<Harness combination={{ kind: 'field', level: 2, field: 0.002, stark: 'lower' }} />);
         const heading = document.getElementById('orbital-name')!;
-        expect(heading).toHaveTextContent('n = 2 Stark state (2s + 2pz)/√2');
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(heading).toHaveSeenText('n = 2 Stark state (2s + 2pz)/√2');
         expect(heading.textContent).not.toContain('_');
         expect(heading.querySelector('sub')).toHaveTextContent('z');
     });

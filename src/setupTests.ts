@@ -1,4 +1,17 @@
 import '@testing-library/jest-dom';
+import { toHaveSeenText } from '../tests/seen_text';
+
+// Final review: a typeset label is its aria-hidden visual beside a visually hidden plain copy (subscripts.ts
+// typesetLabel), so an element's textContent holds a label twice; toHaveSeenText reads the text as the eye does.
+expect.extend({ toHaveSeenText });
+declare global {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
+    namespace jest {
+        interface Matchers<R> {
+            toHaveSeenText(expected: string | RegExp): R;
+        }
+    }
+}
 
 // jsdom's test global does not carry over Node's own structuredClone, which
 // the atom worker's serialisation contract test uses to exercise the same

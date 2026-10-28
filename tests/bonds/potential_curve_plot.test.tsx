@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, fireEvent, screen } from '@testing-library/react';
 import PotentialCurvePlot, { interpolateEnergy, CurveSeries } from '../../src/components/PotentialCurvePlot';
+import { seenText } from '../seen_text';
 
 const series: CurveSeries[] = [
     { key: 'g', label: '1σg', color: '#ff0000', points: [{ R: 1, E: -0.4 }, { R: 2, E: -0.6 }, { R: 4, E: -0.55 }] },
@@ -32,7 +33,8 @@ describe('PotentialCurvePlot', () => {
         const { container } = render(<PotentialCurvePlot {...props} />);
         const legend = Array.from(container.querySelectorAll('.radial-plot-legend-item'), item => item.innerHTML);
         expect(legend[0]).toContain('1σ<sub>g</sub>');
-        expect(legend[1]).toContain('1σ<sub>u</sub></span>*');
+        // Final review: the typeset visual (aria-hidden) and its plain copy (typesetLabel), then the *.
+        expect(legend[1]).toContain('1σ<sub>u</sub></span><span class="visually-hidden">1σu</span></span>*');
     });
 
     it('marks the current R and only the curve(s) in range there', () => {
@@ -143,7 +145,8 @@ describe('PotentialCurvePlot', () => {
             <PotentialCurvePlot {...props} referenceR={{ R: 2, label: 'Dotted line: R_e = 2.086 a₀ (1.104 Å), fitted; D_e = 9.44 eV from separated atoms.' }} />,
         );
         const note = container.querySelector('.potential-reference-note')!;
-        expect(note.textContent).toBe('Dotted line: Re = 2.086 a₀ (1.104 Å), fitted; De = 9.44 eV from separated atoms.');
+        // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+        expect(seenText(note)).toBe('Dotted line: Re = 2.086 a₀ (1.104 Å), fitted; De = 9.44 eV from separated atoms.');
         expect([...note.querySelectorAll('sub')].map(sub => sub.textContent)).toEqual(['e', 'e']);
     });
 

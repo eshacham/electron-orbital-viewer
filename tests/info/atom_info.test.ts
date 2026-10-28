@@ -276,7 +276,8 @@ describe('atomInfo (Task 6)', () => {
         };
         const content = atomInfo(atomsState(selection, drawn), 'advanced');
         const { container, unmount } = render(React.createElement('h3', null, content.title));
-        expect(container).toHaveTextContent('Carbon — 2pz orbital');
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(container).toHaveSeenText('Carbon — 2pz orbital');
         expect(container.querySelector('sub')).toHaveTextContent('z');
         expect(container.textContent).not.toContain('_');
         unmount();

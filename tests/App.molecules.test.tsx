@@ -855,7 +855,8 @@ describe('Molecules mode', () => {
         expect(spoken()).toHaveTextContent(/^Water · electron density$/);
         act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
         // Fix round 1 (M2): the role goes with the name.
-        expect(caption()).toHaveTextContent(/^Water 1b1 \(HOMO\) · 90 % enclosed$/);
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(caption()).toHaveSeenText(/^Water 1b1 \(HOMO\) · 90 % enclosed$/);
         expect(caption().innerHTML).toContain('1b<sub>1</sub>');
         const { loadMoleculeMeta } = jest.requireMock('../src/molecules/loader') as { loadMoleculeMeta: jest.Mock };
         loadMoleculeMeta.mockImplementationOnce(() => new Promise(() => {}));
@@ -877,7 +878,8 @@ describe('Molecules mode', () => {
             store.dispatch(renderFinished({ isoLevel: 0.05, drawn: { id: 'h2o', surface: { kind: 'mo', index: 4 }, enclosedFraction: 0.9 } }));
         });
         const subtitle = document.querySelector('.viewport-subtitle')!;
-        expect(subtitle).toHaveTextContent(/^1b1 orbital \(HOMO\)/);
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(subtitle).toHaveSeenText(/^1b1 orbital \(HOMO\)/);
         expect(subtitle.textContent).not.toMatch(/Water|eV|Ha\b/);
         expect(subtitle.innerHTML).toContain('1b<sub>1</sub>');
         expect(subtitle.textContent).not.toMatch(/[_₁]/);

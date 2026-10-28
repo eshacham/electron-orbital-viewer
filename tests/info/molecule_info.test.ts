@@ -26,6 +26,7 @@ import { validatedLine } from '../../src/validation/geometry_honesty';
 import { resetBuildEnv } from '../jobs/build_env_stub';
 import { waterMeta } from '../molecules/fixtures';
 import { jobFixture } from '../jobs/api_fixtures';
+import { seenText } from '../seen_text';
 
 /** Molecules mode with `meta` loaded (water by default), then whatever `steps` dispatch. */
 function moleculeState(meta: LibraryMoleculeMeta = waterMeta(), ...steps: Array<(store: ReturnType<typeof makeStore>) => void>) {
@@ -145,7 +146,8 @@ describe('moleculeInfo (Task 7b)', () => {
             { quantity: 'angle', value: 104.5, unit: 'deg', source: 'experiment (CCCBDB)', tolerance: 1 }] });
         const { container, unmount } = render(React.createElement('div', null, infoOf(moleculeState(meta), 'research').computed));
         const items = [...container.querySelectorAll('li')];
-        expect(flat(items[0].textContent ?? '')).toBe('Re: 1.098 Å — Huber & Herzberg');
+        // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+        expect(flat(seenText(items[0]))).toBe('Re: 1.098 Å — Huber & Herzberg');
         expect(items[0].querySelector('sub')).toHaveTextContent('e');
         expect(items[1]).toHaveTextContent('angle: 104.5° — experiment (CCCBDB)');
         unmount();
@@ -211,7 +213,8 @@ describe('moleculeInfo (Task 7b)', () => {
         const { container, unmount } = rendered(infoOf(state, 'explore'), 'explore');
         const [lead, ...notes] = [...container.querySelectorAll('.info-body > p.info-text')] as HTMLElement[];
         const facts = container.querySelector('.info-facts') as HTMLElement;
-        expect(lead.textContent).toMatch(/^1b1 is one of H₂O's molecular orbitals\./);
+        // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+        expect(seenText(lead)).toMatch(/^1b1 is one of H₂O's molecular orbitals\./);
         expect(lead.textContent).not.toMatch(/Kohn–Sham|Sticks/);
         expect(lead.compareDocumentPosition(facts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(facts.compareDocumentPosition(notes[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -230,7 +233,8 @@ describe('moleculeInfo (Task 7b)', () => {
             store.dispatch(renderFinished({ isoLevel: 0.0005 }));
         });
         const { container, unmount } = rendered(infoOf(state, 'basics'), 'basics');
-        expect(container.querySelector('.info-title')).toHaveTextContent('Water (H₂O) — 1b1 orbital');
+        // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
+        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H₂O) — 1b1 orbital');
         unmount();
         const basics = shownAt(state, 'basics');
         // Fix round 1 (I3): "orbital", as the homoLumo glossary says. Task 9b (fix 5): the lead says what it is; its electrons
@@ -574,8 +578,9 @@ describe('moleculeInfo (Task 7b)', () => {
             const parts = (index: number) => {
                 const state = moleculeState(meta, store => store.dispatch(setSurface({ kind: 'mo', index })));
                 const { container, unmount } = rendered(infoOf(state, 'basics'), 'basics');
-                const lead = flat(container.querySelector('.info-body > p.info-text')?.textContent ?? '');
-                const note = flat(container.querySelector('.info-notes')?.textContent ?? '');
+                // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
+                const lead = flat(seenText(container.querySelector('.info-body > p.info-text')));
+                const note = flat(seenText(container.querySelector('.info-notes')));
                 unmount();
                 return { lead, note };
             };

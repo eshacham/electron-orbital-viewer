@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatPointGroup } from '../molecules/orbital_display';
+import { typesetLabel } from './subscripts';
 
 /**
  * A point group with everything past its first letter in a real <sub> element, e.g.
@@ -9,18 +10,13 @@ import { formatPointGroup } from '../molecules/orbital_display';
  * subscript Latin letters, a DOM <sub> handles any character — needed because the shipped
  * molecule library already uses suffixes Unicode can't subscript (Td, D3d: Ruling T3-pg).
  *
- * aria-label is the plain written form (after Dooh/Coov -> D∞h/C∞v), matching what a reader
- * sees when the <sub> is read back as flat text — not the DOM's split main/rest halves.
+ * Read as the plain written form (after Dooh/Coov -> D∞h/C∞v), "C2v", from a visually hidden copy beside the visual
+ * (typesetLabel; final review: no aria-label on a role-less span) -- not the DOM's split main/rest halves.
  */
 export function PointGroupLabel({ pg }: { pg: string }): React.JSX.Element {
     const normalized = formatPointGroup(pg);
     const main = normalized.slice(0, 1);
     const rest = normalized.slice(1);
 
-    return (
-        <span aria-label={normalized}>
-            {main}
-            <sub>{rest}</sub>
-        </span>
-    );
+    return typesetLabel([main, <sub key="sub">{rest}</sub>], normalized);
 }
