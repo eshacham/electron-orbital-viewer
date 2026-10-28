@@ -25,9 +25,10 @@
 //                    the local job server is not running: HTTP 500, empty body. Still nothing leaves the browser.
 //   Every run (Task 16d): Vite's /api proxy points at a closed port and has no AWS route, so nothing -- stubbed or
 //                    not -- can reach a real job server; without --jobs-stub the page's /api requests simply fail.
-//   --click/--type/--press/--scroll  scripted steps, in the order given, after the scene settles and before the
-//                    shot: click the one control with that accessible name (or that exact text), type into the
-//                    focused text field, press a key, scroll an element with that text into view.
+//   --click/--type/--press/--scroll/--hover  scripted steps, in the order given, after the scene settles and before
+//                    the shot: click the one control with that accessible name (or that exact text), type into the
+//                    focused text field, press a key, scroll an element with that text into view, or rest the pointer
+//                    on the one control so named (owner R26: a hover state, shot; it presses nothing).
 //   Guards (fix round 1, T16-M3): --owner-session and every scripted step need --jobs-stub (without it /api
 //   has no answer at all). Nothing a step does may send a job: a click is refused when the name asked for,
 //   or the control it actually lands on, reads Approve…/Run on…/Retry on…/Submit…; --press takes only keys that
@@ -135,12 +136,12 @@ const sweep = process.argv.includes('--sweep');
 // The scripted steps, in argv order.
 const steps = [];
 for (let i = 2; i < process.argv.length; i++) {
-  const step = /^--(click|type|press|scroll)$/.exec(process.argv[i]);
+  const step = /^--(click|type|press|scroll|hover)$/.exec(process.argv[i]);
   if (step) steps.push({ kind: step[1], value: process.argv[++i] });
 }
 // Fix round 1 (T16-M3): steps and the owner session only ever run against the stub.
 if ((ownerSession || steps.length) && !jobsStub) {
-  throw new Error('--owner-session and --click/--type/--press/--scroll need --jobs-stub: without it /api has no answer');
+  throw new Error('--owner-session and --click/--type/--press/--scroll/--hover need --jobs-stub: without it /api has no answer');
 }
 if (jobsDown && !jobsStub) throw new Error('--jobs-down is a mode of --jobs-stub');
 // The check stops at the quote: nothing that would send a job is ever activated, even stubbed. "Already
@@ -238,6 +239,7 @@ async function runSteps(page) {
       await target.click();
     }
     else if (step.kind === 'scroll') await (await findNamed(page, step.value)).scrollIntoViewIfNeeded();
+    else if (step.kind === 'hover') await (await findNamed(page, step.value)).hover();
     else if (step.kind === 'press') await page.keyboard.press(step.value);
     else {
       // A text field only: typed characters on a focused button or radio (a space) would activate it.

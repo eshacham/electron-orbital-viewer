@@ -738,3 +738,39 @@ Every page settled with 0 page errors (/tmp/ffw/live.json).
 lowered to Basics. Under Configuration: "Showing Fe²⁺ — charge controls appear at Advanced", then "Show the neutral
 atom".
 
+
+## Owner review R26
+
+The owner's local test of this branch asked for three fixes (brief: `.superpowers/sdd/2026-10-28-owner-r26/brief.md`;
+Molecules "all good"). Shots were taken with `node tools/design/shoot.mjs --gl metal --jobs-stub --level <level>` on a
+private Vite at port 5413, which was stopped after each run. `--hover` is a new scripted step: it rests the pointer on
+the named control and presses nothing.
+
+**R26-1, Orbitals: the H tile is centred** (`fix(orbitals)`). Every line is centred, and "Hydrogen-like" sits on one
+line. The tile keeps the Atoms element tile's 88 × 96 box and its place at the top left.
+- `r26-orbitals-h-tile-dark-desktop.png`, `r26-orbitals-h-tile-light-desktop.png`: 3dz² at Explore.
+- `r26-orbitals-h-tile-dark-phone.png`, `r26-orbitals-h-tile-light-phone.png`: the phone's Explore tab.
+
+**R26-2, Atoms: the Orbitals tab gets Info** (`fix(atoms)`). The diagram is headed "Orbital energies (log scale)", with
+an (i) to the new energyLevels entry. The table is captioned "Orbital energies (Ha)", with a Kohn–Sham (i). Each (i)
+has its own place (`energy-diagram`, `energy-table`), so it lights alone. The table's Ha-only values are unchanged
+(deferred to the science-corrections step).
+- `r26-atoms-orbitals-tab-explore-energy-levels-pressed-dark-desktop.png` (and `-light-`): carbon, whole atom, at
+  Explore. Info shows the plain band.
+- `r26-atoms-orbitals-tab-advanced-energy-levels-pressed-dark-desktop.png` (and `-light-`): the same at Advanced, with
+  the technical band added (Kohn–Sham LDA eigenvalues, ΔSCF ionisation energy, log |E|).
+- `r26-atoms-orbitals-tab-explore-kohn-sham-pressed-dark-desktop.png`: carbon 2pz with the table's Kohn–Sham (i)
+  pressed. The diagram picks out the L shell's 2s and 2p in their colours, and the entry now speaks of atoms too.
+
+**R26-3, Bonds: MO notation and pressable levels** (`fix(bonds)`).
+- `r26-bonds-n2-explore-mo-info-pressed-dark-desktop.png` (and `-light-`), and
+  `r26-bonds-o2-explore-mo-info-pressed-dark-desktop.png` (and `-light-`): N₂ and O₂ at Explore, with the MO diagram's
+  (i) pressed. Info lists one line per mark. O₂'s 1πg* shows the lone ↑ the list explains. "Pick a level to draw that
+  orbital." sits under the heading.
+- `r26-bonds-n2-explore-mo-info-list-end-dark-desktop-crop.png`: the list's end, with g/u, *, the leading count with
+  typeset 1σg, 2σg, 3σg, and ≈ core. The scroll step also moved the page, so this is a detail crop only.
+- `r26-bonds-n2-explore-level-selected-hover-dark-desktop.png` (and `-light-`, plus `-crop` for each): 3σg pressed
+  (Deep Selection, the canvas drawing 3σg) and the pointer resting on 2σg (surface-3). The other levels are at rest,
+  each a hairline-edged surface-2 tile.
+- `r26-bonds-n2-explore-level-focus-dark-desktop-crop.png`: Tab after pressing 3σg. The global 2 px focus ring is on
+  1πg* (1 of 2).
