@@ -266,6 +266,56 @@ components:
     typography: "{typography.mono}"
     rounded: "{rounded.sm}"
     padding: "6px 8px"
+  level-control:
+    rounded: "{rounded.sm}"
+    height: "32px"
+  level-control-option:
+    textColor: "{colors.text-2}"
+    typography: "{typography.caption}"
+    padding: "0 10px"
+  level-control-option-selected:
+    backgroundColor: "{colors.selected-fill}"
+    textColor: "{colors.on-fill}"
+  level-line:
+    textColor: "{colors.text-3}"
+    typography: "{typography.caption}"
+  info-section:
+    textColor: "{colors.text-2}"
+    typography: "{typography.body}"
+    padding: "10px 16px 12px"
+  info-title:
+    textColor: "{colors.text-1}"
+  info-computed-summary:
+    textColor: "{colors.accent-text}"
+    typography: "{typography.caption}"
+    height: "28px"
+  info-button:
+    textColor: "{colors.accent-text}"
+    rounded: "{rounded.pill}"
+    size: "20px"
+  info-button-pressed:
+    backgroundColor: "{colors.selected-fill}"
+    textColor: "{colors.on-fill}"
+    rounded: "{rounded.pill}"
+    size: "20px"
+  info-topic-chip:
+    backgroundColor: "{colors.selected-fill}"
+    textColor: "{colors.on-fill}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.pill}"
+    padding: "1px 8px"
+  info-fact-label:
+    textColor: "{colors.text-3}"
+    typography: "{typography.figure}"
+    width: "max-content"
+  info-fact-value:
+    textColor: "{colors.text-1}"
+    typography: "{typography.figure}"
+  phone-caption:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.text-1}"
+    typography: "{typography.body-phone}"
+    padding: "4px 10px"
 ---
 
 # Design System: QuantumLab
@@ -286,6 +336,7 @@ Both themes are first-class and share every structural token; only colour, shado
 - Inter Variable throughout, a narrow ramp (11 to 20 px), tabular figures for every number.
 - Fixed workstation for the viewer; scrolling ledger for Operate pages.
 - Short ease-out motion (120 / 180 ms), zero under reduced motion.
+- Four learning levels decide which controls exist and how deep Info goes; hidden controls leave one quiet line, never a greyed control.
 
 ## Colors
 
@@ -344,6 +395,10 @@ A cool navy-to-ice neutral ladder with one electric blue for action and selectio
 
 **The No Shouting Rule.** No uppercase labels, no tracked-out small caps, no size over 20 px in product chrome.
 
+**The Typeset Science Rule.** Names of what is drawn carry real subscripts: an orbital's 3d<sub>z²</sub>, an MO's 1σ<sub>g</sub>, an irrep's 1b<sub>1</sub>, a point group's C<sub>2v</sub> or T<sub>d</sub> (everything past the first letter in a real `<sub>`, so any suffix works), a quantity's R<sub>e</sub>; an underscore is never shown. Signs are a true minus (U+2212); values outside the plain range read "2.66 × 10⁻²", never e-notation. A surface that cannot hold markup (the document title, an export caption, an accessible name built as a string) takes the flat Unicode form ("3dz²", "1b₁", "C₂ᵥ"); a spoken name takes plain digits ("H2O", "1b1", "3dz²"), because screen readers voice Unicode subscript digits inconsistently. One parser feeds all three forms (`src/format/sci.ts`, `src/format/subscripts.ts`, `OrbitalLabel`, `PointGroupLabel`), so they never disagree.
+
+**The eV First Rule.** An energy reads in electron-volts first with hartree in parentheses, held on one line: "−5.41 eV (−0.199 Ha)". A difference carries its sign either way ("+9.05 eV (+0.333 Ha)") at three significant figures, so nothing rounds to "−0.00 eV"; a total energy keeps Ha to five places. One Ha→eV factor (CODATA 2018) lives in `src/format/energy.ts`.
+
 ## Layout
 
 **Viewer (fixed workstation).** A full-height grid: a 56 px top bar (52 px on a phone), then a workspace with 12 px outer padding and 12 px gutters holding Explore (315 px; 300 px at medium), the canvas (fluid) and the inspector (290 px; 320 px at 1680 px and wider). Panels pad 16 px with 16 px between sections. Below 1290 px the inspector folds to a 44 px vertical bar over the canvas edge and opens as a drawer; Explore can collapse to a 28 px reveal. On a phone (max-width 760 px, or max-height 500 px, or portrait up to 1100 px) the canvas is the whole screen and the top bar, header and a bottom sheet sit inside it. The canvas's corners are fixed roles: title top-left, toolbar top-right, scale bar bottom-left, key column bottom-right (220 px max), with the thumbnail strip (72 px tiles, 16 px labels, 12 px between tiles) along the bottom.
@@ -351,6 +406,8 @@ A cool navy-to-ice neutral ladder with one electric blue for action and selectio
 **Operate pages (scrolling ledger).** A document on `bg-app`, content capped at 1440 px, padded 16/24/48 px, stacked with 12 px gaps: top bar, a month title row with its controls, the budget strip, the month band (about 120 px, no box of its own), filter chips with search and sort, then the list. At 1024 px and below the strip regroups to three columns and memory moves into each row's details; at 600 px and below the strip folds to the available figure behind a disclosure, the band thins, and each row becomes a two-line grid item (molecule / status, then time / cost / action).
 
 Spacing follows a 4 px step (4, 8, 12, 16, 20, 24, 32). Touch targets are 44 px, the search field 36 px, a control row 28 px.
+
+**Info and the level switch (viewer).** Info sits always open at the top of the inspector, above the accordion, capped at 45 % of the inspector's height; it scrolls inside itself, with a `border-subtle` hairline under it, so the accordion's headers (Plot and data among them) never leave the screen. In a stacked inspector Info takes its natural height with no cap. On a phone Info is a tab of the bottom sheet, and a caption under the header names what is drawn. The level switch sits in the top bar between the tabs and search as a segmented row of four; below 1024 px it is one button naming the level, opening the four as a list in a popover; on a phone the list is titled "Learning level" in the avatar menu, one 44 px row per level.
 
 ## Elevation & Depth
 
@@ -361,9 +418,12 @@ Depth is tonal first. In Deep Space panels carry no drop shadow, only a 1 px inn
 - **Popover** (Deep Space `0 12px 32px rgba(0,0,0,.45)`; Light Clean `0 12px 24px rgba(16,24,40,.12)`), with a `border-subtle` hairline: menus, popovers, search results.
 - **Selected** (Deep Space `0 0 0 1px #1FB6F5, 0 0 12px rgba(31,182,245,.35)`; Light Clean `0 0 0 1px #1662E0`).
 - **Selected tile** (Deep Space `0 0 12px 1px rgba(31,182,245,.5)`; Light Clean none): the selected strip tile, inside its 2 px edge.
+- **Selected halo** (`--ql-shadow-selected-halo`: Deep Space `0 0 12px 1px rgba(31,182,245,.5)`; Light Clean `none`): a small selected mark whose fill alone sits too close to `surface-1` (about 1.8:1), today the pressed (i). It is the selected tile's soft blurred glow, never a hard ring; Light Clean's solid accent fill already reads, so it gets none.
 
 ### Named Rules
 **The Glow Belongs To Deep Space Rule.** Halos and added light exist only in the dark theme; Light Clean expresses the same states with ink rings and darker rims.
+
+**The Tonal Scroll Cue Rule.** A scroller with more below it says so with a tonal fade, not a shadow, glow, arrow or "More": the last ~24 px fade out through a `mask-image` while (and only while) `scrollTop + clientHeight < scrollHeight`. Where the scroller has a hairline under it (Info in the inspector), the mask keeps that last pixel opaque so the hairline stays drawn; the phone sheet, which has none, fades to its edge. The mask is never animated, so reduced motion has nothing to stop. It works the same in both themes.
 
 **The Glow Finish Is The Owner's Rule.** The 3D Glow finish (`src/orbital_glow.ts`, GLOW_TUNING) is presentation only and its values were tuned live by the owner; they are recorded there, not here, and are not restyled.
 
@@ -416,6 +476,42 @@ One line per job in a fixed-layout table: molecule name (600) with formula and m
 - **Details** print the meter's own micro-dollars (`$0.000000`), so quote lines and attempts add up exactly to "Total charged".
 - **Never bare:** every figure carries its word ("held", "of", "estimated", "up to", "absorbed by the app").
 
+### Learning Levels (viewer signature)
+Four levels, in reading order Basics · Explore · Advanced · Research, decide which controls exist and how deep Info goes. Each gated control has one first level (`CONTROL_LEVEL`, `src/levels/levels.ts`): the plot, structure, bond labels, the dipole arrow, orbital energies, properties and axes at Explore; charge, excitation, relativity, combinations, the enclosed fraction, all orbitals, exports, advanced appearance and surface style at Advanced; molecule requests at Research. Picking an orbital, drilling down, the thumbnail strip, opacity, cut-away and Share are never gated.
+- **Switch:** a radio group (one tab stop; arrows move, choose and wrap; Home and End reach the ends). The segmented row is 32 px tall with a 6 px corner and a `border-strong` outline, options split by hairlines, caption type in `text-2`, hover on `surface-2`; the level in use takes Deep Selection (`selected-fill`, a 1 px inset `selected-edge`, `on-fill`, 600). Focus draws inside the clipped row (offset −3 px).
+- **Pointer line:** under a section whose controls the level hides, one caption line in `text-3` names the nearest deeper level's controls only, with the right verb: "Charge and relativity appear at Advanced". Never a list spanning two levels.
+- **Held-value note:** while a hidden control still holds a value off its default, the line says what the picture keeps and where its control lives instead: "Showing Fe²⁺ — charge controls appear at Advanced" (`hiddenValueNote`). Lowering the level never changes what is drawn.
+- **Opens at:** Share's menu offers "Opens at", with Recipient's level (the default, which writes no level) then the four levels. A link that needs more than the reader's level raises it for that visit only, said by an info notice in its own row under the top bar; the stored level is untouched.
+
+**The Hide, Don't Grey Rule.** A control above the reader's level is absent, not disabled. Its place holds one quiet line saying where it appears, or what it still holds; a greyed control is never shown.
+
+### Info (viewer signature)
+One quiet section, always open, that explains the current selection or the term an (i) opened. Heading "Info" in section type; the selection's title in body at 600 `text-1`; running text in body `text-2` (14 px on a phone, the Phone Fourteen Rule); 6 px between blocks; padding 10 × 16 × 12 px. Placement, cap and scrolling are in Layout; its cue is the Tonal Scroll Cue Rule.
+- **Order:** title, the plain lead, the facts, the notes that qualify them, the technical text, then "How this was computed". The facts come before the technical text so the numbers stay above Info's fold at Advanced and Research.
+- **How this was computed:** a disclosure in caption accent text (28 px row), its body caption `text-3`; folded below Research and open at Research, with the inspector's chevron convention (down folded, up open, 180°). Method, references and validity live here, not in the lead.
+- **Bands:** plain text at Basics and Explore; technical text added at Advanced; the full text (method and caveats) added at Research. Each band reads on from the one before. Facts carry their own first level (a point group from Advanced, an experimental value and its citation from Advanced and Research). Glossary terms an (i) opens use the same bands.
+- **Lead length:** at Basics and Explore a lead is 3 lines or fewer, with no navigation sentence in it; technical text and notes are short paragraphs, one idea each, never one wall.
+- **Topic and the way back:** an (i) switches Info to its term, named by the topic chip in the heading; "‹ Back to <selection>" in caption accent text, the pressed (i) again, or a new selection returns Info to the selection. Each change is announced once: by focus on the heading after an (i) or Back, otherwise by a polite live region.
+- **Science words:** Info explains the phase colours and conventions in words; it never re-tints them (the Science Is Not Style Rule).
+
+**The Plain First Rule.** Every explanation starts plain and grows by band. A scientific term with an (i) or a reference never appears below the level its band opens at.
+
+**The One Home Per Number Rule.** Each figure has one place on screen. A key number lives in Info's facts, a control's value in that control's readout, a scale in the canvas key; the canvas subtitle is one plain line that restates neither the title nor Info's numbers, and adds the method only at Research. A panel line that would repeat an Info fact is dropped.
+
+### Info Button (i) and Topic Chip
+- **(i):** a 20 px circle with a 1.5 px ring and a 10 px glyph in `accent-text`, transparent at rest, `surface-2` on hover, with a 44 px hit area around it. Pressed, it takes Deep Selection: `selected-fill`, a `selected-edge` ring, `on-fill` glyph, and the selected halo in Deep Space (Light Clean: a solid accent with no glow, the Glow Belongs To Deep Space Rule). Accent at rest because it is an action (the One Blue Voice Rule).
+- **Semantics:** a native toggle button named "About <term>", with `aria-pressed`, and `aria-controls` naming Info only while Info is in the DOM. Pressing moves focus to Info's heading and brings Info on screen (the phone's Info tab, the folded drawer); pressing the pressed one returns Info to the selection and keeps focus on the (i).
+- **Topic chip:** the term Info now explains, as a pill in the heading beside "Info": `selected-fill`, a 1 px inset `selected-edge`, `on-fill` caption at 600, padding 1 × 8 px. It wears the pressed (i)'s fill and edge so the two read as a pair; being larger, it needs no halo.
+- **Placement:** an (i) sits right beside the word it explains ("Shells (i)", "Shell n (i)", a fact's label), never floating at a panel's far edge. A gloss on a whole control may close that control's row (Relativity's segmented control, the ESP key).
+
+**The One Pressed (i) Rule.** At most one (i) is pressed at a time, and only the one whose press set the topic; a second (i) for the same term elsewhere stays at rest.
+
+### Fact Grid
+Info's key facts as a definition list in tabular figures (the Tabular Figures Rule): label in `text-3` at the left, value in `text-1` at the right, 12 px between, 2 px between rows. A label takes its max-content width and keeps to one line ("Total energy", "Measured (NIST)", "HOMO–LUMO gap"), wrapping only when it alone cannot fit the row; there is no minimum label column. The value takes the rest of the row and wraps at its own spaces; a value that cannot fit beside its label drops below it, whole, still at the right. A label may carry its (i), which stays beside the label.
+
+### Phone Caption
+On a phone, a one-line pill under the header names what is drawn: "<title> · <one qualifier>" ("Carbon · electron density"; an orbital's qualifier is its enclosed share, a Bonds view's its R in a₀). Body-phone type, the title in `text-1` with real subscripts and an ellipsis when long, the qualifier in `text-2` and never cut; `surface-1` with the popover shadow, padding 4 × 10 px. While the view loads the qualifier says "loading…". It is announced once per change, after the canvas stops waiting, from a hidden polite copy with plain digits; Info leaves a new selection to it, so a reader hears each change once.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -426,6 +522,11 @@ One line per job in a fixed-layout table: molecule name (600) with formula and m
 - **Do** open a record's detail in place under its row, one step away, rather than navigating off the list.
 - **Do** keep a visible 2 px focus ring on every interactive element and honour reduced motion (hover 120 ms, panels 180 ms, ease-out, 0 ms when reduced).
 - **Do** give secondary text a real colour token (`text-2`, `text-3`), never opacity, so contrast tests see the painted colour.
+- **Do** hide a control above the reader's level and leave its one-line pointer, or its held-value note while it still holds a value.
+- **Do** order Info as title, plain lead, facts, notes, technical, then "How this was computed", and keep Basics and Explore leads to 3 lines or fewer.
+- **Do** give each number one home, and set energies eV first with Ha in parentheses.
+- **Do** put an (i) beside the word it explains, with `aria-pressed` and `aria-controls`, and let only one be pressed.
+- **Do** set names of what is drawn with real subscripts and a true minus; flat Unicode where markup cannot go, plain digits where it is spoken.
 
 ### Don't:
 - **Don't** whiten, tint, darken or swap the phase, density or ESP colours for either theme or any finish.
@@ -434,3 +535,7 @@ One line per job in a fixed-layout table: molecule name (600) with formula and m
 - **Don't** set anything under 11 px, or uppercase labels and buttons.
 - **Don't** add drop shadows to Deep Space panels or glows to Light Clean.
 - **Don't** let the wordmark's violet gradient leave the wordmark.
+- **Don't** grey out a control the level hides, or let lowering the level change what is drawn.
+- **Don't** print e-notation, a hyphen for a minus, or an underscore in a name.
+- **Don't** repeat a figure across the subtitle, a panel line, the canvas key and Info.
+- **Don't** cue more content with a drop shadow, a glow, an arrow or a "More" label; use the tonal fade.
