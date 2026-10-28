@@ -2,15 +2,23 @@
 
 /* The fixed Z = 1 tile: 88 x 96, surface-3, radius lg -- the same shape as
    the Atom screen's element tile (src/atom_ui/element_tile.css), reusing its
-   size tokens since Basic Orbitals' tile never changes size either. */
+   size tokens since Basic Orbitals' tile never changes size either.
+   Owner R26-1: every line is centred, and the name keeps to one line, as the
+   Atoms tile sets its symbol, name and mass: "Hydrogen-like" wrapped to
+   "Hydrogen-" / "like", left-aligned, in the 72 px the 8 px side padding
+   left it. The tile keeps its size and place; 4 px sides give the name its
+   one line, and the three lines sit together, centred in the tile, so the
+   symbol is not pushed down onto the name. */
 .basic-tile {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto auto;
+  row-gap: 2px;
   justify-items: center;
   align-content: center;
+  text-align: center;
   width: var(--ql-size-element-tile-width);
   height: var(--ql-size-element-tile-height);
-  padding: 6px 8px;
+  padding: 6px 4px;
   box-sizing: border-box;
   border-radius: var(--ql-radius-lg);
   background: var(--ql-color-surface-3);
@@ -21,7 +29,6 @@
   font-size: var(--ql-type-tick-size);
   line-height: 14px;
   color: var(--ql-color-text-2);
-  align-self: start;
 }
 .basic-tile-symbol {
   font-size: 28px;
@@ -31,6 +38,7 @@
 .basic-tile-name {
   font-size: var(--ql-type-caption-size);
   line-height: 16px;
+  white-space: nowrap;
 }
 /* Task 5: each chip row's visible label (it names the row's group) and the (i) beside it. */
 .basic-row-head {

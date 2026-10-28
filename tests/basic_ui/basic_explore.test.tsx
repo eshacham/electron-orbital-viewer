@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import BasicExplore from '../../src/basic_ui/BasicExplore';
 import { BASIC_ORBITALS_ABOUT } from '../../src/info/basic_info';
@@ -32,6 +34,21 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         expect(within(tile as HTMLElement).getByText('Hydrogen-like')).toBeInTheDocument();
         expect(container.querySelector('.basic-tile-caption')).toBeNull();
         expect(container.textContent).not.toContain(BASIC_ORBITALS_ABOUT);
+    });
+
+    // Owner R26-1: every line of the tile is centred, and "Hydrogen-like" sits on one line (it wrapped "Hydrogen-" /
+    // "like", left-aligned) -- in the Atoms tile's 88 × 96 box, as that tile centres its symbol, name and mass.
+    it('centres every line of the tile and keeps "Hydrogen-like" on one line, in the element tile\'s size (owner R26-1)', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/basic_ui/basic_explore.css'), 'utf8');
+        const rule = (selector: string) => {
+            const match = new RegExp(`(?:^|\\n)${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`).exec(css);
+            if (!match) throw new Error(`no rule for ${selector}`);
+            return match[1];
+        };
+        expect(rule('.basic-tile')).toMatch(/text-align:\s*center/);
+        expect(rule('.basic-tile')).toMatch(/width:\s*var\(--ql-size-element-tile-width\)/);
+        expect(rule('.basic-tile')).toMatch(/height:\s*var\(--ql-size-element-tile-height\)/);
+        expect(rule('.basic-tile-name')).toMatch(/white-space:\s*nowrap/);
     });
 
     // Task 5 (critique P2: unlabeled n/l/mₗ rows): each row has a visible label, which names its group, and an (i)
