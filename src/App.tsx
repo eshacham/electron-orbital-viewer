@@ -59,7 +59,7 @@ import BasicExplore from './basic_ui/BasicExplore';
 import { basicInfo, BASIC_ORBITALS_ABOUT } from './info/basic_info';
 import { atomInfo } from './info/atom_info';
 import { bondsInfo, FIXED_RHO_NOTE } from './info/bonds_info';
-import { moleculeInfo } from './info/molecule_info';
+import { moleculeInfo, moleculeInfoSlice } from './info/molecule_info';
 import { ownerJobRecordOf, useOwnerJobRecord } from './jobs/owner_job_record';
 import { useDrawOnSelection } from './basic_ui/useDrawOnSelection';
 import { AxesSwitch } from './atom_ui/DisplayControls';
@@ -718,13 +718,16 @@ function App() {
     // The owner's record of a computed molecule, not the whole jobs slice: App re-renders for nothing else in it.
     const ownerRecordNow = useAppSelector(ownerJobRecordOf, shallowEqual);
     const moleculeLabelsNow = usePref(displayPref).moleculeLabels;
+    // Final review M9: only the slice's fields moleculeInfo reads -- a hover's `pick` does not rebuild Info.
+    const moleculeInfoSliceNow = useAppSelector(state => moleculeInfoSlice(state.molecule), shallowEqual);
+    const moleculeMetaNow = molecule.meta;
     const moleculeInfoContent = useMemo(
         () => (isMoleculeMode ? moleculeInfo({
-            molecule, orbital: orbitalSliceNow, ...ownerRecordNow, moleculeLabels: moleculeLabelsNow,
+            molecule: moleculeInfoSliceNow, orbital: orbitalSliceNow, ...ownerRecordNow, moleculeLabels: moleculeLabelsNow,
             // Ruling (concern 5): a phone's tier chip is compact (its line a tooltip touch never shows), so Info says it.
             tierLineShown: isNarrow,
-        }, molecule.meta, level) : null),
-        [isMoleculeMode, molecule, orbitalSliceNow, ownerRecordNow, moleculeLabelsNow, isNarrow, level],
+        }, moleculeMetaNow, level) : null),
+        [isMoleculeMode, moleculeInfoSliceNow, moleculeMetaNow, orbitalSliceNow, ownerRecordNow, moleculeLabelsNow, isNarrow, level],
     );
     // Ruling PF5: the owner's time and cost for a computed molecule ("How this was computed") are fetched here now that
     // the pinned footer that fetched them is gone -- once, whether or not Info is on screen.

@@ -17,6 +17,7 @@ import { LIBRARY_INDEX, waterMeta } from './molecules/fixtures';
 import { thumbnailService } from '../src/thumbs/ThumbnailService';
 import { setMode } from '../src/store/atomSlice';
 import { clearGridCache } from '../src/molecules/grid_cache';
+import * as moleculeInfoModule from '../src/info/molecule_info';
 
 jest.mock('../src/components/OrbitalViewer', () => ({ __esModule: true, default: () => <div data-testid="orbital-viewer" /> }));
 jest.mock('../src/orbital_visualizer', () => ({}));
@@ -1342,6 +1343,24 @@ describe('Molecules Info (Task 7b)', () => {
         const info = screen.getByRole('tabpanel');
         expect(within(info).getByRole('heading', { level: 2, name: /^Info/ }).querySelector('.info-topic-chip'))
             .toHaveTextContent('Electrostatic potential');
+    });
+
+    // Final review M9: Info's memo reads only what moleculeInfo reads -- hovering an atom (the slice's `pick`) does not
+    // rebuild it (nor, with it, a new ProvenancePanel and InfoPanel's layout pass).
+    it('does not rebuild Info when an atom is hovered', async () => {
+        const { store } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        const build = jest.spyOn(moleculeInfoModule, 'moleculeInfo');
+        try {
+            act(() => { store.dispatch(setPick({ kind: 'atom', index: 0 })); });
+            act(() => { store.dispatch(setPick(null)); });
+            expect(build).not.toHaveBeenCalled();
+            act(() => { store.dispatch(setSurface({ kind: 'esp' })); });
+            expect(build).toHaveBeenCalled();
+        } finally {
+            build.mockRestore();
+        }
     });
 
     // Final review I2: full screen hides Info, so the canvas key's (i) leaves full screen first, then shows Info on its

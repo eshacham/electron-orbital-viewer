@@ -37,7 +37,10 @@ function moleculeState(meta: LibraryMoleculeMeta = waterMeta(), ...steps: Array<
     return store.getState();
 }
 
-const infoOf = (state: MoleculeInfoState, level: LearningLevel): InfoContent => moleculeInfo(state, state.molecule.meta, level);
+// Final review M9: MoleculeInfoState's slice no longer carries the meta (a parameter of its own), so these helpers take
+// the builder's state with the meta beside it, as the full store state has it.
+type InfoState = MoleculeInfoState & { molecule: { meta: LibraryMoleculeMeta | null } };
+const infoOf = (state: InfoState, level: LearningLevel): InfoContent => moleculeInfo(state, state.molecule.meta, level);
 
 /** No-break spaces (formulas, units) read as plain spaces in these checks. */
 const flat = (text: string) => text.replace(/ /g, ' ');
@@ -47,7 +50,7 @@ function rendered(content: InfoContent, level: LearningLevel) {
 }
 
 /** What Info shows at `level`, outside the folded "How this was computed" (that is checked on its own). */
-function shownAt(state: MoleculeInfoState, level: LearningLevel): string {
+function shownAt(state: InfoState, level: LearningLevel): string {
     const { container, unmount } = rendered(infoOf(state, level), level);
     container.querySelector('.info-computed')?.remove();
     const text = container.textContent ?? '';

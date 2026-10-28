@@ -17,6 +17,7 @@
  */
 import React from 'react';
 import type { RootState } from '../store';
+import type { MoleculeState } from '../store/moleculeSlice';
 import { atLeast, CONTROL_LEVEL, type LearningLevel } from '../levels/levels';
 import type { InfoContent, InfoFact, InfoTopicId } from './info_types';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
@@ -56,8 +57,24 @@ const h = React.createElement;
  * set on a phone, where the tier chip is compact and its line would be a tooltip no touch screen shows (fix round 1,
  * ruling on concern 5). App passes the last three in.
  */
-export type MoleculeInfoState = Pick<RootState, 'molecule' | 'orbital'> & Partial<OwnerJobRecord>
+export type MoleculeInfoState = { molecule: MoleculeInfoSlice } & Pick<RootState, 'orbital'> & Partial<OwnerJobRecord>
     & { moleculeLabels?: boolean; tierLineShown?: boolean };
+
+/**
+ * The Molecules slice's fields the builder reads (final review M9) -- not `pick`, which every hover over an atom
+ * changes, nor the meta (a parameter of its own). App selects exactly these (`moleculeInfoSlice`, compared shallowly),
+ * so a hover does not rebuild Info.
+ */
+const MOLECULE_INFO_KEYS = [
+    'index', 'selectedId', 'isLoadingMeta', 'error', 'surface', 'representation', 'showDipole',
+    'renderLabel', 'renderError', 'isoLevel', 'espRange', 'drawn',
+] as const;
+export type MoleculeInfoSlice = Pick<MoleculeState, typeof MOLECULE_INFO_KEYS[number]>;
+
+/** The fields of the Molecules slice `moleculeInfo` reads, as a new object to compare shallowly. */
+export function moleculeInfoSlice(molecule: MoleculeState): MoleculeInfoSlice {
+    return Object.fromEntries(MOLECULE_INFO_KEYS.map(key => [key, molecule[key]])) as MoleculeInfoSlice;
+}
 
 /** The dipole arrow's sign convention (MoleculeViewOptions, before Task 7b), word for word. */
 export const DIPOLE_CONVENTION = 'The arrow points from − to + (the physics convention), 1 a₀ per debye; many chemistry texts draw it the other way.';
