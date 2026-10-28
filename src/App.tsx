@@ -2033,7 +2033,7 @@ function App() {
                             onSelectSubshell={handleSelectSubshell} onSelectOrbital={handleSelectOrbital}
                             relativity={atomProfile.relativity ?? 'off'} part="diagram" palette={palette} />
                     )}
-                    {atomProfile && shows('orbitalEnergies') && <OrbitalEnergyList subshells={atomProfile.subshells} relativity={pictureRelativity} />}
+                    {atomProfile && shows('orbitalEnergies') && <OrbitalEnergyList subshells={atomProfile.subshells} />}
                     <LevelLine level={level} ids={['orbitalEnergies']} />
                     {/* Task 6: the method and "About this model" are Info's ("How this was computed", atomInfo). */}
                 </>

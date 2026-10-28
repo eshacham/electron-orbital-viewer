@@ -41,6 +41,31 @@ describe('glossary (Task 4)', () => {
         expect([id, sentences(glossary[id].technical) <= 3]).toEqual([id, true]);
     });
 
+    // Owner R26-2: the Atoms Orbitals tab's diagram and table are explained here, true to what SubshellPanel draws: one
+    // line per subshell (per j-level with spin–orbit), placed by log |E| with the least bound at the top; the values are
+    // Kohn–Sham (LDA) eigenvalues, not ionisation energies, which are ΔSCF.
+    it('explains the orbital energy levels in three bands (owner R26-2)', () => {
+        const entry = glossary.energyLevels;
+        expect(entry.title).toBe('Orbital energies');
+        expect(entry.plain).toMatch(/one subshell's orbital energy/);
+        expect(entry.plain).toMatch(/held more tightly/);
+        expect(entry.plain).toMatch(/log scale/);
+        expect(entry.technical).toMatch(/Kohn–Sham/);
+        expect(entry.technical).toMatch(/LDA/);
+        expect(entry.technical).toMatch(/not ionisation energies/);
+        expect(entry.technical).toMatch(/ΔSCF/);
+        expect(entry.technical).toMatch(/log \|E\|/);
+        expect(entry.full).toMatch(/j = l − ½ and j = l \+ ½/);
+        expect(entry.full).toMatch(/[Ss]calar/);
+    });
+
+    // Owner R26-2: the Kohn–Sham entry now also opens beside an atom's orbital energies, so it may not speak of
+    // molecules alone.
+    it('words the Kohn–Sham entry for atoms as well as molecules (owner R26-2)', () => {
+        expect(glossary.kohnSham.plain).not.toMatch(/molecular orbitals here/);
+        expect(glossary.kohnSham.plain).toMatch(/atoms/);
+    });
+
     // Final review M3: an entry no (i) opens is unreachable -- each has an (i) beside its term somewhere on screen:
     // an InfoButton's `topic`, a fact label's (i) (withInfo's / labelWithInfo's topic argument) or an Orbitals row's
     // (BasicExplore's rowLabel).

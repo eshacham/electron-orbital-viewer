@@ -455,6 +455,19 @@ describe('SubshellPanel parts (spec §9.1: chips in Configuration, the diagram i
         expect(container.querySelector('.subshell-energy-diagram')).not.toBeNull();
         expect(container.querySelector('.subshell-chip-row')).toBeNull();
     });
+    // Owner R26-2: the diagram is headed by a short label with its scale, and an (i) beside it opens the energyLevels
+    // entry, which says what the lines are and what "log |E|" means -- the panel holds no explanation of its own.
+    it('heads the diagram "Orbital energies (log scale)" with an (i) to the energyLevels entry beside it (owner R26-2)', () => {
+        const { container } = render(<SubshellPanel {...props()} part="diagram" />);
+        const button = container.querySelector('button[aria-label="About Orbital energies"]')!;
+        expect(button).not.toBeNull();
+        const term = button.closest('.info-term')!;
+        expect(term).not.toBeNull();
+        expect(button.previousElementSibling).toHaveSeenText('Orbital energies (log scale)');
+        expect(term.nextElementSibling).toBe(container.querySelector('.subshell-energy-diagram'));
+        expect(container.textContent).not.toContain('log |E|');
+        expect(container.textContent).not.toContain('whole atom');
+    });
 });
 
 // Task 9b (finish review, fix 7): the subshells' (i) follows a "Subshells" label, not the far end of the chip row.

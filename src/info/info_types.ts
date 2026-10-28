@@ -9,7 +9,7 @@ import type { LearningLevel } from '../levels/levels';
 /** Every term an (i) can open, in the order the glossary is written. */
 export const INFO_TOPIC_IDS = [
     'shell', 'subshell', 'orbital', 'enclosed', 'node', 'phase', 'density', 'esp', 'homoLumo', 'kohnSham',
-    'relativity', 'ionisation', 'bondOrder', 'potentialCurve', 'moDiagram', 'pointGroup', 'dipole', 'tier',
+    'energyLevels', 'relativity', 'ionisation', 'bondOrder', 'potentialCurve', 'moDiagram', 'pointGroup', 'dipole', 'tier',
 ] as const;
 
 export type InfoTopicId = typeof INFO_TOPIC_IDS[number];

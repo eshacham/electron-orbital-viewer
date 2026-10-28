@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Box, Chip, Typography, Button } from '@mui/material';
+import { Box, Chip, Button } from '@mui/material';
 import { SerialisedSubshell } from '../workers/atomWorker';
 import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
 import { RelativityMode, methodStatement, shortMethodLabel } from '../atom/relativity';
@@ -285,9 +285,13 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                 captioned "Radial distribution D(r)", which it is not. */}
             {showDiagram && (
                 <>
-                    <Typography variant="caption" className="subshell-panel-legend" display="block">
-                        Orbital energies, whole atom (log |E|)
-                    </Typography>
+                    {/* Owner R26-2: a short label with its scale, and an (i) beside it to the energyLevels entry, which
+                        says what the lines are, what "log |E|" means and that these are Kohn–Sham eigenvalues (the
+                        THESIS: the panel holds the label, Info the explanation). Its own place, so it lights alone. */}
+                    <div className="info-term subshell-panel-legend">
+                        <span className="info-term-label">Orbital energies (log scale)</span>
+                        <InfoButton topic="energyLevels" label="Orbital energies" place="energy-diagram" />
+                    </div>
 
                     <svg
                         className="subshell-energy-diagram"

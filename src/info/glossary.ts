@@ -88,13 +88,29 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
             + 'The HOMO–LUMO gap here is the difference of their Kohn–Sham orbital energies: neither the optical gap (absorption) nor the fundamental gap (IP − EA).',
         full: 'Read the gap as a comparison between molecules computed the same way, not as a prediction of either measured gap.',
     },
+    // Owner R26-2: this entry also opens beside an atom's orbital energies (Atoms' Orbitals tab), so it speaks of atoms
+    // too: Atoms solves the same Kohn–Sham equations with LDA, spin-restricted and spherically averaged (scf.ts).
     kohnSham: {
         title: 'Kohn–Sham orbitals',
-        plain: 'The molecular orbitals here come from density functional theory, a standard way to compute molecules. Their shapes are the familiar orbital picture; their energies are not the energy needed to remove an electron.',
+        plain: 'Atoms, Bonds and Molecules compute their orbitals with density functional theory, a standard way to compute atoms and molecules (H₂⁺\'s alone are exact). Their shapes are the familiar orbital picture; their energies are not the energy needed to remove an electron.',
         technical: 'Kohn–Sham DFT replaces the interacting electrons by non-interacting ones in an effective potential chosen to give the same density ρ. '
             + 'The orbitals and their energies ε belong to that model system; the density and the total energy are the physical results. '
-            + 'With the exact functional −ε of the HOMO would equal the first ionisation energy; approximate functionals such as B3LYP do not achieve this, so the app never reports ε as an ionisation energy.',
-        full: 'For an open shell the calculation is unrestricted: α and β electrons have their own orbitals and energies, and Bonds draws its levels at the α energies.',
+            + 'With the exact functional −ε of the highest occupied orbital would equal the first ionisation energy; approximate functionals such as LDA (Atoms) and B3LYP do not achieve this, so the app never reports ε as an ionisation energy.',
+        full: 'For an open-shell molecule the calculation is unrestricted: α and β electrons have their own orbitals and energies, and Bonds draws its levels at the α energies. '
+            + 'An atom\'s is spin-restricted and spherically averaged, so each subshell has one energy.',
+    },
+    // Owner R26-2: the Atoms Orbitals tab's diagram and table (SubshellPanel's energy diagram, OrbitalEnergyList), true
+    // to what they draw: one rule per occupied subshell of the drawn profile (per j-level with spin–orbit), placed by
+    // log₁₀ |E| between the least bound (top) and the most bound (bottom); the open shell's rules thick, coloured, named.
+    energyLevels: {
+        title: 'Orbital energies',
+        plain: 'Each line is one subshell\'s orbital energy; a lower line means its electrons are held more tightly. '
+            + 'The inner (core) subshells lie far below the outer (valence) ones, so the diagram uses a log scale to fit both.',
+        technical: 'These are the Kohn–Sham eigenvalues ε of the atom\'s LDA calculation, not ionisation energies: Info\'s ionisation energy is computed separately, by ΔSCF. '
+            + 'A line\'s height follows log |E|, so each factor of ten in |E| takes the same height; the subshells of the shell you pick are drawn in their colours and named. '
+            + 'LDA\'s outermost eigenvalue falls short of the ionisation energy by tens of percent, even for light atoms.',
+        full: 'With Relativity set to With spin–orbit, each subshell with l > 0 is drawn as two lines, its j = l − ½ and j = l + ½ levels (as 6p½ and 6p³⁄₂); '
+            + 'Scalar shifts the lines without splitting them. The lines are those of the picture on screen, computed with its relativity.',
     },
     relativity: {
         title: 'Relativity',
