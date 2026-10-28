@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, act, renderHook } from '@testing-library/react';
 import LevelControl from '../../src/levels/LevelControl';
 import { useLevel } from '../../src/levels/useLevel';
-import { LEVEL_KEY, levelPref, raiseForVisit, clearVisit, visitLevel } from '../../src/levels/level_pref';
+import { LEVEL_KEY, levelPref, setVisitLevel, clearVisit, visitLevel } from '../../src/levels/level_pref';
 
 afterEach(() => {
     window.localStorage.clear();
@@ -51,8 +51,9 @@ describe('LevelControl (Task 2: the level switch)', () => {
         expect(screen.getByRole('radio', { name: 'Advanced' })).toHaveAttribute('aria-checked', 'true');
     });
 
+    // Final review I1: raiseForVisit became setVisitLevel (a link sets the visit level both ways).
     it('shows a visit raise as the level in use, and a choice ends the raise', () => {
-        act(() => raiseForVisit('advanced'));
+        act(() => setVisitLevel('advanced'));
         render(<LevelControl variant="segmented" />);
         expect(screen.getByRole('radio', { name: 'Advanced' })).toHaveAttribute('aria-checked', 'true');
         fireEvent.click(screen.getByRole('radio', { name: 'Explore' }));
@@ -91,28 +92,43 @@ describe('LevelControl, compact (below 1024 px)', () => {
     });
 });
 
+// Final review I1 (ruled): a link sets the visit level both ways -- `raised` became `visiting` (the visit differs from
+// the stored level), raiseForVisit became setVisitLevel, and a visit below the stored level is now in use too.
 describe('useLevel', () => {
-    it('is the stored level, raised for the visit when a link needs more', () => {
+    it('is the stored level, or the level a link set for the visit', () => {
         levelPref.set('basics');
         const { result } = renderHook(() => useLevel());
-        expect(result.current).toMatchObject({ level: 'basics', stored: 'basics', raised: false });
-        act(() => raiseForVisit('advanced'));
-        expect(result.current).toMatchObject({ level: 'advanced', stored: 'basics', raised: true });
+        expect(result.current).toMatchObject({ level: 'basics', stored: 'basics', visiting: false });
+        act(() => setVisitLevel('advanced'));
+        expect(result.current).toMatchObject({ level: 'advanced', stored: 'basics', visiting: true });
     });
 
-    it('is not raised by a visit level at or below the stored one', () => {
+    it('uses a visit level below the stored one too', () => {
         levelPref.set('research');
-        act(() => raiseForVisit('advanced'));
+        act(() => setVisitLevel('basics'));
         const { result } = renderHook(() => useLevel());
-        expect(result.current).toMatchObject({ level: 'research', raised: false });
+        expect(result.current).toMatchObject({ level: 'basics', stored: 'research', visiting: true, asked: null });
     });
 
-    it('setLevel stores the level and ends the visit raise', () => {
-        act(() => raiseForVisit('advanced'));
+    it('names the lvl a link asked for when its view needed more', () => {
+        act(() => setVisitLevel('advanced', 'basics'));
+        const { result } = renderHook(() => useLevel());
+        expect(result.current).toMatchObject({ level: 'advanced', stored: 'explore', visiting: true, asked: 'basics' });
+    });
+
+    it('is not a visit when the link\'s level is the stored one', () => {
+        levelPref.set('advanced');
+        act(() => setVisitLevel('advanced'));
+        const { result } = renderHook(() => useLevel());
+        expect(result.current).toMatchObject({ level: 'advanced', visiting: false });
+    });
+
+    it('setLevel stores the level and ends the visit', () => {
+        act(() => setVisitLevel('advanced'));
         const { result } = renderHook(() => useLevel());
         act(() => result.current.setLevel('advanced'));
         expect(levelPref.get()).toBe('advanced');
         expect(visitLevel()).toBeNull();
-        expect(result.current).toMatchObject({ level: 'advanced', stored: 'advanced', raised: false });
+        expect(result.current).toMatchObject({ level: 'advanced', stored: 'advanced', visiting: false });
     });
 });

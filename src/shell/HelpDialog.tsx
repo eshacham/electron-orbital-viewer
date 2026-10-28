@@ -47,7 +47,11 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose, brand, aboutMode
                 <li>Advanced: adds charge and excitation, relativity, combinations and fields, the enclosed fraction, every orbital, exports and advanced appearance.</li>
                 <li>Research: adds full precision, with each result’s method, references and limits of validity.</li>
             </ul>
-            <p>A shared link opens at the level its view needs, for that visit only; your own level stays as you set it.</p>
+            {/* Final review I1 (ruled): a link's level holds both ways, floored at what its view needs. */}
+            <p>
+                A shared link opens at the level its sender chose, or at your own, and never below what its view needs;
+                that is for the visit only, and your own level stays as you set it.
+            </p>
             <h2 className="ql-section">Export formats</h2>
             <ul>
                 {EXPORT_ITEMS.map(item => <li key={item.kind}>{item.label}: {item.detail}.</li>)}

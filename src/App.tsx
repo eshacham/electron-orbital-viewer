@@ -169,8 +169,9 @@ import { BUILD_ENV } from './jobs/build_env';
 import { SESSION_ENDED } from './jobs/api';
 import { NO_COMBINATION } from './combinations';
 import type { SearchAction } from './search/search_index';
-import { atLeast, CONTROL_LEVEL, LEVEL_LABEL, type ControlId, type LearningLevel } from './levels/levels';
+import { atLeast, CONTROL_LEVEL, LEVEL_LABEL, levelRank, type ControlId, type LearningLevel } from './levels/levels';
 import { useLevel } from './levels/useLevel';
+import { requiredLevel } from './levels/required_level';
 import LevelControl from './levels/LevelControl';
 import LevelLine, { type HeldValue } from './levels/LevelLine';
 import PhoneNoticeSlot from './shell/PhoneNoticeSlot';
@@ -254,9 +255,10 @@ function App() {
     const isBondsMode = atomMode === 'bonds';
     const isMoleculeMode = atomMode === 'molecule';
 
-    // Task 2: the learning level in use (stored, or raised for this visit by a link) decides which controls render:
-    // a control above it is hidden, not greyed, and one line says where it appears (LevelLine).
-    const { level, stored: storedLevel, raised: levelRaised, visitId, setLevel } = useLevel();
+    // Task 2: the learning level in use (stored, or the level a link opened this visit at -- final review I1: above or
+    // below the stored one) decides which controls render: a control above it is hidden, not greyed, and one line says
+    // where it appears (LevelLine).
+    const { level, stored: storedLevel, visiting: levelFromLink, asked: linkAsked, visitId, setLevel } = useLevel();
     const shows = useCallback((id: ControlId) => atLeast(level, CONTROL_LEVEL[id]), [level]);
 
     // The Relativity switch shows the effective mode -- the user's choice, or
@@ -372,10 +374,15 @@ function App() {
         return store.getState();
     }, [store]);
     // Task 2: only Share's "Opens at" writes `lvl` -- encodeStateOf never does -- so a plain link keeps the
-    // recipient's own level, and one copied "Opens at Basics" ends `&lvl=basics`.
+    // recipient's own level, and one copied "Opens at Basics" ends `&lvl=basics`. Final review I1: the link opens at
+    // that level, floored at what the view needs (apply_level.ts), so a level below it is written as the floor, and
+    // the outcome names the level the link really opens at for Share's confirmation.
     const handleShare = useCallback(async (opensAt?: LearningLevel): Promise<ShareOutcome> => {
-        const url = shareUrlFor(encodeStateOf(stateNow())) + (opensAt ? `&lvl=${opensAt}` : '');
-        return (await copyText(url)) ? { kind: 'copied' } : { kind: 'manual', url };
+        const state = stateNow();
+        const needs = requiredLevel(state);
+        const at = opensAt && levelRank(opensAt) < levelRank(needs) ? needs : opensAt;
+        const url = shareUrlFor(encodeStateOf(state)) + (at ? `&lvl=${at}` : '');
+        return (await copyText(url)) ? { kind: 'copied', opensAt: at ?? null } : { kind: 'manual', url, opensAt: at ?? null };
     }, [stateNow]);
 
     // Task 5 (ruling P17): the one-time hint goes away once the viewer does
@@ -1458,6 +1465,8 @@ function App() {
         isAtomMode, activePlotTab, isBasicMode, renderedField, basicActivePlotTab,
     ]);
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
+    // Final review I1: the least level a link to this view can open at -- Share's "Opens at" offers none below it.
+    const viewNeedsLevel = useAppSelector(requiredLevel);
     // Ruling DC6 / R22a: the glTF item names the theme whose colours it keeps.
     const exportLook = useMemo(() => ({ theme: themeMode }), [themeMode]);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
@@ -1465,17 +1474,17 @@ function App() {
         () => (
             <ShareExportBar
                 onShare={handleShare} onExport={handleExport} availability={availability} stlSolids={stlSolids}
-                items={exportItemsFor(atomMode, exportLook)} level={level}
+                items={exportItemsFor(atomMode, exportLook)} level={level} opensAtFloor={viewNeedsLevel}
             />
         ),
-        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook, level]
+        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook, level, viewNeedsLevel]
     );
     const shareExportToolbar = useMemo(
         () => (
             <ShareExportBar variant="toolbar" onShare={handleShare} onExport={handleExport} availability={availability}
-                stlSolids={stlSolids} items={exportItemsFor(atomMode, exportLook)} level={level} />
+                stlSolids={stlSolids} items={exportItemsFor(atomMode, exportLook)} level={level} opensAtFloor={viewNeedsLevel} />
         ),
-        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook, level]
+        [handleShare, handleExport, availability, stlSolids, atomMode, exportLook, level, viewNeedsLevel]
     );
 
     // Molecules mode's navigation (layout contract §3.8): the whole card in
@@ -2105,10 +2114,11 @@ function App() {
         </>
     );
 
-    // Task 2 (Review Focus 1): a link that needed a higher level raised it for this visit only, and says so -- with
-    // the way to keep it. Its own row under the top bar (AppShell), so it covers neither panels nor title.
+    // Task 2 (Review Focus 1): a link set the level for this visit only, and says so -- with the way to keep it. Final
+    // review I1 (ruled): above or below the reader's own level; where the link asked for less than its view needs, the
+    // notice says why it opened higher. Its own row under the top bar (AppShell), so it covers neither panels nor title.
     // Fix round 1 (M5): role="status" -- it informs, it does not interrupt (MUI's Alert defaults to an assertive alert).
-    const visitNotice = levelRaised && visitNoticeDismissed !== visitId && (
+    const visitNotice = levelFromLink && visitNoticeDismissed !== visitId && (
         <Alert severity="info" role="status" className="level-visit-notice"
             action={(
                 <>
@@ -2118,7 +2128,9 @@ function App() {
                     </IconButton>
                 </>
             )}>
-            Opened at {LEVEL_LABEL[level]} for this link — your level stays {LEVEL_LABEL[storedLevel]}.
+            {linkAsked && levelRank(linkAsked) < levelRank(level)
+                ? `Opened at ${LEVEL_LABEL[level]} for this link — it asks for ${LEVEL_LABEL[linkAsked]}, but this view needs ${LEVEL_LABEL[level]}. Your level stays ${LEVEL_LABEL[storedLevel]}.`
+                : `Opened at ${LEVEL_LABEL[level]} for this link — your level stays ${LEVEL_LABEL[storedLevel]}.`}
         </Alert>
     );
 

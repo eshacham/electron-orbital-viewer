@@ -19,4 +19,12 @@ describe('HelpDialog (spec §8.1 item 5)', () => {
         expect(dialog).toHaveTextContent('central-field model text');
         expect(screen.queryAllByRole('link')).toHaveLength(0);
     });
+
+    // Final review I1 (ruled): a link opens at its sender's level, above or below the reader's, floored at its view's.
+    it('says a shared link opens at the level its sender chose, never below what its view needs', () => {
+        render(<HelpDialog open onClose={jest.fn()} brand={BRAND} />);
+        const dialog = screen.getByRole('dialog', { name: 'Help' });
+        expect(dialog).toHaveTextContent('A shared link opens at the level its sender chose, or at your own, and never below what its view needs; '
+            + 'that is for the visit only, and your own level stays as you set it.');
+    });
 });

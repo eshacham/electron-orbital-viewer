@@ -8,19 +8,24 @@ import CameraAltOutlined from '@mui/icons-material/CameraAltOutlined';
 import LinkOutlined from '@mui/icons-material/LinkOutlined';
 import FileDownloadOutlined from '@mui/icons-material/FileDownloadOutlined';
 import { EXPORT_ITEMS, ExportAvailability, ExportItem, ExportKind, ExportOptions } from '../export/run_export';
-import { atLeast, CONTROL_LEVEL, LEVELS, LEVEL_LABEL, levelPointer, LearningLevel } from '../levels/levels';
+import { atLeast, CONTROL_LEVEL, LEVELS, LEVEL_LABEL, levelPointer, levelRank, LearningLevel } from '../levels/levels';
 // Task 2: the quiet level line's style (.level-line).
 import '../levels/levels.css';
 
 /** The longest side of a print, offered as a choice (a desk model to a display piece). */
 const PRINT_SIZES_MM = [30, 50, 80, 120];
 
-export type ShareOutcome = { kind: 'copied' } | { kind: 'manual'; url: string };
+/**
+ * What Copy link did. Final review I1: `opensAt` is the level the link really opens at -- the one chosen, floored at
+ * what the view needs -- or null for the recipient's own; omitted, the level chosen.
+ */
+export type ShareOutcome = ({ kind: 'copied' } | { kind: 'manual'; url: string }) & { opensAt?: LearningLevel | null };
 
 interface ShareExportBarProps {
     /**
      * Copies a link to this view. Task 2: `opensAt` is the Share menu's "Opens at" choice -- the link then
-     * carries `lvl`, raising the recipient's level for that visit; undefined keeps the recipient's own level.
+     * carries `lvl`, setting the recipient's level for that visit (final review I1: above or below their own);
+     * undefined keeps the recipient's own level.
      */
     onShare: (opensAt?: LearningLevel) => Promise<ShareOutcome>;
     /** The menu shows only when this is given (Task 8: not every caller exports yet). */
@@ -34,6 +39,11 @@ interface ShareExportBarProps {
     variant?: 'bar' | 'toolbar';
     /** Task 2: the learning level in use -- Snapshot and Export appear at Advanced. Omitted, everything shows. */
     level?: LearningLevel;
+    /**
+     * Final review I1: the least level this view can open at (`requiredLevel`) -- a link opens at least there, so
+     * "Opens at" offers nothing below it and says why. Omitted, Basics: every level.
+     */
+    opensAtFloor?: LearningLevel;
 }
 
 /** The Share menu's "Opens at" choices: the recipient's own level (no `lvl`), then each level. */
@@ -49,6 +59,7 @@ const OPENS_AT: { value: LearningLevel | null; label: string }[] = [
  */
 const ShareExportBar: React.FC<ShareExportBarProps> = ({
     onShare, onExport: exportHandler, availability, stlSolids, items = EXPORT_ITEMS, variant = 'bar', level = 'research',
+    opensAtFloor = 'basics',
 }) => {
     // Task 2: below Advanced there is no Snapshot or Export at all -- hidden, not greyed; the Share menu says where.
     const exportsShown = atLeast(level, CONTROL_LEVEL.exports);
@@ -70,9 +81,12 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const [shareAnchor, setShareAnchor] = useState<HTMLElement | null>(null);
     // Task 2: the Share menu's "Opens at" -- kept while the bar is mounted, so a second copy opens at the same level.
-    const [opensAt, setOpensAt] = useState<LearningLevel | null>(null);
-    // The level the link on screen (copied, or in the copy-by-hand dialog) opens at.
-    const [copiedAt, setCopiedAt] = useState<LearningLevel | null>(null);
+    const [chosenOpensAt, setOpensAt] = useState<LearningLevel | null>(null);
+    // Final review I1: a level chosen below what the view now needs reads as that floor -- the level the link opens at.
+    const belowFloor = (at: LearningLevel) => levelRank(at) < levelRank(opensAtFloor);
+    const opensAt = chosenOpensAt && belowFloor(chosenOpensAt) ? opensAtFloor : chosenOpensAt;
+    // The level the link on screen (copied, or in the copy-by-hand dialog) opens at, and whether the view raised it.
+    const [copiedAt, setCopiedAt] = useState<{ at: LearningLevel; floored: boolean } | null>(null);
     const [stlOpen, setStlOpen] = useState(false);
     const [printSize, setPrintSize] = useState(50);
     const [solidCount, setSolidCount] = useState(0);
@@ -84,10 +98,14 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({
 
     const handleShare = async () => {
         setShareAnchor(null);
-        const at = opensAt;
-        const outcome = await onShare(at ?? undefined);
-        setCopiedAt(at);
-        if (outcome.kind === 'copied') showNotice(at ? `Link copied — it opens this exact view, at ${LEVEL_LABEL[at]}.` : 'Link copied — it opens this exact view.');
+        const chosen = chosenOpensAt;
+        const outcome = await onShare(chosen ?? undefined);
+        // Final review I1: say the level the link really opens at, and why when the view needs more than was chosen.
+        const at = outcome.opensAt !== undefined ? outcome.opensAt : opensAt;
+        const copied = at ? { at, floored: at !== chosen } : null;
+        setCopiedAt(copied);
+        const where = copied ? `, at ${LEVEL_LABEL[copied.at]}${copied.floored ? ', the least this view needs' : ''}` : '';
+        if (outcome.kind === 'copied') showNotice(`Link copied — it opens this exact view${where}.`);
         else setManualUrl(outcome.url);
     };
     const shareButtonProps = {
@@ -158,14 +176,21 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({
                 <ListSubheader>Opens at</ListSubheader>
                 {OPENS_AT.map(option => {
                     const checked = option.value === opensAt;
+                    // Final review I1: a link opens at least at what its view needs; a level below it is not offered.
+                    const unavailable = option.value !== null && belowFloor(option.value);
                     return (
                         <MenuItem key={option.label} role="menuitemradio" aria-checked={checked} aria-label={`Opens at ${option.label}`}
-                            onClick={() => setOpensAt(option.value)}>
+                            disabled={unavailable} onClick={() => setOpensAt(option.value)}>
                             <ListItemIcon>{checked && <Check fontSize="small" />}</ListItemIcon>
                             <ListItemText primary={option.label} />
                         </MenuItem>
                     );
                 })}
+                {opensAtFloor !== 'basics' && (
+                    <li role="none" className="ql-caption level-line share-menu-note">
+                        This view needs {LEVEL_LABEL[opensAtFloor]}, so a link to it opens at {LEVEL_LABEL[opensAtFloor]} or above
+                    </li>
+                )}
                 {exportsPointer && <li role="none" className="ql-caption level-line share-menu-note">{exportsPointer}</li>}
             </Menu>
             {onExport && (
@@ -252,7 +277,11 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({
             <Dialog open={manualUrl !== null} onClose={() => setManualUrl(null)} fullWidth>
                 <DialogTitle>Copy this link</DialogTitle>
                 <DialogContent>
-                    {copiedAt && <p className="ql-caption">Opens at {LEVEL_LABEL[copiedAt]}</p>}
+                    {copiedAt && (
+                        <p className="ql-caption">
+                            Opens at {LEVEL_LABEL[copiedAt.at]}{copiedAt.floored && ', the least this view needs'}
+                        </p>
+                    )}
                     <TextField
                         value={manualUrl ?? ''}
                         fullWidth

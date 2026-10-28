@@ -1,5 +1,5 @@
 import { LEVEL_KEY, levelPref } from '../../src/levels/level_pref';
-import { visitLevel, raiseForVisit, clearVisit, subscribeVisit, visitId } from '../../src/levels/level_pref';
+import { visitLevel, visitAsked, setVisitLevel, clearVisit, subscribeVisit, visitId } from '../../src/levels/level_pref';
 
 afterEach(() => {
     window.localStorage.clear();
@@ -29,56 +29,65 @@ describe('level preference (spec plan: a preference, never a link)', () => {
     });
 });
 
-describe('the visit raise (in-memory only)', () => {
-    it('starts with no visit raise', () => {
+// Final review I1 (ruled): a link sets the visit level both ways, so raiseForVisit (raise-only) became setVisitLevel
+// (an assignment); these tests follow it -- "never lowers" and "a higher raise replaces" are now "the next link's
+// level replaces the last", in either direction.
+describe('the visit level (in-memory only)', () => {
+    it('starts with no visit level', () => {
         expect(visitLevel()).toBeNull();
     });
 
-    it('raiseForVisit never touches the stored preference', () => {
+    it('setVisitLevel never touches the stored preference', () => {
         levelPref.set('basics');
-        raiseForVisit('advanced');
+        setVisitLevel('advanced');
         expect(visitLevel()).toBe('advanced');
         expect(window.localStorage.getItem(LEVEL_KEY)).toBe('basics');
     });
 
-    it('never lowers a visit already in place', () => {
-        raiseForVisit('advanced');
-        raiseForVisit('explore');
-        expect(visitLevel()).toBe('advanced');
-    });
-
-    it('a higher raise replaces a lower one', () => {
-        raiseForVisit('explore');
-        raiseForVisit('research');
+    it('the next link\'s level replaces the last one, lower as well as higher', () => {
+        setVisitLevel('advanced');
+        setVisitLevel('basics');
+        expect(visitLevel()).toBe('basics');
+        setVisitLevel('research');
         expect(visitLevel()).toBe('research');
     });
 
+    it('keeps the lvl a link asked for beside the level it set, and forgets it with the visit', () => {
+        setVisitLevel('advanced', 'basics');
+        expect(visitAsked()).toBe('basics');
+        setVisitLevel('explore');
+        expect(visitAsked()).toBeNull();
+        setVisitLevel('advanced', 'basics');
+        clearVisit();
+        expect(visitAsked()).toBeNull();
+    });
+
     it('clearVisit drops it back to null', () => {
-        raiseForVisit('advanced');
+        setVisitLevel('advanced');
         clearVisit();
         expect(visitLevel()).toBeNull();
     });
 
-    // Task 2 fix round 1 (M5): the visit notice is dismissed per link, so each link asking for a raise is counted --
+    // Task 2 fix round 1 (M5): the visit notice is dismissed per link, so each link setting a visit level is counted --
     // a second link to the level already in place too, though the level itself does not move.
-    it('visitId counts every link that asks for a raise, and tells its listeners', () => {
+    it('visitId counts every link that sets a visit level, and tells its listeners', () => {
         const before = visitId();
         const heard: number[] = [];
         const unsubscribe = subscribeVisit(() => heard.push(visitId()));
-        raiseForVisit('advanced');
-        raiseForVisit('advanced');
+        setVisitLevel('advanced');
+        setVisitLevel('advanced');
         unsubscribe();
         expect(visitLevel()).toBe('advanced');
         expect(heard).toEqual([before + 1, before + 2]);
     });
 
-    it('subscribeVisit fires on a raise and a clear, and unsubscribes cleanly', () => {
+    it('subscribeVisit fires on a visit and a clear, and unsubscribes cleanly', () => {
         const heard: Array<ReturnType<typeof visitLevel>> = [];
         const unsubscribe = subscribeVisit(() => heard.push(visitLevel()));
-        raiseForVisit('advanced');
+        setVisitLevel('advanced');
         clearVisit();
         unsubscribe();
-        raiseForVisit('research');
+        setVisitLevel('research');
         expect(heard).toEqual(['advanced', null]);
     });
 });

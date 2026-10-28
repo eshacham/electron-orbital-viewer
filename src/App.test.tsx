@@ -2807,6 +2807,93 @@ describe('learning levels (Task 2)', () => {
         expect(writeText.mock.calls[1][0]).toMatch(/#mode=atom&.*&lvl=basics$/);
     });
 
+    // Final review I1 (ruled): `lvl` sets the visit level in both directions, floored at what the view needs, and
+    // never stored; the notice says so either way, and why when the view needed more than the link asked for.
+    describe('a link that opens at a level (final review I1)', () => {
+        it('opens at Basics for a reader whose level is Research, and says so', async () => {
+            window.localStorage.setItem('eov.level', 'research');
+            const { store } = renderWithProvider(<App />);
+            act(() => { window.location.hash = '#mode=atom&Z=10&lvl=basics'; });
+            await waitFor(() => expect(store.getState().atom.Z).toBe(10));
+            expect(screen.getByText('Opened at Basics for this link — your level stays Research.')).toBeInTheDocument();
+            expect(screen.getByRole('radio', { name: 'Basics' })).toHaveAttribute('aria-checked', 'true');
+            expect(screen.getByText('Charge, excitation and relativity appear at Advanced')).toBeInTheDocument();
+            expect(window.localStorage.getItem('eov.level')).toBe('research');
+        });
+
+        it('opens at Explore for a first-time visitor, their own level, with no notice', async () => {
+            const { store } = renderWithProvider(<App />);
+            act(() => { window.location.hash = '#mode=atom&Z=10&lvl=explore'; });
+            await waitFor(() => expect(store.getState().atom.Z).toBe(10));
+            expect(screen.getByRole('radio', { name: 'Explore' })).toHaveAttribute('aria-checked', 'true');
+            expect(screen.queryByText(/Opened at/)).toBeNull();
+            expect(window.localStorage.getItem('eov.level')).toBeNull();
+        });
+
+        it('opens a Basics link to Fe²⁺ at Advanced, the least the view needs, and says why', async () => {
+            const { store } = renderWithProvider(<App />);
+            act(() => { window.location.hash = '#mode=atom&Z=26&charge=2&lvl=basics'; });
+            await waitFor(() => expect(store.getState().atom.charge).toBe(2));
+            expect(screen.getByText('Opened at Advanced for this link — it asks for Basics, but this view needs Advanced. Your level stays Explore.'))
+                .toBeInTheDocument();
+            expect(screen.getByRole('radio', { name: 'Advanced' })).toHaveAttribute('aria-checked', 'true');
+            expect(screen.getByRole('button', { name: 'increase charge' })).toBeInTheDocument();
+        });
+
+        it('leaving the link for one with no level restores the reader\'s own level', async () => {
+            window.localStorage.setItem('eov.level', 'research');
+            const { store } = renderWithProvider(<App />);
+            act(() => { window.location.hash = '#mode=atom&Z=10&lvl=basics'; });
+            await waitFor(() => expect(store.getState().atom.Z).toBe(10));
+            expect(screen.getByRole('radio', { name: 'Basics' })).toHaveAttribute('aria-checked', 'true');
+            act(() => { window.location.hash = '#mode=atom&Z=11'; });
+            await waitFor(() => expect(store.getState().atom.Z).toBe(11));
+            expect(screen.getByRole('radio', { name: 'Research' })).toHaveAttribute('aria-checked', 'true');
+            expect(screen.queryByText(/Opened at/)).toBeNull();
+        });
+
+        // Review Focus 2: a visit below the reader's level hides controls, never what the link draws -- the view the
+        // link holds is the one it holds at Research, and a held preference stays with its note.
+        it('lowering the level for a link never changes what is drawn', async () => {
+            window.localStorage.setItem('eov.level', 'research');
+            window.localStorage.setItem('eov.display', JSON.stringify({ showAxes: false }));
+            const { store } = renderWithProvider(<App />);
+            const drawn = () => {
+                const { atom, orbital } = store.getState();
+                return {
+                    mode: atom.mode, Z: atom.Z, charge: atom.charge, excitation: atom.excitation, relativity: atom.relativityOverride,
+                    fraction: orbital.enclosedFraction, style: orbital.surfaceStyle,
+                };
+            };
+            act(() => { window.location.hash = '#mode=atom&Z=10'; });
+            await waitFor(() => expect(store.getState().atom.Z).toBe(10));
+            const atResearch = drawn();
+            act(() => { window.location.hash = '#mode=atom&Z=10&lvl=basics'; });
+            await waitFor(() => expect(screen.getByRole('radio', { name: 'Basics' })).toHaveAttribute('aria-checked', 'true'));
+            expect(drawn()).toEqual(atResearch);
+            expect(JSON.parse(window.localStorage.getItem('eov.display')!)).toMatchObject({ showAxes: false });
+            expect(screen.getByText('Showing the view without axes — axes controls appear at Explore')).toBeInTheDocument();
+        });
+
+        it('Share offers no level below what the view needs, and says the level its link opens at', async () => {
+            const writeText = jest.fn().mockResolvedValue(undefined);
+            Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+            window.localStorage.setItem('eov.level', 'research');
+            const { store } = renderWithProvider(<App />);
+            act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
+            await waitFor(() => expect(store.getState().atom.charge).toBe(2));
+            fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+            expect(screen.getByRole('menuitemradio', { name: 'Opens at Basics' })).toHaveAttribute('aria-disabled', 'true');
+            expect(screen.getByRole('menuitemradio', { name: 'Opens at Explore' })).toHaveAttribute('aria-disabled', 'true');
+            expect(screen.getByText('This view needs Advanced, so a link to it opens at Advanced or above')).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('menuitemradio', { name: 'Opens at Advanced' }));
+            fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+            await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+            expect(writeText.mock.calls[0][0]).toMatch(/&lvl=advanced$/);
+            expect(await screen.findByText('Link copied — it opens this exact view, at Advanced.')).toBeInTheDocument();
+        });
+    });
+
     it('at Basics the inspector drops Plot and data and says where it appears', () => {
         window.localStorage.setItem('eov.level', 'basics');
         renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });

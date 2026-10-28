@@ -21,16 +21,17 @@ export function encodeLevel(level: LearningLevel): string | null {
 export const levelPref = createPref<LearningLevel>(LEVEL_KEY, { decode: decodeLevel, encode: encodeLevel });
 
 /**
- * The visit-only raise (spec plan): a shared link or a value a view already
- * holds can show more than the viewer's stored level for this visit alone,
- * without ever touching `levelPref` -- a level is a preference, never
- * something a link sets permanently. In memory only: a reload starts over
- * at the stored level, and `raiseForVisit` never lowers a raise already in
- * place (it is a raise, not an assignment) -- though each call is a new link,
- * counted by `visitId`.
+ * This visit's level, set by a link (spec plan; final review I1, ruled: both ways): a shared link opens at the level
+ * its `lvl` names -- below the viewer's own level as well as above it -- floored at what its view needs, or, with no
+ * `lvl`, at the viewer's own level raised only if the view needs more. It never touches `levelPref`: a level is a
+ * preference, never something a link sets permanently. In memory only: a reload starts over at the stored level, and
+ * the next link replaces it (`setVisitLevel` assigns), so leaving a link for one without `lvl` restores the viewer's
+ * own level. Each link that sets one is counted by `visitId`.
  */
 let visit: LearningLevel | null = null;
-/** How many links have asked for a raise this session (Task 2 fix round 1: the notice is dismissed per link). */
+/** The `lvl` the link asked for, when it set the visit: the notice says why a view needing more opened above it. */
+let asked: LearningLevel | null = null;
+/** How many links have set a visit level this session (Task 2 fix round 1: the notice is dismissed per link). */
 let visitSerial = 0;
 const visitListeners = new Set<() => void>();
 
@@ -38,21 +39,31 @@ export function visitLevel(): LearningLevel | null {
     return visit;
 }
 
-/** Which link's raise is in place: a new one each time a link asks, even for the level already raised to. */
+/** The level the link that set this visit asked for (its `lvl`), or null when it named none or set no visit. */
+export function visitAsked(): LearningLevel | null {
+    return asked;
+}
+
+/** Which link's visit level is in place: a new one each time a link sets one, even the level already in place. */
 export function visitId(): number {
     return visitSerial;
 }
 
-export function raiseForVisit(level: LearningLevel): void {
-    visitSerial += 1;
-    if (visit === null || levelRank(visit) < levelRank(level)) visit = level;
+/**
+ * A link's level for this visit -- `level`, or null when the link opens at the viewer's own level -- replacing any
+ * earlier link's. `linked` is the link's own `lvl` (null for none), kept beside the level it was floored to.
+ */
+export function setVisitLevel(level: LearningLevel | null, linked: LearningLevel | null = null): void {
+    const nextAsked = level === null ? null : linked;
+    if (level === null && visit === null) return;
+    if (level !== null) visitSerial += 1;
+    visit = level;
+    asked = nextAsked;
     visitListeners.forEach(listener => listener());
 }
 
 export function clearVisit(): void {
-    if (visit === null) return;
-    visit = null;
-    visitListeners.forEach(listener => listener());
+    setVisitLevel(null);
 }
 
 export function subscribeVisit(listener: () => void): () => void {

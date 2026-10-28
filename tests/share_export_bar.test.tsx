@@ -66,6 +66,38 @@ describe('ShareExportBar: Opens at (Task 2)', () => {
         expect(screen.getByText('Opens at Advanced')).toBeInTheDocument();
     });
 
+    // Final review I1: a link opens at least at what its view needs -- the menu offers nothing below it, and the
+    // confirmation names the level the link really opens at.
+    it('offers no level below the view\'s need, and says why', () => {
+        render(<ShareExportBar onShare={jest.fn()} opensAtFloor="advanced" />);
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        expect(screen.getByRole('menuitemradio', { name: 'Opens at Basics' })).toHaveAttribute('aria-disabled', 'true');
+        expect(screen.getByRole('menuitemradio', { name: 'Opens at Explore' })).toHaveAttribute('aria-disabled', 'true');
+        expect(screen.getByRole('menuitemradio', { name: 'Opens at Advanced' })).not.toHaveAttribute('aria-disabled');
+        expect(screen.getByText('This view needs Advanced, so a link to it opens at Advanced or above')).toBeInTheDocument();
+    });
+
+    it('a level chosen below what the view now needs reads, and copies, as that need', async () => {
+        const onShare = jest.fn().mockResolvedValue({ kind: 'copied', opensAt: 'advanced' });
+        const { rerender } = render(<ShareExportBar onShare={onShare} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Opens at Basics' }));
+        rerender(<ShareExportBar onShare={onShare} opensAtFloor="advanced" />);
+        expect(screen.getByRole('menuitemradio', { name: 'Opens at Advanced' })).toHaveAttribute('aria-checked', 'true');
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+        await waitFor(() => expect(onShare).toHaveBeenCalledWith('basics'));
+        expect(await screen.findByText('Link copied — it opens this exact view, at Advanced, the least this view needs.')).toBeInTheDocument();
+    });
+
+    it('the copy-by-hand dialog names the level the link really opens at', async () => {
+        render(<ShareExportBar onShare={async () => ({ kind: 'manual', url: 'http://x/#mode=atom&Z=26&charge=2&lvl=advanced', opensAt: 'advanced' })} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Opens at Basics' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+        await screen.findByRole('textbox', { name: /link to this view/i });
+        expect(screen.getByText('Opens at Advanced, the least this view needs')).toBeInTheDocument();
+    });
+
     it('below Advanced it hides Snapshot and Export, and the Share menu says where they appear', () => {
         render(<ShareExportBar variant="toolbar" level="explore" onShare={jest.fn()} onExport={jest.fn()} availability={allAvailable()} />);
         expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
