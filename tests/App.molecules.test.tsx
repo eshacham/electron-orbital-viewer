@@ -1343,4 +1343,50 @@ describe('Molecules Info (Task 7b)', () => {
         expect(within(info).getByRole('heading', { level: 2, name: /^Info/ }).querySelector('.info-topic-chip'))
             .toHaveTextContent('Electrostatic potential');
     });
+
+    // Final review I2: full screen hides Info, so the canvas key's (i) leaves full screen first, then shows Info on its
+    // term with focus on the heading -- the "Orbital list" tile's pattern (R25-A-I1).
+    it('in full screen, the ESP key\'s (i) leaves full screen, then shows Info on its term, focused', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        act(() => { store.dispatch(setSurface({ kind: 'esp' })); });
+        fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
+        const shell = container.querySelector('.app-shell') as HTMLElement;
+        expect(shell).toHaveClass('is-fullscreen');
+        // jsdom applies no CSS, so a focus() on the heading full screen hides would "work" here: record whether each
+        // focus on Info's heading came while full screen was still on -- a real browser drops that one.
+        const heading = within(container.querySelector('.view-panel') as HTMLElement).getByRole('heading', { level: 2, name: /^Info/ });
+        const focusedInFullscreen: boolean[] = [];
+        const focus = jest.spyOn(heading, 'focus').mockImplementation(function (this: HTMLElement) {
+            focusedInFullscreen.push(shell.classList.contains('is-fullscreen'));
+            HTMLElement.prototype.focus.call(this);
+        });
+        try {
+            fireEvent.click(screen.getByRole('button', { name: 'About Electrostatic potential' }));
+            await flush();
+        } finally {
+            focus.mockRestore();
+        }
+        expect(shell).not.toHaveClass('is-fullscreen');
+        expect(heading.querySelector('.info-topic-chip')).toHaveTextContent('Electrostatic potential');
+        expect(heading).toHaveFocus();
+        expect(focusedInFullscreen[focusedInFullscreen.length - 1]).toBe(false);
+    });
+
+    // Final review I2: on a tablet the drawer is unfolded too, once full screen has gone.
+    it('in full screen on a tablet, the ESP key\'s (i) leaves full screen and unfolds the drawer to Info', async () => {
+        const { store, container } = await enterMolecules(false, { medium: true });
+        pickWater(store);
+        await flush();
+        act(() => { store.dispatch(setSurface({ kind: 'esp' })); });
+        fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
+        const shell = container.querySelector('.app-shell') as HTMLElement;
+        fireEvent.click(screen.getByRole('button', { name: 'About Electrostatic potential' }));
+        await flush();
+        expect(shell).not.toHaveClass('is-fullscreen');
+        const heading = screen.getByRole('heading', { level: 2, name: /^Info/ });
+        expect(heading.querySelector('.info-topic-chip')).toHaveTextContent('Electrostatic potential');
+        expect(heading).toHaveFocus();
+    });
 });

@@ -536,7 +536,7 @@ function App() {
     // Task 4: Info's topic -- an (i)'s term until the selection changes (ruling PF4: each mode's selection key).
     const infoTopic = useInfoTopic(useAppSelector(infoSelectionKey));
     // An (i) brings Info on screen where the layout hides it: the phone's Info tab, the folded drawer.
-    const revealInfo = () => {
+    const revealInfoInLayout = () => {
         if (isNarrow) setPhoneTab('info');
         else if (isMedium && !viewPanelOpen) setViewPanelOpen(() => true);
     };
@@ -585,6 +585,29 @@ function App() {
     const fullscreen = useFullscreen(shellRef);
     const fullscreenActive = fullscreen.active;
     const toggleFullscreen = fullscreen.toggle;
+    // Final review I2: full screen hides Info (and the drawer), so an (i) pressed there -- the canvas key's -- leaves full
+    // screen first, as the "Orbital list" tile does (R25-A-I1, below); once it has gone, Info is brought on screen and
+    // asked for focus again (the press's own focus fell on a hidden heading). When it asked, and Info's focus request.
+    const revealInfoAfterFullscreen = useRef<{ at: number; focusInfo: () => void } | null>(null);
+    const revealInfo = (focusInfo: () => void) => {
+        if (fullscreenActive) {
+            revealInfoAfterFullscreen.current = { at: Date.now(), focusInfo };
+            toggleFullscreen();
+            return;
+        }
+        revealInfoInLayout();
+    };
+    useEffect(() => {
+        const asked = revealInfoAfterFullscreen.current;
+        if (fullscreenActive || asked === null) return;
+        revealInfoAfterFullscreen.current = null;
+        // A full screen that did not end at once (a refused exit) and ended later for another reason reveals nothing.
+        if (Date.now() - asked.at >= REVEAL_AFTER_FULLSCREEN_MS) return;
+        revealInfoInLayout();
+        asked.focusInfo();
+        // Only full screen's end runs this; the layout read is the one that render sees.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fullscreenActive]);
     const [helpOpen, setHelpOpen] = useState(false);
     // Task 2: the visit notice, dismissed for the link it was about (fix round 1, M5: every later link says so again).
     const [visitNoticeDismissed, setVisitNoticeDismissed] = useState<number | null>(null);

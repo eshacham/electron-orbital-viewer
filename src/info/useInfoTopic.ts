@@ -42,7 +42,7 @@ interface InfoTopicContextValue extends InfoTopicState {
     requestFocus(): void;
     /** Info's side of `requestFocus`: true once per request. */
     takeFocusRequest(): boolean;
-    /** Bring Info on screen where the layout can hide it (the phone's Info tab, the folded drawer). */
+    /** Bring Info on screen where the layout can hide it (the phone's Info tab, the folded drawer, full screen). */
     reveal(): void;
     /** Info is in the DOM now -- only then may an active (i) name its region in aria-controls (review M1). */
     infoMounted: boolean;
@@ -52,7 +52,12 @@ interface InfoTopicContextValue extends InfoTopicState {
 
 const InfoTopicContext = createContext<InfoTopicContextValue | null>(null);
 
-export const InfoTopicProvider: React.FC<InfoTopicState & { onReveal?(): void; children?: React.ReactNode }> = ({
+/**
+ * `onReveal` brings Info on screen; it is handed `focusInfo`, which asks Info for focus on its heading again -- for a
+ * layout that can only show Info later (final review I2: full screen, which hides Info, is left first, and its exit
+ * lands on its own event), so the focus the (i) asked for lands once Info can take it.
+ */
+export const InfoTopicProvider: React.FC<InfoTopicState & { onReveal?(focusInfo: () => void): void; children?: React.ReactNode }> = ({
     topic, setTopic, onReveal, children,
 }) => {
     const id = useId();
@@ -74,6 +79,12 @@ export const InfoTopicProvider: React.FC<InfoTopicState & { onReveal?(): void; c
     // The layout's latest reveal, read at click time, so a new callback each App render does not churn the context.
     const revealRef = useRef(onReveal);
     useLayoutEffect(() => { revealRef.current = onReveal; });
+    // Final review I2: a later focus request re-renders Info (a new context value) so its layout effect takes it.
+    const [focusTick, setFocusTick] = useState(0);
+    const focusInfo = useCallback(() => {
+        pendingFocus.current = true;
+        setFocusTick(tick => tick + 1);
+    }, []);
     const value = useMemo<InfoTopicContextValue>(() => ({
         topic,
         setTopic,
@@ -90,10 +101,11 @@ export const InfoTopicProvider: React.FC<InfoTopicState & { onReveal?(): void; c
             pendingFocus.current = false;
             return pending;
         },
-        reveal: () => revealRef.current?.(),
+        reveal: () => revealRef.current?.(focusInfo),
         infoMounted: mountedInfo > 0,
         registerInfo,
-    }), [topic, setTopic, activeButtonId, id, mountedInfo, registerInfo]);
+        // focusTick is read by nothing: it is a dependency only so that a later focus request hands Info a new value.
+    }), [topic, setTopic, activeButtonId, id, mountedInfo, registerInfo, focusInfo, focusTick]);
     return React.createElement(InfoTopicContext.Provider, { value }, children);
 };
 
