@@ -170,6 +170,21 @@ export function subscriptMatches(text: string): SubscriptMatch[] {
  * as orbitalPlainName writes it), an irrep's number takes Unicode's subscript digit ("1b₁"), an MO's g or u stays
  * flat ("1σg"): never a "_".
  */
+/**
+ * Task 9 fix round 1: `text` as a screen reader is given it -- label markup and subscripts read flat with plain digits
+ * ("3d_z²" → "3dz²", "1b₁" → "1b1", "H₂O" → "H2O"), as spoken names are (Task 8 ruling M6: Unicode subscript digits are
+ * said inconsistently, "subscript one").
+ */
+export function spokenText(text: string): string {
+    let spoken = '';
+    let last = 0;
+    for (const match of subscriptMatches(text)) {
+        spoken += text.slice(last, match.index) + match.base + match.sub;
+        last = match.index + match.length;
+    }
+    return toAsciiDigits(spoken + text.slice(last));
+}
+
 export function flatSubscripts(text: string): string {
     let flat = '';
     let last = 0;

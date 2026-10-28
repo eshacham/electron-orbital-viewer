@@ -135,6 +135,7 @@ import Inspector, { type InspectorSection } from './shell/Inspector';
 import InfoPanel from './info/InfoPanel';
 import { InfoTopicProvider, useInfoTopic } from './info/useInfoTopic';
 import { infoSelectionKey } from './info/selection_key';
+import { useChangeAnnouncement, useSettledText } from './info/useAnnouncements';
 import TitleBlock from './shell/TitleBlock';
 import ViewportToolbar from './shell/ViewportToolbar';
 import ThumbnailStrip from './shell/ThumbnailStrip';
@@ -151,7 +152,7 @@ import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
 import FirstViewHint from './shell/FirstViewHint';
 import { viewCaption, viewTitle } from './shell/view_title';
 import { withSubscripts } from './format/subscripts';
-import { flatSubscripts } from './format/sci';
+import { flatSubscripts, spokenText } from './format/sci';
 import { useDocumentTitle } from './shell/useDocumentTitle';
 import { useFullscreen } from './shell/useFullscreen';
 import ThemeSwitch from './design/ThemeSwitch';
@@ -570,6 +571,9 @@ function App() {
         () => (isAtomMode ? atomInfo({ atom: atomSliceNow, orbital: orbitalSliceNow }, level) : null),
         [isAtomMode, atomSliceNow, orbitalSliceNow, level],
     );
+    // Task 9 fix round 1: the relativity line is said when the drawn picture's relativity changes for the same species
+    // (keyed by the profile's species), once, as the new picture lands -- never for a new element's own default.
+    const relativitySpoken = useChangeAnnouncement(atomInfoContent?.announce ?? null, atomSliceNow.profile?.speciesKey ?? null);
     const shellRef = useRef<HTMLDivElement>(null);
     const fullscreen = useFullscreen(shellRef);
     const fullscreenActive = fullscreen.active;
@@ -1262,12 +1266,22 @@ function App() {
     // up), the view asked for, "loading…". Typeset by the same helper as the canvas title.
     const viewCaptionText = useAppSelector(
         state => viewCaption(state, { loading: canvasBusyLabel !== null, failed: isBondsMode && Boolean(bondsData.error) }), shallowEqual);
+    // Task 9 fix round 1 (the screen-reader pass): the caption is seen at once, "loading…" included, but said once a view
+    // has settled -- a load used to be heard up to four times ("Molecule · loading…", the molecule, "· loading…", the
+    // molecule) and a relativity re-solve twice. The visible caption is hidden from the tree; its spoken copy, a polite
+    // region mounted with the caption, holds the last settled view, the name with plain digits (Task 8 ruling M6).
+    const captionSettled = /loading…/.test(viewCaptionText.qualifier) ? null
+        : `${spokenText(viewCaptionText.name)} · ${viewCaptionText.qualifier}`;
+    const captionSpoken = useSettledText(captionSettled);
     const phoneCaption = isNarrow && (
-        <p className="phone-caption" aria-live="polite" aria-atomic="true">
-            <span className="phone-caption-name">{withSubscripts(viewCaptionText.name)}</span>
-            {/* A no-break space: a flex item's leading space would collapse. */}
-            <span className="phone-caption-qualifier">{'\u00a0· '}{viewCaptionText.qualifier}</span>
-        </p>
+        <>
+            <p className="phone-caption" aria-hidden="true">
+                <span className="phone-caption-name">{withSubscripts(viewCaptionText.name)}</span>
+                {/* A no-break space: a flex item's leading space would collapse. */}
+                <span className="phone-caption-qualifier">{'\u00a0· '}{viewCaptionText.qualifier}</span>
+            </p>
+            <p className="visually-hidden phone-caption-live" aria-live="polite" aria-atomic="true">{captionSpoken}</p>
+        </>
     );
 
     // A marching-cubes surface is coloured by the sign of ψ, unlike the shell
@@ -1604,6 +1618,8 @@ function App() {
             onScanIndex={handleScanIndex}
             onView={(view: BondsView) => dispatch(setBondsView(view))}
             onDensityIso={(value: number) => dispatch(setDensityIso(value))}
+            // Task 9 fix round 1: on a phone the caption says the loaded view, so the panel's status would say it twice.
+            announceStatus={!isNarrow}
         />
     );
 
@@ -2120,8 +2136,8 @@ function App() {
             {/* Ruling P12: ahead of the title block and toolbar, so the Tab order runs entry → workspace → toolbar. */}
             {isMoleculeMode && requestsShown && <RequestWorkspace returnFocusRef={requestEntryRef} />}
             {canvasBusyLabel && (
-                // Task 8: on a phone the caption under the header announces the wait ("… · loading…"), so this label is
-                // for the eye only there -- a reader hears the change once.
+                // Task 8: on a phone the caption under the header speaks for the canvas (Task 9 fix round 1: the view, once
+                // settled), so this label is for the eye only there -- a reader hears the change once.
                 <div className="canvas-busy" {...(isNarrow ? {} : { role: 'status', 'aria-live': 'polite' })}>
                     <CircularProgress size={22} thickness={5} color="inherit" />
                     <span>{withSubscripts(canvasBusyLabel)}</span>
@@ -2148,9 +2164,10 @@ function App() {
             {/* Task 9 (the screen-reader pass): Task 6 took the relativity readout out of its live region, and a switch
                 press then went unspoken. Info's line (atomInfo's `announce`) is said from here, mounted for the whole
                 of Atom mode -- Info is not mounted in the phone's other tabs or the folded drawer, where the switch is --
-                so the region is in place before its text changes. Info shows the same readout at Advanced. */}
+                so the region is in place before its text changes. Fix round 1: it says the drawn picture's relativity
+                ("Relativity: scalar relativistic") once, as it lands; Info shows the readout's numbers at Advanced. */}
             {isAtomMode && (
-                <p className="visually-hidden relativity-live" aria-live="polite" aria-atomic="true">{atomInfoContent?.announce ?? ''}</p>
+                <p className="visually-hidden relativity-live" aria-live="polite" aria-atomic="true">{relativitySpoken}</p>
             )}
             {isAtomMode && atomUnbound && !(isNarrow && phoneTab !== 'explore') && (
                 <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>

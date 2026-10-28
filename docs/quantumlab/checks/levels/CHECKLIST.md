@@ -11,8 +11,9 @@ science diff is `main` at `468ade0`, which is the merge-base. It was built from 
 - **The Properties card is trimmed** (ruling, concern 4 of Task 7b). Each number has one home, in Info. The card keeps
   multiplicity, geometry, data tier and the structure table.
 - **The phone tier line now appears in Info**, as its last note. On a phone you have to scroll to reach it (item 4).
-- **New in this task:** a relativity change in Atoms is spoken again by a hidden polite line (item 6). It has no visual
-  change.
+- **New in this task (no visual change):** a relativity change in Atoms is spoken again by a hidden polite line,
+  "Relativity: scalar relativistic", once as the new picture lands (item 6). On a phone the caption under the header is
+  now spoken from a hidden copy that says each view once it has settled; the visible caption still shows "loading…".
 
 ## Finish review
 
@@ -46,7 +47,8 @@ $S --task lv-drawer-<explore|research> --run t --level <l> --drawer open --scene
 $S --task lv-phoneinfo-<explore|research> --run p --level <l> --click Info --scenes water,glycine,bonds-n2,c-2pz --themes dark --sizes phone   # item 4
 $S --task lv-landscape --run l --scenes sf6,water --themes dark,light --sizes phone-landscape                             # item 5 (+ research, dark)
 $S --task lv-energy --run e --level research --sweep --scenes water-orbitals,water-esp,basic-stark-n2,bonds-h2plus,na-ion --themes dark --sizes desktop   # item 7
-node tools/design/sr_pass.mjs --port 5413 --level research --sizes desktop,phone                                        # item 6
+node tools/design/sr_pass.mjs --port 5413 --level research --sizes desktop,phone                                        # item 6 (again after fix round 1)
+node tools/design/sr_pass.mjs --root /tmp/levels-main --port 5412 --level research --sizes desktop                      # item 6: did main announce loading?
 ```
 
 **Tool changes:**
@@ -68,7 +70,7 @@ node tools/design/sr_pass.mjs --port 5413 --level research --sizes desktop,phone
   - Every sentence on one side is looked for anywhere in the other side's text for the same scene and size.
   - A sentence found only after the typography rules is reported as (a). Those rules are: subscripts and superscripts
     read flat, U+2212 read as "-", ×10ⁿ read as e-notation, "_" dropped, and no-break or thin spaces read as spaces.
-- **`sr_pass.mjs`** (new): the screen-reader pass. See item 6.
+- **`sr_pass.mjs`** (new): the screen-reader pass; `--root` runs another checkout (the `main` check). See item 6.
 
 The full shot set is in `/tmp/6g1-lv-{research,basics}-<scene>-<theme>-<size>.png`; this folder keeps the ones the
 items cite. I looked at all 96 Step 1 shots, as one contact sheet per scene and level (`/tmp/lv-sheet-<level>-<scene>.png`).
@@ -178,7 +180,7 @@ The scale readout starts 8 px below the caption in both scenes (SF₆ y 130, wat
 hexafluoride · electron density" and "Water · electron density". The Research shots are identical. Shots:
 `item5-sf6-dark-phone-landscape.png` and `item5-water-light-phone-landscape.png`.
 
-### 6. Screen-reader pass — **done by reading the accessibility side live**; one change was unspoken and is fixed (`fix(atoms)`)
+### 6. Screen-reader pass — **done by reading the accessibility side live**; every change is now announced once (`fix(atoms)`, then fix round 1 `fix(a11y)`)
 **Why not VoiceOver:** it cannot be driven non-interactively here. Starting it would speak on the owner's machine
 and take over input.
 
@@ -193,50 +195,90 @@ those. Each mode, at Research on desktop and on phone, is put through these even
 - loading and done;
 - for Atoms only, a relativity change.
 
-The full log is `/tmp/levels-sr-research.txt` (and `.json`).
+**Logs:**
+- `/tmp/levels-sr-research.txt` is the first pass.
+- `/tmp/levels-sr-fix1.txt` is the pass after fix round 1; the table is from it.
+- `/tmp/levels-sr-main.txt` is `main`, read with `--root`.
+
+**After fix round 1** (the counts are what a reader hears per event):
 
 | Mode · size | Selection | (i) open | (i) clear | Loading and done | Relativity (Atoms) |
 |---|---|---|---|---|---|
-| Orbitals · desktop | once: Info live "Info: Hydrogen — 3dxy orbital" | once: focus moves to the heading "Info Orbital" | once: Info live with the title | n = 4: the new title once; **loading not announced** (the busy label is inserted with its text) | — |
-| Atoms · desktop | once (Info live) | once (focus) | once (Info live) | C → C⁺: "charge: C⁺" once; **done not announced** | **was unspoken** (only the busy label, inserted). Now said by the new line: "Solving the scalar-relativistic picture… the picture on screen is still non-relativistic.", then "What changed: 2s contracts by 0.03 % …" |
-| Bonds · desktop | once (Info live) | once (focus) | once (Info live) | R step: "Loading N₂…" and "N₂ at R = 2.12 a₀ loaded.", once each | — |
-| Molecules · desktop | once (Info live, "… — 1b1 orbital") | once (focus) | once (focus moves to "Info"; the restored title is not said) | surface change: the Info title once; **loading not announced**. First load says Info twice ("Info: Water", then "Info: Water (H₂O) — electron density") | — |
-| Orbitals · phone | once: caption "Hydrogen 3dxy · 90 % enclosed" | once (focus) | once (focus moves to "Info") | the caption once | — |
-| Atoms · phone | once (caption) | once (focus) | once (focus) | the caption once, plus "C⁺" from the charge status | **was unspoken** apart from the caption's "· loading…". Now: the readout line twice (solving, what changed) and the caption twice (loading, done) |
-| Bonds · phone | once (caption) | once (focus) | once (focus) | **done said twice**: status "N₂ at R = 2.12 a₀ loaded." and caption "N₂ 3σg · R = 2.12 a₀" | — |
-| Molecules · phone | once (caption "Water 1b1 (HOMO) · 90 % enclosed") | once (focus) | once (focus) | the caption once; first load chats ("Molecule · loading…" → "Water · electron density" → "· loading…" → "Water · electron density") | — |
+| Orbitals · desktop | 1: Info "Info: Hydrogen — 3dxy orbital" | 1: focus moves to the heading "Info Orbital" | 1: Info live with the title | n = 4: 1 (the new title); loading silent, as on main | — |
+| Atoms · desktop | 1 (Info) | 1 (focus) | 1 (Info) | C → C⁺: 1 ("charge: C⁺"); loading and done silent, as on main | **1:** "Relativity: scalar relativistic", when the picture lands |
+| Bonds · desktop | 1 (Info) | 1 (focus) | 1 (Info) | R step: "Loading N₂…" and "N₂ at R = 2.12 a₀ loaded.", 1 each | — |
+| Molecules · desktop | 1 (Info, "… — 1b1 orbital") | 1 (focus) | 1: "Back to Water (H2O) — 1b1 orbital" names the way back; focus moves to "Info" | surface change: 1 (Info); loading silent, as on main. **First load: 1** ("Info: Water (H2O) — electron density") | — |
+| Orbitals · phone | 1: caption "Hydrogen 3dxy · 90 % enclosed" | 1 (focus) | 1 ("Back to Hydrogen — 3dxy orbital", then focus) | 1 (the caption once settled) | — |
+| Atoms · phone | 1 (caption) | 1 (focus) | 1 | C → C⁺: the caption, plus "C⁺" from the charge status (main's status; see below) | **1:** "Relativity: scalar relativistic"; the caption's spoken copy does not change |
+| Bonds · phone | 1 (caption "N2 3σg · R = 2.07 a₀") | 1 (focus) | 1 | **R step: 1** (the caption, "N2 3σg · R = 2.12 a₀"); the panel status is not live on a phone | — |
+| Molecules · phone | 1 (caption "Water 1b1 (HOMO) · 90 % enclosed") | 1 (focus) | 1 | **First load: 1** ("Water · electron density"); a surface change: 1 | — |
 
-**The fix** (`fix(atoms)`), as ledger line 96 allows. `atomInfo` now returns
-`announce: relativityReadoutText(selected, readout)` from Advanced, the level of the switch and the readout, and null
-below it or for a non-relativistic picture. App speaks it from `<p class="visually-hidden relativity-live"
-aria-live="polite" aria-atomic="true">`. That element is mounted for the whole of Atom mode, because Info is not
-mounted in the phone's other sheet tabs or in the folded drawer, which is where the switch is. The line is Info's: the
-same readout is shown in Info's technical band at Advanced.
+**Before fix round 1** (first pass):
+- **Relativity:** a change was unspoken. The first fix made it heard on a phone as the readout twice plus the caption
+  twice.
+- **Bonds on a phone:** said "done" twice (the status and the caption).
+- **Molecules' first load:** said the Info title twice on desktop ("Info: Water", then the real title) and the caption
+  four times on a phone ("Molecule · loading…", the molecule, "· loading…", the molecule).
 
-**Tests:**
-- `tests/info/atom_info.test.ts`: "gives the relativity readout as the line to speak, from Advanced".
-- `src/App.test.tsx`: "speaks the readout from an always-mounted polite line, also on a phone where Info is not on
-  screen" (it checks the same element across a solve), and "has the one spoken line on a desktop too".
+**The fixes:**
+- **Relativity** (`fix(atoms)`, ledger line 96, reworked in fix round 1 per lines 190–196): `atomInfo` returns
+  `announce: "Relativity: <off | scalar relativistic | with spin–orbit>"`. This is the drawn picture's relativity, in
+  the switch's own words, from Advanced.
+  - App says it from `<p class="visually-hidden relativity-live" aria-live="polite" aria-atomic="true">`, which is
+    mounted for the whole of Atom mode. Info is not mounted in the phone's other tabs or in the folded drawer, which is
+    where the switch is.
+  - It is said only when the text changes for the same drawn species (`useChangeAnnouncement`, keyed by the profile's
+    species). So it is said once, when the new picture lands; a new element's own default is not a change.
+  - The readout's numbers stay in Info's technical band. Main said "Solving…" and then "What changed…" (2).
+- **Phone caption:** the visible caption is `aria-hidden` and still shows "· loading…" at once. A hidden polite copy
+  (`.phone-caption-live`, `useSettledText`) holds the last settled view and never says "loading…", so a load and a
+  relativity re-solve are heard once. The name in it uses plain digits ("N2", "H2O"; Task 8 ruling M6).
+- **Bonds status:** on a phone the panel's "… loaded." status is not rendered (`announceStatus={!isNarrow}`). The
+  caption says the loaded view.
+- **Molecules first load:** `moleculeInfo` marks its stand-in (the index name while the meta loads) as
+  `provisional`. InfoPanel never announces a provisional title and announces the real one after it once. Replacing one
+  molecule with another is also heard once.
+- **"Back to …":** its accessible name is "Back to <selection>" with plain digits, e.g. "Back to Water (H2O) —
+  electron density". Info's own announcement uses the same plain digits ("Info: N2 — 3σg orbital").
 
-All three failed first.
+**Desktop loading (ruling line 195):** I checked `main` the same way. `sr_pass.mjs --root /tmp/levels-main`, in a
+detached worktree at 468ade0 that was removed afterwards, gave:
+- Orbitals n = 4: nothing;
+- Atoms C → C⁺: "C⁺" only;
+- Molecules surface changes: nothing.
 
-**Heard flat (subscripts):** the live texts are plain strings, and these are exactly what a reader is given:
+On main too, the canvas busy label is a status region inserted with its text. Main was silent, so loading was left
+as it is.
+
+**Tests:** each failed first, then passed.
+- `tests/info/info_panel.test.tsx`:
+  - "announces a waited-for selection once: never its provisional title, then its real one";
+  - "names the way back after the selection, with plain digits".
+- `tests/info/molecule_info.test.ts`: the stand-in is `provisional`, a loaded molecule is not.
+- `tests/info/atom_info.test.ts`: "gives the drawn picture's relativity as the line to speak, from Advanced".
+- `src/App.test.tsx`:
+  - "says a relativity change once, when it lands, from an always-mounted line -- also on a phone" (the same element;
+    the caption copy unchanged; a new element silent);
+  - "has the one spoken line on a desktop too, quiet on first load";
+  - the phone caption tests: the spoken copy is polite and never says "loading…";
+  - Bonds on a phone has no "… loaded." status.
+- `tests/App.molecules.test.tsx`: the spoken copy stays on the drawn molecule while the next one loads.
+
+**What a reader is given (plain digits):**
 - "Info: Hydrogen — 3dxy orbital"
-- "Info: Carbon — 2py orbital"
-- "Info: N₂ — 3σg orbital"
-- "Info: Water (H₂O) — 1b1 orbital"
-- the phone captions "Hydrogen 3dxy · 90 % enclosed", "N₂ 3σg · R = 2.12 a₀", "Carbon ion C⁺ · electron density"
+- "Info: N2 — 3σg orbital"
+- "Info: Water (H2O) — 1b1 orbital"
+- "Hydrogen 3dxy · 90 % enclosed"
+- "N2 3σg · R = 2.12 a₀"
+- "Water 1b1 (HOMO) · 90 % enclosed"
 
-The orbital subscripts are flattened to plain letters (ruling at ledger line 173). The formula subscripts (N₂, H₂O)
-stay Unicode subscript digits, which VoiceOver reads by character name or as a digit depending on voice settings. The
-accessible names in the tree match: buttons "3dz² orbital", "2pz", "3σg (1 of 1), −0.438 Ha, occupation 2".
+Units keep their typeset form (a₀). The accessible names in the tree match, e.g. buttons "3dz² orbital" and "2pz".
 
-**Recorded, not fixed** (outside this item's one allowed change):
-- desktop loading is silent in Orbitals, Atoms and Molecules (Task 8 made the busy label for the eye on a phone and
-  left it a region inserted with its text on desktop);
-- Bonds on a phone says "done" twice;
-- clearing an (i) by "Back to …" says only "Info";
-- Molecules' first load says the Info title twice on desktop, and the caption four times on a phone.
+**Still recorded:**
+- The charge stepper's own status ("C⁺", from main) speaks beside the phone caption on a charge change.
+- Desktop loading is silent, as on main.
+- Clearing an (i) by "Back to …" moves focus to the heading "Info". The selection is named by the button the reader
+  just pressed.
 
 ### 7. Energies still Ha first on screen — **recorded** (input to the science-corrections step)
 These come from the Research sweeps: 8 scenes, plus water-orbitals, water-esp, the n = 2 Stark field, H₂⁺ and Na⁺.
@@ -273,7 +315,7 @@ Research, for the 8 scenes, with `--sweep`.
 sentence is classified below; a sentence shared by several scenes is listed once.
 
 **Counts:** (a) the 169 auto-classified sentences, plus the 6 by-hand cases listed under (a); (b) every other
-sentence, in the table; **(c) 3**.
+sentence, in the table, and the three Bonds changes below (first reported as (c), now ruled); **(c) 0**.
 
 ### (a) Typography
 - **Auto (169):**
@@ -336,20 +378,23 @@ said explicitly.
 | — | "Library: Curated; geometry from experiment; …" (phone, Info) | Phone tier line: 155 |
 | — | Titles "Carbon — whole atom", "Iron — M shell", "N₂ — total electron density", "CO — 5σ orbital", "Water (H₂O) — electron density", "Glycine (NH₂CH₂COOH) — electron density"; fact labels (Configuration, Enclosed, Iso value, Bond length R, E − E(atoms), Total energy, Orbital energy, Nodes, Energy, Dipole μ, Measured (NIST)); "Info"; (i) names "About …" | Plan Task 4 (Info, InfoButton aria-label) and Tasks 5–7 (titles, facts) |
 
-### (c) Unexplained (reported, not fixed)
-All three are Bonds wording changes. Each is described in the Task 7a report (`task-7a-report.md`, "Moved out of the
-panels" and "How this was computed"). None has a ruling, and the 7a review did not judge any of them. They are low
-severity: no number changed, and the dropped method is still stated in "How this was computed".
+### (b) The three Bonds changes ruled after the first report (ledger lines 185–189)
+The first report listed these three as (c) unexplained. Each is described in the Task 7a report, and the controller
+then ruled them (retroactive ruling, ledger lines 185–189).
 
-1. The density sentence lost its method tag. "Total electron density **(B3LYP/def2-TZVP)**, surface at ρ = 0.002
-   e/a₀³, …" became "Total electron density, surface at ρ = 0.002 e/a₀³, …". The method is still stated in "Orbitals
-   and density: B3LYP/def2-TZVP; …".
-2. The curve's zero gained words. "Zero: N ⁴S + N ⁴S, UCCSD(T)/aug-cc-pVTZ (UHF reference, frozen core)." became
-   "**Plot: E − E(separated atoms), in eV.** Zero: …, **the grey line**." CO's is the same.
-3. The fixed-ρ note gained a clause. "The density is drawn at a fixed ρ, chosen with the ρ buttons beside the
-   orbitals — not at an enclosed fraction." became "… chosen with the ρ buttons — not at an enclosed fraction, **so
-   Electron enclosed does not apply to it**." Dropping "beside the orbitals" is the ruled position-word rule; the
-   added clause is not ruled.
+1. **The density sentence lost its method tag.** "Total electron density **(B3LYP/def2-TZVP)**, surface at ρ = 0.002
+   e/a₀³, …" became "Total electron density, surface at ρ = 0.002 e/a₀³, …".
+   - Ruled at line 186: the tag left the plain band because the method is stated in "How this was computed".
+   - Checked live: N₂'s "How this was computed" reads "Orbitals and density: B3LYP/def2-TZVP; orbital energies are
+     B3LYP/def2-TZVP Kohn–Sham eigenvalues — not ionisation energies." This is for the finish review to confirm.
+2. **The curve's zero gained words.** "Zero: N ⁴S + N ⁴S, UCCSD(T)/aug-cc-pVTZ (UHF reference, frozen core)." became
+   "**Plot: E − E(separated atoms), in eV.** Zero: …, **the grey line**." CO's is the same. Ruled at line 187: the
+   addition follows eV first.
+3. **The fixed-ρ note gained a clause.** "… chosen with the ρ buttons beside the orbitals — not at an enclosed
+   fraction." became "… chosen with the ρ buttons — not at an enclosed fraction, **so Electron enclosed does not apply
+   to it**."
+   - Dropping "beside the orbitals" is the position-word rule (104).
+   - The clause is ruled at line 188: it is the enclosed helper's move.
 
 **An observation for the science read (new text, not a diff):** Bonds' plain lead says "the HOMO: the highest **level**
 that holds electrons". Molecules was changed to "the highest **orbital** that holds electrons" in 7b (I3: "use

@@ -2520,10 +2520,11 @@ describe('App: relativity', () => {
         });
 
         // Task 9 (live check item 6): Task 6 took the readout out of its live region, and the screen-reader pass found
-        // the switch's result unspoken. Info's line is spoken from a polite region that is always mounted in Atom mode --
-        // on a phone the switch is in the Explore tab, where Info is not mounted -- and that stays the same element
-        // while the readout changes, since a region inserted together with its text is not reliably read.
-        it('speaks the readout from an always-mounted polite line, also on a phone where Info is not on screen', () => {
+        // the switch's result unspoken. Fix round 1: a phone then heard it twice (the readout, and the caption's
+        // "loading…"/done), so one line says it, once, when the new picture lands -- "Relativity: with spin–orbit" names
+        // the change -- from a polite region mounted for all of Atom mode (on a phone the switch is in the Explore tab,
+        // where Info is not mounted), the same element throughout: a region inserted with its text is not reliably read.
+        it('says a relativity change once, when it lands, from an always-mounted line -- also on a phone', () => {
             installMatchMedia(true);
             const { container, store } = renderWithProvider(<App />, {
                 mode: 'atom', Z: 79, relativityOverride: 'spinOrbit', isSolving: true, profile: scalarGold(),
@@ -2531,17 +2532,25 @@ describe('App: relativity', () => {
             expect(container.querySelector('.info-section')).toBeNull();
             const live = container.querySelector('.relativity-live')!;
             expect(live).toHaveAttribute('aria-live', 'polite');
-            expect(live).toHaveTextContent('Solving the picture with spin–orbit… the picture on screen is still scalar-relativistic.');
+            // While spin–orbit solves, the scalar picture is still up: nothing has changed yet, so nothing is said.
+            expect(live).toHaveTextContent(/^$/);
+            const caption = container.querySelector('.phone-caption-live')!.textContent;
             act(() => { store.dispatch(solveSucceeded({ ...scalarGold(), relativity: 'spinOrbit' })); });
             expect(container.querySelector('.relativity-live')).toBe(live);
-            expect(live).toHaveTextContent('What changed: 6s contracts by 14.1 % (mean radius ⟨r⟩ 3.21 → 2.76 a₀');
+            expect(live).toHaveTextContent(/^Relativity: with spin–orbit$/);
+            // The caption's spoken copy did not change: the change is heard once.
+            expect(container.querySelector('.phone-caption-live')!.textContent).toBe(caption);
+            // Another element is not a relativity change (its own default): the line stays as it was.
+            act(() => { store.dispatch(setElement(18)); });
+            act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+            expect(live).toHaveTextContent(/^Relativity: with spin–orbit$/);
         });
 
-        it('has the one spoken line on a desktop too, beside the readout Info shows', () => {
+        it('has the one spoken line on a desktop too, quiet on first load; Info shows the readout', () => {
             installMatchMedia(false);
             const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
             expect(container.querySelectorAll('.relativity-live')).toHaveLength(1);
-            expect(container.querySelector('.relativity-live')).toHaveTextContent('What changed: 6s contracts by 14.1 %');
+            expect(container.querySelector('.relativity-live')).toHaveTextContent(/^$/);
             expect(info(container)).toHaveTextContent('What changed: 6s contracts by 14.1 %');
         });
 
@@ -2830,13 +2839,18 @@ describe('App: what is drawn, named (Task 8)', () => {
         return { store, ...utils };
     };
     const caption = () => document.querySelector('.phone-caption') as HTMLElement;
+    const spoken = () => document.querySelector('.phone-caption-live') as HTMLElement;
 
     describe('phone layout: the caption under the header', () => {
         it('names an atom\'s orbital, typeset, and its enclosed fraction, in a polite live region', () => {
             const { store } = open('#mode=atom&Z=18&level=orbital&n=2&l=1&ml=0', true);
             act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
-            expect(caption()).toHaveAttribute('aria-live', 'polite');
+            // Task 9 fix round 1: the visible caption changes at once ("loading…" included); a hidden polite copy says
+            // the view once it has settled, so each change is heard once (the SR pass heard loading/done flicker).
+            expect(caption()).not.toHaveAttribute('aria-live');
+            expect(spoken()).toHaveAttribute('aria-live', 'polite');
             expect(caption()).toHaveTextContent(/^Argon 2pz · 90 % enclosed$/);
+            expect(spoken()).toHaveTextContent(/^Argon 2pz · 90 % enclosed$/);
             expect(caption().innerHTML).toContain('2p<sub>z</sub>');
             expect(caption().textContent).not.toContain('_');
         });
@@ -2871,6 +2885,8 @@ describe('App: what is drawn, named (Task 8)', () => {
             expect(busy).toHaveTextContent('Solving Carbon…');
             expect(busy).not.toHaveAttribute('aria-live');
             expect(busy).not.toHaveAttribute('role');
+            // Task 9 fix round 1: the wait is for the eye; the spoken copy waits for the settled view.
+            expect(spoken()).not.toHaveTextContent(/loading/);
         });
 
         it('names a hydrogen orbital, typeset, and "loading…" while it is computed', () => {
@@ -2878,8 +2894,11 @@ describe('App: what is drawn, named (Task 8)', () => {
             open('#mode=basic&n=3&l=2&ml=0', true);
             expect(caption()).toHaveTextContent(/^Hydrogen 3dz² · 90 % enclosed$/);
             expect(caption().innerHTML).toContain('3d<sub>z²</sub>');
+            expect(spoken()).toHaveTextContent(/^Hydrogen 3dz² · 90 % enclosed$/);
             act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS + 500); });
             expect(caption()).toHaveTextContent(/^Hydrogen 3dz² · loading…$/);
+            // Task 9 fix round 1: "loading…" is not said; the settled view is, once it settles.
+            expect(spoken()).toHaveTextContent(/^Hydrogen 3dz² · 90 % enclosed$/);
         });
 
         it('names the Bonds orbital drawn and its bond length, folding the old header line into it', async () => {
@@ -2888,6 +2907,11 @@ describe('App: what is drawn, named (Task 8)', () => {
             expect(caption().innerHTML).toContain('1π<sub>u</sub>');
             expect(container.querySelector('.bonds-header')).toBeNull();
             expect(container.querySelectorAll('.phone-caption')).toHaveLength(1);
+            // Task 9 fix round 1: on a phone the caption says the loaded view, so the panel's "… loaded." status is not
+            // a second live region (the SR pass heard "done" twice).
+            // Spoken with plain digits (Task 8 ruling M6), once the view has settled.
+            await waitFor(() => expect(spoken()).toHaveTextContent(/^N2 1πu · R = \d\.\d\d a₀$/));
+            expect([...container.querySelectorAll('[role="status"]')].filter(e => /loaded\.$/.test(e.textContent ?? ''))).toHaveLength(0);
         });
 
         it('names the requested Bonds orbital with "loading…" while its files load', async () => {

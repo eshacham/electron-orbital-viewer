@@ -43,9 +43,15 @@ export interface InfoContent {
     notes?: React.ReactNode[];
     computed?: React.ReactNode;
     /**
-     * Task 9 (the screen-reader pass): a line said aloud whenever it changes, not shown -- Atoms' relativity readout,
-     * which Task 6 took out of its live region. App speaks it from a polite region that is always mounted in the mode,
-     * because Info itself is not mounted in the phone's other tabs or the folded drawer, where the switch is.
+     * Task 9 (the screen-reader pass): a line said aloud when it changes, not shown -- Atoms' relativity, "Relativity:
+     * scalar relativistic", which Task 6 took out of its live region. App speaks it from a polite region that is always
+     * mounted in the mode (Info itself is not mounted in the phone's other tabs or the folded drawer, where the switch
+     * is), and only when it changes for the same species (fix round 1: a new element's own default is not a change).
      */
     announce?: string | null;
+    /**
+     * Task 9 fix round 1: a stand-in while the selection loads (a molecule named from the index before its meta lands).
+     * Info never announces it; the real content that follows is announced once, so a load is heard once.
+     */
+    provisional?: boolean;
 }

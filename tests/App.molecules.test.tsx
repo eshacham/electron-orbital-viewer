@@ -847,7 +847,10 @@ describe('Molecules mode', () => {
         pickWater(store);
         const caption = () => document.querySelector('.phone-caption') as HTMLElement;
         expect(caption()).toHaveTextContent(/^Water · electron density$/);
-        expect(caption()).toHaveAttribute('aria-live', 'polite');
+        // Task 9 fix round 1: a hidden polite copy says the settled view; the visible caption is not live.
+        const spoken = () => document.querySelector('.phone-caption-live') as HTMLElement;
+        expect(spoken()).toHaveAttribute('aria-live', 'polite');
+        expect(spoken()).toHaveTextContent(/^Water · electron density$/);
         act(() => { store.dispatch(setSurface({ kind: 'mo', index: 4 })); });
         // Fix round 1 (M2): the role goes with the name.
         expect(caption()).toHaveTextContent(/^Water 1b1 \(HOMO\) · 90 % enclosed$/);
@@ -857,6 +860,9 @@ describe('Molecules mode', () => {
         act(() => { store.dispatch(selectMolecule({ id: 'nh3' })); });
         await act(async () => { await new Promise(r => setTimeout(r, 450)); });
         expect(caption()).toHaveTextContent(/^Ammonia · loading…$/);
+        // Not said while it loads: the next molecule is heard once, when it is on screen (the SR pass heard a first
+        // load four times: "Molecule · loading…", the molecule, "· loading…" again, the molecule).
+        expect(spoken()).toHaveTextContent(/^Water 1b1 \(HOMO\) · 90 % enclosed$/);
     });
 
     // Fix round 1 (M11): the canvas subtitle reads the export's flat 1b₁ and typesets it again, 1b<sub>1</sub>.

@@ -6,7 +6,7 @@
 // opened and cleared, loading and done, and (Atoms) a relativity change -- and what each event made the page say is
 // printed, so "announced exactly once" can be judged per event. Its own Vite and headless Chromium, as shoot.mjs; the
 // /api proxy points at a dead port and every /api request is refused in the browser, so no job can be sent.
-//   node tools/design/sr_pass.mjs [--port 5413] [--level research] [--sizes desktop,phone] [--out /tmp/levels-sr.json]
+//   node tools/design/sr_pass.mjs [--root <checkout>] [--port 5413] [--level research] [--sizes desktop,phone] [--out /tmp/levels-sr.json]
 // A region that appears with its text already in it is logged as `region-added`: screen readers generally do not
 // announce a live region's first content, only later changes to it.
 import { spawn } from 'node:child_process';
@@ -15,7 +15,9 @@ import { writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const arg0 = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
+// --root runs another checkout's app (the `main` baseline: what main announced) with this tool's scenarios.
+const ROOT = resolve(arg0('root', resolve(dirname(fileURLToPath(import.meta.url)), '../..')));
 const PLAYWRIGHT = process.env.PLAYWRIGHT_DIR ?? '/Users/eyalshacham/.npm/_npx/e41f203b7505f1fb/node_modules/';
 const { chromium } = createRequire(PLAYWRIGHT)('playwright');
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
@@ -80,7 +82,7 @@ function watchSpeech() {
   const log = [];
   const last = new Map();
   window.__srLog = log;
-  const label = el => el.getAttribute('aria-label') || `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}`;
+  const label = el => el.getAttribute('aria-label') || `${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).join('.')}`;
   const scan = () => {
     for (const el of document.querySelectorAll('[aria-live]:not([aria-live="off"]), [role="status"], [role="alert"], [role="log"]')) {
       const text = el.textContent.replace(/\s+/g, ' ').trim();
@@ -163,7 +165,7 @@ try {
       }
       // The live regions at rest, and the Info region as the accessibility tree has it (subscripts read flat or not).
       const regions = await page.evaluate(() => [...document.querySelectorAll('[aria-live]:not([aria-live="off"]), [role="status"], [role="alert"], [role="log"]')]
-        .map(el => `${el.getAttribute('aria-label') || `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}`} (${el.getAttribute('aria-live') ?? `role=${el.getAttribute('role')}`})`));
+        .map(el => `${el.getAttribute('aria-label') || `${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).join('.')}`} (${el.getAttribute('aria-live') ?? `role=${el.getAttribute('role')}`})`));
       results.push({ size, mode: scenario.mode, hash: scenario.hash, level, load, events, regions, errors });
       console.log(`\n=== ${scenario.mode} · ${size} · ${level}${errors.length ? `  ERRORS: ${errors.join(' | ')}` : ''}`);
       console.log(`  live regions: ${regions.join('; ')}`);

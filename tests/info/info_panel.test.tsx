@@ -225,6 +225,44 @@ describe('InfoPanel (Task 4)', () => {
             expect(live()).toHaveTextContent(/^$/);
         });
 
+        // Task 9 fix round 1 (SR pass): a molecule's first load said Info's title twice -- the index name while its meta
+        // loaded, then the real title. A provisional title (content still loading) is never announced; the real one that
+        // follows it is, once -- on a first load and when one molecule replaces another.
+        it('announces a waited-for selection once: never its provisional title, then its real one', () => {
+            const live = () => document.querySelector('.info-section [aria-live="polite"]') as HTMLElement;
+            const Loading: React.FC<{ title: string; provisional?: boolean }> = ({ title, provisional }) => (
+                <InfoPanel content={{ ...content, title, provisional }} topic={null} onClearTopic={() => {}} level="explore" />
+            );
+            const { rerender } = render(<Loading title="Molecules" provisional />);
+            rerender(<Loading title="Water" provisional />);
+            expect(live()).toHaveTextContent(/^$/);
+            rerender(<Loading title="Water (H₂O) — electron density" />);
+            // Said with plain digits, as spoken names are (Task 8 ruling M6).
+            expect(live()).toHaveTextContent(/^Info: Water \(H2O\) — electron density$/);
+            rerender(<Loading title="Ammonia" provisional />);
+            expect(live()).toHaveTextContent(/^Info: Water \(H2O\) — electron density$/);
+            rerender(<Loading title="Ammonia (NH₃) — electron density" />);
+            expect(live()).toHaveTextContent(/^Info: Ammonia \(NH3\) — electron density$/);
+        });
+
+        // Task 9 fix round 1: "Back to …" names the selection it returns to, with plain digits (ruling: spoken names keep
+        // ASCII digits -- screen readers say Unicode subscripts inconsistently).
+        it('names the way back after the selection, with plain digits', () => {
+            const Water: React.FC = () => {
+                const { topic, setTopic } = useInfoTopic('water');
+                return (
+                    <InfoTopicProvider topic={topic} setTopic={setTopic}>
+                        <InfoButton topic="pointGroup" label="Point group" />
+                        <InfoPanel content={{ ...content, title: 'Water (H₂O) — electron density' }} topic={topic}
+                            onClearTopic={() => setTopic(null)} level="explore" />
+                    </InfoTopicProvider>
+                );
+            };
+            render(<Water />);
+            fireEvent.click(screen.getByRole('button', { name: 'About Point group' }));
+            expect(screen.getByRole('button', { name: 'Back to Water (H2O) — electron density' })).toBeInTheDocument();
+        });
+
         it('going back to an earlier selection does not bring the old topic back', () => {
             const { rerender } = render(<Harness selectionKey="a" />);
             fireEvent.click(screen.getByRole('button', { name: 'About Subshell' }));

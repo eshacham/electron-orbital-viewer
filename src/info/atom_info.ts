@@ -24,7 +24,7 @@ import {
     SubshellOccupancy, configurationLabelOf, shellsOf, subshellLabel, valenceConfigurationLabelOf, valenceNote,
     valenceShellOf, valenceSubshellsOf,
 } from '../atom/configurations';
-import { defaultRelativityFor, methodStatement, shortMethodLabel } from '../atom/relativity';
+import { defaultRelativityFor, methodStatement, shortMethodLabel, type RelativityMode } from '../atom/relativity';
 import { deltaScfMethod } from '../atom/delta_scf';
 import { NIST_FIRST_IONISATION_EV } from '../atom/ionisation_references';
 import { formatSignedPercent, ieLimitationNote, signedDifferencePercent } from '../atom/ie_accuracy';
@@ -35,7 +35,7 @@ import { shellLetter } from '../orbital_names';
 import { shellName as viewShellName } from '../shell/view_title';
 import {
     aboutModelText, cutHelpText, energyValueText, formatElectrons, ionisationLabelOf, ionisationNoValueReason, jLevelNote,
-    relativityHelp, relativityReadoutNode, relativityReadoutOf, relativityReadoutText, shellName, subshellCapacity,
+    relativityHelp, relativityReadoutNode, relativityReadoutOf, shellName, subshellCapacity,
 } from '../atom/atom_text';
 import { atLeast, CONTROL_LEVEL, IE_LEVEL } from '../levels/levels';
 import { listOf, plural } from '../format/text';
@@ -43,6 +43,9 @@ import InfoButton from './InfoButton';
 import { enclosedFact } from './facts';
 
 const h = React.createElement;
+
+/** A picture's relativity as the switch names it (its buttons' accessible names), for the spoken line. */
+const RELATIVITY_SPOKEN: Record<RelativityMode, string> = { off: 'off', scalar: 'scalar relativistic', spinOrbit: 'with spin–orbit' };
 
 /** What the builder reads: the atom slice, and the orbital slice's enclosed fraction, iso value and cut. */
 export type AtomsInfoState = Pick<RootState, 'atom' | 'orbital'>;
@@ -359,9 +362,9 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
             h('p', null, aboutModelText(selected, picture, profile !== null)),
             h('p', null, deltaScfMethod(picture)),
         ),
-        // Task 9 (the screen-reader pass): the readout above, said aloud when it changes -- from the level that shows the
-        // switch and the readout, so a reader below it is not told about a change they cannot make or see.
-        announce: profile && atLeast(level, CONTROL_LEVEL.relativity)
-            ? relativityReadoutText(selected, relativityReadoutOf(profile)) : null,
+        // Task 9 (the screen-reader pass): what the picture's relativity is, said when it changes -- from the level that
+        // shows the switch. Fix round 1: one line, once, when the new picture lands, named after the switch's own words
+        // ("Relativity: scalar relativistic"); the readout's numbers stay in the technical band.
+        announce: profile && atLeast(level, CONTROL_LEVEL.relativity) ? `Relativity: ${RELATIVITY_SPOKEN[picture]}` : null,
     };
 }

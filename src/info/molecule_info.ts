@@ -154,6 +154,8 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
             plain: molecule.isLoadingMeta ? 'Loading the molecule…'
                 : molecule.error ? 'This molecule did not load.'
                 : 'Choose a molecule to see its electron density, electrostatic potential and orbitals.',
+            // Task 9 fix round 1: the index name stands in until the meta lands; the real title is the one announced.
+            provisional: molecule.selectedId !== null && !molecule.error,
         };
     }
     const { surface, representation } = molecule;

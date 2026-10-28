@@ -1,6 +1,7 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { atLeast, type LearningLevel } from '../levels/levels';
+import { spokenText } from '../format/sci';
 import { glossary } from './glossary';
 import type { InfoContent, InfoTopicId } from './info_types';
 import { useInfoTopicContext } from './useInfoTopic';
@@ -45,6 +46,10 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
     // a new selection, whether or not a topic was open (fix round 1, M5).
     const lastSelection = useRef<string | null>(null);
     const backTitle = useRef<HTMLSpanElement>(null);
+    const backButton = useRef<HTMLButtonElement>(null);
+    // Task 9 fix round 1: a provisional title (the selection still loading) was shown, and the real one has not yet been.
+    const waitedFor = useRef(false);
+    const provisional = Boolean(content.provisional) && !topic;
     const [announcement, setAnnouncement] = useState('');
     // Review M1: an active (i) names Info's region in aria-controls only while Info is in the DOM.
     const registerInfo = context?.registerInfo;
@@ -58,12 +63,23 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
         const focusMoved = Boolean(context?.takeFocusRequest()) || backPressed.current;
         backPressed.current = false;
         if (focusMoved) heading.current?.focus();
+        // Task 9 fix round 1: the way back is named after the selection it returns to, with plain digits ("Back to Water
+        // (H2O) — electron density"); its visible text keeps the typeset title.
+        if (backButton.current) backButton.current.setAttribute('aria-label', `Back to ${spokenText(backTitle.current?.textContent ?? '')}`);
+        // Task 9 fix round 1: a stand-in title while the selection loads is never said, and the real one after it is said
+        // once -- the screen-reader pass heard a molecule's first load as "Info: Water", then "Info: Water (H₂O) — …".
+        if (provisional) {
+            waitedFor.current = true;
+            return;
+        }
+        const waited = waitedFor.current;
+        waitedFor.current = false;
         const chip = heading.current?.querySelector('.info-topic-chip')?.textContent;
-        const shown = `Info: ${chip ?? title.current?.textContent ?? ''}`;
+        const shown = `Info: ${spokenText(chip ?? title.current?.textContent ?? '')}`;
         const selection = (chip === undefined ? title.current : backTitle.current)?.textContent ?? null;
-        const selectionChanged = lastSelection.current !== null && selection !== lastSelection.current;
+        const selectionChanged = waited || (lastSelection.current !== null && selection !== lastSelection.current);
         lastSelection.current = selection;
-        if (lastShown.current === null || shown === lastShown.current) {
+        if (shown === lastShown.current || (lastShown.current === null && !waited)) {
             lastShown.current = shown;
             return;
         }
@@ -93,7 +109,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
             </div>
             {entry ? (
                 <div className="info-body">
-                    <button type="button" className="info-back" onClick={back}>
+                    <button ref={backButton} type="button" className="info-back" onClick={back}>
                         <span aria-hidden="true">‹</span><span>Back to <span ref={backTitle}>{content.title}</span></span>
                     </button>
                     <p className="info-text">{entry.plain}</p>

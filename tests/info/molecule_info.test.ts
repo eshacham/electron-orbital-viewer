@@ -489,5 +489,9 @@ describe('moleculeInfo (Task 7b)', () => {
         expect(container).toHaveTextContent('Loading the molecule…');
         expect(container.querySelector('details.info-computed')).toBeNull();
         unmount();
+        // Task 9 fix round 1: until the meta lands, the title is the index name -- a stand-in Info does not announce,
+        // so the molecule is said once, by its real title (the SR pass heard "Info: Water", then "Info: Water (H₂O) — …").
+        expect(content.provisional).toBe(true);
+        expect(moleculeInfo(moleculeState(), moleculeState().molecule.meta, 'explore').provisional).toBeFalsy();
     });
 });

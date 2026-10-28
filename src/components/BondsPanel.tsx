@@ -27,6 +27,11 @@ export interface BondsPanelProps {
     onScanIndex: (index: number) => void;
     onView: (view: BondsView) => void;
     onDensityIso: (value: number) => void;
+    /**
+     * Task 9 fix round 1: whether the progress status ("N₂ at R = 2.12 a₀ loaded.") is a live region -- true by default;
+     * off on a phone, where the caption under the header says the loaded view, so a reader hears it once.
+     */
+    announceStatus?: boolean;
 }
 
 /**
@@ -36,7 +41,7 @@ export interface BondsPanelProps {
  * controls and short labels -- the energy line, the density label, the MO
  * legend and the bond-order footer are Info's (bondsInfo), with every method.
  */
-const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSystem, onCommitH2PlusR, onScanIndex, onView, onDensityIso }) => {
+const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSystem, onCommitH2PlusR, onScanIndex, onView, onDensityIso, announceStatus = true }) => {
     const isExact = bonds.system === 'h2plus';
     const formula = systemFormula(bonds.system);
     const { scan, meta } = data;
@@ -98,7 +103,7 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
             </FormControl>
 
             {/* Polite, for progress; the Alert below is assertive, for failures. */}
-            <div className="visually-hidden" role="status">{status}</div>
+            {announceStatus && <div className="visually-hidden" role="status">{status}</div>}
             {failure && <Alert severity="error">{failure}</Alert>}
             {data.loading && <LinearProgress aria-label={`Loading ${formula}`} />}
 
