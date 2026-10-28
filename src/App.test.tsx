@@ -1419,10 +1419,11 @@ describe('App', () => {
         expect(screen.getByRole('button', { name: 'Show orbitals' })).toBeInTheDocument();
     });
 
-    // Review Focus 3: at Advanced, the Subshell/Orbital chips used to be the only other picker, and they wait
-    // disabled while a combination is drawn (chipsFrozen) -- so a chip press could never reach this case. The strip
-    // is never frozen, so it is now the one way a pick can land while a combination is active at Advanced+, and it
-    // must leave the combination exactly as a below-Advanced chip press did (ruling T2-I1), not draw over it.
+    // Review Focus 3: at Advanced, the Subshell/Orbital chips used to be the only other picker, and they waited
+    // disabled while a combination was drawn (chipsFrozen) -- so a chip press could never reach this case, and the
+    // strip was the only one that could. The strip must leave the combination exactly as a below-Advanced chip
+    // press did (ruling T2-I1), not draw over it. (Ruling T1 M2, Task 2, later unfroze the n chips too -- see the
+    // App-level test below for that path; this test stays on the strip.)
     // M4 (Task 1 review): runs at Advanced itself (not Research, which the outer describe sets by default), and
     // asserts the orbital is actually drawn (currentField cleared, currentParams the picked orbital), as the
     // T2-I1 test (below Advanced) does -- not state alone.
@@ -1447,6 +1448,29 @@ describe('App', () => {
         expect(store.getState().orbital.basicSelection).toEqual({ n: 2, l: 1, ml: 1 });
         expect(store.getState().orbital.currentField).toBeNull();
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
+    });
+
+    // M4 (Task 2 review, fix round 1): ruling T1 M2 at App level, not through a harness that re-implements
+    // handleBasicPick (as basic_explore.test.tsx's `withPick` does) -- the n chip itself, wired to App's own
+    // onPick, leaves the held combination and draws the corrected selection.
+    it('ruling T1 M2: at Advanced, pressing the n = 3 chip while an n = 2 Stark combination is active leaves it, selects {n:3, l:0, ml:0} and draws it', () => {
+        window.localStorage.setItem('eov.level', 'advanced');
+        const { store } = renderWithProvider(<App />);
+        act(() => { store.dispatch(setBasicSelection({ n: 2, l: 0, ml: 0 })); });
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+
+        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
+        fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
+        fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
+        expect(store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
+
+        const chip = screen.getByRole('button', { name: 'n = 3' });
+        expect(chip).not.toHaveAttribute('aria-disabled', 'true');
+        fireEvent.click(chip);
+        expect(store.getState().orbital.combination.kind).toBe('none');
+        expect(store.getState().orbital.basicSelection).toEqual({ n: 3, l: 0, ml: 0 });
+        expect(store.getState().orbital.currentField).toBeNull();
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 0, ml: 0, Z: 1 });
     });
 });
 

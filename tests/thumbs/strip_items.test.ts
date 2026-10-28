@@ -40,7 +40,7 @@ describe('the atom strip (spec §9.1 "Strip")', () => {
 
 describe('the Basic Orbitals strip (spec §9.2 "Strip", Task 8): n² tiles grouped by l', () => {
     it('lists all 9 of n = 3, grouped 3s (1), 3p (3), 3d (5), mₗ ascending within each group', () => {
-        const items = basicStripItems({ selection: { n: 3, l: 2, ml: 0 }, enclosedFraction: 0.9 });
+        const items = basicStripItems({ n: 3, selected: { l: 2, ml: 0 }, enclosedFraction: 0.9 });
         expect(items).toHaveLength(9);
         expect(items.map(item => item.group)).toEqual(['3s', '3p', '3p', '3p', '3d', '3d', '3d', '3d', '3d']);
         const groupCounts = new Map<string, number>();
@@ -52,18 +52,26 @@ describe('the Basic Orbitals strip (spec §9.2 "Strip", Task 8): n² tiles group
     });
 
     it('lists all 81 of n = 9', () => {
-        expect(basicStripItems({ selection: { n: 9, l: 0, ml: 0 }, enclosedFraction: 0.9 })).toHaveLength(81);
+        expect(basicStripItems({ n: 9, selected: { l: 0, ml: 0 }, enclosedFraction: 0.9 })).toHaveLength(81);
     });
 
     it('marks the selection\'s own tile selected, and no other', () => {
-        const items = basicStripItems({ selection: { n: 3, l: 1, ml: -1 }, enclosedFraction: 0.9 });
+        const items = basicStripItems({ n: 3, selected: { l: 1, ml: -1 }, enclosedFraction: 0.9 });
         expect(items.filter(item => item.selected)).toHaveLength(1);
         expect(items.find(item => item.selected)?.target).toEqual({ n: 3, l: 1, ml: -1 });
     });
 
+    // M1 (Task 2 review, fix round 1): `selected: null` (App passes this while a combination is drawn, ruling T1
+    // M3) says "nothing selected" directly, rather than an impossible `{l: -1}` travelling through the full shape.
+    it('with selected: null, marks no tile selected', () => {
+        const items = basicStripItems({ n: 3, selected: null, enclosedFraction: 0.9 });
+        expect(items).toHaveLength(9);
+        expect(items.some(item => item.selected)).toBe(false);
+    });
+
     // Interfaces produced: THUMB_RESOLUTION (64), Z fixed at 1 (BASIC_ORBITALS_Z).
     it('requests every tile at the strip resolution and Z = 1', () => {
-        const items = basicStripItems({ selection: { n: 4, l: 2, ml: 1 }, enclosedFraction: 0.9 });
+        const items = basicStripItems({ n: 4, selected: { l: 2, ml: 1 }, enclosedFraction: 0.9 });
         for (const item of items) {
             // Task 10: a tile's request is a union now (orbital | field | grid); a Basic tile's is the orbital kind, with params.
             expect(item.thumb.kind === 'orbital' && 'params' in item.thumb.request && item.thumb.request.params).toMatchObject({ resolution: THUMB_RESOLUTION, Z: 1 });
@@ -72,7 +80,7 @@ describe('the Basic Orbitals strip (spec §9.2 "Strip", Task 8): n² tiles group
 
     // Ruling T16-optname (spec §13): "<label> orbital". Task 6: the label is flat ("3px"), never "3p_x".
     it('names every option "<label> orbital"', () => {
-        const items = basicStripItems({ selection: { n: 3, l: 2, ml: 0 }, enclosedFraction: 0.9 });
+        const items = basicStripItems({ n: 3, selected: { l: 2, ml: 0 }, enclosedFraction: 0.9 });
         for (const item of items) expect(item.spoken).toBe(`${item.label} orbital`);
         expect(items.map(item => item.label)).toContain('3px');
     });

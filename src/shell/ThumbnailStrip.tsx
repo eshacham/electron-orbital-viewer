@@ -205,8 +205,10 @@ function ThumbnailStrip<T = NavigationTarget>({
     const effectiveCollapsed = collapsible && collapsed;
     // Ruling DX2: the listbox mounts only while expanded, so `collapsed` re-attaches the roving focus to it.
     useRovingFocus(listRef, { selector: '[role="option"]', orientation: 'horizontal' }, effectiveCollapsed);
-    // Task 2: always called (hooks run unconditionally); its classes only reach the DOM while `groupScroll` is on.
-    const { before, after } = useMoreSideways(listRef);
+    // Task 2 review fix round 1 (I1): `enabled: groupScroll` -- every mode but Orbitals gets no observer and no
+    // listener at all, not just gated classes. `resetKey` is the DX2 pattern above: the listbox remounts on
+    // collapse/expand, and this re-attaches to the fresh node the same way useRovingFocus does.
+    const { before, after } = useMoreSideways(listRef, { enabled: groupScroll, resetKey: effectiveCollapsed });
     const px = variant === 'sheet' ? 56 : 72;
 
     // Bring the shown orbital into view (instant under reduced motion: §4.7)

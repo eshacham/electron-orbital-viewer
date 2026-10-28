@@ -22,8 +22,12 @@
 @media (prefers-reduced-motion: no-preference) { .strip-list { scroll-behavior: smooth; } }
 /* Task 2 (picture control), opt-in (ThumbnailStrip's `groupScroll`, Orbitals only): the list scrolls one subshell
    group at a time -- proximity, not mandatory, so a drag can still stop between groups -- and each group snaps to
-   its start edge. Native snap, not an animation, so reduced motion has nothing to stop. */
-.strip-list.group-scroll { scroll-snap-type: x proximity; }
+   its start edge. Native snap, not an animation, so reduced motion has nothing to stop.
+   Task 2 review fix round 1 (I2): `scroll-padding-inline` matches the 24 px fade. Without it the snap (with the
+   list's own 8 px padding) rested the first group 8 px in -- enough for `has-more-before` to go true and fade a
+   group nothing precedes. 24 px keeps the snapped rest flush with where the fade starts, so "more that way" and
+   "the fade shows" agree at both ends. */
+.strip-list.group-scroll { scroll-snap-type: x proximity; scroll-padding-inline: 24px; }
 .strip-group.strip-group-snap { scroll-snap-align: start; }
 /* The sideways twin of the Tonal Scroll Cue Rule (DESIGN.md): the ~24 px edge with more tiles off screen fades,
    tonal only -- no shadow, arrow or "More" label -- set from useMoreSideways's has-more-before/has-more-after,

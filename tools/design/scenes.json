@@ -9,6 +9,8 @@
   "basic-3dz2": "#mode=basic&n=3&l=2&ml=0",
   "basic-n4": "#mode=basic&n=4&l=2&ml=1",
   "basic-n9": "#mode=basic&n=9&l=8&ml=8",
+  "basic-n9-mid": "#mode=basic&n=9&l=4&ml=0",
+  "basic-n9-s": "#mode=basic&n=9&l=0&ml=0",
   "bonds-n2": "#mode=bonds&system=n2",
   "bonds-co": "#mode=bonds&system=co",
   "bonds-o2": "#mode=bonds&system=o2",

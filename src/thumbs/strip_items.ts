@@ -140,10 +140,13 @@ export function atomStripItems(args: StripArgs): StripItem[] {
  * back tile: the whole n² set is always in view, and a tile dispatches the
  * same `{n, l, ml}` BasicSelection a chip click does (App.tsx's
  * `useDrawOnSelection` debounce draws it 150 ms later).
+ *
+ * Task 2 review fix round 1 (M1): `selected` is `{l, ml} | null`, not a full `BasicSelection` -- App used to pass
+ * `{n, l: -1, ml}` to mean "nothing selected" (while a combination is drawn, ruling T1 M3), an impossible quantum
+ * state travelling through a type the rest of the code treats as real. `null` says the same thing honestly.
  */
-export function basicStripItems(args: { selection: BasicSelection; enclosedFraction: number }): StripItem<BasicSelection>[] {
-    const { selection, enclosedFraction } = args;
-    const { n } = selection;
+export function basicStripItems(args: { n: number; selected: { l: number; ml: number } | null; enclosedFraction: number }): StripItem<BasicSelection>[] {
+    const { n, selected, enclosedFraction } = args;
     const items: StripItem<BasicSelection>[] = [];
     for (let l = 0; l < n; l++) {
         const group = subshellLabel(n, l);
@@ -160,7 +163,7 @@ export function basicStripItems(args: { selection: BasicSelection; enclosedFract
                 group,
                 groupSpoken,
                 target: { n, l, ml },
-                selected: l === selection.l && ml === selection.ml,
+                selected: selected !== null && l === selected.l && ml === selected.ml,
                 thumb: {
                     kind: 'orbital',
                     request: {

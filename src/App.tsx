@@ -290,13 +290,13 @@ function App() {
         (change: Partial<BasicSelection>) => dispatch(setBasicSelection(change)),
         [dispatch]
     );
-    // Ruling T2-I1, and Review Focus 3 (Task 1, picture control): a chip pressed or a strip tile chosen while a
-    // combination is held leaves the combination first, as the ⌘K search's pick does, so the reader always has a way
-    // back to one orbital -- at every level. Below Advanced the chips are the only way to reach this (the picker is
-    // hidden); at Advanced+ the chips wait disabled while a combination is drawn, so the strip is the only picker
-    // left standing, and it must leave a stale combination exactly as a below-Advanced chip press did, not just draw
-    // over it. The selection is completed and corrected here (l < n, |mₗ| ≤ l), so the redraw that leaving the
-    // combination triggers is already of a valid orbital. (No row correction calls this: they use the one above.)
+    // Ruling T2-I1, Review Focus 3 (Task 1, picture control), and ruling T1 M2 (Task 2): a chip pressed or a strip
+    // tile chosen while a combination is held leaves the combination first, as the ⌘K search's pick does, so the
+    // reader always has a way back to one orbital -- at every level, below Advanced or at it. The n chips and the
+    // strip both call this, and neither waits disabled while a combination is drawn (M2 unfroze the chips: two
+    // pickers with different rules would confuse readers). The selection is completed and corrected here (l < n,
+    // |mₗ| ≤ l), so the redraw that leaving the combination triggers is already of a valid orbital. (No row
+    // correction calls this: they use the one above.)
     const handleBasicPick = useCallback((change: Partial<BasicSelection>) => {
         if (combination.kind === 'none') {
             dispatch(setBasicSelection(change));
@@ -980,12 +980,11 @@ function App() {
         [atomProfile, atomUnbound, atomLevel, atomSelectedShell, atomSelectedOrbital, enclosedFraction, palette],
     );
     // Ruling (T1 M3): at Advanced, while a combination is drawn, no tile shows selected -- the combination is what
-    // is drawn, not any single orbital. `l: -1` matches no subshell (basicStripItems' l starts at 0), so every
-    // tile's `selected` comes back false without a second code path in strip_items.ts.
+    // is drawn, not any single orbital. `selected: null` (Task 2 review fix round 1, M1) says so directly, rather
+    // than routing an impossible `{l: -1}` through the full `BasicSelection` shape.
     const basicStrip = useMemo(
         () => (isBasicMode ? basicStripItems({
-            selection: combination.kind === 'none' ? { n, l, ml } : { n, l: -1, ml },
-            enclosedFraction,
+            n, selected: combination.kind === 'none' ? { l, ml } : null, enclosedFraction,
         }) : []),
         [isBasicMode, n, l, ml, enclosedFraction, combination.kind],
     );

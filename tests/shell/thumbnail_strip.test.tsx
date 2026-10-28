@@ -147,6 +147,13 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
         expect(list).toHaveClass('has-more-after');
         expect(list).not.toHaveClass('has-more-before');
 
+        // M6 (Task 2 review, fix round 1): the strip-level test only ever saw has-more-after; scroll to the other
+        // end and see has-more-before too (use_more_sideways.test.tsx already covers the hook's own formula).
+        list.scrollLeft = 500; // 800 - 300 = 500: fully scrolled right.
+        fireEvent.scroll(list);
+        expect(list).toHaveClass('has-more-before');
+        expect(list).not.toHaveClass('has-more-after');
+
         // Without groupScroll (every other strip): none of these classes appear, even with the same overflow.
         rerender(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} />);
         const plain = screen.getByRole('listbox', { name: 'orbitals in view' });
@@ -177,12 +184,12 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
         });
         try {
             // Last in iteration order: n = 9, l = 8 (the highest subshell), mₗ = 8 (the highest within it).
-            const n9 = basicStripItems({ selection: { n: 9, l: 8, ml: 8 }, enclosedFraction: 0.9 });
+            const n9 = basicStripItems({ n: 9, selected: { l: 8, ml: 8 }, enclosedFraction: 0.9 });
             expect(n9).toHaveLength(81);
             render(<ThumbnailStrip items={n9} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} groupScroll />);
-            expect(scrollTo).toHaveBeenCalled();
-            const [{ left }] = scrollTo.mock.calls.at(-1)!;
-            expect(left).toBeGreaterThan(0);
+            // M5 (Task 2 review, fix round 1): the exact value, as the sibling "centres the shown orbital" test
+            // above asserts 386 -- 6000 − (300 − 72) / 2 = 5886.
+            expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ left: 5886 }));
 
             const options = screen.getAllByRole('option');
             expect(options).toHaveLength(81);
@@ -581,7 +588,7 @@ describe('strip tile styles (ruling R20d)', () => {
 // does not change for a T other than NavigationTarget.
 describe('ThumbnailStrip<T> (Task 8): generic over the dispatched target', () => {
     it('renders and dispatches a non-NavigationTarget T (BasicSelection) exactly as it does NavigationTarget', () => {
-        const basicItems = basicStripItems({ selection: { n: 3, l: 2, ml: 0 }, enclosedFraction: 0.9 });
+        const basicItems = basicStripItems({ n: 3, selected: { l: 2, ml: 0 }, enclosedFraction: 0.9 });
         const onSelect = jest.fn();
         render(<ThumbnailStrip items={basicItems} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={onSelect} />);
         expect(screen.getByRole('listbox', { name: 'orbitals in view' })).toBeInTheDocument();
@@ -593,7 +600,7 @@ describe('ThumbnailStrip<T> (Task 8): generic over the dispatched target', () =>
 
     // Task 5: Orbitals' tiles print the orbital's name with a real subscript (OrbitalLabel), not "3d_z²".
     it('labels Orbitals\' tiles with real subscripts', () => {
-        const basicItems = basicStripItems({ selection: { n: 3, l: 2, ml: 0 }, enclosedFraction: 0.9 });
+        const basicItems = basicStripItems({ n: 3, selected: { l: 2, ml: 0 }, enclosedFraction: 0.9 });
         render(<ThumbnailStrip items={basicItems} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} />);
         const label = screen.getByRole('option', { name: '3dz² orbital' }).querySelector('.strip-tile-label')!;
         // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
