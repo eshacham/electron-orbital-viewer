@@ -47,9 +47,11 @@ describe('requiredLevel (spec plan: a view that already holds an Advanced/Explor
         expect(requiredLevel(stateFor('#mode=molecule&id=h2o&struct=space'))).toBe('explore');
     });
 
-    it('bond labels on, in Molecules, is Explore', () => {
+    // Final review I3: bond labels are the reader's own preference (eov.display), never in a link -- they must not raise
+    // a link's level (the notice would call it "for this link"); the held-value line covers them below Explore.
+    it('bond labels on, in Molecules, needs nothing: a preference, not part of the view a link holds', () => {
         displayPref.set({ ...displayPref.get(), moleculeLabels: true });
-        expect(requiredLevel(stateFor('#mode=molecule&id=h2o'))).toBe('explore');
+        expect(requiredLevel(stateFor('#mode=molecule&id=h2o'))).toBe('basics');
     });
 });
 

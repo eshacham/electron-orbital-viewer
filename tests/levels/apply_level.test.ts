@@ -2,6 +2,8 @@ import { createAppStore } from '../../src/store';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys, applyStateTo } from '../../src/url_state';
 import { levelPref, visitLevel, visitAsked, clearVisit, LEVEL_KEY } from '../../src/levels/level_pref';
 import { applyLevelForHash } from '../../src/levels/apply_level';
+import { registerMoleculeUrlKeys } from '../../src/molecules/url_keys';
+import { displayPref } from '../../src/design/presentation';
 
 /**
  * The one helper main.tsx's boot read, its Cognito-return callback, and
@@ -54,6 +56,16 @@ describe('applyLevelForHash (spec plan: the visit-only raise, shared by every ha
     it('a later link with no lvl restores the reader\'s own level', () => {
         apply('#mode=atom&Z=26&charge=2');
         apply('#mode=atom&Z=6');
+        expect(visitLevel()).toBeNull();
+    });
+
+    // Final review I3: a Basics reader's own bond-label preference is not the link's -- no visit level, so no notice
+    // saying "for this link".
+    it('does not raise a Molecules link for the reader\'s own bond-label preference', () => {
+        registerMoleculeUrlKeys();
+        levelPref.set('basics');
+        displayPref.set({ ...displayPref.get(), moleculeLabels: true });
+        apply('#mode=molecule&id=h2o');
         expect(visitLevel()).toBeNull();
     });
 

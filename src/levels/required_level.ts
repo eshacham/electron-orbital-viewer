@@ -2,7 +2,6 @@ import type { RootState } from '../store';
 import { effectiveRelativity } from '../store/atomSlice';
 import { defaultRelativityFor } from '../atom/relativity';
 import { DEFAULT_ENCLOSED_FRACTION } from '../orbital_presets';
-import { displayPref } from '../design/presentation';
 import { isLearningLevel, LearningLevel } from './levels';
 
 /**
@@ -24,14 +23,13 @@ function holdsAdvancedValue(state: RootState): boolean {
 }
 
 /**
- * Whether this state already holds a value only an Explore control can set:
- * a Molecules representation other than ball-and-stick, or its bond/angle
- * labels switched on (`displayPref`, a preference, not part of `RootState`
- * -- presentation.ts's `moleculeLabels`).
+ * Whether this state already holds a value only an Explore control can set: a Molecules representation other than
+ * ball-and-stick. Final review I3: not the bond/angle labels -- they are the reader's own preference (`displayPref`,
+ * never in a link, ruling P9), so they must not raise a link's level; below Explore the Display line's held-value
+ * note says they are on, as it does for the other held preferences.
  */
 function holdsExploreValue(state: RootState): boolean {
-    if (state.atom.mode !== 'molecule') return false;
-    return state.molecule.representation !== 'ball-and-stick' || displayPref.get().moleculeLabels;
+    return state.atom.mode === 'molecule' && state.molecule.representation !== 'ball-and-stick';
 }
 
 /**
