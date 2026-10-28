@@ -138,6 +138,7 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
 
     // --- What it is, in plain words.
     let title: React.ReactNode;
+    let titleTopic: InfoContent['titleTopic'];
     let lead: string;
     // Task 9b (finish review, fix 5): the lead keeps to three lines. What H₂⁺'s orbital does, or how full an MO is and its
     // role, follows the facts (the first note); that H₂⁺ is solved exactly, and an MO's shape, are technical.
@@ -155,6 +156,8 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
             : `In ${label}, the antibonding orbital, the wavefunction has a nodal plane midway between the nuclei, so the electron is kept out of the region between them, and this state does not hold them together.`;
     } else if (density) {
         title = `${formula} — total electron density`;
+        // Final review M3: the title names the term; the (i) beside it opens Electron density.
+        titleTopic = { topic: 'density', label: 'Electron density' };
         const electrons = meta ? electronsIn(meta.orbitals) : null;
         // Fix round 1 (M3): plain words only -- what the surface at this ρ shows, with its numbers, is technical. Task 9b:
         // that the density is all the occupied orbitals together is technical too (review I3: DENSITY_SUM_SENTENCE, one
@@ -235,6 +238,7 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
 
     return {
         title,
+        titleTopic,
         plain: withSubscripts(lead),
         // Task 9b (fix 5): after the facts, at every level -- what H₂⁺'s orbital does (or an MO's electrons and role), B₂
         // and C₂'s rough guide, He₂'s "no bond", and (fix round 1, I1: Cut away is on screen from Basics) what a cut removes.

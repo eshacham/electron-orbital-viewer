@@ -30,6 +30,11 @@ export interface InfoFact {
  */
 export interface InfoContent {
     title: React.ReactNode;
+    /**
+     * Final review M3: a term the title names, whose (i) sits beside it -- a density view's "electron density", the only
+     * place the term is on screen in Info.
+     */
+    titleTopic?: { topic: InfoTopicId; label: string };
     plain: React.ReactNode;
     /** One paragraph, or (Task 6 fix round 1, M7) a list of short paragraphs, one idea each. */
     technical?: React.ReactNode | React.ReactNode[];

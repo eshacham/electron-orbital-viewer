@@ -13,7 +13,7 @@ import React from 'react';
 import type { RootState } from '../store';
 import type { LearningLevel } from '../levels/levels';
 import type { InfoContent, InfoFact } from './info_types';
-import { enclosedFact } from './facts';
+import { enclosedFact, labelWithInfo } from './facts';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { minus } from '../format/sci';
 import { withSubscripts } from '../format/subscripts';
@@ -173,7 +173,8 @@ function orbitalInfo(state: OrbitalsInfoState): InfoContent {
             { label: qLabel('Shell', 'n'), value: String(n) },
             { label: qLabel('Subshell', 'l'), value: `${l} (${letter})` },
             { label: qLabel('Orbital', 'mₗ'), value: signedMl(ml) },
-            { label: 'Nodes', value: `${total} (${radial} radial, ${l} angular)` },
+            // Final review M3: the Nodes fact is where "node" is on screen, so its (i) opens the Node entry.
+            { label: labelWithInfo('Nodes', 'node', 'Nodes'), value: `${total} (${radial} radial, ${l} angular)` },
             { label: 'Energy', value: energyText(energy), min: 'explore' },
             ...enclosedFacts(state, n, l, ml),
         ],

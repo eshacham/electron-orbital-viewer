@@ -18,6 +18,8 @@
   margin: 0; color: var(--ql-color-text-1);
   font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line); font-weight: 600;
 }
+/* Final review M3: a term the title names ("electron density") takes its (i) inline, after a space. */
+.info-title .info-button { margin-left: 2px; vertical-align: -4px; }
 .info-body { display: flex; flex-direction: column; gap: 6px; }
 .info-body:empty { display: none; }
 .info-text {

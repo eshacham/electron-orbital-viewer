@@ -2,6 +2,7 @@ import React, { useId } from 'react';
 import { Chip } from '@mui/material';
 import { tierOf, type MoleculeTier } from '../molecules/types';
 import { tierLine, TIER_LABEL, validatedLine } from '../validation/geometry_honesty';
+import InfoButton from '../info/InfoButton';
 
 // Task 7b fix round 1: the tier's name and line are worded in validation/geometry_honesty.ts (Info says the line on a
 // phone); still exported from here for the callers that read them beside the badge.
@@ -33,10 +34,13 @@ const TierBadge: React.FC<{ meta: BadgeMeta; compact?: boolean }> = ({ meta, com
             </div>
         );
     }
+    // Final review M3: the tier's chip and line are where "data tier" is on screen, so its (i) sits at their end. A
+    // phone's compact chip has none: there Info's last note says the line, and carries the (i) (moleculeInfo).
     return (
         <div className={`tier-badge tier-${tier}`} role="note" aria-label="data tier">
             {chip}
             <span className="tier-badge-line">{line}</span>
+            <InfoButton topic="tier" label="Data tier" place="badge" />
         </div>
     );
 };

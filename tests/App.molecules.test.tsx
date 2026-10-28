@@ -1345,6 +1345,38 @@ describe('Molecules Info (Task 7b)', () => {
             .toHaveTextContent('Electrostatic potential');
     });
 
+    // Final review M3: "electron density" is named in Info's title for the density view, with its (i) beside it; the
+    // tier chip and line on the canvas carry Data tier's.
+    it('the density view\'s title in Info carries the (i) to Electron density', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        const title = container.querySelector('.view-panel .info-title') as HTMLElement;
+        expect(title).toHaveTextContent('electron density');
+        fireEvent.click(within(title).getByRole('button', { name: 'About Electron density' }));
+        expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Electron density');
+    });
+
+    it('the tier on the canvas carries the (i) to Data tier', async () => {
+        const { store, container } = await enterMolecules(false);
+        pickWater(store);
+        await flush();
+        const badge = container.querySelector('.viewport-title .tier-badge') as HTMLElement;
+        fireEvent.click(within(badge).getByRole('button', { name: 'About Data tier' }));
+        expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Data tier');
+    });
+
+    it('on a phone, Info\'s tier note carries the (i) to Data tier', async () => {
+        const { store } = await enterMolecules(true);
+        pickWater(store);
+        await flush();
+        fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
+        const notes = [...screen.getByRole('tabpanel').querySelectorAll('.info-notes')];
+        fireEvent.click(within(notes[notes.length - 1] as HTMLElement).getByRole('button', { name: 'About Data tier' }));
+        expect(within(screen.getByRole('tabpanel')).getByRole('heading', { level: 2, name: /^Info/ }).querySelector('.info-topic-chip'))
+            .toHaveTextContent('Data tier');
+    });
+
     // Final review M9: Info's memo reads only what moleculeInfo reads -- hovering an atom (the slice's `pick`) does not
     // rebuild it (nor, with it, a new ProvenancePanel and InfoPanel's layout pass).
     it('does not rebuild Info when an atom is hovered', async () => {

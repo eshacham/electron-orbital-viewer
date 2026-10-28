@@ -1,4 +1,5 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
+import InfoButton from './InfoButton';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { atLeast, type LearningLevel } from '../levels/levels';
 import { spokenText } from '../format/sci';
@@ -113,7 +114,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                 </h2>
                 {/* Hidden, yet read as the heading's description: the visible title below holds Unicode subscripts. */}
                 {!entry && <span id={spokenTitleId} hidden>{spokenTitle}</span>}
-                {!entry && <p ref={title} className="info-title">{content.title}</p>}
+                {/* Final review M3: a term the title names gets its (i) beside it; the button adds no text, so the spoken
+                    title (read from this paragraph's text) is unchanged. */}
+                {!entry && (
+                    <p ref={title} className="info-title">
+                        {content.title}
+                        {content.titleTopic && <>{' '}<InfoButton topic={content.titleTopic.topic} label={content.titleTopic.label} place="info-title" /></>}
+                    </p>
+                )}
             </div>
             {entry ? (
                 <div className="info-body">

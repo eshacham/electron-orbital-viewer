@@ -1,7 +1,18 @@
 // tests/info/glossary.test.ts -- Task 4: every term an (i) can open is written in the three bands (plain, technical,
 // and optionally full), in the app's typography: no code-style "_" names and a true minus (U+2212) before a number.
+import { readdirSync, readFileSync, statSync } from 'fs';
+import { join, resolve } from 'path';
 import { glossary } from '../../src/info/glossary';
 import { INFO_TOPIC_IDS } from '../../src/info/info_types';
+
+/** Every app source file, tests left out. */
+function sourceFiles(dir: string): string[] {
+    return readdirSync(dir).flatMap(name => {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) return sourceFiles(path);
+        return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
+    });
+}
 
 describe('glossary (Task 4)', () => {
     it('has exactly one entry per InfoTopicId', () => {
@@ -28,5 +39,15 @@ describe('glossary (Task 4)', () => {
         const sentences = (text: string) => text.split(/(?<=[.!?])\s+(?=[A-Z(|ψρμΔ])/).filter(Boolean).length;
         expect([id, sentences(glossary[id].plain) <= 2]).toEqual([id, true]);
         expect([id, sentences(glossary[id].technical) <= 3]).toEqual([id, true]);
+    });
+
+    // Final review M3: an entry no (i) opens is unreachable -- each has an (i) beside its term somewhere on screen:
+    // an InfoButton's `topic`, a fact label's (i) (withInfo's / labelWithInfo's topic argument) or an Orbitals row's
+    // (BasicExplore's rowLabel).
+    it('every entry is opened by some (i)', () => {
+        const source = sourceFiles(resolve(__dirname, '../../src')).map(path => readFileSync(path, 'utf8')).join('\n');
+        const opened = INFO_TOPIC_IDS.filter(id =>
+            new RegExp(`topic(=|:\\s*)["']${id}["']|[wW]ithInfo\\([^,]+,\\s*'${id}'|rowLabel\\('[^']*',.*'${id}'`).test(source));
+        expect(opened).toEqual([...INFO_TOPIC_IDS]);
     });
 });

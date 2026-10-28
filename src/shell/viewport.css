@@ -57,6 +57,14 @@
 /* Ruling T17-key (§3.3): the compact row wraps inside the column's 220 px rather than running off the screen (Pa's
    seven shell rings did, on a phone). Task 6: the cut-face caption is Info's now (atomInfo). */
 .key-column.compact .phase-legend { flex-direction: row; flex-wrap: wrap; padding: 4px 8px; font-size: var(--ql-type-caption-size); }
+/* Final review M3: the ψ key's (i) on Phase, at the key's right as the ESP key's is; the key column takes no pointer,
+   so the (i) takes it back, and the key makes room for its 20 px mark. */
+.key-column .phase-legend.has-info { position: relative; padding-right: 40px; }
+.key-column.compact .phase-legend.has-info { padding-right: 34px; }
+.phase-legend-info {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  display: flex; pointer-events: auto;
+}
 .key-column .shell-ring-key {
   padding: 8px 10px; border-radius: var(--ql-radius-md); background: var(--ql-color-surface-2); color: var(--ql-color-text-1);
 }

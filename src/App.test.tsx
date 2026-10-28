@@ -631,6 +631,16 @@ describe('App', () => {
         expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Ionisation energy');
     });
 
+    // Final review M3: Orbitals' Nodes fact carries the (i) that opens Node in Info.
+    it('in Orbitals, the Nodes fact\'s (i) opens Info on Node', () => {
+        installMatchMedia(false);
+        const { container } = renderWithProvider(<App />);
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+        const info = container.querySelector('.info-section') as HTMLElement;
+        fireEvent.click(within(info).getByRole('button', { name: 'About Nodes' }));
+        expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Node');
+    });
+
     // Task 6 fix round 2 (owner: only one (i) is ever shown pressed) had a second ionisation (i) on the panel's line.
     // Task 9b (fix 2): that line is gone -- Info's fact is the energy's one home -- so its (i) is the only one, and
     // pressing it opens the entry (Info then shows the entry, not the fact). The per-instance rule itself is pinned in
@@ -1007,6 +1017,14 @@ describe('App', () => {
         });
 
         // Task 9's carry: a curve that could not be computed says why, where the curve would be.
+        // Final review M3: the phase key names the sign of ψ, and its (i) opens Phase in Info.
+        it('the phase key\'s (i) opens Info on Phase', () => {
+            const { container } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+            fireEvent.click(within(screen.getByLabelText('surface colour key')).getByRole('button', { name: 'About Phase' }));
+            expect(container.querySelector('.info-topic-chip')).toHaveTextContent('Phase');
+        });
+
         it('shows why the H2+ curve could not be computed', async () => {
             const { container } = renderWithProvider(<App />);
             // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).

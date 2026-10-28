@@ -1,5 +1,6 @@
 import React from 'react';
 import './viewport.css';
+import InfoButton from '../info/InfoButton';
 import type { ViewLevel } from '../store/atomSlice';
 import type { PhaseColours } from '../design/science';
 
@@ -15,13 +16,18 @@ const KeyColumn: React.FC<{ compact?: boolean; children: React.ReactNode }> = ({
  * surface on the view (ruling T16-tilekey: the strip's orbital tiles).
  */
 export const PhaseKey: React.FC<{ positive: string; negative: string; heading?: string; label?: string }> = ({ positive, negative, heading, label = 'surface colour key' }) => (
-    <div className="phase-legend" aria-label={label}>
+    <div className="phase-legend has-info" aria-label={label}>
         {heading && <span className="key-heading">{heading}</span>}
         <span className="phase-legend-item">
             <span className="phase-legend-swatch positive" style={{ background: positive }} />ψ &gt; 0
         </span>
         <span className="phase-legend-item">
             <span className="phase-legend-swatch negative" style={{ background: negative }} />ψ &lt; 0
+        </span>
+        {/* Final review M3: the sign the colours show is Phase's term -- its (i) at the key's right, as the ESP key's. One
+            phase key shows at a time (the surface's, or the tiles' where the surface has none), so one place serves. */}
+        <span className="phase-legend-info">
+            <InfoButton topic="phase" label="Phase" place="legend" />
         </span>
     </div>
 );

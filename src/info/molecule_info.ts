@@ -46,7 +46,7 @@ import { withSubscripts } from '../format/subscripts';
 import { PointGroupLabel } from '../format/PointGroupLabel';
 import ProvenancePanel from '../components/ProvenancePanel';
 import InfoButton from './InfoButton';
-import { DENSITY_SUM_SENTENCE, enclosedFact } from './facts';
+import { DENSITY_SUM_SENTENCE, enclosedFact, labelWithInfo } from './facts';
 
 const h = React.createElement;
 
@@ -79,9 +79,8 @@ export function moleculeInfoSlice(molecule: MoleculeState): MoleculeInfoSlice {
 /** The dipole arrow's sign convention (MoleculeViewOptions, before Task 7b), word for word. */
 export const DIPOLE_CONVENTION = 'The arrow points from − to + (the physics convention), 1 a₀ per debye; many chemistry texts draw it the other way.';
 
-/** A fact's label with its term's (i) -- in Info, so `place` 'info' (another (i) for the term may sit in a panel). */
-const withInfo = (text: string, topic: InfoTopicId, label: string) =>
-    h(React.Fragment, null, text, h(InfoButton, { topic, label, place: 'info' }));
+/** A fact's label with its term's (i) (facts.ts; final review M3 shares it with Orbitals' Nodes fact). */
+const withInfo = labelWithInfo;
 
 /** Short paragraphs, one idea each, typeset; empty ones dropped. */
 function paragraphs(...parts: Array<string | null | false | undefined>): React.ReactNode[] {
@@ -196,8 +195,11 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     let lead: string;
     // Task 9b: an orbital's electrons, role and flags, the first note after the facts (orbitalWords).
     let orbitalMore: string | null = null;
+    // Final review M3: a density view's title names the term; the (i) beside it opens Electron density.
+    let titleTopic: InfoContent['titleTopic'];
     if (surface.kind === 'density') {
         title = `${moleculeTitle(meta)} — electron density`;
+        titleTopic = { topic: 'density', label: 'Electron density' };
         // Task 9b (finish review, fix 5): the lead keeps to three lines -- that the density is all the occupied orbitals
         // together is the technical band's (Task 9b review I3: DENSITY_SUM_SENTENCE).
         lead = `${meta.name} has ${meta.electronCount} electrons; the surface shows where they are likely to be found.`;
@@ -243,10 +245,14 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
         // controls appear at Explore"), so Info never leaves a drawn arrow unexplained.
         molecule.showDipole && hasDipoleArrow(meta) && DIPOLE_CONVENTION,
         surfaceShown && cutAwaySentence(view.surfaceStyle.clipAxis),
-        // Ruling (concern 5): on a phone, the tier line -- its own builder's words -- last, at every level. Fix round 2
-        // (N2): the computed line already says "Computed on request", so it goes without the label.
-        state.tierLineShown && (tier === 'computed' ? tierLine(meta) : `${TIER_LABEL[tier]}: ${tierLine(meta)}`),
     );
+    // Ruling (concern 5): on a phone, the tier line -- its own builder's words -- last, at every level. Fix round 2
+    // (N2): the computed line already says "Computed on request", so it goes without the label. Final review M3: on a
+    // phone this is where the tier is said, so its (i) to Data tier sits at its end.
+    if (state.tierLineShown) {
+        const line = tier === 'computed' ? tierLine(meta) : `${TIER_LABEL[tier]}: ${tierLine(meta)}`;
+        notes.push(h(React.Fragment, null, withSubscripts(line), ' ', h(InfoButton, { topic: 'tier', label: 'Data tier', place: 'info' })));
+    }
 
     // --- Key facts, each from the level that reads it.
     // Ruling (concern 4): each number has one home, Info; the Properties card keeps what Info does not show. No Formula
@@ -297,5 +303,5 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     // --- How this was computed: the provenance, said once (and the owner's time and cost, to the owner alone).
     const computed = h(ProvenancePanel, { meta, ownerJob: state.ownerJob ?? null, ownerJobError: state.ownerJobError ?? null });
 
-    return { title, plain, facts, notes, technical, computed };
+    return { title, titleTopic, plain, facts, notes, technical, computed };
 }
