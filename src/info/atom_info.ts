@@ -284,8 +284,9 @@ function paragraphs(...parts: React.ReactNode[]): React.ReactNode[] {
 
 /** Atoms' Info for the current selection (InfoPanel filters the facts and bands by level). */
 // Every band is written, and InfoPanel shows the ones a level reads; `level` only decides `announce` (Task 9), which no
-// band filters, and (Task 9c, ruling c3) whether a picture-less "How this was computed" explains an energy Info shows. Ruling PF3 keeps it in the signature every mode's builder shares. `state` is the atom and orbital slices
-// (a whole RootState is one too).
+// band filters, and (Task 9c, ruling c3) whether a picture-less "How this was computed" explains an energy Info shows.
+// Ruling PF3 keeps it in the signature every mode's builder shares. `state` is the atom and orbital slices (a whole
+// RootState is one too).
 export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoContent {
     const atom = state.atom;
     const species = speciesOf(atom);

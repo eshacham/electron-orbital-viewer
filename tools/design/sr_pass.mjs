@@ -179,7 +179,7 @@ try {
         // an element nobody operates, e.g. Info's heading) -- not the focus of the control the reader pressed, nor an
         // emptied region, which says nothing. A region inserted with its text is uncertain (see the header), so it is
         // counted apart and never folded into the told count.
-        const operated = /^(button|input|select|textarea|a|div\[button\]|button\[tab\])/;
+        const operated = /^(button|input|select|textarea|a(\[|$)|div\[button\]|button\[tab\])/;
         const live = e.said.filter(s => s.kind === 'live' && !s.hidden && s.text).length;
         const moved = e.said.filter(s => s.kind === 'focus' && !operated.test(s.region)).length;
         e.tally = { told: live + moved, uncertain: e.said.filter(s => s.kind === 'region-added' && !s.hidden).length };
