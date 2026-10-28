@@ -42,4 +42,10 @@ export interface InfoContent {
      */
     notes?: React.ReactNode[];
     computed?: React.ReactNode;
+    /**
+     * Task 9 (the screen-reader pass): a line said aloud whenever it changes, not shown -- Atoms' relativity readout,
+     * which Task 6 took out of its live region. App speaks it from a polite region that is always mounted in the mode,
+     * because Info itself is not mounted in the phone's other tabs or the folded drawer, where the switch is.
+     */
+    announce?: string | null;
 }

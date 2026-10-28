@@ -2519,6 +2519,32 @@ describe('App: relativity', () => {
             expect(info(container)).toHaveTextContent('Solving the picture with spin–orbit… the picture on screen is still scalar-relativistic.');
         });
 
+        // Task 9 (live check item 6): Task 6 took the readout out of its live region, and the screen-reader pass found
+        // the switch's result unspoken. Info's line is spoken from a polite region that is always mounted in Atom mode --
+        // on a phone the switch is in the Explore tab, where Info is not mounted -- and that stays the same element
+        // while the readout changes, since a region inserted together with its text is not reliably read.
+        it('speaks the readout from an always-mounted polite line, also on a phone where Info is not on screen', () => {
+            installMatchMedia(true);
+            const { container, store } = renderWithProvider(<App />, {
+                mode: 'atom', Z: 79, relativityOverride: 'spinOrbit', isSolving: true, profile: scalarGold(),
+            });
+            expect(container.querySelector('.info-section')).toBeNull();
+            const live = container.querySelector('.relativity-live')!;
+            expect(live).toHaveAttribute('aria-live', 'polite');
+            expect(live).toHaveTextContent('Solving the picture with spin–orbit… the picture on screen is still scalar-relativistic.');
+            act(() => { store.dispatch(solveSucceeded({ ...scalarGold(), relativity: 'spinOrbit' })); });
+            expect(container.querySelector('.relativity-live')).toBe(live);
+            expect(live).toHaveTextContent('What changed: 6s contracts by 14.1 % (mean radius ⟨r⟩ 3.21 → 2.76 a₀');
+        });
+
+        it('has the one spoken line on a desktop too, beside the readout Info shows', () => {
+            installMatchMedia(false);
+            const { container } = renderWithProvider(<App />, { mode: 'atom', Z: 79, profile: scalarGold() });
+            expect(container.querySelectorAll('.relativity-live')).toHaveLength(1);
+            expect(container.querySelector('.relativity-live')).toHaveTextContent('What changed: 6s contracts by 14.1 %');
+            expect(info(container)).toHaveTextContent('What changed: 6s contracts by 14.1 %');
+        });
+
         // Ruling P18 (D13): Help's About text (LevelNav variant="about") is
         // whatever App passes it, so it must name the switch's mode -- not
         // the stale picture's -- while also saying the picture is still the

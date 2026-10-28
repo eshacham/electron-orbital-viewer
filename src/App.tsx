@@ -2145,6 +2145,13 @@ function App() {
                     {atomUnbound && phoneTab !== 'explore' && <div className="canvas-unbound">{atomUnbound}</div>}
                 </div>
             )}
+            {/* Task 9 (the screen-reader pass): Task 6 took the relativity readout out of its live region, and a switch
+                press then went unspoken. Info's line (atomInfo's `announce`) is said from here, mounted for the whole
+                of Atom mode -- Info is not mounted in the phone's other tabs or the folded drawer, where the switch is --
+                so the region is in place before its text changes. Info shows the same readout at Advanced. */}
+            {isAtomMode && (
+                <p className="visually-hidden relativity-live" aria-live="polite" aria-atomic="true">{atomInfoContent?.announce ?? ''}</p>
+            )}
             {isAtomMode && atomUnbound && !(isNarrow && phoneTab !== 'explore') && (
                 <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
             )}

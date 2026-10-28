@@ -35,9 +35,9 @@ import { shellLetter } from '../orbital_names';
 import { shellName as viewShellName } from '../shell/view_title';
 import {
     aboutModelText, cutHelpText, energyValueText, formatElectrons, ionisationLabelOf, ionisationNoValueReason, jLevelNote,
-    relativityHelp, relativityReadoutNode, relativityReadoutOf, shellName, subshellCapacity,
+    relativityHelp, relativityReadoutNode, relativityReadoutOf, relativityReadoutText, shellName, subshellCapacity,
 } from '../atom/atom_text';
-import { IE_LEVEL } from '../levels/levels';
+import { atLeast, CONTROL_LEVEL, IE_LEVEL } from '../levels/levels';
 import { listOf, plural } from '../format/text';
 import InfoButton from './InfoButton';
 import { enclosedFact } from './facts';
@@ -285,8 +285,9 @@ function sentences(...parts: React.ReactNode[]): React.ReactNode {
 }
 
 /** Atoms' Info for the current selection (InfoPanel filters the facts and bands by level). */
-// `level` is unused for now: every band is written, and InfoPanel shows the ones a level reads. Ruling PF3 keeps it in
-// the signature every mode's builder shares. `state` is the atom and orbital slices (a whole RootState is one too).
+// Every band is written, and InfoPanel shows the ones a level reads; `level` only decides `announce` (Task 9), which no
+// band filters. Ruling PF3 keeps it in the signature every mode's builder shares. `state` is the atom and orbital slices
+// (a whole RootState is one too).
 export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoContent {
     const atom = state.atom;
     const species = speciesOf(atom);
@@ -358,5 +359,9 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
             h('p', null, aboutModelText(selected, picture, profile !== null)),
             h('p', null, deltaScfMethod(picture)),
         ),
+        // Task 9 (the screen-reader pass): the readout above, said aloud when it changes -- from the level that shows the
+        // switch and the readout, so a reader below it is not told about a change they cannot make or see.
+        announce: profile && atLeast(level, CONTROL_LEVEL.relativity)
+            ? relativityReadoutText(selected, relativityReadoutOf(profile)) : null,
     };
 }

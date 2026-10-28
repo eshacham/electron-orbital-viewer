@@ -300,6 +300,21 @@ describe('atomInfo (Task 6)', () => {
         expect(textOf(solving.computed)).toContain('The picture on screen is still scalar-relativistic; the one with spin–orbit is being solved.');
     });
 
+    // Task 9 (live check item 6): the screen-reader pass found a relativity change unspoken -- Task 6 had moved the
+    // readout out of its live region. Info's builder gives the readout as a line to speak, from Advanced (where the
+    // switch and the readout are), and nothing for a non-relativistic picture, which has nothing to report.
+    it('gives the relativity readout as the line to speak, from Advanced', () => {
+        const change = { n: 6, label: '6s', nonRelativisticMeanRadius: 3.21, relativisticMeanRadius: 2.76, contractionPercent: 14.1 };
+        const gold = profileOf(79, [sub(6, 0, 1, -0.3)], { relativity: 'scalar', valenceS: change });
+        expect(atomInfo(atomsState({ Z: 79, profile: gold }), 'advanced').announce)
+            .toBe('What changed: 6s contracts by 14.1 % (mean radius ⟨r⟩ 3.21 → 2.76 a₀; the outermost occupied s). '
+                + 'Scalar-relativistic LDA (MacDonald–Vosko exchange) against the same species\' non-relativistic LDA.');
+        expect(atomInfo(atomsState({ Z: 79, relativityOverride: 'spinOrbit', isSolving: true, profile: gold }), 'research').announce)
+            .toBe('Solving the picture with spin–orbit… the picture on screen is still scalar-relativistic.');
+        expect(atomInfo(atomsState({ Z: 79, profile: gold }), 'explore').announce).toBeNull();
+        expect(atomInfo(atomsState({ Z: 6, profile: profileOf(6, [sub(2, 1, 2, -0.2)]) }), 'research').announce).toBeNull();
+    });
+
     it('says the j-level basis caveat and the large-component caveat with spin–orbit', () => {
         const lead = profileOf(82, [sub(6, 0, 2, -0.5, 0.5), sub(6, 1, 0.67, -0.15, 0.5), sub(6, 1, 1.33, -0.12, 1.5)], { relativity: 'spinOrbit' });
         const shown = shownAt(atomInfo(atomsState({
