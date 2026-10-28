@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Alert, FormControl, InputLabel, LinearProgress, ListSubheader, MenuItem, Select, Slider, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { BondsState, BondsView } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
@@ -11,6 +11,7 @@ import { frontierOccupied } from '../molecules/orbital_display';
 import { withSubscripts } from '../format/subscripts';
 import InfoButton from '../info/InfoButton';
 import { atLeast, type LearningLevel } from '../levels/levels';
+import { useElementWidth } from '../shell/useElementWidth';
 import MoDiagram from './MoDiagram';
 
 /** The orbital "One orbital" opens onto when none is picked yet: the HOMO, or the SOMO if open-shell (preflight D8's shared resolver). */
@@ -38,16 +39,26 @@ export interface BondsPanelProps {
      * can be pressed. Omitted, everything shows as at Research (no pointer), as BasicExplore's default.
      */
     level?: LearningLevel;
+    /**
+     * Task 3 (picture control): the potential curve, drawn under the R slider in the "Bond length" block. A function is
+     * called with the block's measured width (only once it is above 0), the R to mark -- the slider's draft while it is
+     * dragged, so the marker moves with the thumb -- and a setter for that draft, for a drag on the curve itself (null
+     * drops it, back to the store's R). App passes BondsCurvePlot; a node is drawn as it is.
+     */
+    curve?: React.ReactNode | ((width: number, markerR: number | null, onDraftR: (R: number | null) => void) => React.ReactNode);
 }
 
 /**
  * Bonds mode's navigation: system, geometry, what to draw and the diagram.
- * The potential curve is not here: the layout contract puts it in the view
- * column and the phone's Plot tab (BondsCurvePlot). Task 7a: the panel keeps
- * controls and short labels -- the energy line, the density label, the MO
- * legend and the bond-order footer are Info's (bondsInfo), with every method.
+ * Task 3 (picture control): R's whole story is one "Bond length" block -- the
+ * readout, the slider (the keyboard path) and under it the potential curve
+ * (`curve`), which a tap or drag sets R on -- at every level and width; it
+ * used to be the inspector's Plot tab. Task 7a: the panel keeps controls and
+ * short labels -- the energy line, the density label, the MO legend and the
+ * bond-order footer are Info's (bondsInfo), with every method; E − E(atoms)
+ * at R is Info's fact, its one home, so the block adds no energy readout.
  */
-const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSystem, onCommitH2PlusR, onScanIndex, onView, onDensityIso, announceStatus = true, level = 'research' }) => {
+const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSystem, onCommitH2PlusR, onScanIndex, onView, onDensityIso, announceStatus = true, level = 'research', curve }) => {
     const isExact = bonds.system === 'h2plus';
     const formula = systemFormula(bonds.system);
     const { scan, meta } = data;
@@ -77,6 +88,14 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
 
     // The readout follows the thumb while it is dragged, for a molecule too.
     const shownR = isExact || bonds.R !== null ? draftR : null;
+
+    // Task 3: the curve fills the block's width, measured; nothing is drawn at a guessed one.
+    const lengthId = useId();
+    const blockRef = useRef<HTMLElement>(null);
+    const blockWidth = useElementWidth(blockRef);
+    const curveNode = typeof curve === 'function'
+        ? blockWidth > 0 && curve(blockWidth, shownR, R => setDraftR(R ?? bonds.R ?? draftR))
+        : curve;
 
     const status = data.loading ? `Loading ${formula}…`
         : !isExact && meta && bonds.R !== null ? `${formula} at R = ${bonds.R.toFixed(2)} a₀ loaded.` : '';
@@ -113,34 +132,41 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
             {failure && <Alert severity="error">{failure}</Alert>}
             {data.loading && <LinearProgress aria-label={`Loading ${formula}`} />}
 
-            {shownR !== null && <Typography variant="body2" className="bonds-r">{lengths(shownR)}</Typography>}
-            {isExact ? (
-                <Slider aria-label="Internuclear distance R" size="small" min={H2PLUS_R_RANGE.min} max={H2PLUS_R_RANGE.max} step={0.01}
-                    value={draftR} getAriaValueText={lengths}
-                    onChange={(_, v) => setDraftR(v as number)} onChangeCommitted={(_, v) => onCommitH2PlusR(v as number)} />
-            ) : scan && bonds.R !== null && (
-                <Slider aria-label="Internuclear distance R" size="small" step={null}
-                    min={scan.points[0].RBohr} max={scan.points[scan.points.length - 1].RBohr}
-                    marks={scan.points.map(p => ({ value: p.RBohr }))} value={draftR}
-                    getAriaValueText={v => `${lengths(v)}, point ${nearestScanIndex(scan.points, v) + 1} of ${scan.points.length}`}
-                    onChange={(_, v) => setDraftR(v as number)}
-                    onChangeCommitted={(_, v) => {
-                        const index = nearestScanIndex(scan.points, v as number);
-                        if (index >= 0) onScanIndex(index);
-                    }}
-                    // WAI-ARIA slider: Home and End go to the first and last
-                    // points. MUI with step={null} treats them as one mark
-                    // down or up, so they are taken in the capture phase,
-                    // before its own handler sees them.
-                    slotProps={{ input: { onKeyDownCapture: (event: React.KeyboardEvent<HTMLInputElement>) => {
-                        if (event.key !== 'Home' && event.key !== 'End') return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const index = event.key === 'Home' ? 0 : scan.points.length - 1;
-                        setDraftR(scan.points[index].RBohr);
-                        onScanIndex(index);
-                    } } }} />
-            )}
+            <section className="bonds-length" aria-labelledby={lengthId} ref={blockRef}>
+                <div className="bonds-length-heading-row">
+                    <Typography variant="subtitle2" id={lengthId} className="bonds-length-heading">Bond length</Typography>
+                    <InfoButton topic="potentialCurve" label="Potential energy curve" />
+                </div>
+                {shownR !== null && <Typography variant="body2" className="bonds-r">{lengths(shownR)}</Typography>}
+                {isExact ? (
+                    <Slider aria-label="Internuclear distance R" size="small" min={H2PLUS_R_RANGE.min} max={H2PLUS_R_RANGE.max} step={0.01}
+                        value={draftR} getAriaValueText={lengths}
+                        onChange={(_, v) => setDraftR(v as number)} onChangeCommitted={(_, v) => onCommitH2PlusR(v as number)} />
+                ) : scan && bonds.R !== null && (
+                    <Slider aria-label="Internuclear distance R" size="small" step={null}
+                        min={scan.points[0].RBohr} max={scan.points[scan.points.length - 1].RBohr}
+                        marks={scan.points.map(p => ({ value: p.RBohr }))} value={draftR}
+                        getAriaValueText={v => `${lengths(v)}, point ${nearestScanIndex(scan.points, v) + 1} of ${scan.points.length}`}
+                        onChange={(_, v) => setDraftR(v as number)}
+                        onChangeCommitted={(_, v) => {
+                            const index = nearestScanIndex(scan.points, v as number);
+                            if (index >= 0) onScanIndex(index);
+                        }}
+                        // WAI-ARIA slider: Home and End go to the first and last
+                        // points. MUI with step={null} treats them as one mark
+                        // down or up, so they are taken in the capture phase,
+                        // before its own handler sees them.
+                        slotProps={{ input: { onKeyDownCapture: (event: React.KeyboardEvent<HTMLInputElement>) => {
+                            if (event.key !== 'Home' && event.key !== 'End') return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const index = event.key === 'Home' ? 0 : scan.points.length - 1;
+                            setDraftR(scan.points[index].RBohr);
+                            onScanIndex(index);
+                        } } }} />
+                )}
+                {curveNode}
+            </section>
 
             {isExact ? (
                 <ToggleButtonGroup exclusive size="small" fullWidth aria-label="H₂⁺ state" value={view.kind === 'h2plus' ? view.state : null}

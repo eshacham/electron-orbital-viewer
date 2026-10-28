@@ -1069,8 +1069,14 @@ html, body, #root {
   color: var(--ql-color-text-1);
   font-weight: 600;
 }
-/* Task 7a: the short heading and its (i) on one line. */
-.mo-heading-row {
+/* Task 3 (picture control): the Bond length block's heading, as the MO list's. */
+.bonds-length-heading {
+  color: var(--ql-color-text-1);
+  font-weight: 600;
+}
+/* Task 7a: the short heading and its (i) on one line. Task 3 (picture control): Bond length's too. */
+.mo-heading-row,
+.bonds-length-heading-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1108,6 +1114,25 @@ html, body, #root {
    different symbol, not a style. Same fix as Controls' KEEP_CASE. */
 .bonds-panel .MuiToggleButton-root {
   text-transform: none;
+}
+/* Task 3 (picture control): R's one block -- heading, readout, slider, then the curve that sets R. The curve is in
+   flow here, the block's full width (BondsPanel measures it), not the floating plot card .radial-plot draws elsewhere;
+   the phone sheet's own .radial-plot card rule (above) is undone here too. */
+.bonds-length {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.bonds-length .radial-plot {
+  position: static;
+  width: auto;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 .bonds-captions {
   margin: 0;

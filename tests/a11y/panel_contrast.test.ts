@@ -63,6 +63,12 @@ const PAIRS: Pair[] = [
     { selector: '.mo-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.mo-footer', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.mo-heading', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
+    // Task 3 (picture control): the Bond length block sits on the panel's card, and its curve with it (no plot card of
+    // its own there, .bonds-length .radial-plot) -- the plot's text-2/text-3 ink is paired on surface-1 above already.
+    { selector: '.bonds-length-heading', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
+    { selector: '.bonds-length .radial-plot', declares: ['background: none'], fg: 'text-1', bg: 'surface-1' },
+    { selector: '.potential-axis-label', declares: [`fill: ${v('text-3')}`], fg: 'text-3', bg: 'surface-1' },
+    { selector: '.potential-reference-note', declares: [`color: ${v('success')}`], fg: 'success', bg: 'surface-1' },
     { selector: '.mo-legend', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.side-panel .bonds-panel', declares: [`background-color: ${v('surface-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.bonds-panel', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },

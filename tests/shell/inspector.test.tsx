@@ -229,6 +229,29 @@ describe('Inspector sections (ruling R24-3)', () => {
         expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'false');
     });
 
+    // Task 3 (picture control): a mode with no tabbed section can name one section (`barSection`, Bonds' Data) for the
+    // drawer's bar: its one button opens the drawer on that section, in one press, rather than a lone "View settings".
+    it("gives the bar one button for the named section, which opens the drawer on it and closes it again", () => {
+        act(() => { displayPref.set({ ...DEFAULT_DISPLAY, inspectorOpen: 'display' }); });
+        const onOpenChange = jest.fn();
+        const sections = [displaySection, { key: 'data', title: 'Data', content: <p>data body</p> }];
+        const { rerender } = render(<Inspector variant="drawer" sections={sections} barSection="data" open={false} onOpenChange={onOpenChange} />);
+        expect(screen.queryByRole('button', { name: 'View settings' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Data panel' }));
+        expect(onOpenChange).toHaveBeenLastCalledWith(true);
+        expect(displayPref.get().inspectorOpen).toBe('data');
+        rerender(<Inspector variant="drawer" sections={sections} barSection="data" open onOpenChange={onOpenChange} />);
+        expect(screen.getByRole('region', { name: 'Data' })).toHaveTextContent('data body');
+        // Ruling R24-I1, as for a tab's button: it reflects the open drawer, whatever section is open inside.
+        fireEvent.click(header('Display'));
+        expect(screen.getByRole('button', { name: 'Data panel' })).toHaveAttribute('aria-expanded', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'Data panel' }));
+        expect(onOpenChange).toHaveBeenLastCalledWith(false);
+        // A named section the inspector lacks (Bonds at Basics, where Data is not shown) leaves the View button.
+        rerender(<Inspector variant="drawer" sections={[displaySection]} barSection="data" open={false} onOpenChange={onOpenChange} />);
+        expect(screen.getByRole('button', { name: 'View settings' })).toBeInTheDocument();
+    });
+
     // The open section fills what is left of the inspector and scrolls inside itself, so the headers never scroll away.
     it('lets the open section fill the remaining height and scroll inside itself', () => {
         const css = readFileSync(resolve(__dirname, '../../src/shell/inspector.css'), 'utf8');

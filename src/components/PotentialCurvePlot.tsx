@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useRef } from 'react';
 import { BOHR_TO_ANGSTROM, HARTREE_TO_EV } from '../bonds/systems';
 import { withSubscripts } from '../format/subscripts';
 import { minus } from '../format/sci';
@@ -29,7 +29,20 @@ interface PotentialCurvePlotProps {
     snapRs?: number[];
     referenceR?: { R: number; label: string } | null;
     width: number;
+    /** A tap, or the release of a drag, chooses R (clamped to xRange); the caller snaps it. */
     onSelectR?: (R: number) => void;
+    /**
+     * Task 3 (picture control): each R a drag passes, before its release commits through onSelectR -- so the caller can
+     * move its marker, slider and readout with the pointer while the heavier redraw waits, as a slider drag does. null
+     * when the browser takes the gesture over (a scroll on a touch screen): the drag chose nothing.
+     */
+    onDragR?: (R: number | null) => void;
+    /**
+     * Whether the plot offers its own keyboard control for R (a visually hidden range input). Default true. Task 3: off
+     * under Bonds' R slider, which is the keyboard path there -- two controls for one value would put two R stops in
+     * the Tab order, the hidden one invisible.
+     */
+    keyboardControl?: boolean;
 }
 
 const HEIGHT = 130;
@@ -71,7 +84,7 @@ function nearestIndex(sorted: number[], R: number): number {
 const axisR = (R: number) => String(Number(R.toFixed(2)));
 
 const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
-    title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, width, onSelectR,
+    title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, width, onSelectR, onDragR, keyboardControl = true,
 }) => {
     const clipId = useId();
     const plotWidth = width - PAD.left - PAD.right;
@@ -79,12 +92,47 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     const x = (R: number) => PAD.left + ((R - xRange[0]) / (xRange[1] - xRange[0])) * plotWidth;
     const y = (E: number) => PAD.top + (1 - (E - yRange[0]) / (yRange[1] - yRange[0])) * plotHeight;
 
-    const handleClick = (event: React.MouseEvent<SVGSVGElement>) => {
-        if (!onSelectR) return;
+    /** The R under the pointer, clamped to the plotted range: a tap beside the plot area takes the nearer end. */
+    const pointerR = (event: React.MouseEvent<SVGSVGElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
         const svgX = (event.clientX - rect.left) * (rect.width > 0 ? width / rect.width : 1);
         const R = xRange[0] + ((svgX - PAD.left) / plotWidth) * (xRange[1] - xRange[0]);
-        onSelectR(Math.min(xRange[1], Math.max(xRange[0], R)));
+        return Math.min(xRange[1], Math.max(xRange[0], R));
+    };
+
+    // Task 3 (picture control): a drag. The pointer is captured, so a release beside the plot still ends it here; the
+    // release commits, and the click the browser sends after it is not a second commit.
+    const dragging = useRef(false);
+    const committedOnRelease = useRef(false);
+    const draggable = Boolean(onSelectR && onDragR);
+    const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+        committedOnRelease.current = false;
+        if (!draggable || event.button !== 0) return;
+        dragging.current = true;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        onDragR!(pointerR(event));
+    };
+    const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+        if (dragging.current) onDragR!(pointerR(event));
+    };
+    const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
+        if (!dragging.current) return;
+        dragging.current = false;
+        committedOnRelease.current = true;
+        onSelectR!(pointerR(event));
+    };
+    const handlePointerCancel = () => {
+        if (!dragging.current) return;
+        dragging.current = false;
+        onDragR!(null);
+    };
+    const handleClick = (event: React.MouseEvent<SVGSVGElement>) => {
+        if (!onSelectR) return;
+        if (committedOnRelease.current) {
+            committedOnRelease.current = false;
+            return;
+        }
+        onSelectR(pointerR(event));
     };
 
     // In range only: a series without a value at markerR (an orbital that
@@ -115,7 +163,12 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                 role="img"
                 aria-label={`${title} against R`}
                 onClick={handleClick}
-                style={{ cursor: onSelectR ? 'pointer' : undefined }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
+                // A sideways drag is the plot's; an up-or-down one still scrolls the panel (and cancels the drag).
+                style={{ cursor: onSelectR ? 'pointer' : undefined, touchAction: draggable ? 'pan-y' : undefined }}
             >
                 <defs>
                     <clipPath id={clipId}><rect x={PAD.left} y={PAD.top} width={plotWidth} height={plotHeight} /></clipPath>
@@ -153,9 +206,11 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                 onClick offers only to a mouse -- rather than reimplementing
                 key handling on a role="img" element, which would make that
                 role a lie. This is the keyboard path; the svg click is a
-                mouse-only shortcut over the same callback.
+                mouse-only shortcut over the same callback. Task 3: a caller
+                with its own keyboard control for R (Bonds' R slider) turns it
+                off, keyboardControl={false}.
             */}
-            {onSelectR && (stops.length >= 2 ? (
+            {onSelectR && keyboardControl && (stops.length >= 2 ? (
                 // A scan exists only at its points, which thin out away from
                 // R_e: stepping R by the smallest spacing from a sparse point
                 // landed between it and the next, and the caller's snap sent

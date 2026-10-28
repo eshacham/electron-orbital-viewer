@@ -99,6 +99,79 @@ describe('PotentialCurvePlot', () => {
         expect(onSelectR).toHaveBeenCalledWith(2);
     });
 
+    // Task 3 (picture control), Review Focus 4: a tap left of the plot area takes the range's lower end, one right
+    // of it the upper end -- never an R the curve does not cover.
+    it('clamps a click outside the plot area to the ends of the range', () => {
+        const onSelectR = jest.fn();
+        const { container } = render(<PotentialCurvePlot {...props} onSelectR={onSelectR} />);
+        const svg = container.querySelector('svg')!;
+        fireEvent.click(svg, { clientX: 5, clientY: 50 });
+        expect(onSelectR).toHaveBeenLastCalledWith(0);
+        fireEvent.click(svg, { clientX: 299, clientY: 50 });
+        expect(onSelectR).toHaveBeenLastCalledWith(4);
+    });
+
+    // Task 3 (picture control): under Bonds' R slider the slider is the keyboard path, so the curve does not offer
+    // a second, hidden one for the same value -- Tab reaches one R control, not two.
+    it('leaves out its hidden range input when the caller has a keyboard control of its own', () => {
+        render(<PotentialCurvePlot {...props} onSelectR={jest.fn()} keyboardControl={false} />);
+        expect(screen.queryByRole('slider')).toBeNull();
+        expect(document.querySelector('input')).toBeNull();
+    });
+
+    // Task 3 (picture control), spec §3 "Dragging or tapping on the curve sets R": a drag reports each R it passes as
+    // a draft (onDragR), and only the release commits (onSelectR) -- once, though a click follows the pointerup.
+    describe('dragging', () => {
+        // jsdom has no PointerEvent; a MouseEvent with a pointerId is all the plot reads.
+        const original = (window as { PointerEvent?: unknown }).PointerEvent;
+        beforeAll(() => {
+            (window as { PointerEvent?: unknown }).PointerEvent = class extends MouseEvent {
+                pointerId: number;
+                constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; }
+            };
+        });
+        afterAll(() => { (window as { PointerEvent?: unknown }).PointerEvent = original; });
+        const at = (fraction: number) => ({ clientX: 34 + 258 * fraction, clientY: 50, pointerId: 1, button: 0 });
+
+        it('reports drafts while dragged and commits once on release', () => {
+            const onSelectR = jest.fn();
+            const onDragR = jest.fn();
+            const { container } = render(<PotentialCurvePlot {...props} onSelectR={onSelectR} onDragR={onDragR} />);
+            const svg = container.querySelector('svg')!;
+            fireEvent.pointerDown(svg, at(0.25));
+            expect(onDragR).toHaveBeenLastCalledWith(1);
+            fireEvent.pointerMove(svg, at(0.5));
+            expect(onDragR).toHaveBeenLastCalledWith(2);
+            // Dragged past the plot's left edge: clamped, as a click is.
+            fireEvent.pointerMove(svg, { ...at(0), clientX: 0 });
+            expect(onDragR).toHaveBeenLastCalledWith(0);
+            expect(onSelectR).not.toHaveBeenCalled();
+            fireEvent.pointerUp(svg, at(0.75));
+            expect(onSelectR).toHaveBeenCalledTimes(1);
+            expect(onSelectR).toHaveBeenLastCalledWith(3);
+            fireEvent.click(svg, at(0.75));
+            expect(onSelectR).toHaveBeenCalledTimes(1);
+            // A move with no button down is a hover, not a drag.
+            onDragR.mockClear();
+            fireEvent.pointerMove(svg, at(0.5));
+            expect(onDragR).not.toHaveBeenCalled();
+            // The next plain click commits again.
+            fireEvent.click(svg, at(0.5));
+            expect(onSelectR).toHaveBeenCalledTimes(2);
+        });
+
+        it('drops the draft when the browser takes the gesture (a scroll), committing nothing', () => {
+            const onSelectR = jest.fn();
+            const onDragR = jest.fn();
+            const { container } = render(<PotentialCurvePlot {...props} onSelectR={onSelectR} onDragR={onDragR} />);
+            const svg = container.querySelector('svg')!;
+            fireEvent.pointerDown(svg, at(0.25));
+            fireEvent.pointerCancel(svg, at(0.25));
+            expect(onDragR).toHaveBeenLastCalledWith(null);
+            expect(onSelectR).not.toHaveBeenCalled();
+        });
+    });
+
     // Final review M9: the plot, its caption and text alternative are one named figure.
     it('is a named figure', () => {
         render(<PotentialCurvePlot {...props} />);

@@ -31,6 +31,7 @@ import { thumbnailService } from './thumbs/ThumbnailService';
 import { GLOW_SETTLE_MS } from './design/glow_pref';
 import { clearVisit } from './levels/level_pref';
 import { FIXED_RHO_NOTE } from './info/bonds_info';
+import { nearestScanIndex } from './bonds/systems';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -80,6 +81,12 @@ jest.mock('./workers/createExportWorker', () => ({ createExportWorker: jest.fn()
 jest.mock('./workers/createH2PlusCurveWorker', () => ({
     createH2PlusCurveWorker: jest.fn(() => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null })),
 }));
+
+// Task 3 (picture control): Bonds' curve is drawn at its block's measured width (useElementWidth, a ResizeObserver),
+// and nothing before. jsdom lays nothing out and has no ResizeObserver, so the block is "measured" at a fixed width
+// here; tests/shell/use_element_width.test.tsx and tests/bonds/bonds_panel.test.tsx cover the measuring itself.
+const mockCurveWidth = 268;
+jest.mock('./shell/useElementWidth', () => ({ useElementWidth: () => mockCurveWidth }));
 
 // Bonds mode loads a molecule's files lazily (useBondsData); here they come
 // from the committed N₂ fixtures instead of the network. The rest of the
@@ -989,16 +996,17 @@ describe('App', () => {
             fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'h2plus', R: 2, state: '1sigma_g' });
             expect(screen.getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
-            // Layout contract §3.8: the panel down the left, the curve under the controls on the right.
+            // Task 3 (picture control): the panel down the left, with the curve in it under the R slider (layout contract
+            // §3.8 had it under the controls on the right); the inspector keeps Data.
             expect(container.querySelector('.side-panel .bonds-panel')).not.toBeNull();
             const inspector = container.querySelector('.view-panel') as HTMLElement;
-            expect(within(inspector).getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
+            expect(within(container.querySelector('.side-panel') as HTMLElement).getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
+            expect(within(inspector).queryByText('Computing the exact H₂⁺ curves…')).toBeNull();
             expect(screen.getByLabelText('surface colour key')).toHaveTextContent('ψ > 0');
             // Task 7a: the methods list ("Exact within Born–Oppenheimer …") is Info's "How this was computed" now
             // (bondsInfo; open at this block's Research level), not the Data tab's -- fix round 1 (ruling I5): H₂⁺'s
             // Data tab holds its exact levels instead -- and still never in the side panel.
-            fireEvent.click(within(inspector).getByRole('tab', { name: 'Data' }));
-            expect(within(inspector).getByText(/Exact levels/)).toBeInTheDocument();
+            expect(within(inspector).getByRole('region', { name: 'Data' })).toHaveTextContent(/Exact levels/);
             expect(inspector.querySelector('.bonds-frontier')).not.toHaveTextContent(/Born–Oppenheimer/);
             expect(within(container.querySelector('.info-computed') as HTMLElement).getByText(/Exact within Born–Oppenheimer/)).toBeInTheDocument();
             expect(container.querySelector('.side-panel')?.textContent).not.toMatch(/Exact within Born–Oppenheimer/);
@@ -1032,7 +1040,8 @@ describe('App', () => {
             fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             const worker = (createH2PlusCurveWorker as jest.Mock).mock.results[0].value;
             await act(async () => { worker.onmessage({ data: { type: 'error', message: 'no root in the bracket' } }); });
-            expect(within(container.querySelector('.view-panel') as HTMLElement).getByRole('alert'))
+            // Task 3 (picture control): said where the curve would be -- the Bond length block in the left panel.
+            expect(within(screen.getByRole('region', { name: 'Bond length' })).getByRole('alert'))
                 .toHaveTextContent('The H₂⁺ potential curves could not be computed: no root in the bracket');
         });
 
@@ -1110,9 +1119,10 @@ describe('App', () => {
             expect(screen.getByRole('combobox', { name: /electron enclosed/i }).closest('.MuiFormControl-root')!
                 .querySelector('.MuiFormHelperText-root')).toBeNull();
             expect(container.querySelector('.info-section')).toHaveTextContent(FIXED_RHO_NOTE);
-            openInspectorSection('Plot and data');
-            expect(within(container.querySelector('.view-panel') as HTMLElement)
+            // Task 3 (picture control): the curve is the left panel's, under the R slider, not the inspector's.
+            expect(within(container.querySelector('.side-panel') as HTMLElement)
                 .getByLabelText('potential energy curve')).toBeInTheDocument();
+            expect(within(container.querySelector('.view-panel') as HTMLElement).queryByLabelText('potential energy curve')).toBeNull();
         });
 
         // Fix round 1, I1 and M2: the key, the fraction select and the
@@ -1270,14 +1280,104 @@ describe('App', () => {
             }
         });
 
-        it('on a phone: the header names the system and R, and the sheet has Explore, Info, View and Plot', async () => {
+        // Task 3 (picture control), Review Focus 4: the curve under the R slider sets R through the slider's own commit
+        // paths -- a scan system's nearest point (the one the slider would choose), H₂⁺'s 0.01 a₀ step -- clamps a tap
+        // outside its range to the range's end, and He₂ (no well, so no Rₑ line) still takes taps.
+        describe('the curve sets R (Review Focus 4)', () => {
+            /** The pixel PotentialCurvePlot draws R at on the measured block (34 px left padding, 8 right). */
+            const pixelFor = (R: number, [lo, hi]: [number, number]) => 34 + ((R - lo) / (hi - lo)) * (mockCurveWidth - 42);
+            const curveSvg = () => within(screen.getByRole('region', { name: 'Bond length' })).getByRole('img', { name: /against R/ });
+            const n2Range: [number, number] = [n2Scan.points[0].RBohr, n2Scan.points[n2Scan.points.length - 1].RBohr];
+
+            it('N₂: a tap at R = 2.4 a₀ commits the scan point the slider would choose; one left of the plot, the first', async () => {
+                const { store } = renderWithProvider(<App />);
+                fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+                chooseSystem('N₂ — Nitrogen');
+                await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
+                const expected = nearestScanIndex(n2Scan.points, 2.4);
+                expect(expected).not.toBe(7);
+                fireEvent.click(curveSvg(), { clientX: pixelFor(2.4, n2Range) });
+                expect(store.getState().bonds).toMatchObject({ scanIndex: expected, R: n2Scan.points[expected].RBohr });
+                // The slider and the marker agree with what was committed.
+                expect(screen.getByRole('slider', { name: 'Internuclear distance R' }))
+                    .toHaveAttribute('aria-valuetext', expect.stringMatching(new RegExp(`point ${expected + 1} of ${n2Scan.points.length}$`)));
+                expect(Number(screen.getByRole('region', { name: 'Bond length' }).querySelector('.potential-marker')!.getAttribute('x1')))
+                    .toBeCloseTo(pixelFor(n2Scan.points[expected].RBohr, n2Range), 6);
+                fireEvent.click(curveSvg(), { clientX: 2 });
+                expect(store.getState().bonds.scanIndex).toBe(0);
+                // Let the committed point's files land and draw, inside the test.
+                await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
+                    .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@00' }));
+            });
+
+            it('H₂⁺: a tap commits R on its 0.01 a₀ step; one left of the plot, the range minimum', async () => {
+                const { store } = renderWithProvider(<App />);
+                fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+                const worker = (createH2PlusCurveWorker as jest.Mock).mock.results[0].value;
+                await act(async () => {
+                    worker.onmessage({ data: {
+                        type: 'curveSuccess', R: [0.5, 1, 2, 4, 10], sigmaG: [0.27, -0.45, -0.6026, -0.546, -0.5005],
+                        sigmaU: [2.3, 0.6, -0.1675, -0.4686, -0.5], equilibrium: { R: 1.9971924, totalEnergy: -0.6026346 },
+                    } });
+                });
+                fireEvent.click(curveSvg(), { clientX: pixelFor(3.1234, [0.5, 10]) });
+                expect(store.getState().bonds.R).toBe(3.12);
+                expect(store.getState().orbital.currentField?.sources[0].recipe).toEqual({ type: 'h2plus', R: 3.12, state: '1sigma_g' });
+                fireEvent.click(curveSvg(), { clientX: 0 });
+                expect(store.getState().bonds.R).toBe(0.5);
+            });
+
+            it('He₂: the curve has no Rₑ line and still commits a tap', async () => {
+                // N₂'s points with He₂'s defining trait: no bound well (diatomicCurveSpec then marks no Rₑ).
+                (loadScan as jest.Mock).mockResolvedValue({ ...n2Scan, id: 'he2', formula: 'He₂', fit: { ...n2Scan.fit, bound: false } });
+                const { store } = renderWithProvider(<App />);
+                fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+                chooseSystem('He₂ — Helium dimer');
+                await waitFor(() => expect(store.getState().bonds.scanIndex).not.toBeNull());
+                const block = screen.getByRole('region', { name: 'Bond length' });
+                expect(within(block).getByRole('figure', { name: 'potential energy curve' })).toBeInTheDocument();
+                expect(block.querySelector('.potential-reference')).toBeNull();
+                fireEvent.click(curveSvg(), { clientX: pixelFor(n2Scan.points[12].RBohr, n2Range) });
+                expect(store.getState().bonds).toMatchObject({ system: 'he2', scanIndex: 12, R: n2Scan.points[12].RBohr });
+                // Let the committed point's files land and draw, inside the test.
+                await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
+                    .toEqual({ type: 'gaussianDensity', moleculeId: 'he2@12' }));
+            });
+        });
+
+        // Task 3 (picture control), spec §6: the curve shows at every level, Basics included, in the left panel; the
+        // inspector has no "Plot and data" for Bonds at any level, and its Data section appears from Explore -- below
+        // that, the Display line says so, not that "the plot" appears (it is on screen).
+        it('shows the curve in the left panel at every level, and Data in the inspector from Explore', async () => {
+            for (const level of ['basics', 'explore', 'advanced', 'research']) {
+                window.localStorage.setItem('eov.level', level);
+                const { store, container, unmount } = renderWithProvider(<App />);
+                fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+                chooseSystem('N₂ — Nitrogen');
+                await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
+                const side = container.querySelector('.side-panel') as HTMLElement;
+                const block = within(side).getByRole('region', { name: 'Bond length' });
+                expect([level, within(block).queryByRole('figure', { name: 'potential energy curve' }) !== null]).toEqual([level, true]);
+                const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+                expect([level, within(inspector).queryByRole('button', { name: 'Plot and data' })]).toEqual([level, null]);
+                expect([level, within(inspector).queryByRole('button', { name: 'Data' }) !== null]).toEqual([level, level !== 'basics']);
+                expect([level, within(inspector).queryByText('Data appears at Explore') !== null]).toEqual([level, level === 'basics']);
+                expect(within(inspector).queryByText(/The plot/)).toBeNull();
+                unmount();
+                act(() => { window.localStorage.removeItem('eov.display'); clearVisit(); });
+            }
+        });
+
+        // Task 3 (picture control): the sheet's fourth tab keeps its key ('plot') but reads "Data" -- the curve is in Explore,
+        // under the R slider, as on the desktop.
+        it('on a phone: the header names the system and R, and the sheet has Explore, Info, View and Data', async () => {
             installMatchMedia(true);
             const { store } = renderWithProvider(<App />);
             fireEvent.click(screen.getByRole('button', { name: /^Mode: / })); // spec §9.8
             // Unanchored: rail items are named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
             fireEvent.click(screen.getByRole('button', { name: /bonds mode/ }));
             // Task 4: Info is the sheet's second tab in every mode.
-            expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'Info', 'View', 'Plot']);
+            expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Explore', 'Info', 'View', 'Data']);
             fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
             chooseSystem('N₂ — Nitrogen');
             await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
@@ -1288,8 +1388,12 @@ describe('App', () => {
             const sheetStrip = await within(screen.getByRole('tabpanel')).findByRole('listbox', { name: 'orbitals in view' });
             expect(sheetStrip.closest('.thumbnail-strip')).toHaveClass('sheet');
             expect(sheetStrip.compareDocumentPosition(screen.getByLabelText('molecular orbital energy diagram')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-            fireEvent.click(screen.getByRole('tab', { name: 'Plot' }));
-            expect(within(screen.getByRole('tabpanel')).getByLabelText('potential energy curve')).toBeInTheDocument();
+            const block = within(screen.getByRole('tabpanel')).getByRole('region', { name: 'Bond length' });
+            expect(within(block).getByLabelText('potential energy curve')).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
+            expect(within(screen.getByRole('tabpanel')).queryByLabelText('potential energy curve')).toBeNull();
+            expect(within(screen.getByRole('tabpanel')).getByRole('heading', { level: 2, name: 'Data' })).toBeInTheDocument();
+            expect(screen.getByRole('tabpanel')).toHaveTextContent(/HOMO 3σg/);
         });
 
         // Task 7a (plan Step 1): at Basics the Bonds screen names no method -- CCSD(T) and the T1 diagnostic are said
@@ -1314,19 +1418,22 @@ describe('App', () => {
             expect(page.textContent).not.toMatch(/T1 diagnostic/);
         });
 
-        // Task 7a fix round 1 (ruling I5): H₂⁺, Bonds' opening view, keeps a Data tab, so the medium-width drawer keeps
-        // its one-press Plot button (the bar names a tabbed section's tabs; with none it would be "View settings" alone).
-        it('at medium width, offers H₂⁺ the drawer\'s Plot panel button, which opens it on the curve', () => {
+        // Task 7a fix round 1 (ruling I5): H₂⁺, Bonds' opening view, keeps its Data, with real content (its exact levels).
+        // Task 3 (picture control): the Plot tab is gone (the curve is the left panel's), so the medium-width drawer's
+        // one-press button is Data's (Inspector's barSection) -- not a lone "View settings".
+        it('at medium width, offers H₂⁺ the drawer\'s Data panel button, which opens it on the exact levels', () => {
             window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
                 addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
             const { container } = renderWithProvider(<App />);
             fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('folded');
-            expect(screen.getByRole('button', { name: 'Data panel' })).toBeInTheDocument();
-            fireEvent.click(screen.getByRole('button', { name: 'Plot panel' }));
+            expect(screen.queryByRole('button', { name: 'Plot panel' })).toBeNull();
+            expect(screen.queryByRole('button', { name: 'View settings' })).toBeNull();
+            fireEvent.click(screen.getByRole('button', { name: 'Data panel' }));
             expect(container.querySelector('#canvas-container .view-panel')).toHaveClass('open');
-            expect(screen.getByRole('tab', { name: 'Plot' })).toHaveAttribute('aria-selected', 'true');
-            expect(screen.getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
+            expect(screen.getByRole('region', { name: 'Data' })).toHaveTextContent(/Exact levels/);
+            // The curve stays in the left panel, under the slider, at this width too.
+            expect(within(container.querySelector('.side-panel') as HTMLElement).getByText('Computing the exact H₂⁺ curves…')).toBeInTheDocument();
         });
 
         // Task 7a (Task 4 review ruling): a Bonds (i) on a phone switches the sheet to the Info tab on its term; pressing
@@ -2254,7 +2361,7 @@ describe('App: shell', () => {
 
     // Ruling T20b-display-header: in every mode the inspector's view settings sit under a visible "Display"
     // heading that folds them away. Ruling R24-3: every section is titled -- Display, then Plot and data in
-    // Atoms, Basic Orbitals and Bonds; Display alone (and so open) in Molecules.
+    // Atoms and Basic Orbitals, Data in Bonds (Task 3, picture control); Display alone (and so open) in Molecules.
     it('heads the view settings with a foldable Display heading in Atoms, Basic Orbitals, Bonds and Molecules', async () => {
         (loadScan as jest.Mock).mockResolvedValue(n2Scan);
         (loadMoleculeMeta as jest.Mock).mockImplementation(async (id: string) => ({ ...n2Meta, id }));
@@ -2265,7 +2372,7 @@ describe('App: shell', () => {
             // Task 4: Info is always open above the accordion, not an accordion section -- so the toggles are read, not every
             // h2, and Info's own heading is checked separately.
             const headers = Array.from(inspector.querySelectorAll('.inspector-section-toggle')).map(toggle => toggle.textContent);
-            expect([mode, headers]).toEqual([mode, mode === 'molecules' ? ['Display'] : ['Display', 'Plot and data']]);
+            expect([mode, headers]).toEqual([mode, mode === 'molecules' ? ['Display'] : mode === 'bonds' ? ['Display', 'Data'] : ['Display', 'Plot and data']]);
             expect([mode, within(inspector).getAllByRole('heading', { level: 2, name: 'Info' }).length]).toEqual([mode, 1]);
             openInspectorSection('Display');
             const display = within(inspector).getByRole('region', { name: 'Display' });

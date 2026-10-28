@@ -36,13 +36,15 @@ export function atLeast(level: LearningLevel, min: LearningLevel): boolean {
  * ungated, so they carry no id here.
  */
 export type ControlId =
-    | 'plot' | 'structure' | 'bondLabels' | 'dipole' | 'orbitalEnergies' | 'properties' | 'axes'
+    | 'plot' | 'data' | 'structure' | 'bondLabels' | 'dipole' | 'orbitalEnergies' | 'properties' | 'axes'
     | 'charge' | 'excite' | 'relativity' | 'combinations' | 'enclosed' | 'allOrbitals' | 'exports'
     | 'advancedAppearance' | 'surfaceStyle' | 'requestWorkspace';
 
 /** The level at which each control first appears (spec plan's level table). */
 export const CONTROL_LEVEL: Record<ControlId, LearningLevel> = {
     plot: 'explore',
+    /** Task 3 (picture control): Bonds' Data section -- its curve is in the left panel at every level, so not 'plot'. */
+    data: 'explore',
     structure: 'explore',
     bondLabels: 'explore',
     dipole: 'explore',
@@ -71,6 +73,7 @@ export const IE_LEVEL: LearningLevel = 'advanced';
 /** How a pointer sentence names each control -- lower case; a sentence capitalises the first word. */
 const CONTROL_NAME: Record<ControlId, string> = {
     plot: 'the plot',
+    data: 'data',
     structure: 'structure',
     bondLabels: 'bond labels',
     dipole: 'the dipole arrow',

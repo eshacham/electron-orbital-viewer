@@ -8,7 +8,7 @@ import { CONTROL_LEVEL, LEVEL_LABEL, type ControlId, type LearningLevel } from '
 
 /** How Help names each gated control (final review M5); the owner's molecule requests are not a reader's. */
 const HELP_NAME: Record<Exclude<ControlId, 'requestWorkspace'>, string> = {
-    plot: 'the plot and data', structure: 'structure options', bondLabels: 'bond labels', dipole: 'the dipole arrow',
+    plot: 'the plot and data', data: 'the plot and data', structure: 'structure options', bondLabels: 'bond labels', dipole: 'the dipole arrow',
     orbitalEnergies: 'orbital energies', properties: 'properties', axes: 'axes', charge: 'charge', excite: 'excitation',
     relativity: 'relativity', combinations: 'combinations and fields', enclosed: 'the enclosed fraction',
     allOrbitals: 'every orbital', exports: 'exports', advancedAppearance: 'advanced appearance', surfaceStyle: 'surface style',

@@ -47,6 +47,9 @@ describe('levels (spec plan: learning levels)', () => {
         expect(levelPointer(['structure', 'bondLabels', 'dipole', 'properties'], 'basics'))
             .toBe('Structure, bond labels, the dipole arrow and properties appear at Explore');
         expect(levelPointer(['requestWorkspace'], 'advanced')).toBe('Molecule requests appear at Research');
+        // Task 3 (picture control): Bonds' curve shows at every level, so its Display line names only Data.
+        expect(levelPointer(['data', 'enclosed'], 'basics')).toBe('Data appears at Explore');
+        expect(CONTROL_LEVEL.data).toBe(CONTROL_LEVEL.plot);
     });
 
     // Ruling PF1 (Review Focus 2): a hidden control still holding a value says what is shown and where it is set.

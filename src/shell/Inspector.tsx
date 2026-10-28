@@ -34,6 +34,12 @@ interface InspectorProps {
      */
     defaultOpen?: string;
     /**
+     * Drawer only. Task 3 (picture control): where no section is tabbed, the section the bar's one button opens the
+     * drawer on, named by its title ("Data panel") -- Bonds' Data, so the drawer stays one press from the numbers. Not
+     * among `sections` (Bonds below Explore), the bar keeps its View button.
+     */
+    barSection?: string;
+    /**
      * Task 4: Info, always open above the accordion (docked, in the open drawer) or above the stacked sections --
      * never one of the accordion's sections. It keeps to part of the column and scrolls inside itself
      * (`.inspector-info`), so a long explanation never pushes the sections' headers away.
@@ -105,7 +111,7 @@ const Accordion: React.FC<{ sections: InspectorSection[]; openKey: string | null
  * right edge, non-modal and measured as a camera inset (§7); stacked inside
  * the phone sheet (ruling R7). `.view-panel` stays its class for the tests.
  */
-const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultOpen, open = false, onOpenChange }) => {
+const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultOpen, barSection, open = false, onOpenChange }) => {
     const id = useId();
     const moreBelow = useMoreBelow();
     const display = usePref(displayPref);
@@ -155,10 +161,12 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
 
     if (variant === 'drawer') {
         // The bar keeps its buttons: one per tab of a tabbed section (each opens the drawer at that section
-        // and tab), or a single View button that opens the drawer as the viewer left it.
+        // and tab), or one for the mode's named section (`barSection`, opening the drawer on it), or a single
+        // View button that opens the drawer as the viewer left it.
         const tabbed = sections.find(section => section.tabs?.length);
         const activeTab = tabbed?.tabs?.find(tab => tab.key === tabbed.activeTab) ?? tabbed?.tabs?.[0];
-        const bar = tabbed?.tabs ?? [{ key: 'view', label: 'View' }];
+        const named = tabbed ? undefined : sections.find(section => section.key === barSection);
+        const bar = tabbed?.tabs ?? (named ? [{ key: named.key, label: named.title }] : [{ key: 'view', label: 'View' }]);
         // Final review B, M6: an id for the panel a bar button opens, so aria-controls
         // can point assistive tech straight at it (the panel only exists while open).
         const drawerPanelId = `${id}-drawer-panel`;
@@ -175,7 +183,7 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
                                 key={item.key}
                                 type="button"
                                 className="inspector-bar-button"
-                                aria-label={tabbed ? `${item.label} panel` : 'View settings'}
+                                aria-label={tabbed || named ? `${item.label} panel` : 'View settings'}
                                 aria-expanded={expanded}
                                 aria-controls={expanded ? drawerPanelId : undefined}
                                 onClick={() => {
@@ -183,6 +191,8 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
                                     if (tabbed) {
                                         tabbed.onTab?.(item.key);
                                         if (openKey !== tabbed.key) choose(tabbed.key);
+                                    } else if (named && openKey !== named.key) {
+                                        choose(named.key);
                                     }
                                     onOpenChange?.(true);
                                 }}

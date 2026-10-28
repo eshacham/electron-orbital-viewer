@@ -1,8 +1,9 @@
 import React from 'react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import BondsPanel from '../../src/components/BondsPanel';
+import BondsCurvePlot from '../../src/components/BondsCurvePlot';
 import reducer, { selectBondsSystem, setBondsView, setScanPoint } from '../../src/store/bondsSlice';
 import { bondsCaptions, densitySurfaceText, frontierText, orbitalCaveats } from '../../src/bonds/captions';
 import { bondAxisMinimumDensity } from '../../src/bonds/bond_density';
@@ -472,5 +473,109 @@ describe('BondsPanel', () => {
             expect(screen.getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
             expect(screen.queryByText(/Bond order/)).toBeNull();
         });
+    });
+});
+
+// Task 3 (picture control): Bonds' R story in one place -- the slider, then the curve that sets R, as one "Bond
+// length" block in the left panel. The panel measures the block (useElementWidth, a ResizeObserver) and draws the
+// curve at that width, nothing before; it hands the curve its draft R, so the marker follows the thumb before release.
+describe('the Bond length block (Task 3, picture control)', () => {
+    /** Reports every observed box at `width` (jsdom has no ResizeObserver, so it never measures by itself). */
+    class FakeResizeObserver {
+        static instances: FakeResizeObserver[] = [];
+        observed: Element[] = [];
+        constructor(private readonly callback: ResizeObserverCallback) { FakeResizeObserver.instances.push(this); }
+        observe(target: Element) { this.observed.push(target); }
+        unobserve() {}
+        disconnect() { this.observed = []; }
+        resize(width: number) {
+            this.callback(this.observed.map(target => ({ target, contentRect: { width } }) as unknown as ResizeObserverEntry), this as unknown as ResizeObserver);
+        }
+    }
+    const original = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    beforeEach(() => {
+        FakeResizeObserver.instances = [];
+        (globalThis as { ResizeObserver?: unknown }).ResizeObserver = FakeResizeObserver;
+    });
+    afterEach(() => { (globalThis as { ResizeObserver?: unknown }).ResizeObserver = original; });
+    const measure = (width: number) => act(() => FakeResizeObserver.instances.forEach(observer => observer.resize(width)));
+    const WIDTH = 268;
+    /** The pixel PotentialCurvePlot draws R at, on a plot WIDTH wide (34 px left padding, 8 right). */
+    const pixelFor = (R: number) => {
+        const [lo, hi] = [n2Scan.points[0].RBohr, n2Scan.points[n2Scan.points.length - 1].RBohr];
+        return 34 + ((R - lo) / (hi - lo)) * (WIDTH - 42);
+    };
+    const n2Curve = (width: number, markerR: number | null, onDraftR: (R: number | null) => void) => (
+        <BondsCurvePlot bonds={n2} data={{ ...empty, scan: n2Scan }} h2plus={{ curve: null, error: null }} width={width} markerR={markerR}
+            onDraftR={onDraftR} onCommitH2PlusR={handlers.onCommitH2PlusR} onScanIndex={handlers.onScanIndex} />
+    );
+
+    it('holds the slider and then the curve, under one "Bond length" heading with the curve\'s (i)', () => {
+        render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} curve={n2Curve} />);
+        const block = screen.getByRole('region', { name: 'Bond length' });
+        const slider = within(block).getByRole('slider', { name: 'Internuclear distance R' });
+        // Not measured yet: no curve drawn at a guessed width.
+        expect(within(block).queryByRole('figure')).toBeNull();
+        measure(WIDTH);
+        const figure = within(block).getByRole('figure', { name: /potential energy curve/ });
+        expect(slider.compareDocumentPosition(figure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(figure.querySelector('svg')).toHaveAttribute('width', String(WIDTH));
+        // The glossary's curve entry, from the panel's own place -- not Info's fact (i), which is 'info:potentialCurve'.
+        expect(within(block).getByRole('button', { name: 'About Potential energy curve' })).toHaveClass('info-button');
+        // One keyboard path for R: the slider (the curve's own hidden range input is left out here).
+        expect(within(block).getAllByRole('slider')).toEqual([slider]);
+    });
+
+    it('moves the marker with the slider while it is dragged, before release commits', () => {
+        handlers.onScanIndex.mockClear();
+        const { container } = render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} curve={n2Curve} />);
+        measure(WIDTH);
+        const marker = () => Number(container.querySelector('.potential-marker')!.getAttribute('x1'));
+        expect(marker()).toBeCloseTo(pixelFor(n2Scan.points[7].RBohr), 6);
+        // A drag on the track (MUI's change, with no commit until the button is released): the track laid out 100 px
+        // wide at x = 0, pressed at point 10's place. (A change on its hidden input is the keyboard's, which commits.)
+        const root = container.querySelector('.bonds-length .MuiSlider-root') as HTMLElement;
+        jest.spyOn(root, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 100, height: 20, right: 100, bottom: 20, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+        const [lo, hi] = [n2Scan.points[0].RBohr, n2Scan.points[n2Scan.points.length - 1].RBohr];
+        fireEvent.mouseDown(root, { button: 0, clientX: ((n2Scan.points[10].RBohr - lo) / (hi - lo)) * 100, clientY: 10 });
+        expect(handlers.onScanIndex).not.toHaveBeenCalled();
+        expect(marker()).toBeCloseTo(pixelFor(n2Scan.points[10].RBohr), 6);
+        // Released: the same point is committed, and the marker stays.
+        fireEvent.mouseUp(document, { button: 0, clientX: ((n2Scan.points[10].RBohr - lo) / (hi - lo)) * 100, clientY: 10 });
+        expect(handlers.onScanIndex).toHaveBeenLastCalledWith(10);
+    });
+
+    it('moves the slider, the readout and the marker with a drag on the curve, and reverts a cancelled one', () => {
+        const original = (window as { PointerEvent?: unknown }).PointerEvent;
+        (window as { PointerEvent?: unknown }).PointerEvent = class extends MouseEvent {
+            pointerId: number;
+            constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; }
+        };
+        try {
+            handlers.onScanIndex.mockClear();
+            const { container } = render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} curve={n2Curve} />);
+            measure(WIDTH);
+            const svg = screen.getByRole('img', { name: /against R/ });
+            const marker = () => Number(container.querySelector('.potential-marker')!.getAttribute('x1'));
+            fireEvent.pointerDown(svg, { clientX: pixelFor(n2Scan.points[11].RBohr), pointerId: 1, button: 0 });
+            expect(marker()).toBeCloseTo(pixelFor(n2Scan.points[11].RBohr), 6);
+            expect(screen.getByRole('slider', { name: 'Internuclear distance R' })).toHaveAttribute('aria-valuetext', expect.stringMatching(/point 12 of 14$/));
+            expect(screen.getByText(new RegExp(`^R = ${n2Scan.points[11].RBohr.toFixed(2)} a₀`))).toBeInTheDocument();
+            expect(handlers.onScanIndex).not.toHaveBeenCalled();
+            fireEvent.pointerCancel(svg, { pointerId: 1 });
+            expect(marker()).toBeCloseTo(pixelFor(n2Scan.points[7].RBohr), 6);
+            fireEvent.pointerDown(svg, { clientX: pixelFor(n2Scan.points[11].RBohr), pointerId: 1, button: 0 });
+            fireEvent.pointerUp(svg, { clientX: pixelFor(n2Scan.points[11].RBohr), pointerId: 1, button: 0 });
+            expect(handlers.onScanIndex).toHaveBeenCalledTimes(1);
+            expect(handlers.onScanIndex).toHaveBeenLastCalledWith(11);
+        } finally {
+            (window as { PointerEvent?: unknown }).PointerEvent = original;
+        }
+    });
+
+    // The panel draws what it is given; App gives it BondsCurvePlot (src/App.tsx), and a node is drawn as is.
+    it('draws a curve given as a node, as it is', () => {
+        render(<BondsPanel bonds={h2plus} data={empty} note={null} {...handlers} curve={<p>the curve</p>} />);
+        expect(within(screen.getByRole('region', { name: 'Bond length' })).getByText('the curve')).toBeInTheDocument();
     });
 });

@@ -118,19 +118,73 @@ describe('BondsCurvePlot', () => {
         expect(screen.getByRole('alert')).toHaveTextContent('The H₂⁺ potential curves could not be computed: worker failed');
     });
 
+    /** The pixel for R on a plot of this width (PotentialCurvePlot's padding: 34 left, 8 right). */
+    const pixelFor = (R: number, [lo, hi]: [number, number]) => 34 + ((R - lo) / (hi - lo)) * (props.width - 42);
+
+    // Task 3 (picture control): the curve sits under the R slider, which is the keyboard path, so these commits go
+    // through the svg (a tap) rather than the curve's own hidden range input, which it no longer has.
     it('commits an H₂⁺ R chosen on the curve', () => {
         render(<BondsCurvePlot bonds={h2plus} data={empty} h2plus={{ curve, error: null }} {...props} />);
-        fireEvent.change(screen.getByLabelText('E − E(H + H⁺): choose R'), { target: { value: '3' } });
-        expect(props.onCommitH2PlusR).toHaveBeenCalledWith(3);
+        fireEvent.click(screen.getByRole('img', { name: /against R/ }), { clientX: pixelFor(3, [0.5, 10]) });
+        expect(props.onCommitH2PlusR.mock.calls.at(-1)[0]).toBeCloseTo(3, 6);
     });
 
     it("snaps a molecule's R chosen on the curve to its nearest scan point", () => {
         render(<BondsCurvePlot bonds={n2} data={{ ...empty, scan: n2Scan }} h2plus={{ curve: null, error: null }} {...props} />);
         fireEvent.click(screen.getByRole('img', { name: /against R/ }), { clientX: 0 });
         expect(props.onScanIndex).toHaveBeenLastCalledWith(0);
-        // The keyboard path steps over scan points by index (final review M5).
-        fireEvent.change(screen.getByLabelText('E − E(separated atoms): choose R'), { target: { value: '9' } });
+        const range: [number, number] = [n2Scan.points[0].RBohr, n2Scan.points[13].RBohr];
+        // Just past point 9, nearer it than point 10.
+        const between = n2Scan.points[9].RBohr + 0.3 * (n2Scan.points[10].RBohr - n2Scan.points[9].RBohr);
+        fireEvent.click(screen.getByRole('img', { name: /against R/ }), { clientX: pixelFor(between, range) });
         expect(props.onScanIndex).toHaveBeenLastCalledWith(9);
+    });
+
+    // Task 3 (picture control): one keyboard path for R -- the slider above the curve.
+    it('offers no second keyboard control for R', () => {
+        render(<BondsCurvePlot bonds={n2} data={{ ...empty, scan: n2Scan }} h2plus={{ curve: null, error: null }} {...props} />);
+        expect(screen.queryByRole('slider')).toBeNull();
+    });
+
+    // Task 3 (picture control): while the slider is dragged the panel passes its draft R, so the marker moves with
+    // the thumb before the store (and the picture) catch up on release.
+    it('marks the R it is given, ahead of the store', () => {
+        const { container } = render(
+            <BondsCurvePlot bonds={n2} data={{ ...empty, scan: n2Scan }} h2plus={{ curve: null, error: null }} {...props} markerR={n2Scan.points[10].RBohr} />,
+        );
+        const range: [number, number] = [n2Scan.points[0].RBohr, n2Scan.points[13].RBohr];
+        expect(Number(container.querySelector('.potential-marker')!.getAttribute('x1'))).toBeCloseTo(pixelFor(n2Scan.points[10].RBohr, range), 6);
+    });
+
+    // Task 3 (picture control), spec §3: dragging on the curve snaps as the slider does -- a molecule's draft is its
+    // nearest scan point, H₂⁺'s the nearest 0.01 a₀ -- and a cancelled drag hands back null (the panel reverts).
+    describe('dragging', () => {
+        const original = (window as { PointerEvent?: unknown }).PointerEvent;
+        beforeAll(() => {
+            (window as { PointerEvent?: unknown }).PointerEvent = class extends MouseEvent {
+                pointerId: number;
+                constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; }
+            };
+        });
+        afterAll(() => { (window as { PointerEvent?: unknown }).PointerEvent = original; });
+
+        it("drafts a molecule's nearest scan point and H₂⁺'s nearest 0.01 a₀", () => {
+            const onDraftR = jest.fn();
+            const { unmount } = render(
+                <BondsCurvePlot bonds={n2} data={{ ...empty, scan: n2Scan }} h2plus={{ curve: null, error: null }} {...props} onDraftR={onDraftR} />,
+            );
+            const range: [number, number] = [n2Scan.points[0].RBohr, n2Scan.points[13].RBohr];
+            const between = n2Scan.points[4].RBohr + 0.3 * (n2Scan.points[5].RBohr - n2Scan.points[4].RBohr);
+            fireEvent.pointerDown(screen.getByRole('img', { name: /against R/ }), { clientX: pixelFor(between, range), pointerId: 1, button: 0 });
+            expect(onDraftR).toHaveBeenLastCalledWith(n2Scan.points[4].RBohr);
+            fireEvent.pointerCancel(screen.getByRole('img', { name: /against R/ }), { pointerId: 1 });
+            expect(onDraftR).toHaveBeenLastCalledWith(null);
+            unmount();
+
+            render(<BondsCurvePlot bonds={h2plus} data={empty} h2plus={{ curve, error: null }} {...props} onDraftR={onDraftR} />);
+            fireEvent.pointerDown(screen.getByRole('img', { name: /against R/ }), { clientX: pixelFor(3.123, [0.5, 10]), pointerId: 1, button: 0 });
+            expect(onDraftR).toHaveBeenLastCalledWith(3.12);
+        });
     });
 
     it('draws nothing for a molecule whose scan has not loaded (the panel says so)', () => {

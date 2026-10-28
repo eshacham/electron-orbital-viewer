@@ -1636,7 +1636,8 @@ function App() {
     // Task 2: the one line at the foot of every Display section -- what this mode's view settings and its other
     // sections (Plot and data, Properties) still hide, or a hidden one's value the picture keeps (ruling PF1).
     // Only what this view would show: the finish is a mesh's (isOrbitalView, not a shell view's), its tuning Glow's.
-    const displayIds: ControlId[] = isMoleculeMode ? ['structure', 'bondLabels', 'dipole', 'properties'] : ['plot'];
+    // Task 3 (picture control): Bonds' curve is in the left panel at every level, so its line names only Data.
+    const displayIds: ControlId[] = isMoleculeMode ? ['structure', 'bondLabels', 'dipole', 'properties'] : isBondsMode ? ['data'] : ['plot'];
     if (isAtomMode) displayIds.push('axes');
     displayIds.push('enclosed');
     if (isOrbitalView) displayIds.push('surfaceStyle');
@@ -1663,9 +1664,11 @@ function App() {
     const displayControls = <>{controls}{advancedAppearance}{displayLine}</>;
 
     // Bonds mode's navigation (layout contract §3.8): the desktop's left
-    // column, the phone's Explore tab. The curve is not in it -- it goes
-    // where every mode's plot goes (renderRadialPlot); the frontier line,
-    // caveats and methods list are the inspector's (Task 9, bondsInspector below).
+    // column, the phone's Explore tab. Task 3 (picture control): the potential
+    // curve is in it, under the R slider (BondsPanel's "Bond length" block), at
+    // every level -- not the `plot` level gate's, which Data keeps -- and a tap
+    // or drag on it commits R through the slider's own paths (setH2PlusR,
+    // handleScanIndex). The frontier values are the inspector's Data (bondsInspector below).
     const bondsExplore = (
         <BondsExplore
             bonds={bonds}
@@ -1679,6 +1682,10 @@ function App() {
             // Task 9 fix round 1: on a phone the caption says the loaded view, so the panel's status would say it twice.
             announceStatus={!isNarrow}
             level={level}
+            curve={(width: number, markerR: number | null, onDraftR: (R: number | null) => void) => (
+                <BondsCurvePlot bonds={bonds} data={bondsData} h2plus={h2plusCurve} width={width} markerR={markerR} onDraftR={onDraftR}
+                    onCommitH2PlusR={R => dispatch(setH2PlusR(R))} onScanIndex={handleScanIndex} />
+            )}
         />
     );
 
@@ -1707,14 +1714,9 @@ function App() {
         // "plot slot" is part of the right panel's HOW/data, and the list is
         // a choice, not a plot. Molecules has nothing left for this slot, on
         // a desktop (moleculeSections has no plot) or a phone (there is no Plot tab for it
-        // any more, below).
-        if (isMoleculeMode) return null;
-        if (isBondsMode) {
-            return (
-                <BondsCurvePlot bonds={bonds} data={bondsData} h2plus={h2plusCurve} width={width}
-                    onCommitH2PlusR={R => dispatch(setH2PlusR(R))} onScanIndex={handleScanIndex} />
-            );
-        }
+        // any more, below). Task 3 (picture control): Bonds' curve left this slot
+        // too, for the left panel under the R slider (bondsExplore above).
+        if (isMoleculeMode || isBondsMode) return null;
         if (isBasicMode) {
             // A combination's plot is its ingredients and the result (see
             // combinationCurves): the weighted sum is its exact radial distribution.
@@ -1842,19 +1844,17 @@ function App() {
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)} />
     ));
 
-    // Bonds mode's inspector (spec §9.3, Phase 6G-2 Task 9): the same
-    // Display-above-Plot-and-Data composition as Atom's and Basic Orbitals',
-    // with `controls` (the view settings Bonds and Molecules share,
-    // `moleculeSections` below) heading it, exactly as it headed the plain
-    // Inspector this replaces. Plot is `renderRadialPlot` (BondsCurvePlot),
-    // unchanged; Data is the frontier line, caveats and methods list that
-    // used to sit under the MO diagram in BondsPanel (ruling P19).
+    // Bonds mode's inspector (spec §9.3, Phase 6G-2 Task 9): Display above
+    // the content section, as Atom's and Basic Orbitals', with `controls` (the
+    // view settings Bonds and Molecules share, `moleculeSections` below)
+    // heading it. Task 3 (picture control): the content section is Data alone
+    // -- the frontier values that used to sit under the MO diagram in
+    // BondsPanel (ruling P19) -- from Explore; the curve is the left panel's.
     const bondsInspector = (variant: 'docked' | 'drawer' | 'stacked') => (
         <BondsInspector variant={variant} display={variant === 'stacked' ? undefined : displayControls}
             info={variant === 'stacked' ? undefined : infoPanel}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
-            bonds={bonds} data={bondsData}
-            plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)} showPlot={shows('plot')} />
+            bonds={bonds} data={bondsData} showData={shows('data')} />
     );
 
     // Ruling R22c (owner review 2026-10-14): the hover/pick readout moves off
@@ -1891,7 +1891,7 @@ function App() {
     ];
 
     // The phone sheet's tabs, one job each, in every mode Explore · Info · View · Plot (Molecules: Explore · Info ·
-    // View) -- Task 4. Info is the desktop's Info, the same content for the same state and level (Review Focus 5).
+    // View; Bonds: Explore · Info · View · Data, Task 3 picture control) -- Task 4. Info is the desktop's Info, the same content for the same state and level (Review Focus 5).
     const phoneInfoTab = { key: 'info', label: 'Info', content: infoPanel };
     const phoneTabs = isMoleculeMode
         ? [
@@ -1947,8 +1947,9 @@ function App() {
             },
             phoneInfoTab,
             { key: 'view', label: 'View', content: <>{displayControls}{phoneViewActions}</> },
-            // Ruling R7: the inspector stacked, Plot then Data, with no inner Plot/Data tabs. Task 2: from Explore.
-            ...(shows('plot') ? [{ key: 'plot', label: 'Plot', content: bondsInspector('stacked') }] : []),
+            // Task 3 (picture control): the curve is Explore's (bondsExplore), so this tab holds Data alone, and says so;
+            // its key stays 'plot', the slot every mode's fourth tab fills. Task 2: from Explore.
+            ...(shows('data') ? [{ key: 'plot', label: 'Data', content: bondsInspector('stacked') }] : []),
         ]
         : isAtomMode
         ? [
