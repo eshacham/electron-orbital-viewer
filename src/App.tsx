@@ -116,7 +116,7 @@ import { ConnectedOwnerBar, signInHere } from './components/OwnerBar';
 import { useComputedList } from './jobs/useComputedList';
 import { useFollowedJob } from './jobs/useFollowedJob';
 import { withComputed } from './jobs/computed';
-import { requestOpened, selectIsOwner, sessionErrorDismissed, sessionFailed } from './store/jobsSlice';
+import { selectIsOwner, sessionErrorDismissed, sessionFailed } from './store/jobsSlice';
 import AppShell from './shell/AppShell';
 import TopBar, { TopBarTab } from './shell/TopBar';
 import { MODE_ITEMS, MODE_LABEL } from './shell/Rail';
@@ -787,17 +787,23 @@ function App() {
     // Ruling P12: the owner's request workspace in the viewport cell, and the preview it puts on the canvas
     // (useMoleculeView draws it). While it is open the strip and the hover caption, which describe the
     // molecule, step aside; while its preview is drawn so do the surface keys and the library line.
-    // Task 2: the request workspace is the owner's at Research; below it, it is not open (the effect below closes it).
-    const requestWorkspaceOpen = useRequestWorkspaceOpen() && shows('requestWorkspace');
+    // Task 2: the request workspace is the owner's at Research. Final review M6 (ruled): below it the workspace's
+    // controls hide, but the request stays open and its preview stays drawn -- lowering the level never changes what
+    // is drawn (Review Focus 2) -- with a held-value line saying where the controls are (requestHeldLine, below).
+    // `requestOpen` is the request itself, at any level: the strip and hover caption step aside for it as at Research.
+    const requestOpen = useRequestWorkspaceOpen();
+    const requestsShown = shows('requestWorkspace');
+    const requestWorkspaceOpen = requestOpen && requestsShown;
     const requestPreviewShown = useAppSelector(state => state.jobs.request.previewAtoms !== null) && isMoleculeMode;
     const requestEntryRef = useRef<HTMLButtonElement>(null);
-    // Task 2: lowering the level below Research closes an open request, and so takes its preview off the canvas --
-    // a preview with no workspace beside it would be a picture nothing on screen explains.
+    // Final review M6: below Research the owner's line says where the request's controls appear -- or, while a request
+    // is open (its preview still drawn), that it is still there.
     const requestIsOpen = useAppSelector(state => state.jobs.request.open);
-    const requestsShown = shows('requestWorkspace');
-    useEffect(() => {
-        if (requestIsOpen && !requestsShown) dispatch(requestOpened(false));
-    }, [requestIsOpen, requestsShown, dispatch]);
+    const requestLine = (
+        <LevelLine level={level} ids={['requestWorkspace']} held={[requestIsOpen && {
+            id: 'requestWorkspace', control: 'request', what: requestPreviewShown ? 'the request’s preview' : 'an open request',
+        }]} />
+    );
     const signInError = useAppSelector(state => state.jobs.session.error);
     const computedJobs = useAppSelector(state => state.jobs.computed.jobs);
     useComputedList(isMoleculeMode);
@@ -1082,7 +1088,7 @@ function App() {
     useEffect(() => (isMoleculeMode ? () => thumbnailService.cancelAll() : undefined), [isMoleculeMode, molecule.selectedId]);
     // Ruling T16-tilekey with preflight D9: the frontier tiles' ψ hues are keyed in the column unless an orbital's
     // own phase key is there already (the density, the ESP map or no surface drawn).
-    const moleculeOrbitalTiles = !isNarrow && !stripCollapsed && !requestWorkspaceOpen
+    const moleculeOrbitalTiles = !isNarrow && !stripCollapsed && !requestOpen
         && moleculeStrip.some(item => 'surface' in item.target && item.target.surface.kind === 'mo');
     const screenRatio = useDevicePixelRatio();
     // Everything a tile's picture depends on besides its content (ruling R20a-4): a change re-requests every
@@ -1365,7 +1371,7 @@ function App() {
     // measured rect -- and the insets derived from it -- stay exactly the
     // same whatever is picked.
     const moleculeCaptionZone = isMoleculeMode && Boolean(molecule.meta) && molecule.representation !== 'none' && !isNarrow
-        && !requestWorkspaceOpen;
+        && !requestOpen;
     const showHoverCaption = moleculeCaptionZone && !molecule.pick;
 
     // The drill-down's next step. On a desktop its chips continue the
@@ -1889,7 +1895,7 @@ function App() {
                         {moleculeHeader(true)}
                         {moleculeSelectionSection}
                         <MoleculeNav {...moleculeNavProps} variant="body" ref={moleculeNavRef} />
-                        {requestsShown ? <MoleculeJobsSection /> : isOwner && <LevelLine level={level} ids={['requestWorkspace']} />}
+                        {requestsShown ? <MoleculeJobsSection /> : isOwner && requestLine}
                     </>
                 ),
             },
@@ -2043,7 +2049,7 @@ function App() {
                     {/* Ruling P12: on a desktop or tablet the request opens as a workspace in the viewport cell. */}
                     {/* Task 2: the owner's request is Research's; below it, one line says so (to the owner only). */}
                     {requestsShown ? <MoleculeJobsSection variant="entry" entryRef={requestEntryRef} />
-                        : isOwner && <LevelLine level={level} ids={['requestWorkspace']} />}
+                        : isOwner && requestLine}
                 </div>
             </div>
         )
@@ -2172,7 +2178,8 @@ function App() {
                 exportHandleRef={exportHandleRef}
             />
             {/* Ruling P12: ahead of the title block and toolbar, so the Tab order runs entry → workspace → toolbar. */}
-            {isMoleculeMode && requestsShown && <RequestWorkspace returnFocusRef={requestEntryRef} />}
+            {/* Final review M6: hidden below Research, never closed by it -- the request and its preview stay. */}
+            {isMoleculeMode && <RequestWorkspace returnFocusRef={requestEntryRef} hidden={!requestsShown} />}
             {canvasBusyLabel && (
                 // Task 8: on a phone the caption under the header speaks for the canvas (Task 9 fix round 1: the view, once
                 // settled), so this label is for the eye only there -- a reader hears the change once.
@@ -2249,7 +2256,7 @@ function App() {
             )}
             {/* Task 15: Molecules' strip -- the molecule's views; its handle says so (ruling R23b-3). */}
             {/* Ruling P12: hidden while the request workspace is open -- it would describe the molecule, not the preview. */}
-            {isMoleculeMode && !isNarrow && moleculeStrip.length > 0 && !requestWorkspaceOpen && (
+            {isMoleculeMode && !isNarrow && moleculeStrip.length > 0 && !requestOpen && (
                 <ThumbnailStrip items={moleculeStrip} label="views of this molecule" rGrid={[]} themeKey={stripThemeKey}
                     onSelect={handleMoleculeStripSelect} variant="overlay" collapsed={stripCollapsed} onCollapsedChange={setStripCollapsed}
                     handleNoun="views" wrapLabels />

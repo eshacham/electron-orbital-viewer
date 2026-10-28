@@ -10,6 +10,8 @@
   border-radius: 0 var(--ql-radius-xl) var(--ql-radius-xl) 0;
   box-shadow: var(--ql-shadow-panel);
 }
+/* Final review M6: below Research the workspace is hidden, not closed (its display above would otherwise win). */
+.request-workspace[hidden] { display: none; }
 /* The cell's own width decides the workspace's; the title block reads the same value to sit beside it. */
 #canvas-container { --request-workspace-width: min(560px, 55%); }
 .request-workspace-head {

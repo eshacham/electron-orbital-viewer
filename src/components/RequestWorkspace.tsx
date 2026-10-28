@@ -25,6 +25,12 @@ export function useRequestWorkspaceOpen(): boolean {
 export interface RequestWorkspaceProps {
     /** Explore's "Request a new molecule" button: closing returns focus there. */
     returnFocusRef: React.RefObject<HTMLButtonElement | null>;
+    /**
+     * Final review M6 (ruled): below Research the workspace is hidden, not closed -- it stays mounted, so the request
+     * and the preview its panel reports stay as they are (lowering the level never changes what is drawn), and come
+     * back with it at Research.
+     */
+    hidden?: boolean;
 }
 
 /**
@@ -37,7 +43,7 @@ export interface RequestWorkspaceProps {
  * panel's own SVG drawing. Esc that nothing inside has used closes it, and
  * focus goes back to the entry that opened it.
  */
-const RequestWorkspace: React.FC<RequestWorkspaceProps> = ({ returnFocusRef }) => {
+const RequestWorkspace: React.FC<RequestWorkspaceProps> = ({ returnFocusRef, hidden = false }) => {
     const dispatch = useAppDispatch();
     const shown = useRequestWorkspaceOpen();
     const { panelProps } = useRequestPanel();
@@ -45,7 +51,9 @@ const RequestWorkspace: React.FC<RequestWorkspaceProps> = ({ returnFocusRef }) =
 
     // Opened, the molecule field takes focus: the request starts there.
     useEffect(() => {
-        if (shown) region.current?.querySelector<HTMLInputElement>('input[aria-label^="molecule"], textarea[aria-label^="molecule"]')?.focus();
+        if (shown && !hidden) region.current?.querySelector<HTMLInputElement>('input[aria-label^="molecule"], textarea[aria-label^="molecule"]')?.focus();
+        // Opened, not unhidden: coming back to Research leaves focus on the level switch.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [shown]);
 
     const close = useCallback(() => {
@@ -72,7 +80,7 @@ const RequestWorkspace: React.FC<RequestWorkspaceProps> = ({ returnFocusRef }) =
 
     if (!shown) return null;
     return (
-        <section id={REQUEST_WORKSPACE_ID} ref={region} className="request-workspace" aria-labelledby="request-workspace-title"
+        <section id={REQUEST_WORKSPACE_ID} ref={region} className="request-workspace" aria-labelledby="request-workspace-title" hidden={hidden}
             onKeyDown={event => {
                 if (event.key !== 'Escape' || event.defaultPrevented) return;
                 event.preventDefault();

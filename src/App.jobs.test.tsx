@@ -376,6 +376,38 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(screen.queryByText(/these are Water’s properties/)).toBeNull();
     });
 
+    // Final review M6 (ruled): lowering the level never changes what is drawn -- below Research the request's
+    // controls hide, but the request stays open and its preview stays on the canvas, with a line saying where the
+    // controls are; back at Research the workspace is as it was.
+    it('below Research hides the request workspace but keeps the request and its preview drawn, saying so', async () => {
+        BUILD_ENV.dev = true;
+        mockApi.preview.mockResolvedValue(previewFixture('preview_ok'));
+        const { store, container } = await enterMolecules(false);
+        await show(store, 'h2o');
+        const side = container.querySelector('.side-panel') as HTMLElement;
+        const viewportCell = container.querySelector('#canvas-container') as HTMLElement;
+        fireEvent.click(within(side).getByRole('button', { name: 'Request a new molecule' }));
+        const workspace = within(viewportCell).getByRole('region', { name: 'Request a molecule' });
+        fireEvent.change(within(workspace).getByRole('textbox', { name: 'molecule (Name)' }), { target: { value: 'water' } });
+        fireEvent.click(within(workspace).getByRole('button', { name: 'Preview' }));
+        await flush();
+        const title = viewportCell.querySelector('.viewport-title') as HTMLElement;
+        expect(within(title).getByRole('heading', { level: 1 })).toHaveTextContent('Preview — H₂O');
+
+        fireEvent.click(screen.getByRole('radio', { name: 'Explore' }));
+        await flush();
+        expect(within(viewportCell).queryByRole('region', { name: 'Request a molecule' })).toBeNull();
+        expect(store.getState().jobs.request.open).toBe(true);
+        expect(store.getState().jobs.request.previewAtoms).not.toBeNull();
+        expect(within(title).getByRole('heading', { level: 1 })).toHaveTextContent('Preview — H₂O');
+        expect(within(side).getByText('Showing the request’s preview — request controls appear at Research')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('radio', { name: 'Research' }));
+        await flush();
+        expect(within(viewportCell).getByRole('region', { name: 'Request a molecule' })).toBeInTheDocument();
+        expect(within(side).queryByText(/Showing the request’s preview/)).toBeNull();
+    });
+
     // Fix round 1 (T16-M1): choosing another molecule closes the workspace and the canvas shows that molecule --
     // from the picker (the quick pick until owner R25-A3 removed it), and when a followed job finishes and opens.
     it('closes the request workspace when another molecule is chosen: the picker, or a followed job that finishes', async () => {
