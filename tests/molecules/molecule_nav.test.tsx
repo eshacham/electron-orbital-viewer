@@ -128,8 +128,9 @@ describe('MoleculeOrbitalList', () => {
         fireEvent.click(rows[2]);
         expect(onSelect).toHaveBeenCalledWith(3);
         expect(container.textContent).not.toMatch(/ionisation|Kohn–Sham|B3LYP/);
-        // Task 9b: the caveat is one sentence, "here" cut in the merge.
-        expect(infoText(waterMeta().orbitals)).toContain('Orbital energies are Kohn–Sham eigenvalues, not ionisation energies, and');
+        // Task 9b: the caveat is one sentence. Task 9b review M1: "These", so it speaks of these numbers, not of every
+        // orbital energy (Hartree–Fock's are not Kohn–Sham eigenvalues).
+        expect(infoText(waterMeta().orbitals)).toContain('These orbital energies are Kohn–Sham eigenvalues, not ionisation energies, and');
     });
 
     // Task 8 (addendum 9): each row's irrep label is typeset, 1b<sub>1</sub>, not the flat "1b1".

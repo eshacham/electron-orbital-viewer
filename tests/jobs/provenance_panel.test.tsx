@@ -203,7 +203,8 @@ describe('ProvenancePanel', () => {
             geometryOptimisation: { steps: 30, converged: false, stoppedBy: 'time-limit', maxGradient: 0.0021 },
             frequencyCheck: { result: 'not-run', summary: 'not checked: the optimisation stopped at its time limit',
                               method: 'B3LYP-D3(BJ)/def2-SVP' } })} ownerJob={null} />);
-        expect(screen.getByText('The optimisation stopped at its time limit, not converged (max force, the largest Cartesian gradient component: 2.1e-3 Ha/bohr).')).toBeInTheDocument();
+        // Task 9b review M4 (ruling): ×10ⁿ, not e-notation, wherever a number is read (this sentence is Info's now).
+        expect(screen.getByText('The optimisation stopped at its time limit, not converged (max force, the largest Cartesian gradient component: 2.1 × 10⁻³ Ha/bohr).')).toBeInTheDocument();
         expect(screen.getByText(/Frequency check \(B3LYP-D3\(BJ\)\/def2-SVP\): not checked: the optimisation stopped at its time limit\./)).toBeInTheDocument();
         expect(screen.queryByRole('link', { name: 'frequencies.json' })).toBeNull();
     });

@@ -62,9 +62,9 @@ export const CONTROL_LEVEL: Record<ControlId, LearningLevel> = {
 };
 
 /**
- * Task 6: the level from which the panel's ΔSCF energy line, and Info's NIST comparison beside it, appear -- with
- * Charge and Excite (the spec's Advanced row). Fix round 1 ruling: a neutral atom's own IE value shows in Info from
- * Explore, as a key number.
+ * Task 6: the level from which Info's ΔSCF energies and the NIST comparison appear -- with Charge and Excite (the spec's
+ * Advanced row; Task 9b removed the panel's energy line). Fix round 1 ruling: a neutral atom's own IE value shows in
+ * Info from Explore, as a key number.
  */
 export const IE_LEVEL: LearningLevel = 'advanced';
 

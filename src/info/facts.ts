@@ -12,3 +12,10 @@ import type { InfoFact } from './info_types';
 export function enclosedFact(fraction: number, of = 'of the electron'): InfoFact {
     return { label: 'Enclosed', value: `${Math.round(fraction * 100)} % ${of}`, min: 'advanced' };
 }
+
+/**
+ * Task 9b review I3: that a density is all its occupied orbitals together -- cut from the Bonds and Molecules density
+ * leads in 9b, and needed beside the orbital tiles it sums -- said once, in both modes' technical band (the density
+ * glossary entry says the same, but no (i) opens it).
+ */
+export const DENSITY_SUM_SENTENCE = 'The density is all the occupied orbitals together: the sum of their |ψ|², each weighted by how many electrons it holds.';

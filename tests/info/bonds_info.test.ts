@@ -96,7 +96,7 @@ describe('bondsInfo (Task 7a)', () => {
         const title = render(React.createElement('div', null, content.title)).container.textContent;
         expect(title).toBe('N₂ — total electron density');
         const shown = shownAt(content, 'basics');
-        // Task 9b (fix 5): the lead keeps to three lines; "all the occupied orbitals together" is the density glossary's.
+        // Task 9b (fix 5): the lead keeps to three lines; "all the occupied orbitals together" is technical (review I3).
         expect(shown).toContain('N₂ has 14 electrons; the surface shows where they are likely to be found.');
         // Fix round 1 (M3): plain words at Basics -- no ρ values, and the title's words are not repeated.
         expect(shown).not.toMatch(/e\/a₀³|Total electron density,/);
@@ -346,11 +346,18 @@ function leadAt(content: InfoContent, level: LearningLevel): string {
 }
 
 // Task 9b (finish review, fix 5): Bonds' leads are three lines at most. What H₂⁺'s orbital does and an MO's shape follow
-// the facts, or join the technical band; "all the occupied orbitals together" is the density glossary entry's.
+// the facts, or join the technical band; "all the occupied orbitals together" is technical (review I3).
 describe('the Bonds lead (Task 9b)', () => {
     it('keeps the density lead to what the surface shows', () => {
         expect(leadAt(bondsInfo(stateOf(n2Store()), n2Data, 'explore'), 'explore'))
             .toBe('N₂ has 14 electrons; the surface shows where they are likely to be found.');
+    });
+
+    // Task 9b review I3: the cut clause's home a reader can reach -- one technical sentence, worded as in Molecules.
+    it('says the density is all the occupied orbitals together, in the technical band', () => {
+        const sentence = 'The density is all the occupied orbitals together: the sum of their |ψ|², each weighted by how many electrons it holds.';
+        expect(shownAt(bondsInfo(stateOf(n2Store()), n2Data, 'explore'), 'explore')).not.toContain(sentence);
+        expect(shownAt(bondsInfo(stateOf(n2Store()), n2Data, 'advanced'), 'advanced')).toContain(sentence);
     });
 
     it('says what an MO is in the lead, how full and its role after the facts; its shape is technical', () => {

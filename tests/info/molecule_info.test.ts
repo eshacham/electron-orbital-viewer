@@ -92,8 +92,8 @@ describe('moleculeInfo (Task 7b)', () => {
         const { container, unmount } = rendered(content, 'basics');
         expect(container.querySelector('.info-title')).toHaveTextContent('Water (H₂O) — electron density');
         unmount();
-        // Task 9b (finish review, fix 5): the lead keeps to three lines; "all its occupied orbitals together" is the density
-        // glossary entry's (the sum of |ψ|² over the occupied orbitals).
+        // Task 9b (finish review, fix 5): the lead keeps to three lines; "all its occupied orbitals together" is technical
+        // (the sum of |ψ|² over the occupied orbitals; Task 9b review I3).
         expect(shownAt(state, 'basics')).toContain('Water has 10 electrons; the surface shows where they are likely to be found.');
     });
 
@@ -195,7 +195,8 @@ describe('moleculeInfo (Task 7b)', () => {
         expect(count(text, /ionisation energ/i)).toBe(1);
         expect(count(text, /neither the optical gap/)).toBe(1);
         // Task 9b (fix 5): the caveat is one sentence now, its two clauses joined.
-        expect(text).toContain('Orbital energies are Kohn–Sham eigenvalues, not ionisation energies, '
+        // Task 9b review M1: "These" -- the caveat is about these numbers, not every orbital energy.
+        expect(text).toContain('These orbital energies are Kohn–Sham eigenvalues, not ionisation energies, '
             + 'and the HOMO–LUMO gap is a Kohn–Sham orbital gap — neither the optical gap (absorption) nor the fundamental gap (IP − EA).');
         expect(shownAt(state, 'basics')).not.toMatch(/Kohn–Sham|ionisation/);
     });
@@ -215,7 +216,8 @@ describe('moleculeInfo (Task 7b)', () => {
         // Task 9b: the caveat's first words lost "here" in its merge into one sentence, and the orbital's electrons and
         // role, out of the lead, come first.
         expect(notes.map(note => note.textContent?.slice(0, 24))).toEqual([
-            'It holds 2 electrons. It', 'Orbital energies are Koh', 'Sticks show connectivity', 'The arrow points from − ']);
+            // Task 9b review M1: the caveat opens "These orbital energies".
+            'It holds 2 electrons. It', 'These orbital energies a', 'Sticks show connectivity', 'The arrow points from − ']);
         unmount();
     });
 
@@ -511,21 +513,28 @@ describe('moleculeInfo (Task 7b)', () => {
             expect(shownAt(state, 'advanced')).toContain('Point group');
         });
 
-        it('gives the dipole as its value with units below Research, and the experiment and its reference at Research', () => {
+        // Task 9c ruling: the experiment is a key validity number, shown from Advanced; its reference is Research's (the
+        // level table puts references at Research).
+        it('gives the dipole as its value with units below Advanced, the experiment from Advanced, and its reference at Research', () => {
             const state = moleculeState();
-            for (const level of ['basics', 'explore', 'advanced'] as const) {
+            for (const level of ['basics', 'explore'] as const) {
                 const shown = shownAt(state, level);
                 expect(shown).toContain('Dipole μ1.86 D');
                 expect(shown).not.toMatch(/CRC Handbook|CCCBDB|experiment|computed/);
             }
+            const advanced = shownAt(state, 'advanced');
+            expect(advanced).toContain('Dipole μ1.86 D computed · 1.855 D experiment');
+            expect(advanced).not.toMatch(/CRC Handbook|CCCBDB/);
             expect(shownAt(state, 'research')).toContain('Dipole μ1.86 D computed · 1.855 D experiment (CRC Handbook, via CCCBDB)');
         });
 
-        it('says the arrow\'s convention only where the arrow and its switch are on screen -- never below Explore', () => {
+        // Task 9c ruling (flips 9b's "never below Explore"): the arrow is still drawn at Basics -- lowering the level never
+        // changes what is drawn -- so Info says its convention whenever it is drawn; the panel's held-value note names it.
+        it('says the arrow\'s convention whenever the arrow is drawn, at every level', () => {
             const convention = 'The arrow points from − to +';
-            // The pointer at Basics says "the dipole arrow … appear(s) at Explore"; Info must not explain it there.
-            expect(shownAt(moleculeState(), 'basics')).not.toContain(convention);
+            expect(shownAt(moleculeState(), 'basics')).toContain(convention);
             expect(shownAt(moleculeState(), 'explore')).toContain(convention);
+            expect(shownAt(moleculeState(waterMeta(), store => store.dispatch(setShowDipole(false))), 'basics')).not.toContain(convention);
         });
 
         it('states the Kohn–Sham caveat as one sentence', () => {
@@ -533,7 +542,8 @@ describe('moleculeInfo (Task 7b)', () => {
             const { container, unmount } = rendered(infoOf(state, 'explore'), 'explore');
             const caveat = [...container.querySelectorAll('.info-notes')].map(note => flat(note.textContent ?? '')).find(text => /Kohn–Sham/.test(text))!;
             unmount();
-            expect(caveat).toBe('Orbital energies are Kohn–Sham eigenvalues, not ionisation energies, and the HOMO–LUMO gap is a '
+            // Task 9b review M1: "These", so the claim stays about these numbers.
+            expect(caveat).toBe('These orbital energies are Kohn–Sham eigenvalues, not ionisation energies, and the HOMO–LUMO gap is a '
                 + 'Kohn–Sham orbital gap — neither the optical gap (absorption) nor the fundamental gap (IP − EA).');
             expect(caveat.match(/\. /g)).toBeNull();
         });
@@ -580,6 +590,15 @@ describe('moleculeInfo (Task 7b)', () => {
             expect(flat(container.querySelector('.info-body > p.info-text')?.textContent ?? ''))
                 .toBe('Water has 10 electrons; the surface shows where they are likely to be found.');
             unmount();
+        });
+
+        // Task 9b review I3: no (i) opens the density glossary entry, so the cut clause needs a home a reader can reach --
+        // one technical sentence, the same in Bonds, beside the tiles of the orbitals it sums.
+        it('says the density is all the occupied orbitals together, in the technical band', () => {
+            const sentence = 'The density is all the occupied orbitals together: the sum of their |ψ|², each weighted by how many electrons it holds.';
+            expect(shownAt(moleculeState(), 'explore')).not.toContain(sentence);
+            expect(shownAt(moleculeState(), 'advanced')).toContain(sentence);
+            expect(shownAt(moleculeState(waterMeta(), store => store.dispatch(setSurface({ kind: 'esp' }))), 'research')).not.toContain(sentence);
         });
     });
 

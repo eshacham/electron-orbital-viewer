@@ -45,7 +45,7 @@ import { withSubscripts } from '../format/subscripts';
 import { PointGroupLabel } from '../format/PointGroupLabel';
 import ProvenancePanel from '../components/ProvenancePanel';
 import InfoButton from './InfoButton';
-import { enclosedFact } from './facts';
+import { DENSITY_SUM_SENTENCE, enclosedFact } from './facts';
 
 const h = React.createElement;
 
@@ -182,7 +182,7 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     if (surface.kind === 'density') {
         title = `${moleculeTitle(meta)} — electron density`;
         // Task 9b (finish review, fix 5): the lead keeps to three lines -- that the density is all the occupied orbitals
-        // together is the density glossary entry's (technical band: the sum of |ψ|² over the occupied orbitals).
+        // together is the technical band's (Task 9b review I3: DENSITY_SUM_SENTENCE).
         lead = `${meta.name} has ${meta.electronCount} electrons; the surface shows where they are likely to be found.`;
     } else if (surface.kind === 'esp') {
         title = `${moleculeTitle(meta)} — electrostatic potential`;
@@ -204,7 +204,6 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     // The structure options are Explore's (CONTROL_LEVEL): what they cannot do is said where they are on screen.
     const structureControls = atLeast(level, CONTROL_LEVEL.structure);
     const labelsControl = atLeast(level, CONTROL_LEVEL.bondLabels);
-    const dipoleControl = atLeast(level, CONTROL_LEVEL.dipole);
     const unavailable = spaceFillingUnavailableReason(meta.atoms);
     // The lead says what is drawn; the facts follow it, and then these notes on the numbers and the picture -- after
     // the facts, so the numbers stay above Info's fold (InfoContent.notes), one idea a paragraph (fix round 1, I6).
@@ -222,10 +221,10 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
         labelsControl && representation === 'none' && 'No structure is drawn, so there is nothing to label.',
         labelsControl && representation === 'space-filling' && state.moleculeLabels && 'Space filling draws no bonds, so only angles are labelled.',
         structureControls && unavailable && `Space filling is unavailable: ${unavailable}.`,
-        // Ruling T2-I2: while the arrow is drawn its convention is said -- Task 9b (finish review, fix 1): from the level
-        // its switch is on screen (Explore), so Info never explains it where the pointer says "the dipole arrow … appear
-        // at Explore".
-        dipoleControl && molecule.showDipole && hasDipoleArrow(meta) && DIPOLE_CONVENTION,
+        // Ruling T2-I2: while the arrow is drawn its convention is said -- at every level (Task 9c ruling): the arrow is
+        // still drawn at Basics, and the Display line's held-value note says why ("Showing the dipole arrow — Display
+        // controls appear at Explore"), so Info never leaves a drawn arrow unexplained.
+        molecule.showDipole && hasDipoleArrow(meta) && DIPOLE_CONVENTION,
         surfaceShown && cutAwaySentence(view.surfaceStyle.clipAxis),
         // Ruling (concern 5): on a phone, the tier line -- its own builder's words -- last, at every level. Fix round 2
         // (N2): the computed line already says "Computed on request", so it goes without the label.
@@ -235,9 +234,10 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     // --- Key facts, each from the level that reads it.
     // Ruling (concern 4): each number has one home, Info; the Properties card keeps what Info does not show. No Formula
     // fact: the title says it ("Water (H₂O)").
-    // Task 9b (finish review, fix 1): the point group is a scientific term with an (i) -- Advanced's band; the dipole
-    // shows its value with units below Research, and the experiment and its reference at Research.
-    const dipole = atLeast(level, 'research') ? dipoleFactText(meta) : dipoleValueText(meta);
+    // Task 9b (finish review, fix 1): the point group is a scientific term with an (i) -- Advanced's band. The dipole
+    // shows its value with units below Advanced; Task 9c ruling: the experiment, a key validity number, from Advanced,
+    // and its reference at Research.
+    const dipole = atLeast(level, 'advanced') ? dipoleFactText(meta, atLeast(level, 'research')) : dipoleValueText(meta);
     const facts: InfoFact[] = [
         { label: withInfo('Point group', 'pointGroup', 'Point group'), value: h(PointGroupLabel, { pg: meta.symmetry.pointGroup }), min: 'advanced' },
         { label: 'Electrons', value: String(meta.electronCount) },
@@ -269,6 +269,7 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
 
     // --- The technical band: what the surface's contour is, and (with the list on screen) its labels and classes.
     const technical = paragraphs(
+        surface.kind === 'density' && DENSITY_SUM_SENTENCE,
         surface.kind === 'density' && 'The surface is a contour of constant density ρ, at the value that encloses the chosen fraction of the electrons.',
         surface.kind === 'mo' && 'The surface is a contour of constant |ψ|², at the value that encloses the chosen fraction of the orbital.',
         surface.kind === 'esp' && ESP_SCALE_SENTENCE,

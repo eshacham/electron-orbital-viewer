@@ -94,6 +94,13 @@ describe('Gaussian cube', () => {
         expect(asciiLine('Born–Oppenheimer')).toBe('Born-Oppenheimer');
     });
 
+    // Task 9b review M4: captions now write "2.31 × 10⁻³" (formatSci); "×" has no ASCII decomposition, so the line read
+    // "2.31  10-3". In ASCII a number in scientific notation is written as data files write it, "2.31e-3".
+    it('writes a number in ×10ⁿ notation as ASCII e-notation', () => {
+        expect(asciiLine('ρ = 2.31 × 10⁻³ e/a₀³')).toBe('rho = 2.31e-3 e/a03');
+        expect(asciiLine('−1.5 × 10¹² and 4 × 10⁺²')).toBe('-1.5e12 and 4e+2');
+    });
+
     // Fix round 1 (I3): the reorder (normalise, *then* replace) only changes
     // output for text containing one of the characters it now specifically
     // handles (σ/π/δ/φ/α/β, or a minus/en/em dash, including one NFKD

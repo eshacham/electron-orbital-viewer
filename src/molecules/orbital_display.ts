@@ -47,8 +47,9 @@ export const GAP_CAVEAT = 'Kohn–Sham orbital gap — neither the optical gap (
  */
 export function kohnShamNote(orbitals: MoleculeOrbitalInfo[]): string {
     const gaps = orbitalGaps(orbitals);
-    // Task 9b (finish review, fix 5): one sentence, the two clauses joined -- the finish review read two as a wall.
-    const energies = 'Orbital energies are Kohn–Sham eigenvalues, not ionisation energies';
+    // Task 9b (finish review, fix 5): one sentence, the two clauses joined -- the finish review read two as a wall. Task 9b
+    // review M1: "These", not "Orbital energies are" -- a claim about these numbers (Hartree–Fock's are not KS eigenvalues).
+    const energies = 'These orbital energies are Kohn–Sham eigenvalues, not ionisation energies';
     if (gaps.length === 0) return `${energies}.`;
     // "… and the HOMO–LUMO gap is a Kohn–Sham orbital gap — …"; two: "… and the HOMO–LUMO and HOMO–LVMO gaps are Kohn–Sham orbital gaps — …".
     return gaps.length === 1

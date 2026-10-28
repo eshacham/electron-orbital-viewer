@@ -49,22 +49,23 @@ export function formatDipole(meta: LibraryMoleculeMeta): string {
  * Task 7b: the dipole as Info's fact -- computed against experiment, both in debye, with the measurement's source;
  * a symmetric molecule's zero by symmetry; and, where no measured value is listed (an on-demand computed molecule), it
  * says so rather than leave a gap. The method is under "How this was computed" (formatDipole names it, for exports).
+ * Task 9c ruling: `cited` false leaves out the source -- Advanced reads the comparison, Research its reference.
  */
-export function dipoleFactText(meta: LibraryMoleculeMeta): string {
+export function dipoleFactText(meta: LibraryMoleculeMeta, cited = true): string {
     const reference = meta.references.find(r => r.quantity === 'dipole');
     // Fix round 1 (M4): each number held to its unit by a no-break space.
     const magnitude = nb(`${new THREE.Vector3(...meta.dipoleVectorDebye).length().toFixed(2)} D`);
     if (reference && reference.value === 0) return `${nb('0 D')} by symmetry (computed ${magnitude})`;
     const computed = `${magnitude} computed`;
     return reference
-        ? `${computed} · ${nb(`${reference.value} ${reference.unit}`)} experiment (${reference.source})`
+        ? `${computed} · ${nb(`${reference.value} ${reference.unit}`)} experiment${cited ? ` (${reference.source})` : ''}`
         : `${computed} · no measured value listed`;
 }
 
 /**
- * Task 9b (finish review, fix 1): the dipole below Research -- its value with units alone, cut from dipoleFactText: the
- * computed magnitude ("1.86 D"), or a symmetric molecule's "0 D by symmetry". The experiment and its reference are
- * Research's (the spec's level table: references at Research).
+ * Task 9b (finish review, fix 1): the dipole below Advanced (Task 9c ruling) -- its value with units alone, cut from
+ * dipoleFactText: the computed magnitude ("1.86 D"), or a symmetric molecule's "0 D by symmetry". The experiment is
+ * Advanced's, its reference Research's (the spec's level table: references at Research).
  */
 export function dipoleValueText(meta: LibraryMoleculeMeta): string {
     const reference = meta.references.find(r => r.quantity === 'dipole');

@@ -98,6 +98,7 @@ import { bondsFieldRequest } from './bonds/bonds_request';
 import { BondsSystemId, systemFormula } from './bonds/systems';
 import { selectBondsSystem, setH2PlusR, setScanPoint, setBondsView, setDensityIso, BondsView } from './store/bondsSlice';
 import { selectMolecule, setSurface, setRepresentation, setShowDipole, MoleculeSurface } from './store/moleculeSlice';
+import { hasDipoleArrow } from './molecules/dipole';
 import { insideBallNoteFor } from './molecules/inside_ball';
 import { useMoleculeLoader } from './molecules/useMoleculeLoader';
 import { spaceFillingUnavailableReason } from './molecules/vdw_radii';
@@ -1591,8 +1592,12 @@ function App() {
             what: molecule.representation === 'none' ? 'the surface without its structure' : 'the space-filling structure',
         },
         isMoleculeMode && display.moleculeLabels && { id: 'bondLabels', control: 'bond-label', what: 'bond lengths and angles' },
-        // The arrow is on by default (moleculeSlice), so the value held is its absence.
+        // The arrow is on by default (moleculeSlice), so the value held is its absence. Task 9c ruling: a drawn arrow is
+        // held too -- lowering the level never changes what is drawn (Review Focus 2) -- so below Explore the line says
+        // why it is there and where its switch is, "Showing the dipole arrow — Display controls appear at Explore".
         isMoleculeMode && !molecule.showDipole && { id: 'dipole', control: 'dipole', what: 'the molecule without its dipole arrow' },
+        isMoleculeMode && molecule.showDipole && molecule.meta !== null && hasDipoleArrow(molecule.meta)
+            && { id: 'dipole', control: 'Display', what: 'the dipole arrow' },
         isAtomMode && !display.showAxes && { id: 'axes', control: 'axes', what: 'the view without axes' },
         enclosedFraction !== DEFAULT_ENCLOSED_FRACTION && {
             id: 'enclosed', control: 'enclosed-fraction', what: `a ${Math.round(enclosedFraction * 100)} % contour`,

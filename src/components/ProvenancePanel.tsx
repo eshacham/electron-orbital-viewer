@@ -7,6 +7,7 @@ import { capacityLabel, formatDuration, formatGB, money, predictionNote, quotedC
 import type { JobView } from '../jobs/api_types';
 import { countsAsCheck, isExperimentalGeometry } from '../validation/geometry_honesty';
 import { withSubscripts } from '../format/subscripts';
+import { formatSci } from '../format/sci';
 
 export const PUBCHEM_COMPOUND_URL = 'https://pubchem.ncbi.nlm.nih.gov/compound/';
 const EXTERNAL = { target: '_blank', rel: 'noopener noreferrer' } as const;
@@ -76,7 +77,7 @@ function StructureChecks({ meta, provenance }: { meta: LibraryMoleculeMeta; prov
         <>
             {optimisation?.stoppedBy === 'time-limit' && (
                 <p>
-                    The optimisation stopped at its time limit, not converged (max force, the largest Cartesian gradient component: {optimisation.maxGradient?.toExponential(1)} Ha/bohr).
+                    The optimisation stopped at its time limit, not converged (max force, the largest Cartesian gradient component: {optimisation.maxGradient !== undefined && formatSci(optimisation.maxGradient, 2)} Ha/bohr).
                 </p>
             )}
             {check && (

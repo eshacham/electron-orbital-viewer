@@ -62,8 +62,11 @@ export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
     if (atom.mode === 'atom') {
         const part = atomPartName(atom, 'title') ?? 'whole atom';
         const method = technical && METHOD[atom.profile ? profileRelativity(atom.profile) : 'off'];
+        // Task 9b review M5 (ruling): a subshell draws each of its orbitals' own surfaces (Info: "of each orbital's
+        // probability"), so it is named as an orbital's surface is; a whole atom or a shell is its electron density.
+        const orbitalSurfaces = atom.level === 'orbital' || (atom.level === 'shell' && atom.selectedSubshell !== null);
         const subtitle = atom.unbound ? line('nothing is drawn for this species', method)
-            : line(atom.level === 'orbital' ? orbitalSurface : ELECTRON_DENSITY, share, method);
+            : line(orbitalSurfaces ? orbitalSurface : ELECTRON_DENSITY, share, method);
         return { title: `${speciesTitle(speciesOf(atom))} — ${part}`, subtitle };
     }
     if (atom.mode === 'hydrogenic') {
@@ -100,7 +103,7 @@ export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
     const { previewAtoms, previewFormula } = state.jobs.request;
     if (previewAtoms) return { title: `Preview — ${formatFormula(previewFormula ?? '')}`, subtitle: 'resolved structure, not yet computed' };
     const meta = state.molecule.meta;
-    if (!meta) return { title: 'Molecules', subtitle: 'Choose a molecule' };
+    if (!meta) return { title: 'Molecules', subtitle: 'choose a molecule' };
     return { title: moleculeTitle(meta), subtitle: moleculeSubtitle(state, share) };
 }
 
@@ -112,7 +115,11 @@ export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
  */
 function moleculeSubtitle(state: RootState, share: string | false): string {
     const noSurface = noSurfaceView(state);
-    if (noSurface) return noSurface.shows === 'structure' ? 'Structure only' : noSurface.shows === 'dipole' ? 'Dipole arrow only' : noSurface.line;
+    // Task 9b review M8: lower case, as every subtitle is (the PNG caption's line keeps its capital).
+    if (noSurface) {
+        return noSurface.shows === 'structure' ? 'structure only' : noSurface.shows === 'dipole' ? 'dipole arrow only'
+            : noSurface.line.charAt(0).toLowerCase() + noSurface.line.slice(1);
+    }
     const drawn = moleculeDrawnPicture(state);
     if (!drawn) return '';
     const { surface } = drawn;

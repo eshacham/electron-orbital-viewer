@@ -549,8 +549,9 @@ describe('Molecules mode', () => {
         // Owner R25-A4: "None" reads "No surface" now, its name its visible text.
         fireEvent.click(within(surface).getByRole('button', { name: 'No surface' }));
         expect(store.getState().molecule.surface).toEqual({ kind: 'none' });
-        // Task 8 (addendum 8): the subtitle no longer names the geometry source -- Info does, once.
-        expect(within(container.querySelector('.viewport-title') as HTMLElement).getByText('Structure only'))
+        // Task 8 (addendum 8): the subtitle no longer names the geometry source -- Info does, once. Task 9b review M8:
+        // lower case, as every subtitle.
+        expect(within(container.querySelector('.viewport-title') as HTMLElement).getByText('structure only'))
             .toBeInTheDocument();
         // No contour is drawn, so the enclosed fraction applies to nothing: disabled, saying why (never the
         // orbital's "contour of constant |ψ|²" fallback), and no colour key stands for a surface.
@@ -1207,8 +1208,9 @@ describe('Molecules at Basics (Task 2, fix round 1)', () => {
 
     // Ruling T2-I2: the switch is Explore's, but the arrow drawn keeps its value and caveat -- Task 7b: in Info, which
     // every level reads. Task 9b (fix 1): at Basics the value alone with its units (the experiment and its reference are
-    // Research's), and no sign convention -- the pointer says the dipole arrow appears at Explore.
-    it('keeps the dipole\'s value and caveat in Info, with no switch and no convention', async () => {
+    // Research's). Task 9c ruling (flips 9b's "no convention"): the arrow is drawn, so Info says its convention, and the
+    // Display line says why it is drawn and where its switch is (ruling PF1's held-value note).
+    it('keeps the dipole\'s value, caveat and convention in Info, with no switch; the Display line names the arrow held', async () => {
         const { store, container } = await enterMolecules(false);
         act(() => {
             store.dispatch(selectMolecule({ id: 'o3' }));
@@ -1218,7 +1220,9 @@ describe('Molecules at Basics (Task 2, fix round 1)', () => {
         expect(within(viewPanel).queryByRole('checkbox', { name: 'Dipole arrow' })).toBeNull();
         const info = viewPanel.querySelector('.info-section') as HTMLElement;
         expect(info).toHaveTextContent(/Dipole μ1\.86 D — Ozone has strong multireference character\./);
-        expect(info).not.toHaveTextContent(/The arrow points from − to \+/);
+        expect(info).toHaveTextContent(/The arrow points from − to \+/);
+        expect(container).toHaveTextContent('Showing the dipole arrow — Display controls appear at Explore');
+        expect(container).not.toHaveTextContent(/the dipole arrow and properties appear at Explore/i);
     });
 
     // Ruling T2-energies: orbital energies are Explore's; the list keeps names, occupancy and the frontier chips.

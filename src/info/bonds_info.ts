@@ -33,7 +33,7 @@ import { absoluteEnergyText, energyDifferenceText, orbitalEnergyText } from '../
 import { nb, plural } from '../format/text';
 import { withSubscripts } from '../format/subscripts';
 import InfoButton from './InfoButton';
-import { enclosedFact } from './facts';
+import { DENSITY_SUM_SENTENCE, enclosedFact } from './facts';
 
 const h = React.createElement;
 
@@ -157,7 +157,8 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
         title = `${formula} — total electron density`;
         const electrons = meta ? electronsIn(meta.orbitals) : null;
         // Fix round 1 (M3): plain words only -- what the surface at this ρ shows, with its numbers, is technical. Task 9b:
-        // that the density is all the occupied orbitals together is the density glossary entry's (one wording with Molecules).
+        // that the density is all the occupied orbitals together is technical too (review I3: DENSITY_SUM_SENTENCE, one
+        // wording with Molecules).
         lead = electrons !== null
             ? `${formula} has ${electrons} electrons; the surface shows where they are likely to be found.`
             : 'The surface shows where the electrons are likely to be found.';
@@ -213,6 +214,7 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
     const technical = paragraphs(
         exactSentence,
         shape,
+        density && DENSITY_SUM_SENTENCE,
         density && densitySurfaceText(bonds.densityIso, null, minOnAxisOf(data.basis)),
         orbitals && orbitals.length > 0 && MO_LEGEND,
         orbitals && spinOrderNote(buildMoDiagram(orbitals)),

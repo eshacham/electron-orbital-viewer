@@ -38,7 +38,8 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         // The default Basic selection is 3d_z² (orbitalSlice DEFAULT_BASIC_SELECTION).
         expect(viewTitle(store.getState(), 'research').title).toBe('Hydrogen — 3d_z² orbital');
         store.dispatch(setMode('molecule'));
-        expect(viewTitle(store.getState(), 'research')).toEqual({ title: 'Molecules', subtitle: 'Choose a molecule' });
+        // Task 9b review M8: subtitles are lower case, as the phone caption's "choose a molecule" is.
+        expect(viewTitle(store.getState(), 'research')).toEqual({ title: 'Molecules', subtitle: 'choose a molecule' });
     });
 
     // Task 5 (critique P1; fix round 1 ruling): a field view is first-order perturbation theory, so its subtitle never says "exact".
@@ -63,14 +64,15 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         store.dispatch(selectMolecule({ id: 'h2o' }));
         store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
         store.dispatch(setSurface({ kind: 'none' }));
-        expect(viewTitle(store.getState(), 'research')).toEqual({ title: 'Water (H₂O)', subtitle: 'Structure only' });
+        // Task 9b review M8: lower case, as every other subtitle (a PNG's caption line keeps its capital).
+        expect(viewTitle(store.getState(), 'research')).toEqual({ title: 'Water (H₂O)', subtitle: 'structure only' });
         // Ruling T13-M: with no structure either, the subtitle never says "Structure only" -- it names the
         // dipole arrow when that is what is left, and says nothing is drawn when nothing is.
         store.dispatch(setRepresentation('none'));
         // Task 9b: the dipole's numbers are Info's fact's; the subtitle says only what is drawn (a PNG's caption keeps them).
-        expect(viewTitle(store.getState(), 'research').subtitle).toBe('Dipole arrow only');
+        expect(viewTitle(store.getState(), 'research').subtitle).toBe('dipole arrow only');
         store.dispatch(setShowDipole(false));
-        expect(viewTitle(store.getState(), 'research').subtitle).toBe('Nothing drawn: no surface, structure or dipole arrow');
+        expect(viewTitle(store.getState(), 'research').subtitle).toBe('nothing drawn: no surface, structure or dipole arrow');
     });
 
     // Task 16 (ruling P12): while the request workspace's preview is on the canvas, the title names it as a
@@ -204,6 +206,18 @@ describe('viewTitle banded by level (Task 9b)', () => {
         expect(viewTitle(store.getState(), 'research').subtitle).toBe('|ψ|² isosurface · LDA, non-relativistic');
     });
 
+    // Task 9b review M5 (ruling): a subshell draws each of its orbitals' own surfaces, and Info's Enclosed fact says "of
+    // each orbital's probability" -- so its subtitle names an orbital's probability, as the orbital view's does, never
+    // "electron density". A shell is still its electron density.
+    it('names a subshell\'s surfaces as orbitals\' probability, not electron density', () => {
+        const store = neonStore();
+        store.dispatch(drillToShell(2));
+        expect(viewTitle(store.getState(), 'explore').subtitle).toBe('electron density · 90 % enclosed');
+        store.dispatch(drillToSubshell(2, 1));
+        expect(viewTitle(store.getState(), 'explore').subtitle).toBe('electron cloud · 90 % enclosed');
+        expect(viewTitle(store.getState(), 'advanced').subtitle).toBe('|ψ|² isosurface · LDA, non-relativistic');
+    });
+
     it('says a hydrogen orbital plainly below Advanced, and its method from Advanced', () => {
         const store = neonStore();
         store.dispatch(setMode('hydrogenic'));
@@ -266,7 +280,8 @@ describe('viewTitle banded by level (Task 9b)', () => {
         // The dipole's numbers are Info's; the subtitle only says the arrow is what is drawn.
         store.dispatch(setSurface({ kind: 'none' }));
         store.dispatch(setRepresentation('none'));
-        expect(viewTitle(store.getState(), 'research').subtitle).toBe('Dipole arrow only');
+        // Task 9b review M8: lower case.
+        expect(viewTitle(store.getState(), 'research').subtitle).toBe('dipole arrow only');
     });
 
     it('leaves the export caption whole at every level', () => {

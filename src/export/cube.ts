@@ -33,9 +33,13 @@ export function formatCubeValue(value: number): string {
  * way, reading as a one-sided scale. Phase 6 final review M2: NFKD turns
  * '½' (and '³⁄₂') into digits around U+2044 FRACTION SLASH, which has no
  * ASCII form either, so a spin-orbit cube read "6p12" until it became '/'.
+ * Levels Task 9b review M4: captions write "2.31 × 10⁻³" (formatSci), and '×'
+ * has no decomposition, so it read "2.31  10-3"; a number in ×10ⁿ notation is
+ * written as data files write it, "2.31e-3", before anything else.
  */
 export function asciiLine(text: string): string {
-    return text.normalize('NFKD')
+    return text.replace(/ × 10([⁺⁻]?[⁰¹²³⁴-⁹]+)/g, (_, exponent: string) => `e${exponent}`)
+        .normalize('NFKD')
         .replace(/ψ/g, 'psi').replace(/ρ/g, 'rho')
         .replace(/σ/g, 'sigma').replace(/π/g, 'pi').replace(/δ/g, 'delta').replace(/φ/g, 'phi')
         .replace(/α/g, 'alpha').replace(/β/g, 'beta')

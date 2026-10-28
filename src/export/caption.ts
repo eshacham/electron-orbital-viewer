@@ -20,7 +20,7 @@ import { formatFormula } from '../molecules/catalogue';
 import { orbitalEnergyWithEstimate, orbitalNoun, orbitalTag } from '../molecules/orbital_display';
 import { ESP_LIMIT_HARTREE, ESP_SURFACE_DENSITY } from '../molecules/esp_color';
 import { formatDipole, hasDipoleArrow } from '../molecules/dipole';
-import { flatSubscripts } from '../format/sci';
+import { flatSubscripts, formatSci } from '../format/sci';
 import { atomOrbitalName, bondsViewName, type BondsNamed } from '../shell/view_names';
 
 /** Spec §3.1: every exported number says how it was computed. Still true of an ion or excited atom's picture -- only the configuration solved for changes, not the method. */
@@ -227,7 +227,8 @@ function moleculeViewDescription(state: RootState): string {
     }
     if (surface === 'density') {
         // The ρ the fraction produced, written as the view settings write it (App's moleculeIsoNote).
-        const rho = drawn.isoLevel !== undefined ? ` (ρ = ${drawn.isoLevel.toExponential(2)} e/a₀³)` : '';
+        // Task 9b review M4 (ruling): ×10ⁿ, never e-notation -- the typography rule holds in captions and titles too.
+        const rho = drawn.isoLevel !== undefined ? ` (ρ = ${formatSci(drawn.isoLevel)} e/a₀³)` : '';
         return `${moleculeTitle(meta)}, density, ${enclosedText(fraction)}${rho}`;
     }
     // The tag is its own clause, as MoleculeNav's "Showing" line has it: inside the role's brackets it nested a

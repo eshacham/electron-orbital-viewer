@@ -180,8 +180,9 @@ describe('atomInfo (Task 6)', () => {
         const content = atomInfo(atomsState({ Z: 6, profile: carbon() }), 'explore');
         expect(textOf(content.title)).toBe('Carbon — whole atom');
         const shown = shownAt(content, 'explore');
-        // Task 9b (fix 2): the configuration fact is Advanced's -- below it the panel's line is its one home.
-        expect(shownAt(content, 'advanced')).toContain('Configuration1s² 2s² 2p²');
+        // Task 9b review M10 (ruling): the panel's configuration line -- the drill control's label, at every level -- is
+        // its one home, so Info has no Configuration fact at any level.
+        expect(shownAt(content, 'research')).not.toContain('Configuration');
         expect(shown).toContain('Valence4 electrons in the outer shell');
         expect(shown).toContain('Click a ring in the 3D view, or a shell chip, to open it.');
         // Ruling P14's note moved here from the valence line, in the technical band.
@@ -222,7 +223,7 @@ describe('atomInfo (Task 6)', () => {
         expect(valencePlainWords(speciesConfiguration({ Z, charge, excitation: null }))).toBe(words);
     });
 
-    // Task 9b (fix 5): the caption is technical now -- the lead keeps to what the selection is -- so it is read from Advanced.
+    // Task 9b (fix 5): the caption left the lead. Review M2: it is a note after the facts, read at every level.
     it('says the cut-face caption once, for the shell views only', () => {
         const atom = shownAt(atomInfo(atomsState({ Z: 6, profile: carbon() }), 'advanced'), 'advanced');
         expect(atom.split(CUT_FACE_NOTE)).toHaveLength(2);
@@ -417,19 +418,24 @@ describe('atomInfo (Task 6)', () => {
             return lead;
         };
 
-        it('leaves the configuration to the panel\'s line below Advanced, where both would show it', () => {
+        // Task 9b review M10 (ruling): the panel's configuration line shows at every level, so it is the one home -- Info
+        // drops the fact at Advanced and Research too.
+        it('leaves the configuration to the panel\'s line at every level', () => {
             const content = atomInfo(atomsState({ Z: 6, profile: carbon() }), 'explore');
-            expect(shownAt(content, 'basics')).not.toContain('Configuration');
-            expect(shownAt(content, 'explore')).not.toContain('Configuration');
-            expect(shownAt(content, 'advanced')).toContain('Configuration1s² 2s² 2p²');
+            for (const level of ['basics', 'explore', 'advanced', 'research'] as const) {
+                expect(shownAt(content, level)).not.toContain('Configuration');
+            }
         });
 
-        it('keeps the lead to what the selection is; the hint on what to click follows the facts, the cut-face note is technical', () => {
+        // Task 9b review M2: the cut-face note is how to read the default picture every level sees, so it is a note after
+        // the facts (every level), not technical.
+        it('keeps the lead to what the selection is; the hint on what to click and the cut-face note follow the facts', () => {
             const whole = atomInfo(atomsState({ Z: 6, profile: carbon() }), 'explore');
             expect(leadOf(whole, 'explore')).toBe('Carbon has 6 electrons in 2 shells. The cut face shows them as rings.');
             expect(shownAt(whole, 'explore')).toContain('Click a ring in the 3D view, or a shell chip, to open it.');
-            expect(shownAt(whole, 'explore')).not.toContain(CUT_FACE_NOTE);
-            expect(shownAt(whole, 'advanced')).toContain(CUT_FACE_NOTE);
+            expect(leadOf(whole, 'basics')).not.toContain(CUT_FACE_NOTE);
+            expect(shownAt(whole, 'basics')).toContain(CUT_FACE_NOTE);
+            expect(whole.notes?.length).toBeGreaterThan(0);
             const orbital = atomInfo(atomsState({
                 Z: 6, profile: carbon(), level: 'orbital', selectedShell: 2, selectedSubshell: { n: 2, l: 1 }, selectedOrbital: { n: 2, l: 1, ml: 0 },
             }), 'explore');

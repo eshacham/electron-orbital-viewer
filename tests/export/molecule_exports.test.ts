@@ -112,7 +112,8 @@ describe('moleculeDrawnPicture: what was rendered, never what is merely selected
 describe('captions and file stems', () => {
     it('water, density: the enclosed fraction and the ρ it produced', () => {
         const state = drawnStore({ kind: 'density' }).getState();
-        expect(viewDescription(state)).toBe('Water (H₂O), density, 90 % enclosed (ρ = 2.31e-3 e/a₀³)');
+        // Task 9b review M4 (ruling): ×10ⁿ, not e-notation, in captions and export titles too (the typography rule).
+        expect(viewDescription(state)).toBe('Water (H₂O), density, 90 % enclosed (ρ = 2.31 × 10⁻³ e/a₀³)');
         expect(methodStatement(state)).toBe('B3LYP/def2-TZVPD (PySCF); geometry: experiment (CCCBDB)');
         expect(exportFileStem(state)).toBe('orbital-viewer_H2O_density-90');
     });
@@ -197,7 +198,8 @@ describe('captions and file stems', () => {
         const capturePng = jest.fn().mockResolvedValue(new Blob(['png']));
         await runExport('png', { ...baseContext(drawnStore({ kind: 'density' }, ozone()).getState()), handle: exportHandle({ capturePng }) });
         expect(capturePng.mock.calls[0][0].caption).toEqual([
-            'Ozone (O₃), density, 90 % enclosed (ρ = 2.31e-3 e/a₀³)',
+            // Task 9b review M4 (ruling): ×10ⁿ in the PNG caption.
+            'Ozone (O₃), density, 90 % enclosed (ρ = 2.31 × 10⁻³ e/a₀³)',
             'B3LYP/def2-TZVPD (PySCF); geometry: experiment (CCCBDB)',
             OZONE_CAVEAT,
         ]);

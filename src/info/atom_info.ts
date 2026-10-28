@@ -225,7 +225,8 @@ function measuredText(ev: number): string {
 /**
  * The ΔSCF energy, and for a neutral atom NIST's measurement with the signed difference. Fix round 1 ruling: a neutral
  * atom's own IE value is a key number, so it shows from Explore, its label carrying the (i) to the ionisation entry;
- * NIST, the signed % and the panel line stay at Advanced, as an ion's or excited atom's energy does.
+ * NIST and the signed % stay at Advanced, as an ion's or excited atom's energy does. Task 9b removed the panel's energy
+ * line: these facts are the energy's one home.
  */
 function energyFacts(state: AtomsInfoState): EnergyFacts {
     const atom = state.atom;
@@ -318,9 +319,8 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
     const readout = profile ? relativityReadoutNode(selected, relativityReadoutOf(profile)) : null;
 
     const facts: InfoFact[] = [
-        // Task 9b (finish review, fix 2): the panel's configuration line -- the drill-down's label -- shows it at every
-        // level, so Info's fact waits for Advanced rather than repeat it.
-        { label: 'Configuration', value: configurationLabelOf(configuration), min: 'advanced' },
+        // Task 9b (finish review, fix 2) and review M10 (ruling): the panel's configuration line -- the drill-down's label,
+        // shown at every level -- is the configuration's one home, so Info has no Configuration fact.
         { label: 'Valence', value: valencePlainWords(configuration) },
         ...(energySubshell ? [{ label: 'Orbital energy', value: orbitalEnergyText(energySubshell.energy), min: 'explore' as const }] : []),
         ...energies.facts,
@@ -335,14 +335,15 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
     return {
         title: titleOf(atom, drill, speciesTitle(species)),
         // Task 9b (finish review, fix 5): the lead says what the selection is, in three lines at most. The scalar-default
-        // note and the hint on what to click follow the facts (notes); the cut-face note is technical.
+        // note, the cut-face note and the hint on what to click follow the facts (notes) -- review M2: the cut-face note
+        // is how to read the default picture, which every level sees, so it is not technical.
         plain: leadSentence(state, drill, configuration),
         notes: paragraphs(
             scalarDefault && SCALAR_DEFAULT_NOTE,
+            shellView && profile && !atom.unbound && CUT_FACE_NOTE,
             hintSentence(atom, drill),
         ),
         technical: paragraphs(
-            shellView && profile && !atom.unbound && CUT_FACE_NOTE,
             coreNote && `Valence ${valenceConfigurationLabelOf(configuration)}: ${coreNote}.`,
             // Fix round 1 (M2): its own subject, and the picture's method (spec §3.1: a relativistic eigenvalue says so).
             energySubshell && `The orbital energy is an eigenvalue of the ${shortMethodLabel(picture)}, not an ionisation energy.`,
