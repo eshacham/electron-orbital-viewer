@@ -284,7 +284,7 @@ function paragraphs(...parts: React.ReactNode[]): React.ReactNode[] {
 
 /** Atoms' Info for the current selection (InfoPanel filters the facts and bands by level). */
 // Every band is written, and InfoPanel shows the ones a level reads; `level` only decides `announce` (Task 9), which no
-// band filters. Ruling PF3 keeps it in the signature every mode's builder shares. `state` is the atom and orbital slices
+// band filters, and (Task 9c, ruling c3) whether a picture-less "How this was computed" explains an energy Info shows. Ruling PF3 keeps it in the signature every mode's builder shares. `state` is the atom and orbital slices
 // (a whole RootState is one too).
 export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoContent {
     const atom = state.atom;
@@ -359,7 +359,10 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
         computed: h(React.Fragment, null,
             h('p', null, `${capitalise(methodStatement(selected))}.`),
             h('p', null, aboutModelText(selected, picture, profile !== null)),
-            h('p', null, deltaScfMethod(picture)),
+            // Task 9c fix round 1, ruling (c3): with nothing drawn, the ΔSCF method is explained only if Info shows an
+            // energy it explains (an unbound anion shows none), and it never speaks of a picture.
+            (profile || energies.facts.some(fact => !fact.min || atLeast(level, fact.min)))
+                && h('p', null, deltaScfMethod(profile ? picture : null)),
         ),
         // Task 9 (the screen-reader pass): what the picture's relativity is, said when it changes -- from the level that
         // shows the switch. Fix round 1: one line, once, when the new picture lands, named after the switch's own words

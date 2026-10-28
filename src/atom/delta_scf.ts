@@ -37,9 +37,12 @@ export const DELTA_SCF_METHOD =
  * so with a relativistic picture "the same LDA draws the picture" stops
  * being true, and a heavy atom's energy would otherwise read as carrying
  * the relativistic shifts its picture shows. 'off' is DELTA_SCF_METHOD,
- * word for word.
+ * word for word; null (no picture drawn) names the method alone.
  */
-export function deltaScfMethod(pictureMode: RelativityMode): string {
+export function deltaScfMethod(pictureMode: RelativityMode | null): string {
+    // Levels Task 9c fix round 1, ruling (c3): with no picture drawn (a failed solve), the method alone -- nothing about
+    // a picture on screen.
+    if (pictureMode === null) return DELTA_SCF_HEAD.replace(/ — $/, '.') + DELTA_SCF_TAIL;
     if (pictureMode === 'off') return DELTA_SCF_METHOD;
     return DELTA_SCF_HEAD + 'the picture on screen is not: it is drawn by a spin-restricted '
         + `${shortMethodLabel(pictureMode)}, so these energies leave out the relativistic shifts the picture shows.`

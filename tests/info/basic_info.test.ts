@@ -11,10 +11,10 @@ import type { LearningLevel } from '../../src/levels/levels';
 import { makeStore } from '../export/fixtures';
 import { setMode } from '../../src/store/atomSlice';
 import {
-    finishOrbitalCalculation, setBasicSelection, setCombination, setSurfaceStyle, startOrbitalCalculation,
+    finishOrbitalCalculation, setBasicSelection, setCombination, setSurfaceStyle, startFieldCalculation, startOrbitalCalculation,
 } from '../../src/store/orbitalSlice';
 import { basicOrbitalParams } from '../../src/orbital_presets';
-import type { CombinationSelection } from '../../src/combinations';
+import { fieldRequestFor, type CombinationSelection } from '../../src/combinations';
 import type { BasicSelection } from '../../src/store/orbitalSlice';
 
 /** Orbitals mode with `selection` drawn (its iso value landed) and `combination` chosen. */
@@ -46,6 +46,37 @@ function computedText(content: InfoContent): string {
     unmount();
     return flat(text);
 }
+
+// Task 9c fix round 1, ruling (c1): main showed a combination's iso value under Electron enclosed; Info gives it from
+// Advanced, as for one orbital -- the value the picture is drawn at (the overlay's members are equivalent, so one value),
+// and only once that combination's own picture has landed.
+describe('the iso value of a combination (Task 9c, ruling c1)', () => {
+    const drawnCombination = (combination: CombinationSelection) => {
+        const store = orbitalsState(undefined, combination);
+        store.dispatch(startFieldCalculation(fieldRequestFor(combination, 0.9)!));
+        const asked = basicInfo(store.getState(), 'advanced');
+        store.dispatch(finishOrbitalCalculation({ isoLevel: 8.15e-5 }));
+        return { asked, drawn: basicInfo(store.getState(), 'advanced') };
+    };
+
+    it.each([
+        ['the n = 2 Stark states', { kind: 'field', level: 2, field: 0.002, stark: 'both' } as CombinationSelection],
+        ['the n = 1 field', { kind: 'field', level: 1, field: 0.03, stark: 'lower' } as CombinationSelection],
+        ['an sp³ hybrid', { kind: 'hybrid', hybrid: 'sp3', member: 0 } as CombinationSelection],
+    ])('gives %s its drawn iso value from Advanced, with its unit', (_, combination) => {
+        const { asked, drawn } = drawnCombination(combination);
+        // While its picture is computed, the previous picture's value is not this one's.
+        expect(shownAt(asked, 'advanced')).not.toContain('Iso value');
+        expect(shownAt(drawn, 'advanced')).toContain('Iso value|ψ|² = 8.15 × 10⁻⁵ a₀⁻³');
+        expect(shownAt(drawn, 'explore')).not.toContain('Iso value');
+    });
+
+    it('never gives a combination the single orbital\'s iso value', () => {
+        // orbitalsState draws 3dz² (iso 1.234e-3) and then chooses the combination, which is not drawn yet.
+        const text = shownAt(basicInfo(orbitalsState(undefined, { kind: 'hybrid', hybrid: 'sp3', member: 0 }).getState(), 'advanced'), 'advanced');
+        expect(text).not.toContain('Iso value');
+    });
+});
 
 describe('basicInfo (Task 5)', () => {
     it('titles one orbital "Hydrogen — <name> orbital" with a real subscript, never "3d_z²"', () => {

@@ -22,7 +22,7 @@ import { shellLetter } from '../orbital_names';
 import { angularNodeSurfaces, isoValueText, shapeWord } from '../orbital_facts';
 import { RADIAL_FACTOR_NOTE } from '../atom/plot_tabs';
 import { cutAwaySentence } from '../atom/atom_text';
-import { CombinationSelection, combinationTitle, selectionProblem } from '../combinations';
+import { CombinationSelection, combinationTitle, fieldRequestFor, samePicture, selectionProblem } from '../combinations';
 import { HybridKind, HYBRID_NAMES, hybridCount } from '../hybrids';
 import { MAX_FIELD_AU } from '../field_source';
 import { BASIC_ORBITALS_Z } from '../orbital_presets';
@@ -99,6 +99,23 @@ function enclosedFacts(state: OrbitalsInfoState, n: number, l: number, ml: numbe
     const drawn = currentParams && !currentParams.radialSamples && currentParams.Z === BASIC_ORBITALS_Z
         && currentParams.n === n && currentParams.l === l && currentParams.ml === ml
         && currentParams.enclosedFraction === enclosedFraction;
+    if (drawn && !isLoading && !renderFailed && isoLevel !== null) {
+        facts.push({ label: 'Iso value', value: isoValueText(isoLevel), min: 'advanced' });
+    }
+    return facts;
+}
+
+/**
+ * Task 9c fix round 1, ruling (c1): a combination's fraction and, once that combination is drawn, the iso value it is
+ * drawn at, from Advanced as for one orbital. An overlay's members (the two Stark states, a hybrid set) are equivalent,
+ * so the one value the viewer reports (its first member's) is every member's. Until the picture on screen is this
+ * selection's at this fraction, the value would be the previous picture's, so none is given.
+ */
+function combinationEnclosedFacts(state: OrbitalsInfoState, selection: CombinationSelection): InfoFact[] {
+    const { enclosedFraction, currentField, isoLevel, isLoading, renderFailed } = state.orbital;
+    const facts: InfoFact[] = [enclosedFact(enclosedFraction)];
+    const asked = fieldRequestFor(selection, enclosedFraction);
+    const drawn = asked !== null && currentField !== null && samePicture(currentField, asked);
     if (drawn && !isLoading && !renderFailed && isoLevel !== null) {
         facts.push({ label: 'Iso value', value: isoValueText(isoLevel), min: 'advanced' });
     }
@@ -185,7 +202,7 @@ function hybridInfo(state: OrbitalsInfoState, selection: Extract<CombinationSele
             { label: 'Hybrids', value: String(k + 1) },
             { label: 'Built from', value: k === 1 ? '2s and 2p' : `2s and ${k} × 2p` },
             { label: 'Energy', value: energyText(-1 / 8), min: 'explore' },
-            enclosedFact(state.orbital.enclosedFraction),
+            ...combinationEnclosedFacts(state, selection),
         ],
         // Fix round 1 (science ruling): for hydrogen a mixture of the degenerate n = 2 states is still stationary.
         computed: 'Exact one-electron solution, Z = 1, for the 2s and 2p. A hybrid is a linear combination of these degenerate states '
@@ -196,7 +213,7 @@ function hybridInfo(state: OrbitalsInfoState, selection: Extract<CombinationSele
 function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelection, { kind: 'field' }>): InfoContent {
     const field = selection.field;
     const fieldFact: InfoFact = { label: 'Field F', value: `${field.toFixed(selection.level === 1 ? 3 : 4)} a.u. (${formatVoltsPerMetre(field)})` };
-    const enclosed = enclosedFact(state.orbital.enclosedFraction);
+    const enclosed = combinationEnclosedFacts(state, selection);
 
     if (selection.level === 1) {
         const share = nextOrderDipoleShare(field);
@@ -211,7 +228,7 @@ function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelec
                 fieldFact,
                 { label: 'Induced dipole μ', value: `${dipole.toFixed(3)} e·a₀ (${(dipole * DEBYE_PER_EA0).toFixed(3)} D)`, min: 'explore' },
                 { label: 'Polarisability α', value: '9/2 a₀³', min: 'advanced' },
-                enclosed,
+                ...enclosed,
             ],
             computed: joinSentences(
                 'Drawn: ψ = ψ₁ₛ − F z (1 + r/2) ψ₁ₛ, first-order perturbation theory (Dalgarno–Lewis).',
@@ -233,7 +250,7 @@ function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelec
             ' the electron leans towards −z and its energy falls; in ', starkLabel('upper'), ' it leans towards +z and its energy rises.'),
         notes: notesOf(cutSentence(state)),
         technical: h(React.Fragment, null, `${N2_FIRST_ORDER} ${nb('ΔE = ∓3F')}, from ⟨2s|z|`, twoPz(), nb('⟩ = −3 a₀'), ' in this sign convention.'),
-        facts: [fieldFact, { label: 'Energy at F = 0', value: energyText(-1 / 8), min: 'explore' }, ...shiftFacts, enclosed],
+        facts: [fieldFact, { label: 'Energy at F = 0', value: energyText(-1 / 8), min: 'explore' }, ...shiftFacts, ...enclosed],
         computed: h(React.Fragment, null,
             'Drawn: the n = 2 Stark states (2s ± ', twoPz(), ')/√2, first-order degenerate perturbation theory. ',
             `${FIELD_VALIDITY} ${N2_FIELD_LIMIT}`),

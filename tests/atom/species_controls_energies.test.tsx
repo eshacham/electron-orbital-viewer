@@ -63,7 +63,10 @@ describe('Info: energy accuracy (ruling P15, Task 6)', () => {
 
     // Ruling C6 / final review M4: the full ΔSCF method, as text (no longer a tooltip), worded for the picture.
     it('states the full ΔSCF method for the picture on screen', () => {
-        expect(infoText({ Z: 11, energies: done('11', 5.37, 'Na', 'Na⁺') })).toContain(DELTA_SCF_METHOD);
+        // Task 9c fix round 1 (ruling c3): the wording that names the picture needs one drawn, so sodium gets a profile.
+        expect(infoText({
+            Z: 11, energies: done('11', 5.37, 'Na', 'Na⁺'), profile: { ...makeStoreProfile(), Z: 11, relativity: 'off' },
+        })).toContain(DELTA_SCF_METHOD);
         expect(infoText({
             Z: 79, energies: done('79', 9.1, 'Au', 'Au⁺'),
             profile: { ...makeStoreProfile(), Z: 79, relativity: 'scalar' },

@@ -399,6 +399,30 @@ describe('atomInfo (Task 6)', () => {
         expect(shown).not.toContain('NIST');
     });
 
+    // Task 9c fix round 1, ruling (c3): with nothing drawn, "How this was computed" explains the ΔSCF energies only if Info
+    // shows them, and never says a picture is drawn. An unbound anion has no energy in Info, so no ΔSCF paragraph.
+    it('leaves ΔSCF out of "How this was computed" for Cl⁻ with nothing drawn, which shows no energy', () => {
+        const content = atomInfo(atomsState({ Z: 17, charge: -1, unbound: 'LDA does not bind this anion.' }), 'research');
+        expect(shownAt(content, 'research')).not.toContain('Ionisation energy');
+        // The ΔSCF paragraph is gone (the model's own description, which names ΔSCF in passing, is main's and stays).
+        const computed = textOf(content.computed);
+        expect(computed).not.toContain('ΔSCF: the difference');
+        expect(computed).not.toContain('Occupations follow Hund');
+    });
+
+    it('explains the ΔSCF energies it shows when no picture is drawn, without claiming one', () => {
+        // The picture's solve failed (no profile), and the ΔSCF energy, computed separately, landed.
+        const content = atomInfo(atomsState({
+            Z: 91, profile: null, error: 'SCF did not converge', energies: paEnergies,
+        }), 'research');
+        expect(shownAt(content, 'research')).toContain('7.38');
+        const computed = textOf(content.computed);
+        const deltaScf = computed.slice(computed.indexOf('ΔSCF: the difference of two self-consistent total energies'));
+        expect(deltaScf).toMatch(/^ΔSCF: the difference/);
+        expect(deltaScf).toContain('Never an orbital eigenvalue.');
+        expect(deltaScf).not.toMatch(/picture/);
+    });
+
     it('says plainly when nothing is drawn', () => {
         const content = atomInfo(atomsState({ Z: 17, charge: -1, unbound: 'LDA does not bind this anion.' }), 'research');
         expect(textOf(content.title)).toBe('Chlorine ion Cl⁻ — whole atom — not drawn');
