@@ -402,6 +402,26 @@ function collectMetrics() {
         }),
         text: [...section.querySelectorAll('.info-text')].map(e => e.textContent),
         computedText: section.querySelector('.info-computed-body')?.textContent ?? null,
+        // Task 9b (finish review, fix 5): the lead's laid-out lines (Basics and Explore: 3 at most at the inspector's
+        // width), counted as the distinct tops of its text's line boxes; and every fact label's lines (fix 8: one each).
+        // Lines are the box's height over its line height (a subscript's or an (i)'s own box would count twice by tops).
+        leadLines: (() => {
+          const lead = section.querySelector('.info-body > p.info-text');
+          if (!lead) return null;
+          return Math.round(lead.getBoundingClientRect().height / parseFloat(getComputedStyle(lead).lineHeight));
+        })(),
+        // A label's lines: its text's line boxes, a new line wherever one starts more than half a line below the last (a
+        // dt stretches to its row, so its own box would count a wrapped value's lines; a subscript sits a little lower).
+        factLabelLines: [...section.querySelectorAll('.info-fact dt')].map(dt => {
+          const range = document.createRange();
+          range.selectNodeContents(dt);
+          const half = parseFloat(getComputedStyle(dt).lineHeight) / 2;
+          const tops = [...range.getClientRects()].filter(r => r.height > 4).map(r => r.top).sort((a, b) => a - b);
+          const lines = tops.reduce((n, top, i) => (i === 0 || top - tops[i - 1] > half ? n + 1 : n), 0);
+          return [dt.textContent, lines];
+        }),
+        // Fix 4: the scroll cue's class on whatever scrolls Info (shown only while more is below).
+        moreBelow: scroller ? scroller.classList.contains('has-more-below') : null,
       };
     })(),
     // Levels Task 9, Review Focus 4: the "Plot and data" header is on screen and is what is painted at its centre.

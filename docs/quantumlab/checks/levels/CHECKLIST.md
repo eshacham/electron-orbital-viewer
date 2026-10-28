@@ -19,9 +19,61 @@ science diff is `main` at `468ade0`, which is the merge-base. It was built from 
 
 pending (controller): the `impeccable-finish-reviewer` against the direction contract, its fixes and verdict.
 
+## Finish fixes
+
+Task 9b applies the finish review's eight material fixes (`.impeccable/critique/2026-10-27-levels-finish.md`,
+disposition fix). Shot on this branch's own Vite on 5413, `--gl metal --jobs-stub`, 1440 × 900 desktop and 390 × 844
+phone. Every shot settled with 0 page errors. Molecules saw 2 `/api` requests, both stubbed.
+
+**Before and after** (dark, desktop):
+
+| View | Before | After |
+|---|---|---|
+| Molecules Basics, water: Info | `finish-before-basics-water-dark-desktop.png` | `finish-after-basics-water-dark-desktop.png` |
+| Orbitals Explore, 3dz²: the lead | `finish-before-explore-basic-3dz2-dark-desktop.png` | `finish-after-explore-basic-3dz2-dark-desktop.png` |
+| Bonds Research, N₂: the canvas | `finish-before-research-bonds-n2-dark-desktop.png` | `finish-after-research-bonds-n2-dark-desktop.png` |
+| Atoms Research, carbon 2pz: the panel | `finish-before-research-c-2pz-dark-desktop.png` | `finish-after-research-c-2pz-dark-desktop.png` |
+
+What changed in them:
+- **Molecules Basics:** Info has no point group, the dipole reads "1.86 D", and the arrow's convention is gone. Info
+  now fits without scrolling. The subtitle reads "electron density · 90 % enclosed", with no e-notation ρ and no
+  repeat of the title.
+- **Orbitals Explore:** the lead is 3 lines, and "How this was computed" is above the fold (before, it was cut).
+- **Bonds Research:** the subtitle is "electron density", with no R and no ρ. The canvas key and Info hold those, and
+  the R slider keeps its readout. "Total energy" stays on one line, and its value drops below it whole.
+- **Atoms Research:** no ionisation-energy line in the panel. The (i)s sit beside "Shells" and "Subshells", not at
+  the panel's edge. The subtitle is "|ψ|² isosurface · LDA, non-relativistic".
+
+**The pressed (i) and its topic chip** (owner amendment). Two modes, both themes, desktop and phone:
+- Atoms, Shells (i):
+  - desktop: `finish-pressed-atoms-c-whole-{dark,light}-desktop.png`;
+  - phone: `finish-pressed-atoms-chip-c-whole-{dark,light}-phone.png` shows the Info tab with the chip, and
+    `finish-pressed-atoms-i-c-whole-{dark,light}-phone.png` shows the Explore tab with the pressed (i).
+- Molecules, the ESP key's (i): `finish-pressed-esp-water-esp-{dark,light}-{desktop,phone}.png`. On the phone, the
+  pressed (i) on the canvas key and the chip in the Info tab are in one shot.
+- In dark, the pressed (i) wears the 2 px cyan halo (`--ql-shadow-selected-halo`). In light, it is the solid accent
+  with no glow.
+
+**The scroll cue** (a tonal 24 px bottom fade, only while more is below):
+- **Showing:** `finish-cue-on-bonds-n2-{dark,light}-desktop-crop.png` (Research, N₂) and
+  `finish-cue-phone-bonds-n2-dark-phone.png` (the phone sheet's Info tab). metrics.info.moreBelow is true, and the
+  mask is `linear-gradient(<text colour> calc(100% − 24px), transparent)`.
+- **Not showing:** `finish-cue-off-water-{dark,light}-desktop-crop.png` (Basics, water: Info fits). moreBelow is
+  false and the mask is `none`.
+
+**Measured** (`tools/design/shoot.mjs`, new metrics `info.leadLines`, `info.factLabelLines` and `info.moreBelow`):
+- **Leads:** 1–3 lines at Basics and Explore in every scene swept: c-whole, c-2pz, fe-shell, na-ion, pa-whole,
+  basic-3dz2, basic-n4, bonds-n2, bonds-co-orbital, bonds-n2-sg, bonds-n2-1pu, bonds-h2plus, bonds-o2, water,
+  water-esp, water-orbitals, core-water, c2h2-deep, benzene, glycine and no2. Before, they were 8–9 (Orbitals), 6
+  (H₂⁺), 7 (ESP) and 4 (Bonds MO, C₂H₂ HOMO).
+- **Fact labels:** every one is 1 line at Research, desktop and phone, in bonds-n2, bonds-h2plus, c-2pz, pa-whole,
+  na-ion, water, water-orbitals, water-esp and no2. No fact (i) wrapped under its label.
+- **Review Focus 4:** Info's share stays 0.449.
+
 ## DESIGN.md
 
-pending (controller): the documenter updates DESIGN.md (levels, Info, the (i), the text bands).
+pending (controller): the documenter updates DESIGN.md (levels, Info, the (i), the text bands). Task 9b adds one
+token, `--ql-shadow-selected-halo`: `0 0 0 2px rgba(31,182,245,.35)` in Deep Space and `none` in Light Clean.
 
 ## How it was shot
 
