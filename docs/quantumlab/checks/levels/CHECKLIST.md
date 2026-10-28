@@ -13,6 +13,16 @@ pruned afterwards.
 
 ## Owner flags for the local test
 
+- **"Opens at" now holds both ways** (final review I1, ruling). A link copied with "Opens at Basics" opens at Basics
+  for a reader whose own level is Research (or Explore, the first-visit default), and says so: "Opened at Basics for
+  this link — your level stays Research." It never opens below what the view needs: a Basics link to Fe²⁺ opens at
+  Advanced and says why. Share's menu offers nothing below the view's need. If wrong, restore raise-only and word the
+  menu as "at least". See "Final fix wave" below.
+- **The Data tabs keep their values** (final review M1, ruling). Orbitals', Atoms' and Bonds' Data tabs are the
+  CSV-backed table, so they still repeat Info's numbers. If wrong, trimming them is a next-step item.
+- **Below Research the owner's request is hidden, not closed** (final review M6, ruling): its preview stays drawn, and
+  the Explore column says "Showing the request's preview — request controls appear at Research".
+
 - **PF5:** the pinned "How this was computed" footer is gone from Molecules. Its content now lives in Info, folded
   below Research and open at Research.
 - **The Properties card is trimmed** (ruling, concern 4 of Task 7b). Each number has one home, in Info. The card keeps
@@ -52,7 +62,11 @@ pruned afterwards.
 
 ## Finish review
 
-pending (controller): the `impeccable-finish-reviewer` against the direction contract, its fixes and verdict.
+Done. The `impeccable-finish-reviewer` judged the build against the direction contract
+(`.impeccable/critique/2026-10-27-levels-finish.md`, committed in e9684e3):
+- first pass: disposition **fix**, with eight material fixes (applied as Task 9b and Task 9c, below);
+- verdict pass on HEAD 927667d: disposition **ship**, 8/8 resolved. Its non-blocking notes (the dark phone pressed-(i)
+  re-shoot, one capture of Atoms' Research facts) were taken in the Task 9 cleanup.
 
 ## Finish fixes
 
@@ -186,8 +200,9 @@ node tools/design/science_diff.mjs /tmp/lv9c-main-metrics.json /tmp/lv9c-sci-met
 
 ## DESIGN.md
 
-pending (controller): the documenter updates DESIGN.md (levels, Info, the (i), the text bands). Task 9b adds one
-token, `--ql-shadow-selected-halo`. Task 9c (ruling) gives it the strip tile's soft glow:
+Done. The documenter recorded levels, Info, the (i), the phone caption and the typography rules in DESIGN.md and
+design.json, committed in c268992. Task 9b adds one token, `--ql-shadow-selected-halo`. Task 9c (ruling) gives it the
+strip tile's soft glow:
 - Deep Space: `0 0 12px 1px rgba(31,182,245,.5)`, the same value as `--ql-shadow-selected-tile`;
 - Light Clean: `none`.
 
@@ -689,3 +704,37 @@ The first report's three findings, as they stood:
 **An observation for the science read (new text, not a diff):** Bonds' plain lead says "the HOMO: the highest **level**
 that holds electrons". Molecules was changed to "the highest **orbital** that holds electrons" in 7b
 (task-7b-review.md:98, I3: "use 'orbital', not 'level'").
+
+## Final fix wave
+
+The final whole-branch review's fixes (W/final-fix-brief.md), on this branch's own Vite on 5413, headless Chromium with
+`--use-angle=metal`, every `/api` request aborted (no job server reached), 1440 × 900 desktop and 390 × 844 phone, dark.
+Every page settled with 0 page errors (/tmp/ffw/live.json).
+
+**I1, a link's level both ways:**
+- `final-i1-basics-link-at-research-dark-desktop.png`: `#mode=atom&Z=6&level=atom&lvl=basics`, stored level Research.
+  The switch shows Basics, the notice reads "Opened at Basics for this link — your level stays Research.", and
+  `eov.level` is still `research`.
+- `final-i1-explore-link-fresh-dark-desktop.png`: the same view with `lvl=explore`, on a fresh profile (no stored
+  level). It opens at Explore, the reader's own level, so there is no notice, and nothing is stored.
+- `final-i1-basics-link-fe2-floored-dark-desktop.png`: `#mode=atom&Z=26&charge=2&level=atom&lvl=basics`, fresh
+  profile. It opens at Advanced: "Opened at Advanced for this link — it asks for Basics, but this view needs Advanced.
+  Your level stays Explore." Fe²⁺ and its charge control are on screen.
+
+**I2, an (i) in full screen:** water's ESP map at Explore.
+- `final-i2-fullscreen-esp-before-dark-desktop.png`: full screen, the ESP key and its (i) on the canvas.
+- `final-i2-fullscreen-esp-after-dark-desktop.png`: after pressing the key's (i). Full screen has gone, Info shows
+  "Electrostatic potential" in its topic chip, the key's (i) is pressed, and focus is on Info's heading.
+
+**M3, the new (i)s:**
+- `final-m3-orbitals-nodes-phase-dark-desktop.png`: Orbitals, 3dz² at Explore. The Nodes fact and the ψ key each carry
+  an (i); `final-m3-orbitals-phase-pressed-dark-desktop.png` shows the key's pressed, and Info on Phase.
+- `final-m3-water-density-tier-dark-desktop.png`: Molecules, water's density. Info's title "Water (H₂O) — electron
+  density" carries Electron density's (i), and the tier line on the canvas carries Data tier's;
+  `final-m3-water-density-pressed-dark-desktop.png` shows Info on Electron density.
+- `final-m3-water-tier-note-dark-phone.png`: on a phone, the tier note at the end of Info carries Data tier's (i).
+
+**The way back to neutral** (unverified item, checked): `final-atoms-way-back-basics-dark-desktop.png`, an Fe²⁺ link
+lowered to Basics. Under Configuration: "Showing Fe²⁺ — charge controls appear at Advanced", then "Show the neutral
+atom".
+
