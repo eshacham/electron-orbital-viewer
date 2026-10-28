@@ -10,6 +10,7 @@ import { MoleculeOrbitalInfo } from '../molecules/types';
 import { frontierOccupied } from '../molecules/orbital_display';
 import { withSubscripts } from '../format/subscripts';
 import InfoButton from '../info/InfoButton';
+import { atLeast, type LearningLevel } from '../levels/levels';
 import MoDiagram from './MoDiagram';
 
 /** The orbital "One orbital" opens onto when none is picked yet: the HOMO, or the SOMO if open-shell (preflight D8's shared resolver). */
@@ -32,6 +33,11 @@ export interface BondsPanelProps {
      * off on a phone, where the caption under the header says the loaded view, so a reader hears it once.
      */
     announceStatus?: boolean;
+    /**
+     * Owner R26-3: the learning level in use -- at Basics and Explore a pointer line under the MO heading says a level
+     * can be pressed. Omitted, everything shows as at Research (no pointer), as BasicExplore's default.
+     */
+    level?: LearningLevel;
 }
 
 /**
@@ -41,7 +47,7 @@ export interface BondsPanelProps {
  * controls and short labels -- the energy line, the density label, the MO
  * legend and the bond-order footer are Info's (bondsInfo), with every method.
  */
-const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSystem, onCommitH2PlusR, onScanIndex, onView, onDensityIso, announceStatus = true }) => {
+const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSystem, onCommitH2PlusR, onScanIndex, onView, onDensityIso, announceStatus = true, level = 'research' }) => {
     const isExact = bonds.system === 'h2plus';
     const formula = systemFormula(bonds.system);
     const { scan, meta } = data;
@@ -179,6 +185,7 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                         <Typography variant="subtitle2" className="mo-heading">Molecular orbitals</Typography>
                         <InfoButton topic="moDiagram" label="Molecular orbitals" />
                     </div>
+                    {!atLeast(level, 'advanced') && <Typography variant="caption" component="p" className="mo-hint">Pick a level to draw that orbital.</Typography>}
                     <MoDiagram orbitals={orbitals} selectedIndex={selectedIndex}
                         onSelect={index => onView(viewForIndex(index))} />
                 </div>

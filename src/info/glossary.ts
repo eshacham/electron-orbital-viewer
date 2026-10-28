@@ -7,9 +7,22 @@
  */
 import type { InfoTopicId } from './info_types';
 
+/**
+ * Owner R26-3: one mark a figure shows and what it means, read with the plain band at every level -- the MO diagram's
+ * notation. `mark` and `text` are typeset as names are (σg → σ<sub>g</sub>, withSubscripts); `spoken` is what a reader
+ * hears for a mark that is a symbol, not a word (an arrow, a line).
+ */
+export interface GlossaryMark {
+    mark: string;
+    spoken?: string;
+    text: string;
+}
+
 export interface GlossaryEntry {
     title: string;
     plain: string;
+    /** Owner R26-3: a compact list after the plain text, one line per mark, at every level. */
+    marks?: GlossaryMark[];
     technical: string;
     full?: string;
 }
@@ -145,9 +158,23 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
         full: 'Energies are coupled cluster, CCSD(T) with the aug-cc-pVTZ basis (full CI for H₂ and He₂), at precomputed bond lengths; H₂⁺ is solved exactly here. '
             + 'A curve stops where single-reference CCSD(T) is no longer valid, as the bond breaks into open-shell atoms.',
     },
+    // Owner R26-3: every mark MoDiagram draws, checked against N₂, CO, H₂⁺, He₂ and O₂ -- one box (line) per orbital,
+    // a degenerate pair side by side under one label; ↑ from occupation ≥ 1 (an unrestricted α orbital), ↓ from 2 (its β
+    // partner); g/u and * only in homonuclear labels (CO: 1σ … 6σ, 1π, 2π); the core band only where a gap over 1 Ha
+    // splits it off (N₂, O₂, CO; not H₂⁺, H₂ or He₂).
     moDiagram: {
         title: 'MO diagram',
-        plain: 'The diagram shows the molecule\'s orbitals as levels, lowest energy at the bottom, with an arrow for each electron. Levels marked * are antibonding: electrons there weaken the bond.',
+        plain: 'The diagram shows the molecule\'s orbitals by energy, the lowest at the bottom, and its marks read as follows.',
+        marks: [
+            { mark: '―', spoken: 'A line', text: 'One orbital; with no arrows it is empty.' },
+            { mark: '↑↓', spoken: 'Up and down arrows', text: 'Two electrons, with opposite spins.' },
+            { mark: '↑', spoken: 'An up arrow', text: 'One electron on its own (H₂⁺, O₂).' },
+            { mark: 'σ, π', text: 'Shape round the bond axis: σ is the same all round; π has a nodal plane along it and comes in pairs.' },
+            { mark: 'g, u', text: 'Sign kept (g, gerade) or flipped (u, ungerade) through the centre; none in CO and HF, whose atoms differ.' },
+            { mark: '*', text: 'Antibonding: its electrons weaken the bond. Marked only where g and u are.' },
+            { mark: '1, 2, 3', text: 'Counts the orbitals of one kind from the lowest: 1σg, 2σg, 3σg.' },
+            { mark: '≈ core', text: 'The inner orbitals, far lower in energy, drawn below a break.' },
+        ],
         technical: 'Each level is a molecular orbital labelled by its symmetry (σ or π, g or u), placed at its orbital energy ε in Ha; '
             + 'the valence levels are to scale, and the core levels, far lower, sit in a band under a break. '
             + 'For every system but H₂⁺ the energies are Kohn–Sham eigenvalues; for H₂⁺ they are the exact electronic energies.',

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { DiagramBox, DiagramLevel, buildMoDiagram } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
 import { withSubscripts } from '../format/subscripts';
-import { minus } from '../format/sci';
+import { minus, spokenText } from '../format/sci';
 
 interface MoDiagramProps {
     /** meta.json's `orbitals`, or H₂⁺'s two exact levels (h2plusOrbitals). */
@@ -27,19 +27,17 @@ const MIN_ROW = 20;
 /** Core levels (1σg, 1σu*: millihartree apart) share the band's one row, side by side. */
 const CORE_COLUMN = 110;
 
-const SPIN_WORD: Record<string, string> = { alpha: ', alpha spin', beta: ', beta spin', restricted: '' };
-
 /**
- * A box's accessible name: which degenerate partner it is, its energy (a
- * Kohn–Sham eigenvalue for a molecule, an exact electronic energy for H₂⁺ --
- * never called an ionisation energy), how many electrons sit in it, and its
- * spin where that is meaningful (O₂'s α/β pair have different occupations).
+ * A level's accessible name (owner R26-3): what pressing it draws -- "2σg orbital, 2 electrons", with plain digits
+ * (ruling M6) -- and, for a degenerate partner, which of the pair it is, as the strip names it ("1πu orbital (1 of 2)",
+ * bonds_strip_items.ts). The electrons are the arrows it shows: an empty level is "empty". Its energy is Info's fact (the
+ * One Home Per Number Rule) and stays in the hover title.
  */
 function boxLabel(level: DiagramLevel, box: DiagramBox, index: number): string {
-    const occupation = (box.up ? 1 : 0) + (box.down ? 1 : 0);
-    // Task 7a fix round 1 (M9): a true minus.
-    return `${level.label} (${index + 1} of ${level.boxes.length}), ${minus(level.energyHartree.toFixed(3))} Ha, `
-        + `occupation ${occupation}${SPIN_WORD[level.spin]}`;
+    const electrons = (box.up ? 1 : 0) + (box.down ? 1 : 0);
+    const which = level.boxes.length > 1 ? ` (${index + 1} of ${level.boxes.length})` : '';
+    const count = electrons === 0 ? 'empty' : electrons === 1 ? '1 electron' : `${electrons} electrons`;
+    return `${spokenText(level.label)} orbital${which}, ${count}`;
 }
 
 /**

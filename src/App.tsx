@@ -1670,6 +1670,7 @@ function App() {
             onDensityIso={(value: number) => dispatch(setDensityIso(value))}
             // Task 9 fix round 1: on a phone the caption says the loaded view, so the panel's status would say it twice.
             announceStatus={!isNarrow}
+            level={level}
         />
     );
 

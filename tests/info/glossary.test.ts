@@ -28,7 +28,9 @@ describe('glossary (Task 4)', () => {
     });
 
     it.each(INFO_TOPIC_IDS.map(id => [id]))('%s uses the app typography: no "_" and no hyphen-minus before a digit', id => {
-        for (const text of Object.values(glossary[id])) {
+        const { marks, ...bands } = glossary[id];
+        const texts = [...Object.values(bands), ...(marks ?? []).flatMap(mark => [mark.mark, mark.text])];
+        for (const text of texts) {
             expect([id, text.includes('_')]).toEqual([id, false]);
             expect([id, /-\d/.test(text)]).toEqual([id, false]);
         }
@@ -57,6 +59,33 @@ describe('glossary (Task 4)', () => {
         expect(entry.technical).toMatch(/log \|E\|/);
         expect(entry.full).toMatch(/j = l − ½ and j = l \+ ½/);
         expect(entry.full).toMatch(/[Ss]calar/);
+    });
+
+    // Owner R26-3 ("there is no info about the orbitals notation (e.g., ↑↓ 2σg)"): the MO diagram's plain band explains
+    // every mark the diagram shows, one short line each -- checked against what MoDiagram draws for N₂, CO, H₂⁺, He₂ and
+    // O₂ (CO's and HF's labels carry no g/u and no *; O₂'s π* and H₂⁺'s 1σg hold a lone ↑; only N₂-like rows have a core).
+    it("explains every mark of the MO diagram in its plain band, one line each (owner R26-3)", () => {
+        const marks = glossary.moDiagram.marks!;
+        expect(marks.map(mark => mark.mark)).toEqual(['―', '↑↓', '↑', 'σ, π', 'g, u', '*', '1, 2, 3', '≈ core']);
+        const text = (mark: string) => marks.find(entry => entry.mark === mark)!.text;
+        expect(text('―')).toMatch(/one orbital/i);
+        expect(text('―')).toMatch(/no arrows.*empty/);
+        expect(text('↑↓')).toMatch(/two electrons.*opposite spins/i);
+        expect(text('↑')).toMatch(/one electron/i);
+        expect(text('σ, π')).toMatch(/bond axis/);
+        expect(text('σ, π')).toMatch(/nodal plane/);
+        expect(text('g, u')).toMatch(/gerade/);
+        expect(text('g, u')).toMatch(/ungerade/);
+        expect(text('g, u')).toMatch(/centre/);
+        expect(text('g, u')).toMatch(/CO and HF/);
+        expect(text('*')).toMatch(/[Aa]ntibonding/);
+        expect(text('1, 2, 3')).toMatch(/1σg, 2σg, 3σg/);
+        expect(text('≈ core')).toMatch(/below a break/);
+        // One short line each.
+        for (const mark of marks) expect([mark.mark, mark.text.length <= 140]).toEqual([mark.mark, true]);
+        // Arrows are real arrows (U+2191, U+2193), and the lines name what a reader hears.
+        expect('↑↓').toBe('\u2191\u2193');
+        expect(marks.filter(mark => /[―↑↓]/.test(mark.mark)).every(mark => mark.spoken)).toBe(true);
     });
 
     // Owner R26-2: the Kohn–Sham entry now also opens beside an atom's orbital energies, so it may not speak of

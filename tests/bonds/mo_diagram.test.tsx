@@ -180,27 +180,51 @@ describe('MoDiagram', () => {
         render(<MoDiagram orbitals={n2} selectedIndex={6} onSelect={onSelect} />);
         expect(screen.getAllByText('↑')).toHaveLength(7);
         expect(screen.getAllByText('↓')).toHaveLength(7);
-        fireEvent.click(screen.getByRole('button', { name: /1πg\* \(2 of 2\)/ }));
+        fireEvent.click(screen.getByRole('button', { name: /^1πg\* orbital \(2 of 2\)/ }));
         expect(onSelect).toHaveBeenCalledWith(8);
-        expect(screen.getByRole('button', { name: /3σg \(1 of 1\)/ })).toHaveClass('selected');
+        expect(screen.getByRole('button', { name: /^3σg orbital,/ })).toHaveClass('selected');
         expect(screen.queryByText(/Bond order/)).toBeNull();
     });
 
-    // Accessibility: a level's box states its energy, occupation and spin, and
-    // marks the one on screen with aria-pressed (not colour alone).
-    it('marks the selected box and names each one fully for assistive tech', () => {
+    // Accessibility: each level is a real button named for what pressing it draws -- "2σg orbital, 2 electrons", plain
+    // digits (ruling M6), a degenerate partner's place in its pair as the strip names it ("1πu orbital (1 of 2)") --
+    // and the one on screen is marked with aria-pressed (not colour alone). Owner R26-3: the energy is Info's fact.
+    it('marks the selected level and names each one for what pressing it draws (owner R26-3)', () => {
         render(<MoDiagram orbitals={n2} selectedIndex={6} onSelect={jest.fn()} />);
-        // Task 7a fix round 1 (M9): the energies read with a true minus (U+2212), in the name and the tooltip.
-        const selected = screen.getByRole('button', { name: /3σg \(1 of 1\), −0\.380 Ha, occupation 2/ });
-        expect(selected).toHaveAttribute('title', '3σg: ε = −0.3800 Ha');
+        const selected = screen.getByRole('button', { name: '3σg orbital, 2 electrons' });
+        expect(selected.tagName).toBe('BUTTON');
+        expect(selected).toHaveAttribute('type', 'button');
         expect(selected).toHaveAttribute('aria-pressed', 'true');
-        const other = screen.getByRole('button', { name: /2σg \(1 of 1\), −1\.100 Ha, occupation 2/ });
-        expect(other).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.getByRole('button', { name: '2σg orbital, 2 electrons' })).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.getByRole('button', { name: '1πu orbital (1 of 2), 2 electrons' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '1πg* orbital (2 of 2), empty' })).toBeInTheDocument();
     });
 
-    it("names O2's alpha levels with their spin", () => {
+    it("names O2's singly occupied levels with their one electron (owner R26-3)", () => {
         render(<MoDiagram orbitals={o2} selectedIndex={null} onSelect={jest.fn()} />);
-        expect(screen.getByRole('button', { name: /1πg\* \(1 of 2\), −0\.350 Ha, occupation 1, alpha spin/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '1πg* orbital (1 of 2), 1 electron' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '1πu orbital (2 of 2), 2 electrons' })).toBeInTheDocument();
+    });
+
+    // Owner R26-3 ("there is no indication these are links"): a level looks pressable -- a tonal tile at rest, a
+    // stronger tone on hover, the app's selected style (Deep Selection, as chips) when it is the one drawn, the pointer
+    // cursor -- and keeps the global 2 px focus ring (no outline of its own drawn over it). Tokens only.
+    it('styles each level as pressable: rest, hover, selected and focus, in tokens (owner R26-3)', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+        const rule = (selector: string) => {
+            const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const match = new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'm').exec(css);
+            if (!match) throw new Error(`no rule for ${selector}`);
+            return match[1];
+        };
+        expect(rule('.mo-box')).toMatch(/cursor:\s*pointer/);
+        expect(rule('.mo-box')).toMatch(/background:\s*var\(--ql-color-surface-2\)/);
+        expect(rule('.mo-box:hover')).toMatch(/background:\s*var\(--ql-color-surface-3\)/);
+        const selected = rule('.mo-box.selected,\n.mo-box.selected:hover');
+        expect(selected).toMatch(/background:\s*var\(--ql-color-selected-fill\)/);
+        expect(selected).toMatch(/color:\s*var\(--ql-color-on-fill\)/);
+        expect(selected).toMatch(/box-shadow:\s*var\(--ql-shadow-selected\)/);
+        expect(css).not.toMatch(/\.mo-box[^{]*\{[^}]*outline/);
     });
 
     // Found live (Task 13, N₂): the "≈ core" break was drawn across the 1σg

@@ -131,6 +131,27 @@ describe('InfoPanel (Task 4)', () => {
         expect(screen.queryByText('Electrons')).toBeNull();
     });
 
+    // Owner R26-3: a topic's marks (the MO diagram's notation) follow its plain text as a compact list at every level,
+    // each mark typeset (σ<sub>g</sub>) and spoken as the reader hears it.
+    it("lists a topic's marks after its plain text, typeset, at every level (owner R26-3)", () => {
+        const { container, rerender } = render(<InfoPanel content={content} topic="moDiagram" onClearTopic={() => {}} level="basics" />);
+        const list = container.querySelector('dl.info-marks')!;
+        expect(list).not.toBeNull();
+        const plain = screen.getByText(glossary.moDiagram.plain);
+        expect(plain.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(list.querySelectorAll('.info-mark')).toHaveLength(glossary.moDiagram.marks!.length);
+        const numbers = [...list.querySelectorAll('.info-mark')].find(dt => dt.textContent === '1, 2, 3')!;
+        expect(numbers.nextElementSibling).toHaveSeenText('Counts the orbitals of one kind from the lowest: 1σg, 2σg, 3σg.');
+        expect(numbers.nextElementSibling!.querySelector('sub')).toHaveTextContent('g');
+        const pair = [...list.querySelectorAll('.info-mark')].find(dt => dt.textContent?.includes('↑↓'))!;
+        expect(pair.querySelector('[aria-hidden="true"]')).toHaveTextContent('↑↓');
+        expect(pair.querySelector('.visually-hidden')).toHaveTextContent('Up and down arrows');
+        rerender(<InfoPanel content={content} topic="moDiagram" onClearTopic={() => {}} level="research" />);
+        expect(container.querySelector('dl.info-marks')).not.toBeNull();
+        rerender(<InfoPanel content={content} topic="node" onClearTopic={() => {}} level="research" />);
+        expect(container.querySelector('dl.info-marks')).toBeNull();
+    });
+
     describe('with an (i) (Review Focus 3)', () => {
         const Harness: React.FC<{ selectionKey: string }> = ({ selectionKey }) => {
             const { topic, setTopic } = useInfoTopic(selectionKey);

@@ -3,7 +3,7 @@ import InfoButton from './InfoButton';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { atLeast, type LearningLevel } from '../levels/levels';
 import { spokenText } from '../format/sci';
-import { spokenTextOf } from '../format/subscripts';
+import { spokenTextOf, typesetLabel, withSubscripts } from '../format/subscripts';
 import { glossary } from './glossary';
 import type { InfoContent, InfoTopicId } from './info_types';
 import { useInfoTopicContext } from './useInfoTopic';
@@ -132,6 +132,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                         <span><span aria-hidden="true">‹</span>{'\u00A0'}Back to <span ref={backTitle}>{content.title}</span></span>
                     </button>
                     <p className="info-text">{entry.plain}</p>
+                    {/* Owner R26-3: a figure's marks (the MO diagram's notation), one line each, at every level -- each mark
+                        typeset as names are (σ<sub>g</sub>), a symbol mark heard by its words ("Up and down arrows"). */}
+                    {entry.marks && (
+                        <dl className="info-marks">
+                            {entry.marks.map(mark => (
+                                <div key={mark.mark} className="info-mark-row">
+                                    <dt className="info-mark">{mark.spoken ? typesetLabel([mark.mark], mark.spoken) : withSubscripts(mark.mark)}</dt>
+                                    <dd className="info-mark-text">{withSubscripts(mark.text)}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    )}
                     {technical && <p className="info-text">{entry.technical}</p>}
                     {research && entry.full && <p className="info-text">{entry.full}</p>}
                 </div>

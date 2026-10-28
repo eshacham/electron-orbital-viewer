@@ -245,7 +245,7 @@ describe('BondsPanel', () => {
         expect(screen.queryByText(/surface at ρ = 0\.002 e\/a₀³/)).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'ρ = 0.05 e/a₀³' }));
         expect(handlers.onDensityIso).toHaveBeenCalledWith(0.05);
-        fireEvent.click(screen.getByRole('button', { name: /1σu\* \(1 of 1\)/ }));
+        fireEvent.click(screen.getByRole('button', { name: /^1σu\* orbital,/ }));
         expect(handlers.onView).toHaveBeenCalledWith({ kind: 'mo', label: '1σu*', spin: 'restricted', component: 0 });
         expect(screen.queryByText(/FCI\/aug-cc-pVTZ/)).toBeNull();
         // The frontier line ("HOMO 1σu* …") moved to BondsInspector's Data tab
@@ -289,7 +289,7 @@ describe('BondsPanel', () => {
     it('lets an orbital view return to the total density', () => {
         const mo = reducer(n2, setBondsView({ kind: 'mo', label: '3σg', spin: 'restricted', component: 0 }));
         render(<BondsPanel bonds={mo} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
-        expect(screen.getByRole('button', { name: /3σg \(1 of 1\)/ })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: /^3σg orbital,/ })).toHaveAttribute('aria-pressed', 'true');
         const density = screen.getByRole('button', { name: 'Total electron density' });
         expect(density).toHaveAttribute('aria-pressed', 'false');
         fireEvent.click(density);
@@ -379,6 +379,30 @@ describe('BondsPanel', () => {
             expect(screen.getByText('Molecular orbitals')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'About Molecular orbitals' })).toHaveClass('info-button');
             expect(screen.queryByText(/σ\/π: symmetry about the bond axis/)).toBeNull();
+        });
+
+        // Owner R26-3: pressing a level draws that orbital (today's behaviour, confirmed), and at Basics and Explore one
+        // short pointer line under the heading says so -- a control hint, not an explanation (Info has the notation).
+        it('draws the orbital of a pressed level (owner R26-3)', () => {
+            handlers.onView.mockClear();
+            render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
+            fireEvent.click(screen.getByRole('button', { name: '2σg orbital, 2 electrons' }));
+            expect(handlers.onView).toHaveBeenCalledWith({ kind: 'mo', label: '2σg', spin: 'restricted', component: 0 });
+            fireEvent.click(screen.getByRole('button', { name: '1πu orbital (2 of 2), 2 electrons' }));
+            expect(handlers.onView).toHaveBeenLastCalledWith({ kind: 'mo', label: '1πu', spin: 'restricted', component: 1 });
+        });
+
+        it.each(['basics', 'explore'] as const)('says "Pick a level to draw that orbital." under the heading at %s (owner R26-3)', level => {
+            render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} level={level} />);
+            const hint = screen.getByText('Pick a level to draw that orbital.');
+            expect(hint).toHaveClass('mo-hint');
+            const heading = screen.getByText('Molecular orbitals').closest('.mo-heading-row')!;
+            expect(heading.nextElementSibling).toBe(hint);
+        });
+
+        it.each(['advanced', 'research'] as const)('leaves the pointer line out at %s (owner R26-3)', level => {
+            render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} level={level} />);
+            expect(screen.queryByText('Pick a level to draw that orbital.')).toBeNull();
         });
 
         it('shows Total density selected by default, and One orbital disabled until orbitals are known', () => {

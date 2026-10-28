@@ -1006,21 +1006,38 @@ html, body, #root {
   gap: 4px;
   transform: translateY(-50%);
 }
+/* Owner R26-3 ("there is no indication these are links"): each level is a
+   button that looks pressable -- a tonal tile on its level line at rest
+   (surface-2, the strip tile's and key chips' ground, edged by a
+   border-subtle hairline so it reads on Deep Space's surface-1 card, where
+   surface-2 alone sits a few points away), a stronger tone on
+   hover (surface-3, the strip tile's hover), and the app's selected style
+   when it is the orbital drawn (Deep Selection: selected-fill, the
+   selected-edge ring with Deep Space's glow, on-fill arrows and line, as the
+   chips). Focus keeps the global 2 px focus-ring outline: no outline here. */
 .mo-box {
   height: 18px;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--ql-color-border-subtle);
   border-bottom: 2px solid var(--ql-color-text-1);
-  background: none;
+  border-radius: var(--ql-radius-xs) var(--ql-radius-xs) 0 0;
+  background: var(--ql-color-surface-2);
   color: inherit;
   font: inherit;
   cursor: pointer;
+  transition: background-color var(--ql-motion-hover) ease-out;
 }
-/* The theme primary already reads at 4.5:1+ on the light card (panel_contrast
-   checks it generically); selection is never carried by this outline alone
-   -- aria-pressed and the box's own accessible name say so too. */
-.mo-box.selected {
-  outline: 2px solid var(--ql-color-selected-edge);
+.mo-box:hover {
+  background: var(--ql-color-surface-3);
+}
+/* Selection is never carried by the fill alone: aria-pressed says so too. */
+.mo-box.selected,
+.mo-box.selected:hover {
+  background: var(--ql-color-selected-fill);
+  color: var(--ql-color-on-fill);
+  border-color: var(--ql-color-selected-fill);
+  border-bottom-color: var(--ql-color-on-fill);
+  box-shadow: var(--ql-shadow-selected);
 }
 .mo-label {
   margin-left: 6px;
@@ -1057,6 +1074,12 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+/* Owner R26-3: at Basics and Explore, one pointer line under the heading says the levels are pressable -- a control
+   hint in the level line's quiet caption ink, not an explanation (Info has the notation). */
+.mo-hint {
+  margin: 0;
+  color: var(--ql-color-text-3);
 }
 .mo-legend {
   display: block;

@@ -50,6 +50,16 @@
 .info-fact dt { color: var(--ql-color-text-3); flex: none; width: max-content; max-width: 100%; }
 .info-fact dd { margin: 0; color: var(--ql-color-text-1); text-align: right; flex: 1 1 0; }
 
+/* Owner R26-3: a topic's marks (the MO diagram's notation) as a compact two-column list -- the mark in text-1 at its
+   own width, what it means in the running text's text-2 beside it, one row per mark, rows 2 px apart as the fact grid's. */
+.info-marks {
+  margin: 0; display: grid; grid-template-columns: max-content 1fr; column-gap: 10px; row-gap: 2px;
+  font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line);
+}
+.info-mark-row { display: contents; }
+.info-mark { color: var(--ql-color-text-1); font-weight: 600; white-space: nowrap; }
+.info-mark-text { margin: 0; color: var(--ql-color-text-2); }
+
 /* "How this was computed": folded below Research, open at Research. Its chevron follows the inspector's
    disclosure convention (ruling R23b-2): down when folded, up when open. */
 .info-computed > summary {
@@ -86,7 +96,7 @@
 
 /* DESIGN.md's Phone Fourteen Rule: running text steps to 14 px on a phone; captions do not grow. */
 @media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
-  .info-text, .info-title, .info-fact { font-size: 14px; }
+  .info-text, .info-title, .info-fact, .info-marks { font-size: 14px; }
   /* Review M4: the way back is a touch target like the (i) beside it. */
   .info-back { min-height: var(--ql-size-touch); }
 }

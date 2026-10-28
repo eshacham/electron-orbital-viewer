@@ -54,7 +54,11 @@ const PAIRS: Pair[] = [
     { selector: '.subshell-panel-legend', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.periodic-table-panel', declares: [`background: ${v('surface-1')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.mo-diagram', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
-    { selector: '.mo-box', declares: [`border-bottom: 2px solid ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
+    // Owner R26-3: a level is a pressable tile -- surface-2 at rest, surface-3 on hover, Deep Selection when drawn.
+    { selector: '.mo-box', declares: [`border-bottom: 2px solid ${v('text-1')}`, `background: ${v('surface-2')}`], fg: 'text-1', bg: 'surface-2' },
+    { selector: '.mo-box:hover', declares: [`background: ${v('surface-3')}`], fg: 'text-1', bg: 'surface-3' },
+    { selector: '.mo-box.selected,\n.mo-box.selected:hover', declares: [`background: ${v('selected-fill')}`, `color: ${v('on-fill')}`], fg: 'on-fill', bg: 'selected-fill' },
+    { selector: '.mo-hint', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-1' },
     { selector: '.mo-break', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.mo-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.mo-footer', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
