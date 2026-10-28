@@ -28,8 +28,10 @@ export function useInfoTopic(selectionKey: string): InfoTopicState {
 interface InfoTopicContextValue extends InfoTopicState {
     /**
      * Task 6 fix round 2 (owner: only one (i) is ever shown pressed): the (i) whose press set the current topic, by its
-     * id (InfoButton: its place and topic, stable across a remount) -- a topic can have more than one (i) on screen (Atoms' ionisation energy: the panel's line and Info's
-     * fact). Null when no (i) set it: no topic, or a topic left by Back or a new selection.
+     * id (InfoButton: its place and topic, stable across a remount) -- a topic can have more than one (i) on screen
+     * (Bonds' Kohn–Sham orbitals: the Data tab's energies line and Info's orbital-energy fact; Atoms' ionisation energy
+     * had two until Task 9b removed the panel's line). Null when no (i) set it: no topic, or a topic left by Back or a
+     * new selection.
      */
     activeButtonId: string | null;
     /** An (i) pressed: Info shows `topic`, and the (i) with `buttonId` is the active one. */

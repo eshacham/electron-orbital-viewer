@@ -18,7 +18,7 @@ const NEXT_KEYS: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLe
  * The Learning level switch (spec plan): Basics · Explore · Advanced ·
  * Research, a radio group -- one Tab stop, the arrow keys move and choose,
  * wrapping, Home and End go to the ends (WAI-ARIA radio group). It shows the
- * level in use, a visit raise included; a choice is stored and ends the raise.
+ * level in use, a link's visit level included; a choice is stored and ends the visit.
  */
 const LevelControl: React.FC<LevelControlProps> = ({ variant }) => {
     if (variant === 'compact') return <CompactLevelControl />;

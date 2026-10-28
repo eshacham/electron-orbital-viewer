@@ -307,9 +307,9 @@ const Controls: React.FC<ControlsProps> = ({
           rather than the view. The group is named "relativity treatment",
           not "relativity", so it and its fieldset (legend "Relativity")
           are two distinct groups to a screen reader and to a role query.
-          The readout under it is a polite live region, mounted whenever
-          the switch is, so a new contraction is announced when it lands
-          (a region inserted together with its text often is not). */}
+          Task 6 moved the readout under it into Info; Task 9 speaks the
+          relativity line from App's own polite region (atomInfo's
+          `announce`), which stays mounted where the switch is. */}
       {showSelection && isAtomMode && onRelativityChange && relativity && (
         <RelativityControl relativity={relativity} onRelativityChange={onRelativityChange} />
       )}

@@ -34,10 +34,10 @@ function holdsExploreValue(state: RootState): boolean {
 
 /**
  * The level this view's own state calls for -- independent of any stored
- * preference or visit raise (spec plan): a value an Advanced/Explore-only
+ * preference or visit level (spec plan): a value an Advanced/Explore-only
  * control set must stay visible, even to a viewer whose own level is lower.
- * Callers (main.tsx, useUrlStateSync.ts) compare this against the stored
- * preference themselves before raising the visit.
+ * applyLevelForHash floors a link's visit level at it (final review I1), and
+ * Share's "Opens at" offers nothing below it.
  */
 export function requiredLevel(state: RootState): LearningLevel {
     if (holdsAdvancedValue(state)) return 'advanced';

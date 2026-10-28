@@ -58,7 +58,7 @@ void startOwnerSession(store.dispatch, '/').then(back => {
     // Fix round 1, Important #1: this hash can itself need Advanced/Research
     // (or carry its own `lvl`) just as much as the boot hash above -- the
     // owner's return from a sign-in redirect must not silently drop the
-    // raise that a direct visit to the same link would have gotten.
+    // visit level that a direct visit to the same link would have gotten.
     const backHash = new URL(back, window.location.origin).hash;
     applyState(backHash);
     applyLevelForHash(backHash, () => store.getState());

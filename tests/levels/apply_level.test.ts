@@ -12,7 +12,7 @@ import { displayPref } from '../../src/design/presentation';
  * the Cognito-return path (fix round 1, Important #1), which has no main.tsx
  * test of its own to exercise it directly.
  */
-describe('applyLevelForHash (spec plan: the visit-only raise, shared by every hash-apply entry point)', () => {
+describe('applyLevelForHash (spec plan: the visit level a link sets, shared by every hash-apply entry point)', () => {
     beforeEach(() => {
         resetUrlKeysForTests();
         registerBuiltInUrlKeys();
