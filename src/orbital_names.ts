@@ -20,6 +20,20 @@ const SUBSCRIPTS: Record<number, string[]> = {
     3: ['y(3x²−y²)', 'xyz', 'yz²', 'z³', 'xz²', 'z(x²−y²)', 'x(x²−3y²)'],
 };
 
+/** The old X-ray letters of the first seven principal shells; nothing in this app reaches n > 7 (configurations.ts). */
+const PRINCIPAL_SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
+
+/**
+ * A shell's name, written once (final review M2): "L shell", as the view title, the caption, the strip and the radial
+ * plot's curves name it; with `withNumber`, "L shell (n = 2)", as the chips, the breadcrumb and Info's lead do --
+ * spaced, as the app writes every "n = 2". Past Q, where there is no letter, "n = 8 shell" either way.
+ */
+export function shellName(n: number, { withNumber = false }: { withNumber?: boolean } = {}): string {
+    const letter = PRINCIPAL_SHELL_LETTERS[n - 1];
+    if (!letter) return `n = ${n} shell`;
+    return withNumber ? `${letter} shell (n = ${n})` : `${letter} shell`;
+}
+
 /** The letter for an angular momentum: s, p, d, f, g, h, i, k, l. */
 export function shellLetter(l: number): string {
     return SHELL_LETTERS[l] ?? `l=${l}`;

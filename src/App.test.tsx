@@ -329,7 +329,8 @@ describe('App', () => {
 
         // Hydrogen has exactly one shell (K, n=1); LevelNav exposes it as a
         // clickable chip built from shellsFor(Z), per ruling R26.
-        fireEvent.click(screen.getByText(/K shell \(n=1\)/));
+        // Final review M2: shell names are spaced, "L shell (n = 2)".
+        fireEvent.click(screen.getByText(/K shell \(n = 1\)/));
 
         expect(screen.getByLabelText('subshells')).toBeInTheDocument();
 
@@ -501,7 +502,8 @@ describe('App', () => {
             renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
 
             fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
-            fireEvent.click(screen.getByText(/K shell \(n=1\)/));
+            // Final review M2: shell names are spaced, "L shell (n = 2)".
+            fireEvent.click(screen.getByText(/K shell \(n = 1\)/));
 
             expect(screen.getByRole('button', { name: /back to Hydrogen/i })).toBeInTheDocument();
             expect(screen.getByLabelText('subshells')).toBeInTheDocument();
@@ -1701,7 +1703,8 @@ describe('App: the first-view hint (Task 5, ruling P17)', () => {
         renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
         expect(screen.getByRole('note')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByText(/K shell \(n=1\)/));
+        // Final review M2: shell names are spaced, "L shell (n = 2)".
+        fireEvent.click(screen.getByText(/K shell \(n = 1\)/));
 
         expect(screen.queryByRole('note')).not.toBeInTheDocument();
         expect(hintPref.get()).toEqual({ rotateDismissed: true });

@@ -10,7 +10,8 @@ import { useRovingFocus } from '../shell/useRovingFocus';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { orbitalPlainName } from '../format/sci';
 import InfoButton from '../info/InfoButton';
-import { aboutModelText, shellName } from '../atom/atom_text';
+import { aboutModelText } from '../atom/atom_text';
+import { shellName } from '../shell/view_title';
 
 /**
  * Where a breadcrumb segment or shell chip should take the app.
@@ -221,12 +222,12 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 target: subshellTarget(selectedOrbital.n, selectedOrbital.l, selectedOrbital.j),
             }
             : selectedSubshell
-                ? { label: shellName(selectedSubshell.n), target: { level: 'shell', n: selectedSubshell.n } }
+                ? { label: shellName(selectedSubshell.n, { withNumber: true }), target: { level: 'shell', n: selectedSubshell.n } }
                 : selectedShell !== null
                     ? { label: rootLabel, target: { level: 'atom' } }
                     : null;
     if (selectedShell !== null) {
-        crumbs.push({ key: 'shell', label: shellName(selectedShell), target: { level: 'shell', n: selectedShell } });
+        crumbs.push({ key: 'shell', label: shellName(selectedShell, { withNumber: true }), target: { level: 'shell', n: selectedShell } });
     }
     if (selectedSubshell) {
         crumbs.push({
@@ -351,7 +352,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                         <Chip
                             key={shell.n}
                             className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isValence ? ' valence' : ' core'}`}
-                            label={`${shellName(shell.n)}${isValence ? ' · valence' : ''}`}
+                            label={`${shellName(shell.n, { withNumber: true })}${isValence ? ' · valence' : ''}`}
                             color={isSelected ? 'primary' : 'default'}
                             disabled={shellsUnavailable}
                             // Addendum 2's "is there a way to unselect one?".

@@ -20,16 +20,7 @@ const h = React.createElement;
 
 // ---- Shells and "About this model" (from LevelNav) ----
 
-// Old X-ray shell letters, matching atom_profile.ts's private shellName
-// (not exported from there — this is a UI label, not a physics quantity, so
-// it is simpler to keep its own tiny copy than to export an internal of the
-// solver module just for this).
-const PRINCIPAL_SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
-
-/** "L shell (n=2)": the chips', breadcrumb's and hint's name for a shell (Info's hint says it too, Task 6). */
-export function shellName(n: number): string {
-    return `${PRINCIPAL_SHELL_LETTERS[n - 1] ?? `n=${n}`} shell (n=${n})`;
-}
+// Final review M2: a shell's name is view_names.ts's shellName (one helper; `withNumber` for "L shell (n = 2)").
 
 /**
  * The relativity clause of "About this model" -- the rest of the paragraph

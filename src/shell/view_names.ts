@@ -5,17 +5,13 @@
  */
 import type { AtomState } from '../store/atomSlice';
 import type { OrbitalSpin } from '../molecules/types';
-import { orbitalName } from '../orbital_names';
+import { orbitalName, shellName } from '../orbital_names';
 import { subshellLabel } from '../atom/configurations';
 import { H2PLUS_LABELS, type H2PlusState } from '../bonds/h2plus';
 import { SPIN_SUFFIX } from '../bonds/bonds_request';
 
-const SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
-
-/** "L shell": the X-ray letter, as the breadcrumb and the strip name shells. */
-export function shellName(n: number): string {
-    return `${SHELL_LETTERS[n - 1] ?? `n = ${n}`} shell`;
-}
+// Final review M2: a shell's name is written once, in orbital_names.ts (no imports, so the solver can use it too).
+export { shellName };
 
 /** One atom orbital: "2p_z", with its j-level after `jJoin` under spin–orbit ("2p_z · 2p³⁄₂", or " (" → "2p_z (2p³⁄₂)"). */
 export function atomOrbitalName(orbital: { n: number; l: number; ml: number; j?: number }, jJoin: ' · ' | ' ('): string {

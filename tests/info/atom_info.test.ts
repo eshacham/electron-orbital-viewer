@@ -229,9 +229,11 @@ describe('atomInfo (Task 6)', () => {
         expect(atom.split(CUT_FACE_NOTE)).toHaveLength(2);
         const shell = shownAt(atomInfo(atomsState({ Z: 6, profile: carbon(), level: 'shell', selectedShell: 2 }), 'advanced'), 'advanced');
         expect(shell).toContain(CUT_FACE_NOTE);
-        expect(shell).toContain('The L shell (n=2) holds 4 of Carbon\'s 6 electrons: 2s² 2p².');
+        // Final review M2: shell names are spaced, "L shell (n = 2)".
+        expect(shell).toContain('The L shell (n = 2) holds 4 of Carbon\'s 6 electrons: 2s² 2p².');
         // Fix round 1 (M1): no "it" without a referent in Info.
-        expect(shell).toContain('Showing the L shell (n=2) only — click its chip again, or the ✕ on the chip, for the whole atom. Click a subshell to show its orbitals on their own.');
+        // Final review M2: shell names are spaced, "L shell (n = 2)".
+        expect(shell).toContain('Showing the L shell (n = 2) only — click its chip again, or the ✕ on the chip, for the whole atom. Click a subshell to show its orbitals on their own.');
         const orbital = shownAt(atomInfo(atomsState({
             Z: 6, profile: carbon(), level: 'orbital', selectedShell: 2, selectedSubshell: { n: 2, l: 1 }, selectedOrbital: { n: 2, l: 1, ml: 0 },
         }), 'research'), 'research');

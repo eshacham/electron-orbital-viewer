@@ -32,10 +32,10 @@ import { formatDrawnRadius } from '../atom/format_radius';
 import { LARGE_COMPONENT_NOTE, RADIAL_FACTOR_NOTE } from '../atom/plot_tabs';
 import { isoValueText, orbitalEnergyText, shapeWord } from '../orbital_facts';
 import { shellLetter } from '../orbital_names';
-import { shellName as viewShellName } from '../shell/view_title';
+import { shellName } from '../shell/view_title';
 import {
     aboutModelText, cutHelpText, energyValueText, formatElectrons, ionisationLabelOf, ionisationNoValueReason, jLevelNote,
-    relativityHelp, relativityReadoutNode, relativityReadoutOf, shellName, subshellCapacity,
+    relativityHelp, relativityReadoutNode, relativityReadoutOf, subshellCapacity,
 } from '../atom/atom_text';
 import { atLeast, CONTROL_LEVEL, IE_LEVEL } from '../levels/levels';
 import { listOf, plural } from '../format/text';
@@ -118,7 +118,7 @@ function hintSentence(atom: AtomsInfoState['atom'], drill: Drill): string {
             return 'Click a ring in the 3D view, or a shell chip, to open it.';
         case 'shell':
             // Fix round 1 (M1): "it" had no referent in Info, which has controls of its own nearby.
-            return `Showing the ${shellName(atom.selectedShell!)} only — click its chip again, or the ✕ on the chip, for the whole atom. `
+            return `Showing the ${shellName(atom.selectedShell!, { withNumber: true })} only — click its chip again, or the ✕ on the chip, for the whole atom. `
                 + 'Click a subshell to show its orbitals on their own.';
         case 'subshell': {
             const { n, l, j } = atom.selectedSubshell!;
@@ -139,7 +139,7 @@ function titleOf(atom: AtomsInfoState['atom'], drill: Drill, who: string): React
         case 'atom':
             return `${who} — whole atom${notDrawn}`;
         case 'shell':
-            return `${who} — ${viewShellName(atom.selectedShell!)}${notDrawn}`;
+            return `${who} — ${shellName(atom.selectedShell!)}${notDrawn}`;
         case 'subshell': {
             const { n, l, j } = atom.selectedSubshell!;
             return `${who} — ${subshellLabel(n, l, j)}${notDrawn}`;
@@ -167,7 +167,7 @@ function leadSentence(state: AtomsInfoState, drill: Drill, configuration: Subshe
         }
         case 'shell': {
             const own = configuration.filter(s => s.n === atom.selectedShell);
-            return `The ${shellName(atom.selectedShell!)} holds ${sum(own)} of ${who}'s ${electrons} electrons: ${configurationLabelOf(own)}.`;
+            return `The ${shellName(atom.selectedShell!, { withNumber: true })} holds ${sum(own)} of ${who}'s ${electrons} electrons: ${configurationLabelOf(own)}.`;
         }
         case 'subshell': {
             const { n, l, j } = atom.selectedSubshell!;

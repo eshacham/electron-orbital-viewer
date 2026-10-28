@@ -1,6 +1,6 @@
 import { drillToOrbital, drillToShell, drillToSubshell, setMode } from '../../src/store/atomSlice';
 import { setCombination, setEnclosedFraction } from '../../src/store/orbitalSlice';
-import { captionIsLoading, viewCaption, viewTitle } from '../../src/shell/view_title';
+import { captionIsLoading, shellName, viewCaption, viewTitle } from '../../src/shell/view_title';
 import { selectBondsSystem, setBondsView } from '../../src/store/bondsSlice';
 import { indexLoaded } from '../../src/store/moleculeSlice';
 import { selectMolecule, metaLoaded, setSurface, setRepresentation, setShowDipole, renderStarted, renderFinished } from '../../src/store/moleculeSlice';
@@ -287,5 +287,15 @@ describe('viewTitle banded by level (Task 9b)', () => {
     it('leaves the export caption whole at every level', () => {
         expect(viewDescription(bondsMoleculeStore({ kind: 'density' }).getState()))
             .toBe('N₂ total density, surface at ρ = 0.002 e/a₀³, R = 2.07 a₀ (1.098 Å)');
+    });
+});
+
+// Final review M2: one shellName -- "L shell" where the view is named, "L shell (n = 2)" (spaced, the typography rule)
+// where the chips, the breadcrumb and Info's lead name a shell.
+describe('shellName', () => {
+    it('names a shell by its letter, with its number spaced as the rest of the app writes it', () => {
+        expect(shellName(2)).toBe('L shell');
+        expect(shellName(2, { withNumber: true })).toBe('L shell (n = 2)');
+        expect(shellName(8, { withNumber: true })).toBe('n = 8 shell');
     });
 });

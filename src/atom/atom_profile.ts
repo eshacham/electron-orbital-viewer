@@ -16,6 +16,7 @@ import { RadialGrid, cumulativeIntegral, interpolateOnGrid } from './radial_grid
 import { RadialState } from './radial_solver';
 import { AtomSolution } from './scf';
 import { subshellLabel } from './configurations';
+import { shellName } from '../orbital_names';
 
 export interface RadialCurve {
     label: string;
@@ -96,15 +97,6 @@ export interface AtomProfile {
      * (`curve_colors.ts`) a radius is tinted with.
      */
     shellIndexAtR: Uint8Array;
-}
-
-// Letters for the first seven principal shells, in the old X-ray notation
-// ("K shell", "L shell", ...) the brief's example label uses. Nothing in this
-// app reaches n > 7 (see configurations.ts), so the table need not go further.
-const PRINCIPAL_SHELL_LETTERS = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
-
-function shellName(n: number): string {
-    return `${PRINCIPAL_SHELL_LETTERS[n - 1] ?? `n=${n}`} shell`;
 }
 
 /**

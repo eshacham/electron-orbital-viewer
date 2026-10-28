@@ -60,13 +60,15 @@ describe('LevelNav', () => {
 
         const crumbs = within(getByRole('navigation', { name: /breadcrumb/i }));
         expect(crumbs.getByText('Carbon')).toBeInTheDocument();
-        expect(crumbs.getByText(/L shell \(n=2\)/)).toBeInTheDocument();
+        // Final review M2: shell names are spaced, "L shell (n = 2)".
+        expect(crumbs.getByText(/L shell \(n = 2\)/)).toBeInTheDocument();
         expect(crumbs.getByText('2p')).toBeInTheDocument();
 
         fireEvent.click(crumbs.getByRole('button', { name: 'Carbon' }));
         expect(onNavigate).toHaveBeenCalledWith({ level: 'atom' } as NavigationTarget);
 
-        fireEvent.click(crumbs.getByRole('button', { name: /L shell \(n=2\)/ }));
+        // Final review M2: shell names are spaced, "L shell (n = 2)".
+        fireEvent.click(crumbs.getByRole('button', { name: /L shell \(n = 2\)/ }));
         expect(onNavigate).toHaveBeenCalledWith({ level: 'shell', n: 2 } as NavigationTarget);
 
         fireEvent.click(crumbs.getByRole('button', { name: '2p' }));
@@ -130,7 +132,8 @@ describe('LevelNav', () => {
             const onNavigate = jest.fn();
             const { getByRole } = renderWithShell(onNavigate);
             const chips = within(getByRole('group', { name: /shells/i }));
-            fireEvent.click(chips.getByText(/L shell \(n=2\)/));
+            // Final review M2: shell names are spaced, "L shell (n = 2)".
+            fireEvent.click(chips.getByText(/L shell \(n = 2\)/));
             expect(onNavigate).toHaveBeenCalledWith({ level: 'atom' } as NavigationTarget);
         });
 
@@ -138,7 +141,8 @@ describe('LevelNav', () => {
             const onNavigate = jest.fn();
             const { getByRole } = renderWithShell(onNavigate);
             const chips = within(getByRole('group', { name: /shells/i }));
-            fireEvent.click(chips.getByText(/M shell \(n=3\)/));
+            // Final review M2: shell names are spaced, "L shell (n = 2)".
+            fireEvent.click(chips.getByText(/M shell \(n = 3\)/));
             expect(onNavigate).toHaveBeenCalledWith({ level: 'shell', n: 3 } as NavigationTarget);
         });
 
@@ -155,7 +159,8 @@ describe('LevelNav', () => {
             const { container } = renderWithShell(jest.fn());
             const pressed = container.querySelectorAll('.level-nav-shell-chip[aria-pressed="true"]');
             expect(pressed).toHaveLength(1);
-            expect(pressed[0].textContent).toMatch(/L shell \(n=2\)/);
+            // Final review M2: shell names are spaced, "L shell (n = 2)".
+            expect(pressed[0].textContent).toMatch(/L shell \(n = 2\)/);
         });
     });
 
@@ -389,10 +394,13 @@ describe('LevelNav for a species', () => {
             <LevelNav Z={82} selectedShell={6} selectedSubshell={{ n: 6, l: 1, j: 1.5 }}
                 selectedOrbital={null} onNavigate={() => {}} variant="header" />
         );
-        expect(getByRole('button', { name: 'back to P shell (n=6)' })).toBeTruthy();
+        // Final review M2: shell names are spaced, "L shell (n = 2)".
+        expect(getByRole('button', { name: 'back to P shell (n = 6)' })).toBeTruthy();
         const location = container.querySelector('.level-nav-location')!;
-        expect(location.querySelector('[aria-hidden="true"]')!.textContent).toBe('P shell (n=6) · 6p³⁄₂');
-        expect(location.querySelector('.visually-hidden')!.textContent).toBe('P shell (n=6) · 6p j = 3/2');
+        // Final review M2: shell names are spaced, "L shell (n = 2)".
+        expect(location.querySelector('[aria-hidden="true"]')!.textContent).toBe('P shell (n = 6) · 6p³⁄₂');
+        // Final review M2: shell names are spaced, "L shell (n = 2)".
+        expect(location.querySelector('.visually-hidden')!.textContent).toBe('P shell (n = 6) · 6p j = 3/2');
     });
 
     it('leaves non-relativistic crumbs exactly as they were', () => {
@@ -407,7 +415,8 @@ describe('LevelNav for a species', () => {
         const crumbs = getByRole('navigation', { name: 'breadcrumb' });
         expect(Array.from(crumbs.querySelectorAll('button')).map(b => [b.textContent, b.getAttribute('aria-label')]))
             // Task 6: the orbital crumb reads "3pz" (a real subscript), never "3p_z".
-            .toEqual([['Argon', null], ['M shell (n=3)', null], ['3p', null], ['3pz', null]]);
+            // Final review M2: shell names are spaced, "L shell (n = 2)".
+            .toEqual([['Argon', null], ['M shell (n = 3)', null], ['3p', null], ['3pz', null]]);
         expect(container.querySelector('.visually-hidden')).toBeNull();
     });
 
