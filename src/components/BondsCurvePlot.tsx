@@ -5,6 +5,7 @@ import { BondsData } from '../bonds/useBondsData';
 import { UseH2PlusCurveResult } from '../bonds/useH2PlusCurve';
 import { diatomicCurveSpec, h2plusCurveSpec } from '../bonds/curve';
 import { DiatomicId, nearestScanIndex, snapH2PlusR } from '../bonds/systems';
+import { atLeast, type LearningLevel } from '../levels/levels';
 
 interface BondsCurvePlotProps {
     bonds: BondsState;
@@ -21,6 +22,11 @@ interface BondsCurvePlotProps {
     onDraftR?: (R: number | null) => void;
     onCommitH2PlusR: (R: number) => void;
     onScanIndex: (index: number) => void;
+    /**
+     * Task 4 (picture control): the learning level. Below Explore the curve reads in plain words ("Energy (eV)",
+     * "Distance between nuclei (Å)", "most stable"); what it draws is the same at every level. Omitted, as at Research.
+     */
+    level?: LearningLevel;
 }
 
 /**
@@ -31,8 +37,9 @@ interface BondsCurvePlotProps {
  * so until it lands this says so, and if it fails, why (Task 9's carry); a molecule's comes with its scan, whose
  * loading and failures BondsPanel reports, so here it is simply absent until then.
  */
-const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, width, markerR, onDraftR, onCommitH2PlusR, onScanIndex }) => {
+const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, width, markerR, onDraftR, onCommitH2PlusR, onScanIndex, level = 'research' }) => {
     const marked = markerR === undefined ? bonds.R : markerR;
+    const plain = !atLeast(level, 'explore');
     if (bonds.system === 'h2plus') {
         if (h2plus.error) {
             return (
@@ -49,7 +56,7 @@ const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, wi
             );
         }
         return (
-            <PotentialCurvePlot {...h2plusCurveSpec(h2plus.curve, marked)} width={width} keyboardControl={false}
+            <PotentialCurvePlot {...h2plusCurveSpec(h2plus.curve, marked)} width={width} keyboardControl={false} plain={plain}
                 onSelectR={onCommitH2PlusR} onDragR={onDraftR && (R => onDraftR(R === null ? null : snapH2PlusR(R)))} />
         );
     }
@@ -60,6 +67,7 @@ const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, wi
             {...diatomicCurveSpec(bonds.system as DiatomicId, scan, marked)}
             width={width}
             keyboardControl={false}
+            plain={plain}
             onSelectR={R => {
                 // A molecule exists only at its scan points: a click between two lands on the nearer.
                 const index = nearestScanIndex(scan.points, R);

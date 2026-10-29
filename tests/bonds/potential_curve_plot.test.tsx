@@ -169,6 +169,64 @@ describe('PotentialCurvePlot', () => {
             fireEvent.pointerCancel(svg, at(0.25));
             expect(onDragR).toHaveBeenLastCalledWith(null);
             expect(onSelectR).not.toHaveBeenCalled();
+            // Over: a move is a hover again, and a release commits nothing.
+            onDragR.mockClear();
+            fireEvent.pointerMove(svg, at(0.5));
+            fireEvent.pointerUp(svg, at(0.5));
+            expect(onDragR).not.toHaveBeenCalled();
+            expect(onSelectR).not.toHaveBeenCalled();
+        });
+
+        // Task 4 (T3 M1): a drag never sticks. When the capture is lost without a release (a context menu, a window
+        // blur), the drag is cancelled -- the draft dropped, nothing committed -- and later hovers do not draft.
+        it('cancels the drag when the pointer capture is lost, committing nothing', () => {
+            const onSelectR = jest.fn();
+            const onDragR = jest.fn();
+            const { container } = render(<PotentialCurvePlot {...props} onSelectR={onSelectR} onDragR={onDragR} />);
+            const svg = container.querySelector('svg')!;
+            fireEvent.pointerDown(svg, at(0.25));
+            fireEvent.pointerMove(svg, at(0.5));
+            fireEvent.lostPointerCapture(svg, at(0.5));
+            expect(onDragR).toHaveBeenLastCalledWith(null);
+            onDragR.mockClear();
+            fireEvent.pointerMove(svg, at(0.75));
+            fireEvent.pointerUp(svg, at(0.75));
+            expect(onDragR).not.toHaveBeenCalled();
+            expect(onSelectR).not.toHaveBeenCalled();
+            // A capture lost after a release (the browser's own, after pointerup) cancels nothing.
+            fireEvent.pointerDown(svg, at(0.25));
+            fireEvent.pointerUp(svg, at(0.75));
+            onDragR.mockClear();
+            fireEvent.lostPointerCapture(svg, at(0.75));
+            expect(onDragR).not.toHaveBeenCalled();
+            expect(onSelectR).toHaveBeenCalledTimes(1);
+            expect(onSelectR).toHaveBeenLastCalledWith(3);
+        });
+
+        // Task 4 (T3 M1): the drag belongs to the pointer that started it. A second finger's down, moves, release and
+        // tap neither restart, draft nor commit it; the first pointer's release still commits once.
+        it('follows only the pointer that started the drag', () => {
+            const onSelectR = jest.fn();
+            const onDragR = jest.fn();
+            const { container } = render(<PotentialCurvePlot {...props} onSelectR={onSelectR} onDragR={onDragR} />);
+            const svg = container.querySelector('svg')!;
+            fireEvent.pointerDown(svg, at(0.25));
+            expect(onDragR).toHaveBeenLastCalledWith(1);
+            onDragR.mockClear();
+            const second = (fraction: number) => ({ ...at(fraction), pointerId: 2 });
+            fireEvent.pointerDown(svg, second(0.75));
+            fireEvent.pointerMove(svg, second(0.75));
+            fireEvent.pointerCancel(svg, second(0.75));
+            fireEvent.lostPointerCapture(svg, second(0.75));
+            fireEvent.pointerUp(svg, second(0.75));
+            fireEvent.click(svg, second(0.75));
+            expect(onDragR).not.toHaveBeenCalled();
+            expect(onSelectR).not.toHaveBeenCalled();
+            fireEvent.pointerMove(svg, at(0.5));
+            expect(onDragR).toHaveBeenLastCalledWith(2);
+            fireEvent.pointerUp(svg, at(0.5));
+            expect(onSelectR).toHaveBeenCalledTimes(1);
+            expect(onSelectR).toHaveBeenLastCalledWith(2);
         });
     });
 
@@ -226,6 +284,82 @@ describe('PotentialCurvePlot', () => {
     it('has an accessible role and label describing what it plots', () => {
         render(<PotentialCurvePlot {...props} />);
         expect(screen.getByRole('img', { name: /potential energy/i })).toBeInTheDocument();
+    });
+
+    // Task 4 (picture control), carried from Task 3: He₂'s low energy end, "−0.0664", is wider than the default left
+    // margin, so it ran over the first scan tick and the axis. The margin widens to the measured labels, plain or not.
+    it('widens its left margin to fit the energy labels, so no label overlaps the axis or a scan tick (He₂)', () => {
+        const proto = SVGElement.prototype as unknown as { getComputedTextLength?: () => number };
+        const charWidth = 6;
+        proto.getComputedTextLength = function (this: SVGElement) { return (this.textContent ?? '').length * charWidth; };
+        try {
+            const he2 = { ...props, unit: 'eV', xRange: [2.4, 7.2] as [number, number], yRange: [-0.0664, 1.372] as [number, number],
+                markerR: 4.4, snapRs: [2.4, 3.4, 4.4, 5.6, 7.2] };
+            for (const plain of [false, true]) {
+                const onSelectR = jest.fn();
+                const { container, unmount } = render(<PotentialCurvePlot {...he2} plain={plain} onSelectR={onSelectR} />);
+                const labels = [...container.querySelectorAll('.potential-axis-label')];
+                expect(labels.map(t => t.textContent)).toEqual(['1.37', '−0.0664']);
+                const labelsEnd = Math.max(...labels.map(t => Number(t.getAttribute('x')) + (t.textContent ?? '').length * charWidth));
+                const axisStart = Number(container.querySelector('.radial-plot-axis')!.getAttribute('x1'));
+                const ticks = [...container.querySelectorAll('.radial-plot-peak')].map(t => Number(t.getAttribute('x1')));
+                expect([plain, labelsEnd < axisStart, labelsEnd < Math.min(...ticks)]).toEqual([plain, true, true]);
+                // The curve and a tap use the same, wider margin: a tap on the first tick is its R.
+                fireEvent.click(container.querySelector('svg')!, { clientX: Math.min(...ticks), clientY: 50 });
+                expect(onSelectR).toHaveBeenLastCalledWith(2.4);
+                unmount();
+            }
+        } finally {
+            delete proto.getComputedTextLength;
+        }
+    });
+
+    // Task 4 (picture control): at Basics the curve speaks plainly -- the words only; what is drawn is the same.
+    describe('plain words, for Basics', () => {
+        const ev = { ...props, title: 'E − E(separated atoms)', unit: 'eV', xRange: [1.6594818936013664, 2.4062487457219808] as [number, number],
+            yRange: [-10, 1] as [number, number], markerR: 2,
+            referenceR: { R: 2.086, label: 'Dotted line: R_e = 2.086 a₀ (1.104 Å), fitted; D_e = 9.44 eV from separated atoms.' } };
+
+        it('names the energy axis "Energy (eV)", and the image in the same words', () => {
+            const { container } = render(<PotentialCurvePlot {...ev} plain />);
+            expect(container.querySelector('.radial-plot-title')!.textContent).toBe('Energy (eV)');
+            expect(screen.getByRole('img', { name: 'Energy against the distance between nuclei' })).toBeInTheDocument();
+        });
+
+        it('reads the distance axis "Distance between nuclei (Å)", its ends in Å (a₀ × 0.529177, two decimals)', () => {
+            const { container } = render(<PotentialCurvePlot {...ev} plain />);
+            const scale = container.querySelector('.radial-plot-scale')!;
+            // 1.6595 a₀ = 0.878 Å; 2.4062 a₀ = 1.273 Å.
+            expect([...scale.children].map(span => span.textContent)).toEqual(['0.88', 'Distance between nuclei (Å)', '1.27']);
+            expect(scale.textContent).not.toMatch(/a₀|R \(/);
+        });
+
+        it('labels the Rₑ line "most stable", with its R in Å', () => {
+            const { container } = render(<PotentialCurvePlot {...ev} plain />);
+            // 2.086 a₀ = 1.104 Å.
+            expect(seenText(container.querySelector('.potential-reference-note')!)).toBe('most stable: 1.10 Å');
+        });
+
+        it('draws the same curves, marker, ticks and Rₑ line as without plain words', () => {
+            const geometry = (plain: boolean) => {
+                const { container, unmount } = render(<PotentialCurvePlot {...ev} snapRs={[1.7, 2, 2.3]} plain={plain} />);
+                const svg = container.querySelector('svg')!.cloneNode(true) as SVGSVGElement;
+                svg.querySelectorAll('clipPath').forEach(clip => clip.removeAttribute('id'));
+                svg.querySelectorAll('g').forEach(g => g.removeAttribute('clip-path'));
+                const html = svg.innerHTML;
+                const alt = container.querySelector('.potential-text-alt')!.textContent;
+                unmount();
+                return { html, alt };
+            };
+            expect(geometry(true)).toEqual(geometry(false));
+        });
+
+        it("says today's words without it", () => {
+            const { container } = render(<PotentialCurvePlot {...ev} />);
+            expect(container.querySelector('.radial-plot-title')!.textContent).toBe('E − E(separated atoms) (eV)');
+            expect(container.querySelector('.radial-plot-scale')).toHaveTextContent('R (2.41 a₀ · 1.27 Å)');
+            expect(seenText(container.querySelector('.potential-reference-note')!)).toBe('Dotted line: Re = 2.086 a₀ (1.104 Å), fitted; De = 9.44 eV from separated atoms.');
+        });
     });
 
     // Found live (Task 13, N₂): the axis ends were printed as raw floats --

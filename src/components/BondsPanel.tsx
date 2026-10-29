@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import { Alert, FormControl, InputLabel, LinearProgress, ListSubheader, MenuItem, Select, Slider, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { BondsState, BondsView } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
@@ -91,8 +91,7 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
 
     // Task 3: the curve fills the block's width, measured; nothing is drawn at a guessed one.
     const lengthId = useId();
-    const blockRef = useRef<HTMLElement>(null);
-    const blockWidth = useElementWidth(blockRef);
+    const [blockRef, blockWidth] = useElementWidth<HTMLElement>();
     const curveNode = typeof curve === 'function'
         ? blockWidth > 0 && curve(blockWidth, shownR, R => setDraftR(R ?? bonds.R ?? draftR))
         : curve;
@@ -137,6 +136,13 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                     <Typography variant="subtitle2" id={lengthId} className="bonds-length-heading">Bond length</Typography>
                     <InfoButton topic="potentialCurve" label="Potential energy curve" />
                 </div>
+                {/* Task 4 (T3 M2): until a molecule's scan is here there is no R, slider or curve -- one short line says
+                    why, in the words of the status and the alert above; they stay the announcements, so this is not live. */}
+                {!isExact && !scan && (
+                    <Typography variant="body2" className="bonds-length-state">
+                        {data.error ? `${formula} could not be loaded.` : `Loading ${formula}…`}
+                    </Typography>
+                )}
                 {shownR !== null && <Typography variant="body2" className="bonds-r">{lengths(shownR)}</Typography>}
                 {isExact ? (
                     <Slider aria-label="Internuclear distance R" size="small" min={H2PLUS_R_RANGE.min} max={H2PLUS_R_RANGE.max} step={0.01}

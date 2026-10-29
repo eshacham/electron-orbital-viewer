@@ -43,8 +43,8 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose, brand, aboutMode
             <h2 className="ql-section">Learning levels</h2>
             <p>How much the panels show is yours to choose, in the top bar (on a phone, in the menu):</p>
             <ul>
-                <li>Basics: pick an element, orbital, bond or molecule and look at it, with opacity and cut away; Info explains it in plain words.</li>
-                <li>Explore: adds the plot and data, axes, structure options, bond labels, the dipole arrow, properties and orbital energies.</li>
+                <li>Basics: pick an element, orbital, bond or molecule and look at it, with opacity and cut away, and set a bond’s length on its energy curve; Info explains it in plain words.</li>
+                <li>Explore: adds the plot and data in Orbitals and Atoms, Bonds’ data, axes, structure options, bond labels, the dipole arrow, properties and orbital energies.</li>
                 <li>Advanced: adds charge, excitation, relativity, combinations and fields, the enclosed fraction, every orbital, surface style, advanced appearance and exports, and Info’s technical detail.</li>
                 <li>Research: opens “How this was computed” in Info, with each result’s method, references and limits of validity, and adds total energies.</li>
             </ul>

@@ -8,7 +8,9 @@ import { CONTROL_LEVEL, LEVEL_LABEL, type ControlId, type LearningLevel } from '
 
 /** How Help names each gated control (final review M5); the owner's molecule requests are not a reader's. */
 const HELP_NAME: Record<Exclude<ControlId, 'requestWorkspace'>, string> = {
-    plot: 'the plot and data', data: 'the plot and data', structure: 'structure options', bondLabels: 'bond labels', dipole: 'the dipole arrow',
+    // Task 4 (picture control): 'plot' gates Orbitals' and Atoms' plot and data; 'data' gates Bonds' Data alone -- its
+    // curve is in the left panel from Basics.
+    plot: 'the plot and data in Orbitals and Atoms', data: 'Bonds’ data', structure: 'structure options', bondLabels: 'bond labels', dipole: 'the dipole arrow',
     orbitalEnergies: 'orbital energies', properties: 'properties', axes: 'axes', charge: 'charge', excite: 'excitation',
     relativity: 'relativity', combinations: 'combinations and fields', enclosed: 'the enclosed fraction',
     allOrbitals: 'every orbital', exports: 'exports', advancedAppearance: 'advanced appearance', surfaceStyle: 'surface style',
@@ -52,5 +54,15 @@ describe('HelpDialog (spec §8.1 item 5)', () => {
         }
         expect(screen.getByRole('dialog', { name: 'Help' })).not.toHaveTextContent('full precision');
         expect(lines.Research).toContain('How this was computed');
+    });
+
+    // Task 4 (picture control): Bonds' energy curve is under its R slider at every level, so Basics names it, and no
+    // line says it waits for Explore.
+    it("puts Bonds' energy curve on the Basics line", () => {
+        render(<HelpDialog open onClose={jest.fn()} brand={BRAND} />);
+        const line = (level: string) => screen.getAllByRole('listitem').map(item => item.textContent ?? '').find(text => text.startsWith(`${level}:`))!;
+        expect(line('Basics')).toContain('set a bond’s length on its energy curve');
+        expect(line('Explore')).not.toMatch(/curve/);
+        expect(line('Explore')).not.toMatch(/adds the plot and data,/);
     });
 });

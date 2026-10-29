@@ -1,4 +1,4 @@
-import React, { useId, useRef } from 'react';
+import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 import { BOHR_TO_ANGSTROM, HARTREE_TO_EV } from '../bonds/systems';
 import { withSubscripts } from '../format/subscripts';
 import { minus } from '../format/sci';
@@ -27,6 +27,7 @@ interface PotentialCurvePlotProps {
     markerR: number | null;
     /** Scan geometries, ticked on the axis: the keyboard slider steps over these, one point per press. */
     snapRs?: number[];
+    /** A line across the plot at one R (Bonds: the fitted Rₑ, where the curve is lowest), with its label. */
     referenceR?: { R: number; label: string } | null;
     width: number;
     /** A tap, or the release of a drag, chooses R (clamped to xRange); the caller snaps it. */
@@ -43,10 +44,19 @@ interface PotentialCurvePlotProps {
      * the Tab order, the hidden one invisible.
      */
     keyboardControl?: boolean;
+    /**
+     * Task 4 (picture control): plain words, for Basics -- the energy axis reads "Energy (<unit>)", the distance axis
+     * "Distance between nuclei (Å)" between its ends in Å, and the reference line "most stable: <R in Å>". Labels only:
+     * the curves, the marker, the ticks and the text alternative are the same either way.
+     */
+    plain?: boolean;
 }
 
 const HEIGHT = 130;
 const PAD = { left: 34, right: 8, top: 8, bottom: 18 };
+/** The energy labels' x, and the least room between their right end and the axis, px. */
+const LABEL_X = 2;
+const LABEL_GAP = 4;
 
 export function interpolateEnergy(points: Array<{ R: number; E: number }>, R: number): number | null {
     for (let i = 1; i < points.length; i++) {
@@ -82,52 +92,76 @@ function nearestIndex(sorted: number[], R: number): number {
 
 /** An axis end, a₀: two decimals, trailing zeros dropped (H₂⁺'s range stays "0.5 … 10"). */
 const axisR = (R: number) => String(Number(R.toFixed(2)));
+/** An R in Å, two decimals: the plain axis ends and the plain Rₑ label. */
+const angstrom = (R: number) => (R * BOHR_TO_ANGSTROM).toFixed(2);
 
 const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, width, onSelectR, onDragR, keyboardControl = true,
+    plain = false,
 }) => {
     const clipId = useId();
-    const plotWidth = width - PAD.left - PAD.right;
+
+    // Task 4 (picture control): the energy labels sit left of the axis, and the margin is at least as wide as they are
+    // -- He₂'s "−0.0664" outgrew the fixed 34 px and ran over the axis and the first scan tick. Measured before paint;
+    // where text cannot be measured (jsdom) the margin stays PAD.left.
+    const yLabels = [minus(yRange[1].toPrecision(3)), minus(yRange[0].toPrecision(3))];
+    const [topLabel, bottomLabel] = yLabels;
+    const labelRefs = useRef<Array<SVGTextElement | null>>([]);
+    const [labelWidth, setLabelWidth] = useState(0);
+    useLayoutEffect(() => {
+        const widths = labelRefs.current.map(text => (text && typeof text.getComputedTextLength === 'function' ? text.getComputedTextLength() : 0));
+        setLabelWidth(Math.ceil(Math.max(0, ...widths)));
+    }, [topLabel, bottomLabel]);
+    const left = Math.max(PAD.left, LABEL_X + labelWidth + LABEL_GAP);
+
+    const plotWidth = width - left - PAD.right;
     const plotHeight = HEIGHT - PAD.top - PAD.bottom;
-    const x = (R: number) => PAD.left + ((R - xRange[0]) / (xRange[1] - xRange[0])) * plotWidth;
+    const x = (R: number) => left + ((R - xRange[0]) / (xRange[1] - xRange[0])) * plotWidth;
     const y = (E: number) => PAD.top + (1 - (E - yRange[0]) / (yRange[1] - yRange[0])) * plotHeight;
 
     /** The R under the pointer, clamped to the plotted range: a tap beside the plot area takes the nearer end. */
     const pointerR = (event: React.MouseEvent<SVGSVGElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
         const svgX = (event.clientX - rect.left) * (rect.width > 0 ? width / rect.width : 1);
-        const R = xRange[0] + ((svgX - PAD.left) / plotWidth) * (xRange[1] - xRange[0]);
+        const R = xRange[0] + ((svgX - left) / plotWidth) * (xRange[1] - xRange[0]);
         return Math.min(xRange[1], Math.max(xRange[0], R));
     };
 
     // Task 3 (picture control): a drag. The pointer is captured, so a release beside the plot still ends it here; the
-    // release commits, and the click the browser sends after it is not a second commit.
+    // release commits, and the click the browser sends after it is not a second commit. Task 4 (T3 M1): it belongs to
+    // the pointer that started it -- another pointer's events are ignored -- and it never sticks: a lost capture
+    // (a context menu, a window blur, with no release) cancels it as pointercancel does, dropping the draft.
     const dragging = useRef(false);
+    const dragPointer = useRef<number | undefined>(undefined);
     const committedOnRelease = useRef(false);
     const draggable = Boolean(onSelectR && onDragR);
+    const isDragPointer = (event: React.PointerEvent<SVGSVGElement>) => dragging.current && event.pointerId === dragPointer.current;
     const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+        if (dragging.current) return;
         committedOnRelease.current = false;
         if (!draggable || event.button !== 0) return;
         dragging.current = true;
+        dragPointer.current = event.pointerId;
         event.currentTarget.setPointerCapture?.(event.pointerId);
         onDragR!(pointerR(event));
     };
     const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
-        if (dragging.current) onDragR!(pointerR(event));
+        if (isDragPointer(event)) onDragR!(pointerR(event));
     };
     const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
-        if (!dragging.current) return;
+        if (!isDragPointer(event)) return;
         dragging.current = false;
         committedOnRelease.current = true;
         onSelectR!(pointerR(event));
     };
-    const handlePointerCancel = () => {
-        if (!dragging.current) return;
+    const handlePointerCancel = (event: React.PointerEvent<SVGSVGElement>) => {
+        if (!isDragPointer(event)) return;
         dragging.current = false;
         onDragR!(null);
     };
     const handleClick = (event: React.MouseEvent<SVGSVGElement>) => {
-        if (!onSelectR) return;
+        // A second pointer's tap during a drag is not a choice; the drag's release is.
+        if (!onSelectR || dragging.current) return;
         if (committedOnRelease.current) {
             committedOnRelease.current = false;
             return;
@@ -156,22 +190,23 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
             aria-label="potential energy curve"
             style={{ maxWidth: width + 22 }}
         >
-            <div className="radial-plot-title">{title} ({unit})</div>
+            <div className="radial-plot-title">{plain ? `Energy (${unit})` : `${title} (${unit})`}</div>
             <svg
                 width={width}
                 height={HEIGHT}
                 role="img"
-                aria-label={`${title} against R`}
+                aria-label={plain ? 'Energy against the distance between nuclei' : `${title} against R`}
                 onClick={handleClick}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerCancel}
+                onLostPointerCapture={handlePointerCancel}
                 // A sideways drag is the plot's; an up-or-down one still scrolls the panel (and cancels the drag).
                 style={{ cursor: onSelectR ? 'pointer' : undefined, touchAction: draggable ? 'pan-y' : undefined }}
             >
                 <defs>
-                    <clipPath id={clipId}><rect x={PAD.left} y={PAD.top} width={plotWidth} height={plotHeight} /></clipPath>
+                    <clipPath id={clipId}><rect x={left} y={PAD.top} width={plotWidth} height={plotHeight} /></clipPath>
                 </defs>
                 <g clipPath={`url(#${clipId})`}>
                     {series.map(s => (
@@ -179,7 +214,7 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                             d={`M ${s.points.map(p => `${x(p.R).toFixed(2)},${y(p.E).toFixed(2)}`).join(' L ')}`} />
                     ))}
                 </g>
-                <line className="radial-plot-axis" x1={PAD.left} x2={width - PAD.right} y1={PAD.top + plotHeight} y2={PAD.top + plotHeight} />
+                <line className="radial-plot-axis" x1={left} x2={width - PAD.right} y1={PAD.top + plotHeight} y2={PAD.top + plotHeight} />
                 {snapRs.map(R => (
                     <line key={R} className="radial-plot-peak" x1={x(R)} x2={x(R)} y1={PAD.top + plotHeight} y2={PAD.top + plotHeight - 4} />
                 ))}
@@ -197,18 +232,18 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                         ))}
                     </>
                 )}
-                <text x={2} y={PAD.top + 8} className="potential-axis-label">{minus(yRange[1].toPrecision(3))}</text>
-                <text x={2} y={PAD.top + plotHeight} className="potential-axis-label">{minus(yRange[0].toPrecision(3))}</text>
+                <text ref={node => { labelRefs.current[0] = node; }} x={LABEL_X} y={PAD.top + 8} className="potential-axis-label">{topLabel}</text>
+                <text ref={node => { labelRefs.current[1] = node; }} x={LABEL_X} y={PAD.top + plotHeight} className="potential-axis-label">{bottomLabel}</text>
             </svg>
             {/*
-                A native range input, visually hidden, gives Tab + arrow-key
+                For a caller with no keyboard control of its own for R: a
+                native range input, visually hidden, gives Tab + arrow-key
                 (and Home/End/Page) operation of the same R choice the svg's
-                onClick offers only to a mouse -- rather than reimplementing
+                onClick offers only to a pointer -- rather than reimplementing
                 key handling on a role="img" element, which would make that
-                role a lie. This is the keyboard path; the svg click is a
-                mouse-only shortcut over the same callback. Task 3: a caller
-                with its own keyboard control for R (Bonds' R slider) turns it
-                off, keyboardControl={false}.
+                role a lie. Task 4 (T3 M3): no caller uses it today. Bonds,
+                the one caller, turns it off (keyboardControl={false}) because
+                its R slider is the keyboard path there.
             */}
             {onSelectR && keyboardControl && (stops.length >= 2 ? (
                 // A scan exists only at its points, which thin out away from
@@ -248,16 +283,33 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                 ))}
             </div>
             <div className="radial-plot-scale" style={{ width }}>
-                {/* A scan's ends are arbitrary floats; R is shown to 0.01 a₀ everywhere else. */}
-                <span>{axisR(xRange[0])}</span>
-                <span>R ({axisR(xRange[1])} a₀ · {(xRange[1] * BOHR_TO_ANGSTROM).toFixed(2)} Å)</span>
+                {plain ? (
+                    // Task 4: the ends in Å, and the axis named in words between them.
+                    <>
+                        <span>{angstrom(xRange[0])}</span>
+                        <span>Distance between nuclei (Å)</span>
+                        <span>{angstrom(xRange[1])}</span>
+                    </>
+                ) : (
+                    <>
+                        {/* A scan's ends are arbitrary floats; R is shown to 0.01 a₀ everywhere else. */}
+                        <span>{axisR(xRange[0])}</span>
+                        <span>R ({axisR(xRange[1])} a₀ · {angstrom(xRange[1])} Å)</span>
+                    </>
+                )}
             </div>
-            {/* The validity stop / R_e / D_e reference a caller passes is
-                drawn as a rule above; its label is plain text here rather
+            {/* The reference a caller passes (Bonds: R_e, with D_e in its
+                label) is drawn as a rule above; its label is plain text here rather
                 than an SVG <title> (a pointing-device-only tooltip), so it
                 reads for everyone, not just a mouse hovering the rule.
-                Task 7a: R_e and D_e with a real subscript, never "_". */}
-            {referenceR && <div className="radial-plot-note potential-reference-note">{withSubscripts(referenceR.label)}</div>}
+                Task 7a: R_e and D_e with a real subscript, never "_".
+                Task 4: in plain words the line is named for what it marks,
+                the most stable R, in Å. */}
+            {referenceR && (
+                <div className="radial-plot-note potential-reference-note">
+                    {plain ? `most stable: ${angstrom(referenceR.R)} Å` : withSubscripts(referenceR.label)}
+                </div>
+            )}
             {/* The text alternative to the pixels: the current geometry and
                 each curve's value there (series without a value, or whose
                 value falls outside the plotted range, are read as "no value

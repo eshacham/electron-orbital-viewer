@@ -1684,7 +1684,7 @@ function App() {
             level={level}
             curve={(width: number, markerR: number | null, onDraftR: (R: number | null) => void) => (
                 <BondsCurvePlot bonds={bonds} data={bondsData} h2plus={h2plusCurve} width={width} markerR={markerR} onDraftR={onDraftR}
-                    onCommitH2PlusR={R => dispatch(setH2PlusR(R))} onScanIndex={handleScanIndex} />
+                    onCommitH2PlusR={R => dispatch(setH2PlusR(R))} onScanIndex={handleScanIndex} level={level} />
             )}
         />
     );

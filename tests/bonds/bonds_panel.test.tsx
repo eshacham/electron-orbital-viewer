@@ -573,6 +573,28 @@ describe('the Bond length block (Task 3, picture control)', () => {
         }
     });
 
+    // Task 4 (T3 M2): while a molecule's scan loads, or after it failed to, the block says so in one short line -- the
+    // panel's own words for it -- rather than stand empty under its heading. The polite status and the alert above it
+    // stay the announcements, so the line is plain text, not a second live region.
+    it('says the scan is loading, or could not be loaded, rather than stand empty', () => {
+        const fresh = reducer(undefined, selectBondsSystem('n2'));
+        const panel = (data: typeof empty | { scan: MoleculeScan; meta: MoleculeMeta; basis: null; loading: false; error: null }) => (
+            <BondsPanel bonds={fresh} data={data} note={null} {...handlers} curve={n2Curve} />
+        );
+        const { rerender } = render(panel({ ...empty, loading: true }));
+        measure(WIDTH);
+        const block = () => screen.getByRole('region', { name: 'Bond length' });
+        expect(within(block()).getByText('Loading N₂…')).toHaveClass('bonds-length-state');
+        expect(within(block()).queryByRole('status')).toBeNull();
+        rerender(panel({ ...empty, error: 'HTTP 404' }));
+        expect(within(block()).getByText('N₂ could not be loaded.')).toHaveClass('bonds-length-state');
+        expect(within(block()).queryByRole('alert')).toBeNull();
+        // The full reason is the alert's, above the block.
+        expect(screen.getByRole('alert')).toHaveTextContent('N₂ could not be loaded: HTTP 404.');
+        rerender(panel({ scan: n2Scan, meta: n2Meta, basis: null, loading: false, error: null }));
+        expect(block().querySelector('.bonds-length-state')).toBeNull();
+    });
+
     // The panel draws what it is given; App gives it BondsCurvePlot (src/App.tsx), and a node is drawn as is.
     it('draws a curve given as a node, as it is', () => {
         render(<BondsPanel bonds={h2plus} data={empty} note={null} {...handlers} curve={<p>the curve</p>} />);

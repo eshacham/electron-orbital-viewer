@@ -86,7 +86,7 @@ jest.mock('./workers/createH2PlusCurveWorker', () => ({
 // and nothing before. jsdom lays nothing out and has no ResizeObserver, so the block is "measured" at a fixed width
 // here; tests/shell/use_element_width.test.tsx and tests/bonds/bonds_panel.test.tsx cover the measuring itself.
 const mockCurveWidth = 268;
-jest.mock('./shell/useElementWidth', () => ({ useElementWidth: () => mockCurveWidth }));
+jest.mock('./shell/useElementWidth', () => ({ useElementWidth: () => [() => {}, mockCurveWidth] }));
 
 // Bonds mode loads a molecule's files lazily (useBondsData); here they come
 // from the committed N₂ fixtures instead of the network. The rest of the
@@ -1161,7 +1161,9 @@ describe('App', () => {
 
             (loadScan as jest.Mock).mockRejectedValue(new Error('Could not load /molecules/v1/o2/scan.json (HTTP 403)'));
             act(() => { store.dispatch(selectBondsSystem('o2')); });
-            expect(await screen.findByText(/O₂ could not be loaded/)).toBeInTheDocument();
+            // The alert says why; Task 4 (T3 M2): the Bond length block's state line says it too, briefly.
+            expect(await screen.findByRole('alert')).toHaveTextContent(/O₂ could not be loaded: /);
+            expect(within(screen.getByRole('region', { name: 'Bond length' })).getByText('O₂ could not be loaded.')).toBeInTheDocument();
             stillKeyed();
             // A failure is not a wait: the cue goes (the mocked viewer never finishes, so "Computing…" may remain).
             await waitFor(() => expect(screen.queryByText(/^Loading O₂/)).not.toBeInTheDocument());
@@ -1175,7 +1177,9 @@ describe('App', () => {
             // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
             fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             chooseSystem('N₂ — Nitrogen');
-            expect(await screen.findByText(/N₂ could not be loaded/)).toBeInTheDocument();
+            // Task 4 (T3 M2): the alert, and the Bond length block's short state line, which is not a second alert.
+            expect(await screen.findByRole('alert')).toHaveTextContent(/N₂ could not be loaded: /);
+            expect(within(screen.getByRole('region', { name: 'Bond length' })).getByText('N₂ could not be loaded.')).toBeInTheDocument();
             expect(store.getState().orbital.error).toBeNull();
             expect(screen.getAllByRole('alert')).toHaveLength(1);
         });
@@ -1366,6 +1370,39 @@ describe('App', () => {
                 unmount();
                 act(() => { window.localStorage.removeItem('eov.display'); clearVisit(); });
             }
+        });
+
+        // Task 4 (picture control), Review Focus 5: lowering the level to Basics with R at a non-default scan point keeps
+        // R, the scan point and the picture; the curve stays in the block, now in plain words.
+        it('keeps R, the point and the picture when lowered to Basics, and the curve reads in plain words (Review Focus 5)', async () => {
+            window.localStorage.setItem('eov.level', 'explore');
+            const { store } = renderWithProvider(<App />);
+            fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+            chooseSystem('N₂ — Nitrogen');
+            await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
+            const n2Range: [number, number] = [n2Scan.points[0].RBohr, n2Scan.points[n2Scan.points.length - 1].RBohr];
+            const pixelFor = (R: number) => 34 + ((R - n2Range[0]) / (n2Range[1] - n2Range[0])) * (mockCurveWidth - 42);
+            const block = () => screen.getByRole('region', { name: 'Bond length' });
+            fireEvent.click(within(block()).getByRole('img', { name: /against R/ }), { clientX: pixelFor(n2Scan.points[5].RBohr) });
+            await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
+                .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@05' }));
+            const before = store.getState().bonds;
+            expect(before).toMatchObject({ scanIndex: 5, R: n2Scan.points[5].RBohr });
+            expect(block().querySelector('.radial-plot-title')).toHaveTextContent('E − E(separated atoms) (eV)');
+            const field = store.getState().orbital.currentField;
+
+            fireEvent.click(screen.getByRole('radio', { name: 'Basics' }));
+            expect(screen.getByRole('radio', { name: 'Basics' })).toHaveAttribute('aria-checked', 'true');
+            expect(store.getState().bonds).toEqual(before);
+            expect(store.getState().orbital.currentField).toBe(field);
+            const figure = within(block()).getByRole('figure', { name: 'potential energy curve' });
+            expect(figure.querySelector('.radial-plot-title')!.textContent).toBe('Energy (eV)');
+            expect(within(figure).getByText('Distance between nuclei (Å)')).toBeInTheDocument();
+            expect(figure.querySelector('.potential-reference-note')).toHaveTextContent(/^most stable: \d\.\d\d Å$/);
+            // The marker still stands at point 5, and the slider says so.
+            expect(Number(figure.querySelector('.potential-marker')!.getAttribute('x1'))).toBeCloseTo(pixelFor(n2Scan.points[5].RBohr), 6);
+            expect(screen.getByRole('slider', { name: 'Internuclear distance R' }))
+                .toHaveAttribute('aria-valuetext', expect.stringMatching(new RegExp(`point 6 of ${n2Scan.points.length}$`)));
         });
 
         // Task 3 (picture control): the sheet's fourth tab keeps its key ('plot') but reads "Data" -- the curve is in Explore,

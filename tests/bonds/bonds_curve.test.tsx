@@ -187,6 +187,36 @@ describe('BondsCurvePlot', () => {
         });
     });
 
+    // Task 4 (picture control): below Explore the curve speaks plainly -- "Energy (eV)", "Distance between nuclei (Å)",
+    // "most stable" -- and from Explore up it keeps its own words. Labels only: the same curve and marker either way.
+    it('reads in plain words below Explore, for a molecule and for H₂⁺', () => {
+        const title = (container: HTMLElement) => container.querySelector('.radial-plot-title')!.textContent;
+        const note = (container: HTMLElement) => container.querySelector('.potential-reference-note')!.textContent;
+        const scale = (container: HTMLElement) => [...container.querySelector('.radial-plot-scale')!.children].map(span => span.textContent);
+        const marker = (container: HTMLElement) => container.querySelector('.potential-marker')!.getAttribute('x1');
+        const n2At = (level: 'basics' | 'explore') => render(
+            <BondsCurvePlot bonds={n2} data={{ ...empty, scan: n2Scan }} h2plus={{ curve: null, error: null }} {...props} level={level} />,
+        );
+        const basics = n2At('basics');
+        expect(title(basics.container)).toBe('Energy (eV)');
+        expect(scale(basics.container)[1]).toBe('Distance between nuclei (Å)');
+        // N₂'s fitted Rₑ, 2.086 a₀ = 1.104 Å.
+        expect(note(basics.container)).toBe('most stable: 1.10 Å');
+        const basicsMarker = marker(basics.container);
+        basics.unmount();
+        const explore = n2At('explore');
+        expect(title(explore.container)).toBe('E − E(separated atoms) (eV)');
+        expect(scale(explore.container)[1]).toMatch(/^R \(/);
+        expect(note(explore.container)).toMatch(/^Dotted line: R/);
+        expect(marker(explore.container)).toBe(basicsMarker);
+        explore.unmount();
+
+        const h2 = render(<BondsCurvePlot bonds={h2plus} data={empty} h2plus={{ curve, error: null }} {...props} level="basics" />);
+        expect(title(h2.container)).toBe('Energy (eV)');
+        // H₂⁺'s exact Rₑ, 1.997 a₀ = 1.057 Å.
+        expect(note(h2.container)).toBe('most stable: 1.06 Å');
+    });
+
     it('draws nothing for a molecule whose scan has not loaded (the panel says so)', () => {
         const { container } = render(<BondsCurvePlot bonds={n2} data={{ ...empty, loading: true }} h2plus={{ curve: null, error: null }} {...props} />);
         expect(container).toBeEmptyDOMElement();
