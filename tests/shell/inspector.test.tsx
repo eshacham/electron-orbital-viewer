@@ -252,6 +252,53 @@ describe('Inspector sections (ruling R24-3)', () => {
         expect(screen.getByRole('button', { name: 'View settings' })).toBeInTheDocument();
     });
 
+    // Task 5b (picture control, finish fix 2; ruling): the open drawer's bar was a full-width, 56 px, selected-fill bar
+    // with its label set vertically -- the loudest blue on screen (One Blue Voice). Open, it is a quiet horizontal label
+    // on surface tokens: a surface-2 strip, text-2 ink, no accent fill. Folded, it is the edge bar as before. A shell
+    // fix, so every mode's drawer; the one-press open and close and the accessible name are unchanged.
+    describe('the open drawer bar is a quiet horizontal label (finish fix 2)', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/shell/inspector.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+        const rule = (selector: string) => {
+            const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const match = new RegExp(`(^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(css);
+            if (!match) throw new Error(`No rule for ${selector}`);
+            return match[2];
+        };
+
+        it('lays the open bar out as a surface-2 strip in a row, its labels horizontal in text-2', () => {
+            const bar = rule('.inspector-drawer.open .inspector-bar');
+            expect(bar).toMatch(/flex-direction:\s*row;/);
+            expect(bar).toMatch(/background:\s*var\(--ql-color-surface-2\);/);
+            const button = rule('.inspector-drawer.open .inspector-bar-button');
+            expect(button).toMatch(/writing-mode:\s*horizontal-tb;/);
+            expect(button).toMatch(/color:\s*var\(--ql-color-text-2\);/);
+        });
+
+        it('never fills a bar button with the selection blue', () => {
+            const buttonRules = css.match(/[^{}]*\.inspector-bar-button[^{}]*\{[^}]*\}/g) ?? [];
+            expect(buttonRules.length).toBeGreaterThan(0);
+            for (const body of buttonRules) {
+                expect(body).not.toMatch(/selected-fill|accent-fill|on-fill/);
+            }
+        });
+
+        it('keeps the open label one press from closing, under the same name, with a quiet close mark', () => {
+            const onOpenChange = jest.fn();
+            const sections = [displaySection, { key: 'data', title: 'Data', content: <p>data body</p> }];
+            render(<Inspector variant="drawer" sections={sections} barSection="data" open onOpenChange={onOpenChange} />);
+            const button = screen.getByRole('button', { name: 'Data panel' });
+            expect(button).toHaveTextContent('Data');
+            expect(button.querySelector('.inspector-bar-close')).toHaveAttribute('aria-hidden', 'true');
+            fireEvent.click(button);
+            expect(onOpenChange).toHaveBeenLastCalledWith(false);
+        });
+
+        it('shows no close mark on the folded edge bar', () => {
+            render(<Inspector variant="drawer" sections={[displaySection]} open={false} onOpenChange={jest.fn()} />);
+            expect(screen.getByRole('button', { name: 'View settings' }).querySelector('.inspector-bar-close')).toBeNull();
+        });
+    });
+
     // The open section fills what is left of the inspector and scrolls inside itself, so the headers never scroll away.
     it('lets the open section fill the remaining height and scroll inside itself', () => {
         const css = readFileSync(resolve(__dirname, '../../src/shell/inspector.css'), 'utf8');

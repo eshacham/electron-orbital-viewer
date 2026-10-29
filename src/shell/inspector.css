@@ -57,15 +57,28 @@
   flex: 0 0 var(--ql-size-inspector-bar); display: flex; flex-direction: column; gap: 4px;
   padding: 8px 4px; box-sizing: border-box;
 }
-.inspector-drawer.open .inspector-bar { border-left: 1px solid var(--ql-color-border-subtle); }
 .inspector-bar-button {
   writing-mode: vertical-rl; padding: 12px 6px; cursor: pointer;
   border: 1px solid transparent; border-radius: var(--ql-radius-md); background: none;
   color: var(--ql-color-text-2); font: var(--ql-type-nav-weight) var(--ql-type-nav-size) var(--ql-font-sans);
 }
-.inspector-bar-button[aria-expanded="true"] {
-  background: var(--ql-color-selected-fill); border-color: var(--ql-color-selected-edge); color: var(--ql-color-on-fill);
+/* Task 5b (picture control, finish fix 2; ruling): open, the drawer stacks the bar above Info (.inspector is a column,
+   app_shell.css), and the bar used to stretch into a full-width, 56 px, selected-fill block with its label set
+   vertically -- the loudest blue on screen, against the One Blue Voice Rule. Open, it is a quiet horizontal label
+   instead: a surface-2 strip under a hairline, text-2 ink, the label read across, and a chevron saying a press folds
+   the drawer away to the right. No accent anywhere; folded, the edge bar above is unchanged. Every mode's drawer. */
+.inspector-drawer.open .inspector-bar {
+  flex: none; flex-direction: row; gap: var(--ql-space-4); padding: 0 var(--ql-space-8);
+  background: var(--ql-color-surface-2); border-bottom: 1px solid var(--ql-color-border-subtle);
 }
+.inspector-drawer.open .inspector-bar-button {
+  writing-mode: horizontal-tb; display: inline-flex; align-items: center; gap: var(--ql-space-4);
+  min-height: var(--ql-size-touch); padding: 0 var(--ql-space-8); border: 0; border-radius: 0; background: none;
+  color: var(--ql-color-text-2);
+}
+.inspector-drawer.open .inspector-bar-button[aria-expanded="true"] { color: var(--ql-color-text-1); }
+.inspector-drawer.open .inspector-bar-button:hover { color: var(--ql-color-text-1); }
+.inspector-bar-close { color: var(--ql-color-text-2); }
 .inspector-drawer-panel { display: flex; flex-direction: column; width: var(--ql-size-inspector); min-height: 0; }
 .inspector-stacked { display: flex; flex-direction: column; gap: var(--ql-size-section-gap); }
 @media (prefers-reduced-motion: no-preference) {

@@ -1,4 +1,5 @@
 import React, { useId } from 'react';
+import ChevronRight from '@mui/icons-material/ChevronRight';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import TabRow, { type TabItem } from './TabRow';
 import { displayPref, INSPECTOR_ALL_FOLDED } from '../design/presentation';
@@ -198,6 +199,8 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
                                 }}
                             >
                                 <span className="inspector-bar-label">{item.label}</span>
+                                {/* Task 5b (finish fix 2): open, the label reads across, and this says a press folds it away. */}
+                                {expanded && <ChevronRight className="inspector-bar-close" fontSize="small" aria-hidden="true" />}
                             </button>
                         );
                     })}
