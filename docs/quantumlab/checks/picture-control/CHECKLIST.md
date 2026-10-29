@@ -280,9 +280,8 @@ view's edge plus a fade width snaps further on, so 32 px of the next group's fir
 pick rests where a snap does when the picked tile is clear of both fades there; otherwise it is centred, as before.
 For example, 9l's last tile is still centred.
 
-**Still pending.** DESIGN.md does not yet record the strip as picker, the sideways Tonal Scroll Cue, the Bond length
-block, or the changes in this section: the open drawer label, the curve handle, and the sticky group labels. That is
-the documenter's job (Step 3).
+**Done in `aed8e8d`.** DESIGN.md records the strip as picker, the sideways Tonal Scroll Cue, the Bond length block,
+and the changes in this section: the open drawer label, the curve handle, and the sticky group labels.
 
 ### Fix round 1 (Task 5b review and finish verdict pass 1)
 

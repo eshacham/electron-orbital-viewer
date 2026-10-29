@@ -4,7 +4,7 @@ import { BondsState, BondsView } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
 import { BOND_GROUP_ORDER, BONDS_SYSTEMS, BondsSystemId, DENSITY_ISO_VALUES, bondOrderSelectText, nearestScanIndex, systemFormula } from '../bonds/systems';
 import { H2PLUS_R_RANGE } from '../bonds/h2plus';
-import { lengths, plainLength } from '../bonds/captions';
+import { lengths, plainLength, plainLengthForms } from '../bonds/captions';
 import { h2plusOrbitals } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
 import { frontierOccupied } from '../molecules/orbital_display';
@@ -113,10 +113,13 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
         : curve;
     const trackStyle = inset ? { paddingLeft: inset.left, paddingRight: inset.right } : undefined;
 
+    // Ruling M1 (final review): at Basics the status and the alert say R as the readout does, in Å; from Explore, a₀.
+    const plainR = !atLeast(level, 'explore');
     const status = data.loading ? `Loading ${formula}…`
-        : !isExact && meta && bonds.R !== null ? `${formula} at R = ${bonds.R.toFixed(2)} a₀ loaded.` : '';
+        : !isExact && meta && bonds.R !== null
+            ? `${formula} at ${plainR ? plainLengthForms(bonds.R).qualifier : `R = ${bonds.R.toFixed(2)} a₀`} loaded.` : '';
     const failure = data.error && (scan && bonds.R !== null
-        ? `${formula} at ${lengths(bonds.R)} could not be loaded: ${data.error}. The view still shows the previous picture.`
+        ? `${formula} at ${plainR ? plainLengthForms(bonds.R).qualifier : lengths(bonds.R)} could not be loaded: ${data.error}. The view still shows the previous picture.`
         : `${formula} could not be loaded: ${data.error}. The view still shows the previous system.`);
 
     const lengthBlock = (

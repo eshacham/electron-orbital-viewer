@@ -314,6 +314,27 @@ describe('BondsPanel', () => {
         expect(screen.getByRole('status')).toHaveTextContent(`N₂ at R = ${n2Scan.points[7].RBohr.toFixed(2)} a₀ loaded.`);
     });
 
+    // Ruling M1 (final review, picture control): at Basics the block's status and its failure alert give R as the
+    // readout does -- in the curve's words and Å, two decimals -- not in a₀. From Explore up they are unchanged.
+    it('says R in the status and the alert as the readout does: in Å at Basics, in a₀ from Explore up', () => {
+        const R = n2Scan.points[7].RBohr;
+        const plain = `distance between nuclei ${(R * 0.529177210903).toFixed(2)} Å`;
+        const failed = { ...empty, scan: n2Scan, meta: n2Meta, error: 'HTTP 404' };
+        const { rerender } = render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} level="basics" />);
+        expect(screen.getByRole('status')).toHaveTextContent(`N₂ at ${plain} loaded.`);
+        expect(screen.getByRole('status')).not.toHaveTextContent(/a₀/);
+        rerender(<BondsPanel bonds={n2} data={failed} note={null} {...handlers} level="basics" />);
+        expect(screen.getByRole('alert')).toHaveTextContent(`N₂ at ${plain} could not be loaded: HTTP 404. The view still shows the previous picture.`);
+        expect(screen.getByRole('alert')).not.toHaveTextContent(/a₀/);
+        for (const level of ['explore', 'advanced', 'research'] as const) {
+            rerender(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} level={level} />);
+            expect(screen.getByRole('status')).toHaveTextContent(`N₂ at R = ${R.toFixed(2)} a₀ loaded.`);
+            rerender(<BondsPanel bonds={n2} data={failed} note={null} {...handlers} level={level} />);
+            expect(screen.getByRole('alert')).toHaveTextContent(
+                `N₂ at R = ${R.toFixed(2)} a₀ (${(R * 0.529177210903).toFixed(3)} Å) could not be loaded: HTTP 404. The view still shows the previous picture.`);
+        }
+    });
+
     it('shows why the picture differs from the selection', () => {
         const { container } = render(<BondsPanel bonds={he2} data={{ ...empty, scan: heScan, meta: heMeta }} note="3σu* is not among the orbitals kept at this geometry; showing the total density." {...handlers} />);
         // Task 7a: the orbital's g/u is a real subscript, so the note's text is split around it.
