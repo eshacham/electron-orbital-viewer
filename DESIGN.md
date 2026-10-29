@@ -191,6 +191,35 @@ components:
   strip-tile-label:
     textColor: "{colors.text-2}"
     typography: "{typography.body}"
+  strip-group-label-picker:
+    textColor: "{colors.text-1}"
+    typography: "{typography.section}"
+  curve-handle:
+    rounded: "{rounded.pill}"
+    size: "10px"
+  curve-handle-hit:
+    size: "44px"
+  drawer-bar-open:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.text-2}"
+    padding: "0 8px"
+  drawer-bar-tab-open:
+    textColor: "{colors.text-1}"
+    height: "44px"
+    padding: "0 8px"
+  drawer-bar-close:
+    textColor: "{colors.text-2}"
+    size: "44px"
+  mo-level-box:
+    backgroundColor: "{colors.surface-2}"
+    rounded: "{rounded.xs}"
+    width: "22px"
+    height: "18px"
+  mo-level-box-hover:
+    backgroundColor: "{colors.surface-3}"
+  mo-level-box-selected:
+    backgroundColor: "{colors.selected-fill}"
+    textColor: "{colors.on-fill}"
   button-contained:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.on-accent}"
@@ -345,7 +374,7 @@ A cool navy-to-ice neutral ladder with one electric blue for action and selectio
 ### Primary
 - **Signal Blue** (`accent` / `accent-light`): primary actions (contained buttons, outlined and text buttons), the cumulative charged line and the "now" dot on the month band, the charged segment of the cap bar and the swatch that keys it. On a contained fill, text is `on-accent` (black in Deep Space, white in Light Clean, chosen for contrast).
 - **Link Blue** (`accent-text` / `accent-text-light`): links and inline accent text, a step brighter than Signal Blue in Deep Space so it reads at body size.
-- **Deep Selection** (`selected-fill`, edge `selected-edge`): the selected state of toggles, filter chips, the inspector bar button; text on it is `on-fill`. In Deep Space the edge is a cyan (`selected-edge`, also `focus-ring`) that draws tab underlines and the selected strip tile's ring; in Light Clean both collapse to the accent.
+- **Deep Selection** (`selected-fill`, edge `selected-edge`): the selected state of toggles, filter chips, the level switch, the pressed (i) and a drawn MO level; text on it is `on-fill`. In Deep Space the edge is a cyan (`selected-edge`, also `focus-ring`) that draws top-bar and panel tab underlines, the selected strip tile's ring and the potential curve's handle ring; in Light Clean both collapse to the accent. The inspector's drawer bar never takes it: folded, its buttons are `text-2` ink; open, the open tab is marked in `text-1` (Navigation).
 
 ### Secondary
 - **Status set** (`success`, `warning`, `danger`, plus `accent` for "running or queued"): what happened to a job. Success green is done-as-predicted; Warning amber is past a prediction or money absorbed past an approval; Danger red is failed. Light Clean darkens each for contrast on white.
@@ -401,7 +430,7 @@ A cool navy-to-ice neutral ladder with one electric blue for action and selectio
 
 ## Layout
 
-**Viewer (fixed workstation).** A full-height grid: a 56 px top bar (52 px on a phone), then a workspace with 12 px outer padding and 12 px gutters holding Explore (315 px; 300 px at medium), the canvas (fluid) and the inspector (290 px; 320 px at 1680 px and wider). Panels pad 16 px with 16 px between sections. Below 1290 px the inspector folds to a 44 px vertical bar over the canvas edge and opens as a drawer; Explore can collapse to a 28 px reveal. On a phone (max-width 760 px, or max-height 500 px, or portrait up to 1100 px) the canvas is the whole screen and the top bar, header and a bottom sheet sit inside it. The canvas's corners are fixed roles: title top-left, toolbar top-right, scale bar bottom-left, key column bottom-right (220 px max), with the thumbnail strip (72 px tiles, 16 px labels, 12 px between tiles) along the bottom.
+**Viewer (fixed workstation).** A full-height grid: a 56 px top bar (52 px on a phone), then a workspace with 12 px outer padding and 12 px gutters holding Explore (315 px; 300 px at medium), the canvas (fluid) and the inspector (290 px; 320 px at 1680 px and wider). Panels pad 16 px with 16 px between sections. Below 1290 px the inspector folds to a 44 px vertical bar over the canvas edge and opens as a drawer; Explore can collapse to a 28 px reveal. On a phone (max-width 760 px, or max-height 500 px, or portrait up to 1100 px) the canvas is the whole screen and the top bar, header and a bottom sheet sit inside it. The canvas's corners are fixed roles: title top-left, toolbar top-right, scale bar bottom-left, key column bottom-right (220 px max), with the thumbnail strip (72 px tiles, 16 px labels, 12 px between tiles or groups, 8 px between tiles inside a group) along the bottom. In Orbitals the strip is the picker and never folds (no handle); on a phone it is the first row of the Explore tab, and in Bonds the "Bond length" block follows it directly there.
 
 **Operate pages (scrolling ledger).** A document on `bg-app`, content capped at 1440 px, padded 16/24/48 px, stacked with 12 px gaps: top bar, a month title row with its controls, the budget strip, the month band (about 120 px, no box of its own), filter chips with search and sort, then the list. At 1024 px and below the strip regroups to three columns and memory moves into each row's details; at 600 px and below the strip folds to the available figure behind a disclosure, the band thins, and each row becomes a two-line grid item (molecule / status, then time / cost / action).
 
@@ -418,18 +447,20 @@ Depth is tonal first. In Deep Space panels carry no drop shadow, only a 1 px inn
 - **Popover** (Deep Space `0 12px 32px rgba(0,0,0,.45)`; Light Clean `0 12px 24px rgba(16,24,40,.12)`), with a `border-subtle` hairline: menus, popovers, search results.
 - **Selected** (Deep Space `0 0 0 1px #1FB6F5, 0 0 12px rgba(31,182,245,.35)`; Light Clean `0 0 0 1px #1662E0`).
 - **Selected tile** (Deep Space `0 0 12px 1px rgba(31,182,245,.5)`; Light Clean none): the selected strip tile, inside its 2 px edge.
-- **Selected halo** (`--ql-shadow-selected-halo`: Deep Space `0 0 12px 1px rgba(31,182,245,.5)`; Light Clean `none`): a small selected mark whose fill alone sits too close to `surface-1` (about 1.8:1), today the pressed (i). It is the selected tile's soft blurred glow, never a hard ring; Light Clean's solid accent fill already reads, so it gets none.
+- **Selected halo** (`--ql-shadow-selected-halo`: Deep Space `0 0 12px 1px rgba(31,182,245,.5)`; Light Clean `none`): a small selected mark whose fill alone sits too close to `surface-1` (about 1.8:1): the pressed (i) and the potential curve's handle. It is the selected tile's soft blurred glow, never a hard ring; Light Clean's solid accent fill already reads, so it gets none.
 
 ### Named Rules
 **The Glow Belongs To Deep Space Rule.** Halos and added light exist only in the dark theme; Light Clean expresses the same states with ink rings and darker rims.
 
 **The Tonal Scroll Cue Rule.** A scroller with more below it says so with a tonal fade, not a shadow, glow, arrow or "More": the last ~24 px fade out through a `mask-image` while (and only while) `scrollTop + clientHeight < scrollHeight`. Where the scroller has a hairline under it (Info in the inspector), the mask keeps that last pixel opaque so the hairline stays drawn; the phone sheet, which has none, fades to its edge. The mask is never animated, so reduced motion has nothing to stop. It works the same in both themes.
 
+Its sideways twin is opt-in (the strip's `groupScroll`, Orbitals only): the left, right or both 24 px edges fade from the list's own `scrollLeft` (one pixel of slack at each end), with the same tonal-only mask. The list snaps by subshell group (`scroll-snap-type: x proximity`, each group's start edge) with `scroll-padding-inline: 24px`, so a snapped rest sits flush with where the fade starts and no fade is drawn before the first group. At rest the next group peeks in: a group whose own tiles would end inside the view snaps a little further on, so 32 px of the next group's first tile and its label stand clear of the right fade. Snapping is native, not animated.
+
 **The Glow Finish Is The Owner's Rule.** The 3D Glow finish (`src/orbital_glow.ts`, GLOW_TUNING) is presentation only and its values were tuned live by the owner; they are recorded there, not here, and are not restyled.
 
 ## Shapes
 
-Softly squared. Docked viewer panels and the canvas take 16 px corners; Operate cards (budget strip, job list) take 12 px; key chips, strip tiles, buttons, inputs and the inspector bar's buttons take 8 px; filter chips and tooltips 6 px; small hit areas 4 px. Pills (999 px) are reserved for status chips, the avatar, and thin bars (cap bar, prediction gauge). Borders are 1 px hairlines; selection and current-tab marks are 2 px. On a phone and in fullscreen the canvas loses its corners and runs edge to edge.
+Softly squared. Docked viewer panels and the canvas take 16 px corners; Operate cards (budget strip, job list) take 12 px; key chips, strip tiles, buttons, inputs and the folded inspector bar's buttons take 8 px (the open bar's are square, flush in their strip); filter chips and tooltips 6 px; small hit areas and the MO level boxes' top corners 4 px. Pills (999 px) are reserved for status chips, the avatar, and thin bars (cap bar, prediction gauge). Borders are 1 px hairlines; selection and current-tab marks are 2 px. On a phone and in fullscreen the canvas loses its corners and runs edge to edge.
 
 ## Components
 
@@ -459,6 +490,7 @@ Softly squared. Docked viewer panels and the canvas take 16 px corners; Operate 
 ### Navigation
 - **Top bar:** `bg-bar` with a bottom hairline; wordmark and mark at left, tabs in nav type (`text-2`, `text-1` and 600 when current, underlined by a 2 px `selected-edge` bar), search and actions at right. Operate pages reuse the bar with the page name beside the wordmark and a "Back to the viewer" link.
 - **Panel tabs:** the same nav style and 2 px underline, 20 px apart, above a hairline.
+- **Drawer bar (below 1290 px):** folded, a 44 px vertical bar of `text-2` labels set sideways at the canvas edge. Open, it becomes a quiet horizontal label across the top of the drawer: a `surface-2` strip under a `border-subtle` hairline, 8 px side padding, each tab a 44 px row in nav type and `text-2`, hover `text-1`. The open tab is marked by a 2 px `text-1` underline (an inset bottom shadow) and weight 600: no accent, no fill, no `selected-fill`. A separate "Close panel" control, a 44 px chevron in `text-2`, sits at the bar's far right and returns focus to the open tab. The bar sits flush against the drawer's clipped edge, so its buttons draw the 2 px focus ring inside (offset −2 px).
 - **Disclosure:** inspector sections are titled accordions, one open at a time; their chevron points down when folded and rotates to point up when open (180°, 180 ms).
 
 ### Budget Strip (Operate signature)
@@ -512,6 +544,24 @@ Info's key facts as a definition list in tabular figures (the Tabular Figures Ru
 ### Phone Caption
 On a phone, a one-line pill under the header names what is drawn: "<title> · <one qualifier>" ("Carbon · electron density"; an orbital's qualifier is its enclosed share, a Bonds view's its R in a₀). Body-phone type, the title in `text-1` with real subscripts and an ellipsis when long, the qualifier in `text-2` and never cut; `surface-1` with the popover shadow, padding 4 × 10 px. While the view loads the qualifier says "loading…". It is announced once per change, after the canvas stops waiting, from a hidden polite copy with plain digits; Info leaves a new selection to it, so a reader hears each change once.
 
+### Thumbnail Strip as Picker (Orbitals signature)
+In Orbitals the picture is the control: the left panel keeps one chip row, Shell n, and the strip under the canvas picks the orbital. It is always expanded (no collapse handle). Tiles are grouped by subshell (3s, 3p, 3d; 9s to 9l), each group a labelled `role="group"`; the selected tile wears the strip's 2 px `selected-edge` ring and, in Deep Space, the selected-tile glow. A pick from the strip or a Shell n chip draws that orbital at every level.
+- **Group labels:** the group's heading in section type (600, 14/20 px) in `text-1`, sticky inside its own group so the group on screen is always named: at rest it stands where it is laid out; once the strip has scrolled it holds 24 px from the list's edge, just past the left fade. Elsewhere (other modes' strips) group labels stay 500 11/14 px in `text-3`.
+- **Tile labels:** on a phone a long name breaks only before its "(" ("9g" / "(mₗ = −2)"), never inside either part.
+- **Scrolling:** by subshell group, with the sideways twin of the Tonal Scroll Cue Rule and the next group peeking in at rest (Elevation). A pick rests where a snap would when the picked tile stands clear of both fades there; otherwise it is centred.
+
+### Bond Length Block (Bonds signature)
+R's whole story is one block, read top to bottom as one instrument: the "Bond length" heading (section weight, `text-1`) with its (i), the readout, the R slider, then the potential curve at the block's full width, its legend, its axis row and the Rₑ note. 2 px between parts; the curve is in flow, with no card of its own. The energy at R is Info's fact, so the block has no energy readout (the One Home Per Number Rule). On a phone the block comes right after the strip, above the identity card and the molecule select.
+- **One axis:** the slider's track is inset by the plot's own gutters (the left margin the plot reports, which widens to fit its energy labels, and its 8 px right pad), so the thumb stands over the curve's marker to a tenth of a pixel.
+- **Marker:** a 1 px dashed `text-1` line (3 2) at R, with a 3 px dot in each series' colour where that series is on the plot.
+- **Handle:** a 10 px dot in the colour of the series it rides (the drawn state's curve, else the first) with a 2 px `selected-edge` ring, wearing the selected halo in Deep Space and nothing in Light Clean. Its hit area is 44 px across with an `ew-resize` cursor; a drag that starts on it keeps its offset from the centre, a tap elsewhere on the curve sets R there. Where its curve is off the plot at R, or has no value there, the handle stays on the marker line at the plot's edge as a hollow ring, so it never reads as a point at a false energy.
+- **Rₑ line:** a 1 px dotted line (1 3) in `success` green at the fitted Rₑ, keyed by its note under the plot in the same green. He₂ has no well, so it has none.
+- **Basics words:** the readout and the slider's value text read "Distance between nuclei 1.10 Å"; the plot is titled "Energy (eV)", its x-axis row reads the ends in Å around "Distance between nuclei (Å)", the energy ends round to 2 significant figures with 0 labelling the separated-atoms line (an end within 16 px of the 0 gives way to it), H₂⁺'s legend reads "bonding · antibonding · apart", and the note reads "Dotted line: most stable, 1.10 Å".
+- **Explore and up (Research included):** the readout keeps "R = 2.07 a₀ (1.098 Å)", each axis end carries its unit ("1.66 a₀ · R · 2.41 a₀"), the legend takes the symmetry labels with real subscripts, and the note names Rₑ and Dₑ in full.
+
+### MO Level Buttons (Bonds, owner R26)
+Each level box in the MO diagram is a native toggle button (22 × 18 px) named for what it draws ("2σg orbital, 2 electrons"), so it looks pressable: at rest a `surface-2` tile edged by a `border-subtle` hairline, standing on its 2 px `text-1` level line, with 4 px top corners; `surface-3` on hover (120 ms); and, when it is the orbital drawn, Deep Selection: `selected-fill`, `on-fill` arrows and level line, and the selected shadow (cyan ring and halo in Deep Space, accent ring in Light Clean), with `aria-pressed`. Focus keeps the global 2 px ring. At Basics and Explore one `text-3` caption under the heading says "Pick a level to draw that orbital."
+
 ## Do's and Don'ts
 
 ### Do:
@@ -527,6 +577,7 @@ On a phone, a one-line pill under the header names what is drawn: "<title> · <o
 - **Do** give each number one home, and set energies eV first with Ha in parentheses.
 - **Do** put an (i) beside the word it explains, with `aria-pressed` and `aria-controls`, and let only one be pressed.
 - **Do** set names of what is drawn with real subscripts and a true minus; flat Unicode where markup cannot go, plain digits where it is spoken.
+- **Do** stand a control over the plot it moves: inset its track by the plot's own gutters, and draw its handle hollow when the value is off the plot.
 
 ### Don't:
 - **Don't** whiten, tint, darken or swap the phase, density or ESP colours for either theme or any finish.
