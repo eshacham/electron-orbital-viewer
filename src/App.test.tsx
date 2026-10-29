@@ -1161,9 +1161,9 @@ describe('App', () => {
 
             (loadScan as jest.Mock).mockRejectedValue(new Error('Could not load /molecules/v1/o2/scan.json (HTTP 403)'));
             act(() => { store.dispatch(selectBondsSystem('o2')); });
-            // The alert says why; Task 4 (T3 M2): the Bond length block's state line says it too, briefly.
+            // The alert says why; Task 4 (T3 M2, ruling C9): the Bond length block only says it has no curve.
             expect(await screen.findByRole('alert')).toHaveTextContent(/O₂ could not be loaded: /);
-            expect(within(screen.getByRole('region', { name: 'Bond length' })).getByText('O₂ could not be loaded.')).toBeInTheDocument();
+            expect(within(screen.getByRole('region', { name: 'Bond length' })).getByText('No curve to show.')).toBeInTheDocument();
             stillKeyed();
             // A failure is not a wait: the cue goes (the mocked viewer never finishes, so "Computing…" may remain).
             await waitFor(() => expect(screen.queryByText(/^Loading O₂/)).not.toBeInTheDocument());
@@ -1177,9 +1177,9 @@ describe('App', () => {
             // Unanchored: the top bar's tab is named "<Visible label> (<old name>)" (WCAG 2.5.3, label in name).
             fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             chooseSystem('N₂ — Nitrogen');
-            // Task 4 (T3 M2): the alert, and the Bond length block's short state line, which is not a second alert.
-            expect(await screen.findByRole('alert')).toHaveTextContent(/N₂ could not be loaded: /);
-            expect(within(screen.getByRole('region', { name: 'Bond length' })).getByText('N₂ could not be loaded.')).toBeInTheDocument();
+            // Task 4 (T3 M2, ruling C9): said once, by the alert; the Bond length block's line only says it has no curve.
+            expect(await screen.findByText(/N₂ could not be loaded/)).toBeInTheDocument();
+            expect(within(screen.getByRole('region', { name: 'Bond length' })).getByText('No curve to show.')).toBeInTheDocument();
             expect(store.getState().orbital.error).toBeNull();
             expect(screen.getAllByRole('alert')).toHaveLength(1);
         });
@@ -1398,7 +1398,7 @@ describe('App', () => {
             const figure = within(block()).getByRole('figure', { name: 'potential energy curve' });
             expect(figure.querySelector('.radial-plot-title')!.textContent).toBe('Energy (eV)');
             expect(within(figure).getByText('Distance between nuclei (Å)')).toBeInTheDocument();
-            expect(figure.querySelector('.potential-reference-note')).toHaveTextContent(/^most stable: \d\.\d\d Å$/);
+            expect(figure.querySelector('.potential-reference-note')).toHaveTextContent(/^Dotted line: most stable, \d\.\d\d Å$/);
             // The marker still stands at point 5, and the slider says so.
             expect(Number(figure.querySelector('.potential-marker')!.getAttribute('x1'))).toBeCloseTo(pixelFor(n2Scan.points[5].RBohr), 6);
             expect(screen.getByRole('slider', { name: 'Internuclear distance R' }))

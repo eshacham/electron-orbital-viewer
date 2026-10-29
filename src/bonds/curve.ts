@@ -18,7 +18,8 @@ export interface CurvePlotSpec {
     yRange: [number, number];
     markerR: number | null;
     snapRs: number[];
-    referenceR: { R: number; label: string } | null;
+    /** Bonds' Rₑ line: its label, and (Task 4) the same line in Basics' plain words. */
+    referenceR: { R: number; label: string; plainLabel: string } | null;
 }
 
 /** The plots' titles: what E means on each (zero is the separated atoms, or H + H⁺). */
@@ -53,6 +54,12 @@ const MAX_SPAN_EV = 15;
 const clampTo = (range: [number, number], R: number) => Math.min(range[1], Math.max(range[0], R));
 
 /**
+ * Task 4 (picture control): the Rₑ line's label at Basics -- the same line as the full label names ("Dotted line"),
+ * called what it marks, the most stable distance, in Å (two decimals).
+ */
+const plainReferenceLabel = (ReBohr: number) => `Dotted line: most stable, ${(ReBohr * BOHR_TO_ANGSTROM).toFixed(2)} Å`;
+
+/**
  * A molecule's curve, E − E(separated atoms) in eV: zero is the dissociation
  * limit, as the separated-atom calculation defines it, so the depth of the
  * well is D_e as the captions state it and the grey line shows how far short
@@ -83,7 +90,11 @@ export function diatomicCurveSpec(system: DiatomicId, scan: MoleculeScan, R: num
         snapRs: scan.points.map(p => p.RBohr),
         // He₂ has no bond, so no bond length to mark.
         referenceR: fit.bound && fit.ReBohr >= xRange[0] && fit.ReBohr <= xRange[1]
-            ? { R: fit.ReBohr, label: `Dotted line: R_e = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted; D_e = ${fit.DeEv.toFixed(2)} eV from separated atoms.` }
+            ? {
+                R: fit.ReBohr,
+                label: `Dotted line: R_e = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted; D_e = ${fit.DeEv.toFixed(2)} eV from separated atoms.`,
+                plainLabel: plainReferenceLabel(fit.ReBohr),
+            }
             : null,
     };
 }
@@ -119,6 +130,7 @@ export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null): CurvePlot
             R: equilibrium.R,
             label: `Dotted line: R_e = ${equilibrium.R.toFixed(3)} a₀ (${(equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), `
                 + `E = ${signed(equilibrium.totalEnergy, 4)} Ha; D_e = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
+            plainLabel: plainReferenceLabel(equilibrium.R),
         },
     };
 }

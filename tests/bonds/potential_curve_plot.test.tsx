@@ -127,11 +127,40 @@ describe('PotentialCurvePlot', () => {
         beforeAll(() => {
             (window as { PointerEvent?: unknown }).PointerEvent = class extends MouseEvent {
                 pointerId: number;
-                constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; }
+                pointerType: string;
+                constructor(type: string, init: PointerEventInit = {}) {
+                    super(type, init);
+                    this.pointerId = init.pointerId ?? 1;
+                    this.pointerType = init.pointerType ?? '';
+                }
             };
         });
         afterAll(() => { (window as { PointerEvent?: unknown }).PointerEvent = original; });
         const at = (fraction: number) => ({ clientX: 34 + 258 * fraction, clientY: 50, pointerId: 1, button: 0 });
+
+        // Fix round 1 (M1): where the release is swallowed with no lost capture either (a macOS ctrl-click menu, an app
+        // switch), the next mouse move comes with no button held -- that ends the drag as a cancel, not a commit.
+        it('cancels a mouse drag whose button is found released, committing nothing', () => {
+            const onSelectR = jest.fn();
+            const onDragR = jest.fn();
+            const { container } = render(<PotentialCurvePlot {...props} onSelectR={onSelectR} onDragR={onDragR} />);
+            const svg = container.querySelector('svg')!;
+            const mouse = (fraction: number, buttons: number) => ({ ...at(fraction), pointerType: 'mouse', buttons });
+            fireEvent.pointerDown(svg, mouse(0.25, 1));
+            fireEvent.pointerMove(svg, mouse(0.5, 1));
+            expect(onDragR).toHaveBeenLastCalledWith(2);
+            fireEvent.pointerMove(svg, mouse(0.75, 0));
+            expect(onDragR).toHaveBeenLastCalledWith(null);
+            onDragR.mockClear();
+            fireEvent.pointerMove(svg, mouse(0.5, 0));
+            fireEvent.pointerUp(svg, mouse(0.5, 0));
+            expect(onDragR).not.toHaveBeenCalled();
+            expect(onSelectR).not.toHaveBeenCalled();
+            // A touch or pen move reports its buttons its own way; only a mouse's is read.
+            fireEvent.pointerDown(svg, { ...at(0.25), pointerType: 'touch', buttons: 1 });
+            fireEvent.pointerMove(svg, { ...at(0.5), pointerType: 'touch', buttons: 0 });
+            expect(onDragR).toHaveBeenLastCalledWith(2);
+        });
 
         it('reports drafts while dragged and commits once on release', () => {
             const onSelectR = jest.fn();
@@ -304,6 +333,8 @@ describe('PotentialCurvePlot', () => {
                 const axisStart = Number(container.querySelector('.radial-plot-axis')!.getAttribute('x1'));
                 const ticks = [...container.querySelectorAll('.radial-plot-peak')].map(t => Number(t.getAttribute('x1')));
                 expect([plain, labelsEnd < axisStart, labelsEnd < Math.min(...ticks)]).toEqual([plain, true, true]);
+                // Fix round 1 (M4): the scale row's ends follow the wider margin too.
+                expect((container.querySelector('.radial-plot-scale') as HTMLElement).style.paddingLeft).toBe(`${axisStart}px`);
                 // The curve and a tap use the same, wider margin: a tap on the first tick is its R.
                 fireEvent.click(container.querySelector('svg')!, { clientX: Math.min(...ticks), clientY: 50 });
                 expect(onSelectR).toHaveBeenLastCalledWith(2.4);
@@ -318,7 +349,8 @@ describe('PotentialCurvePlot', () => {
     describe('plain words, for Basics', () => {
         const ev = { ...props, title: 'E − E(separated atoms)', unit: 'eV', xRange: [1.6594818936013664, 2.4062487457219808] as [number, number],
             yRange: [-10, 1] as [number, number], markerR: 2,
-            referenceR: { R: 2.086, label: 'Dotted line: R_e = 2.086 a₀ (1.104 Å), fitted; D_e = 9.44 eV from separated atoms.' } };
+            referenceR: { R: 2.086, label: 'Dotted line: R_e = 2.086 a₀ (1.104 Å), fitted; D_e = 9.44 eV from separated atoms.',
+                plainLabel: 'Dotted line: most stable, 1.10 Å' } };
 
         it('names the energy axis "Energy (eV)", and the image in the same words', () => {
             const { container } = render(<PotentialCurvePlot {...ev} plain />);
@@ -334,10 +366,27 @@ describe('PotentialCurvePlot', () => {
             expect(scale.textContent).not.toMatch(/a₀|R \(/);
         });
 
-        it('labels the Rₑ line "most stable", with its R in Å', () => {
-            const { container } = render(<PotentialCurvePlot {...ev} plain />);
-            // 2.086 a₀ = 1.104 Å.
-            expect(seenText(container.querySelector('.potential-reference-note')!)).toBe('most stable: 1.10 Å');
+        // Fix round 1 (M2): the plot says nothing of its own about the line -- its plain label is the caller's
+        // (curve.ts), and a line given none keeps its one label rather than be called something it may not be.
+        it("labels the reference line in the caller's plain words, or its own label if it has none", () => {
+            const { container, unmount } = render(<PotentialCurvePlot {...ev} plain />);
+            expect(seenText(container.querySelector('.potential-reference-note')!)).toBe('Dotted line: most stable, 1.10 Å');
+            unmount();
+            const other = render(<PotentialCurvePlot {...ev} plain referenceR={{ R: 2.2, label: 'CCSD(T) not valid beyond R = 2.20 a₀' }} />);
+            expect(seenText(other.container.querySelector('.potential-reference-note')!)).toBe('CCSD(T) not valid beyond R = 2.20 a₀');
+            expect(other.container).not.toHaveTextContent(/most stable/);
+        });
+
+        // Fix round 1 (M4): the axis ends' values stand under the axis ends, not under the energy labels.
+        it('sets the end values under the ends of the axis, plain or not', () => {
+            for (const plain of [false, true]) {
+                const { container, unmount } = render(<PotentialCurvePlot {...ev} plain={plain} />);
+                const scale = container.querySelector('.radial-plot-scale') as HTMLElement;
+                const axis = container.querySelector('.radial-plot-axis')!;
+                expect([plain, scale.style.width, scale.style.boxSizing, scale.style.paddingLeft, scale.style.paddingRight])
+                    .toEqual([plain, '300px', 'border-box', `${axis.getAttribute('x1')}px`, `${300 - Number(axis.getAttribute('x2'))}px`]);
+                unmount();
+            }
         });
 
         it('draws the same curves, marker, ticks and Rₑ line as without plain words', () => {

@@ -47,7 +47,9 @@ describe('diatomicCurveSpec', () => {
     // (curveNote), the method and the validity stop in bondsCaptions, which Info prints just before it.
     it('marks the fitted R_e, and leaves the method, its zero and where it stops being valid to Info', () => {
         const spec = diatomicCurveSpec('n2', n2Scan, 2.07);
-        expect(spec.referenceR).toEqual({ R: n2Scan.fit.ReBohr, label: 'Dotted line: R_e = 2.086 a₀ (1.104 Å), fitted; D_e = 9.44 eV from separated atoms.' });
+        // Task 4 fix round 1 (M2, M3): with its Basics words beside it -- the same line, named the same way.
+        expect(spec.referenceR).toEqual({ R: n2Scan.fit.ReBohr, label: 'Dotted line: R_e = 2.086 a₀ (1.104 Å), fitted; D_e = 9.44 eV from separated atoms.',
+            plainLabel: 'Dotted line: most stable, 1.10 Å' });
         expect(spec).not.toHaveProperty('caption');
         expect(curveNote('n2', n2Scan)).toBe('Plot: E − E(separated atoms), in eV. Zero: N ⁴S + N ⁴S, UCCSD(T)/aug-cc-pVTZ (UHF reference, frozen core), the grey line.');
         expect(bondsCaptions('n2', n2Scan).join(' ')).toMatch(/Single-reference CCSD\(T\) is not valid beyond R = 2\.41 a₀ \(1\.273 Å\) \(the bond breaks into open-shell atoms\), so the curve stops there: T1 diagnostic 0\.0214/);
@@ -98,7 +100,8 @@ describe('h2plusCurveSpec', () => {
         expect(spec.unit).toBe('eV');
         expect(spec.series[0].points[2].E).toBeCloseTo((-0.6026 + 0.5) * HARTREE_TO_EV, 10);
         expect(spec.series[2].points.map(p => p.E)).toEqual([0, 0]);
-        expect(spec.referenceR).toEqual({ R: 1.9971924, label: 'Dotted line: R_e = 1.997 a₀ (1.057 Å), E = −0.6026 Ha; D_e = 2.79 eV (0.1026 Ha) to H + H⁺.' });
+        expect(spec.referenceR).toEqual({ R: 1.9971924, label: 'Dotted line: R_e = 1.997 a₀ (1.057 Å), E = −0.6026 Ha; D_e = 2.79 eV (0.1026 Ha) to H + H⁺.',
+            plainLabel: 'Dotted line: most stable, 1.06 Å' });
         // Task 7a: the exact method is H2PLUS_CAPTIONS' (Info); the plot's own note is its zero.
         expect(spec).not.toHaveProperty('caption');
         expect(curveNote('h2plus', null)).toBe('Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (−0.5 Ha), the grey line.');
@@ -201,7 +204,7 @@ describe('BondsCurvePlot', () => {
         expect(title(basics.container)).toBe('Energy (eV)');
         expect(scale(basics.container)[1]).toBe('Distance between nuclei (Å)');
         // N₂'s fitted Rₑ, 2.086 a₀ = 1.104 Å.
-        expect(note(basics.container)).toBe('most stable: 1.10 Å');
+        expect(note(basics.container)).toBe('Dotted line: most stable, 1.10 Å');
         const basicsMarker = marker(basics.container);
         basics.unmount();
         const explore = n2At('explore');
@@ -214,7 +217,7 @@ describe('BondsCurvePlot', () => {
         const h2 = render(<BondsCurvePlot bonds={h2plus} data={empty} h2plus={{ curve, error: null }} {...props} level="basics" />);
         expect(title(h2.container)).toBe('Energy (eV)');
         // H₂⁺'s exact Rₑ, 1.997 a₀ = 1.057 Å.
-        expect(note(h2.container)).toBe('most stable: 1.06 Å');
+        expect(note(h2.container)).toBe('Dotted line: most stable, 1.06 Å');
     });
 
     it('draws nothing for a molecule whose scan has not loaded (the panel says so)', () => {

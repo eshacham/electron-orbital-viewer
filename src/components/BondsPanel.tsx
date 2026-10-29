@@ -136,11 +136,12 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                     <Typography variant="subtitle2" id={lengthId} className="bonds-length-heading">Bond length</Typography>
                     <InfoButton topic="potentialCurve" label="Potential energy curve" />
                 </div>
-                {/* Task 4 (T3 M2): until a molecule's scan is here there is no R, slider or curve -- one short line says
-                    why, in the words of the status and the alert above; they stay the announcements, so this is not live. */}
+                {/* Task 4 (T3 M2): until a molecule's scan is here there is no R, slider or curve -- one short line says so,
+                    not live (the status and the alert above are the announcements). A failure is said once, by the alert
+                    (ruling C9); this line only says what the block lacks. */}
                 {!isExact && !scan && (
                     <Typography variant="body2" className="bonds-length-state">
-                        {data.error ? `${formula} could not be loaded.` : `Loading ${formula}…`}
+                        {data.error ? 'No curve to show.' : `Loading ${formula}…`}
                     </Typography>
                 )}
                 {shownR !== null && <Typography variant="body2" className="bonds-r">{lengths(shownR)}</Typography>}

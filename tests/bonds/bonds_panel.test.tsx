@@ -573,9 +573,10 @@ describe('the Bond length block (Task 3, picture control)', () => {
         }
     });
 
-    // Task 4 (T3 M2): while a molecule's scan loads, or after it failed to, the block says so in one short line -- the
-    // panel's own words for it -- rather than stand empty under its heading. The polite status and the alert above it
-    // stay the announcements, so the line is plain text, not a second live region.
+    // Task 4 (T3 M2): while a molecule's scan loads, or after it failed to, the block says so in one short line rather
+    // than stand empty under its heading. The polite status and the alert above it stay the announcements, so the line
+    // is plain text, not a second live region; fix round 1 (ruling C9, a failure is said once): on failure it says what
+    // the block lacks, "No curve to show.", and leaves the failure to the alert.
     it('says the scan is loading, or could not be loaded, rather than stand empty', () => {
         const fresh = reducer(undefined, selectBondsSystem('n2'));
         const panel = (data: typeof empty | { scan: MoleculeScan; meta: MoleculeMeta; basis: null; loading: false; error: null }) => (
@@ -587,7 +588,8 @@ describe('the Bond length block (Task 3, picture control)', () => {
         expect(within(block()).getByText('Loading N₂…')).toHaveClass('bonds-length-state');
         expect(within(block()).queryByRole('status')).toBeNull();
         rerender(panel({ ...empty, error: 'HTTP 404' }));
-        expect(within(block()).getByText('N₂ could not be loaded.')).toHaveClass('bonds-length-state');
+        expect(within(block()).getByText('No curve to show.')).toHaveClass('bonds-length-state');
+        expect(block()).not.toHaveTextContent(/could not be loaded/);
         expect(within(block()).queryByRole('alert')).toBeNull();
         // The full reason is the alert's, above the block.
         expect(screen.getByRole('alert')).toHaveTextContent('N₂ could not be loaded: HTTP 404.');

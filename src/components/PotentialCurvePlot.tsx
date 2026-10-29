@@ -27,8 +27,11 @@ interface PotentialCurvePlotProps {
     markerR: number | null;
     /** Scan geometries, ticked on the axis: the keyboard slider steps over these, one point per press. */
     snapRs?: number[];
-    /** A line across the plot at one R (Bonds: the fitted Rₑ, where the curve is lowest), with its label. */
-    referenceR?: { R: number; label: string } | null;
+    /**
+     * A line across the plot at one R (Bonds: the fitted Rₑ), with its label, and the caller's plain words for it -- what
+     * the line means is the caller's to say, at either level. Without a plainLabel, plain mode keeps `label`.
+     */
+    referenceR?: { R: number; label: string; plainLabel?: string } | null;
     width: number;
     /** A tap, or the release of a drag, chooses R (clamped to xRange); the caller snaps it. */
     onSelectR?: (R: number) => void;
@@ -46,8 +49,8 @@ interface PotentialCurvePlotProps {
     keyboardControl?: boolean;
     /**
      * Task 4 (picture control): plain words, for Basics -- the energy axis reads "Energy (<unit>)", the distance axis
-     * "Distance between nuclei (Å)" between its ends in Å, and the reference line "most stable: <R in Å>". Labels only:
-     * the curves, the marker, the ticks and the text alternative are the same either way.
+     * "Distance between nuclei (Å)" between its ends in Å, and the reference line takes the caller's `plainLabel`.
+     * Labels only: the curves, the marker, the ticks and the text alternative are the same either way.
      */
     plain?: boolean;
 }
@@ -92,7 +95,7 @@ function nearestIndex(sorted: number[], R: number): number {
 
 /** An axis end, a₀: two decimals, trailing zeros dropped (H₂⁺'s range stays "0.5 … 10"). */
 const axisR = (R: number) => String(Number(R.toFixed(2)));
-/** An R in Å, two decimals: the plain axis ends and the plain Rₑ label. */
+/** An R in Å, two decimals, for the axis ends. */
 const angstrom = (R: number) => (R * BOHR_TO_ANGSTROM).toFixed(2);
 
 const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
@@ -146,7 +149,14 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
         onDragR!(pointerR(event));
     };
     const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
-        if (isDragPointer(event)) onDragR!(pointerR(event));
+        if (!isDragPointer(event)) return;
+        // Fix round 1 (M1): a mouse moving with no button held has been released where we never heard it (a macOS
+        // ctrl-click menu, an app switch, with no lost capture either) -- a cancel, not a commit.
+        if (event.pointerType === 'mouse' && event.buttons === 0) {
+            handlePointerCancel(event);
+            return;
+        }
+        onDragR!(pointerR(event));
     };
     const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
         if (!isDragPointer(event)) return;
@@ -282,7 +292,8 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                     </span>
                 ))}
             </div>
-            <div className="radial-plot-scale" style={{ width }}>
+            {/* Fix round 1 (M4): padded to the plot area, so the end values stand under the axis ends. */}
+            <div className="radial-plot-scale" style={{ width, boxSizing: 'border-box', paddingLeft: left, paddingRight: PAD.right }}>
                 {plain ? (
                     // Task 4: the ends in Å, and the axis named in words between them.
                     <>
@@ -303,11 +314,10 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                 than an SVG <title> (a pointing-device-only tooltip), so it
                 reads for everyone, not just a mouse hovering the rule.
                 Task 7a: R_e and D_e with a real subscript, never "_".
-                Task 4: in plain words the line is named for what it marks,
-                the most stable R, in Å. */}
+                Task 4: in plain words, the caller's plainLabel for it. */}
             {referenceR && (
                 <div className="radial-plot-note potential-reference-note">
-                    {plain ? `most stable: ${angstrom(referenceR.R)} Å` : withSubscripts(referenceR.label)}
+                    {withSubscripts(plain ? referenceR.plainLabel ?? referenceR.label : referenceR.label)}
                 </div>
             )}
             {/* The text alternative to the pixels: the current geometry and
