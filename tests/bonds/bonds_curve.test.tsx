@@ -3,9 +3,10 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { curveNote, diatomicCurveSpec, h2plusCurveSpec } from '../../src/bonds/curve';
-import { bondsCaptions } from '../../src/bonds/captions';
+import { bondsCaptions, plainLengthForms } from '../../src/bonds/captions';
 import BondsCurvePlot from '../../src/components/BondsCurvePlot';
-import reducer, { selectBondsSystem, setScanPoint } from '../../src/store/bondsSlice';
+import reducer, { selectBondsSystem, setBondsView, setH2PlusR, setScanPoint } from '../../src/store/bondsSlice';
+import { CURVE_COLORS } from '../../src/curve_colors';
 import { HARTREE_TO_EV } from '../../src/bonds/systems';
 import { MoleculeScan } from '../../src/molecules/types';
 
@@ -104,6 +105,14 @@ describe('diatomicCurveSpec', () => {
     });
 });
 
+// Fix round 1 (review M5): Basics' bond length in both forms from one helper -- the block's line, and the caption's
+// lower-case qualifier -- so neither is string surgery on the other.
+describe('plainLengthForms', () => {
+    it('gives the line and the qualifier, in Å to two decimals', () => {
+        expect(plainLengthForms(2.07)).toEqual({ line: 'Distance between nuclei 1.10 Å', qualifier: 'distance between nuclei 1.10 Å' });
+    });
+});
+
 describe('h2plusCurveSpec', () => {
     // Like every molecule's: relative to the separated fragments, in eV.
     it('plots both exact curves relative to H + H⁺, with R_e and D_e marked', () => {
@@ -123,6 +132,15 @@ describe('h2plusCurveSpec', () => {
 
     // Task 5b (finish fix 6): at Basics the legend says what each curve is in plain words; curve.ts says them, as it
     // says the Rₑ line's, so the plot makes no science claim of its own. N₂'s legend ("separated atoms") is plain already.
+    // Fix round 1 (review I1): the handle wears Deep Selection, so it rides the drawn state's curve -- 1σu* when that
+    // is drawn, 1σg otherwise; a molecule's handle rides its one curve.
+    it("names the drawn state's curve as the one the handle rides", () => {
+        expect(h2plusCurveSpec(curve, 2).handleKey).toBe('g');
+        expect(h2plusCurveSpec(curve, 2, '1sigma_g').handleKey).toBe('g');
+        expect(h2plusCurveSpec(curve, 2, '1sigma_u').handleKey).toBe('u');
+        expect(diatomicCurveSpec('n2', n2Scan, 2.07).handleKey).toBe('e');
+    });
+
     it('names its curves in plain words for Basics: bonding, antibonding, apart', () => {
         expect(h2plusCurveSpec(curve, 2).series.map(s => [s.label, s.plainLabel]))
             .toEqual([['1σg', 'bonding'], ['1σu*', 'antibonding'], ['H + H⁺', 'apart']]);
@@ -245,6 +263,20 @@ describe('BondsCurvePlot', () => {
         h2.unmount();
         const h2Explore = render(<BondsCurvePlot bonds={h2plus} data={empty} h2plus={{ curve, error: null }} {...props} level="explore" />);
         expect(legend(h2Explore.container)).toEqual(['1σg1σg', '1σu1σu*', 'H + H⁺']);
+    });
+
+    // Fix round 1 (review I1): with 1σu* drawn, the handle stands on 1σu*'s curve, in its colour -- not on 1σg's.
+    it('puts the H₂⁺ handle on the drawn state\'s curve', () => {
+        const colour = (container: HTMLElement) => (container.querySelector('.potential-handle') as HTMLElement).style.background;
+        const rgb = (hex: string) => `rgb(${[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
+        // At R = 4 a₀ both curves are on the plot.
+        const at4 = reducer(h2plus, setH2PlusR(4));
+        const g = render(<BondsCurvePlot bonds={at4} data={empty} h2plus={{ curve, error: null }} {...props} />);
+        expect(colour(g.container)).toBe(rgb(CURVE_COLORS[0]));
+        g.unmount();
+        const drawnU = reducer(at4, setBondsView({ kind: 'h2plus', state: '1sigma_u' }));
+        const u = render(<BondsCurvePlot bonds={drawnU} data={empty} h2plus={{ curve, error: null }} {...props} />);
+        expect(colour(u.container)).toBe(rgb(CURVE_COLORS[1]));
     });
 
     it('draws nothing for a molecule whose scan has not loaded (the panel says so)', () => {

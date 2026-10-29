@@ -2,7 +2,7 @@ import type { CurveSeries } from '../components/PotentialCurvePlot';
 import { CURVE_COLORS } from '../curve_colors';
 import { MoleculeScan } from '../molecules/types';
 import { atomsMethod, signed } from './captions';
-import { H2PLUS_LABELS, H2PLUS_R_RANGE } from './h2plus';
+import { H2PLUS_LABELS, H2PLUS_R_RANGE, type H2PlusState } from './h2plus';
 import { BOHR_TO_ANGSTROM, BondsSystemId, DiatomicId, HARTREE_TO_EV, systemFormula } from './systems';
 import type { H2PlusCurve } from './useH2PlusCurve';
 
@@ -20,6 +20,11 @@ export interface CurvePlotSpec {
     snapRs: number[];
     /** Bonds' Rₑ line: its label, and (Task 4) the same line in Basics' plain words. */
     referenceR: { R: number; label: string; plainLabel: string } | null;
+    /**
+     * Task 5b fix round 1 (review I1): the series the marker's handle rides -- the drawn state's curve. The handle wears
+     * Deep Selection, so on another state's curve it would mark an energy the drawn state does not have.
+     */
+    handleKey: string;
 }
 
 /** The plots' titles: what E means on each (zero is the separated atoms, or H + H⁺). */
@@ -102,6 +107,7 @@ export function diatomicCurveSpec(system: DiatomicId, scan: MoleculeScan, R: num
                 plainLabel: plainReferenceLabel(fit.ReBohr),
             }
             : null,
+        handleKey: 'e',
     };
 }
 
@@ -113,7 +119,7 @@ export const H_PLUS_H_PLUS_HARTREE = -0.5;
  * relative to the separated fragments (H + H⁺, −0.5 Ha), in eV, so the depth
  * of the 1σg well is D_e here too.
  */
-export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null): CurvePlotSpec {
+export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null, state: H2PlusState = '1sigma_g'): CurvePlotSpec {
     const xRange: [number, number] = [H2PLUS_R_RANGE.min, H2PLUS_R_RANGE.max];
     const toEv = (E: number) => (E - H_PLUS_H_PLUS_HARTREE) * HARTREE_TO_EV;
     const along = (E: number[]) => curve.R.map((r, i) => ({ R: r, E: toEv(E[i]) }));
@@ -139,5 +145,7 @@ export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null): CurvePlot
                 + `E = ${signed(equilibrium.totalEnergy, 4)} Ha; D_e = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
             plainLabel: plainReferenceLabel(equilibrium.R),
         },
+        // Fix round 1 (review I1): the handle rides the drawn state's curve.
+        handleKey: state === '1sigma_u' ? 'u' : 'g',
     };
 }

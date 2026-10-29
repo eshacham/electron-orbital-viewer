@@ -23,7 +23,16 @@ export function lengths(R: number): string {
  * between nuclei (Å)"), two decimals: "Distance between nuclei 1.10 Å". From Explore, `lengths`.
  */
 export function plainLength(R: number): string {
-    return `Distance between nuclei ${(R * BOHR_TO_ANGSTROM).toFixed(2)} Å`;
+    return plainLengthForms(R).line;
+}
+
+/**
+ * Fix round 1 (review M5): Basics' bond length in its two forms -- the Bond length block's line, and the phone
+ * caption's qualifier, lower-case as every qualifier is -- written here once, so neither is surgery on the other.
+ */
+export function plainLengthForms(R: number): { line: string; qualifier: string } {
+    const value = `${(R * BOHR_TO_ANGSTROM).toFixed(2)} Å`;
+    return { line: `Distance between nuclei ${value}`, qualifier: `distance between nuclei ${value}` };
 }
 
 /*

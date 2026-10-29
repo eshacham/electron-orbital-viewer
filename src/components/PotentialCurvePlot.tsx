@@ -61,6 +61,11 @@ interface PotentialCurvePlotProps {
      * inset its track to the plotted x range and stand its thumb over the marker.
      */
     onInset?: (inset: PlotInset | null) => void;
+    /**
+     * Task 5b fix round 1 (review I1): the key of the series the marker's handle rides -- Bonds: the drawn state's curve.
+     * Absent, or naming no series, the first.
+     */
+    handleKey?: string;
 }
 
 /** The plot area's distance from the svg's left and right edges, px. */
@@ -128,12 +133,15 @@ const axisR = (R: number) => {
 const angstrom = (R: number) => (R * BOHR_TO_ANGSTROM).toFixed(2);
 /** Task 5b (finish fix 6): an energy end at Basics, to 2 significant figures, with a true minus: "8.2", "−9.9". */
 const roundedEnergy = (E: number) => minus(String(Number(E.toPrecision(2))));
-/** The least distance between the 0 label's centre and an end label's before the end gives way, px (11 px type). */
-const LABEL_CLEARANCE = 12;
+/**
+ * The least distance between the 0 label's centre and an end label's before the end gives way, px (11 px type on a
+ * 14 px line, plus room). Fix round 1 (verdict pass 1): 12 px let He₂'s 0 crowd "−0.26" at 12.6 px apart.
+ */
+const LABEL_CLEARANCE = 16;
 
 const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, width, onSelectR, onDragR, keyboardControl = true,
-    plain = false, onInset,
+    plain = false, onInset, handleKey,
 }) => {
     const clipId = useId();
 
@@ -173,11 +181,17 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     const plotWidth = width - left - PAD.right;
     const x = (R: number) => plotX(R, xRange, width, left);
 
-    /** The R under the pointer, clamped to the plotted range: a tap beside the plot area takes the nearer end. */
-    const pointerR = (event: React.MouseEvent<SVGSVGElement>) => {
+    /** The pointer's x in the svg's own px. */
+    const svgXOf = (event: React.MouseEvent<SVGSVGElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
-        const svgX = (event.clientX - rect.left) * (rect.width > 0 ? width / rect.width : 1);
-        const R = xRange[0] + ((svgX - left) / plotWidth) * (xRange[1] - xRange[0]);
+        return (event.clientX - rect.left) * (rect.width > 0 ? width / rect.width : 1);
+    };
+    // Fix round 1 (review M2): a drag that starts on the handle's 44 px hit area, off its centre, keeps that offset --
+    // R follows the pointer's travel, so grabbing the handle never jumps R by up to half the hit area.
+    const grabOffset = useRef(0);
+    /** The R under the pointer (less a grab's offset), clamped to the plotted range: a tap beside the plot area takes the nearer end. */
+    const pointerR = (event: React.MouseEvent<SVGSVGElement>, offset = 0) => {
+        const R = xRange[0] + ((svgXOf(event) - offset - left) / plotWidth) * (xRange[1] - xRange[0]);
         return Math.min(xRange[1], Math.max(xRange[0], R));
     };
 
@@ -196,8 +210,10 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
         if (!draggable || event.button !== 0) return;
         dragging.current = true;
         dragPointer.current = event.pointerId;
+        const onHandle = handle !== null && (event.target as Element).classList?.contains('potential-handle-hit');
+        grabOffset.current = onHandle ? svgXOf(event) - handle!.cx : 0;
         event.currentTarget.setPointerCapture?.(event.pointerId);
-        onDragR!(pointerR(event));
+        onDragR!(pointerR(event, grabOffset.current));
     };
     const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
         if (!isDragPointer(event)) return;
@@ -207,13 +223,13 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
             handlePointerCancel(event);
             return;
         }
-        onDragR!(pointerR(event));
+        onDragR!(pointerR(event, grabOffset.current));
     };
     const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
         if (!isDragPointer(event)) return;
         dragging.current = false;
         committedOnRelease.current = true;
-        onSelectR!(pointerR(event));
+        onSelectR!(pointerR(event, grabOffset.current));
     };
     const handlePointerCancel = (event: React.PointerEvent<SVGSVGElement>) => {
         if (!isDragPointer(event)) return;
@@ -246,13 +262,18 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     // Task 5b (finish fix 4): where R can be set here, the marker carries a handle on the first curve, so the thing to
     // drag is seen. Where that curve has left the plot (or has no value at R), the handle keeps to the plot area on the
     // marker line: at the edge the curve left through, or on the axis.
+    // Fix round 1 (review I1, I2): it rides the caller's `handleKey` series (the drawn state's curve), else the first.
+    // Where that curve is off the plot at R, or has no value there, it is drawn hollow -- the ring only, no fill -- so
+    // it never reads as a point at a false energy (D14 above), and stays grabbable on the marker line at the edge.
     const handle = (() => {
         if (markerR === null || !onSelectR || series.length === 0) return null;
-        const E = markerEnergies[0].E;
+        const index = Math.max(0, series.findIndex(s => s.key === handleKey));
+        const E = markerEnergies[index].E;
         const top = PAD.top;
         const bottom = PAD.top + plotHeight;
+        const offScale = E === null || E < yRange[0] || E > yRange[1];
         const cy = E === null ? bottom : Math.min(bottom, Math.max(top, y(E)));
-        return { cx: x(markerR), cy, color: series[0].color };
+        return { cx: x(markerR), cy, color: series[index].color, offScale };
     })();
 
     return (
@@ -321,7 +342,8 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                     {zeroY !== null && <text x={LABEL_X} y={zeroY + 4} className="potential-axis-label">0</text>}
                 </svg>
                 {handle && (
-                    <span className="potential-handle" aria-hidden="true" style={{ left: handle.cx, top: handle.cy, background: handle.color }} />
+                    <span className={`potential-handle${handle.offScale ? ' off-scale' : ''}`} aria-hidden="true"
+                        style={{ left: handle.cx, top: handle.cy, background: handle.offScale ? undefined : handle.color }} />
                 )}
             </div>
             {/*

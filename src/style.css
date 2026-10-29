@@ -449,6 +449,9 @@ html, body, #root {
   border: 2px solid var(--ql-color-selected-edge); border-radius: var(--ql-radius-pill);
   box-shadow: var(--ql-shadow-selected-halo); pointer-events: none;
 }
+/* Fix round 1 (review I2): where its curve is off the plot at R, the handle stays on the marker line at the edge, still
+   the thing to drag, but hollow -- the ring, no fill -- so it is never read as a point at that edge's energy. */
+.potential-handle.off-scale { background: transparent; }
 
 
 /* ---------------------------------------------------------------------------

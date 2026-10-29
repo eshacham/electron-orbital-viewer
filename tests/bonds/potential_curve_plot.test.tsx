@@ -429,6 +429,13 @@ describe('PotentialCurvePlot', () => {
                 expect(labels(container)).toEqual(['−9.9', '0']);
             });
 
+            // Fix round 1 (verdict pass 1, regression 2): He₂'s 0 sat about 12.6 px over "−0.26" and the two crowded into
+            // one cluster at the axis foot. The end gives way to the 0 there too, as N₂'s top end does.
+            it("lets He₂'s bottom end give way to the 0 rather than crowd it", () => {
+                const { container } = render(<PotentialCurvePlot {...ev} yRange={[-0.2614, 1.3704]} plain />);
+                expect(labels(container)).toEqual(['1.4', '0']);
+            });
+
             it('keeps the ends unrounded and adds no 0 without plain words', () => {
                 const { container } = render(<PotentialCurvePlot {...ev} yRange={[-4.0817, 8.1634]} />);
                 expect(labels(container)).toEqual(['8.16', '−4.08']);
@@ -542,6 +549,84 @@ describe('PotentialCurvePlot', () => {
             const still = render(<PotentialCurvePlot {...props} />);
             expect(still.container.querySelector('.potential-handle')).toBeNull();
             expect(still.container.querySelector('.potential-handle-hit')).toBeNull();
+        });
+    });
+
+    // Task 5b fix round 1 (review I1, I2, M2): the handle rides the curve its caller names (the drawn state), is drawn
+    // hollow -- ring only -- where that curve is off the plot at R (D14: never a filled point at a false energy), and a
+    // drag that grabs it off-centre moves it by the pointer's travel, not to the press point.
+    describe('the handle, fix round 1', () => {
+        const dragProps = { ...props, onSelectR: jest.fn(), onDragR: jest.fn() };
+
+        it('rides the curve named by handleKey, and the first curve without one', () => {
+            const { container, unmount } = render(<PotentialCurvePlot {...dragProps} yRange={[-0.7, 0]} handleKey="u" />);
+            // series u at R = 2 is −0.1, inside [−0.7, 0].
+            expect((container.querySelector('.potential-handle') as HTMLElement).style.background).toBe('rgb(0, 0, 255)');
+            unmount();
+            const fallback = render(<PotentialCurvePlot {...dragProps} yRange={[-0.7, 0]} handleKey="nope" />);
+            expect((fallback.container.querySelector('.potential-handle') as HTMLElement).style.background).toBe('rgb(255, 0, 0)');
+        });
+
+        it('is hollow, not filled, where its curve is off the plot at R, and still grabbable at the edge', () => {
+            // series u at R = 2 is −0.1, above yRange [−0.7, −0.3]: the handle keeps to the top edge, ring only.
+            const { container } = render(<PotentialCurvePlot {...dragProps} handleKey="u" />);
+            const handle = container.querySelector('.potential-handle') as HTMLElement;
+            expect(handle).toHaveClass('off-scale');
+            expect(handle.style.background).toBe('');
+            expect(parseFloat(handle.style.top)).toBeCloseTo(8, 6);
+            expect(container.querySelector('.potential-handle-hit')).not.toBeNull();
+            const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+            expect(css).toMatch(/\.potential-handle\.off-scale\s*\{[^}]*background:\s*transparent;/);
+            // In range it is filled and not marked off-scale.
+            const inRange = render(<PotentialCurvePlot {...dragProps} />).container.querySelector('.potential-handle')!;
+            expect(inRange).not.toHaveClass('off-scale');
+        });
+
+        describe('grabbed off-centre', () => {
+            const original = (window as { PointerEvent?: unknown }).PointerEvent;
+            beforeAll(() => {
+                (window as { PointerEvent?: unknown }).PointerEvent = class extends MouseEvent {
+                    pointerId: number;
+                    pointerType: string;
+                    constructor(type: string, init: PointerEventInit = {}) {
+                        super(type, init); this.pointerId = init.pointerId ?? 1; this.pointerType = init.pointerType ?? '';
+                    }
+                };
+            });
+            afterAll(() => { (window as { PointerEvent?: unknown }).PointerEvent = original; });
+
+            it('moves R by the travel from the press, so a press on the handle changes nothing', () => {
+                const onSelectR = jest.fn();
+                const onDragR = jest.fn();
+                const { container } = render(<PotentialCurvePlot {...props} onSelectR={onSelectR} onDragR={onDragR} />);
+                const svg = container.querySelector('svg')!;
+                jest.spyOn(svg, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 300, height: 130, right: 300, bottom: 130, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+                const hit = container.querySelector('.potential-handle-hit')!;
+                // The handle stands at x = 163 (R = 2); pressed 15 px right of its centre.
+                fireEvent.pointerDown(hit, { clientX: 178, clientY: 50, pointerId: 1, button: 0 });
+                expect(onDragR).toHaveBeenLastCalledWith(2);
+                // 64.5 px of travel is 1 a₀ on this 258 px, 4 a₀ plot.
+                fireEvent.pointerMove(svg, { clientX: 178 + 64.5, clientY: 50, pointerId: 1, buttons: 1 });
+                expect(onDragR.mock.calls.at(-1)![0]).toBeCloseTo(3, 9);
+                fireEvent.pointerUp(svg, { clientX: 178 + 64.5, clientY: 50, pointerId: 1, button: 0 });
+                expect(onSelectR.mock.calls.at(-1)![0]).toBeCloseTo(3, 9);
+                // A press and release on the handle with no travel commits the R it already had.
+                fireEvent.pointerDown(hit, { clientX: 150, clientY: 50, pointerId: 1, button: 0 });
+                fireEvent.pointerUp(svg, { clientX: 150, clientY: 50, pointerId: 1, button: 0 });
+                expect(onSelectR.mock.calls.at(-1)![0]).toBeCloseTo(2, 9);
+            });
+
+            it('still sets R to a tap on the curve away from the handle', () => {
+                const onSelectR = jest.fn();
+                const onDragR = jest.fn();
+                const { container } = render(<PotentialCurvePlot {...props} onSelectR={onSelectR} onDragR={onDragR} />);
+                const svg = container.querySelector('svg')!;
+                jest.spyOn(svg, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 300, height: 130, right: 300, bottom: 130, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+                fireEvent.pointerDown(svg, { clientX: 34 + 258 * 0.75, clientY: 50, pointerId: 1, button: 0 });
+                expect(onDragR).toHaveBeenLastCalledWith(3);
+                fireEvent.pointerUp(svg, { clientX: 34 + 258 * 0.75, clientY: 50, pointerId: 1, button: 0 });
+                expect(onSelectR).toHaveBeenLastCalledWith(3);
+            });
         });
     });
 
