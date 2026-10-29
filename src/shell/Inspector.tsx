@@ -206,7 +206,19 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
                         not a chevron after the open label, which read as a breadcrumb ("Plot › Data"). The open tab
                         still closes it in one press, under its own name. */}
                     {open && (
-                        <button type="button" className="inspector-bar-close" aria-label="Close panel" onClick={() => onOpenChange?.(false)}>
+                        <button
+                            type="button"
+                            className="inspector-bar-close"
+                            aria-label="Close panel"
+                            onClick={event => {
+                                // 5b re-review N1: like Esc, focus goes back to the open tab's bar button, not to the page.
+                                const bar = event.currentTarget.parentElement;
+                                const tab = bar?.querySelector<HTMLButtonElement>('.inspector-bar-button[aria-expanded="true"]')
+                                    ?? bar?.querySelector<HTMLButtonElement>('.inspector-bar-button');
+                                onOpenChange?.(false);
+                                tab?.focus();
+                            }}
+                        >
                             <ChevronRight fontSize="small" aria-hidden="true" />
                         </button>
                     )}

@@ -89,6 +89,8 @@
   border: 0; background: none; color: var(--ql-color-text-2);
 }
 .inspector-bar-close:hover { color: var(--ql-color-text-1); }
+/* 5b re-review N2: the open bar sits flush against the drawer's clipped edge, so its buttons draw the focus ring inside. */
+.inspector-drawer.open .inspector-bar-button:focus-visible, .inspector-bar-close:focus-visible { outline-offset: -2px; }
 .inspector-drawer-panel { display: flex; flex-direction: column; width: var(--ql-size-inspector); min-height: 0; }
 .inspector-stacked { display: flex; flex-direction: column; gap: var(--ql-size-section-gap); }
 @media (prefers-reduced-motion: no-preference) {

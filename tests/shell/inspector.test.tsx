@@ -42,6 +42,18 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
         expect(onOpenChange).toHaveBeenLastCalledWith(false);
     });
 
+    // Picture control 5b re-review N1: "Close panel" must not drop focus to the page either -- it returns focus to the
+    // open tab's bar button, as Esc does.
+    it('"Close panel" returns focus to the open tab\'s bar button', () => {
+        const onOpenChange = jest.fn();
+        render(<Inspector variant="drawer" sections={[plotAndData('data')]} open onOpenChange={onOpenChange} />);
+        const close = screen.getByRole('button', { name: 'Close panel' });
+        close.focus();
+        fireEvent.click(close);
+        expect(onOpenChange).toHaveBeenLastCalledWith(false);
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Data panel' }));
+    });
+
     // Ruling T18-a11y-carry (b), spec §13: closing must not drop focus to the page, and an
     // Esc meant for the periodic table or the search must not close the drawer as well.
     it('on Esc returns focus to the bar button that opened it, and ignores an Esc meant for something else', () => {
