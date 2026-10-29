@@ -509,10 +509,24 @@ function collectMetrics() {
       const list = document.querySelector('.thumbnail-strip .strip-list.group-scroll');
       if (!list) return null;
       const style = getComputedStyle(list);
+      // Task 5b (finish fixes 7, 8): where each group and its label stand in the list's view, px from its left edge,
+      // and each group's snap margin -- the sticky label and the next group's peek, read rather than looked for.
+      const at = list.getBoundingClientRect().left;
+      const groups = [...list.querySelectorAll('.strip-group')].map(group => {
+        const box = group.getBoundingClientRect();
+        const label = group.querySelector('.strip-group-label');
+        return {
+          label: label?.textContent ?? null,
+          left: Math.round(box.left - at), right: Math.round(box.right - at),
+          labelLeft: label ? Math.round(label.getBoundingClientRect().left - at) : null,
+          scrollMarginLeft: getComputedStyle(group).scrollMarginLeft,
+        };
+      }).filter(group => group.right > 0 && group.left < list.clientWidth);
       return {
         hasMoreBefore: list.classList.contains('has-more-before'),
         hasMoreAfter: list.classList.contains('has-more-after'),
         mask: style.maskImage ?? style.webkitMaskImage ?? 'none',
+        scrollLeft: Math.round(list.scrollLeft), clientWidth: list.clientWidth, groups,
       };
     })(),
     bondsLength: (() => {
@@ -520,11 +534,23 @@ function collectMetrics() {
       const block = document.querySelector('.bonds-length');
       if (!panel && !block) return null;
       const over = el => (el ? Math.max(0, el.scrollWidth - el.clientWidth) : null);
+      // Task 5b (finish fixes 3, 4): the slider's thumb centre and the curve's marker, px from the block's left edge
+      // (one instrument: they should agree to a pixel), and the marker's handle as drawn.
+      const left = block ? block.getBoundingClientRect().left : 0;
+      const centre = el => { if (!el) return null; const box = el.getBoundingClientRect(); return Math.round((box.left + box.width / 2 - left) * 10) / 10; };
+      const handle = block?.querySelector('.potential-handle');
+      const handleStyle = handle ? getComputedStyle(handle) : null;
       return {
         panelWidth: panel ? Math.round(panel.getBoundingClientRect().width) : null,
         blockWidth: block ? Math.round(block.getBoundingClientRect().width) : null,
         panelOverflowX: over(panel),
         blockOverflowX: over(block),
+        thumbX: centre(block?.querySelector('.MuiSlider-thumb')),
+        markerX: centre(block?.querySelector('.potential-marker')),
+        handle: handle ? {
+          x: centre(handle), width: Math.round(handle.getBoundingClientRect().width),
+          border: handleStyle.borderTopColor, shadow: handleStyle.boxShadow, background: handleStyle.backgroundColor,
+        } : null,
       };
     })(),
     // Task 16: what has focus (Esc returns it to the entry), and anything in the request workspace wider than it.
