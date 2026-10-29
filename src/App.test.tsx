@@ -32,6 +32,9 @@ import { GLOW_SETTLE_MS } from './design/glow_pref';
 import { clearVisit } from './levels/level_pref';
 import { FIXED_RHO_NOTE } from './info/bonds_info';
 import { nearestScanIndex } from './bonds/systems';
+import { lengthText } from './bonds/captions';
+import { energyDifferenceText } from './format/energy';
+import { nb } from './format/text';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -1312,6 +1315,34 @@ describe('App', () => {
                 // Let the committed point's files land and draw, inside the test.
                 await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
                     .toEqual({ type: 'gaussianDensity', moleculeId: 'n2@00' }));
+            });
+
+            // Final review M3: Info's facts read the store, so after a curve tap they give the committed point -- its R
+            // and its E − E(atoms) -- not the one the molecule opened on.
+            it('N₂: after a curve tap, Info\'s Bond length R and E − E(atoms) give the committed point', async () => {
+                const { store } = renderWithProvider(<App />);
+                fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
+                chooseSystem('N₂ — Nitrogen');
+                await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
+                /** The value of the Info fact whose label starts with `label` (the label may carry an (i) after it). */
+                const fact = (label: string) => {
+                    const row = Array.from(document.querySelectorAll('.info-fact'))
+                        .find(el => (el.querySelector('dt')?.textContent ?? '').startsWith(label));
+                    return row?.querySelector('dd')?.textContent;
+                };
+                const expected = nearestScanIndex(n2Scan.points, 2.4);
+                expect(expected).not.toBe(7);
+                const opening = n2Scan.points[7];
+                expect(fact('Bond length R')).toBe(nb(lengthText(opening.RBohr)));
+                fireEvent.click(curveSvg(), { clientX: pixelFor(2.4, n2Range) });
+                const committed = n2Scan.points[expected];
+                expect(store.getState().bonds).toMatchObject({ scanIndex: expected, R: committed.RBohr });
+                expect(fact('Bond length R')).toBe(nb(lengthText(committed.RBohr)));
+                expect(fact('E − E(atoms)')).toBe(energyDifferenceText(committed.energyHartree - n2Scan.fit.separatedAtomsHartree));
+                expect(fact('E − E(atoms)')).not.toBe(energyDifferenceText(opening.energyHartree - n2Scan.fit.separatedAtomsHartree));
+                // Let the committed point's files land and draw, inside the test.
+                await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
+                    .toEqual({ type: 'gaussianDensity', moleculeId: `n2@${String(expected).padStart(2, '0')}` }));
             });
 
             it('H₂⁺: a tap commits R on its 0.01 a₀ step; one left of the plot, the range minimum', async () => {
