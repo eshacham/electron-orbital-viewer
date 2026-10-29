@@ -28,6 +28,14 @@ export const DRAW_DEBOUNCE_MS = 150;
  * Review Focus 1: three chip clicks within the debounce window (n, then l,
  * then mₗ) must draw once, for the last of them -- each change restarts the
  * timer rather than queuing its own.
+ *
+ * Final review I1 (picture control): a selection change that lands in the
+ * same commit as `enabled` turning on, or while it is off, schedules
+ * nothing. Whatever turned `enabled` on draws that selection itself: leaving
+ * a combination (a strip tile or an n chip pressed while one is held) is
+ * drawn at once by App.tsx's combination effect, and entering the mode by
+ * the nonce effect. Timing the same orbital again 150 ms later rebuilt the
+ * mesh just drawn.
  */
 export function useDrawOnSelection(
     selection: BasicSelection,
@@ -44,6 +52,9 @@ export function useDrawOnSelection(
     const enabledRef = useRef(enabled);
     enabledRef.current = enabled;
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // `enabled` as of the previous commit: the selection effect below runs
+    // before the effect at the end of this hook brings it up to date.
+    const wasEnabledRef = useRef(enabled);
 
     // Cancel a pending draw the moment `enabled` turns false -- a combination
     // picked, or the mode left, before the debounce elapsed.
@@ -60,6 +71,8 @@ export function useDrawOnSelection(
             return undefined;
         }
         if (timerRef.current !== null) clearTimeout(timerRef.current);
+        timerRef.current = null;
+        if (!enabled || !wasEnabledRef.current) return undefined;
         const timer = setTimeout(() => {
             timerRef.current = null;
             if (enabledRef.current) drawRef.current(selection);
@@ -71,4 +84,6 @@ export function useDrawOnSelection(
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selection.n, selection.l, selection.ml]);
+
+    useEffect(() => { wasEnabledRef.current = enabled; });
 }

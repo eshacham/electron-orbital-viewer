@@ -1621,6 +1621,95 @@ describe('App', () => {
         expect(store.getState().orbital.currentField).toBeNull();
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 0, ml: 0, Z: 1 });
     });
+
+    // Final review I1: leaving a combination draws the picked orbital once -- the combination effect's own draw --
+    // not that and then the debounced selection draw 150 ms later for the very same orbital (which rebuilt the mesh
+    // just drawn and cleared currentField). The twin of "entering the mode draws once (nonce), not twice".
+    describe('final review I1: a pick that leaves a combination draws once, not twice', () => {
+        const drawCount = (spy: jest.SpyInstance) =>
+            spy.mock.calls.filter(([action]) => action.type === startOrbitalCalculation.type).length;
+        const holdStarkCombination = () => {
+            window.localStorage.setItem('eov.level', 'advanced');
+            const rendered = renderWithProvider(<App />);
+            act(() => { rendered.store.dispatch(setBasicSelection({ n: 2, l: 0, ml: 0 })); });
+            fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+            fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
+            fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
+            fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
+            expect(rendered.store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
+            return rendered;
+        };
+
+        it('at Advanced, a strip pick (2px) draws exactly once, at once', () => {
+            jest.useFakeTimers();
+            try {
+                const { store } = holdStarkCombination();
+                const dispatchSpy = jest.spyOn(store, 'dispatch');
+                const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
+                fireEvent.click(within(strip).getByRole('option', { name: '2px orbital' }));
+                expect(drawCount(dispatchSpy)).toBe(1);
+                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                expect(drawCount(dispatchSpy)).toBe(1);
+                expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('at Advanced, an n = 3 chip press draws exactly once, at once', () => {
+            jest.useFakeTimers();
+            try {
+                const { store } = holdStarkCombination();
+                const dispatchSpy = jest.spyOn(store, 'dispatch');
+                fireEvent.click(screen.getByRole('button', { name: 'n = 3' }));
+                expect(drawCount(dispatchSpy)).toBe(1);
+                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                expect(drawCount(dispatchSpy)).toBe(1);
+                expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 0, ml: 0, Z: 1 });
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('a plain strip pick, with no combination, still draws once, after the debounce', () => {
+            jest.useFakeTimers();
+            try {
+                window.localStorage.setItem('eov.level', 'advanced');
+                const { store } = renderWithProvider(<App />);
+                fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+                const dispatchSpy = jest.spyOn(store, 'dispatch');
+                const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
+                fireEvent.click(within(strip).getByRole('option', { name: '3px orbital' }));
+                expect(drawCount(dispatchSpy)).toBe(0);
+                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                expect(drawCount(dispatchSpy)).toBe(1);
+                expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 1, ml: 1, Z: 1 });
+                // And a second pick right after, still with no combination, draws once more.
+                fireEvent.click(within(strip).getByRole('option', { name: '3s orbital' }));
+                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                expect(drawCount(dispatchSpy)).toBe(2);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('a strip pick right after leaving a combination draws once more, after the debounce', () => {
+            jest.useFakeTimers();
+            try {
+                const { store } = holdStarkCombination();
+                const dispatchSpy = jest.spyOn(store, 'dispatch');
+                const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
+                fireEvent.click(within(strip).getByRole('option', { name: '2px orbital' }));
+                fireEvent.click(within(strip).getByRole('option', { name: '2s orbital' }));
+                expect(drawCount(dispatchSpy)).toBe(1);
+                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                expect(drawCount(dispatchSpy)).toBe(2);
+                expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 0, Z: 1 });
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+    });
 });
 
 describe('App: opening a shared link', () => {
