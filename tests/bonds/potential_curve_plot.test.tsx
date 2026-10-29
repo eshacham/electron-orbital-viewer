@@ -517,6 +517,8 @@ describe('PotentialCurvePlot', () => {
 
         it('is drawn with tokens only: a 10 px dot, a selected-edge ring and the selected halo, and lets taps through', () => {
             const handle = rule('.potential-handle');
+            // Found live: the app's border-box sizing left a 6 px dot inside the ring; the dot itself is 10 px across.
+            expect(handle).toMatch(/box-sizing:\s*content-box;/);
             expect(handle).toMatch(/width:\s*10px;/);
             expect(handle).toMatch(/height:\s*10px;/);
             expect(handle).toMatch(/border:\s*2px solid var\(--ql-color-selected-edge\);/);

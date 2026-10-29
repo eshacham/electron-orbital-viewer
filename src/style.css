@@ -445,7 +445,7 @@ html, body, #root {
    selected halo -- Deep Selection, as the selected strip tile wears it (the halo token is none in Light Clean). It
    never takes a tap: the svg below has the 44 px hit area (.potential-handle-hit) and every gesture. */
 .potential-handle {
-  position: absolute; width: 10px; height: 10px; transform: translate(-50%, -50%);
+  position: absolute; box-sizing: content-box; width: 10px; height: 10px; transform: translate(-50%, -50%);
   border: 2px solid var(--ql-color-selected-edge); border-radius: var(--ql-radius-pill);
   box-shadow: var(--ql-shadow-selected-halo); pointer-events: none;
 }
