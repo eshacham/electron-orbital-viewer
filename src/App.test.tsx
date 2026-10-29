@@ -1178,7 +1178,7 @@ describe('App', () => {
             fireEvent.click(screen.getByRole('link', { name: /bonds mode/ }));
             chooseSystem('N₂ — Nitrogen');
             // Task 4 (T3 M2, ruling C9): said once, by the alert; the Bond length block's line only says it has no curve.
-            expect(await screen.findByText(/N₂ could not be loaded/)).toBeInTheDocument();
+            expect(await screen.findByRole('alert')).toHaveTextContent(/N₂ could not be loaded: /);
             expect(within(screen.getByRole('region', { name: 'Bond length' })).getByText('No curve to show.')).toBeInTheDocument();
             expect(store.getState().orbital.error).toBeNull();
             expect(screen.getAllByRole('alert')).toHaveLength(1);
