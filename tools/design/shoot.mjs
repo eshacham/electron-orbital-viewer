@@ -66,6 +66,10 @@ const OWNER_PORTS = new Set([5173, 5391, 8787]);
 const SIZES = {
   desktop: { width: 1440, height: 900 },
   wide: { width: 1728, height: 1000 },
+  // Picture-is-the-control, Task 5 Step 2: the left column's narrow and wide ends named in the brief (1280 and
+  // 1920 px); 1440 is already `desktop`.
+  '1280': { width: 1280, height: 900 },
+  '1920': { width: 1920, height: 1080 },
   tablet: { width: 1024, height: 768 },
   phone: { width: 390, height: 844, mobile: true },
   'phone-landscape': { width: 844, height: 390, mobile: true },
@@ -496,6 +500,31 @@ function collectMetrics() {
         stickyInList: [...list.querySelectorAll('*')].filter(e => getComputedStyle(e).position === 'sticky').length,
         topmostAtCentre: onScreen ? Boolean(top && note.contains(top)) : null,
         noteTop: Math.round(N.top), noteHeight: Math.round(N.height), listTop: Math.round(L.top), listBottom: Math.round(L.bottom),
+      };
+    })(),
+    // Picture-is-the-control, Task 5 Step 2: the Orbitals strip's sideways scroll cue (useMoreSideways, Task 2) --
+    // measured the same way as Info's own `moreCue` above -- and the Bond length block's fit in the left column
+    // (Task 3), measured the same way as `workspaceOverflow` below.
+    stripCue: (() => {
+      const list = document.querySelector('.thumbnail-strip .strip-list.group-scroll');
+      if (!list) return null;
+      const style = getComputedStyle(list);
+      return {
+        hasMoreBefore: list.classList.contains('has-more-before'),
+        hasMoreAfter: list.classList.contains('has-more-after'),
+        mask: style.maskImage ?? style.webkitMaskImage ?? 'none',
+      };
+    })(),
+    bondsLength: (() => {
+      const panel = document.querySelector('.side-panel');
+      const block = document.querySelector('.bonds-length');
+      if (!panel && !block) return null;
+      const over = el => (el ? Math.max(0, el.scrollWidth - el.clientWidth) : null);
+      return {
+        panelWidth: panel ? Math.round(panel.getBoundingClientRect().width) : null,
+        blockWidth: block ? Math.round(block.getBoundingClientRect().width) : null,
+        panelOverflowX: over(panel),
+        blockOverflowX: over(block),
       };
     })(),
     // Task 16: what has focus (Esc returns it to the entry), and anything in the request workspace wider than it.
