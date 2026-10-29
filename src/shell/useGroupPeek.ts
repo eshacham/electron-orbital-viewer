@@ -37,12 +37,15 @@ export function peekShifts(groups: GroupBox[], viewWidth: number): number[] {
 export function groupRest(groups: GroupBox[], shifts: number[], index: number, tile: GroupBox, viewWidth: number): number | null {
     const group = groups[index];
     if (!group) return null;
-    const rest = restOf(group) + (shifts[index] ?? 0);
-    const clearFrom = rest > 0 ? rest + FADE : 0;
-    return tile.start >= clearFrom && tile.end <= rest + viewWidth - FADE ? rest : null;
+    const clearAt = (rest: number) => tile.start >= (rest > 0 ? rest + FADE : 0) && tile.end <= rest + viewWidth - FADE;
+    const shifted = restOf(group) + (shifts[index] ?? 0);
+    if (clearAt(shifted)) return shifted;
+    // Fix round 1 (review (b)): a tile the shift would put under the left fade rests at the group's own snap instead --
+    // a real snap position with its whole group in view -- before the caller falls back to centring it.
+    return clearAt(restOf(group)) ? restOf(group) : null;
 }
 
-/** The scroller's snap groups and one element's box in its scrolled content, px. */
+/** The scroller's snap groups (each carrying its `data-group-key`) and one element's box in its scrolled content, px. */
 export function contentBoxes(list: HTMLElement): { groups: GroupBox[]; elements: HTMLElement[]; boxOf(element: Element): GroupBox } {
     const at = list.getBoundingClientRect();
     const origin = at.left + list.clientLeft - list.scrollLeft;
@@ -54,25 +57,39 @@ export function contentBoxes(list: HTMLElement): { groups: GroupBox[]; elements:
     return { groups: elements.map(boxOf), elements, boxOf };
 }
 
+/** Each group's shift, by its `data-group-key`. */
+export type GroupShifts = Record<string, number>;
+
+/** `peekShifts` for the scroller's snap groups as they lie now, by group key. */
+export function measureShifts(list: HTMLElement): GroupShifts {
+    const { groups, elements } = contentBoxes(list);
+    const shifts = peekShifts(groups, list.clientWidth);
+    return Object.fromEntries(elements.map((element, i) => [element.dataset.groupKey ?? String(i), shifts[i]]));
+}
+
 /**
  * Task 5b (finish fix 8): `peekShifts` for the scroller's `.strip-group-snap` children as they lie, re-read when the
  * scroller or a group is resized and when the groups are swapped (a new Shell n). The caller applies each shift as a
- * negative scroll-margin on the group's snap edge, so the browser's own snap rests further on; a fresh array only when a
- * shift changes. `enabled: false` (every strip but Orbitals) does nothing at all and returns no shifts. `resetKey` picks
- * up a scroller that remounts, as useMoreSideways' does.
+ * negative scroll-margin on the group's snap edge, so the browser's own snap rests further on. Fix round 1 (review M6):
+ * keyed by each group's `data-group-key`, so the caller pairs group and shift by name; a fresh object only when a shift
+ * changes. `enabled: false` (every strip but Orbitals) does nothing at all and returns no shifts. `resetKey` picks up a
+ * scroller that remounts, as useMoreSideways' does.
  */
-export function useGroupPeek(ref: RefObject<HTMLElement | null>, { enabled, resetKey }: { enabled: boolean; resetKey?: unknown }): number[] {
-    const [shifts, setShifts] = useState<number[]>([]);
+export function useGroupPeek(ref: RefObject<HTMLElement | null>, { enabled, resetKey }: { enabled: boolean; resetKey?: unknown }): GroupShifts {
+    const [shifts, setShifts] = useState<GroupShifts>({});
 
     useLayoutEffect(() => {
         const node = ref.current;
         if (!enabled || !node) {
-            setShifts(previous => (previous.length === 0 ? previous : []));
+            setShifts(previous => (Object.keys(previous).length === 0 ? previous : {}));
             return undefined;
         }
         const update = () => {
-            const next = peekShifts(contentBoxes(node).groups, node.clientWidth);
-            setShifts(previous => (previous.length === next.length && previous.every((shift, i) => shift === next[i]) ? previous : next));
+            const next = measureShifts(node);
+            setShifts(previous => {
+                const keys = Object.keys(next);
+                return keys.length === Object.keys(previous).length && keys.every(key => previous[key] === next[key]) ? previous : next;
+            });
         };
         const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
         const observe = () => {

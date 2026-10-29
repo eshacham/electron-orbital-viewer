@@ -11,7 +11,7 @@ import { TOKENS } from '../design/tokens';
 import type { StripItem } from '../thumbs/strip_items';
 import { useRovingFocus } from './useRovingFocus';
 import { useMoreSideways } from './useMoreSideways';
-import { contentBoxes, groupRest, useGroupPeek } from './useGroupPeek';
+import { contentBoxes, groupRest, measureShifts, useGroupPeek } from './useGroupPeek';
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { orbitalParts } from '../format/sci';
 import { withSubscripts } from '../format/subscripts';
@@ -254,15 +254,20 @@ function ThumbnailStrip<T = NavigationTarget>({
         let left = Math.max(0, list.scrollLeft + (tileRect.left - listRect.left) - (list.clientWidth - tileRect.width) / 2);
         // Task 5b (finish fix 8): under groupScroll a pick rests where a snap would -- its group's rest, shifted so the
         // next group peeks -- whenever the picked tile stands clear of the fades there; otherwise it is centred.
+        // Fix round 1 (review M3): the shifts are measured here, as the boxes lie now, rather than taken from the hook's
+        // state -- so the strip scrolls once on load (not again when the hook has measured), and a resize alone, which
+        // only changes the shifts, never scrolls the strip back to the selection; a new selection (or Shell n) does.
         if (groupScroll) {
             const { groups, elements, boxOf } = contentBoxes(list);
-            const group = selected.closest('.strip-group-snap');
-            const rest = groupRest(groups, peek, elements.findIndex(element => element === group), boxOf(selected), list.clientWidth);
+            const shifts = measureShifts(list);
+            const index = elements.findIndex(element => element === selected.closest('.strip-group-snap'));
+            const rest = groupRest(groups, elements.map((element, i) => shifts[element.dataset.groupKey ?? String(i)] ?? 0), index,
+                boxOf(selected), list.clientWidth);
             if (rest !== null) left = rest;
         }
         if (typeof list.scrollTo === 'function') list.scrollTo({ left, behavior: reduce ? 'auto' : 'smooth' });
         else list.scrollLeft = left;
-    }, [items, effectiveCollapsed, groupScroll, peek]);
+    }, [items, effectiveCollapsed, groupScroll]);
 
     const groups: Array<{ label: string | null; spoken: string | null; items: StripItem<T>[] }> = [];
     for (const item of items) {
@@ -273,9 +278,9 @@ function ThumbnailStrip<T = NavigationTarget>({
     const tile = (item: StripItem<T>) => (
         <Tile key={item.key} item={item} px={px} rGrid={rGrid} themeKey={themeKey} onSelect={onSelect} splitLabel={groupScroll} />
     );
-    let snapIndex = 0;
-    const snapStyle = (): React.CSSProperties | undefined => {
-        const shift = groupScroll ? peek[snapIndex++] ?? 0 : 0;
+    // Fix round 1 (review M6): a group's shift is found by its own key, not by the order the groups render in.
+    const snapStyle = (key: string): React.CSSProperties | undefined => {
+        const shift = groupScroll ? peek[key] ?? 0 : 0;
         return shift > 0 ? { scrollMarginLeft: -shift } : undefined;
     };
 
@@ -296,7 +301,8 @@ function ThumbnailStrip<T = NavigationTarget>({
                     className={`strip-list${groupScroll ? ' group-scroll' : ''}${groupScroll && before ? ' has-more-before' : ''}${groupScroll && after ? ' has-more-after' : ''}`}>
                     {groups.map((group, index) => (group.label ? (
                         <div key={`${group.label}-${index}`} role="group" aria-label={group.spoken ?? group.label}
-                            className={`strip-group${groupScroll ? ' strip-group-snap' : ''}`} style={snapStyle()}>
+                            className={`strip-group${groupScroll ? ' strip-group-snap' : ''}`}
+                            data-group-key={groupScroll ? `${group.label}-${index}` : undefined} style={snapStyle(`${group.label}-${index}`)}>
                             <span className="strip-group-label" aria-hidden="true">{group.label}</span>
                             <div className="strip-group-tiles">{group.items.map(tile)}</div>
                         </div>

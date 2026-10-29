@@ -55,21 +55,26 @@ describe('groupRest (finish fix 8)', () => {
         expect(groupRest(groups, shifts, 0, { start: 8, end: 80 }, 763)).toBe(0);
     });
 
-    it('gives none when the tile would sit under a fade or out of view at that rest', () => {
-        // 9g's first tile (1304–1384) starts under the left fade of the shifted rest.
-        expect(groupRest(groups, shifts, 1, { start: 1304, end: 1384 }, 763)).toBeNull();
+    // Fix round 1 (review (b)): a tile under the left fade at the shifted rest falls back to the group's own snap (its
+    // unshifted rest) when it is clear there -- a real snap position with the whole group in view -- before centring.
+    it("falls back to the group's unshifted rest for a tile the shift would hide, and gives none past that", () => {
+        // 9g's first tile (1304–1384) starts under the left fade of the shifted rest (clear from 1360); at the
+        // unshifted rest, 1280, it is clear from 1304.
+        expect(groupRest(groups, shifts, 1, { start: 1304, end: 1384 }, 763)).toBe(1280);
         expect(groupRest(groups, shifts, 2, { start: 2900, end: 2980 }, 763)).toBeNull();
     });
 });
 
+// Fix round 1 (review M6): the shifts come back keyed by each group's own key (its data-group-key), so the strip pairs
+// a group with its shift by name, never by the order it happens to render in.
 function Probe() {
     const ref = useRef<HTMLDivElement>(null);
     const shifts = useGroupPeek(ref, { enabled: true });
     return (
-        <div ref={ref} data-testid="list" data-shifts={shifts.join(',')}>
-            <div className="strip-group-snap" data-start="0" data-end="552" />
-            <div className="strip-group-snap" data-start="564" data-end="1240" />
-            <div className="strip-group-snap" data-start="1252" data-end="2100" />
+        <div ref={ref} data-testid="list" data-shifts={JSON.stringify(shifts)}>
+            <div className="strip-group-snap" data-group-key="9f" data-start="0" data-end="552" />
+            <div className="strip-group-snap" data-group-key="9g" data-start="564" data-end="1240" />
+            <div className="strip-group-snap" data-group-key="9h" data-start="1252" data-end="2100" />
         </div>
     );
 }
@@ -87,7 +92,7 @@ describe('useGroupPeek (finish fix 8)', () => {
         });
         try {
             render(<Probe />);
-            expect(screen.getByTestId('list')).toHaveAttribute('data-shifts', '0,28,0');
+            expect(JSON.parse(screen.getByTestId('list').dataset.shifts!)).toEqual({ '9f': 0, '9g': 28, '9h': 0 });
         } finally {
             rects.mockRestore();
             width.mockRestore();
@@ -98,9 +103,9 @@ describe('useGroupPeek (finish fix 8)', () => {
         function Off() {
             const ref = useRef<HTMLDivElement>(null);
             const shifts = useGroupPeek(ref, { enabled: false });
-            return <div ref={ref} data-testid="off" data-shifts={shifts.join(',')}><div className="strip-group-snap" /></div>;
+            return <div ref={ref} data-testid="off" data-shifts={JSON.stringify(shifts)}><div className="strip-group-snap" data-group-key="a" /></div>;
         }
         render(<Off />);
-        expect(screen.getByTestId('off')).toHaveAttribute('data-shifts', '');
+        expect(screen.getByTestId('off')).toHaveAttribute('data-shifts', '{}');
     });
 });

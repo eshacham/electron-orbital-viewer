@@ -294,6 +294,85 @@ describe('ThumbnailStrip: a pick rests where a snap does (finish fix 8)', () => 
     });
 });
 
+// Task 5b fix round 1 (review M3, M4): the shift lands on the right group's snap edge, a pick in a shifted group rests
+// where a snap would (or at the group's own snap for a tile the shift would hide), the strip scrolls once on load, and
+// a resize alone never scrolls it back to the selection.
+describe('ThumbnailStrip: the peek, wired (fix round 1)', () => {
+    // n = 3 in a 340 px view: 3s at 8–80, 3p at 92–360, 3d at 372–812. 3p's rest (68) is clear to 384 and 3d starts at
+    // 372, short of it by 44 px of peek: 3p snaps on by 372 + 32 − 384 = 20. 3s already shows 3p; 3d is last.
+    const boxes: Record<string, [number, number]> = { '3s': [8, 80], '3p': [92, 360], '3d': [372, 812] };
+    const tiles: Record<string, [number, number]> = { '3py orbital': [92, 164], '3pz orbital': [180, 252], '3px orbital': [268, 340] };
+    let scrollTo: jest.Mock;
+    let width: jest.SpyInstance;
+    let rects: jest.SpyInstance;
+    const resizers: Array<() => void> = [];
+    const originalObserver = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    beforeEach(() => {
+        scrollTo = jest.fn();
+        Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo });
+        width = jest.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+            return this.getAttribute('role') === 'listbox' ? 340 : 0;
+        });
+        rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            const at = ([left, right]: [number, number]) => ({ left, right, width: right - left, top: 0, bottom: 90, height: 90, x: left, y: 0, toJSON: () => ({}) }) as DOMRect;
+            if (this.getAttribute('role') === 'listbox') return at([0, 340]);
+            if (this.getAttribute('role') === 'group') return at(boxes[this.getAttribute('aria-label') ?? ''] ?? [0, 0]);
+            if (this.getAttribute('role') === 'option') return at(tiles[this.getAttribute('aria-label') ?? ''] ?? [0, 0]);
+            return at([0, 0]);
+        });
+        resizers.length = 0;
+        (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+            constructor(callback: () => void) { resizers.push(callback); }
+            observe() {}
+            unobserve() {}
+            disconnect() {}
+        };
+    });
+    afterEach(() => {
+        rects.mockRestore();
+        width.mockRestore();
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
+        (globalThis as { ResizeObserver?: unknown }).ResizeObserver = originalObserver;
+    });
+    const strip = (ml: number) => (
+        <ThumbnailStrip items={basicStripItems({ n: 3, selected: { l: 1, ml }, enclosedFraction: 0.9 })} label="orbitals in view" rGrid={[]}
+            themeKey="dark|glow" onSelect={jest.fn()} groupScroll />
+    );
+
+    it("writes the shift on the shifted group's snap edge only", () => {
+        render(strip(0));
+        const margin = (name: string) => screen.getByRole('group', { name }).style.scrollMarginLeft;
+        expect([margin('3s'), margin('3p'), margin('3d')]).toEqual(['', '-20px', '']);
+    });
+
+    it("rests a pick in the shifted group at its shifted rest, once, and a first tile the shift would hide at the group's own snap", () => {
+        const { unmount } = render(strip(0));
+        // 3pz (180–252) is clear of both fades at 68 + 20 = 88 (clear 112 … 404). One scroll on load, not two.
+        expect(scrollTo).toHaveBeenCalledTimes(1);
+        expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ left: 88 }));
+        unmount();
+        render(strip(-1));
+        // 3py (92–164) starts under the shifted rest's left fade; at 3p's own snap, 68, it is clear from 92.
+        expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ left: 68 }));
+    });
+
+    it('does not scroll back to the selection on a resize alone, only when the selection changes', () => {
+        const { rerender } = render(strip(0));
+        const calls = scrollTo.mock.calls.length;
+        // A resize that moves 3d on by 8 px: 3p's shift becomes 28, and the strip stays where the reader left it.
+        boxes['3d'] = [380, 820];
+        try {
+            act(() => resizers.forEach(resize => resize()));
+            expect(screen.getByRole('group', { name: '3p' }).style.scrollMarginLeft).toBe('-28px');
+            expect(scrollTo.mock.calls.length).toBe(calls);
+        } finally {
+            boxes['3d'] = [372, 812];
+        }
+        rerender(strip(1));
+        expect(scrollTo.mock.calls.length).toBe(calls + 1);
+    });
+});
+
 // Controller ruling DC12 (spec §12: "On WebGL context loss, tiles show a
 // glyph and their text label"): tiles already waiting for an image when the
 // context goes must switch to their glyph, not stay blank.
