@@ -50,6 +50,12 @@ const LIMIT_COLOR = '#9aa4ad';
 const MIN_SPAN_EV = 1;
 /** A repulsive wall is cut off this far above the minimum, eV, so the well keeps the plot's height. */
 const MAX_SPAN_EV = 15;
+/**
+ * Task 5b (picture control, finish fix 6): the least room under the separated-atoms line, as a fraction of the energy
+ * span. He₂'s curve barely dips below zero, so its zero line ran about 4 px over the x-axis, the scan ticks between
+ * them, and the floor read as a hollow bar. A bound molecule's well reaches far lower, so its range is unchanged.
+ */
+const ZERO_CLEARANCE = 0.2;
 
 const clampTo = (range: [number, number], R: number) => Math.min(range[1], Math.max(range[0], R));
 
@@ -75,7 +81,7 @@ export function diatomicCurveSpec(system: DiatomicId, scan: MoleculeScan, R: num
     const hi = Math.min(Math.max(...energies, 0), lo + MAX_SPAN_EV);
     const span = Math.max(hi - lo, MIN_SPAN_EV);
     const pad = 0.05 * span;
-    const yRange: [number, number] = [lo - pad, lo + span + pad];
+    const yRange: [number, number] = [Math.min(lo - pad, -ZERO_CLEARANCE * span), lo + span + pad];
 
     return {
         title: DIATOMIC_TITLE,
@@ -117,9 +123,10 @@ export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null): CurvePlot
         title: H2PLUS_TITLE,
         unit: 'eV',
         series: [
-            { key: 'g', label: H2PLUS_LABELS['1sigma_g'], color: CURVE_COLORS[0], points: along(curve.sigmaG) },
-            { key: 'u', label: H2PLUS_LABELS['1sigma_u'], color: CURVE_COLORS[1], points: along(curve.sigmaU) },
-            { key: 'limit', label: 'H + H⁺', color: LIMIT_COLOR, points: [{ R: xRange[0], E: 0 }, { R: xRange[1], E: 0 }] },
+            // Task 5b (finish fix 6): with Basics' plain words for each -- what the curve is, not its symmetry label.
+            { key: 'g', label: H2PLUS_LABELS['1sigma_g'], plainLabel: 'bonding', color: CURVE_COLORS[0], points: along(curve.sigmaG) },
+            { key: 'u', label: H2PLUS_LABELS['1sigma_u'], plainLabel: 'antibonding', color: CURVE_COLORS[1], points: along(curve.sigmaU) },
+            { key: 'limit', label: 'H + H⁺', plainLabel: 'apart', color: LIMIT_COLOR, points: [{ R: xRange[0], E: 0 }, { R: xRange[1], E: 0 }] },
         ],
         xRange,
         // The 1σg well (−0.103 Ha) and the limit, with room above for 1σu* falling towards it.

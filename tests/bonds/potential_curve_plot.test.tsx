@@ -330,7 +330,9 @@ describe('PotentialCurvePlot', () => {
                 const onSelectR = jest.fn();
                 const { container, unmount } = render(<PotentialCurvePlot {...he2} plain={plain} onSelectR={onSelectR} />);
                 const labels = [...container.querySelectorAll('.potential-axis-label')];
-                expect(labels.map(t => t.textContent)).toEqual(['1.37', '−0.0664']);
+                // Task 5b (finish fix 6): at Basics the ends are rounded, 0 is labelled, and the bottom end -- 5 px
+                // under the 0 in this old He₂ range -- gives way to it.
+                expect(labels.map(t => t.textContent)).toEqual(plain ? ['1.4', '0'] : ['1.37', '−0.0664']);
                 const labelsEnd = Math.max(...labels.map(t => Number(t.getAttribute('x')) + (t.textContent ?? '').length * charWidth));
                 const axisStart = Number(container.querySelector('.radial-plot-axis')!.getAttribute('x1'));
                 const ticks = [...container.querySelectorAll('.radial-plot-peak')].map(t => Number(t.getAttribute('x1')));
@@ -391,12 +393,14 @@ describe('PotentialCurvePlot', () => {
             }
         });
 
+        // Task 5b (finish fix 6): labels aside -- the energy ends are rounded at Basics, and zero is labelled.
         it('draws the same curves, marker, ticks and Rₑ line as without plain words', () => {
             const geometry = (plain: boolean) => {
                 const { container, unmount } = render(<PotentialCurvePlot {...ev} snapRs={[1.7, 2, 2.3]} plain={plain} />);
                 const svg = container.querySelector('svg')!.cloneNode(true) as SVGSVGElement;
                 svg.querySelectorAll('clipPath').forEach(clip => clip.removeAttribute('id'));
                 svg.querySelectorAll('g').forEach(g => g.removeAttribute('clip-path'));
+                svg.querySelectorAll('text').forEach(text => text.remove());
                 const html = svg.innerHTML;
                 const alt = container.querySelector('.potential-text-alt')!.textContent;
                 unmount();
@@ -405,10 +409,48 @@ describe('PotentialCurvePlot', () => {
             expect(geometry(true)).toEqual(geometry(false));
         });
 
+        // Task 5b (finish fix 6): at Basics the energy ends are rounded to 2 significant figures, and 0 is labelled at
+        // the separated-atoms line. An end label that would sit on the 0 gives way to it (N₂'s top end, 0.47, is
+        // just above zero). Without plain words the ends stay as they were, with no 0 of their own.
+        describe('energy labels at Basics (finish fix 6)', () => {
+            const labels = (container: HTMLElement) => [...container.querySelectorAll('.potential-axis-label')].map(t => t.textContent);
+            const zeroY = (range: [number, number]) => 8 + (1 - (0 - range[0]) / (range[1] - range[0])) * 104;
+
+            it('rounds the ends and labels zero, plain', () => {
+                const range: [number, number] = [-4.0817, 8.1634];
+                const { container } = render(<PotentialCurvePlot {...ev} yRange={range} plain />);
+                expect(labels(container)).toEqual(['8.2', '−4.1', '0']);
+                const zero = [...container.querySelectorAll('.potential-axis-label')].find(t => t.textContent === '0')!;
+                expect(Number(zero.getAttribute('y'))).toBeCloseTo(zeroY(range) + 4, 6);
+            });
+
+            it('lets an end give way to the 0 it would sit on', () => {
+                const { container } = render(<PotentialCurvePlot {...ev} yRange={[-9.9123, 0.4721]} plain />);
+                expect(labels(container)).toEqual(['−9.9', '0']);
+            });
+
+            it('keeps the ends unrounded and adds no 0 without plain words', () => {
+                const { container } = render(<PotentialCurvePlot {...ev} yRange={[-4.0817, 8.1634]} />);
+                expect(labels(container)).toEqual(['8.16', '−4.08']);
+            });
+
+            it("names the curves in the caller's plain words, or their own labels if they have none", () => {
+                const named = [{ ...series[0], plainLabel: 'bonding' }, series[1]];
+                const { container, unmount } = render(<PotentialCurvePlot {...ev} series={named} plain />);
+                const legend = () => [...container.querySelectorAll('.radial-plot-legend-item')].map(item => item.textContent);
+                expect(legend()[0]).toBe('bonding');
+                expect(legend()[1]).toMatch(/^1σu/);
+                unmount();
+                const technical = render(<PotentialCurvePlot {...ev} series={named} />);
+                expect(technical.container.querySelector('.radial-plot-legend-item')!.textContent).toMatch(/^1σg/);
+            });
+        });
+
         it("says today's words without it", () => {
             const { container } = render(<PotentialCurvePlot {...ev} />);
             expect(container.querySelector('.radial-plot-title')!.textContent).toBe('E − E(separated atoms) (eV)');
-            expect(container.querySelector('.radial-plot-scale')).toHaveTextContent('R (2.41 a₀ · 1.27 Å)');
+            // Task 5b (finish fix 5): the ends alike, each with its unit; the maximum is no longer fused into "R (…)".
+            expect([...container.querySelector('.radial-plot-scale')!.children].map(span => span.textContent)).toEqual(['1.66 a₀', 'R', '2.41 a₀']);
             expect(seenText(container.querySelector('.potential-reference-note')!)).toBe('Dotted line: Re = 2.086 a₀ (1.104 Å), fitted; De = 9.44 eV from separated atoms.');
         });
     });
@@ -507,7 +549,14 @@ describe('PotentialCurvePlot', () => {
         const { container } = render(<PotentialCurvePlot {...props} xRange={[1.6594818936013664, 2.4062487457219808]} markerR={2} />);
         const scale = container.querySelector('.radial-plot-scale')!;
         expect(scale).toHaveTextContent('1.66');
-        expect(scale).toHaveTextContent('R (2.41 a₀ · 1.27 Å)');
+        expect(scale).toHaveTextContent('2.41 a₀');
         expect(scale.textContent).not.toMatch(/\d{5}/);
+    });
+
+    // Task 5b (finish fix 5): the R axis ends read alike, each with its unit -- "0.50 a₀" … "10 a₀" -- and the axis is
+    // named between them; the maximum was fused into the title ("R (10 a₀ · 5.29 Å)"), which read as "R in units of 10 a₀".
+    it('gives both R axis ends the same format with a unit, and never fuses the maximum into the axis name', () => {
+        const { container } = render(<PotentialCurvePlot {...props} xRange={[0.5, 10]} markerR={2} />);
+        expect([...container.querySelector('.radial-plot-scale')!.children].map(span => span.textContent)).toEqual(['0.50 a₀', 'R', '10 a₀']);
     });
 });

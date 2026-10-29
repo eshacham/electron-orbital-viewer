@@ -609,6 +609,21 @@ describe('the Bond length block (Task 3, picture control)', () => {
         expect([track.style.paddingLeft, track.style.paddingRight]).toEqual(['', '']);
     });
 
+    // Task 5b (finish fix 5; ruling): at Basics the readout speaks the curve's words and unit -- "Distance between nuclei
+    // 1.10 Å", two decimals -- where it led with a₀ and showed R three ways in one block. From Explore, the a₀ (Å) form.
+    it('reads R in the curve\'s words and Å at Basics, and as a₀ (Å) from Explore', () => {
+        const R = n2Scan.points[7].RBohr;
+        const { rerender } = render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} level="basics" />);
+        const block = () => screen.getByRole('region', { name: 'Bond length' });
+        const readout = () => block().querySelector('.bonds-r')!.textContent;
+        expect(readout()).toBe(`Distance between nuclei ${(R * 0.529177210903).toFixed(2)} Å`);
+        expect(block()).not.toHaveTextContent(/a₀/);
+        expect(screen.getByRole('slider', { name: 'Internuclear distance R' }))
+            .toHaveAttribute('aria-valuetext', `Distance between nuclei ${(R * 0.529177210903).toFixed(2)} Å, point 8 of 14`);
+        rerender(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} level="explore" />);
+        expect(readout()).toMatch(/^R = \d\.\d\d a₀ \(\d\.\d{3} Å\)$/);
+    });
+
     // Task 4 (T3 M2): while a molecule's scan loads, or after it failed to, the block says so in one short line rather
     // than stand empty under its heading. The polite status and the alert above it stay the announcements, so the line
     // is plain text, not a second live region; fix round 1 (ruling C9, a failure is said once): on failure it says what

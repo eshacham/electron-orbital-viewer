@@ -4,7 +4,7 @@ import { BondsState, BondsView } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
 import { BOND_GROUP_ORDER, BONDS_SYSTEMS, BondsSystemId, DENSITY_ISO_VALUES, bondOrderSelectText, nearestScanIndex, systemFormula } from '../bonds/systems';
 import { H2PLUS_R_RANGE } from '../bonds/h2plus';
-import { lengths } from '../bonds/captions';
+import { lengths, plainLength } from '../bonds/captions';
 import { h2plusOrbitals } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
 import { frontierOccupied } from '../molecules/orbital_display';
@@ -99,6 +99,8 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
 
     // The readout follows the thumb while it is dragged, for a molecule too.
     const shownR = isExact || bonds.R !== null ? draftR : null;
+    // Task 5b (finish fix 5; ruling): at Basics R reads in the curve's words and unit, readout and slider alike.
+    const lengthWords = atLeast(level, 'explore') ? lengths : plainLength;
 
     // Task 3: the curve fills the block's width, measured; nothing is drawn at a guessed one.
     const lengthId = useId();
@@ -131,17 +133,17 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                     {data.error ? 'No curve to show.' : `Loading ${formula}…`}
                 </Typography>
             )}
-            {shownR !== null && <Typography variant="body2" className="bonds-r">{lengths(shownR)}</Typography>}
+            {shownR !== null && <Typography variant="body2" className="bonds-r">{lengthWords(shownR)}</Typography>}
             <div className="bonds-length-slider" style={trackStyle}>
                 {isExact ? (
                     <Slider aria-label="Internuclear distance R" size="small" min={H2PLUS_R_RANGE.min} max={H2PLUS_R_RANGE.max} step={0.01}
-                        value={draftR} getAriaValueText={lengths}
+                        value={draftR} getAriaValueText={lengthWords}
                         onChange={(_, v) => setDraftR(v as number)} onChangeCommitted={(_, v) => onCommitH2PlusR(v as number)} />
                 ) : scan && bonds.R !== null && (
                     <Slider aria-label="Internuclear distance R" size="small" step={null}
                         min={scan.points[0].RBohr} max={scan.points[scan.points.length - 1].RBohr}
                         marks={scan.points.map(p => ({ value: p.RBohr }))} value={draftR}
-                        getAriaValueText={v => `${lengths(v)}, point ${nearestScanIndex(scan.points, v) + 1} of ${scan.points.length}`}
+                        getAriaValueText={v => `${lengthWords(v)}, point ${nearestScanIndex(scan.points, v) + 1} of ${scan.points.length}`}
                         onChange={(_, v) => setDraftR(v as number)}
                         onChangeCommitted={(_, v) => {
                             const index = nearestScanIndex(scan.points, v as number);

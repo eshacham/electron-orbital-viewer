@@ -1313,7 +1313,9 @@ function App() {
     // Task 8: the phone's caption under the header names what is drawn -- or, while the canvas waits (its busy label is
     // up), the view asked for, "loading…". Typeset by the same helper as the canvas title.
     const viewCaptionText = useAppSelector(
-        state => viewCaption(state, { loading: canvasBusyLabel !== null, failed: isBondsMode && Boolean(bondsData.error) }), shallowEqual);
+        state => viewCaption(state, { loading: canvasBusyLabel !== null, failed: isBondsMode && Boolean(bondsData.error),
+            // Task 5b (finish fix 5; ruling): at Basics a bond length reads as the Bond length block reads it.
+            plain: !atLeast(level, 'explore') }), shallowEqual);
     // Task 9 fix round 1 (the screen-reader pass): the caption is seen at once, "loading…" included, but said only when
     // it is not waiting -- a load used to be heard up to four times ("Molecule · loading…", the molecule, "· loading…",
     // the molecule) and a relativity re-solve twice. The visible caption is hidden from the tree; its spoken copy, a

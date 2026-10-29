@@ -18,6 +18,14 @@ export function lengths(R: number): string {
     return `R = ${lengthText(R)}`;
 }
 
+/**
+ * Task 5b (picture control, finish fix 5; ruling): R as Basics says it -- the curve's own words and unit ("Distance
+ * between nuclei (Å)"), two decimals: "Distance between nuclei 1.10 Å". From Explore, `lengths`.
+ */
+export function plainLength(R: number): string {
+    return `Distance between nuclei ${(R * BOHR_TO_ANGSTROM).toFixed(2)} Å`;
+}
+
 /*
  * Task 8 fix round 1 (I1, M7): these captions are also an export's plain text -- the method line of every B₂/C₂
  * export, the CSV comments -- so their quantities are written with Unicode, never markup: Rₑ, Dₑ, E(el). Not

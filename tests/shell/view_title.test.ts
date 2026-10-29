@@ -140,6 +140,17 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
             expect(viewCaption(store.getState(), { loading: false }).qualifier).toBe('not drawn');
         });
 
+        // Task 5b (picture control, finish fix 5; ruling): at Basics the caption gives R as the Bond length block does,
+        // in the curve's words and unit, to 2 decimals; from Explore it keeps the a₀ form.
+        it('gives a Bonds bond length in the curve\'s words and Å at Basics, and in a₀ from Explore', () => {
+            const store = neonStore();
+            store.dispatch(setMode('bonds'));
+            // H₂⁺ opens at R = 2.00 a₀ = 1.058 Å.
+            expect(viewCaption(store.getState(), { loading: false }).qualifier).toBe('R = 2.00 a₀');
+            expect(viewCaption(store.getState(), { loading: false, plain: true }).qualifier).toBe('distance between nuclei 1.06 Å');
+            expect(viewCaption(store.getState(), { loading: true, plain: true }).qualifier).toBe('loading…');
+        });
+
         it('names the Bonds orbital asked for and its bond length, or says it is loading', () => {
             const store = neonStore();
             store.dispatch(setMode('bonds'));

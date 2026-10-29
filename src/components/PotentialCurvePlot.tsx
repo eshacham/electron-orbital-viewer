@@ -14,6 +14,8 @@ import { minus } from '../format/sci';
 export interface CurveSeries {
     key: string;
     label: string;
+    /** Task 5b (finish fix 6): the caller's plain words for this curve, for Basics' legend ("bonding"). Without, `label`. */
+    plainLabel?: string;
     color: string;
     points: Array<{ R: number; E: number }>;
 }
@@ -114,10 +116,20 @@ function nearestIndex(sorted: number[], R: number): number {
     return best;
 }
 
-/** An axis end, a₀: two decimals, trailing zeros dropped (H₂⁺'s range stays "0.5 … 10"). */
-const axisR = (R: number) => String(Number(R.toFixed(2)));
+/**
+ * An axis end, a₀, with its unit: two decimals, as R is printed everywhere else, a whole number bare -- "0.50 a₀" …
+ * "10 a₀" (Task 5b, finish fix 5: both ends alike, each with its unit).
+ */
+const axisR = (R: number) => {
+    const fixed = R.toFixed(2);
+    return `${Number.isInteger(Number(fixed)) ? String(Number(fixed)) : fixed} a₀`;
+};
 /** An R in Å, two decimals, for the axis ends. */
 const angstrom = (R: number) => (R * BOHR_TO_ANGSTROM).toFixed(2);
+/** Task 5b (finish fix 6): an energy end at Basics, to 2 significant figures, with a true minus: "8.2", "−9.9". */
+const roundedEnergy = (E: number) => minus(String(Number(E.toPrecision(2))));
+/** The least distance between the 0 label's centre and an end label's before the end gives way, px (11 px type). */
+const LABEL_CLEARANCE = 12;
 
 const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, width, onSelectR, onDragR, keyboardControl = true,
@@ -128,14 +140,28 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     // Task 4 (picture control): the energy labels sit left of the axis, and the margin is at least as wide as they are
     // -- He₂'s "−0.0664" outgrew the fixed 34 px and ran over the axis and the first scan tick. Measured before paint;
     // where text cannot be measured (jsdom) the margin stays PAD.left.
-    const yLabels = [minus(yRange[1].toPrecision(3)), minus(yRange[0].toPrecision(3))];
+    // Task 5b (finish fix 6): at Basics the ends are rounded to 2 significant figures.
+    const yLabels = plain
+        ? [roundedEnergy(yRange[1]), roundedEnergy(yRange[0])]
+        : [minus(yRange[1].toPrecision(3)), minus(yRange[0].toPrecision(3))];
     const [topLabel, bottomLabel] = yLabels;
+    const plotHeight = HEIGHT - PAD.top - PAD.bottom;
+    const y = (E: number) => PAD.top + (1 - (E - yRange[0]) / (yRange[1] - yRange[0])) * plotHeight;
+
+    // Task 5b (finish fix 6): at Basics, 0 is labelled where the separated-atoms line runs, and an end label that would
+    // sit on it gives way (N₂'s top end, 0.47, is just above zero). Label centres: the top's at PAD.top + 4, the
+    // bottom's 4 px above the axis, the 0's on its line.
+    const zeroY = plain && yRange[0] < 0 && yRange[1] > 0 ? y(0) : null;
+    const clearOfZero = (centre: number) => zeroY === null || Math.abs(zeroY - centre) >= LABEL_CLEARANCE;
+    const showTop = clearOfZero(PAD.top + 4);
+    const showBottom = clearOfZero(PAD.top + plotHeight - 4);
     const labelRefs = useRef<Array<SVGTextElement | null>>([]);
     const [labelWidth, setLabelWidth] = useState(0);
     useLayoutEffect(() => {
-        const widths = labelRefs.current.map(text => (text && typeof text.getComputedTextLength === 'function' ? text.getComputedTextLength() : 0));
+        // Only the labels drawn: one that gives way to the 0 (finish fix 6) leaves a hole or a null here.
+        const widths = labelRefs.current.filter(Boolean).map(text => (typeof text!.getComputedTextLength === 'function' ? text!.getComputedTextLength() : 0));
         setLabelWidth(Math.ceil(Math.max(0, ...widths)));
-    }, [topLabel, bottomLabel]);
+    }, [topLabel, bottomLabel, showTop, showBottom]);
     const left = Math.max(PAD.left, LABEL_X + labelWidth + LABEL_GAP);
 
     // Finish fix 3: the margins drawn with, said to the caller -- again whenever the left one moves, and null on unmount.
@@ -145,9 +171,7 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     useLayoutEffect(() => () => insetRef.current?.(null), []);
 
     const plotWidth = width - left - PAD.right;
-    const plotHeight = HEIGHT - PAD.top - PAD.bottom;
     const x = (R: number) => plotX(R, xRange, width, left);
-    const y = (E: number) => PAD.top + (1 - (E - yRange[0]) / (yRange[1] - yRange[0])) * plotHeight;
 
     /** The R under the pointer, clamped to the plotted range: a tap beside the plot area takes the nearer end. */
     const pointerR = (event: React.MouseEvent<SVGSVGElement>) => {
@@ -288,8 +312,13 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                         <circle className="potential-handle-hit" cx={handle.cx} cy={handle.cy} r={HANDLE_HIT_RADIUS} fill="transparent"
                             style={{ cursor: 'ew-resize', touchAction: 'none' }} />
                     )}
-                    <text ref={node => { labelRefs.current[0] = node; }} x={LABEL_X} y={PAD.top + 8} className="potential-axis-label">{topLabel}</text>
-                    <text ref={node => { labelRefs.current[1] = node; }} x={LABEL_X} y={PAD.top + plotHeight} className="potential-axis-label">{bottomLabel}</text>
+                    {showTop && (
+                        <text ref={node => { labelRefs.current[0] = node; }} x={LABEL_X} y={PAD.top + 8} className="potential-axis-label">{topLabel}</text>
+                    )}
+                    {showBottom && (
+                        <text ref={node => { labelRefs.current[1] = node; }} x={LABEL_X} y={PAD.top + plotHeight} className="potential-axis-label">{bottomLabel}</text>
+                    )}
+                    {zeroY !== null && <text x={LABEL_X} y={zeroY + 4} className="potential-axis-label">0</text>}
                 </svg>
                 {handle && (
                     <span className="potential-handle" aria-hidden="true" style={{ left: handle.cx, top: handle.cy, background: handle.color }} />
@@ -338,7 +367,8 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
             <div className="radial-plot-legend">
                 {series.map(s => (
                     <span key={s.key} className="radial-plot-legend-item">
-                        <span className="radial-plot-legend-swatch" style={{ background: s.color }} />{withSubscripts(s.label) /* Task 8: 1σ<sub>g</sub> */}
+                        <span className="radial-plot-legend-swatch" style={{ background: s.color }} />
+                        {plain && s.plainLabel ? s.plainLabel : withSubscripts(s.label) /* Task 8: 1σ<sub>g</sub>; Task 5b: plain words at Basics */}
                     </span>
                 ))}
             </div>
@@ -352,10 +382,13 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                         <span>{angstrom(xRange[1])}</span>
                     </>
                 ) : (
+                    // A scan's ends are arbitrary floats; R is shown to 0.01 a₀ everywhere else. Task 5b (finish fix 5):
+                    // both ends alike, each with its unit, and the axis named between them -- the maximum is never fused
+                    // into the name, where "R (10 a₀ · 5.29 Å)" read as "R in units of 10 a₀".
                     <>
-                        {/* A scan's ends are arbitrary floats; R is shown to 0.01 a₀ everywhere else. */}
                         <span>{axisR(xRange[0])}</span>
-                        <span>R ({axisR(xRange[1])} a₀ · {angstrom(xRange[1])} Å)</span>
+                        <span>R</span>
+                        <span>{axisR(xRange[1])}</span>
                     </>
                 )}
             </div>

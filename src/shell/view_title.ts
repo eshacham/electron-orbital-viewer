@@ -6,6 +6,7 @@ import type { RelativityMode } from '../atom/relativity';
 import { orbitalName } from '../orbital_names';
 import { combinationTitle, selectionProblem } from '../combinations';
 import { BONDS_SYSTEMS, systemFormula } from '../bonds/systems';
+import { plainLength } from '../bonds/captions';
 import { bondsDrawnPicture, bondsPictureNamed, moleculeDrawnPicture, moleculeTitle, noSurfaceView } from '../export/caption';
 import { atomPartName, bondsViewName } from './view_names';
 import { formatFormula } from '../molecules/catalogue';
@@ -145,6 +146,8 @@ export interface ViewCaptionStatus {
     loading: boolean;
     /** Its files could not be loaded (Bonds' are fetched outside the store). */
     failed?: boolean;
+    /** Task 5b (finish fix 5; ruling): Basics' plain words -- a Bonds bond length as the Bond length block says it, in Å. */
+    plain?: boolean;
 }
 
 const LOADING = 'loading…';
@@ -184,15 +187,18 @@ function orbitalsCaption(state: RootState, { loading }: ViewCaptionStatus): View
     };
 }
 
-function bondsCaption(state: RootState, { loading, failed }: ViewCaptionStatus): ViewCaption {
+function bondsCaption(state: RootState, { loading, failed, plain }: ViewCaptionStatus): ViewCaption {
+    // Task 5b (finish fix 5; ruling): at Basics in the Bond length block's words and Å, lower-case as a qualifier is;
+    // from Explore in a₀, as before.
+    const length = (R: number) => (plain ? plainLength(R).replace(/^D/, 'd') : `R = ${R.toFixed(2)} a₀`);
     // The picture on screen (an orbital this geometry does not keep is drawn as the density), or -- while the next
     // one loads, or before any has landed -- the one asked for.
     const drawn = loading || failed ? null : bondsDrawnPicture(state);
     if (drawn) {
-        return { name: `${systemFormula(drawn.system)} ${bondsViewName(bondsPictureNamed(drawn.picture))}`, qualifier: `R = ${drawn.R.toFixed(2)} a₀` };
+        return { name: `${systemFormula(drawn.system)} ${bondsViewName(bondsPictureNamed(drawn.picture))}`, qualifier: length(drawn.R) };
     }
     const { system, view, R } = state.bonds;
-    const qualifier = failed ? 'not loaded' : loading || R === null ? LOADING : `R = ${R.toFixed(2)} a₀`;
+    const qualifier = failed ? 'not loaded' : loading || R === null ? LOADING : length(R);
     return { name: `${systemFormula(system)} ${bondsViewName(view)}`, qualifier };
 }
 

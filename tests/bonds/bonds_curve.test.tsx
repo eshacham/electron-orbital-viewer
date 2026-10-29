@@ -80,6 +80,19 @@ describe('diatomicCurveSpec', () => {
         expect(curveNote('he2', heScan)).not.toMatch(/counterpoise|No chemical bond/);
     });
 
+    // Task 5b (finish fix 6): He₂'s zero line sat about 4 px over the x-axis, the scan ticks between them, and read as a
+    // hollow bar. The axis now starts a fifth of the energy span below zero wherever the curve barely dips under it, so
+    // the separated-atoms line stands clear of the floor -- at every level (lowering the level never changes the plot).
+    it("stands He₂'s zero line clear of the x-axis, and leaves a bound molecule's range as it was", () => {
+        const he = diatomicCurveSpec('he2', heScan, 4.4);
+        const heSpan = he.yRange[1] - he.yRange[0];
+        expect((0 - he.yRange[0]) / heSpan).toBeGreaterThanOrEqual(0.15);
+        const n2 = diatomicCurveSpec('n2', n2Scan, 2.07);
+        const lowest = Math.min(...n2.series[0].points.map(p => p.E));
+        // N₂'s floor is still its well's bottom less 5 % of the span.
+        expect(n2.yRange[0]).toBeCloseTo(lowest - 0.05 * (n2.yRange[1] - n2.yRange[0]) / 1.1, 6);
+    });
+
     it("names the experiment Li₂'s R_e is compared with", () => {
         const li2 = { ...n2Scan, fit: { ...n2Scan.fit, ReBohr: 5.102 }, reference: { ReAngstrom: null, source: null } } as MoleculeScan;
         // Task 7a: Li₂'s caveat is bondsCaptions' (Info), where the R_e caption has just named the experiment.
@@ -106,6 +119,13 @@ describe('h2plusCurveSpec', () => {
         expect(spec).not.toHaveProperty('caption');
         expect(curveNote('h2plus', null)).toBe('Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (−0.5 Ha), the grey line.');
         expect(h2plusCurveSpec(curve, 0.1).markerR).toBe(0.5);
+    });
+
+    // Task 5b (finish fix 6): at Basics the legend says what each curve is in plain words; curve.ts says them, as it
+    // says the Rₑ line's, so the plot makes no science claim of its own. N₂'s legend ("separated atoms") is plain already.
+    it('names its curves in plain words for Basics: bonding, antibonding, apart', () => {
+        expect(h2plusCurveSpec(curve, 2).series.map(s => [s.label, s.plainLabel]))
+            .toEqual([['1σg', 'bonding'], ['1σu*', 'antibonding'], ['H + H⁺', 'apart']]);
     });
 });
 
@@ -209,7 +229,8 @@ describe('BondsCurvePlot', () => {
         basics.unmount();
         const explore = n2At('explore');
         expect(title(explore.container)).toBe('E − E(separated atoms) (eV)');
-        expect(scale(explore.container)[1]).toMatch(/^R \(/);
+        // Task 5b (finish fix 5): from Explore the axis is R, its ends in a₀ alike (no maximum fused into the title).
+        expect(scale(explore.container)).toEqual(['1.66 a₀', 'R', '2.41 a₀']);
         expect(note(explore.container)).toMatch(/^Dotted line: R/);
         expect(marker(explore.container)).toBe(basicsMarker);
         explore.unmount();
@@ -218,6 +239,12 @@ describe('BondsCurvePlot', () => {
         expect(title(h2.container)).toBe('Energy (eV)');
         // H₂⁺'s exact Rₑ, 1.997 a₀ = 1.057 Å.
         expect(note(h2.container)).toBe('Dotted line: most stable, 1.06 Å');
+        // Task 5b (finish fix 6): its legend in plain words at Basics, the technical names from Explore.
+        const legend = (container: HTMLElement) => [...container.querySelectorAll('.radial-plot-legend-item')].map(item => item.textContent);
+        expect(legend(h2.container)).toEqual(['bonding', 'antibonding', 'apart']);
+        h2.unmount();
+        const h2Explore = render(<BondsCurvePlot bonds={h2plus} data={empty} h2plus={{ curve, error: null }} {...props} level="explore" />);
+        expect(legend(h2Explore.container)).toEqual(['1σg1σg', '1σu1σu*', 'H + H⁺']);
     });
 
     it('draws nothing for a molecule whose scan has not loaded (the panel says so)', () => {
