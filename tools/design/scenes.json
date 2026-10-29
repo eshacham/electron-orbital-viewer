@@ -15,6 +15,8 @@
   "bonds-co": "#mode=bonds&system=co",
   "bonds-o2": "#mode=bonds&system=o2",
   "bonds-h2plus": "#mode=bonds&system=h2plus",
+  "bonds-h2plus-u": "#mode=bonds&system=h2plus&R=4&state=1sigma_u",
+  "bonds-h2plus-u-off": "#mode=bonds&system=h2plus&R=2&state=1sigma_u",
   "bonds-he2": "#mode=bonds&system=he2",
   "bonds-co-orbital": "#mode=bonds&system=co&state=mo%3Arestricted%3A5%CF%83%3A0",
   "bonds-n2-sg": "#mode=bonds&system=n2&state=mo%3Arestricted%3A3%CF%83g%3A0",

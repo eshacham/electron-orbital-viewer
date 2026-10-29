@@ -283,3 +283,41 @@ For example, 9l's last tile is still centred.
 **Still pending.** DESIGN.md does not yet record the strip as picker, the sideways Tonal Scroll Cue, the Bond length
 block, or the changes in this section: the open drawer label, the curve handle, and the sticky group labels. That is
 the documenter's job (Step 3).
+
+### Fix round 1 (Task 5b review and finish verdict pass 1)
+
+Commits: `55c2492` (handle and labels), `d832720` (drawer), `298b53b` (strip peek wiring). These shots were taken the
+same way as above, on our own Vite on port 5413, under `--task pc-T5b2-*`. Every shot settled with 0 errors and 0
+`/api` requests. `scenes.json` gains `bonds-h2plus-u` (R = 4 a₀, 1σu\* drawn, both curves on the plot) and
+`bonds-h2plus-u-off` (R = 2 a₀, 1σu\* drawn, its curve above the plot).
+
+| Item | Verdict | Shots |
+|---|---|---|
+| I1: the H₂⁺ handle rides the drawn state's curve | pass | `finish2-block-h2plus-u-basics-dark.png`, `finish2-block-h2plus-u-basics-light.png` |
+| I2: off the plot, the handle is drawn hollow | pass | `finish2-block-h2plus-u-off-basics-dark.png`, `finish2-block-h2plus-u-off-basics-light.png` |
+| M1 (ruling): the drawer's underlined tab and its own Close panel control, in Orbitals, Atoms and Bonds | pass | `finish2-drawer-orbitals-3dz2-research-{dark,light}-tablet.png`, `finish2-drawer-atoms-c-2pz-research-{dark,light}-tablet.png`, `finish2-drawer-bonds-n2-research-{dark,light}-tablet.png` |
+| He₂'s 0 no longer crowds the bottom end label | pass | `finish2-block-he2-basics-dark.png`, `finish2-block-he2-basics-light.png` |
+| M3/M6: the peek still shows at rest after the rewiring | pass | `finish2-strip-n9-mid-dark-desktop.png`, `finish2-strip-n9-mid-light-desktop.png` |
+
+**I1 and I2.** With 1σu\* drawn at R = 4 a₀, the handle is filled in 1σu\*'s colour, measured as `rgb(255, 107, 107)`.
+Its thumb is at 122.0 px and its marker at 122.1 px. At R = 2 a₀, 1σu\* (+9.05 eV) is above the plot's 8.16 eV top. The
+handle then stands on the marker line at the top edge as a ring only, measured with background `rgba(0, 0, 0, 0)`. It
+is still the thing to drag, and it is not read as a point at 8.2 eV. 1σg's own small value dot stays where 1σg is.
+
+**M1.** No chevron sits between the bar's labels any more. The open tab ("Plot", "Data" or "View") is marked by a 2 px
+text-1 underline and weight 600, with no accent and no fill. A separate "Close panel" control (a chevron in text-2,
+44 px) sits at the bar's far right. The open tab still closes the drawer in one press, under its own name ("Plot
+panel", "Data panel"). Esc still returns focus to that tab.
+
+**He₂.** An end label now gives way to the 0 within 16 px (it was 12). At Basics He₂ reads "1.4" at the top and "0" at
+the zero line, with no "−0.26" crowding the foot of the axis. Above Basics there is no 0 label, so nothing can overlap
+at any level.
+
+**M2.** A drag that starts on the handle's hit area keeps the offset from the handle's centre, so a press off-centre
+leaves R where it was. A tap elsewhere on the curve still sets R at the tap. This is checked by unit tests, not a
+capture.
+
+**M3, M4 and M6.** At n9-mid the rest is unchanged: scrollLeft 1337, 9g's margin −57 px, and 9h at 706 of 763. The pick
+rest now measures the shifts itself, so the strip scrolls once on load and a resize alone no longer scrolls it back.
+Shifts are paired with groups by key. A tile that the shift would hide rests at its group's own snap before the strip
+centres it. All of this is checked by unit tests.
