@@ -320,3 +320,32 @@ capture.
 rest now measures the shifts itself, so the strip scrolls once on load and a resize alone no longer scrolls it back.
 Shifts are paired with groups by key. A tile that the shift would hide rests at its group's own snap before the strip
 centres it. All of this is checked by unit tests.
+
+### Final review M4: Li₂ and F₂ under the separated-atoms floor
+
+The finish fix gave a molecule's plot a floor at least a fifth of its span below the separated-atoms line
+(`ZERO_CLEARANCE`, `src/bonds/curve.ts`). Only N₂, H₂⁺ and He₂ had been shot since then. Li₂ (the shallowest bound
+well, Dₑ = 1.03 eV) and F₂ were shot here to see whether that floor flattens their wells.
+
+Shot on our own Vite on port 5413 only, dark, desktop. `scenes.json` gains `bonds-li2` and `bonds-f2`. Every shot
+settled with 0 page errors and 0 `/api` requests, and the slider thumb stands over the marker in each one.
+
+```
+S="node tools/design/shoot.mjs --gl metal --jobs-stub --port 5413"
+$S --task pc-final-basics   --run d --level basics   --scenes bonds-li2,bonds-f2 --themes dark --sizes desktop
+$S --task pc-final-research --run d --level research --scenes bonds-li2,bonds-f2 --themes dark --sizes desktop
+```
+
+| System | Level | y axis ends (as drawn) | Verdict | Shot |
+|---|---|---|---|---|
+| Li₂ | Basics | 0 … −1.1 | well fills the plot | `final-bonds-li2-basics-dark-desktop.png` |
+| Li₂ | Research | 0.0516 … −1.08 | well fills the plot | `final-bonds-li2-research-dark-desktop.png` |
+| F₂ | Basics | 1.1 … −1.7 (0 labelled) | well fills the plot | `final-bonds-f2-basics-dark-desktop.png` |
+| F₂ | Research | 1.07 … −1.70 | well fills the plot | `final-bonds-f2-research-dark-desktop.png` |
+
+**Verdict: neither well is flattened; the floor does not apply to either.** The axis ends match the range without the
+clearance: the minimum less 5 % of the span. Li₂'s scan starts at 4.04 a₀, near its minimum, so there is no tall
+short-R wall. Its span is about its 1.03 eV depth, so the bottom is −1.03 − 0.05 eV = −1.08, far below the clearance's
+−0.21 eV. F₂'s wall at 2.13 a₀ rises to about +0.9 eV, giving a span of about 2.5 eV. Its bottom is −1.58 − 0.13 =
+−1.70, below the clearance's −0.50 eV. In both, the well's floor sits on the plot's bottom edge, and the curve's
+minimum is the lowest thing drawn.

@@ -12,6 +12,8 @@
   "basic-n9-mid": "#mode=basic&n=9&l=4&ml=0",
   "basic-n9-s": "#mode=basic&n=9&l=0&ml=0",
   "bonds-n2": "#mode=bonds&system=n2",
+  "bonds-li2": "#mode=bonds&system=li2",
+  "bonds-f2": "#mode=bonds&system=f2",
   "bonds-co": "#mode=bonds&system=co",
   "bonds-o2": "#mode=bonds&system=o2",
   "bonds-h2plus": "#mode=bonds&system=h2plus",
