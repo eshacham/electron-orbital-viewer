@@ -65,8 +65,8 @@
 /* Task 5b (picture control, finish fix 2; ruling): open, the drawer stacks the bar above Info (.inspector is a column,
    app_shell.css), and the bar used to stretch into a full-width, 56 px, selected-fill block with its label set
    vertically -- the loudest blue on screen, against the One Blue Voice Rule. Open, it is a quiet horizontal label
-   instead: a surface-2 strip under a hairline, text-2 ink, the label read across, and a chevron saying a press folds
-   the drawer away to the right. No accent anywhere; folded, the edge bar above is unchanged. Every mode's drawer. */
+   instead: a surface-2 strip under a hairline, text-2 ink, the label read across, and "Close panel" at its far right.
+   No accent anywhere; folded, the edge bar above is unchanged. Every mode's drawer. */
 .inspector-drawer.open .inspector-bar {
   flex: none; flex-direction: row; gap: var(--ql-space-4); padding: 0 var(--ql-space-8);
   background: var(--ql-color-surface-2); border-bottom: 1px solid var(--ql-color-border-subtle);
@@ -76,9 +76,19 @@
   min-height: var(--ql-size-touch); padding: 0 var(--ql-space-8); border: 0; border-radius: 0; background: none;
   color: var(--ql-color-text-2);
 }
-.inspector-drawer.open .inspector-bar-button[aria-expanded="true"] { color: var(--ql-color-text-1); }
+/* Fix round 1 (ruling M1): the open tab is marked by a text-1 underline and weight 600 -- more than an ink step, still
+   no accent and no fill. */
+.inspector-drawer.open .inspector-bar-button[aria-expanded="true"] {
+  color: var(--ql-color-text-1); font-weight: 600; box-shadow: inset 0 -2px 0 var(--ql-color-text-1);
+}
 .inspector-drawer.open .inspector-bar-button:hover { color: var(--ql-color-text-1); }
-.inspector-bar-close { color: var(--ql-color-text-2); }
+/* Fix round 1 (ruling M1): "Close panel", its own control at the bar's far right, a touch target, in text-2 ink. */
+.inspector-bar-close {
+  margin-inline-start: auto; display: inline-flex; align-items: center; justify-content: center;
+  min-width: var(--ql-size-touch); min-height: var(--ql-size-touch); padding: 0; cursor: pointer;
+  border: 0; background: none; color: var(--ql-color-text-2);
+}
+.inspector-bar-close:hover { color: var(--ql-color-text-1); }
 .inspector-drawer-panel { display: flex; flex-direction: column; width: var(--ql-size-inspector); min-height: 0; }
 .inspector-stacked { display: flex; flex-direction: column; gap: var(--ql-size-section-gap); }
 @media (prefers-reduced-motion: no-preference) {

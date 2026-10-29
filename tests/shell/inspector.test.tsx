@@ -282,20 +282,45 @@ describe('Inspector sections (ruling R24-3)', () => {
             }
         });
 
-        it('keeps the open label one press from closing, under the same name, with a quiet close mark', () => {
+        // Fix round 1 (ruling M1): a chevron after the open label read as a breadcrumb ("Plot › Data") or "go into
+        // Data". The open tab is marked by a text-1 underline and weight 600 (no accent, no fill); a separate "Close
+        // panel" control sits at the bar's far right; the tab's own one-press close and its name are kept.
+        it('marks the open tab with a text-1 underline and weight 600, and no chevron between the labels', () => {
+            const open = rule('.inspector-drawer.open .inspector-bar-button[aria-expanded="true"]');
+            expect(open).toMatch(/color:\s*var\(--ql-color-text-1\);/);
+            expect(open).toMatch(/font-weight:\s*600;/);
+            expect(open).toMatch(/box-shadow:\s*inset 0 -2px 0 var\(--ql-color-text-1\);/);
+            render(<Inspector variant="drawer" sections={[plotAndData('plot')]} open onOpenChange={jest.fn()} />);
+            for (const name of ['Plot panel', 'Data panel']) {
+                expect(screen.getByRole('button', { name }).querySelector('svg')).toBeNull();
+            }
+        });
+
+        it('puts a separate "Close panel" control at the bar\'s far right, which closes the drawer in one press', () => {
+            const onOpenChange = jest.fn();
+            const { container } = render(<Inspector variant="drawer" sections={[plotAndData('data')]} open onOpenChange={onOpenChange} />);
+            const close = screen.getByRole('button', { name: 'Close panel' });
+            expect(container.querySelector('.inspector-bar')!.lastElementChild).toBe(close);
+            expect(rule('.inspector-bar-close')).toMatch(/margin-inline-start:\s*auto;/);
+            expect(rule('.inspector-bar-close')).not.toMatch(/accent|selected-fill|on-fill/);
+            fireEvent.click(close);
+            expect(onOpenChange).toHaveBeenLastCalledWith(false);
+        });
+
+        it('keeps the open tab one press from closing, under its own name', () => {
             const onOpenChange = jest.fn();
             const sections = [displaySection, { key: 'data', title: 'Data', content: <p>data body</p> }];
             render(<Inspector variant="drawer" sections={sections} barSection="data" open onOpenChange={onOpenChange} />);
             const button = screen.getByRole('button', { name: 'Data panel' });
             expect(button).toHaveTextContent('Data');
-            expect(button.querySelector('.inspector-bar-close')).toHaveAttribute('aria-hidden', 'true');
+            expect(button).toHaveAttribute('aria-expanded', 'true');
             fireEvent.click(button);
             expect(onOpenChange).toHaveBeenLastCalledWith(false);
         });
 
-        it('shows no close mark on the folded edge bar', () => {
+        it('shows no Close panel control on the folded edge bar', () => {
             render(<Inspector variant="drawer" sections={[displaySection]} open={false} onOpenChange={jest.fn()} />);
-            expect(screen.getByRole('button', { name: 'View settings' }).querySelector('.inspector-bar-close')).toBeNull();
+            expect(screen.queryByRole('button', { name: 'Close panel' })).toBeNull();
         });
     });
 

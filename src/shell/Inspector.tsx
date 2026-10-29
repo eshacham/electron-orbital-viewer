@@ -199,11 +199,17 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
                                 }}
                             >
                                 <span className="inspector-bar-label">{item.label}</span>
-                                {/* Task 5b (finish fix 2): open, the label reads across, and this says a press folds it away. */}
-                                {expanded && <ChevronRight className="inspector-bar-close" fontSize="small" aria-hidden="true" />}
                             </button>
                         );
                     })}
+                    {/* Task 5b fix round 1 (ruling M1): open, a separate control at the bar's far right folds the drawer away --
+                        not a chevron after the open label, which read as a breadcrumb ("Plot › Data"). The open tab
+                        still closes it in one press, under its own name. */}
+                    {open && (
+                        <button type="button" className="inspector-bar-close" aria-label="Close panel" onClick={() => onOpenChange?.(false)}>
+                            <ChevronRight fontSize="small" aria-hidden="true" />
+                        </button>
+                    )}
                 </div>
                 {open && <div id={drawerPanelId} className="inspector-drawer-panel">{infoSlot}{content}</div>}
             </aside>
