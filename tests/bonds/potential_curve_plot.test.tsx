@@ -1,6 +1,8 @@
 import React from 'react';
 import { render, fireEvent, screen } from '@testing-library/react';
-import PotentialCurvePlot, { interpolateEnergy, CurveSeries } from '../../src/components/PotentialCurvePlot';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import PotentialCurvePlot, { interpolateEnergy, CurveSeries, PLOT_PAD, plotX } from '../../src/components/PotentialCurvePlot';
 import { seenText } from '../seen_text';
 
 const series: CurveSeries[] = [
@@ -408,6 +410,94 @@ describe('PotentialCurvePlot', () => {
             expect(container.querySelector('.radial-plot-title')!.textContent).toBe('E − E(separated atoms) (eV)');
             expect(container.querySelector('.radial-plot-scale')).toHaveTextContent('R (2.41 a₀ · 1.27 Å)');
             expect(seenText(container.querySelector('.potential-reference-note')!)).toBe('Dotted line: Re = 2.086 a₀ (1.104 Å), fitted; De = 9.44 eV from separated atoms.');
+        });
+    });
+
+    // Task 5b (picture control, finish fix 3): the R slider above the plot is inset by the plot's own margins, so its
+    // thumb stands over the marker. The margins and the scale are the plot's, exported, and the plot reports the left
+    // margin it actually draws with (it widens to fit the energy labels), so a caller never copies a number.
+    describe('its scale and inset, shared (finish fix 3)', () => {
+        it('draws R where the exported scale puts it', () => {
+            const { container } = render(<PotentialCurvePlot {...props} markerR={3} />);
+            const x1 = Number(container.querySelector('.potential-marker')!.getAttribute('x1'));
+            expect(x1).toBeCloseTo(plotX(3, props.xRange, props.width, PLOT_PAD.left), 6);
+            expect(plotX(0, [0, 4], 300, 34)).toBe(34);
+            expect(plotX(4, [0, 4], 300, 34)).toBe(300 - PLOT_PAD.right);
+        });
+
+        it('reports the margins it draws with, the widened left one too, and withdraws them when it goes', () => {
+            const onInset = jest.fn();
+            const { unmount } = render(<PotentialCurvePlot {...props} onInset={onInset} />);
+            expect(onInset).toHaveBeenLastCalledWith({ left: PLOT_PAD.left, right: PLOT_PAD.right });
+            unmount();
+            expect(onInset).toHaveBeenLastCalledWith(null);
+            const proto = SVGElement.prototype as unknown as { getComputedTextLength?: () => number };
+            proto.getComputedTextLength = function (this: SVGElement) { return (this.textContent ?? '').length * 6; };
+            try {
+                const wide = jest.fn();
+                const { container } = render(<PotentialCurvePlot {...props} yRange={[-0.0664, 1.372]} onInset={wide} />);
+                const axisStart = Number(container.querySelector('.radial-plot-axis')!.getAttribute('x1'));
+                expect(axisStart).toBeGreaterThan(PLOT_PAD.left);
+                expect(wide).toHaveBeenLastCalledWith({ left: axisStart, right: PLOT_PAD.right });
+            } finally {
+                delete proto.getComputedTextLength;
+            }
+        });
+    });
+
+    // Task 5b (finish fix 4): the curve invites a drag. Where R can be set on it, the marker carries a handle on the
+    // first curve -- a dot at least 10 px across in that curve's colour, ringed in selected-edge, with the selected
+    // halo (Deep Space only: the token is none in Light Clean) -- over a 44 px hit area with an ew-resize cursor.
+    // The Rₑ line stays green and dotted, so the two never read alike.
+    describe('a handle on the curve (finish fix 4)', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+        const rule = (selector: string) => {
+            const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const match = new RegExp(`(^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(css);
+            if (!match) throw new Error(`No rule for ${selector}`);
+            return match[2];
+        };
+
+        it('stands on the first curve at the marker, in its colour, over a 44 px ew-resize hit area', () => {
+            const { container } = render(<PotentialCurvePlot {...props} onSelectR={jest.fn()} onDragR={jest.fn()} />);
+            const handle = container.querySelector('.potential-handle') as HTMLElement;
+            expect(handle).toHaveAttribute('aria-hidden', 'true');
+            const markerX = Number(container.querySelector('.potential-marker')!.getAttribute('x1'));
+            const dot = container.querySelector('.potential-marker-dot') as SVGCircleElement;
+            expect(parseFloat(handle.style.left)).toBeCloseTo(markerX, 6);
+            expect(parseFloat(handle.style.top)).toBeCloseTo(Number(dot.getAttribute('cy')), 6);
+            expect(handle.style.background).toBe('rgb(255, 0, 0)');
+            const hit = container.querySelector('svg .potential-handle-hit') as SVGCircleElement;
+            expect(Number(hit.getAttribute('r')) * 2).toBeGreaterThanOrEqual(44);
+            expect(Number(hit.getAttribute('cx'))).toBeCloseTo(markerX, 6);
+            expect(hit.style.cursor).toBe('ew-resize');
+        });
+
+        it('is drawn with tokens only: a 10 px dot, a selected-edge ring and the selected halo, and lets taps through', () => {
+            const handle = rule('.potential-handle');
+            expect(handle).toMatch(/width:\s*10px;/);
+            expect(handle).toMatch(/height:\s*10px;/);
+            expect(handle).toMatch(/border:\s*2px solid var\(--ql-color-selected-edge\);/);
+            expect(handle).toMatch(/box-shadow:\s*var\(--ql-shadow-selected-halo\);/);
+            expect(handle).toMatch(/pointer-events:\s*none;/);
+            expect(handle).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
+            // The Rₑ line keeps its own look: green, dotted.
+            expect(rule('.potential-reference')).toMatch(/stroke:\s*var\(--ql-color-success\);[^}]*stroke-dasharray:\s*1 3;/);
+        });
+
+        it('keeps to the plot area where the first curve leaves it, and is not drawn where R cannot be set', () => {
+            const { container, unmount } = render(<PotentialCurvePlot {...props} markerR={1} onSelectR={jest.fn()} onDragR={jest.fn()} />);
+            // series g at R = 1 is −0.4, inside [−0.7, −0.3]; at R = 0.2 it has no value, so the handle rests on the axis.
+            expect(container.querySelector('.potential-handle')).not.toBeNull();
+            unmount();
+            const outside = render(<PotentialCurvePlot {...props} markerR={0.2} onSelectR={jest.fn()} onDragR={jest.fn()} />);
+            const handle = outside.container.querySelector('.potential-handle') as HTMLElement;
+            const axisY = Number(outside.container.querySelector('.radial-plot-axis')!.getAttribute('y1'));
+            expect(parseFloat(handle.style.top)).toBeCloseTo(axisY, 6);
+            outside.unmount();
+            const still = render(<PotentialCurvePlot {...props} />);
+            expect(still.container.querySelector('.potential-handle')).toBeNull();
+            expect(still.container.querySelector('.potential-handle-hit')).toBeNull();
         });
     });
 

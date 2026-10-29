@@ -53,10 +53,31 @@ interface PotentialCurvePlotProps {
      * Labels only: the curves, the marker, the ticks and the text alternative are the same either way.
      */
     plain?: boolean;
+    /**
+     * Task 5b (picture control, finish fix 3): told the margins the plot draws with -- its left one widens to fit the
+     * energy labels -- whenever they change, and null when the plot goes; so a control above it (Bonds' R slider) can
+     * inset its track to the plotted x range and stand its thumb over the marker.
+     */
+    onInset?: (inset: PlotInset | null) => void;
 }
 
+/** The plot area's distance from the svg's left and right edges, px. */
+export interface PlotInset { left: number; right: number }
+
 const HEIGHT = 130;
-const PAD = { left: 34, right: 8, top: 8, bottom: 18 };
+/**
+ * The plot area's padding, px; `left` is the least left margin (it widens to fit the energy labels). Exported with
+ * plotX, the plot's x scale, so a control aligned with the plot (finish fix 3) uses these numbers, not copies.
+ */
+export const PLOT_PAD = { left: 34, right: 8, top: 8, bottom: 18 } as const;
+const PAD = PLOT_PAD;
+/** The handle's hit area on the curve (finish fix 4): the touch size, 44 px across. */
+const HANDLE_HIT_RADIUS = 22;
+
+/** Where R stands across an svg `width` wide whose plot area starts `left` px in and ends PLOT_PAD.right px short. */
+export function plotX(R: number, xRange: [number, number], width: number, left: number): number {
+    return left + ((R - xRange[0]) / (xRange[1] - xRange[0])) * (width - left - PAD.right);
+}
 /** The energy labels' x, and the least room between their right end and the axis, px. */
 const LABEL_X = 2;
 const LABEL_GAP = 4;
@@ -100,7 +121,7 @@ const angstrom = (R: number) => (R * BOHR_TO_ANGSTROM).toFixed(2);
 
 const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, width, onSelectR, onDragR, keyboardControl = true,
-    plain = false,
+    plain = false, onInset,
 }) => {
     const clipId = useId();
 
@@ -117,9 +138,15 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     }, [topLabel, bottomLabel]);
     const left = Math.max(PAD.left, LABEL_X + labelWidth + LABEL_GAP);
 
+    // Finish fix 3: the margins drawn with, said to the caller -- again whenever the left one moves, and null on unmount.
+    const insetRef = useRef(onInset);
+    insetRef.current = onInset;
+    useLayoutEffect(() => { insetRef.current?.({ left, right: PAD.right }); }, [left]);
+    useLayoutEffect(() => () => insetRef.current?.(null), []);
+
     const plotWidth = width - left - PAD.right;
     const plotHeight = HEIGHT - PAD.top - PAD.bottom;
-    const x = (R: number) => left + ((R - xRange[0]) / (xRange[1] - xRange[0])) * plotWidth;
+    const x = (R: number) => plotX(R, xRange, width, left);
     const y = (E: number) => PAD.top + (1 - (E - yRange[0]) / (yRange[1] - yRange[0])) * plotHeight;
 
     /** The R under the pointer, clamped to the plotted range: a tap beside the plot area takes the nearer end. */
@@ -192,6 +219,17 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     const inRangeMarkers = markerEnergies.filter(
         (m): m is { s: CurveSeries; E: number } => m.E !== null && m.E >= yRange[0] && m.E <= yRange[1],
     );
+    // Task 5b (finish fix 4): where R can be set here, the marker carries a handle on the first curve, so the thing to
+    // drag is seen. Where that curve has left the plot (or has no value at R), the handle keeps to the plot area on the
+    // marker line: at the edge the curve left through, or on the axis.
+    const handle = (() => {
+        if (markerR === null || !onSelectR || series.length === 0) return null;
+        const E = markerEnergies[0].E;
+        const top = PAD.top;
+        const bottom = PAD.top + plotHeight;
+        const cy = E === null ? bottom : Math.min(bottom, Math.max(top, y(E)));
+        return { cx: x(markerR), cy, color: series[0].color };
+    })();
 
     return (
         <div
@@ -201,50 +239,62 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
             style={{ maxWidth: width + 22 }}
         >
             <div className="radial-plot-title">{plain ? `Energy (${unit})` : `${title} (${unit})`}</div>
-            <svg
-                width={width}
-                height={HEIGHT}
-                role="img"
-                aria-label={plain ? 'Energy against the distance between nuclei' : `${title} against R`}
-                onClick={handleClick}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
-                onLostPointerCapture={handlePointerCancel}
-                // A sideways drag is the plot's; an up-or-down one still scrolls the panel (and cancels the drag).
-                style={{ cursor: onSelectR ? 'pointer' : undefined, touchAction: draggable ? 'pan-y' : undefined }}
-            >
-                <defs>
-                    <clipPath id={clipId}><rect x={left} y={PAD.top} width={plotWidth} height={plotHeight} /></clipPath>
-                </defs>
-                <g clipPath={`url(#${clipId})`}>
-                    {series.map(s => (
-                        <path key={s.key} className="radial-plot-line" fill="none" style={{ stroke: s.color }}
-                            d={`M ${s.points.map(p => `${x(p.R).toFixed(2)},${y(p.E).toFixed(2)}`).join(' L ')}`} />
-                    ))}
-                </g>
-                <line className="radial-plot-axis" x1={left} x2={width - PAD.right} y1={PAD.top + plotHeight} y2={PAD.top + plotHeight} />
-                {snapRs.map(R => (
-                    <line key={R} className="radial-plot-peak" x1={x(R)} x2={x(R)} y1={PAD.top + plotHeight} y2={PAD.top + plotHeight - 4} />
-                ))}
-                {/* Labelled visibly below, as plain text (not an SVG <title>,
-                    which only a pointing device's hover ever surfaces) --
-                    see .potential-reference-note. */}
-                {referenceR && (
-                    <line className="potential-reference" x1={x(referenceR.R)} x2={x(referenceR.R)} y1={PAD.top} y2={PAD.top + plotHeight} />
-                )}
-                {markerR !== null && (
-                    <>
-                        <line className="potential-marker" x1={x(markerR)} x2={x(markerR)} y1={PAD.top} y2={PAD.top + plotHeight} />
-                        {inRangeMarkers.map(({ s, E }) => (
-                            <circle key={s.key} className="potential-marker-dot" cx={x(markerR)} cy={y(E)} r={3} style={{ fill: s.color }} />
+            {/* The svg and, over it, the marker's handle (finish fix 4): an HTML dot, so it can wear the selected halo's
+                box-shadow token, which no SVG filter takes. It lets every tap through to the svg below. */}
+            <div className="potential-plot-area" style={{ width, height: HEIGHT }}>
+                <svg
+                    width={width}
+                    height={HEIGHT}
+                    role="img"
+                    aria-label={plain ? 'Energy against the distance between nuclei' : `${title} against R`}
+                    onClick={handleClick}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerCancel}
+                    onLostPointerCapture={handlePointerCancel}
+                    // A sideways drag is the plot's; an up-or-down one still scrolls the panel (and cancels the drag).
+                    style={{ cursor: onSelectR ? 'pointer' : undefined, touchAction: draggable ? 'pan-y' : undefined }}
+                >
+                    <defs>
+                        <clipPath id={clipId}><rect x={left} y={PAD.top} width={plotWidth} height={plotHeight} /></clipPath>
+                    </defs>
+                    <g clipPath={`url(#${clipId})`}>
+                        {series.map(s => (
+                            <path key={s.key} className="radial-plot-line" fill="none" style={{ stroke: s.color }}
+                                d={`M ${s.points.map(p => `${x(p.R).toFixed(2)},${y(p.E).toFixed(2)}`).join(' L ')}`} />
                         ))}
-                    </>
+                    </g>
+                    <line className="radial-plot-axis" x1={left} x2={width - PAD.right} y1={PAD.top + plotHeight} y2={PAD.top + plotHeight} />
+                    {snapRs.map(R => (
+                        <line key={R} className="radial-plot-peak" x1={x(R)} x2={x(R)} y1={PAD.top + plotHeight} y2={PAD.top + plotHeight - 4} />
+                    ))}
+                    {/* Labelled visibly below, as plain text (not an SVG <title>,
+                        which only a pointing device's hover ever surfaces) --
+                        see .potential-reference-note. */}
+                    {referenceR && (
+                        <line className="potential-reference" x1={x(referenceR.R)} x2={x(referenceR.R)} y1={PAD.top} y2={PAD.top + plotHeight} />
+                    )}
+                    {markerR !== null && (
+                        <>
+                            <line className="potential-marker" x1={x(markerR)} x2={x(markerR)} y1={PAD.top} y2={PAD.top + plotHeight} />
+                            {inRangeMarkers.map(({ s, E }) => (
+                                <circle key={s.key} className="potential-marker-dot" cx={x(markerR)} cy={y(E)} r={3} style={{ fill: s.color }} />
+                            ))}
+                        </>
+                    )}
+                    {/* The handle's hit area, the touch size across: a finger on it drags R whichever way it wanders. */}
+                    {handle && (
+                        <circle className="potential-handle-hit" cx={handle.cx} cy={handle.cy} r={HANDLE_HIT_RADIUS} fill="transparent"
+                            style={{ cursor: 'ew-resize', touchAction: 'none' }} />
+                    )}
+                    <text ref={node => { labelRefs.current[0] = node; }} x={LABEL_X} y={PAD.top + 8} className="potential-axis-label">{topLabel}</text>
+                    <text ref={node => { labelRefs.current[1] = node; }} x={LABEL_X} y={PAD.top + plotHeight} className="potential-axis-label">{bottomLabel}</text>
+                </svg>
+                {handle && (
+                    <span className="potential-handle" aria-hidden="true" style={{ left: handle.cx, top: handle.cy, background: handle.color }} />
                 )}
-                <text ref={node => { labelRefs.current[0] = node; }} x={LABEL_X} y={PAD.top + 8} className="potential-axis-label">{topLabel}</text>
-                <text ref={node => { labelRefs.current[1] = node; }} x={LABEL_X} y={PAD.top + plotHeight} className="potential-axis-label">{bottomLabel}</text>
-            </svg>
+            </div>
             {/*
                 For a caller with no keyboard control of its own for R: a
                 native range input, visually hidden, gives Tab + arrow-key

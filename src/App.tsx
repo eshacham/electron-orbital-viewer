@@ -92,6 +92,7 @@ import { createExportWorker } from './workers/createExportWorker';
 import BondsExplore from './bonds_ui/BondsExplore';
 import BondsInspector from './bonds_ui/BondsInspector';
 import BondsCurvePlot from './components/BondsCurvePlot';
+import type { PlotInset } from './components/PotentialCurvePlot';
 import { useBondsData } from './bonds/useBondsData';
 import { useH2PlusCurve } from './bonds/useH2PlusCurve';
 import { bondsFieldRequest } from './bonds/bonds_request';
@@ -1682,9 +1683,11 @@ function App() {
             // Task 9 fix round 1: on a phone the caption says the loaded view, so the panel's status would say it twice.
             announceStatus={!isNarrow}
             level={level}
-            curve={(width: number, markerR: number | null, onDraftR: (R: number | null) => void) => (
+            // Task 5b (finish fix 1): on a phone the block leads the Explore tab, right under the strip.
+            lengthFirst={isNarrow}
+            curve={(width: number, markerR: number | null, onDraftR: (R: number | null) => void, onInset: (inset: PlotInset | null) => void) => (
                 <BondsCurvePlot bonds={bonds} data={bondsData} h2plus={h2plusCurve} width={width} markerR={markerR} onDraftR={onDraftR}
-                    onCommitH2PlusR={R => dispatch(setH2PlusR(R))} onScanIndex={handleScanIndex} level={level} />
+                    onInset={onInset} onCommitH2PlusR={R => dispatch(setH2PlusR(R))} onScanIndex={handleScanIndex} level={level} />
             )}
         />
     );

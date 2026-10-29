@@ -1,7 +1,7 @@
 import React from 'react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import BondsExplore from '../../src/bonds_ui/BondsExplore';
 import reducer, { selectBondsSystem, setScanPoint } from '../../src/store/bondsSlice';
 import { MoleculeMeta, MoleculeScan } from '../../src/molecules/types';
@@ -51,5 +51,32 @@ describe('BondsExplore (spec §9.3, Phase 6G-2 Task 9)', () => {
     it('keeps the methods list out of the Explore panel', () => {
         render(<BondsExplore bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
         expect(screen.queryByRole('list', { name: 'methods' })).not.toBeInTheDocument();
+    });
+
+    // Task 5b (picture control, finish fix 1): on a phone the sheet opened on the strip, the identity card and the
+    // select, and the slider sat at the fold (under the tab bar for H₂⁺), so the curve never shared the screen with the
+    // picture. There the Bond length block comes first -- right under the strip -- then the card and the select. The
+    // desktop column keeps its order.
+    describe('the Bond length block on a phone (finish fix 1)', () => {
+        const follows = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+        it('comes first, above the identity card and the molecule select', () => {
+            const { container } = render(<BondsExplore bonds={h2plus} data={empty} note={null} {...handlers} lengthFirst />);
+            const block = screen.getByRole('region', { name: 'Bond length' });
+            expect(container.querySelector('.bonds-explore')!.firstElementChild).toContainElement(block);
+            expect(follows(block, container.querySelector('.bonds-tile')!)).toBe(true);
+            expect(follows(block, screen.getByRole('combobox', { name: 'Molecule (by bond type)' }))).toBe(true);
+            expect(within(block).getByRole('slider', { name: 'Internuclear distance R' })).toBeInTheDocument();
+            // One block, one card: nothing is drawn twice.
+            expect(screen.getAllByRole('region', { name: 'Bond length' })).toHaveLength(1);
+            expect(container.querySelectorAll('.bonds-tile')).toHaveLength(1);
+        });
+
+        it('keeps the desktop order without it: card, select, then the block', () => {
+            const { container } = render(<BondsExplore bonds={h2plus} data={empty} note={null} {...handlers} />);
+            const block = screen.getByRole('region', { name: 'Bond length' });
+            expect(follows(container.querySelector('.bonds-tile')!, block)).toBe(true);
+            expect(follows(screen.getByRole('combobox', { name: 'Molecule (by bond type)' }), block)).toBe(true);
+        });
     });
 });

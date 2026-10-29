@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import BondsPanel from '../../src/components/BondsPanel';
 import BondsCurvePlot from '../../src/components/BondsCurvePlot';
+import { PLOT_PAD, plotX } from '../../src/components/PotentialCurvePlot';
 import reducer, { selectBondsSystem, setBondsView, setScanPoint } from '../../src/store/bondsSlice';
 import { bondsCaptions, densitySurfaceText, frontierText, orbitalCaveats } from '../../src/bonds/captions';
 import { bondAxisMinimumDensity } from '../../src/bonds/bond_density';
@@ -571,6 +572,41 @@ describe('the Bond length block (Task 3, picture control)', () => {
         } finally {
             (window as { PointerEvent?: unknown }).PointerEvent = original;
         }
+    });
+
+    // Task 5b (picture control, finish fix 3): one instrument. The slider's track is inset by the plot's own left
+    // margin and PAD.right, reported by the plot, so the thumb stands over the curve's marker at every R. Both are
+    // checked against the plot's exported scale; MUI puts the thumb's centre at its value's % of the track.
+    it("stands the slider's thumb over the curve's marker at every R", () => {
+        const withInset = (bonds: typeof n2) => (width: number, markerR: number | null, onDraftR: (R: number | null) => void,
+            onInset: (inset: { left: number; right: number } | null) => void) => (
+            <BondsCurvePlot bonds={bonds} data={{ ...empty, scan: n2Scan }} h2plus={{ curve: null, error: null }} width={width} markerR={markerR}
+                onDraftR={onDraftR} onInset={onInset} onCommitH2PlusR={handlers.onCommitH2PlusR} onScanIndex={handlers.onScanIndex} />
+        );
+        const xRange: [number, number] = [n2Scan.points[0].RBohr, n2Scan.points[n2Scan.points.length - 1].RBohr];
+        for (const index of [0, 3, 7, 10, n2Scan.points.length - 1]) {
+            const R = n2Scan.points[index].RBohr;
+            const bonds = reducer(reducer(undefined, selectBondsSystem('n2')), setScanPoint({ system: 'n2', index, RBohr: R }));
+            const { container, unmount } = render(
+                <BondsPanel bonds={bonds} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} curve={withInset(bonds)} />);
+            measure(WIDTH);
+            const track = container.querySelector('.bonds-length-slider') as HTMLElement;
+            const [left, right] = [parseFloat(track.style.paddingLeft), parseFloat(track.style.paddingRight)];
+            expect([left, right]).toEqual([PLOT_PAD.left, PLOT_PAD.right]);
+            const percent = parseFloat((track.querySelector('.MuiSlider-thumb') as HTMLElement).style.left);
+            const thumbX = left + (percent / 100) * (WIDTH - left - right);
+            const markerX = Number(container.querySelector('.potential-marker')!.getAttribute('x1'));
+            const expected = plotX(R, xRange, WIDTH, PLOT_PAD.left);
+            expect(Math.abs(thumbX - expected)).toBeLessThanOrEqual(1);
+            expect(Math.abs(markerX - expected)).toBeLessThanOrEqual(1);
+            unmount();
+        }
+    });
+
+    it('gives the track the full width while no curve is drawn', () => {
+        render(<BondsPanel bonds={h2plus} data={empty} note={null} {...handlers} curve={<p>the curve</p>} />);
+        const track = document.querySelector('.bonds-length-slider') as HTMLElement;
+        expect([track.style.paddingLeft, track.style.paddingRight]).toEqual(['', '']);
     });
 
     // Task 4 (T3 M2): while a molecule's scan loads, or after it failed to, the block says so in one short line rather

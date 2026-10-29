@@ -1427,6 +1427,11 @@ describe('App', () => {
             expect(sheetStrip.compareDocumentPosition(screen.getByLabelText('molecular orbital energy diagram')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
             const block = within(screen.getByRole('tabpanel')).getByRole('region', { name: 'Bond length' });
             expect(within(block).getByLabelText('potential energy curve')).toBeInTheDocument();
+            // Task 5b (finish fix 1): the block sits right under the strip, above the molecule select, so the curve
+            // shares the screen with the picture.
+            expect(sheetStrip.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            expect(block.compareDocumentPosition(within(screen.getByRole('tabpanel')).getByRole('combobox', { name: 'Molecule (by bond type)' }))
+                & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
             fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
             expect(within(screen.getByRole('tabpanel')).queryByLabelText('potential energy curve')).toBeNull();
             expect(within(screen.getByRole('tabpanel')).getByRole('heading', { level: 2, name: 'Data' })).toBeInTheDocument();

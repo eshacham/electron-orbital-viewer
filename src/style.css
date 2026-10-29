@@ -438,6 +438,17 @@ html, body, #root {
 .potential-reference { stroke: var(--ql-color-success); stroke-width: 1; stroke-dasharray: 1 3; }
 .potential-axis-label { fill: var(--ql-color-text-3); font-size: var(--ql-type-tick-size); }
 .potential-reference-note { color: var(--ql-color-success); }
+/* Task 5b (picture control, finish fix 4): the svg's box, for the handle drawn over it. */
+.potential-plot-area { position: relative; }
+.potential-plot-area svg { display: block; }
+/* The marker's handle on the curve: a 10 px dot in the curve's colour (inline), ringed in selected-edge and wearing the
+   selected halo -- Deep Selection, as the selected strip tile wears it (the halo token is none in Light Clean). It
+   never takes a tap: the svg below has the 44 px hit area (.potential-handle-hit) and every gesture. */
+.potential-handle {
+  position: absolute; width: 10px; height: 10px; transform: translate(-50%, -50%);
+  border: 2px solid var(--ql-color-selected-edge); border-radius: var(--ql-radius-pill);
+  box-shadow: var(--ql-shadow-selected-halo); pointer-events: none;
+}
 
 
 /* ---------------------------------------------------------------------------

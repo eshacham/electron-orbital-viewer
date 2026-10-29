@@ -1,5 +1,5 @@
 import React from 'react';
-import PotentialCurvePlot from './PotentialCurvePlot';
+import PotentialCurvePlot, { type PlotInset } from './PotentialCurvePlot';
 import { BondsState } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
 import { UseH2PlusCurveResult } from '../bonds/useH2PlusCurve';
@@ -27,6 +27,8 @@ interface BondsCurvePlotProps {
      * "Distance between nuclei (Å)", "most stable"); what it draws is the same at every level. Omitted, as at Research.
      */
     level?: LearningLevel;
+    /** Task 5b (finish fix 3): the plot's margins as drawn (PotentialCurvePlot's onInset), for the slider above it. */
+    onInset?: (inset: PlotInset | null) => void;
 }
 
 /**
@@ -37,7 +39,7 @@ interface BondsCurvePlotProps {
  * so until it lands this says so, and if it fails, why (Task 9's carry); a molecule's comes with its scan, whose
  * loading and failures BondsPanel reports, so here it is simply absent until then.
  */
-const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, width, markerR, onDraftR, onCommitH2PlusR, onScanIndex, level = 'research' }) => {
+const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, width, markerR, onDraftR, onCommitH2PlusR, onScanIndex, level = 'research', onInset }) => {
     const marked = markerR === undefined ? bonds.R : markerR;
     const plain = !atLeast(level, 'explore');
     if (bonds.system === 'h2plus') {
@@ -56,7 +58,7 @@ const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, wi
             );
         }
         return (
-            <PotentialCurvePlot {...h2plusCurveSpec(h2plus.curve, marked)} width={width} keyboardControl={false} plain={plain}
+            <PotentialCurvePlot {...h2plusCurveSpec(h2plus.curve, marked)} width={width} keyboardControl={false} plain={plain} onInset={onInset}
                 onSelectR={onCommitH2PlusR} onDragR={onDraftR && (R => onDraftR(R === null ? null : snapH2PlusR(R)))} />
         );
     }
@@ -68,6 +70,7 @@ const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, wi
             width={width}
             keyboardControl={false}
             plain={plain}
+            onInset={onInset}
             onSelectR={R => {
                 // A molecule exists only at its scan points: a click between two lands on the nearer.
                 const index = nearestScanIndex(scan.points, R);

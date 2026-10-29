@@ -12,6 +12,7 @@ import { withSubscripts } from '../format/subscripts';
 import InfoButton from '../info/InfoButton';
 import { atLeast, type LearningLevel } from '../levels/levels';
 import { useElementWidth } from '../shell/useElementWidth';
+import type { PlotInset } from './PotentialCurvePlot';
 import MoDiagram from './MoDiagram';
 
 /** The orbital "One orbital" opens onto when none is picked yet: the HOMO, or the SOMO if open-shell (preflight D8's shared resolver). */
@@ -45,7 +46,16 @@ export interface BondsPanelProps {
      * dragged, so the marker moves with the thumb -- and a setter for that draft, for a drag on the curve itself (null
      * drops it, back to the store's R). App passes BondsCurvePlot; a node is drawn as it is.
      */
-    curve?: React.ReactNode | ((width: number, markerR: number | null, onDraftR: (R: number | null) => void) => React.ReactNode);
+    curve?: React.ReactNode | ((width: number, markerR: number | null, onDraftR: (R: number | null) => void,
+        onInset: (inset: PlotInset | null) => void) => React.ReactNode);
+    /**
+     * Task 5b (picture control, finish fix 1): the "Bond length" block comes first, above `lead` and the molecule select
+     * -- on a phone, where the sheet would otherwise open on the card and the select with the slider at the fold, so the
+     * curve shares the screen with the picture. Off, the block keeps its place under the select.
+     */
+    lengthFirst?: boolean;
+    /** Drawn above the molecule select, after the block when it comes first: BondsExplore's identity card on a phone. */
+    lead?: React.ReactNode;
 }
 
 /**
@@ -58,7 +68,8 @@ export interface BondsPanelProps {
  * bond-order footer are Info's (bondsInfo), with every method; E − E(atoms)
  * at R is Info's fact, its one home, so the block adds no energy readout.
  */
-const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSystem, onCommitH2PlusR, onScanIndex, onView, onDensityIso, announceStatus = true, level = 'research', curve }) => {
+const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSystem, onCommitH2PlusR, onScanIndex, onView, onDensityIso, announceStatus = true, level = 'research', curve,
+    lengthFirst = false, lead }) => {
     const isExact = bonds.system === 'h2plus';
     const formula = systemFormula(bonds.system);
     const { scan, meta } = data;
@@ -92,9 +103,13 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
     // Task 3: the curve fills the block's width, measured; nothing is drawn at a guessed one.
     const lengthId = useId();
     const [blockRef, blockWidth] = useElementWidth<HTMLElement>();
+    // Task 5b (finish fix 3): the plot's own margins, as it draws them, inset the slider's track -- so its thumb stands
+    // over the curve's marker at every R. Until a curve is drawn (and once it goes), the track keeps the full width.
+    const [inset, setInset] = useState<PlotInset | null>(null);
     const curveNode = typeof curve === 'function'
-        ? blockWidth > 0 && curve(blockWidth, shownR, R => setDraftR(R ?? bonds.R ?? draftR))
+        ? blockWidth > 0 && curve(blockWidth, shownR, R => setDraftR(R ?? bonds.R ?? draftR), setInset)
         : curve;
+    const trackStyle = inset ? { paddingLeft: inset.left, paddingRight: inset.right } : undefined;
 
     const status = data.loading ? `Loading ${formula}…`
         : !isExact && meta && bonds.R !== null ? `${formula} at R = ${bonds.R.toFixed(2)} a₀ loaded.` : '';
@@ -102,49 +117,22 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
         ? `${formula} at ${lengths(bonds.R)} could not be loaded: ${data.error}. The view still shows the previous picture.`
         : `${formula} could not be loaded: ${data.error}. The view still shows the previous system.`);
 
-    return (
-        <div className="bonds-panel">
-            <FormControl fullWidth size="small" margin="dense">
-                <InputLabel id="bonds-system-label">Molecule (by bond type)</InputLabel>
-                <Select labelId="bonds-system-label" label="Molecule (by bond type)" value={bonds.system}
-                    onChange={event => onSelectSystem(event.target.value as BondsSystemId)}
-                    renderValue={value => {
-                        const system = BONDS_SYSTEMS.find(s => s.id === value);
-                        return system ? `${system.formula} — ${system.name}` : value;
-                    }}>
-                    {BOND_GROUP_ORDER.flatMap(group => [
-                        <ListSubheader key={group}>{group}</ListSubheader>,
-                        ...BONDS_SYSTEMS.filter(s => s.group === group).map(s => (
-                            <MenuItem key={s.id} value={s.id} aria-label={`${s.formula} — ${s.name}, ${bondOrderSelectText(s.id)}`}>
-                                <div>
-                                    <div>{s.formula} — {s.name}</div>
-                                    <Typography variant="caption" color="text.secondary" component="div">{bondOrderSelectText(s.id)}</Typography>
-                                </div>
-                            </MenuItem>
-                        )),
-                    ])}
-                </Select>
-            </FormControl>
-
-            {/* Polite, for progress; the Alert below is assertive, for failures. */}
-            {announceStatus && <div className="visually-hidden" role="status">{status}</div>}
-            {failure && <Alert severity="error">{failure}</Alert>}
-            {data.loading && <LinearProgress aria-label={`Loading ${formula}`} />}
-
-            <section className="bonds-length" aria-labelledby={lengthId} ref={blockRef}>
-                <div className="bonds-length-heading-row">
-                    <Typography variant="subtitle2" id={lengthId} className="bonds-length-heading">Bond length</Typography>
-                    <InfoButton topic="potentialCurve" label="Potential energy curve" />
-                </div>
-                {/* Task 4 (T3 M2): until a molecule's scan is here there is no R, slider or curve -- one short line says so,
-                    not live (the status and the alert above are the announcements). A failure is said once, by the alert
-                    (ruling C9); this line only says what the block lacks. */}
-                {!isExact && !scan && (
-                    <Typography variant="body2" className="bonds-length-state">
-                        {data.error ? 'No curve to show.' : `Loading ${formula}…`}
-                    </Typography>
-                )}
-                {shownR !== null && <Typography variant="body2" className="bonds-r">{lengths(shownR)}</Typography>}
+    const lengthBlock = (
+        <section className="bonds-length" aria-labelledby={lengthId} ref={blockRef}>
+            <div className="bonds-length-heading-row">
+                <Typography variant="subtitle2" id={lengthId} className="bonds-length-heading">Bond length</Typography>
+                <InfoButton topic="potentialCurve" label="Potential energy curve" />
+            </div>
+            {/* Task 4 (T3 M2): until a molecule's scan is here there is no R, slider or curve -- one short line says so,
+                not live (the status and the alert above are the announcements). A failure is said once, by the alert
+                (ruling C9); this line only says what the block lacks. */}
+            {!isExact && !scan && (
+                <Typography variant="body2" className="bonds-length-state">
+                    {data.error ? 'No curve to show.' : `Loading ${formula}…`}
+                </Typography>
+            )}
+            {shownR !== null && <Typography variant="body2" className="bonds-r">{lengths(shownR)}</Typography>}
+            <div className="bonds-length-slider" style={trackStyle}>
                 {isExact ? (
                     <Slider aria-label="Internuclear distance R" size="small" min={H2PLUS_R_RANGE.min} max={H2PLUS_R_RANGE.max} step={0.01}
                         value={draftR} getAriaValueText={lengths}
@@ -172,8 +160,43 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                             onScanIndex(index);
                         } } }} />
                 )}
-                {curveNode}
-            </section>
+            </div>
+            {curveNode}
+        </section>
+    );
+
+    return (
+        <div className="bonds-panel">
+            {lengthFirst && lengthBlock}
+            {lead}
+            <FormControl fullWidth size="small" margin="dense">
+                <InputLabel id="bonds-system-label">Molecule (by bond type)</InputLabel>
+                <Select labelId="bonds-system-label" label="Molecule (by bond type)" value={bonds.system}
+                    onChange={event => onSelectSystem(event.target.value as BondsSystemId)}
+                    renderValue={value => {
+                        const system = BONDS_SYSTEMS.find(s => s.id === value);
+                        return system ? `${system.formula} — ${system.name}` : value;
+                    }}>
+                    {BOND_GROUP_ORDER.flatMap(group => [
+                        <ListSubheader key={group}>{group}</ListSubheader>,
+                        ...BONDS_SYSTEMS.filter(s => s.group === group).map(s => (
+                            <MenuItem key={s.id} value={s.id} aria-label={`${s.formula} — ${s.name}, ${bondOrderSelectText(s.id)}`}>
+                                <div>
+                                    <div>{s.formula} — {s.name}</div>
+                                    <Typography variant="caption" color="text.secondary" component="div">{bondOrderSelectText(s.id)}</Typography>
+                                </div>
+                            </MenuItem>
+                        )),
+                    ])}
+                </Select>
+            </FormControl>
+
+            {/* Polite, for progress; the Alert below is assertive, for failures. */}
+            {announceStatus && <div className="visually-hidden" role="status">{status}</div>}
+            {failure && <Alert severity="error">{failure}</Alert>}
+            {data.loading && <LinearProgress aria-label={`Loading ${formula}`} />}
+
+            {!lengthFirst && lengthBlock}
 
             {isExact ? (
                 <ToggleButtonGroup exclusive size="small" fullWidth aria-label="H₂⁺ state" value={view.kind === 'h2plus' ? view.state : null}
