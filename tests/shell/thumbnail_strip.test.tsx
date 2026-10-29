@@ -208,6 +208,92 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
     });
 });
 
+// Task 5b (picture control, finish fix 7): the strip is Orbitals' picker, so its group labels are its menu's headings.
+// Under `groupScroll` (Orbitals only) each label is sticky inside its group, just past the 24 px fade once the strip
+// has scrolled, so the group on screen is always named; it is set in DESIGN.md's section type; and on a phone a long
+// tile label breaks on purpose before "(" -- "9g" / "(mₗ = -2)" -- not mid-expression ("9g (mₗ =" / "-2)").
+describe('the strip as a picker: its group labels and tile labels (finish fix 7)', () => {
+    const css = readFileSync(resolve(__dirname, '../../src/shell/strip.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = (selector: string) => {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const match = new RegExp(`(^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(css);
+        if (!match) throw new Error(`No rule for ${selector}`);
+        return match[2];
+    };
+
+    it('keeps each group label in view inside its group, just past the fade once the strip has scrolled', () => {
+        const label = rule('.strip-list.group-scroll .strip-group-label');
+        expect(label).toMatch(/position:\s*sticky;/);
+        expect(label).toMatch(/align-self:\s*flex-start;/);
+        // At rest (nothing before) it stands where it is laid out; scrolled, just past the 24 px fade.
+        expect(label).toMatch(/left:\s*0;/);
+        // A sticky offset counts from inside the list's own 8 px padding (found live): 16 px puts the label at 24 px.
+        expect(rule('.strip-list')).toMatch(/padding:\s*8px;/);
+        expect(rule('.strip-list.group-scroll.has-more-before .strip-group-label')).toMatch(/left:\s*16px;/);
+    });
+
+    it('sets the group labels in section type, from tokens', () => {
+        const label = rule('.strip-list.group-scroll .strip-group-label');
+        expect(label).toMatch(/font:\s*var\(--ql-type-section-weight\) var\(--ql-type-section-size\) \/ var\(--ql-type-section-line\) var\(--ql-font-sans\);/);
+        expect(label).toMatch(/color:\s*var\(--ql-color-text-1\);/);
+        // Every other strip keeps its quiet labels.
+        expect(rule('.strip-group-label')).toMatch(/font:\s*500 11px/);
+    });
+
+    it('breaks a long tile label before "(" and nowhere inside either part, under groupScroll only', () => {
+        const n9 = basicStripItems({ n: 9, selected: { l: 4, ml: 0 }, enclosedFraction: 0.9 });
+        const { rerender } = render(<ThumbnailStrip items={n9} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} variant="sheet" groupScroll />);
+        // orbitalName writes mₗ's sign as the hyphen-minus it has always used (orbital_names.ts).
+        const tile = screen.getByRole('option', { name: /^9g \(mₗ = -2\) orbital$/ });
+        const parts = [...tile.querySelectorAll('.strip-tile-label .strip-tile-label-part')].map(part => part.textContent);
+        expect(parts).toEqual(['9g', '(mₗ = -2)']);
+        expect(tile.querySelector('.strip-tile-label')!.textContent).toBe('9g (mₗ = -2)');
+        expect(rule('.strip-tile-label-part')).toMatch(/white-space:\s*nowrap;/);
+        // A name with a subscript keeps its typeset label, whole.
+        expect(screen.getByRole('option', { name: '9pz orbital' }).querySelector('.strip-tile-label-part')).toBeNull();
+        rerender(<ThumbnailStrip items={n9} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} variant="sheet" />);
+        expect(document.querySelector('.strip-tile-label-part')).toBeNull();
+    });
+});
+
+// Task 5b (finish fix 8): under groupScroll a pick rests where a snap would -- its group's rest, shifted so the next
+// group peeks -- when the picked tile is in clear view there; every other strip, and a tile that would not be, is
+// centred as before (the Review Focus 2 test above: n = 9's last tile, wider than its group's rest shows).
+describe('ThumbnailStrip: a pick rests where a snap does (finish fix 8)', () => {
+    it("scrolls to the picked tile's group rest under groupScroll, and centres it without", () => {
+        const scrollTo = jest.fn();
+        Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo });
+        const width = jest.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+            return this.getAttribute('role') === 'listbox' ? 763 : 0;
+        });
+        // n = 3: 3s, 3p, 3d. The list at x = 0, unscrolled; 3d's group from 400 to 812 with its middle tile at 560–632,
+        // so 3d's rest is 376 and its clear view 400 … 1115 -- the next group? None: 3d is last, no shift.
+        const rects = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            const at = (left: number, w: number) => ({ left, width: w, right: left + w, top: 0, bottom: 72, height: 72, x: left, y: 0, toJSON: () => ({}) }) as DOMRect;
+            if (this.getAttribute('role') === 'listbox') return at(0, 763);
+            if (this.getAttribute('aria-selected') === 'true') return at(560, 72);
+            if (this.getAttribute('role') === 'group') {
+                const label = this.getAttribute('aria-label') ?? '';
+                return /3s/.test(label) ? at(8, 72) : /3p/.test(label) ? at(92, 296) : at(400, 412);
+            }
+            return at(0, 0);
+        });
+        try {
+            const n3 = basicStripItems({ n: 3, selected: { l: 2, ml: 0 }, enclosedFraction: 0.9 });
+            const { unmount } = render(<ThumbnailStrip items={n3} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} groupScroll />);
+            expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ left: 376 }));
+            unmount();
+            render(<ThumbnailStrip items={n3} label="orbitals in view" rGrid={[]} themeKey="dark|glow" onSelect={jest.fn()} />);
+            // Centred: 560 − (763 − 72) / 2 = 214.5.
+            expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ left: 214.5 }));
+        } finally {
+            rects.mockRestore();
+            width.mockRestore();
+            Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
+        }
+    });
+});
+
 // Controller ruling DC12 (spec §12: "On WebGL context loss, tiles show a
 // glyph and their text label"): tiles already waiting for an image when the
 // context goes must switch to their glyph, not stay blank.

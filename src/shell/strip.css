@@ -46,6 +46,21 @@
 }
 .strip-group { display: flex; flex-direction: column; gap: 2px; }
 .strip-group-label { font: 500 11px / 14px var(--ql-font-sans); color: var(--ql-color-text-3); padding-left: 2px; }
+/* Task 5b (picture control, finish fix 7), `groupScroll` only (Orbitals, where the strip is the picker): the group
+   labels are the menu's headings, so they take DESIGN.md's section type, and each is sticky inside its own group --
+   the group on screen is always named. At rest nothing is before the strip and the label stands where it is laid out;
+   once the strip has scrolled (has-more-before, when the left fade shows) it holds just past the 24 px fade. It keeps
+   to its own width (align-self), so it has room to travel along its group. Not animated: it moves with the scroll. */
+.strip-list.group-scroll .strip-group-label {
+  position: sticky; left: 0; align-self: flex-start;
+  font: var(--ql-type-section-weight) var(--ql-type-section-size) / var(--ql-type-section-line) var(--ql-font-sans);
+  color: var(--ql-color-text-1);
+}
+/* A sticky offset counts from inside the list's own 8 px padding (found live), so 16 px stands the label at 24 px. */
+.strip-list.group-scroll.has-more-before .strip-group-label { left: 16px; }
+/* Task 5b (finish fix 7): the two parts of a long orbital name ("9g", "(mₗ = -2)") each hold together, so a phone's
+   two-line label breaks only before "(". */
+.strip-tile-label-part { white-space: nowrap; }
 .strip-group-tiles { display: flex; gap: 8px; }
 .strip-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
 /* Ruling R20d: the picture spans the whole tile, unscaled (its canvas is the tile's size in device pixels),

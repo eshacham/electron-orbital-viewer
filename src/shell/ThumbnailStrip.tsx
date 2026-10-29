@@ -11,7 +11,9 @@ import { TOKENS } from '../design/tokens';
 import type { StripItem } from '../thumbs/strip_items';
 import { useRovingFocus } from './useRovingFocus';
 import { useMoreSideways } from './useMoreSideways';
+import { contentBoxes, groupRest, useGroupPeek } from './useGroupPeek';
 import { OrbitalLabel } from '../format/OrbitalLabel';
+import { orbitalParts } from '../format/sci';
 import { withSubscripts } from '../format/subscripts';
 import './strip.css';
 
@@ -64,11 +66,33 @@ export function tileBacking(px: number, devicePixelRatio: number): number {
     return Math.round(px * dpr);
 }
 
-interface TileProps<T> { item: StripItem<T>; px: number; rGrid: number[]; themeKey: string; onSelect(target: T): void }
+interface TileProps<T> {
+    item: StripItem<T>; px: number; rGrid: number[]; themeKey: string; onSelect(target: T): void;
+    /** Task 5b (finish fix 7, `groupScroll` only): a long name breaks before its "(", and nowhere inside either part. */
+    splitLabel?: boolean;
+}
+
+/**
+ * Task 5b (picture control, finish fix 7): past f an orbital is named by its mₗ -- "9g (mₗ = -2)" -- and a phone's
+ * two-line tile label broke it mid-expression ("9g (mₗ =" / "-2)"). Its two parts each hold together, so the one
+ * break left is the space before "(". Null for a name with nothing to split (a subscript name, a word label).
+ */
+function splitOrbitalLabel(orbital: StripItem<unknown>['orbital']): React.ReactNode {
+    if (!orbital) return null;
+    const { base, sub } = orbitalParts(orbital.n, orbital.l, orbital.ml);
+    const at = base.indexOf(' (');
+    if (sub !== null || at < 0) return null;
+    return (
+        <>
+            <span className="strip-tile-label-part">{base.slice(0, at)}</span>{' '}
+            <span className="strip-tile-label-part">{base.slice(at + 1)}</span>
+        </>
+    );
+}
 
 // A plain generic function, not React.FC<...> (which cannot carry a type
 // parameter): T follows whatever StripItem<T> the enclosing strip was given.
-function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
+function Tile<T>({ item, px, rGrid, themeKey, onSelect, splitLabel = false }: TileProps<T>) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const backing = tileBacking(px, typeof window === 'undefined' ? 1 : window.devicePixelRatio);
     const { thumb } = item;
@@ -143,7 +167,8 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect }: TileProps<T>) {
 
     // Task 5: an orbital's name with a real subscript ("3d" + sub "z²"), not the "3d_z²" string the label carries.
     // Task 8 (addendum 7, 9): an MO tile's label too -- 1π<sub>u</sub>, 1b<sub>1</sub>; words come back as they are.
-    const labelText = item.orbital ? <OrbitalLabel {...item.orbital} /> : withSubscripts(item.label);
+    const labelText = (splitLabel && splitOrbitalLabel(item.orbital))
+        || (item.orbital ? <OrbitalLabel {...item.orbital} /> : withSubscripts(item.label));
     return (
         <div
             role="option"
@@ -209,6 +234,10 @@ function ThumbnailStrip<T = NavigationTarget>({
     // listener at all, not just gated classes. `resetKey` is the DX2 pattern above: the listbox remounts on
     // collapse/expand, and this re-attaches to the fresh node the same way useRovingFocus does.
     const { before, after } = useMoreSideways(listRef, { enabled: groupScroll, resetKey: effectiveCollapsed });
+    // Task 5b (finish fix 8): a group whose snapped rest would end with nothing of the next group in view snaps a little
+    // further on (a negative scroll-margin on its snap edge), so the next group's first tile and label show -- "more" is
+    // seen, not only faded. Same opt-in and remount key as the cue.
+    const peek = useGroupPeek(listRef, { enabled: groupScroll, resetKey: effectiveCollapsed });
     const px = variant === 'sheet' ? 56 : 72;
 
     // Bring the shown orbital into view (instant under reduced motion: §4.7)
@@ -222,10 +251,18 @@ function ThumbnailStrip<T = NavigationTarget>({
         const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const listRect = list.getBoundingClientRect();
         const tileRect = selected.getBoundingClientRect();
-        const left = Math.max(0, list.scrollLeft + (tileRect.left - listRect.left) - (list.clientWidth - tileRect.width) / 2);
+        let left = Math.max(0, list.scrollLeft + (tileRect.left - listRect.left) - (list.clientWidth - tileRect.width) / 2);
+        // Task 5b (finish fix 8): under groupScroll a pick rests where a snap would -- its group's rest, shifted so the
+        // next group peeks -- whenever the picked tile stands clear of the fades there; otherwise it is centred.
+        if (groupScroll) {
+            const { groups, elements, boxOf } = contentBoxes(list);
+            const group = selected.closest('.strip-group-snap');
+            const rest = groupRest(groups, peek, elements.findIndex(element => element === group), boxOf(selected), list.clientWidth);
+            if (rest !== null) left = rest;
+        }
         if (typeof list.scrollTo === 'function') list.scrollTo({ left, behavior: reduce ? 'auto' : 'smooth' });
         else list.scrollLeft = left;
-    }, [items, effectiveCollapsed]);
+    }, [items, effectiveCollapsed, groupScroll, peek]);
 
     const groups: Array<{ label: string | null; spoken: string | null; items: StripItem<T>[] }> = [];
     for (const item of items) {
@@ -233,7 +270,14 @@ function ThumbnailStrip<T = NavigationTarget>({
         if (last && last.label === item.group) last.items.push(item);
         else groups.push({ label: item.group, spoken: item.groupSpoken, items: [item] });
     }
-    const tile = (item: StripItem<T>) => <Tile key={item.key} item={item} px={px} rGrid={rGrid} themeKey={themeKey} onSelect={onSelect} />;
+    const tile = (item: StripItem<T>) => (
+        <Tile key={item.key} item={item} px={px} rGrid={rGrid} themeKey={themeKey} onSelect={onSelect} splitLabel={groupScroll} />
+    );
+    let snapIndex = 0;
+    const snapStyle = (): React.CSSProperties | undefined => {
+        const shift = groupScroll ? peek[snapIndex++] ?? 0 : 0;
+        return shift > 0 ? { scrollMarginLeft: -shift } : undefined;
+    };
 
     return (
         <div className={`thumbnail-strip ${variant}${effectiveCollapsed ? ' collapsed' : ''}${wrapLabels ? ' wrap-labels' : ''}`}>
@@ -252,7 +296,7 @@ function ThumbnailStrip<T = NavigationTarget>({
                     className={`strip-list${groupScroll ? ' group-scroll' : ''}${groupScroll && before ? ' has-more-before' : ''}${groupScroll && after ? ' has-more-after' : ''}`}>
                     {groups.map((group, index) => (group.label ? (
                         <div key={`${group.label}-${index}`} role="group" aria-label={group.spoken ?? group.label}
-                            className={`strip-group${groupScroll ? ' strip-group-snap' : ''}`}>
+                            className={`strip-group${groupScroll ? ' strip-group-snap' : ''}`} style={snapStyle()}>
                             <span className="strip-group-label" aria-hidden="true">{group.label}</span>
                             <div className="strip-group-tiles">{group.items.map(tile)}</div>
                         </div>
