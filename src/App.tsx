@@ -172,7 +172,7 @@ import { NO_COMBINATION } from './combinations';
 import type { SearchAction } from './search/search_index';
 import { atLeast, CONTROL_LEVEL, LEVEL_LABEL, levelRank, type ControlId, type LearningLevel } from './levels/levels';
 import { useLevel } from './levels/useLevel';
-import { linkCorrections, linkCorrectionText, subscribeLinkCorrections } from './link_corrections';
+import { clearLinkCorrections, linkCorrections, linkCorrectionSpoken, linkCorrectionText, subscribeLinkCorrections } from './link_corrections';
 import { requiredLevel } from './levels/required_level';
 import LevelControl from './levels/LevelControl';
 import LevelLine, { type HeldValue } from './levels/LevelLine';
@@ -703,6 +703,20 @@ function App() {
     // orbital slice's fraction and cut), the owner's record of a computed molecule and the bond-label preference.
     // Fix round 1 (M11): the one Molecules selector, read here first and by the mode's wiring below.
     const molecule = useAppSelector(state => state.molecule);
+    // Final fix wave, I1: "showing hydrogen" is true only while it is shown. A link's notice goes on the reader's first
+    // change of view after it -- in-app navigation writes the hash with replaceState, which fires no hashchange. The view
+    // is what the corrections name: the mode, the species, the selection and (Bonds) the system and R; a new link records
+    // its own view, so the render that carries a link's state and its notice together never clears it.
+    const viewIdentity = JSON.stringify([
+        atomMode, atomZ, atomCharge, atomLevel, atomSelectedShell, atomSelectedSubshell, atomSelectedOrbital, n, l, ml,
+        bonds.system, bonds.R, molecule.selectedId,
+    ]);
+    const identityAtLink = useRef<{ id: number; identity: string } | null>(null);
+    useEffect(() => {
+        if (correctedLink.corrections.length === 0) { identityAtLink.current = null; return; }
+        if (identityAtLink.current?.id !== correctedLink.id) { identityAtLink.current = { id: correctedLink.id, identity: viewIdentity }; return; }
+        if (identityAtLink.current.identity !== viewIdentity) clearLinkCorrections();
+    }, [correctedLink, viewIdentity]);
     // The owner's record of a computed molecule, not the whole jobs slice: App re-renders for nothing else in it.
     const ownerRecordNow = useAppSelector(ownerJobRecordOf, shallowEqual);
     const moleculeLabelsNow = usePref(displayPref).moleculeLabels;
@@ -2174,6 +2188,8 @@ function App() {
     // Final polish F1: a link with values out of range opened corrected; one sentence names every correction, in the
     // same slot, with the same polite role and per-link dismissal as the visit notice above. Each dismissal names its
     // notice (ruling c5): a link can bring both, and two buttons both called "Dismiss" would not say which is which.
+    const correctionShown = linkCorrectionText(correctedLink.corrections);
+    const correctionSpoken = linkCorrectionSpoken(correctedLink.corrections);
     const correctionNotice = correctedLink.corrections.length > 0 && correctionNoticeDismissed !== correctedLink.id && (
         <Alert severity="info" role="status" className="link-correction-notice"
             action={(
@@ -2181,7 +2197,12 @@ function App() {
                     <Close fontSize="small" />
                 </IconButton>
             )}>
-            {linkCorrectionText(correctedLink.corrections)}
+            {correctionShown === correctionSpoken ? correctionShown : (
+                <>
+                    <span aria-hidden="true">{correctionShown}</span>
+                    <span className="visually-hidden">{correctionSpoken}</span>
+                </>
+            )}
         </Alert>
     );
     const linkNotices = visitNotice || correctionNotice ? <>{visitNotice}{correctionNotice}</> : null;

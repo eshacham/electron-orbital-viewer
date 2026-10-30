@@ -68,7 +68,6 @@ const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, wi
         <PotentialCurvePlot
             {...diatomicCurveSpec(bonds.system as DiatomicId, scan, marked)}
             width={width}
-           
             plain={plain}
             onInset={onInset}
             onSelectR={R => {

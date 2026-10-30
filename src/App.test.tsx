@@ -1946,6 +1946,43 @@ describe('App: a corrected link says so (final polish F1)', () => {
         followLink('#mode=atom&Z=6');
         expect(screen.queryByText(/This link asked for/)).toBeNull();
     });
+
+    // Final fix wave, I1: "showing hydrogen" is a present-tense claim. In-app navigation writes the hash with
+    // replaceState (no hashchange), so the notice goes on the reader's first change of view after the link.
+    it('picking another element takes the notice away: it no longer describes what is shown', () => {
+        const { store } = renderWithProvider(<App />, { Z: 26 });
+        followLink('#mode=atom&Z=200');
+        expect(screen.getByText(Z200)).toBeInTheDocument();
+        // Nothing changed the view yet (the card's own solve, a re-render): the notice stands.
+        expect(screen.getByText(Z200)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /change element, currently Hydrogen/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'Carbon (p-block)' }));
+        expect(store.getState().atom.Z).toBe(6);
+        expect(screen.queryByText(/This link asked for/)).toBeNull();
+    });
+
+    it('a later link brings its own notice back after the reader moved on', () => {
+        renderWithProvider(<App />);
+        followLink('#mode=atom&Z=200');
+        fireEvent.click(screen.getByRole('button', { name: /change element, currently Hydrogen/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'Carbon (p-block)' }));
+        expect(screen.queryByText(Z200)).toBeNull();
+        followLink('#mode=atom&Z=200');
+        expect(screen.getByText(Z200)).toBeInTheDocument();
+    });
+
+    // Final fix wave, M5 (ruled): the status region is spoken like the app's other live text -- plain words for the
+    // typeset symbols (mₗ, a₀, the true minus) -- and the typeset line stays for the eye.
+    it('speaks the notice in plain words: "m l", "minus", and the typeset line is hidden from the reader', () => {
+        renderWithProvider(<App />);
+        followLink('#mode=basic&n=2&l=1&ml=-7');
+        const notice = document.querySelector('.link-correction-notice') as HTMLElement;
+        const shown = within(notice).getByText(/This link asked for mₗ = −7; showing mₗ = −1\./);
+        expect(shown).toHaveAttribute('aria-hidden', 'true');
+        const spoken = within(notice).getByText('This link asked for m l = minus 7; showing m l = minus 1.');
+        expect(spoken).toHaveClass('visually-hidden');
+        expect(spoken).not.toHaveAttribute('aria-hidden');
+    });
 });
 
 describe('App: opening a shared link', () => {

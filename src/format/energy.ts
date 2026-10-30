@@ -19,7 +19,8 @@ export function hartreeText(hartree: number): string {
 
 /**
  * An orbital energy's two numbers without their units, for a table that names the unit in its column headers (the Atoms
- * "Orbital energies" table: "Energy (eV)", "(Ha)"): eV to 2 places and Ha to 3, each with a true minus.
+ * "Orbital energies" table: "eV", "Ha"): eV to 2 places and Ha to 3, each with a true minus. It is the base of
+ * `orbitalEnergyTableParts` (the table's own precision rule) and `orbitalEnergyText` (the inline eV-first text).
  */
 export function orbitalEnergyParts(hartree: number): { ev: string; ha: string } {
     return { ev: minus((hartree * HARTREE_IN_EV).toFixed(2)), ha: minus(hartree.toFixed(3)) };

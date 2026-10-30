@@ -5,6 +5,8 @@
  * them -- the same mechanism as the visit level's "Opened at … for this link" (level_pref.ts `setVisitLevel`): module
  * state, in memory only, counted per link so a dismissal belongs to the one link, and replaced by the next link.
  */
+import { spokenText } from './format/sci';
+
 export interface LinkCorrection {
     /** The value's plain name, as the notice writes it: 'Z', 'n', 'l', 'mₗ', 'charge', 'R'. */
     field: string;
@@ -34,6 +36,18 @@ const asWritten = (asked: string) => asked.replace(/^-/, '−');
 export function linkCorrectionText(corrections: readonly LinkCorrection[]): string {
     const clauses = corrections.map(({ field, asked, used }) => `asked for ${field} = ${asWritten(asked)}; showing ${used}`);
     return `This link ${clauses.join('; ')}.`;
+}
+
+/**
+ * The same sentence as a screen reader is given it (final fix wave, M5): the notice is a live region, so the typeset
+ * symbols are plain words, as the app's other live text is (format/sci.ts `spokenText`: plain digits). mₗ is "m l", a₀ is
+ * "bohr" and the true minus is "minus"; a sentence with none of them is the one `linkCorrectionText` writes.
+ */
+export function linkCorrectionSpoken(corrections: readonly LinkCorrection[]): string {
+    return spokenText(linkCorrectionText(corrections)
+        .replace(/mₗ/g, 'm l')
+        .replace(/a₀/g, 'bohr')
+        .replace(/−(?=\d)/g, 'minus '));
 }
 
 /** The corrections the link just applied brought, replacing the last link's: an empty list takes its notice away. */
