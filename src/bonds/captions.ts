@@ -1,6 +1,6 @@
 import { MoleculeMeta, MoleculeOrbitalInfo, MoleculeScan } from '../molecules/types';
-import { BOHR_TO_ANGSTROM, BondsSystemId, HARTREE_TO_EV, openingScanIndex } from './systems';
-import { orbitalEnergyText } from '../format/energy';
+import { BOHR_TO_ANGSTROM, BondsSystemId, openingScanIndex } from './systems';
+import { orbitalEnergyText, totalEnergyText, wellDepthText } from '../format/energy';
 import { nb } from '../format/text';
 
 /** A signed number as the panel prints it: a true minus sign (U+2212), not a hyphen. */
@@ -50,7 +50,7 @@ export function plainLengthForms(R: number): { line: string; qualifier: string }
 export const H2PLUS_CAPTIONS: readonly string[] = [
     'Exact within Born–Oppenheimer (nuclei fixed): the separated spheroidal equations are solved to 10⁻¹⁰ Ha, with no basis set.',
     'E = E(el) + 1/R. One electron, so its orbital energy is the exact electronic energy.',
-    '1σu* has no minimum between 0.5 and 10 a₀; its only well, 0.06 mHa deep at 12.5 a₀, is a polarisation effect outside this range.',
+    '1σu* has no minimum between 0.5 and 10 a₀; its only well, 1.6 × 10⁻³ eV (0.06 mHa) deep at 12.5 a₀, is a polarisation effect outside this range.',
 ];
 
 /**
@@ -120,7 +120,7 @@ export function unboundCaption(detail: string, counterpoiseStated = false): stri
     return `No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa (${detail}), `
         + `comparable to this basis' superposition error${counterpoiseStated ? '' : ', with no counterpoise correction'}.`;
 }
-export const wellMilliHartree = (scan: MoleculeScan) => `${(scan.fit.DeHartree * 1000).toFixed(2)} mHa`;
+export const wellDepth = (scan: MoleculeScan) => wellDepthText(scan.fit.DeHartree);
 
 /**
  * The separated atoms' method, shortened to "same method" where it ends with
@@ -167,7 +167,7 @@ export function bondsCaptions(system: BondsSystemId, scan: MoleculeScan | null):
         captions.push(...bondCaptions(system, scan));
     } else {
         // Fix round 1 (M6): "no counterpoise correction" is said once -- in the method, when the method says it.
-        captions.push(unboundCaption(`${wellMilliHartree(scan)} below the separated atoms, ${atomsMethod(scan)}`, /counterpoise/.test(scan.energyMethod)));
+        captions.push(unboundCaption(`${wellDepth(scan)} below the separated atoms, ${atomsMethod(scan)}`, /counterpoise/.test(scan.energyMethod)));
         const opening = scan.points[openingScanIndex(scan)];
         if (opening) captions.push(`The view opens at ${lengths(opening.RBohr)}, the lowest energy on the scan: van der Waals contact, not a bond.`);
     }
@@ -176,7 +176,7 @@ export function bondsCaptions(system: BondsSystemId, scan: MoleculeScan | null):
     if (scan.spin > 0) captions.push('Unrestricted Kohn–Sham: α and β orbitals differ; levels are drawn at α energies.');
     if (scan.spinCheck) {
         const gap = scan.spinCheck.singletHartree - scan.spinCheck.tripletHartree;
-        captions.push(`The triplet lies ${gap.toFixed(4)} Ha (${(gap * HARTREE_TO_EV).toFixed(2)} eV) below the closed-shell singlet `
+        captions.push(`The triplet lies ${totalEnergyText(gap, 4)} below the closed-shell singlet `
             + `at R = ${scan.spinCheck.RBohr.toFixed(2)} a₀ (${scan.spinCheck.method}).`);
     }
     // An unbound molecule's note (He₂'s) says what the caption above already

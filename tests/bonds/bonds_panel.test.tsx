@@ -6,6 +6,7 @@ import BondsPanel from '../../src/components/BondsPanel';
 import BondsCurvePlot from '../../src/components/BondsCurvePlot';
 import { PLOT_PAD, plotX } from '../../src/components/PotentialCurvePlot';
 import reducer, { selectBondsSystem, setBondsView, setScanPoint } from '../../src/store/bondsSlice';
+import { nb } from '../../src/format/text';
 import { bondsCaptions, densitySurfaceText, frontierText, orbitalCaveats } from '../../src/bonds/captions';
 import { bondAxisMinimumDensity } from '../../src/bonds/bond_density';
 import { bondOrderNote, bondOrderOf } from '../../src/bonds/mo_diagram';
@@ -113,11 +114,18 @@ describe('bondsCaptions', () => {
         const unbound = bondsCaptions('he2', heScan).find(c => c.startsWith('No chemical bond'));
         // Task 7a fix round 1 (M6): "no counterpoise correction" is said once, by the method ("Energies: FCI/… (no
         // counterpoise correction)."), not again here.
-        expect(unbound).toBe("No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa "
-            + "(0.04 mHa below the separated atoms, He ¹S + He ¹S, same method), comparable to this basis' superposition error.");
+        // Final review M2: the well's depth reads eV first, with mHa beside it (the sentence compares it with the basis' error).
+        expect(unbound).toBe(`No chemical bond: bond order 0 — a van der Waals well of a few hundredths of a mHa `
+            + `(${nb('1.06 × 10⁻³ eV, 0.04 mHa')} below the separated atoms, He ¹S + He ¹S, same method), comparable to this basis' superposition error.`);
         expect(he.match(/counterpoise/g)).toHaveLength(1);
         // He₂ has no bond, so it has no R_e or D_e to state.
         expect(he).not.toMatch(/D_e|R_e =/);
+    });
+
+    // Final review (the Ha-first grep): H₂⁺'s polarisation well reads eV first too, mHa beside it.
+    it("gives H₂⁺'s 1σu* polarisation well in eV first, with mHa beside it", () => {
+        expect(bondsCaptions('h2plus', null)).toContain(
+            '1σu* has no minimum between 0.5 and 10 a₀; its only well, 1.6 × 10⁻³ eV (0.06 mHa) deep at 12.5 a₀, is a polarisation effect outside this range.');
     });
 
     // Fix round 1, M4: He₂ opens at its lowest-energy point; say what that is.
@@ -167,7 +175,9 @@ describe('bondsCaptions', () => {
     it("states O₂'s triplet–singlet gap with its method", () => {
         const captions = bondsCaptions('o2', o2Scan).join(' ');
         expect(captions).toMatch(/Unrestricted Kohn–Sham/);
-        expect(captions).toMatch(/The triplet lies 0\.0478 Ha \(1\.30 eV\) below the closed-shell singlet at R = 2\.28 a₀ \(UCCSD\(T\) triplet vs closed-shell CCSD\(T\) singlet/);
+        // Final review I2: eV first, Ha in brackets, like every energy on screen (format/energy's totalEnergyText, Ha to 4 places).
+        expect(captions).toContain(`The triplet lies ${nb('1.30 eV (0.0478 Ha)')} below the closed-shell singlet at R = 2.28 a₀ (UCCSD(T) triplet vs closed-shell CCSD(T) singlet`);
+        expect(captions).not.toMatch(/Ha \(1\.30 eV\)/);
     });
 });
 

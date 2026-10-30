@@ -143,7 +143,7 @@ export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null, state: H2P
         referenceR: {
             R: equilibrium.R,
             label: `Dotted line: R_e = ${equilibrium.R.toFixed(3)} a₀ (${(equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), `
-                + `E = ${totalEnergyText(equilibrium.totalEnergy, 4)}; D_e = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
+                + `E = ${totalEnergyText(equilibrium.totalEnergy, 4)}; D_e = ${totalEnergyText(De, 4)} to H + H⁺.`,
             plainLabel: plainReferenceLabel(equilibrium.R),
         },
         // Fix round 1 (review I1): the handle rides the drawn state's curve.

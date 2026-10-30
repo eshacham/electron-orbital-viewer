@@ -123,7 +123,7 @@ describe('h2plusCurveSpec', () => {
         expect(spec.unit).toBe('eV');
         expect(spec.series[0].points[2].E).toBeCloseTo((-0.6026 + 0.5) * HARTREE_TO_EV, 10);
         expect(spec.series[2].points.map(p => p.E)).toEqual([0, 0]);
-        expect(spec.referenceR).toEqual({ R: 1.9971924, label: `Dotted line: R_e = 1.997 a₀ (1.057 Å), E = ${nb('−16.40 eV (−0.6026 Ha)')}; D_e = 2.79 eV (0.1026 Ha) to H + H⁺.`,
+        expect(spec.referenceR).toEqual({ R: 1.9971924, label: `Dotted line: R_e = 1.997 a₀ (1.057 Å), E = ${nb('−16.40 eV (−0.6026 Ha)')}; D_e = ${nb('2.79 eV (0.1026 Ha)')} to H + H⁺.`,
             plainLabel: 'Dotted line: most stable, 1.06 Å' });
         // Task 7a: the exact method is H2PLUS_CAPTIONS' (Info); the plot's own note is its zero.
         expect(spec).not.toHaveProperty('caption');

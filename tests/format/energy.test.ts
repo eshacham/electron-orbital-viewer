@@ -1,5 +1,5 @@
 import { nb } from '../../src/format/text';
-import { evText, evTickText, totalEnergyPairText, totalEnergyText, orbitalEnergyText, hartreeText } from '../../src/format/energy';
+import { evText, evTickText, totalEnergyPairText, totalEnergyText, orbitalEnergyText, hartreeText, wellDepthText } from '../../src/format/energy';
 
 // Science corrections S2: the last Ha-first energies read eV first, through the one shared formatter.
 describe('evText', () => {
@@ -63,5 +63,13 @@ describe('the shared pieces stay put', () => {
     it('keeps the orbital energy texts as they were', () => {
         expect(orbitalEnergyText(-0.1988)).toBe('−5.41 eV (−0.199 Ha)');
         expect(hartreeText(-0.1988)).toBe('−0.199 Ha');
+    });
+});
+
+// Final review M2: He₂'s van der Waals well, a few hundredths of a mHa: eV first, mHa beside it.
+describe('wellDepthText', () => {
+    it('is eV to 3 significant figures, then mHa to 2 places, held on one line', () => {
+        expect(wellDepthText(3.9e-5)).toBe(nb('1.06 × 10⁻³ eV, 0.04 mHa'));
+        expect(wellDepthText(0.0004)).toBe(nb('1.09 × 10⁻² eV, 0.40 mHa'));
     });
 });

@@ -98,3 +98,12 @@ export function totalEnergyPairText(hartree: number, haDigits = 6): string {
     const { ev, ha } = totalEnergyParts(hartree, haDigits);
     return nb(`${ev} eV, ${ha} Ha`);
 }
+
+/**
+ * Final review M2: a van der Waals well's depth, eV first and mHa beside it, held on one line: "1.06 × 10⁻³ eV, 0.04 mHa"
+ * (He₂'s, a few hundredths of a mHa -- the unit its caption compares with the basis set's own error). Bare of brackets:
+ * the caption puts it in its own (see totalEnergyPairText).
+ */
+export function wellDepthText(hartree: number): string {
+    return nb(`${formatSci(hartree * HARTREE_IN_EV)} eV, ${(hartree * 1000).toFixed(2)} mHa`);
+}
