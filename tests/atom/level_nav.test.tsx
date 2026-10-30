@@ -66,6 +66,12 @@ describe('LevelNav', () => {
             expect(chips.map(chip => chip.textContent)).toEqual([expect.stringContaining('K'), expect.stringContaining('L'), expect.stringContaining('N')]);
             expect(dotColour(chips[2])).toBe(CURVE_COLORS[2]);
         });
+        // T5 review M2: on a selected chip the accent fill hides the dot, so it gets an on-fill ring there.
+        it('is ringed in on-fill on a selected chip', () => {
+            const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+            const rule = /\.level-nav-shell-chip\.valence\.selected \.MuiChip-label::before \{[^}]*\}/.exec(css)?.[0] ?? '';
+            expect(rule).toMatch(/box-shadow:\s*0 0 0 1\.5px var\(--ql-color-on-fill\)/);
+        });
         it('is painted from that colour, not from the warning token', () => {
             const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
             const rule = /\.level-nav-shell-chip\.valence \.MuiChip-label::before \{[^}]*\}/.exec(css)?.[0] ?? '';

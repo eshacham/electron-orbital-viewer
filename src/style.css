@@ -760,6 +760,11 @@ html, body, #root {
   box-shadow: 0 0 0 1px var(--ql-color-swatch-ring);
   vertical-align: 1px;
 }
+/* Science corrections T5 review M2: on a selected chip the accent fill can swallow the dot (n = 1 is near the accent),
+   so the dot is ringed in on-fill there. */
+.level-nav-shell-chip.valence.selected .MuiChip-label::before {
+  box-shadow: 0 0 0 1.5px var(--ql-color-on-fill);
+}
 .level-nav-shells {
   display: flex;
   flex-wrap: wrap;

@@ -69,7 +69,8 @@ describe('orbital display', () => {
         it('falls back to energy, 1e-4 Ha, for unlabelled "?" orbitals only', () => {
             expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.5 + 1e-5), orb(2, '?', 0.1)])).toEqual([2, 2, 1]);
             expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.5 + 1e-3)])).toEqual([1, 1]);
-            // Chained through energy order: first and last lie 1.1e-4 apart, yet each neighbour is closer than 1e-4.
+            // A close triple is one group; the second case is the real chain: its ends lie 1.8e-4 apart, yet each
+            // neighbour is closer than 1e-4.
             expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.50001), orb(2, '?', -0.5 + 1e-5)])).toEqual([3, 3, 3]);
             expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.50009), orb(2, '?', -0.50018)])).toEqual([3, 3, 3]);
             // A labelled orbital between two "?" does not break their chain.

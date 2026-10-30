@@ -1,4 +1,6 @@
 import React from 'react';
+import { curvePalette } from './design/science';
+import { CURVE_COLORS } from './curve_colors';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react'; // Add screen import
@@ -2220,6 +2222,18 @@ describe('App: shell', () => {
     });
 
     // Owner R25-B3: the brand switch left with the brand preview; a theme switch is what can still change here.
+    // Science corrections T5 review M1: App gives LevelNav the theme's own palette, so the valence dot matches the ring.
+    it('paints the valence dot from the active theme\'s palette', async () => {
+        renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+        const dot = () => /--level-nav-shell-colour:\s*([^;]+)/.exec(document.querySelector('.level-nav-shell-chip.valence')?.getAttribute('style') ?? '')?.[1].trim();
+        await waitFor(() => expect(dot()).toBeTruthy());
+        expect(CURVE_COLORS).toContain(dot());
+        fireEvent.click(screen.getByRole('button', { name: /^Theme: / }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Light Clean' }));
+        expect(curvePalette('light')).toContain(dot());
+        expect(dot()).not.toBe(undefined);
+    });
+
     it('a theme switch leaves the share link byte-identical (Review Focus 1)', async () => {
         const writeText = jest.fn().mockResolvedValue(undefined);
         Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
