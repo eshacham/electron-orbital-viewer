@@ -5,6 +5,8 @@
 // for the reader's level: plain words at Basics, the gap and orbital energies (eV, then Ha) and the Kohn–Sham caveat,
 // stated once, from Explore, the iso value and the labels from Advanced, and the method and references open at Research.
 import React from 'react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render } from '@testing-library/react';
 import { moleculeInfo, type MoleculeInfoState } from '../../src/info/molecule_info';
 import InfoPanel from '../../src/info/InfoPanel';
@@ -403,6 +405,32 @@ describe('moleculeInfo (Task 7b)', () => {
         });
         it('keeps "with the same energy" for an unlabelled pair, grouped by its energy', () => {
             expect(lead(orbitals, 4)).toContain('one of 2 with the same energy');
+        });
+        // Ruling M4: a subgroup labelling (allene, D2d labelled in D2) gives a true pair two labels; the energy joins them.
+        it('groups a subgroup-labelled pair by its energy, in words that say so', () => {
+            const allene = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules/allene/orbitals.json'), 'utf8'));
+            const at = (index: number, symmetry: unknown) => flat(shownAt(moleculeState(waterMeta({ orbitals: allene.orbitals, symmetry }),
+                store => store.dispatch(setSurface({ kind: 'mo', index }))), 'basics'));
+            expect(at(7, allene.symmetry)).toContain('1b2 is one of H₂O\'s molecular orbitals, one of 2 with the same energy.');
+            expect(at(7, { ...allene.symmetry, labels: 'full-group' })).not.toContain('one of 2');
+        });
+        // The role clauses ask "is anything above this orbital": its own degenerate partner never is, but a different label
+        // a hair higher is (the old rule tolerated 1e-4 Ha for both).
+        it('counts a different label 1e-5 Ha higher as above, and a partner in the same set as not', () => {
+            const words = (list: unknown[], index: number) => flat(shownAt(
+                moleculeState(waterMeta({ orbitals: list }), store => store.dispatch(setSurface({ kind: 'mo', index }))), 'basics'));
+            const split = [
+                { index: 0, label: '4b2', energyHartree: -0.3766, occupation: 2, role: 'HOMO' },
+                { index: 1, label: '6a1', energyHartree: -0.3766 + 1e-5, occupation: 1, role: 'SOMO' },
+            ];
+            expect(words(split, 0)).toContain('the singly occupied SOMO lies above it.');
+            expect(words(split, 0)).not.toContain('the highest orbital that holds electrons');
+            expect(words(split, 1)).toContain('the highest that holds electrons');
+            const pair = [
+                { index: 0, label: '1e', energyHartree: -0.5, occupation: 2, role: 'HOMO' },
+                { index: 1, label: '1e', energyHartree: -0.5 + 3e-5, occupation: 2, role: 'HOMO' },
+            ];
+            expect(words(pair, 0)).toContain('It is the HOMO: the highest orbital that holds electrons.');
         });
     });
 

@@ -95,8 +95,8 @@ function paragraphs(...parts: Array<string | null | false | undefined>): React.R
  * triplet has two SOMOs, and ROKS energies need not put them above the HOMO. Only an orbital with no occupied orbital
  * above it is "the highest that holds electrons"; the HOMO says how many SOMOs lie above it, if any do.
  */
-function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: MoleculeOrbitalInfo[]): { lead: string; more: string } {
-    const groups = degenerateGroups(orbitals);
+function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: MoleculeOrbitalInfo[], labelRegime?: 'full-group' | 'subgroup' | 'none' | null): { lead: string; more: string } {
+    const groups = degenerateGroups(orbitals, labelRegime);
     const group = groups.get(orbital.index);
     const degenerate = group?.size ?? 1;
     // S4: a set marked by its symmetry label is "degenerate orbitals"; only an unlabelled ('?') set, grouped by its energy
@@ -210,7 +210,7 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     } else if (surface.kind === 'mo') {
         const label = chosen?.label ?? `orbital ${surface.index}`;
         title = h(React.Fragment, null, `${moleculeTitle(meta)} — `, withSubscripts(label), ' orbital');
-        const words = chosen ? orbitalWords(formula, chosen, meta.orbitals) : null;
+        const words = chosen ? orbitalWords(formula, chosen, meta.orbitals, meta.symmetry?.labels) : null;
         lead = words?.lead ?? `${label} is one of ${formula}'s molecular orbitals.`;
         orbitalMore = words?.more || null;
     } else {

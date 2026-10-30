@@ -1,0 +1,97 @@
+{
+ "id": "allene",
+ "formula": "C3H4",
+ "symmetry": {
+  "pointGroup": "D2d",
+  "labelGroup": "D2",
+  "labels": "subgroup",
+  "labelNote": "irreducible representations of D2, a subgroup of D2d: full-group labels are not available for D2d"
+ },
+ "orbitals": [
+  {
+   "index": 0,
+   "label": "1a",
+   "energyHartree": -10.2086011,
+   "occupation": 2.0
+  },
+  {
+   "index": 1,
+   "label": "1b1",
+   "energyHartree": -10.1952156,
+   "occupation": 2.0
+  },
+  {
+   "index": 2,
+   "label": "2a",
+   "energyHartree": -10.1950895,
+   "occupation": 2.0
+  },
+  {
+   "index": 3,
+   "label": "3a",
+   "energyHartree": -0.7831277,
+   "occupation": 2.0
+  },
+  {
+   "index": 4,
+   "label": "2b1",
+   "energyHartree": -0.6988631,
+   "occupation": 2.0
+  },
+  {
+   "index": 5,
+   "label": "4a",
+   "energyHartree": -0.5192816,
+   "occupation": 2.0
+  },
+  {
+   "index": 6,
+   "label": "3b1",
+   "energyHartree": -0.4547864,
+   "occupation": 2.0
+  },
+  {
+   "index": 7,
+   "label": "1b2",
+   "energyHartree": -0.4451618,
+   "occupation": 2.0
+  },
+  {
+   "index": 8,
+   "label": "1b3",
+   "energyHartree": -0.4451618,
+   "occupation": 2.0
+  },
+  {
+   "index": 9,
+   "label": "2b2",
+   "energyHartree": -0.2707844,
+   "occupation": 2.0
+  },
+  {
+   "index": 10,
+   "label": "2b3",
+   "energyHartree": -0.2707844,
+   "occupation": 2.0
+  },
+  {
+   "index": 11,
+   "label": "3b2",
+   "energyHartree": 0.0095412,
+   "occupation": 0.0
+  },
+  {
+   "index": 12,
+   "label": "3b3",
+   "energyHartree": 0.0095412,
+   "occupation": 0.0
+  },
+  {
+   "index": 13,
+   "label": "5a",
+   "energyHartree": 0.0862503,
+   "occupation": 0.0
+  }
+ ],
+ "_note": "Real orbitals: tools/molecules/point_group.label_orbitals on allene (D2d), B3LYP/def2-SVP, geometry of tools/molecules/tests/test_point_group.py. Occupied plus 3 virtuals; the generator labels in D2, so 1b2/1b3 is one degenerate pair."
+}

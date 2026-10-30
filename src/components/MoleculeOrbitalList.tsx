@@ -36,6 +36,8 @@ interface MoleculeOrbitalListProps {
      * the names, occupancy, degeneracy and HOMO/LUMO/SOMO chips stay. Default true.
      */
     showEnergies?: boolean;
+    /** The molecule's label regime (meta.symmetry.labels): in a 'subgroup' regime degenerate orbitals also group by energy. */
+    labelRegime?: 'full-group' | 'subgroup' | 'none' | null;
 }
 
 /** How many orbitals either side of the HOMO/LUMO boundary a list below Advanced keeps: HOMO−3…LUMO+3. */
@@ -91,13 +93,13 @@ export function centredScrollTop(list: HTMLElement, row: HTMLElement): number {
  */
 const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
     orbitals, selectedIndex, onSelect, highlightRun = 0, insideBallNote, onHideStructure, allOrbitals = true,
-    showEnergies = true,
+    showEnergies = true, labelRegime,
 }) => {
     const sorted = useMemo(() => [...orbitals].sort((a, b) => b.energyHartree - a.energyHartree), [orbitals]);
     // Below Advanced: the four highest occupied and the four lowest virtual orbitals, plus the one drawn (a link's
     // choice stays listed -- lowering the level never changes what is drawn, Review Focus 2). Ruling T2-M9: an edge
     // that falls inside a degenerate group moves out to take the whole group (degenerateGroups: one symmetry label, S4).
-    const groups = useMemo(() => degenerateGroups(orbitals), [orbitals]);
+    const groups = useMemo(() => degenerateGroups(orbitals, labelRegime), [orbitals, labelRegime]);
     const rows = useMemo(() => {
         const boundary = sorted.findIndex(o => o.occupation > 0);
         if (allOrbitals || boundary < 0) return sorted;

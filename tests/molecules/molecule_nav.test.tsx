@@ -69,17 +69,59 @@ describe('orbital display', () => {
         it('falls back to energy, 1e-4 Ha, for unlabelled "?" orbitals only', () => {
             expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.5 + 1e-5), orb(2, '?', 0.1)])).toEqual([2, 2, 1]);
             expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.5 + 1e-3)])).toEqual([1, 1]);
+            // Chained through energy order: first and last lie 1.1e-4 apart, yet each neighbour is closer than 1e-4.
+            expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.50001), orb(2, '?', -0.5 + 1e-5)])).toEqual([3, 3, 3]);
+            expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.50009), orb(2, '?', -0.50018)])).toEqual([3, 3, 3]);
+            // A labelled orbital between two "?" does not break their chain.
+            expect(sizes([orb(0, '?', -0.5), orb(1, '1a1', -0.50005), orb(2, '?', -0.50009)])).toEqual([2, 1, 2]);
             const mixed = [orb(0, '?', -0.5), orb(1, '?', -0.5 + 1e-5), orb(2, '1e', -0.5), orb(3, '1e', -0.5)];
             expect(sizes(mixed)).toEqual([2, 2, 2, 2]);
             expect(degenerateGroups(mixed).get(0)?.bySymmetry).toBe(false);
             // A "?" never joins a labelled orbital that happens to tie with it.
             expect(sizes([orb(0, '?', -0.5), orb(1, '1a1', -0.5)])).toEqual([1, 1]);
         });
-        it('groups within one spin, never an alpha with its beta', () => {
-            expect(sizes([orb(0, '1πu', -0.57, 'alpha'), orb(1, '1πu', -0.57, 'alpha'), orb(2, '1πu', -0.47, 'beta'), orb(3, '1πu', -0.47, 'beta')]))
-                .toEqual([2, 2, 2, 2]);
+        it('groups within one spin, never an alpha with its beta (real O₂: four pairs, none across spins)', () => {
+            const o2 = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules/o2/meta.json'), 'utf8')).orbitals;
+            const groups = degenerateGroups(o2);
+            const pairs = o2.filter((o: { index: number; label: string }) => groups.get(o.index)?.size === 2);
+            expect(pairs.map((o: { label: string; spin: string }) => `${o.spin} ${o.label}`).sort()).toEqual(
+                ['alpha 1πg*', 'alpha 1πg*', 'alpha 1πu', 'alpha 1πu', 'beta 1πg*', 'beta 1πg*', 'beta 1πu', 'beta 1πu']);
+            for (const o of o2) {
+                expect(degenerateGroups(o2).get(o.index)?.indices.every((i: number) => o2[i].spin === o.spin)).toBe(true);
+            }
+            // The same label and the same energy in both spins is still two sets, and so is an unlabelled one.
             expect(sizes([orb(0, '2σg', -0.5, 'alpha'), orb(1, '2σg', -0.5, 'beta')])).toEqual([1, 1]);
             expect(sizes([orb(0, '?', -0.5, 'alpha'), orb(1, '?', -0.5, 'beta')])).toEqual([1, 1]);
+        });
+        // Ruling M4: a subgroup's irreps cannot express a degenerate pair. Real allene (D2d, labelled in D2, def2-SVP):
+        // its 1b2/1b3, 2b2/2b3 and 3b2/3b3 pairs lie at the same energy and carry two labels each.
+        describe('a subgroup labelling regime (real allene, D2d labelled in D2)', () => {
+            const allene = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules/allene/orbitals.json'), 'utf8'));
+            const sizesIn = (regime?: 'full-group' | 'subgroup') => allene.orbitals.map(
+                (o: { index: number }) => degenerateGroups(allene.orbitals, regime).get(o.index)?.size);
+            it('is recorded by the generator as symmetry.labels = "subgroup"', () => {
+                expect(allene.symmetry.labels).toBe('subgroup');
+            });
+            it('also groups by energy there: the b2/b3 pairs are ×2', () => {
+                expect(sizesIn(allene.symmetry.labels)).toEqual([1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1]);
+                // Core 1b1 and 2a lie 1.3e-4 Ha apart: two levels, as they are.
+            });
+            it('leaves the same data at ×1 in a full-group regime (labels alone), and names the set by its energy', () => {
+                expect(new Set(sizesIn('full-group'))).toEqual(new Set([1]));
+                const groups = degenerateGroups(allene.orbitals, 'subgroup');
+                expect(groups.get(7)?.indices).toEqual([7, 8]);
+                expect(groups.get(7)?.bySymmetry).toBe(false);
+            });
+            it('keeps a same-label set whole and still keeps spins apart', () => {
+                const orbitals = [orb(0, '1e', -0.5, 'alpha'), orb(1, '1e', -0.4, 'alpha'), orb(2, '2b2', -0.5, 'beta'), orb(3, '2b3', -0.5, 'alpha')];
+                expect(orbitals.map(o => degenerateGroups(orbitals, 'subgroup').get(o.index)?.size)).toEqual([3, 3, 1, 3]);
+            });
+            it('marks ×2 in the orbital list only when the list is told the regime', () => {
+                const { rerender } = render(<MoleculeOrbitalList orbitals={allene.orbitals} selectedIndex={null} onSelect={() => {}} />);
+                expect(screen.queryAllByText('×2')).toHaveLength(0);
+                rerender(<MoleculeOrbitalList orbitals={allene.orbitals} selectedIndex={null} onSelect={() => {}} labelRegime="subgroup" />);
+                expect(screen.getAllByText('×2')).toHaveLength(6);
+            });
         });
         it('groups the real fixtures by label: NO₂ has no pair, N₂ and ethane\'s e sets are ×2', () => {
             const load = (id: string) => JSON.parse(readFileSync(resolve(__dirname, `../fixtures/molecules/${id}/meta.json`), 'utf8')).orbitals;

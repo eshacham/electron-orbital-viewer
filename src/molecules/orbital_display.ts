@@ -10,14 +10,14 @@ import { typedPointGroup } from '../format/sci';
  */
 export { HARTREE_IN_EV as HARTREE_TO_EV } from '../format/energy';
 
-/** Orbitals this close in energy, with no symmetry label to say otherwise, are one level (Ha). */
-const UNLABELLED_SAME_LEVEL_HARTREE = 1e-4;
+/** Orbitals this close in energy, where no symmetry label can say otherwise, are one level (Ha). */
+const SAME_LEVEL_HARTREE = 1e-4;
 
 /** One degenerate set: `size` orbitals (their `indices`), and whether a shared symmetry label or an energy tie made it. */
 export interface DegenerateGroup {
     size: number;
     indices: number[];
-    /** True when the members share a symmetry label ("1e", "2t2"); false when unlabelled ('?') orbitals tied in energy. */
+    /** True when every member shares one symmetry label ("1e", "2t2"); false when an energy tie made (or joined) the set. */
     bySymmetry: boolean;
 }
 
@@ -25,35 +25,47 @@ export interface DegenerateGroup {
  * Science correction S4: a degenerate set is the orbitals that share a symmetry label (the generator gives every member of
  * an e, t or π set the exact same label, "1e", "2t2", "1πu"), counted within one spin so an unrestricted α orbital is never
  * grouped with its β partner. An energy near-tie across *different* labels is not degeneracy (NO₂'s 1b2 and 1a1 core
- * orbitals lie 1.9e-5 Ha apart and are two levels). Only an unlabelled ('?') orbital falls back to the energy: those
- * within 1e-4 Ha of the next one (chained through energy order, still within one spin) are one set. Keyed by orbital index;
- * every orbital has a group, a lone one has size 1.
+ * orbitals lie 1.9e-5 Ha apart and are two levels). Two cases fall back to the energy, still within one spin, chained
+ * through energy order at 1e-4 Ha: an unlabelled ('?') orbital, and -- ruling M4 -- every orbital of a molecule whose
+ * labels come from a subgroup (`labels: 'subgroup'`, point_group.py: D2d, C3, Ih ...), because a subgroup's irreps
+ * cannot express a degenerate pair, so allene's true pair reads 1b2 and 1b3. There a set is a label's members, joined
+ * with any energy tie. Keyed by orbital index; every orbital has a group, a lone one has size 1.
  */
 export function degenerateGroups(
     orbitals: Array<{ index: number; energyHartree: number; label: string; spin?: string }>,
+    labelRegime?: 'full-group' | 'subgroup' | 'none' | null,
 ): Map<number, DegenerateGroup> {
-    const groups = new Map<number, DegenerateGroup>();
-    const add = (members: typeof orbitals, bySymmetry: boolean) => {
-        const group: DegenerateGroup = { size: members.length, indices: members.map(o => o.index), bySymmetry };
-        for (const o of members) groups.set(o.index, group);
-    };
-    const labelled = new Map<string, typeof orbitals>();
-    const unlabelled = new Map<string, typeof orbitals>();
-    for (const o of orbitals) {
-        const bucket = o.label === UNLABELLED ? unlabelled : labelled;
-        const key = o.label === UNLABELLED ? (o.spin ?? '') : `${o.spin ?? ''}|${o.label}`;
-        bucket.set(key, [...(bucket.get(key) ?? []), o]);
-    }
-    for (const members of labelled.values()) add(members, true);
-    for (const members of unlabelled.values()) {
-        const sorted = [...members].sort((a, b) => a.energyHartree - b.energyHartree);
-        let start = 0;
-        for (let i = 1; i <= sorted.length; i++) {
-            if (i === sorted.length || sorted[i].energyHartree - sorted[i - 1].energyHartree >= UNLABELLED_SAME_LEVEL_HARTREE) {
-                add(sorted.slice(start, i), false);
-                start = i;
-            }
+    const root = orbitals.map((_, i) => i);
+    const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i])));
+    const join = (a: number, b: number) => { root[find(a)] = find(b); };
+    const bySpin = new Map<string, number[]>();
+    const byLabel = new Map<string, number>();
+    orbitals.forEach((o, i) => {
+        const spin = o.spin ?? '';
+        bySpin.set(spin, [...(bySpin.get(spin) ?? []), i]);
+        if (o.label === UNLABELLED) return;
+        const key = `${spin}|${o.label}`;
+        if (byLabel.has(key)) join(i, byLabel.get(key) as number); else byLabel.set(key, i);
+    });
+    const byEnergy = labelRegime === 'subgroup';
+    for (const members of bySpin.values()) {
+        // Whom the energy test may tie: every orbital in a subgroup regime, otherwise only the unlabelled among themselves.
+        const sorted = members.filter(i => byEnergy || orbitals[i].label === UNLABELLED)
+            .sort((a, b) => orbitals[a].energyHartree - orbitals[b].energyHartree);
+        for (let k = 1; k < sorted.length; k++) {
+            if (orbitals[sorted[k]].energyHartree - orbitals[sorted[k - 1]].energyHartree < SAME_LEVEL_HARTREE) join(sorted[k - 1], sorted[k]);
         }
+    }
+    const sets = new Map<number, number[]>();
+    orbitals.forEach((_, i) => sets.set(find(i), [...(sets.get(find(i)) ?? []), i]));
+    const groups = new Map<number, DegenerateGroup>();
+    for (const members of sets.values()) {
+        const first = orbitals[members[0]].label;
+        const group: DegenerateGroup = {
+            size: members.length, indices: members.map(i => orbitals[i].index),
+            bySymmetry: first !== UNLABELLED && members.every(i => orbitals[i].label === first),
+        };
+        for (const i of members) groups.set(orbitals[i].index, group);
     }
     return groups;
 }
