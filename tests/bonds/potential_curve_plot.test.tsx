@@ -532,8 +532,23 @@ describe('PotentialCurvePlot', () => {
             expect(handle).toMatch(/box-shadow:\s*var\(--ql-shadow-selected-halo\);/);
             expect(handle).toMatch(/pointer-events:\s*none;/);
             expect(handle).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
-            // The Rₑ line keeps its own look: green, dotted.
-            expect(rule('.potential-reference')).toMatch(/stroke:\s*var\(--ql-color-success\);[^}]*stroke-dasharray:\s*1 3;/);
+        });
+
+        // Science corrections S5 (Meaning-Only Status): the Rₑ line states no outcome, so it is not green. It is a dotted
+        // text-2 line, still unlike the marker (dashed text-1) and the hover rule (text-2, dashed 2 2).
+        it('draws the Rₑ line and its note neutral: dotted text-2, never success green, unlike the dashed marker', () => {
+            const reference = rule('.potential-reference');
+            expect(reference).toMatch(/stroke:\s*var\(--ql-color-text-2\);/);
+            expect(reference).toMatch(/stroke-dasharray:\s*1 3;/);
+            expect(reference).toMatch(/stroke-width:\s*1;/);
+            expect(rule('.potential-reference-note')).toMatch(/color:\s*var\(--ql-color-text-2\);/);
+            for (const selector of ['.potential-reference', '.potential-reference-note']) {
+                expect(rule(selector)).not.toMatch(/success|warning|danger/);
+            }
+            const marker = rule('.potential-marker');
+            expect(marker).toMatch(/stroke:\s*var\(--ql-color-text-1\);/);
+            expect(marker).toMatch(/stroke-dasharray:\s*3 2;/);
+            expect(reference).not.toBe(marker);
         });
 
         it('keeps to the plot area where the first curve leaves it, and is not drawn where R cannot be set', () => {

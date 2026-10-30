@@ -1436,6 +1436,7 @@ function App() {
         // the drawn picture's (pictureRelativity) while a re-solve is in flight.
         selectedRelativity: relativity,
         pictureShown: atomProfile !== null,
+        palette,
     };
     // The Relativity switch chooses the model, so it sits with the
     // configuration: Explore › Configuration on a desktop, the phone's

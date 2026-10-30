@@ -73,9 +73,13 @@ describe('TierBadge', () => {
         rerender(<TierBadge meta={computed()} />);
         expect(screen.getByRole('note', { name: 'data tier' }))
             .toHaveTextContent('ComputedComputed on request by the same method; not benchmarked against experiment.');
-        // V1: the Computed chip takes the darker amber style.css declares (contrast-tested), not MUI's warning (3.1:1).
-        expect(screen.getByText('Computed').closest('.MuiChip-root')).toHaveClass('tier-chip-computed');
-        expect(screen.getByText('Computed').closest('.MuiChip-root')).not.toHaveClass('MuiChip-colorWarning');
+        // Science corrections S5 (Meaning-Only Status): a tier is a name, not an outcome, so both chips are neutral outlines.
+        for (const label of ['Library', 'Computed']) {
+            rerender(<TierBadge meta={label === 'Library' ? water : computed()} />);
+            const chip = screen.getByText(label).closest('.MuiChip-root')!;
+            expect(chip).toHaveClass('MuiChip-outlined', 'neutral-chip');
+            expect(chip.className).not.toMatch(/MuiChip-color(Success|Warning|Error|Primary)|MuiChip-filled|tier-chip-computed/);
+        }
     });
     // V2: the compact badge's title is its only pointer hint, and the legend stack takes no pointer events.
     it('compact, takes the pointer, so its title can show', () => {

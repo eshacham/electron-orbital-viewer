@@ -12,6 +12,7 @@ import { orbitalPlainName } from '../format/sci';
 import InfoButton from '../info/InfoButton';
 import { aboutModelText } from '../atom/atom_text';
 import { shellName } from '../shell/view_title';
+import { CURVE_COLORS } from '../curve_colors';
 
 /**
  * Where a breadcrumb segment or shell chip should take the app.
@@ -111,6 +112,12 @@ interface LevelNavProps {
      * picture", whichever mode the switch is in. Defaults to true.
      */
     pictureShown?: boolean;
+    /**
+     * The curve palette the 3D view rings its shells with (design/science.ts's curvePalette for the theme). A valence
+     * shell's dot takes the colour at its position among the occupied shells, the index the view and the strip use.
+     * Defaults to CURVE_COLORS (the view's own default).
+     */
+    palette?: readonly string[];
 }
 
 interface Crumb {
@@ -158,6 +165,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
     relativity = 'off',
     selectedRelativity,
     pictureShown = true,
+    palette = CURVE_COLORS,
 }) => {
     // P18: what the switch is solving for. Ordinarily the same mode as
     // `relativity` (the picture actually drawn) -- it only differs mid re-solve.
@@ -345,7 +353,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 <InfoButton topic="shell" label="Shell" />
             </div>
             <Box ref={shellsRef} className="level-nav-shells" role="group" aria-label="shells">
-                {shells.map(shell => {
+                {shells.map((shell, shellIndex) => {
                     const isSelected = selectedShell === shell.n;
                     const isValence = valenceShells.has(shell.n);
                     return (
@@ -353,6 +361,8 @@ const LevelNav: React.FC<LevelNavProps> = ({
                             key={shell.n}
                             className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isValence ? ' valence' : ' core'}`}
                             label={`${shellName(shell.n, { withNumber: true })}${isValence ? ' · valence' : ''}`}
+                            // The valence dot's colour: this shell's ring colour in the 3D view (S5, never a status colour).
+                            style={isValence ? { '--level-nav-shell-colour': palette[shellIndex % palette.length] } as React.CSSProperties : undefined}
                             color={isSelected ? 'primary' : 'default'}
                             disabled={shellsUnavailable}
                             // Addendum 2's "is there a way to unselect one?".

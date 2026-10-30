@@ -22,10 +22,8 @@ const TierBadge: React.FC<{ meta: BadgeMeta; compact?: boolean }> = ({ meta, com
     const tier = tierOf(meta);
     const label = TIER_LABEL[tier];
     const line = tierLine(meta);
-    // V1: the computed chip's amber is declared in style.css (.tier-chip-computed), where its contrast is tested.
-    const chip = tier === 'validated'
-        ? <Chip size="small" label={label} color="success" />
-        : <Chip size="small" label={label} className="tier-chip-computed" />;
+    // Science corrections S5 (Meaning-Only Status): a tier is a name, not an outcome -- a neutral outlined chip for both.
+    const chip = <Chip size="small" variant="outlined" label={label} className="neutral-chip" />;
     if (compact) {
         return (
             <div className={`tier-badge tier-${tier} compact`} role="note" aria-label="data tier" title={line} aria-describedby={lineId}>

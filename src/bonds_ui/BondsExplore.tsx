@@ -31,7 +31,7 @@ const BondsExplore: React.FC<BondsPanelProps> = props => {
             </div>
             {/* WCAG 2.5.3: the accessible name contains the visible label ("exact"). */}
             {system.id === 'h2plus' && (
-                <Chip size="small" color="success" label="exact" aria-label="exact solution" className="bonds-tile-chip" />
+                <Chip size="small" variant="outlined" label="exact" aria-label="exact solution" className="bonds-tile-chip neutral-chip" />
             )}
         </div>
     );

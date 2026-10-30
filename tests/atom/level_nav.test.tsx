@@ -5,6 +5,10 @@ import LevelNav, { NavigationTarget } from '../../src/components/LevelNav';
 import { relativisticEnergiesSentence, aboutRelativitySentence, aboutModelText } from '../../src/atom/atom_text';
 import { speciesConfiguration } from '../../src/atom/species';
 import { seenText } from '../seen_text';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { curvePalette } from '../../src/design/science';
+import { CURVE_COLORS } from '../../src/curve_colors';
 
 describe('LevelNav', () => {
     // Task 6: the valence line keeps its short labelled value; the core note is Info's (atomInfo, whose tests
@@ -31,6 +35,43 @@ describe('LevelNav', () => {
                 selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
         );
         expect(container.querySelector('.level-nav-valence')?.textContent).toBe(line);
+    });
+
+    // Science corrections S5 (Meaning-Only Status): the valence dot is the 3D view's own colour for that shell (the strip's
+    // thumbnails read the same palette by the shell's position, ascending n), never warning amber.
+    describe('the valence dot', () => {
+        const dotColour = (chip: Element) => (chip as HTMLElement).style.getPropertyValue('--level-nav-shell-colour');
+        it.each([
+            ['dark', curvePalette('dark')],
+            ['light', curvePalette('light')],
+        ])('takes the %s palette colour of its shell', (_theme, palette) => {
+            const { container } = render(
+                <LevelNav Z={6} selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} palette={palette} />
+            );
+            const chips = [...container.querySelectorAll('.level-nav-shell-chip')];
+            expect(chips).toHaveLength(2);
+            // Carbon: K (n = 1) is palette[0], L (n = 2, the valence shell) is palette[1].
+            expect(chips[1]).toHaveClass('valence');
+            expect(dotColour(chips[1])).toBe(palette[1]);
+            // A core chip has no dot, so no colour to carry.
+            expect(dotColour(chips[0])).toBe('');
+        });
+        it('follows the shell by position, so an ion with a shell missing keeps the 3D view colours', () => {
+            const { container } = render(
+                <LevelNav Z={11} configuration={speciesConfiguration({ Z: 11, charge: 0, excitation: { from: { n: 3, l: 0 }, to: { n: 4, l: 0 } } })}
+                    selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+            );
+            const chips = [...container.querySelectorAll('.level-nav-shell-chip')];
+            // Na(3s→4s) holds K, L and N: the valence N shell is the third ring, palette[2].
+            expect(chips.map(chip => chip.textContent)).toEqual([expect.stringContaining('K'), expect.stringContaining('L'), expect.stringContaining('N')]);
+            expect(dotColour(chips[2])).toBe(CURVE_COLORS[2]);
+        });
+        it('is painted from that colour, not from the warning token', () => {
+            const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+            const rule = /\.level-nav-shell-chip\.valence \.MuiChip-label::before \{[^}]*\}/.exec(css)?.[0] ?? '';
+            expect(rule).toMatch(/background:\s*var\(--level-nav-shell-colour\)/);
+            expect(rule).not.toMatch(/warning/);
+        });
     });
 
     it('offers an element button only when given somewhere to send it', () => {

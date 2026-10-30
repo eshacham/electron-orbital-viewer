@@ -36,6 +36,9 @@ describe('BondsExplore (spec §9.3, Phase 6G-2 Task 9)', () => {
         // WCAG 2.5.3: the chip's accessible name contains its visible label ("exact").
         const chip = screen.getByText('exact').closest('.MuiChip-root');
         expect(chip).toHaveAttribute('aria-label', 'exact solution');
+        // Science corrections S5 (Meaning-Only Status): "exact" names the method, not an outcome -- a neutral outline.
+        expect(chip).toHaveClass('MuiChip-outlined', 'neutral-chip');
+        expect(chip!.className).not.toMatch(/MuiChip-color(Success|Warning|Error|Primary)|MuiChip-filled/);
     });
 
     it("still renders BondsPanel's own navigation -- the select, the R slider and the Show switch", () => {

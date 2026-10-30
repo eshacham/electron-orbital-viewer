@@ -26,7 +26,6 @@ function rule(selector: string, sheet: string = css): string {
 const STYLE_LITERALS_ALLOWED = new Set([
     'rgba(91, 141, 217, 0.20)', 'rgba(217, 139, 74, 0.20)', 'rgba(74, 168, 138, 0.20)', 'rgba(157, 122, 212, 0.20)', // periodic blocks
     'rgba(0, 0, 0, 0.6)', // the structure preview's atom outlines, drawn on CPK colours
-    '#a84300', '#ffffff', // the Computed tier chip and its white text (5.6:1 in both themes)
 ]);
 const literals = (sheet: string) => [...sheet.matchAll(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|rgba?\([^)]*\)/g)].map(m => m[0]);
 
@@ -68,7 +67,7 @@ const PAIRS: Pair[] = [
     { selector: '.bonds-length-heading', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.bonds-length .radial-plot', declares: ['background: none'], fg: 'text-1', bg: 'surface-1' },
     { selector: '.potential-axis-label', declares: [`fill: ${v('text-3')}`], fg: 'text-3', bg: 'surface-1' },
-    { selector: '.potential-reference-note', declares: [`color: ${v('success')}`], fg: 'success', bg: 'surface-1' },
+    { selector: '.potential-reference-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.mo-legend', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
     { selector: '.side-panel .bonds-panel', declares: [`background-color: ${v('surface-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.bonds-panel', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
@@ -94,6 +93,9 @@ const PAIRS: Pair[] = [
     // the list itself, now beside the switch, already names the orbital drawn.
     { selector: '.molecule-error', declares: [`background-color: ${v('error-bg')}`, `color: ${v('error-text')}`], fg: 'error-text', bg: 'error-bg' },
     { selector: '.sign-in-error', declares: [`background-color: ${v('error-bg')}`, `color: ${v('error-text')}`], fg: 'error-text', bg: 'error-bg' },
+    // Science corrections S5: the tier chips and the H₂⁺ "exact" chip are neutral and outlined; their label carries the meaning.
+    { selector: '.neutral-chip', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
+    { selector: '.neutral-chip', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.tier-badge', declares: [`background: ${v('surface-2')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
     { selector: '.molecule-jobs .job-status', declares: [`background-color: ${v('surface-1')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.quote-option-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
@@ -143,9 +145,11 @@ describe.each(THEME_MODES)('panel text meets WCAG AA in %s', mode => {
         for (const declaration of pair.declares) expect(rule(selector, adminCss)).toContain(declaration);
         expect(contrastRatio(rgb(TOKENS[mode][pair.fg]), rgb(TOKENS[mode][pair.bg]))).toBeGreaterThanOrEqual(4.5);
     });
-    it('the Computed chip keeps white on its own amber', () => {
-        expect(rule('.tier-badge .tier-chip-computed')).toContain('background-color: #a84300');
-        expect(contrastRatio([255, 255, 255], rgb('#a84300'))).toBeGreaterThanOrEqual(4.5);
+    it('a neutral chip is an outline with no status colour and no hard-coded hex (the Computed amber is gone)', () => {
+        const chip = rule('.neutral-chip');
+        expect(chip).toContain(`border-color: ${v('border-strong')}`);
+        expect(chip).not.toMatch(/success|warning|danger|#[0-9a-fA-F]{3,8}\b/);
+        expect(css).not.toContain('tier-chip-computed');
     });
     it('a chosen quote is outlined at 3:1 or better', () => {
         expect(rule('.quote-option.chosen')).toContain(`border: 2px solid ${v('selected-edge')}`);

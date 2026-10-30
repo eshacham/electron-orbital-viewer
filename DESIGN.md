@@ -475,6 +475,8 @@ Softly squared. Docked viewer panels and the canvas take 16 px corners; Operate 
 - **Filter chips:** MUI small outlined chips (6 px radius, 24 px tall) with a muted count after the label; selected takes `selected-fill`, `selected-edge` and `on-fill`, count included.
 - **Status chip:** a non-interactive pill with a hairline border, caption text at 500 in `text-1`, and a 7 px dot in the status tone. The word is one of Queued, Starting, Running, Done, Failed; the dot's tone, not the word, carries "over prediction".
 - **Key chips:** the canvas keys sit on `surface-2` at 8 px radius with 11 px round swatches.
+- **Neutral chips:** the data-tier chips ("Library", "Computed") and the H₂⁺ "exact" chip are small outlined chips in `text-1` on a `border-strong` hairline, with no fill and no status colour: the label is the meaning (the Meaning-Only Status Rule).
+- **Valence dot:** the 7 px dot on an Atoms valence-shell chip (with its "· valence" label) is that shell's own ring colour in the 3D view, read from the same curve palette as the strip's rings, with the `swatch-ring` outline; it is never warning amber.
 
 ### Cards / Containers
 - **Corner Style:** 16 px for docked viewer panels; 12 px for Operate cards.
@@ -555,7 +557,7 @@ R's whole story is one block, read top to bottom as one instrument: the "Bond le
 - **One axis:** the slider's track is inset by the plot's own gutters (the left margin the plot reports, which widens to fit its energy labels, and its 8 px right pad), so the thumb stands over the curve's marker to a tenth of a pixel.
 - **Marker:** a 1 px dashed `text-1` line (3 2) at R, with a 3 px dot in each series' colour where that series is on the plot.
 - **Handle:** a 10 px dot in the colour of the series it rides (the drawn state's curve, else the first) with a 2 px `selected-edge` ring, wearing the selected halo in Deep Space and nothing in Light Clean. Its hit area is 44 px across with an `ew-resize` cursor; a drag that starts on it keeps its offset from the centre, a tap elsewhere on the curve sets R there. Where its curve is off the plot at R, or has no value there, the handle stays on the marker line at the plot's edge as a hollow ring, so it never reads as a point at a false energy.
-- **Rₑ line:** a 1 px dotted line (1 3) in `success` green at the fitted Rₑ, keyed by its note under the plot in the same green. He₂ has no well, so it has none.
+- **Rₑ line:** a 1 px dotted line (1 3) in `text-2` at the fitted Rₑ, keyed by its note under the plot in the same `text-2` (it states no outcome, so it takes no status colour; it stays unlike the marker's dashed `text-1`). He₂ has no well, so it has none.
 - **Basics words:** the readout and the slider's value text read "Distance between nuclei 1.10 Å"; the plot is titled "Energy (eV)", its x-axis row reads the ends in Å around "Distance between nuclei (Å)", the energy ends round to 2 significant figures with 0 labelling the separated-atoms line (an end within 16 px of the 0 gives way to it), H₂⁺'s legend reads "bonding · antibonding · apart", and the note reads "Dotted line: most stable, 1.10 Å".
 - **Explore and up (Research included):** the readout keeps "R = 2.07 a₀ (1.098 Å)", each axis end carries its unit ("1.66 a₀ · R · 2.41 a₀"), the legend takes the symmetry labels with real subscripts, and the note names Rₑ and Dₑ in full.
 
