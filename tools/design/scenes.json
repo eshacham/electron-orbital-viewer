@@ -75,5 +75,14 @@
   "computed-water-structure": "#mode=molecule&job=4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216&show=none",
   "bonds-co-00": "#mode=bonds&system=co&R=1.706",
   "bonds-f2-12": "#mode=bonds&system=f2&R=2.988",
-  "bonds-h2plus-05": "#mode=bonds&system=h2plus&R=0.5"
+  "bonds-h2plus-05": "#mode=bonds&system=h2plus&R=0.5",
+  "bonds-hf": "#mode=bonds&system=hf",
+  "bonds-n2-far": "#mode=bonds&system=n2&R=3.4",
+  "fe-atom": "#mode=atom&Z=26&level=atom",
+  "fe2-ion": "#mode=atom&Z=26&charge=2&level=atom",
+  "ga3-ion": "#mode=atom&Z=31&charge=3&level=atom",
+  "gd3-ion": "#mode=atom&Z=64&charge=3&level=atom",
+  "silane": "#mode=molecule&id=sih4",
+  "fe2-shell3": "#mode=atom&Z=26&charge=2&level=shell&n=3",
+  "fe-atom-table": "#mode=atom&Z=26&level=atom"
 }
