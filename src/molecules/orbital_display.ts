@@ -10,18 +10,52 @@ import { typedPointGroup } from '../format/sci';
  */
 export { HARTREE_IN_EV as HARTREE_TO_EV } from '../format/energy';
 
-/** Size of each orbital's degenerate set (|ΔE| below tol, chained through energy order), keyed by orbital index. */
-export function degeneracyCounts(orbitals: Array<{ index: number; energyHartree: number }>, tol = 1e-4): Map<number, number> {
-    const sorted = [...orbitals].sort((a, b) => a.energyHartree - b.energyHartree);
-    const counts = new Map<number, number>();
-    let start = 0;
-    for (let i = 1; i <= sorted.length; i++) {
-        if (i === sorted.length || sorted[i].energyHartree - sorted[i - 1].energyHartree >= tol) {
-            for (let j = start; j < i; j++) counts.set(sorted[j].index, i - start);
-            start = i;
+/** Orbitals this close in energy, with no symmetry label to say otherwise, are one level (Ha). */
+const UNLABELLED_SAME_LEVEL_HARTREE = 1e-4;
+
+/** One degenerate set: `size` orbitals (their `indices`), and whether a shared symmetry label or an energy tie made it. */
+export interface DegenerateGroup {
+    size: number;
+    indices: number[];
+    /** True when the members share a symmetry label ("1e", "2t2"); false when unlabelled ('?') orbitals tied in energy. */
+    bySymmetry: boolean;
+}
+
+/**
+ * Science correction S4: a degenerate set is the orbitals that share a symmetry label (the generator gives every member of
+ * an e, t or π set the exact same label, "1e", "2t2", "1πu"), counted within one spin so an unrestricted α orbital is never
+ * grouped with its β partner. An energy near-tie across *different* labels is not degeneracy (NO₂'s 1b2 and 1a1 core
+ * orbitals lie 1.9e-5 Ha apart and are two levels). Only an unlabelled ('?') orbital falls back to the energy: those
+ * within 1e-4 Ha of the next one (chained through energy order, still within one spin) are one set. Keyed by orbital index;
+ * every orbital has a group, a lone one has size 1.
+ */
+export function degenerateGroups(
+    orbitals: Array<{ index: number; energyHartree: number; label: string; spin?: string }>,
+): Map<number, DegenerateGroup> {
+    const groups = new Map<number, DegenerateGroup>();
+    const add = (members: typeof orbitals, bySymmetry: boolean) => {
+        const group: DegenerateGroup = { size: members.length, indices: members.map(o => o.index), bySymmetry };
+        for (const o of members) groups.set(o.index, group);
+    };
+    const labelled = new Map<string, typeof orbitals>();
+    const unlabelled = new Map<string, typeof orbitals>();
+    for (const o of orbitals) {
+        const bucket = o.label === UNLABELLED ? unlabelled : labelled;
+        const key = o.label === UNLABELLED ? (o.spin ?? '') : `${o.spin ?? ''}|${o.label}`;
+        bucket.set(key, [...(bucket.get(key) ?? []), o]);
+    }
+    for (const members of labelled.values()) add(members, true);
+    for (const members of unlabelled.values()) {
+        const sorted = [...members].sort((a, b) => a.energyHartree - b.energyHartree);
+        let start = 0;
+        for (let i = 1; i <= sorted.length; i++) {
+            if (i === sorted.length || sorted[i].energyHartree - sorted[i - 1].energyHartree >= UNLABELLED_SAME_LEVEL_HARTREE) {
+                add(sorted.slice(start, i), false);
+                start = i;
+            }
         }
     }
-    return counts;
+    return groups;
 }
 
 /**

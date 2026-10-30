@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Chip, Link, Typography } from '@mui/material';
 import {
-    CONSTRUCTED_LABEL, CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, degeneracyCounts, diffuseDescription, isConstructed,
+    CONSTRUCTED_LABEL, CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, degenerateGroups, diffuseDescription, isConstructed,
     isUpperEstimate, frontierOccupied, orbitalGaps,
 } from '../molecules/orbital_display';
 import { orbitalEnergyText } from '../format/energy';
@@ -40,8 +40,6 @@ interface MoleculeOrbitalListProps {
 
 /** How many orbitals either side of the HOMO/LUMO boundary a list below Advanced keeps: HOMO−3…LUMO+3. */
 const FRONTIER_WINDOW = 4;
-/** degeneracyCounts' default tolerance: orbitals closer than this are one degenerate group. */
-const DEGENERATE_HARTREE = 1e-4;
 /** Task 2's line where the rest of the list would be (the brief's own words). */
 export const ALL_ORBITALS_POINTER = 'Show all orbitals at Advanced';
 
@@ -98,19 +96,29 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
     const sorted = useMemo(() => [...orbitals].sort((a, b) => b.energyHartree - a.energyHartree), [orbitals]);
     // Below Advanced: the four highest occupied and the four lowest virtual orbitals, plus the one drawn (a link's
     // choice stays listed -- lowering the level never changes what is drawn, Review Focus 2). Ruling T2-M9: an edge
-    // that falls inside a degenerate group moves out to take the whole group (degeneracyCounts' own tolerance).
+    // that falls inside a degenerate group moves out to take the whole group (degenerateGroups: one symmetry label, S4).
+    const groups = useMemo(() => degenerateGroups(orbitals), [orbitals]);
     const rows = useMemo(() => {
         const boundary = sorted.findIndex(o => o.occupation > 0);
         if (allOrbitals || boundary < 0) return sorted;
-        const sameLevel = (a: number, b: number) => Math.abs(sorted[a].energyHartree - sorted[b].energyHartree) < DEGENERATE_HARTREE;
+        const positionOf = new Map(sorted.map((o, position) => [o.index, position]));
         let first = Math.max(0, boundary - FRONTIER_WINDOW);
         let last = Math.min(sorted.length - 1, boundary + FRONTIER_WINDOW - 1);
-        while (first > 0 && sameLevel(first - 1, first)) first--;
-        while (last < sorted.length - 1 && sameLevel(last + 1, last)) last++;
+        // A group's members need not sit side by side (two labels can tie in energy), so widen until every group the
+        // window touches lies wholly inside it.
+        for (let widened = true; widened;) {
+            widened = false;
+            for (let position = first; position <= last; position++) {
+                for (const index of groups.get(sorted[position].index)?.indices ?? []) {
+                    const at = positionOf.get(index) ?? position;
+                    if (at < first) { first = at; widened = true; }
+                    if (at > last) { last = at; widened = true; }
+                }
+            }
+        }
         return sorted.filter((orbital, position) => (position >= first && position <= last) || orbital.index === selectedIndex);
-    }, [allOrbitals, sorted, selectedIndex]);
+    }, [allOrbitals, sorted, selectedIndex, groups]);
     const trimmed = rows.length < sorted.length;
-    const counts = useMemo(() => degeneracyCounts(orbitals), [orbitals]);
     // Ruling T16-b: highest first reads like an MO diagram, but puts the
     // virtuals on top -- so the gap is marked where the occupied orbitals
     // begin, and the list opens with the HOMO in view.
@@ -136,7 +144,7 @@ const MoleculeOrbitalList: React.FC<MoleculeOrbitalListProps> = ({
                 ref={listRef}>
                 {rows.map((orbital, position) => {
                     const role = orbital.role ? String(orbital.role) : null;
-                    const degenerate = counts.get(orbital.index) ?? 1;
+                    const degenerate = groups.get(orbital.index)?.size ?? 1;
                     return (
                         <React.Fragment key={orbital.index}>
                             {/* Ruling T16-b: where the occupied orbitals begin; its words, the gap, are Info's (Task 7b). */}

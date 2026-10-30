@@ -8,7 +8,7 @@ import MoleculeOrbitalList from '../../src/components/MoleculeOrbitalList';
 import MoleculeReadout from '../../src/components/MoleculeReadout';
 import MoleculeViewOptions from '../../src/components/MoleculeViewOptions';
 import {
-    degeneracyCounts, orbitalEnergyWithEstimate, formatPointGroup, orbitalGaps, orbitalTag, isConstructed, textbookLumo,
+    degenerateGroups, orbitalEnergyWithEstimate, formatPointGroup, orbitalGaps, orbitalTag, isConstructed, textbookLumo,
     labelsSentence, AXES_NOTE, GAP_CAVEAT, CONSTRUCTED_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, UNLABELLED_NOTE, VALENCE_VIRTUAL_NOTE,
 } from '../../src/molecules/orbital_display';
 import { LIBRARY_INDEX, waterMeta, waterAtoms } from './fixtures';
@@ -50,9 +50,43 @@ describe('orbital display', () => {
     it('formats energies in eV with Ha beside, and an upper estimate as one', () => {
         expect(orbitalEnergyWithEstimate({ energyHartree: -0.4913 })).toBe('−13.37 eV (−0.491 Ha)');
     });
-    it('counts degenerate sets', () => {
-        const counts = degeneracyCounts([{ index: 2, energyHartree: -0.5 }, { index: 3, energyHartree: -0.50001 }, { index: 4, energyHartree: -0.5 + 1e-5 }, { index: 5, energyHartree: 0.1 }]);
-        expect([counts.get(2), counts.get(5)]).toEqual([3, 1]);
+    // Science correction S4: a degenerate set is what shares a symmetry label, not what happens to lie close in energy.
+    describe('degenerateGroups', () => {
+        const orb = (index: number, label: string, energyHartree: number, spin?: string) => ({ index, label, energyHartree, spin });
+        const sizes = (orbitals: ReturnType<typeof orb>[]) => orbitals.map(o => degenerateGroups(orbitals).get(o.index)?.size);
+        it('leaves NO₂\'s 1b2 and 1a1 (1.9e-5 Ha apart, different labels) at ×1 each', () => {
+            expect(sizes([orb(0, '1b2', -19.24555), orb(1, '1a1', -19.24553), orb(2, '2a1', -14.56683)])).toEqual([1, 1, 1]);
+        });
+        it('groups a pair labelled "1e" as ×2 and a triple labelled "2t2" as ×3', () => {
+            expect(sizes([orb(0, '1e', -0.5), orb(1, '1e', -0.5), orb(2, '1a1', -0.9)])).toEqual([2, 2, 1]);
+            expect(sizes([orb(0, '2t2', -0.3), orb(1, '2t2', -0.3), orb(2, '2t2', -0.3)])).toEqual([3, 3, 3]);
+        });
+        it('keeps a labelled set whole even if an unrelated level ties with it in energy', () => {
+            const orbitals = [orb(0, '1e', -0.5), orb(1, '3a1', -0.5), orb(2, '1e', -0.5)];
+            expect(sizes(orbitals)).toEqual([2, 1, 2]);
+            expect(degenerateGroups(orbitals).get(0)?.bySymmetry).toBe(true);
+        });
+        it('falls back to energy, 1e-4 Ha, for unlabelled "?" orbitals only', () => {
+            expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.5 + 1e-5), orb(2, '?', 0.1)])).toEqual([2, 2, 1]);
+            expect(sizes([orb(0, '?', -0.5), orb(1, '?', -0.5 + 1e-3)])).toEqual([1, 1]);
+            const mixed = [orb(0, '?', -0.5), orb(1, '?', -0.5 + 1e-5), orb(2, '1e', -0.5), orb(3, '1e', -0.5)];
+            expect(sizes(mixed)).toEqual([2, 2, 2, 2]);
+            expect(degenerateGroups(mixed).get(0)?.bySymmetry).toBe(false);
+            // A "?" never joins a labelled orbital that happens to tie with it.
+            expect(sizes([orb(0, '?', -0.5), orb(1, '1a1', -0.5)])).toEqual([1, 1]);
+        });
+        it('groups within one spin, never an alpha with its beta', () => {
+            expect(sizes([orb(0, '1πu', -0.57, 'alpha'), orb(1, '1πu', -0.57, 'alpha'), orb(2, '1πu', -0.47, 'beta'), orb(3, '1πu', -0.47, 'beta')]))
+                .toEqual([2, 2, 2, 2]);
+            expect(sizes([orb(0, '2σg', -0.5, 'alpha'), orb(1, '2σg', -0.5, 'beta')])).toEqual([1, 1]);
+            expect(sizes([orb(0, '?', -0.5, 'alpha'), orb(1, '?', -0.5, 'beta')])).toEqual([1, 1]);
+        });
+        it('groups the real fixtures by label: NO₂ has no pair, N₂ and ethane\'s e sets are ×2', () => {
+            const load = (id: string) => JSON.parse(readFileSync(resolve(__dirname, `../fixtures/molecules/${id}/meta.json`), 'utf8')).orbitals;
+            expect(new Set(sizes(load('no2')))).toEqual(new Set([1]));
+            expect(sizes(load('n2'))).toEqual([1, 1, 1, 1, 2, 2, 1, 2, 2, 1]);
+            expect(sizes(load('c2h6')).filter(n => n === 2)).toHaveLength(8);
+        });
     });
     // D34: PySCF writes Dooh/Coov (ASCII for infinity); the UI shows the
     // conventional D∞h/C∞v wherever a point group is displayed.
@@ -92,13 +126,42 @@ describe('MoleculeOrbitalList', () => {
         // Ruling T2-M9: a degenerate pair at either edge of the window comes in whole (benzene's e1g/e2u pattern).
         it('widens the window rather than split a degenerate pair at its edge', () => {
             const paired = ladder.map(o => ({ ...o }));
-            // o1/o2 (HOMO−4/HOMO−3) and o9/o10 (LUMO+3/LUMO+4) become degenerate pairs.
+            // o1/o2 (HOMO−4/HOMO−3) and o9/o10 (LUMO+3/LUMO+4) become degenerate pairs: one symmetry label each (S4).
             paired[1].energyHartree = paired[2].energyHartree;
             paired[10].energyHartree = paired[9].energyHartree;
+            paired[2].label = paired[1].label;
+            paired[10].label = paired[9].label;
             render(<MoleculeOrbitalList orbitals={paired} selectedIndex={null} onSelect={() => {}} allOrbitals={false} />);
-            expect(labels()).toEqual(expect.arrayContaining(['o10', 'o9', 'o2', 'o1']));
-            expect(labels()).not.toContain('o0');
-            expect(labels()).not.toContain('o11');
+            // The pairs share a label ("o9" twice, "o1" twice), and each comes in whole; o0 and o11 stay out.
+            expect(labels()).toEqual(['o9', 'o9', 'o8', 'o7', 'o6', 'o5', 'o4', 'o3', 'o1', 'o1']);
+        });
+
+        // S4: the same near-tie across two different labels is not a pair, so the edge does not move for it.
+        it('does not widen the window for an energy tie between different labels', () => {
+            const tied = ladder.map(o => ({ ...o }));
+            tied[1].energyHartree = tied[2].energyHartree - 1e-5;
+            tied[10].energyHartree = tied[9].energyHartree + 1e-5;
+            render(<MoleculeOrbitalList orbitals={tied} selectedIndex={null} onSelect={() => {}} allOrbitals={false} />);
+            expect(labels()).toEqual(['o9', 'o8', 'o7', 'o6', 'o5', 'o4', 'o3', 'o2']);
+            expect(screen.queryByText(/×\d/)).toBeNull();
+        });
+
+        it('marks ×2 on a pair labelled alike and nothing on a tie between two labels (NO₂)', () => {
+            const rowOf = (label: string) => screen.getAllByRole('button').filter(b => b.textContent?.startsWith(label));
+            render(<MoleculeOrbitalList selectedIndex={null} onSelect={() => {}} orbitals={[
+                { index: 0, label: '1b2', energyHartree: -19.24555, occupation: 2 },
+                { index: 1, label: '1a1', energyHartree: -19.24553, occupation: 2 },
+                { index: 2, label: '1e', energyHartree: -0.5, occupation: 2 },
+                { index: 3, label: '1e', energyHartree: -0.5, occupation: 2 },
+                { index: 4, label: '?', energyHartree: 0.1, occupation: 0 },
+                { index: 5, label: '?', energyHartree: 0.1 + 1e-5, occupation: 0 },
+                { index: 6, label: '?', energyHartree: 0.3, occupation: 0 },
+                { index: 7, label: '?', energyHartree: 0.3 + 1e-3, occupation: 0 },
+            ] as ReturnType<typeof waterMeta>['orbitals']} />);
+            for (const label of ['1b2', '1a1']) expect(rowOf(label)[0]).not.toHaveTextContent('×');
+            expect(rowOf('1e').map(r => r.textContent?.includes('×2'))).toEqual([true, true]);
+            const unknown = rowOf('?');
+            expect(unknown.map(r => r.textContent?.includes('×2'))).toEqual([false, false, true, true]);
         });
 
         // Ruling T2-energies: below Explore the rows keep their names, occupancy and chips, not their energies.

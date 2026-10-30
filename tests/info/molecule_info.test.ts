@@ -381,6 +381,31 @@ describe('moleculeInfo (Task 7b)', () => {
         expect(research).toContain('Orbital energy5.17 eV (0.190 Ha), upper estimate');
     });
 
+    // S4: Info's "one of N" follows the same groups as the orbital list: a label's set is "degenerate orbitals", an
+    // unlabelled set is still "with the same energy", and a near-tie across two labels is no set at all.
+    describe('"one of N" follows the symmetry groups', () => {
+        const lead = (orbitals: unknown[], index: number) => flat(shownAt(
+            moleculeState(waterMeta({ orbitals }), store => store.dispatch(setSurface({ kind: 'mo', index }))), 'basics'));
+        const orbitals = [
+            { index: 0, label: '1b2', energyHartree: -19.24555, occupation: 2 },
+            { index: 1, label: '1a1', energyHartree: -19.24553, occupation: 2 },
+            { index: 2, label: '1e', energyHartree: -0.5, occupation: 2 },
+            { index: 3, label: '1e', energyHartree: -0.5, occupation: 2, role: 'HOMO' },
+            { index: 4, label: '?', energyHartree: 0.1, occupation: 0, role: 'LUMO' },
+            { index: 5, label: '?', energyHartree: 0.1 + 1e-5, occupation: 0 },
+        ];
+        it('says "degenerate orbitals" for a labelled pair', () => {
+            expect(lead(orbitals, 2)).toContain('1e is one of H₂O\'s molecular orbitals, one of 2 degenerate orbitals.');
+        });
+        it('names no set for two labels that tie in energy', () => {
+            expect(lead(orbitals, 0)).toContain('1b2 is one of H₂O\'s molecular orbitals.');
+            expect(lead(orbitals, 0)).not.toContain('one of 2');
+        });
+        it('keeps "with the same energy" for an unlabelled pair, grouped by its energy', () => {
+            expect(lead(orbitals, 4)).toContain('one of 2 with the same energy');
+        });
+    });
+
     // Fix round 1 (I3): real NO₂ (tests/fixtures/molecules/no2/meta.json) -- its SOMO 6a1 (−0.230 Ha) lies above its
     // doubly occupied HOMO 4b2 (−0.377 Ha), so the HOMO is not "the highest that holds electrons".
     describe('an open shell whose SOMO lies above its HOMO (NO₂)', () => {

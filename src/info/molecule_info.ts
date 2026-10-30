@@ -26,7 +26,7 @@ import { formatFormula } from '../molecules/catalogue';
 import { moleculeTitle } from '../export/caption';
 import {
     CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, DIFFUSE_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, VALENCE_THRESHOLD,
-    degeneracyCounts, diffuseDescription, gapTerm, isConstructed, isUpperEstimate, kohnShamNote, labelNotes,
+    degenerateGroups, diffuseDescription, gapTerm, isConstructed, isUpperEstimate, kohnShamNote, labelNotes,
     labelsSentence, orbitalEnergyWithEstimate, orbitalGaps,
 } from '../molecules/orbital_display';
 import {
@@ -87,9 +87,6 @@ function paragraphs(...parts: Array<string | null | false | undefined>): React.R
     return parts.filter((part): part is string => Boolean(part)).map(withSubscripts);
 }
 
-/** Orbitals closer than this are one level (degeneracyCounts' own tolerance). */
-const SAME_LEVEL_HARTREE = 1e-4;
-
 /**
  * One orbital in plain words: what it is, how many electrons it holds, its frontier role and what its data flag.
  * Fix round 1 (I3): an open shell's HOMO is the highest *doubly* occupied orbital -- NO₂'s SOMO (6a1) lies above its
@@ -99,8 +96,12 @@ const SAME_LEVEL_HARTREE = 1e-4;
  * above it is "the highest that holds electrons"; the HOMO says how many SOMOs lie above it, if any do.
  */
 function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: MoleculeOrbitalInfo[]): { lead: string; more: string } {
-    const degenerate = degeneracyCounts(orbitals).get(orbital.index) ?? 1;
-    const others = degenerate > 1 ? `, one of ${degenerate} with the same energy` : '';
+    const groups = degenerateGroups(orbitals);
+    const group = groups.get(orbital.index);
+    const degenerate = group?.size ?? 1;
+    // S4: a set marked by its symmetry label is "degenerate orbitals"; only an unlabelled ('?') set, grouped by its energy
+    // alone, says what was measured -- "the same energy".
+    const others = degenerate > 1 ? `, one of ${degenerate} ${group?.bySymmetry ? 'degenerate orbitals' : 'with the same energy'}` : '';
     // Task 9b (finish review, fix 5): the lead keeps to three lines -- what the orbital is. What a constructed one is, how
     // full it is, its role and what its data flag follow the facts (the first note): a Basics strip tile (HOMO, LUMO,
     // LVMO) opened a lead of up to ten lines.
@@ -111,7 +112,7 @@ function orbitalWords(formula: string, orbital: MoleculeOrbitalInfo, orbitals: M
     const held = orbital.role === 'SOMO' ? null
         : orbital.occupation === 0 ? 'It is empty.'
         : `It holds ${orbital.occupation} ${plural(orbital.occupation, 'electron', 'electrons')}.`;
-    const above = (o: MoleculeOrbitalInfo) => o.energyHartree > orbital.energyHartree + SAME_LEVEL_HARTREE;
+    const above = (o: MoleculeOrbitalInfo) => o.energyHartree > orbital.energyHartree && groups.get(o.index) !== group;
     const highest = !orbitals.some(o => o.occupation > 0 && above(o));
     const somosAbove = orbitals.filter(o => o.role === 'SOMO' && above(o)).length;
     const role = orbital.role === 'HOMO'
