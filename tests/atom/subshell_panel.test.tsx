@@ -402,14 +402,17 @@ describe('SubshellPanel with spin–orbit', () => {
         for (const energy of energies) expect(energy.getAttribute('title')).toMatch(/Koelling–Harmon/);
     });
 
-    it('leaves the non-relativistic panel exactly as it was', () => {
+    it('keeps the non-relativistic panel to its (n, l) chips, with the full energy in each name and tooltip', () => {
         const onSelectSubshell = jest.fn();
         const { container } = render(
             <SubshellPanel subshells={neonLikeSubshells()} shellN={2} selectedSubshell={{ n: 2, l: 1 }}
                 onSelectSubshell={onSelectSubshell} onSelectOrbital={() => {}} />
         );
         const chips = container.querySelectorAll('.subshell-chip');
-        expect(Array.from(chips).map(c => c.getAttribute('aria-label'))).toEqual([null, null]);
+        // Science corrections S2 (fix round 1): a plain chip's accessible name carries the full orbitalEnergyText too.
+        expect(Array.from(chips).map(c => c.getAttribute('aria-label'))).toEqual([
+            '2s, 2 of 2 electrons, −35.37 eV (−1.300 Ha) orbital energy (non-relativistic LDA)',
+            '2p, 6 of 6 electrons, −13.61 eV (−0.500 Ha) orbital energy (non-relativistic LDA)']);
         expect(Array.from(chips).map(c => c.getAttribute('data-j'))).toEqual([null, null]);
         // Science corrections S2: the tooltip is the full-precision energy, with no method to state.
         expect(Array.from(container.querySelectorAll('.subshell-chip-energy')).map(e => e.getAttribute('title')))

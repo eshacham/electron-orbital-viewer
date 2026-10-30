@@ -34,6 +34,8 @@ describe('AtomExplore (spec §9.1)', () => {
         const table = screen.getByRole('table', { name: 'orbital energies, whole atom' });
         expect(screen.getAllByRole('columnheader').map(header => header.textContent)).toEqual(['Subshell', 'Electrons', 'Energy (eV)', '(Ha)']);
         const row = screen.getByRole('row', { name: /2p/ });
+        // Fix round 1: the "(Ha)" header keeps its visible text, and its accessible name says what it is.
+        expect(screen.getByRole('columnheader', { name: 'Energy (Ha)' })).toHaveTextContent('(Ha)');
         expect(Array.from(row.querySelectorAll('td')).map(cell => cell.textContent).slice(-2)).toEqual(['−5.41', '−0.199']);
         expect(table.textContent).not.toMatch(/\d Ha/);
     });

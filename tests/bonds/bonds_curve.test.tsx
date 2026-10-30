@@ -8,6 +8,7 @@ import BondsCurvePlot from '../../src/components/BondsCurvePlot';
 import reducer, { selectBondsSystem, setBondsView, setH2PlusR, setScanPoint } from '../../src/store/bondsSlice';
 import { CURVE_COLORS } from '../../src/curve_colors';
 import { HARTREE_TO_EV } from '../../src/bonds/systems';
+import { nb } from '../../src/format/text';
 import { MoleculeScan } from '../../src/molecules/types';
 
 const n2Scan: MoleculeScan = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/molecules/n2/scan.json'), 'utf8'));
@@ -122,11 +123,11 @@ describe('h2plusCurveSpec', () => {
         expect(spec.unit).toBe('eV');
         expect(spec.series[0].points[2].E).toBeCloseTo((-0.6026 + 0.5) * HARTREE_TO_EV, 10);
         expect(spec.series[2].points.map(p => p.E)).toEqual([0, 0]);
-        expect(spec.referenceR).toEqual({ R: 1.9971924, label: 'Dotted line: R_e = 1.997 a₀ (1.057 Å), E = −16.40 eV (−0.6026 Ha); D_e = 2.79 eV (0.1026 Ha) to H + H⁺.',
+        expect(spec.referenceR).toEqual({ R: 1.9971924, label: `Dotted line: R_e = 1.997 a₀ (1.057 Å), E = ${nb('−16.40 eV (−0.6026 Ha)')}; D_e = 2.79 eV (0.1026 Ha) to H + H⁺.`,
             plainLabel: 'Dotted line: most stable, 1.06 Å' });
         // Task 7a: the exact method is H2PLUS_CAPTIONS' (Info); the plot's own note is its zero.
         expect(spec).not.toHaveProperty('caption');
-        expect(curveNote('h2plus', null)).toBe('Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (−13.61 eV, −0.5 Ha), the grey line.');
+        expect(curveNote('h2plus', null)).toBe(`Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (${nb('−13.61 eV, −0.5 Ha')}), the grey line.`);
         expect(h2plusCurveSpec(curve, 0.1).markerR).toBe(0.5);
     });
 

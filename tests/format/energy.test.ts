@@ -1,3 +1,4 @@
+import { nb } from '../../src/format/text';
 import { evText, totalEnergyPairText, totalEnergyText, orbitalEnergyText, hartreeText } from '../../src/format/energy';
 
 // Science corrections S2: the last Ha-first energies read eV first, through the one shared formatter.
@@ -13,23 +14,35 @@ describe('evText', () => {
 
 describe('totalEnergyText', () => {
     it('is eV to 2 decimals, then Ha to 6, a true minus', () => {
-        expect(totalEnergyText(-76.358723)).toBe('−2077.83 eV (−76.358723 Ha)');
-        expect(totalEnergyText(0.021134)).toBe('0.575 eV (0.021134 Ha)');
+        expect(totalEnergyText(-76.358723)).toBe(nb('−2077.83 eV (−76.358723 Ha)'));
+        expect(totalEnergyText(0.021134)).toBe(nb('0.575 eV (0.021134 Ha)'));
+    });
+    it('holds its number and unit on one line (no-break spaces)', () => {
+        expect(totalEnergyText(-76.358723)).not.toMatch(/ /);
     });
     it('keeps a small eV value to three significant figures, never a rounded −0.00 eV', () => {
-        expect(totalEnergyText(-0.000574)).toBe('−0.0156 eV (−0.000574 Ha)');
-        expect(totalEnergyText(-0.00004)).toBe('−0.00109 eV (−0.000040 Ha)');
-        expect(totalEnergyText(-0.00002)).toBe('−5.44 × 10⁻⁴ eV (−0.000020 Ha)');
-        expect(totalEnergyText(0)).toBe('0 eV (0.000000 Ha)');
+        expect(totalEnergyText(-0.000574)).toBe(nb('−0.0156 eV (−0.000574 Ha)'));
+        expect(totalEnergyText(-0.00004)).toBe(nb('−0.00109 eV (−0.000040 Ha)'));
+        expect(totalEnergyText(-0.00002)).toBe(nb('−5.44 × 10⁻⁴ eV (−0.000020 Ha)'));
+        expect(totalEnergyText(0)).toBe(nb('0 eV (0.000000 Ha)'));
     });
     it('takes the Ha places the caller needs (H₂⁺ quotes four)', () => {
-        expect(totalEnergyText(-0.6026342, 4)).toBe('−16.40 eV (−0.6026 Ha)');
+        expect(totalEnergyText(-0.6026342, 4)).toBe(nb('−16.40 eV (−0.6026 Ha)'));
+    });
+});
+
+describe('evText at core energies', () => {
+    it('is a whole number from 1000 eV up, never × 10³ (Mg 1s, −49.2 Ha)', () => {
+        expect(evText(-49.2)).toBe('−1339 eV');
+        expect(evText(-36.7)).toBe('−999 eV'); // still three significant figures below 1000 eV
+        expect(evText(-37)).toBe('−1007 eV');
+        expect(evText(-9.3)).toBe('−253 eV');
     });
 });
 
 describe('totalEnergyPairText', () => {
     it('is the same two numbers joined by a comma, for a place that is itself in brackets', () => {
-        expect(totalEnergyPairText(-0.5, 1)).toBe('−13.61 eV, −0.5 Ha');
+        expect(totalEnergyPairText(-0.5, 1)).toBe(nb('−13.61 eV, −0.5 Ha'));
     });
 });
 

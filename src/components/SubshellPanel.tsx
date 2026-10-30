@@ -191,14 +191,14 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                     data-j={subshell.j}
                                     // "6p³⁄₂" is read aloud as superscripts and a
                                     // fraction slash; a j-level chip says "6p j = 3/2"
-                                    // instead. Without j the visible text already
-                                    // reads well and stays the name. The name replaces
-                                    // the visible text, whose energy states its method
-                                    // only as a hover title, so it names the method
-                                    // too (spec §3.1, final review M8).
-                                    aria-label={subshell.j === undefined ? undefined
-                                        : `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons`
-                                            + (showEnergies ? `, ${fullEnergy} orbital energy (${shortMethodLabel(relativity)})` : '')}
+                                    // instead (subshellSpokenLabel). Every chip's name
+                                    // replaces the visible text, whose energy is three
+                                    // figures of eV with its method only as a hover
+                                    // title, so it carries the full orbitalEnergyText
+                                    // and names the method too (spec §3.1, final
+                                    // review M8; science corrections S2).
+                                    aria-label={`${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons`
+                                        + (showEnergies ? `, ${fullEnergy} orbital energy (${shortMethodLabel(relativity)})` : '')}
                                     color={isSelected ? 'primary' : 'default'}
                                     // A toggle, not a one-way selection: pressed means
                                     // this subshell's orbitals are isolated in the 3D

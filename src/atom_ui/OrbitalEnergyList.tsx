@@ -25,7 +25,7 @@ const OrbitalEnergyList: React.FC<{ subshells: SerialisedSubshell[] }> = ({ subs
             </span>
         </caption>
         <thead>
-            <tr><th scope="col">Subshell</th><th scope="col">Electrons</th><th scope="col">Energy (eV)</th><th scope="col">(Ha)</th></tr>
+            <tr><th scope="col">Subshell</th><th scope="col">Electrons</th><th scope="col">Energy (eV)</th><th scope="col" aria-label="Energy (Ha)">(Ha)</th></tr>
         </thead>
         <tbody>
             {[...subshells].sort((a, b) => a.energy - b.energy).map(subshell => (
