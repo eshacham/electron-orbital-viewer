@@ -114,6 +114,29 @@ What a reader will notice, in the order they will meet it.
 - Ha 100 rounding cases (−99.9996 → "−100.0", −99.9994 → "−99.999") and the exact 8 px band gap are pinned.
 - act() warnings: not worked on (optional); the full run prints 47 "not wrapped in act" lines both before and after.
 
+## Finish-review captures
+
+Taken 2026-10-30 at `c23a31c` (its own Vite on 5411, headless Chromium, `--gl metal --jobs-stub --level research`, stopped after each run;
+0 page errors except the LVMO shot's three expected `ERR_BLOCKED_BY_CLIENT` lines). New tool options: scenes `bonds-b2`, `bonds-c2`
+(tools/design/scenes.json); `--clip '<selector> || <selector>' [--clip-pad px]` (a screenshot of the union of those elements' boxes)
+and the size `1280-tall` (1280 x 1500, so the Explore panel shows a whole energy table) in tools/design/shoot.mjs. No app code changed.
+
+- **MO box hover, N2 at 1280, Research, 2x** (`--hover "1πu orbital (2 of 2), 2 electrons"`, crop = the 1πu level plus 6 px): the right-hand box is hovered,
+  its partner at rest beside it. Surface-3 fill and the border-strong hairline on the three non-line edges read on both cards.
+  `mo-hover-n2-dark.png`, `mo-hover-n2-light.png`.
+- **Folded band with two levels.** B2 at its opening point (R = 3.005 a0) and C2 at its (R = 2.348 a0) both fold **1πg\* and 3σu\*** under
+  "≈ higher empty levels": two boxes then label, 8 px, one box then label, on one row. The MO section at 1280 and on a 390 phone
+  (Explore sheet), 2x. The band does **not** wrap on either: the diagram is a fixed 260 px wide on every layout (the same crop at 1280
+  and phone), and its two levels take 142 px of the 222 px row; the wrap path is pinned by `tests/bonds/mo_layout.test.ts`, not shown.
+  `mo-folded-band-b2-1280.png`, `mo-folded-band-b2-phone.png`, `mo-folded-band-c2-1280.png`, `mo-folded-band-c2-phone.png`.
+- **Full energy tables, 1280, Research, with spin-orbit** (Orbitals tab; the `table` element itself, on a 1500 px tall window so nothing scrolls):
+  gold's 22 rows, 1s½ to 6s½ (1 of 2); lead's 24 rows, 1s½ to 6p3/2 (1.33 of 4). Table 266 / 266 wide, no sideways scroll.
+  `table-gold-so-1280.png`, `table-lead-so-1280.png` (overwritten).
+- **LVMO Info at 232 px** (`computed-water-lvmo`, desktop, 2x, `--info-width 232`): cropped from the top of Info to the bottom of Properties'
+  Structure row, no empty background below. `facts-lvmo-info-232.png` (overwritten).
+- **Review shots** (git-ignored `.impeccable/review/`, not committed): Bonds N2 Research, `desktop.png` and `desktop-light.png` (1440 x 900),
+  `mobile.png` (390 x 844, Explore tab open) and `mobile-first-screen.png` (390 x 844, as the page opens), at this HEAD, 1x.
+
 ## Pending (controller)
 - [ ] **Finish review** — pending (controller).
 - [ ] **DESIGN.md** — pending (controller).

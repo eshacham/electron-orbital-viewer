@@ -70,6 +70,8 @@ const SIZES = {
   // 1920 px); 1440 is already `desktop`.
   '1280': { width: 1280, height: 900 },
   '1920': { width: 1920, height: 1080 },
+  // Final polish finish review: 1280 wide and tall enough that the Explore panel shows a whole 24-row energy table.
+  '1280-tall': { width: 1280, height: 1500 },
   tablet: { width: 1024, height: 768 },
   phone: { width: 390, height: 844, mobile: true },
   'phone-landscape': { width: 844, height: 390, mobile: true },
@@ -118,6 +120,11 @@ const drawerOpen = arg('drawer', 'folded') === 'open';
 // periodic-table miniature, ruling R23d -- can be checked for crispness
 // without upscaling a raster after the fact.
 const cropSelector = arg('crop', null);
+// --clip '<selector> || <selector>' [--clip-pad <px>]: a screenshot of the union of those elements' boxes, grown by the
+// pad (default 8) and kept inside the viewport -- for a region that is not one element (Info and Properties together,
+// a hovered box beside its partner with a little context). Written beside the crop as ...-clip.png.
+const clipSelectors = arg('clip', null);
+const clipPad = Number(arg('clip-pad', '8'));
 const ownerSession = process.argv.includes('--owner-session');
 const jobsStub = process.argv.includes('--jobs-stub');
 const previewFixture = arg('preview-fixture', 'preview_ok');
@@ -912,6 +919,22 @@ try {
             await crop.screenshot({ path: cropFile });
           }
         }
+        let clipFile = null;
+        if (clipSelectors) {
+          const boxes = [];
+          for (const selector of clipSelectors.split('||').map(t => t.trim())) {
+            const target = page.locator(selector).first();
+            if (!(await target.count())) throw new Error(`--clip: nothing matches ${selector}`);
+            await target.scrollIntoViewIfNeeded();
+            boxes.push(await target.boundingBox());
+          }
+          const left = Math.max(0, Math.min(...boxes.map(b => b.x)) - clipPad);
+          const top = Math.max(0, Math.min(...boxes.map(b => b.y)) - clipPad);
+          const right = Math.min(spec.width, Math.max(...boxes.map(b => b.x + b.width)) + clipPad);
+          const bottom = Math.min(spec.height, Math.max(...boxes.map(b => b.y + b.height)) + clipPad);
+          clipFile = `/tmp/6g1-${task}-${scene}-${theme}-${size}-clip.png`;
+          await page.screenshot({ path: clipFile, clip: { x: left, y: top, width: right - left, height: bottom - top } });
+        }
         await page.addStyleTag({ content: '#orbital-canvas-host canvas { visibility: hidden !important; }' });
         await page.waitForTimeout(150);
         const off = await sampleColours(page, await page.screenshot(), size);
@@ -924,7 +947,7 @@ try {
           }
         }
         results.push({ scene, theme, size, level, file, cropFile, settled, metrics, colours: judge(on, off, theme), errors });
-        console.log(`${file}  settled=${settled}  webgl=${metrics.webglCanvases}  webglCreated=${metrics.webglContextsCreated}  errors=${errors.length}${cropFile ? `  crop=${cropFile}` : ''}${jobsStub ? `  api seen=${api.seen.length} stubbed=${api.stubbed.length} refused=${api.refused.length}` : ''}`);
+        console.log(`${file}  settled=${settled}  webgl=${metrics.webglCanvases}  webglCreated=${metrics.webglContextsCreated}  errors=${errors.length}${cropFile ? `  crop=${cropFile}` : ''}${clipFile ? `  clip=${clipFile}` : ''}${jobsStub ? `  api seen=${api.seen.length} stubbed=${api.stubbed.length} refused=${api.refused.length}` : ''}`);
         await context.close();
       }
     }
