@@ -179,3 +179,52 @@ node tools/design/science_diff.mjs /tmp/6g1-sc-T6-main-merged.json /tmp/6g1-sc-T
 `fe2-shell3`, `ga3-ion`, `gd3-ion` and `silane`. The geometry, contrast and ×N measurements were taken with one-off
 Playwright scripts (not committed): they read `getBoundingClientRect`, `getComputedStyle` and the Orbital list rows
 of all 25 library molecules on both sides.
+
+## Finish-review captures
+
+**Taken 2026-10-30 at head `bcea6e3`** for the Impeccable finish review: `--gl metal --jobs-stub`, own Vite on 5413, stopped
+after each run, 0 page errors (the computed-water runs log the same expected `ERR_BLOCKED_BY_CLIENT` lines as above).
+Research and dark unless the name says otherwise. Full-viewport means 1440 × 900 or 390 × 844, not scrolled and not cropped,
+unless the name says "scrolled".
+
+**1. The four review files in `.impeccable/review/`** (git-ignored folder, added with `-f`), now the Bonds tab, N₂, Research, dark.
+The old four showed the owner dashboard (`admin.html`), not Bonds; they are replaced as asked. Framing as before: desktop and
+desktop-light 1440 × 900 viewports; `mobile-first-screen.png` the 390 × 844 first screen (canvas, sheet collapsed to its tab bar).
+The Bonds phone page does not scroll (document height 844 px, measured), so "full page" is 390 × 844: `mobile.png` is that page with
+the Explore sheet open (same picture as `bonds-n2-dark-phone-full.png`), where the old dashboard page was 390 × 1533.
+- `.impeccable/review/desktop.png` (dark), `desktop-light.png` (light), `mobile.png`, `mobile-first-screen.png`.
+
+**2. Bonds, desktop (the Molecular orbitals section sits below the fold on purpose: this is what a 1440 × 900 window shows)**
+- `bonds-o2-dark-desktop-full.png`, `bonds-n2-dark-desktop-full.png`, `bonds-co-dark-desktop-full.png`, `bonds-n2-light-desktop-full.png`
+- `bonds-n2-dark-desktop-basics-full.png` (level Basics)
+
+**3. Bonds, phone (390 × 844, Explore sheet opened with `--click Explore`)**
+- `bonds-o2-dark-phone-full.png`, `bonds-n2-dark-phone-full.png`: the sheet's first screen.
+- `bonds-o2-dark-phone-full-scrolled.png`, `bonds-n2-dark-phone-full-scrolled.png`: scrolled inside the sheet (`--scroll "≈ core"`, the
+  label at the diagram's foot) until the whole MO diagram shows, the sheet's top edge in view.
+
+**4. Molecules provenance ("How this was computed" is open by default at Research; clicking it would close it)**
+- `mol-water-provenance-dark-desktop.png`, `mol-water-provenance-dark-phone.png` (Info tab): scrolled to the footer, so the whole
+  "Total energy −2080.78 eV (−76.467311 Ha), including −0.0156 eV (−0.000574 Ha) of D3(BJ)." and its wrap are visible.
+- `mol-water-computed-provenance-dark-desktop.png`: `computed-water-structure` with `--computed-meta`, showing the total energy and
+  "zero-point energy 0.575 eV (0.021134 Ha)". **The committed `computed_water_meta.json` has no `frequencyCheck`**, so the run used a copy
+  in `/tmp` with one field added: `frequencyCheck` = minimum, 0 imaginary, `zeroPointEnergyHartree` 0.021134 (the value
+  `tests/jobs/provenance_panel.test.tsx` uses). The ZPE number is a layout stand-in, not a computed water value.
+
+**5. Atoms, Fe, phone 390 (Advanced)**
+- `atom-fe-subshell-chips-phone.png`: `fe-shell`, Explore sheet scrolled to "Subshells": the shell chips with their dots and the
+  whole subshell chip column (3s, 3p, 3d, eV first).
+- `atom-fe-energy-table-phone.png`: **not taken.** The Orbital energies table is the Orbitals tab of the desktop Explore panel
+  (`AtomExplore`); the phone sheet (Explore, Info, View, Plot) never mounts `.orbital-energy-list`. Checked on `fe-atom`, `fe-shell` and
+  an orbital scene, at Advanced and Research, in all four tabs. The phone has only the log-scale energy diagram (shell level).
+
+**6. Atoms, Gd³⁺, light, desktop, Advanced**
+- `atom-gd3-ion-light-desktop.png`: "Valence: 5s² 5p⁶ · open 4f⁷", and the N and O shell chips with their dots.
+
+**7. MO tooltip**
+- `mo-n2-tooltip-dark-desktop.png`: N₂, Research, the pointer resting on the 3σg level (the diagram scrolled into view, the pointer held
+  2.5 s). **Headless Chromium does not draw a native `title` tooltip**, so the shot shows the hover state only. The `title`, read through
+  Playwright from `.mo-box`: `3σg: ε = −11.92 eV (−0.438 Ha)`; its accessible name is `3σg orbital, 2 electrons`.
+
+Scripted with `shoot.mjs` (`--task rc`) except the tooltip, which needed a hover on a control with no accessible name of its own and
+a read of `title`: a one-off Playwright script, same Chromium arguments, not committed.
