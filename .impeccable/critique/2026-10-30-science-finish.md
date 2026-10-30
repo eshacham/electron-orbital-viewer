@@ -106,3 +106,50 @@ Paths:
 - /Users/eyalshacham/conductor/workspaces/electron-orbital-viewer/quantumlab/docs/quantumlab/checks/science/CHECKLIST.md
 
 disposition: fix
+
+
+---
+
+# Verdict pass (HEAD ff60c71)
+
+The fix didn't fully land: one sentence in the new DESIGN.md text describes the tick rule wrongly, so the disposition stays fix. Everything else in both fixes checks out.
+
+I read the full diffs of c4be822 and ff60c71, both new captures, and `src/bonds/mo_layout.ts` and `MoDiagram.tsx` as far as needed to check what the docs claim. I did not re-read the rest of DESIGN.md or design.json.
+
+## verdict
+
+1. **Record S1 in DESIGN.md and design.json: partial.**
+   - **Landed:**
+     - The new "MO Diagram (Bonds, science corrections S1)" section covers every point the review asked for: the 5 px/eV scale with the 320 px cap, the "scale reduced to fit" note, the eV unit's placement, both breaks and their rules (including that H₂⁺ never has a core break and a half-filled level counts as filled), the sideways-only collision rule with its 8 px gap, and the eV-first tooltip.
+     - The documented sizes match the code (`mo_layout.ts` lines 9–47, `MoDiagram.tsx:33`, `style.css:1074`): 260 px width, 34 px gutter, levels at 38 px, 4 px ticks, 16 px minimum tick gap, 11/13 px break labels in `text-2`.
+     - The True Height Rule is in both files. The eV First addition matches what the earlier captures show.
+     - design.json has a new "MO Diagram" component. Its N₂ sample is internally consistent: −10 and −20 are 50 px apart, 3σg sits at −11.9 eV, and the upper break and unit are placed as documented.
+   - **Wrong: the shrunk-scale tick sentence.** DESIGN.md says: "On a shrunk scale they take the first coarser step (20, 50, 100, …) that keeps them at least 16 px apart." That reads as "a shrunk scale always goes coarser," and the code and the new capture both disagree:
+     - In `mo_layout.ts:162–179`, a shrunk scale keeps its 5 or 10 eV step and only moves up the list (10 → 20 → 50 …) while ticks would sit under 16 px apart. The comment at line 130 says exactly that.
+     - The new O₂ capture is shrunk but keeps the 10 eV step (+20 down to −40, about 39 px apart).
+     - The fix is one sentence, e.g.: "On a shrunk scale the step stays, unless the ticks would fall under 16 px apart; then it takes the first coarser step (20, 50, 100, …) that clears 16 px."
+2. **Capture O₂ at a shrinking scan point, desktop and phone: resolved.**
+   - Both crops are valid. Desktop is 281×357, phone is 356×357, no blank regions, and the content is what the filenames say.
+   - Both show O₂ at scan point 00 (R = 1.825 a₀, Research, dark) with "scale reduced to fit" under the axis.
+   - The ticks run every 10 eV from +20 to −40, about 39 px apart, so the scale has shrunk to about 3.9 px/eV.
+   - Levels stay at their true heights. 3σu* is drawn to scale at about +24 eV with no upper break. 1πg* is half-filled and stays to scale. 3σg sits beside 1πu, offset sideways only. The core band (1σg, 1σu*) sits under "≈ core".
+   - The captures were taken at `8198852`. The source hasn't changed since: the two commits after it touch only docs, the critique file and `scenes.json`.
+
+**Regressions from this fix batch:** one, the tick sentence above. It's new text that disagrees with the code and with the batch's own evidence. Nothing else in the batch falls below the bar.
+
+## remaining
+
+- In DESIGN.md's "MO Diagram (Bonds, science corrections S1)" section, under **Axis**, reword the shrunk-scale tick sentence so it says the step only goes coarser when ticks would fall under 16 px apart, as `mo_layout.ts:130` and `:178` do. design.json doesn't state the tick rule, so it needs no change.
+
+Fix 2 earns a clean result, but that covers only the two scored fixes, not the whole surface. Fix 1 is still partial, so the result can't be ship.
+
+Paths:
+- /Users/eyalshacham/conductor/workspaces/electron-orbital-viewer/quantumlab/DESIGN.md
+- /Users/eyalshacham/conductor/workspaces/electron-orbital-viewer/quantumlab/.impeccable/design.json
+- /Users/eyalshacham/conductor/workspaces/electron-orbital-viewer/quantumlab/src/bonds/mo_layout.ts
+- /Users/eyalshacham/conductor/workspaces/electron-orbital-viewer/quantumlab/docs/quantumlab/checks/science/mo-o2-shrunk-dark-desktop.png
+- /Users/eyalshacham/conductor/workspaces/electron-orbital-viewer/quantumlab/docs/quantumlab/checks/science/mo-o2-shrunk-dark-phone.png
+
+disposition: fix
+
+**Controller:** the one remaining item (the shrunk-scale tick sentence) was corrected in 3eba628 with the reviewer's own wording; nothing else was open.
