@@ -70,7 +70,8 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(onOpenChange).not.toHaveBeenCalled();
 
-        const tab = screen.getByRole('tab', { name: 'Data' });
+        // F5: the drawer has no inner tab row; the bar's open tab is where focus starts.
+        const tab = screen.getByRole('button', { name: 'Data panel' });
         tab.focus();
         // Already handled by a control inside the drawer (e.g. its own popup): not the drawer's.
         const handled = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
@@ -239,6 +240,60 @@ describe('Inspector sections (ruling R24-3)', () => {
         fireEvent.click(header('Display'));
         expect(screen.getByRole('region', { name: 'Display' })).toBeInTheDocument();
         expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    // Final polish F5: the open drawer's bar already says Plot . Data and drives the tab, so the section does not
+    // repeat the row. It is not rendered (not merely hidden), so it also leaves the tab order.
+    describe('the drawer shows Plot . Data once, in its bar (final polish F5)', () => {
+        const withControl = [
+            { key: 'plot', label: 'Plot', content: <button type="button">plot control</button> },
+            { key: 'data', label: 'Data', content: <button type="button">data control</button> },
+        ];
+        const section = (activeTab = 'plot', onTab: (key: string) => void = jest.fn()) => ({ key: 'plot', title: 'Plot and data', tabs: withControl, activeTab, onTab });
+        const tabbable = (root: HTMLElement) => Array.from(root.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]'))
+            .filter(el => el.getAttribute('tabindex') !== '-1' && !(el as HTMLButtonElement).disabled);
+
+        it('renders no inner tab row in the drawer, and the bar\'s tabs still switch the tab', () => {
+            const onTab = jest.fn();
+            const onOpenChange = jest.fn();
+            render(<Inspector variant="drawer" sections={[section('plot', onTab)]} open onOpenChange={onOpenChange} />);
+            expect(screen.queryByRole('tablist')).toBeNull();
+            expect(screen.queryByRole('tab')).toBeNull();
+            // The panel is still there, and the bar's open tab names it.
+            expect(screen.getByRole('tabpanel', { name: 'Plot panel' })).toHaveTextContent('plot control');
+            fireEvent.click(screen.getByRole('button', { name: 'Data panel' }));
+            expect(onTab).toHaveBeenLastCalledWith('data');
+        });
+
+        it('shows the other tab\'s content when the bar moves to it, still with no inner row', () => {
+            render(<Inspector variant="drawer" sections={[section('data')]} open onOpenChange={jest.fn()} />);
+            expect(screen.queryByRole('tablist')).toBeNull();
+            expect(screen.getByRole('tabpanel', { name: 'Data panel' })).toHaveTextContent('data control');
+        });
+
+        it('keeps the inner row in the docked and stacked variants', () => {
+            const { unmount } = render(<Inspector variant="docked" sections={[section('plot')]} />);
+            expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Plot', 'Data']);
+            unmount();
+            render(<Inspector variant="stacked" sections={[section('plot')]} />);
+            // The phone sheet stacks the tabs as sections; it never had a tab row.
+            expect(screen.getByRole('region', { name: 'Plot' })).toBeInTheDocument();
+        });
+
+        it('keeps the folded drawer\'s accordion working: Display still opens beside the bar\'s tabs', () => {
+            act(() => { displayPref.set({ ...DEFAULT_DISPLAY, inspectorOpen: 'display' }); });
+            render(<Inspector variant="drawer" sections={[displaySection, section('plot')]} open onOpenChange={jest.fn()} />);
+            expect(screen.queryByRole('tablist')).toBeNull();
+            expect(screen.getByRole('region', { name: 'Display' })).toBeInTheDocument();
+        });
+
+        it('keyboard: Tab from the bar\'s open tab goes through Close panel and the section header to the content, with no stop in between', () => {
+            render(<Inspector variant="drawer" sections={[section('plot')]} open onOpenChange={jest.fn()} />);
+            const aside = screen.getByRole('complementary', { name: 'Inspector' });
+            const order = tabbable(aside).map(el => el.getAttribute('aria-label') ?? el.textContent);
+            const from = order.indexOf('Plot panel');
+            expect(order.slice(from)).toEqual(['Plot panel', 'Data panel', 'Close panel', 'Plot and data', 'plot control']);
+        });
     });
 
     // Task 3 (picture control): a mode with no tabbed section can name one section (`barSection`, Bonds' Data) for the

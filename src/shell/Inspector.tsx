@@ -51,23 +51,28 @@ interface InspectorProps {
     onOpenChange?(open: boolean): void;
 }
 
-/** A tabbed section's inside: its tab row and the active tab's panel. */
-const SectionTabs: React.FC<{ section: InspectorSection }> = ({ section }) => {
+/**
+ * A tabbed section's inside: its tab row and the active tab's panel. In the drawer the bar's own tabs are the row
+ * (final polish F5): `barTabId` names the bar button of a tab, the row is not rendered -- so it is not in the tab order
+ * either -- and the panel is labelled by the bar's button.
+ */
+const SectionTabs: React.FC<{ section: InspectorSection; barTabId?(tabKey: string): string }> = ({ section, barTabId }) => {
     const id = useId();
     const tabs = section.tabs ?? [];
     const active = tabs.find(tab => tab.key === section.activeTab) ?? tabs[0];
     if (!active) return null;
     return (
         <>
-            <TabRow idPrefix={id} label="Inspector" tabs={tabs} active={active.key} onChange={key => section.onTab?.(key)} />
-            <div className="inspector-body" role="tabpanel" id={`${id}-panel-${active.key}`} aria-labelledby={`${id}-tab-${active.key}`}>
+            {!barTabId && <TabRow idPrefix={id} label="Inspector" tabs={tabs} active={active.key} onChange={key => section.onTab?.(key)} />}
+            <div className="inspector-body" role="tabpanel" id={`${id}-panel-${active.key}`} aria-labelledby={barTabId ? barTabId(active.key) : `${id}-tab-${active.key}`}>
                 {active.content}
             </div>
         </>
     );
 };
 
-const sectionInside = (section: InspectorSection) => (section.tabs ? <SectionTabs section={section} /> : <div className="inspector-body">{section.content}</div>);
+const sectionInside = (section: InspectorSection, barTabId?: (tabKey: string) => string) =>
+    (section.tabs ? <SectionTabs section={section} barTabId={barTabId} /> : <div className="inspector-body">{section.content}</div>);
 
 /**
  * Ruling R24-3 (owner): the inspector's sections are titled accordion
@@ -77,7 +82,7 @@ const sectionInside = (section: InspectorSection) => (section.tabs ? <SectionTab
  * hold. Which one is open is a presentation preference (eov.display), never
  * part of a link.
  */
-const Accordion: React.FC<{ sections: InspectorSection[]; openKey: string | null; onToggle(key: string): void }> = ({ sections, openKey, onToggle }) => {
+const Accordion: React.FC<{ sections: InspectorSection[]; openKey: string | null; onToggle(key: string): void; barTabId?(tabKey: string): string }> = ({ sections, openKey, onToggle, barTabId }) => {
     const id = useId();
     return (
         <div className="inspector-sections">
@@ -96,7 +101,7 @@ const Accordion: React.FC<{ sections: InspectorSection[]; openKey: string | null
                         </h2>
                         {isOpen && (
                             <div id={regionId} role="region" aria-labelledby={headerId} className="inspector-section-body">
-                                {sectionInside(section)}
+                                {sectionInside(section, barTabId)}
                             </div>
                         )}
                     </section>
@@ -158,7 +163,11 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
         );
     }
 
-    const content = <Accordion sections={sections} openKey={openKey} onToggle={key => choose(key === openKey ? null : key)} />;
+    // The drawer's bar buttons carry ids, so a tabbed section's panel is named by the bar tab that drives it (F5).
+    const barTabId = (tabKey: string) => `${id}-bar-${tabKey}`;
+    const tabbedHere = sections.some(section => section.tabs?.length);
+    const content = <Accordion sections={sections} openKey={openKey} onToggle={key => choose(key === openKey ? null : key)}
+        barTabId={variant === 'drawer' && tabbedHere ? barTabId : undefined} />;
 
     if (variant === 'drawer') {
         // The bar keeps its buttons: one per tab of a tabbed section (each opens the drawer at that section
@@ -182,6 +191,7 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
                         return (
                             <button
                                 key={item.key}
+                                id={barTabId(item.key)}
                                 type="button"
                                 className="inspector-bar-button"
                                 aria-label={tabbed || named ? `${item.label} panel` : 'View settings'}

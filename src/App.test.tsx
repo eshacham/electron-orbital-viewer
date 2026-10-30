@@ -2729,9 +2729,12 @@ describe('App: shell', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Plot panel' }));
         const inspector = screen.getByRole('complementary', { name: 'Inspector' });
         // Ruling R24-3: the bar's Plot opens the drawer at Plot and data; the folded Display header sits above it.
-        expect(within(inspector).getByRole('region', { name: 'Plot and data' })).toContainElement(within(inspector).getByRole('tab', { name: 'Plot' }));
-        expect(within(inspector).getByRole('button', { name: 'Display' }).compareDocumentPosition(within(inspector).getByRole('tab', { name: 'Plot' }))
-            & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // Final polish F5: the bar's Plot | Data is the only row; the section holds the panel it drives, with no row of its own.
+        expect(within(inspector).queryByRole('tablist', { name: 'Inspector' })).toBeNull();
+        expect(within(inspector).queryByRole('tab', { name: 'Data' })).toBeNull();
+        const panel = within(inspector).getByRole('tabpanel', { name: 'Plot panel' });
+        expect(within(inspector).getByRole('region', { name: 'Plot and data' })).toContainElement(panel);
+        expect(within(inspector).getByRole('button', { name: 'Display' }).compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         openInspectorSection('Display');
         const display = within(inspector).getByRole('region', { name: 'Display' });
         expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
