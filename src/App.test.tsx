@@ -2732,7 +2732,7 @@ describe('App: shell', () => {
         // Final polish F5: the bar's Plot | Data is the only row; the section holds the panel it drives, with no row of its own.
         expect(within(inspector).queryByRole('tablist', { name: 'Inspector' })).toBeNull();
         expect(within(inspector).queryByRole('tab', { name: 'Data' })).toBeNull();
-        const panel = within(inspector).getByRole('tabpanel', { name: 'Plot panel' });
+        const panel = within(inspector).getByRole('region', { name: 'Plot panel' });
         expect(within(inspector).getByRole('region', { name: 'Plot and data' })).toContainElement(panel);
         expect(within(inspector).getByRole('button', { name: 'Display' }).compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         openInspectorSection('Display');
