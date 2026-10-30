@@ -1,5 +1,5 @@
 import { nb } from '../../src/format/text';
-import { evText, evTickText, totalEnergyPairText, totalEnergyText, orbitalEnergyText, orbitalEnergyTableParts, orbitalEnergyParts, hartreeText, wellDepthText } from '../../src/format/energy';
+import { evText, evTickText, totalEnergyPairText, totalEnergyText, orbitalEnergyText, orbitalEnergyTableParts, orbitalEnergyParts, hartreeText, wellDepthText, energyInUnitText, evHaPairText } from '../../src/format/energy';
 
 // Science corrections S2: the last Ha-first energies read eV first, through the one shared formatter.
 describe('evText', () => {
@@ -24,6 +24,11 @@ describe('orbitalEnergyTableParts', () => {
         expect(orbitalEnergyTableParts(-157.4691).ha).toBe('−157.5');
         expect(orbitalEnergyTableParts(-100).ha).toBe('−100.0');
         expect(orbitalEnergyTableParts(-157.4691).ev).toBe('−4285');
+    });
+    // The 100 Ha boundary is tested on the rounded value: what rounds up to 100.000 at three places reads 100.0.
+    it('switches to one place where three places round up to 100 Ha, and not before', () => {
+        expect(orbitalEnergyTableParts(-99.9996).ha).toBe('−100.0');
+        expect(orbitalEnergyTableParts(-99.9994).ha).toBe('−99.999');
     });
     // eV: a whole number from 1000 eV up, two places below (both sides of the boundary; 1000 eV = 36.7493 Ha).
     it('gives eV whole from 1000 eV up and two places below', () => {
@@ -99,5 +104,23 @@ describe('wellDepthText', () => {
     it('is eV to 3 significant figures, then mHa to 2 places, held on one line', () => {
         expect(wellDepthText(3.9e-5)).toBe(nb('1.06 × 10⁻³ eV, 0.04 mHa'));
         expect(wellDepthText(0.0004)).toBe(nb('1.09 × 10⁻² eV, 0.40 mHa'));
+    });
+});
+
+// Final polish F7: the curve plot's and the Bonds captions' local formatters live here, their strings unchanged.
+describe('energyInUnitText', () => {
+    it('states the energy in its own unit with the other beside it, a true minus', () => {
+        expect(energyInUnitText(-0.5, 'Ha')).toBe('−0.5000 Ha (−13.61 eV)');
+        expect(energyInUnitText(-13.6057, 'eV')).toBe('−13.61 eV (−0.5000 Ha)');
+        expect(energyInUnitText(0.25, 'Ha')).toBe('0.2500 Ha (6.80 eV)');
+    });
+    it('shows an unrecognised unit bare', () => {
+        expect(energyInUnitText(3, 'kJ')).toBe('3 kJ');
+    });
+});
+
+describe('evHaPairText', () => {
+    it('is eV to two places and Ha to four', () => {
+        expect(evHaPairText(9.4412, 0.34697)).toBe('9.44 eV (0.3470 Ha)');
     });
 });

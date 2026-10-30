@@ -310,7 +310,7 @@ describe('layoutMoDiagram', () => {
         expect(new Set(band.map(row => row.y)).size).toBe(1);
         expect(gapsOf(levels, band).length).toBe(2);
         expect(new Set(gapsOf(levels, band)).size).toBe(1);
-        expect(gapsOf(levels, band)[0]).toBeGreaterThan(0);
+        expect(gapsOf(levels, band)[0]).toBe(8);   // SIDE_GAP: 8 px exactly, not merely positive
         // A narrower diagram (200 px) wraps the third level to the row above, at the start; the first two keep their gap.
         const narrow = layoutMoDiagram(levels, { width: 200 }).rows.filter(row => levels[row.levelIndex].folded);
         expect(narrow.map(row => [levels[row.levelIndex].label, row.xOffset === 0, row.y === narrow[0].y])).toEqual(
@@ -330,8 +330,7 @@ describe('layoutMoDiagram', () => {
         expect(core.map(row => n2[row.levelIndex].label)).toEqual(['1σg', '1σu*']);
         expect(core[0].xOffset).toBe(0);
         expect(core[0].y).toBe(core[1].y);
-        expect(gapsOf(n2, core)[0]).toBeGreaterThan(0);
-        expect(gapsOf(n2, core)[0]).toBeLessThan(20);
+        expect(gapsOf(n2, core)[0]).toBe(8);   // SIDE_GAP: 8 px exactly
 
         // Four 1s-like cores, each 12 Ha apart, over a valence pair: 1σg 1σu* 2σg 2σu* wide, a 200 px diagram forces a wrap.
         const four = levelsOf([r(0, '1σg', -90), r(1, '1σu*', -78), r(2, '2σg', -66), r(3, '2σu*', -54), r(4, '3σg', -1), r(5, '4σg', -0.5)]);

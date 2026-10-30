@@ -23,6 +23,7 @@ import { CubeAtom } from './cube';
 import { CubeJob, CubeWorkerHandle, requestCube } from './cube_request';
 import { H2PLUS_LABELS } from '../bonds/h2plus';
 import { bondsCaptions, signed } from '../bonds/captions';
+import { evHaPairText } from '../format/energy';
 import { H_PLUS_H_PLUS_HARTREE } from '../bonds/curve';
 // H2PlusCurve as a type only: bonds/useH2PlusCurve.ts also pulls in
 // createH2PlusCurveWorker.ts's `new Worker(new URL(...), import.meta.url)`,
@@ -568,7 +569,7 @@ function h2plusCurveCsv(curve: H2PlusCurve, shareUrl: string): string {
         `H2+ potential curve: E(R), both states (${H2PLUS_LABELS['1sigma_g']} gerade, ${H2PLUS_LABELS['1sigma_u']} ungerade).`,
         ...bondsCaptions('h2plus', null),
         `Rₑ = ${curve.equilibrium.R.toFixed(3)} a₀ (${(curve.equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), `
-            + `E = ${signed(curve.equilibrium.totalEnergy, 4)} Ha (exact); Dₑ = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
+            + `E = ${signed(curve.equilibrium.totalEnergy, 4)} Ha (exact); Dₑ = ${evHaPairText(De * HARTREE_TO_EV, De)} to H + H⁺.`,
         `Zero: H + H+ (${H_PLUS_H_PLUS_HARTREE} Ha).`,
         `view: ${shareUrl}`,
     ];

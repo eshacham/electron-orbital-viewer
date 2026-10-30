@@ -1,5 +1,6 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
-import { BOHR_TO_ANGSTROM, HARTREE_TO_EV } from '../bonds/systems';
+import { BOHR_TO_ANGSTROM } from '../bonds/systems';
+import { energyInUnitText } from '../format/energy';
 import { withSubscripts } from '../format/subscripts';
 import { minus } from '../format/sci';
 
@@ -43,12 +44,6 @@ interface PotentialCurvePlotProps {
      * when the browser takes the gesture over (a scroll on a touch screen): the drag chose nothing.
      */
     onDragR?: (R: number | null) => void;
-    /**
-     * Whether the plot offers its own keyboard control for R (a visually hidden range input). Default true. Task 3: off
-     * under Bonds' R slider, which is the keyboard path there -- two controls for one value would put two R stops in
-     * the Tab order, the hidden one invisible.
-     */
-    keyboardControl?: boolean;
     /**
      * Task 4 (picture control): plain words, for Basics -- the energy axis reads "Energy (<unit>)", the distance axis
      * "Distance between nuclei (Å)" between its ends in Å, and the reference line takes the caller's `plainLabel`.
@@ -103,24 +98,6 @@ function formatR(R: number): string {
     return `${R.toFixed(2)} a₀ (${(R * BOHR_TO_ANGSTROM).toFixed(2)} Å)`;
 }
 
-/** E in whichever unit the caller states, with the other beside it -- same constraint, for energy. Unrecognised units are shown bare rather than guessed at. */
-function formatEnergy(E: number, unit: string): string {
-    // Task 7a fix round 1 (M9): a true minus (U+2212), not a hyphen.
-    if (unit === 'Ha') return minus(`${E.toFixed(4)} Ha (${(E * HARTREE_TO_EV).toFixed(2)} eV)`);
-    if (unit === 'eV') return minus(`${E.toFixed(2)} eV (${(E / HARTREE_TO_EV).toFixed(4)} Ha)`);
-    return `${E} ${unit}`;
-}
-
-/** H₂⁺'s continuous R step, a₀ (ruling C14); a scan steps over its points instead. */
-const CONTINUOUS_STEP = 0.01;
-
-/** The scan point nearest R, by index into the sorted list. */
-function nearestIndex(sorted: number[], R: number): number {
-    let best = 0;
-    sorted.forEach((value, i) => { if (Math.abs(value - R) < Math.abs(sorted[best] - R)) best = i; });
-    return best;
-}
-
 /**
  * An axis end, a₀, with its unit: two decimals, as R is printed everywhere else, a whole number bare -- "0.50 a₀" …
  * "10 a₀" (Task 5b, finish fix 5: both ends alike, each with its unit).
@@ -140,7 +117,7 @@ const roundedEnergy = (E: number) => minus(String(Number(E.toPrecision(2))));
 const LABEL_CLEARANCE = 16;
 
 const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
-    title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, width, onSelectR, onDragR, keyboardControl = true,
+    title, unit, series, xRange, yRange, markerR, snapRs = [], referenceR = null, width, onSelectR, onDragR,
     plain = false, onInset, handleKey,
 }) => {
     const clipId = useId();
@@ -252,9 +229,6 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
     // position (D14 -- the brief's own sample test expected a dot for both
     // series here, but series u's value at R = 2 sits outside yRange; that
     // dot is correctly missing, not a bug to paper over).
-    const stops = [...snapRs].sort((a, b) => a - b);
-    const stopIndex = nearestIndex(stops, markerR ?? xRange[0]);
-
     const markerEnergies = markerR === null ? [] : series.map(s => ({ s, E: interpolateEnergy(s.points, markerR) }));
     const inRangeMarkers = markerEnergies.filter(
         (m): m is { s: CurveSeries; E: number } => m.E !== null && m.E >= yRange[0] && m.E <= yRange[1],
@@ -346,46 +320,6 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                         style={{ left: handle.cx, top: handle.cy, backgroundColor: handle.offScale ? undefined : handle.color }} />
                 )}
             </div>
-            {/*
-                For a caller with no keyboard control of its own for R: a
-                native range input, visually hidden, gives Tab + arrow-key
-                (and Home/End/Page) operation of the same R choice the svg's
-                onClick offers only to a pointer -- rather than reimplementing
-                key handling on a role="img" element, which would make that
-                role a lie. Task 4 (T3 M3): no caller uses it today. Bonds,
-                the one caller, turns it off (keyboardControl={false}) because
-                its R slider is the keyboard path there.
-            */}
-            {onSelectR && keyboardControl && (stops.length >= 2 ? (
-                // A scan exists only at its points, which thin out away from
-                // R_e: stepping R by the smallest spacing from a sparse point
-                // landed between it and the next, and the caller's snap sent
-                // it straight back (final review M5). The slider steps over
-                // point indices instead, so each arrow press reaches the
-                // next shipped geometry; aria-valuetext reads R, not the index.
-                <input
-                    type="range"
-                    className="visually-hidden"
-                    aria-label={`${title}: choose R`}
-                    min={0}
-                    max={stops.length - 1}
-                    step={1}
-                    value={stopIndex}
-                    aria-valuetext={`R = ${formatR(stops[stopIndex])}`}
-                    onChange={event => onSelectR(stops[Number(event.target.value)])}
-                />
-            ) : (
-                <input
-                    type="range"
-                    className="visually-hidden"
-                    aria-label={`${title}: choose R`}
-                    min={xRange[0]}
-                    max={xRange[1]}
-                    step={CONTINUOUS_STEP}
-                    value={markerR ?? xRange[0]}
-                    onChange={event => onSelectR(Number(event.target.value))}
-                />
-            ))}
             <div className="radial-plot-legend">
                 {series.map(s => (
                     <span key={s.key} className="radial-plot-legend-item">
@@ -437,7 +371,7 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                         At R = {formatR(markerR)}: {series.map(s => {
                             const m = markerEnergies.find(e => e.s === s)!;
                             const inRange = inRangeMarkers.some(e => e.s === s);
-                            return `${s.label} = ${inRange ? formatEnergy(m.E as number, unit) : 'no value here'}`;
+                            return `${s.label} = ${inRange ? energyInUnitText(m.E as number, unit) : 'no value here'}`;
                         }).join('; ')}.
                     </>
                 )}

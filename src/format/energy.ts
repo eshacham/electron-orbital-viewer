@@ -26,10 +26,11 @@ export function orbitalEnergyParts(hartree: number): { ev: string; ha: string } 
 }
 
 /**
- * The Atoms "Orbital energies" table's two numbers (final polish F4, ruled): eV as `orbitalEnergyParts` gives it, and Ha
- * to 3 places below 100 Ha but to 1 place from 100 Ha up, and eV to 2 places below 1000 eV but whole from 1000 eV up -- a heavy atom's 1s ("−3689.7", not "−3689.719") fits the
- * 300 px Explore panel without a sideways scroll, at five or more figures where it is long. Only this table calls it:
- * every other Ha display keeps its three places.
+ * The Atoms "Orbital energies" table's two numbers (final polish F4, ruled). Ha: 3 places below 100 Ha, 1 place from
+ * 100 Ha up ("−3689.7", not "−3689.719"). eV: 2 places below 1000 eV, a whole number from 1000 eV up. Both boundaries
+ * are tested on the rounded value, so −99.9996 Ha (which rounds to 100.000) reads "−100.0". A heavy atom's 1s then fits
+ * the 300 px Explore panel without a sideways scroll. Only this table calls it: every other Ha display keeps its
+ * three places.
  */
 export function orbitalEnergyTableParts(hartree: number): { ev: string; ha: string } {
     const { ev, ha } = orbitalEnergyParts(hartree);
@@ -123,4 +124,22 @@ export function totalEnergyPairText(hartree: number, haDigits = 6): string {
  */
 export function wellDepthText(hartree: number): string {
     return nb(`${formatSci(hartree * HARTREE_IN_EV)} eV, ${(hartree * 1000).toFixed(2)} mHa`);
+}
+
+/**
+ * A curve's energy in whichever unit the caller states, with the other beside it, a true minus: "−0.5000 Ha (−13.61 eV)",
+ * "−13.61 eV (−0.5002 Ha)". Moved here from PotentialCurvePlot (final polish F7). Any other unit is shown bare, not guessed at.
+ */
+export function energyInUnitText(energy: number, unit: string): string {
+    if (unit === 'Ha') return minus(`${energy.toFixed(4)} Ha (${(energy * HARTREE_IN_EV).toFixed(2)} eV)`);
+    if (unit === 'eV') return minus(`${energy.toFixed(2)} eV (${(energy / HARTREE_IN_EV).toFixed(4)} Ha)`);
+    return `${energy} ${unit}`;
+}
+
+/**
+ * A positive energy as eV to 2 places with Ha to 4 beside it: "9.44 eV (0.3470 Ha)" (a dissociation energy). Moved here
+ * from the Bonds caption and the H₂⁺ CSV note (final polish F7); the caller gives both numbers.
+ */
+export function evHaPairText(ev: number, hartree: number): string {
+    return `${ev.toFixed(2)} eV (${hartree.toFixed(4)} Ha)`;
 }

@@ -76,31 +76,6 @@ describe('PotentialCurvePlot', () => {
         expect(container.querySelector('svg')!.style.cursor).not.toBe('pointer');
     });
 
-    it('offers a native, keyboard-operable control alongside the mouse-only svg click', () => {
-        const onSelectR = jest.fn();
-        render(<PotentialCurvePlot {...props} onSelectR={onSelectR} />);
-        const slider = screen.getByRole('slider', { name: /potential energy/i }) as HTMLInputElement;
-        expect(slider.min).toBe('0');
-        expect(slider.max).toBe('4');
-        expect(slider.value).toBe('2');
-        fireEvent.change(slider, { target: { value: '3' } });
-        expect(onSelectR).toHaveBeenCalledWith(3);
-    });
-
-    // Final review M5: stepping by the smallest scan spacing (0.1 a₀ here)
-    // from 1.2 lands on 1.3, which snaps straight back to 1.2 -- the keyboard
-    // was trapped wherever the scan's points thin out. With scan points the
-    // slider steps over their indices instead, and reads R aloud.
-    it('steps a scan by point index, so a sparse stretch cannot trap the arrow keys', () => {
-        const onSelectR = jest.fn();
-        render(<PotentialCurvePlot {...props} markerR={1.2} snapRs={[1, 1.1, 1.2, 2, 4]} onSelectR={onSelectR} />);
-        const slider = screen.getByRole('slider', { name: /potential energy/i }) as HTMLInputElement;
-        expect([slider.min, slider.max, slider.step, slider.value]).toEqual(['0', '4', '1', '2']);
-        expect(slider).toHaveAttribute('aria-valuetext', 'R = 1.20 a₀ (0.64 Å)');
-        fireEvent.change(slider, { target: { value: '3' } });
-        expect(onSelectR).toHaveBeenCalledWith(2);
-    });
-
     // Task 3 (picture control), Review Focus 4: a tap left of the plot area takes the range's lower end, one right
     // of it the upper end -- never an R the curve does not cover.
     it('clamps a click outside the plot area to the ends of the range', () => {
@@ -113,10 +88,10 @@ describe('PotentialCurvePlot', () => {
         expect(onSelectR).toHaveBeenLastCalledWith(4);
     });
 
-    // Task 3 (picture control): under Bonds' R slider the slider is the keyboard path, so the curve does not offer
-    // a second, hidden one for the same value -- Tab reaches one R control, not two.
-    it('leaves out its hidden range input when the caller has a keyboard control of its own', () => {
-        render(<PotentialCurvePlot {...props} onSelectR={jest.fn()} keyboardControl={false} />);
+    // Task 3 (picture control): under Bonds' R slider the slider is the keyboard path, so the curve has no hidden range
+    // input of its own (final polish F7 removed the opt-out and the input) -- Tab reaches one R control, not two.
+    it('renders no range input: the caller\'s own slider is the keyboard path', () => {
+        render(<PotentialCurvePlot {...props} markerR={1.2} snapRs={[1, 1.1, 1.2, 2, 4]} onSelectR={jest.fn()} />);
         expect(screen.queryByRole('slider')).toBeNull();
         expect(document.querySelector('input')).toBeNull();
     });

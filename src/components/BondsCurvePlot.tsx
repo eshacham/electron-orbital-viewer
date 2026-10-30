@@ -58,7 +58,7 @@ const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, wi
             );
         }
         return (
-            <PotentialCurvePlot {...h2plusCurveSpec(h2plus.curve, marked, bonds.view.kind === 'h2plus' ? bonds.view.state : '1sigma_g')} width={width} keyboardControl={false} plain={plain} onInset={onInset}
+            <PotentialCurvePlot {...h2plusCurveSpec(h2plus.curve, marked, bonds.view.kind === 'h2plus' ? bonds.view.state : '1sigma_g')} width={width} plain={plain} onInset={onInset}
                 onSelectR={onCommitH2PlusR} onDragR={onDraftR && (R => onDraftR(R === null ? null : snapH2PlusR(R)))} />
         );
     }
@@ -68,7 +68,7 @@ const BondsCurvePlot: React.FC<BondsCurvePlotProps> = ({ bonds, data, h2plus, wi
         <PotentialCurvePlot
             {...diatomicCurveSpec(bonds.system as DiatomicId, scan, marked)}
             width={width}
-            keyboardControl={false}
+           
             plain={plain}
             onInset={onInset}
             onSelectR={R => {

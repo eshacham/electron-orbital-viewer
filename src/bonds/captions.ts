@@ -1,6 +1,6 @@
 import { MoleculeMeta, MoleculeOrbitalInfo, MoleculeScan } from '../molecules/types';
 import { BOHR_TO_ANGSTROM, BondsSystemId, openingScanIndex } from './systems';
-import { orbitalEnergyText, totalEnergyText, wellDepthText } from '../format/energy';
+import { evHaPairText, orbitalEnergyText, totalEnergyText, wellDepthText } from '../format/energy';
 import { nb } from '../format/text';
 
 /** A signed number as the panel prints it: a true minus sign (U+2212), not a hyphen. */
@@ -145,7 +145,7 @@ function bondCaptions(system: BondsSystemId, scan: MoleculeScan): string[] {
     // H₂ (FCI) 4.71 vs Kołos & Wolniewicz's 4.75, 0.9 %. A triple-zeta basis
     // misses correlation energy that grows with the bond, so it underbinds.
     return [
-        `Dₑ = ${fit.DeEv.toFixed(2)} eV (${fit.DeHartree.toFixed(4)} Ha) from separated atoms, ${atomsMethod(scan)}: `
+        `Dₑ = ${evHaPairText(fit.DeEv, fit.DeHartree)} from separated atoms, ${atomsMethod(scan)}: `
             + 'E(A) + E(B) − E(Rₑ), without zero-point energy; aug-cc-pVTZ underbinds by a few % against experiment.',
         `Rₑ = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted to the scan points `
             + `(fit uncertainty ${uncertainty} a₀)${experiment}.${system === 'li2' ? ` ${li2Caveat(scan, reference !== null)}` : ''}`,
